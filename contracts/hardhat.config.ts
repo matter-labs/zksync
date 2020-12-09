@@ -24,7 +24,7 @@ const testConfig = {
 };
 
 const localConfig = Object.assign({}, prodConfig);
-localConfig.DUMMY_VERIFIER = process.env.DUMMY_VERIFIER ? true : localConfig.DUMMY_VERIFIER;
+localConfig.DUMMY_VERIFIER = process.env.DUMMY_VERIFIER === '1';
 
 const contractDefs = {
     rinkeby: testnetConfig,

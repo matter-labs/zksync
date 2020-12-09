@@ -1,6 +1,7 @@
 use crate::{ApiClient, ProverConfig, ProverImpl};
 use std::sync::Mutex;
 use std::time::Duration;
+use zksync_config::AvailableBlockSizesConfig;
 use zksync_crypto::proof::{AggregatedProof, SingleProof};
 use zksync_crypto::Engine;
 use zksync_prover_utils::aggregated_proofs::{gen_aggregate_proof, prepare_proof_data};
@@ -88,7 +89,15 @@ impl PlonkStepByStepProver {
             self.prepared_computations.lock().unwrap().take();
         }
         let (vks, proof_data) = prepare_proof_data(&self.config.all_block_sizes, proofs);
-        gen_aggregate_proof(vks, proof_data, self.config.download_setup_from_network)
+
+        let aggregated_proof_sizes_with_setup_pow =
+            AvailableBlockSizesConfig::from_env().aggregated_proof_sizes_with_setup_pow();
+        gen_aggregate_proof(
+            vks,
+            proof_data,
+            &aggregated_proof_sizes_with_setup_pow,
+            self.config.download_setup_from_network,
+        )
     }
 }
 
@@ -110,7 +119,7 @@ impl ProverImpl for PlonkStepByStepProver {
                 JobResultData::AggregatedBlockProof(aggregate_proof)
             }
             JobRequestData::BlockProof(zksync_circuit, block_size) => {
-                let zksync_circuit = zksync_circuit.into_circuit(block_size as i64);
+                let zksync_circuit = zksync_circuit.into_circuit();
                 let proof = self
                     .create_single_block_proof(zksync_circuit, block_size)
                     .map_err(|e| {

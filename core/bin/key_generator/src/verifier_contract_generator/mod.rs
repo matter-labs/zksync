@@ -10,7 +10,6 @@ use crate::verifier_contract_generator::render_vk::{
     get_exit_vk_tree_root_hash, get_vk_tree_root_hash, rendered_key,
 };
 use zksync_config::AvailableBlockSizesConfig;
-use zksync_crypto::params::RECURSIVE_CIRCUIT_SIZES;
 use zksync_prover_utils::fs_utils::{
     get_block_verification_key_path, get_exodus_verification_key_path,
     get_recursive_verification_key_path, get_verifier_contract_key_path,
@@ -44,15 +43,11 @@ pub(crate) fn create_verifier_contract(config: AvailableBlockSizesConfig) {
     let chunks = to_json(config.blocks_chunks);
     template_params.insert("chunks".to_string(), chunks);
 
-    let aggregate_circuit_sizes = RECURSIVE_CIRCUIT_SIZES
-        .iter()
-        .map(|(s, _)| *s)
-        .collect::<Vec<_>>();
-
-    let sizes = to_json(aggregate_circuit_sizes.clone());
+    let sizes = to_json(config.aggregated_proof_sizes.clone());
     template_params.insert("sizes".to_string(), sizes);
 
-    let templates_for_key_getters = aggregate_circuit_sizes
+    let templates_for_key_getters = config
+        .aggregated_proof_sizes
         .into_iter()
         .map(|blocks| {
             let key_getter_name = format!("getVkAggregated{}", blocks);

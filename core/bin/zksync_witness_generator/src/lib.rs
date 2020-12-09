@@ -311,22 +311,22 @@ async fn update_prover_job_queue(storage: &mut StorageProcessor<'_>) -> anyhow::
             ..
         })) = create_block_proof_action
         {
-            let first_block = *blocks.first().expect("should have 1 block");
-            let last_block = *blocks.last().expect("should have 1 block");
+            let first_block = blocks
+                .first()
+                .map(|b| b.block_number)
+                .expect("should have 1 block");
+            let last_block = blocks
+                .last()
+                .map(|b| b.block_number)
+                .expect("should have 1 block");
             let mut data = Vec::new();
             for block in blocks {
                 let proof = storage
                     .prover_schema()
-                    .load_proof(block)
+                    .load_proof(block.block_number)
                     .await?
                     .expect("Single proof should exist");
-                let block_size = storage
-                    .chain()
-                    .block_schema()
-                    .get_block(block)
-                    .await?
-                    .expect("Block should exist")
-                    .block_chunks_size;
+                let block_size = block.block_chunks_size;
                 data.push((proof, block_size));
             }
             let job_data = serde_json::to_value(JobRequestData::AggregatedBlockProof(data))
