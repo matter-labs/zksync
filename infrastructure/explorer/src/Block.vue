@@ -217,7 +217,7 @@ export default {
             if(tx.op.type === 'Deposit') {
                 entry.outterLink(`${blockchainExplorerAddress}/${fromAddress}`);
             } else {
-                entry.localLink(`${this.routerBase}accounts/${fromAddress}`);
+                entry.localLink(`/accounts/${fromAddress}`);
             }
 
             entry.innerHTML(shortenHash(fromAddress, fallback));       
@@ -243,7 +243,7 @@ export default {
             if(onChainWithdrawals.includes(tx.op.type)) {
                 entry.outterLink(`${blockchainExplorerAddress}/${toAddress}`);
             } else {
-                entry.localLink(`${this.routerBase}accounts/${toAddress}`);
+                entry.localLink(`/accounts/${toAddress}`);
             }
             
             entry.innerHTML(shortenHash(toAddress, fallback));

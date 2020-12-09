@@ -242,7 +242,7 @@ export default {
             }
 
             return makeEntry('TxHash')
-                .localLink(`${this.routerBase}transactions/${tx.hash}`)
+                .localLink(`/transactions/${tx.hash}`)
                 .innerHTML(`${shortenHash(tx.hash, 'unknown! hash')}`);
         },
         getLinkFromEntry(tx) {
@@ -251,7 +251,7 @@ export default {
             if (tx.type == 'Deposit') {
                 entry.outterLink(`${blockchainExplorerAddress}/${tx.from}`);
             } else {
-                entry.localLink(`${this.routerBase}accounts/${tx.from}`);
+                entry.localLink(`/accounts/${tx.from}`);
             }
 
             return entry.innerHTML(`${shortenHash(tx.from, 'unknown! from')}`);
@@ -268,7 +268,7 @@ export default {
                     .outterLink(`${blockchainExplorerAddress}/${tx.to}`);
             } else {
                 entry
-                    .localLink(`${this.routerBase}accounts/${tx.to}`);
+                    .localLink(`/accounts/${tx.to}`);
             }
             
             return entry.innerHTML(`${shortenHash(tx.to, 'unknown! to')}`);
