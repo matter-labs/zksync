@@ -44,6 +44,9 @@ export default {
     async created() {
         this.update();
     },
+    activated() {
+        this.update();
+    },
     data() { 
         return {
             tokens:             [],

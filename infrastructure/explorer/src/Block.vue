@@ -15,27 +15,27 @@
             <b-card no-body>
                 <b-table responsive id="my-table" thead-class="displaynone" :items="props" :busy="isBusy" class="nowrap">
                     <template v-slot:cell(value)="data">
-                        <CopyableAddress 
+                        <Entry 
                             v-if="data.item.name == 'New root hash'" 
-                            :address="new_state_root" 
-                            :linkHtml="data.item.value"
+                            :value="data.item.value"
                         />
-                        <CopyableAddress 
+                        <Entry 
                             v-else-if="data.item.name == 'Commit tx hash'" 
-                            :address="commit_tx_hash" 
-                            :linkHtml="data.item.value" 
+                            :value="data.item.value"
                         />
-                        <CopyableAddress 
+                        <Entry 
                             v-else-if="data.item.name == 'Verify tx hash'" 
-                            :address="verify_tx_hash" 
-                            :linkHtml="data.item.value" 
+                            :value="data.item.value"
                         />
                         <span v-else-if="data.item.name == 'Status'">
-                            <ReadinessStatus :status="data.item.value == 'Pending' ? 1 : 2" />
-                            <span v-html="data.item.value" class="mr-1"/>
-                            <Question :text="data.item.value" />
+                            <ReadinessStatus :status="data.item.value.innerHTML == 'Pending' ? 1 : 2" />
+                            <span v-html="data.item.value.innerHTML" class="mr-1"/>
+                            <Question :text="data.item.value.innerHTML" />
                         </span>
-                        <span v-else v-html="data.item.value" />
+                        <Entry
+                            v-else
+                            :value="data.item.value"
+                        />
                     </template>
                 </b-table>
             </b-card>
@@ -49,8 +49,7 @@
 
 <script>
 
-import store from './store';
-import { shortenHash, formatDate, formatToken } from './utils';
+import { shortenHash, formatDate, makeEntry } from './utils';
 
 import TransactionList from './TransactionList.vue';
 import SearchField from './SearchField.vue';
@@ -59,11 +58,22 @@ import Navbar from './Navbar.vue';
 import Question from './Question.vue';
 import ReadinessStatus from './ReadinessStatus.vue';
 import { clientPromise } from './Client';
+import Entry from './links/Entry';
 
 import { 
     blockchainExplorerTx,
-    blockchainExplorerAddress 
+    blockchainExplorerAddress,
 } from './constants';
+
+import  {
+    getTxFromAddress,
+    getTxFromFallbackValue,
+    getTxToAddress,
+    getTxToFallbackValue,
+    getTxToken,
+    getTxAmount,
+    getTxFee,
+} from './blockUtils';
 
 const components = {
     TransactionList,
@@ -72,11 +82,12 @@ const components = {
     Navbar,
     Question,
     ReadinessStatus,
+    Entry
 };
 
 export default {
     name: 'Block',
-    created() {
+    mounted() {
         this.update();
     },
     data: () => ({
@@ -109,21 +120,45 @@ export default {
         rows() {
             return this.items.length;
         },
+        commitHashEntry() {
+            const entry = makeEntry('Commit tx hash').copyable();
+
+            if(this.commit_tx_hash) {
+                entry.outterLink(`${blockchainExplorerTx}/${this.commit_tx_hash}`);
+                entry.innerHTML(`${this.commit_tx_hash}`);
+            } else {
+                entry.innerHTML(`Not yet sent on the chain.`);
+            }
+
+            return entry;
+        },
+        verifyHashEntry() {
+            const entry = makeEntry('Verify tx hash').copyable();
+
+            if(this.verify_tx_hash) {
+                entry.outterLink(`${blockchainExplorerTx}/${this.verify_tx_hash}`);
+                entry.innerHTML(`${this.verify_tx_hash}`);
+            } else {
+                entry.innerHTML(`Not yet sent on the chain.`);
+            }
+
+            return entry;
+        },
+        rootHashEntry() {
+            return makeEntry('New root hash')
+                .innerHTML(this.new_state_root)
+                .copyable();
+        },
         props() {
             return [
-                { name: 'Block Number',          value: `${this.blockNumber}`},
-                { name: 'Block Size',            value: `${this.block_size}`},
-                { name: 'New root hash',         value: `${this.new_state_root}`},
-                // { name: 'Transactions',       value: client.TX_PER_BLOCK(), },
-                { name: 'Status',                value: this.status, },
-                { name: 'Commit tx hash',        value: this.commit_tx_hash
-                    ? `<a target="blanc" href="${blockchainExplorerTx}/${this.commit_tx_hash}">${this.commit_tx_hash} <i class="fas fa-external-link-alt"></i></a>`
-                    : `Not yet sent on the chain.` },
-                { name: 'Committed at',          value: formatDate(this.committed_at)},
-                { name: 'Verify tx hash',        value: this.verify_tx_hash
-                    ? `<a target="blanc" href="${blockchainExplorerTx}/${this.verify_tx_hash}">${this.verify_tx_hash} <i class="fas fa-external-link-alt"></i></a>`
-                    : `Not yet sent on the chain.` },
-                { name: 'Verified at',           value: formatDate(this.verified_at)},
+                makeEntry('Block Number').innerHTML(this.blockNumber),
+                makeEntry('Block Size').innerHTML(this.block_size),
+                this.rootHashEntry,
+                makeEntry('Status').innerHTML(this.status),
+                this.commitHashEntry,
+                makeEntry('Committed at').innerHTML(formatDate(this.committed_at)),
+                this.verifyHashEntry,
+                makeEntry('Verified at').innerHTML(formatDate(this.verified_at)),
             ];
         },
     },
@@ -132,7 +167,6 @@ export default {
             const client = await clientPromise;
 
             const block = await client.getBlock(this.blockNumber).catch(() => null);
-            console.log({block});
             if (!block) {
                 this.loadingStatus = 'not committed';
                 return;
@@ -154,156 +188,102 @@ export default {
             const txs = await client.getBlockTransactions(this.blockNumber);
             const tokens = await client.tokensPromise;
 
-            // TODO: Remove the hack to get the amount field in ForcedExit operations (#1124).
-            
             const transactions = await Promise.all(txs.map(async (tx) => {
-                const type = tx.op.type;
-                let fromAddr = "";
-                let toAddr = "";
-                let from = "";
-                let to = "";
-                let token = "";
-                let amount = "";
-                let fee = "";
-                let from_explorer_link = "";
-                let to_explorer_link = "";
-                let from_onchain_icon = "";
-                let to_onchain_icon = "";
-                let success = false;
-                let created_at = "";
-
-                switch (type) {
-                    case "Deposit":
-                        fromAddr           = tx.op.priority_op.from;
-                        toAddr             = tx.op.priority_op.to;
-                        from               = shortenHash(tx.op.priority_op.from, 'unknown sender');
-                        to                 = shortenHash(tx.op.priority_op.to, 'unknown account');
-                        from_explorer_link = `${blockchainExplorerAddress}/${tx.op.priority_op.from}`;
-                        to_explorer_link   = `${this.routerBase}accounts/${tx.op.priority_op.to}`;
-                        from_onchain_icon  = `<i class="fas fa-external-link-alt"></i>`;
-                        to_onchain_icon    = '';
-                        token              = tx.op.priority_op.token;
-                        token              = tokens[token].syncSymbol;
-                        amount             = `${formatToken(tx.op.priority_op.amount || 0, token)} ${token}`;
-                        success            = tx.success;
-                        created_at         = tx.created_at;
-                        fee                = '';
-                        break;
-                    case "Transfer":
-                        fromAddr           = tx.op.from;
-                        toAddr             = tx.op.to;
-                        from               = shortenHash(tx.op.from, 'unknown from');
-                        to                 = shortenHash(tx.op.to, 'unknown to');
-                        from_explorer_link = `${this.routerBase}accounts/${tx.op.from}`;
-                        to_explorer_link   = `${this.routerBase}accounts/${tx.op.to}`;
-                        from_onchain_icon  = '';
-                        to_onchain_icon    = '';
-                        token              = tx.op.token;
-                        token              = tokens[token].syncSymbol;
-                        amount             = `${formatToken(tx.op.amount, token)} ${token}`;
-                        fee                = `${formatToken(tx.op.fee, token)} ${token}`;
-                        success            = tx.success;
-                        created_at         = tx.created_at;
-                        break;
-                    case "ChangePubKey":
-                        fromAddr           = tx.op.account;
-                        toAddr             = tx.op.newPkHash;
-                        from               = shortenHash(tx.op.account, 'unknown account address');
-                        to                 = shortenHash(tx.op.newPkHash, 'unknown pubkey hash');
-                        from_explorer_link = `${this.routerBase}accounts/${tx.op.account}`;
-                        to_explorer_link   = ``;
-                        from_onchain_icon  = '';
-                        to_onchain_icon    = '';
-                        token              = tx.op.feeToken;
-                        token              = token == null ? '' : tokens[token].syncSymbol;
-                        amount             = '';
-                        fee                = tx.op.fee == null ? '' :`${formatToken(tx.op.fee, token)} ${token}`;
-                        success            = tx.success;
-                        created_at         = tx.created_at;
-                        break;
-                    case "Withdraw":
-                        fromAddr           = tx.op.from;
-                        toAddr             = tx.op.to;
-                        from               = shortenHash(tx.op.from, 'unknown account');
-                        to                 = shortenHash(tx.op.to, 'unknown ethAddress');
-                        from_explorer_link = `${this.routerBase}accounts/${tx.op.from}`;
-                        to_explorer_link   = `${blockchainExplorerAddress}/${tx.op.to}`;
-                        from_onchain_icon  = '';
-                        to_onchain_icon    = `<i class="fas fa-external-link-alt"></i>`;
-                        token              = tx.op.token;
-                        token              = tokens[token].syncSymbol;
-                        amount             = `${formatToken(tx.op.amount || 0, token)} ${token}`;
-                        fee                = `${formatToken(tx.op.fee, token)} ${token}`;
-                        success            = tx.success;
-                        created_at         = tx.created_at;
-                        break;
-                    case "ForcedExit":
-                        fromAddr           = tx.op.target;
-                        toAddr             = tx.op.target;
-                        from               = shortenHash(tx.op.target, 'unknown account');
-                        to                 = shortenHash(tx.op.target, 'unknown ethAddress');
-                        from_explorer_link = `${this.routerBase}accounts/${tx.op.target}`;
-                        to_explorer_link   = `${blockchainExplorerAddress}/${tx.op.target}`;
-                        from_onchain_icon  = '';
-                        to_onchain_icon    = `<i class="fas fa-external-link-alt"></i>`;
-                        token              = tx.op.token;
-                        token              = tokens[token].syncSymbol;
-                        amount             = (await client.searchTx(tx.tx_hash)).amount;
-                        amount             = amount == "unknown amount" ? 0 : amount;
-                        amount             = `${formatToken(amount || 0, token)} ${token}`;
-                        fee                = `${formatToken(tx.op.fee, token)} ${token}`;
-                        success            = tx.success;
-                        created_at         = tx.created_at;
-                        break;
-                    case "FullExit":
-                        fromAddr           = tx.op.priority_op.eth_address;
-                        toAddr             = tx.op.priority_op.eth_address;
-                        from               = shortenHash(tx.op.priority_op.eth_address, 'unknown account address');
-                        to                 = shortenHash(tx.op.priority_op.eth_address, 'unknown account address');
-                        from_explorer_link = `${this.routerBase}accounts/${tx.op.priority_op.eth_address}`;
-                        to_explorer_link   = `${blockchainExplorerAddress}/${tx.op.priority_op.eth_address}`;
-                        from_onchain_icon  = `<i class="fas fa-external-link-alt"></i>`;
-                        to_onchain_icon    = `<i class="fas fa-external-link-alt"></i>`;
-                        token              = tx.op.priority_op.token;
-                        token              = tokens[token].syncSymbol;
-                        amount             = `${formatToken(tx.op.withdraw_amount || 0, token)} ${token}`;
-                        success            = tx.success;
-                        created_at         = tx.created_at;
-                        fee                = '';
-                        break;
-                    default:
-                        throw new Error('switch reached default');
-                }
-
-                const from_target 
-                    = from_explorer_link.startsWith('/') ? ''
-                    : from_explorer_link == '' ? ''
-                    : `target="_blank" rel="noopener noreferrer"`;
-
-                const to_target 
-                    = to_explorer_link.startsWith('/') ? ''
-                    : to_explorer_link == '' ? ''
-                    : `target="_blank" rel="noopener noreferrer"`;
-
                 return {
-                    tx_hash: tx.tx_hash,
-                    type: `${type}`,
-                    from_explorer_link,
-                    to_explorer_link,
-                    from: `${from} ${from_onchain_icon}`,
-                    to: `${to} ${to_onchain_icon}`,
-                    fromAddr,
-                    toAddr,
-                    amount,
-                    fee,
-                    success,
-                    created_at: formatDate(created_at),
+                    ...this.txEntries(tx, tokens, client),
+                    success: tx.success
                 };
             }));
 
             this.transactions = transactions.filter(tx => tx.success);
             this.loadingStatus = 'ready';
         },
+        txHashEntry(tx) {
+            const entry = makeEntry('Tx Hash');
+            entry.localLink(`/transactions/${tx.tx_hash}`);
+            
+            entry.innerHTML(shortenHash(tx.tx_hash));
+            return entry;
+        },  
+        txTypeEntry(tx) {   
+            return makeEntry('Type').innerHTML(tx.op.type);
+        },
+        txFromEntry(tx) {
+            const entry = makeEntry('From');
+
+            const fromAddress = getTxFromAddress(tx);
+            const fallback = getTxFromFallbackValue(tx);
+
+            if(tx.op.type === 'Deposit') {
+                entry.outterLink(`${blockchainExplorerAddress}/${fromAddress}`);
+            } else {
+                entry.localLink(`${this.routerBase}accounts/${fromAddress}`);
+            }
+
+            entry.innerHTML(shortenHash(fromAddress, fallback));       
+            return entry;
+        },
+
+        txToEntry(tx) {
+            const entry = makeEntry('To');
+
+            if(tx.op.type === 'ChangePubKey') {
+                return entry; 
+            }
+
+            const toAddress = getTxToAddress(tx);
+            const fallback = getTxToFallbackValue(tx);
+
+            const onChainWithdrawals = [
+                'Withdraw',
+                'ForcedExit',
+                'FullExit'
+            ];
+            
+            if(onChainWithdrawals.includes(tx.op.type)) {
+                entry.outterLink(`${blockchainExplorerAddress}/${toAddress}`);
+            } else {
+                entry.localLink(`${this.routerBase}accounts/${toAddress}`);
+            }
+            
+            entry.innerHTML(shortenHash(toAddress, fallback));
+
+            return entry;
+        },
+
+        txAmountEntry(tx, tokenSymbol, client) {
+            return makeEntry('Amount')
+                .innerHTML(getTxAmount(tx, tokenSymbol, client));
+        },
+        txFeeEntry(tx, tokenSymbol) {
+            return makeEntry('Fee')
+                .innerHTML(getTxFee(tx, tokenSymbol));
+        },
+        txCreatedAtEntry(tx) {
+            return makeEntry('Created at')
+                .innerHTML(formatDate(tx.created_at));
+        },
+        txEntries(tx, tokens, client) {
+            const tokenSymbol = tokens[getTxToken(tx)].syncSymbol;
+
+            const txHash = this.txHashEntry(tx);
+            const type = this.txTypeEntry(tx);
+            const from = this.txFromEntry(tx);
+            const to = this.txToEntry(tx);
+            const amount = this.txAmountEntry(tx, tokenSymbol, client);
+            const fee = this.txFeeEntry(tx, tokenSymbol);
+            const createdAt = this.txCreatedAtEntry(tx);
+
+            return {
+                txHash,
+                type,
+                from,
+                to,
+                amount,
+                fee,
+                createdAt
+            };
+        }
     },
     components,
 };

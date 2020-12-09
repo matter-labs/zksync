@@ -118,7 +118,7 @@ class Entry {
     }
 
     // Can be used to rename
-    name(newName) {
+    rename(newName) {
         this.name = newName;
         return this;
     }

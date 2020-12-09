@@ -11,23 +11,26 @@
         :fields="fields" 
         class="nowrap"
     >
-        <template v-slot:cell(tx_hash)="data">
-            <router-link :to="`/transactions/${data.item['tx_hash']}`">
-                {{ shortenHash(data.item['tx_hash']) }}
-            </router-link>
+        <template v-slot:cell(txHash)="data">
+            <Entry :value="data.item['txHash'].value" />
         </template>
         <template v-slot:cell(type)="data">
-            <span v-html="data.item['type']" />
+            <Entry :value="data.item['type'].value" />
         </template>
         <template v-slot:cell(from)="data">
-            <router-link :to="data.item['from_explorer_link']">
-               <span v-html="data.item['from']" />
-            </router-link>
+            <Entry :value="data.item['from'].value" />
         </template>
         <template v-slot:cell(to)="data">
-             <router-link :to="data.item['to_explorer_link']">
-               <span v-html="data.item['to']" />
-            </router-link>
+            <Entry :value="data.item['to'].value" />
+        </template>
+        <template v-slot:cell(amount)="data">
+            <Entry :value="data.item['amount'].value" />
+        </template>
+        <template v-slot:cell(fee)="data">
+            <Entry :value="data.item['fee'].value" />
+        </template>
+        <template v-slot:cell(createdAt)="data">
+            <Entry :value="data.item['createdAt'].value" />
         </template>
     </b-table>
     <b-pagination 
@@ -43,9 +46,11 @@
 <script>
 import CopyableAddress from './CopyableAddress.vue';
 import { shortenHash } from './utils';
+import Entry from './links/Entry.vue';
 
 const components = {
     CopyableAddress,
+    Entry
 };
 
 export default {
@@ -56,10 +61,7 @@ export default {
         rowsPerPage: 1000,
     }),
     methods: {
-        onRowClicked(item) {
-            this.$parent.$router.push('/transactions/' + item.tx_hash);
-        },
-        shortenHash,
+        shortenHash
     },
     computed: {
         fields() {

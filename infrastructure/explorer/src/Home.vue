@@ -1,52 +1,52 @@
 <template>
-<div>
-    <Navbar />
-    <br>
-    <b-container>
-        <b-alert v-if="updateError" variant="danger" show>
-            {{updateError}}. Try again later.
-        </b-alert>
-        <b-card bg-variant="light" >
-            <h4>zkSync {{store.capitalizedNetwork}} Block Explorer</h4> 
-            <SearchField :searchFieldInMenu="false" />
-        </b-card>
+    <div>
+        <Navbar />
         <br>
-        <b-card>
-        <div class="row" style="color: grey">
-            <div class="col-sm text-center">
-            <i class="far fa-square"></i> <b>Blocks committed</b><br><span class="num">{{lastCommitted}}</span>
+        <b-container>
+            <b-alert v-if="updateError" variant="danger" show>
+                {{updateError}}. Try again later.
+            </b-alert>
+            <b-card bg-variant="light" >
+                <h4>zkSync {{store.capitalizedNetwork}} Block Explorer</h4> 
+                <SearchField :searchFieldInMenu="false" />
+            </b-card>
+            <br>
+            <b-card>
+            <div class="row" style="color: grey">
+                <div class="col-sm text-center">
+                <i class="far fa-square"></i> <b>Blocks committed</b><br><span class="num">{{lastCommitted}}</span>
+                </div>
+                <div class="col-sm text-center">
+                <i class="far fa-check-square"></i> <b>Blocks verified</b><br><span class="num">{{lastVerified}}</span>
+                </div>
+                <div class="col-sm text-center">
+                <i class="fas fa-list"></i> <b>Total transactions</b><br><span class="num">{{totalTransactions}}</span>
+                </div>
             </div>
-            <div class="col-sm text-center">
-            <i class="far fa-check-square"></i> <b>Blocks verified</b><br><span class="num">{{lastVerified}}</span>
-            </div>
-            <div class="col-sm text-center">
-            <i class="fas fa-list"></i> <b>Total transactions</b><br><span class="num">{{totalTransactions}}</span>
-            </div>
-        </div>
-        </b-card>
-        <br>
+            </b-card>
+            <br>
 
-        <b-pagination v-if="ready && totalTransactions > perPage" v-model="currentPage" :per-page="perPage" :total-rows="rows" @change="onPageChanged"></b-pagination>
-        <b-table responsive class="nowrap" hover outlined :items="items" :busy="loading">
-            <template v-slot:cell(block_number)="data">
-                <router-link :to="`/blocks/${data.item.block_number}`" class="block_number_link">
-                    {{ data.item.block_number }}
-                </router-link>
-            </template>
-            <template v-slot:cell(status)="data">
-                <ReadinessStatus :status="data.item.status == 'Pending' ? 1 : 2" />
-                {{ data.item.status }}
-            </template>
-            <template v-slot:cell(new_state_root)="data">
-                <router-link :to="`/blocks/${data.item.block_number}`">
-                    {{ `${data.item.new_state_root.slice(8, 40)}...` }}
-                </router-link>
-            </template>
-        </b-table>
-        <b-pagination v-if="ready && totalTransactions > perPage" v-model="currentPage" :per-page="perPage" :total-rows="rows" @change="onPageChanged"></b-pagination>
+            <b-pagination v-if="ready && totalTransactions > perPage" v-model="currentPage" :per-page="perPage" :total-rows="rows" @change="onPageChanged"></b-pagination>
+            <b-table responsive class="nowrap" hover outlined :items="items" :busy="loading">
+                <template v-slot:cell(block_number)="data">
+                    <router-link :to="`/blocks/${data.item.block_number}`" class="block_number_link">
+                        {{ data.item.block_number }}
+                    </router-link>
+                </template>
+                <template v-slot:cell(status)="data">
+                    <ReadinessStatus :status="data.item.status == 'Pending' ? 1 : 2" />
+                    {{ data.item.status }}
+                </template>
+                <template v-slot:cell(new_state_root)="data">
+                    <router-link :to="`/blocks/${data.item.block_number}`">
+                        {{ `${data.item.new_state_root.slice(8, 40)}...` }}
+                    </router-link>
+                </template>
+            </b-table>
+            <b-pagination v-if="ready && totalTransactions > perPage" v-model="currentPage" :per-page="perPage" :total-rows="rows" @change="onPageChanged"></b-pagination>
 
-    </b-container>
-</div>
+        </b-container>
+    </div>
 </template>
 
 <script>
@@ -100,6 +100,7 @@ export default {
             ],
 
             updateError:        null,
+            inactive:           false
         };
     },
     computed: {
@@ -116,10 +117,18 @@ export default {
             return this.lastCommitted || 9999;
         },
     },
+    activated() {
+        this.inactive = false;
+    },
+    deactivated() {
+        this.inactive = true;
+    },  
     methods: {
         async ticker() {
             try {
-                await this.update(true);
+                if(!this.inactive) {
+                    await this.update(true);
+                }
                 this.updateError = null;
             } catch (e) {
                 this.updateError = e.message || "Unknown error";

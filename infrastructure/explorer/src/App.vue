@@ -1,5 +1,5 @@
 <template>
-    <keep-alive>
+    <keep-alive max="10" include="home,tokens">
         <router-view></router-view>
     </keep-alive>
 </template>

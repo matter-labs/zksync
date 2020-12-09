@@ -47,18 +47,43 @@
                     class="nowrap"
                     :items="transactionProps" 
                     :fields="transactionFields">
-                    <template v-slot:cell(TxHash) ="data">
+                    <template v-slot:cell(TxHash) = "data">
                         <i v-if="!data.item['success']" class="fas fa-times brown" />
-                        <span v-html="data.item['TxHash']" />
+                        <Entry
+                            :value="data.item['TxHash'].value"
+                        />
                     </template>
-                    <template v-slot:cell(Type)   ="data"><span v-html="data.item['Type']"   /></template>
-                    <template v-slot:cell(Block)  ="data"><span v-html="data.item['Block']"  /></template>
-                    <template v-slot:cell(Value)  ="data"><span v-html="data.item['Value']"  /></template>
-                    <template v-slot:cell(Amount) ="data"><span v-html="data.item['Amount']" /></template>
-                    <template v-slot:cell(Age)    ="data"><span v-html="data.item['Age']"    /></template>
-                    <template v-slot:cell(From)   ="data"><span v-html="data.item['From']"   /></template>
-                    <template v-slot:cell(To)     ="data"><span v-html="data.item['To']"     /></template>
-                    <template v-slot:cell(Fee)    ="data"><span v-html="data.item['Fee']"    /></template>
+                    <template v-slot:cell(Type) = "data">
+                        <Entry
+                            :value="data.item['Type'].value"
+                        />
+                    </template>
+                    <template v-slot:cell(Block) = "data">
+                        <Entry
+                            :value="data.item['Block'].value"
+                        />
+                    </template>
+                    <template v-slot:cell(Amount) = "data">
+                       <Entry
+                            :value="data.item['Amount'].value"
+                        />
+                    </template>
+                    <template v-slot:cell(From) = "data">
+                        <Entry
+                            :value="data.item['From'].value"
+                        />
+                    </template>
+                    <template v-slot:cell(To) = "data">
+                        <Entry
+                            :value="data.item['To'].value"
+                        />
+                    </template>
+                    <template v-slot:cell(CreatedAt) = "data">
+                        <Entry
+                            :value="data.item['CreatedAt'].value"
+                        />
+                    </template>
+
                 </b-table>
             </b-card>
             <b-pagination 
@@ -76,20 +101,21 @@
 
 <script>
 
-import store from './store';
 import timeConstants from './timeConstants';
 import { clientPromise } from './Client';
-import { shortenHash, formatDate } from './utils';
+import { shortenHash, formatDate, makeEntry } from './utils';
 import SearchField from './SearchField.vue';
 import CopyableAddress from './CopyableAddress.vue';
 import Navbar from './Navbar.vue';
 
 import { blockchainExplorerAddress } from './constants';
+import Entry from './links/Entry.vue';
 
 const components = {
     SearchField,
     CopyableAddress,
     Navbar,
+    Entry
 };
 
 export default {
@@ -107,14 +133,40 @@ export default {
 
         intervalHandle: null,
         client: null,
+        nextAddress: ''
     }),
     watch: {
         async currentPage() {
             await this.update();
+        },
+        nextAddress() {
+            this.loading = true;
+            this.totalRows = 0;
+            this.pagesOfTransactions = {};
+
+            this.update();
         }
+    },
+    beforeRouteUpdate(to, from, next) {
+        if(to.params.address) {
+            this.currentPage = 1;
+            this.nextAddress = to.params.address;
+        }
+
+        next();
+    },
+    beforeRouteEnter (to, from, next) {
+        if(to.params.address) {
+            next(vm => vm.nextAddress = to.params.address);
+        }
+        next();
     },
     async created() {
         this.client = await clientPromise;
+
+        if(!this.nextAddress) {
+            this.nextAddress = this.address;
+        }
 
         this.update();  
         this.intervalHandle = setInterval(async () => {
@@ -132,7 +184,12 @@ export default {
             this.$parent.$router.push('/transactions/' + item.hash);
         },
         async update() {
-            const balances = await this.client.getCommitedBalances(this.address);
+            // Used to tackle races when 
+            // the page updates, but this async function
+            // tries to update the page, according to the previous address
+            const addressAtBeginning = this.nextAddress;
+
+            const balances = await this.client.getCommitedBalances(addressAtBeginning);
             this.balances = balances
                 .map(bal => ({ name: bal.tokenSymbol, value: bal.balance }));
 
@@ -142,14 +199,14 @@ export default {
             // maybe load the requested page
             if (this.pagesOfTransactions[this.currentPage] == undefined)
                 this.pagesOfTransactions[this.currentPage] 
-                    = await this.client.transactionsList(this.address, offset, limit);
+                    = await this.client.transactionsList(addressAtBeginning, offset, limit);
 
             let nextPageLoaded = false;
             let numNextPageTransactions;
             
             // maybe load the next page
             if (this.pagesOfTransactions[this.currentPage + 1] == undefined) {
-                let txs = await this.client.transactionsList(this.address, offset + limit, limit);
+                let txs = await this.client.transactionsList(addressAtBeginning, offset + limit, limit);
                 numNextPageTransactions = txs.length;
                 nextPageLoaded = true;
 
@@ -170,13 +227,55 @@ export default {
             // display the page
             this.transactions = this.pagesOfTransactions[this.currentPage];
 
-            this.loading = false;
+            if(this.nextAddress === addressAtBeginning) {
+                this.loading = false;
+            }
         },
         loadNewTransactions() {
             this.totalRows = 0;
             this.pagesOfTransactions = {};
             this.load();
         },
+        getHashEntry(tx) {
+            if (tx.hash.startsWith('sync-tx:')) {
+                tx.hash = tx.hash.slice('sync-tx:'.length);
+            }
+
+            return makeEntry('TxHash')
+                .localLink(`${this.routerBase}transactions/${tx.hash}`)
+                .innerHTML(`${shortenHash(tx.hash, 'unknown! hash')}`);
+        },
+        getLinkFromEntry(tx) {
+            const entry = makeEntry('From');
+
+            if (tx.type == 'Deposit') {
+                entry.outterLink(`${blockchainExplorerAddress}/${tx.from}`);
+            } else {
+                entry.localLink(`${this.routerBase}accounts/${tx.from}`);
+            }
+
+            return entry.innerHTML(`${shortenHash(tx.from, 'unknown! from')}`);
+        },
+        getLinkToEntry(tx) {
+            const entry = makeEntry('To');
+            
+            if(tx.type == "ChangePubKey" ) {
+                return entry;
+            }
+
+            if(tx.type == 'Withdrawal') {
+                entry
+                    .outterLink(`${blockchainExplorerAddress}/${tx.to}`);
+            } else {
+                entry
+                    .localLink(`${this.routerBase}accounts/${tx.to}`);
+            }
+            
+            return entry.innerHTML(`${shortenHash(tx.to, 'unknown! to')}`);
+        },
+        getTxAmountEntry() {
+            
+        }
     },
     computed: {
         address() {
@@ -202,68 +301,29 @@ export default {
                 },
             ];
         },
+        
         transactionProps() {
             return this.transactions
                 .map(tx => {
-                    if (tx.hash.startsWith('sync-tx:')) {
-                        tx.hash = tx.hash.slice('sync-tx:'.length);
-                    }
-
                     if (tx.type == 'Withdraw') {
                         tx.type = 'Withdrawal';
                     }
 
-                    let TxHash = `
-                        <a href="${this.routerBase}transactions/${tx.hash}">
-                            ${shortenHash(tx.hash, 'unknown! hash')}
-                        </a>`;
+                    const TxHash = this.getHashEntry(tx);
+                    const From = this.getLinkFromEntry(tx);
 
-                    const link_from = tx.type == 'Deposit' 
-                        ? `${blockchainExplorerAddress}/${tx.from}`
-                        : `${this.routerBase}accounts/${tx.from}`;
+                    const To = this.getLinkToEntry(tx);
 
-                    const link_to = tx.type == 'Withdrawal' 
-                        ? `${blockchainExplorerAddress}/${tx.to}`
-                        : `${this.routerBase}accounts/${tx.to}`;
-
-                    const target_from = tx.type == 'Deposit' 
-                        ? `target="_blank" rel="noopener noreferrer"`
-                        : '';
-
-                    const target_to = tx.type == 'Withdrawal' 
-                        ? `target="_blank" rel="noopener noreferrer"`
-                        : '';
-
-                    const onchain_from = tx.type == 'Deposit' 
-                        ? '<i class="fas fa-external-link-alt"></i> '
-                        : '';
-
-                    const onchain_to = tx.type == 'Withdrawal' 
-                        ? '<i class="fas fa-external-link-alt"></i> '
-                        : '';
-
-                    const From = `
-                        <a href="${link_from}" ${target_from}>
-                            ${shortenHash(tx.from, 'unknown! from')}
-                            ${onchain_from}
-                        </a>`;
-
-                    const To = `
-                        <local-link :to="${link_to}" ${target_to}>
-                            ${
-                                tx.type == "ChangePubKey" 
-                                    ? ''
-                                    : shortenHash(tx.to, 'unknown! to')
-                            }
-
-                            ${ tx.type == "ChangePubKey" ? '' : onchain_to }
-                        </local-link>`;
-
-                    const Type = `${tx.type}`;
-                    const Amount 
-                        = tx.type == "ChangePubKey" ? ''
-                        : `${tx.token} <span>${tx.amount}</span>`;
-                    const CreatedAt = formatDate(tx.created_at);
+                    const Type = makeEntry('Type').innerHTML(tx.type);
+                    const Amount = makeEntry('Amount')
+                        .innerHTML(`${tx.token} <span>${tx.amount}</span>`);
+                    const CreatedAt = makeEntry('CreatedAt')
+                        .innerHTML(formatDate(tx.created_at));
+                    
+                    if(tx.type === 'ChangePubKey') {
+                        // There is no amount for ChangePubKey
+                        Amount.innerHTML('');
+                    }
 
                     return {
                         TxHash,

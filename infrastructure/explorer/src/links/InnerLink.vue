@@ -2,7 +2,7 @@
     <router-link 
         :to="to"
     >
-        <span class="link-html-span mr-1" v-html="innerHTML" />
+        <span class="link-html-span" v-html="innerHTML" />
     </router-link> 
 </template>
 

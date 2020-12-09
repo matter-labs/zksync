@@ -241,9 +241,7 @@ export default {
             return entry.innerHTML(this.txData.to);
         },
         typeEntry() {
-            console.log('Getting type entry: ', this.txData.tx_type);
             return makeEntry('Type').innerHTML(this.txData.tx_type);
-            
         },
         statusEntry() {
             const entry = makeEntry('Status');
@@ -272,12 +270,14 @@ export default {
             if (Object.keys(this.txData).length == 0) 
                 return [];
 
+            const fromLinkEntry = this.fromLinkEntry;
+
             const rows = this.txData.tx_type == "ChangePubKey"
                 ? [
-                    this.txHashEntry,
+                    this.hashEntry,
                     this.typeEntry,
                     this.statusEntry,
-                    this.fromLinkEntry.name("Account"),
+                    fromLinkEntry.rename("Account"),
                     this.feeEntry,
                     makeEntry("New signer key hash").innerHTML(`${this.txData.to.replace('sync:', '')}`),
                     this.createdAtEntry    
