@@ -36,7 +36,7 @@ async fn stored_accounts(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
     for (account_id, account) in accounts_block.iter() {
         let mut account = account.clone();
         let account_state = AccountSchema(&mut storage)
-            .account_state(account.address)
+            .account_state_by_address(account.address)
             .await?;
 
         // Check that committed state is available, but verified is not.
@@ -85,7 +85,7 @@ async fn stored_accounts(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
     // After that all the accounts should have a verified state.
     for (account_id, account) in accounts_block {
         let account_state = AccountSchema(&mut storage)
-            .account_state(account.address)
+            .account_state_by_id(account_id)
             .await?;
 
         assert!(

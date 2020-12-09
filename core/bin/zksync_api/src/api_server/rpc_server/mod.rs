@@ -318,7 +318,7 @@ impl RpcApp {
         let account_info = storage
             .chain()
             .account_schema()
-            .account_state(address)
+            .account_state_by_address(address)
             .await
             .map_err(|_| Error::internal_error())?;
 

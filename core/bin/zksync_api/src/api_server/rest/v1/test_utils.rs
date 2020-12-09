@@ -321,13 +321,12 @@ impl TestServerConfig {
             }
         }
 
-        // Get the accounts by their addresses.
-        for (_account_id, account) in accounts {
-            let account = account.clone();
+        // Get the accounts by their IDs.
+        for (account_id, _account) in accounts {
             let account_state = storage
                 .chain()
                 .account_schema()
-                .account_state(account.address)
+                .account_state_by_id(account_id)
                 .await?;
 
             // Check that committed state is available.

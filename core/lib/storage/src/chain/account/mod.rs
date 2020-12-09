@@ -17,50 +17,18 @@ mod stored_state;
 pub(crate) use self::restore_account::restore_account;
 pub use self::stored_state::StoredAccountState;
 
-/// Account query.
-#[derive(Debug, Copy, Clone)]
-pub enum AccountQuery {
-    /// By ID.
-    Id(AccountId),
-    /// By Address.
-    Address(Address),
-}
-
-impl From<AccountId> for AccountQuery {
-    fn from(account_id: AccountId) -> Self {
-        Self::Id(account_id)
-    }
-}
-
-impl From<Address> for AccountQuery {
-    fn from(account_address: Address) -> Self {
-        Self::Address(account_address)
-    }
-}
-
 /// Account schema contains interfaces to interact with the stored
 /// ZKSync accounts.
 #[derive(Debug)]
 pub struct AccountSchema<'a, 'c>(pub &'a mut StorageProcessor<'c>);
 
 impl<'a, 'c> AccountSchema<'a, 'c> {
-    /// Obtains both committed and verified state for the account by its address.
-    pub async fn account_state(
+    /// Obtains both committed and verified state for the account by its ID.
+    pub async fn account_state_by_id(
         &mut self,
-        query: impl Into<AccountQuery>,
+        account_id: AccountId,
     ) -> QueryResult<StoredAccountState> {
         let start = Instant::now();
-
-        // If account wasn't found, we return no state for it.
-        // Otherwise we obtain the account ID for the state lookup.
-        let account_id = if let Some(account_id) = self.get_account_id(query.into()).await? {
-            account_id
-        } else {
-            return Ok(StoredAccountState {
-                committed: None,
-                verified: None,
-            });
-        };
 
         // Load committed & verified states, and return them.
         let committed = self
@@ -72,14 +40,34 @@ impl<'a, 'c> AccountSchema<'a, 'c> {
             .await?
             .map(|a| (account_id, a));
 
-        metrics::histogram!(
-            "sql.chain.account.account_state_by_address",
-            start.elapsed()
-        );
+        metrics::histogram!("sql.chain.account.account_state_by_id", start.elapsed());
         Ok(StoredAccountState {
             committed,
             verified,
         })
+    }
+
+    /// Obtains both committed and verified state for the account by its address.
+    pub async fn account_state_by_address(
+        &mut self,
+        address: Address,
+    ) -> QueryResult<StoredAccountState> {
+        let start = Instant::now();
+
+        let account_state = if let Some(account_id) = self.account_id_by_address(address).await? {
+            self.account_state_by_id(account_id).await
+        } else {
+            Ok(StoredAccountState {
+                committed: None,
+                verified: None,
+            })
+        };
+
+        metrics::histogram!(
+            "sql.chain.account.account_state_by_address",
+            start.elapsed()
+        );
+        account_state
     }
 
     /// Loads the last committed (e.g. just added but no necessarily verified) state for
@@ -95,7 +83,7 @@ impl<'a, 'c> AccountSchema<'a, 'c> {
         // Note that `account` can be `None` here (if it wasn't verified yet), since
         // we will update the committed changes below.
         let (last_block, account) = AccountSchema(&mut transaction)
-            .get_account_and_last_block(account_id)
+            .account_and_last_block(account_id)
             .await?;
 
         let account_balance_diff = sqlx::query_as!(
@@ -182,7 +170,7 @@ impl<'a, 'c> AccountSchema<'a, 'c> {
         account_id: AccountId,
     ) -> QueryResult<Option<Account>> {
         let start = Instant::now();
-        let (_, account) = self.get_account_and_last_block(account_id).await?;
+        let (_, account) = self.account_and_last_block(account_id).await?;
         metrics::histogram!(
             "sql.chain.account.last_verified_state_for_account",
             start.elapsed()
@@ -191,7 +179,7 @@ impl<'a, 'c> AccountSchema<'a, 'c> {
     }
 
     /// Obtains the last verified state of the account.
-    async fn get_account_and_last_block(
+    async fn account_and_last_block(
         &mut self,
         account_id: AccountId,
     ) -> QueryResult<(i64, Option<Account>)> {
@@ -248,25 +236,23 @@ impl<'a, 'c> AccountSchema<'a, 'c> {
         result
     }
 
-    async fn get_account_id(&mut self, query: AccountQuery) -> QueryResult<Option<AccountId>> {
-        match query {
-            AccountQuery::Id(account_id) => Ok(Some(account_id)),
-            AccountQuery::Address(address) => {
-                // Find the account in `account_creates` table.
-                let result = sqlx::query!(
-                    "SELECT account_id FROM account_creates
-                        WHERE address = $1 AND is_create = $2
-                        ORDER BY block_number desc
-                        LIMIT 1
-                    ",
-                    address.as_bytes(),
-                    true
-                )
-                .fetch_optional(self.0.conn())
-                .await?;
+    pub async fn account_id_by_address(
+        &mut self,
+        address: Address,
+    ) -> QueryResult<Option<AccountId>> {
+        // Find the account in `account_creates` table.
+        let result = sqlx::query!(
+            "SELECT account_id FROM account_creates
+                                WHERE address = $1 AND is_create = $2
+                                ORDER BY block_number desc
+                                LIMIT 1
+                            ",
+            address.as_bytes(),
+            true
+        )
+        .fetch_optional(self.0.conn())
+        .await?;
 
-                Ok(result.map(|record| record.account_id as AccountId))
-            }
-        }
+        Ok(result.map(|record| record.account_id as AccountId))
     }
 }

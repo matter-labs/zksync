@@ -8,11 +8,8 @@ use serde::{Deserialize, Serialize};
 
 // Workspace uses
 use zksync_storage::{
-    chain::{
-        account::AccountQuery as StorageAccountQuery,
-        operations_ext::{
-            records::AccountTxReceiptResponse, SearchDirection as StorageSearchDirection,
-        },
+    chain::operations_ext::{
+        records::AccountTxReceiptResponse, SearchDirection as StorageSearchDirection,
     },
     QueryResult, MAX_BLOCK_NUMBER,
 };
@@ -33,10 +30,13 @@ use super::{
     unable_to_find_token,
 };
 
+/// Account search query.
 #[derive(Debug, Serialize, Copy, Clone, PartialEq, Eq, Ord, PartialOrd, Hash)]
 #[serde(untagged, rename_all = "camelCase")]
 pub enum AccountQuery {
+    /// Search account by ID.
     Id(AccountId),
+    /// Search account by address.
     Address(Address),
 }
 
@@ -53,17 +53,21 @@ pub struct AccountState {
     pub pub_key_hash: PubKeyHash,
 }
 
+/// Pending amount for the deposit.
 #[derive(Debug, Deserialize, Serialize, Clone, PartialEq, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct DepositingFunds {
+    /// Amount in wei.
     pub amount: BigUintSerdeWrapper,
     /// The greatest block number among all the deposits for a certain token.
     pub expected_accept_block: BlockNumber,
 }
 
+/// Depositing balances
 #[derive(Debug, Deserialize, Serialize, Clone, PartialEq, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct DepositingBalances {
+    /// The amount of deposits by token symbols.
     pub balances: BTreeMap<String, DepositingFunds>,
 }
 
@@ -75,9 +79,9 @@ pub struct AccountInfo {
     pub address: Address,
     /// Unique identifier of the account in the zkSync network.
     pub id: AccountId,
-    /// Account state in according of the actual committed block.
+    /// Account state in accordance with the actual committed block.
     pub committed: AccountState,
-    /// Account state in according of the actual verified block.
+    /// Account state in accordance with the actual verified block.
     pub verified: AccountState,
     /// Unconfirmed account deposits.
     pub depositing: DepositingBalances,
@@ -93,10 +97,14 @@ pub struct TxLocation {
     pub index: Option<u32>,
 }
 
+/// Account receipts search options.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum AccountReceipts {
+    /// Search for older receipts starting from a given location.
     Older(TxLocation),
+    /// Search for newer receipts starting from a given location.
     Newer(TxLocation),
+    /// Search for latest receipts.
     Latest,
 }
 
@@ -149,15 +157,6 @@ pub struct AccountTxReceipt {
 pub struct PendingAccountTxReceipt {
     pub block: u64,
     pub hash: H256,
-}
-
-impl From<AccountQuery> for StorageAccountQuery {
-    fn from(query: AccountQuery) -> Self {
-        match query {
-            AccountQuery::Id(id) => StorageAccountQuery::Id(id),
-            AccountQuery::Address(address) => StorageAccountQuery::Address(address),
-        }
-    }
 }
 
 impl From<AccountId> for AccountQuery {
@@ -294,7 +293,7 @@ impl AccountReceiptsQuery {
     pub fn new(from: AccountReceipts, limit: u32) -> Self {
         match from {
             AccountReceipts::Older(location) => {
-                Self::from_parts(location, SearchDirection::Newer, limit)
+                Self::from_parts(location, SearchDirection::Older, limit)
             }
 
             AccountReceipts::Newer(location) => {
@@ -306,7 +305,7 @@ impl AccountReceiptsQuery {
                     block: MAX_BLOCK_NUMBER,
                     index: None,
                 },
-                SearchDirection::Newer,
+                SearchDirection::Older,
                 limit,
             ),
         }

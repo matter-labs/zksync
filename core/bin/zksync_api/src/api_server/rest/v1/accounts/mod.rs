@@ -1,7 +1,9 @@
 //! Accounts part of API implementation.
 
-// Built-in uses
+// Public uses
 pub use self::types::{AccountInfo, AccountState, DepositingBalances, DepositingFunds};
+
+// Built-in uses
 
 // External uses
 use actix_web::{
@@ -11,8 +13,8 @@ use actix_web::{
 
 // Workspace uses
 use zksync_config::ConfigurationOptions;
-use zksync_storage::QueryResult;
-use zksync_types::{Address, BlockNumber, TokenId};
+use zksync_storage::{QueryResult, StorageProcessor};
+use zksync_types::{AccountId, Address, BlockNumber, TokenId};
 
 // Local uses
 use crate::{core_api_client::CoreApiClient, utils::token_db_cache::TokenDBCache};
@@ -61,9 +63,12 @@ impl ApiAccountsData {
         }
     }
 
+    async fn access_storage(&self) -> QueryResult<StorageProcessor<'_>> {
+        self.tokens.pool.access_storage().await.map_err(From::from)
+    }
+
     async fn find_account_address(&self, query: String) -> Result<Address, ApiError> {
         let query = parse_account_query(query)?;
-
         self.account_address(query)
             .await
             .map_err(ApiError::internal)?
@@ -73,12 +78,32 @@ impl ApiAccountsData {
             })
     }
 
+    async fn account_id(
+        storage: &mut StorageProcessor<'_>,
+        query: AccountQuery,
+    ) -> QueryResult<Option<AccountId>> {
+        match query {
+            AccountQuery::Id(id) => Ok(Some(id)),
+            AccountQuery::Address(address) => {
+                storage
+                    .chain()
+                    .account_schema()
+                    .account_id_by_address(address)
+                    .await
+            }
+        }
+    }
+
     async fn account_address(&self, query: AccountQuery) -> QueryResult<Option<Address>> {
         let address = match query {
             AccountQuery::Id(id) => {
-                let mut storage = self.tokens.pool.access_storage().await?;
+                let mut storage = self.access_storage().await?;
 
-                let account_state = storage.chain().account_schema().account_state(id).await?;
+                let account_state = storage
+                    .chain()
+                    .account_schema()
+                    .account_state_by_id(id)
+                    .await?;
 
                 account_state
                     .committed
@@ -91,12 +116,17 @@ impl ApiAccountsData {
     }
 
     async fn account_info(&self, query: AccountQuery) -> QueryResult<Option<AccountInfo>> {
-        let mut storage = self.tokens.pool.access_storage().await?;
+        let mut storage = self.access_storage().await?;
+        let account_id = if let Some(id) = Self::account_id(&mut storage, query).await? {
+            id
+        } else {
+            return Ok(None);
+        };
 
         let account_state = storage
             .chain()
             .account_schema()
-            .account_state(query)
+            .account_state_by_id(account_id)
             .await?;
 
         // Drop storage access to avoid deadlocks.
@@ -148,7 +178,7 @@ impl ApiAccountsData {
         direction: SearchDirection,
         limit: u32,
     ) -> QueryResult<Vec<AccountTxReceipt>> {
-        let mut storage = self.tokens.pool.access_storage().await?;
+        let mut storage = self.access_storage().await?;
 
         let items = storage
             .chain()
