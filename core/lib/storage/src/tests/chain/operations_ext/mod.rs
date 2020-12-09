@@ -582,7 +582,7 @@ async fn get_account_transactions_receipts(mut storage: StorageProcessor<'_>) ->
         .get_account_transactions_receipts(address, 1, 1, SearchDirection::Newer, 1)
         .await?;
 
-    // Check that `commit_tx_hash` now exist.
+    // Check that `commit_tx_hash` and `verify_tx_hash` now exist.
     let reciept = receipts.into_iter().next().unwrap();
     assert!(reciept.commit_tx_hash.is_some());
     assert!(reciept.verify_tx_hash.is_some());

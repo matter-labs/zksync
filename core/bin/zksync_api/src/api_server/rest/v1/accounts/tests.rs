@@ -10,8 +10,10 @@ use serde_json::json;
 use tokio::sync::Mutex;
 
 // Workspace uses
-use zksync_storage::{ConnectionPool, StorageProcessor};
-use zksync_types::{Address, H256};
+use zksync_storage::{
+    chain::operations_ext::records::AccountTxReceiptResponse, ConnectionPool, StorageProcessor,
+};
+use zksync_types::{tx::TxHash, Address, BlockNumber, H256};
 
 // Local uses
 use crate::{
@@ -23,7 +25,10 @@ use crate::{
     utils::token_db_cache::TokenDBCache,
 };
 
-use super::{api_scope, types::AccountReceipts};
+use super::{
+    api_scope,
+    types::{AccountReceipts, AccountTxReceipt},
+};
 
 type DepositsHandle = Arc<Mutex<serde_json::Value>>;
 
@@ -87,11 +92,14 @@ impl TestServer {
         ))
     }
 
-    async fn account_address(storage: &mut StorageProcessor<'_>) -> anyhow::Result<Address> {
+    async fn account_address(
+        storage: &mut StorageProcessor<'_>,
+        block: BlockNumber,
+    ) -> anyhow::Result<Address> {
         let transactions = storage
             .chain()
             .block_schema()
-            .get_block_transactions(1)
+            .get_block_transactions(block)
             .await?;
 
         let tx = &transactions[0];
@@ -108,7 +116,7 @@ impl TestServer {
 }
 
 #[actix_rt::test]
-async fn test_get_unconfirmed_deposits_loopback() -> anyhow::Result<()> {
+async fn unconfirmed_deposits_loopback() -> anyhow::Result<()> {
     let (client, server) =
         get_unconfirmed_deposits_loopback(DepositsHandle::new(Mutex::new(json!([]))));
 
@@ -119,11 +127,11 @@ async fn test_get_unconfirmed_deposits_loopback() -> anyhow::Result<()> {
 }
 
 #[actix_rt::test]
-async fn test_accounts_scope() -> anyhow::Result<()> {
+async fn accounts_scope() -> anyhow::Result<()> {
     let (client, server) = TestServer::new().await?;
 
     // Get account information.
-    let address = TestServer::account_address(&mut server.pool.access_storage().await?).await?;
+    let address = TestServer::account_address(&mut server.pool.access_storage().await?, 1).await?;
 
     let account_info = client.account_info(address).await?.unwrap();
     let id = account_info.id;
@@ -160,10 +168,10 @@ async fn test_accounts_scope() -> anyhow::Result<()> {
 
     // Get account tx receipts.
     let receipts = client
-        .account_receipts(address, AccountReceipts::newer_than(0, 0), 100)
+        .account_receipts(address, AccountReceipts::newer_than(1, 0), 100)
         .await?;
-    assert_eq!(receipts[0].location.block, 1);
-    assert_eq!(receipts[0].location.index, None);
+
+    assert_eq!(receipts[0].index, Some(2));
     assert_eq!(receipts[0].receipt, TxReceipt::Verified { block: 1 });
 
     // Get account pending receipts.
@@ -173,4 +181,101 @@ async fn test_accounts_scope() -> anyhow::Result<()> {
 
     server.stop().await;
     Ok(())
+}
+
+#[test]
+fn account_tx_response_to_receipt() {
+    fn empty_hash() -> Vec<u8> {
+        TxHash::default().as_ref().to_vec()
+    }
+
+    let cases = vec![
+        (
+            AccountTxReceiptResponse {
+                block_index: Some(1),
+                block_number: 1,
+                success: true,
+                fail_reason: None,
+                commit_tx_hash: None,
+                verify_tx_hash: None,
+                tx_hash: empty_hash(),
+            },
+            AccountTxReceipt {
+                index: Some(1),
+                hash: TxHash::default(),
+                receipt: TxReceipt::Executed,
+            },
+        ),
+        (
+            AccountTxReceiptResponse {
+                block_index: None,
+                block_number: 1,
+                success: true,
+                fail_reason: None,
+                commit_tx_hash: None,
+                verify_tx_hash: None,
+                tx_hash: empty_hash(),
+            },
+            AccountTxReceipt {
+                index: None,
+                hash: TxHash::default(),
+                receipt: TxReceipt::Executed,
+            },
+        ),
+        (
+            AccountTxReceiptResponse {
+                block_index: Some(1),
+                block_number: 1,
+                success: false,
+                fail_reason: Some("Oops".to_string()),
+                commit_tx_hash: None,
+                verify_tx_hash: None,
+                tx_hash: empty_hash(),
+            },
+            AccountTxReceipt {
+                index: Some(1),
+                hash: TxHash::default(),
+                receipt: TxReceipt::Rejected {
+                    reason: Some("Oops".to_string()),
+                },
+            },
+        ),
+        (
+            AccountTxReceiptResponse {
+                block_index: Some(1),
+                block_number: 1,
+                success: true,
+                fail_reason: None,
+                commit_tx_hash: Some(empty_hash()),
+                verify_tx_hash: None,
+                tx_hash: empty_hash(),
+            },
+            AccountTxReceipt {
+                index: Some(1),
+                hash: TxHash::default(),
+                receipt: TxReceipt::Committed { block: 1 },
+            },
+        ),
+        (
+            AccountTxReceiptResponse {
+                block_index: Some(1),
+                block_number: 1,
+                success: true,
+                fail_reason: None,
+                commit_tx_hash: Some(empty_hash()),
+                verify_tx_hash: Some(empty_hash()),
+                tx_hash: empty_hash(),
+            },
+            AccountTxReceipt {
+                index: Some(1),
+                hash: TxHash::default(),
+                receipt: TxReceipt::Verified { block: 1 },
+            },
+        ),
+    ];
+
+    for (resp, expected_receipt) in cases {
+        let actual_receipt = AccountTxReceipt::from(resp);
+        assert_eq!(actual_receipt, expected_receipt);
+    }
 }

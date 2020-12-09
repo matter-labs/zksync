@@ -74,7 +74,8 @@ pub struct TxByHashResponse {
 pub struct AccountTxReceiptResponse {
     pub block_number: i64,
     pub block_index: Option<i32>,
-    pub success: Option<bool>,
+    pub tx_hash: Vec<u8>,
+    pub success: bool,
     pub fail_reason: Option<String>,
     pub commit_tx_hash: Option<Vec<u8>>,
     pub verify_tx_hash: Option<Vec<u8>>,

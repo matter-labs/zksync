@@ -11,10 +11,10 @@ use zksync_storage::{
     chain::{
         account::AccountQuery as StorageAccountQuery,
         operations_ext::{
-            records::TransactionsHistoryItem, SearchDirection as StorageSearchDirection,
+            records::AccountTxReceiptResponse, SearchDirection as StorageSearchDirection,
         },
     },
-    QueryResult,
+    QueryResult, MAX_BLOCK_NUMBER,
 };
 use zksync_types::{
     tx::TxHash, Account, AccountId, Address, BlockNumber, Nonce, PriorityOp, PubKeyHash, H256,
@@ -90,7 +90,7 @@ pub struct TxLocation {
     /// The block containing the transaction.
     pub block: BlockNumber,
     /// Transaction index in block. Absent for rejected transactions.
-    pub index: Option<u64>,
+    pub index: Option<u32>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -101,14 +101,14 @@ pub enum AccountReceipts {
 }
 
 impl AccountReceipts {
-    pub fn newer_than(block: BlockNumber, index: u64) -> Self {
+    pub fn newer_than(block: BlockNumber, index: u32) -> Self {
         Self::Newer(TxLocation {
             block,
             index: Some(index),
         })
     }
 
-    pub fn older_than(block: BlockNumber, index: u64) -> Self {
+    pub fn older_than(block: BlockNumber, index: u32) -> Self {
         Self::Older(TxLocation {
             block,
             index: Some(index),
@@ -130,7 +130,7 @@ pub enum SearchDirection {
 #[serde(rename_all = "camelCase")]
 pub struct AccountReceiptsQuery {
     pub block: Option<BlockNumber>,
-    pub index: Option<u64>,
+    pub index: Option<u32>,
     pub direction: Option<SearchDirection>,
     pub limit: BlockNumber,
 }
@@ -138,10 +138,10 @@ pub struct AccountReceiptsQuery {
 #[derive(Debug, Deserialize, Serialize, Clone, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct AccountTxReceipt {
+    pub index: Option<u32>,
     #[serde(flatten)]
-    pub location: TxLocation,
     pub receipt: TxReceipt,
-    pub hash: Option<TxHash>,
+    pub hash: TxHash,
 }
 
 #[derive(Debug, Deserialize, Serialize, Clone, PartialEq)]
@@ -303,7 +303,7 @@ impl AccountReceiptsQuery {
 
             AccountReceipts::Latest => Self::from_parts(
                 TxLocation {
-                    block: BlockNumber::MAX,
+                    block: MAX_BLOCK_NUMBER,
                     index: None,
                 },
                 SearchDirection::Newer,
@@ -348,44 +348,39 @@ impl AccountReceiptsQuery {
     }
 }
 
-impl TxLocation {
-    fn from_tx_id(tx_id: &str) -> Option<Self> {
-        let mut iter = tx_id.splitn(2, ',').filter_map(|x| x.parse::<u64>().ok());
-
-        let block = iter.next()? as BlockNumber;
-        let index = iter.next();
-
-        Some(TxLocation { block, index })
-    }
-}
-
-impl From<TransactionsHistoryItem> for AccountTxReceipt {
-    fn from(inner: TransactionsHistoryItem) -> Self {
-        let location = TxLocation::from_tx_id(&inner.tx_id)
-            .unwrap_or_else(|| panic!("Database provided an incorrect transaction ID"));
-
-        let hash = inner.hash.map(|s| {
-            TxHash::from_str(&s).unwrap_or_else(|err| {
-                panic!("Database provided an incorrect transaction hash: {}", err)
-            })
+impl From<AccountTxReceiptResponse> for AccountTxReceipt {
+    fn from(inner: AccountTxReceiptResponse) -> Self {
+        let block = inner.block_number as BlockNumber;
+        let index = inner.block_index.map(|x| x as u32);
+        let hash = TxHash::from_slice(&inner.tx_hash).unwrap_or_else(|| {
+            panic!(
+                "Database provided an incorrect tx_hash field: {}",
+                hex::encode(&inner.tx_hash)
+            )
         });
 
-        // TODO Ask for correctness.
-        let receipt = match (inner.success, inner.verified) {
-            (None, _) => TxReceipt::Executed,
-            (Some(false), _) => TxReceipt::Rejected {
-                reason: inner.fail_reason,
-            },
-            (Some(true), false) => TxReceipt::Committed {
-                block: location.block,
-            },
-            (Some(true), true) => TxReceipt::Verified {
-                block: location.block,
-            },
+        if !inner.success {
+            return Self {
+                index,
+                hash,
+                receipt: TxReceipt::Rejected {
+                    reason: inner.fail_reason,
+                },
+            };
+        }
+
+        let receipt = match (
+            inner.commit_tx_hash.is_some(),
+            inner.verify_tx_hash.is_some(),
+        ) {
+            (false, false) => TxReceipt::Executed,
+            (true, false) => TxReceipt::Committed { block },
+            (true, true) => TxReceipt::Verified { block },
+            _ => panic!("Database provided an incorrect account tx reciept"),
         };
 
         Self {
-            location,
+            index,
             receipt,
             hash,
         }

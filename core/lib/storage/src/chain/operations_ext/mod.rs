@@ -721,8 +721,9 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
                     )
                     SELECT
                         block_number, 
-                        block_index,
-                        success as "success?",
+                        block_index as "block_index?",
+                        tx_hash,
+                        success,
                         fail_reason as "fail_reason?",
                         details.commit_tx_hash as "commit_tx_hash?",
                         details.verify_tx_hash as "verify_tx_hash?"
@@ -778,8 +779,9 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
                     )
                     SELECT
                         block_number, 
-                        block_index,
-                        success as "success?",
+                        block_index as "block_index?",
+                        tx_hash,
+                        success,
                         fail_reason as "fail_reason?",
                         details.commit_tx_hash as "commit_tx_hash?",
                         details.verify_tx_hash as "verify_tx_hash?"

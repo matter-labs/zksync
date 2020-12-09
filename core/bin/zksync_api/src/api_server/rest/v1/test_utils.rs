@@ -103,7 +103,7 @@ impl TestServerConfig {
                 success: true,
                 op: Some(zksync_op),
                 fail_reason: None,
-                block_index: None,
+                block_index: Some(1),
                 created_at: chrono::Utc::now(),
                 batch_id: None,
             };
@@ -130,6 +130,33 @@ impl TestServerConfig {
                 success: true,
                 op: Some(zksync_op),
                 fail_reason: None,
+                block_index: Some(2),
+                created_at: chrono::Utc::now(),
+                batch_id: None,
+            };
+
+            txs.push((
+                ZkSyncTx::Transfer(Box::new(tx)),
+                ExecutedOperations::Tx(Box::new(executed_tx)),
+            ));
+        }
+        // Failed transfer tx pair
+        {
+            let tx = from
+                .sign_transfer(0, "GLM", 1_u64.into(), fee.into(), &to.address, None, false)
+                .0;
+
+            let zksync_op = ZkSyncOp::TransferToNew(Box::new(TransferToNewOp {
+                tx: tx.clone(),
+                from: from.get_account_id().unwrap(),
+                to: to.get_account_id().unwrap(),
+            }));
+
+            let executed_tx = ExecutedTx {
+                signed_tx: zksync_op.try_get_tx().unwrap().into(),
+                success: false,
+                op: Some(zksync_op),
+                fail_reason: Some("Unknown token".to_string()),
                 block_index: None,
                 created_at: chrono::Utc::now(),
                 batch_id: None,
@@ -206,7 +233,14 @@ impl TestServerConfig {
                 vec![]
             };
 
-            // Store the operation in the block schema.
+            // Storage transactions in the block schema.
+            storage
+                .chain()
+                .block_schema()
+                .save_block_transactions(block_number, txs.clone())
+                .await?;
+
+            // Store the commit operation in the block schema.
             let operation = storage
                 .chain()
                 .block_schema()

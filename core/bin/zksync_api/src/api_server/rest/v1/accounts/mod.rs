@@ -150,14 +150,13 @@ impl ApiAccountsData {
     ) -> QueryResult<Vec<AccountTxReceipt>> {
         let mut storage = self.tokens.pool.access_storage().await?;
 
-        let location = (location.block as u64, location.index.unwrap_or_default());
-
         let items = storage
             .chain()
             .operations_ext_schema()
-            .get_account_transactions_history_from(
-                &address,
-                location,
+            .get_account_transactions_receipts(
+                address,
+                location.block as u64,
+                location.index.unwrap_or_default(),
                 direction.into(),
                 limit as u64,
             )
