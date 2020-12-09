@@ -229,7 +229,8 @@ impl<'a, 'c> AccountSchema<'a, 'c> {
         &mut self,
         address: Address,
     ) -> QueryResult<Option<AccountId>> {
-        // Find the account in `account_creates` table.
+        let start = Instant::now();
+        // Find the account ID in `account_creates` table.
         let result = sqlx::query!(
             "SELECT account_id FROM account_creates
                                 WHERE address = $1 AND is_create = $2
@@ -242,6 +243,26 @@ impl<'a, 'c> AccountSchema<'a, 'c> {
         .fetch_optional(self.0.conn())
         .await?;
 
-        Ok(result.map(|record| record.account_id as AccountId))
+        let account_id = result.map(|record| record.account_id as AccountId);
+        metrics::histogram!("sql.chain.account.account_id_by_address", start.elapsed());
+        Ok(account_id)
+    }
+
+    pub async fn account_address_by_id(
+        &mut self,
+        account_id: AccountId,
+    ) -> QueryResult<Option<Address>> {
+        let start = Instant::now();
+        // Find the account address in `account_creates` table.
+        let result = sqlx::query!(
+            "SELECT address FROM account_creates WHERE account_id = $1",
+            i64::from(account_id)
+        )
+        .fetch_optional(self.0.conn())
+        .await?;
+
+        let address = result.map(|record| Address::from_slice(&record.address));
+        metrics::histogram!("sql.chain.account.account_address_by_id", start.elapsed());
+        Ok(address)
     }
 }

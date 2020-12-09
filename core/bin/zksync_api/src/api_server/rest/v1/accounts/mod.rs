@@ -95,24 +95,17 @@ impl ApiAccountsData {
     }
 
     async fn account_address(&self, query: AccountQuery) -> QueryResult<Option<Address>> {
-        let address = match query {
+        match query {
             AccountQuery::Id(id) => {
                 let mut storage = self.access_storage().await?;
-
-                let account_state = storage
+                storage
                     .chain()
                     .account_schema()
-                    .account_state_by_id(id)
-                    .await?;
-
-                account_state
-                    .committed
-                    .map(|(_id, account)| account.address)
+                    .account_address_by_id(id)
+                    .await
             }
-            AccountQuery::Address(address) => Some(address),
-        };
-
-        Ok(address)
+            AccountQuery::Address(address) => Ok(Some(address)),
+        }
     }
 
     async fn account_info(&self, query: AccountQuery) -> QueryResult<Option<AccountInfo>> {

@@ -65,6 +65,20 @@ async fn stored_accounts(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
                 .await?,
             Some(got_account)
         );
+
+        // Check account address and ID getters.
+        assert_eq!(
+            AccountSchema(&mut storage)
+                .account_address_by_id(*account_id)
+                .await?,
+            Some(account.address)
+        );
+        assert_eq!(
+            AccountSchema(&mut storage)
+                .account_id_by_address(account.address)
+                .await?,
+            Some(*account_id)
+        );
     }
 
     // Now add a proof, verify block and apply a state update.
