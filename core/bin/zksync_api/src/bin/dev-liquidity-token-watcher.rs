@@ -78,7 +78,7 @@ fn load_tokens(path: &Path) -> Tokens {
     };
     tokens.insert(phnx_token.address.clone(), phnx_token);
 
-    println!("Tokens in liquidity watcher {:?}", &tokens);
+    vlog::error!("Tokens in liquidity watcher {:?}", &tokens);
     tokens
 }
 
