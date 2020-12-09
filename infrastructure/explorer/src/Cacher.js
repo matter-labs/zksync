@@ -87,15 +87,20 @@ class Cacher {
             MAX_CACHED_TRANSACTIONS - numbrerOfTxToCache
         );
 
-        txs.slice(0, numbrerOfTxToCache).forEach((tx) => {
+        // We do not await for the Promises, because
+        // 
+        // a) JS is single-threaded, no data-races possible
+        // b) By the time we will want to reuse these transactions
+        // they will 99% be set, or, if not, it does not ruin anything.
+        txs.slice(0, numbrerOfTxToCache).forEach(async (tx) => {
             const op = tx.op;
             this.cachedTransactions[tx.tx_hash] = {
                 tx_type: op.type,
-                from: getTxFromAddress(op),
-                to: getTxToAddress(op),
-                token: getTxToken(op),
-                amount: getTxAmount(op, client),
-                fee: getTxFee(op),
+                from: getTxFromAddress(tx),
+                to: getTxToAddress(tx),
+                token: getTxToken(tx),
+                amount: await getTxAmount(tx, client),
+                fee: getTxFee(tx),
                 block_number: tx.block_number,
                 nonce: op.nonce,
                 created_at: tx.created_at,

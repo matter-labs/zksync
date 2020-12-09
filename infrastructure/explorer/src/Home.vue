@@ -186,7 +186,6 @@ export default {
     watch: {
         '$route' (to, from) {
             this.currentPage = this.page;
-            this.updateBlocks();
         },
     },
     components,

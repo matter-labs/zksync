@@ -58,10 +58,12 @@ export class Client {
             tokensPromise,
             ethersProvider,
             syncProvider: window.syncProvider,
-            cacher: new Cacher(this)
         };
 
-        return new Client(props);
+        const client = new Client(props);
+        const cacher = new Cacher(client);
+        client.cacher = cacher;
+        return client;
     }
 
     async getNumConfirmationsToWait(txEthBlock) {
@@ -79,7 +81,6 @@ export class Client {
     }
 
     async status() {
-        console.log('Getting status');
         return fetch({
             method: 'get',
             url: `${baseUrl()}/status`,
@@ -95,7 +96,6 @@ export class Client {
 
     async getBlock(blockNumber) {
         const cached = this.cacher.getCachedBlock(blockNumber);
-        console.log(cached);
         if(cached) {
             return cached;
         }
@@ -187,7 +187,6 @@ export class Client {
 
     async transactionsList(address, offset, limit) {
         if (!address) {
-            console.log(address);
             return [];
         }
         const transactions = await this.blockExplorerClient.getAccountTransactions(address, offset, limit);

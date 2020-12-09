@@ -185,7 +185,7 @@ export default {
             this.status          = block.verified_at ? 'Verified' : 'Pending';
             this.block_size      = block.block_size;
 
-            const txs = await client.getBlockTransactions(this.blockNumber);
+            const txs = await client.getBlockTransactions(this.blockNumber, block);
             const tokens = await client.tokensPromise;
 
             const transactions = await Promise.all(txs.map(async (tx) => {

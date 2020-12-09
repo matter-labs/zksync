@@ -67,8 +67,12 @@ export default {
     data() {
         const isMainPage = (this.$router.currentRoute.path === '/');
         return {
-            contractLink: `${blockchainExplorerAddress}/${store.contractAddress}`,
             isMainPage
+        }
+    },
+    computed: {
+        contractLink() {
+            return `${blockchainExplorerAddress}/${store.contractAddress}`;
         }
     },
     methods: {
@@ -97,7 +101,7 @@ export default {
         // console.log(this.$router.currentRoute);
         const client = await clientPromise;
         const { contractAddress } = await client.testnetConfig();
-        this.store.contractAddress = contractAddress;
+        store.contractAddress = contractAddress;
     }
 };
 </script>

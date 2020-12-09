@@ -138,11 +138,13 @@ export default {
         async currentPage() {
             await this.update();
         },
-        nextAddress() {
+        async nextAddress() {
             this.loading = true;
             this.totalRows = 0;
             this.pagesOfTransactions = {};
 
+            this.client = await clientPromise;
+            
             this.update();
         }
     },
