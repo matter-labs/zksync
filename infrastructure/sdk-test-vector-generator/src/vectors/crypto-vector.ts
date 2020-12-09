@@ -17,7 +17,7 @@ export interface CryptoPrimitivesTestEntry extends TestVectorEntry {
         // Private key to be obtained from seed.
         privateKey: string;
         // Hash of a public key corresponding to the generated private key.
-        pubKeyHash: string;
+        pubKey: string;
         // Signature obtained using private key and message.
         signature: string;
     };
@@ -41,7 +41,7 @@ export async function generateCryptoTestVectors(): Promise<TestVector<CryptoPrim
         },
         outputs: {
             privateKey: utils.hexlify(privateKey),
-            pubKeyHash: pubKey,
+            pubKey: pubKey,
             signature: signature
         }
     };

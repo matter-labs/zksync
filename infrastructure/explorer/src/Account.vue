@@ -184,7 +184,7 @@ export default {
             this.$parent.$router.push('/transactions/' + item.hash);
         },
         async update() {
-            // Used to tackle races when 
+            // Used to tackle races when
             // the page updates, but this async function
             // tries to update the page, according to the previous address
             const addressAtBeginning = this.nextAddress;
@@ -272,9 +272,6 @@ export default {
             }
             
             return entry.innerHTML(`${shortenHash(tx.to, 'unknown! to')}`);
-        },
-        getTxAmountEntry() {
-            
         }
     },
     computed: {

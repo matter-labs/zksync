@@ -10,7 +10,7 @@ pub type SparseMerkleTree<T, H, HH> = parallel_smt::SparseMerkleTree<T, H, HH>;
 /// Default hasher used in the zkSync network for state hash calculations.
 pub type RescueHasher<T> = rescue_hasher::RescueHasher<T>;
 
-// TODO: return the code below and uncomment asserts (#1119)
+// TODO: return the code below and uncomment asserts (ZKS-107)
 
 // pub fn verify_proof<E: Account>(&self, index: u32, item: Account, proof: Vec<(E::Fr, bool)>) -> bool {
 //     use crate::sparse_merkle_tree::hasher::Hasher;

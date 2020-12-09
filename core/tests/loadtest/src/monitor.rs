@@ -13,7 +13,8 @@ use tokio::{
 };
 // Workspace uses
 use zksync::{
-    error::ClientError, ethereum::PriorityOpHolder, types::BlockStatus, EthereumProvider, Provider,
+    error::ClientError, ethereum::PriorityOpHolder, provider::Provider, types::BlockStatus,
+    EthereumProvider, RpcProvider,
 };
 use zksync_eth_signer::EthereumSigner;
 use zksync_types::{
@@ -94,7 +95,7 @@ struct MonitorInner {
 #[derive(Debug, Clone)]
 pub struct Monitor {
     /// Underlying zkSync network provider.
-    pub provider: Provider,
+    pub provider: RpcProvider,
     /// A pool of data required for api tests.
     pub api_data_pool: ApiDataPool,
     inner: Arc<Mutex<MonitorInner>>,
@@ -169,7 +170,7 @@ impl Monitor {
     const POLLING_INTERVAL: Duration = Duration::from_millis(50);
 
     /// Creates a new load monitor from the zkSync network provider.
-    pub async fn new(provider: Provider) -> Self {
+    pub async fn new(provider: RpcProvider) -> Self {
         let monitor = Self {
             provider,
             inner: Arc::new(Mutex::new(MonitorInner::default())),
