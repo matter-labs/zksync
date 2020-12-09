@@ -12,8 +12,10 @@ use zksync_types::{
     Address,
 };
 // Local uses
+use crate::fee_ticker::ticker_api::REQUEST_TIMEOUT;
 use crate::utils::token_db_cache::TokenDBCache;
 use std::collections::HashSet;
+use tokio::sync::Mutex;
 
 #[derive(Clone, Debug)]
 struct AcceptanceData {
@@ -90,14 +92,14 @@ impl<W: TokenWatcher> FeeTokenValidator<W> {
         );
         Ok(allowed)
     }
-    async fn get_token_market_amount(&self, token: &Token) -> anyhow::Result<f64> {
+    async fn get_token_market_amount(&mut self, token: &Token) -> anyhow::Result<f64> {
         self.watcher.get_token_market_amount(token).await
     }
 }
 
 #[async_trait::async_trait]
 pub trait TokenWatcher {
-    async fn get_token_market_amount(&self, token: &Token) -> anyhow::Result<f64>;
+    async fn get_token_market_amount(&mut self, token: &Token) -> anyhow::Result<f64>;
 }
 
 /// Watcher for Uniswap protocol
@@ -105,6 +107,7 @@ pub trait TokenWatcher {
 pub struct UniswapTokenWatcher {
     client: reqwest::Client,
     addr: String,
+    cache: Mutex<HashMap<Address, f64>>,
 }
 
 impl UniswapTokenWatcher {
@@ -112,7 +115,38 @@ impl UniswapTokenWatcher {
         Self {
             client: reqwest::Client::new(),
             addr,
+            cache: Default::default(),
         }
+    }
+    async fn get_token_amount(&mut self, address: Address) -> anyhow::Result<f64> {
+        // Uniswap has graphql API, using full graphql client for one query is overkill for current task
+        let query = format!("{{token(id: \"{:?}\"){{tradeVolumeUSD}}}}", address);
+        vlog::error!("Token market request {:?}", &query);
+        let request = self.client.post(&self.addr).json(&serde_json::json!({
+            "query": query,
+        }));
+
+        let api_request_future = tokio::time::timeout(REQUEST_TIMEOUT, request.send());
+
+        let response: String = api_request_future
+            .await
+            .map_err(|_| anyhow::format_err!("Uniswap API request timeout"))?
+            .map_err(|err| anyhow::format_err!("Uniswap API request failed: {}", err))?
+            .text()
+            .await?;
+
+        vlog::error!("Token market response {:?}", &response);
+        let data: GraphqlResponse = serde_json::from_str(&response).unwrap();
+        vlog::error!("Token market response {:?}", &data);
+        Ok(data.data.token.trade_volume_usd.parse()?)
+    }
+    async fn update_historical_amount(&mut self, address: Address, amount: f64) {
+        let mut cache = self.cache.lock().await;
+        cache.insert(address, amount);
+    }
+    async fn get_historical_amount(&mut self, address: Address) -> Option<f64> {
+        let cache = self.cache.lock().await;
+        cache.get(&address).cloned()
     }
 }
 
@@ -134,26 +168,15 @@ struct TokenResponse {
 
 #[async_trait::async_trait]
 impl TokenWatcher for UniswapTokenWatcher {
-    async fn get_token_market_amount(&self, token: &Token) -> anyhow::Result<f64> {
-        // Uniswap has graphql API, using full graphql client for one query is overkill for current task
-        let query = format!("{{token(id: \"{:?}\"){{tradeVolumeUSD}}}}", token.address);
-        vlog::error!("Token market request {:?}", &query);
-        let request = serde_json::json!({
-            "query": query,
-        });
-
-        let response = self
-            .client
-            .post(&self.addr)
-            .json(&request)
-            .send()
-            .await?
-            .text()
-            .await?;
-        vlog::error!("Token market response {:?}", &response);
-        let data: GraphqlResponse = serde_json::from_str(&response).unwrap();
-        vlog::error!("Token market response {:?}", &data);
-        Ok(data.data.token.trade_volume_usd.parse()?)
+    async fn get_token_market_amount(&mut self, token: &Token) -> anyhow::Result<f64> {
+        if let Ok(amount) = self.get_token_amount(token.address).await {
+            self.update_historical_amount(token.address, amount).await;
+            return Ok(amount);
+        };
+        if let Some(amount) = self.get_historical_amount(token.address).await {
+            return Ok(amount);
+        };
+        anyhow::bail!("Token amount api is not available right now.")
     }
 }
 
@@ -195,14 +218,14 @@ mod tests {
 
     #[async_trait::async_trait]
     impl TokenWatcher for InMemoryTokenWatcher {
-        async fn get_token_market_amount(&self, token: &Token) -> anyhow::Result<f64> {
+        async fn get_token_market_amount(&mut self, token: &Token) -> anyhow::Result<f64> {
             Ok(*self.amounts.get(&token.address).unwrap())
         }
     }
 
     #[tokio::test]
     async fn get_dev_token_amount() {
-        let watcher = UniswapTokenWatcher::new("http://0.0.0.0:9975/graphql".to_string());
+        let mut watcher = UniswapTokenWatcher::new("http://0.0.0.0:9975/graphql".to_string());
         let dai_token_address =
             Address::from_str("6b175474e89094c44da98b954eedeac495271d0f").unwrap();
         let dai_token = Token::new(1, dai_token_address, "DAI", 18);
@@ -213,7 +236,7 @@ mod tests {
     }
     #[tokio::test]
     async fn get_real_token_amount() {
-        let watcher = UniswapTokenWatcher::new(
+        let mut watcher = UniswapTokenWatcher::new(
             "https://api.thegraph.com/subgraphs/name/uniswap/uniswap-v2".to_string(),
         );
         let dai_token_address =

@@ -32,7 +32,7 @@ sleep 1
 
 # Launch binaries
 echo "Launching dev-liquidity-token-watcher..."
-nohup zk f $ZKSYNC_HOME/target/release/dev-liquidity-token-watcher &>/dev/null &
+nohup zk f $ZKSYNC_HOME/target/release/dev-liquidity-token-watcher &>$ZKSYNC_HOME/dev-liquidity-token-watcher.log &
 sleep 1
 
 echo "Launching server..."
