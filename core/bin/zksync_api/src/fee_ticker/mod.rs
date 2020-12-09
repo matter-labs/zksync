@@ -284,7 +284,6 @@ impl<API: FeeTickerAPI, INFO: FeeTickerInfo, WATCHER: TokenWatcher> FeeTicker<AP
                 }
                 TickerRequest::IsTokenAllowed { token, response } => {
                     let allowed = self.validator.token_allowed(token).await;
-                    vlog::error!("Token allowed {:?}", &allowed);
                     response.send(allowed).unwrap_or_default();
                 }
             }
