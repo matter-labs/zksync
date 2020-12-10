@@ -24,6 +24,7 @@ pub mod client;
 mod config;
 mod error;
 mod operations;
+mod search;
 #[cfg(test)]
 mod test_utils;
 mod tokens;
@@ -47,6 +48,7 @@ pub(crate) fn api_scope(
         ))
         .service(transactions::api_scope(tx_sender.clone()))
         .service(operations::api_scope(tx_sender.pool.clone()))
+        .service(search::api_scope(tx_sender.pool.clone()))
         .service(tokens::api_scope(
             tx_sender.tokens,
             tx_sender.ticker_requests,
