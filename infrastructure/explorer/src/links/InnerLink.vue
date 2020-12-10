@@ -1,21 +1,13 @@
-<template >
-    <router-link 
-        :to="to"
-    >
+<template>
+    <router-link :to="to">
         <span class="link-html-span" v-html="innerHTML" />
-    </router-link> 
+    </router-link>
 </template>
 
 <script>
-
 export default {
-    props: [
-        'to',
-        'innerHTML'
-    ]
-}
+    props: ['to', 'innerHTML']
+};
 </script>
 
-<style>
-
-</style>
+<style></style>

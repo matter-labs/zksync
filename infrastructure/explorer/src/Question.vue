@@ -5,6 +5,6 @@
 <script>
 export default {
     name: 'Question',
-    props: ['text'],
+    props: ['text']
 };
 </script>

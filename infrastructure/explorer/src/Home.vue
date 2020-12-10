@@ -1,31 +1,40 @@
 <template>
     <div>
-        <br>
+        <br />
         <b-container>
-            <b-alert v-if="updateError" variant="danger" show>
-                {{updateError}}. Try again later.
-            </b-alert>
-            <b-card bg-variant="light" >
-                <h4>zkSync {{store.capitalizedNetwork}} Block Explorer</h4> 
+            <b-alert v-if="updateError" variant="danger" show> {{ updateError }}. Try again later. </b-alert>
+            <b-card bg-variant="light">
+                <h4>zkSync {{ store.capitalizedNetwork }} Block Explorer</h4>
                 <SearchField :searchFieldInMenu="false" />
             </b-card>
-            <br>
+            <br />
             <b-card>
-            <div class="row" style="color: grey">
-                <div class="col-sm text-center">
-                <i class="far fa-square"></i> <b>Blocks committed</b><br><span class="num">{{lastCommitted}}</span>
+                <div class="row" style="color: grey">
+                    <div class="col-sm text-center">
+                        <i class="far fa-square"></i> <b>Blocks committed</b><br /><span class="num">{{
+                            lastCommitted
+                        }}</span>
+                    </div>
+                    <div class="col-sm text-center">
+                        <i class="far fa-check-square"></i>
+                        <b>Blocks verified</b><br /><span class="num">{{ lastVerified }}</span>
+                    </div>
+                    <div class="col-sm text-center">
+                        <i class="fas fa-list"></i> <b>Total transactions</b><br /><span class="num">{{
+                            totalTransactions
+                        }}</span>
+                    </div>
                 </div>
-                <div class="col-sm text-center">
-                <i class="far fa-check-square"></i> <b>Blocks verified</b><br><span class="num">{{lastVerified}}</span>
-                </div>
-                <div class="col-sm text-center">
-                <i class="fas fa-list"></i> <b>Total transactions</b><br><span class="num">{{totalTransactions}}</span>
-                </div>
-            </div>
             </b-card>
-            <br>
+            <br />
 
-            <b-pagination v-if="ready && totalTransactions > perPage" v-model="currentPage" :per-page="perPage" :total-rows="rows" @change="onPageChanged"></b-pagination>
+            <b-pagination
+                v-if="ready && totalTransactions > perPage"
+                v-model="currentPage"
+                :per-page="perPage"
+                :total-rows="rows"
+                @change="onPageChanged"
+            ></b-pagination>
             <b-table responsive class="nowrap" hover outlined :items="items" :busy="loading">
                 <template v-slot:cell(block_number)="data">
                     <router-link :to="`/blocks/${data.item.block_number}`" class="block_number_link">
@@ -42,8 +51,13 @@
                     </router-link>
                 </template>
             </b-table>
-            <b-pagination v-if="ready && totalTransactions > perPage" v-model="currentPage" :per-page="perPage" :total-rows="rows" @change="onPageChanged"></b-pagination>
-
+            <b-pagination
+                v-if="ready && totalTransactions > perPage"
+                v-model="currentPage"
+                :per-page="perPage"
+                :total-rows="rows"
+                @change="onPageChanged"
+            ></b-pagination>
         </b-container>
     </div>
 </template>
@@ -58,13 +72,13 @@ import Question from './Question.vue';
 import Navbar from './Navbar.vue';
 import ReadinessStatus from './ReadinessStatus.vue';
 import { formatDate } from './utils';
-const components = { 
+const components = {
     ClosableJumbotron,
     SearchField,
     CopyableAddress,
     Question,
     Navbar,
-    ReadinessStatus,
+    ReadinessStatus
 };
 
 export default {
@@ -75,29 +89,29 @@ export default {
     timers: {
         ticker: { time: 5000, autostart: true, repeat: true }
     },
-    data() { 
+    data() {
         return {
-            lastCommitted:      0,
-            lastVerified:       0,
-            totalTransactions:  0,
-            currentPage:        this.$route.query.page || 1,
-            
-            txPerBlock:         constants.TX_BATCH_SIZE,
-            blocks:             [],
-            ready:              false,
+            lastCommitted: 0,
+            lastVerified: 0,
+            totalTransactions: 0,
+            currentPage: this.$route.query.page || 1,
 
-            loading:            true,
-            contractAddress:    null,
+            txPerBlock: constants.TX_BATCH_SIZE,
+            blocks: [],
+            ready: false,
+
+            loading: true,
+            contractAddress: null,
 
             breadcrumbs: [
                 {
                     text: 'Blocks',
                     active: true
-                },
+                }
             ],
 
-            updateError:        null,
-            inactive:           false
+            updateError: null,
+            inactive: false
         };
     },
     computed: {
@@ -112,23 +126,23 @@ export default {
         },
         rows() {
             return this.lastCommitted || 9999;
-        },
+        }
     },
     activated() {
         this.inactive = false;
     },
     deactivated() {
         this.inactive = true;
-    },  
+    },
     methods: {
         async ticker() {
             try {
-                if(!this.inactive) {
+                if (!this.inactive) {
                     await this.update(true);
                 }
                 this.updateError = null;
             } catch (e) {
-                this.updateError = e.message || "Unknown error";
+                this.updateError = e.message || 'Unknown error';
             }
         },
         onRowClicked(item) {
@@ -145,7 +159,7 @@ export default {
             const client = await clientPromise;
 
             const status = await client.status();
-            
+
             let newBlocks = false;
             if (status) {
                 newBlocks = this.lastCommitted !== status.last_committed || this.lastVerified !== status.last_verified;
@@ -156,40 +170,40 @@ export default {
 
             if (newBlocks) {
                 await this.updateBlocks();
-            } 
+            }
 
             this.loading = false;
         },
         async updateBlocks() {
             const client = await clientPromise;
 
-            const max_block = this.lastCommitted - (constants.PAGE_SIZE * (this.currentPage-1));
+            const max_block = this.lastCommitted - constants.PAGE_SIZE * (this.currentPage - 1);
             if (max_block < 0) return;
 
             const blocks = await client.loadBlocks(max_block);
             if (blocks) {
-                this.blocks = blocks.map( b => ({
-                    block_number:   b.block_number,
-                    status:         `${b.verified_at ? 'Verified' : 'Pending'}`,
+                this.blocks = blocks.map(b => ({
+                    block_number: b.block_number,
+                    status: `${b.verified_at ? 'Verified' : 'Pending'}`,
                     new_state_root: b.new_state_root,
-                    accepted_at:    formatDate(b.committed_at),
-                    verified_at:    formatDate(b.verified_at),
+                    accepted_at: formatDate(b.committed_at),
+                    verified_at: formatDate(b.verified_at)
                 }));
                 this.currentPage = this.page;
                 this.ready = true;
             }
             this.loading = false;
-        },
+        }
     },
     watch: {
-        '$route' () {
-            if(!this.inactive) {
+        $route() {
+            if (!this.inactive) {
                 this.currentPage = this.page;
                 this.updateBlocks();
             }
-        },
+        }
     },
-    components,
+    components
 };
 </script>
 
@@ -199,15 +213,15 @@ export default {
 }
 
 .table-container {
-  position: relative;
+    position: relative;
 }
 
 .overlay {
-  position: absolute;
-  left: 0;
-  top: 0;
-  width: 100%;
-  height: 100%;
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
 }
 
 .clickable tr {
@@ -220,17 +234,20 @@ export default {
 
 @media (max-width: 720px) {
     .hide-sm {
-        display: none
+        display: none;
     }
 }
 
 @media (max-width: 992px) {
     .hide-lg {
-        display: none
+        display: none;
     }
 }
 
-h1, h2, h3, h4 {
+h1,
+h2,
+h3,
+h4 {
     font-weight: bold;
 }
 

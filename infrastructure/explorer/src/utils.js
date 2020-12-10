@@ -18,7 +18,15 @@ export function shortenHash(str, fallback) {
 
 export function formatDate(timeStr) {
     if (timeStr == null) return '';
-    return timeStr.toString().split('T')[0] + " " + timeStr.toString().split('T')[1].slice(0, 8) + " UTC";
+    return (
+        timeStr.toString().split('T')[0] +
+        ' ' +
+        timeStr
+            .toString()
+            .split('T')[1]
+            .slice(0, 8) +
+        ' UTC'
+    );
 }
 
 export function formatToken(amount, token) {
@@ -43,7 +51,7 @@ export function blockchainExplorerToken(token, account) {
     if (store.network === 'localhost') return `http://localhost:8000/${account}`;
     const prefix = store.network === 'mainnet' ? '' : `${store.network}.`;
     const tokenAddress = window.syncProvider.tokenSet.resolveTokenAddress(token);
-    
+
     if (tokenAddress != '0x0000000000000000000000000000000000000000') {
         return `https://${prefix}etherscan.io/token/${tokenAddress}?a=${account}`;
     } else {
@@ -54,50 +62,77 @@ export function blockchainExplorerToken(token, account) {
 // Note that this class follows Builder pattern
 // If you see any of it's methods not returning `this`
 // it is a bug.
+//
+// Used to represent the "data" part of the Entry component
+// It has 2 properties:
+// - name. It is used mostly to aid the programmer when dealing with bootstrap tables
+// - value. The data which describes the Entry and should passed to the `value` prop
+//          of the Entry component
 class Entry {
     constructor(name) {
         this.name = name;
         this.value = {};
     }
 
+    // If the link does not redirect user to another page
+    // this method should be called with the address relative to
+    // the routerBase be passed to it.
+    //
+    // Note that it only sets the router-link and its address
+    // but does not change the inner content
     localLink(to) {
         this.value.isLocalLink = true;
         this.value.to = to;
         return this;
     }
 
+    // If the link redirects user to another page
+    // with the target URL passed to it.
+    //
+    // Note that it only sets the router-link and its address
+    // but does not change the inner content
     outterLink(to) {
         this.value.isOutterLink = true;
         this.value.to = to;
         return this;
-    }   
+    }
 
+    // Pass here the html of the content of the entry
+    // Even though we should avoid hard-coding html,
+    // in rare cases it is much more convenient and readable.
     innerHTML(innerHTML) {
         this.value.innerHTML = innerHTML;
         return this;
     }
 
-    afterHTML(afterHTML) {
-        this.value.afterHTML = afterHTML;
-        return this;
-    }
-
+    // Used to set layer icons
+    // Example:
+    // https://zkscan.io/transactions/0xccacad609c8ae5703b2bb00fd277ba2e6dd6f1d888c3963b99576aca3e3fbae8
+    //
+    // You should pass number 1 or number 2 depending on the layer.
     layer(layer) {
         this.value.layer = layer;
         return this;
     }
 
+    // Makes the entry "copyable". Under the current implementation
+    // it means that the entry has copy icon appended to it.
+    //
+    // Pass the value if the component will be copyable
     copyable(newValue = true) {
         this.value.copyable = newValue;
         return this;
     }
 
+    // Adds tooltip to the right.
+    // Note that this should be used only in combination with
+    // copyable()
     tooltipRight(newValue = true) {
         this.value.tooltipRight = newValue;
         return this;
     }
 
-    // Can be used to rename
+    // Can be used to rename the entry
     rename(newName) {
         this.name = newName;
         return this;

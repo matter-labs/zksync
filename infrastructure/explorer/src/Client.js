@@ -1,12 +1,7 @@
 import config from './env-config';
 import * as constants from './constants';
-import {
-    formatToken,
-    isBlockVerified
-} from './utils';
-import {
-    BlockExplorerClient
-} from './BlockExplorerClient';
+import { formatToken, isBlockVerified } from './utils';
+import { BlockExplorerClient } from './BlockExplorerClient';
 
 import { Provider } from 'zksync';
 
@@ -18,7 +13,7 @@ import Cacher from './Cacher';
 function initOnUnloadSaving(cacher) {
     window.onunload = () => {
         cacher.saveCacheToLocalStorage();
-    }
+    };
 }
 
 async function fetch(req) {
@@ -40,30 +35,30 @@ export class Client {
 
     static async new() {
         window.syncProvider = await Provider.newHttpProvider(config.HTTP_RPC_API_ADDR);
-        const tokensPromise = window.syncProvider.getTokens()
-            .then(tokens => {
-                const res = {};
-                for (const token of Object.values(tokens)) {
-                    const symbol = token.symbol || `${token.id.toString().padStart(3, '0')}`;
-                    const syncSymbol = `${symbol}`;
-                    res[token.id] = {
-                        ...token,
-                        symbol,
-                        syncSymbol,
-                    };
-                }
-                return res;
-            });
+        const tokensPromise = window.syncProvider.getTokens().then(tokens => {
+            const res = {};
+            for (const token of Object.values(tokens)) {
+                const symbol = token.symbol || `${token.id.toString().padStart(3, '0')}`;
+                const syncSymbol = `${symbol}`;
+                res[token.id] = {
+                    ...token,
+                    symbol,
+                    syncSymbol
+                };
+            }
+            return res;
+        });
         const blockExplorerClient = new BlockExplorerClient(config.API_SERVER);
-        const ethersProvider = config.ETH_NETWORK == 'localhost' ?
-            new ethers.providers.JsonRpcProvider('http://localhost:8545') :
-            ethers.getDefaultProvider();
+        const ethersProvider =
+            config.ETH_NETWORK == 'localhost'
+                ? new ethers.providers.JsonRpcProvider('http://localhost:8545')
+                : ethers.getDefaultProvider();
 
         const props = {
             blockExplorerClient,
             tokensPromise,
             ethersProvider,
-            syncProvider: window.syncProvider,
+            syncProvider: window.syncProvider
         };
 
         const client = new Client(props);
@@ -83,38 +78,38 @@ export class Client {
     async testnetConfig() {
         return fetch({
             method: 'get',
-            url: `${baseUrl()}/testnet_config`,
+            url: `${baseUrl()}/testnet_config`
         });
     }
 
     async status() {
         return fetch({
             method: 'get',
-            url: `${baseUrl()}/status`,
+            url: `${baseUrl()}/status`
         });
     }
 
     async loadBlocks(max_block) {
         return fetch({
             method: 'get',
-            url: `${baseUrl()}/blocks?max_block=${max_block}&limit=${constants.PAGE_SIZE}`,
+            url: `${baseUrl()}/blocks?max_block=${max_block}&limit=${constants.PAGE_SIZE}`
         });
     }
 
     async getBlock(blockNumber) {
         const cached = this.cacher.getCachedBlock(blockNumber);
-        if(cached) {
+        if (cached) {
             return cached;
         }
 
         const block = await fetch({
             method: 'get',
-            url: `${baseUrl()}/blocks/${blockNumber}`,
+            url: `${baseUrl()}/blocks/${blockNumber}`
         });
 
-        // Cache only verified blocks since 
-        // these will definitely never change again 
-        if(isBlockVerified(block)) {
+        // Cache only verified blocks since
+        // these will definitely never change again
+        if (isBlockVerified(block)) {
             this.cacher.cacheBlock(blockNumber, block);
         }
 
@@ -123,22 +118,19 @@ export class Client {
 
     async getBlockTransactions(blockNumber, blockInfo) {
         const cached = this.cacher.getCachedBlockTransactions(blockNumber);
-        if(cached) {
+        if (cached) {
             return cached;
         }
 
         let txs = await fetch({
             method: 'get',
-            url: `${baseUrl()}/blocks/${blockNumber}/transactions`,
+            url: `${baseUrl()}/blocks/${blockNumber}/transactions`
         });
 
         // We can cache only verified transactions
-        if(blockInfo && isBlockVerified(blockInfo)) {
+        if (blockInfo && isBlockVerified(blockInfo)) {
             this.cacher.cacheBlockTransactions(blockNumber, txs);
-            this.cacher.cacheTransactionsFromBlock(
-                txs,
-                this
-            );
+            this.cacher.cacheTransactionsFromBlock(txs, this);
         }
 
         return txs;
@@ -147,19 +139,19 @@ export class Client {
     searchBlock(query) {
         return fetch({
             method: 'get',
-            url: `${baseUrl()}/search?query=${query}`,
+            url: `${baseUrl()}/search?query=${query}`
         });
     }
 
     async searchTx(txHash) {
         const cached = this.cacher.getCachedTransaction(txHash);
-        if(cached) {
+        if (cached) {
             return cached;
         }
 
         const tx = await fetch({
             method: 'get',
-            url: `${baseUrl()}/transactions_all/${txHash}`,
+            url: `${baseUrl()}/transactions_all/${txHash}`
         });
 
         return tx;
@@ -172,13 +164,12 @@ export class Client {
     async getCommitedBalances(address) {
         const account = await this.getAccount(address);
 
-        let balances = Object.entries(account.committed.balances)
-            .map(([tokenSymbol, balance]) => {
-                return {
-                    tokenSymbol,
-                    balance: formatToken(balance, tokenSymbol),
-                };
-            });
+        let balances = Object.entries(account.committed.balances).map(([tokenSymbol, balance]) => {
+            return {
+                tokenSymbol,
+                balance: formatToken(balance, tokenSymbol)
+            };
+        });
 
         balances.sort((a, b) => a.tokenSymbol.localeCompare(b.tokenSymbol));
         return balances;
@@ -197,7 +188,7 @@ export class Client {
             return [];
         }
         const transactions = await this.blockExplorerClient.getAccountTransactions(address, offset, limit);
-        const res = transactions.map(async (tx) => {
+        const res = transactions.map(async tx => {
             const type = tx.tx.type || '';
             const hash = tx.hash;
             const created_at = tx.created_at;
@@ -208,7 +199,7 @@ export class Client {
                 type,
                 success,
                 hash,
-                created_at,
+                created_at
             };
 
             switch (true) {
@@ -220,7 +211,7 @@ export class Client {
                         from: tx.tx.priority_op.from,
                         to: tx.tx.priority_op.to,
                         token,
-                        amount,
+                        amount
                     };
                 }
                 case type == 'FullExit': {
@@ -231,8 +222,7 @@ export class Client {
                         from: tx.tx.priority_op.eth_address,
                         to: tx.tx.priority_op.eth_address,
                         token,
-                        amount,
-
+                        amount
                     };
                 }
                 case type == 'Transfer' || type == 'Withdraw': {
@@ -243,13 +233,13 @@ export class Client {
                         from: tx.tx.from,
                         to: tx.tx.to,
                         token,
-                        amount,
+                        amount
                     };
                 }
                 case type == 'ForcedExit': {
                     const token = this.tokenNameFromSymbol(tx.tx.token);
                     let amount = (await this.searchTx(hash)).amount;
-                    if (amount != "unknown amount") {
+                    if (amount != 'unknown amount') {
                         amount = formatToken(amount || 0, token);
                     }
                     return {
@@ -257,14 +247,14 @@ export class Client {
                         from: tx.tx.target,
                         to: tx.tx.target,
                         token,
-                        amount,
+                        amount
                     };
                 }
                 case type == 'Close' || type == 'ChangePubKey': {
                     return {
                         ...data,
                         from: tx.tx.account,
-                        to: '',
+                        to: ''
                     };
                 }
             }
@@ -277,9 +267,9 @@ export class Client {
     async loadTokens() {
         return fetch({
             method: 'get',
-            url: `${baseUrl()}/tokens`,
+            url: `${baseUrl()}/tokens`
         });
     }
-};
+}
 
 export const clientPromise = Client.new();

@@ -1,53 +1,47 @@
 <template>
-<div>
-    <br>
-    <b-container>
-        <b-breadcrumb :items="breadcrumbs"></b-breadcrumb>
-        <div v-if="loadingStatus == 'loading'">
-            <img style="margin-right: 1.5em" src="./assets/loading.gif" width="100em">
-        </div>
-        <div v-else-if="loadingStatus == 'not committed'">
-            This block is not committed yet.
-        </div>
-        <div v-else>
-            <h5>Block data</h5>
-            <b-card no-body>
-                <b-table responsive id="my-table" thead-class="displaynone" :items="props" :busy="isBusy" class="nowrap">
-                    <template v-slot:cell(value)="data">
-                        <Entry 
-                            v-if="data.item.name == 'New root hash'" 
-                            :value="data.item.value"
-                        />
-                        <Entry 
-                            v-else-if="data.item.name == 'Commit tx hash'" 
-                            :value="data.item.value"
-                        />
-                        <Entry 
-                            v-else-if="data.item.name == 'Verify tx hash'" 
-                            :value="data.item.value"
-                        />
-                        <span v-else-if="data.item.name == 'Status'">
-                            <ReadinessStatus :status="data.item.value.innerHTML == 'Pending' ? 1 : 2" />
-                            <span v-html="data.item.value.innerHTML" class="mr-1"/>
-                            <Question :text="data.item.value.innerHTML" />
-                        </span>
-                        <Entry
-                            v-else
-                            :value="data.item.value"
-                        />
-                    </template>
-                </b-table>
-            </b-card>
-            <br>
-            <h5>Transactions in this block</h5>
-            <TransactionList :transactions="transactions"></TransactionList>
-        </div>
-    </b-container>
-</div>
+    <div>
+        <br />
+        <b-container>
+            <b-breadcrumb :items="breadcrumbs"></b-breadcrumb>
+            <div v-if="loadingStatus == 'loading'">
+                <img style="margin-right: 1.5em" src="./assets/loading.gif" width="100em" />
+            </div>
+            <div v-else-if="loadingStatus == 'not committed'">
+                This block is not committed yet.
+            </div>
+            <div v-else>
+                <h5>Block data</h5>
+                <b-card no-body>
+                    <b-table
+                        responsive
+                        id="my-table"
+                        thead-class="displaynone"
+                        :items="props"
+                        :busy="isBusy"
+                        class="nowrap"
+                    >
+                        <template v-slot:cell(value)="data">
+                            <Entry v-if="data.item.name == 'New root hash'" :value="data.item.value" />
+                            <Entry v-else-if="data.item.name == 'Commit tx hash'" :value="data.item.value" />
+                            <Entry v-else-if="data.item.name == 'Verify tx hash'" :value="data.item.value" />
+                            <span v-else-if="data.item.name == 'Status'">
+                                <ReadinessStatus :status="data.item.value.innerHTML == 'Pending' ? 1 : 2" />
+                                <span v-html="data.item.value.innerHTML" class="mr-1" />
+                                <Question :text="data.item.value.innerHTML" />
+                            </span>
+                            <Entry v-else :value="data.item.value" />
+                        </template>
+                    </b-table>
+                </b-card>
+                <br />
+                <h5>Transactions in this block</h5>
+                <TransactionList :transactions="transactions"></TransactionList>
+            </div>
+        </b-container>
+    </div>
 </template>
 
 <script>
-
 import { shortenHash, formatDate, makeEntry, formatToken } from './utils';
 
 import TransactionList from './TransactionList.vue';
@@ -59,12 +53,9 @@ import ReadinessStatus from './ReadinessStatus.vue';
 import { clientPromise } from './Client';
 import Entry from './links/Entry';
 
-import { 
-    blockchainExplorerTx,
-    blockchainExplorerAddress,
-} from './constants';
+import { blockchainExplorerTx, blockchainExplorerAddress } from './constants';
 
-import  {
+import {
     getTxFromAddress,
     getTxFromFallbackValue,
     getTxToAddress,
@@ -94,11 +85,11 @@ export default {
         new_state_root: null,
         commit_tx_hash: null,
         verify_tx_hash: null,
-        committed_at:   null,
-        verified_at:    null,
-        status:         null,
-        transactions:   [  ],
-        loadingStatus:  'loading',
+        committed_at: null,
+        verified_at: null,
+        status: null,
+        transactions: [],
+        loadingStatus: 'loading'
     }),
     computed: {
         isBusy: () => false,
@@ -112,9 +103,9 @@ export default {
                     to: '/'
                 },
                 {
-                    text: 'Block '+this.blockNumber,
+                    text: 'Block ' + this.blockNumber,
                     active: true
-                },
+                }
             ];
         },
         rows() {
@@ -123,7 +114,7 @@ export default {
         commitHashEntry() {
             const entry = makeEntry('Commit tx hash').copyable();
 
-            if(this.commit_tx_hash) {
+            if (this.commit_tx_hash) {
                 entry.outterLink(`${blockchainExplorerTx}/${this.commit_tx_hash}`);
                 entry.innerHTML(`${this.commit_tx_hash}`);
             } else {
@@ -135,7 +126,7 @@ export default {
         verifyHashEntry() {
             const entry = makeEntry('Verify tx hash').copyable();
 
-            if(this.verify_tx_hash) {
+            if (this.verify_tx_hash) {
                 entry.outterLink(`${blockchainExplorerTx}/${this.verify_tx_hash}`);
                 entry.innerHTML(`${this.verify_tx_hash}`);
             } else {
@@ -158,9 +149,9 @@ export default {
                 this.commitHashEntry,
                 makeEntry('Committed at').innerHTML(formatDate(this.committed_at)),
                 this.verifyHashEntry,
-                makeEntry('Verified at').innerHTML(formatDate(this.verified_at)),
+                makeEntry('Verified at').innerHTML(formatDate(this.verified_at))
             ];
-        },
+        }
     },
     methods: {
         async update() {
@@ -177,23 +168,25 @@ export default {
                 return;
             }
 
-            this.new_state_root  = block.new_state_root.slice(8);
-            this.commit_tx_hash  = block.commit_tx_hash || '';
-            this.verify_tx_hash  = block.verify_tx_hash || '';
-            this.committed_at    = block.committed_at;
-            this.verified_at     = block.verified_at;
-            this.status          = block.verified_at ? 'Verified' : 'Pending';
-            this.block_size      = block.block_size;
+            this.new_state_root = block.new_state_root.slice(8);
+            this.commit_tx_hash = block.commit_tx_hash || '';
+            this.verify_tx_hash = block.verify_tx_hash || '';
+            this.committed_at = block.committed_at;
+            this.verified_at = block.verified_at;
+            this.status = block.verified_at ? 'Verified' : 'Pending';
+            this.block_size = block.block_size;
 
             const txs = await client.getBlockTransactions(this.blockNumber, block);
             const tokens = await client.tokensPromise;
 
-            const transactions = await Promise.all(txs.map(async (tx) => {
-                return {
-                    ...await this.txEntries(tx, tokens, client),
-                    success: tx.success
-                };
-            }));
+            const transactions = await Promise.all(
+                txs.map(async tx => {
+                    return {
+                        ...(await this.txEntries(tx, tokens, client)),
+                        success: tx.success
+                    };
+                })
+            );
 
             this.transactions = transactions.filter(tx => tx.success);
             this.loadingStatus = 'ready';
@@ -201,11 +194,11 @@ export default {
         txHashEntry(tx) {
             const entry = makeEntry('Tx Hash');
             entry.localLink(`/transactions/${tx.tx_hash}`);
-            
+
             entry.innerHTML(shortenHash(tx.tx_hash));
             return entry;
-        },  
-        txTypeEntry(tx) {   
+        },
+        txTypeEntry(tx) {
             return makeEntry('Type').innerHTML(tx.op.type);
         },
         txFromEntry(tx) {
@@ -214,38 +207,34 @@ export default {
             const fromAddress = getTxFromAddress(tx);
             const fallback = getTxFromFallbackValue(tx);
 
-            if(tx.op.type === 'Deposit') {
+            if (tx.op.type === 'Deposit') {
                 entry.outterLink(`${blockchainExplorerAddress}/${fromAddress}`);
             } else {
                 entry.localLink(`/accounts/${fromAddress}`);
             }
 
-            entry.innerHTML(shortenHash(fromAddress, fallback));       
+            entry.innerHTML(shortenHash(fromAddress, fallback));
             return entry;
         },
 
         txToEntry(tx) {
             const entry = makeEntry('To');
 
-            if(tx.op.type === 'ChangePubKey') {
-                return entry; 
+            if (tx.op.type === 'ChangePubKey') {
+                return entry;
             }
 
             const toAddress = getTxToAddress(tx);
             const fallback = getTxToFallbackValue(tx);
 
-            const onChainWithdrawals = [
-                'Withdraw',
-                'ForcedExit',
-                'FullExit'
-            ];
-            
-            if(onChainWithdrawals.includes(tx.op.type)) {
+            const onChainWithdrawals = ['Withdraw', 'ForcedExit', 'FullExit'];
+
+            if (onChainWithdrawals.includes(tx.op.type)) {
                 entry.outterLink(`${blockchainExplorerAddress}/${toAddress}`);
             } else {
                 entry.localLink(`/accounts/${toAddress}`);
             }
-            
+
             entry.innerHTML(shortenHash(toAddress, fallback));
 
             return entry;
@@ -253,7 +242,7 @@ export default {
 
         async txAmountEntry(tx, token, client) {
             const entry = makeEntry('Amount');
-            if(tx.op.type === 'ChangePubKey') {
+            if (tx.op.type === 'ChangePubKey') {
                 return entry;
             }
 
@@ -264,15 +253,14 @@ export default {
             const entry = makeEntry('Fee');
             const fee = getTxFee(tx);
 
-            if(!fee) {
+            if (!fee) {
                 return entry;
             }
 
             return entry.innerHTML(`${formatToken(numOrZero(fee), token)} ${token}`);
         },
         txCreatedAtEntry(tx) {
-            return makeEntry('Created at')
-                .innerHTML(formatDate(tx.created_at));
+            return makeEntry('Created at').innerHTML(formatDate(tx.created_at));
         },
         async txEntries(tx, tokens, client) {
             const tokenSymbol = tokens[getTxToken(tx)].syncSymbol;
@@ -296,9 +284,8 @@ export default {
             };
         }
     },
-    components,
+    components
 };
 </script>
 
-<style>
-</style>
+<style></style>

@@ -11,12 +11,12 @@
 import Navbar from './Navbar.vue';
 export default {
     components: { Navbar },
-    name: "app",
+    name: 'app'
 };
 </script>
 
 <style lang="scss">
-@import "../scss/common.scss";
+@import '../scss/common.scss';
 input::placeholder {
     color: lightgrey !important;
     font-style: italic !important;

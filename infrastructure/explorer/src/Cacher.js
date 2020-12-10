@@ -6,20 +6,12 @@ import {
     MAX_CACHED_TRANSACTIONS
 } from './constants';
 
-import  {
-    getTxFee,
-    getTxFromAddress,
-    getTxToAddress,
-    getTxAmount,
-    getTxToken
-} from './blockUtils';
-
+import { getTxFee, getTxFromAddress, getTxToAddress, getTxAmount, getTxToken } from './blockUtils';
 
 class Cacher {
-
     loadCachedBlocks() {
         const stored = localStorage.getItem(BLOCK_STORAGE_CONSTANT);
-        this.cachedBlocks = stored ? JSON.parse(stored): {};
+        this.cachedBlocks = stored ? JSON.parse(stored) : {};
     }
 
     loadCachedBlocksTransactions() {
@@ -43,36 +35,30 @@ class Cacher {
         const objKeys = Object.keys(obj);
         const objSize = objKeys.length;
 
-        if(objSize < maxLeft) {
+        if (objSize < maxLeft) {
             return;
         }
 
         let toDelete = objSize - maxLeft;
-        
+
         // We delete the first toDelete elements, because:
         //
         // a) It does not really matter what elements to delete
-        // b) The first elements are usually the smallest one, thus 
-        // we delete the most irrelevant blocks 
-        for(let i = 0; i < toDelete; i++) {
+        // b) The first elements are usually the smallest one, thus
+        // we delete the most irrelevant blocks
+        for (let i = 0; i < toDelete; i++) {
             const key = objKeys[i];
             delete obj[key];
         }
     }
 
     cacheBlock(blockNumber, block) {
-        this.freeSpaceForCache(
-            this.cachedBlocks,
-            MAX_CACHED_BLOCKS-1
-        );
+        this.freeSpaceForCache(this.cachedBlocks, MAX_CACHED_BLOCKS - 1);
         this.cachedBlocks[blockNumber] = block;
     }
 
     cacheBlockTransactions(blockNumber, txs) {
-        this.freeSpaceForCache(
-            this.cachedBlocksTransactions,
-            MAX_CACHED_BLOCKS_TRANSACTIONS-1
-        );
+        this.freeSpaceForCache(this.cachedBlocksTransactions, MAX_CACHED_BLOCKS_TRANSACTIONS - 1);
         this.cachedBlocksTransactions[blockNumber] = txs;
     }
 
@@ -88,11 +74,11 @@ class Cacher {
         );
 
         // We do not await for the Promises, because
-        // 
+        //
         // a) JS is single-threaded, no data-races possible
         // b) By the time we will want to reuse these transactions
         // they will 99% be set, or, if not, it does not ruin anything.
-        txs.slice(0, numbrerOfTxToCache).forEach(async (tx) => {
+        txs.slice(0, numbrerOfTxToCache).forEach(async tx => {
             const op = tx.op;
             this.cachedTransactions[tx.tx_hash] = {
                 tx_type: op.type,
@@ -111,32 +97,23 @@ class Cacher {
     }
 
     cacheTransaction(hash, tx) {
-        this.freeSpaceForCache(
-            this.cachedTransactions, 
-            MAX_CACHED_TRANSACTIONS - 1
-        );
-        this.cachedTransactions[hash] = tx; 
+        this.freeSpaceForCache(this.cachedTransactions, MAX_CACHED_TRANSACTIONS - 1);
+        this.cachedTransactions[hash] = tx;
     }
 
     saveCacheToLocalStorage() {
         // We don't store transactions here, because:
         // a) A lot of them are already stored with block transactions
-        // b) It is unlikely that if a person wants to open a transaction 
+        // b) It is unlikely that if a person wants to open a transaction
         // first it will be verified, i.e. suitable for caching.
-        // c) We can not simply store all the transactions we want. 
-        // localStorage has it's own limitation. 
-        // 
+        // c) We can not simply store all the transactions we want.
+        // localStorage has it's own limitation.
+        //
         // Although to reach unlimited memory we could use
         // https://developer.mozilla.org/en-US/docs/Web/API/IndexedDB_API
         // But I believe it is an overkill
-        localStorage.setItem(
-            BLOCK_STORAGE_CONSTANT,
-            JSON.stringify(this.cachedBlocks)
-        );
-        localStorage.setItem(
-            BLOCK_TRANSACTIONS_STORAGE_CONSTANT,
-            JSON.stringify(this.cachedBlocksTransactions)
-        );
+        localStorage.setItem(BLOCK_STORAGE_CONSTANT, JSON.stringify(this.cachedBlocks));
+        localStorage.setItem(BLOCK_TRANSACTIONS_STORAGE_CONSTANT, JSON.stringify(this.cachedBlocksTransactions));
     }
 
     constructor(client) {
@@ -144,12 +121,10 @@ class Cacher {
         this.loadCachedBlocksTransactions();
         this.cachedTransactions = {};
 
-        
-        Object.values(this.cachedBlocksTransactions).forEach((txs) => {
+        Object.values(this.cachedBlocksTransactions).forEach(txs => {
             this.cacheTransactionsFromBlock(txs, client);
         });
     }
-
 }
 
-export default Cacher; 
+export default Cacher;

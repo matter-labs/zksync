@@ -1,7 +1,7 @@
 import Vue from 'vue';
-import BootstrapVue from "bootstrap-vue";
+import BootstrapVue from 'bootstrap-vue';
 
-import "./style.css";
+import './style.css';
 
 import Clipboard from 'v-clipboard';
 
@@ -15,7 +15,6 @@ import Transaction from './Transaction.vue';
 import Account from './Account.vue';
 import Tokens from './Tokens.vue';
 
-
 import VueTimers from 'vue-timers';
 
 const ethers = require('ethers');
@@ -26,11 +25,11 @@ Vue.use(BootstrapVue);
 Vue.use(Clipboard);
 
 const routes = [
-    { path: '/',                    component: Home },
+    { path: '/', component: Home },
     { path: '/blocks/:blockNumber', component: Block },
-    { path: '/transactions/:id',    component: Transaction },
-    { path: '/accounts/:address',   component: Account, props: true },
-    { path: '/tokens',              component: Tokens },
+    { path: '/transactions/:id', component: Transaction },
+    { path: '/accounts/:address', component: Account, props: true },
+    { path: '/tokens', component: Tokens }
 ];
 
 function getRouterBase() {
@@ -40,13 +39,13 @@ function getRouterBase() {
 const router = new Router({
     routes, // short for `routes: routes`
     mode: 'history',
-    base: getRouterBase(),
+    base: getRouterBase()
 });
 
 Vue.mixin({
     data: () => ({
         store,
-        routerBase: getRouterBase(),
+        routerBase: getRouterBase()
     })
 });
 
@@ -66,6 +65,6 @@ window.ethers = ethers;
 window.p = {
     // promise printer for debugging in console
     set p(promise) {
-        promise.then(r => console.log(r) );
-    },
+        promise.then(r => console.log(r));
+    }
 };

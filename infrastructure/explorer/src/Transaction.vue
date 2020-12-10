@@ -1,65 +1,59 @@
 <template>
-<div>
-    <br>
-    <b-container>
-        <div v-if="loading">
-            <h5 class="mt-3">Transaction data</h5>
-            <img 
-            src="./assets/loading.gif" 
-            width="100" 
-            height="100">
-        </div>
-        <div v-else-if="transactionExists == false">
-            <h5 class="mt-3">Can't find transaction <code> {{ tx_hash }} </code></h5>
-        </div>
-        <div v-else>
-            <b-breadcrumb :items="breadcrumbs"></b-breadcrumb>
-            <h5 class="mt-3">Transaction data</h5>
-            <b-card no-body class="table-margin-hack">
-                <b-table responsive thead-class="displaynone" :items="props">
-                    <template v-slot:cell(value)="data">
-                        <EntryComponent
-                            class="normalize-text"
-                            v-if="data.item['name'] == 'From'" 
-                            :value="data.item.value"
-                        />
-                        <EntryComponent
-                            class="normalize-text"
-                            v-else-if="data.item['name'] == 'To'" 
-                            :value="data.item.value"
-                        />
-                        <EntryComponent
-                            class="normalize-text"
-                            v-else-if="data.item['name'] == 'Account'" 
-                            :value="data.item.value"
-                        />
-                        <EntryComponent
-                            class="normalize-text"
-                            v-else-if="['zkSync tx hash', 'ETH Tx hash'].includes(data.item['name'])"
-                            :value="data.item.value"
-                        />
-                        <span v-else-if="data.item.name == 'Status'">
-                            <ReadinessStatus :status="readyStateFromString(data.item.value.innerHTML)" />
-                            <span v-html="data.item.value.innerHTML" class="mr-1"/>
-                            <Question :text="data.item.value.innerHTML" />
-                        </span>
-                        <span v-else v-html="data.item.value.innerHTML" />
-                    </template>
-                </b-table>
-            </b-card>
-            <br>
-        </div>
-    </b-container>
-</div>
+    <div>
+        <br />
+        <b-container>
+            <div v-if="loading">
+                <h5 class="mt-3">Transaction data</h5>
+                <img src="./assets/loading.gif" width="100" height="100" />
+            </div>
+            <div v-else-if="transactionExists == false">
+                <h5 class="mt-3">
+                    Can't find transaction <code> {{ tx_hash }} </code>
+                </h5>
+            </div>
+            <div v-else>
+                <b-breadcrumb :items="breadcrumbs"></b-breadcrumb>
+                <h5 class="mt-3">Transaction data</h5>
+                <b-card no-body class="table-margin-hack">
+                    <b-table responsive thead-class="displaynone" :items="props">
+                        <template v-slot:cell(value)="data">
+                            <EntryComponent
+                                class="normalize-text"
+                                v-if="data.item['name'] == 'From'"
+                                :value="data.item.value"
+                            />
+                            <EntryComponent
+                                class="normalize-text"
+                                v-else-if="data.item['name'] == 'To'"
+                                :value="data.item.value"
+                            />
+                            <EntryComponent
+                                class="normalize-text"
+                                v-else-if="data.item['name'] == 'Account'"
+                                :value="data.item.value"
+                            />
+                            <EntryComponent
+                                class="normalize-text"
+                                v-else-if="['zkSync tx hash', 'ETH Tx hash'].includes(data.item['name'])"
+                                :value="data.item.value"
+                            />
+                            <span v-else-if="data.item.name == 'Status'">
+                                <ReadinessStatus :status="readyStateFromString(data.item.value.innerHTML)" />
+                                <span v-html="data.item.value.innerHTML" class="mr-1" />
+                                <Question :text="data.item.value.innerHTML" />
+                            </span>
+                            <span v-else v-html="data.item.value.innerHTML" />
+                        </template>
+                    </b-table>
+                </b-card>
+                <br />
+            </div>
+        </b-container>
+    </div>
 </template>
 
 <script>
-import { 
-    formatDate, 
-    formatToken, 
-    makeEntry,
-    blockchainExplorerToken 
-} from './utils';
+import { formatDate, formatToken, makeEntry, blockchainExplorerToken } from './utils';
 import { clientPromise } from './Client';
 import timeConstants from './timeConstants';
 
@@ -70,10 +64,7 @@ import Question from './Question.vue';
 import ReadinessStatus from './ReadinessStatus.vue';
 import EntryComponent from './links/Entry';
 
-import { 
-    blockchainExplorerTx,
-    blockchainExplorerAddress
-} from './constants'; 
+import { blockchainExplorerTx, blockchainExplorerAddress } from './constants';
 import { BigNumber } from 'ethers';
 
 const components = {
@@ -92,7 +83,7 @@ export default {
         status: '',
         intervalHandle: null,
         loading: true,
-        transactionExists: true,
+        transactionExists: true
     }),
     async created() {
         await this.update();
@@ -107,10 +98,10 @@ export default {
     methods: {
         readyStateFromString(s) {
             return {
-                "Rejected": -1,
-                "Initiated": 0,
-                "Pending": 1,
-                "Complete": 2,
+                Rejected: -1,
+                Initiated: 0,
+                Pending: 1,
+                Complete: 2
             }[s];
         },
         async update() {
@@ -123,19 +114,18 @@ export default {
                 return;
             }
 
-            txData.tokenName = txData.token === -1 ? "" : tokens[txData.token].syncSymbol;
-            if (txData.tx_type  == "Deposit" || txData.tx_type == "FullExit") {
-                txData.feeTokenName = "ETH";
-            } else if(txData.tx_type  == "ChangePubKey" || txData.tx_type == "ChangePubKeyOffchain") {
+            txData.tokenName = txData.token === -1 ? '' : tokens[txData.token].syncSymbol;
+            if (txData.tx_type == 'Deposit' || txData.tx_type == 'FullExit') {
+                txData.feeTokenName = 'ETH';
+            } else if (txData.tx_type == 'ChangePubKey' || txData.tx_type == 'ChangePubKeyOffchain') {
                 // Once upon a time there was no need to pay the fee for the `ChangePubKey` operations,
                 // so we need to check if `txData` contains fields associated with fee
-                txData.feeTokenName = txData.token === -1 ? "" : tokens[txData.token || 0].syncSymbol;
+                txData.feeTokenName = txData.token === -1 ? '' : tokens[txData.token || 0].syncSymbol;
                 txData.fee = txData.fee || 0;
+            } else {
+                txData.feeTokenName = txData.token === -1 ? '' : tokens[txData.token].syncSymbol;
             }
-            else {
-                txData.feeTokenName = txData.token === -1 ? "" : tokens[txData.token].syncSymbol;
-            }
-            txData.amount = txData.amount == "unknown amount" ? "" : txData.amount;
+            txData.amount = txData.amount == 'unknown amount' ? '' : txData.amount;
 
             if (txData.tx_type == 'Withdraw') {
                 txData.tx_type = 'Withdrawal';
@@ -143,9 +133,9 @@ export default {
 
             let block = {
                 verified_at: null,
-                committed_at: null,
+                committed_at: null
             };
-            
+
             if (txData.block_number != -1) {
                 const fetchedBlock = await client.getBlock(txData.block_number);
                 // Only update block if it's created already.
@@ -161,16 +151,14 @@ export default {
                 txData.numEthConfirmationsToWait = await client.getNumConfirmationsToWait(txData.tx.eth_block_number);
             }
 
-            if(block.verified_at) {
+            if (block.verified_at) {
                 client.cacher.cacheTransaction(this.tx_hash, txData);
             }
 
-            txData.status = block.verified_at ? `Complete`
-                           : block.committed_at ? `Pending`
-                           : `Initiated`;
-            
+            txData.status = block.verified_at ? `Complete` : block.committed_at ? `Pending` : `Initiated`;
+
             this.txData = txData;
-        },
+        }
     },
     computed: {
         tx_hash() {
@@ -184,36 +172,33 @@ export default {
                 },
                 {
                     text: 'Block ' + this.txData.block_number,
-                    to: '/blocks/' + this.txData.block_number,
-                },                
+                    to: '/blocks/' + this.txData.block_number
+                },
                 {
                     text: 'Transaction ' + this.tx_hash,
                     active: true
-                },
+                }
             ];
         },
         hashEntry() {
-            const entry =  this.onChainTx ? 
-                makeEntry('ETH Tx hash')
-                .outterLink(`${blockchainExplorerTx}/${this.tx_hash}`)
-                .innerHTML(this.tx_hash)
-                : 
-                makeEntry('zkSync tx hash')
-                .innerHTML(this.tx_hash);
+            const entry = this.onChainTx
+                ? makeEntry('ETH Tx hash')
+                      .outterLink(`${blockchainExplorerTx}/${this.tx_hash}`)
+                      .innerHTML(this.tx_hash)
+                : makeEntry('zkSync tx hash').innerHTML(this.tx_hash);
 
             return entry.copyable();
         },
         fromLinkEntry() {
             const entry = makeEntry('From').copyable();
-            
+
             if (this.txData.tx_type == 'Deposit') {
                 entry.outterLink(`${blockchainExplorerAddress}/${this.txData.from}`);
             } else {
                 entry.localLink(`/accounts/${this.txData.from}`);
             }
 
-            if (this.txData.tx_type == 'Withdrawal' 
-                || this.txData.tx_type == 'FullExit') {
+            if (this.txData.tx_type == 'Withdrawal' || this.txData.tx_type == 'FullExit') {
                 entry.layer(2);
             }
             if (this.txData.tx_type == 'Deposit') {
@@ -233,8 +218,7 @@ export default {
                 entry.localLink(`/accounts/${this.txData.to}`);
             }
 
-            if (this.txData.tx_type == 'Withdrawal' 
-                || this.txData.tx_type == 'FullExit') {
+            if (this.txData.tx_type == 'Withdrawal' || this.txData.tx_type == 'FullExit') {
                 entry.layer(1);
             }
             if (this.txData.tx_type == 'Deposit') {
@@ -249,7 +233,7 @@ export default {
         statusEntry() {
             const entry = makeEntry('Status');
 
-            if(this.txData.fail_reason) {
+            if (this.txData.fail_reason) {
                 entry.innerHTML('Rejected');
             } else {
                 entry.innerHTML(this.txData.status);
@@ -262,95 +246,87 @@ export default {
 
             try {
                 const feeBN = BigNumber.from(fee);
-                if(feeBN.eq('0')) {
-                    return makeEntry("Fee")
-                        .innerHTML('<i>This transaction is a part of a batch. The fee was payed in another transaction.</i>');
+                if (feeBN.eq('0')) {
+                    return makeEntry('Fee').innerHTML(
+                        '<i>This transaction is a part of a batch. The fee was payed in another transaction.</i>'
+                    );
                 }
             } catch {
-                return makeEntry("Fee");
+                return makeEntry('Fee');
             }
-            
-            return makeEntry("Fee")
-                .innerHTML(`${this.txData.feeTokenName} ${formatToken(fee, this.txData.feeTokenName)}`);
+
+            return makeEntry('Fee').innerHTML(
+                `${this.txData.feeTokenName} ${formatToken(fee, this.txData.feeTokenName)}`
+            );
         },
         createdAtEntry() {
-            return makeEntry("Created at")
-                .innerHTML(formatDate(this.txData.created_at));
+            return makeEntry('Created at').innerHTML(formatDate(this.txData.created_at));
         },
         amountEntry() {
-            return makeEntry("Amount")
-                .innerHTML(`${this.txData.tokenName} ${formatToken(this.txData.amount || 0, this.txData.feeTokenName)}`);
+            return makeEntry('Amount').innerHTML(
+                `${this.txData.tokenName} ${formatToken(this.txData.amount || 0, this.txData.feeTokenName)}`
+            );
         },
         props() {
-            if (Object.keys(this.txData).length == 0) 
-                return [];
+            if (Object.keys(this.txData).length == 0) return [];
 
             const fromLinkEntry = this.fromLinkEntry;
 
-            const rows = this.txData.tx_type == "ChangePubKey"
-                ? [
-                    this.hashEntry,
-                    this.typeEntry,
-                    this.statusEntry,
-                    fromLinkEntry.rename("Account"),
-                    this.feeEntry,
-                    makeEntry("New signer key hash").innerHTML(`${this.txData.to.replace('sync:', '')}`),
-                    this.createdAtEntry    
-                ]
-                : this.txData.tx_type == "Deposit" || this.txData.tx_type == "FullExit"
-                ? [
-                    this.hashEntry,
-                    this.typeEntry,
-                    this.statusEntry,
-                    this.fromLinkEntry,
-                    this.toLinkEntry,
-                    this.amountEntry
-                ]
-                : [
-                    this.hashEntry,
-                    this.typeEntry,
-                    this.statusEntry,
-                    this.fromLinkEntry,
-                    this.toLinkEntry,
-                    this.amountEntry,
-                    this.feeEntry,
-                    this.createdAtEntry
-                ];
+            const rows =
+                this.txData.tx_type == 'ChangePubKey'
+                    ? [
+                          this.hashEntry,
+                          this.typeEntry,
+                          this.statusEntry,
+                          fromLinkEntry.rename('Account'),
+                          this.feeEntry,
+                          makeEntry('New signer key hash').innerHTML(`${this.txData.to.replace('sync:', '')}`),
+                          this.createdAtEntry
+                      ]
+                    : this.txData.tx_type == 'Deposit' || this.txData.tx_type == 'FullExit'
+                    ? [
+                          this.hashEntry,
+                          this.typeEntry,
+                          this.statusEntry,
+                          this.fromLinkEntry,
+                          this.toLinkEntry,
+                          this.amountEntry
+                      ]
+                    : [
+                          this.hashEntry,
+                          this.typeEntry,
+                          this.statusEntry,
+                          this.fromLinkEntry,
+                          this.toLinkEntry,
+                          this.amountEntry,
+                          this.feeEntry,
+                          this.createdAtEntry
+                      ];
 
-            if (this.txData.nonce != -1 
-                && (this.txData.nonce || this.txData === 0)) {
-                rows.push(
-                    makeEntry("Nonce")
-                    .innerHTML(this.txData.nonce)
-                );
+            if (this.txData.nonce != -1 && (this.txData.nonce || this.txData === 0)) {
+                rows.push(makeEntry('Nonce').innerHTML(this.txData.nonce));
             }
 
             if (this.txData.numEthConfirmationsToWait) {
-                rows.push(
-                    makeEntry("Eth confirmations")
-                    .innerHTML(this.txData.numEthConfirmationsToWait)
-                );
+                rows.push(makeEntry('Eth confirmations').innerHTML(this.txData.numEthConfirmationsToWait));
             }
 
             if (this.txData.fail_reason) {
-                rows.push(
-                    makeEntry("Rejection reason:")
-                    .innerHTML(this.txData.fail_reason)
-                );
+                rows.push(makeEntry('Rejection reason:').innerHTML(this.txData.fail_reason));
             }
 
             return rows;
         },
         onChainTx() {
-            return this.txData.tx_type == "Deposit" || this.txData.tx_type == "FullExit";
+            return this.txData.tx_type == 'Deposit' || this.txData.tx_type == 'FullExit';
         }
     },
-    components,
+    components
 };
 </script>
 
 <style>
-.table-margin-hack table, 
+.table-margin-hack table,
 .table-margin-hack .table-responsive {
     margin: 0 !important;
 }
@@ -361,7 +337,7 @@ export default {
     font-weight: bold;
     background: #17a2b8;
     border-radius: 5px;
-    padding: 0 .2em;
+    padding: 0 0.2em;
     color: white;
 }
 
@@ -371,12 +347,12 @@ export default {
     font-weight: bold;
     background: #17a2b8;
     border-radius: 5px;
-    padding: 0 .2em;
+    padding: 0 0.2em;
     color: white;
     font-size: 0.8em;
 }
 
 .normalize-text {
-    font-size: 1.0em;
+    font-size: 1em;
 }
 </style>

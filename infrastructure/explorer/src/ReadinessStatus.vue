@@ -19,8 +19,8 @@ export default {
             if ([1].includes(this.status)) return 1;
             if ([2].includes(this.status)) return 2;
             throw new Error('Invalid status');
-        },
-    },
+        }
+    }
 };
 </script>
 
@@ -30,6 +30,6 @@ export default {
     margin-right: -0.25em;
 }
 .brown {
-    color: #AA935D;
+    color: #aa935d;
 }
 </style>
