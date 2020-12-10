@@ -55,7 +55,7 @@ fn client_with_empty_worker_name_panics() {
 #[cfg_attr(not(feature = "db_test"), ignore)]
 async fn client_with_incorrect_secret_auth() {
     let block_size_chunks = ConfigurationOptions::from_env().available_block_chunk_sizes[0];
-    let addr = spawn_server(time::Duration::from_secs(1), time::Duration::from_secs(1)).await;
+    let addr = spawn_server(Duration::from_secs(1), Duration::from_secs(1)).await;
     let client = client::ApiClient::new(
         &format!("http://{}", &addr).parse().unwrap(),
         "foo",
