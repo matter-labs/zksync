@@ -61,8 +61,7 @@ impl TestServerConfig {
             App::new().service(web::scope("/api/v1").service(scope_factory(&this)))
         });
 
-        let mut url = server.url("");
-        url.pop(); // Pop last '/' symbol.
+        let url = server.url("").trim_end_matches('/').to_owned();
 
         let client = Client::new(url);
         (client, server)

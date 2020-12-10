@@ -50,8 +50,7 @@ fn get_unconfirmed_deposits_loopback(
         )
     });
 
-    let mut url = server.url("");
-    url.pop(); // Pop last '/' symbol.
+    let url = server.url("").trim_end_matches('/').to_owned();
 
     (CoreApiClient::new(url), server)
 }

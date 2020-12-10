@@ -430,8 +430,7 @@ mod tests {
                 .route("new_txs_batch", web::post().to(send_txs_batch))
         });
 
-        let mut url = server.url("");
-        url.pop(); // Pop last '/' symbol.
+        let url = server.url("").trim_end_matches('/').to_owned();
 
         (CoreApiClient::new(url), server)
     }

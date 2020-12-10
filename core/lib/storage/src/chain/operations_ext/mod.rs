@@ -678,6 +678,16 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
         Ok(tx_history)
     }
 
+    /// Loads the range of transaction receipts applied to the given account address
+    /// starting from the specified transaction location. Transaction location is defined
+    /// by the (`block_number`, `block index`) pair. This method can be used to get receipts
+    /// "older" than some location or "newer" than one.
+    ///
+    /// The response for "newer" receipts is sorted in ascending order by position and for "older"
+    /// ones in descending order.
+    ///
+    /// Note that rejected transactions do not have a `block_number`, but since the indexes of
+    /// succeesed transactions start from 1, the indexes of rejected transactions is set to 0.
     pub async fn get_account_transactions_receipts(
         &mut self,
         address: Address,

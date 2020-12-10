@@ -40,5 +40,5 @@ pub fn try_parse_tx_hash(query: &str) -> Result<TxHash, hex::FromHexError> {
     let tx_hex = remove_prefix(query);
     hex::decode_to_slice(&tx_hex, &mut slice)?;
 
-    TxHash::from_slice(&slice).ok_or(hex::FromHexError::InvalidStringLength)
+    Ok(TxHash::from_slice(&slice).unwrap())
 }

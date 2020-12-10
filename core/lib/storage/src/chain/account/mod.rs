@@ -232,11 +232,12 @@ impl<'a, 'c> AccountSchema<'a, 'c> {
         let start = Instant::now();
         // Find the account ID in `account_creates` table.
         let result = sqlx::query!(
-            "SELECT account_id FROM account_creates
-                                WHERE address = $1 AND is_create = $2
-                                ORDER BY block_number desc
-                                LIMIT 1
-                            ",
+            r#"
+                SELECT account_id FROM account_creates
+                WHERE address = $1 AND is_create = $2
+                ORDER BY block_number desc
+                LIMIT 1
+            "#,
             address.as_bytes(),
             true
         )
