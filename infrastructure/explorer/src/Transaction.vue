@@ -198,7 +198,11 @@ export default {
                 entry.localLink(`/accounts/${this.txData.from}`);
             }
 
-            if (this.txData.tx_type == 'Withdrawal' || this.txData.tx_type == 'FullExit') {
+            if (
+                this.txData.tx_type == 'Withdrawal' ||
+                this.txData.tx_type == 'FullExit' ||
+                this.txData.tx_type == 'ForcedExit'
+            ) {
                 entry.layer(2);
             }
             if (this.txData.tx_type == 'Deposit') {
@@ -218,7 +222,11 @@ export default {
                 entry.localLink(`/accounts/${this.txData.to}`);
             }
 
-            if (this.txData.tx_type == 'Withdrawal' || this.txData.tx_type == 'FullExit') {
+            if (
+                this.txData.tx_type == 'Withdrawal' ||
+                this.txData.tx_type == 'FullExit' ||
+                this.txData.tx_type == 'ForcedExit'
+            ) {
                 entry.layer(1);
             }
             if (this.txData.tx_type == 'Deposit') {
