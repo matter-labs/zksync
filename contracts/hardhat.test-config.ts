@@ -1,9 +1,8 @@
 import '@nomiclabs/hardhat-waffle';
 import '@nomiclabs/hardhat-solpp';
 import '@nomiclabs/hardhat-etherscan';
-import 'hardhat-typechain';
 import 'hardhat-contract-sizer';
-import { Network, loadDefs } from './hardhat.utils';
+import { loadDefs } from './hardhat.utils';
 
 export default {
     defaultNetwork: 'env',
@@ -20,14 +19,17 @@ export default {
         runOnCompile: false
     },
     paths: {
-        sources: './contracts'
+        sources: './contracts',
+        cache: './cache/test-contracts',
+        artifacts: './artifacts/test-contracts'
     },
     solpp: {
-        defs: loadDefs(process.env.ETH_NETWORK as Network)
+        defs: loadDefs('test')
     },
     networks: {
         env: {
-            url: `${process.env.WEB3_URL}`
+            url: `${process.env.WEB3_URL}`,
+            allowUnlimitedContractSize: true
         }
     },
     etherscan: {

@@ -84,7 +84,9 @@ export class EthMessageSigner {
     }
 
     getChangePubKeyEthSignMessage(changePubKey: { pubKeyHash: PubKeyHash; nonce: number; accountId: number }): string {
-        return getChangePubkeyMessage(changePubKey.pubKeyHash, changePubKey.nonce, changePubKey.accountId);
+        // TODO: Check this transformate (zks-???).
+        const uint8array = getChangePubkeyMessage(changePubKey.pubKeyHash, changePubKey.nonce, changePubKey.accountId);
+        return new TextDecoder('utf-8').decode(uint8array);
     }
 
     async ethSignChangePubKey(changePubKey: {
