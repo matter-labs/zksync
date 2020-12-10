@@ -1,5 +1,3 @@
-import { formatToken } from './utils';
-
 export function isTxPriorityOp(tx) {
     return tx.op.type === 'Deposit' || tx.op.type === 'FullExit';
 }

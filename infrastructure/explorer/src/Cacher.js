@@ -1,86 +1,76 @@
+import LRU from 'lru-cache';
 import {
-    BLOCK_STORAGE_CONSTANT,
-    BLOCK_TRANSACTIONS_STORAGE_CONSTANT,
+    BLOCK_STORAGE_SLOT,
+    BLOCK_TRANSACTIONS_STORAGE_SLOT,
     MAX_CACHED_BLOCKS,
     MAX_CACHED_BLOCKS_TRANSACTIONS,
-    MAX_CACHED_TRANSACTIONS
+    MAX_CACHED_TRANSACTIONS,
+    CACHE_VERSION_SLOT,
+    CACHE_VERSION
 } from './constants';
-
 import { getTxFee, getTxFromAddress, getTxToAddress, getTxAmount, getTxToken } from './blockUtils';
 
 class Cacher {
-    loadCachedBlocks() {
-        const stored = localStorage.getItem(BLOCK_STORAGE_CONSTANT);
-        this.cachedBlocks = stored ? JSON.parse(stored) : {};
+    checkCacheVersion() {
+        const version = localStorage.getItem(CACHE_VERSION_SLOT);
+        if (version !== CACHE_VERSION) {
+            localStorage.removeItem(BLOCK_STORAGE_SLOT);
+            localStorage.removeItem(BLOCK_TRANSACTIONS_STORAGE_SLOT);
+
+            localStorage.setItem(CACHE_VERSION_SLOT, CACHE_VERSION);
+        }
     }
 
-    loadCachedBlocksTransactions() {
-        const stored = localStorage.getItem(BLOCK_TRANSACTIONS_STORAGE_CONSTANT);
-        this.cachedBlocksTransactions = stored ? JSON.parse(stored) : {};
+    initLRUCaches() {
+        this.blocksCache = new LRU(MAX_CACHED_BLOCKS);
+        this.blocksTxsCache = new LRU(MAX_CACHED_BLOCKS_TRANSACTIONS);
+        this.txCache = new LRU(MAX_CACHED_TRANSACTIONS);
     }
 
-    getCachedBlock(blockNumber) {
-        return this.cachedBlocks[blockNumber];
-    }
-
-    getCachedBlockTransactions(blockNumber) {
-        return this.cachedBlocksTransactions[blockNumber];
-    }
-
-    getCachedTransaction(hash) {
-        return this.cachedTransactions[hash];
-    }
-
-    freeSpaceForCache(obj, maxLeft) {
-        const objKeys = Object.keys(obj);
-        const objSize = objKeys.length;
-
-        if (objSize < maxLeft) {
+    load(cache, slot) {
+        const stored = localStorage.getItem(slot);
+        if (!stored) {
             return;
         }
 
-        let toDelete = objSize - maxLeft;
-
-        // We delete the first toDelete elements, because:
-        //
-        // a) It does not really matter what elements to delete
-        // b) The first elements are usually the smallest one, thus
-        // we delete the most irrelevant blocks
-        for (let i = 0; i < toDelete; i++) {
-            const key = objKeys[i];
-            delete obj[key];
+        try {
+            cache.load(JSON.parse(stored));
+        } catch {
+            localStorage.removeItem(slot);
         }
     }
 
+    getCachedBlock(blockNumber) {
+        return this.blocksCache.get(blockNumber);
+    }
+
+    getCachedBlockTransactions(blockNumber) {
+        return this.blocksTxsCache.get(blockNumber);
+    }
+
+    getCachedTransaction(hash) {
+        return this.txCache.get(hash);
+    }
+
     cacheBlock(blockNumber, block) {
-        this.freeSpaceForCache(this.cachedBlocks, MAX_CACHED_BLOCKS - 1);
-        this.cachedBlocks[blockNumber] = block;
+        this.blocksCache.set(blockNumber, block);
     }
 
     cacheBlockTransactions(blockNumber, txs) {
-        this.freeSpaceForCache(this.cachedBlocksTransactions, MAX_CACHED_BLOCKS_TRANSACTIONS - 1);
-        this.cachedBlocksTransactions[blockNumber] = txs;
+        this.blocksTxsCache.set(blockNumber, txs);
     }
 
     // Technically, we could also cache transactions also from an account.
     // But it introduces too many complications.
     cacheTransactionsFromBlock(txs, client) {
-        const numbrerOfTxToCache = Math.min(txs.length, MAX_CACHED_TRANSACTIONS);
-        this.freeSpaceForCache(
-            this.cachedTransactions,
-            // Leaving just enough room for numbrerOfTxToCache
-            // transactions
-            MAX_CACHED_TRANSACTIONS - numbrerOfTxToCache
-        );
-
         // We do not await for the Promises, because
         //
         // a) JS is single-threaded, no data-races possible
-        // b) By the time we will want to reuse these transactions
-        // they will 99% be set, or, if not, it does not ruin anything.
-        txs.slice(0, numbrerOfTxToCache).forEach(async tx => {
+        // b) By the time we will want to reuse these transactions there is a
+        // 99% change they will be set, or, if not, it does not ruin anything.
+        txs.forEach(async tx => {
             const op = tx.op;
-            this.cachedTransactions[tx.tx_hash] = {
+            this.cacheTransaction(tx.tx_hash, {
                 tx_type: op.type,
                 from: getTxFromAddress(tx),
                 to: getTxToAddress(tx),
@@ -92,13 +82,12 @@ class Cacher {
                 created_at: tx.created_at,
                 fail_reason: tx.fail_reason,
                 tx: op
-            };
+            });
         });
     }
 
     cacheTransaction(hash, tx) {
-        this.freeSpaceForCache(this.cachedTransactions, MAX_CACHED_TRANSACTIONS - 1);
-        this.cachedTransactions[hash] = tx;
+        this.txCache.set(hash, tx);
     }
 
     saveCacheToLocalStorage() {
@@ -112,16 +101,19 @@ class Cacher {
         // Although to reach unlimited memory we could use
         // https://developer.mozilla.org/en-US/docs/Web/API/IndexedDB_API
         // But I believe it is an overkill
-        localStorage.setItem(BLOCK_STORAGE_CONSTANT, JSON.stringify(this.cachedBlocks));
-        localStorage.setItem(BLOCK_TRANSACTIONS_STORAGE_CONSTANT, JSON.stringify(this.cachedBlocksTransactions));
+        const blocksCacheDump = this.blocksCache.dump();
+        const blocksTxsCacheDump = this.blocksTxsCache.dump();
+        localStorage.setItem(BLOCK_STORAGE_SLOT, JSON.stringify(blocksCacheDump));
+        localStorage.setItem(BLOCK_TRANSACTIONS_STORAGE_SLOT, JSON.stringify(blocksTxsCacheDump));
     }
 
     constructor(client) {
-        this.loadCachedBlocks();
-        this.loadCachedBlocksTransactions();
-        this.cachedTransactions = {};
+        this.checkCacheVersion();
+        this.initLRUCaches();
+        this.load(this.blocksCache, BLOCK_STORAGE_SLOT);
+        this.load(this.blocksTxsCache, BLOCK_TRANSACTIONS_STORAGE_SLOT);
 
-        Object.values(this.cachedBlocksTransactions).forEach(txs => {
+        this.blocksTxsCache.values().forEach(txs => {
             this.cacheTransactionsFromBlock(txs, client);
         });
     }

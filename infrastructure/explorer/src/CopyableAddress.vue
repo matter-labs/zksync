@@ -21,8 +21,6 @@
 </template>
 
 <script>
-import { shortenHash } from './utils';
-
 export default {
     name: 'CopyableAddress',
     props: ['address', 'tooltipRight', 'isLocalLink', 'isOutterLink', 'link', 'linkHtml'],

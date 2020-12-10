@@ -13,6 +13,7 @@
     "bootstrap-vue": "^2.0.4",
     "core-js": "^3.3.2",
     "ethers": "^5.0.0",
+    "lru-cache": "^6.0.0",
     "node-libs-browser": "^2.2.1",
     "node-sass": "^4.13.0",
     "sass-loader": "^8.0.0",

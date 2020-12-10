@@ -2,6 +2,7 @@ import config from './env-config';
 import * as constants from './constants';
 import { formatToken, isBlockVerified } from './utils';
 import { BlockExplorerClient } from './BlockExplorerClient';
+import timeConstants from './timeConstants';
 
 import { Provider } from 'zksync';
 
@@ -11,9 +12,14 @@ import * as ethers from 'ethers';
 import Cacher from './Cacher';
 
 function initOnUnloadSaving(cacher) {
-    window.onunload = () => {
+    // Unfortunately there is no reliable way to save cache
+    // upon user leaving the page.
+    //
+    // window.onunload just does not give us enough time
+    // window.onbeforeunload might show weird popups in some browsers
+    setInterval(() => {
         cacher.saveCacheToLocalStorage();
-    };
+    }, timeConstants.cacheSaving);
 }
 
 async function fetch(req) {
