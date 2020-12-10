@@ -48,7 +48,9 @@ export default {
     }),
     methods: {
         async search() {
-            if (this.query == null) return;
+            if (this.query == null) {
+                return;
+            }
 
             const client = await clientPromise;
 
@@ -56,8 +58,11 @@ export default {
             this.searching = true;
 
             let query = this.query.trim();
-            for (const prefix of ['0x', 'sync-tx:', 'sync-bl:', 'sync:'])
-                if (query.startsWith(prefix)) query = query.slice(prefix.length);
+            for (const prefix of ['0x', 'sync-tx:', 'sync-bl:', 'sync:']) {
+                if (query.startsWith(prefix)) {
+                    query = query.slice(prefix.length);
+                }
+            }
 
             let block = await client.searchBlock(query).catch(() => null);
             if (block && block.block_number) {

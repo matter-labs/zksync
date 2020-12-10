@@ -14,10 +14,9 @@ export default {
     props: ['status'],
     computed: {
         getStatus() {
-            if ([-1].includes(this.status)) return -1;
-            if ([0].includes(this.status)) return 0;
-            if ([1].includes(this.status)) return 1;
-            if ([2].includes(this.status)) return 2;
+            if ([-1, 0, 1, 2].includes(this.status)) {
+                return this.status;
+            }
             throw new Error('Invalid status');
         }
     }

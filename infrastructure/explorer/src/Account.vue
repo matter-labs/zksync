@@ -168,12 +168,13 @@ export default {
             const limit = this.rowsPerPage;
 
             // maybe load the requested page
-            if (this.pagesOfTransactions[this.currentPage] == undefined)
+            if (this.pagesOfTransactions[this.currentPage] == undefined) {
                 this.pagesOfTransactions[this.currentPage] = await this.client.transactionsList(
                     addressAtBeginning,
                     offset,
                     limit
                 );
+            }
 
             let nextPageLoaded = false;
             let numNextPageTransactions;

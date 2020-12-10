@@ -289,7 +289,9 @@ export default {
             }
         },
         props() {
-            if (Object.keys(this.txData).length == 0) return [];
+            if (Object.keys(this.txData).length == 0) {
+                return [];
+            }
 
             const rows = [];
 

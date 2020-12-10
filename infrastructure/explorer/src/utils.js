@@ -17,7 +17,10 @@ export function shortenHash(str, fallback) {
 }
 
 export function formatDate(timeStr) {
-    if (timeStr == null) return '';
+    if (timeStr == null) {
+        return '';
+    }
+
     return (
         timeStr.toString().split('T')[0] +
         ' ' +
@@ -34,8 +37,12 @@ export function formatToken(amount, token) {
 }
 
 export function capitalize(s) {
-    if (typeof s !== 'string') return '';
-    if (!s) return;
+    if (typeof s !== 'string') {
+        return '';
+    }
+    if (!s) {
+        return;
+    }
     return s[0].toUpperCase() + s.slice(1);
 }
 
@@ -48,7 +55,9 @@ export function getLocalAccountLink(address) {
 }
 
 export function blockchainExplorerToken(token, account) {
-    if (store.network === 'localhost') return `http://localhost:8000/${account}`;
+    if (store.network === 'localhost') {
+        return `http://localhost:8000/${account}`;
+    }
     const prefix = store.network === 'mainnet' ? '' : `${store.network}.`;
     const tokenAddress = window.syncProvider.tokenSet.resolveTokenAddress(token);
 
