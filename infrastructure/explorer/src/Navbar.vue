@@ -60,12 +60,6 @@ import { blockchainExplorerAddress } from './constants';
 export default {
     name: 'Navbar',
     components,
-    data() {
-        const isMainPage = this.$router.currentRoute.path === '/';
-        return {
-            isMainPage
-        };
-    },
     computed: {
         contractLink() {
             return `${blockchainExplorerAddress}/${store.contractAddress}`;
@@ -73,20 +67,18 @@ export default {
     },
     methods: {
         goToTokens() {
-            if (!this.isMainPage) {
+            if (this.$router.currentRoute.path === '/tokens') {
                 return;
             }
 
             this.$router.push('/tokens');
-            this.isMainPage = false;
         },
         goToHome() {
-            if (this.isMainPage) {
+            if (this.$router.currentRoute.path === '/') {
                 return;
             }
 
             this.$router.push('/');
-            this.isMainPage = true;
         }
     },
     async created() {
