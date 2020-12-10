@@ -73,20 +73,20 @@ export default {
     },
     methods: {
         goToTokens() {
-            // Throws an error when moving
-            // to the same route
-            try {
-                this.$router.push('/tokens');
-                this.isMainPage = false;
-            } catch {}
+            if (!this.isMainPage) {
+                return;
+            }
+
+            this.$router.push('/tokens');
+            this.isMainPage = false;
         },
         goToHome() {
-            // Throws an error when moving
-            // to the same route
-            try {
-                this.$router.push('/');
-                this.isMainPage = true;
-            } catch {}
+            if (this.isMainPage) {
+                return;
+            }
+
+            this.$router.push('/');
+            this.isMainPage = true;
         }
     },
     async created() {
