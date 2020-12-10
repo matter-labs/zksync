@@ -244,6 +244,15 @@ export default {
             }
 
             return entry.innerHTML(`${shortenHash(tx.to, 'unknown! to')}`);
+        },
+        getTypeEntry(tx) {
+            return makeEntry('Type').innerHTML(tx.type);
+        },
+        getAmountEntry(tx) {
+            return makeEntry('Amount').innerHTML(`${tx.token} <span>${tx.amount}</span>`);
+        },
+        getCreatedAtEntry(tx) {
+            return makeEntry('CreatedAt').innerHTML(formatDate(tx.created_at));
         }
     },
     computed: {
@@ -280,9 +289,9 @@ export default {
 
                 const To = this.getLinkToEntry(tx);
 
-                const Type = makeEntry('Type').innerHTML(tx.type);
-                const Amount = makeEntry('Amount').innerHTML(`${tx.token} <span>${tx.amount}</span>`);
-                const CreatedAt = makeEntry('CreatedAt').innerHTML(formatDate(tx.created_at));
+                const Type = this.getTypeEntry(tx);
+                const Amount = this.getAmountEntry(tx);
+                const CreatedAt = this.getCreatedAtEntry(tx);
 
                 if (tx.type === 'ChangePubKey') {
                     // There is no amount for ChangePubKey

@@ -209,6 +209,10 @@ export default {
                 entry.layer(1);
             }
 
+            if (this.txData.tx_type == 'ChangePubKey') {
+                entry.rename('Account');
+            }
+
             entry.innerHTML(this.txData.from);
 
             return entry;
@@ -275,41 +279,19 @@ export default {
                 `${this.txData.tokenName} ${formatToken(this.txData.amount || 0, this.txData.feeTokenName)}`
             );
         },
+        newSignerPubKeyHashEntry() {
+            if (this.txData.tx_type == 'ChangePubKey') {
+                return makeEntry('New signer key hash').innerHTML(`${this.txData.to.replace('sync:', '')}`);
+            } else {
+                // This entry won't be used for any tx_type
+                // except for ChangePubKey anyway
+                return '';
+            }
+        },
         props() {
             if (Object.keys(this.txData).length == 0) return [];
 
-            const fromLinkEntry = this.fromLinkEntry;
-
-            const rows =
-                this.txData.tx_type == 'ChangePubKey'
-                    ? [
-                          this.hashEntry,
-                          this.typeEntry,
-                          this.statusEntry,
-                          fromLinkEntry.rename('Account'),
-                          this.feeEntry,
-                          makeEntry('New signer key hash').innerHTML(`${this.txData.to.replace('sync:', '')}`),
-                          this.createdAtEntry
-                      ]
-                    : this.txData.tx_type == 'Deposit' || this.txData.tx_type == 'FullExit'
-                    ? [
-                          this.hashEntry,
-                          this.typeEntry,
-                          this.statusEntry,
-                          this.fromLinkEntry,
-                          this.toLinkEntry,
-                          this.amountEntry
-                      ]
-                    : [
-                          this.hashEntry,
-                          this.typeEntry,
-                          this.statusEntry,
-                          this.fromLinkEntry,
-                          this.toLinkEntry,
-                          this.amountEntry,
-                          this.feeEntry,
-                          this.createdAtEntry
-                      ];
+            const rows = [];
 
             if (this.txData.nonce != -1 && (this.txData.nonce || this.txData === 0)) {
                 rows.push(makeEntry('Nonce').innerHTML(this.txData.nonce));
@@ -323,7 +305,42 @@ export default {
                 rows.push(makeEntry('Rejection reason:').innerHTML(this.txData.fail_reason));
             }
 
-            return rows;
+            if (this.txData.tx_type == 'ChangePubKey') {
+                return [
+                    this.hashEntry,
+                    this.typeEntry,
+                    this.statusEntry,
+                    this.fromLinkEntry,
+                    this.feeEntry,
+                    this.newSignerPubKeyHashEntry,
+                    this.createdAtEntry,
+                    ...rows
+                ];
+            }
+
+            if (this.txData.tx_type == 'Deposit' || this.txData.tx_type == 'FullExit') {
+                return [
+                    this.hashEntry,
+                    this.typeEntry,
+                    this.statusEntry,
+                    this.fromLinkEntry,
+                    this.toLinkEntry,
+                    this.amountEntry,
+                    ...rows
+                ];
+            }
+
+            return [
+                this.hashEntry,
+                this.typeEntry,
+                this.statusEntry,
+                this.fromLinkEntry,
+                this.toLinkEntry,
+                this.amountEntry,
+                this.feeEntry,
+                this.createdAtEntry,
+                ...rows
+            ];
         },
         onChainTx() {
             return this.txData.tx_type == 'Deposit' || this.txData.tx_type == 'FullExit';

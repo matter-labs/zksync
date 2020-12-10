@@ -111,6 +111,20 @@ export default {
         rows() {
             return this.items.length;
         },
+        blockNumberEntry() {
+            return makeEntry('Block Number').innerHTML(this.blockNumber);
+        },
+        blockSizeEntry() {
+            return makeEntry('Block Size').innerHTML(this.block_size);
+        },
+        rootHashEntry() {
+            return makeEntry('New root hash')
+                .innerHTML(this.new_state_root)
+                .copyable();
+        },
+        statusEntry() {
+            return makeEntry('Status').innerHTML(this.status);
+        },
         commitHashEntry() {
             const entry = makeEntry('Commit tx hash').copyable();
 
@@ -122,6 +136,9 @@ export default {
             }
 
             return entry;
+        },
+        commitedAtEntry() {
+            return makeEntry('Committed at').innerHTML(formatDate(this.committed_at));
         },
         verifyHashEntry() {
             const entry = makeEntry('Verify tx hash').copyable();
@@ -135,21 +152,19 @@ export default {
 
             return entry;
         },
-        rootHashEntry() {
-            return makeEntry('New root hash')
-                .innerHTML(this.new_state_root)
-                .copyable();
+        verifiedAtEntry() {
+            return makeEntry('Verified at').innerHTML(formatDate(this.verified_at));
         },
         props() {
             return [
-                makeEntry('Block Number').innerHTML(this.blockNumber),
-                makeEntry('Block Size').innerHTML(this.block_size),
+                this.blockNumberEntry,
+                this.blockSizeEntry,
                 this.rootHashEntry,
-                makeEntry('Status').innerHTML(this.status),
+                this.statusEntry,
                 this.commitHashEntry,
-                makeEntry('Committed at').innerHTML(formatDate(this.committed_at)),
+                this.commitedAtEntry,
                 this.verifyHashEntry,
-                makeEntry('Verified at').innerHTML(formatDate(this.verified_at))
+                this.verifiedAtEntry
             ];
         }
     },
