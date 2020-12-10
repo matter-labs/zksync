@@ -194,11 +194,10 @@ fn small_input_and_middle_leaf() {
         sequential_smt::SparseMerkleTree::<u64, Fr, RescueHasher<Engine>>::new(depth);
 
     for (idx, item) in elements.iter().enumerate() {
-        let idx = idx as u32;
-        par_tree.insert(idx, *item);
-        seq_tree.insert(idx as usize, *item);
-        assert_eq!(root_hashes[idx as usize], par_tree.root_hash());
-        assert_eq!(root_hashes[idx as usize], seq_tree.root_hash());
+        par_tree.insert(idx as u32, *item);
+        seq_tree.insert(idx, *item);
+        assert_eq!(root_hashes[idx], par_tree.root_hash());
+        assert_eq!(root_hashes[idx], seq_tree.root_hash());
     }
     assert_eq!(path, par_tree.merkle_path(index_to_find_path));
 }
@@ -249,11 +248,10 @@ fn small_input_and_leftmost_leaf() {
         sequential_smt::SparseMerkleTree::<u64, Fr, RescueHasher<Engine>>::new(depth);
 
     for (idx, item) in elements.iter().enumerate() {
-        let idx = idx as u32;
-        par_tree.insert(idx, *item);
-        seq_tree.insert(idx as usize, *item);
-        assert_eq!(root_hashes[idx as usize], par_tree.root_hash());
-        assert_eq!(root_hashes[idx as usize], seq_tree.root_hash());
+        par_tree.insert(idx as u32, *item);
+        seq_tree.insert(idx, *item);
+        assert_eq!(root_hashes[idx], par_tree.root_hash());
+        assert_eq!(root_hashes[idx], seq_tree.root_hash());
     }
     assert_eq!(path, par_tree.merkle_path(index_to_find_path));
 }
