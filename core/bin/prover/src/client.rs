@@ -33,7 +33,7 @@ pub struct ApiClient {
 
 impl ApiClient {
     // The time for which the authorization token will be valid
-    const AUTH_TOKEN_LIFETIME: std::time::Duration = time::Duration::from_secs(10);
+    const AUTH_TOKEN_LIFETIME: Duration = Duration::from_secs(10);
 
     pub fn new(
         base_url: &Url,
