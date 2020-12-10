@@ -70,12 +70,10 @@
 <script>
 import timeConstants from './timeConstants';
 import { clientPromise } from './Client';
-import { shortenHash, formatDate, makeEntry } from './utils';
 import SearchField from './SearchField.vue';
 import CopyableAddress from './CopyableAddress.vue';
 import Navbar from './Navbar.vue';
 
-import { blockchainExplorerAddress } from './constants';
 import Entry from './links/Entry.vue';
 
 import { getTxEntries } from './accountTxEntries';

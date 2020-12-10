@@ -42,7 +42,7 @@
 </template>
 
 <script>
-import { shortenHash, formatDate, makeEntry, formatToken } from './utils';
+import { formatDate, makeEntry } from './utils';
 
 import TransactionList from './TransactionList.vue';
 import SearchField from './SearchField.vue';
@@ -53,7 +53,7 @@ import ReadinessStatus from './ReadinessStatus.vue';
 import { clientPromise } from './Client';
 import Entry from './links/Entry';
 
-import { blockchainExplorerTx, blockchainExplorerAddress } from './constants';
+import { blockchainExplorerTx } from './constants';
 
 import { getTxEntries } from './blockTxEnries';
 

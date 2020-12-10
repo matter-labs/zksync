@@ -53,19 +53,16 @@
 </template>
 
 <script>
-import { formatDate, formatToken, makeEntry, blockchainExplorerToken } from './utils';
 import { clientPromise } from './Client';
 import timeConstants from './timeConstants';
-
+import { makeEntry } from './utils';
 import SearchField from './SearchField.vue';
 import CopyableAddress from './CopyableAddress.vue';
 import Navbar from './Navbar.vue';
 import Question from './Question.vue';
 import ReadinessStatus from './ReadinessStatus.vue';
 import EntryComponent from './links/Entry';
-
-import { blockchainExplorerTx, blockchainExplorerAddress } from './constants';
-import { BigNumber } from 'ethers';
+import { blockchainExplorerTx } from './constants';
 
 import { getTxEntries } from './transactionEntries';
 
@@ -188,13 +185,21 @@ export default {
                 }
             ];
         },
+        hashEntry() {
+            const entry = this.onChainTx
+                ? makeEntry('ETH Tx hash')
+                      .outterLink(`${blockchainExplorerTx}/${this.tx_hash}`)
+                      .innerHTML(this.tx_hash)
+                : makeEntry('zkSync tx hash').innerHTML(this.tx_hash);
 
+            return entry.copyable();
+        },
         props() {
             if (Object.keys(this.txData).length == 0) {
                 return [];
             }
 
-            return getTxEntries(this.txData);
+            return [this.hashEntry, ...getTxEntries(this.txData)];
         },
         onChainTx() {
             return this.txData.tx_type == 'Deposit' || this.txData.tx_type == 'FullExit';

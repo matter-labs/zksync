@@ -1,16 +1,6 @@
 import { formatDate, formatToken, makeEntry, blockchainExplorerToken } from './utils';
-import { blockchainExplorerTx, blockchainExplorerAddress } from './constants';
+import { blockchainExplorerAddress } from './constants';
 import { BigNumber } from 'ethers';
-
-function hashEntry(txData) {
-    const entry = this.onChainTx
-        ? makeEntry('ETH Tx hash')
-              .outterLink(`${blockchainExplorerTx}/${this.tx_hash}`)
-              .innerHTML(this.tx_hash)
-        : makeEntry('zkSync tx hash').innerHTML(this.tx_hash);
-
-    return entry.copyable();
-}
 
 function fromLinkEntry(txData) {
     const entry = makeEntry('From').copyable();
@@ -124,7 +114,6 @@ export function getTxEntries(txData) {
 
     if (txData.tx_type == 'ChangePubKey') {
         return [
-            hashEntry(txData),
             typeEntry(txData),
             statusEntry(txData),
             fromLinkEntry(txData),
@@ -137,7 +126,6 @@ export function getTxEntries(txData) {
 
     if (txData.tx_type == 'Deposit' || txData.tx_type == 'FullExit') {
         return [
-            hashEntry(txData),
             typeEntry(txData),
             statusEntry(txData),
             fromLinkEntry(txData),
@@ -148,7 +136,6 @@ export function getTxEntries(txData) {
     }
 
     return [
-        hashEntry(txData),
         typeEntry(txData),
         statusEntry(txData),
         fromLinkEntry(txData),
