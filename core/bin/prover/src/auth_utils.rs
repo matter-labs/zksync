@@ -4,8 +4,10 @@ use std::time;
 
 #[derive(Debug, Serialize, Deserialize)]
 struct PayloadAuthToken {
-    sub: String, // Subject (whom auth token refers to)
-    exp: usize,  // Expiration time (as UTC timestamp)
+    /// Subject (whom auth token refers to).
+    sub: String,
+    /// Expiration time (as UTC timestamp).
+    exp: usize,
 }
 
 impl PayloadAuthToken {
@@ -24,9 +26,9 @@ pub struct AuthTokenGenerator {
 }
 
 impl AuthTokenGenerator {
-    pub fn new(secret: &str, period_availability: time::Duration) -> Self {
+    pub fn new(secret: String, period_availability: time::Duration) -> Self {
         Self {
-            secret: secret.to_string(),
+            secret,
             period_availability,
         }
     }

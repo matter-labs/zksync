@@ -48,7 +48,8 @@ impl ApiClient {
             .timeout(req_server_timeout)
             .build()
             .expect("Failed to create request client");
-        let auth_token_generator = AuthTokenGenerator::new(secret, Self::AUTH_TOKEN_LIFETIME);
+        let auth_token_generator =
+            AuthTokenGenerator::new(secret.to_string(), Self::AUTH_TOKEN_LIFETIME);
         Self {
             register_url: base_url.join("/register").unwrap(),
             block_to_prove_url: base_url.join("/block_to_prove").unwrap(),
@@ -60,6 +61,12 @@ impl ApiClient {
             http_client,
             auth_token_generator,
         }
+    }
+
+    fn get_encoded_token(&self) -> anyhow::Result<String> {
+        self.auth_token_generator
+            .encode()
+            .map_err(|e| format_err!("failed generate authorization token: {}", e))
     }
 
     fn with_retries<T>(
@@ -98,17 +105,12 @@ impl ApiClient {
     }
 
     pub fn register_prover(&self, block_size: usize) -> anyhow::Result<i32> {
-        let auth_token_generator = self
-            .auth_token_generator
-            .encode()
-            .map_err(|e| format_err!("failed generate authorization token: {}", e))?;
-
         let op = || -> Result<i32, anyhow::Error> {
             info!("Registering prover...");
             let res = self
                 .http_client
                 .post(self.register_url.as_str())
-                .bearer_auth(&auth_token_generator)
+                .bearer_auth(&self.get_encoded_token()?)
                 .json(&client::ProverReq {
                     name: self.worker.clone(),
                     block_size,
@@ -130,17 +132,12 @@ impl ApiClient {
 
 impl crate::ApiClient for ApiClient {
     fn block_to_prove(&self, block_size: usize) -> Result<Option<(i64, i32)>, anyhow::Error> {
-        let auth_token_generator = self
-            .auth_token_generator
-            .encode()
-            .map_err(|e| format_err!("failed generate authorization token: {}", e))?;
-
         let op = || -> Result<Option<(i64, i32)>, anyhow::Error> {
             trace!("sending block_to_prove");
             let res = self
                 .http_client
                 .get(self.block_to_prove_url.as_str())
-                .bearer_auth(&auth_token_generator)
+                .bearer_auth(&self.get_encoded_token()?)
                 .json(&client::ProverReq {
                     name: self.worker.clone(),
                     block_size,
@@ -163,15 +160,11 @@ impl crate::ApiClient for ApiClient {
 
     fn working_on(&self, job_id: i32) -> Result<(), anyhow::Error> {
         trace!("sending working_on {}", job_id);
-        let auth_token_generator = self
-            .auth_token_generator
-            .encode()
-            .map_err(|e| format_err!("failed generate authorization token: {}", e))?;
 
         let res = self
             .http_client
             .post(self.working_on_url.as_str())
-            .bearer_auth(&auth_token_generator)
+            .bearer_auth(&self.get_encoded_token()?)
             .json(&client::WorkingOnReq {
                 prover_run_id: job_id,
             })
@@ -185,17 +178,12 @@ impl crate::ApiClient for ApiClient {
     }
 
     fn prover_data(&self, block: i64) -> Result<ZkSyncCircuit<'_, Engine>, anyhow::Error> {
-        let auth_token_generator = self
-            .auth_token_generator
-            .encode()
-            .map_err(|e| format_err!("failed generate authorization token: {}", e))?;
-
         let op = || -> Result<ProverData, anyhow::Error> {
             trace!("sending prover_data");
             let res = self
                 .http_client
                 .get(self.prover_data_url.as_str())
-                .bearer_auth(&auth_token_generator)
+                .bearer_auth(&self.get_encoded_token()?)
                 .json(&block)
                 .send()
                 .map_err(|e| format_err!("failed to request prover data: {}", e))?;
@@ -212,18 +200,13 @@ impl crate::ApiClient for ApiClient {
     }
 
     fn publish(&self, block: i64, proof: EncodedProofPlonk) -> Result<(), anyhow::Error> {
-        let auth_token_generator = self
-            .auth_token_generator
-            .encode()
-            .map_err(|e| format_err!("failed generate authorization token: {}", e))?;
-
         let op = move || -> Result<(), anyhow::Error> {
             trace!("Trying publish proof {}", block);
             let proof = proof.clone();
             let res = self
                 .http_client
                 .post(self.publish_url.as_str())
-                .bearer_auth(&auth_token_generator)
+                .bearer_auth(&self.get_encoded_token()?)
                 .json(&client::PublishReq {
                     block: block as u32,
                     proof,
@@ -257,14 +240,9 @@ impl crate::ApiClient for ApiClient {
     }
 
     fn prover_stopped(&self, prover_run_id: i32) -> Result<(), anyhow::Error> {
-        let auth_token_generator = self
-            .auth_token_generator
-            .encode()
-            .map_err(|e| format_err!("failed generate authorization token: {}", e))?;
-
         self.http_client
             .post(self.stopped_url.as_str())
-            .bearer_auth(&auth_token_generator)
+            .bearer_auth(&self.get_encoded_token()?)
             .json(&prover_run_id)
             .send()
             .map_err(|e| format_err!("prover stopped request failed: {}", e))?;
