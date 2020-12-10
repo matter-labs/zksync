@@ -58,12 +58,14 @@ describe('Wallet with mock provider', function () {
         const key = new Uint8Array(new Array(32).fill(40));
         const wallet = await getWallet(key, 'mainnet');
 
-        // FIXME: `chai.throw` does not work with async functions
-        //  https://github.com/chaijs/chai/issues/882
-        this.skip();
-        expect(async () => {
+        let thrown = false;
+        try {
             await wallet.getBalance('ETH', 'committed');
-        }).to.throw();
+        } catch {
+            thrown = true;
+        }
+
+        expect(thrown, 'getBalance call was expected to throw an exception').to.be.true;
     });
 
     it('Wallet has expected verified balances', async function () {
@@ -80,12 +82,14 @@ describe('Wallet with mock provider', function () {
         const key = new Uint8Array(new Array(32).fill(50));
         const wallet = await getWallet(key, 'mainnet');
 
-        // FIXME: `chai.throw` does not work with async functions
-        //  https://github.com/chaijs/chai/issues/882
-        this.skip();
-        expect(async () => {
+        let thrown = false;
+        try {
             await wallet.getBalance('ETH', 'verified');
-        }).to.throw();
+        } catch {
+            thrown = true;
+        }
+
+        expect(thrown, 'getBalance call was expected to throw an exception').to.be.true;
     });
 
     it.skip("Wallet's signing key checking procedure is more strict than the one in Rust implementation", async function () {
