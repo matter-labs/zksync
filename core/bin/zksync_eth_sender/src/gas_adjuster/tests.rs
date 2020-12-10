@@ -149,7 +149,8 @@ async fn gas_price_limit_scaling() {
     let mut expected_price = PRICE_LIMIT;
 
     // Initial phase: stats are not yet initialized, we are based on the DB limit.
-    for _ in 0..N_SAMPLES {
+    // The reason for the dividing is that we update samples it twice per iteration
+    for _ in 0..N_SAMPLES / 2 {
         let suggested_price = gas_adjuster
             .get_gas_price(&ethereum, Some(expected_price.into()))
             .await
@@ -188,7 +189,7 @@ async fn gas_price_limit_scaling() {
 /// Checks that if the price suggested by the Ethereum client is below the price limit,
 /// the limit is calculated as (average of samples) * scale_factor.
 #[tokio::test]
-#[ignore] // TODO: Disabled as currently the limit is calculated based on the network price rather than used txs samples (#1130).
+#[ignore] // TODO: Disabled as currently the limit is calculated based on the network price rather than used txs samples (ZKS-118).
 async fn gas_price_limit_average_basis() {
     // Increases the gas price value by 15%.
     fn increase_gas_price(value: u64) -> u64 {
