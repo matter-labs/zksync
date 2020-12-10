@@ -1,6 +1,10 @@
+import { BigNumber } from 'ethers';
 import Axios from 'axios';
 import WebSocketAsPromised = require('websocket-as-promised');
+import * as fs from 'fs';
+import { parseHexWithPrefix, TokenSet } from './utils';
 import * as websocket from 'websocket';
+
 const W3CWebSocket = websocket.w3cwebsocket;
 
 export abstract class AbstractJSONRPCTransport {
@@ -155,4 +159,83 @@ export class WSTransport extends AbstractJSONRPCTransport {
     async disconnect() {
         await this.ws.close();
     }
+}
+
+export class DummyTransport extends AbstractJSONRPCTransport {
+    public constructor(public network: string) {
+        super();
+    }
+
+    getTokensList(network: string) {
+        const configPath = `${process.env.ZKSYNC_HOME}/etc/tokens/${network}.json`;
+        return JSON.parse(
+            fs.readFileSync(configPath, {
+                encoding: 'utf-8'
+            })
+        );
+    }
+
+    async request(method: string, params = null): Promise<any> {
+        if (method == 'contract_address') {
+            return {
+                //  the HEX-encoded sequence of bytes [0..20) provided as the `mainContract`
+                mainContract: '0x000102030405060708090a0b0c0d0e0f10111213',
+                //  the `govContract` is not usable in tests and it is simply an empty string
+                govContract: ''
+            };
+        }
+
+        if (method == 'tokens') {
+            const tokensList = this.getTokensList(this.network);
+            const tokens = {};
+
+            let id = 1;
+            for (const tokenItem of tokensList.slice(0, 3)) {
+                const token = {
+                    address: tokenItem.address.slice(2),
+                    id: id,
+                    symbol: tokenItem.symbol,
+                    decimals: tokenItem.decimals
+                };
+
+                tokens[tokenItem.symbol] = token;
+                id++;
+            }
+
+            return tokens;
+        }
+
+        if (method == 'account_info') {
+            // The example `AccountState` instance:
+            //  - assigns the '42' value to account_id;
+            //  - adds single entry of "DAI" token to the committed balances;
+            //  - adds single entry of "USDC" token to the verified balances.
+            return {
+                address: params[0],
+                id: 42,
+                depositing: {},
+                committed: {
+                    balances: {
+                        DAI: BigNumber.from(12345)
+                    },
+                    nonce: 0,
+                    pubKeyHash: 'sync:0102030405060708091011121314151617181920'
+                },
+                verified: {
+                    balances: {
+                        USDC: BigNumber.from(98765)
+                    },
+                    nonce: 0,
+                    pubKeyHash: ''
+                }
+            };
+        }
+
+        return {
+            method,
+            params
+        };
+    }
+
+    async disconnect() {}
 }

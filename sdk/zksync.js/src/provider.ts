@@ -1,4 +1,4 @@
-import { AbstractJSONRPCTransport, HTTPTransport, WSTransport } from './transport';
+import { AbstractJSONRPCTransport, HTTPTransport, WSTransport, DummyTransport } from './transport';
 import { ethers, Contract, BigNumber } from 'ethers';
 import {
     AccountState,
@@ -72,6 +72,19 @@ export class Provider {
         if (pollIntervalMilliSecs) {
             provider.pollIntervalMilliSecs = pollIntervalMilliSecs;
         }
+        provider.contractAddress = await provider.getContractAddress();
+        provider.tokenSet = new TokenSet(await provider.getTokens());
+        return provider;
+    }
+
+    /**
+     * Provides some hardcoded values the `Provider` responsible for
+     * without communicating with the network
+     */
+    static async newMockProvider(network: string): Promise<Provider> {
+        const transport = new DummyTransport(network);
+        const provider = new Provider(transport);
+
         provider.contractAddress = await provider.getContractAddress();
         provider.tokenSet = new TokenSet(await provider.getTokens());
         return provider;

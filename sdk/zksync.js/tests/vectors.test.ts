@@ -9,14 +9,11 @@ import {
     isTransactionFeePackable,
     packAmountChecked,
     packFeeChecked,
-    TokenSet
+    TokenSet,
+    parseHexWithPrefix
 } from '../src/utils';
 import { privateKeyFromSeed, signTransactionBytes } from '../src/crypto';
 import { loadTestVectorsConfig } from './helpers';
-
-function parseHexWithPrefix(str) {
-    return Uint8Array.from(Buffer.from(str.slice(2), 'hex'));
-}
 
 const vectors = loadTestVectorsConfig();
 const cryptoPrimitivesVectors = vectors['cryptoPrimitivesTest'];
