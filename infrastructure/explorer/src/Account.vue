@@ -314,11 +314,12 @@ export default {
             });
         },
         transactionFields() {
-            return this.transactionProps && this.transactionProps.length
-                ? Object.keys(this.transactionProps[0]).filter(
-                      k => !['hash', 'fromAddr', 'toAddr', 'success'].includes(k)
-                  )
-                : [];
+            if (this.transactionProps && this.transactionProps.length) {
+                return Object.keys(this.transactionProps[0]).filter(
+                    k => !['hash', 'fromAddr', 'toAddr', 'success'].includes(k)
+                );
+            }
+            return [];
         }
     },
     components

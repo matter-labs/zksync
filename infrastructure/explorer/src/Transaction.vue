@@ -155,7 +155,13 @@ export default {
                 client.cacher.cacheTransaction(this.tx_hash, txData);
             }
 
-            txData.status = block.verified_at ? `Complete` : block.committed_at ? `Pending` : `Initiated`;
+            if (block.verified_at) {
+                txData.status = 'Complete';
+            } else if (block.committed_at) {
+                txData.status = 'Pending';
+            } else {
+                txData.status = 'Initiated';
+            }
 
             this.txData = txData;
         }

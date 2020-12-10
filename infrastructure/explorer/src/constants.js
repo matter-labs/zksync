@@ -1,4 +1,5 @@
 import store from './store';
+import { getBlockchainExplorerTx, getBlockchainExplorerAddress } from './utils';
 
 export const PAGE_SIZE = 20;
 export const TX_BATCH_SIZE = 50;
@@ -13,19 +14,9 @@ export const CACHE_VERSION_SLOT = 'CACHE_VERSION';
 // it wiil be reset.
 export const CACHE_VERSION = 1;
 
-export const blockchainExplorerTx =
-    store.network === 'localhost'
-        ? 'http://localhost:8000'
-        : store.network === 'mainnet'
-        ? `https://etherscan.io/tx`
-        : `https://${store.network}.etherscan.io/tx`;
+export const blockchainExplorerTx = getBlockchainExplorerTx(store.network);
 
-export const blockchainExplorerAddress =
-    store.network === 'localhost'
-        ? 'http://localhost:8000'
-        : store.network === 'mainnet'
-        ? `https://etherscan.io/address`
-        : `https://${store.network}.etherscan.io/address`;
+export const blockchainExplorerAddress = getBlockchainExplorerAddress(store.network);
 
 export const MAX_CACHED_BLOCKS = 20;
 export const MAX_CACHED_BLOCKS_TRANSACTIONS = 5;

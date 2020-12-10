@@ -68,6 +68,28 @@ export function blockchainExplorerToken(token, account) {
     }
 }
 
+export function getBlockchainExplorerTx(network) {
+    if (network === 'localhost') {
+        return 'http://localhost:8000';
+    }
+    if (network === 'mainnet') {
+        return 'https://etherscan.io/tx';
+    }
+
+    return `https://${network}.etherscan.io/tx`;
+}
+
+export function getBlockchainExplorerAddress(network) {
+    if (network === 'localhost') {
+        return 'http://localhost:8000';
+    }
+    if (network === 'mainnet') {
+        return 'https://etherscan.io/address';
+    }
+
+    return `https://${network}.etherscan.io/address`;
+}
+
 // Note that this class follows Builder pattern
 // If you see any of it's methods not returning `this`
 // it is a bug.

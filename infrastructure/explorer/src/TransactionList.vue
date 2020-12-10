@@ -65,11 +65,12 @@ export default {
     },
     computed: {
         fields() {
-            const hiddenFields = ['fromAddr', 'toAddr', 'success', 'from_explorer_link', 'to_explorer_link'];
+            if (this.transactions.length == 0) {
+                return [];
+            }
 
-            return this.transactions.length == 0
-                ? []
-                : Object.keys(this.transactions[0]).filter(k => !hiddenFields.includes(k));
+            const hiddenFields = ['fromAddr', 'toAddr', 'success', 'from_explorer_link', 'to_explorer_link'];
+            return Object.keys(this.transactions[0]).filter(k => !hiddenFields.includes(k));
         }
     },
     components
