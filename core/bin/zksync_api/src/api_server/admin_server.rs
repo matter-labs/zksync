@@ -80,7 +80,7 @@ impl<'a> AuthTokenValidator<'a> {
         credentials: BearerAuth,
     ) -> actix_web::Result<ServiceRequest> {
         let config = req.app_data::<Config>().cloned().unwrap_or_default();
-        
+
         self.validate_auth_token(credentials.token())
             .map_err(|_| AuthenticationError::from(config))?;
 
