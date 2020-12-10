@@ -27,7 +27,7 @@ use franklin_crypto::{
     jubjub::JubjubEngine,
 };
 
-use crate::utils::{pub_key_hash, rescue_hash_tx_msg, set_panic_hook};
+use crate::utils::{rescue_hash_tx_msg, set_panic_hook};
 use sha2::{Digest, Sha256};
 
 // When the `wee_alloc` feature is enabled, use `wee_alloc` as the global
@@ -91,9 +91,17 @@ fn privkey_to_pubkey_internal(private_key: &[u8]) -> Result<PublicKey<Engine>, J
     Ok(JUBJUB_PARAMS.with(|params| PublicKey::from_private(&sk, p_g, params)))
 }
 
+#[wasm_bindgen(js_name = pubKeyHash)]
+pub fn pub_key_hash(pubkey: &[u8]) -> Result<Vec<u8>, JsValue> {
+    let pubkey = JUBJUB_PARAMS
+        .with(|params| PublicKey::read(&pubkey[..], params))
+        .map_err(|_| JsValue::from_str("couldn't read public key"))?;
+    Ok(utils::pub_key_hash(&pubkey))
+}
+
 #[wasm_bindgen]
 pub fn private_key_to_pubkey_hash(private_key: &[u8]) -> Result<Vec<u8>, JsValue> {
-    Ok(pub_key_hash(&privkey_to_pubkey_internal(private_key)?))
+    Ok(utils::pub_key_hash(&privkey_to_pubkey_internal(private_key)?))
 }
 
 #[wasm_bindgen]
@@ -118,7 +126,6 @@ pub fn private_key_to_pubkey(private_key: &[u8]) -> Result<Vec<u8>, JsValue> {
 /// [64..96] - s poing of the signature.
 pub fn sign_musig(private_key: &[u8], msg: &[u8]) -> Result<Vec<u8>, JsValue> {
     let mut packed_full_signature = Vec::with_capacity(PACKED_POINT_SIZE + PACKED_SIGNATURE_SIZE);
-    //
     let p_g = FixedGenerators::SpendingKeyGenerator;
     let private_key = read_signing_key(private_key)?;
 
@@ -129,7 +136,7 @@ pub fn sign_musig(private_key: &[u8], msg: &[u8]) -> Result<Vec<u8>, JsValue> {
             .write(&mut packed_full_signature)
             .expect("failed to write pubkey to packed_point");
     };
-    //
+
     let signature = JUBJUB_PARAMS.with(|jubjub_params| {
         RESCUE_PARAMS.with(|rescue_params| {
             let hashed_msg = rescue_hash_tx_msg(msg);
