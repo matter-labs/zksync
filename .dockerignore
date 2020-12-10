@@ -13,7 +13,7 @@
 !package.json
 !Cargo.lock
 !Cargo.toml
-!contracts/build
+!contracts/artifacts
 !infrastructure/explorer/index.html
 !infrastructure/explorer/dist
 !infrastructure/fee-seller
