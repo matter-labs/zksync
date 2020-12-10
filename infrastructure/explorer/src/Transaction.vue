@@ -67,6 +67,8 @@ import EntryComponent from './links/Entry';
 import { blockchainExplorerTx, blockchainExplorerAddress } from './constants';
 import { BigNumber } from 'ethers';
 
+import { getTxEntries } from './transactionEntries';
+
 const components = {
     SearchField,
     CopyableAddress,
@@ -186,169 +188,13 @@ export default {
                 }
             ];
         },
-        hashEntry() {
-            const entry = this.onChainTx
-                ? makeEntry('ETH Tx hash')
-                      .outterLink(`${blockchainExplorerTx}/${this.tx_hash}`)
-                      .innerHTML(this.tx_hash)
-                : makeEntry('zkSync tx hash').innerHTML(this.tx_hash);
 
-            return entry.copyable();
-        },
-        fromLinkEntry() {
-            const entry = makeEntry('From').copyable();
-
-            if (this.txData.tx_type == 'Deposit') {
-                entry.outterLink(`${blockchainExplorerAddress}/${this.txData.from}`);
-            } else {
-                entry.localLink(`/accounts/${this.txData.from}`);
-            }
-
-            if (
-                this.txData.tx_type == 'Withdrawal' ||
-                this.txData.tx_type == 'FullExit' ||
-                this.txData.tx_type == 'ForcedExit'
-            ) {
-                entry.layer(2);
-            }
-            if (this.txData.tx_type == 'Deposit') {
-                entry.layer(1);
-            }
-
-            if (this.txData.tx_type == 'ChangePubKey') {
-                entry.rename('Account');
-            }
-
-            entry.innerHTML(this.txData.from);
-
-            return entry;
-        },
-        toLinkEntry() {
-            const entry = makeEntry('To').copyable();
-
-            if (this.txData.tx_type == 'Withdrawal') {
-                entry.outterLink(blockchainExplorerToken(this.txData.tokenName, this.txData.to));
-            } else {
-                entry.localLink(`/accounts/${this.txData.to}`);
-            }
-
-            if (
-                this.txData.tx_type == 'Withdrawal' ||
-                this.txData.tx_type == 'FullExit' ||
-                this.txData.tx_type == 'ForcedExit'
-            ) {
-                entry.layer(1);
-            }
-            if (this.txData.tx_type == 'Deposit') {
-                entry.layer(2);
-            }
-
-            return entry.innerHTML(this.txData.to);
-        },
-        typeEntry() {
-            return makeEntry('Type').innerHTML(this.txData.tx_type);
-        },
-        statusEntry() {
-            const entry = makeEntry('Status');
-
-            if (this.txData.fail_reason) {
-                entry.innerHTML('Rejected');
-            } else {
-                entry.innerHTML(this.txData.status);
-            }
-
-            return entry;
-        },
-        feeEntry() {
-            const fee = this.txData.fee || 0;
-
-            try {
-                const feeBN = BigNumber.from(fee);
-                if (feeBN.eq('0')) {
-                    return makeEntry('Fee').innerHTML(
-                        '<i>This transaction is a part of a batch. The fee was payed in another transaction.</i>'
-                    );
-                }
-            } catch {
-                return makeEntry('Fee');
-            }
-
-            return makeEntry('Fee').innerHTML(
-                `${this.txData.feeTokenName} ${formatToken(fee, this.txData.feeTokenName)}`
-            );
-        },
-        createdAtEntry() {
-            return makeEntry('Created at').innerHTML(formatDate(this.txData.created_at));
-        },
-        amountEntry() {
-            return makeEntry('Amount').innerHTML(
-                `${this.txData.tokenName} ${formatToken(this.txData.amount || 0, this.txData.feeTokenName)}`
-            );
-        },
-        newSignerPubKeyHashEntry() {
-            if (this.txData.tx_type == 'ChangePubKey') {
-                return makeEntry('New signer key hash').innerHTML(`${this.txData.to.replace('sync:', '')}`);
-            } else {
-                // This entry won't be used for any tx_type
-                // except for ChangePubKey anyway
-                return '';
-            }
-        },
         props() {
             if (Object.keys(this.txData).length == 0) {
                 return [];
             }
 
-            const rows = [];
-
-            if (this.txData.nonce != -1 && (this.txData.nonce || this.txData === 0)) {
-                rows.push(makeEntry('Nonce').innerHTML(this.txData.nonce));
-            }
-
-            if (this.txData.numEthConfirmationsToWait) {
-                rows.push(makeEntry('Eth confirmations').innerHTML(this.txData.numEthConfirmationsToWait));
-            }
-
-            if (this.txData.fail_reason) {
-                rows.push(makeEntry('Rejection reason:').innerHTML(this.txData.fail_reason));
-            }
-
-            if (this.txData.tx_type == 'ChangePubKey') {
-                return [
-                    this.hashEntry,
-                    this.typeEntry,
-                    this.statusEntry,
-                    this.fromLinkEntry,
-                    this.feeEntry,
-                    this.newSignerPubKeyHashEntry,
-                    this.createdAtEntry,
-                    ...rows
-                ];
-            }
-
-            if (this.txData.tx_type == 'Deposit' || this.txData.tx_type == 'FullExit') {
-                return [
-                    this.hashEntry,
-                    this.typeEntry,
-                    this.statusEntry,
-                    this.fromLinkEntry,
-                    this.toLinkEntry,
-                    this.amountEntry,
-                    ...rows
-                ];
-            }
-
-            return [
-                this.hashEntry,
-                this.typeEntry,
-                this.statusEntry,
-                this.fromLinkEntry,
-                this.toLinkEntry,
-                this.amountEntry,
-                this.feeEntry,
-                this.createdAtEntry,
-                ...rows
-            ];
+            return getTxEntries(this.txData);
         },
         onChainTx() {
             return this.txData.tx_type == 'Deposit' || this.txData.tx_type == 'FullExit';

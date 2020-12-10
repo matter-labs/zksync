@@ -78,6 +78,8 @@ import Navbar from './Navbar.vue';
 import { blockchainExplorerAddress } from './constants';
 import Entry from './links/Entry.vue';
 
+import { getTxEntries } from './accountTxEntries';
+
 const components = {
     SearchField,
     CopyableAddress,
@@ -210,50 +212,6 @@ export default {
             this.totalRows = 0;
             this.pagesOfTransactions = {};
             this.load();
-        },
-        getHashEntry(tx) {
-            if (tx.hash.startsWith('sync-tx:')) {
-                tx.hash = tx.hash.slice('sync-tx:'.length);
-            }
-
-            return makeEntry('TxHash')
-                .localLink(`/transactions/${tx.hash}`)
-                .innerHTML(`${shortenHash(tx.hash, 'unknown! hash')}`);
-        },
-        getLinkFromEntry(tx) {
-            const entry = makeEntry('From');
-
-            if (tx.type == 'Deposit') {
-                entry.outterLink(`${blockchainExplorerAddress}/${tx.from}`);
-            } else {
-                entry.localLink(`/accounts/${tx.from}`);
-            }
-
-            return entry.innerHTML(`${shortenHash(tx.from, 'unknown! from')}`);
-        },
-        getLinkToEntry(tx) {
-            const entry = makeEntry('To');
-
-            if (tx.type == 'ChangePubKey') {
-                return entry;
-            }
-
-            if (tx.type == 'Withdrawal') {
-                entry.outterLink(`${blockchainExplorerAddress}/${tx.to}`);
-            } else {
-                entry.localLink(`/accounts/${tx.to}`);
-            }
-
-            return entry.innerHTML(`${shortenHash(tx.to, 'unknown! to')}`);
-        },
-        getTypeEntry(tx) {
-            return makeEntry('Type').innerHTML(tx.type);
-        },
-        getAmountEntry(tx) {
-            return makeEntry('Amount').innerHTML(`${tx.token} <span>${tx.amount}</span>`);
-        },
-        getCreatedAtEntry(tx) {
-            return makeEntry('CreatedAt').innerHTML(formatDate(tx.created_at));
         }
     },
     computed: {
@@ -285,27 +243,8 @@ export default {
                     tx.type = 'Withdrawal';
                 }
 
-                const TxHash = this.getHashEntry(tx);
-                const From = this.getLinkFromEntry(tx);
-
-                const To = this.getLinkToEntry(tx);
-
-                const Type = this.getTypeEntry(tx);
-                const Amount = this.getAmountEntry(tx);
-                const CreatedAt = this.getCreatedAtEntry(tx);
-
-                if (tx.type === 'ChangePubKey') {
-                    // There is no amount for ChangePubKey
-                    Amount.innerHTML('');
-                }
-
                 return {
-                    TxHash,
-                    Type,
-                    Amount,
-                    From,
-                    To,
-                    CreatedAt,
+                    ...getTxEntries(tx),
                     success: tx.success,
                     fromAddr: tx.from,
                     toAddr: tx.to,

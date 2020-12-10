@@ -55,16 +55,7 @@ import Entry from './links/Entry';
 
 import { blockchainExplorerTx, blockchainExplorerAddress } from './constants';
 
-import {
-    getTxFromAddress,
-    getTxFromFallbackValue,
-    getTxToAddress,
-    getTxToFallbackValue,
-    getTxToken,
-    getTxAmount,
-    getTxFee,
-    numOrZero
-} from './blockUtils';
+import { getTxEntries } from './blockTxEnries';
 
 const components = {
     TransactionList,
@@ -197,7 +188,7 @@ export default {
             const transactions = await Promise.all(
                 txs.map(async tx => {
                     return {
-                        ...(await this.txEntries(tx, tokens, client)),
+                        ...(await getTxEntries(tx, tokens, client)),
                         success: tx.success
                     };
                 })
@@ -205,98 +196,6 @@ export default {
 
             this.transactions = transactions.filter(tx => tx.success);
             this.loadingStatus = 'ready';
-        },
-        txHashEntry(tx) {
-            const entry = makeEntry('Tx Hash');
-            entry.localLink(`/transactions/${tx.tx_hash}`);
-
-            entry.innerHTML(shortenHash(tx.tx_hash));
-            return entry;
-        },
-        txTypeEntry(tx) {
-            return makeEntry('Type').innerHTML(tx.op.type);
-        },
-        txFromEntry(tx) {
-            const entry = makeEntry('From');
-
-            const fromAddress = getTxFromAddress(tx);
-            const fallback = getTxFromFallbackValue(tx);
-
-            if (tx.op.type === 'Deposit') {
-                entry.outterLink(`${blockchainExplorerAddress}/${fromAddress}`);
-            } else {
-                entry.localLink(`/accounts/${fromAddress}`);
-            }
-
-            entry.innerHTML(shortenHash(fromAddress, fallback));
-            return entry;
-        },
-
-        txToEntry(tx) {
-            const entry = makeEntry('To');
-
-            if (tx.op.type === 'ChangePubKey') {
-                return entry;
-            }
-
-            const toAddress = getTxToAddress(tx);
-            const fallback = getTxToFallbackValue(tx);
-
-            const onChainWithdrawals = ['Withdraw', 'ForcedExit', 'FullExit'];
-
-            if (onChainWithdrawals.includes(tx.op.type)) {
-                entry.outterLink(`${blockchainExplorerAddress}/${toAddress}`);
-            } else {
-                entry.localLink(`/accounts/${toAddress}`);
-            }
-
-            entry.innerHTML(shortenHash(toAddress, fallback));
-
-            return entry;
-        },
-
-        async txAmountEntry(tx, token, client) {
-            const entry = makeEntry('Amount');
-            if (tx.op.type === 'ChangePubKey') {
-                return entry;
-            }
-
-            const amount = await getTxAmount(tx, client);
-            return entry.innerHTML(`${formatToken(numOrZero(amount), token)} ${token}`);
-        },
-        txFeeEntry(tx, token) {
-            const entry = makeEntry('Fee');
-            const fee = getTxFee(tx);
-
-            if (!fee) {
-                return entry;
-            }
-
-            return entry.innerHTML(`${formatToken(numOrZero(fee), token)} ${token}`);
-        },
-        txCreatedAtEntry(tx) {
-            return makeEntry('Created at').innerHTML(formatDate(tx.created_at));
-        },
-        async txEntries(tx, tokens, client) {
-            const tokenSymbol = tokens[getTxToken(tx)].syncSymbol;
-
-            const txHash = this.txHashEntry(tx);
-            const type = this.txTypeEntry(tx);
-            const from = this.txFromEntry(tx);
-            const to = this.txToEntry(tx);
-            const amount = await this.txAmountEntry(tx, tokenSymbol, client);
-            const fee = this.txFeeEntry(tx, tokenSymbol);
-            const createdAt = this.txCreatedAtEntry(tx);
-
-            return {
-                txHash,
-                type,
-                from,
-                to,
-                amount,
-                fee,
-                createdAt
-            };
         }
     },
     components
