@@ -24,9 +24,10 @@ jobs:
         echo $(pwd)/bin >> $GITHUB_PATH
 
     - name: update-deps
+      # Upstream version of sqlx-cli has some incompatibilities with the sqlx version used zksync_storage.
       run: |
         rustup update stable
-        cargo sqlx --version || cargo install --version=0.2.0 sqlx-cli
+        cargo sqlx --version || cargo install sqlx-cli --git https://github.com/alekseysidorov/sqlx.git
         docker pull matterlabs/ci-integration-test:zk-latest
 
     - name: zk
