@@ -101,7 +101,9 @@ pub fn pub_key_hash(pubkey: &[u8]) -> Result<Vec<u8>, JsValue> {
 
 #[wasm_bindgen]
 pub fn private_key_to_pubkey_hash(private_key: &[u8]) -> Result<Vec<u8>, JsValue> {
-    Ok(utils::pub_key_hash(&privkey_to_pubkey_internal(private_key)?))
+    Ok(utils::pub_key_hash(&privkey_to_pubkey_internal(
+        private_key,
+    )?))
 }
 
 #[wasm_bindgen]
