@@ -1,7 +1,7 @@
 //! Tests strictly validating the output for hardcoded input data
 //!
 //! These tests only check the code that should not change, and if it does change, then this may be a critical change.
-//!  
+//!
 //! If after changing some code, the tests stopped passing, then not only change the expected
 //! answer for the tests but also be sure to notify the command about the changes introduced!
 
