@@ -31,6 +31,7 @@ url="http://127.0.0.1:8090"
 [api.prover]
 port=8088
 url="http://127.0.0.1:8088"
+# secret_auth is set in `private.toml`
 
 # Configuration for the prometheus exporter server.
 [api.prometheus]
