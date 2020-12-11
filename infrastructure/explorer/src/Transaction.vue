@@ -17,32 +17,24 @@
                 <b-card no-body class="table-margin-hack">
                     <b-table responsive thead-class="displaynone" :items="props">
                         <template v-slot:cell(value)="data">
-                            <EntryComponent
-                                class="normalize-text"
-                                v-if="data.item['name'] == 'From'"
-                                :value="data.item.value"
-                            />
-                            <EntryComponent
+                            <Entry class="normalize-text" v-if="data.item['name'] == 'From'" :value="data.item.value" />
+                            <Entry
                                 class="normalize-text"
                                 v-else-if="data.item['name'] == 'To'"
                                 :value="data.item.value"
                             />
-                            <EntryComponent
+                            <Entry
                                 class="normalize-text"
                                 v-else-if="data.item['name'] == 'Account'"
                                 :value="data.item.value"
                             />
-                            <EntryComponent
+                            <Entry
                                 class="normalize-text"
                                 v-else-if="['zkSync tx hash', 'ETH Tx hash'].includes(data.item['name'])"
                                 :value="data.item.value"
                             />
-                            <span v-else-if="data.item.name == 'Status'">
-                                <ReadinessStatus :status="readyStateFromString(data.item.value.innerHTML)" />
-                                <span v-html="data.item.value.innerHTML" class="mr-1" />
-                                <Question :text="data.item.value.innerHTML" />
-                            </span>
-                            <span v-else v-html="data.item.value.innerHTML" />
+                            <Entry v-else-if="data.item.name == 'Status'" :value="data.item.value" />
+                            <Entry v-else :value="data.item.value" />
                         </template>
                     </b-table>
                 </b-card>
@@ -59,9 +51,8 @@ import { makeEntry } from './utils';
 import SearchField from './SearchField.vue';
 import CopyableAddress from './CopyableAddress.vue';
 import Navbar from './Navbar.vue';
-import Question from './Question.vue';
 import ReadinessStatus from './ReadinessStatus.vue';
-import EntryComponent from './links/Entry';
+import Entry from './links/Entry.vue';
 import { blockchainExplorerTx } from './constants';
 
 import { getTxEntries } from './transactionEntries';
@@ -70,9 +61,8 @@ const components = {
     SearchField,
     CopyableAddress,
     Navbar,
-    Question,
     ReadinessStatus,
-    EntryComponent
+    Entry
 };
 
 export default {
@@ -95,14 +85,6 @@ export default {
         clearInterval(this.intervalHandle);
     },
     methods: {
-        readyStateFromString(s) {
-            return {
-                Rejected: -1,
-                Initiated: 0,
-                Pending: 1,
-                Complete: 2
-            }[s];
-        },
         async update() {
             const client = await clientPromise;
             const tokens = await client.tokensPromise;

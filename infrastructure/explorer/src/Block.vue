@@ -24,11 +24,7 @@
                             <Entry v-if="data.item.name == 'New root hash'" :value="data.item.value" />
                             <Entry v-else-if="data.item.name == 'Commit tx hash'" :value="data.item.value" />
                             <Entry v-else-if="data.item.name == 'Verify tx hash'" :value="data.item.value" />
-                            <span v-else-if="data.item.name == 'Status'">
-                                <ReadinessStatus :status="data.item.value.innerHTML == 'Pending' ? 1 : 2" />
-                                <span v-html="data.item.value.innerHTML" class="mr-1" />
-                                <Question :text="data.item.value.innerHTML" />
-                            </span>
+                            <Entry v-else-if="data.item.name == 'Status'" :value="data.item.value" />
                             <Entry v-else :value="data.item.value" />
                         </template>
                     </b-table>
@@ -48,7 +44,6 @@ import TransactionList from './TransactionList.vue';
 import SearchField from './SearchField.vue';
 import CopyableAddress from './CopyableAddress.vue';
 import Navbar from './Navbar.vue';
-import Question from './Question.vue';
 import ReadinessStatus from './ReadinessStatus.vue';
 import { clientPromise } from './Client';
 import Entry from './links/Entry';
@@ -62,7 +57,6 @@ const components = {
     SearchField,
     CopyableAddress,
     Navbar,
-    Question,
     ReadinessStatus,
     Entry
 };

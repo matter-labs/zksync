@@ -1,4 +1,4 @@
-import { formatDate, formatToken, makeEntry, blockchainExplorerToken } from './utils';
+import { formatDate, formatToken, makeEntry, blockchainExplorerToken, readyStateFromString } from './utils';
 import { blockchainExplorerAddress } from './constants';
 import { BigNumber } from 'ethers';
 
@@ -53,11 +53,9 @@ function typeEntry(txData) {
 function statusEntry(txData) {
     const entry = makeEntry('Status');
 
-    if (txData.fail_reason) {
-        entry.innerHTML('Rejected');
-    } else {
-        entry.innerHTML(txData.status);
-    }
+    const statusStr = txData.fail_reason ? 'Rejected' : txData.status;
+    entry.innerHTML(statusStr);
+    entry.status(readyStateFromString(statusStr));
 
     return entry;
 }

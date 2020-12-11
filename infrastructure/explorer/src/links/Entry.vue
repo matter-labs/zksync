@@ -1,5 +1,6 @@
 <template>
     <span v-if="value">
+        <readiness-status v-if="value.status" :status="value.status" />
         <layer-icon :layer="value.layer" />
 
         <span
@@ -37,11 +38,13 @@
 import LayerIcon from './LayerIcon';
 import InnerLink from './InnerLink';
 import OutterLink from './OutterLink';
+import ReadinessStatus from '../ReadinessStatus';
 
 const components = {
     InnerLink,
     OutterLink,
-    LayerIcon
+    LayerIcon,
+    ReadinessStatus
 };
 
 export default {

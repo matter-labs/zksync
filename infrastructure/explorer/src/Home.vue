@@ -37,18 +37,19 @@
             ></b-pagination>
             <b-table responsive class="nowrap" hover outlined :items="items" :busy="loading">
                 <template v-slot:cell(block_number)="data">
-                    <router-link :to="`/blocks/${data.item.block_number}`" class="block_number_link">
-                        {{ data.item.block_number }}
-                    </router-link>
+                    <Entry :value="data.item.block_number.value" class="block_number_link" />
                 </template>
                 <template v-slot:cell(status)="data">
-                    <ReadinessStatus :status="data.item.status == 'Pending' ? 1 : 2" />
-                    {{ data.item.status }}
+                    <Entry :value="data.item.status.value" />
                 </template>
                 <template v-slot:cell(new_state_root)="data">
-                    <router-link :to="`/blocks/${data.item.block_number}`">
-                        {{ `${data.item.new_state_root.slice(8, 40)}...` }}
-                    </router-link>
+                    <Entry :value="data.item.new_state_root.value" />
+                </template>
+                <template v-slot:cell(accepted_at)="data">
+                    <Entry :value="data.item.accepted_at.value" />
+                </template>
+                <template v-slot:cell(verified_at)="data">
+                    <Entry :value="data.item.verified_at.value" />
                 </template>
             </b-table>
             <b-pagination
@@ -68,17 +69,18 @@ import { clientPromise } from './Client';
 import ClosableJumbotron from './ClosableJumbotron.vue';
 import SearchField from './SearchField.vue';
 import CopyableAddress from './CopyableAddress.vue';
-import Question from './Question.vue';
 import Navbar from './Navbar.vue';
+import Entry from './links/Entry';
 import ReadinessStatus from './ReadinessStatus.vue';
-import { formatDate } from './utils';
+import { getBlockEntries } from './homeBlockEntries';
+
 const components = {
     ClosableJumbotron,
     SearchField,
     CopyableAddress,
-    Question,
     Navbar,
-    ReadinessStatus
+    ReadinessStatus,
+    Entry
 };
 
 export default {
@@ -182,13 +184,7 @@ export default {
 
             const blocks = await client.loadBlocks(max_block);
             if (blocks) {
-                this.blocks = blocks.map(b => ({
-                    block_number: b.block_number,
-                    status: `${b.verified_at ? 'Verified' : 'Pending'}`,
-                    new_state_root: b.new_state_root,
-                    accepted_at: formatDate(b.committed_at),
-                    verified_at: formatDate(b.verified_at)
-                }));
+                this.blocks = blocks.map(getBlockEntries);
                 this.currentPage = this.page;
                 this.ready = true;
             }
