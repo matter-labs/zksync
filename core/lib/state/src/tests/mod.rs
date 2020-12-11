@@ -11,7 +11,7 @@ use zksync_crypto::{
 };
 use zksync_types::tx::PackedEthSignature;
 use zksync_types::{
-    Account, AccountId, AccountUpdate, PubKeyHash, TokenId, ZkSyncPriorityOp, ZkSyncTx,
+    Account, AccountId, AccountUpdate, PubKeyHash, TokenId, ZkSyncPriorityOp, ZkSyncTx, SignedZkSyncTx
 };
 
 type BoundAccountUpdates = [(AccountId, AccountUpdate)];
@@ -82,6 +82,20 @@ impl PlasmaTestBuilder {
         self.compare_updates(
             expected_updates,
             op_success.updates.as_slice(),
+            &mut state_clone,
+        );
+    }
+
+    pub fn test_txs_batch(&mut self, txs: &[SignedZkSyncTx], expected_updates: &BoundAccountUpdates) {
+        let mut state_clone = self.state.clone();
+        let op_successes = self.state.execute_txs_batch(txs);
+        let mut updates : Vec<(u32, zksync_types::AccountUpdate)> = Vec::new();
+        for result in op_successes {
+            updates.append(&mut result.unwrap().updates);
+        }
+        self.compare_updates(
+            expected_updates,
+            &updates,
             &mut state_clone,
         );
     }
