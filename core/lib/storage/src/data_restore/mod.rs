@@ -3,7 +3,6 @@ use std::time::Instant;
 // External imports
 use itertools::Itertools;
 // Workspace imports
-use zksync_types::block::Block;
 use zksync_types::{AccountId, AccountUpdate, ActionType, BlockNumber, Operation, Token, ZkSyncOp};
 // Local imports
 use self::records::{
@@ -26,20 +25,6 @@ pub mod records;
 pub struct DataRestoreSchema<'a, 'c>(pub &'a mut StorageProcessor<'c>);
 
 impl<'a, 'c> DataRestoreSchema<'a, 'c> {
-    pub async fn save_block_transactions(&mut self, block: Block) -> QueryResult<()> {
-        let new_state = self.new_storage_state("None");
-        let mut transaction = self.0.start_transaction().await?;
-
-        BlockSchema(&mut transaction)
-            .save_block_transactions(block.block_number, block.block_transactions)
-            .await?;
-        DataRestoreSchema(&mut transaction)
-            .update_storage_state(new_state)
-            .await?;
-        transaction.commit().await?;
-        Ok(())
-    }
-
     pub async fn save_block_operations(
         &mut self,
         commit_op: Operation,
@@ -96,9 +81,6 @@ impl<'a, 'c> DataRestoreSchema<'a, 'c> {
         .fetch_all(self.0.conn())
         .await?;
 
-        // let stored_operations = data_restore_rollup_ops::table
-        //     .order(data_restore_rollup_ops::id.asc())
-        //     .load::<StoredZkSyncOp>(self.0.conn())?;
         let ops_blocks: Vec<StoredRollupOpsBlock> = stored_operations
             .into_iter()
             .group_by(|op| op.block_num)
@@ -122,7 +104,7 @@ impl<'a, 'c> DataRestoreSchema<'a, 'c> {
                 }
             })
             .collect();
-        metrics::histogram!("sql", start.elapsed(), "data_restore" => "load_rollup_ops_blocks");
+        metrics::histogram!("sql.data_restore.load_rollup_ops_blocks", start.elapsed());
         Ok(ops_blocks)
     }
 
@@ -145,7 +127,10 @@ impl<'a, 'c> DataRestoreSchema<'a, 'c> {
         .await?;
         transaction.commit().await?;
 
-        metrics::histogram!("sql", start.elapsed(), "data_restore" => "update_last_watched_block_number");
+        metrics::histogram!(
+            "sql.data_restore.update_last_watched_block_number",
+            start.elapsed()
+        );
         Ok(())
     }
 
@@ -161,7 +146,10 @@ impl<'a, 'c> DataRestoreSchema<'a, 'c> {
         .fetch_one(self.0.conn())
         .await?;
 
-        metrics::histogram!("sql", start.elapsed(), "data_restore" => "load_last_watched_block_number");
+        metrics::histogram!(
+            "sql.data_restore.load_last_watched_block_number",
+            start.elapsed()
+        );
         Ok(stored)
     }
 
@@ -227,7 +215,7 @@ impl<'a, 'c> DataRestoreSchema<'a, 'c> {
             .update_storage_state(new_state)
             .await?;
         transaction.commit().await?;
-        metrics::histogram!("sql", start.elapsed(), "data_restore" => "save_rollup_ops");
+        metrics::histogram!("sql.data_restore.save_rollup_ops", start.elapsed());
         Ok(())
     }
 
@@ -253,7 +241,7 @@ impl<'a, 'c> DataRestoreSchema<'a, 'c> {
         .execute(self.0.conn())
         .await?;
 
-        metrics::histogram!("sql", start.elapsed(), "data_restore" => "initialize_eth_stats");
+        metrics::histogram!("sql.data_restore.initialize_eth_stats", start.elapsed());
         Ok(())
     }
 
@@ -269,7 +257,7 @@ impl<'a, 'c> DataRestoreSchema<'a, 'c> {
         .fetch_all(self.0.conn())
         .await?;
 
-        metrics::histogram!("sql", start.elapsed(), "data_restore" => "load_events_state");
+        metrics::histogram!("sql.data_restore.load_events_state", start.elapsed());
         Ok(events)
     }
 
@@ -291,7 +279,7 @@ impl<'a, 'c> DataRestoreSchema<'a, 'c> {
         .fetch_one(self.0.conn())
         .await?;
 
-        metrics::histogram!("sql", start.elapsed(), "data_restore" => "load_storage_state");
+        metrics::histogram!("sql.data_restore.load_storage_state", start.elapsed());
         Ok(state)
     }
 
@@ -310,7 +298,7 @@ impl<'a, 'c> DataRestoreSchema<'a, 'c> {
         .await?;
         transaction.commit().await?;
 
-        metrics::histogram!("sql", start.elapsed(), "data_restore" => "update_storage_state");
+        metrics::histogram!("sql.data_restore.update_storage_state", start.elapsed());
         Ok(())
     }
 
@@ -333,7 +321,7 @@ impl<'a, 'c> DataRestoreSchema<'a, 'c> {
             .await?;
         }
         transaction.commit().await?;
-        metrics::histogram!("sql", start.elapsed(), "data_restore" => "update_block_events");
+        metrics::histogram!("sql.data_restore.update_block_events", start.elapsed());
         Ok(())
     }
 }

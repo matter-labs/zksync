@@ -10,7 +10,7 @@ use zksync_eth_signer::PrivateKeySigner;
 // Workspace uses
 use super::ExecutedTxStatus;
 use std::time::Duration;
-use zksync_config::ConfigurationOptions;
+use zksync_config::EthClientOptions;
 use zksync_contracts::zksync_contract;
 use zksync_eth_client::{ETHClient, SignedCallResult};
 
@@ -78,7 +78,7 @@ pub struct EthereumHttpClient {
 }
 
 impl EthereumHttpClient {
-    pub fn new(options: &ConfigurationOptions) -> anyhow::Result<Self> {
+    pub fn new(options: &EthClientOptions) -> anyhow::Result<Self> {
         let transport = Http::new(&options.web3_url)?;
         let ethereum_signer = PrivateKeySigner::new(
             options

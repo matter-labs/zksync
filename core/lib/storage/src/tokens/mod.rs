@@ -4,17 +4,17 @@ use std::time::Instant;
 // External imports
 // Workspace imports
 use zksync_types::{Token, TokenId, TokenLike, TokenPrice};
+use zksync_utils::ratio_to_big_decimal;
 // Local imports
 use self::records::{DbTickerPrice, DbToken};
 use crate::tokens::utils::address_to_stored_string;
 use crate::{QueryResult, StorageProcessor};
-use zksync_utils::ratio_to_big_decimal;
 
 pub mod records;
 mod utils;
 
 /// Precision of the USD price per token
-const STORED_USD_PRICE_PRECISION: usize = 6;
+pub(crate) const STORED_USD_PRICE_PRECISION: usize = 6;
 
 /// Tokens schema handles the `tokens` table, providing methods to
 /// get and store new tokens.
@@ -41,7 +41,7 @@ impl<'a, 'c> TokensSchema<'a, 'c> {
         .execute(self.0.conn())
         .await?;
 
-        metrics::histogram!("sql", start.elapsed(), "token" => "store_token");
+        metrics::histogram!("sql.token.store_token", start.elapsed());
         Ok(())
     }
 
@@ -68,7 +68,7 @@ impl<'a, 'c> TokensSchema<'a, 'c> {
             })
             .collect());
 
-        metrics::histogram!("sql", start.elapsed(), "token" => "load_tokens");
+        metrics::histogram!("sql.token.load_tokens", start.elapsed());
         result
     }
 
@@ -84,7 +84,7 @@ impl<'a, 'c> TokensSchema<'a, 'c> {
         .await?
         .count;
 
-        metrics::histogram!("sql", start.elapsed(), "token" => "get_count");
+        metrics::histogram!("sql.token.get_count", start.elapsed());
         Ok(tokens_count)
     }
 
@@ -133,7 +133,7 @@ impl<'a, 'c> TokensSchema<'a, 'c> {
             }
         };
 
-        metrics::histogram!("sql", start.elapsed(), "token" => "get_token");
+        metrics::histogram!("sql.token.get_token", start.elapsed());
         Ok(db_token.map(|t| t.into()))
     }
 
@@ -154,7 +154,7 @@ impl<'a, 'c> TokensSchema<'a, 'c> {
         .fetch_optional(self.0.conn())
         .await?;
 
-        metrics::histogram!("sql", start.elapsed(), "token" => "get_historical_ticker_price");
+        metrics::histogram!("sql.token.get_historical_ticker_price", start.elapsed());
         Ok(db_price.map(|p| p.into()))
     }
 
@@ -180,7 +180,7 @@ impl<'a, 'c> TokensSchema<'a, 'c> {
         .fetch_optional(self.0.conn())
         .await?;
 
-        metrics::histogram!("sql", start.elapsed(), "token" => "update_historical_ticker_price");
+        metrics::histogram!("sql.token.update_historical_ticker_price", start.elapsed());
         Ok(())
     }
 }

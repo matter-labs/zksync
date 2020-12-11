@@ -5515,10 +5515,12 @@ checksum = "05f33972566adbd2d3588b0491eb94b98b43695c4ef897903470ede4f3f5a28a"
 
 [[package]]
 name = "zksync"
-version = "0.1.1"
+version = "0.2.0"
 dependencies = [
  "anyhow",
+ "async-trait",
  "ethabi 12.0.0",
+ "hex",
  "jsonrpc-core",
  "num",
  "reqwest",
@@ -5528,6 +5530,7 @@ dependencies = [
  "thiserror",
  "tokio 0.2.22",
  "web3 0.13.0",
+ "zksync_config",
  "zksync_crypto",
  "zksync_eth_client",
  "zksync_eth_signer",
@@ -5613,10 +5616,11 @@ name = "zksync_config"
 version = "1.0.0"
 dependencies = [
  "log 0.4.11",
+ "num",
  "serde",
  "serde_json",
  "url 2.1.1",
- "zksync_basic_types",
+ "zksync_types",
  "zksync_utils",
 ]
 
@@ -5635,11 +5639,13 @@ dependencies = [
  "actix-rt",
  "actix-web",
  "anyhow",
+ "async-trait",
  "chrono",
  "ctrlc",
  "env_logger 0.6.2",
  "ethabi 12.0.0",
  "futures 0.3.6",
+ "itertools 0.9.0",
  "log 0.4.11",
  "metrics",
  "num",
@@ -5680,6 +5686,7 @@ name = "zksync_data_restore"
 version = "1.0.0"
 dependencies = [
  "anyhow",
+ "async-trait",
  "chrono",
  "db_test_macro",
  "env_logger 0.6.2",
@@ -5796,6 +5803,7 @@ dependencies = [
  "ctrlc",
  "env_logger 0.6.2",
  "hex",
+ "jsonwebtoken",
  "log 0.4.11",
  "num",
  "reqwest",
@@ -5929,6 +5937,7 @@ dependencies = [
  "zksync_contracts",
  "zksync_core",
  "zksync_crypto",
+ "zksync_data_restore",
  "zksync_eth_client",
  "zksync_eth_signer",
  "zksync_prover",
@@ -5947,6 +5956,7 @@ dependencies = [
  "criterion",
  "ethabi 12.0.0",
  "hex",
+ "lazy_static",
  "log 0.4.11",
  "num",
  "parity-crypto",
@@ -5954,6 +5964,7 @@ dependencies = [
  "serde",
  "serde_json",
  "tiny-keccak 1.5.0",
+ "web3 0.13.0",
  "zksync_basic_types",
  "zksync_crypto",
  "zksync_utils",
@@ -5966,8 +5977,10 @@ dependencies = [
  "anyhow",
  "bigdecimal",
  "futures 0.3.6",
+ "hex",
  "num",
  "serde",
+ "serde_json",
 ]
 
 [[package]]
@@ -5976,11 +5989,13 @@ version = "1.0.0"
 dependencies = [
  "actix-rt",
  "actix-web",
+ "actix-web-httpauth",
  "anyhow",
  "chrono",
  "ctrlc",
  "env_logger 0.6.2",
  "futures 0.3.6",
+ "jsonwebtoken",
  "log 0.4.11",
  "metrics",
  "num",

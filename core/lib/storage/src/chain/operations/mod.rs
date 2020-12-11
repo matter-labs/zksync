@@ -38,7 +38,10 @@ impl<'a, 'c> OperationsSchema<'a, 'c> {
         .max
         .unwrap_or(0);
 
-        metrics::histogram!("sql.chain", start.elapsed(), "operations" => "get_last_block_by_action");
+        metrics::histogram!(
+            "sql.chain.operations.get_last_block_by_action",
+            start.elapsed()
+        );
         Ok(max_block as BlockNumber)
     }
 
@@ -59,7 +62,7 @@ impl<'a, 'c> OperationsSchema<'a, 'c> {
         .ok()
         .flatten();
 
-        metrics::histogram!("sql.chain", start.elapsed(), "operations" => "get_operation");
+        metrics::histogram!("sql.chain.operations.get_operation", start.elapsed());
         result
     }
 
@@ -76,7 +79,10 @@ impl<'a, 'c> OperationsSchema<'a, 'c> {
         .fetch_optional(self.0.conn())
         .await?;
 
-        metrics::histogram!("sql.chain", start.elapsed(), "operations" => "get_executed_operation");
+        metrics::histogram!(
+            "sql.chain.operations.get_executed_operation",
+            start.elapsed()
+        );
         Ok(op)
     }
 
@@ -93,7 +99,10 @@ impl<'a, 'c> OperationsSchema<'a, 'c> {
         .fetch_optional(self.0.conn())
         .await?;
 
-        metrics::histogram!("sql.chain", start.elapsed(), "operations" => "get_executed_priority_operation");
+        metrics::histogram!(
+            "sql.chain.operations.get_executed_priority_operation",
+            start.elapsed()
+        );
         Ok(op)
     }
 
@@ -110,7 +119,10 @@ impl<'a, 'c> OperationsSchema<'a, 'c> {
         .fetch_optional(self.0.conn())
         .await?;
 
-        metrics::histogram!("sql.chain", start.elapsed(), "operations" => "get_executed_priority_operation_by_hash");
+        metrics::histogram!(
+            "sql.chain.operations.get_executed_priority_operation_by_hash",
+            start.elapsed()
+        );
         Ok(op)
     }
 
@@ -128,7 +140,7 @@ impl<'a, 'c> OperationsSchema<'a, 'c> {
         )
         .fetch_one(self.0.conn())
         .await?;
-        metrics::histogram!("sql.chain", start.elapsed(), "operations" => "store_operation");
+        metrics::histogram!("sql.chain.operations.store_operation", start.elapsed());
         Ok(op)
     }
 
@@ -148,7 +160,7 @@ impl<'a, 'c> OperationsSchema<'a, 'c> {
         )
         .execute(self.0.conn())
         .await?;
-        metrics::histogram!("sql.chain", start.elapsed(), "operations" => "confirm_operation");
+        metrics::histogram!("sql.chain.operations.confirm_operation", start.elapsed());
         Ok(())
     }
 
@@ -221,11 +233,16 @@ impl<'a, 'c> OperationsSchema<'a, 'c> {
         };
 
         transaction.commit().await?;
-        metrics::histogram!("sql.chain", start.elapsed(), "operations" => "store_executed_tx");
+        metrics::histogram!("sql.chain.operations.store_executed_tx", start.elapsed());
         Ok(())
     }
 
-    pub(crate) async fn store_executed_priority_op(
+    /// Stores executed priority operation in database.
+    ///
+    /// This method is made public to fill the database for tests, do not use it for
+    /// any other purposes.
+    #[doc = "hidden"]
+    pub async fn store_executed_priority_op(
         &mut self,
         operation: NewExecutedPriorityOperation,
     ) -> QueryResult<()> {
@@ -248,7 +265,10 @@ impl<'a, 'c> OperationsSchema<'a, 'c> {
         )
         .execute(self.0.conn())
         .await?;
-        metrics::histogram!("sql.chain", start.elapsed(), "operations" => "store_executed_priority_op");
+        metrics::histogram!(
+            "sql.chain.operations.store_executed_priority_op",
+            start.elapsed()
+        );
         Ok(())
     }
 
@@ -283,7 +303,10 @@ impl<'a, 'c> OperationsSchema<'a, 'c> {
         )
         .execute(self.0.conn())
         .await?;
-        metrics::histogram!("sql.chain", start.elapsed(), "operations" => "add_pending_withdrawal");
+        metrics::histogram!(
+            "sql.chain.operations.add_pending_withdrawal",
+            start.elapsed()
+        );
         Ok(())
     }
 
@@ -304,7 +327,10 @@ impl<'a, 'c> OperationsSchema<'a, 'c> {
         )
         .execute(self.0.conn())
         .await?;
-        metrics::histogram!("sql.chain", start.elapsed(), "operations" => "add_complete_withdrawals_transaction");
+        metrics::histogram!(
+            "sql.chain.operations.add_complete_withdrawals_transaction",
+            start.elapsed()
+        );
         Ok(())
     }
 
@@ -354,7 +380,10 @@ impl<'a, 'c> OperationsSchema<'a, 'c> {
             None => None,
         };
 
-        metrics::histogram!("sql.chain", start.elapsed(), "operations" => "eth_tx_for_withdrawal");
+        metrics::histogram!(
+            "sql.chain.operations.eth_tx_for_withdrawal",
+            start.elapsed()
+        );
         Ok(res)
     }
 }

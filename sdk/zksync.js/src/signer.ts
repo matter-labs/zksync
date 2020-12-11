@@ -15,14 +15,36 @@ import {
 import { Address, EthSignerType, PubKeyHash, Transfer, Withdraw, ForcedExit, ChangePubKey } from './types';
 
 export class Signer {
-    readonly privateKey: Uint8Array;
+    readonly #privateKey: Uint8Array;
 
     private constructor(privKey: Uint8Array) {
-        this.privateKey = privKey;
+        this.#privateKey = privKey;
     }
 
     async pubKeyHash(): Promise<PubKeyHash> {
-        return await privateKeyToPubKeyHash(this.privateKey);
+        return await privateKeyToPubKeyHash(this.#privateKey);
+    }
+
+    transferSignBytes(transfer: {
+        accountId: number;
+        from: Address;
+        to: Address;
+        tokenId: number;
+        amount: BigNumberish;
+        fee: BigNumberish;
+        nonce: number;
+    }): Uint8Array {
+        const type = new Uint8Array([5]); // tx type
+        const accountId = serializeAccountId(transfer.accountId);
+        const from = serializeAddress(transfer.from);
+        const to = serializeAddress(transfer.to);
+        const token = serializeTokenId(transfer.tokenId);
+        const amount = serializeAmountPacked(transfer.amount);
+        const fee = serializeFeePacked(transfer.fee);
+        const nonce = serializeNonce(transfer.nonce);
+        const msgBytes = ethers.utils.concat([type, accountId, from, to, token, amount, fee, nonce]);
+
+        return msgBytes;
     }
 
     async signSyncTransfer(transfer: {
@@ -34,17 +56,8 @@ export class Signer {
         fee: BigNumberish;
         nonce: number;
     }): Promise<Transfer> {
-        const type = new Uint8Array([5]); // tx type
-        const accountId = serializeAccountId(transfer.accountId);
-        const from = serializeAddress(transfer.from);
-        const to = serializeAddress(transfer.to);
-        const token = serializeTokenId(transfer.tokenId);
-        const amount = serializeAmountPacked(transfer.amount);
-        const fee = serializeFeePacked(transfer.fee);
-        const nonce = serializeNonce(transfer.nonce);
-        const msgBytes = ethers.utils.concat([type, accountId, from, to, token, amount, fee, nonce]);
-
-        const signature = await signTransactionBytes(this.privateKey, msgBytes);
+        const msgBytes = this.transferSignBytes(transfer);
+        const signature = await signTransactionBytes(this.#privateKey, msgBytes);
 
         return {
             type: 'Transfer',
@@ -59,7 +72,7 @@ export class Signer {
         };
     }
 
-    async signSyncWithdraw(withdraw: {
+    withdrawSignBytes(withdraw: {
         accountId: number;
         from: Address;
         ethAddress: string;
@@ -67,7 +80,7 @@ export class Signer {
         amount: BigNumberish;
         fee: BigNumberish;
         nonce: number;
-    }): Promise<Withdraw> {
+    }): Uint8Array {
         const typeBytes = new Uint8Array([3]);
         const accountId = serializeAccountId(withdraw.accountId);
         const accountBytes = serializeAddress(withdraw.from);
@@ -86,7 +99,21 @@ export class Signer {
             feeBytes,
             nonceBytes
         ]);
-        const signature = await signTransactionBytes(this.privateKey, msgBytes);
+
+        return msgBytes;
+    }
+
+    async signSyncWithdraw(withdraw: {
+        accountId: number;
+        from: Address;
+        ethAddress: string;
+        tokenId: number;
+        amount: BigNumberish;
+        fee: BigNumberish;
+        nonce: number;
+    }): Promise<Withdraw> {
+        const msgBytes = this.withdrawSignBytes(withdraw);
+        const signature = await signTransactionBytes(this.#privateKey, msgBytes);
 
         return {
             type: 'Withdraw',
@@ -101,13 +128,13 @@ export class Signer {
         };
     }
 
-    async signSyncForcedExit(forcedExit: {
+    forcedExitSignBytes(forcedExit: {
         initiatorAccountId: number;
         target: Address;
         tokenId: number;
         fee: BigNumberish;
         nonce: number;
-    }): Promise<ForcedExit> {
+    }): Uint8Array {
         const typeBytes = new Uint8Array([8]);
         const initiatorAccountIdBytes = serializeAccountId(forcedExit.initiatorAccountId);
         const targetBytes = serializeAddress(forcedExit.target);
@@ -122,7 +149,19 @@ export class Signer {
             feeBytes,
             nonceBytes
         ]);
-        const signature = await signTransactionBytes(this.privateKey, msgBytes);
+
+        return msgBytes;
+    }
+
+    async signSyncForcedExit(forcedExit: {
+        initiatorAccountId: number;
+        target: Address;
+        tokenId: number;
+        fee: BigNumberish;
+        nonce: number;
+    }): Promise<ForcedExit> {
+        const msgBytes = this.forcedExitSignBytes(forcedExit);
+        const signature = await signTransactionBytes(this.#privateKey, msgBytes);
         return {
             type: 'ForcedExit',
             initiatorAccountId: forcedExit.initiatorAccountId,
@@ -134,14 +173,14 @@ export class Signer {
         };
     }
 
-    async signSyncChangePubKey(changePubKey: {
+    changePubKeySignBytes(changePubKey: {
         accountId: number;
         account: Address;
         newPkHash: PubKeyHash;
         feeTokenId: number;
         fee: BigNumberish;
         nonce: number;
-    }): Promise<ChangePubKey> {
+    }): Uint8Array {
         const typeBytes = new Uint8Array([7]); // Tx type (1 byte)
         const accountIdBytes = serializeAccountId(changePubKey.accountId);
         const accountBytes = serializeAddress(changePubKey.account);
@@ -158,7 +197,20 @@ export class Signer {
             feeBytes,
             nonceBytes
         ]);
-        const signature = await signTransactionBytes(this.privateKey, msgBytes);
+
+        return msgBytes;
+    }
+
+    async signSyncChangePubKey(changePubKey: {
+        accountId: number;
+        account: Address;
+        newPkHash: PubKeyHash;
+        feeTokenId: number;
+        fee: BigNumberish;
+        nonce: number;
+    }): Promise<ChangePubKey> {
+        const msgBytes = this.changePubKeySignBytes(changePubKey);
+        const signature = await signTransactionBytes(this.#privateKey, msgBytes);
         return {
             type: 'ChangePubKey',
             accountId: changePubKey.accountId,

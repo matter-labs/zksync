@@ -2,11 +2,14 @@ import { ArgumentParser } from 'argparse';
 import { deployContract } from 'ethereum-waffle';
 import { constants, ethers } from 'ethers';
 import { readTestContracts } from '../src.ts/deploy';
+import * as fs from 'fs';
+import * as path from 'path';
 
 const { expect } = require('chai');
 
 export const FranklinTestUpgradeTargetContractCode = require(`../build/ZkSyncTestUpgradeTarget`);
-
+const testConfigPath = path.join(process.env.ZKSYNC_HOME as string, `etc/test_config/constant`);
+const ethTestConfig = JSON.parse(fs.readFileSync(`${testConfigPath}/eth.json`, { encoding: 'utf-8' }));
 const testContracts = readTestContracts();
 
 async function main() {
@@ -26,7 +29,7 @@ async function main() {
 
         const provider = new ethers.providers.JsonRpcProvider(process.env.WEB3_URL);
 
-        const wallet = ethers.Wallet.fromMnemonic(process.env.TEST_MNEMONIC, "m/44'/60'/0'/0/0").connect(provider);
+        const wallet = ethers.Wallet.fromMnemonic(ethTestConfig.test_mnemonic, "m/44'/60'/0'/0/0").connect(provider);
 
         const proxyContract = new ethers.Contract(args.contractAddress, testContracts.proxy.abi, wallet);
 

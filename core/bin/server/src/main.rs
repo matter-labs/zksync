@@ -2,7 +2,7 @@ use futures::{channel::mpsc, executor::block_on, SinkExt, StreamExt};
 use std::cell::RefCell;
 use structopt::StructOpt;
 use zksync_api::run_api;
-use zksync_config::{ConfigurationOptions, ProverOptions};
+use zksync_config::{ConfigurationOptions, EthClientOptions, EthSenderOptions, ProverOptions};
 use zksync_core::{genesis_init, run_core, wait_for_tasks};
 use zksync_eth_sender::run_eth_sender;
 use zksync_prometheus_exporter::run_prometheus_exporter;
@@ -46,6 +46,8 @@ async fn main() -> anyhow::Result<()> {
 
     let connection_pool = ConnectionPool::new(None);
     let config_options = ConfigurationOptions::from_env();
+    let eth_client_options = EthClientOptions::from_env();
+    let eth_sender_options = EthSenderOptions::from_env();
     let prover_options = ProverOptions::from_env();
 
     // Handle Ctrl+C
@@ -77,16 +79,15 @@ async fn main() -> anyhow::Result<()> {
 
     // Run Ethereum sender actors.
     log::info!("Starting the Ethereum sender actors");
-    let eth_sender_task_handle = run_eth_sender(connection_pool.clone(), config_options.clone());
+    let eth_sender_task_handle = run_eth_sender(
+        connection_pool.clone(),
+        eth_client_options,
+        eth_sender_options,
+    );
 
     // Run prover server & witness generator.
     log::info!("Starting the Prover server actors");
-    run_prover_server(
-        connection_pool,
-        stop_signal_sender,
-        prover_options,
-        config_options,
-    );
+    run_prover_server(connection_pool, stop_signal_sender, prover_options);
 
     tokio::select! {
         _ = async { wait_for_tasks(core_task_handles).await } => {

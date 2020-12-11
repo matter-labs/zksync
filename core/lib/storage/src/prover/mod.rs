@@ -59,7 +59,7 @@ impl<'a, 'c> ProverSchema<'a, 'c> {
         let result = last_committed_block - (last_verified_block + num_ongoing_jobs);
 
         transaction.commit().await?;
-        metrics::histogram!("sql", start.elapsed(), "prover" => "unstarted_jobs_count");
+        metrics::histogram!("sql.prover.unstarted_jobs_count", start.elapsed());
         Ok(result)
     }
 
@@ -82,7 +82,7 @@ impl<'a, 'c> ProverSchema<'a, 'c> {
             .integer_value
             .unwrap_or(0) as u64;
 
-        metrics::histogram!("sql", start.elapsed(), "prover" => "pending_jobs_count");
+        metrics::histogram!("sql.prover.pending_jobs_count", start.elapsed());
         Ok(block_without_proofs as u32)
     }
 
@@ -100,7 +100,7 @@ impl<'a, 'c> ProverSchema<'a, 'c> {
         .fetch_optional(self.0.conn())
         .await?;
 
-        metrics::histogram!("sql", start.elapsed(), "prover" => "get_existing_prover_run");
+        metrics::histogram!("sql.prover.get_existing_prover_run", start.elapsed());
         Ok(prover_run)
     }
 
@@ -127,7 +127,7 @@ impl<'a, 'c> ProverSchema<'a, 'c> {
         // - Either there is no ongoing job for the block, or the job exceeded the timeout.
         // Return the index of such a block.
 
-        // TODO: Prover gone interval is hard-coded (#1115).
+        // TODO: Prover gone interval is hard-coded (ZKS-103).
         // Is it critical?
         let job = sqlx::query!(
             r#"
@@ -183,7 +183,7 @@ impl<'a, 'c> ProverSchema<'a, 'c> {
 
         transaction.commit().await?;
 
-        metrics::histogram!("sql", start.elapsed(), "prover" => "prover_run_for_next_commit");
+        metrics::histogram!("sql.prover.prover_run_for_next_commit", start.elapsed());
         Ok(result)
     }
 
@@ -199,7 +199,7 @@ impl<'a, 'c> ProverSchema<'a, 'c> {
         .execute(self.0.conn())
         .await?;
 
-        metrics::histogram!("sql", start.elapsed(), "prover" => "record_prover_is_working");
+        metrics::histogram!("sql.prover.record_prover_is_working", start.elapsed());
         Ok(())
     }
 
@@ -217,7 +217,7 @@ impl<'a, 'c> ProverSchema<'a, 'c> {
         .await?
         .id;
 
-        metrics::histogram!("sql", start.elapsed(), "prover" => "register_prover");
+        metrics::histogram!("sql.prover.register_prover", start.elapsed());
         Ok(inserted_id)
     }
 
@@ -232,7 +232,7 @@ impl<'a, 'c> ProverSchema<'a, 'c> {
         .fetch_one(self.0.conn())
         .await?;
 
-        metrics::histogram!("sql", start.elapsed(), "prover" => "prover_by_id");
+        metrics::histogram!("sql.prover.prover_by_id", start.elapsed());
         Ok(prover)
     }
 
@@ -241,7 +241,7 @@ impl<'a, 'c> ProverSchema<'a, 'c> {
         let start = Instant::now();
         // TODO: It seems that it isn't actually checked if the prover has been stopped
         // anywhere. And also it doesn't seem that prover can be restored from the stopped
-        // state (#1129).
+        // state (ZKS-117).
         sqlx::query!(
             "UPDATE active_provers 
             SET stopped_at = now()
@@ -251,7 +251,7 @@ impl<'a, 'c> ProverSchema<'a, 'c> {
         .execute(self.0.conn())
         .await?;
 
-        metrics::histogram!("sql", start.elapsed(), "prover" => "record_prover_stop");
+        metrics::histogram!("sql.prover.record_prover_stop", start.elapsed());
         Ok(())
     }
 
@@ -272,7 +272,7 @@ impl<'a, 'c> ProverSchema<'a, 'c> {
         .await?
         .rows_affected() as usize;
 
-        metrics::histogram!("sql", start.elapsed(), "prover" => "store_proof");
+        metrics::histogram!("sql.prover.store_proof", start.elapsed());
         Ok(updated_rows)
     }
 
@@ -291,7 +291,7 @@ impl<'a, 'c> ProverSchema<'a, 'c> {
         .await?
         .map(|stored| serde_json::from_value(stored.proof).unwrap());
 
-        metrics::histogram!("sql", start.elapsed(), "prover" => "load_proof");
+        metrics::histogram!("sql.prover.load_proof", start.elapsed());
         Ok(proof)
     }
 
@@ -314,7 +314,7 @@ impl<'a, 'c> ProverSchema<'a, 'c> {
         .execute(self.0.conn())
         .await?;
 
-        metrics::histogram!("sql", start.elapsed(), "prover" => "store_witness");
+        metrics::histogram!("sql.prover.store_witness", start.elapsed());
         Ok(())
     }
 
@@ -332,7 +332,7 @@ impl<'a, 'c> ProverSchema<'a, 'c> {
         .fetch_optional(self.0.conn())
         .await?;
 
-        metrics::histogram!("sql", start.elapsed(), "prover" => "get_witness");
+        metrics::histogram!("sql.prover.get_witness", start.elapsed());
         Ok(block_witness
             .map(|w| serde_json::from_str(&w.witness).expect("Failed to deserialize witness")))
     }

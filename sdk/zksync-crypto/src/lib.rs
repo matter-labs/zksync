@@ -27,7 +27,7 @@ use franklin_crypto::{
     jubjub::JubjubEngine,
 };
 
-use crate::utils::{pub_key_hash, rescue_hash_tx_msg, set_panic_hook};
+use crate::utils::{rescue_hash_tx_msg, set_panic_hook};
 use sha2::{Digest, Sha256};
 
 // When the `wee_alloc` feature is enabled, use `wee_alloc` as the global
@@ -36,7 +36,7 @@ use sha2::{Digest, Sha256};
 #[global_allocator]
 static ALLOC: wee_alloc::WeeAlloc = wee_alloc::WeeAlloc::INIT;
 
-#[wasm_bindgen]
+#[wasm_bindgen(start)]
 /// This method initializes params for current thread, otherwise they will be initialized when signing
 /// first message.
 pub fn zksync_crypto_init() {
@@ -46,9 +46,9 @@ pub fn zksync_crypto_init() {
 }
 
 #[wasm_bindgen(js_name = privateKeyFromSeed)]
-pub fn private_key_from_seed(seed: &[u8]) -> Vec<u8> {
+pub fn private_key_from_seed(seed: &[u8]) -> Result<Vec<u8>, JsValue> {
     if seed.len() < 32 {
-        panic!("Seed is too short");
+        return Err(JsValue::from_str("Seed is too short"));
     };
 
     let sha256_bytes = |input: &[u8]| -> Vec<u8> {
@@ -66,45 +66,57 @@ pub fn private_key_from_seed(seed: &[u8]) -> Vec<u8> {
             .read_be(&raw_priv_key[..])
             .expect("failed to read raw_priv_key");
         if Fs::from_repr(fs_repr).is_ok() {
-            return raw_priv_key;
+            return Ok(raw_priv_key);
         } else {
             effective_seed = raw_priv_key;
         }
     }
 }
 
-fn read_signing_key(private_key: &[u8]) -> PrivateKey<Engine> {
+fn read_signing_key(private_key: &[u8]) -> Result<PrivateKey<Engine>, JsValue> {
     let mut fs_repr = FsRepr::default();
     fs_repr
         .read_be(private_key)
-        .expect("couldn't read private key repr");
-    PrivateKey::<Engine>(Fs::from_repr(fs_repr).expect("couldn't read private key from repr"))
+        .map_err(|_| JsValue::from_str("couldn't read private key repr"))?;
+    Ok(PrivateKey::<Engine>(
+        Fs::from_repr(fs_repr).expect("couldn't read private key from repr"),
+    ))
 }
 
-fn privkey_to_pubkey_internal(private_key: &[u8]) -> PublicKey<Engine> {
+fn privkey_to_pubkey_internal(private_key: &[u8]) -> Result<PublicKey<Engine>, JsValue> {
     let p_g = FixedGenerators::SpendingKeyGenerator;
 
-    let sk = read_signing_key(private_key);
+    let sk = read_signing_key(private_key)?;
 
-    JUBJUB_PARAMS.with(|params| PublicKey::from_private(&sk, p_g, params))
+    Ok(JUBJUB_PARAMS.with(|params| PublicKey::from_private(&sk, p_g, params)))
+}
+
+#[wasm_bindgen(js_name = pubKeyHash)]
+pub fn pub_key_hash(pubkey: &[u8]) -> Result<Vec<u8>, JsValue> {
+    let pubkey = JUBJUB_PARAMS
+        .with(|params| PublicKey::read(&pubkey[..], params))
+        .map_err(|_| JsValue::from_str("couldn't read public key"))?;
+    Ok(utils::pub_key_hash(&pubkey))
 }
 
 #[wasm_bindgen]
-pub fn private_key_to_pubkey_hash(private_key: &[u8]) -> Vec<u8> {
-    pub_key_hash(&privkey_to_pubkey_internal(private_key))
+pub fn private_key_to_pubkey_hash(private_key: &[u8]) -> Result<Vec<u8>, JsValue> {
+    Ok(utils::pub_key_hash(&privkey_to_pubkey_internal(
+        private_key,
+    )?))
 }
 
 #[wasm_bindgen]
-pub fn private_key_to_pubkey(private_key: &[u8]) -> Vec<u8> {
+pub fn private_key_to_pubkey(private_key: &[u8]) -> Result<Vec<u8>, JsValue> {
     let mut pubkey_buf = Vec::with_capacity(PACKED_POINT_SIZE);
 
-    let pubkey = privkey_to_pubkey_internal(private_key);
+    let pubkey = privkey_to_pubkey_internal(private_key)?;
 
     pubkey
         .write(&mut pubkey_buf)
         .expect("failed to write pubkey to buffer");
 
-    pubkey_buf
+    Ok(pubkey_buf)
 }
 
 #[wasm_bindgen]
@@ -114,11 +126,10 @@ pub fn private_key_to_pubkey(private_key: &[u8]) -> Vec<u8> {
 /// [0..32] - packed public key of signer.
 /// [32..64] - packed r point of the signature.
 /// [64..96] - s poing of the signature.
-pub fn sign_musig(private_key: &[u8], msg: &[u8]) -> Vec<u8> {
+pub fn sign_musig(private_key: &[u8], msg: &[u8]) -> Result<Vec<u8>, JsValue> {
     let mut packed_full_signature = Vec::with_capacity(PACKED_POINT_SIZE + PACKED_SIGNATURE_SIZE);
-    //
     let p_g = FixedGenerators::SpendingKeyGenerator;
-    let private_key = read_signing_key(private_key);
+    let private_key = read_signing_key(private_key)?;
 
     {
         let public_key =
@@ -127,7 +138,7 @@ pub fn sign_musig(private_key: &[u8], msg: &[u8]) -> Vec<u8> {
             .write(&mut packed_full_signature)
             .expect("failed to write pubkey to packed_point");
     };
-    //
+
     let signature = JUBJUB_PARAMS.with(|jubjub_params| {
         RESCUE_PARAMS.with(|rescue_params| {
             let hashed_msg = rescue_hash_tx_msg(msg);
@@ -152,5 +163,5 @@ pub fn sign_musig(private_key: &[u8], msg: &[u8]) -> Vec<u8> {
         "incorrect signature size when signing"
     );
 
-    packed_full_signature
+    Ok(packed_full_signature)
 }

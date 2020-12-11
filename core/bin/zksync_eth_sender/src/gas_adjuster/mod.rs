@@ -52,15 +52,16 @@ impl<ETH: EthereumInterface, DB: DatabaseInterface> GasAdjuster<ETH, DB> {
         }
     }
 
-    /// Calculates a new gas amount for the replacement of the stuck tx.
-    /// Replacement price is usually suggested to be at least 10% higher, we make it 15% higher.
-    pub async fn get_gas_price(
-        &mut self,
+    async fn get_suggested_price(
+        &self,
         ethereum: &ETH,
         old_tx_gas_price: Option<U256>,
     ) -> anyhow::Result<U256> {
-        let network_price = ethereum.gas_price().await?;
+        if let Some(price) = self.statistics.get_average_price() {
+            return Ok(price);
+        }
 
+        let network_price = ethereum.gas_price().await?;
         let scaled_price = if let Some(old_price) = old_tx_gas_price {
             // Stuck transaction, scale it up.
             self.scale_up(old_price, network_price)
@@ -68,7 +69,17 @@ impl<ETH: EthereumInterface, DB: DatabaseInterface> GasAdjuster<ETH, DB> {
             // New transaction, use the network price as the base.
             network_price
         };
+        Ok(scaled_price)
+    }
 
+    /// Calculates a new gas amount for the replacement of the stuck tx.
+    /// Replacement price is usually suggested to be at least 10% higher, we make it 15% higher.
+    pub async fn get_gas_price(
+        &mut self,
+        ethereum: &ETH,
+        old_tx_gas_price: Option<U256>,
+    ) -> anyhow::Result<U256> {
+        let scaled_price = self.get_suggested_price(ethereum, old_tx_gas_price).await?;
         // Now, cut the price if it's too big.
         let price = self.limit_max(scaled_price);
 
@@ -78,10 +89,8 @@ impl<ETH: EthereumInterface, DB: DatabaseInterface> GasAdjuster<ETH, DB> {
             log::warn!("Maximum possible gas price will be used: <{}>", price);
         }
 
-        // TODO: Currently instead of using sent txs as samples, we use the gas prices suggested by
-        // the Ethereum node (#1130).
-        // // Report used price to be gathered by the statistics module.
-        // self.statistics.add_sample(price);
+        // Report used price to be gathered by the statistics module.
+        self.statistics.add_sample(price);
 
         Ok(price)
     }
@@ -211,6 +220,14 @@ impl GasStatistics {
         let average_price = self.current_sum / self.samples.len();
 
         self.current_max_price = average_price * multiplier / divider;
+    }
+
+    pub fn get_average_price(&self) -> Option<U256> {
+        if self.samples.len() < Self::GAS_PRICE_SAMPLES_AMOUNT {
+            None
+        } else {
+            Some(self.current_sum / Self::GAS_PRICE_SAMPLES_AMOUNT)
+        }
     }
 
     pub fn get_limit(&self) -> U256 {
