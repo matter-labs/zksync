@@ -680,6 +680,10 @@ impl ZkSyncStateKeeper {
             .success_operations
             .push(exec_result.clone());
         self.current_unprocessed_priority_op += 1;
+        println!(
+            "current_unprocessed_priority_op : {:?}",
+            self.current_unprocessed_priority_op
+        );
 
         metrics::histogram!("state_keeper.apply_priority_op", start.elapsed());
         Ok(exec_result)
@@ -954,7 +958,7 @@ impl ZkSyncStateKeeper {
         pending_block.stored_account_updates = pending_block.account_updates.len();
         self.state.block_number += 1;
 
-        log::info!(
+        println!(
             "Creating full block: {}, operations: {}, chunks_left: {}, miniblock iterations: {}",
             block_commit_request.block.block_number,
             block_commit_request.block.block_transactions.len(),

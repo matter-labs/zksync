@@ -419,6 +419,7 @@ async fn exit_test() {
         &contracts,
         commit_account,
         initial_root_hash,
+        None,
     );
 
     let deposit_amount = parse_ether("0.1").unwrap();

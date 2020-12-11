@@ -1,16 +1,15 @@
 use crate::eth_account::{parse_ether, EthereumAccount};
 use crate::external_commands::{deploy_contracts, get_test_accounts, Contracts};
 use crate::zksync_account::ZkSyncAccount;
-use futures::channel::oneshot;
+use itertools::Itertools;
 use std::thread::JoinHandle;
 use web3::transports::Http;
 use zksync_core::state_keeper::ZkSyncStateInitParams;
 use zksync_testkit::data_restore::verify_restore;
 use zksync_testkit::scenarios::{perform_basic_operations, BlockProcessing};
-use zksync_testkit::state_keeper_utils::StateKeeperChannels;
 use zksync_testkit::*;
 use zksync_types::block::Block;
-use zksync_types::{AccountMap, AccountTree};
+use zksync_types::{AccountMap, AccountTree, PriorityOp};
 
 fn create_test_setup_state(
     testkit_config: &TestkitConfig,
@@ -73,15 +72,16 @@ async fn execute_blocks(
     number_of_verified_iteration_blocks: u16, // Each operation generate 4 blocks
     number_of_committed_iteration_blocks: u16,
     number_of_reverted_iterations_blocks: u16,
-) -> (ZkSyncStateInitParams, Block) {
+) -> (ZkSyncStateInitParams, Block, Vec<PriorityOp>) {
     let deposit_amount = parse_ether("1.0").unwrap();
 
     let mut executed_blocks = Vec::new();
     let token = 0;
+    let mut priority_ops_states = Vec::new();
+    let mut states = Vec::new();
 
-    let mut states = vec![];
     for _ in 0..number_of_verified_iteration_blocks {
-        let blocks = perform_basic_operations(
+        let (blocks, priority_ops) = perform_basic_operations(
             token,
             test_setup,
             deposit_amount.clone(),
@@ -90,9 +90,10 @@ async fn execute_blocks(
         .await;
         executed_blocks.extend(blocks.into_iter());
         states.push(test_setup.get_current_state().await);
+        priority_ops_states.push(priority_ops);
     }
     for _ in 0..number_of_committed_iteration_blocks - number_of_verified_iteration_blocks {
-        let blocks = perform_basic_operations(
+        let (blocks, priority_ops) = perform_basic_operations(
             token,
             test_setup,
             deposit_amount.clone(),
@@ -101,6 +102,7 @@ async fn execute_blocks(
         .await;
         executed_blocks.extend(blocks.into_iter());
         states.push(test_setup.get_current_state().await);
+        priority_ops_states.push(priority_ops);
     }
 
     let executed_blocks_reverse_order = executed_blocks
@@ -117,6 +119,12 @@ async fn execute_blocks(
     let reverted_state = states[reverted_state_idx as usize].clone();
 
     let executed_block = executed_blocks[(reverted_state.last_block_number - 1) as usize].clone();
+    let priority_ops = priority_ops_states
+        .into_iter()
+        .rev()
+        .take((number_of_reverted_iterations_blocks - 1) as usize)
+        .rev()
+        .concat();
 
     test_setup
         .revert_blocks(&executed_blocks_reverse_order)
@@ -134,7 +142,7 @@ async fn execute_blocks(
     )
     .await;
 
-    (reverted_state, executed_block)
+    (reverted_state, executed_block, priority_ops)
 }
 
 fn balance_tree_to_account_map(balance_tree: &AccountTree) -> AccountMap {
@@ -166,16 +174,17 @@ async fn revert_blocks_test() {
         &contracts,
         commit_account.clone(),
         hash,
+        None,
     );
 
-    let (state, block) = execute_blocks(
+    let (state, block, priority_ops) = execute_blocks(
         &contracts,
         &fee_account,
         &mut test_setup,
         &test_config,
+        1,
         2,
-        4,
-        3,
+        1,
     )
     .await;
     sender.send(()).expect("sk stop send");
@@ -184,16 +193,25 @@ async fn revert_blocks_test() {
     let hash = state.tree.root_hash();
     let (handler, sender, channels) = spawn_state_keeper(&fee_account.address, state);
     let account_set = test_setup.accounts;
-    let mut test_setup = TestSetup::new(channels, account_set, &contracts, commit_account, hash);
-    test_setup.last_committed_block = block;
+    let mut test_setup = TestSetup::new(
+        channels,
+        account_set,
+        &contracts,
+        commit_account,
+        hash,
+        Some(block),
+    );
+    for op in priority_ops.into_iter() {
+        test_setup.execute_priority_op(op).await
+    }
     let state = execute_blocks(
         &contracts,
         &fee_account,
         &mut test_setup,
         &test_config,
-        2,
-        4,
         1,
+        2,
+        0,
     )
     .await;
     sender.send(()).expect("sk stop send");

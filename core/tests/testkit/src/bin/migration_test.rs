@@ -74,6 +74,7 @@ async fn migration_test() {
         &contracts,
         commit_account,
         genesis_root,
+        None,
     );
 
     let deposit_amount = parse_ether("1.0").unwrap();

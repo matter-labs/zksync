@@ -60,6 +60,7 @@ impl TestSetup {
         deployed_contracts: &Contracts,
         commit_account: EthereumAccount<Http>,
         initial_root: Fr,
+        last_block: Option<Block>,
     ) -> Self {
         let mut tokens = HashMap::new();
         tokens.insert(1, deployed_contracts.test_erc20_address);
@@ -72,7 +73,7 @@ impl TestSetup {
             expected_changes_for_current_block: ExpectedAccountState::default(),
             commit_account,
             current_state_root: None,
-            last_committed_block: Block::new(
+            last_committed_block: last_block.unwrap_or(Block::new(
                 0,
                 initial_root,
                 0,
@@ -83,7 +84,7 @@ impl TestSetup {
                 U256::from(0),
                 H256::default(),
                 0,
-            ),
+            )),
         }
     }
 
@@ -133,7 +134,7 @@ impl TestSetup {
         to: ZKSyncAccountId,
         token: Token,
         amount: BigUint,
-    ) -> Vec<TransactionReceipt> {
+    ) -> (Vec<TransactionReceipt>, PriorityOp) {
         let mut from_eth_balance = self.get_expected_eth_account_balance(from, token.0).await;
         from_eth_balance -= &amount;
 
@@ -177,8 +178,8 @@ impl TestSetup {
             .eth_accounts_state
             .insert((from, 0), eth_balance);
 
-        self.execute_priority_op(deposit_op).await;
-        receipts
+        self.execute_priority_op(deposit_op.clone()).await;
+        (receipts, deposit_op)
     }
 
     async fn execute_tx(&mut self, tx: ZkSyncTx) {
@@ -249,7 +250,8 @@ impl TestSetup {
         receipts
     }
 
-    async fn execute_priority_op(&mut self, op: PriorityOp) {
+    pub async fn execute_priority_op(&mut self, op: PriorityOp) {
+        println!("Execute priority op {:?}", op.serial_id);
         let block = ProposedBlock {
             priority_ops: vec![op],
             txs: Vec::new(),
@@ -286,7 +288,7 @@ impl TestSetup {
         post_by: ETHAccountId,
         from: ZKSyncAccountId,
         token: Token,
-    ) -> TransactionReceipt {
+    ) -> (TransactionReceipt, PriorityOp) {
         let account_id = self
             .get_zksync_account_committed_state(from)
             .await
@@ -331,8 +333,8 @@ impl TestSetup {
             .eth_accounts_state
             .insert((post_by, 0), eth_balance);
 
-        self.execute_priority_op(full_exit_op).await;
-        receipt
+        self.execute_priority_op(full_exit_op.clone()).await;
+        (receipt, full_exit_op)
     }
 
     pub async fn change_pubkey_with_tx(
@@ -730,13 +732,13 @@ impl TestSetup {
         let block_chunks = new_block.block_chunks_size;
 
         let mut block_checks_failed = false;
-        for ((eth_account, token), expeted_balance) in
+        for ((eth_account, token), expected_balance) in
             &self.expected_changes_for_current_block.eth_accounts_state
         {
             let real_balance = self.get_eth_balance(*eth_account, *token).await;
-            if expeted_balance != &real_balance {
+            if expected_balance != &real_balance {
                 println!("eth acc: {}, token: {}", eth_account.0, token);
-                println!("expected: {}", expeted_balance);
+                println!("expected: {}", expected_balance);
                 println!("real:     {}", real_balance);
                 block_checks_failed = true;
             }

@@ -14,6 +14,7 @@ use crate::{
 
 use super::*;
 use zksync_types::block::Block;
+use zksync_types::PriorityOp;
 
 /// Performs a fixed set of operations which covers most of the main server's functionality.
 /// Aim is to cover operations processed by state keeper, while manually simulating everything else around it.
@@ -91,6 +92,7 @@ pub async fn perform_basic_tests() {
         &contracts,
         commit_account,
         initial_root,
+        None,
     );
 
     let deposit_amount = parse_ether("1.0").unwrap();
@@ -133,11 +135,12 @@ pub async fn perform_basic_operations(
     test_setup: &mut TestSetup,
     deposit_amount: BigUint,
     blocks_processing: BlockProcessing,
-) -> Vec<Block> {
+) -> (Vec<Block>, Vec<PriorityOp>) {
     let mut executed_blocks = Vec::new();
+    let mut priority_ops = Vec::new();
     // test deposit to other account
     test_setup.start_block();
-    test_setup
+    let (_, op) = test_setup
         .deposit(
             ETHAccountId(0),
             ZKSyncAccountId(2),
@@ -145,6 +148,7 @@ pub async fn perform_basic_operations(
             deposit_amount.clone(),
         )
         .await;
+    priority_ops.push(op);
     let block = if blocks_processing == BlockProcessing::CommitAndVerify {
         test_setup
             .execute_commit_and_verify_block()
@@ -159,7 +163,7 @@ pub async fn perform_basic_operations(
 
     // test two deposits
     test_setup.start_block();
-    test_setup
+    let (_, op) = test_setup
         .deposit(
             ETHAccountId(0),
             ZKSyncAccountId(1),
@@ -167,7 +171,9 @@ pub async fn perform_basic_operations(
             deposit_amount.clone(),
         )
         .await;
-    test_setup
+    priority_ops.push(op);
+
+    let (_, op) = test_setup
         .deposit(
             ETHAccountId(0),
             ZKSyncAccountId(1),
@@ -175,6 +181,8 @@ pub async fn perform_basic_operations(
             deposit_amount.clone(),
         )
         .await;
+    priority_ops.push(op);
+
     let block = if blocks_processing == BlockProcessing::CommitAndVerify {
         test_setup
             .execute_commit_and_verify_block()
@@ -278,9 +286,12 @@ pub async fn perform_basic_operations(
     println!("Transfer test success, token_id: {}", token);
 
     test_setup.start_block();
-    test_setup
+
+    let (_, op) = test_setup
         .full_exit(ETHAccountId(0), ZKSyncAccountId(1), Token(token))
         .await;
+    priority_ops.push(op);
+
     let block = if blocks_processing == BlockProcessing::CommitAndVerify {
         test_setup
             .execute_commit_and_verify_block()
@@ -293,5 +304,5 @@ pub async fn perform_basic_operations(
     executed_blocks.push(block);
     println!("FullExit test success, token_id: {}", token);
 
-    executed_blocks
+    (executed_blocks, priority_ops)
 }
