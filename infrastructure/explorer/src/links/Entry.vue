@@ -38,7 +38,7 @@
 import LayerIcon from './LayerIcon';
 import InnerLink from './InnerLink';
 import OutterLink from './OutterLink';
-import ReadinessStatus from '../ReadinessStatus';
+import ReadinessStatus from './ReadinessStatus';
 
 const components = {
     InnerLink,
