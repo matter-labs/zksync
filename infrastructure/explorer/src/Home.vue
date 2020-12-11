@@ -66,7 +66,6 @@
 <script>
 import * as constants from './constants';
 import { clientPromise } from './Client';
-import ClosableJumbotron from './ClosableJumbotron.vue';
 import SearchField from './SearchField.vue';
 import CopyableAddress from './CopyableAddress.vue';
 import Navbar from './Navbar.vue';
@@ -75,7 +74,6 @@ import ReadinessStatus from './ReadinessStatus.vue';
 import { getBlockEntries } from './homeBlockEntries';
 
 const components = {
-    ClosableJumbotron,
     SearchField,
     CopyableAddress,
     Navbar,
