@@ -33,7 +33,8 @@ impl ResponseAccountState {
             .await
             .map_err(|_| Error::internal_error())?;
 
-        // To provide backward compatibility with the old code.
+        // Old code used `HashMap` as well and didn't rely on the particular order,
+        // so here we use `HashMap` as well for the consistency.
         let balances: HashMap<_, _> = inner.balances.into_iter().collect();
 
         Ok(Self {

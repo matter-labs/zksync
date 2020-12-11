@@ -7,7 +7,6 @@ local metrics = [
   "sql.chain.account.get_account_and_last_block",
   "sql.chain.account.last_committed_state_for_account",
   "sql.chain.account.last_verified_state_for_account",
-  "sql.chain.operations_ext.get_account_transactions_receipts",
   "sql.chain.stats.count_outstanding_proofs",
   "sql.chain.stats.count_total_transactions",
 ];

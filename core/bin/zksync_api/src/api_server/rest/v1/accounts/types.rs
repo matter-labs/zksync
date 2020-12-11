@@ -375,7 +375,10 @@ impl From<AccountTxReceiptResponse> for AccountTxReceipt {
             (false, false) => TxReceipt::Executed,
             (true, false) => TxReceipt::Committed { block },
             (true, true) => TxReceipt::Verified { block },
-            _ => panic!("Database provided an incorrect account tx reciept"),
+            (false, true) => panic!(
+                "Database provided an incorrect account tx reciept: {:?}",
+                inner
+            ),
         };
 
         Self {
