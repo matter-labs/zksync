@@ -1,9 +1,12 @@
 import { BigNumber } from 'ethers';
+import * as ethers from 'ethers';
 import Axios from 'axios';
 import WebSocketAsPromised = require('websocket-as-promised');
 import * as fs from 'fs';
-import { parseHexWithPrefix, TokenSet } from './utils';
 import * as websocket from 'websocket';
+import { parseHexWithPrefix, TokenSet } from './utils';
+import { PubKeyHash } from './types';
+import { Signer } from './signer';
 
 const W3CWebSocket = websocket.w3cwebsocket;
 
@@ -162,7 +165,7 @@ export class WSTransport extends AbstractJSONRPCTransport {
 }
 
 export class DummyTransport extends AbstractJSONRPCTransport {
-    public constructor(public network: string) {
+    public constructor(public network: string, public ethPrivateKey: Uint8Array) {
         super();
     }
 
@@ -173,6 +176,12 @@ export class DummyTransport extends AbstractJSONRPCTransport {
                 encoding: 'utf-8'
             })
         );
+    }
+
+    async getPubKeyHash(): Promise<PubKeyHash> {
+        const ethWallet = new ethers.Wallet(this.ethPrivateKey);
+        const { signer } = await Signer.fromETHSignature(ethWallet);
+        return await signer.pubKeyHash();
     }
 
     async request(method: string, params = null): Promise<any> {
@@ -208,6 +217,7 @@ export class DummyTransport extends AbstractJSONRPCTransport {
         if (method == 'account_info') {
             // The example `AccountState` instance:
             //  - assigns the '42' value to account_id;
+            //  - assigns the committed.pubKeyHash to match the wallet's signer's PubKeyHash
             //  - adds single entry of "DAI" token to the committed balances;
             //  - adds single entry of "USDC" token to the verified balances.
             return {
@@ -219,7 +229,7 @@ export class DummyTransport extends AbstractJSONRPCTransport {
                         DAI: BigNumber.from(12345)
                     },
                     nonce: 0,
-                    pubKeyHash: 'sync:0102030405060708091011121314151617181920'
+                    pubKeyHash: await this.getPubKeyHash()
                 },
                 verified: {
                     balances: {

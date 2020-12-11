@@ -9,7 +9,7 @@ import { Provider } from '../src/provider';
 describe('Wallet with mock provider', function () {
     async function getWallet(ethPrivateKey: Uint8Array, network: string): Promise<Wallet> {
         const ethWallet = new ethers.Wallet(ethPrivateKey);
-        const mockProvider = await Provider.newMockProvider(network);
+        const mockProvider = await Provider.newMockProvider(network, ethPrivateKey);
         const wallet = await Wallet.fromEthSigner(ethWallet, mockProvider);
         return wallet;
     }
@@ -32,16 +32,6 @@ describe('Wallet with mock provider', function () {
         const wallet = await getWallet(key, 'mainnet');
         const accountId = await wallet.getAccountId();
         expect(accountId).eq(42, "Wallet's accountId does not match the hardcoded mock value");
-    });
-
-    it('Wallet has defined PubKeyHash', async function () {
-        const key = new Uint8Array(new Array(32).fill(17));
-        const wallet = await getWallet(key, 'mainnet');
-        const pubKeyHash = await wallet.getCurrentPubKeyHash();
-        expect(pubKeyHash).eq(
-            'sync:0102030405060708091011121314151617181920',
-            "Wallet's pubKeyHash does not match the hardcoded mock value"
-        );
     });
 
     it('Wallet has expected committed balances', async function () {
@@ -92,7 +82,7 @@ describe('Wallet with mock provider', function () {
         expect(thrown, 'getBalance call was expected to throw an exception').to.be.true;
     });
 
-    it.skip("Wallet's signing key checking procedure is more strict than the one in Rust implementation", async function () {
+    it("Wallet's signing key checking", async function () {
         const key = new Uint8Array(new Array(32).fill(60));
         const wallet = await getWallet(key, 'mainnet');
         expect(await wallet.isSigningKeySet()).eq(true, "Wallet's signing key is unset");
