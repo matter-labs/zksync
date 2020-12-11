@@ -11,5 +11,5 @@ EXPOSE 3000
 EXPOSE 3031
 EXPOSE 3030
 COPY --from=builder /usr/src/zksync/target/release/zksync_server /usr/bin
-COPY contracts/build/ /contracts/build/
+COPY contracts/artifacts/ /contracts/artifacts/
 ENTRYPOINT ["zksync_server"]
