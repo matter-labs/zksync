@@ -34,8 +34,12 @@ async function getEnvironment(): Promise<string> {
     return 'dev';
 }
 
+function envDirPath(): string {
+    return path.join(env['ZKSYNC_HOME'] as string, 'etc', 'env');
+}
+
 function getConfigPath(environment: string, configName: string): string {
-    return path.join(env['ZKSYNC_HOME'] as string, 'etc', 'env', environment, configName);
+    return path.join(envDirPath(), environment, configName);
 }
 
 async function loadConfig(environment: string, configName: string) {
@@ -53,7 +57,7 @@ async function loadConfig(environment: string, configName: string) {
 }
 
 async function checkConfigExistence(environment: string) {
-    const configFolder = path.join(env['ZKSYNC_HOME'] as string, 'etc', 'env', environment);
+    const configFolder = path.join(envDirPath(), environment);
 
     if (fs.existsSync(configFolder)) {
         return;
@@ -77,7 +81,32 @@ async function checkConfigExistence(environment: string) {
     process.exit(1);
 }
 
-export async function loadAllConfigs(environment?: string) {
+function collectVariables(prefix: string, config: any): Map<string, string> {
+    let variables: Map<string, string> = new Map();
+
+    for (const key in config) {
+        const keyUppercase = key.toLocaleUpperCase();
+        if (typeof config[key] == 'object' && config[key] !== null && !Array.isArray(config[key])) {
+            // It's a map object: parse it recursively.
+
+            // Add a prefix for the child elements:
+            // '' -> 'KEY_'; 'KEY_' -> 'KEY_ANOTHER_KEY_'.
+            const newPrefix = `${prefix}${keyUppercase}_`;
+
+            const nestedEntries = collectVariables(newPrefix, config[key]);
+            variables = new Map([...variables, ...nestedEntries]);
+        } else {
+            const variableName = `${prefix}${keyUppercase}`;
+            const value = Array.isArray(config[key]) ? config[key].join(',') : config[key];
+
+            variables.set(variableName, value);
+        }
+    }
+
+    return variables;
+}
+
+async function loadAllConfigs(environment?: string) {
     if (!environment) {
         environment = await getEnvironment();
     }
@@ -95,12 +124,37 @@ export async function loadAllConfigs(environment?: string) {
         deepExtend(config, localConfig);
     }
 
+    return config;
+}
+
+export async function printAllConfigs(environment?: string) {
+    const config = await loadAllConfigs(environment);
     console.log(`${JSON.stringify(config, null, 2)}`);
+}
+
+export async function compileConfig(environment?: string) {
+    if (!environment) {
+        environment = await getEnvironment();
+    }
+
+    const config = await loadAllConfigs(environment);
+
+    const variables = collectVariables('', config);
+
+    let outputFileContents = `# This file is generated automatically by 'zk config compile'\n`;
+    outputFileContents += `# Do not edit manually!\n\n`;
+    variables.forEach((value: string, key: string) => {
+        outputFileContents += `${key}="${value}"\n`;
+    });
+
+    const outputFileName = path.join(envDirPath(), `${environment}.env`);
+    await fs.promises.writeFile(outputFileName, outputFileContents);
 }
 
 export const command = new Command('config').description('config management');
 
+command.command('load [environment]').description('load the config for a certain environment').action(printAllConfigs);
 command
-    .command('load [environment]')
-    .description('load the config for a certain environment')
-    .action(loadAllConfigs);
+    .command('compile [environment]')
+    .description('compile the config for a certain environment')
+    .action(compileConfig);

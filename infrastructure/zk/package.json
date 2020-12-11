@@ -10,7 +10,6 @@
         "start": "node build/index.js"
     },
     "dependencies": {
-        "@types/deep-extend": "^0.4.31",
         "commander": "^6.0.0",
         "deep-extend": "^0.6.0",
         "dotenv": "^8.2.0",
@@ -21,6 +20,7 @@
     },
     "devDependencies": {
         "@types/node": "^14.6.1",
+        "@types/deep-extend": "^0.4.31",
         "@types/node-fetch": "^2.5.7",
         "@types/tabtab": "^3.0.1",
         "typescript": "^4.0.2"
