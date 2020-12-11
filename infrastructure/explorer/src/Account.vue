@@ -31,7 +31,7 @@
                 <b-card no-body class="table-margin-hack">
                     <b-table responsive class="nowrap" :items="transactionProps" :fields="transactionFields">
                         <template v-slot:cell(TxHash)="data">
-                            <i v-if="!data.item['success']" class="fas fa-times brown" />
+                            <i v-if="!data.item['success']" class="fas fa-times brown mr-1" />
                             <Entry :value="data.item['TxHash'].value" />
                         </template>
                         <template v-slot:cell(Type)="data">
