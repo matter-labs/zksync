@@ -44,7 +44,6 @@ import TransactionList from './TransactionList.vue';
 import SearchField from './SearchField.vue';
 import CopyableAddress from './CopyableAddress.vue';
 import Navbar from './Navbar.vue';
-import ReadinessStatus from './ReadinessStatus.vue';
 import { clientPromise } from './Client';
 import Entry from './links/Entry';
 
@@ -57,7 +56,6 @@ const components = {
     SearchField,
     CopyableAddress,
     Navbar,
-    ReadinessStatus,
     Entry
 };
 

@@ -3,8 +3,8 @@
     <span class="mr-1">
         <i v-if="getStatus == -1" class="fas fa-times brown"></i>
         <b-spinner v-else-if="getStatus == 0" small label="Small Spinner" />
-        <img v-else-if="getStatus == 1" small class="readiness-image" src="./assets/2.svg" />
-        <img v-else-if="getStatus == 2" small class="readiness-image" src="./assets/1.svg" />
+        <img v-else-if="getStatus == 1" small class="readiness-image" src="../assets/2.svg" />
+        <img v-else-if="getStatus == 2" small class="readiness-image" src="../assets/1.svg" />
     </span>
 </template>
 

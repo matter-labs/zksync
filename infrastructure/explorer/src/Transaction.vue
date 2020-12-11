@@ -51,7 +51,6 @@ import { makeEntry } from './utils';
 import SearchField from './SearchField.vue';
 import CopyableAddress from './CopyableAddress.vue';
 import Navbar from './Navbar.vue';
-import ReadinessStatus from './ReadinessStatus.vue';
 import Entry from './links/Entry.vue';
 import { blockchainExplorerTx } from './constants';
 
@@ -61,7 +60,6 @@ const components = {
     SearchField,
     CopyableAddress,
     Navbar,
-    ReadinessStatus,
     Entry
 };
 

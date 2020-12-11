@@ -70,14 +70,12 @@ import SearchField from './SearchField.vue';
 import CopyableAddress from './CopyableAddress.vue';
 import Navbar from './Navbar.vue';
 import Entry from './links/Entry';
-import ReadinessStatus from './ReadinessStatus.vue';
 import { getBlockEntries } from './homeBlockEntries';
 
 const components = {
     SearchField,
     CopyableAddress,
     Navbar,
-    ReadinessStatus,
     Entry
 };
 
