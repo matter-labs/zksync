@@ -3,7 +3,7 @@
 
 [database]
 # Address of the databaase server.
-database_url="postgres://postgres@localhost/plasma"
+url="postgres://postgres@localhost/plasma"
 
 [eth_client]
 # Set in env file for development, production, staging and testnet.

@@ -1,5 +1,5 @@
-[database]
+[db]
 # Datbase URL is defined in the `private.toml`
 
 # Amount of open connections to the database.
-db_pool_size=10
+pool_size=10
