@@ -1,6 +1,7 @@
 # Addresses of the deployed zkSync contracts.
 # Values of this file are updated automatically by the contract deploy script.
 
+[contracts]
 UPGRADE_GATEKEEPER_ADDR="0x5E6D086F5eC079ADFF4FB3774CDf3e8D6a34F7E9"
 GOVERNANCE_TARGET_ADDR="0x5E6D086F5eC079ADFF4FB3774CDf3e8D6a34F7E9"
 VERIFIER_TARGET_ADDR="0x5E6D086F5eC079ADFF4FB3774CDf3e8D6a34F7E9"
