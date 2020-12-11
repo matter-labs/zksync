@@ -32,12 +32,12 @@ pub fn bench_close_account_witness(c: &mut Criterion) {
         close_account_witness,
     );
     c.bench_with_input(
-        BenchmarkId::new("Change pubkey offchain witness", 10usize),
+        BenchmarkId::new("Close account witness", 10usize),
         &10usize,
         close_account_witness,
     );
     c.bench_with_input(
-        BenchmarkId::new("Change pubkey offchain witness", 100usize),
+        BenchmarkId::new("Close account witness", 100usize),
         &100usize,
         close_account_witness,
     );

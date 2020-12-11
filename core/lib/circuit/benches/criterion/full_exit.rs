@@ -32,17 +32,17 @@ fn full_exit_witness(b: &mut Bencher<'_>, number_of_accounts: &usize) {
 
 pub fn bench_full_exit(c: &mut Criterion) {
     c.bench_with_input(
-        BenchmarkId::new("Forced exit witness", 1usize),
+        BenchmarkId::new("Full exit witness", 1usize),
         &1usize,
         full_exit_witness,
     );
     c.bench_with_input(
-        BenchmarkId::new("Forced exit witness", 10usize),
+        BenchmarkId::new("Full exit witness", 10usize),
         &10usize,
         full_exit_witness,
     );
     c.bench_with_input(
-        BenchmarkId::new("Forced exit witness", 100usize),
+        BenchmarkId::new("Full exit witness", 100usize),
         &100usize,
         full_exit_witness,
     );
