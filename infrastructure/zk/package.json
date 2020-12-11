@@ -10,7 +10,9 @@
         "start": "node build/index.js"
     },
     "dependencies": {
+        "@types/deep-extend": "^0.4.31",
         "commander": "^6.0.0",
+        "deep-extend": "^0.6.0",
         "dotenv": "^8.2.0",
         "ethers": "^5.0.18",
         "node-fetch": "^2.6.1",
