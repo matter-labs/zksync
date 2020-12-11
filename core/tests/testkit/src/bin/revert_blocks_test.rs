@@ -70,9 +70,9 @@ async fn execute_blocks(
     fee_account: &ZkSyncAccount,
     test_setup: &mut TestSetup,
     testkit_config: &TestkitConfig,
-    number_of_verified_blocks: u16,
-    number_of_committed_blocks: u16,
-    number_of_reverted_blocks: u16,
+    number_of_verified_iteration_blocks: u16, // Each operation generate 4 blocks
+    number_of_committed_iteration_blocks: u16,
+    number_of_reverted_iterations_blocks: u16,
 ) -> (ZkSyncStateInitParams, Block) {
     let deposit_amount = parse_ether("1.0").unwrap();
 
@@ -80,7 +80,7 @@ async fn execute_blocks(
     let token = 0;
 
     let mut states = vec![];
-    for step in 0..number_of_verified_blocks {
+    for _ in 0..number_of_verified_iteration_blocks {
         let blocks = perform_basic_operations(
             token,
             test_setup,
@@ -91,7 +91,7 @@ async fn execute_blocks(
         executed_blocks.extend(blocks.into_iter());
         states.push(test_setup.get_current_state().await);
     }
-    for step in 0..number_of_committed_blocks - number_of_verified_blocks {
+    for _ in 0..number_of_committed_iteration_blocks - number_of_verified_iteration_blocks {
         let blocks = perform_basic_operations(
             token,
             test_setup,
@@ -107,11 +107,14 @@ async fn execute_blocks(
         .clone()
         .into_iter()
         .rev()
-        .take(number_of_reverted_blocks as usize)
+        .take((number_of_reverted_iterations_blocks * 4) as usize)
         .collect::<Vec<_>>();
 
-    let reverted_state =
-        states[(number_of_committed_blocks - number_of_reverted_blocks / 4 - 1) as usize].clone();
+    let reverted_state_idx = std::cmp::max(
+        number_of_verified_iteration_blocks,
+        number_of_committed_iteration_blocks - number_of_reverted_iterations_blocks,
+    ) - 1;
+    let reverted_state = states[reverted_state_idx as usize].clone();
 
     let executed_block = executed_blocks[(reverted_state.last_block_number - 1) as usize].clone();
 
@@ -172,7 +175,7 @@ async fn revert_blocks_test() {
         &test_config,
         2,
         4,
-        8,
+        3,
     )
     .await;
     sender.send(()).expect("sk stop send");
@@ -190,7 +193,7 @@ async fn revert_blocks_test() {
         &test_config,
         2,
         4,
-        2,
+        1,
     )
     .await;
     sender.send(()).expect("sk stop send");
