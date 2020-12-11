@@ -304,13 +304,13 @@ mod tests {
         Ok(())
     }
 
-    // Test special case for Golem: GLM token name should be alias for the GNT.
+    // Test special case for Golem: tGLM token name should be alias for the GNT.
     // By the way, since `TokenDBCache` is shared between this API implementation
     // and the old RPC code, there is no need to write a test for the old implementation.
     //
     // TODO: Remove this case after Golem update [ZKS-173]
     #[actix_rt::test]
-    async fn gnt_as_glm_alias() -> anyhow::Result<()> {
+    async fn gnt_as_tglm_alias() -> anyhow::Result<()> {
         let cfg = TestServerConfig::default();
         cfg.fill_database().await?;
 
@@ -325,12 +325,12 @@ mod tests {
             .await?
             .expect("Golem token should be exist");
         // Get Golem token as GMT.
-        let golem_glm = client
-            .token_by_id(&TokenLike::from("GLM"))
+        let golem_tglm = client
+            .token_by_id(&TokenLike::from("tGLM"))
             .await?
             .expect("Golem token should be exist");
         // Check that GNT is alias to GMT.
-        assert_eq!(golem_gnt, golem_glm);
+        assert_eq!(golem_gnt, golem_tglm);
         assert_eq!(golem_gnt.id, 16);
 
         server.stop().await;
