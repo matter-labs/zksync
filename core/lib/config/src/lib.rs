@@ -68,6 +68,7 @@ impl EthClientOptions {
 
 #[derive(Debug, Clone)]
 pub struct ProverOptions {
+    pub secret_auth: String,
     pub prepare_data_interval: Duration,
     pub heartbeat_interval: Duration,
     pub cycle_wait: Duration,
@@ -81,6 +82,14 @@ impl ProverOptions {
     /// Parses the configuration options values from the environment variables.
     /// Panics if any of options is missing or has inappropriate value.
     pub fn from_env() -> Self {
+        let secret_auth = get_env("PROVER_SECRET_AUTH");
+        let network = get_env("ETH_NETWORK");
+
+        // Checks if an untrusted key is being used for production.
+        if &secret_auth == "sample" && &network != "localhost" {
+            log::error!("Prover secret for JWT authorization set to 'sample', this is an incorrect value for production");
+        }
+
         Self {
             prepare_data_interval: Duration::from_millis(parse_env("PROVER_PREPARE_DATA_INTERVAL")),
             heartbeat_interval: Duration::from_millis(parse_env("PROVER_HEARTBEAT_INTERVAL")),
@@ -89,6 +98,7 @@ impl ProverOptions {
             prover_server_address: addr_from_port(parse_env("PROVER_SERVER_PORT")),
             witness_generators: parse_env("WITNESS_GENERATORS"),
             idle_provers: parse_env("IDLE_PROVERS"),
+            secret_auth,
         }
     }
 }
@@ -105,10 +115,18 @@ impl AdminServerOptions {
     /// Parses the configuration options values from the environment variables.
     /// Panics if any of options is missing or has inappropriate value.
     pub fn from_env() -> Self {
+        let secret_auth = get_env("ADMIN_SERVER_SECRET_AUTH");
+        let network = get_env("ETH_NETWORK");
+
+        // Checks if an untrusted key is being used for production.
+        if &secret_auth == "sample" && &network != "localhost" {
+            log::error!("Admin server secret for JWT authorization set to 'sample', this is an incorrect value for production");
+        }
+
         Self {
             admin_http_server_url: parse_env("ADMIN_SERVER_API_URL"),
             admin_http_server_address: addr_from_port(parse_env("ADMIN_SERVER_API_PORT")),
-            secret_auth: parse_env("SECRET_AUTH"),
+            secret_auth,
         }
     }
 }
@@ -212,8 +230,9 @@ impl ApiServerOptions {
     pub fn from_env() -> Self {
         let forced_exit_minimum_account_age =
             Duration::from_secs(parse_env::<u64>("FORCED_EXIT_MINIMUM_ACCOUNT_AGE_SECS"));
+        let network = get_env("ETH_NETWORK");
 
-        if forced_exit_minimum_account_age.as_secs() == 0 {
+        if forced_exit_minimum_account_age.as_secs() == 0 && &network != "localhost" {
             log::error!("Forced exit minimum account age is set to 0, this is an incorrect value for production");
         }
 
