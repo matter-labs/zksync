@@ -26,7 +26,7 @@ pub async fn perform_basic_tests() {
     let fee_account = ZkSyncAccount::rand();
     let fee_account_address = fee_account.address;
     let (sk_thread_handle, stop_state_keeper_sender, sk_channels) =
-        spawn_state_keeper(&fee_account_address);
+        spawn_state_keeper(&fee_account_address, genesis_state(&fee_account_address));
 
     let initial_root = genesis_state(&fee_account.address).tree.root_hash();
 

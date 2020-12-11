@@ -392,6 +392,14 @@ impl ZkSyncState {
             }
         }
     }
+
+    pub fn get_balance_tree(&self) -> AccountTree {
+        self.balance_tree.clone()
+    }
+
+    pub fn get_account_addresses(&self) -> HashMap<Address, AccountId> {
+        self.account_id_by_address.clone()
+    }
 }
 
 #[cfg(test)]

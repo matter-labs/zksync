@@ -2,13 +2,14 @@ use crate::eth_watch::EthWatchRequest;
 use zksync_storage::StorageProcessor;
 use zksync_types::{tokens::get_genesis_token_list, tx::TxHash, Token, TokenId};
 
+use crate::state_keeper::ZkSyncStateInitParams;
 use crate::{
     block_proposer::run_block_proposer_task,
     committer::run_committer,
     eth_watch::start_eth_watch,
     mempool::run_mempool_task,
     private_api::start_private_core_api,
-    state_keeper::{start_state_keeper, ZkSyncStateInitParams, ZkSyncStateKeeper},
+    state_keeper::{start_state_keeper, ZkSyncStateKeeper},
 };
 use futures::{
     channel::{mpsc, oneshot},

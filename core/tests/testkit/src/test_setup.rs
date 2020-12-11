@@ -1,29 +1,34 @@
 use crate::eth_account::{get_executed_tx_fee, ETHExecResult, EthereumAccount};
 use crate::external_commands::Contracts;
 use anyhow::bail;
-use futures::{channel::mpsc, SinkExt, StreamExt};
+use futures::{
+    channel::{mpsc, oneshot},
+    SinkExt, StreamExt,
+};
 use num::BigUint;
 use std::collections::HashMap;
 use web3::transports::Http;
 use zksync_core::committer::{BlockCommitRequest, CommitRequest};
 use zksync_core::mempool::ProposedBlock;
-use zksync_core::state_keeper::StateKeeperRequest;
+use zksync_core::state_keeper::{StateKeeperRequest, ZkSyncStateInitParams};
 use zksync_types::{
-    mempool::SignedTxVariant, tx::SignedZkSyncTx, Account, AccountId, AccountMap, Address, Fr,
-    PriorityOp, TokenId, ZkSyncTx, H256, U256,
+    aggregated_operations::{
+        BlockExecuteOperationArg, BlocksCommitOperation, BlocksExecuteOperation,
+        BlocksProofOperation,
+    },
+    block::Block,
+    mempool::SignedTxVariant,
+    tx::SignedZkSyncTx,
+    Account, AccountId, AccountMap, Address, Fr, PriorityOp, TokenId, ZkSyncTx, H256, U256,
 };
 
 use web3::types::TransactionReceipt;
 use zksync_crypto::proof::EncodedAggregatedProof;
 use zksync_crypto::rand::Rng;
-use zksync_types::block::Block;
 
 use crate::account_set::AccountSet;
 use crate::state_keeper_utils::*;
 use crate::types::*;
-use zksync_types::aggregated_operations::{
-    BlockExecuteOperationArg, BlocksCommitOperation, BlocksExecuteOperation, BlocksProofOperation,
-};
 
 /// Used to create transactions between accounts and check for their validity.
 /// Every new block should start with `.start_block()`
@@ -645,7 +650,7 @@ impl TestSetup {
             .expect("sk receiver dropped");
 
         let new_block = self.await_for_block_commit_request().await.block;
-        self.current_state_root = Some(new_block.new_root_hash);
+        // self.current_state_root = Some(new_block.new_root_hash);
 
         let block_commit_op = BlocksCommitOperation {
             last_committed_block: self.last_committed_block.clone(),
@@ -787,6 +792,15 @@ impl TestSetup {
         self.get_zksync_account_committed_state(zksync_id)
             .await
             .map(|a| a.0)
+    }
+
+    pub async fn get_current_state(&mut self) -> ZkSyncStateInitParams {
+        let (sender, receiver) = oneshot::channel();
+        self.state_keeper_request_sender
+            .send(StateKeeperRequest::GetCurrentState(sender))
+            .await
+            .expect("sk request send");
+        receiver.await.unwrap()
     }
 
     async fn get_zksync_balance(&self, zksync_id: ZKSyncAccountId, token: TokenId) -> BigUint {

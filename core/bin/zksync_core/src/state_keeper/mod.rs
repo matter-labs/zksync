@@ -44,6 +44,7 @@ pub enum StateKeeperRequest {
     GetLastUnprocessedPriorityOp(oneshot::Sender<u64>),
     ExecuteMiniBlock(ProposedBlock),
     SealBlock,
+    GetCurrentState(oneshot::Sender<ZkSyncStateInitParams>),
 }
 
 #[derive(Debug, Clone)]
@@ -119,6 +120,7 @@ pub struct ZkSyncStateKeeper {
     failed_txs_pending_len: usize,
 }
 
+#[derive(Debug, Clone)]
 pub struct ZkSyncStateInitParams {
     pub tree: AccountTree,
     pub acc_id_by_addr: HashMap<Address, AccountId>,
@@ -535,6 +537,9 @@ impl ZkSyncStateKeeper {
                 }
                 StateKeeperRequest::SealBlock => {
                     self.seal_pending_block().await;
+                }
+                StateKeeperRequest::GetCurrentState(sender) => {
+                    sender.send(self.get_current_state()).unwrap_or_default();
                 }
             }
         }
@@ -1024,6 +1029,14 @@ impl ZkSyncStateKeeper {
 
     fn account(&self, address: &Address) -> Option<(AccountId, Account)> {
         self.state.get_account_by_address(address)
+    }
+    pub fn get_current_state(&self) -> ZkSyncStateInitParams {
+        ZkSyncStateInitParams {
+            tree: self.state.get_balance_tree(),
+            acc_id_by_addr: self.state.get_account_addresses(),
+            last_block_number: self.state.block_number - 1,
+            unprocessed_priority_op: self.current_unprocessed_priority_op,
+        }
     }
 }
 
