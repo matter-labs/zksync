@@ -50,7 +50,7 @@ impl MockDatabase {
         let unconfirmed_operations: BTreeMap<i64, ETHOperation> =
             restore_state.iter().map(|op| (op.id, op.clone())).collect();
 
-        let gas_price_limit: u64 = zksync_utils::parse_env("ETH_GAS_PRICE_DEFAULT_LIMIT");
+        let gas_price_limit: u64 = zksync_utils::parse_env("ETH_GAS_PRICE_LIMIT_DEFAULT");
 
         Self {
             restore_state,
