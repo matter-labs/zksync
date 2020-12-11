@@ -14,6 +14,9 @@ use zksync_types::{block::Block, Address};
 use zksync_circuit::witness::utils::get_used_subtree_root_hash;
 use zksync_witness_generator::run_prover_server;
 
+const CORRECT_PROVER_SECRET_AUTH: &str = "42";
+const INCORRECT_PROVER_SECRET_AUTH: &str = "123";
+
 async fn connect_to_db() -> zksync_storage::ConnectionPool {
     zksync_storage::ConnectionPool::new(Some(1))
 }
@@ -26,6 +29,7 @@ async fn spawn_server(prover_timeout: time::Duration, rounds_interval: time::Dur
     prover_options.prepare_data_interval = rounds_interval;
     prover_options.gone_timeout = prover_timeout;
     prover_options.prover_server_address = net::SocketAddr::from_str(bind_to).unwrap();
+    prover_options.secret_auth = CORRECT_PROVER_SECRET_AUTH.to_string();
 
     let conn_pool = connect_to_db().await;
     let (tx, _rx) = mpsc::channel(1);
@@ -43,6 +47,29 @@ fn client_with_empty_worker_name_panics() {
         &"http:://example.com".parse().unwrap(),
         "",
         Duration::from_secs(1),
+        CORRECT_PROVER_SECRET_AUTH,
+    );
+}
+
+#[tokio::test]
+#[cfg_attr(not(feature = "db_test"), ignore)]
+async fn client_with_incorrect_secret_auth() {
+    let block_size_chunks = ConfigurationOptions::from_env().available_block_chunk_sizes[0];
+    let addr = spawn_server(Duration::from_secs(1), Duration::from_secs(1)).await;
+    let client = client::ApiClient::new(
+        &format!("http://{}", &addr).parse().unwrap(),
+        "foo",
+        Duration::from_secs(1),
+        INCORRECT_PROVER_SECRET_AUTH,
+    );
+
+    assert_eq!(
+        &client
+            .register_prover(block_size_chunks)
+            .err()
+            .unwrap()
+            .to_string(),
+        "failed generate authorization token"
     );
 }
 
@@ -55,6 +82,7 @@ async fn api_client_register_start_and_stop_of_prover() {
         &format!("http://{}", &addr).parse().unwrap(),
         "foo",
         Duration::from_secs(1),
+        CORRECT_PROVER_SECRET_AUTH,
     );
     let id = client
         .register_prover(block_size_chunks)
@@ -93,6 +121,7 @@ async fn api_client_simple_simulation() {
         &format!("http://{}", &addr).parse().unwrap(),
         "foo",
         time::Duration::from_secs(1),
+        CORRECT_PROVER_SECRET_AUTH,
     );
 
     // call block_to_prove and check its none
