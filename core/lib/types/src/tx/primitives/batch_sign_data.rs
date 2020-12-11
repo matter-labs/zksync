@@ -3,17 +3,20 @@ use anyhow::ensure;
 use tiny_keccak::keccak256;
 // Local uses
 use super::eth_signature::TxEthSignature;
-use crate::{tx::EthSignData, ZkSyncTx};
+use crate::ZkSyncTx;
 
 /// Encapsulates transactions batch signature data. Should only be created via `new()`
 /// as long as errors are possible.
 #[derive(Debug, Clone)]
-pub struct BatchSignData(pub EthSignData);
+pub struct BatchSignData {
+    pub signatures: Vec<TxEthSignature>,
+    pub message: Vec<u8>,
+}
 
 impl BatchSignData {
     /// Construct the message user is expected to sign for the given batch and pack
     /// it along with signature.
-    pub fn new(txs: &[ZkSyncTx], signature: TxEthSignature) -> anyhow::Result<BatchSignData> {
+    pub fn new(txs: &[ZkSyncTx], signatures: Vec<TxEthSignature>) -> anyhow::Result<BatchSignData> {
         ensure!(!txs.is_empty(), "Transaction batch cannot be empty");
         // First, check, if `ChangePubKey` is present in the batch. If it is,
         // we expect its signature to be always present and the following message to be signed:
@@ -48,6 +51,9 @@ impl BatchSignData {
             .to_vec()
         });
 
-        Ok(BatchSignData(EthSignData { signature, message }))
+        Ok(BatchSignData {
+            signatures,
+            message,
+        })
     }
 }

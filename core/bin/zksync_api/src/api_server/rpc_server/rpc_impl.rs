@@ -105,11 +105,11 @@ impl RpcApp {
     pub async fn _impl_submit_txs_batch(
         self,
         txs: Vec<TxWithSignature>,
-        eth_signature: Option<TxEthSignature>,
+        eth_signatures: Vec<TxEthSignature>,
     ) -> Result<Vec<TxHash>> {
         let txs = txs.into_iter().map(|tx| (tx.tx, tx.signature)).collect();
         self.tx_sender
-            .submit_txs_batch(txs, eth_signature)
+            .submit_txs_batch(txs, eth_signatures)
             .await
             .map_err(Error::from)
     }

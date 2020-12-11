@@ -42,6 +42,9 @@ pub struct TxSender {
     /// Mimimum age of the account for `ForcedExit` operations to be allowed.
     pub forced_exit_minimum_account_age: chrono::Duration,
     pub enforce_pubkey_change_fee: bool,
+    // Limit the number of both transactions and Ethereum signatures per batch.
+    pub max_number_of_transactions_per_batch: usize,
+    pub max_number_of_authors_per_batch: usize,
 }
 
 #[derive(Debug, Error)]
@@ -124,6 +127,10 @@ impl TxSender {
             chrono::Duration::from_std(config_options.forced_exit_minimum_account_age)
                 .expect("Unable to convert std::Duration to chrono::Duration");
 
+        let max_number_of_transactions_per_batch =
+            config_options.max_number_of_transactions_per_batch;
+        let max_number_of_authors_per_batch = config_options.max_number_of_authors_per_batch;
+
         Self {
             core_api_client,
             pool: connection_pool.clone(),
@@ -133,6 +140,8 @@ impl TxSender {
 
             enforce_pubkey_change_fee,
             forced_exit_minimum_account_age,
+            max_number_of_transactions_per_batch,
+            max_number_of_authors_per_batch,
         }
     }
 
@@ -243,10 +252,20 @@ impl TxSender {
     pub async fn submit_txs_batch(
         &self,
         txs: Vec<(ZkSyncTx, Option<TxEthSignature>)>,
-        eth_signature: Option<TxEthSignature>,
+        eth_signatures: Vec<TxEthSignature>,
     ) -> Result<Vec<TxHash>, SubmitError> {
         if txs.is_empty() {
             return Err(SubmitError::TxAdd(TxAddError::EmptyBatch));
+        }
+        // Even though this is going to be checked on the Mempool part,
+        // we don't want to verify huge batches as long as this operation
+        // is expensive.
+        if txs.len() > self.max_number_of_transactions_per_batch {
+            return Err(SubmitError::TxAdd(TxAddError::BatchTooBig));
+        }
+        // Same check but in terms of signatures.
+        if eth_signatures.len() > self.max_number_of_authors_per_batch {
+            return Err(SubmitError::TxAdd(TxAddError::EthSignaturesLimitExceeded));
         }
 
         if txs.iter().any(|tx| tx.0.is_close()) {
@@ -290,7 +309,7 @@ impl TxSender {
         }
 
         let mut verified_txs = Vec::with_capacity(txs.len());
-        let mut verified_signature = None;
+        let mut verified_signatures = Vec::new();
 
         let mut messages_to_sign = Vec::with_capacity(txs.len());
         let mut tx_senders = Vec::with_capacity(txs.len());
@@ -303,12 +322,12 @@ impl TxSender {
             );
         }
 
-        if let Some(signature) = eth_signature {
-            // User provided the signature for the whole batch.
+        if !eth_signatures.is_empty() {
+            // User provided at least one signature for the whole batch.
             let _txs = txs.iter().map(|tx| tx.0.clone()).collect::<Vec<ZkSyncTx>>();
             // Create batch signature data.
             let batch_sign_data =
-                BatchSignData::new(&_txs, signature).map_err(SubmitError::other)?;
+                BatchSignData::new(&_txs, eth_signatures).map_err(SubmitError::other)?;
             let (verified_batch, sign_data) = verify_txs_batch_signature(
                 txs,
                 tx_senders,
@@ -319,7 +338,7 @@ impl TxSender {
             .await?
             .unwrap_batch();
 
-            verified_signature = Some(sign_data.0.signature);
+            verified_signatures.extend(sign_data.signatures.into_iter());
             verified_txs.extend(verified_batch.into_iter());
         } else {
             // Otherwise, we process every transaction in turn.
@@ -337,11 +356,10 @@ impl TxSender {
                 verified_txs.push(verified_tx);
             }
         }
-
         let tx_hashes: Vec<TxHash> = verified_txs.iter().map(|tx| tx.tx.hash()).collect();
         // Send verified transactions to the mempool.
         self.core_api_client
-            .send_txs_batch(verified_txs, verified_signature)
+            .send_txs_batch(verified_txs, verified_signatures)
             .await
             .map_err(SubmitError::communication_core_server)?
             .map_err(SubmitError::TxAdd)?;

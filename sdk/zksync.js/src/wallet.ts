@@ -271,7 +271,7 @@ export class Wallet {
         const message = Uint8Array.from(Buffer.from(hash, 'hex'));
         const ethSignature = await this.getEthMessageSignature(message);
 
-        const transactionHashes = await this.provider.submitTxsBatch(batch, ethSignature);
+        const transactionHashes = await this.provider.submitTxsBatch(batch, [ethSignature]);
         return transactionHashes.map((txHash, idx) => new Transaction(batch[idx], txHash, this.provider));
     }
 
@@ -869,10 +869,15 @@ export async function submitSignedTransaction(
 }
 
 export async function submitSignedTransactionsBatch(
+    provider: Provider,
     signedTxs: SignedTransaction[],
-    ethSignature: TxEthSignature,
-    provider: Provider
+    ethSignatures?: TxEthSignature[]
 ): Promise<Transaction[]> {
-    const transactionHashes = await provider.submitTxsBatch(signedTxs, ethSignature);
+    const transactionHashes = await provider.submitTxsBatch(
+        signedTxs.map((tx) => {
+            return { tx: tx.tx, signature: tx.ethereumSignature };
+        }),
+        ethSignatures
+    );
     return transactionHashes.map((txHash, idx) => new Transaction(signedTxs[idx], txHash, provider));
 }

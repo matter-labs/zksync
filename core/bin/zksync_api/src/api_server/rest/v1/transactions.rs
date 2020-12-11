@@ -91,7 +91,8 @@ struct IncomingTx {
 #[derive(Debug, Serialize, Deserialize, Clone)]
 struct IncomingTxBatch {
     txs: Vec<ZkSyncTx>,
-    signature: Option<TxEthSignature>,
+    #[serde(default)]
+    signatures: Vec<TxEthSignature>,
 }
 
 // Client implementation
@@ -116,10 +117,10 @@ impl Client {
     pub async fn submit_tx_batch(
         &self,
         txs: Vec<ZkSyncTx>,
-        signature: Option<TxEthSignature>,
+        signatures: Vec<TxEthSignature>,
     ) -> Result<Vec<TxHash>, ClientError> {
         self.post("transactions/submit/batch")
-            .body(&IncomingTxBatch { txs, signature })
+            .body(&IncomingTxBatch { txs, signatures })
             .send()
             .await
     }
@@ -149,7 +150,7 @@ async fn submit_tx_batch(
 
     let tx_hashes = data
         .tx_sender
-        .submit_txs_batch(txs, body.signature)
+        .submit_txs_batch(txs, body.signatures)
         .await
         .map_err(ApiError::from)?;
 
@@ -188,7 +189,7 @@ mod tests {
         }
 
         async fn send_txs_batch(
-            _txs: Json<(Vec<SignedZkSyncTx>, Option<TxEthSignature>)>,
+            _txs: Json<(Vec<SignedZkSyncTx>, Vec<TxEthSignature>)>,
         ) -> Json<Result<(), ()>> {
             Json(Ok(()))
         }
@@ -299,7 +300,9 @@ mod tests {
         };
 
         core_client.send_tx(signed_tx.clone()).await??;
-        core_client.send_txs_batch(vec![signed_tx], None).await??;
+        core_client
+            .send_txs_batch(vec![signed_tx], vec![])
+            .await??;
 
         core_server.stop().await;
         Ok(())
@@ -340,7 +343,7 @@ mod tests {
         ).unwrap();
 
         assert_eq!(
-            client.submit_tx_batch(txs, Some(signature)).await?,
+            client.submit_tx_batch(txs, vec![signature]).await?,
             tx_hashes
         );
 

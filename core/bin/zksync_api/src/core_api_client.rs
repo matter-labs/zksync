@@ -28,10 +28,10 @@ impl CoreApiClient {
     pub async fn send_txs_batch(
         &self,
         txs: Vec<SignedZkSyncTx>,
-        eth_signature: Option<TxEthSignature>,
+        eth_signatures: Vec<TxEthSignature>,
     ) -> anyhow::Result<Result<(), TxAddError>> {
         let endpoint = format!("{}/new_txs_batch", self.addr);
-        let data = (txs, eth_signature);
+        let data = (txs, eth_signatures);
 
         self.post(&endpoint, data).await
     }
