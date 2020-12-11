@@ -304,14 +304,14 @@ mod tests {
             blocks.into_iter().map(From::from).collect()
         };
 
-        assert_eq!(client.block_by_id(1).await?.unwrap(), blocks[4]);
-        assert_eq!(client.blocks_range(Pagination::Last, 5).await?, blocks);
+        assert_eq!(client.block_by_id(1).await?.unwrap(), blocks[7]);
+        assert_eq!(client.blocks_range(Pagination::Last, 10).await?, blocks);
         assert_eq!(
             client.blocks_range(Pagination::Before(2), 5).await?,
-            &blocks[4..5]
+            &blocks[7..8]
         );
         assert_eq!(
-            client.blocks_range(Pagination::After(4), 5).await?,
+            client.blocks_range(Pagination::After(7), 5).await?,
             &blocks[0..1]
         );
 
@@ -328,7 +328,7 @@ mod tests {
             transactions.into_iter().map(From::from).collect()
         };
         assert_eq!(client.block_transactions(1).await?, expected_txs);
-        assert_eq!(client.block_transactions(2).await?, vec![]);
+        assert_eq!(client.block_transactions(6).await?, vec![]);
 
         server.stop().await;
         Ok(())
