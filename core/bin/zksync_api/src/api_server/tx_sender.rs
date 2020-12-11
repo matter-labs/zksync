@@ -593,8 +593,7 @@ fn scale_user_fee_up(provided_total_usd_fee: BigDecimal) -> BigDecimal {
     // b) It is intended as a smaller substitute for 1 cent scaling when
     // scaling by 1 cent means scaling more than 2x.
     if provided_total_usd_fee < one_cent {
-        let scaled_by_two_provided_fee_in_usd =
-            provided_total_usd_fee.clone() * BigDecimal::from(2u32);
+        let scaled_by_two_provided_fee_in_usd = provided_total_usd_fee * BigDecimal::from(2u32);
 
         return scaled_by_two_provided_fee_in_usd;
     }
