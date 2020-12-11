@@ -9,7 +9,9 @@ const IGNORED = [
     'dist',
     '.git',
     // Below are generated contracts.
-    'generated',
+    'cache',
+    'artifacts',
+    'typechain',
     'KeysWithPlonkVerifier.sol',
     'TokenInit.sol'
 ];
