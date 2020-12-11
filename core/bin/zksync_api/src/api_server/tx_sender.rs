@@ -153,8 +153,7 @@ impl TxSender {
         }
 
         let fast_processing = fast_processing.unwrap_or_default(); // `None` => false
-
-        if fast_processing && tx.is_withdraw() {
+        if fast_processing && !tx.is_withdraw() {
             return Err(SubmitError::UnsupportedFastProcessing);
         }
 
