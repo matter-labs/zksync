@@ -10,7 +10,7 @@ use zksync_circuit::witness::full_exit::FullExitWitness;
 
 type FullExitWitnessBn256 = FullExitWitness<Bn256>;
 
-/// Measures the time of forced exit witness
+/// Measures the time of full exit witness
 fn full_exit_witness(b: &mut Bencher<'_>, number_of_accounts: &usize) {
     let accounts = generate_accounts(*number_of_accounts);
     let account = &accounts[0];
