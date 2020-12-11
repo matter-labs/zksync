@@ -19,9 +19,7 @@ use zksync_crypto::bellman::worker::Worker;
 use zksync_crypto::ff::ScalarEngine;
 use zksync_crypto::franklin_crypto::bellman::pairing::bn256::Bn256;
 use zksync_crypto::franklin_crypto::bellman::plonk::commitments::transcript::keccak_transcript::RollingKeccakTranscript;
-use zksync_crypto::params::{
-    RECURSIVE_CIRCUIT_NUM_INPUTS, RECURSIVE_CIRCUIT_SIZES, RECURSIVE_CIRCUIT_VK_TREE_DEPTH,
-};
+use zksync_crypto::params::{RECURSIVE_CIRCUIT_NUM_INPUTS, RECURSIVE_CIRCUIT_VK_TREE_DEPTH};
 use zksync_crypto::proof::{AggregatedProof, EncodedAggregatedProof, SingleProof, Vk};
 use zksync_crypto::recursive_aggregation_circuit::circuit::{
     create_recursive_circuit_setup, create_zksync_recursive_aggregate,
@@ -75,6 +73,7 @@ pub fn prepare_proof_data(
 pub fn gen_aggregate_proof(
     single_vks: Vec<Vk>,
     proofs: Vec<SingleProofData>,
+    available_aggregated_proof_sizes: &[(usize, u32)],
     download_setup_network: bool,
 ) -> anyhow::Result<AggregatedProof> {
     // proofs: Vec<SingleProofData>,
@@ -95,7 +94,7 @@ pub fn gen_aggregate_proof(
     let worker = Worker::new();
 
     let universal_setup = {
-        let setup_power = RECURSIVE_CIRCUIT_SIZES
+        let setup_power = available_aggregated_proof_sizes
             .iter()
             .find_map(|(aggr_size, aggregate_setup_power)| {
                 if *aggr_size == proofs.len() {

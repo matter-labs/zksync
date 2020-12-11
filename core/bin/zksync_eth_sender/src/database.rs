@@ -230,7 +230,7 @@ impl DatabaseInterface for Database {
             transaction.ethereum_schema().confirm_eth_tx(hash).await?;
 
             for block in &op.blocks {
-                let block_number = block.block.block_number;
+                let block_number = block.block_number;
                 transaction
                     .chain()
                     .state_schema()
@@ -244,7 +244,7 @@ impl DatabaseInterface for Database {
                         action: Action::Verify {
                             proof: Default::default(),
                         },
-                        block: block.block.clone(),
+                        block: block.clone(),
                     })
                     .await?;
             }

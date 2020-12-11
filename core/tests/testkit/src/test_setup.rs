@@ -22,7 +22,7 @@ use crate::account_set::AccountSet;
 use crate::state_keeper_utils::*;
 use crate::types::*;
 use zksync_types::aggregated_operations::{
-    BlockExecuteOperationArg, BlocksCommitOperation, BlocksExecuteOperation, BlocksProofOperation,
+    BlocksCommitOperation, BlocksExecuteOperation, BlocksProofOperation,
 };
 
 /// Used to create transactions between accounts and check for their validity.
@@ -695,7 +695,6 @@ impl TestSetup {
         let block_proof_op = BlocksProofOperation {
             blocks: vec![new_block.clone()],
             proof,
-            block_idxs_in_proof: vec![0],
         };
         let verify_result = self
             .commit_account
@@ -705,9 +704,7 @@ impl TestSetup {
             .expect_success();
 
         let block_execute_op = BlocksExecuteOperation {
-            blocks: vec![BlockExecuteOperationArg {
-                block: new_block.clone(),
-            }],
+            blocks: vec![new_block.clone()],
         };
         let withdrawals_result = self
             .commit_account

@@ -722,8 +722,7 @@ impl<ETH: EthereumInterface, DB: DatabaseInterface> ETHSender<ETH, DB> {
             } // not for eth sender
             AggregatedOperation::PublishProofBlocksOnchain(operation) => {
                 let args = operation.get_eth_tx_args();
-                self.ethereum
-                    .encode_tx_data("verifyCommitments", args.as_slice())
+                self.ethereum.encode_tx_data("proofBlocks", args.as_slice())
             }
             AggregatedOperation::ExecuteBlocks(operation) => {
                 let args = operation.get_eth_tx_args();

@@ -1,6 +1,7 @@
 //! Block sizes test is used to create blocks of all available sizes, make proofs of them and verify onchain
 
 use log::info;
+use std::io::Write;
 use std::time::Instant;
 use web3::transports::Http;
 use zksync_circuit::witness::utils::build_block_witness;
@@ -84,7 +85,7 @@ async fn main() {
         accounts,
         &contracts,
         commit_account,
-        Default::default(),
+        genesis_root,
     );
 
     let account_state = test_setup.get_accounts_state().await;
@@ -94,6 +95,8 @@ async fn main() {
     }
 
     let block_chunk_sizes = AvailableBlockSizesConfig::from_env().blocks_chunks;
+    let aggregated_proof_sizes =
+        AvailableBlockSizesConfig::from_env().aggregated_proof_sizes_with_setup_pow();
     info!(
         "Checking keys and onchain verification for block sizes: {:?}",
         block_chunk_sizes
@@ -147,13 +150,13 @@ async fn main() {
             proofs.push((proof.clone(), block_size));
         }
         let (vks, proof_data) = prepare_proof_data(&block_chunk_sizes, proofs);
-        let mut aggreagated_proof = gen_aggregate_proof(vks, proof_data, false)
-            .expect("Failed to generate aggreagated proof");
+        let mut aggreagated_proof =
+            gen_aggregate_proof(vks, proof_data, &aggregated_proof_sizes, false)
+                .expect("Failed to generate aggreagated proof");
 
         let proof_op = BlocksProofOperation {
             blocks: vec![block],
             proof: aggreagated_proof.serialize_aggregated_proof(),
-            block_idxs_in_proof: vec![0],
         };
         test_setup
             .execute_verify_commitments(proof_op)
@@ -221,14 +224,14 @@ async fn main() {
         }
 
         let (vks, proof_data) = prepare_proof_data(&block_chunk_sizes, proofs);
-        let mut aggreagated_proof = gen_aggregate_proof(vks, proof_data, false)
-            .expect("Failed to generate aggreagated proof");
+        let mut aggreagated_proof =
+            gen_aggregate_proof(vks, proof_data, &aggregated_proof_sizes, false)
+                .expect("Failed to generate aggreagated proof");
         // aggreagated_proof.individual_vk_inputs = block_commitments;
 
         let proof_op = BlocksProofOperation {
             blocks,
             proof: aggreagated_proof.serialize_aggregated_proof(),
-            block_idxs_in_proof,
         };
         test_setup
             .execute_verify_commitments(proof_op)

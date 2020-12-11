@@ -5,6 +5,7 @@ use log::info;
 use num::BigUint;
 use std::time::Instant;
 use zksync_circuit::exit_circuit::create_exit_circuit_with_public_input;
+use zksync_config::AvailableBlockSizesConfig;
 use zksync_crypto::circuit::account::CircuitAccount;
 use zksync_crypto::circuit::CircuitAccountTree;
 use zksync_crypto::proof::EncodedAggregatedProof;
@@ -50,6 +51,7 @@ pub fn create_exit_proof(
     let aggreagated_proof = gen_aggregate_proof(
         vec![vk.0],
         vec![SingleProofData { proof, vk_idx: 0 }],
+        &AvailableBlockSizesConfig::from_env().aggregated_proof_sizes_with_setup_pow(),
         false,
     )?;
 

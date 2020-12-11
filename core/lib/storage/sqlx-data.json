@@ -496,19 +496,6 @@
       "nullable": []
     }
   },
-  "21f5974c8b44b476e606833f96353a6eac4f832665dc4161ca17c6dc9ecff805": {
-    "query": "\n                UPDATE prover_job_queue \n                SET (job_status, updated_at, updated_by) = ($1, now(), 'server')\n                WHERE id = $2;\n            ",
-    "describe": {
-      "columns": [],
-      "parameters": {
-        "Left": [
-          "Int4",
-          "Int4"
-        ]
-      },
-      "nullable": []
-    }
-  },
   "222e3946401772e3f6e0d9ce9909e8e7ac2dc830c5ecfcd522f56b3bf70fd679": {
     "query": "INSERT INTO data_restore_storage_state_update (storage_state) VALUES ($1)",
     "describe": {
@@ -1519,20 +1506,6 @@
       "nullable": []
     }
   },
-  "5e787ba690db443e308db72a6cb29b8c51d57f09ea21391a9ee64630cea34036": {
-    "query": "UPDATE prover_job_queue\n            SET (updated_at, job_status) = (now(), $1)\n            WHERE first_block = $2 and last_block = $3",
-    "describe": {
-      "columns": [],
-      "parameters": {
-        "Left": [
-          "Int4",
-          "Int8",
-          "Int8"
-        ]
-      },
-      "nullable": []
-    }
-  },
   "60a2be4d7162d73b929f7ab712d01404d45bcc128e2b03ad3ff853a645e2fb5c": {
     "query": "\n            WITH eth_ops AS (\n                SELECT DISTINCT ON (block_number, action_type)\n                    operations.block_number,\n                    eth_tx_hashes.tx_hash,\n                    operations.action_type,\n                    operations.created_at,\n                    confirmed\n                FROM operations\n                    left join eth_ops_binding on eth_ops_binding.op_id = operations.id\n                    left join eth_tx_hashes on eth_tx_hashes.eth_op_id = eth_ops_binding.eth_op_id\n                ORDER BY block_number desc, action_type, confirmed\n            )\n            SELECT\n                blocks.number AS \"block_number!\",\n                blocks.root_hash AS \"new_state_root!\",\n                blocks.block_size AS \"block_size!\",\n                committed.tx_hash AS \"commit_tx_hash?\",\n                verified.tx_hash AS \"verify_tx_hash?\",\n                committed.created_at AS \"committed_at!\",\n                verified.created_at AS \"verified_at?\"\n            FROM blocks\n            INNER JOIN eth_ops committed ON\n                committed.block_number = blocks.number AND committed.action_type = 'COMMIT' AND committed.confirmed = true\n            LEFT JOIN eth_ops verified ON\n                verified.block_number = blocks.number AND verified.action_type = 'VERIFY' AND verified.confirmed = true\n            WHERE false\n                OR committed.tx_hash = $1\n                OR verified.tx_hash = $1\n                OR blocks.root_hash = $1\n                OR blocks.number = $2\n            ORDER BY blocks.number DESC\n            LIMIT 1;\n            ",
     "describe": {
@@ -1694,6 +1667,23 @@
       "nullable": []
     }
   },
+  "64e87611fad53aaa3b5cddddd468045d5870603f705ec1652eafb536e4a0658f": {
+    "query": "\n          WITH job_values as (\n            SELECT $1::int4, $2::int4, $3::text, 'server_add_job', $4::int8, $5::int8, $6::jsonb\n            WHERE NOT EXISTS (SELECT * FROM prover_job_queue WHERE first_block = $4 and last_block = $5 and job_type = $3 LIMIT 1)\n          ) \n          INSERT INTO prover_job_queue (job_status, job_priority, job_type, updated_by, first_block, last_block, job_data) \n          SELECT * from job_values\n        ",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "Int4",
+          "Int4",
+          "Text",
+          "Int8",
+          "Int8",
+          "Jsonb"
+        ]
+      },
+      "nullable": []
+    }
+  },
   "681359f99d0e4bafdd3109f67c7af4d235dc1197ba88cd0d6148f632ae0cdf8f": {
     "query": "SELECT * FROM aggregated_proofs WHERE first_block = $1 and last_block = $2",
     "describe": {
@@ -1731,6 +1721,19 @@
         false,
         false
       ]
+    }
+  },
+  "6bd51c16a66835305c8fa763966bbfef13199924cbe1c97b7d7b840edea4217a": {
+    "query": "UPDATE prover_job_queue\n            SET (updated_at, job_status, updated_by) = (now(), $1, 'server_finish_job')\n            WHERE id = $2",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "Int4",
+          "Int4"
+        ]
+      },
+      "nullable": []
     }
   },
   "6d676581f14d0935983aca496bc37b58206b90320058290809020a2604b11df3": {
@@ -2453,6 +2456,19 @@
       "nullable": []
     }
   },
+  "a77668a3dce7f7cd1f45816f932eea685d429c3d75b40ea8e1a1bb9fc29f11c6": {
+    "query": "UPDATE prover_job_queue SET (job_status, updated_at, updated_by) = ($1, now(), 'server_clean_idle')\n            WHERE job_status = $2 and (now() - updated_at) >= interval '120 seconds'",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "Int4",
+          "Int4"
+        ]
+      },
+      "nullable": []
+    }
+  },
   "aaaf2bcea738151db11f6152772516a46ef7d23ae885936094226b837369ee3c": {
     "query": "DELETE FROM mempool_txs\n            WHERE tx_hash = ANY($1)",
     "describe": {
@@ -2644,19 +2660,6 @@
       ]
     }
   },
-  "b6ec588f73141845615fcc324cdbe69ce043049c94bd52b417cad6c290a78700": {
-    "query": "UPDATE prover_job_queue\n            SET (updated_at, job_status) = (now(), $1)\n            WHERE first_block = $2 and last_block = $2",
-    "describe": {
-      "columns": [],
-      "parameters": {
-        "Left": [
-          "Int4",
-          "Int8"
-        ]
-      },
-      "nullable": []
-    }
-  },
   "ba7b1041b86ef292034c6e53ee6347c458fea2d19c91b060179e7f01f7ea60fc": {
     "query": "UPDATE prover_job_queue \n            SET (updated_at, updated_by) = (now(), $1)\n            WHERE id = $2",
     "describe": {
@@ -2700,19 +2703,6 @@
         false,
         false
       ]
-    }
-  },
-  "bbe27e525e6d5969c09657bfcffee0a81098c01013d989d7688e783c0c533d63": {
-    "query": "UPDATE prover_job_queue SET job_status = $1\n            WHERE job_status = $2 and (now() - updated_at) < interval '120 seconds'",
-    "describe": {
-      "columns": [],
-      "parameters": {
-        "Left": [
-          "Int4",
-          "Int4"
-        ]
-      },
-      "nullable": []
     }
   },
   "bbf6839d81439b9760bea580b95a044cfb2b418aa385e051295252ea7a0d60dd": {
@@ -3100,6 +3090,19 @@
         false,
         false
       ]
+    }
+  },
+  "c623ce8cb2f6e17285af5aa0fe4fddbb302f7dda343778690f299d49b832e273": {
+    "query": "\n                UPDATE prover_job_queue \n                SET (job_status, updated_at, updated_by) = ($1, now(), 'server_give_job')\n                WHERE id = $2;\n            ",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "Int4",
+          "Int4"
+        ]
+      },
+      "nullable": []
     }
   },
   "c7bc91425f35b3a77be36fe8ba80030445051a0bc2536fa4a0def7ac498fc5c2": {
@@ -3814,24 +3817,6 @@
       "nullable": [
         null
       ]
-    }
-  },
-  "fbcf404f1a662c9f093c14a49a497dd9dc21c68dc60ac9c192e0930a9bebc6a1": {
-    "query": "\n          WITH job_values as (\n            SELECT $1::int4, $2::int4, $3::text, $4::text, $5::int8, $6::int8, $7::jsonb\n            WHERE NOT EXISTS (SELECT * FROM prover_job_queue WHERE first_block = $5 and last_block = $6 LIMIT 1)\n          ) \n          INSERT INTO prover_job_queue (job_status, job_priority, job_type, updated_by, first_block, last_block, job_data) \n          SELECT * from job_values\n        ",
-    "describe": {
-      "columns": [],
-      "parameters": {
-        "Left": [
-          "Int4",
-          "Int4",
-          "Text",
-          "Text",
-          "Int8",
-          "Int8",
-          "Jsonb"
-        ]
-      },
-      "nullable": []
     }
   },
   "fd16aadbd04d4a48332d59c77290a588f1a33922418b55a08c656a44ff75b8e8": {

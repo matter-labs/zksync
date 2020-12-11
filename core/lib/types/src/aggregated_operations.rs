@@ -61,40 +61,38 @@ impl BlocksCommitOperation {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct BlocksCreateProofOperation {
+    pub blocks: Vec<Block>,
+    pub proofs_to_pad: usize,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BlocksProofOperation {
     pub blocks: Vec<Block>,
     pub proof: EncodedAggregatedProof,
-    pub block_idxs_in_proof: Vec<usize>,
 }
 
 impl BlocksProofOperation {
     pub fn get_eth_tx_args(&self) -> Vec<Token> {
         let blocks_arg = Token::Array(self.blocks.iter().map(|b| stored_block_info(b)).collect());
 
-        let committed_idxs = Token::Array(
-            self.block_idxs_in_proof
-                .iter()
-                .map(|idx| Token::Uint(U256::from(*idx)))
-                .collect(),
-        );
-
         let proof = self.proof.get_eth_tx_args();
 
-        vec![blocks_arg, committed_idxs, proof]
+        vec![blocks_arg, proof]
     }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct BlockExecuteOperationArg {
-    pub block: Block,
+pub struct BlocksExecuteOperation {
+    pub blocks: Vec<Block>,
 }
 
-impl BlockExecuteOperationArg {
-    fn get_eth_tx_args(&self) -> Token {
-        let stored_block = stored_block_info(&self.block);
+impl BlocksExecuteOperation {
+    fn get_eth_tx_args_for_block(block: &Block) -> Token {
+        let stored_block = stored_block_info(&block);
 
         let processable_ops_pubdata = Token::Array(
-            self.block
+            block
                 .processable_ops_pubdata()
                 .into_iter()
                 .map(|pubdata| Token::Bytes(pubdata))
@@ -103,19 +101,12 @@ impl BlockExecuteOperationArg {
 
         Token::Tuple(vec![stored_block, processable_ops_pubdata])
     }
-}
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct BlocksExecuteOperation {
-    pub blocks: Vec<BlockExecuteOperationArg>,
-}
-
-impl BlocksExecuteOperation {
     pub fn get_eth_tx_args(&self) -> Vec<Token> {
         vec![Token::Array(
             self.blocks
                 .iter()
-                .map(|arg| arg.get_eth_tx_args())
+                .map(BlocksExecuteOperation::get_eth_tx_args_for_block)
                 .collect(),
         )]
     }
@@ -158,7 +149,7 @@ impl std::str::FromStr for AggregatedActionType {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum AggregatedOperation {
     CommitBlocks(BlocksCommitOperation),
-    CreateProofBlocks(Vec<BlockNumber>),
+    CreateProofBlocks(BlocksCreateProofOperation),
     PublishProofBlocksOnchain(BlocksProofOperation),
     ExecuteBlocks(BlocksExecuteOperation),
 }
@@ -181,9 +172,11 @@ impl AggregatedOperation {
                 blocks.first().map(|b| b.block_number).unwrap_or_default(),
                 blocks.last().map(|b| b.block_number).unwrap_or_default(),
             ),
-            AggregatedOperation::CreateProofBlocks(blocks) => (
-                blocks.first().cloned().unwrap_or_default(),
-                blocks.last().cloned().unwrap_or_default(),
+            AggregatedOperation::CreateProofBlocks(BlocksCreateProofOperation {
+                blocks, ..
+            }) => (
+                blocks.first().map(|c| c.block_number).unwrap_or_default(),
+                blocks.last().map(|c| c.block_number).unwrap_or_default(),
             ),
             AggregatedOperation::PublishProofBlocksOnchain(BlocksProofOperation {
                 blocks, ..
@@ -192,15 +185,32 @@ impl AggregatedOperation {
                 blocks.last().map(|c| c.block_number).unwrap_or_default(),
             ),
             AggregatedOperation::ExecuteBlocks(BlocksExecuteOperation { blocks }) => (
-                blocks
-                    .first()
-                    .map(|b| b.block.block_number)
-                    .unwrap_or_default(),
-                blocks
-                    .last()
-                    .map(|b| b.block.block_number)
-                    .unwrap_or_default(),
+                blocks.first().map(|b| b.block_number).unwrap_or_default(),
+                blocks.last().map(|b| b.block_number).unwrap_or_default(),
             ),
         }
+    }
+}
+
+impl From<BlocksCommitOperation> for AggregatedOperation {
+    fn from(other: BlocksCommitOperation) -> Self {
+        Self::CommitBlocks(other)
+    }
+}
+impl From<BlocksCreateProofOperation> for AggregatedOperation {
+    fn from(other: BlocksCreateProofOperation) -> Self {
+        Self::CreateProofBlocks(other)
+    }
+}
+
+impl From<BlocksProofOperation> for AggregatedOperation {
+    fn from(other: BlocksProofOperation) -> Self {
+        Self::PublishProofBlocksOnchain(other)
+    }
+}
+
+impl From<BlocksExecuteOperation> for AggregatedOperation {
+    fn from(other: BlocksExecuteOperation) -> Self {
+        Self::ExecuteBlocks(other)
     }
 }

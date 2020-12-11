@@ -17,7 +17,9 @@ use zksync_prover_utils::api::{
     JobRequestData, JobResultData, ProverInputRequest, ProverInputResponse, ProverOutputRequest,
     WorkingOn,
 };
-use zksync_types::aggregated_operations::{AggregatedActionType, AggregatedOperation};
+use zksync_types::aggregated_operations::{
+    AggregatedActionType, AggregatedOperation, BlocksCreateProofOperation,
+};
 use zksync_types::prover::{
     ProverJobType, AGGREGATED_PROOF_JOB_PRIORITY, SINGLE_PROOF_JOB_PRIORITY,
 };
@@ -150,19 +152,29 @@ async fn publish(
     data: web::Data<AppState>,
     r: web::Json<ProverOutputRequest>,
 ) -> actix_web::Result<HttpResponse> {
-    log::info!("Received a proof for job: {}", r.job_id);
     let mut storage = data
         .access_storage()
         .await
         .map_err(actix_web::error::ErrorInternalServerError)?;
     let storage_result = match &r.data {
         JobResultData::BlockProof(single_proof) => {
+            log::info!(
+                "Received a proof for job: {}, single block: {}",
+                r.job_id,
+                r.first_block
+            );
             storage
                 .prover_schema()
                 .store_proof(r.job_id, r.first_block, single_proof)
                 .await
         }
         JobResultData::AggregatedBlockProof(aggregated_proof) => {
+            log::info!(
+                "Received a proof for job: {}, aggregated blocks: [{},{}]",
+                r.job_id,
+                r.first_block,
+                r.last_block
+            );
             storage
                 .prover_schema()
                 .store_aggregated_proof(r.job_id, r.first_block, r.last_block, aggregated_proof)
@@ -294,23 +306,27 @@ async fn update_prover_job_queue(storage: &mut StorageProcessor<'_>) -> anyhow::
                 next_aggregated_proof_block,
             )
             .await?;
-        if let Some(AggregatedOperation::CreateProofBlocks(blocks)) = create_block_proof_action {
-            let first_block = *blocks.first().expect("should have 1 block");
-            let last_block = *blocks.last().expect("should have 1 block");
+        if let Some(AggregatedOperation::CreateProofBlocks(BlocksCreateProofOperation {
+            blocks,
+            ..
+        })) = create_block_proof_action
+        {
+            let first_block = blocks
+                .first()
+                .map(|b| b.block_number)
+                .expect("should have 1 block");
+            let last_block = blocks
+                .last()
+                .map(|b| b.block_number)
+                .expect("should have 1 block");
             let mut data = Vec::new();
             for block in blocks {
                 let proof = storage
                     .prover_schema()
-                    .load_proof(block)
+                    .load_proof(block.block_number)
                     .await?
                     .expect("Single proof should exist");
-                let block_size = storage
-                    .chain()
-                    .block_schema()
-                    .get_block(block)
-                    .await?
-                    .expect("Block should exist")
-                    .block_chunks_size;
+                let block_size = block.block_chunks_size;
                 data.push((proof, block_size));
             }
             let job_data = serde_json::to_value(JobRequestData::AggregatedBlockProof(data))
