@@ -49,9 +49,7 @@ jobs:
         docker pull matterlabs/ci-integration-test:zk-latest
 
     - name: zk
-      run: |
-        zk
-        zk db setup
+      run: zk
 
     - name: lints
       run: |
