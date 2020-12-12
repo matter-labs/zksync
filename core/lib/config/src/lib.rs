@@ -7,6 +7,7 @@ use zksync_types::{Address, H256};
 use zksync_utils::{get_env, parse_env, parse_env_if_exists, parse_env_with};
 // Local uses
 
+pub mod new_config;
 pub mod test_config;
 
 /// Makes address for bind from port.
