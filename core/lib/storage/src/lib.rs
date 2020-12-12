@@ -1,6 +1,6 @@
 //! Storage crate provides the interfaces to interact with the database.
 //! The backend database used in this crate is `Postgres`, and interaction
-//! with it is based on the `diesel` crate.
+//! with it is based on the `sqlx` crate.
 //!
 //! The essential structure of this crate is the `StorageProcessor`, which
 //! holds down the connection to the database and provides abstract interfaces
@@ -61,7 +61,7 @@
 //!
 //! Tests for the storage use the actual empty Postgres database.
 //! Because of that, these tests are disabled by default, to run them you must use
-//! `zksync db-test` (or `zksync db-test-no-reset`, if this is not a first run)
+//! `zk test db` (or `zk test db --no-reset`, if this is not a first run)
 //! command, which will setup the database and enable the tests by passing a feature flag.
 //!
 //! Tests are implemented in a form of "test transactions", which are database transactions
