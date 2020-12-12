@@ -7,7 +7,7 @@ use zksync_types::{
     Action, ActionType, BlockNumber,
 };
 // Local imports
-use super::utils::{get_operation, get_operation_with_txs};
+use crate::test_data::{get_operation, get_operation_with_txs};
 use crate::{
     chain::{
         block::{records::BlockDetails, BlockSchema},
@@ -17,7 +17,7 @@ use crate::{
     ethereum::EthereumSchema,
     prover::ProverSchema,
     test_data::{
-        dummy_ethereum_tx_hash, gen_acc_random_updates, gen_unique_operation, BLOCK_SIZE_CHUNKS,
+        dummy_ethereum_tx_hash, get_acc_random_updates, get_unique_operation, BLOCK_SIZE_CHUNKS,
     },
     tests::{create_rng, db_test},
     QueryResult, StorageProcessor,
@@ -31,7 +31,7 @@ pub fn apply_random_updates(
     rng: &mut XorShiftRng,
 ) -> (AccountMap, Vec<(u32, AccountUpdate)>) {
     let updates = (0..3)
-        .map(|_| gen_acc_random_updates(rng))
+        .map(|_| get_acc_random_updates(rng))
         .flatten()
         .collect::<AccountUpdates>();
     apply_updates(&mut accounts, updates.clone());
@@ -228,7 +228,7 @@ async fn find_block_by_height_or_hash(mut storage: StorageProcessor<'_>) -> Quer
 
         // Store the operation in the block schema.
         let operation = BlockSchema(&mut storage)
-            .execute_operation(gen_unique_operation(
+            .execute_operation(get_unique_operation(
                 block_number,
                 Action::Commit,
                 BLOCK_SIZE_CHUNKS,
@@ -270,7 +270,7 @@ async fn find_block_by_height_or_hash(mut storage: StorageProcessor<'_>) -> Quer
                 .store_proof(block_number, &Default::default())
                 .await?;
             let verify_operation = BlockSchema(&mut storage)
-                .execute_operation(gen_unique_operation(
+                .execute_operation(get_unique_operation(
                     block_number,
                     Action::Verify {
                         proof: Default::default(),
@@ -376,7 +376,7 @@ async fn block_range(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
 
         // Store the operation in the block schema.
         let operation = BlockSchema(&mut storage)
-            .execute_operation(gen_unique_operation(
+            .execute_operation(get_unique_operation(
                 block_number,
                 Action::Commit,
                 BLOCK_SIZE_CHUNKS,
@@ -412,7 +412,7 @@ async fn block_range(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
                 .store_proof(block_number, &Default::default())
                 .await?;
             let operation = BlockSchema(&mut storage)
-                .execute_operation(gen_unique_operation(
+                .execute_operation(get_unique_operation(
                     block_number,
                     Action::Verify {
                         proof: Default::default(),
@@ -481,7 +481,7 @@ async fn unconfirmed_transaction(mut storage: StorageProcessor<'_>) -> QueryResu
 
         // Store the operation in the block schema.
         let operation = BlockSchema(&mut storage)
-            .execute_operation(gen_unique_operation(
+            .execute_operation(get_unique_operation(
                 block_number,
                 Action::Commit,
                 BLOCK_SIZE_CHUNKS,
@@ -520,7 +520,7 @@ async fn unconfirmed_transaction(mut storage: StorageProcessor<'_>) -> QueryResu
                 .store_proof(block_number, &Default::default())
                 .await?;
             let operation = BlockSchema(&mut storage)
-                .execute_operation(gen_unique_operation(
+                .execute_operation(get_unique_operation(
                     block_number,
                     Action::Verify {
                         proof: Default::default(),

@@ -2,7 +2,8 @@
 // Workspace imports
 use zksync_types::{helpers::apply_updates, AccountMap, Action, ActionType};
 // Local imports
-use super::{block::apply_random_updates, utils::get_operation};
+use super::block::apply_random_updates;
+use crate::test_data::get_operation;
 use crate::tests::{create_rng, db_test};
 use crate::{
     chain::{

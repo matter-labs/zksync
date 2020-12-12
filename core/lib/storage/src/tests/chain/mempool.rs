@@ -7,6 +7,7 @@ use zksync_types::{
     Address, SignedZkSyncTx, ZkSyncTx,
 };
 // Local imports
+use crate::test_data::get_eth_sign_data;
 use crate::tests::db_test;
 use crate::{
     chain::{
@@ -15,8 +16,6 @@ use crate::{
     },
     QueryResult, StorageProcessor,
 };
-
-use crate::tests::chain::utils::get_eth_sign_data;
 
 /// Generates several different `SignedFranlinTx` objects.
 fn franklin_txs() -> Vec<SignedZkSyncTx> {

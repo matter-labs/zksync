@@ -6,8 +6,8 @@ use zksync_config::ConfigurationOptions;
 use zksync_crypto::proof::EncodedProofPlonk;
 use zksync_types::{block::PendingBlock, Action};
 // Local imports
-use crate::tests::{chain::utils::get_operation, db_test};
 use crate::{chain::block::BlockSchema, prover::ProverSchema, QueryResult, StorageProcessor};
+use crate::{test_data::get_operation, tests::db_test};
 
 /// Checks that the proof can be stored and loaded.
 #[db_test]
