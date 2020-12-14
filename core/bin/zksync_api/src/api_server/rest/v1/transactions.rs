@@ -199,7 +199,8 @@ struct IncomingTx {
 #[derive(Debug, Serialize, Deserialize, Clone)]
 struct IncomingTxBatch {
     txs: Vec<ZkSyncTx>,
-    signature: Option<TxEthSignature>,
+    #[serde(default)]
+    signatures: Vec<TxEthSignature>,
 }
 
 #[derive(Debug, Deserialize, Serialize, Clone, PartialEq)]
@@ -240,10 +241,10 @@ impl Client {
     pub async fn submit_tx_batch(
         &self,
         txs: Vec<ZkSyncTx>,
-        signature: Option<TxEthSignature>,
+        signatures: Vec<TxEthSignature>,
     ) -> Result<Vec<TxHash>, ClientError> {
         self.post("transactions/submit/batch")
-            .body(&IncomingTxBatch { txs, signature })
+            .body(&IncomingTxBatch { txs, signatures })
             .send()
             .await
     }
@@ -376,7 +377,7 @@ async fn submit_tx_batch(
 
     let tx_hashes = data
         .tx_sender
-        .submit_txs_batch(txs, body.signature)
+        .submit_txs_batch(txs, body.signatures)
         .await
         .map_err(ApiError::from)?;
 
@@ -427,7 +428,7 @@ mod tests {
         }
 
         async fn send_txs_batch(
-            _txs: Json<(Vec<SignedZkSyncTx>, Option<TxEthSignature>)>,
+            _txs: Json<(Vec<SignedZkSyncTx>, Vec<TxEthSignature>)>,
         ) -> Json<Result<(), ()>> {
             Json(Ok(()))
         }
@@ -550,7 +551,9 @@ mod tests {
         };
 
         core_client.send_tx(signed_tx.clone()).await??;
-        core_client.send_txs_batch(vec![signed_tx], None).await??;
+        core_client
+            .send_txs_batch(vec![signed_tx], vec![])
+            .await??;
 
         core_server.stop().await;
         Ok(())
@@ -769,6 +772,92 @@ mod tests {
                 .await?,
             good_batch_hashes
         );
+
+        server.stop().await;
+        Ok(())
+    }
+
+    /// This test checks the following criteria:
+    ///
+    /// - Attempt to submit non-withdraw transaction with the enabled fast-processing.
+    /// - Attempt to submit non-withdraw transaction with the disabled fast-processing.
+    /// - Attempt to submit withdraw transaction with the enabled fast-processing.
+    #[actix_rt::test]
+    async fn test_fast_processing_flag() -> anyhow::Result<()> {
+        let (client, server) = TestServer::new().await?;
+
+        let from = ZkSyncAccount::rand();
+        from.set_account_id(Some(0xdead));
+        let to = ZkSyncAccount::rand();
+
+        // Submit non-withdraw transaction with the enabled fast-processing.
+        let (tx, eth_sig) = from.sign_transfer(
+            0,
+            "ETH",
+            10_u64.into(),
+            10_u64.into(),
+            &to.address,
+            None,
+            false,
+        );
+        client
+            .submit_tx(
+                ZkSyncTx::Transfer(Box::new(tx.clone())),
+                Some(TxEthSignature::EthereumSignature(eth_sig.clone())),
+                Some(true),
+            )
+            .await
+            .unwrap_err();
+        // Submit with the disabled fast-processing.
+        client
+            .submit_tx(
+                ZkSyncTx::Transfer(Box::new(tx.clone())),
+                Some(TxEthSignature::EthereumSignature(eth_sig.clone())),
+                Some(false),
+            )
+            .await?;
+        // Submit without fast-processing flag.
+        client
+            .submit_tx(
+                ZkSyncTx::Transfer(Box::new(tx)),
+                Some(TxEthSignature::EthereumSignature(eth_sig)),
+                None,
+            )
+            .await?;
+
+        // Submit withdraw transaction with the enabled fast-processing.
+        let (tx, eth_sig) = from.sign_withdraw(
+            0,
+            "ETH",
+            100u64.into(),
+            10u64.into(),
+            &to.address,
+            None,
+            false,
+        );
+        client
+            .submit_tx(
+                ZkSyncTx::Withdraw(Box::new(tx.clone())),
+                Some(TxEthSignature::EthereumSignature(eth_sig.clone())),
+                Some(true),
+            )
+            .await?;
+        // Submit with the disabled fast-processing.
+        client
+            .submit_tx(
+                ZkSyncTx::Withdraw(Box::new(tx.clone())),
+                Some(TxEthSignature::EthereumSignature(eth_sig.clone())),
+                Some(false),
+            )
+            .await?;
+        // Submit without fast-processing flag.
+        client
+            .submit_tx(
+                ZkSyncTx::Withdraw(Box::new(tx)),
+                Some(TxEthSignature::EthereumSignature(eth_sig.clone())),
+                None,
+            )
+            .await?;
 
         server.stop().await;
         Ok(())

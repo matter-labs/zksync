@@ -47,7 +47,7 @@ def circuit:
     for op in operations:
 
         # enfore correct bitlentgh for every input in witness
-        # TODO: create a macro gadget to recursively iterate over struct member annotations (#1131).
+        # TODO: create a macro gadget to recursively iterate over struct member annotations (ZKS-119).
         for x in op:
             verify_bitlength(x)
 
@@ -81,7 +81,7 @@ def circuit:
             current_root = new_root
         
         # update `prev` references
-        # TODO: need a gadget to copy struct members one by one (#1131).
+        # TODO: need a gadget to copy struct members one by one (ZKS-119).
         prev.rhs = op.rhs
         prev.lhs = op.lhs
         prev.args = op.args
@@ -118,7 +118,7 @@ def verify_correct_chunking(op, computed):
             prev.lhs == op.lhs and 
             prev.rhs == op.rhs and
             prev.new_root == op.new_root
-        ) # TODO: need a gadget for logical equality which works with structs (#1131).
+        ) # TODO: need a gadget for logical equality which works with structs (ZKS-119).
 
     enforce correct_inputs
 
@@ -137,7 +137,7 @@ def select_branch(op, computed):
    
     op.current_side := LHS if op.tx_type == 'deposit' else op.chunk
 
-    # TODO: need a gadget for conditional swap applied to each struct member (#1131).
+    # TODO: need a gadget for conditional swap applied to each struct member (ZKS-119).
     cur := op.lhs if current_side == LHS else op.rhs
 
     return cur

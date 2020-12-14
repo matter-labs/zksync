@@ -69,8 +69,8 @@ migrated from `previous_root` to `new_root`
 ### Overview
 
 Spec for the exact bytes of `pub_data` for each operation is given in another document (TODO: actually create one
-(#1131)) Spec for the exact bytes of `signatures` for each is given in another document (TODO: actually create one
-(#1131))
+(ZKS-119)) Spec for the exact bytes of `signatures` for each is given in another document (TODO: actually create one
+(ZKS-119))
 
 Pub data is chosen in the way that you have all information needed to reconstruct state.
 

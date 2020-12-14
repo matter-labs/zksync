@@ -2,9 +2,8 @@
 use std::time::Instant;
 // External imports
 use sqlx::Acquire;
-use zksync_basic_types::Address;
 // Workspace imports
-use zksync_types::{Account, AccountId, AccountUpdates};
+use zksync_types::{Account, AccountId, AccountUpdates, Address};
 // Local imports
 use self::records::*;
 use crate::diff::StorageAccountDiff;
@@ -23,6 +22,22 @@ pub use self::stored_state::StoredAccountState;
 pub struct AccountSchema<'a, 'c>(pub &'a mut StorageProcessor<'c>);
 
 impl<'a, 'c> AccountSchema<'a, 'c> {
+    pub async fn account_address_by_id(&mut self, account_id: AccountId) -> QueryResult<Address> {
+        let start = Instant::now();
+
+        let bytes = sqlx::query!(
+            "SELECT address FROM account_creates WHERE account_id = $1",
+            i64::from(account_id)
+        )
+        .fetch_one(self.0.conn())
+        .await?
+        .address;
+        let address = Address::from_slice(&bytes);
+
+        metrics::histogram!("sql.chain.account.account_address_by_id", start.elapsed());
+        Ok(address)
+    }
+
     /// Obtains both committed and verified state for the account by its address.
     pub async fn account_state_by_address(
         &mut self,
@@ -171,7 +186,7 @@ impl<'a, 'c> AccountSchema<'a, 'c> {
         Ok(account_state)
     }
 
-    /// Loads the last verified state for the account (e.g. the one obtained in the last block
+    /// Loads the last verified state for the account (i.e. the one obtained in the last block
     /// which was both committed and verified).
     pub async fn last_verified_state_for_account(
         &mut self,
@@ -196,27 +211,17 @@ impl<'a, 'c> AccountSchema<'a, 'c> {
 
         // `accounts::table` is updated only after the block verification, so we should
         // just load the account with the provided ID.
-        let mut results = sqlx::query_as!(
+        let maybe_account = sqlx::query_as!(
             StorageAccount,
             "
                 SELECT * FROM accounts
                 WHERE id = $1
-                LIMIT 1
             ",
             i64::from(account_id)
         )
-        .fetch_all(&mut transaction)
+        .fetch_optional(&mut transaction)
         .await?;
 
-        assert!(results.len() <= 1, "LIMIT 1 is in query");
-        let maybe_account = results.pop();
-
-        // let maybe_account = self.0.conn().transaction(|| {
-        //     accounts::table
-        //         .find(i64::from(account_id))
-        //         .first::<StorageAccount>(self.0.conn())
-        //         .optional()
-        // })?;
         let result = if let Some(account) = maybe_account {
             let balances = sqlx::query_as!(
                 StorageBalance,

@@ -124,7 +124,7 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
     /// in the list of executed operations.
     async fn find_tx_by_hash(&mut self, hash: &[u8]) -> QueryResult<Option<TxByHashResponse>> {
         let start = Instant::now();
-        // TODO: Maybe move the transformations to api_server (#1126)?
+        // TODO: Maybe move the transformations to api_server (ZKS-114)?
         let query_result = OperationsSchema(self.0)
             .get_executed_operation(hash)
             .await?;
@@ -224,7 +224,7 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
         hash: &[u8],
     ) -> QueryResult<Option<TxByHashResponse>> {
         let start = Instant::now();
-        // TODO: Maybe move the transformations to api_server (#1126)?
+        // TODO: Maybe move the transformations to api_server (ZKS-114)?
         let tx: Option<StoredExecutedPriorityOperation> = OperationsSchema(self.0)
             .get_executed_priority_operation_by_hash(hash)
             .await?;
