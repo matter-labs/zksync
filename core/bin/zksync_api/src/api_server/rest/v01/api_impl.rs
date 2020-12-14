@@ -5,11 +5,11 @@
 //! scope configuration. This is done by the `ApiV01::into_scope` method.
 
 use crate::api_server::{
+    helpers::try_parse_hash,
     rest::{
-        helpers::*,
+        helpers::{deposit_op_to_tx_by_hash, parse_tx_id, priority_op_to_tx_history},
         v01::{api_decl::ApiV01, types::*},
     },
-    rpc_server::get_ongoing_priority_ops,
 };
 use actix_web::{web, HttpResponse, Result as ActixResult};
 use std::time::Instant;
@@ -82,7 +82,9 @@ impl ApiV01 {
             })?;
 
         // Fetch ongoing deposits, since they must be reported within the transactions history.
-        let mut ongoing_ops = get_ongoing_priority_ops(&self_.api_client, address)
+        let mut ongoing_ops = self_
+            .api_client
+            .get_unconfirmed_deposits(address)
             .await
             .map_err(|err| {
                 vlog::warn!(
@@ -231,7 +233,9 @@ impl ApiV01 {
             // fill the rest of the limit.
 
             // Fetch ongoing deposits, since they must be reported within the transactions history.
-            let mut ongoing_ops = get_ongoing_priority_ops(&self_.api_client, address)
+            let mut ongoing_ops = self_
+                .api_client
+                .get_unconfirmed_deposits(address)
                 .await
                 .map_err(|err| {
                     vlog::warn!(
@@ -304,7 +308,7 @@ impl ApiV01 {
     ) -> ActixResult<HttpResponse> {
         let start = Instant::now();
         let hash = try_parse_hash(&hash_hex_with_prefix)
-            .ok_or_else(|| HttpResponse::BadRequest().finish())?;
+            .map_err(|_| HttpResponse::BadRequest().finish())?;
 
         let mut res = self_
             .access_storage()

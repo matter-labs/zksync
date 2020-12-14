@@ -10,13 +10,13 @@ fn success() {
     let balance = 10u32;
     let (account_id, account, sk) = tb.add_account(Locked);
     tb.set_balance(account_id, token_id, balance);
-    let old_pub_key_hash = account.pub_key_hash.clone();
+    let old_pub_key_hash = account.pub_key_hash;
     let new_pub_key_hash = PubKeyHash::from_privkey(&sk);
 
     let change_pub_key = ChangePubKey::new_signed(
         account_id,
         account.address,
-        new_pub_key_hash.clone(),
+        new_pub_key_hash,
         token_id,
         balance.into(),
         account.nonce,

@@ -294,7 +294,7 @@ mod signatures_with_vectors {
                     sign_data.account_id,
                 )
                 .await;
-                signer.pubkey_hash = change_pubkey_tx.new_pk_hash.clone();
+                signer.pubkey_hash = change_pubkey_tx.new_pk_hash;
 
                 let token = Token {
                     id: change_pubkey_tx.fee_token_id,

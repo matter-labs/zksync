@@ -68,7 +68,7 @@ impl BigUintSerdeAsRadix10Str {
     }
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize, Default)]
+#[derive(Clone, Debug, Serialize, Deserialize, Default, Ord, PartialOrd, Eq, PartialEq, Hash)]
 pub struct BigUintSerdeWrapper(#[serde(with = "BigUintSerdeAsRadix10Str")] pub BigUint);
 
 impl From<BigUint> for BigUintSerdeWrapper {

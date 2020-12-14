@@ -77,6 +77,7 @@
 // External imports
 use sqlx::{postgres::Postgres, Connection, PgConnection, Transaction};
 // Workspace imports
+use zksync_basic_types::BlockNumber;
 // Local imports
 use crate::connection::{holder::ConnectionHolder, PooledConnection};
 
@@ -96,6 +97,11 @@ pub mod tokens;
 
 pub use crate::connection::ConnectionPool;
 pub type QueryResult<T> = Result<T, anyhow::Error>;
+
+/// The maximum possible block number in the storage.
+pub const MAX_BLOCK_NUMBER: BlockNumber = BlockNumber::MAX;
+/// The maximum possible index value in block in the storage.
+pub const MAX_BLOCK_INDEX: u32 = i32::MAX as u32;
 
 /// Storage processor is the main storage interaction point.
 /// It holds down the connection (either direct or pooled) to the database

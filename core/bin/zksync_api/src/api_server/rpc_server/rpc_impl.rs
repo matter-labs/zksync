@@ -23,7 +23,7 @@ impl RpcApp {
     pub async fn _impl_account_info(self, address: Address) -> Result<AccountInfoResp> {
         let start = Instant::now();
 
-        let account_state = self.get_account_state(&address).await?;
+        let account_state = self.get_account_state(address).await?;
 
         let depositing_ops = self.get_ongoing_deposits_impl(address).await?;
         let depositing =
