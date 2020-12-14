@@ -24,9 +24,9 @@ pub struct ETHClient<S: EthereumSigner> {
     sender_account: Address,
     pub contract_addr: H160,
     contract: ethabi::Contract,
-    chain_id: u8,
-    gas_price_factor: f64,
-    web3: Web3<Http>,
+    pub chain_id: u8,
+    pub gas_price_factor: f64,
+    pub web3: Web3<Http>,
 }
 
 impl<S: EthereumSigner> fmt::Debug for ETHClient<S> {
@@ -61,6 +61,12 @@ impl<S: EthereumSigner> ETHClient<S> {
             gas_price_factor,
             web3: Web3::new(transport),
         }
+    }
+    pub fn main_contract_with_address(&self, address: Address) -> Contract<Http> {
+        Contract::new(self.web3.eth(), address, self.contract.clone())
+    }
+    pub fn main_contract(&self) -> Contract<Http> {
+        self.main_contract_with_address(self.contract_addr)
     }
 }
 
@@ -233,16 +239,13 @@ impl<S: EthereumSigner + Sync + Send> ETHClientSender for ETHClient<S> {
     }
     async fn contract_balance(
         &self,
-        token: &Token,
+        token_address: Address,
         abi: ethabi::Contract,
         address: Address,
     ) -> Result<U256, anyhow::Error> {
         // TODO create it only once, cache it
-        assert_ne!(
-            token.symbol, "ETH",
-            "Wrong function, please use eth_balance"
-        );
-        let contract = Contract::new(self.web3.eth(), token.address, abi);
+
+        let contract = Contract::new(self.web3.eth(), token_address, abi);
         Ok(contract
             .query("balanceOf", address, None, Options::default(), None)
             .await?)

@@ -74,7 +74,7 @@ pub trait ETHClientSender: Sync + Send {
     async fn eth_balance(&self, address: Address) -> Result<U256, anyhow::Error>;
     async fn contract_balance(
         &self,
-        token: &Token,
+        token_address: Address,
         abi: ethabi::Contract,
         address: Address,
     ) -> Result<U256, anyhow::Error>;

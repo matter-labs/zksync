@@ -150,12 +150,15 @@ impl ETHClientSender for MultiPlexClient {
 
     async fn contract_balance(
         &self,
-        token: &Token,
+        token_address: Address,
         abi: ethabi::Contract,
         address: Address,
     ) -> Result<U256, anyhow::Error> {
         for (name, client) in self.clients.iter() {
-            match client.contract_balance(token, abi.clone(), address).await {
+            match client
+                .contract_balance(token_address, abi.clone(), address)
+                .await
+            {
                 Ok(res) => return Ok(res),
                 Err(err) => log::error!("Error in interface: {}, {} ", name, err),
             }

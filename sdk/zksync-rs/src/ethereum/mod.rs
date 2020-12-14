@@ -4,10 +4,10 @@ use num::BigUint;
 use std::{convert::TryFrom, time::Duration};
 use std::{str::FromStr, time::Instant};
 use web3::contract::tokens::Tokenize;
-use web3::contract::{Contract, Options};
+use web3::contract::{Options};
 use web3::transports::Http;
 use web3::types::{TransactionReceipt, H160, H256, U256};
-use web3::Web3;
+
 use zksync_eth_client::ETHClient;
 use zksync_eth_signer::EthereumSigner;
 use zksync_types::{AccountId, PriorityOp, TokenLike};

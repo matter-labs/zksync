@@ -35,21 +35,21 @@ pub struct TestSetup {
     pub state_keeper_request_sender: mpsc::Sender<StateKeeperRequest>,
     pub proposed_blocks_receiver: mpsc::Receiver<CommitRequest>,
 
-    pub accounts: AccountSet<Http>,
+    pub accounts: AccountSet,
     pub tokens: HashMap<TokenId, Address>,
 
     pub expected_changes_for_current_block: ExpectedAccountState,
 
-    pub commit_account: EthereumAccount<Http>,
+    pub commit_account: EthereumAccount,
     pub current_state_root: Option<Fr>,
 }
 
 impl TestSetup {
     pub fn new(
         sk_channels: StateKeeperChannels,
-        accounts: AccountSet<Http>,
+        accounts: AccountSet,
         deployed_contracts: &Contracts,
-        commit_account: EthereumAccount<Http>,
+        commit_account: EthereumAccount,
     ) -> Self {
         let mut tokens = HashMap::new();
         tokens.insert(1, deployed_contracts.test_erc20_address);

@@ -10,12 +10,12 @@ use crate::types::*;
 
 /// Account set is used to create transactions using stored account
 /// in a convenient way
-pub struct AccountSet<T: Transport> {
-    pub eth_accounts: Vec<EthereumAccount<T>>,
+pub struct AccountSet {
+    pub eth_accounts: Vec<EthereumAccount>,
     pub zksync_accounts: Vec<ZkSyncAccount>,
     pub fee_account_id: ZKSyncAccountId,
 }
-impl<T: Transport> AccountSet<T> {
+impl AccountSet {
     /// Create deposit from eth account to zksync account
     pub async fn deposit(
         &self,
