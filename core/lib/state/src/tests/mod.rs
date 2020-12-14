@@ -11,7 +11,8 @@ use zksync_crypto::{
 };
 use zksync_types::tx::PackedEthSignature;
 use zksync_types::{
-    Account, AccountId, AccountUpdate, PubKeyHash, TokenId, ZkSyncPriorityOp, ZkSyncTx, SignedZkSyncTx
+    Account, AccountId, AccountUpdate, PubKeyHash, SignedZkSyncTx, TokenId, ZkSyncPriorityOp,
+    ZkSyncTx,
 };
 
 type BoundAccountUpdates = [(AccountId, AccountUpdate)];
@@ -86,20 +87,6 @@ impl PlasmaTestBuilder {
         );
     }
 
-    pub fn test_txs_batch(&mut self, txs: &[SignedZkSyncTx], expected_updates: &BoundAccountUpdates) {
-        let mut state_clone = self.state.clone();
-        let op_successes = self.state.execute_txs_batch(txs);
-        let mut updates : Vec<(u32, zksync_types::AccountUpdate)> = Vec::new();
-        for result in op_successes {
-            updates.append(&mut result.unwrap().updates);
-        }
-        self.compare_updates(
-            expected_updates,
-            &updates,
-            &mut state_clone,
-        );
-    }
-
     pub fn test_tx_fail(&mut self, tx: ZkSyncTx, expected_error_message: &str) {
         let error = self
             .state
@@ -111,6 +98,31 @@ impl PlasmaTestBuilder {
             expected_error_message,
             "unexpected error message"
         );
+    }
+
+    pub fn test_txs_batch_success(
+        &mut self,
+        txs: &[SignedZkSyncTx],
+        expected_updates: &BoundAccountUpdates,
+    ) {
+        let mut state_clone = self.state.clone();
+        let op_successes = self.state.execute_txs_batch(txs);
+        let mut updates: Vec<(u32, zksync_types::AccountUpdate)> = Vec::new();
+        for result in op_successes {
+            updates.append(&mut result.unwrap().updates);
+        }
+        self.compare_updates(expected_updates, &updates, &mut state_clone);
+    }
+
+    pub fn test_txs_batch_fail(&mut self, txs: &[SignedZkSyncTx], expected_error_message: &str) {
+        let op_errors = self.state.execute_txs_batch(txs);
+        for error in op_errors {
+            assert_eq!(
+                error.unwrap_err().to_string().as_str(),
+                expected_error_message,
+                "unexpected error message"
+            );
+        }
     }
 
     pub fn test_priority_op_success(

@@ -397,55 +397,132 @@ impl ZkSyncState {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use zksync_crypto::rand::{Rng, SeedableRng, XorShiftRng};
     use crate::tests::{AccountState::*, PlasmaTestBuilder};
-    use zksync_types::{priority_ops::Deposit, tx::Withdraw};
+    use zksync_crypto::rand::{Rng, SeedableRng, XorShiftRng};
+    use zksync_types::tx::Withdraw;
 
+    /// Checks if execute_txs_batch fails if it is not enough balance.
     #[test]
-    fn execute_txs_batch_success() {
+    fn execute_txs_batch_fail() {
         let mut tb = PlasmaTestBuilder::new();
 
         let (account_id, account, sk) = tb.add_account(Unlocked);
-        
-        let deposit = Deposit {
-            from: account.address,
-            to: account.address,
-            amount: BigUint::from(100u32),
-            token: 0,
-        };
+        tb.set_balance(account_id, 0, BigUint::from(99u32));
 
-        let withdraw = Withdraw::new_signed(
+        let withdraw1 = Withdraw::new_signed(
             account_id,
             account.address,
             account.address,
             0,
-            BigUint::from(99u32),
-            BigUint::from(1u32),
+            BigUint::from(48u32),
+            BigUint::from(2u32),
+            account.nonce,
+            &sk,
+        )
+        .unwrap();
+        let withdraw2 = Withdraw::new_signed(
+            account_id,
+            account.address,
+            account.address,
+            0,
+            BigUint::from(47u32),
+            BigUint::from(3u32),
             account.nonce + 1,
             &sk,
         )
         .unwrap();
 
-        //tb.test_txs_batch(&[withdraw.into()], &[]);
+        let signed_zk_sync_tx1 = SignedZkSyncTx {
+            tx: ZkSyncTx::Withdraw(Box::new(withdraw1)),
+            eth_sign_data: None,
+        };
+        let signed_zk_sync_tx2 = SignedZkSyncTx {
+            tx: ZkSyncTx::Withdraw(Box::new(withdraw2)),
+            eth_sign_data: None,
+        };
+        tb.test_txs_batch_fail(
+            &[signed_zk_sync_tx1, signed_zk_sync_tx2],
+            "Batch execution failed, since tx #2 of batch failed with a reason: Not enough balance",
+        );
     }
 
+    /// Checks if execute_txs_batch executes normally with valid operations.
+    #[test]
+    fn execute_txs_batch_success() {
+        let mut tb = PlasmaTestBuilder::new();
+
+        let (account_id, account, sk) = tb.add_account(Unlocked);
+        tb.set_balance(account_id, 0, BigUint::from(100u32));
+
+        let withdraw1 = Withdraw::new_signed(
+            account_id,
+            account.address,
+            account.address,
+            0,
+            BigUint::from(48u32),
+            BigUint::from(2u32),
+            account.nonce,
+            &sk,
+        )
+        .unwrap();
+        let withdraw2 = Withdraw::new_signed(
+            account_id,
+            account.address,
+            account.address,
+            0,
+            BigUint::from(47u32),
+            BigUint::from(3u32),
+            account.nonce + 1,
+            &sk,
+        )
+        .unwrap();
+
+        let signed_zk_sync_tx1 = SignedZkSyncTx {
+            tx: ZkSyncTx::Withdraw(Box::new(withdraw1)),
+            eth_sign_data: None,
+        };
+        let signed_zk_sync_tx2 = SignedZkSyncTx {
+            tx: ZkSyncTx::Withdraw(Box::new(withdraw2)),
+            eth_sign_data: None,
+        };
+        let expected_updates = vec![
+            (
+                0,
+                AccountUpdate::UpdateBalance {
+                    old_nonce: 0,
+                    new_nonce: 1,
+                    balance_update: (0, 100u32.into(), 50u32.into()),
+                },
+            ),
+            (
+                0,
+                AccountUpdate::UpdateBalance {
+                    old_nonce: 1,
+                    new_nonce: 2,
+                    balance_update: (0, 50u32.into(), 0u32.into()),
+                },
+            ),
+        ];
+        tb.test_txs_batch_success(&[signed_zk_sync_tx1, signed_zk_sync_tx2], &expected_updates);
+    }
+
+    /// Checks if apply_account_updates panics if there is deletion of unexisting account in updates.
     #[test]
     #[should_panic]
     fn delete_unexisting_account() {
         let mut rng = XorShiftRng::from_seed([1, 2, 3, 4]);
         let mut state = ZkSyncState::empty();
-        let updates = vec![
-            (
-                0,
-                AccountUpdate::Delete {
-                    address: Address::from(rng.gen::<[u8; 20]>()),
-                    nonce: 0,
-                },
-            ),
-        ];
-        state.apply_account_updates(updates); // should panic here
+        let updates = vec![(
+            0,
+            AccountUpdate::Delete {
+                address: Address::from(rng.gen::<[u8; 20]>()),
+                nonce: 0,
+            },
+        )];
+        state.apply_account_updates(updates);
     }
 
+    /// Checks if apply_account_updates panics if its updates have mismatched nonces.
     #[test]
     #[should_panic]
     fn mismatched_nonce() {
@@ -453,13 +530,7 @@ mod tests {
         let mut state = ZkSyncState::empty();
         let address = Address::from(rng.gen::<[u8; 20]>());
         let updates = vec![
-            (
-                0,
-                AccountUpdate::Create {
-                    address,
-                    nonce: 0,
-                },
-            ),
+            (0, AccountUpdate::Create { address, nonce: 0 }),
             (
                 0,
                 AccountUpdate::UpdateBalance {
@@ -477,9 +548,10 @@ mod tests {
                 },
             ),
         ];
-        state.apply_account_updates(updates); // should panic here
+        state.apply_account_updates(updates);
     }
 
+    /// Checks if apply_account_updates panics if its updates have mismatched balances.
     #[test]
     #[should_panic]
     fn mismatched_old_balance() {
@@ -487,13 +559,7 @@ mod tests {
         let mut state = ZkSyncState::empty();
         let address = Address::from(rng.gen::<[u8; 20]>());
         let updates = vec![
-            (
-                0,
-                AccountUpdate::Create {
-                    address,
-                    nonce: 0,
-                },
-            ),
+            (0, AccountUpdate::Create { address, nonce: 0 }),
             (
                 0,
                 AccountUpdate::UpdateBalance {
@@ -511,17 +577,18 @@ mod tests {
                 },
             ),
         ];
-        state.apply_account_updates(updates); // should panic here
+        state.apply_account_updates(updates);
     }
 
+    /// Checks if apply_account_updates panics if there are creations of two accounts with the same addresses in updates.
     #[test]
     #[should_panic]
-    fn create_two_accounts_with_same_adresses() {
+    fn create_two_accounts_with_same_addresses() {
         let mut rng = XorShiftRng::from_seed([1, 2, 3, 4]);
         let mut random_addresses = Vec::new();
         random_addresses.push(Address::from(rng.gen::<[u8; 20]>()));
         random_addresses.push(Address::from(rng.gen::<[u8; 20]>()));
-        
+
         let mut state = ZkSyncState::empty();
         let updates = vec![
             (
@@ -542,6 +609,7 @@ mod tests {
         state.apply_account_updates(updates); // should panic here
     }
 
+    /// Checks if all types of updates apply properly in apply_account_updates.
     #[test]
     fn apply_account_updates_success() {
         let mut rng = XorShiftRng::from_seed([1, 2, 3, 4]);
@@ -549,7 +617,7 @@ mod tests {
         let token_id = 0;
         random_addresses.push(Address::from(rng.gen::<[u8; 20]>()));
         random_addresses.push(Address::from(rng.gen::<[u8; 20]>()));
-        
+
         let mut state = ZkSyncState::empty();
 
         let updates = vec![
