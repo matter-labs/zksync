@@ -6,7 +6,7 @@ use num::{BigUint, ToPrimitive};
 use std::convert::TryFrom;
 use std::str::FromStr;
 use web3::api::Eth;
-use web3::contract::Contract;
+use web3::contract::Options;
 use web3::transports::Http;
 use web3::types::{
     BlockId, CallRequest, Transaction, TransactionId, TransactionReceipt, H256, U128, U256, U64,

@@ -9,7 +9,7 @@ jobs:
   ci-all:
     # We currently have two self-hosted runners, one of which is marked "DEV-CI" and other one is marder "MAIN".
     # "MAIN" is the current CI runner, "DEV-CI" is currently used to experiment with CI optimizing.
-    runs-on: [self-hosted, MAIN]
+    runs-on: self-hosted
 
     steps:
     - uses: actions/checkout@v2
