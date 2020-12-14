@@ -1,10 +1,9 @@
 use web3::contract::tokens::Tokenize;
 use web3::contract::Options;
 use web3::types::{Address, U64};
-use web3::Error;
 
 use ethabi::Contract;
-use zksync_types::{Token, TransactionReceipt, H160, H256, U256};
+use zksync_types::{TransactionReceipt, H160, H256, U256};
 
 // pub struct anyhow::Error;
 

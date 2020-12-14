@@ -24,7 +24,7 @@ use std::time::{Duration, Instant};
 use zksync::operations::SyncTransactionHandle;
 use zksync::{
     error::ClientError,
-    ethereum::{ierc20_contract, zksync_contract},
+    ethereum::ierc20_contract,
     provider::Provider,
     types::BlockStatus,
     web3::{
@@ -78,7 +78,7 @@ async fn get_ethereum_balance<S: EthereumSigner + Send + Sync + Clone + Send + S
 
     eth_provider
         .client()
-        .contract_balance(token, ierc20_contract(), address)
+        .contract_balance(token.address, ierc20_contract(), address)
         .await
         .map_err(|_e| anyhow::anyhow!("failed to request erc20 balance from Ethereum"))
 }

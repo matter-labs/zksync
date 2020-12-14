@@ -2,8 +2,8 @@ use crate::eth_client_trait::{ETHClientSender, ETHTxEncoder, FailureInfo, Signed
 use ethabi::Contract;
 use web3::contract::Options;
 use web3::types::{Address, U64};
-use web3::Error;
-use zksync_types::{Token, TransactionReceipt, H160, H256, U256};
+
+use zksync_types::{TransactionReceipt, H160, H256, U256};
 
 pub struct MultiPlexClient {
     clients: Vec<(String, Box<dyn ETHClientSender>)>,

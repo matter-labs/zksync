@@ -2,7 +2,7 @@
 use std::fmt;
 
 // External uses
-use web3::contract::tokens::Tokenize;
+
 use web3::contract::{Contract, Options};
 use web3::types::{Address, BlockNumber, Bytes, TransactionReceipt, H160, H256, U256, U64};
 use web3::{transports::Http, Web3};
@@ -10,7 +10,6 @@ use web3::{transports::Http, Web3};
 // Workspace uses
 use crate::eth_client_trait::{ETHClientSender, ETHTxEncoder, FailureInfo, SignedCallResult};
 use zksync_eth_signer::{raw_ethereum_tx::RawTransaction, EthereumSigner};
-use zksync_types::Token;
 
 /// Gas limit value to be used in transaction if for some reason
 /// gas limit was not set for it.
