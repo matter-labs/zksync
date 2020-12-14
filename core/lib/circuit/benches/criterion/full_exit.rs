@@ -44,8 +44,7 @@ fn full_exit_get_pubdata(b: &mut Bencher<'_>) {
     };
     let (_, mut circuit_account_tree) = ZkSyncStateGenerator::generate(&accounts);
 
-    let witness =
-        FullExitWitnessBn256::apply_tx(&mut circuit_account_tree, &(full_exit_op.clone(), true));
+    let witness = FullExitWitnessBn256::apply_tx(&mut circuit_account_tree, &(full_exit_op, true));
     b.iter(|| {
         let _pubdata = black_box(witness.get_pubdata());
     });
@@ -65,12 +64,9 @@ fn full_exit_calculate_operations(b: &mut Bencher<'_>) {
     };
     let (_, mut circuit_account_tree) = ZkSyncStateGenerator::generate(&accounts);
 
-    let witness =
-        FullExitWitnessBn256::apply_tx(&mut circuit_account_tree, &(full_exit_op.clone(), true));
-    let input = ();
-    let setup = || (input.clone());
-    b.iter_with_setup(setup, |input| {
-        let _ops = black_box(witness.calculate_operations(input));
+    let witness = FullExitWitnessBn256::apply_tx(&mut circuit_account_tree, &(full_exit_op, true));
+    b.iter(|| {
+        let _ops = black_box(witness.calculate_operations(()));
     });
 }
 

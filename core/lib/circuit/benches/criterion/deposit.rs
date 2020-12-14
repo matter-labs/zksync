@@ -68,10 +68,8 @@ fn create_deposit_calculate_operations(b: &mut Bencher<'_>) {
     let (_, mut circuit_account_tree) = ZkSyncStateGenerator::generate(&accounts);
 
     let witness = DepositWitnessBn256::apply_tx(&mut circuit_account_tree, &deposit_op);
-    let input = ();
-    let setup = || (input.clone());
-    b.iter_with_setup(setup, |input| {
-        let _ops = black_box(witness.calculate_operations(input));
+    b.iter(|| {
+        let _ops = black_box(witness.calculate_operations(()));
     });
 }
 
