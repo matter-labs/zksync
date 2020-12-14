@@ -1,11 +1,11 @@
 # Sensitive values which MUST be different for production
 # Values provided here are valid for the development infrastructure only.
 
-[database]
+[db]
 # Address of the databaase server.
 url="postgres://postgres@localhost/plasma"
 
-[eth_client]
+[eth_sender]
 # Set in env file for development, production, staging and testnet.
 operator_private_key="27593fea79697e947890ecbecce7901b0008345e5d7259710d0dd5e500d040be"
 # Address to be used for zkSync account managing the interaction with a contract on Ethereum.

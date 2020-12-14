@@ -1,7 +1,4 @@
 [eth_client]
-# operator_private_key is defined in the `private.toml`
-# operator_commit_eth_addr is defined in the `private.toml`
-
 chain_id=9
 # Coefficient for increasing the network gas price. Normally it's 1, we use the network-provided price (and limit it
 # with the gas adjuster in eth sender). However, it can be increased to speed up the transaction mining time.
