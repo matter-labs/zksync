@@ -11,7 +11,7 @@ use rand::{thread_rng, Rng};
 use tokio::sync::{RwLock, RwLockReadGuard, RwLockWriteGuard};
 // Workspace uses
 use zksync_api::client::Pagination;
-use zksync_types::{tx::TxHash, Address, BlockNumber, PriorityOp, ZkSyncPriorityOp};
+use zksync_types::{tx::TxHash, AccountId, Address, BlockNumber, PriorityOp, ZkSyncPriorityOp};
 // Local uses
 
 /// Maximum limit value in the requests.
@@ -25,6 +25,8 @@ pub struct AddressData {
     pub txs_count: usize,
     /// Total count of priority operations related to the address.
     pub ops_count: usize,
+    /// Associated account ID.
+    pub account_id: Option<AccountId>,
 }
 
 /// Generates a `(offset, limit)` pair for the corresponding API request.
@@ -68,6 +70,10 @@ impl ApiDataPoolInner {
     pub fn store_address(&mut self, address: Address) -> &mut AddressData {
         self.addresses.push(address);
         self.data_by_address.entry(address).or_default()
+    }
+
+    pub fn set_account_id(&mut self, address: Address, account_id: AccountId) {
+        self.store_address(address).account_id = Some(account_id);
     }
 
     pub fn random_address(&self) -> (Address, &AddressData) {
@@ -120,7 +126,7 @@ impl ApiDataPoolInner {
 
     /// Generates a random block number in range [0, max block number].
     pub fn random_block(&self) -> BlockNumber {
-        self.random_tx_id().0
+        self.random_tx_location().0
     }
 
     /// Generates a random pagination block range.
@@ -140,7 +146,7 @@ impl ApiDataPoolInner {
     }
 
     /// Generates a random transaction identifier (block number, position in block).
-    pub fn random_tx_id(&self) -> (BlockNumber, usize) {
+    pub fn random_tx_location(&self) -> (BlockNumber, usize) {
         let from = *self.blocks.keys().next().unwrap();
         let to = self.max_block_number;
 

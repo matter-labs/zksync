@@ -9,12 +9,15 @@ use std::str::FromStr;
 // Workspace uses
 use futures::prelude::*;
 use rand::{thread_rng, Rng};
-use zksync_api::client::{Client, TokenPriceKind};
+use zksync_api::{
+    api_server::v1::MAX_LIMIT,
+    client::{AccountQuery, AccountReceipts, Client, TokenPriceKind},
+};
 use zksync_config::test_config::TestConfig;
 use zksync_types::{Address, TokenLike};
 
 // Local uses
-use super::ApiTestsBuilder;
+use super::{ApiDataPool, ApiTestsBuilder};
 use crate::monitor::Monitor;
 
 struct RestApiTestsBuilder<'a> {
@@ -67,6 +70,25 @@ fn random_token(tokens: &[TokenLike]) -> TokenLike {
     tokens[index].clone()
 }
 
+async fn random_account_query(pool: &ApiDataPool) -> AccountQuery {
+    let inner = pool.read().await;
+    let (address, data) = inner.random_address();
+    match data.account_id {
+        Some(account_id) if thread_rng().gen::<bool>() => AccountQuery::Id(account_id),
+        _ => AccountQuery::Address(address),
+    }
+}
+
+async fn random_account_receipts(pool: &ApiDataPool) -> AccountReceipts {
+    let location = pool.read().await.random_tx_location();
+    match thread_rng().gen_range(0, 3) {
+        0 => AccountReceipts::older_than(location.0, location.1 as u32),
+        1 => AccountReceipts::newer_than(location.0, location.1 as u32),
+        2 => AccountReceipts::Latest,
+        _ => unreachable!(),
+    }
+}
+
 pub fn wire_tests<'a>(builder: ApiTestsBuilder<'a>, monitor: &'a Monitor) -> ApiTestsBuilder<'a> {
     let builder = RestApiTestsBuilder::new(builder, monitor);
 
@@ -83,8 +105,27 @@ pub fn wire_tests<'a>(builder: ApiTestsBuilder<'a>, monitor: &'a Monitor) -> Api
     ];
 
     builder
+        // accounts endpoints.
+        .append("accounts/info", |client, monitor| async move {
+            let address = random_account_query(&monitor.api_data_pool).await;
+            client.account_info(address).await?;
+            Ok(())
+        })
+        .append("accounts/receipts", |client, monitor| async move {
+            let address = random_account_query(&monitor.api_data_pool).await;
+            let receipts = random_account_receipts(&monitor.api_data_pool).await;
+            client
+                .account_receipts(address, receipts, MAX_LIMIT)
+                .await?;
+            Ok(())
+        })
+        .append("accounts/receipts/pending", |client, monitor| async move {
+            let address = random_account_query(&monitor.api_data_pool).await;
+            client.account_pending_receipts(address).await?;
+            Ok(())
+        })
         // blocks endpoints.
-        .append("blocks/by_id", |client, monitor| async move {
+        .append("blocks/info", |client, monitor| async move {
             let block_number = monitor.api_data_pool.read().await.random_block();
             client.block_by_id(block_number).await?;
             Ok(())
@@ -115,6 +156,18 @@ pub fn wire_tests<'a>(builder: ApiTestsBuilder<'a>, monitor: &'a Monitor) -> Api
             client.network().await?;
             Ok(())
         })
+        // operations endpoints.
+        .append("operations/by_serial_id", |client, monitor| async move {
+            let op = monitor.api_data_pool.read().await.random_priority_op();
+            client.priority_op(op.serial_id).await?;
+            Ok(())
+        })
+        // search endpoints.
+        .append("search", |client, monitor| async move {
+            let block_id = monitor.api_data_pool.read().await.random_block();
+            client.search_block(block_id).await?;
+            Ok(())
+        })
         // tokens endpoints.
         .append("tokens/list", |client, _monitor| async move {
             client.tokens().await?;
@@ -139,6 +192,28 @@ pub fn wire_tests<'a>(builder: ApiTestsBuilder<'a>, monitor: &'a Monitor) -> Api
                 Ok(())
             }
         })
-        // Transactions enpoints.
+        // transactions enpoints.
+        .append("transactions/status", move |client, monitor| async move {
+            let tx_hash = monitor.api_data_pool.read().await.random_tx_hash();
+            client.tx_status(tx_hash).await?;
+            Ok(())
+        })
+        .append("transactions/data", move |client, monitor| async move {
+            let tx_hash = monitor.api_data_pool.read().await.random_tx_hash();
+            client.tx_data(tx_hash).await?;
+            Ok(())
+        })
+        .append("transactions/receipts", move |client, monitor| async move {
+            let tx_hash = monitor.api_data_pool.read().await.random_tx_hash();
+            let range = monitor.api_data_pool.read().await.random_block_range().0;
+            client.tx_receipts(tx_hash, range, MAX_LIMIT).await?;
+            Ok(())
+        })
+        .append("transactions/receipt", move |client, monitor| async move {
+            let tx_hash = monitor.api_data_pool.read().await.random_tx_hash();
+            let receipt_id = thread_rng().gen_range(0, MAX_LIMIT);
+            client.tx_receipt_by_id(tx_hash, receipt_id).await?;
+            Ok(())
+        })
         .into_inner()
 }

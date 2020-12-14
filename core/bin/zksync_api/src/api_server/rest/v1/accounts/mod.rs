@@ -1,7 +1,10 @@
 //! Accounts part of API implementation.
 
 // Public uses
-pub use self::types::{AccountInfo, AccountState, DepositingBalances, DepositingFunds};
+pub use self::types::{
+    AccountInfo, AccountQuery, AccountReceipts, AccountState, DepositingBalances, DepositingFunds,
+    TxLocation,
+};
 
 // Built-in uses
 
@@ -20,8 +23,7 @@ use zksync_types::{AccountId, Address, BlockNumber, TokenId};
 use crate::{core_api_client::CoreApiClient, utils::token_db_cache::TokenDBCache};
 
 use self::types::{
-    AccountQuery, AccountReceiptsQuery, AccountTxReceipt, PendingAccountTxReceipt, SearchDirection,
-    TxLocation,
+    AccountReceiptsQuery, AccountTxReceipt, PendingAccountTxReceipt, SearchDirection,
 };
 use super::{ApiError, JsonResult};
 

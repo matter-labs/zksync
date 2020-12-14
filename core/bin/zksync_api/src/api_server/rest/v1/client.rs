@@ -2,6 +2,10 @@
 
 // Public uses
 pub use super::{
+    accounts::{
+        AccountInfo, AccountQuery, AccountReceipts, AccountState, DepositingBalances,
+        DepositingFunds, TxLocation,
+    },
     blocks::{BlockInfo, TransactionInfo},
     config::Contracts,
     operations::PriorityOpReceipt,

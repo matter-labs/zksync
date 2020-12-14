@@ -157,7 +157,7 @@ impl RestApiClient {
     }
 
     pub async fn block_tx(&self) -> anyhow::Result<()> {
-        let (block_id, tx_id) = self.pool.read().await.random_tx_id();
+        let (block_id, tx_id) = self.pool.read().await.random_tx_location();
         let url = format!("/blocks/{}/transactions/{}", block_id, tx_id);
         self.get(&url).await?;
         Ok(())
