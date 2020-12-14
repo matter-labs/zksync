@@ -24,7 +24,7 @@ use zksync_types::{
 pub const BLOCK_SIZE_CHUNKS: usize = 100;
 
 /// Generates a random account with a set of changes.
-pub fn get_acc_random_updates<R: Rng>(rng: &mut R) -> impl Iterator<Item = (u32, AccountUpdate)> {
+pub fn gen_acc_random_updates<R: Rng>(rng: &mut R) -> impl Iterator<Item = (u32, AccountUpdate)> {
     let id: u32 = rng.gen();
     let balance = u128::from(rng.gen::<u64>());
     let nonce: u32 = rng.gen();
@@ -69,16 +69,16 @@ pub fn get_acc_random_updates<R: Rng>(rng: &mut R) -> impl Iterator<Item = (u32,
 }
 
 /// Generates dummy operation with the default `new_root_hash` in the block.
-pub fn get_operation(
+pub fn gen_operation(
     block_number: BlockNumber,
     action: Action,
     block_chunks_size: usize,
 ) -> Operation {
-    get_operation_with_txs(block_number, action, block_chunks_size, vec![])
+    gen_operation_with_txs(block_number, action, block_chunks_size, vec![])
 }
 
 /// Generates dummy operation with the default `new_root_hash` in the block and given set of transactions.
-pub fn get_operation_with_txs(
+pub fn gen_operation_with_txs(
     block_number: BlockNumber,
     action: Action,
     block_chunks_size: usize,
@@ -101,7 +101,7 @@ pub fn get_operation_with_txs(
 }
 
 /// Generates EthSignData for testing (not a valid signature)
-pub fn get_eth_sign_data(message: String) -> EthSignData {
+pub fn gen_eth_sign_data(message: String) -> EthSignData {
     let keypair = Random.generate();
     let private_key = keypair.secret();
 
@@ -124,17 +124,17 @@ pub fn dummy_ethereum_tx_hash(ethereum_op_id: i64) -> H256 {
 }
 
 /// Generates dummy operation with the unique `new_root_hash` in the block.
-pub fn get_unique_operation(
+pub fn gen_unique_operation(
     block_number: BlockNumber,
     action: Action,
     block_chunks_size: usize,
 ) -> Operation {
-    get_unique_operation_with_txs(block_number, action, block_chunks_size, vec![])
+    gen_unique_operation_with_txs(block_number, action, block_chunks_size, vec![])
 }
 
 /// Generates dummy operation with the unique `new_root_hash` in the block and
 /// given set of transactions..
-pub fn get_unique_operation_with_txs(
+pub fn gen_unique_operation_with_txs(
     block_number: BlockNumber,
     action: Action,
     block_chunks_size: usize,

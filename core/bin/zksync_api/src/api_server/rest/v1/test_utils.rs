@@ -15,8 +15,8 @@ use zksync_crypto::rand::{SeedableRng, XorShiftRng};
 use zksync_storage::{
     chain::operations::records::NewExecutedPriorityOperation,
     test_data::{
-        dummy_ethereum_tx_hash, get_acc_random_updates, get_unique_operation,
-        get_unique_operation_with_txs, BLOCK_SIZE_CHUNKS,
+        dummy_ethereum_tx_hash, gen_acc_random_updates, gen_unique_operation,
+        gen_unique_operation_with_txs, BLOCK_SIZE_CHUNKS,
     },
     ConnectionPool,
 };
@@ -235,7 +235,7 @@ impl TestServerConfig {
         // Create and apply several blocks to work with.
         for block_number in 1..=COMMITTED_BLOCKS_COUNT {
             let updates = (0..3)
-                .map(|_| get_acc_random_updates(&mut rng))
+                .map(|_| gen_acc_random_updates(&mut rng))
                 .flatten()
                 .collect::<Vec<_>>();
             apply_updates(&mut accounts, updates.clone());
@@ -264,7 +264,7 @@ impl TestServerConfig {
             let operation = storage
                 .chain()
                 .block_schema()
-                .execute_operation(get_unique_operation_with_txs(
+                .execute_operation(gen_unique_operation_with_txs(
                     block_number,
                     Action::Commit,
                     BLOCK_SIZE_CHUNKS,
@@ -309,7 +309,7 @@ impl TestServerConfig {
                 let operation = storage
                     .chain()
                     .block_schema()
-                    .execute_operation(get_unique_operation(
+                    .execute_operation(gen_unique_operation(
                         block_number,
                         Action::Verify {
                             proof: Default::default(),

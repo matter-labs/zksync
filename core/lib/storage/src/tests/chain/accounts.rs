@@ -5,7 +5,7 @@ use zksync_types::Action;
 // Local imports
 use super::block::apply_random_updates;
 use crate::tests::{create_rng, db_test};
-use crate::{chain::state::StateSchema, test_data::get_operation};
+use crate::{chain::state::StateSchema, test_data::gen_operation};
 use crate::{
     chain::{account::AccountSchema, block::BlockSchema},
     prover::ProverSchema,
@@ -26,7 +26,7 @@ async fn stored_accounts(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
     // Execute and commit block with them.
     // Also store account updates.
     BlockSchema(&mut storage)
-        .execute_operation(get_operation(1, Action::Commit, block_size))
+        .execute_operation(gen_operation(1, Action::Commit, block_size))
         .await?;
     StateSchema(&mut storage)
         .commit_state_update(1, &updates_block, 0)
@@ -86,7 +86,7 @@ async fn stored_accounts(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
         .store_proof(1, &Default::default())
         .await?;
     BlockSchema(&mut storage)
-        .execute_operation(get_operation(
+        .execute_operation(gen_operation(
             1,
             Action::Verify {
                 proof: Default::default(),
