@@ -187,9 +187,9 @@ export class DummyTransport extends AbstractJSONRPCTransport {
     async request(method: string, params = null): Promise<any> {
         if (method == 'contract_address') {
             return {
-                //  the HEX-encoded sequence of bytes [0..20) provided as the `mainContract`
+                // The HEX-encoded sequence of bytes [0..20) provided as the `mainContract`.
                 mainContract: '0x000102030405060708090a0b0c0d0e0f10111213',
-                //  the `govContract` is not usable in tests and it is simply an empty string
+                //  The `govContract` is not used in tests and it is simply an empty string.
                 govContract: ''
             };
         }
