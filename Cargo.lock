@@ -5718,6 +5718,7 @@ dependencies = [
  "anyhow",
  "async-trait",
  "ethabi 12.0.0",
+ "hex",
  "log 0.4.11",
  "parity-crypto",
  "serde",

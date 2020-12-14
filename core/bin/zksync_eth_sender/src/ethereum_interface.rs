@@ -12,19 +12,11 @@ use super::ExecutedTxStatus;
 use std::time::Duration;
 use zksync_config::EthClientOptions;
 use zksync_contracts::zksync_contract;
+use zksync_eth_client::eth_client_trait::{ETHClientSender, ETHTxEncoder, FailureInfo};
 use zksync_eth_client::{ETHClient, SignedCallResult};
 
 /// Sleep time between consecutive requests.
 const SLEEP_DURATION: Duration = Duration::from_millis(250);
-
-/// Information about transaction failure.
-#[derive(Debug, Clone)]
-pub struct FailureInfo {
-    pub revert_code: String,
-    pub revert_reason: String,
-    pub gas_used: Option<U256>,
-    pub gas_limit: U256,
-}
 
 /// Ethereum Interface module provides an abstract interface to
 /// interact with the Ethereum blockchain.
@@ -74,7 +66,7 @@ pub(super) trait EthereumInterface {
 /// Supposed to be an actual Ethereum intermediator for the `ETHSender`.
 #[derive(Debug)]
 pub struct EthereumHttpClient {
-    eth_client: ETHClient<Http, PrivateKeySigner>,
+    eth_client: ETHClient<PrivateKeySigner>,
 }
 
 impl EthereumHttpClient {
@@ -109,12 +101,7 @@ impl EthereumHttpClient {
 impl EthereumInterface for EthereumHttpClient {
     async fn get_tx_status(&self, hash: &H256) -> anyhow::Result<Option<ExecutedTxStatus>> {
         self.sleep();
-        let receipt = self
-            .eth_client
-            .web3
-            .eth()
-            .transaction_receipt(*hash)
-            .await?;
+        let receipt = self.eth_client.tx_receipt(*hash).await?;
 
         match receipt {
             Some(TransactionReceipt {
@@ -147,7 +134,7 @@ impl EthereumInterface for EthereumHttpClient {
 
     async fn block_number(&self) -> anyhow::Result<u64> {
         self.sleep();
-        let block_number = self.eth_client.web3.eth().block_number().await?;
+        let block_number = self.eth_client.block_number().await?;
         Ok(block_number.as_u64())
     }
 
@@ -183,61 +170,6 @@ impl EthereumInterface for EthereumHttpClient {
     }
 
     async fn failure_reason(&self, tx_hash: H256) -> Option<FailureInfo> {
-        let transaction = self
-            .eth_client
-            .web3
-            .eth()
-            .transaction(tx_hash.into())
-            .await
-            .ok()??;
-        let receipt = self
-            .eth_client
-            .web3
-            .eth()
-            .transaction_receipt(tx_hash)
-            .await
-            .ok()??;
-
-        let gas_limit = transaction.gas;
-        let gas_used = receipt.gas_used;
-
-        let call_request = web3::types::CallRequest {
-            from: Some(transaction.from),
-            to: transaction.to,
-            gas: Some(transaction.gas),
-            gas_price: Some(transaction.gas_price),
-            value: Some(transaction.value),
-            data: Some(transaction.input),
-        };
-
-        let encoded_revert_reason = self
-            .eth_client
-            .web3
-            .eth()
-            .call(call_request, receipt.block_number.map(Into::into))
-            .await
-            .ok()?;
-        let revert_code = hex::encode(&encoded_revert_reason.0);
-        let revert_reason = if encoded_revert_reason.0.len() >= 4 {
-            let encoded_string_without_function_hash = &encoded_revert_reason.0[4..];
-
-            ethabi::decode(
-                &[ethabi::ParamType::String],
-                encoded_string_without_function_hash,
-            )
-            .ok()?
-            .into_iter()
-            .next()?
-            .to_string()?
-        } else {
-            "unknown".to_string()
-        };
-
-        Some(FailureInfo {
-            gas_limit,
-            gas_used,
-            revert_code,
-            revert_reason,
-        })
+        self.eth_client.failure_reason(tx_hash).await.ok()?
     }
 }

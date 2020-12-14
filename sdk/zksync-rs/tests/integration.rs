@@ -35,6 +35,7 @@ use zksync::{
     zksync_types::{tx::PackedEthSignature, Token, TokenLike, TxFeeTypes, ZkSyncTx},
     EthereumProvider, Network, RpcProvider, Wallet, WalletCredentials,
 };
+use zksync_eth_client::eth_client_trait::ETHClientSender;
 use zksync_eth_signer::{EthereumSigner, PrivateKeySigner};
 
 const ETH_ADDR: &str = "36615Cf349d7F6344891B1e7CA7C72883F5dc049";
@@ -69,16 +70,15 @@ async fn get_ethereum_balance<S: EthereumSigner + Clone>(
 ) -> Result<U256, anyhow::Error> {
     if token.symbol == "ETH" {
         return eth_provider
-            .web3()
-            .eth()
-            .balance(address, None)
+            .client()
+            .eth_balance(address)
             .await
             .map_err(|_e| anyhow::anyhow!("failed to request balance from Ethereum {}", _e));
     }
 
-    let contract = Contract::new(eth_provider.web3().eth(), token.address, ierc20_contract());
-    contract
-        .query("balanceOf", address, None, Options::default(), None)
+    eth_provider
+        .client()
+        .contract_balance(token, ierc20_contract())
         .await
         .map_err(|_e| anyhow::anyhow!("failed to request erc20 balance from Ethereum"))
 }

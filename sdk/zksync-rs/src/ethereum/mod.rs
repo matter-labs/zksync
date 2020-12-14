@@ -15,6 +15,7 @@ use zksync_types::{AccountId, PriorityOp, TokenLike};
 use crate::{
     error::ClientError, provider::Provider, tokens_cache::TokensCache, utils::u256_to_biguint,
 };
+use zksync_eth_client::eth_client_trait::{ETHClientSender, ETHTxEncoder};
 
 const IERC20_INTERFACE: &str = include_str!("abi/IERC20.json");
 const ZKSYNC_INTERFACE: &str = include_str!("abi/ZkSync.json");
@@ -45,12 +46,12 @@ pub fn ierc20_contract() -> ethabi::Contract {
 #[derive(Debug)]
 pub struct EthereumProvider<S: EthereumSigner> {
     tokens_cache: TokensCache,
-    eth_client: ETHClient<Http, S>,
+    eth_client: ETHClient<S>,
     erc20_abi: ethabi::Contract,
     confirmation_timeout: Duration,
 }
 
-impl<S: EthereumSigner> EthereumProvider<S> {
+impl<S: EthereumSigner + Send + Sync> EthereumProvider<S> {
     /// Creates a new Ethereum provider.
     pub async fn new<P: Provider>(
         provider: &P,
@@ -94,8 +95,8 @@ impl<S: EthereumSigner> EthereumProvider<S> {
     }
 
     /// Exposes Ethereum node `web3` API.
-    pub fn web3(&self) -> &Web3<Http> {
-        &self.eth_client.web3
+    pub fn client(&self) -> &ETHClient<S> {
+        &self.eth_client
     }
 
     /// Returns the zkSync contract address.
@@ -141,20 +142,9 @@ impl<S: EthereumSigner> EthereumProvider<S> {
             .resolve(token)
             .ok_or(ClientError::UnknownToken)?;
 
-        let contract = Contract::new(
-            self.eth_client.web3.eth(),
-            token.address,
-            self.erc20_abi.clone(),
-        );
-
-        let query = contract.query(
-            "allowance",
-            (self.eth_client.sender_account, self.contract_address()),
-            None,
-            Options::default(),
-            None,
-        );
-        let current_allowance: U256 = query
+        let current_allowance = self
+            .eth_client
+            .allowance(token.address, self.erc20_abi.clone())
             .await
             .map_err(|err| ClientError::NetworkError(err.to_string()))?;
 
@@ -270,16 +260,20 @@ impl<S: EthereumSigner> EthereumProvider<S> {
             let mut options = Options::default();
             options.value = Some(amount);
             options.gas = Some(200_000.into());
+            let data = self.eth_client.encode_tx_data("depositETH", sync_address);
+
             self.eth_client
-                .sign_call_tx("depositETH", sync_address, options)
+                .sign_prepared_tx(data, options)
                 .await
                 .map_err(|_| ClientError::IncorrectCredentials)?
         } else {
             let mut options = Options::default();
             options.gas = Some(300_000.into());
             let params = (token_info.address, amount, sync_address);
+            let data = self.eth_client.encode_tx_data("depositETH", params);
+
             self.eth_client
-                .sign_call_tx("depositERC20", params, options)
+                .sign_prepared_tx(data, options)
                 .await
                 .map_err(|_| ClientError::IncorrectCredentials)?
         };
@@ -308,10 +302,13 @@ impl<S: EthereumSigner> EthereumProvider<S> {
 
         let mut options = Options::default();
         options.gas = Some(500_000.into());
+        let data = self
+            .eth_client
+            .encode_tx_data("depositETH", (account_id, token.address));
 
         let signed_tx = self
             .eth_client
-            .sign_call_tx("fullExit", (account_id, token.address), options)
+            .sign_prepared_tx(data, options)
             .await
             .map_err(|_| ClientError::IncorrectCredentials)?;
 

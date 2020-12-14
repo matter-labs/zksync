@@ -3,6 +3,7 @@ use crate::external_commands::js_revert_reason;
 use anyhow::{bail, ensure, format_err};
 use ethabi::ParamType;
 use num::{BigUint, ToPrimitive};
+use serde::export::PhantomData;
 use std::convert::TryFrom;
 use std::str::FromStr;
 use web3::api::Eth;
@@ -44,7 +45,8 @@ pub fn parse_ether(eth_value: &str) -> Result<BigUint, anyhow::Error> {
 pub struct EthereumAccount<T: Transport> {
     pub private_key: H256,
     pub address: Address,
-    pub main_contract_eth_client: ETHClient<T, PrivateKeySigner>,
+    pub main_contract_eth_client: ETHClient<PrivateKeySigner>,
+    _phantom: PhantomData<T>,
 }
 
 fn big_dec_to_u256(bd: BigUint) -> U256 {

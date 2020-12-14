@@ -21,7 +21,7 @@ pub struct ChangePubKeyBuilder<'a, S: EthereumSigner, P: Provider> {
 
 impl<'a, S, P> ChangePubKeyBuilder<'a, S, P>
 where
-    S: EthereumSigner + Clone,
+    S: EthereumSigner + Clone + Send + Sync,
     P: Provider + Clone,
 {
     /// Initializes a change public key transaction building process.

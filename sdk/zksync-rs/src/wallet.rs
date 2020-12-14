@@ -22,7 +22,7 @@ pub struct Wallet<S: EthereumSigner, P: Provider> {
 
 impl<S, P> Wallet<S, P>
 where
-    S: EthereumSigner + Clone,
+    S: EthereumSigner + Clone + Send + Sync,
     P: Provider + Clone,
 {
     pub async fn new(provider: P, credentials: WalletCredentials<S>) -> Result<Self, ClientError> {

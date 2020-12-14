@@ -3,15 +3,14 @@ use std::fmt;
 
 // External uses
 use web3::contract::tokens::Tokenize;
-use web3::contract::Options;
-use web3::types::{Address, BlockNumber, Bytes, TransactionReceipt};
-use web3::types::{H160, H256, U256, U64};
-use web3::{Error, Transport, Web3};
+use web3::contract::{Contract, Options};
+use web3::types::{Address, BlockNumber, Bytes, TransactionReceipt, H160, H256, U256, U64};
+use web3::{transports::Http, Web3};
 
 // Workspace uses
-use crate::eth_client_trait::{EthClientInterface, SignedCallResult};
-use web3::transports::Http;
+use crate::eth_client_trait::{ETHClientSender, ETHTxEncoder, FailureInfo, SignedCallResult};
 use zksync_eth_signer::{raw_ethereum_tx::RawTransaction, EthereumSigner};
+use zksync_types::Token;
 
 /// Gas limit value to be used in transaction if for some reason
 /// gas limit was not set for it.
@@ -23,7 +22,7 @@ const FALLBACK_GAS_LIMIT: u64 = 3_000_000;
 pub struct ETHClient<S: EthereumSigner> {
     eth_signer: S,
     sender_account: Address,
-    contract_addr: H160,
+    pub contract_addr: H160,
     contract: ethabi::Contract,
     chain_id: u8,
     gas_price_factor: f64,
@@ -66,7 +65,7 @@ impl<S: EthereumSigner> ETHClient<S> {
 }
 
 #[async_trait::async_trait]
-impl<S: EthereumSigner + Sync + Send> EthClientInterface for ETHClient<S> {
+impl<S: EthereumSigner + Sync + Send> ETHClientSender for ETHClient<S> {
     /// Returns the next *expected* nonce with respect to the transactions
     /// in the mempool.
     ///
@@ -74,25 +73,27 @@ impl<S: EthereumSigner + Sync + Send> EthClientInterface for ETHClient<S> {
     /// (e.g. `infura`), since the consecutive tx send and attempt to get a pending
     /// nonce may be routed to the different nodes in cluster, and the latter node
     /// may not know about the send tx yet. Thus it is not recommended to rely on this
-    /// method as on the trusted source of the latest nonce.  
-    async fn pending_nonce(&self) -> Result<U256, Error> {
-        self.web3
+    /// method as on the trusted source of the latest nonce.
+    async fn pending_nonce(&self) -> Result<U256, anyhow::Error> {
+        Ok(self
+            .web3
             .eth()
             .transaction_count(self.sender_account, Some(BlockNumber::Pending))
-            .await
+            .await?)
     }
 
     /// Returns the account nonce based on the last *mined* block. Not mined transactions
     /// (which are in mempool yet) are not taken into account by this method.
-    async fn current_nonce(&self) -> Result<U256, Error> {
-        self.web3
+    async fn current_nonce(&self) -> Result<U256, anyhow::Error> {
+        Ok(self
+            .web3
             .eth()
             .transaction_count(self.sender_account, Some(BlockNumber::Latest))
-            .await
+            .await?)
     }
 
-    async fn block_number(&self) -> Result<U64, Error> {
-        self.web3.eth().block_number().await
+    async fn block_number(&self) -> Result<U64, anyhow::Error> {
+        Ok(self.web3.eth().block_number().await?)
     }
 
     async fn get_gas_price(&self) -> Result<U256, anyhow::Error> {
@@ -103,19 +104,8 @@ impl<S: EthereumSigner + Sync + Send> EthClientInterface for ETHClient<S> {
     }
 
     /// Returns the account balance.
-    async fn balance(&self) -> Result<U256, Error> {
-        self.web3.eth().balance(self.sender_account, None).await
-    }
-
-    /// Encodes the transaction data (smart contract method and its input) to the bytes
-    /// without creating an actual transaction.
-    fn encode_tx_data<P: Tokenize>(&self, func: &str, params: P) -> Vec<u8> {
-        let f = self
-            .contract
-            .function(func)
-            .expect("failed to get function parameters");
-        f.encode_input(&params.into_tokens())
-            .expect("failed to encode parameters")
+    async fn balance(&self) -> Result<U256, anyhow::Error> {
+        Ok(self.web3.eth().balance(self.sender_account, None).await?)
     }
 
     /// Signs the transaction given the previously encoded data.
@@ -185,25 +175,6 @@ impl<S: EthereumSigner + Sync + Send> EthClientInterface for ETHClient<S> {
         })
     }
 
-    /// Encodes the transaction data and signs the transaction.
-    /// Fills in gas/nonce if not supplied inside options.
-    async fn sign_call_tx<P: Tokenize + Send>(
-        &self,
-        func: &str,
-        params: P,
-        options: Options,
-    ) -> Result<SignedCallResult, anyhow::Error> {
-        let f = self
-            .contract
-            .function(func)
-            .expect("failed to get function parameters");
-        let data = f
-            .encode_input(&params.into_tokens())
-            .expect("failed to encode parameters");
-
-        self.sign_prepared_tx(data, options).await
-    }
-
     /// Sends the transaction to the Ethereum blockchain.
     /// Transaction is expected to be encoded as the byte sequence.
     async fn send_raw_tx(&self, tx: Vec<u8>) -> Result<H256, anyhow::Error> {
@@ -213,5 +184,94 @@ impl<S: EthereumSigner + Sync + Send> EthClientInterface for ETHClient<S> {
     /// Gets the Ethereum transaction receipt.
     async fn tx_receipt(&self, tx_hash: H256) -> Result<Option<TransactionReceipt>, anyhow::Error> {
         Ok(self.web3.eth().transaction_receipt(tx_hash).await?)
+    }
+
+    async fn failure_reason(&self, tx_hash: H256) -> Result<Option<FailureInfo>, anyhow::Error> {
+        let transaction = self.web3.eth().transaction(tx_hash.into()).await?.unwrap();
+        let receipt = self.web3.eth().transaction_receipt(tx_hash).await?.unwrap();
+
+        let gas_limit = transaction.gas;
+        let gas_used = receipt.gas_used;
+
+        let call_request = web3::types::CallRequest {
+            from: Some(transaction.from),
+            to: transaction.to,
+            gas: Some(transaction.gas),
+            gas_price: Some(transaction.gas_price),
+            value: Some(transaction.value),
+            data: Some(transaction.input),
+        };
+
+        let encoded_revert_reason = self
+            .web3
+            .eth()
+            .call(call_request, receipt.block_number.map(Into::into))
+            .await?;
+        let revert_code = hex::encode(&encoded_revert_reason.0);
+        let revert_reason = if encoded_revert_reason.0.len() >= 4 {
+            let encoded_string_without_function_hash = &encoded_revert_reason.0[4..];
+
+            ethabi::decode(
+                &[ethabi::ParamType::String],
+                encoded_string_without_function_hash,
+            )?
+            .into_iter()
+            .next()
+            .unwrap()
+            .to_string()
+            .unwrap()
+        } else {
+            "unknown".to_string()
+        };
+
+        Ok(Some(FailureInfo {
+            gas_limit,
+            gas_used,
+            revert_code,
+            revert_reason,
+        }))
+    }
+    async fn contract_balance(
+        &self,
+        token: &Token,
+        abi: ethabi::Contract,
+        address: Address,
+    ) -> Result<U256, anyhow::Error> {
+        // TODO create it only once, cache it
+        assert_ne!(
+            token.symbol, "ETH",
+            "Wrong function, please use eth_balance"
+        );
+        let contract = Contract::new(self.web3.eth(), token.address, abi);
+        Ok(contract
+            .query("balanceOf", address, None, Options::default(), None)
+            .await?)
+    }
+    async fn eth_balance(&self, address: Address) -> Result<U256, anyhow::Error> {
+        Ok(self.web3.eth().balance(address, None).await?)
+    }
+
+    async fn allowance(
+        &self,
+        token_address: Address,
+        erc20_abi: ethabi::Contract,
+    ) -> Result<U256, anyhow::Error> {
+        let contract = Contract::new(self.web3.eth(), token_address, erc20_abi);
+
+        Ok(contract
+            .query(
+                "allowance",
+                (self.sender_account, self.contract_addr),
+                None,
+                Options::default(),
+                None,
+            )
+            .await?)
+    }
+}
+
+impl<S: EthereumSigner> ETHTxEncoder for ETHClient<S> {
+    fn contract(&self) -> &ethabi::Contract {
+        &self.contract
     }
 }
