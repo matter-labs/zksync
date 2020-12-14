@@ -2,7 +2,6 @@ use crate::eth_account::EthereumAccount;
 use crate::zksync_account::ZkSyncAccount;
 use num::BigUint;
 use web3::types::{TransactionReceipt, U64};
-use web3::Transport;
 use zksync_crypto::rand::Rng;
 use zksync_types::{AccountId, Address, Nonce, PriorityOp, TokenId, ZkSyncTx};
 

@@ -2,7 +2,6 @@
 
 // Built-in deps
 use crate::database::DatabaseInterface;
-use crate::ethereum_interface::FailureInfo;
 use crate::EthSenderOptions;
 use std::collections::{BTreeMap, HashMap, VecDeque};
 use tokio::sync::RwLock;
@@ -21,6 +20,7 @@ use super::ETHSender;
 
 use crate::ethereum_interface::EthereumInterface;
 use crate::transactions::{ETHStats, ExecutedTxStatus};
+use zksync_eth_client::eth_client_trait::FailureInfo;
 
 /// Mock database is capable of recording all the incoming requests for the further analysis.
 #[derive(Debug, Default)]

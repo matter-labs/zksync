@@ -4,7 +4,6 @@ use anyhow::bail;
 use futures::{channel::mpsc, SinkExt, StreamExt};
 use num::BigUint;
 use std::collections::HashMap;
-use web3::transports::Http;
 use zksync_core::committer::{BlockCommitRequest, CommitRequest};
 use zksync_core::mempool::ProposedBlock;
 use zksync_core::state_keeper::StateKeeperRequest;
