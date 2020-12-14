@@ -129,7 +129,7 @@ impl ForcedExit {
     /// Restores the `PubKeyHash` from the transaction signature.
     pub fn verify_signature(&self) -> Option<PubKeyHash> {
         if let VerifiedSignatureCache::Cached(cached_signer) = &self.cached_signer {
-            cached_signer.clone()
+            *cached_signer
         } else if let Some(pub_key) = self.signature.verify_musig(&self.get_bytes()) {
             Some(PubKeyHash::from_pubkey(&pub_key))
         } else {

@@ -217,7 +217,7 @@ export function buffer2bitsBE(buff) {
     return res;
 }
 
-export function sleep(ms) {
+export function sleep(ms: number) {
     return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
@@ -226,7 +226,7 @@ export function isTokenETH(token: TokenLike): boolean {
 }
 
 export class TokenSet {
-    // TODO: handle stale entries, edge case when we rename token after adding it (#1132).
+    // TODO: handle stale entries, edge case when we rename token after adding it (ZKS-120).
     constructor(private tokensBySymbol: Tokens) {}
 
     private resolveTokenObject(tokenLike: TokenLike) {
@@ -340,7 +340,7 @@ export async function verifyERC1271Signature(
 }
 
 export async function getEthSignatureType(
-    provider: ethers.providers.Provider,
+    _provider: ethers.providers.Provider,
     message: string,
     signature: string,
     address: string

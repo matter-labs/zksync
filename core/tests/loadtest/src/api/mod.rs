@@ -28,7 +28,7 @@ mod old_rest_api_tests;
 mod rest_api_v1_tests;
 mod sdk_tests;
 
-// TODO: Make it configurable (#1116).
+// TODO: Make it configurable (ZKS-104).
 const API_REQUEST_TIMEOUT: Duration = Duration::from_secs(10);
 const MAX_API_REQUEST_COUNT: usize = 1_000_000_000;
 

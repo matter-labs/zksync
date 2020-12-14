@@ -407,7 +407,7 @@ mod tests {
         *,
     };
     use crate::{
-        api_server::rest::helpers::try_parse_tx_hash,
+        api_server::helpers::try_parse_tx_hash,
         core_api_client::CoreApiClient,
         fee_ticker::{Fee, OutputFeeType::Withdraw, TickerRequest},
         signature_checker::{VerifiedTx, VerifyTxSignatureRequest},
@@ -430,8 +430,7 @@ mod tests {
                 .route("new_txs_batch", web::post().to(send_txs_batch))
         });
 
-        let mut url = server.url("");
-        url.pop(); // Pop last '/' symbol.
+        let url = server.url("").trim_end_matches('/').to_owned();
 
         (CoreApiClient::new(url), server)
     }
@@ -761,6 +760,92 @@ mod tests {
                 .await?,
             good_batch_hashes
         );
+
+        server.stop().await;
+        Ok(())
+    }
+
+    /// This test checks the following criteria:
+    ///
+    /// - Attempt to submit non-withdraw transaction with the enabled fast-processing.
+    /// - Attempt to submit non-withdraw transaction with the disabled fast-processing.
+    /// - Attempt to submit withdraw transaction with the enabled fast-processing.
+    #[actix_rt::test]
+    async fn test_fast_processing_flag() -> anyhow::Result<()> {
+        let (client, server) = TestServer::new().await?;
+
+        let from = ZkSyncAccount::rand();
+        from.set_account_id(Some(0xdead));
+        let to = ZkSyncAccount::rand();
+
+        // Submit non-withdraw transaction with the enabled fast-processing.
+        let (tx, eth_sig) = from.sign_transfer(
+            0,
+            "ETH",
+            10_u64.into(),
+            10_u64.into(),
+            &to.address,
+            None,
+            false,
+        );
+        client
+            .submit_tx(
+                ZkSyncTx::Transfer(Box::new(tx.clone())),
+                Some(TxEthSignature::EthereumSignature(eth_sig.clone())),
+                Some(true),
+            )
+            .await
+            .unwrap_err();
+        // Submit with the disabled fast-processing.
+        client
+            .submit_tx(
+                ZkSyncTx::Transfer(Box::new(tx.clone())),
+                Some(TxEthSignature::EthereumSignature(eth_sig.clone())),
+                Some(false),
+            )
+            .await?;
+        // Submit without fast-processing flag.
+        client
+            .submit_tx(
+                ZkSyncTx::Transfer(Box::new(tx)),
+                Some(TxEthSignature::EthereumSignature(eth_sig)),
+                None,
+            )
+            .await?;
+
+        // Submit withdraw transaction with the enabled fast-processing.
+        let (tx, eth_sig) = from.sign_withdraw(
+            0,
+            "ETH",
+            100u64.into(),
+            10u64.into(),
+            &to.address,
+            None,
+            false,
+        );
+        client
+            .submit_tx(
+                ZkSyncTx::Withdraw(Box::new(tx.clone())),
+                Some(TxEthSignature::EthereumSignature(eth_sig.clone())),
+                Some(true),
+            )
+            .await?;
+        // Submit with the disabled fast-processing.
+        client
+            .submit_tx(
+                ZkSyncTx::Withdraw(Box::new(tx.clone())),
+                Some(TxEthSignature::EthereumSignature(eth_sig.clone())),
+                Some(false),
+            )
+            .await?;
+        // Submit without fast-processing flag.
+        client
+            .submit_tx(
+                ZkSyncTx::Withdraw(Box::new(tx)),
+                Some(TxEthSignature::EthereumSignature(eth_sig.clone())),
+                None,
+            )
+            .await?;
 
         server.stop().await;
         Ok(())

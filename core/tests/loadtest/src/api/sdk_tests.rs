@@ -1,6 +1,7 @@
 // Built-in uses
 // External uses
 // Workspace uses
+use zksync::provider::Provider;
 use zksync_types::TxFeeTypes;
 // Local uses
 use crate::monitor::Monitor;

@@ -4,6 +4,7 @@
 pub use super::{
     blocks::{BlockInfo, TransactionInfo},
     config::Contracts,
+    operations::PriorityOpReceipt,
     tokens::TokenPriceKind,
     transactions::{SumbitErrorCode, TxReceipt},
     Pagination,
@@ -22,7 +23,7 @@ use thiserror::Error;
 
 pub type Result<T> = std::result::Result<T, ClientError>;
 
-// TODO Make error handling as correct as possible. (#1152)
+// TODO Make error handling as correct as possible. (ZKS-125)
 #[derive(Debug, Error)]
 pub enum ClientError {
     #[error("Bad request: {0}")]

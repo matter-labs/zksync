@@ -1,7 +1,8 @@
 import { Command } from 'commander';
 import * as utils from './utils';
 
-const IGNORED = ['target', 'node_modules', 'volumes', 'build', 'dist', '.git'];
+const IGNORED_DIRS = ['target', 'node_modules', 'volumes', 'build', 'dist', '.git', 'generated', 'grafonnet-lib'];
+const IGNORED_FILES = ['KeysWithPlonkVerifier.sol', 'TokenInit.sol'];
 const EXTENSIONS = ['ts', 'md', 'sol'];
 
 // If you wonder why this is written so obscurely through find and not through .prettierignore and globs,
@@ -17,8 +18,11 @@ export async function fmt(extension: string, check: boolean = false) {
     }
     const command = check ? 'check' : 'write';
     const root = extension == 'sol' ? 'contracts' : '.';
-    const ignored = IGNORED.map((folder) => ` -o -path '*/${folder}' -prune`).join('');
-    const { stdout: files } = await utils.exec(`find ${root} -name '*.${extension}' -print ${ignored}`);
+    const ignored_dirs = IGNORED_DIRS.map((dir) => `-o -path '*/${dir}' -prune`).join(' ');
+    const ignored_files = IGNORED_FILES.map((file) => `-a ! -name '${file}'`).join(' ');
+    const { stdout: files } = await utils.exec(
+        `find ${root} -name '*.${extension}' ${ignored_files} -print ${ignored_dirs}`
+    );
     await utils.spawn(`yarn --silent prettier --config .prettier-${extension}.json --${command} ${files}`);
 }
 

@@ -103,7 +103,7 @@ impl RestApiClient {
 
     pub async fn tx_history_older_than(&self) -> anyhow::Result<()> {
         let address = self.pool.read().await.random_address().0;
-        // TODO: Implement queries (#1116).
+        // TODO: Implement queries (ZKS-104).
         let url = format!(
             "/account/{}/history/older_than?limit={}",
             address.to_hex_id(),
@@ -115,7 +115,7 @@ impl RestApiClient {
 
     pub async fn tx_history_newer_than(&self) -> anyhow::Result<()> {
         let address = self.pool.read().await.random_address().0;
-        // TODO: Implement queries (#1116).
+        // TODO: Implement queries (ZKS-104).
         let url = format!(
             "/account/{}/history/newer_than?limit={}",
             address.to_hex_id(),
