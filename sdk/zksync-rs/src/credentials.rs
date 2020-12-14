@@ -77,7 +77,7 @@ impl<S: EthereumSigner> WalletCredentials<S> {
     }
 
     /// Creates wallet credentials from the provided seed.
-    /// zkSync private key will be randomly generated and Ethereum signer will be not set.
+    /// zkSync private key will be randomly generated and Ethereum signer will not be set.
     /// Wallet created with such credentials won't be capable of performing on-chain operations,
     /// such as deposits and full exits.
     ///

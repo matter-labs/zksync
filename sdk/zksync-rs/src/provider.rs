@@ -57,7 +57,7 @@ pub trait Provider {
     /// Requests and returns information about an Ethereum operation given its `serial_id`.
     async fn ethop_info(&self, serial_id: u32) -> ResponseResult<EthOpInfo>;
 
-    /// Requests and returns eth withdrawal transaction hash for some offchain withdrawal.
+    /// Requests and returns Ethereum withdrawal transaction hash for some offchain withdrawal.
     async fn get_eth_tx_for_withdrawal(
         &self,
         withdrawal_hash: TxHash,
@@ -74,7 +74,7 @@ pub trait Provider {
         eth_signature: Option<PackedEthSignature>,
     ) -> ResponseResult<TxHash>;
 
-    /// Submits a batch transaction to the zkSync network.
+    /// Submits a batch of transactions to the zkSync network.
     /// Returns the hashes of the created transactions.
     async fn send_txs_batch(
         &self,
@@ -279,7 +279,8 @@ mod messages {
 
     #[macro_export]
     macro_rules! json_values {
-        // https://stackoverflow.com/a/43143459
+        // Separate values with the comma
+        // and allow optional trailing comma
         ($($value: expr),* $(,)?) => {
             vec![
             $(
