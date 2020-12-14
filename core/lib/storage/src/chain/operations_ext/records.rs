@@ -57,24 +57,33 @@ pub struct PriorityOpReceiptResponse {
     pub prover_run: Option<ProverRun>,
 }
 
-/// Stored executed transaction found by hash.
+/// Stored executed operation (can be both L1 or L2)
+/// unified under a single interface for the explorer.
 #[derive(Debug, Serialize, Deserialize)]
 pub struct TxByHashResponse {
     pub tx_type: String,
-    /// Address of transaction sender for `Transfer` and `Withdraw`.
+    /// Address of transaction sender for `Transfer`, `Withdraw` and `ChangePubKey`.
     ///
-    /// Our contract address for `Deposit`.
+    /// Target's address in case of `ForcedExit`.
+    ///
+    /// Author's address in L1 for `Deposit` and `FullExit`.
     pub from: String,
     /// Receiver's address for `Transfer`.
     ///
+    /// Author's address in L1 for `Withdraw` and 'FullExit'.
+    ///
+    /// New public key hash for `ChangePubKey`.
+    ///
     /// Sender's address for `Deposit`.
     ///
-    /// Our contract address for `Withdraw`.
+    /// Target's address in case of `ForcedExit`.
     pub to: String,
     pub token: i32,
     pub amount: String,
     /// Fee paid in the zkSync network.
-    /// `None` for `Deposit`.
+    /// `None` for priority operations.
+    ///
+    /// Can also be `None` for very old `ChangePubKey` operations.
     pub fee: Option<String>,
     pub block_number: i64,
     pub nonce: i64,
