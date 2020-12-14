@@ -7,7 +7,7 @@ use ethabi::{decode, ParamType};
 use num::BigUint;
 use serde::{Deserialize, Serialize};
 use std::convert::{TryFrom, TryInto};
-use zksync_basic_types::{Address, Log, U256};
+use zksync_basic_types::{Address, Log, H256, U256};
 use zksync_crypto::params::{
     ACCOUNT_ID_BIT_WIDTH, BALANCE_BIT_WIDTH, ETH_ADDRESS_BIT_WIDTH, FR_ADDRESS_LEN, TOKEN_BIT_WIDTH,
 };
@@ -164,7 +164,7 @@ pub struct PriorityOp {
     /// Ethereum deadline block until which operation must be processed.
     pub deadline_block: u64,
     /// Hash of the corresponding Ethereum transaction. Size should be 32 bytes
-    pub eth_hash: Vec<u8>,
+    pub eth_hash: H256,
     /// Block in which Ethereum transaction was included.
     pub eth_block: u64,
 }
@@ -212,9 +212,7 @@ impl TryFrom<Log> for PriorityOp {
                 .unwrap(),
             eth_hash: event
                 .transaction_hash
-                .expect("Event transaction hash is missing")
-                .as_bytes()
-                .to_vec(),
+                .expect("Event transaction hash is missing"),
             eth_block: event
                 .block_number
                 .expect("Event block number is missing")

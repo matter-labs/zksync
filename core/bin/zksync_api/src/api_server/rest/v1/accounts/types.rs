@@ -393,7 +393,7 @@ impl PendingAccountTxReceipt {
     pub fn from_priority_op(block_id: EthBlockId, op: PriorityOp) -> Self {
         Self {
             block: block_id,
-            hash: H256::from_slice(&op.eth_hash),
+            hash: op.eth_hash,
         }
     }
 }

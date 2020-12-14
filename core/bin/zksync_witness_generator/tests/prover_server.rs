@@ -9,7 +9,7 @@ use zksync_circuit::witness::{deposit::DepositWitness, Witness};
 use zksync_config::{ConfigurationOptions, ProverOptions};
 use zksync_crypto::{params::total_tokens, proof::EncodedProofPlonk};
 use zksync_prover::{client, ApiClient};
-use zksync_types::{block::Block, Address};
+use zksync_types::{block::Block, Address, H256};
 // Local deps
 use zksync_circuit::witness::utils::get_used_subtree_root_hash;
 use zksync_witness_generator::run_prover_server;
@@ -273,7 +273,7 @@ pub async fn test_operation_and_wanted_prover_data(
                 serial_id: 0,
                 data: deposit_priority_op.clone(),
                 deadline_block: 2,
-                eth_hash: vec![0; 8],
+                eth_hash: H256::zero(),
                 eth_block: 10,
             },
             block_index: 0,

@@ -1,6 +1,6 @@
 use crate::rollup_ops::RollupOpsBlock;
 use anyhow::format_err;
-use web3::types::Address;
+use web3::types::{Address, H256};
 use zksync_crypto::Fr;
 use zksync_state::{
     handler::TxHandler,
@@ -350,7 +350,7 @@ impl TreeState {
                 serial_id: 0,
                 data: priority_op,
                 deadline_block: 0,
-                eth_hash: Vec::new(),
+                eth_hash: H256::zero(),
                 eth_block: 0,
             },
             block_index,

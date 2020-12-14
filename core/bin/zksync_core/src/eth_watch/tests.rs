@@ -158,7 +158,7 @@ async fn test_operation_queues() {
                     to: [2u8; 20].into(),
                 }),
                 deadline_block: 0,
-                eth_hash: [2; 32].to_vec(),
+                eth_hash: [2; 32].into(),
                 eth_block: 4,
             },
             PriorityOp {
@@ -170,7 +170,7 @@ async fn test_operation_queues() {
                     to: Default::default(),
                 }),
                 deadline_block: 0,
-                eth_hash: [3u8; 32].to_vec(),
+                eth_hash: [3; 32].into(),
                 eth_block: 3,
             },
         ])
@@ -203,7 +203,7 @@ async fn test_restore_and_poll() {
                     to: [2u8; 20].into(),
                 }),
                 deadline_block: 0,
-                eth_hash: [2; 32].to_vec(),
+                eth_hash: [2; 32].into(),
                 eth_block: 4,
             },
             PriorityOp {
@@ -215,7 +215,7 @@ async fn test_restore_and_poll() {
                     to: Default::default(),
                 }),
                 deadline_block: 0,
-                eth_hash: [3u8; 32].to_vec(),
+                eth_hash: [3; 32].into(),
                 eth_block: 3,
             },
         ])
@@ -234,7 +234,7 @@ async fn test_restore_and_poll() {
                     to: [2u8; 20].into(),
                 }),
                 deadline_block: 0,
-                eth_hash: [2; 32].to_vec(),
+                eth_hash: [2; 32].into(),
                 eth_block: 5,
             },
             PriorityOp {
@@ -246,7 +246,7 @@ async fn test_restore_and_poll() {
                     to: Default::default(),
                 }),
                 deadline_block: 0,
-                eth_hash: [3u8; 32].to_vec(),
+                eth_hash: [3; 32].into(),
                 eth_block: 5,
             },
         ])
