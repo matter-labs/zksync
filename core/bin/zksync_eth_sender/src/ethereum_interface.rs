@@ -13,7 +13,7 @@ use std::time::Duration;
 use zksync_config::EthClientOptions;
 use zksync_contracts::zksync_contract;
 use zksync_eth_client::eth_client_trait::{ETHClientSender, ETHTxEncoder, FailureInfo};
-use zksync_eth_client::{ETHClient, SignedCallResult};
+use zksync_eth_client::{ETHClient, MultiPlexClient, SignedCallResult};
 
 /// Sleep time between consecutive requests.
 const SLEEP_DURATION: Duration = Duration::from_millis(250);
@@ -66,7 +66,7 @@ pub(super) trait EthereumInterface {
 /// Supposed to be an actual Ethereum intermediator for the `ETHSender`.
 #[derive(Debug)]
 pub struct EthereumHttpClient {
-    eth_client: ETHClient<PrivateKeySigner>,
+    eth_client: MultiPlexClient,
 }
 
 impl EthereumHttpClient {
@@ -78,14 +78,17 @@ impl EthereumHttpClient {
                 .expect("Operator private key is required for eth_sender"),
         );
 
-        let eth_client = ETHClient::new(
-            transport,
-            zksync_contract(),
-            options.operator_commit_eth_addr,
-            ethereum_signer,
-            options.contract_eth_addr,
-            options.chain_id,
-            options.gas_price_factor,
+        let eth_client = MultiPlexClient::new(zksync_contract()).add_client(
+            "infura".to_string(),
+            ETHClient::new(
+                transport,
+                zksync_contract(),
+                options.operator_commit_eth_addr,
+                ethereum_signer,
+                options.contract_eth_addr,
+                options.chain_id,
+                options.gas_price_factor,
+            ),
         );
 
         Ok(Self { eth_client })

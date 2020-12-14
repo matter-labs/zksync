@@ -3,6 +3,7 @@ use web3::contract::Options;
 use web3::types::{Address, U64};
 
 use ethabi::Contract;
+use std::fmt::Debug;
 use zksync_types::{TransactionReceipt, H160, H256, U256};
 
 // pub struct anyhow::Error;
@@ -24,7 +25,7 @@ pub struct FailureInfo {
     pub gas_limit: U256,
 }
 #[async_trait::async_trait]
-pub trait ETHClientSender: Sync + Send {
+pub trait ETHClientSender: Sync + Send + Debug {
     /// Returns the next *expected* nonce with respect to the transactions
     /// in the mempool.
     ///

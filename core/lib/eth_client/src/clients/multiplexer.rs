@@ -5,6 +5,7 @@ use web3::types::{Address, U64};
 
 use zksync_types::{TransactionReceipt, H160, H256, U256};
 
+#[derive(Debug)]
 pub struct MultiPlexClient {
     clients: Vec<(String, Box<dyn ETHClientSender>)>,
     contract: ethabi::Contract,
