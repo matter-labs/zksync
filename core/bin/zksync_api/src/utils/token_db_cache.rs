@@ -32,8 +32,8 @@ impl TokenDBCache {
         //
         // TODO: Remove this case after Golem update [ZKS-173]
         match token_query {
-            TokenLike::Symbol(symbol) if symbol == "GLM" => {
-                // Try to lookup Golem token as "GLM".
+            TokenLike::Symbol(symbol) if symbol == "tGLM" => {
+                // Try to lookup Golem token as "tGLM".
                 if let Some(token) = self.get_token_impl(TokenLike::Symbol(symbol)).await? {
                     // If such token exists, use it.
                     Ok(Some(token))
