@@ -8,7 +8,7 @@ use zksync_types::{ethereum::OperationType, Action};
 use self::setup::TransactionsHistoryTestSetup;
 use crate::{
     chain::operations_ext::{records::AccountTxReceiptResponse, SearchDirection},
-    test_data::{dummy_ethereum_tx_hash, gen_unique_operation, BLOCK_SIZE_CHUNKS},
+    test_data::{dummy_ethereum_tx_hash, get_unique_operation, BLOCK_SIZE_CHUNKS},
     tests::db_test,
     QueryResult, StorageProcessor,
 };
@@ -543,7 +543,7 @@ async fn get_account_transactions_receipts(mut storage: StorageProcessor<'_>) ->
     let operation = storage
         .chain()
         .block_schema()
-        .execute_operation(gen_unique_operation(1, Action::Commit, BLOCK_SIZE_CHUNKS))
+        .execute_operation(get_unique_operation(1, Action::Commit, BLOCK_SIZE_CHUNKS))
         .await?;
     storage
         .chain()
@@ -561,7 +561,7 @@ async fn get_account_transactions_receipts(mut storage: StorageProcessor<'_>) ->
     let operation = storage
         .chain()
         .block_schema()
-        .execute_operation(gen_unique_operation(
+        .execute_operation(get_unique_operation(
             1,
             Action::Verify {
                 proof: Default::default(),
