@@ -42,6 +42,7 @@ jobs:
         key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
 
     - name: update-deps
+      # Upstream version of sqlx-cli has some incompatibilities with the sqlx version used zksync_storage.
       run: |
         rustup update stable
         cargo install sqlx-cli --git https://github.com/alekseysidorov/sqlx.git
