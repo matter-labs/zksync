@@ -270,7 +270,7 @@ impl<S: EthereumSigner + Send + Sync> EthereumProvider<S> {
             let mut options = Options::default();
             options.gas = Some(300_000.into());
             let params = (token_info.address, amount, sync_address);
-            let data = self.eth_client.encode_tx_data("depositETH", params);
+            let data = self.eth_client.encode_tx_data("depositERC20", params);
 
             self.eth_client
                 .sign_prepared_tx(data, options)
@@ -304,7 +304,7 @@ impl<S: EthereumSigner + Send + Sync> EthereumProvider<S> {
         options.gas = Some(500_000.into());
         let data = self
             .eth_client
-            .encode_tx_data("depositETH", (account_id, token.address));
+            .encode_tx_data("fullExit", (account_id, token.address));
 
         let signed_tx = self
             .eth_client
