@@ -7,7 +7,6 @@ use std::str::FromStr;
 use actix_web::{web, App, Scope};
 use once_cell::sync::Lazy;
 use tokio::sync::Mutex;
-use web3::types::H256;
 
 // Workspace uses
 use zksync_config::{ApiServerOptions, ConfigurationOptions};
@@ -352,7 +351,9 @@ impl TestServerConfig {
                 to_account: Default::default(),
                 priority_op_serialid: VERIFIED_OP_SERIAL_ID as i64,
                 deadline_block: 100,
-                eth_hash: H256::default().as_bytes().to_vec(),
+                eth_hash: dummy_ethereum_tx_hash(VERIFIED_OP_SERIAL_ID as i64)
+                    .as_bytes()
+                    .to_vec(),
                 eth_block: 10,
                 created_at: chrono::Utc::now(),
             },
@@ -365,7 +366,9 @@ impl TestServerConfig {
                 to_account: Default::default(),
                 priority_op_serialid: COMMITTED_OP_SERIAL_ID as i64,
                 deadline_block: 200,
-                eth_hash: H256::default().as_bytes().to_vec(),
+                eth_hash: dummy_ethereum_tx_hash(COMMITTED_OP_SERIAL_ID as i64)
+                    .as_bytes()
+                    .to_vec(),
                 eth_block: 14,
                 created_at: chrono::Utc::now(),
             },
