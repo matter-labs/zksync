@@ -189,6 +189,79 @@ async fn test_operation_queues() {
     assert_eq!(deposits.len(), 1);
 }
 
+/// This test simulates the situation when eth watch module did not poll Ethereum node for some time
+/// (e.g. because of rate limit) and skipped more blocks than `number_of_confirmations_for_event`.
+#[tokio::test]
+async fn test_operation_queues_time_lag() {
+    let mut client = FakeEthClient::new();
+
+    // Below we initialize client with 3 operations: one for the 1st block, one for 100th, and one for 110th.
+    // Client's block number will be 110, thus both first and second operations should get to the priority queue
+    // in eth watcher.
+    client
+        .add_operations(&vec![
+            PriorityOp {
+                serial_id: 0,
+                data: ZkSyncPriorityOp::Deposit(Deposit {
+                    from: Default::default(),
+                    token: 0,
+                    amount: Default::default(),
+                    to: [2u8; 20].into(),
+                }),
+                deadline_block: 0,
+                eth_hash: [2; 32].to_vec(),
+                eth_block: 1, // <- First operation goes to the first block.
+            },
+            PriorityOp {
+                serial_id: 1,
+                data: ZkSyncPriorityOp::Deposit(Deposit {
+                    from: Default::default(),
+                    token: 0,
+                    amount: Default::default(),
+                    to: Default::default(),
+                }),
+                deadline_block: 0,
+                eth_hash: [3u8; 32].to_vec(),
+                eth_block: 100, // <-- Note 100th block, it will set the network block to 100.
+            },
+            PriorityOp {
+                serial_id: 2,
+                data: ZkSyncPriorityOp::Deposit(Deposit {
+                    from: Default::default(),
+                    token: 0,
+                    amount: Default::default(),
+                    to: Default::default(),
+                }),
+                deadline_block: 0,
+                eth_hash: [3u8; 32].to_vec(),
+                eth_block: 110, // <-- This operation will get to the unconfirmed queue.
+            },
+        ])
+        .await;
+    let mut watcher = create_watcher(client);
+    watcher.poll_eth_node().await.unwrap();
+    assert_eq!(watcher.eth_state.last_ethereum_block(), 110);
+
+    let priority_queues = watcher.eth_state.priority_queue();
+    let unconfirmed_queue = watcher.eth_state.unconfirmed_queue();
+    assert_eq!(priority_queues.len(), 2, "Incorrect confirmed queue size");
+    assert_eq!(
+        unconfirmed_queue.len(),
+        1,
+        "Incorrect unconfirmed queue size"
+    );
+    assert_eq!(
+        unconfirmed_queue[0].serial_id, 3,
+        "Incorrect operation ID for the unconfirmed queue"
+    );
+    priority_queues
+        .get(&0)
+        .expect("Operation with serial ID 0 is not in the confirmed queue");
+    priority_queues
+        .get(&1)
+        .expect("Operation with serial ID 1 is not in the confirmed queue");
+}
+
 #[tokio::test]
 async fn test_restore_and_poll() {
     let mut client = FakeEthClient::new();
@@ -262,4 +335,46 @@ async fn test_restore_and_poll() {
     watcher.find_ongoing_op_by_hash(&[2u8; 32]).unwrap();
     let deposits = watcher.get_ongoing_deposits_for([2u8; 20].into());
     assert_eq!(deposits.len(), 1);
+}
+
+/// Checks that even for a big gap between skipped blocks, state is restored correctly.
+#[tokio::test]
+async fn test_restore_and_poll_time_lag() {
+    let mut client = FakeEthClient::new();
+    client
+        .add_operations(&vec![
+            PriorityOp {
+                serial_id: 0,
+                data: ZkSyncPriorityOp::Deposit(Deposit {
+                    from: Default::default(),
+                    token: 0,
+                    amount: Default::default(),
+                    to: [2u8; 20].into(),
+                }),
+                deadline_block: 0,
+                eth_hash: [2; 32].to_vec(),
+                eth_block: 1,
+            },
+            PriorityOp {
+                serial_id: 1,
+                data: ZkSyncPriorityOp::Deposit(Deposit {
+                    from: Default::default(),
+                    token: 0,
+                    amount: Default::default(),
+                    to: Default::default(),
+                }),
+                deadline_block: 0,
+                eth_hash: [3u8; 32].to_vec(),
+                eth_block: 100,
+            },
+        ])
+        .await;
+
+    let mut watcher = create_watcher(client.clone());
+    watcher.restore_state_from_eth(101).await.unwrap();
+    assert_eq!(watcher.eth_state.last_ethereum_block(), 101);
+    let priority_queues = watcher.eth_state.priority_queue();
+    assert_eq!(priority_queues.len(), 2);
+    priority_queues.get(&0).unwrap();
+    priority_queues.get(&1).unwrap();
 }
