@@ -1,4 +1,6 @@
-use crate::eth_client_trait::{ETHClientSender, ETHTxEncoder, FailureInfo, SignedCallResult};
+use crate::eth_client_trait::{
+    ETHClientSender, ETHTxEncoder, ExecutedTxStatus, FailureInfo, SignedCallResult,
+};
 use ethabi::Contract;
 use web3::contract::Options;
 use web3::types::{Address, U64};
@@ -174,6 +176,16 @@ impl ETHClientSender for MultiPlexClient {
     ) -> Result<U256, anyhow::Error> {
         for (name, client) in self.clients.iter() {
             match client.allowance(token_address, erc20_abi.clone()).await {
+                Ok(res) => return Ok(res),
+                Err(err) => log::error!("Error in interface: {}, {} ", name, err),
+            }
+        }
+        anyhow::bail!("All interfaces was wrong please try again")
+    }
+
+    async fn get_tx_status(&self, hash: &H256) -> Result<Option<ExecutedTxStatus>, anyhow::Error> {
+        for (name, client) in self.clients.iter() {
+            match client.get_tx_status(hash).await {
                 Ok(res) => return Ok(res),
                 Err(err) => log::error!("Error in interface: {}, {} ", name, err),
             }

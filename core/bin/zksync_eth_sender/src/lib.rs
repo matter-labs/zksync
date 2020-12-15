@@ -14,7 +14,7 @@ use web3::{
 };
 // Workspace uses
 use zksync_config::{EthClientOptions, EthSenderOptions};
-use zksync_eth_client::SignedCallResult;
+use zksync_eth_client::{ETHClient, MultiPlexClient, SignedCallResult};
 use zksync_storage::ConnectionPool;
 use zksync_types::{
     config,
@@ -25,14 +25,16 @@ use zksync_types::{
 // Local uses
 use self::{
     database::{Database, DatabaseInterface},
-    ethereum_interface::{EthereumHttpClient, EthereumInterface},
     gas_adjuster::GasAdjuster,
     transactions::*,
     tx_queue::{TxData, TxQueue, TxQueueBuilder},
 };
+use web3::transports::Http;
+use zksync_contracts::zksync_contract;
+use zksync_eth_client::eth_client_trait::ETHClientInterface;
+use zksync_eth_signer::PrivateKeySigner;
 
 mod database;
-mod ethereum_interface;
 mod gas_adjuster;
 mod transactions;
 mod tx_queue;
@@ -110,7 +112,7 @@ enum TxCheckMode {
 /// report the incident to the log and then panic to prevent continue working in a probably
 /// erroneous conditions. Failure handling policy is determined by a corresponding callback,
 /// which can be changed if needed.
-struct ETHSender<ETH: EthereumInterface, DB: DatabaseInterface> {
+struct ETHSender<ETH: ETHClientInterface, DB: DatabaseInterface> {
     /// Ongoing operations queue.
     ongoing_ops: VecDeque<ETHOperation>,
     /// Connection to the database.
@@ -125,7 +127,7 @@ struct ETHSender<ETH: EthereumInterface, DB: DatabaseInterface> {
     options: EthSenderOptions,
 }
 
-impl<ETH: EthereumInterface, DB: DatabaseInterface> ETHSender<ETH, DB> {
+impl<ETH: ETHClientInterface, DB: DatabaseInterface> ETHSender<ETH, DB> {
     pub async fn new(options: EthSenderOptions, db: DB, ethereum: ETH) -> Self {
         let mut connection = db
             .acquire_connection()
@@ -311,7 +313,7 @@ impl<ETH: EthereumInterface, DB: DatabaseInterface> ETHSender<ETH, DB> {
     /// Stores the new operation in the database and sends the corresponding transaction.
     async fn initialize_operation(&mut self, tx: TxData) -> anyhow::Result<()> {
         let current_block = self.ethereum.block_number().await?;
-        let deadline_block = self.get_deadline_block(current_block);
+        let deadline_block = self.get_deadline_block(current_block.as_u64());
         let gas_price = self
             .gas_adjuster
             .get_gas_price(&self.ethereum, None)
@@ -370,13 +372,13 @@ impl<ETH: EthereumInterface, DB: DatabaseInterface> ETHSender<ETH, DB> {
             "Sending new tx: [ETH Operation <id: {}, type: {:?}>. ETH tx: {}. ZKSync operation: {}]",
             new_op.id, new_op.op_type, self.eth_tx_description(&signed_tx), self.zksync_operation_description(&new_op),
         );
-        self.ethereum.send_tx(&signed_tx).await.unwrap_or_else(|e| {
+        if let Err(e) = self.ethereum.send_raw_tx(signed_tx.raw_tx).await {
             // Sending tx error is not critical: this will result in transaction being considered stuck,
             // and resent. We can't do anything about this failure either, since it's most probably is not
             // related to the node logic, so we just log this error and pretend to have this operation
             // processed.
             log::warn!("Error while sending the operation: {}", e);
-        });
+        };
 
         transaction.commit().await?;
 
@@ -438,7 +440,7 @@ impl<ETH: EthereumInterface, DB: DatabaseInterface> ETHSender<ETH, DB> {
             };
 
             match self
-                .check_transaction_state(mode, op, tx_hash, current_block)
+                .check_transaction_state(mode, op, tx_hash, current_block.as_u64())
                 .await?
             {
                 TxCheckOutcome::Pending => {
@@ -504,7 +506,7 @@ impl<ETH: EthereumInterface, DB: DatabaseInterface> ETHSender<ETH, DB> {
 
         // Reaching this point will mean that the latest transaction got stuck.
         // We should create another tx based on it, and send it.
-        let deadline_block = self.get_deadline_block(current_block);
+        let deadline_block = self.get_deadline_block(current_block.as_u64());
         // Raw tx contents are the same for every transaction, so we just
         // create a new one from the old one with updated parameters.
         let new_tx = self.create_supplement_tx(deadline_block, op).await?;
@@ -529,7 +531,12 @@ impl<ETH: EthereumInterface, DB: DatabaseInterface> ETHSender<ETH, DB> {
             op.id,
             self.eth_tx_description(&new_tx),
         );
-        self.ethereum.send_tx(&new_tx).await?;
+        let hash = self.ethereum.send_raw_tx(new_tx.raw_tx.clone()).await?;
+        anyhow::ensure!(
+            hash == new_tx.hash,
+            "Hash from signer and Ethereum node mismatch"
+        );
+
         transaction.commit().await?;
 
         metrics::histogram!("eth_sender.perform_commitment_step", start.elapsed());
@@ -543,7 +550,7 @@ impl<ETH: EthereumInterface, DB: DatabaseInterface> ETHSender<ETH, DB> {
             "Ethereum transaction unexpectedly failed. Receipt: {:#?}",
             receipt
         );
-        if let Some(reason) = self.ethereum.failure_reason(receipt.transaction_hash).await {
+        if let Ok(Some(reason)) = self.ethereum.failure_reason(receipt.transaction_hash).await {
             log::error!("Failure reason for Ethereum tx: {:#?}", reason);
         } else {
             log::error!("Unable to receive failure reason for Ethereum tx");
@@ -824,9 +831,25 @@ pub fn run_eth_sender(
     eth_client_options: EthClientOptions,
     eth_sender_options: EthSenderOptions,
 ) -> JoinHandle<()> {
-    let ethereum =
-        EthereumHttpClient::new(&eth_client_options).expect("Ethereum client creation failed");
+    let transport = Http::new(&eth_client_options.web3_url).expect("Wrong web3 url");
+    let ethereum_signer = PrivateKeySigner::new(
+        eth_client_options
+            .operator_private_key
+            .expect("Operator private key is required for eth_sender"),
+    );
 
+    let ethereum = MultiPlexClient::new(zksync_contract()).add_client(
+        "infura".to_string(),
+        ETHClient::new(
+            transport,
+            zksync_contract(),
+            eth_client_options.operator_commit_eth_addr,
+            ethereum_signer,
+            eth_client_options.contract_eth_addr,
+            eth_client_options.chain_id,
+            eth_client_options.gas_price_factor,
+        ),
+    );
     let db = Database::new(pool);
 
     tokio::spawn(async move {

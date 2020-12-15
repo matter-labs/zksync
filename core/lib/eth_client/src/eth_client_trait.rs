@@ -16,6 +16,17 @@ pub struct SignedCallResult {
     pub hash: H256,
 }
 
+/// State of the executed Ethereum transaction.
+#[derive(Debug, Clone)]
+pub struct ExecutedTxStatus {
+    /// Amount of confirmations for a block containing the transaction.
+    pub confirmations: u64,
+    /// Whether transaction was executed successfully or failed.
+    pub success: bool,
+    /// Receipt for a transaction. Will be set to `Some` only if the transaction
+    /// failed during execution.
+    pub receipt: Option<TransactionReceipt>,
+}
 /// Information about transaction failure.
 #[derive(Debug, Clone)]
 pub struct FailureInfo {
@@ -83,6 +94,7 @@ pub trait ETHClientSender: Sync + Send + Debug {
         token_address: Address,
         erc20_abi: ethabi::Contract,
     ) -> Result<U256, anyhow::Error>;
+    async fn get_tx_status(&self, hash: &H256) -> anyhow::Result<Option<ExecutedTxStatus>>;
 }
 
 pub trait ETHTxEncoder {
@@ -100,6 +112,6 @@ pub trait ETHTxEncoder {
     }
 }
 
-trait ETHClientInterface: ETHTxEncoder + ETHClientSender {}
+pub trait ETHClientInterface: ETHTxEncoder + ETHClientSender {}
 
 impl<T: ETHTxEncoder + ETHClientSender> ETHClientInterface for T {}

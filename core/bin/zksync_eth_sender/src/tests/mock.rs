@@ -3,11 +3,11 @@
 // Built-in deps
 use crate::database::DatabaseInterface;
 use crate::EthSenderOptions;
-use std::collections::{BTreeMap, HashMap, VecDeque};
+use std::collections::{BTreeMap, HashMap, HashSet, VecDeque};
 use tokio::sync::RwLock;
 // External uses
 use web3::contract::{tokens::Tokenize, Options};
-use zksync_basic_types::{H256, U256};
+use zksync_basic_types::{TransactionReceipt, H160, H256, U256};
 // Workspace uses
 use zksync_eth_client::SignedCallResult;
 use zksync_storage::StorageProcessor;
@@ -18,9 +18,13 @@ use zksync_types::{
 // Local uses
 use super::ETHSender;
 
-use crate::ethereum_interface::EthereumInterface;
-use crate::transactions::{ETHStats, ExecutedTxStatus};
-use zksync_eth_client::eth_client_trait::FailureInfo;
+use crate::transactions::ETHStats;
+use anyhow::Error;
+use ethabi::Contract;
+use web3::types::{Address, U64};
+use zksync_eth_client::eth_client_trait::{
+    ETHClientSender, ETHTxEncoder, ExecutedTxStatus, FailureInfo,
+};
 
 /// Mock database is capable of recording all the incoming requests for the further analysis.
 #[derive(Debug, Default)]
@@ -328,7 +332,7 @@ pub(in crate) struct MockEthereum {
     pub block_number: u64,
     pub gas_price: U256,
     pub tx_statuses: RwLock<HashMap<H256, ExecutedTxStatus>>,
-    pub sent_txs: RwLock<HashMap<H256, SignedCallResult>>,
+    pub sent_txs: RwLock<HashSet<Vec<u8>>>,
 }
 
 impl Default for MockEthereum {
@@ -358,10 +362,10 @@ impl MockEthereum {
     }
 
     /// Checks that there was a request to send the provided transaction.
-    pub async fn assert_sent(&self, hash: &H256) {
+    pub async fn assert_sent(&self, tx: &Vec<u8>) {
         assert!(
-            self.sent_txs.read().await.get(hash).is_some(),
-            format!("Transaction with hash {:?} was not sent", hash),
+            self.sent_txs.read().await.contains(tx),
+            format!("Transaction {:?} was not sent", tx),
         );
     }
 
@@ -397,30 +401,25 @@ impl MockEthereum {
 }
 
 #[async_trait::async_trait]
-impl EthereumInterface for MockEthereum {
+impl ETHClientSender for MockEthereum {
     async fn get_tx_status(&self, hash: &H256) -> anyhow::Result<Option<ExecutedTxStatus>> {
         Ok(self.tx_statuses.read().await.get(hash).cloned())
     }
 
-    async fn block_number(&self) -> anyhow::Result<u64> {
-        Ok(self.block_number)
+    async fn block_number(&self) -> anyhow::Result<U64> {
+        Ok(self.block_number.into())
     }
 
-    async fn gas_price(&self) -> anyhow::Result<U256> {
+    async fn get_gas_price(&self) -> anyhow::Result<U256> {
         Ok(self.gas_price)
     }
 
-    async fn send_tx(&self, signed_tx: &SignedCallResult) -> anyhow::Result<()> {
-        self.sent_txs
-            .write()
-            .await
-            .insert(signed_tx.hash, signed_tx.clone());
-
-        Ok(())
-    }
-
-    fn encode_tx_data<P: Tokenize>(&self, _func: &str, params: P) -> Vec<u8> {
-        ethabi::encode(params.into_tokens().as_ref())
+    async fn send_raw_tx(&self, tx: Vec<u8>) -> Result<H256, anyhow::Error> {
+        // Cut hash of transaction
+        let mut hash: [u8; 32] = Default::default();
+        hash.copy_from_slice(&tx[..32]);
+        self.sent_txs.write().await.insert(hash.to_vec());
+        Ok(H256::from(hash))
     }
 
     async fn sign_prepared_tx(
@@ -437,17 +436,74 @@ impl EthereumInterface for MockEthereum {
         data_for_hash.append(&mut ethabi::encode(gas_price.into_tokens().as_ref()));
         data_for_hash.append(&mut ethabi::encode(nonce.into_tokens().as_ref()));
         let hash = Self::fake_sha256(data_for_hash.as_ref()); // Okay for test purposes.
-
+                                                              // Concatenate raw_tx plus hash for test purposes
+        let mut new_raw_tx = hash.as_bytes().to_vec();
+        new_raw_tx.extend(raw_tx);
         Ok(SignedCallResult {
-            raw_tx,
+            raw_tx: new_raw_tx,
             gas_price,
             nonce,
             hash,
         })
     }
 
-    async fn failure_reason(&self, _tx_hash: H256) -> Option<FailureInfo> {
-        None
+    async fn failure_reason(&self, _tx_hash: H256) -> Result<Option<FailureInfo>, anyhow::Error> {
+        Ok(None)
+    }
+
+    async fn pending_nonce(&self) -> Result<U256, Error> {
+        unreachable!()
+    }
+
+    async fn current_nonce(&self) -> Result<U256, Error> {
+        unreachable!()
+    }
+
+    async fn balance(&self) -> Result<U256, Error> {
+        unreachable!()
+    }
+
+    async fn sign_prepared_tx_for_addr(
+        &self,
+        _data: Vec<u8>,
+        _contract_addr: H160,
+        _options: Options,
+    ) -> Result<SignedCallResult, Error> {
+        unreachable!()
+    }
+
+    async fn tx_receipt(&self, _tx_hash: H256) -> Result<Option<TransactionReceipt>, Error> {
+        unreachable!()
+    }
+
+    async fn eth_balance(&self, _address: Address) -> Result<U256, Error> {
+        unreachable!()
+    }
+
+    async fn contract_balance(
+        &self,
+        _token_address: Address,
+        _abi: Contract,
+        _address: Address,
+    ) -> Result<U256, Error> {
+        unreachable!()
+    }
+
+    async fn allowance(
+        &self,
+        _token_address: Address,
+        _erc20_abi: Contract,
+    ) -> Result<U256, Error> {
+        unreachable!()
+    }
+}
+impl ETHTxEncoder for MockEthereum {
+    fn contract(&self) -> &Contract {
+        unreachable!()
+    }
+
+    fn encode_tx_data<P: Tokenize>(&self, _func: &str, params: P) -> Vec<u8> {
+        ethabi::encode(params.into_tokens().as_ref())
     }
 }
 

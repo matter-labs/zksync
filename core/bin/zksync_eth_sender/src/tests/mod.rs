@@ -4,9 +4,10 @@ use self::mock::{
     restored_eth_sender,
 };
 use super::{
-    transactions::{ETHStats, ExecutedTxStatus, TxCheckOutcome},
+    transactions::{ETHStats, TxCheckOutcome},
     ETHSender, TxCheckMode,
 };
+use zksync_eth_client::eth_client_trait::ExecutedTxStatus;
 
 const EXPECTED_WAIT_TIME_BLOCKS: u64 = 30;
 const WAIT_CONFIRMATIONS: u64 = 3;
@@ -260,7 +261,7 @@ async fn operation_commitment_workflow() {
 
         eth_sender
             .ethereum
-            .assert_sent(&expected_tx.used_tx_hashes[0])
+            .assert_sent(&expected_tx.used_tx_hashes[0].as_bytes().to_vec())
             .await;
 
         // Increment block, make the transaction look successfully executed, and process the
@@ -289,7 +290,7 @@ async fn operation_commitment_workflow() {
     eth_sender.db.assert_stored(&withdraw_op_tx).await;
     eth_sender
         .ethereum
-        .assert_sent(&withdraw_op_tx.used_tx_hashes[0])
+        .assert_sent(&withdraw_op_tx.used_tx_hashes[0].as_bytes().to_vec())
         .await;
 
     // Mark `completeWithdrawals` as completed.
@@ -347,7 +348,7 @@ async fn stuck_transaction() {
     eth_sender.db.assert_stored(&stuck_tx).await;
     eth_sender
         .ethereum
-        .assert_sent(&expected_sent_tx.hash)
+        .assert_sent(&expected_sent_tx.hash.as_bytes().to_vec())
         .await;
 
     // Increment block, make the transaction look successfully executed, and process the
@@ -455,7 +456,10 @@ async fn operations_order() {
 
         // Check that current expected tx is stored.
         eth_sender.db.assert_stored(&tx).await;
-        eth_sender.ethereum.assert_sent(&current_tx_hash).await;
+        eth_sender
+            .ethereum
+            .assert_sent(&current_tx_hash.as_bytes().to_vec())
+            .await;
 
         // Mark the tx as successfully
         eth_sender
@@ -601,7 +605,10 @@ async fn confirmations_independence() {
         .await
         .unwrap();
     eth_sender.db.assert_stored(&stuck_tx).await;
-    eth_sender.ethereum.assert_sent(&next_tx.hash).await;
+    eth_sender
+        .ethereum
+        .assert_sent(&next_tx.hash.as_bytes().to_vec())
+        .await;
 
     // Add a confirmation for a *stuck* transaction.
     eth_sender
@@ -725,7 +732,10 @@ async fn concurrent_operations_order() {
 
             // Check that current expected tx is stored.
             eth_sender.db.assert_stored(&tx).await;
-            eth_sender.ethereum.assert_sent(&current_tx_hash).await;
+            eth_sender
+                .ethereum
+                .assert_sent(&current_tx_hash.as_bytes().to_vec())
+                .await;
 
             // Mark the tx as successfully
             eth_sender
@@ -753,7 +763,10 @@ async fn concurrent_operations_order() {
 
         let withdraw_tx_hash = withdraw_tx.used_tx_hashes[0];
         eth_sender.db.assert_stored(&withdraw_tx).await;
-        eth_sender.ethereum.assert_sent(&withdraw_tx_hash).await;
+        eth_sender
+            .ethereum
+            .assert_sent(&withdraw_tx_hash.as_bytes().to_vec())
+            .await;
 
         // Mark the tx as successfully
         eth_sender

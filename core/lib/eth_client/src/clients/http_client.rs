@@ -8,7 +8,9 @@ use web3::types::{Address, BlockNumber, Bytes, TransactionReceipt, H160, H256, U
 use web3::{transports::Http, Web3};
 
 // Workspace uses
-use crate::eth_client_trait::{ETHClientSender, ETHTxEncoder, FailureInfo, SignedCallResult};
+use crate::eth_client_trait::{
+    ETHClientSender, ETHTxEncoder, ExecutedTxStatus, FailureInfo, SignedCallResult,
+};
 use zksync_eth_signer::{raw_ethereum_tx::RawTransaction, EthereumSigner};
 
 /// Gas limit value to be used in transaction if for some reason
@@ -236,6 +238,9 @@ impl<S: EthereumSigner + Sync + Send> ETHClientSender for ETHClient<S> {
             revert_reason,
         }))
     }
+    async fn eth_balance(&self, address: Address) -> Result<U256, anyhow::Error> {
+        Ok(self.web3.eth().balance(address, None).await?)
+    }
     async fn contract_balance(
         &self,
         token_address: Address,
@@ -248,9 +253,6 @@ impl<S: EthereumSigner + Sync + Send> ETHClientSender for ETHClient<S> {
         Ok(contract
             .query("balanceOf", address, None, Options::default(), None)
             .await?)
-    }
-    async fn eth_balance(&self, address: Address) -> Result<U256, anyhow::Error> {
-        Ok(self.web3.eth().balance(address, None).await?)
     }
 
     async fn allowance(
@@ -269,6 +271,38 @@ impl<S: EthereumSigner + Sync + Send> ETHClientSender for ETHClient<S> {
                 None,
             )
             .await?)
+    }
+    async fn get_tx_status(&self, hash: &H256) -> anyhow::Result<Option<ExecutedTxStatus>> {
+        let receipt = self.tx_receipt(*hash).await?;
+
+        match receipt {
+            Some(TransactionReceipt {
+                block_number: Some(tx_block_number),
+                status: Some(status),
+                ..
+            }) => {
+                let confirmations = self
+                    .block_number()
+                    .await?
+                    .saturating_sub(tx_block_number)
+                    .as_u64();
+                let success = status.as_u64() == 1;
+
+                // Set the receipt only for failures.
+                let receipt = if success {
+                    None
+                } else {
+                    Some(receipt.unwrap())
+                };
+
+                Ok(Some(ExecutedTxStatus {
+                    confirmations,
+                    success,
+                    receipt,
+                }))
+            }
+            _ => Ok(None),
+        }
     }
 }
 

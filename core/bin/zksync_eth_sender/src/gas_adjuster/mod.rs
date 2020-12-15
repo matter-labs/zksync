@@ -3,7 +3,8 @@ use std::{collections::VecDeque, marker::PhantomData, time::Instant};
 // External deps
 use zksync_basic_types::U256;
 // Local deps
-use crate::{database::DatabaseInterface, ethereum_interface::EthereumInterface};
+use crate::database::DatabaseInterface;
+use zksync_eth_client::eth_client_trait::ETHClientInterface;
 
 mod parameters;
 
@@ -20,7 +21,7 @@ mod tests;
 /// gas price for transactions that were not mined by the network
 /// within a reasonable time.
 #[derive(Debug)]
-pub(super) struct GasAdjuster<ETH: EthereumInterface, DB: DatabaseInterface> {
+pub(super) struct GasAdjuster<ETH: ETHClientInterface, DB: DatabaseInterface> {
     /// Collected statistics about recently used gas prices.
     statistics: GasStatistics,
     /// Timestamp of the last maximum gas price update.
@@ -28,11 +29,11 @@ pub(super) struct GasAdjuster<ETH: EthereumInterface, DB: DatabaseInterface> {
     /// Timestamp of the last sample added to the `statistics`.
     last_sample_added: Instant,
 
-    _etherum_client: PhantomData<ETH>,
+    _ethereum_client: PhantomData<ETH>,
     _db: PhantomData<DB>,
 }
 
-impl<ETH: EthereumInterface, DB: DatabaseInterface> GasAdjuster<ETH, DB> {
+impl<ETH: ETHClientInterface, DB: DatabaseInterface> GasAdjuster<ETH, DB> {
     pub async fn new(db: &DB) -> Self {
         let mut connection = db
             .acquire_connection()
@@ -47,7 +48,7 @@ impl<ETH: EthereumInterface, DB: DatabaseInterface> GasAdjuster<ETH, DB> {
             last_price_renewal: Instant::now(),
             last_sample_added: Instant::now(),
 
-            _etherum_client: PhantomData,
+            _ethereum_client: PhantomData,
             _db: PhantomData,
         }
     }
@@ -61,7 +62,7 @@ impl<ETH: EthereumInterface, DB: DatabaseInterface> GasAdjuster<ETH, DB> {
             return Ok(price);
         }
 
-        let network_price = ethereum.gas_price().await?;
+        let network_price = ethereum.get_gas_price().await?;
         let scaled_price = if let Some(old_price) = old_tx_gas_price {
             // Stuck transaction, scale it up.
             self.scale_up(old_price, network_price)
@@ -101,7 +102,7 @@ impl<ETH: EthereumInterface, DB: DatabaseInterface> GasAdjuster<ETH, DB> {
     pub async fn keep_updated(&mut self, ethereum: &ETH, db: &DB) {
         if self.last_sample_added.elapsed() >= parameters::sample_adding_interval() {
             // Report the current price to be gathered by the statistics module.
-            match ethereum.gas_price().await {
+            match ethereum.get_gas_price().await {
                 Ok(network_price) => {
                     self.statistics.add_sample(network_price);
 
