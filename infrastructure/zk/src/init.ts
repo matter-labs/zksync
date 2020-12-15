@@ -33,8 +33,8 @@ async function checkEnv() {
     }
     await utils.exec('cargo sqlx --version');
     const { stdout: version } = await utils.exec('node --version');
-    if ('v14' >= version) {
-        throw new Error('Error, node.js version 14 or higher is required');
+    if ('v14.14' >= version) {
+        throw new Error('Error, node.js version 14.14.0 or higher is required');
     }
 }
 
