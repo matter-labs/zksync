@@ -17,7 +17,7 @@ gone_timeout=60000 # Milliseconds
 idle_provers=1
 
 # Witness generator application settings
-[prover.core.witness_generator]
+[prover.witness_generator]
 # Interval to check whether a new witness generation job should be started.
 prepare_data_interval=500 # Milliseconds
 # Amount of witness generator threads.

@@ -1,6 +1,8 @@
 # Configuration for the Ethereum sender crate
 
 [eth_sender]
+
+[eth_sender.sender]
 # operator_private_key is defined in the `private.toml`
 # operator_commit_eth_addr is defined in the `private.toml`
 
