@@ -416,7 +416,7 @@ mod tests {
         *,
     };
     use crate::{
-        api_server::rest::helpers::try_parse_tx_hash,
+        api_server::helpers::try_parse_tx_hash,
         core_api_client::CoreApiClient,
         fee_ticker::{Fee, OutputFeeType::Withdraw, TickerRequest},
         signature_checker::{VerifiedTx, VerifyTxSignatureRequest},
@@ -439,8 +439,7 @@ mod tests {
                 .route("new_txs_batch", web::post().to(send_txs_batch))
         });
 
-        let mut url = server.url("");
-        url.pop(); // Pop last '/' symbol.
+        let url = server.url("").trim_end_matches('/').to_owned();
 
         (CoreApiClient::new(url), server)
     }

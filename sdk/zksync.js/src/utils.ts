@@ -532,3 +532,7 @@ function numberToBytesBE(number: number, bytes: number): Uint8Array {
     }
     return result;
 }
+
+export function parseHexWithPrefix(str) {
+    return Uint8Array.from(Buffer.from(str.slice(2), 'hex'));
+}
