@@ -11,13 +11,18 @@ use tokio::sync::Mutex;
 // Workspace uses
 use zksync_config::{ApiServerOptions, ConfigurationOptions};
 use zksync_crypto::rand::{SeedableRng, XorShiftRng};
-use zksync_storage::test_data::{
-    dummy_ethereum_tx_hash, gen_acc_random_updates, gen_unique_operation,
-    gen_unique_operation_with_txs, BLOCK_SIZE_CHUNKS,
-};
 use zksync_storage::ConnectionPool;
+use zksync_storage::{
+    chain::operations::records::NewExecutedPriorityOperation,
+    test_data::{
+        dummy_ethereum_tx_hash, gen_acc_random_updates, gen_unique_operation,
+        gen_unique_operation_with_txs, BLOCK_SIZE_CHUNKS,
+    },
+};
 use zksync_test_account::ZkSyncAccount;
-use zksync_types::{ethereum::OperationType, helpers::apply_updates, AccountMap, Action};
+use zksync_types::{
+    ethereum::OperationType, helpers::apply_updates, AccountMap, Action, BlockNumber, H256,
+};
 use zksync_types::{
     operations::{ChangePubKeyOp, TransferToNewOp},
     Address, ExecutedOperations, ExecutedTx, Token, ZkSyncOp, ZkSyncTx,
@@ -25,6 +30,15 @@ use zksync_types::{
 
 // Local uses
 use super::client::Client;
+
+/// Serial ID of the verified priority operation.
+pub const VERIFIED_OP_SERIAL_ID: u64 = 10;
+/// Serial ID of the committed priority operation.
+pub const COMMITTED_OP_SERIAL_ID: u64 = 243;
+/// Number of committed blocks.
+pub const COMMITTED_BLOCKS_COUNT: BlockNumber = 8;
+/// Number of verified blocks.
+pub const VERIFIED_BLOCKS_COUNT: BlockNumber = 3;
 
 #[derive(Debug, Clone)]
 pub struct TestServerConfig {
@@ -172,18 +186,16 @@ impl TestServerConfig {
             .tokens_schema()
             .store_token(Token::new(
                 16,
-                Address::from_str("d94e3dc39d4cad1dad634e7eb585a57a19dc7efe ").unwrap(),
+                Address::from_str("d94e3dc39d4cad1dad634e7eb585a57a19dc7efe").unwrap(),
                 "GNT",
                 18,
             ))
             .await?;
 
         let mut accounts = AccountMap::default();
-        let n_committed = 5;
-        let n_verified = n_committed - 2;
 
         // Create and apply several blocks to work with.
-        for block_number in 1..=n_committed {
+        for block_number in 1..=COMMITTED_BLOCKS_COUNT {
             let updates = (0..3)
                 .map(|_| gen_acc_random_updates(&mut rng))
                 .flatten()
@@ -242,7 +254,7 @@ impl TestServerConfig {
                 .await?;
 
             // Add verification for the block if required.
-            if block_number <= n_verified {
+            if block_number <= VERIFIED_BLOCKS_COUNT {
                 storage
                     .prover_schema()
                     .store_proof(block_number, &Default::default())
@@ -280,6 +292,44 @@ impl TestServerConfig {
                     .confirm_eth_tx(&eth_tx_hash)
                     .await?;
             }
+        }
+
+        // Store priority operations for some tests.
+        let ops = vec![
+            // Verified priority operation.
+            NewExecutedPriorityOperation {
+                block_number: 2,
+                block_index: 2,
+                operation: Default::default(),
+                from_account: Default::default(),
+                to_account: Default::default(),
+                priority_op_serialid: VERIFIED_OP_SERIAL_ID as i64,
+                deadline_block: 100,
+                eth_hash: H256::default().as_bytes().to_vec(),
+                eth_block: 10,
+                created_at: chrono::Utc::now(),
+            },
+            // Committed priority operation.
+            NewExecutedPriorityOperation {
+                block_number: VERIFIED_BLOCKS_COUNT as i64 + 1,
+                block_index: 1,
+                operation: Default::default(),
+                from_account: Default::default(),
+                to_account: Default::default(),
+                priority_op_serialid: COMMITTED_OP_SERIAL_ID as i64,
+                deadline_block: 200,
+                eth_hash: H256::default().as_bytes().to_vec(),
+                eth_block: 14,
+                created_at: chrono::Utc::now(),
+            },
+        ];
+
+        for op in ops {
+            storage
+                .chain()
+                .operations_schema()
+                .store_executed_priority_op(op)
+                .await?;
         }
 
         storage.commit().await?;

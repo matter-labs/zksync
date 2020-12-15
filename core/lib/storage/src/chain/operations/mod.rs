@@ -237,7 +237,12 @@ impl<'a, 'c> OperationsSchema<'a, 'c> {
         Ok(())
     }
 
-    pub(crate) async fn store_executed_priority_op(
+    /// Stores executed priority operation in database.
+    ///
+    /// This method is made public to fill the database for tests, do not use it for
+    /// any other purposes.
+    #[doc = "hidden"]
+    pub async fn store_executed_priority_op(
         &mut self,
         operation: NewExecutedPriorityOperation,
     ) -> QueryResult<()> {
