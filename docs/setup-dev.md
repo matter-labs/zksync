@@ -40,17 +40,11 @@ If logging out does not help, restarting the computer should.
    `Node.js`, we suggest you to install [nvm](https://github.com/nvm-sh/nvm). It will allow you to update `Node.js`
    version easily in the future.
 
-2. Install `yarn`. Instructions can be found on the [official site](https://classic.yarnpkg.com/en/docs/install/).
-
-Check if yarn is installed by running the following command:
-
-```sh
-yarn -v
-```
-
-If you face any problems when installing `yarn`, it might be the case that your package manager installed the wrong
-package. Make sure to thoroughly follow the instructions above on the official website. It has a lot of troubleshooting
-guides in it.
+2. Install `yarn`. Instructions can be found on the [official site](https://classic.yarnpkg.com/en/docs/install/). Check
+   if `yarn` is installed by running `yarn -v`.<!-- This is needed for multiparagraph list item.--> <br/><br/> If you
+   face any problems when installing `yarn`, it might be the case that your package manager installed the wrong package.
+   Make sure to thoroughly follow the instructions above on the official website. It contains a lot of troubleshooting
+   guides in it.
 
 3. Run `yarn global add @vue/cli-service`
 
