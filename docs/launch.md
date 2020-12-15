@@ -97,7 +97,7 @@ output.
 
 **Problem.** `zk init` fails with the following error:
 
-```sh
+```
 Cannot create container for service geth: invalid mount config for type "bind": bind source path does not exist: /home/stanislav/matter-labs/zksync-dev/volumes/geth
 ```
 
