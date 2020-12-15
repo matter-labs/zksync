@@ -10,7 +10,7 @@ declare module './tester' {
         testTransfer(from: Wallet, to: Wallet, token: TokenLike, amount: BigNumber, timeout?: number): Promise<void>;
         testBatch(from: Wallet, to: Wallet, token: TokenLike, amount: BigNumber): Promise<void>;
         testIgnoredBatch(from: Wallet, to: Wallet, token: TokenLike, amount: BigNumber): Promise<void>;
-        testFailedBatch(from: Wallet, to: Wallet, token: TokenLike, amount: BigNumber): Promise<void>;
+        testRejectedBatch(from: Wallet, to: Wallet, token: TokenLike, amount: BigNumber): Promise<void>;
     }
 }
 
@@ -111,7 +111,7 @@ Tester.prototype.testIgnoredBatch = async function (
     expect(receiverAfter.eq(receiverBefore), 'Wrong batch was not ignored').to.be.true;
 };
 
-Tester.prototype.testFailedBatch = async function (
+Tester.prototype.testRejectedBatch = async function (
     sender: Wallet,
     receiver: Wallet,
     token: types.TokenLike,
