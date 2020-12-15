@@ -1,6 +1,6 @@
 import { expect } from 'chai';
 import * as ethers from 'ethers';
-import { loadTestConfig } from './test-utils';
+import { loadTestConfig } from './helpers';
 import * as zkUtils from '../src/utils';
 
 const testConfig = loadTestConfig();

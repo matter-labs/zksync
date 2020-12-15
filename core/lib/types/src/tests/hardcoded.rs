@@ -263,7 +263,7 @@ pub mod tx_conversion_test {
         let change_pubkey = ChangePubKey::new(
             ACCOUNT_ID,
             *ALICE,
-            (*PK_HASH).clone(),
+            *PK_HASH,
             TOKEN_ID,
             (*FEE).clone(),
             NONCE,

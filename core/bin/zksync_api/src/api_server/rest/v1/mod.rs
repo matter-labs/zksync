@@ -19,6 +19,9 @@ use zksync_types::BlockNumber;
 // Local uses
 use crate::api_server::tx_sender::TxSender;
 
+use Error as ApiError;
+
+pub(crate) mod accounts;
 mod blocks;
 pub mod client;
 mod config;
@@ -41,6 +44,11 @@ pub(crate) fn api_scope(
     api_server_options: ApiServerOptions,
 ) -> Scope {
     web::scope("/api/v1")
+        .service(accounts::api_scope(
+            &env_options,
+            tx_sender.tokens.clone(),
+            tx_sender.core_api_client.clone(),
+        ))
         .service(config::api_scope(&env_options))
         .service(blocks::api_scope(
             &api_server_options,
@@ -72,7 +80,7 @@ struct PaginationQuery {
 
 /// Pagination request parameter.
 ///
-/// Used together with the limit parameter to perform  pagination.
+/// Used together with the limit parameter to perform pagination.
 #[derive(Debug, Serialize, Deserialize, Copy, Clone, PartialEq)]
 pub enum Pagination {
     /// Request to return some items before specified (not including itself).
