@@ -362,7 +362,7 @@ impl MockEthereum {
     }
 
     /// Checks that there was a request to send the provided transaction.
-    pub async fn assert_sent(&self, tx: &Vec<u8>) {
+    pub async fn assert_sent(&self, tx: &[u8]) {
         assert!(
             self.sent_txs.read().await.contains(tx),
             format!("Transaction {:?} was not sent", tx),
