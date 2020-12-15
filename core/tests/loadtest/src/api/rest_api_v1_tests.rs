@@ -71,11 +71,31 @@ fn random_token(tokens: &[TokenLike]) -> TokenLike {
 }
 
 async fn random_account_query(pool: &ApiDataPool) -> AccountQuery {
-    let inner = pool.read().await;
-    let (address, data) = inner.random_address();
-    match data.account_id {
-        Some(account_id) if thread_rng().gen::<bool>() => AccountQuery::Id(account_id),
-        _ => AccountQuery::Address(address),
+    let (address, account_id);
+    // We should only use accounts with the settled account ID.
+    let mut attempts: u32 = 0;
+    loop {
+        let inner = pool.read().await;
+        let data = inner.random_address();
+        if let Some(id) = data.1.account_id {
+            address = data.0;
+            account_id = id;
+            break;
+        }
+
+        attempts += 1;
+        if attempts >= MAX_LIMIT {
+            unreachable!(
+                "Unable to find the appropriate account {} attempts.",
+                MAX_LIMIT
+            );
+        }
+    }
+
+    if thread_rng().gen::<bool>() {
+        AccountQuery::Id(account_id)
+    } else {
+        AccountQuery::Address(address)
     }
 }
 
