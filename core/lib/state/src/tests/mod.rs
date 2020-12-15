@@ -115,6 +115,7 @@ impl PlasmaTestBuilder {
     }
 
     pub fn test_txs_batch_fail(&mut self, txs: &[SignedZkSyncTx], expected_error_message: &str) {
+        let state_clone = self.state.clone();
         let op_errors = self.state.execute_txs_batch(txs);
         for error in op_errors {
             assert_eq!(
@@ -123,6 +124,11 @@ impl PlasmaTestBuilder {
                 "unexpected error message"
             );
         }
+        assert_eq!(
+            self.state.root_hash(),
+            state_clone.root_hash(),
+            "state has changed, but it should not"
+        );
     }
 
     pub fn test_priority_op_success(

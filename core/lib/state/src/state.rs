@@ -508,7 +508,7 @@ mod tests {
 
     /// Checks if apply_account_updates panics if there is deletion of unexisting account in updates.
     #[test]
-    #[should_panic]
+    #[should_panic(expected = "account to delete must exist")]
     fn delete_unexisting_account() {
         let mut rng = XorShiftRng::from_seed([1, 2, 3, 4]);
         let mut state = ZkSyncState::empty();
@@ -582,7 +582,7 @@ mod tests {
 
     /// Checks if apply_account_updates panics if there are creations of two accounts with the same addresses in updates.
     #[test]
-    #[should_panic]
+    #[should_panic(expected = "assertion failed: self.get_account_by_address(&address).is_none()")]
     fn create_two_accounts_with_same_addresses() {
         let mut rng = XorShiftRng::from_seed([1, 2, 3, 4]);
         let mut random_addresses = Vec::new();
@@ -606,7 +606,7 @@ mod tests {
                 },
             ),
         ];
-        state.apply_account_updates(updates); // should panic here
+        state.apply_account_updates(updates);
     }
 
     /// Checks if all types of updates apply properly in apply_account_updates.
