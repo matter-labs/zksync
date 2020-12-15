@@ -264,9 +264,12 @@ pub fn api_scope(
     web::scope("accounts")
         .data(data)
         .route("{id}", web::get().to(account_info))
-        .route("{id}/receipts", web::get().to(account_receipts))
         .route(
-            "{id}/receipts/pending",
+            "{id}/transactions/receipts",
+            web::get().to(account_receipts),
+        )
+        .route(
+            "{id}/operations/pending",
             web::get().to(account_pending_receipts),
         )
 }

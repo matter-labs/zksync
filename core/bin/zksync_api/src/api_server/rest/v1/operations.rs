@@ -344,6 +344,10 @@ mod tests {
             Some(&expected_data)
         );
 
+        // Try to get non-existing priority operation.
+        assert!(client.priority_op(1000).await?.is_none());
+        assert!(client.priority_op(H256::default()).await?.is_none());
+
         server.stop().await;
         Ok(())
     }

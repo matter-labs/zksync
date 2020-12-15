@@ -26,7 +26,7 @@ impl Client {
         self.get(&format!("accounts/{}", account)).send().await
     }
 
-    pub async fn account_receipts(
+    pub async fn account_tx_receipts(
         &self,
         account: impl Into<AccountQuery>,
         from: AccountReceipts,
@@ -34,19 +34,19 @@ impl Client {
     ) -> Result<Vec<AccountTxReceipt>, ClientError> {
         let account = account.into();
 
-        self.get(&format!("accounts/{}/receipts", account))
+        self.get(&format!("accounts/{}/transactions/receipts", account))
             .query(&AccountReceiptsQuery::new(from, limit))
             .send()
             .await
     }
 
-    pub async fn account_pending_receipts(
+    pub async fn account_pending_ops(
         &self,
         account: impl Into<AccountQuery>,
     ) -> Result<Vec<PendingAccountTxReceipt>, ClientError> {
         let account = account.into();
 
-        self.get(&format!("accounts/{}/receipts/pending", account))
+        self.get(&format!("accounts/{}/operations/pending", account))
             .send()
             .await
     }

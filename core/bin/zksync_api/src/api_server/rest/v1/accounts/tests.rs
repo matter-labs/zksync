@@ -167,7 +167,7 @@ async fn accounts_scope() -> anyhow::Result<()> {
 
     // Get account tx receipts.
     let receipts = client
-        .account_receipts(address, AccountReceipts::newer_than(1, 0), 10)
+        .account_tx_receipts(address, AccountReceipts::newer_than(1, 0), 10)
         .await?;
 
     assert_eq!(receipts[0].index, Some(2));
@@ -176,19 +176,19 @@ async fn accounts_scope() -> anyhow::Result<()> {
     // Get same receipts by the different requests.
     assert_eq!(
         client
-            .account_receipts(address, AccountReceipts::Latest, 10)
+            .account_tx_receipts(address, AccountReceipts::Latest, 10)
             .await?,
         receipts
     );
     assert_eq!(
         client
-            .account_receipts(address, AccountReceipts::older_than(10, 0), 10)
+            .account_tx_receipts(address, AccountReceipts::older_than(10, 0), 10)
             .await?,
         receipts
     );
 
     // Get account pending receipts.
-    let pending_receipts = client.account_pending_receipts(id).await?;
+    let pending_receipts = client.account_pending_ops(id).await?;
     assert_eq!(pending_receipts[0].block, 5);
     assert_eq!(pending_receipts[0].hash, H256::default());
 
