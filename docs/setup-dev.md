@@ -45,7 +45,7 @@ If logging out does not help, restarting the computer should.
 Check if yarn is installed by running the following command:
 
 ```sh
-$ yarn -v
+yarn -v
 ```
 
 If you face any problems when installing `yarn`, it might be the case that your package manager installed the wrong
