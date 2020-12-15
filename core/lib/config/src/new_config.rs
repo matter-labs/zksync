@@ -1,5 +1,8 @@
 // Public re-exports
-pub use self::api_config::ApiConfig;
+pub use self::{
+    api::ApiConfig, chain::ChainConfig, db::DBConfig, eth_client::ETHClientConfig,
+    eth_sender::ETHSenderConfig, eth_watch::ETHWatchConfig, prover::ProverConfig,
+};
 
 /// Convenience macro that loads the structure from the environment variable given the prefix.
 ///
@@ -36,7 +39,8 @@ macro_rules! toml_load {
     }};
 }
 
-pub mod api_config {
+pub mod api {
+    /// External uses
     use serde::Deserialize;
 
     /// API configuration.
@@ -142,6 +146,7 @@ pub mod api_config {
 }
 
 pub mod chain {
+    /// External uses
     use serde::Deserialize;
 
     #[derive(Debug, Deserialize)]
@@ -267,7 +272,6 @@ pub mod db {
 pub mod eth_client {
     // External uses
     use serde::Deserialize;
-    // Workspace uses
 
     /// Configuration for the Ethereum gateways.
     #[derive(Debug, Deserialize)]
@@ -355,7 +359,6 @@ pub mod eth_sender {
 pub mod eth_watch {
     // External uses
     use serde::Deserialize;
-    // Workspace uses
 
     /// Configuration for the Ethereum sender crate.
     #[derive(Debug, Deserialize)]
@@ -375,5 +378,96 @@ pub mod eth_watch {
         pub fn from_toml(path: &str) -> Self {
             toml_load!("eth_watch", path)
         }
+    }
+}
+
+pub mod misc {
+    // External uses
+    use serde::Deserialize;
+    // Workspace uses
+    use zksync_types::H256;
+
+    /// Miscellaneous options for different infrastructure elements.
+    ///
+    /// While these options may not be used by the server, it's helpful to provide an interface for them too,
+    /// so at the very least it will be checked for correctness and parseability within the tests.
+    #[derive(Debug, Deserialize)]
+    pub struct MiscConfig {
+        /// Download setup files from `prover_setup_network_dir` if `prover_download_setup` == 1
+        /// or use local files if `prover_download_setup` == 0.
+        pub prover_download_setup: bool,
+        /// Network location of setup files.
+        pub prover_setup_network_dir: String,
+        /// Used to configure env for docker.
+        pub docker_dummy_prover: bool,
+        /// Whether to ask user about dangerous actions or not
+        pub zksync_action: String,
+        /// API key for the analytics script.
+        pub etherscan_api_key: String,
+        /// Part of configuration for the fee selling script.
+        pub max_liquidation_fee_percent: u64,
+        /// Fee seller account private key.
+        pub fee_account_private_key: H256,
+    }
+
+    impl MiscConfig {
+        pub fn from_env() -> Self {
+            envy_load!("misc", "MISC_")
+        }
+
+        pub fn from_toml(path: &str) -> Self {
+            toml_load!("misc", path)
+        }
+    }
+}
+
+pub mod prover {
+    // External uses
+    use serde::Deserialize;
+
+    /// Configuration for the prover application and part of the server that interact with it.
+    #[derive(Debug, Deserialize)]
+    pub struct ProverConfig {
+        pub prover: Prover,
+        pub core: Core,
+        pub witness_generator: WitnessGenerator,
+    }
+
+    impl ProverConfig {
+        pub fn from_env() -> Self {
+            Self {
+                prover: envy_load!("prover.prover", "PROVER_PROVER_"),
+                core: envy_load!("prover.core", "PROVER_CORE_"),
+                witness_generator: envy_load!(
+                    "prover.witness_generator",
+                    "PROVER_WITNESS_GENERATOR_"
+                ),
+            }
+        }
+
+        pub fn from_toml(path: &str) -> Self {
+            toml_load!("eth_sender", path)
+        }
+    }
+
+    /// Actual prover application settings.
+    #[derive(Debug, Deserialize)]
+    pub struct Prover {
+        pub heartbeat_interval: u64,
+        pub cycle_wait: u64,
+        pub request_timeout: u64,
+    }
+
+    /// Core settings related to the prover applications interacting with it.
+    #[derive(Debug, Deserialize)]
+    pub struct Core {
+        pub gone_timeout: u64,
+        pub idle_provers: u32,
+    }
+
+    #[derive(Debug, Deserialize)]
+    pub struct WitnessGenerator {
+        pub prepare_data_interval: u64,
+        pub witness_generators: usize,
     }
 }
