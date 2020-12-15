@@ -251,7 +251,7 @@ async fn test_operation_queues_time_lag() {
         "Incorrect unconfirmed queue size"
     );
     assert_eq!(
-        unconfirmed_queue[0].serial_id, 3,
+        unconfirmed_queue[0].serial_id, 2,
         "Incorrect operation ID for the unconfirmed queue"
     );
     priority_queues
