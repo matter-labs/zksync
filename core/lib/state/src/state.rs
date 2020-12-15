@@ -401,7 +401,7 @@ mod tests {
     use zksync_crypto::rand::{Rng, SeedableRng, XorShiftRng};
     use zksync_types::tx::Withdraw;
 
-    /// Checks if execute_txs_batch fails if it is not enough balance.
+    /// Checks if execute_txs_batch fails if it doesn't have enough balance.
     #[test]
     fn execute_txs_batch_fail() {
         let mut tb = PlasmaTestBuilder::new();
