@@ -36,8 +36,9 @@ If logging out does not help, restarting the computer should.
 
 ## `Node` & `Yarn`
 
-1. Install `node` (requires version 14.14.0 or higher).
-Since our team tries to always use the latest LTS version of `node.js`, we suggest you to install [nvm](https://github.com/nvm-sh/nvm). It will allow you to update the node version quickly in the future.
+1. Install `Node` (requires version 14.14.0 or higher). Since our team attempts to always use the latest LTS version of
+   `Node.js`, we suggest you to install [nvm](https://github.com/nvm-sh/nvm). It will allow you to update `Node.js`
+   version easily in the future.
 
 2. Install `yarn`. Instructions can be found on the [official site](https://classic.yarnpkg.com/en/docs/install/).
 
@@ -47,7 +48,9 @@ Check if yarn is installed by running the following command:
 $ yarn -v
 ```
 
-If you face any problems when installing `yarn`, it might be the case that your package manager installed the wrong package. Make sure to thoroughly follow the instructions above on the official website. It has a lot of troubleshooting guides in it. 
+If you face any problems when installing `yarn`, it might be the case that your package manager installed the wrong
+package. Make sure to thoroughly follow the instructions above on the official website. It has a lot of troubleshooting
+guides in it.
 
 3. Run `yarn global add @vue/cli-service`
 
@@ -143,18 +146,27 @@ Also, we need [`sqlx`](https://github.com/launchbadge/sqlx) CLI (it is used to g
 cargo install --version=0.2.0 sqlx-cli
 ```
 
-If you face an error `Could not find directory of OpenSSL installation`, then you should do the following. The instruction is targeted on debian-based Linux, but generally the steps are similar for all OS.
+If you face an error `Could not find directory of OpenSSL installation`, then you should do the following. The
+instruction is targeted on debian-based Linux, but generally the steps are similar for all OS.
 
 - Install `libssl-dev`:
+
 ```sh
 sudo apt install libssl-dev
 ```
-- Install OpenSSL. Here is [the instruction for Ubuntu](https://www.notion.so/matterlabs/Setup-checklist-056a2e5c3a104608a5a25788520ef0ff#5f34729bdffe496f9d38c46787c640d7), but the steps should be similar for the debian-based Linux distros.
-- Add `OPENSSL_DIR` variable to your environment. This would typically be `/usr/local/ssl`. You can do this by adding the following line to your shell profile file (e.g. `~/.bash_profile`):
+
+- Install OpenSSL. Here is
+  [the instruction for Ubuntu](https://www.notion.so/matterlabs/Setup-checklist-056a2e5c3a104608a5a25788520ef0ff#5f34729bdffe496f9d38c46787c640d7),
+  but the steps should be similar for the debian-based Linux distros.
+- Add `OPENSSL_DIR` variable to your environment. This would typically be `/usr/local/ssl`. You can do this by adding
+  the following line to your shell profile file (e.g. `~/.bash_profile`):
+
 ```sh
 export OPENSSL_DIR=/usr/local/ssl
 ```
+
 - Install `package-config`:
+
 ```sh
 sudo apt-get install -y pkg-config
 ```

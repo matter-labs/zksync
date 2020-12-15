@@ -178,7 +178,8 @@ zk test db
   zk run loadtest # Has to be run in the 3rd terminal
   ```
 
-  **Note**. If you have compilation issues with `sqlx`, then make sure to run `zk up` before running the tests.
+  **Note**. If you have compilation issues with `sqlx`, then make sure to run `zk up` before running the tests. Also, if
+  you see some tests fail, might need to call `zk db reset` and restart the tests.
 
 ## Developing circuit
 
