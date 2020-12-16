@@ -274,7 +274,8 @@ async fn get_account_transactions_receipts(mut storage: StorageProcessor<'_>) ->
     // execute_operation
     commit_schema_data(&mut storage, &setup).await?;
 
-    let address = setup.from_zksync_account.address;
+    let from = setup.from_zksync_account.address;
+    let to = setup.to_zksync_account.address;
     let test_data = vec![
         (
             "Get first five transactions.",
@@ -522,7 +523,7 @@ async fn get_account_transactions_receipts(mut storage: StorageProcessor<'_>) ->
             .chain()
             .operations_ext_schema()
             .get_account_transactions_receipts(
-                address,
+                from,
                 request.block_number,
                 request.block_index,
                 request.direction,
@@ -534,6 +535,7 @@ async fn get_account_transactions_receipts(mut storage: StorageProcessor<'_>) ->
             .into_iter()
             .map(ReceiptLocation::from_item)
             .collect::<Vec<_>>();
+
         assert_eq!(actual_resp, expected_resp, "\"{}\", failed", test_name);
     }
 
@@ -579,13 +581,26 @@ async fn get_account_transactions_receipts(mut storage: StorageProcessor<'_>) ->
     let receipts = storage
         .chain()
         .operations_ext_schema()
-        .get_account_transactions_receipts(address, 1, 1, SearchDirection::Newer, 1)
+        .get_account_transactions_receipts(from, 1, 1, SearchDirection::Newer, 1)
         .await?;
 
     // Check that `commit_tx_hash` and `verify_tx_hash` now exist.
     let reciept = receipts.into_iter().next().unwrap();
     assert!(reciept.commit_tx_hash.is_some());
     assert!(reciept.verify_tx_hash.is_some());
+    // Make sure that the receiver doesn't see the same receipts.
+    assert!(storage
+        .chain()
+        .operations_ext_schema()
+        .get_account_transactions_receipts(to, 1, 1, SearchDirection::Newer, 1)
+        .await?
+        .is_empty());
+    assert!(storage
+        .chain()
+        .operations_ext_schema()
+        .get_account_transactions_receipts(to, 1, 1, SearchDirection::Older, 1)
+        .await?
+        .is_empty());
 
     Ok(())
 }
