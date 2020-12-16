@@ -20,7 +20,7 @@ impl<S: EthereumSigner> std::fmt::Debug for WalletCredentials<S> {
 }
 
 impl<S: EthereumSigner> WalletCredentials<S> {
-    /// Creates wallet credentials from the provided Ethereum wallet private key.
+    /// Creates wallet credentials from the provided Ethereum signer.
     ///
     /// ## Arguments
     ///
@@ -48,7 +48,7 @@ impl<S: EthereumSigner> WalletCredentials<S> {
         let signature = eth_signer
             .sign_message(&eth_sign_message)
             .await
-            .map_err(|_| ClientError::IncorrectCredentials)?;
+            .map_err(ClientError::SigningError)?;
 
         let packed_signature =
             if let TxEthSignature::EthereumSignature(packed_signature) = signature {
@@ -58,12 +58,11 @@ impl<S: EthereumSigner> WalletCredentials<S> {
             };
 
         // Check that signature is correct and corresponds to the provided address.
-        let address_from_sig = packed_signature.signature_recover_signer(&eth_sign_message);
-        if !address_from_sig
-            .map(|address_from_pk| eth_address == address_from_pk)
-            .unwrap_or(false)
-        {
-            return Err(ClientError::IncorrectCredentials);
+        let address_from_pk = packed_signature
+            .signature_recover_signer(&eth_sign_message)
+            .map_err(|_| ClientError::IncorrectCredentials)?;
+        if eth_address != address_from_pk {
+            return Err(ClientError::IncorrectAddress);
         }
 
         // Generate seed, and then zkSync private key.
@@ -78,7 +77,7 @@ impl<S: EthereumSigner> WalletCredentials<S> {
     }
 
     /// Creates wallet credentials from the provided seed.
-    /// zkSync private key will be randomly generated and Ethereum private key will be not set.
+    /// zkSync private key will be randomly generated and Ethereum signer will not be set.
     /// Wallet created with such credentials won't be capable of performing on-chain operations,
     /// such as deposits and full exits.
     ///
