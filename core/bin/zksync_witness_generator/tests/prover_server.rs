@@ -52,29 +52,6 @@ fn client_with_empty_worker_name_panics() {
         CORRECT_PROVER_SECRET_AUTH,
     );
 }
-
-#[tokio::test]
-#[cfg_attr(not(feature = "db_test"), ignore)]
-async fn client_with_incorrect_secret_auth() {
-    let block_size_chunks = ConfigurationOptions::from_env().available_block_chunk_sizes[0];
-    let addr = spawn_server(Duration::from_secs(1), Duration::from_secs(1)).await;
-    let client = client::ApiClient::new(
-        &format!("http://{}", &addr).parse().unwrap(),
-        "foo",
-        Duration::from_secs(1),
-        INCORRECT_PROVER_SECRET_AUTH,
-    );
-
-    assert_eq!(
-        &client
-            .register_prover(block_size_chunks)
-            .err()
-            .unwrap()
-            .to_string(),
-        "failed generate authorization token"
-    );
-}
-
 // TODO: prover server tests
 //
 // #[tokio::test]
@@ -392,4 +369,26 @@ async fn client_with_incorrect_secret_auth() {
 //         .expect("failed to send publish request");
 //
 //     assert_eq!(res.status(), reqwest::StatusCode::OK);
+// }
+//
+// #[tokio::test]
+// #[cfg_attr(not(feature = "db_test"), ignore)]
+// async fn client_with_incorrect_secret_auth() {
+//     let block_size_chunks = ConfigurationOptions::from_env().available_block_chunk_sizes[0];
+//     let addr = spawn_server(Duration::from_secs(1), Duration::from_secs(1)).await;
+//     let client = client::ApiClient::new(
+//         &format!("http://{}", &addr).parse().unwrap(),
+//         "foo",
+//         Duration::from_secs(1),
+//         INCORRECT_PROVER_SECRET_AUTH,
+//     );
+//
+//     assert_eq!(
+//         &client
+//             .register_prover(block_size_chunks)
+//             .err()
+//             .unwrap()
+//             .to_string(),
+//         "failed generate authorization token"
+//     );
 // }

@@ -207,7 +207,7 @@ async fn apply_batch_with_two_transfers(tester: &mut StateKeeperTester) {
         txs: vec![SignedTxVariant::Batch(SignedTxsBatch {
             txs: vec![first_transfer, second_transfer],
             batch_id: 1,
-            eth_signature: None,
+            eth_signatures: Vec::new(),
         })],
         priority_ops: Vec::new(),
     };

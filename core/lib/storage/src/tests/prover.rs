@@ -3,13 +3,11 @@ use std::time::Duration;
 // External imports
 // Workspace imports
 use zksync_config::ConfigurationOptions;
-use zksync_crypto::proof::EncodedProofPlonk;
 use zksync_types::{block::PendingBlock, Action};
 // Local imports
 use crate::tests::{chain::utils::get_operation, db_test};
 use crate::{chain::block::BlockSchema, prover::ProverSchema, QueryResult, StorageProcessor};
 use zksync_basic_types::H256;
-use zksync_config::ConfigurationOptions;
 
 /// Checks that the proof can be stored and loaded.
 #[db_test]
@@ -135,6 +133,7 @@ async fn prover_registration(mut storage: StorageProcessor<'_>) -> QueryResult<(
 /// - Create a new block & obtain a prover run for it.
 #[db_test]
 async fn prover_run(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
+    todo!()
     // // Add the prover.
     // let prover_name = "prover_10";
     // // Smallest block size.
@@ -206,6 +205,7 @@ async fn prover_run(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
 /// of blocks for which proof is not generating (or generated) yet.
 #[db_test]
 async fn unstarted_prover_jobs_count(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
+    todo!()
     // // Add the prover.
     // let prover_name = "prover_10";
     // // Smallest block size.

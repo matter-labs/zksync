@@ -123,7 +123,7 @@ impl RpcApp {
         let start = Instant::now();
         let result = self
             .tx_sender
-            .submit_txs_batch(txs, eth_signature)
+            .submit_txs_batch(txs, eth_signatures)
             .await
             .map_err(Error::from);
         metrics::histogram!("api.rpc.submit_txs_batch", start.elapsed());

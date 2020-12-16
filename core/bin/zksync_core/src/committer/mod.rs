@@ -144,26 +144,6 @@ async fn commit_block(
         .await
         .expect("Failed initializing a DB transaction");
 
-    for exec_op in block.block_transactions.clone() {
-        if let Some(exec_tx) = exec_op.get_executed_tx() {
-            if exec_tx.success && exec_tx.signed_tx.tx.is_withdraw() {
-                transaction
-                    .chain()
-                    .operations_schema()
-                    .add_pending_withdrawal(&exec_tx.signed_tx.tx.hash(), None)
-                    .await
-                    .map_err(|e| {
-                        format_err!(
-                            "Failed to save pending withdrawal {:?}, error : {}",
-                            exec_tx,
-                            e
-                        )
-                    })
-                    .expect("failed to save pending withdrawals into db");
-            }
-        }
-    }
-
     transaction
         .chain()
         .state_schema()

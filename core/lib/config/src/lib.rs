@@ -224,6 +224,9 @@ pub struct ApiServerOptions {
     /// Fee increase coefficient for fast processing of withdrawal.
     pub forced_exit_minimum_account_age: Duration,
     pub enforce_pubkey_change_fee: bool,
+    // Limit the number of both transactions and Ethereum signatures per batch.
+    pub max_number_of_transactions_per_batch: usize,
+    pub max_number_of_authors_per_batch: usize,
 }
 
 impl ApiServerOptions {
@@ -246,6 +249,8 @@ impl ApiServerOptions {
             forced_exit_minimum_account_age,
             enforce_pubkey_change_fee: parse_env_if_exists("ENFORCE_PUBKEY_CHANGE_FEE")
                 .unwrap_or(true),
+            max_number_of_transactions_per_batch: parse_env("MAX_TRANSACTIONS_PER_BATCH"),
+            max_number_of_authors_per_batch: parse_env("MAX_ETH_SIGNATURES_PER_BATCH"),
         }
     }
 }
@@ -265,9 +270,6 @@ pub struct ConfigurationOptions {
     pub miniblock_timings: MiniblockTimings,
     pub prometheus_export_port: u16,
     pub aggregated_proof_sizes: Vec<usize>,
-    // Limit the number of both transactions and Ethereum signatures per batch.
-    pub max_number_of_transactions_per_batch: usize,
-    pub max_number_of_authors_per_batch: usize,
 }
 
 impl ConfigurationOptions {
@@ -312,8 +314,6 @@ impl ConfigurationOptions {
             eth_network: parse_env("ETH_NETWORK"),
             miniblock_timings: MiniblockTimings::from_env(),
             prometheus_export_port: parse_env("PROMETHEUS_EXPORT_PORT"),
-            max_number_of_transactions_per_batch: parse_env("MAX_TRANSACTIONS_PER_BATCH"),
-            max_number_of_authors_per_batch: parse_env("MAX_ETH_SIGNATURES_PER_BATCH"),
             aggregated_proof_sizes,
         }
     }

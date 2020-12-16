@@ -126,6 +126,8 @@ impl TransactionsHistoryTestSetup {
             100,
             1_000_000.into(), // Not important
             1_500_000.into(), // Not important
+            Default::default(),
+            0,
         );
 
         self.blocks.push(block);
