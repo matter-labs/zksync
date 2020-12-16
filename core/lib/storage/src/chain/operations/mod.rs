@@ -90,7 +90,7 @@ impl<'a, 'c> OperationsSchema<'a, 'c> {
         Ok(op)
     }
 
-    /// Retrieves priority operation from the database given its id.
+    /// Retrieves priority operation from the database given its ID.
     pub async fn get_executed_priority_operation(
         &mut self,
         priority_op_id: u32,

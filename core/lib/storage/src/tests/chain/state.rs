@@ -3,8 +3,6 @@
 use zksync_types::{helpers::apply_updates, AccountMap, Action, ActionType};
 // Local imports
 use super::block::apply_random_updates;
-use crate::test_data::gen_operation;
-use crate::tests::{create_rng, db_test};
 use crate::{
     chain::{
         block::BlockSchema,
@@ -12,6 +10,8 @@ use crate::{
         state::StateSchema,
     },
     prover::ProverSchema,
+    test_data::gen_operation,
+    tests::{create_rng, db_test},
     QueryResult, StorageProcessor,
 };
 
