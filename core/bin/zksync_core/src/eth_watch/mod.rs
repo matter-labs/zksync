@@ -37,6 +37,11 @@ use self::{
 pub use client::EthHttpClient;
 pub use storage::DBStorage;
 
+use zksync_contracts::zksync_contract;
+use zksync_eth_client::ethereum_gateway::EthereumGateway;
+use zksync_eth_client::{ETHDirectClient, MultiPlexClient};
+use zksync_eth_signer::PrivateKeySigner;
+
 mod client;
 mod eth_state;
 mod received_ops;
@@ -418,8 +423,21 @@ pub fn start_eth_watch(
     db_pool: ConnectionPool,
 ) -> JoinHandle<()> {
     let transport = web3::transports::Http::new(&config_options.web3_url).unwrap();
-    let web3 = web3::Web3::new(transport);
-    let eth_client = EthHttpClient::new(web3, config_options.contract_eth_addr);
+    let eth_signer = PrivateKeySigner::new(Default::default());
+    // TODO find pk
+    let client = EthereumGateway::Multiplexed(MultiPlexClient::new().add_client(
+        config_options.eth_network.clone(),
+        ETHDirectClient::new(
+            transport,
+            zksync_contract(),
+            config_options.operator_fee_eth_addr,
+            eth_signer,
+            config_options.contract_eth_addr,
+            1, // TODO find chain id
+            1.5f64,
+        ),
+    ));
+    let eth_client = EthHttpClient::new(client, config_options.contract_eth_addr);
 
     let storage = DBStorage::new(db_pool);
 

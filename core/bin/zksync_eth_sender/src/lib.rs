@@ -14,7 +14,7 @@ use web3::{
 };
 // Workspace uses
 use zksync_config::{EthClientOptions, EthSenderOptions};
-use zksync_eth_client::{ETHClient, MultiPlexClient, SignedCallResult};
+use zksync_eth_client::{ETHDirectClient, MultiPlexClient, SignedCallResult};
 use zksync_storage::ConnectionPool;
 use zksync_types::{
     config,
@@ -841,19 +841,18 @@ pub fn run_eth_sender(
             .expect("Operator private key is required for eth_sender"),
     );
 
-    let ethereum =
-        EthereumGateway::Multiplexed(MultiPlexClient::new(zksync_contract()).add_client(
-            "infura".to_string(),
-            ETHClient::new(
-                transport,
-                zksync_contract(),
-                eth_client_options.operator_commit_eth_addr,
-                ethereum_signer,
-                eth_client_options.contract_eth_addr,
-                eth_client_options.chain_id,
-                eth_client_options.gas_price_factor,
-            ),
-        ));
+    let ethereum = EthereumGateway::Multiplexed(MultiPlexClient::new().add_client(
+        "infura".to_string(),
+        ETHDirectClient::new(
+            transport,
+            zksync_contract(),
+            eth_client_options.operator_commit_eth_addr,
+            ethereum_signer,
+            eth_client_options.contract_eth_addr,
+            eth_client_options.chain_id,
+            eth_client_options.gas_price_factor,
+        ),
+    ));
     let db = Database::new(pool);
 
     tokio::spawn(async move {

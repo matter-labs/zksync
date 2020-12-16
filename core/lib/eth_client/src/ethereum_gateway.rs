@@ -2,14 +2,13 @@ use web3::contract::tokens::{Detokenize, Tokenize};
 use web3::contract::Options;
 use web3::types::{Address, BlockId, Filter, Log, U64};
 
-use ethabi::Contract;
 use std::fmt::Debug;
 use zksync_eth_signer::PrivateKeySigner;
 use zksync_types::{TransactionReceipt, H160, H256, U256};
 
 use crate::clients::mock::MockEthereum;
 use crate::clients::multiplexer::MultiPlexClient;
-use crate::ETHClient;
+use crate::ETHDirectClient;
 // pub struct anyhow::Error;
 
 #[derive(Debug, Clone, PartialEq)]
@@ -42,7 +41,7 @@ pub struct FailureInfo {
 
 #[derive(Debug)]
 pub enum EthereumGateway {
-    Direct(ETHClient<PrivateKeySigner>),
+    Direct(ETHDirectClient<PrivateKeySigner>),
     Multiplexed(MultiPlexClient),
     Mock(MockEthereum),
 }
@@ -164,13 +163,6 @@ impl EthereumGateway {
     }
     /// Encodes the transaction data (smart contract method and its input) to the bytes
     /// without creating an actual transaction.
-    pub fn contract(&self) -> &Contract {
-        match self {
-            EthereumGateway::Direct(d) => d.contract(),
-            EthereumGateway::Multiplexed(m) => m.contract(),
-            EthereumGateway::Mock(m) => m.contract(),
-        }
-    }
     pub async fn call_main_contract_function<R, A, B, P>(
         &self,
         func: &str,
@@ -219,14 +211,12 @@ impl EthereumGateway {
         delegate_call!(self.logs(filter))
     }
 
-    pub fn encode_tx_data<P: Tokenize>(&self, func: &str, params: P) -> Vec<u8> {
-        let f = self
-            .contract()
-            .function(func)
-            .expect("failed to get function parameters");
-
-        f.encode_input(&params.into_tokens())
-            .expect("failed to encode parameters")
+    pub fn encode_tx_data<P: Tokenize + Clone>(&self, func: &str, params: P) -> Vec<u8> {
+        match self {
+            EthereumGateway::Multiplexed(c) => c.encode_tx_data(func, params),
+            EthereumGateway::Direct(c) => c.encode_tx_data(func, params),
+            EthereumGateway::Mock(c) => c.encode_tx_data(func, params),
+        }
     }
 
     pub fn get_mut_mock(&mut self) -> Option<&mut MockEthereum> {

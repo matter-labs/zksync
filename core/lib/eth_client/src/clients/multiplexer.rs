@@ -3,7 +3,7 @@ use ethabi::Contract;
 use web3::contract::Options;
 use web3::types::{Address, BlockId, Filter, Log, U64};
 
-use crate::ETHClient;
+use crate::ETHDirectClient;
 
 use web3::contract::tokens::{Detokenize, Tokenize};
 use zksync_eth_signer::PrivateKeySigner;
@@ -11,19 +11,15 @@ use zksync_types::{TransactionReceipt, H160, H256, U256};
 
 #[derive(Debug, Clone)]
 pub struct MultiPlexClient {
-    clients: Vec<(String, ETHClient<PrivateKeySigner>)>,
-    contract: ethabi::Contract,
+    clients: Vec<(String, ETHDirectClient<PrivateKeySigner>)>,
 }
 
 impl MultiPlexClient {
-    pub fn new(contract: ethabi::Contract) -> Self {
-        Self {
-            clients: vec![],
-            contract,
-        }
+    pub fn new() -> Self {
+        Self { clients: vec![] }
     }
 
-    pub fn add_client(mut self, name: String, client: ETHClient<PrivateKeySigner>) -> Self {
+    pub fn add_client(mut self, name: String, client: ETHDirectClient<PrivateKeySigner>) -> Self {
         self.clients.push((name, client));
         self
     }
@@ -279,7 +275,8 @@ impl MultiPlexClient {
         anyhow::bail!("All interfaces was wrong please try again")
     }
 
-    pub fn contract(&self) -> &Contract {
-        &self.contract
+    pub fn encode_tx_data<P: Tokenize + Clone>(&self, func: &str, params: P) -> Vec<u8> {
+        let (_, client) = self.clients.first().expect("Should be exactly one client");
+        client.encode_tx_data(func, params.clone())
     }
 }

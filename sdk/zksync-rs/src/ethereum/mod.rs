@@ -8,7 +8,7 @@ use web3::contract::Options;
 use web3::transports::Http;
 use web3::types::{TransactionReceipt, H160, H256, U256};
 
-use zksync_eth_client::ETHClient;
+use zksync_eth_client::ETHDirectClient;
 use zksync_eth_signer::EthereumSigner;
 use zksync_types::{AccountId, PriorityOp, TokenLike};
 
@@ -45,7 +45,7 @@ pub fn ierc20_contract() -> ethabi::Contract {
 #[derive(Debug)]
 pub struct EthereumProvider<S: EthereumSigner> {
     tokens_cache: TokensCache,
-    eth_client: ETHClient<S>,
+    eth_client: ETHDirectClient<S>,
     erc20_abi: ethabi::Contract,
     confirmation_timeout: Duration,
 }
@@ -72,7 +72,7 @@ impl<S: EthereumSigner + Send + Sync> EthereumProvider<S> {
                 &address_response.main_contract
             };
 
-        let eth_client = ETHClient::new(
+        let eth_client = ETHDirectClient::new(
             transport,
             zksync_contract(),
             eth_addr,
@@ -94,7 +94,7 @@ impl<S: EthereumSigner + Send + Sync> EthereumProvider<S> {
     }
 
     /// Exposes Ethereum node `web3` API.
-    pub fn client(&self) -> &ETHClient<S> {
+    pub fn client(&self) -> &ETHDirectClient<S> {
         &self.eth_client
     }
 

@@ -4,10 +4,8 @@ use anyhow::format_err;
 use ethabi::Hash;
 use serde::export::fmt::Debug;
 use web3::{
-    contract::{Contract, Options},
-    transports::Http,
+    contract::Options,
     types::{BlockNumber, FilterBuilder, Log},
-    Web3,
 };
 
 use zksync_contracts::zksync_contract;
@@ -55,19 +53,17 @@ pub trait EthClient {
 
 pub struct EthHttpClient {
     client: EthereumGateway,
-    zksync_contract: Contract<Http>,
     topics: ContractTopics,
+    zksync_contract_addr: H160,
 }
 
 impl EthHttpClient {
     pub fn new(client: EthereumGateway, zksync_contract_addr: H160) -> Self {
-        let zksync_contract = Contract::new(web3.eth(), zksync_contract_addr, zksync_contract());
-
-        let topics = ContractTopics::new(zksync_contract.abi());
+        let topics = ContractTopics::new(&zksync_contract());
         Self {
-            zksync_contract,
             client,
             topics,
+            zksync_contract_addr,
         }
     }
 
@@ -82,14 +78,13 @@ impl EthHttpClient {
         T::Error: Debug,
     {
         let filter = FilterBuilder::default()
-            .address(vec![self.zksync_contract.address()])
+            .address(vec![self.zksync_contract_addr])
             .from_block(from)
             .to_block(to)
             .topics(Some(topics), None, None, None)
             .build();
 
-        self.web3
-            .eth()
+        self.client
             .logs(filter)
             .await?
             .into_iter()
