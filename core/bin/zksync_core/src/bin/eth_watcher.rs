@@ -3,8 +3,7 @@ use std::time::Duration;
 use tokio::{runtime::Runtime, time};
 use zksync_contracts::zksync_contract;
 use zksync_core::eth_watch::{DBStorage, EthHttpClient, EthWatch, EthWatchRequest};
-use zksync_eth_client::ethereum_gateway::EthereumGateway;
-use zksync_eth_client::{ETHDirectClient, MultiPlexClient};
+use zksync_eth_client::{ETHDirectClient, EthereumGateway, MultiplexerEthereumClient};
 use zksync_eth_signer::PrivateKeySigner;
 use zksync_storage::ConnectionPool;
 
@@ -26,7 +25,7 @@ fn main() {
     let eth_signer = PrivateKeySigner::new(Default::default());
     // TODO find pk
 
-    let client = EthereumGateway::Multiplexed(MultiPlexClient::new().add_client(
+    let client = EthereumGateway::Multiplexed(MultiplexerEthereumClient::new().add_client(
         "Infura".to_string(),
         ETHDirectClient::new(
             transport,

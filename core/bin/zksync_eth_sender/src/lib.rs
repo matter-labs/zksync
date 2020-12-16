@@ -10,11 +10,17 @@ use std::time::{Duration, Instant};
 use tokio::{task::JoinHandle, time};
 use web3::{
     contract::Options,
+    transports::Http,
     types::{TransactionReceipt, H256, U256},
 };
+
 // Workspace uses
 use zksync_config::{EthClientOptions, EthSenderOptions};
-use zksync_eth_client::{ETHDirectClient, MultiPlexClient, SignedCallResult};
+use zksync_contracts::zksync_contract;
+use zksync_eth_client::{
+    ETHDirectClient, EthereumGateway, MultiplexerEthereumClient, SignedCallResult,
+};
+use zksync_eth_signer::PrivateKeySigner;
 use zksync_storage::ConnectionPool;
 use zksync_types::{
     config,
@@ -29,10 +35,6 @@ use self::{
     transactions::*,
     tx_queue::{TxData, TxQueue, TxQueueBuilder},
 };
-use web3::transports::Http;
-use zksync_contracts::zksync_contract;
-use zksync_eth_client::ethereum_gateway::EthereumGateway;
-use zksync_eth_signer::PrivateKeySigner;
 
 mod database;
 mod gas_adjuster;
@@ -841,7 +843,7 @@ pub fn run_eth_sender(
             .expect("Operator private key is required for eth_sender"),
     );
 
-    let ethereum = EthereumGateway::Multiplexed(MultiPlexClient::new().add_client(
+    let ethereum = EthereumGateway::Multiplexed(MultiplexerEthereumClient::new().add_client(
         "infura".to_string(),
         ETHDirectClient::new(
             transport,

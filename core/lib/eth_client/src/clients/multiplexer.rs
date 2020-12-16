@@ -10,17 +10,17 @@ use zksync_eth_signer::PrivateKeySigner;
 use zksync_types::{TransactionReceipt, H160, H256, U256};
 
 #[derive(Debug, Clone)]
-pub struct MultiPlexClient {
+pub struct MultiplexerEthereumClient {
     clients: Vec<(String, ETHDirectClient<PrivateKeySigner>)>,
 }
 
-impl Default for MultiPlexClient {
+impl Default for MultiplexerEthereumClient {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl MultiPlexClient {
+impl MultiplexerEthereumClient {
     pub fn new() -> Self {
         Self { clients: vec![] }
     }

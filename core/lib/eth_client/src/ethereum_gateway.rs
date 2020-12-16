@@ -7,7 +7,7 @@ use zksync_eth_signer::PrivateKeySigner;
 use zksync_types::{TransactionReceipt, H160, H256, U256};
 
 use crate::clients::mock::MockEthereum;
-use crate::clients::multiplexer::MultiPlexClient;
+use crate::clients::multiplexer::MultiplexerEthereumClient;
 use crate::ETHDirectClient;
 // pub struct anyhow::Error;
 
@@ -42,7 +42,7 @@ pub struct FailureInfo {
 #[derive(Debug, Clone)]
 pub enum EthereumGateway {
     Direct(ETHDirectClient<PrivateKeySigner>),
-    Multiplexed(MultiPlexClient),
+    Multiplexed(MultiplexerEthereumClient),
     Mock(MockEthereum),
 }
 

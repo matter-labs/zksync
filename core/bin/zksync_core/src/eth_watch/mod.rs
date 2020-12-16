@@ -38,8 +38,10 @@ pub use client::EthHttpClient;
 pub use storage::DBStorage;
 
 use zksync_contracts::zksync_contract;
-use zksync_eth_client::ethereum_gateway::EthereumGateway;
-use zksync_eth_client::{ETHDirectClient, MultiPlexClient};
+use zksync_eth_client::{
+    ethereum_gateway::EthereumGateway,
+    {ETHDirectClient, MultiplexerEthereumClient},
+};
 use zksync_eth_signer::PrivateKeySigner;
 
 mod client;
@@ -425,7 +427,7 @@ pub fn start_eth_watch(
     let transport = web3::transports::Http::new(&config_options.web3_url).unwrap();
     let eth_signer = PrivateKeySigner::new(Default::default());
     // TODO find pk
-    let client = EthereumGateway::Multiplexed(MultiPlexClient::new().add_client(
+    let client = EthereumGateway::Multiplexed(MultiplexerEthereumClient::new().add_client(
         config_options.eth_network.clone(),
         ETHDirectClient::new(
             transport,
