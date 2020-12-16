@@ -35,7 +35,6 @@ use zksync::{
     zksync_types::{tx::PackedEthSignature, Token, TokenLike, TxFeeTypes, ZkSyncTx},
     EthereumProvider, Network, RpcProvider, Wallet, WalletCredentials,
 };
-use zksync_eth_client::eth_client_trait::ETHClientSender;
 use zksync_eth_signer::{EthereumSigner, PrivateKeySigner};
 
 const ETH_ADDR: &str = "36615Cf349d7F6344891B1e7CA7C72883F5dc049";

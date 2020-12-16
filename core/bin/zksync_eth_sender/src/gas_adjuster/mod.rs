@@ -4,7 +4,7 @@ use std::{collections::VecDeque, marker::PhantomData, time::Instant};
 use zksync_basic_types::U256;
 // Local deps
 use crate::database::DatabaseInterface;
-use zksync_eth_client::eth_client_trait::ETHClientInterface;
+use zksync_eth_client::eth_client_trait::EthereumGateway;
 
 mod parameters;
 
@@ -21,19 +21,17 @@ mod tests;
 /// gas price for transactions that were not mined by the network
 /// within a reasonable time.
 #[derive(Debug)]
-pub(super) struct GasAdjuster<ETH: ETHClientInterface, DB: DatabaseInterface> {
+pub(super) struct GasAdjuster<DB: DatabaseInterface> {
     /// Collected statistics about recently used gas prices.
     statistics: GasStatistics,
     /// Timestamp of the last maximum gas price update.
     last_price_renewal: Instant,
     /// Timestamp of the last sample added to the `statistics`.
     last_sample_added: Instant,
-
-    _ethereum_client: PhantomData<ETH>,
     _db: PhantomData<DB>,
 }
 
-impl<ETH: ETHClientInterface, DB: DatabaseInterface> GasAdjuster<ETH, DB> {
+impl<DB: DatabaseInterface> GasAdjuster<DB> {
     pub async fn new(db: &DB) -> Self {
         let mut connection = db
             .acquire_connection()
@@ -48,14 +46,13 @@ impl<ETH: ETHClientInterface, DB: DatabaseInterface> GasAdjuster<ETH, DB> {
             last_price_renewal: Instant::now(),
             last_sample_added: Instant::now(),
 
-            _ethereum_client: PhantomData,
             _db: PhantomData,
         }
     }
 
     async fn get_suggested_price(
         &self,
-        ethereum: &ETH,
+        ethereum: &EthereumGateway,
         old_tx_gas_price: Option<U256>,
     ) -> anyhow::Result<U256> {
         if let Some(price) = self.statistics.get_average_price() {
@@ -77,7 +74,7 @@ impl<ETH: ETHClientInterface, DB: DatabaseInterface> GasAdjuster<ETH, DB> {
     /// Replacement price is usually suggested to be at least 10% higher, we make it 15% higher.
     pub async fn get_gas_price(
         &mut self,
-        ethereum: &ETH,
+        ethereum: &EthereumGateway,
         old_tx_gas_price: Option<U256>,
     ) -> anyhow::Result<U256> {
         let scaled_price = self.get_suggested_price(ethereum, old_tx_gas_price).await?;
@@ -99,7 +96,7 @@ impl<ETH: ETHClientInterface, DB: DatabaseInterface> GasAdjuster<ETH, DB> {
     /// Performs an actualization routine for `GasAdjuster`:
     /// This method is intended to be invoked periodically, and it updates the
     /// current max gas price limit according to the configurable update interval.
-    pub async fn keep_updated(&mut self, ethereum: &ETH, db: &DB) {
+    pub async fn keep_updated(&mut self, ethereum: &EthereumGateway, db: &DB) {
         if self.last_sample_added.elapsed() >= parameters::sample_adding_interval() {
             // Report the current price to be gathered by the statistics module.
             match ethereum.get_gas_price().await {

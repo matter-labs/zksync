@@ -15,7 +15,6 @@ use zksync_types::{AccountId, PriorityOp, TokenLike};
 use crate::{
     error::ClientError, provider::Provider, tokens_cache::TokensCache, utils::u256_to_biguint,
 };
-use zksync_eth_client::eth_client_trait::{ETHClientSender, ETHTxEncoder};
 
 const IERC20_INTERFACE: &str = include_str!("abi/IERC20.json");
 const ZKSYNC_INTERFACE: &str = include_str!("abi/ZkSync.json");

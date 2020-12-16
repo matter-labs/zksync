@@ -31,7 +31,7 @@ use self::{
 };
 use web3::transports::Http;
 use zksync_contracts::zksync_contract;
-use zksync_eth_client::eth_client_trait::ETHClientInterface;
+use zksync_eth_client::eth_client_trait::EthereumGateway;
 use zksync_eth_signer::PrivateKeySigner;
 
 mod database;
@@ -112,23 +112,23 @@ enum TxCheckMode {
 /// report the incident to the log and then panic to prevent continue working in a probably
 /// erroneous conditions. Failure handling policy is determined by a corresponding callback,
 /// which can be changed if needed.
-struct ETHSender<ETH: ETHClientInterface, DB: DatabaseInterface> {
+struct ETHSender<DB: DatabaseInterface> {
     /// Ongoing operations queue.
     ongoing_ops: VecDeque<ETHOperation>,
     /// Connection to the database.
     db: DB,
     /// Ethereum intermediator.
-    ethereum: ETH,
+    ethereum: EthereumGateway,
     /// Queue for ordered transaction processing.
     tx_queue: TxQueue,
     /// Utility for managing the gas price for transactions.
-    gas_adjuster: GasAdjuster<ETH, DB>,
+    gas_adjuster: GasAdjuster<DB>,
     /// Settings for the `ETHSender`.
     options: EthSenderOptions,
 }
 
-impl<ETH: ETHClientInterface, DB: DatabaseInterface> ETHSender<ETH, DB> {
-    pub async fn new(options: EthSenderOptions, db: DB, ethereum: ETH) -> Self {
+impl<DB: DatabaseInterface> ETHSender<DB> {
+    pub async fn new(options: EthSenderOptions, db: DB, ethereum: EthereumGateway) -> Self {
         let mut connection = db
             .acquire_connection()
             .await
@@ -612,7 +612,10 @@ impl<ETH: ETHClientInterface, DB: DatabaseInterface> ETHSender<ETH, DB> {
     }
 
     /// Creates a new Ethereum operation.
-    async fn sign_new_tx(ethereum: &ETH, op: &ETHOperation) -> anyhow::Result<SignedCallResult> {
+    async fn sign_new_tx(
+        ethereum: &EthereumGateway,
+        op: &ETHOperation,
+    ) -> anyhow::Result<SignedCallResult> {
         let tx_options = {
             let mut options = Options::default();
             options.nonce = Some(op.nonce);
@@ -838,18 +841,19 @@ pub fn run_eth_sender(
             .expect("Operator private key is required for eth_sender"),
     );
 
-    let ethereum = MultiPlexClient::new(zksync_contract()).add_client(
-        "infura".to_string(),
-        ETHClient::new(
-            transport,
-            zksync_contract(),
-            eth_client_options.operator_commit_eth_addr,
-            ethereum_signer,
-            eth_client_options.contract_eth_addr,
-            eth_client_options.chain_id,
-            eth_client_options.gas_price_factor,
-        ),
-    );
+    let ethereum =
+        EthereumGateway::Multiplexed(MultiPlexClient::new(zksync_contract()).add_client(
+            "infura".to_string(),
+            ETHClient::new(
+                transport,
+                zksync_contract(),
+                eth_client_options.operator_commit_eth_addr,
+                ethereum_signer,
+                eth_client_options.contract_eth_addr,
+                eth_client_options.chain_id,
+                eth_client_options.gas_price_factor,
+            ),
+        ));
     let db = Database::new(pool);
 
     tokio::spawn(async move {

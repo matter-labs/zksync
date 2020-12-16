@@ -4,8 +4,12 @@ use web3::types::{Address, U64};
 
 use ethabi::Contract;
 use std::fmt::Debug;
+use zksync_eth_signer::PrivateKeySigner;
 use zksync_types::{TransactionReceipt, H160, H256, U256};
 
+use crate::clients::mock::MockEthereum;
+use crate::clients::multiplexer::MultiPlexClient;
+use crate::ETHClient;
 // pub struct anyhow::Error;
 
 #[derive(Debug, Clone, PartialEq)]
@@ -35,8 +39,33 @@ pub struct FailureInfo {
     pub gas_used: Option<U256>,
     pub gas_limit: U256,
 }
-#[async_trait::async_trait]
-pub trait ETHClientSender: Sync + Send + Debug {
+
+#[derive(Debug)]
+pub enum EthereumGateway {
+    Direct(ETHClient<PrivateKeySigner>),
+    Multiplexed(MultiPlexClient),
+    Mock(MockEthereum),
+}
+
+macro_rules! delegate_call {
+    ($self:ident.$method:ident($($args:ident),+)) => {
+        match $self {
+            Self::Direct(d) => d.$method($($args),+).await,
+            Self::Multiplexed(d) => d.$method($($args),+).await,
+            Self::Mock(d) => d.$method($($args),+).await,
+        }
+    };
+    ($self:ident.$method:ident()) => {
+        match $self {
+            Self::Direct(d) => d.$method().await,
+            Self::Multiplexed(m) => m.$method().await,
+            Self::Mock(d) => d.$method().await,
+        }
+    }
+
+}
+
+impl EthereumGateway {
     /// Returns the next *expected* nonce with respect to the transactions
     /// in the mempool.
     ///
@@ -44,64 +73,108 @@ pub trait ETHClientSender: Sync + Send + Debug {
     /// (e.g. `infura`), since the consecutive tx send and attempt to get a pending
     /// nonce may be routed to the different nodes in cluster, and the latter node
     /// may not know about the send tx yet. Thus it is not recommended to rely on this
-    /// method as on the trusted source of the latest nonce.  
-    async fn pending_nonce(&self) -> Result<U256, anyhow::Error>;
+    /// method as on the trusted source of the latest nonce.
+    pub async fn pending_nonce(&self) -> Result<U256, anyhow::Error> {
+        delegate_call!(self.pending_nonce())
+    }
 
     /// Returns the account nonce based on the last *mined* block. Not mined transactions
     /// (which are in mempool yet) are not taken into account by this method.
-    async fn current_nonce(&self) -> Result<U256, anyhow::Error>;
+    pub async fn current_nonce(&self) -> Result<U256, anyhow::Error> {
+        delegate_call!(self.current_nonce())
+    }
 
-    async fn block_number(&self) -> Result<U64, anyhow::Error>;
+    pub async fn block_number(&self) -> Result<U64, anyhow::Error> {
+        delegate_call!(self.block_number())
+    }
 
-    async fn get_gas_price(&self) -> Result<U256, anyhow::Error>;
+    pub async fn get_gas_price(&self) -> Result<U256, anyhow::Error> {
+        delegate_call!(self.get_gas_price())
+    }
     /// Returns the account balance.
-    async fn balance(&self) -> Result<U256, anyhow::Error>;
+    pub async fn balance(&self) -> Result<U256, anyhow::Error> {
+        delegate_call!(self.balance())
+    }
 
     /// Signs the transaction given the previously encoded data.
     /// Fills in gas/nonce if not supplied inside options.
-    async fn sign_prepared_tx(
+    pub async fn sign_prepared_tx(
         &self,
         data: Vec<u8>,
         options: Options,
-    ) -> Result<SignedCallResult, anyhow::Error>;
+    ) -> Result<SignedCallResult, anyhow::Error> {
+        delegate_call!(self.sign_prepared_tx(data, options))
+    }
 
     /// Signs the transaction given the previously encoded data.
     /// Fills in gas/nonce if not supplied inside options.
-    async fn sign_prepared_tx_for_addr(
+    pub async fn sign_prepared_tx_for_addr(
         &self,
         data: Vec<u8>,
         contract_addr: H160,
         options: Options,
-    ) -> Result<SignedCallResult, anyhow::Error>;
+    ) -> Result<SignedCallResult, anyhow::Error> {
+        delegate_call!(self.sign_prepared_tx_for_addr(data, contract_addr, options))
+    }
 
     /// Sends the transaction to the Ethereum blockchain.
     /// Transaction is expected to be encoded as the byte sequence.
-    async fn send_raw_tx(&self, tx: Vec<u8>) -> Result<H256, anyhow::Error>;
+    pub async fn send_raw_tx(&self, tx: Vec<u8>) -> Result<H256, anyhow::Error> {
+        delegate_call!(self.send_raw_tx(tx))
+    }
 
     /// Gets the Ethereum transaction receipt.
-    async fn tx_receipt(&self, tx_hash: H256) -> Result<Option<TransactionReceipt>, anyhow::Error>;
-    async fn failure_reason(&self, tx_hash: H256) -> Result<Option<FailureInfo>, anyhow::Error>;
+    pub async fn tx_receipt(
+        &self,
+        tx_hash: H256,
+    ) -> Result<Option<TransactionReceipt>, anyhow::Error> {
+        delegate_call!(self.tx_receipt(tx_hash))
+    }
+
+    pub async fn failure_reason(
+        &self,
+        tx_hash: H256,
+    ) -> Result<Option<FailureInfo>, anyhow::Error> {
+        delegate_call!(self.failure_reason(tx_hash))
+    }
+
     /// Auxiliary function that returns the balance of the account on Ethereum.
-    async fn eth_balance(&self, address: Address) -> Result<U256, anyhow::Error>;
-    async fn contract_balance(
+    pub async fn eth_balance(&self, address: Address) -> Result<U256, anyhow::Error> {
+        delegate_call!(self.eth_balance(address))
+    }
+
+    pub async fn contract_balance(
         &self,
         token_address: Address,
         abi: ethabi::Contract,
         address: Address,
-    ) -> Result<U256, anyhow::Error>;
-    async fn allowance(
+    ) -> Result<U256, anyhow::Error> {
+        delegate_call!(self.contract_balance(token_address, abi, address))
+    }
+
+    pub async fn allowance(
         &self,
         token_address: Address,
         erc20_abi: ethabi::Contract,
-    ) -> Result<U256, anyhow::Error>;
-    async fn get_tx_status(&self, hash: &H256) -> anyhow::Result<Option<ExecutedTxStatus>>;
-}
-
-pub trait ETHTxEncoder {
+    ) -> Result<U256, anyhow::Error> {
+        delegate_call!(self.allowance(token_address, erc20_abi))
+    }
+    pub async fn get_tx_status(&self, hash: &H256) -> anyhow::Result<Option<ExecutedTxStatus>> {
+        delegate_call!(self.get_tx_status(hash))
+    }
     /// Encodes the transaction data (smart contract method and its input) to the bytes
     /// without creating an actual transaction.
-    fn contract(&self) -> &Contract;
-    fn encode_tx_data<P: Tokenize>(&self, func: &str, params: P) -> Vec<u8> {
+    pub fn contract(&self) -> &Contract {
+        match self {
+            EthereumGateway::Direct(d) => d.contract(),
+            EthereumGateway::Multiplexed(m) => m.contract(),
+            EthereumGateway::Mock(m) => m.contract(),
+        }
+    }
+
+    // pub fn call_contract_function(&self, func: &str, params: To)
+
+    pub fn encode_tx_data<P: Tokenize>(&self, func: &str, params: P) -> Vec<u8> {
         let f = self
             .contract()
             .function(func)
@@ -110,8 +183,17 @@ pub trait ETHTxEncoder {
         f.encode_input(&params.into_tokens())
             .expect("failed to encode parameters")
     }
+
+    pub fn get_mut_mock(&mut self) -> Option<&mut MockEthereum> {
+        match self {
+            EthereumGateway::Mock(m) => Some(m),
+            _ => None,
+        }
+    }
+    pub fn get_mock(&self) -> Option<&MockEthereum> {
+        match self {
+            EthereumGateway::Mock(m) => Some(m),
+            _ => None,
+        }
+    }
 }
-
-pub trait ETHClientInterface: ETHTxEncoder + ETHClientSender {}
-
-impl<T: ETHTxEncoder + ETHClientSender> ETHClientInterface for T {}

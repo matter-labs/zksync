@@ -14,7 +14,7 @@ use web3::types::{
 use web3::{Transport, Web3};
 use zksync_contracts::{erc20_contract, zksync_contract};
 use zksync_crypto::proof::EncodedProofPlonk;
-use zksync_eth_client::eth_client_trait::{ETHClientSender, ETHTxEncoder};
+
 use zksync_eth_client::ETHClient;
 use zksync_eth_signer::PrivateKeySigner;
 use zksync_types::block::Block;

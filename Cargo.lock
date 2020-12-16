@@ -5722,6 +5722,7 @@ dependencies = [
  "log 0.4.11",
  "parity-crypto",
  "serde",
+ "tokio 0.2.22",
  "web3 0.13.0",
  "zksync_eth_signer",
  "zksync_types",
