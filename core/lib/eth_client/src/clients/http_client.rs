@@ -3,14 +3,17 @@ use std::fmt;
 
 // External uses
 
-use web3::contract::{Contract, Options};
-use web3::types::{Address, BlockNumber, Bytes, TransactionReceipt, H160, H256, U256, U64};
-use web3::{transports::Http, Web3};
+use web3::{
+    contract::{Contract, Options},
+    transports::Http,
+    types::{Address, BlockId, BlockNumber, Bytes, TransactionReceipt, H160, H256, U256, U64},
+    Web3,
+};
 
 // Workspace uses
 use crate::eth_client_trait::{ExecutedTxStatus, FailureInfo, SignedCallResult};
 
-use web3::contract::tokens::Tokenize;
+use web3::contract::tokens::{Detokenize, Tokenize};
 use zksync_eth_signer::{raw_ethereum_tx::RawTransaction, EthereumSigner};
 
 /// Gas limit value to be used in transaction if for some reason
@@ -234,10 +237,16 @@ impl<S: EthereumSigner> ETHClient<S> {
         abi: ethabi::Contract,
         address: Address,
     ) -> Result<U256, anyhow::Error> {
-        let contract = Contract::new(self.web3.eth(), token_address, abi);
-        Ok(contract
-            .query("balanceOf", address, None, Options::default(), None)
-            .await?)
+        self.call_contract_function(
+            "balanceOf",
+            address,
+            None,
+            Options::default(),
+            None,
+            token_address,
+            abi,
+        )
+        .await
     }
 
     pub async fn allowance(
@@ -245,17 +254,61 @@ impl<S: EthereumSigner> ETHClient<S> {
         token_address: Address,
         erc20_abi: ethabi::Contract,
     ) -> Result<U256, anyhow::Error> {
-        let contract = Contract::new(self.web3.eth(), token_address, erc20_abi);
+        self.call_contract_function(
+            "allowance",
+            (self.sender_account, self.contract_addr),
+            None,
+            Options::default(),
+            None,
+            token_address,
+            erc20_abi,
+        )
+        .await
+    }
 
-        Ok(contract
-            .query(
-                "allowance",
-                (self.sender_account, self.contract_addr),
-                None,
-                Options::default(),
-                None,
-            )
-            .await?)
+    pub async fn call_main_contract_function<R, A, P, B>(
+        &self,
+        func: &str,
+        params: P,
+        from: A,
+        options: Options,
+        block: B,
+    ) -> Result<R, anyhow::Error>
+    where
+        R: Detokenize + Unpin,
+        A: Into<Option<Address>>,
+        B: Into<Option<BlockId>>,
+        P: Tokenize,
+    {
+        self.call_contract_function(
+            func,
+            params,
+            from,
+            options,
+            block,
+            self.contract_addr,
+            self.contract.clone(),
+        )
+        .await
+    }
+    pub async fn call_contract_function<R, A, B, P>(
+        &self,
+        func: &str,
+        params: P,
+        from: A,
+        options: Options,
+        block: B,
+        token_address: Address,
+        erc20_abi: ethabi::Contract,
+    ) -> Result<R, anyhow::Error>
+    where
+        R: Detokenize + Unpin,
+        A: Into<Option<Address>>,
+        B: Into<Option<BlockId>>,
+        P: Tokenize,
+    {
+        let contract = Contract::new(self.web3.eth(), token_address, erc20_abi);
+        Ok(contract.query(func, params, from, options, block).await?)
     }
 
     pub async fn get_tx_status(&self, hash: &H256) -> anyhow::Result<Option<ExecutedTxStatus>> {

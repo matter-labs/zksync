@@ -1,10 +1,11 @@
 use crate::eth_client_trait::{ExecutedTxStatus, FailureInfo, SignedCallResult};
 use ethabi::Contract;
 use web3::contract::Options;
-use web3::types::{Address, U64};
+use web3::types::{Address, BlockId, U64};
 
 use crate::ETHClient;
 
+use web3::contract::tokens::{Detokenize, Tokenize};
 use zksync_eth_signer::PrivateKeySigner;
 use zksync_types::{TransactionReceipt, H160, H256, U256};
 
@@ -180,6 +181,74 @@ impl MultiPlexClient {
     ) -> Result<U256, anyhow::Error> {
         for (name, client) in self.clients.iter() {
             match client.allowance(token_address, erc20_abi.clone()).await {
+                Ok(res) => return Ok(res),
+                Err(err) => log::error!("Error in interface: {}, {} ", name, err),
+            }
+        }
+        anyhow::bail!("All interfaces was wrong please try again")
+    }
+
+    pub async fn call_contract_function<R, A, B, P>(
+        &self,
+        func: &str,
+        params: P,
+        from: A,
+        options: Options,
+        block: B,
+        token_address: Address,
+        erc20_abi: ethabi::Contract,
+    ) -> Result<R, anyhow::Error>
+    where
+        R: Detokenize + Unpin,
+        A: Into<Option<Address>> + Clone,
+        B: Into<Option<BlockId>> + Clone,
+        P: Tokenize + Clone,
+    {
+        for (name, client) in self.clients.iter() {
+            match client
+                .call_contract_function(
+                    func,
+                    params.clone(),
+                    from.clone(),
+                    options.clone(),
+                    block.clone(),
+                    token_address,
+                    erc20_abi.clone(),
+                )
+                .await
+            {
+                Ok(res) => return Ok(res),
+                Err(err) => log::error!("Error in interface: {}, {} ", name, err),
+            }
+        }
+        anyhow::bail!("All interfaces was wrong please try again")
+    }
+
+    pub async fn call_main_contract_function<R, A, B, P>(
+        &self,
+        func: &str,
+        params: P,
+        from: A,
+        options: Options,
+        block: B,
+    ) -> Result<R, anyhow::Error>
+    where
+        R: Detokenize + Unpin,
+        A: Into<Option<Address>> + Clone,
+        B: Into<Option<BlockId>> + Clone,
+        P: Tokenize + Clone,
+    {
+        for (name, client) in self.clients.iter() {
+            match client
+                .call_main_contract_function(
+                    func,
+                    params.clone(),
+                    from.clone(),
+                    options.clone(),
+                    block.clone(),
+                )
+                .await
+            {
                 Ok(res) => return Ok(res),
                 Err(err) => log::error!("Error in interface: {}, {} ", name, err),
             }

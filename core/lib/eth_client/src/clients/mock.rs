@@ -4,9 +4,9 @@ use anyhow::Error;
 use ethabi::{Address, Contract};
 use std::collections::{HashMap, HashSet};
 use tokio::sync::RwLock;
-use web3::contract::tokens::Tokenize;
+use web3::contract::tokens::{Detokenize, Tokenize};
 use web3::contract::Options;
-use web3::types::U64;
+use web3::types::{BlockId, U64};
 use zksync_types::{TransactionReceipt, H160, H256, U256};
 
 /// Mock Ethereum client is capable of recording all the incoming requests for the further analysis.
@@ -184,5 +184,41 @@ impl MockEthereum {
 
     pub fn encode_tx_data<P: Tokenize>(&self, _func: &str, params: P) -> Vec<u8> {
         ethabi::encode(params.into_tokens().as_ref())
+    }
+
+    pub async fn call_main_contract_function<R, A, P, B>(
+        &self,
+        _func: &str,
+        _params: P,
+        _from: A,
+        _options: Options,
+        _block: B,
+    ) -> Result<R, anyhow::Error>
+    where
+        R: Detokenize + Unpin,
+        A: Into<Option<Address>>,
+        B: Into<Option<BlockId>>,
+        P: Tokenize,
+    {
+        todo!()
+    }
+
+    pub async fn call_contract_function<R, A, B, P>(
+        &self,
+        _func: &str,
+        _params: P,
+        _from: A,
+        _options: Options,
+        _block: B,
+        _token_address: Address,
+        _erc20_abi: ethabi::Contract,
+    ) -> Result<R, anyhow::Error>
+    where
+        R: Detokenize + Unpin,
+        A: Into<Option<Address>>,
+        B: Into<Option<BlockId>>,
+        P: Tokenize,
+    {
+        todo!()
     }
 }

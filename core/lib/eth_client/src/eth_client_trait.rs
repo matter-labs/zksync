@@ -1,6 +1,6 @@
-use web3::contract::tokens::Tokenize;
+use web3::contract::tokens::{Detokenize, Tokenize};
 use web3::contract::Options;
-use web3::types::{Address, U64};
+use web3::types::{Address, BlockId, U64};
 
 use ethabi::Contract;
 use std::fmt::Debug;
@@ -171,8 +171,49 @@ impl EthereumGateway {
             EthereumGateway::Mock(m) => m.contract(),
         }
     }
+    pub async fn call_main_contract_function<R, A, B, P>(
+        &self,
+        func: &str,
+        params: P,
+        from: A,
+        options: Options,
+        block: B,
+    ) -> Result<R, anyhow::Error>
+    where
+        R: Detokenize + Unpin,
+        A: Into<Option<Address>> + Clone,
+        B: Into<Option<BlockId>> + Clone,
+        P: Tokenize + Clone,
+    {
+        delegate_call!(self.call_main_contract_function(func, params, from, options, block))
+    }
 
-    // pub fn call_contract_function(&self, func: &str, params: To)
+    pub async fn call_contract_function<R, A, B, P>(
+        &self,
+        func: &str,
+        params: P,
+        from: A,
+        options: Options,
+        block: B,
+        token_address: Address,
+        erc20_abi: ethabi::Contract,
+    ) -> Result<R, anyhow::Error>
+    where
+        R: Detokenize + Unpin,
+        A: Into<Option<Address>> + Clone,
+        B: Into<Option<BlockId>> + Clone,
+        P: Tokenize + Clone,
+    {
+        delegate_call!(self.call_contract_function(
+            func,
+            params,
+            from,
+            options,
+            block,
+            token_address,
+            erc20_abi
+        ))
+    }
 
     pub fn encode_tx_data<P: Tokenize>(&self, func: &str, params: P) -> Vec<u8> {
         let f = self
