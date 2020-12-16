@@ -1,4 +1,4 @@
-use crate::eth_client_trait::{ExecutedTxStatus, FailureInfo};
+use crate::ethereum_gateway::{ExecutedTxStatus, FailureInfo};
 use crate::SignedCallResult;
 use anyhow::Error;
 use ethabi::{Address, Contract};
@@ -6,7 +6,7 @@ use std::collections::{HashMap, HashSet};
 use tokio::sync::RwLock;
 use web3::contract::tokens::{Detokenize, Tokenize};
 use web3::contract::Options;
-use web3::types::{BlockId, U64};
+use web3::types::{BlockId, Filter, Log, U64};
 use zksync_types::{TransactionReceipt, H160, H256, U256};
 
 /// Mock Ethereum client is capable of recording all the incoming requests for the further analysis.
@@ -200,6 +200,10 @@ impl MockEthereum {
         B: Into<Option<BlockId>>,
         P: Tokenize,
     {
+        todo!()
+    }
+
+    pub async fn logs(&self, _filter: Filter) -> anyhow::Result<Vec<Log>> {
         todo!()
     }
 

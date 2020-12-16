@@ -1,6 +1,6 @@
 use web3::contract::tokens::{Detokenize, Tokenize};
 use web3::contract::Options;
-use web3::types::{Address, BlockId, U64};
+use web3::types::{Address, BlockId, Filter, Log, U64};
 
 use ethabi::Contract;
 use std::fmt::Debug;
@@ -213,6 +213,10 @@ impl EthereumGateway {
             token_address,
             erc20_abi
         ))
+    }
+
+    pub async fn logs(&self, filter: Filter) -> anyhow::Result<Vec<Log>> {
+        delegate_call!(self.logs(filter))
     }
 
     pub fn encode_tx_data<P: Tokenize>(&self, func: &str, params: P) -> Vec<u8> {

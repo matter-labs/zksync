@@ -4,7 +4,7 @@ use std::{collections::VecDeque, marker::PhantomData, time::Instant};
 use zksync_basic_types::U256;
 // Local deps
 use crate::database::DatabaseInterface;
-use zksync_eth_client::eth_client_trait::EthereumGateway;
+use zksync_eth_client::ethereum_gateway::EthereumGateway;
 
 mod parameters;
 

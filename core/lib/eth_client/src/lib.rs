@@ -1,5 +1,5 @@
 pub mod clients;
-pub mod eth_client_trait;
+pub mod ethereum_gateway;
 pub use clients::http_client::ETHClient;
 pub use clients::multiplexer::MultiPlexClient;
-pub use eth_client_trait::SignedCallResult;
+pub use ethereum_gateway::SignedCallResult;

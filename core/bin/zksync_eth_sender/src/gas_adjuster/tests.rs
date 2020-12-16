@@ -7,7 +7,7 @@ use crate::{
     DatabaseInterface, GasAdjuster,
 };
 
-use zksync_eth_client::eth_client_trait::EthereumGateway;
+use zksync_eth_client::ethereum_gateway::EthereumGateway;
 
 /// Creates `Ethereum` and `Database` instances for the `GasAdjuster` tests.
 async fn eth_and_db_clients() -> (EthereumGateway, MockDatabase) {

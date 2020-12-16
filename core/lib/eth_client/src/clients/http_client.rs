@@ -11,9 +11,10 @@ use web3::{
 };
 
 // Workspace uses
-use crate::eth_client_trait::{ExecutedTxStatus, FailureInfo, SignedCallResult};
+use crate::ethereum_gateway::{ExecutedTxStatus, FailureInfo, SignedCallResult};
 
 use web3::contract::tokens::{Detokenize, Tokenize};
+use web3::types::{Filter, Log};
 use zksync_eth_signer::{raw_ethereum_tx::RawTransaction, EthereumSigner};
 
 /// Gas limit value to be used in transaction if for some reason
@@ -343,6 +344,11 @@ impl<S: EthereumSigner> ETHClient<S> {
             _ => Ok(None),
         }
     }
+
+    pub async fn logs(&self, filter: Filter) -> anyhow::Result<Vec<Log>> {
+        Ok(self.web3.eth().logs(filter).await?)
+    }
+
     pub fn contract(&self) -> &ethabi::Contract {
         &self.contract
     }

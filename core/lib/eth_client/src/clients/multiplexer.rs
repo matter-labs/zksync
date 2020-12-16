@@ -1,7 +1,7 @@
-use crate::eth_client_trait::{ExecutedTxStatus, FailureInfo, SignedCallResult};
+use crate::ethereum_gateway::{ExecutedTxStatus, FailureInfo, SignedCallResult};
 use ethabi::Contract;
 use web3::contract::Options;
-use web3::types::{Address, BlockId, U64};
+use web3::types::{Address, BlockId, Filter, Log, U64};
 
 use crate::ETHClient;
 
@@ -268,6 +268,17 @@ impl MultiPlexClient {
         }
         anyhow::bail!("All interfaces was wrong please try again")
     }
+
+    pub async fn logs(&self, filter: Filter) -> anyhow::Result<Vec<Log>> {
+        for (name, client) in self.clients.iter() {
+            match client.logs(filter.clone()).await {
+                Ok(res) => return Ok(res),
+                Err(err) => log::error!("Error in interface: {}, {} ", name, err),
+            }
+        }
+        anyhow::bail!("All interfaces was wrong please try again")
+    }
+
     pub fn contract(&self) -> &Contract {
         &self.contract
     }

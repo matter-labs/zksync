@@ -11,6 +11,7 @@ use web3::{
 };
 
 use zksync_contracts::zksync_contract;
+use zksync_eth_client::ethereum_gateway::EthereumGateway;
 use zksync_types::{ethereum::CompleteWithdrawalsTx, Address, Nonce, PriorityOp, H160};
 
 struct ContractTopics {
@@ -53,19 +54,19 @@ pub trait EthClient {
 }
 
 pub struct EthHttpClient {
-    web3: Web3<Http>,
+    client: EthereumGateway,
     zksync_contract: Contract<Http>,
     topics: ContractTopics,
 }
 
 impl EthHttpClient {
-    pub fn new(web3: Web3<Http>, zksync_contract_addr: H160) -> Self {
+    pub fn new(client: EthereumGateway, zksync_contract_addr: H160) -> Self {
         let zksync_contract = Contract::new(web3.eth(), zksync_contract_addr, zksync_contract());
 
         let topics = ContractTopics::new(zksync_contract.abi());
         Self {
             zksync_contract,
-            web3,
+            client,
             topics,
         }
     }
@@ -135,12 +136,12 @@ impl EthClient for EthHttpClient {
     }
 
     async fn block_number(&self) -> anyhow::Result<u64> {
-        Ok(self.web3.eth().block_number().await?.as_u64())
+        Ok(self.client.block_number().await?.as_u64())
     }
 
     async fn get_auth_fact(&self, address: Address, nonce: u32) -> anyhow::Result<Vec<u8>> {
-        self.zksync_contract
-            .query(
+        self.client
+            .call_main_contract_function(
                 "authFacts",
                 (address, u64::from(nonce)),
                 None,
@@ -152,8 +153,8 @@ impl EthClient for EthHttpClient {
     }
 
     async fn get_first_pending_withdrawal_index(&self) -> anyhow::Result<u32> {
-        self.zksync_contract
-            .query(
+        self.client
+            .call_main_contract_function(
                 "firstPendingWithdrawalIndex",
                 (),
                 None,
@@ -170,8 +171,8 @@ impl EthClient for EthHttpClient {
     }
 
     async fn get_number_of_pending_withdrawals(&self) -> anyhow::Result<u32> {
-        self.zksync_contract
-            .query(
+        self.client
+            .call_main_contract_function(
                 "numberOfPendingWithdrawals",
                 (),
                 None,

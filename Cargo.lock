@@ -5658,6 +5658,7 @@ dependencies = [
  "zksync_config",
  "zksync_contracts",
  "zksync_crypto",
+ "zksync_eth_client",
  "zksync_state",
  "zksync_storage",
  "zksync_types",

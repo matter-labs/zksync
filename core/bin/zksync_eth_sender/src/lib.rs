@@ -31,7 +31,7 @@ use self::{
 };
 use web3::transports::Http;
 use zksync_contracts::zksync_contract;
-use zksync_eth_client::eth_client_trait::EthereumGateway;
+use zksync_eth_client::ethereum_gateway::EthereumGateway;
 use zksync_eth_signer::PrivateKeySigner;
 
 mod database;

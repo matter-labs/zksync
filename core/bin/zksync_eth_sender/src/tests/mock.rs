@@ -10,7 +10,7 @@ use web3::contract::Options;
 use zksync_basic_types::{H256, U256};
 // Workspace uses
 
-use zksync_eth_client::{clients::mock::MockEthereum, eth_client_trait::EthereumGateway};
+use zksync_eth_client::{clients::mock::MockEthereum, ethereum_gateway::EthereumGateway};
 use zksync_storage::StorageProcessor;
 use zksync_types::{
     ethereum::{ETHOperation, EthOpId, InsertedOperationResponse, OperationType},

@@ -7,7 +7,7 @@ use super::{
     transactions::{ETHStats, TxCheckOutcome},
     ETHSender, TxCheckMode,
 };
-use zksync_eth_client::eth_client_trait::ExecutedTxStatus;
+use zksync_eth_client::ethereum_gateway::ExecutedTxStatus;
 
 const EXPECTED_WAIT_TIME_BLOCKS: u64 = 30;
 const WAIT_CONFIRMATIONS: u64 = 3;
