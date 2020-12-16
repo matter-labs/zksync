@@ -1,5 +1,8 @@
 use std::collections::HashMap;
-use zksync::{tokens_cache::TokensCache, web3::types::H160, zksync_types::Token};
+use zksync::{tokens_cache::TokensCache, utils::*, web3::types::H160, zksync_types::Token};
+use zksync_config::test_config::unit_vectors::{Config as TestVectorsConfig, TestEntry};
+use zksync_crypto::PrivateKey;
+use zksync_types::tx::TxSignature;
 
 #[test]
 fn test_tokens_cache() {
@@ -54,4 +57,555 @@ fn test_tokens_cache() {
     assert!(!tokens_hash.is_eth(token_dai.address.into()));
     assert!(!tokens_hash.is_eth(token_dai.id.into()));
     assert!(!tokens_hash.is_eth((&token_dai.symbol as &str).into()));
+}
+
+fn priv_key_from_raw(raw: &[u8]) -> Option<PrivateKey> {
+    use zksync_crypto::{
+        bellman::{pairing::ff::PrimeField, PrimeFieldRepr},
+        franklin_crypto::alt_babyjubjub::fs::FsRepr,
+        priv_key_from_fs, Fs,
+    };
+
+    let mut fs_repr = FsRepr::default();
+    fs_repr.read_be(raw).ok()?;
+    Fs::from_repr(fs_repr).ok().map(priv_key_from_fs)
+}
+
+fn assert_tx_signature(signature: &TxSignature, expected_pub: &str, expected_sig: &str) {
+    let TxSignature { pub_key, signature } = signature;
+
+    let pub_point = pub_key.serialize_packed().unwrap();
+    assert_eq!(hex::encode(pub_point), expected_pub);
+
+    let packed_sig = signature.serialize_packed().unwrap();
+    assert_eq!(hex::encode(packed_sig), expected_sig);
+}
+
+#[cfg(test)]
+mod primitives_with_vectors {
+    use super::*;
+
+    #[test]
+    fn test_signature() {
+        let test_vectors = TestVectorsConfig::load();
+        for TestEntry { inputs, outputs } in test_vectors.crypto_primitives.items {
+            let private_key =
+                private_key_from_seed(&inputs.seed).expect("Cannot get key from seed");
+
+            assert_eq!(
+                priv_key_from_raw(&outputs.private_key).unwrap().0,
+                private_key.0
+            );
+
+            let signature = TxSignature::sign_musig(&private_key, &inputs.message);
+            assert_tx_signature(&signature, &outputs.pub_key, &outputs.signature);
+        }
+    }
+}
+
+#[cfg(test)]
+mod utils_with_vectors {
+    use super::*;
+    use zksync_utils::format_units;
+
+    #[test]
+    fn test_token_packing() {
+        let test_vectors = TestVectorsConfig::load();
+        for TestEntry { inputs, outputs } in test_vectors.utils.amount_packing.items {
+            let token_amount = inputs.value;
+
+            assert_eq!(is_token_amount_packable(&token_amount), outputs.packable);
+            assert_eq!(
+                closest_packable_token_amount(&token_amount),
+                outputs.closest_packable
+            );
+            assert_eq!(pack_token_amount(&token_amount), outputs.packed_value);
+        }
+    }
+
+    #[test]
+    fn test_fee_packing() {
+        let test_vectors = TestVectorsConfig::load();
+        for TestEntry { inputs, outputs } in test_vectors.utils.fee_packing.items {
+            let fee_amount = inputs.value;
+
+            assert_eq!(is_fee_amount_packable(&fee_amount), outputs.packable);
+            assert_eq!(
+                closest_packable_fee_amount(&fee_amount),
+                outputs.closest_packable
+            );
+            assert_eq!(pack_fee_amount(&fee_amount), outputs.packed_value);
+        }
+    }
+
+    #[test]
+    fn test_formatting() {
+        let test_vectors = TestVectorsConfig::load();
+        for TestEntry { inputs, outputs } in test_vectors.utils.token_formatting.items {
+            let units_str = format_units(inputs.amount, inputs.decimals);
+            assert_eq!(format!("{} {}", units_str, inputs.token), outputs.formatted);
+        }
+    }
+}
+
+#[cfg(test)]
+mod signatures_with_vectors {
+    use super::*;
+    use zksync::{signer::Signer, WalletCredentials};
+    use zksync_config::test_config::unit_vectors::TxData;
+    use zksync_eth_signer::PrivateKeySigner;
+    use zksync_types::{network::Network, AccountId, Address, H256};
+
+    async fn get_signer(
+        eth_private_key_raw: &[u8],
+        from_address: Address,
+        account_id: AccountId,
+    ) -> Signer<PrivateKeySigner> {
+        let eth_private_key = H256::from_slice(eth_private_key_raw);
+        let eth_signer = PrivateKeySigner::new(eth_private_key);
+
+        let creds = WalletCredentials::from_eth_signer(from_address, eth_signer, Network::Mainnet)
+            .await
+            .unwrap();
+
+        let mut signer = Signer::with_credentials(creds);
+        signer.set_account_id(Some(account_id));
+        signer
+    }
+
+    #[tokio::test]
+    async fn test_transfer_signature() {
+        let test_vectors = TestVectorsConfig::load();
+        for TestEntry { inputs, outputs } in test_vectors.transactions.items {
+            if let TxData::Transfer {
+                data: transfer_tx,
+                eth_sign_data: sign_data,
+            } = &inputs.data
+            {
+                let signer = get_signer(
+                    &inputs.eth_private_key,
+                    transfer_tx.from,
+                    sign_data.account_id,
+                )
+                .await;
+
+                let token = Token {
+                    id: transfer_tx.token_id,
+                    address: Default::default(),
+                    symbol: sign_data.string_token.clone(),
+                    decimals: 0,
+                };
+                let (transfer, eth_signature) = signer
+                    .sign_transfer(
+                        token,
+                        transfer_tx.amount.clone(),
+                        transfer_tx.fee.clone(),
+                        sign_data.to,
+                        sign_data.nonce,
+                        0,
+                        u64::MAX,
+                    )
+                    .await
+                    .expect("Transfer signing error");
+
+                assert_eq!(transfer.get_bytes(), outputs.sign_bytes);
+                assert_tx_signature(
+                    &transfer.signature,
+                    &outputs.signature.pub_key,
+                    &outputs.signature.signature,
+                );
+
+                assert_eq!(
+                    transfer.get_ethereum_sign_message(&sign_data.string_token, 0),
+                    outputs.eth_sign_message.unwrap()
+                );
+
+                if let Some(expected_eth_signature) = outputs.eth_signature {
+                    let eth_signature = eth_signature.unwrap().serialize_packed();
+                    assert_eq!(&eth_signature, expected_eth_signature.as_slice());
+                }
+            }
+        }
+    }
+
+    #[tokio::test]
+    async fn test_withdraw_signature() {
+        let test_vectors = TestVectorsConfig::load();
+        for TestEntry { inputs, outputs } in test_vectors.transactions.items {
+            if let TxData::Withdraw {
+                data: withdraw_tx,
+                eth_sign_data: sign_data,
+            } = &inputs.data
+            {
+                let signer = get_signer(
+                    &inputs.eth_private_key,
+                    withdraw_tx.from,
+                    sign_data.account_id,
+                )
+                .await;
+
+                let token = Token {
+                    id: withdraw_tx.token_id,
+                    address: Default::default(),
+                    symbol: sign_data.string_token.clone(),
+                    decimals: 0,
+                };
+                let (withdraw, eth_signature) = signer
+                    .sign_withdraw(
+                        token,
+                        withdraw_tx.amount.clone(),
+                        withdraw_tx.fee.clone(),
+                        sign_data.eth_address,
+                        sign_data.nonce,
+                    )
+                    .await
+                    .expect("Withdraw signing error");
+
+                assert_eq!(withdraw.get_bytes(), outputs.sign_bytes);
+                assert_tx_signature(
+                    &withdraw.signature,
+                    &outputs.signature.pub_key,
+                    &outputs.signature.signature,
+                );
+
+                assert_eq!(
+                    withdraw.get_ethereum_sign_message(&sign_data.string_token, 0),
+                    outputs.eth_sign_message.unwrap()
+                );
+
+                if let Some(expected_eth_signature) = outputs.eth_signature {
+                    let eth_signature = eth_signature.unwrap().serialize_packed();
+                    assert_eq!(&eth_signature, expected_eth_signature.as_slice());
+                }
+            }
+        }
+    }
+
+    #[tokio::test]
+    async fn test_change_pubkey_signature() {
+        let test_vectors = TestVectorsConfig::load();
+        for TestEntry { inputs, outputs } in test_vectors.transactions.items {
+            if let TxData::ChangePubKey {
+                data: change_pubkey_tx,
+                eth_sign_data: sign_data,
+            } = &inputs.data
+            {
+                let mut signer = get_signer(
+                    &inputs.eth_private_key,
+                    change_pubkey_tx.account,
+                    sign_data.account_id,
+                )
+                .await;
+                signer.pubkey_hash = change_pubkey_tx.new_pk_hash;
+
+                let token = Token {
+                    id: change_pubkey_tx.fee_token_id,
+                    address: Default::default(),
+                    symbol: String::new(),
+                    decimals: 0,
+                };
+                let change_pub_key = signer
+                    .sign_change_pubkey_tx(
+                        sign_data.nonce,
+                        false,
+                        token,
+                        change_pubkey_tx.fee.clone(),
+                    )
+                    .await
+                    .expect("Change pub key signing error");
+
+                assert_eq!(change_pub_key.get_bytes(), outputs.sign_bytes);
+                assert_tx_signature(
+                    &change_pub_key.signature,
+                    &outputs.signature.pub_key,
+                    &outputs.signature.signature,
+                );
+
+                assert_eq!(
+                    change_pub_key.get_eth_signed_data().unwrap(),
+                    outputs.eth_sign_message.unwrap().into_bytes()
+                );
+
+                if let Some(expected_eth_signature) = outputs.eth_signature {
+                    let eth_signature = change_pub_key.eth_signature.unwrap().serialize_packed();
+                    assert_eq!(&eth_signature, expected_eth_signature.as_slice());
+                }
+            }
+        }
+    }
+
+    #[tokio::test]
+    async fn test_forced_exit_signature() {
+        let test_vectors = TestVectorsConfig::load();
+        for TestEntry { inputs, outputs } in test_vectors.transactions.items {
+            if let TxData::ForcedExit { data: forced_exit } = &inputs.data {
+                let signer = get_signer(
+                    &inputs.eth_private_key,
+                    forced_exit.from,
+                    forced_exit.initiator_account_id,
+                )
+                .await;
+
+                let token = Token {
+                    id: forced_exit.token_id,
+                    address: Default::default(),
+                    symbol: String::new(),
+                    decimals: 0,
+                };
+                let forced_exit = signer
+                    .sign_forced_exit(
+                        forced_exit.target,
+                        token,
+                        forced_exit.fee.clone(),
+                        forced_exit.nonce,
+                    )
+                    .await
+                    .expect("Forced exit signing error");
+
+                assert_eq!(forced_exit.get_bytes(), outputs.sign_bytes);
+                assert_tx_signature(
+                    &forced_exit.signature,
+                    &outputs.signature.pub_key,
+                    &outputs.signature.signature,
+                );
+            }
+        }
+    }
+}
+
+#[cfg(test)]
+mod wallet_tests {
+    use super::*;
+    use num::{BigUint, ToPrimitive};
+    use zksync::{
+        error::ClientError,
+        provider::Provider,
+        signer::Signer,
+        types::{
+            AccountInfo, AccountState, BlockStatus, ContractAddress, Fee, Tokens, TransactionInfo,
+        },
+        Network, Wallet, WalletCredentials,
+    };
+    use zksync_eth_signer::PrivateKeySigner;
+    use zksync_types::{
+        tokens::get_genesis_token_list,
+        tx::{PackedEthSignature, TxHash},
+        Address, PubKeyHash, TokenLike, TxFeeTypes, ZkSyncTx, H256,
+    };
+
+    #[derive(Debug, Clone)]
+    /// Provides some hardcoded values the `Provider` responsible to
+    /// without communicating with the network
+    struct MockProvider {
+        network: Network,
+        eth_private_key: H256,
+    }
+
+    impl MockProvider {
+        async fn pub_key_hash(&self) -> PubKeyHash {
+            let address =
+                PackedEthSignature::address_from_private_key(&self.eth_private_key).unwrap();
+            let eth_signer = PrivateKeySigner::new(self.eth_private_key);
+            let creds = WalletCredentials::from_eth_signer(address, eth_signer, self.network)
+                .await
+                .unwrap();
+            let signer = Signer::with_credentials(creds);
+            signer.pubkey_hash
+        }
+    }
+
+    #[async_trait::async_trait]
+    impl Provider for MockProvider {
+        /// Returns the example `AccountInfo` instance:
+        ///  - assigns the '42' value to account_id;
+        ///  - assigns the PubKeyHash to match the wallet's signer's PubKeyHash
+        ///  - adds single entry of "DAI" token to the committed balances;
+        ///  - adds single entry of "USDC" token to the verified balances.
+        async fn account_info(&self, address: Address) -> Result<AccountInfo, ClientError> {
+            let mut committed_balances = HashMap::new();
+            committed_balances.insert("DAI".into(), BigUint::from(12345_u32).into());
+
+            let mut verified_balances = HashMap::new();
+            verified_balances.insert("USDC".into(), BigUint::from(98765_u32).into());
+
+            Ok(AccountInfo {
+                address,
+                id: Some(42),
+                depositing: Default::default(),
+                committed: AccountState {
+                    balances: committed_balances,
+                    nonce: 0,
+                    pub_key_hash: self.pub_key_hash().await,
+                },
+                verified: AccountState {
+                    balances: verified_balances,
+                    ..Default::default()
+                },
+            })
+        }
+
+        /// Returns first three tokens from the configuration found in
+        /// $ZKSYNC_HOME/etc/tokens/<NETWORK>.json
+        async fn tokens(&self) -> Result<Tokens, ClientError> {
+            let genesis_tokens = get_genesis_token_list(&self.network.to_string())
+                .expect("Initial token list not found");
+
+            let tokens = (1..)
+                .zip(&genesis_tokens[..3])
+                .map(|(id, token)| Token {
+                    id,
+                    symbol: token.symbol.clone(),
+                    address: token.address[2..]
+                        .parse()
+                        .expect("failed to parse token address"),
+                    decimals: token.decimals,
+                })
+                .map(|token| (token.symbol.clone(), token))
+                .collect();
+            Ok(tokens)
+        }
+
+        async fn tx_info(&self, _tx_hash: TxHash) -> Result<TransactionInfo, ClientError> {
+            unreachable!()
+        }
+
+        async fn get_tx_fee(
+            &self,
+            _tx_type: TxFeeTypes,
+            _address: Address,
+            _token: impl Into<TokenLike> + Send + 'async_trait,
+        ) -> Result<Fee, ClientError> {
+            unreachable!()
+        }
+
+        async fn send_tx(
+            &self,
+            _tx: ZkSyncTx,
+            _eth_signature: Option<PackedEthSignature>,
+        ) -> Result<TxHash, ClientError> {
+            unreachable!()
+        }
+
+        fn network(&self) -> Network {
+            self.network
+        }
+
+        /// Returns the example `ContractAddress` instance:
+        ///  - the HEX-encoded sequence of bytes [0..20) provided as the `main_contract`;
+        ///  - the `gov_contract` is not usable in tests and it is simply an empty string.
+        async fn contract_address(&self) -> Result<ContractAddress, ClientError> {
+            Ok(ContractAddress {
+                main_contract: "0x000102030405060708090a0b0c0d0e0f10111213".to_string(),
+                gov_contract: "".to_string(),
+            })
+        }
+    }
+
+    async fn get_test_wallet(
+        private_key_raw: &[u8],
+        network: Network,
+    ) -> Wallet<PrivateKeySigner, MockProvider> {
+        let private_key = H256::from_slice(private_key_raw);
+        let address = PackedEthSignature::address_from_private_key(&private_key).unwrap();
+
+        let eth_signer = PrivateKeySigner::new(private_key);
+        let creds = WalletCredentials::from_eth_signer(address, eth_signer, Network::Mainnet)
+            .await
+            .unwrap();
+
+        let provider = MockProvider {
+            network,
+            eth_private_key: private_key,
+        };
+        Wallet::new(provider, creds).await.unwrap()
+    }
+
+    #[tokio::test]
+    async fn test_wallet_address() {
+        let wallet = get_test_wallet(&[5; 32], Network::Mainnet).await;
+        let expected_address =
+            PackedEthSignature::address_from_private_key(&H256::from([5; 32])).unwrap();
+        assert_eq!(wallet.address(), expected_address);
+    }
+
+    #[tokio::test]
+    async fn test_wallet_account_info() {
+        let wallet = get_test_wallet(&[10; 32], Network::Mainnet).await;
+        let account_info = wallet.account_info().await.unwrap();
+        assert_eq!(account_info.address, wallet.address());
+    }
+
+    #[tokio::test]
+    async fn test_wallet_account_id() {
+        let wallet = get_test_wallet(&[14; 32], Network::Mainnet).await;
+        assert_eq!(wallet.account_id(), Some(42));
+    }
+
+    #[tokio::test]
+    async fn test_wallet_refresh_tokens() {
+        let mut wallet = get_test_wallet(&[20; 32], Network::Mainnet).await;
+        let _dai_token = wallet
+            .tokens
+            .resolve(TokenLike::Symbol("DAI".into()))
+            .unwrap();
+
+        wallet.provider.network = Network::Rinkeby;
+        wallet.refresh_tokens_cache().await.unwrap();
+
+        // DAI is not in the Rinkeby network
+        assert!(wallet
+            .tokens
+            .resolve(TokenLike::Symbol("DAI".into()))
+            .is_none());
+    }
+
+    #[tokio::test]
+    async fn test_wallet_get_balance_committed() {
+        let wallet = get_test_wallet(&[40; 32], Network::Mainnet).await;
+        let balance = wallet
+            .get_balance(BlockStatus::Committed, "DAI")
+            .await
+            .unwrap();
+        assert_eq!(balance.to_u32(), Some(12345));
+    }
+
+    #[tokio::test]
+    async fn test_wallet_get_balance_committed_not_existent() {
+        let wallet = get_test_wallet(&[40; 32], Network::Mainnet).await;
+        let result = wallet.get_balance(BlockStatus::Committed, "ETH").await;
+
+        assert_eq!(result.unwrap_err(), ClientError::UnknownToken);
+    }
+
+    #[tokio::test]
+    async fn test_wallet_get_balance_verified() {
+        let wallet = get_test_wallet(&[50; 32], Network::Mainnet).await;
+        let balance = wallet
+            .get_balance(BlockStatus::Verified, "USDC")
+            .await
+            .unwrap();
+        assert_eq!(balance.to_u32(), Some(98765));
+    }
+
+    #[tokio::test]
+    async fn test_wallet_get_balance_verified_not_existent() {
+        let wallet = get_test_wallet(&[50; 32], Network::Mainnet).await;
+        let result = wallet.get_balance(BlockStatus::Verified, "ETH").await;
+
+        assert_eq!(result.unwrap_err(), ClientError::UnknownToken);
+    }
+
+    #[tokio::test]
+    async fn test_wallet_is_signing_key_set() {
+        let wallet = get_test_wallet(&[50; 32], Network::Mainnet).await;
+        assert!(wallet.is_signing_key_set().await.unwrap());
+    }
+
+    #[tokio::test]
+    async fn test_wallet_ethereum() {
+        let wallet = get_test_wallet(&[50; 32], Network::Mainnet).await;
+        let eth_provider = wallet.ethereum("http://some.random.url").await.unwrap();
+        let expected_address: Vec<_> = (0..20).collect();
+        assert_eq!(eth_provider.contract_address().as_bytes(), expected_address);
+    }
 }

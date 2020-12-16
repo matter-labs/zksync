@@ -235,7 +235,7 @@ impl InMemoryStorageInteractor {
                         .get_mut(id)
                         .expect("In tests this account should be stored");
                     account.nonce = max(account.nonce, *new_nonce);
-                    account.pub_key_hash = new_pub_key_hash.clone();
+                    account.pub_key_hash = *new_pub_key_hash;
                 }
             }
         }

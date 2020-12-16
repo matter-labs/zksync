@@ -190,7 +190,7 @@ impl ZkSyncState {
                     assert_eq!(account.pub_key_hash, old_pub_key_hash);
                     assert_eq!(account.nonce, old_nonce);
 
-                    account.pub_key_hash = new_pub_key_hash.clone();
+                    account.pub_key_hash = new_pub_key_hash;
                     account.nonce = new_nonce;
                     self.insert_account(account_id, account);
                 }
@@ -384,7 +384,7 @@ impl ZkSyncState {
                     );
                     assert_eq!(&account.nonce, old_nonce, "nonce mismatch");
 
-                    account.pub_key_hash = new_pub_key_hash.clone();
+                    account.pub_key_hash = *new_pub_key_hash;
                     account.nonce = *new_nonce;
 
                     self.insert_account(*account_id, account);

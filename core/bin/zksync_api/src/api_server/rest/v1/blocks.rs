@@ -22,7 +22,7 @@ use super::{
     client::{self, Client},
     Error as ApiError, JsonResult, Pagination, PaginationQuery,
 };
-use crate::{api_server::rest::helpers::try_parse_tx_hash, utils::shared_lru_cache::AsyncLruCache};
+use crate::{api_server::helpers::try_parse_tx_hash, utils::shared_lru_cache::AsyncLruCache};
 
 /// Shared data between `api/v1/blocks` endpoints.
 #[derive(Debug, Clone)]
@@ -162,10 +162,10 @@ impl From<records::BlockDetails> for BlockInfo {
 impl From<records::BlockTransactionItem> for TransactionInfo {
     fn from(inner: records::BlockTransactionItem) -> Self {
         Self {
-            tx_hash: try_parse_tx_hash(&inner.tx_hash).unwrap_or_else(|| {
+            tx_hash: try_parse_tx_hash(&inner.tx_hash).unwrap_or_else(|err| {
                 panic!(
-                    "Database provided an incorrect transaction hash: {:?}",
-                    inner.tx_hash
+                    "Database provided an incorrect transaction hash: {:?}, an error occurred: {}",
+                    inner.tx_hash, err
                 )
             }),
             block_number: inner.block_number as BlockNumber,
@@ -255,7 +255,7 @@ async fn blocks_range(
         .await
         .map_err(ApiError::internal)?;
     // Handle edge case when "after + limit" greater than the total blocks count.
-    // TODO Handle this case directly in the `storage` crate. (#1151)
+    // TODO Handle this case directly in the `storage` crate. (ZKS-124)
     let range = if let Pagination::After(after) = pagination {
         range
             .into_iter()
@@ -304,14 +304,14 @@ mod tests {
             blocks.into_iter().map(From::from).collect()
         };
 
-        assert_eq!(client.block_by_id(1).await?.unwrap(), blocks[4]);
-        assert_eq!(client.blocks_range(Pagination::Last, 5).await?, blocks);
+        assert_eq!(client.block_by_id(1).await?.unwrap(), blocks[7]);
+        assert_eq!(client.blocks_range(Pagination::Last, 10).await?, blocks);
         assert_eq!(
             client.blocks_range(Pagination::Before(2), 5).await?,
-            &blocks[4..5]
+            &blocks[7..8]
         );
         assert_eq!(
-            client.blocks_range(Pagination::After(4), 5).await?,
+            client.blocks_range(Pagination::After(7), 5).await?,
             &blocks[0..1]
         );
 
@@ -328,7 +328,7 @@ mod tests {
             transactions.into_iter().map(From::from).collect()
         };
         assert_eq!(client.block_transactions(1).await?, expected_txs);
-        assert_eq!(client.block_transactions(2).await?, vec![]);
+        assert_eq!(client.block_transactions(6).await?, vec![]);
 
         server.stop().await;
         Ok(())

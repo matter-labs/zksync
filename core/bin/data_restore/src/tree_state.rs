@@ -545,7 +545,7 @@ mod test {
         let tx5 = ChangePubKey::new(
             0,
             [7u8; 20].into(),
-            pub_key_hash_7.clone(),
+            pub_key_hash_7,
             1,
             BigUint::from(1u32),
             2,
@@ -742,7 +742,7 @@ mod test {
         let tx5 = ChangePubKey::new(
             0,
             [7u8; 20].into(),
-            pub_key_hash_7.clone(),
+            pub_key_hash_7,
             1,
             BigUint::from(1u32),
             2,

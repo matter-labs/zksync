@@ -3,7 +3,7 @@ use std::{collections::HashSet, env, net::SocketAddr, str::FromStr, time::Durati
 // External uses
 use url::Url;
 // Workspace uses
-use zksync_basic_types::{Address, H256};
+use zksync_types::{Address, H256};
 use zksync_utils::{get_env, parse_env, parse_env_if_exists, parse_env_with};
 // Local uses
 
@@ -68,6 +68,7 @@ impl EthClientOptions {
 
 #[derive(Debug, Clone)]
 pub struct ProverOptions {
+    pub secret_auth: String,
     pub prepare_data_interval: Duration,
     pub heartbeat_interval: Duration,
     pub cycle_wait: Duration,
@@ -81,6 +82,14 @@ impl ProverOptions {
     /// Parses the configuration options values from the environment variables.
     /// Panics if any of options is missing or has inappropriate value.
     pub fn from_env() -> Self {
+        let secret_auth = get_env("PROVER_SECRET_AUTH");
+        let network = get_env("ETH_NETWORK");
+
+        // Checks if an untrusted key is being used for production.
+        if &secret_auth == "sample" && &network != "localhost" {
+            log::error!("Prover secret for JWT authorization set to 'sample', this is an incorrect value for production");
+        }
+
         Self {
             prepare_data_interval: Duration::from_millis(parse_env("PROVER_PREPARE_DATA_INTERVAL")),
             heartbeat_interval: Duration::from_millis(parse_env("PROVER_HEARTBEAT_INTERVAL")),
@@ -89,6 +98,7 @@ impl ProverOptions {
             prover_server_address: addr_from_port(parse_env("PROVER_SERVER_PORT")),
             witness_generators: parse_env("WITNESS_GENERATORS"),
             idle_provers: parse_env("IDLE_PROVERS"),
+            secret_auth,
         }
     }
 }
@@ -105,10 +115,18 @@ impl AdminServerOptions {
     /// Parses the configuration options values from the environment variables.
     /// Panics if any of options is missing or has inappropriate value.
     pub fn from_env() -> Self {
+        let secret_auth = get_env("ADMIN_SERVER_SECRET_AUTH");
+        let network = get_env("ETH_NETWORK");
+
+        // Checks if an untrusted key is being used for production.
+        if &secret_auth == "sample" && &network != "localhost" {
+            log::error!("Admin server secret for JWT authorization set to 'sample', this is an incorrect value for production");
+        }
+
         Self {
             admin_http_server_url: parse_env("ADMIN_SERVER_API_URL"),
             admin_http_server_address: addr_from_port(parse_env("ADMIN_SERVER_API_PORT")),
-            secret_auth: parse_env("SECRET_AUTH"),
+            secret_auth,
         }
     }
 }
@@ -206,14 +224,18 @@ pub struct ApiServerOptions {
     /// Fee increase coefficient for fast processing of withdrawal.
     pub forced_exit_minimum_account_age: Duration,
     pub enforce_pubkey_change_fee: bool,
+    // Limit the number of both transactions and Ethereum signatures per batch.
+    pub max_number_of_transactions_per_batch: usize,
+    pub max_number_of_authors_per_batch: usize,
 }
 
 impl ApiServerOptions {
     pub fn from_env() -> Self {
         let forced_exit_minimum_account_age =
             Duration::from_secs(parse_env::<u64>("FORCED_EXIT_MINIMUM_ACCOUNT_AGE_SECS"));
+        let network = get_env("ETH_NETWORK");
 
-        if forced_exit_minimum_account_age.as_secs() == 0 {
+        if forced_exit_minimum_account_age.as_secs() == 0 && &network != "localhost" {
             log::error!("Forced exit minimum account age is set to 0, this is an incorrect value for production");
         }
 
@@ -227,6 +249,8 @@ impl ApiServerOptions {
             forced_exit_minimum_account_age,
             enforce_pubkey_change_fee: parse_env_if_exists("ENFORCE_PUBKEY_CHANGE_FEE")
                 .unwrap_or(true),
+            max_number_of_transactions_per_batch: parse_env("MAX_TRANSACTIONS_PER_BATCH"),
+            max_number_of_authors_per_batch: parse_env("MAX_ETH_SIGNATURES_PER_BATCH"),
         }
     }
 }
@@ -245,19 +269,35 @@ pub struct ConfigurationOptions {
     pub eth_network: String,
     pub miniblock_timings: MiniblockTimings,
     pub prometheus_export_port: u16,
+    pub aggregated_proof_sizes: Vec<usize>,
 }
 
 impl ConfigurationOptions {
     /// Parses the configuration options values from the environment variables.
     /// Panics if any of options is missing or has inappropriate value.
     pub fn from_env() -> Self {
-        let runtime_value = env::var("BLOCK_CHUNK_SIZES").expect("BLOCK_CHUNK_SIZES missing");
-        let mut available_block_chunk_sizes = runtime_value
-            .split(',')
-            .map(|s| usize::from_str(s).unwrap())
-            .collect::<Vec<_>>();
+        let available_block_chunk_sizes = {
+            let runtime_value = env::var("BLOCK_CHUNK_SIZES").expect("BLOCK_CHUNK_SIZES missing");
+            let mut available_block_chunk_sizes = runtime_value
+                .split(',')
+                .map(|s| usize::from_str(s).unwrap())
+                .collect::<Vec<_>>();
 
-        available_block_chunk_sizes.sort_unstable();
+            available_block_chunk_sizes.sort_unstable();
+            available_block_chunk_sizes
+        };
+
+        let aggregated_proof_sizes = {
+            let runtime_value =
+                env::var("AGGREGATED_PROOF_SIZES").expect("AGGREGATED_PROOF_SIZES missing");
+            let mut aggregated_proof_sizes = runtime_value
+                .split(',')
+                .map(|s| usize::from_str(s).unwrap())
+                .collect::<Vec<_>>();
+
+            aggregated_proof_sizes.sort_unstable();
+            aggregated_proof_sizes
+        };
 
         Self {
             web3_url: get_env("WEB3_URL"),
@@ -274,16 +314,19 @@ impl ConfigurationOptions {
             eth_network: parse_env("ETH_NETWORK"),
             miniblock_timings: MiniblockTimings::from_env(),
             prometheus_export_port: parse_env("PROMETHEUS_EXPORT_PORT"),
+            aggregated_proof_sizes,
         }
     }
 }
 
 /// Possible block chunks sizes and corresponding setup powers of two,
 /// this is only parameters needed to create verifying contract.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct AvailableBlockSizesConfig {
     pub blocks_chunks: Vec<usize>,
     pub blocks_setup_power2: Vec<u32>,
+    pub aggregated_proof_sizes: Vec<usize>,
+    pub aggregated_proof_sizes_setup_power2: Vec<u32>,
 }
 
 impl AvailableBlockSizesConfig {
@@ -297,12 +340,35 @@ impl AvailableBlockSizesConfig {
                 .split(',')
                 .map(|p| p.parse().unwrap())
                 .collect(),
+            aggregated_proof_sizes: get_env("SUPPORTED_AGGREGATED_PROOF_SIZES")
+                .split(',')
+                .map(|p| p.parse().unwrap())
+                .collect(),
+            aggregated_proof_sizes_setup_power2: get_env(
+                "SUPPORTED_AGGREGATED_PROOF_SIZES_SETUP_POWERS",
+            )
+            .split(',')
+            .map(|p| p.parse().unwrap())
+            .collect(),
         };
         assert_eq!(
             result.blocks_chunks.len(),
             result.blocks_setup_power2.len(),
             "block sized and setup powers should have same length, check config file"
         );
+        assert_eq!(
+            result.aggregated_proof_sizes.len(),
+            result.aggregated_proof_sizes_setup_power2.len(),
+            "aggregated proof sizes and setup powers should have same length, check config file"
+        );
         result
+    }
+
+    pub fn aggregated_proof_sizes_with_setup_pow(&self) -> Vec<(usize, u32)> {
+        self.aggregated_proof_sizes
+            .iter()
+            .cloned()
+            .zip(self.aggregated_proof_sizes_setup_power2.iter().cloned())
+            .collect()
     }
 }

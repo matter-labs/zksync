@@ -65,9 +65,9 @@ fn get_batch() -> Vec<ZkSyncTx> {
 #[test]
 fn test_empty_batch() {
     let txs = vec![];
-    let signature = get_eth_signature();
+    let signatures = vec![get_eth_signature()];
 
-    assert!(BatchSignData::new(&txs, signature).is_err());
+    assert!(BatchSignData::new(&txs, signatures).is_err());
 }
 
 /// Checks that we can't create batch signature data from the batch with multiple
@@ -76,17 +76,17 @@ fn test_empty_batch() {
 fn multiple_change_pub_key_in_batch() {
     let mut txs = get_batch();
     txs.push(txs.last().unwrap().clone());
-    let signature = get_eth_signature();
+    let signatures = vec![get_eth_signature()];
 
     // Should return error.
-    assert!(BatchSignData::new(&txs, signature).is_err());
+    assert!(BatchSignData::new(&txs, signatures).is_err());
 }
 
 /// Checks the correctness of the message `BatchSignData::new()` returns.
 #[test]
 fn test_batch_message() -> Result<()> {
     let mut txs = get_batch();
-    let signature = get_eth_signature();
+    let signatures = vec![get_eth_signature()];
 
     // For the initial batch we expect prefixed hash of transactions data.
     let mut batch_hash = Vec::new();
@@ -103,9 +103,9 @@ fn test_batch_message() -> Result<()> {
     let change_pub_key_message = change_pub_key.as_ref().get_eth_signed_data()?;
     assert!(change_pub_key_message.ends_with(batch_hash.as_slice()));
     // Shouldn't fail.
-    let batch_sign_data = BatchSignData::new(&txs, signature.clone())?;
+    let batch_sign_data = BatchSignData::new(&txs, signatures.clone())?;
 
-    assert_eq!(batch_sign_data.0.message, change_pub_key_message);
+    assert_eq!(batch_sign_data.message, change_pub_key_message);
 
     // Now remove `ChangePubKey` from the batch and expect the hash of bytes without the prefix.
     txs.pop();
@@ -115,8 +115,8 @@ fn test_batch_message() -> Result<()> {
     }
     let batch_hash = tiny_keccak::keccak256(&batch_hash);
     // Still shouldn't fail.
-    let batch_sign_data = BatchSignData::new(&txs, signature)?;
+    let batch_sign_data = BatchSignData::new(&txs, signatures)?;
 
-    assert_eq!(batch_sign_data.0.message, batch_hash);
+    assert_eq!(batch_sign_data.message, batch_hash);
     Ok(())
 }

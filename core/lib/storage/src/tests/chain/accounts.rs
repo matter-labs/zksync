@@ -37,7 +37,7 @@ async fn stored_accounts(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
     // for (account_id, account) in accounts_block.iter() {
     //     let mut account = account.clone();
     //     let account_state = AccountSchema(&mut storage)
-    //         .account_state_by_address(&account.address)
+    //         .account_state_by_address(account.address)
     //         .await?;
     //
     //     // Check that committed state is available, but verified is not.
@@ -54,7 +54,7 @@ async fn stored_accounts(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
     //     let (got_account_id, got_account) = account_state.committed.unwrap();
     //
     //     // We have to copy this field, since it is not initialized by default.
-    //     account.pub_key_hash = got_account.pub_key_hash.clone();
+    //     account.pub_key_hash = got_account.pub_key_hash;
     //
     //     assert_eq!(got_account_id, *account_id);
     //     assert_eq!(got_account, account);
@@ -65,6 +65,20 @@ async fn stored_accounts(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
     //             .last_committed_state_for_account(*account_id)
     //             .await?,
     //         Some(got_account)
+    //     );
+    //
+    //     // Check account address and ID getters.
+    //     assert_eq!(
+    //         AccountSchema(&mut storage)
+    //             .account_address_by_id(*account_id)
+    //             .await?,
+    //         Some(account.address)
+    //     );
+    //     assert_eq!(
+    //         AccountSchema(&mut storage)
+    //             .account_id_by_address(account.address)
+    //             .await?,
+    //         Some(*account_id)
     //     );
     // }
     //
@@ -86,7 +100,7 @@ async fn stored_accounts(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
     // // After that all the accounts should have a verified state.
     // for (account_id, account) in accounts_block {
     //     let account_state = AccountSchema(&mut storage)
-    //         .account_state_by_address(&account.address)
+    //         .account_state_by_id(account_id)
     //         .await?;
     //
     //     assert!(

@@ -4,11 +4,10 @@ pragma solidity ^0.7.0;
 pragma experimental ABIEncoderV2;
 
 import "./KeysWithPlonkVerifier.sol";
+import "./Config.sol";
 
 // Hardcoded constants to avoid accessing store
-contract Verifier is KeysWithPlonkVerifier {
-    bool constant DUMMY_VERIFIER = $(DUMMY_VERIFIER);
-
+contract Verifier is KeysWithPlonkVerifier, Config {
     function initialize(bytes calldata) external {}
 
     /// @notice Verifier contract upgrade. Can be external because Proxy contract intercepts illegal calls of this function.
@@ -23,7 +22,8 @@ contract Verifier is KeysWithPlonkVerifier {
         uint256[16] memory _subproofs_limbs,
         bool blockProof
     ) external view returns (bool) {
-        if (DUMMY_VERIFIER && blockProof) {
+        // #if DUMMY_VERIFIER
+        if (blockProof) {
             uint256 oldGasValue = gasleft();
             uint256 tmp;
             while (gasleft() + 500000 > oldGasValue) {
@@ -31,10 +31,10 @@ contract Verifier is KeysWithPlonkVerifier {
             }
             return true;
         }
+        // #endif
         for (uint256 i = 0; i < _individual_vks_inputs.length; ++i) {
             uint256 commitment = _individual_vks_inputs[i];
-            uint256 mask = (~uint256(0)) >> 3;
-            _individual_vks_inputs[i] = uint256(commitment) & mask;
+            _individual_vks_inputs[i] = uint256(commitment) & INPUT_MASK;
         }
         VerificationKey memory vk = getVkAggregated(uint32(_vkIndexes.length));
 

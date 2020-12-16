@@ -3,8 +3,16 @@ use std::sync::{Arc, RwLock};
 use std::thread;
 use std::time::Duration;
 // External
+use actix_web::dev::ServiceRequest;
 use actix_web::{web, App, HttpResponse, HttpServer};
+use actix_web_httpauth::extractors::{
+    bearer::{BearerAuth, Config},
+    AuthenticationError,
+};
+use actix_web_httpauth::middleware::HttpAuthentication;
 use futures::channel::mpsc;
+use jsonwebtoken::errors::Error as JwtError;
+use jsonwebtoken::{decode, DecodingKey, Validation};
 use serde::{Deserialize, Serialize};
 // Workspace deps
 use zksync_config::ProverOptions;
@@ -28,8 +36,17 @@ use zksync_utils::panic_notify::ThreadPanicNotify;
 mod scaler;
 mod witness_generator;
 
-#[derive(Debug)]
+#[derive(Debug, Serialize, Deserialize)]
+struct PayloadAuthToken {
+    /// Subject (whom auth token refers to).
+    sub: String,
+    /// Expiration time (as UTC timestamp).
+    exp: usize,
+}
+
+#[derive(Debug, Clone)]
 struct AppState {
+    secret_auth: String,
     connection_pool: zksync_storage::ConnectionPool,
     scaler_oracle: Arc<RwLock<ScalerOracle>>,
     prover_timeout: Duration,
@@ -37,6 +54,7 @@ struct AppState {
 
 impl AppState {
     pub fn new(
+        secret_auth: String,
         connection_pool: ConnectionPool,
         prover_timeout: Duration,
         idle_provers: u32,
@@ -47,6 +65,7 @@ impl AppState {
         )));
 
         Self {
+            secret_auth,
             connection_pool,
             scaler_oracle,
             prover_timeout,
@@ -58,6 +77,39 @@ impl AppState {
             vlog::warn!("Failed to access storage: {}", e);
             actix_web::error::ErrorInternalServerError(e)
         })
+    }
+}
+
+/// The structure that stores the secret key for checking JsonWebToken matching.
+struct AuthTokenValidator<'a> {
+    decoding_key: DecodingKey<'a>,
+}
+
+impl<'a> AuthTokenValidator<'a> {
+    fn new(secret: &'a str) -> Self {
+        Self {
+            decoding_key: DecodingKey::from_secret(secret.as_ref()),
+        }
+    }
+
+    /// Checks whether the secret key and the authorization token match.
+    fn validate_auth_token(&self, token: &str) -> Result<(), JwtError> {
+        decode::<PayloadAuthToken>(token, &self.decoding_key, &Validation::default())?;
+
+        Ok(())
+    }
+
+    async fn validator(
+        &self,
+        req: ServiceRequest,
+        credentials: BearerAuth,
+    ) -> actix_web::Result<ServiceRequest> {
+        let config = req.app_data::<Config>().cloned().unwrap_or_default();
+
+        self.validate_auth_token(credentials.token())
+            .map_err(|_| AuthenticationError::from(config))?;
+
+        Ok(req)
     }
 }
 
@@ -311,22 +363,22 @@ async fn update_prover_job_queue(storage: &mut StorageProcessor<'_>) -> anyhow::
             ..
         })) = create_block_proof_action
         {
-            let first_block = *blocks.first().expect("should have 1 block");
-            let last_block = *blocks.last().expect("should have 1 block");
+            let first_block = blocks
+                .first()
+                .map(|b| b.block_number)
+                .expect("should have 1 block");
+            let last_block = blocks
+                .last()
+                .map(|b| b.block_number)
+                .expect("should have 1 block");
             let mut data = Vec::new();
             for block in blocks {
                 let proof = storage
                     .prover_schema()
-                    .load_proof(block)
+                    .load_proof(block.block_number)
                     .await?
                     .expect("Single proof should exist");
-                let block_size = storage
-                    .chain()
-                    .block_schema()
-                    .get_block(block)
-                    .await?
-                    .expect("Block should exist")
-                    .block_chunks_size;
+                let block_size = block.block_chunks_size;
                 data.push((proof, block_size));
             }
             let job_data = serde_json::to_value(JobRequestData::AggregatedBlockProof(data))
@@ -394,16 +446,32 @@ pub fn run_prover_server(
                     pool_maintainer.start(panic_notify.clone());
                 }
                 // Start HTTP server.
+                let secret_auth = prover_options.secret_auth.clone();
                 let gone_timeout = prover_options.gone_timeout;
                 let idle_provers = prover_options.idle_provers;
                 HttpServer::new(move || {
-                    let app_state =
-                        AppState::new(connection_pool.clone(), gone_timeout, idle_provers);
+                    let app_state = AppState::new(
+                        secret_auth.clone(),
+                        connection_pool.clone(),
+                        gone_timeout,
+                        idle_provers,
+                    );
+
+                    let auth = HttpAuthentication::bearer(move |req, credentials| async {
+                        let secret_auth = req
+                            .app_data::<web::Data<AppState>>()
+                            .expect("failed get AppState upon receipt of the authentication token")
+                            .secret_auth
+                            .clone();
+                        AuthTokenValidator::new(&secret_auth)
+                            .validator(req, credentials)
+                            .await
+                    });
 
                     // By calling `register_data` instead of `data` we're avoiding double
                     // `Arc` wrapping of the object.
                     App::new()
-                        .wrap(actix_web::middleware::Logger::default())
+                        .wrap(auth)
                         .app_data(web::Data::new(app_state))
                         .route("/status", web::get().to(status))
                         .route("/get_job", web::get().to(get_job))

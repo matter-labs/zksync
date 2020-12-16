@@ -346,7 +346,7 @@ async fn test_run_state_update(mut storage: StorageProcessor<'_>) {
 
     // Check that it's stores some account, created by deposit
     let (_, account) = AccountSchema(interactor.storage())
-        .account_state_by_address(&Default::default())
+        .account_state_by_address(Address::default())
         .await
         .unwrap()
         .verified

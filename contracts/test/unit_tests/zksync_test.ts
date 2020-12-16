@@ -185,7 +185,9 @@ describe('ZK priority queue ops unit tests', function () {
 
         let tx;
         if (token === ethers.constants.AddressZero) {
-            tx = await zksyncContract.depositETH(depositOwner, { value: depositAmount });
+            tx = await zksyncContract.depositETH(depositOwner, {
+                value: depositAmount
+            });
         } else {
             tx = await zksyncContract.depositERC20(token, depositAmount, depositOwner);
         }
@@ -487,11 +489,16 @@ describe('zkSync auth pubkey onchain unit tests', function () {
         const nonce = 0xdead;
         const pubkeyHash = '0xfefefefefefefefefefefefefefefefefefefefe';
 
-        await zksyncContract.setAuthPubkeyHash(pubkeyHash, nonce, { gasLimit: 300000 });
+        await zksyncContract.setAuthPubkeyHash(pubkeyHash, nonce, {
+            gasLimit: 300000
+        });
         //
         const otherPubkeyHash = '0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
         const { revertReason } = await getCallRevertReason(
-            async () => await zksyncContract.setAuthPubkeyHash(otherPubkeyHash, nonce, { gasLimit: 300000 })
+            async () =>
+                await zksyncContract.setAuthPubkeyHash(otherPubkeyHash, nonce, {
+                    gasLimit: 300000
+                })
         );
         expect(revertReason, 'revert reason incorrect').eq('ahf11');
     });
@@ -504,7 +511,10 @@ describe('zkSync auth pubkey onchain unit tests', function () {
 
         for (const pkHash of [shortPubkeyHash, longPubkeyHash]) {
             const { revertReason } = await getCallRevertReason(
-                async () => await zksyncContract.setAuthPubkeyHash(shortPubkeyHash, nonce, { gasLimit: 300000 })
+                async () =>
+                    await zksyncContract.setAuthPubkeyHash(shortPubkeyHash, nonce, {
+                        gasLimit: 300000
+                    })
             );
             expect(revertReason, 'revert reason incorrect').eq('ahf10');
         }

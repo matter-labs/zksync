@@ -46,8 +46,10 @@ pub fn get_matches_from_lines(stream: &str, pattern: &str) -> Result<String> {
 
 #[derive(Debug, Serialize, Deserialize)]
 struct PayloadAuthToken {
-    sub: String, // Subject (whom auth token refers to)
-    exp: usize,  // Expiration time (as UTC timestamp)
+    /// Subject (whom auth token refers to).
+    sub: String,
+    /// Expiration time (as UTC timestamp).
+    exp: usize,
 }
 
 /// Encode JsonWebToken with shared secret - secret,

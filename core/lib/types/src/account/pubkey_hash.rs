@@ -15,7 +15,7 @@ use zksync_crypto::{public_key_from_private, Fr, PrivateKey, PublicKey};
 /// to perform an operation.
 ///
 /// `PubKeyHash` is calculated as the Rescue hash of the public key byte sequence.
-#[derive(Clone, PartialEq, Default, Eq, Hash, PartialOrd, Ord)]
+#[derive(Copy, Clone, PartialEq, Default, Eq, Hash, PartialOrd, Ord)]
 pub struct PubKeyHash {
     pub data: [u8; params::FR_ADDRESS_LEN],
 }
@@ -112,9 +112,7 @@ impl<'de> Deserialize<'de> for PubKeyHash {
     where
         D: Deserializer<'de>,
     {
-        use serde::de::Error;
-        String::deserialize(deserializer).and_then(|string| {
-            PubKeyHash::from_hex(&string).map_err(|err| Error::custom(err.to_string()))
-        })
+        let string = String::deserialize(deserializer)?;
+        PubKeyHash::from_hex(&string).map_err(serde::de::Error::custom)
     }
 }

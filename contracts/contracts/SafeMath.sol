@@ -27,7 +27,7 @@ library SafeMath {
      */
     function add(uint256 a, uint256 b) internal pure returns (uint256) {
         uint256 c = a + b;
-        require(c >= a, "SafeMath: addition overflow");
+        require(c >= a, "u");
 
         return c;
     }
@@ -61,7 +61,7 @@ library SafeMath {
         uint256 b,
         string memory errorMessage
     ) internal pure returns (uint256) {
-        require(b <= a, errorMessage);
+        require(b <= a, "v");
         uint256 c = a - b;
 
         return c;
@@ -85,7 +85,7 @@ library SafeMath {
         }
 
         uint256 c = a * b;
-        require(c / a == b, "SafeMath: multiplication overflow");
+        require(c / a == b, "w");
 
         return c;
     }
@@ -124,7 +124,7 @@ library SafeMath {
         string memory errorMessage
     ) internal pure returns (uint256) {
         // Solidity only automatically asserts when dividing by 0
-        require(b > 0, errorMessage);
+        require(b > 0, "x");
         uint256 c = a / b;
         // assert(a == b * c + a % b); // There is no case in which this doesn't hold
 
@@ -164,7 +164,7 @@ library SafeMath {
         uint256 b,
         string memory errorMessage
     ) internal pure returns (uint256) {
-        require(b != 0, errorMessage);
+        require(b != 0, "y");
         return a % b;
     }
 }

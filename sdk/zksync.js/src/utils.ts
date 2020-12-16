@@ -10,7 +10,8 @@ import {
     Transfer,
     ForcedExit,
     ChangePubKey,
-    Withdraw
+    Withdraw,
+    CloseAccount
 } from './types';
 
 // Max number of tokens for the current version, it is determined by the zkSync circuit implementation.
@@ -229,7 +230,7 @@ export function buffer2bitsBE(buff) {
     return res;
 }
 
-export function sleep(ms) {
+export function sleep(ms: number) {
     return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
@@ -238,7 +239,7 @@ export function isTokenETH(token: TokenLike): boolean {
 }
 
 export class TokenSet {
-    // TODO: handle stale entries, edge case when we rename token after adding it (#1132).
+    // TODO: handle stale entries, edge case when we rename token after adding it (ZKS-120).
     constructor(private tokensBySymbol: Tokens) {}
 
     private resolveTokenObject(tokenLike: TokenLike) {
@@ -345,13 +346,14 @@ export async function verifyERC1271Signature(
     // sign_message = keccak256("\x19Ethereum Signed Message:\n{message_len}" + message)
     const signMessage = getSignedBytesFromMessage(message, true);
     const signMessageHash = utils.keccak256(signMessage);
+
     const eip1271 = new ethers.Contract(address, IEIP1271_INTERFACE, signerOrProvider);
     const eipRetVal = await eip1271.isValidSignature(signMessageHash, signature);
     return eipRetVal === EIP1271_SUCCESS_VALUE;
 }
 
 export async function getEthSignatureType(
-    provider: ethers.providers.Provider,
+    _provider: ethers.providers.Provider,
     message: string,
     signature: string,
     address: string
@@ -503,6 +505,25 @@ export function serializeForcedExit(forcedExit: ForcedExit): Uint8Array {
     return ethers.utils.concat([type, initiatorAccountIdBytes, targetBytes, tokenIdBytes, feeBytes, nonceBytes]);
 }
 
+/**
+ * Encodes the transaction data as the byte sequence according to the zkSync protocol.
+ * @param tx A transaction to serialize.
+ */
+export function serializeTx(tx: Transfer | Withdraw | ChangePubKey | CloseAccount | ForcedExit): Uint8Array {
+    switch (tx.type) {
+        case 'Transfer':
+            return serializeTransfer(tx);
+        case 'Withdraw':
+            return serializeWithdraw(tx);
+        case 'ChangePubKey':
+            return serializeChangePubKey(tx);
+        case 'ForcedExit':
+            return serializeForcedExit(tx);
+        default:
+            return new Uint8Array();
+    }
+}
+
 function numberToBytesBE(number: number, bytes: number): Uint8Array {
     const result = new Uint8Array(bytes);
     for (let i = bytes - 1; i >= 0; i--) {
@@ -510,4 +531,8 @@ function numberToBytesBE(number: number, bytes: number): Uint8Array {
         number >>= 8;
     }
     return result;
+}
+
+export function parseHexWithPrefix(str) {
+    return Uint8Array.from(Buffer.from(str.slice(2), 'hex'));
 }
