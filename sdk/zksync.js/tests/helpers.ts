@@ -28,3 +28,18 @@ export function loadTestConfig() {
         eth: ethConfig
     };
 }
+
+export function loadTestVectorsConfig() {
+    let vectorsConfigPath = configPath('sdk/test-vectors.json');
+    return loadConfig(vectorsConfigPath);
+}
+
+export function getTokens(network: string) {
+    const configPath = `${process.env.ZKSYNC_HOME}/etc/tokens/${network}.json`;
+    console.log(configPath);
+    return JSON.parse(
+        fs.readFileSync(configPath, {
+            encoding: 'utf-8'
+        })
+    );
+}
