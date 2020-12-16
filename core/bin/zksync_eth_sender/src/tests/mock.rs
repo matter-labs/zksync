@@ -6,24 +6,21 @@ use crate::EthSenderOptions;
 use std::collections::{BTreeMap, VecDeque};
 use tokio::sync::RwLock;
 // External uses
-use web3::contract::{Options};
+use web3::contract::Options;
 use zksync_basic_types::{H256, U256};
 // Workspace uses
 
+use zksync_eth_client::{clients::mock::MockEthereum, eth_client_trait::EthereumGateway};
 use zksync_storage::StorageProcessor;
 use zksync_types::{
     ethereum::{ETHOperation, EthOpId, InsertedOperationResponse, OperationType},
     Action, Operation,
 };
-// Local uses
-use super::ETHSender;
 
+// Local uses
 use crate::transactions::ETHStats;
 
-
-
-use zksync_eth_client::clients::mock::MockEthereum;
-use zksync_eth_client::eth_client_trait::{EthereumGateway};
+use super::ETHSender;
 
 /// Mock database is capable of recording all the incoming requests for the further analysis.
 #[derive(Debug, Default)]
