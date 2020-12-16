@@ -35,10 +35,6 @@ impl ZkSyncStateGenerator {
             .collect();
 
         let accounts = if accounts.iter().any(|(id, _)| *id == FEE_ACCOUNT_ID) {
-            println!(
-                "Note: AccountId {} is an existing fee account",
-                FEE_ACCOUNT_ID
-            );
             accounts.into_iter().collect()
         } else {
             std::iter::once((
