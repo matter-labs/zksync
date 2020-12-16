@@ -150,7 +150,7 @@ impl TransactionsHistoryTestSetup {
                 data: deposit_op.try_get_priority_op().unwrap(),
                 deadline_block: 0,
                 eth_hash: H256::from_slice(
-                    &hex::decode(format!("000000{}{}", block, block_index)).unwrap(),
+                    &hex::decode(format!("{:0>64}", format!("{}{}", block, block_index))).unwrap(),
                 ),
                 eth_block: 10,
             },
@@ -183,7 +183,7 @@ impl TransactionsHistoryTestSetup {
                 data: full_exit_op.try_get_priority_op().unwrap(),
                 deadline_block: 0,
                 eth_hash: H256::from_slice(
-                    &hex::decode(format!("000000{}{}", block, block_index)).unwrap(),
+                    &hex::decode(format!("{:0>64}", format!("{}{}", block, block_index))).unwrap(),
                 ),
                 eth_block: 11,
             },
