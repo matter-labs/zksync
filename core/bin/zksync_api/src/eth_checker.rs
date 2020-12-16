@@ -2,12 +2,9 @@
 //! onchain `ChangePubKey` authorization or EIP1271 signature
 //! verification.
 
-use web3::{
-    contract::{Contract, Options},
-    types::{Address, H160},
-    Transport, Web3,
-};
-use zksync_contracts::{eip1271_contract, zksync_contract};
+use web3::{contract::Options, types::Address};
+use zksync_contracts::eip1271_contract;
+use zksync_eth_client::ethereum_gateway::EthereumGateway;
 use zksync_types::{
     tx::EIP1271Signature,
     {Nonce, PubKeyHash},
@@ -18,28 +15,13 @@ use zksync_types::{
 pub const EIP1271_SUCCESS_RETURN_VALUE: [u8; 4] = [0x16, 0x26, 0xba, 0x7e];
 
 #[derive(Clone)]
-pub struct EthereumChecker<T: Transport> {
-    web3: Web3<T>,
-    zksync_contract: (ethabi::Contract, Contract<T>),
+pub struct EthereumChecker {
+    client: EthereumGateway,
 }
 
-impl<T: Transport> EthereumChecker<T> {
-    pub fn new(web3: Web3<T>, zksync_contract_addr: H160) -> Self {
-        let zksync_contract = {
-            (
-                zksync_contract(),
-                Contract::new(web3.eth(), zksync_contract_addr, zksync_contract()),
-            )
-        };
-
-        Self {
-            zksync_contract,
-            web3,
-        }
-    }
-
-    fn get_eip1271_contract(&self, address: Address) -> Contract<T> {
-        Contract::new(self.web3.eth(), address, eip1271_contract())
+impl EthereumChecker {
+    pub fn new(client: EthereumGateway) -> Self {
+        Self { client }
     }
 
     /// Transforms the message into an array expected by EIP-1271 standard.
@@ -61,13 +43,15 @@ impl<T: Transport> EthereumChecker<T> {
         let sign_message = Self::get_sign_message(message);
 
         let call_result = self
-            .get_eip1271_contract(address)
-            .query(
+            .client
+            .call_contract_function(
                 "isValidSignature",
                 (sign_message, signature.0),
                 Some(address),
                 Options::default(),
                 None,
+                address,
+                eip1271_contract(),
             )
             .await;
 
@@ -91,9 +75,8 @@ impl<T: Transport> EthereumChecker<T> {
         pub_key_hash: &PubKeyHash,
     ) -> Result<bool, anyhow::Error> {
         let auth_fact: Vec<u8> = self
-            .zksync_contract
-            .1
-            .query(
+            .client
+            .call_main_contract_function(
                 "authFacts",
                 (address, u64::from(nonce)),
                 None,
@@ -111,6 +94,10 @@ mod tests {
     use super::EthereumChecker;
     use std::str::FromStr;
     use zksync_config::test_config::TestConfig;
+    use zksync_contracts::zksync_contract;
+    use zksync_eth_client::ethereum_gateway::EthereumGateway;
+    use zksync_eth_client::ETHDirectClient;
+    use zksync_eth_signer::PrivateKeySigner;
     use zksync_types::{
         tx::{EIP1271Signature, PackedEthSignature},
         Address,
@@ -127,9 +114,17 @@ mod tests {
         let signature = EIP1271Signature(manual_signature.serialize_packed().to_vec());
 
         let transport = web3::transports::Http::new(&config.eth.web3_url).unwrap();
-        let web3 = web3::Web3::new(transport);
+        let client = EthereumGateway::Direct(ETHDirectClient::new(
+            transport,
+            zksync_contract(),
+            Default::default(),
+            PrivateKeySigner::new(Default::default()),
+            Default::default(),
+            0,
+            1.0,
+        ));
 
-        let eth_checker = EthereumChecker::new(web3, Default::default());
+        let eth_checker = EthereumChecker::new(client);
         let result = eth_checker
             .is_eip1271_signature_correct(
                 config.eip1271.contract_address,
@@ -157,8 +152,7 @@ mod tests {
 
         let signature_data = hex::decode(SIG_DATA).unwrap();
 
-        let modified_message =
-            EthereumChecker::<web3::transports::Http>::get_sign_message(MESSAGE.as_bytes());
+        let modified_message = EthereumChecker::get_sign_message(MESSAGE.as_bytes());
         // Here we use `web3::signing` module for purpose to not interfer with our own recovering implementation.
         // Otherwise it's possible that signing / recovering will overlap with the same error.
         let restored_address = web3::signing::recover(

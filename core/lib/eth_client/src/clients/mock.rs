@@ -1,5 +1,5 @@
-use crate::ethereum_gateway::{ExecutedTxStatus, FailureInfo};
-use crate::SignedCallResult;
+use std::sync::Arc;
+
 use anyhow::Error;
 use ethabi::{Address, Contract};
 use std::collections::{HashMap, HashSet};
@@ -7,15 +7,21 @@ use tokio::sync::RwLock;
 use web3::contract::tokens::{Detokenize, Tokenize};
 use web3::contract::Options;
 use web3::types::{BlockId, Filter, Log, U64};
+
 use zksync_types::{TransactionReceipt, H160, H256, U256};
 
+use crate::{
+    ethereum_gateway::{ExecutedTxStatus, FailureInfo},
+    SignedCallResult,
+};
+
 /// Mock Ethereum client is capable of recording all the incoming requests for the further analysis.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct MockEthereum {
     pub block_number: u64,
     pub gas_price: U256,
-    pub tx_statuses: RwLock<HashMap<H256, ExecutedTxStatus>>,
-    pub sent_txs: RwLock<HashSet<Vec<u8>>>,
+    pub tx_statuses: Arc<RwLock<HashMap<H256, ExecutedTxStatus>>>,
+    pub sent_txs: Arc<RwLock<HashSet<Vec<u8>>>>,
 }
 
 impl Default for MockEthereum {

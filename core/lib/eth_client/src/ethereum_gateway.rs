@@ -39,7 +39,7 @@ pub struct FailureInfo {
     pub gas_limit: U256,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum EthereumGateway {
     Direct(ETHDirectClient<PrivateKeySigner>),
     Multiplexed(MultiPlexClient),
