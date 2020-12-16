@@ -81,8 +81,8 @@ export class Provider {
      * Provides some hardcoded values the `Provider` responsible for
      * without communicating with the network
      */
-    static async newMockProvider(network: string, ethPrivateKey: Uint8Array): Promise<Provider> {
-        const transport = new DummyTransport(network, ethPrivateKey);
+    static async newMockProvider(network: string, ethPrivateKey: Uint8Array, tokensList: any): Promise<Provider> {
+        const transport = new DummyTransport(network, ethPrivateKey, tokensList);
         const provider = new Provider(transport);
 
         provider.contractAddress = await provider.getContractAddress();

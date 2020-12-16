@@ -532,6 +532,10 @@ mod tests {
     }
 
     #[actix_rt::test]
+    #[cfg_attr(
+        not(feature = "api_test"),
+        ignore = "Use `zk test rust-api` command to perform this test"
+    )]
     async fn test_submit_txs_loopback() -> anyhow::Result<()> {
         let (core_client, core_server) = submit_txs_loopback();
 
@@ -548,6 +552,10 @@ mod tests {
     }
 
     #[actix_rt::test]
+    #[cfg_attr(
+        not(feature = "api_test"),
+        ignore = "Use `zk test rust-api` command to perform this test"
+    )]
     async fn test_transactions_scope() -> anyhow::Result<()> {
         let (client, server) = TestServer::new().await?;
 
@@ -685,6 +693,10 @@ mod tests {
     /// - Attempt to pay fees in an inappropriate token fails for single batch.
     /// - Batch with an inappropriate token still can be processed if the fee is covered with a common token.
     #[actix_rt::test]
+    #[cfg_attr(
+        not(feature = "api_test"),
+        ignore = "Use `zk test rust-api` command to perform this test"
+    )]
     async fn test_bad_fee_token() -> anyhow::Result<()> {
         let (client, server) = TestServer::new().await?;
 
@@ -771,6 +783,10 @@ mod tests {
     /// - Attempt to submit non-withdraw transaction with the disabled fast-processing.
     /// - Attempt to submit withdraw transaction with the enabled fast-processing.
     #[actix_rt::test]
+    #[cfg_attr(
+        not(feature = "api_test"),
+        ignore = "Use `zk test rust-api` command to perform this test"
+    )]
     async fn test_fast_processing_flag() -> anyhow::Result<()> {
         let (client, server) = TestServer::new().await?;
 
