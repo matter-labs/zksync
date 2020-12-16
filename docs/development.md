@@ -135,7 +135,7 @@ zk test db
 - Running the `rust` unit-tests (heavy tests such as ones for `circuit` and database will not be run):
 
   ```sh
-  f cargo test
+  zk f cargo test
   ```
 
 - Running the database tests:
@@ -167,7 +167,7 @@ zk test db
 - Running the benchmarks:
 
   ```sh
-  f cargo bench
+  zk f cargo bench
   ```
 
 - Running the loadtest:
@@ -177,6 +177,9 @@ zk test db
   zk prover # Has to be run in the 2nd terminal
   zk run loadtest # Has to be run in the 3rd terminal
   ```
+
+  **Note**. If you have compilation issues with `sqlx`, then make sure to run `zk up` before running the tests. Also, if
+  you see some tests fail, might need to call `zk db reset` and restart the tests.
 
 ## Developing circuit
 

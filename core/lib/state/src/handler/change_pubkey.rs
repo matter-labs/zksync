@@ -24,7 +24,7 @@ impl TxHandler<ChangePubKey> for ZkSyncState {
             "ChangePubKey Ethereum signature is incorrect"
         );
         ensure!(
-            tx.verify_signature() == Some(tx.new_pk_hash.clone()),
+            tx.verify_signature() == Some(tx.new_pk_hash),
             "ChangePubKey zkSync signature is incorrect"
         );
         ensure!(
@@ -61,7 +61,7 @@ impl TxHandler<ChangePubKey> for ZkSyncState {
 
         let old_balance = account.get_balance(op.tx.fee_token);
 
-        let old_pub_key_hash = account.pub_key_hash.clone();
+        let old_pub_key_hash = account.pub_key_hash;
         let old_nonce = account.nonce;
 
         // Update nonce.
@@ -69,13 +69,13 @@ impl TxHandler<ChangePubKey> for ZkSyncState {
         account.nonce += 1;
 
         // Update pubkey hash.
-        account.pub_key_hash = op.tx.new_pk_hash.clone();
+        account.pub_key_hash = op.tx.new_pk_hash;
 
         // Subract fees.
         ensure!(old_balance >= op.tx.fee, "Not enough balance");
         account.sub_balance(op.tx.fee_token, &op.tx.fee);
 
-        let new_pub_key_hash = account.pub_key_hash.clone();
+        let new_pub_key_hash = account.pub_key_hash;
         let new_nonce = account.nonce;
         let new_balance = account.get_balance(op.tx.fee_token);
 

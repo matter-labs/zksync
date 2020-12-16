@@ -22,40 +22,12 @@ pub use self::stored_state::StoredAccountState;
 pub struct AccountSchema<'a, 'c>(pub &'a mut StorageProcessor<'c>);
 
 impl<'a, 'c> AccountSchema<'a, 'c> {
-    /// Obtains both committed and verified state for the account by its address.
-    pub async fn account_state_by_address(
+    /// Obtains both committed and verified state for the account by its ID.
+    pub async fn account_state_by_id(
         &mut self,
-        address: &Address,
+        account_id: AccountId,
     ) -> QueryResult<StoredAccountState> {
         let start = Instant::now();
-        // Find the account in `account_creates` table.
-        let mut results = sqlx::query_as!(
-            StorageAccountCreation,
-            "
-                SELECT * FROM account_creates
-                WHERE address = $1 AND is_create = $2
-                ORDER BY block_number desc
-                LIMIT 1
-            ",
-            address.as_bytes(),
-            true
-        )
-        .fetch_all(self.0.conn())
-        .await?;
-
-        assert!(results.len() <= 1, "LIMIT 1 is in query");
-        let account_create_record = results.pop();
-
-        // If account wasn't found, we return no state for it.
-        // Otherwise we obtain the account ID for the state lookup.
-        let account_id = if let Some(account_create_record) = account_create_record {
-            account_create_record.account_id as AccountId
-        } else {
-            return Ok(StoredAccountState {
-                committed: None,
-                verified: None,
-            });
-        };
 
         // Load committed & verified states, and return them.
         let committed = self
@@ -67,14 +39,34 @@ impl<'a, 'c> AccountSchema<'a, 'c> {
             .await?
             .map(|a| (account_id, a));
 
-        metrics::histogram!(
-            "sql.chain.account.account_state_by_address",
-            start.elapsed()
-        );
+        metrics::histogram!("sql.chain.account.account_state_by_id", start.elapsed());
         Ok(StoredAccountState {
             committed,
             verified,
         })
+    }
+
+    /// Obtains both committed and verified state for the account by its address.
+    pub async fn account_state_by_address(
+        &mut self,
+        address: Address,
+    ) -> QueryResult<StoredAccountState> {
+        let start = Instant::now();
+
+        let account_state = if let Some(account_id) = self.account_id_by_address(address).await? {
+            self.account_state_by_id(account_id).await
+        } else {
+            Ok(StoredAccountState {
+                committed: None,
+                verified: None,
+            })
+        };
+
+        metrics::histogram!(
+            "sql.chain.account.account_state_by_address",
+            start.elapsed()
+        );
+        account_state
     }
 
     /// Loads the last committed (e.g. just added but no necessarily verified) state for
@@ -90,7 +82,7 @@ impl<'a, 'c> AccountSchema<'a, 'c> {
         // Note that `account` can be `None` here (if it wasn't verified yet), since
         // we will update the committed changes below.
         let (last_block, account) = AccountSchema(&mut transaction)
-            .get_account_and_last_block(account_id)
+            .account_and_last_block(account_id)
             .await?;
 
         let account_balance_diff = sqlx::query_as!(
@@ -177,7 +169,7 @@ impl<'a, 'c> AccountSchema<'a, 'c> {
         account_id: AccountId,
     ) -> QueryResult<Option<Account>> {
         let start = Instant::now();
-        let (_, account) = self.get_account_and_last_block(account_id).await?;
+        let (_, account) = self.account_and_last_block(account_id).await?;
         metrics::histogram!(
             "sql.chain.account.last_verified_state_for_account",
             start.elapsed()
@@ -186,7 +178,7 @@ impl<'a, 'c> AccountSchema<'a, 'c> {
     }
 
     /// Obtains the last verified state of the account.
-    async fn get_account_and_last_block(
+    async fn account_and_last_block(
         &mut self,
         account_id: AccountId,
     ) -> QueryResult<(i64, Option<Account>)> {
@@ -231,5 +223,47 @@ impl<'a, 'c> AccountSchema<'a, 'c> {
             start.elapsed()
         );
         result
+    }
+
+    pub async fn account_id_by_address(
+        &mut self,
+        address: Address,
+    ) -> QueryResult<Option<AccountId>> {
+        let start = Instant::now();
+        // Find the account ID in `account_creates` table.
+        let result = sqlx::query!(
+            r#"
+                SELECT account_id FROM account_creates
+                WHERE address = $1 AND is_create = $2
+                ORDER BY block_number desc
+                LIMIT 1
+            "#,
+            address.as_bytes(),
+            true
+        )
+        .fetch_optional(self.0.conn())
+        .await?;
+
+        let account_id = result.map(|record| record.account_id as AccountId);
+        metrics::histogram!("sql.chain.account.account_id_by_address", start.elapsed());
+        Ok(account_id)
+    }
+
+    pub async fn account_address_by_id(
+        &mut self,
+        account_id: AccountId,
+    ) -> QueryResult<Option<Address>> {
+        let start = Instant::now();
+        // Find the account address in `account_creates` table.
+        let result = sqlx::query!(
+            "SELECT address FROM account_creates WHERE account_id = $1",
+            i64::from(account_id)
+        )
+        .fetch_optional(self.0.conn())
+        .await?;
+
+        let address = result.map(|record| Address::from_slice(&record.address));
+        metrics::histogram!("sql.chain.account.account_address_by_id", start.elapsed());
+        Ok(address)
     }
 }
