@@ -14,6 +14,12 @@ pub struct MultiPlexClient {
     clients: Vec<(String, ETHDirectClient<PrivateKeySigner>)>,
 }
 
+impl Default for MultiPlexClient {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl MultiPlexClient {
     pub fn new() -> Self {
         Self { clients: vec![] }
@@ -184,6 +190,7 @@ impl MultiPlexClient {
         anyhow::bail!("All interfaces was wrong please try again")
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub async fn call_contract_function<R, A, B, P>(
         &self,
         func: &str,
@@ -277,6 +284,6 @@ impl MultiPlexClient {
 
     pub fn encode_tx_data<P: Tokenize + Clone>(&self, func: &str, params: P) -> Vec<u8> {
         let (_, client) = self.clients.first().expect("Should be exactly one client");
-        client.encode_tx_data(func, params.clone())
+        client.encode_tx_data(func, params)
     }
 }

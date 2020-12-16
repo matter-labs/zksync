@@ -180,6 +180,7 @@ impl EthereumGateway {
         delegate_call!(self.call_main_contract_function(func, params, from, options, block))
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub async fn call_contract_function<R, A, B, P>(
         &self,
         func: &str,

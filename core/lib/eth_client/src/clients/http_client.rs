@@ -292,6 +292,8 @@ impl<S: EthereumSigner> ETHDirectClient<S> {
         )
         .await
     }
+
+    #[allow(clippy::too_many_arguments)]
     pub async fn call_contract_function<R, A, B, P>(
         &self,
         func: &str,
