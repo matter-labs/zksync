@@ -207,6 +207,7 @@ impl MockEthereum {
         todo!()
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub async fn call_contract_function<R, A, B, P>(
         &self,
         _func: &str,
