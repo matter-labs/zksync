@@ -709,6 +709,8 @@ mod tests {
             100u64.into(),
             &to.address,
             0.into(),
+            0,
+            u64::MAX,
             false,
         );
         let transfer_bad_token = ZkSyncTx::Transfer(Box::new(tx));
@@ -742,6 +744,8 @@ mod tests {
             0u64.into(), // Note that fee is zero, which is OK.
             &to.address,
             0.into(),
+            0,
+            u64::MAX,
             false,
         );
         let phnx_transfer = ZkSyncTx::Transfer(Box::new(tx));
@@ -753,6 +757,8 @@ mod tests {
             200u64.into(), // Here we pay fees for both transfers in ETH.
             &to.address,
             0.into(),
+            0,
+            u64::MAX,
             false,
         );
         let fee_tx = ZkSyncTx::Transfer(Box::new(tx));

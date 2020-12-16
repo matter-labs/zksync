@@ -52,9 +52,6 @@ contract Config {
     /// @dev Full exit operation length
     uint256 constant FULL_EXIT_BYTES = 6 * CHUNK_BYTES;
 
-    /// @dev OnchainWithdrawal data length
-    uint256 constant ONCHAIN_WITHDRAWAL_BYTES = 1 + 20 + 2 + 16; // (uint8 addToPendingWithdrawalsQueue, address _to, uint16 _tokenId, uint128 _amount)
-
     /// @dev ChangePubKey operation length
     uint256 constant CHANGE_PUBKEY_BYTES = 6 * CHUNK_BYTES;
 
@@ -88,7 +85,7 @@ contract Config {
         );
 
     /// @dev Timestamp - seconds since unix epoch
-    uint256 constant COMMIT_TIMESTAMP_NOT_OLDER = 8 hours;
+    uint256 constant COMMIT_TIMESTAMP_NOT_OLDER = 24 hours;
 
     /// @dev Maximum available error between real commit block timestamp and analog used in the verifier (in seconds)
     /// @dev Must be used cause miner's `block.timestamp` value can differ on some small value (as we know - 15 seconds)

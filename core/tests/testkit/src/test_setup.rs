@@ -396,6 +396,8 @@ impl TestSetup {
         token: Token,
         amount: BigUint,
         fee: BigUint,
+        valid_from: u64,
+        valid_until: u64,
     ) {
         let mut zksync0_old = self
             .get_expected_zksync_account_balance(from, token.0)
@@ -420,9 +422,17 @@ impl TestSetup {
             .sync_accounts_state
             .insert((self.accounts.fee_account_id, token.0), zksync0_old);
 
-        let transfer = self
-            .accounts
-            .transfer(from, to, token, amount, fee, None, true);
+        let transfer = self.accounts.transfer(
+            from,
+            to,
+            token,
+            amount,
+            fee,
+            None,
+            valid_from,
+            valid_until,
+            true,
+        );
 
         self.execute_tx(transfer).await;
     }
@@ -433,6 +443,8 @@ impl TestSetup {
         token: Token,
         amount: BigUint,
         fee: BigUint,
+        valid_from: u64,
+        valid_until: u64,
         rng: &mut impl Rng,
     ) {
         let mut zksync0_old = self
@@ -452,9 +464,17 @@ impl TestSetup {
             .sync_accounts_state
             .insert((self.accounts.fee_account_id, token.0), zksync0_old);
 
-        let transfer = self
-            .accounts
-            .transfer_to_new_random(from, token, amount, fee, None, true, rng);
+        let transfer = self.accounts.transfer_to_new_random(
+            from,
+            token,
+            amount,
+            fee,
+            None,
+            valid_from,
+            valid_until,
+            true,
+            rng,
+        );
 
         self.execute_tx(transfer).await;
     }

@@ -121,6 +121,8 @@ impl ZkSyncAccount {
         fee: BigUint,
         to: &Address,
         nonce: Option<Nonce>,
+        valid_from: u64,
+        valid_until: u64,
         increment_nonce: bool,
     ) -> (Transfer, PackedEthSignature) {
         let mut stored_nonce = self.nonce.lock().unwrap();
@@ -135,6 +137,8 @@ impl ZkSyncAccount {
             amount,
             fee,
             nonce.unwrap_or_else(|| *stored_nonce),
+            valid_from,
+            valid_until,
             &self.private_key,
         )
         .expect("Failed to sign transfer");

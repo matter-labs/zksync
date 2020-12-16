@@ -122,6 +122,8 @@ impl<S: EthereumSigner> Signer<S> {
         fee: BigUint,
         to: Address,
         nonce: Nonce,
+        valid_from: u64,
+        valid_until: u64,
     ) -> Result<(Transfer, Option<PackedEthSignature>), SignerError> {
         let account_id = self.account_id.ok_or(SignerError::NoSigningKey)?;
 
@@ -133,6 +135,8 @@ impl<S: EthereumSigner> Signer<S> {
             amount,
             fee,
             nonce,
+            valid_from,
+            valid_until,
             &self.private_key,
         )
         .map_err(signing_failed_error)?;

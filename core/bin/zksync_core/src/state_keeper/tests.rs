@@ -753,4 +753,112 @@ mod execute_proposed_block {
             panic!("Block #2 not stored");
         }
     }
+
+    /// Checks that a transaction with a valid timestamp accepted by the statekeeper
+    /// and transaction with an invalid timestamp failed.
+    #[tokio::test]
+    async fn transfers_with_different_timestamps() {
+        let mut tester = StateKeeperTester::new(20, 5, 5, 4);
+
+        let token_id: TokenId = 0;
+        let account_from_id: AccountId = 1;
+        let account_to_id: AccountId = 2;
+        let balance = 999u32;
+        let fee = 0u32;
+        let (account_from, sk_from) = tester.add_account(account_from_id);
+        let (account_to, _sk_to) = tester.add_account(account_to_id);
+        tester.set_balance(account_from_id, token_id, balance);
+
+        let premature_transfer = SignedZkSyncTx {
+            tx: ZkSyncTx::Transfer(Box::new(
+                Transfer::new_signed(
+                    account_from_id,
+                    account_from.address,
+                    account_to.address,
+                    token_id,
+                    balance.into(),
+                    fee.into(),
+                    0,
+                    u64::MAX,
+                    u64::MAX,
+                    &sk_from,
+                )
+                .unwrap(),
+            )),
+            eth_sign_data: None,
+        };
+        let belated_transfer = SignedZkSyncTx {
+            tx: ZkSyncTx::Transfer(Box::new(
+                Transfer::new_signed(
+                    account_from_id,
+                    account_from.address,
+                    account_to.address,
+                    token_id,
+                    balance.into(),
+                    fee.into(),
+                    0,
+                    0,
+                    0,
+                    &sk_from,
+                )
+                .unwrap(),
+            )),
+            eth_sign_data: None,
+        };
+        let correct_transfer = SignedZkSyncTx {
+            tx: ZkSyncTx::Transfer(Box::new(
+                Transfer::new_signed(
+                    account_from_id,
+                    account_from.address,
+                    account_to.address,
+                    token_id,
+                    balance.into(),
+                    fee.into(),
+                    0,
+                    0,
+                    u64::MAX,
+                    &sk_from,
+                )
+                .unwrap(),
+            )),
+            eth_sign_data: None,
+        };
+        let proposed_block = ProposedBlock {
+            txs: vec![
+                SignedTxVariant::Tx(premature_transfer.clone()),
+                SignedTxVariant::Tx(belated_transfer.clone()),
+                SignedTxVariant::Tx(correct_transfer.clone()),
+            ],
+            priority_ops: vec![],
+        };
+        tester
+            .state_keeper
+            .execute_proposed_block(proposed_block)
+            .await;
+        if let Some(CommitRequest::PendingBlock((block, _))) = tester.response_rx.next().await {
+            assert_eq!(block.number, 1); // It's the first block.
+
+            assert_eq!(block.success_operations.len(), 1);
+            assert_eq!(
+                block.success_operations[0]
+                    .get_executed_tx()
+                    .unwrap()
+                    .signed_tx
+                    .hash(),
+                correct_transfer.hash()
+            );
+
+            assert_eq!(block.failed_txs.len(), 2);
+            assert_eq!(
+                block.failed_txs[0].signed_tx.hash(),
+                premature_transfer.hash()
+            );
+            assert_eq!(
+                block.failed_txs[1].signed_tx.hash(),
+                belated_transfer.hash()
+            );
+        } else {
+            panic!("Block not stored");
+        }
+    }
 }

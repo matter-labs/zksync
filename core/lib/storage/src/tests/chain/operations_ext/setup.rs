@@ -170,6 +170,8 @@ impl TransactionsHistoryTestSetup {
                     0u32.into(),
                     &self.to_zksync_account.address,
                     None,
+                    0,
+                    u64::MAX,
                     true,
                 )
                 .0,
@@ -201,6 +203,8 @@ impl TransactionsHistoryTestSetup {
                     0u32.into(),
                     &self.to_zksync_account.address,
                     None,
+                    0,
+                    u64::MAX,
                     true,
                 )
                 .0,

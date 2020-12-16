@@ -19,6 +19,8 @@ pub struct TransferBuilder<'a, S: EthereumSigner> {
     fee: Option<BigUint>,
     to: Option<Address>,
     nonce: Option<Nonce>,
+    valid_from: Option<u64>,
+    valid_until: Option<u64>,
 }
 
 impl<'a, S: EthereumSigner + Clone> TransferBuilder<'a, S> {
@@ -31,6 +33,8 @@ impl<'a, S: EthereumSigner + Clone> TransferBuilder<'a, S> {
             fee: None,
             to: None,
             nonce: None,
+            valid_from: None,
+            valid_until: None,
         }
     }
 
@@ -45,6 +49,8 @@ impl<'a, S: EthereumSigner + Clone> TransferBuilder<'a, S> {
         let to = self
             .to
             .ok_or_else(|| ClientError::MissingRequiredField("to".into()))?;
+        let valid_from = self.valid_from.unwrap_or(0);
+        let valid_until = self.valid_until.unwrap_or(u64::MAX);
 
         let nonce = match self.nonce {
             Some(nonce) => nonce,
@@ -72,7 +78,7 @@ impl<'a, S: EthereumSigner + Clone> TransferBuilder<'a, S> {
 
         self.wallet
             .signer
-            .sign_transfer(token, amount, fee, to, nonce)
+            .sign_transfer(token, amount, fee, to, nonce, valid_from, valid_until)
             .await
             .map(|(tx, signature)| (ZkSyncTx::Transfer(Box::new(tx)), signature))
             .map_err(ClientError::SigningError)
@@ -155,6 +161,18 @@ impl<'a, S: EthereumSigner + Clone> TransferBuilder<'a, S> {
     /// Sets the transaction recipient.
     pub fn to(mut self, to: Address) -> Self {
         self.to = Some(to);
+        self
+    }
+
+    /// Sets the unix format timestamp of the first moment when transaction execution is valid.
+    pub fn valid_from(mut self, valid_from: u64) -> Self {
+        self.valid_from = Some(valid_from);
+        self
+    }
+
+    /// Sets the unix format timestamp of the last moment when transaction execution is valid.
+    pub fn valid_until(mut self, valid_until: u64) -> Self {
+        self.valid_until = Some(valid_until);
         self
     }
 

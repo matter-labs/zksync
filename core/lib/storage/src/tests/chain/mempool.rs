@@ -28,6 +28,8 @@ fn franklin_txs() -> Vec<SignedZkSyncTx> {
         100u32.into(),
         10u32.into(),
         10,
+        0,
+        u64::MAX,
         None,
     );
 
@@ -39,6 +41,8 @@ fn franklin_txs() -> Vec<SignedZkSyncTx> {
         500u32.into(),
         20u32.into(),
         11,
+        0,
+        u64::MAX,
         None,
     );
 
@@ -99,6 +103,8 @@ fn gen_transfers(n: usize) -> Vec<SignedZkSyncTx> {
                 100u32.into(),
                 10u32.into(),
                 10,
+                0,
+                u64::MAX,
                 None,
             );
 

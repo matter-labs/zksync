@@ -71,6 +71,8 @@ impl<T: Transport> AccountSet<T> {
         amount: BigUint,
         fee: BigUint,
         nonce: Option<Nonce>,
+        valid_from: u64,
+        valid_until: u64,
         increment_nonce: bool,
     ) -> ZkSyncTx {
         let from = &self.zksync_accounts[from.0];
@@ -84,6 +86,8 @@ impl<T: Transport> AccountSet<T> {
                 fee,
                 &to.address,
                 nonce,
+                valid_from,
+                valid_until,
                 increment_nonce,
             )
             .0,
@@ -101,6 +105,8 @@ impl<T: Transport> AccountSet<T> {
         amount: BigUint,
         fee: BigUint,
         nonce: Option<Nonce>,
+        valid_from: u64,
+        valid_until: u64,
         increment_nonce: bool,
         rng: &mut impl Rng,
     ) -> ZkSyncTx {
@@ -116,6 +122,8 @@ impl<T: Transport> AccountSet<T> {
                 fee,
                 &to_address,
                 nonce,
+                valid_from,
+                valid_until,
                 increment_nonce,
             )
             .0,
