@@ -5828,13 +5828,21 @@ version = "1.0.0"
 dependencies = [
  "anyhow",
  "backoff",
+ "env_logger 0.6.2",
  "lazy_static",
  "log 0.4.11",
+ "num",
  "reqwest",
  "serde",
+ "serde_json",
+ "structopt",
+ "tokio 0.2.22",
  "zksync_basic_types",
  "zksync_circuit",
  "zksync_crypto",
+ "zksync_storage",
+ "zksync_types",
+ "zksync_utils",
 ]
 
 [[package]]
@@ -5940,7 +5948,6 @@ dependencies = [
  "zksync_data_restore",
  "zksync_eth_client",
  "zksync_eth_signer",
- "zksync_prover",
  "zksync_prover_utils",
  "zksync_test_account",
  "zksync_types",
