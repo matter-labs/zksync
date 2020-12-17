@@ -2266,6 +2266,21 @@
       "nullable": []
     }
   },
+  "92ea6ba2573073b4ccb3823d09743295761c242d47bd96227a4379b014154e63": {
+    "query": "UPDATE operations\n                SET confirmed = $1\n                WHERE block_number >= $2 AND block_number <= $3 AND action_type = $4",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "Bool",
+          "Int8",
+          "Int8",
+          "Text"
+        ]
+      },
+      "nullable": []
+    }
+  },
   "93fe4dceacf4e052ad807068272dc768eab33513e6c1e1ac62d2f989b1a26eee": {
     "query": "\n                INSERT INTO eth_operations (op_type, nonce, last_deadline_block, last_used_gas_price, raw_tx)\n                VALUES ($1, $2, $3, $4, $5)\n                RETURNING id\n            ",
     "describe": {

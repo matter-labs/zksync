@@ -489,9 +489,9 @@ impl<'a, 'c> EthereumSchema<'a, 'c> {
         Ok(())
     }
 
-    pub async fn is_aggregated_op_confirmed(&mut self, op_id: i64) -> QueryResult<bool> {
-        let confirmed_ops = sqlx::query!(
-            "SELECT COUNT(*) FROM aggregate_operations
+    pub async fn aggregated_op_final_hash(&mut self, op_id: i64) -> QueryResult<Option<H256>> {
+        let final_hash: Option<Vec<u8>> = sqlx::query!(
+            "SELECT eth_operations.final_hash as final_hash FROM aggregate_operations
                   LEFT JOIN eth_aggregated_ops_binding ON eth_aggregated_ops_binding.op_id = aggregate_operations.id
                   LEFT JOIN eth_operations ON eth_aggregated_ops_binding.eth_op_id = eth_operations.id
             WHERE
@@ -499,9 +499,9 @@ impl<'a, 'c> EthereumSchema<'a, 'c> {
             op_id
         )
         .fetch_one(self.0.conn())
-        .await?
-        .count
-        .unwrap_or(0);
-        Ok(confirmed_ops > 0)
+            .await?
+        .final_hash;
+
+        Ok(final_hash.map(|hash| H256::from_slice(&hash)))
     }
 }

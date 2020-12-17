@@ -310,7 +310,7 @@ async fn create_aggregated_publish_proof_operation_storage(
     }
 
     let last_unpublished_create_proof_operation = {
-        let aggregated_operation = OperationsSchema(storage)
+        let (_, aggregated_operation) = OperationsSchema(storage)
             .get_aggregated_op_that_affects_block(
                 AggregatedActionType::CreateProofBlocks,
                 last_aggregate_publish_proof_block + 1,
