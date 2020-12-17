@@ -139,7 +139,7 @@ mod tests {
     async fn test_coingecko_api() {
         let ticker_url = parse_env("COINGECKO_BASE_URL");
         let client = reqwest::Client::new();
-        let mut api = CoinGeckoAPI::new(client, ticker_url).unwrap();
+        let api = CoinGeckoAPI::new(client, ticker_url).unwrap();
         api.get_price("ETH")
             .await
             .expect("Failed to get data from ticker");
