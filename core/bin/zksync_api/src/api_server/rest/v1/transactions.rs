@@ -188,8 +188,10 @@ struct FastProcessingQuery {
     fast_processing: Option<bool>,
 }
 
-/// This structure has the same layout as [`zksync_types::SignedZkSyncTx`],
-/// expect that it uses `camelCase for serialization.
+/// This structure has the same layout as [`SignedZkSyncTx`],
+/// expect that it uses "camelCase" for serialization.
+///
+/// [`SignedZkSyncTx`]: zksync_types::SignedZkSyncTx
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct TxData {
