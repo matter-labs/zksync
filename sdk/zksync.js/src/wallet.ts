@@ -439,6 +439,7 @@ export class Wallet {
                 type: 'Onchain'
             };
         } else if (changePubKey.ethAuthType === 'ECDSA') {
+            await this.setRequiredAccountIdFromServer('ChangePubKey authorized by ECDSA.');
             const changePubKeyMessage = getChangePubkeyMessage(
                 newPubKeyHash,
                 changePubKey.nonce,
@@ -477,23 +478,19 @@ export class Wallet {
 
     async setSigningKey(changePubKey: {
         feeToken: TokenLike;
+        ethAuthType: ChangePubkeyTypes;
         fee?: BigNumberish;
         nonce?: Nonce;
-        onchainAuth?: boolean;
     }): Promise<Transaction> {
         changePubKey.nonce =
             changePubKey.nonce != null ? await this.getNonce(changePubKey.nonce) : await this.getNonce();
-
-        if (changePubKey.onchainAuth == null) {
-            changePubKey.onchainAuth = false;
-        }
 
         if (changePubKey.fee == null) {
             changePubKey.fee = 0;
 
             const feeType = {
                 ChangePubKey: {
-                    onchainPubkeyAuth: changePubKey.onchainAuth
+                    onchainPubkeyAuth: changePubKey.ethAuthType === 'Onchain'
                 }
             };
             const fullFee = await this.provider.getTransactionFee(feeType, this.address(), changePubKey.feeToken);

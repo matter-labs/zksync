@@ -1,5 +1,5 @@
 use crate::helpers::{pack_fee_amount, unpack_fee_amount};
-use crate::tx::ChangePubKey;
+use crate::tx::{ChangePubKey, ChangePubKeyEthAuthData};
 use crate::AccountId;
 use crate::PubKeyHash;
 use anyhow::{ensure, format_err};
@@ -36,15 +36,7 @@ impl ChangePubKeyOp {
     }
 
     pub fn get_eth_witness(&self) -> Vec<u8> {
-        if let Some(eth_signature) = &self.tx.eth_signature {
-            let mut res = Vec::new();
-            res.push(0x00); // change pubkey type
-            res.extend_from_slice(&eth_signature.serialize_packed());
-            res.extend_from_slice(self.tx.batch_hash.as_bytes());
-            res
-        } else {
-            Vec::new()
-        }
+        self.tx.eth_auth_data.get_eth_witness()
     }
 
     pub fn from_public_data(bytes: &[u8]) -> Result<Self, anyhow::Error> {

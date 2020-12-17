@@ -38,11 +38,13 @@ impl CommitCost {
     }
 
     pub fn op_cost(op: &ZkSyncOp) -> U256 {
+        // let x = ChangePubKeyEthAuthDa;
         let cost = match op {
             ZkSyncOp::Noop(_) => 0,
             ZkSyncOp::Deposit(_) => Self::DEPOSIT_COST,
             ZkSyncOp::ChangePubKeyOffchain(change_pubkey) => {
-                if change_pubkey.tx.eth_signature.is_some() {
+                // TODO: determine correct cost of this tx
+                if change_pubkey.tx.eth_auth_data.is_ecdsa() {
                     Self::CHANGE_PUBKEY_COST_OFFCHAIN
                 } else {
                     Self::CHANGE_PUBKEY_COST_ONCHAIN

@@ -37,7 +37,7 @@ impl BatchSignData {
         );
         // We only prefix the batch message in case `change_pub_key` has Ethereum signature.
         let change_pub_key_message = change_pub_key
-            .filter(|tx| tx.eth_signature.is_some())
+            .filter(|tx| tx.eth_auth_data.is_ecdsa())
             .map(|tx| tx.get_eth_signed_data())
             .transpose()?;
         // The hash is already present in `change_pub_key_message`.
