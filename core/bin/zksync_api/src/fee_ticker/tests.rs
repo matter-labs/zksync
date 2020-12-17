@@ -419,10 +419,23 @@ async fn test_error_coingecko_api() {
 #[actix_rt::test]
 async fn test_error_api() {
     let validator = FeeTokenValidator::new(HashMap::new(), Default::default());
-    let connection_pool = ConnectionPool::new(Some(1));
     let second_connection_pool = connection_pool.clone();
     let ticker_api = TickerApi::new(second_connection_pool, ErrorTickerApi);
-
+    let connection_pool = ConnectionPool::new(Some(1));
+    connection_pool
+        .access_storage()
+        .await
+        .unwrap()
+        .tokens_schema()
+        .update_historical_ticker_price(
+            1,
+            TokenPrice {
+                usd_price: big_decimal_to_ratio(&BigDecimal::from(10)).unwrap(),
+                last_updated: chrono::offset::Utc::now(),
+            },
+        )
+        .await
+        .unwrap();
     let config = get_test_ticker_config();
     let mut ticker = FeeTicker::new(
         ticker_api,
@@ -433,11 +446,11 @@ async fn test_error_api() {
     );
 
     ticker
-        .get_fee_from_ticker_in_wei(TxFeeTypes::FastWithdraw, 0.into(), Address::default())
+        .get_fee_from_ticker_in_wei(TxFeeTypes::FastWithdraw, 1.into(), Address::default())
         .await
         .unwrap();
     ticker
-        .get_token_price(0.into(), TokenPriceRequestType::USDForOneWei)
+        .get_token_price(1.into(), TokenPriceRequestType::USDForOneWei)
         .await
         .unwrap();
 }
