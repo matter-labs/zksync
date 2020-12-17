@@ -211,6 +211,7 @@ impl<T: TokenPriceAPI + Send + Sync> FeeTickerAPI for TickerApi<T> {
 
         // TODO: remove hardcode for Matter Labs Trial Token (ZKS-63).
         if token.symbol == "MLTT" {
+            metrics::histogram!("ticker.get_last_quote", start.elapsed());
             return Ok(TokenPrice {
                 usd_price: Ratio::from_integer(1u32.into()),
                 last_updated: Utc::now(),
@@ -218,6 +219,7 @@ impl<T: TokenPriceAPI + Send + Sync> FeeTickerAPI for TickerApi<T> {
         }
 
         if let Some(cached_value) = self.get_stored_value(token.id).await {
+            metrics::histogram!("ticker.get_last_quote", start.elapsed());
             return Ok(cached_value);
         }
 
@@ -229,6 +231,7 @@ impl<T: TokenPriceAPI + Send + Sync> FeeTickerAPI for TickerApi<T> {
         if let Ok(api_price) = api_price {
             self.update_stored_value(token.id, api_price.clone(), false)
                 .await;
+            metrics::histogram!("ticker.get_last_quote", start.elapsed());
             return Ok(api_price);
         }
 
@@ -240,10 +243,10 @@ impl<T: TokenPriceAPI + Send + Sync> FeeTickerAPI for TickerApi<T> {
         if let Ok(Some(historical_price)) = historical_price {
             self.update_stored_value(token.id, historical_price.clone(), true)
                 .await;
+            metrics::histogram!("ticker.get_last_quote", start.elapsed());
             return Ok(historical_price);
         }
 
-        metrics::histogram!("ticker.get_last_quote", start.elapsed());
         anyhow::bail!("Token price api is not available right now.")
     }
 
