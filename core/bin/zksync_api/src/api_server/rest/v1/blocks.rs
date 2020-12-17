@@ -22,7 +22,7 @@ use super::{
     client::{self, Client},
     Error as ApiError, JsonResult, Pagination, PaginationQuery,
 };
-use crate::{api_server::rest::helpers::try_parse_tx_hash, utils::shared_lru_cache::AsyncLruCache};
+use crate::{api_server::helpers::try_parse_tx_hash, utils::shared_lru_cache::AsyncLruCache};
 
 /// Shared data between `api/v1/blocks` endpoints.
 #[derive(Debug, Clone)]
@@ -162,10 +162,10 @@ impl From<records::BlockDetails> for BlockInfo {
 impl From<records::BlockTransactionItem> for TransactionInfo {
     fn from(inner: records::BlockTransactionItem) -> Self {
         Self {
-            tx_hash: try_parse_tx_hash(&inner.tx_hash).unwrap_or_else(|| {
+            tx_hash: try_parse_tx_hash(&inner.tx_hash).unwrap_or_else(|err| {
                 panic!(
-                    "Database provided an incorrect transaction hash: {:?}",
-                    inner.tx_hash
+                    "Database provided an incorrect transaction hash: {:?}, an error occurred: {}",
+                    inner.tx_hash, err
                 )
             }),
             block_number: inner.block_number as BlockNumber,
@@ -284,6 +284,10 @@ mod tests {
     use super::{super::test_utils::TestServerConfig, *};
 
     #[actix_rt::test]
+    #[cfg_attr(
+        not(feature = "api_test"),
+        ignore = "Use `zk test rust-api` command to perform this test"
+    )]
     async fn test_blocks_scope() -> anyhow::Result<()> {
         let cfg = TestServerConfig::default();
         cfg.fill_database().await?;

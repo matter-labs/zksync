@@ -190,7 +190,7 @@ impl ZkSyncState {
                     assert_eq!(account.pub_key_hash, old_pub_key_hash);
                     assert_eq!(account.nonce, old_nonce);
 
-                    account.pub_key_hash = new_pub_key_hash.clone();
+                    account.pub_key_hash = new_pub_key_hash;
                     account.nonce = new_nonce;
                     self.insert_account(account_id, account);
                 }
@@ -384,7 +384,7 @@ impl ZkSyncState {
                     );
                     assert_eq!(&account.nonce, old_nonce, "nonce mismatch");
 
-                    account.pub_key_hash = new_pub_key_hash.clone();
+                    account.pub_key_hash = *new_pub_key_hash;
                     account.nonce = *new_nonce;
 
                     self.insert_account(*account_id, account);
@@ -397,7 +397,298 @@ impl ZkSyncState {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::tests::{AccountState::*, PlasmaTestBuilder};
     use zksync_crypto::rand::{Rng, SeedableRng, XorShiftRng};
+    use zksync_types::tx::Withdraw;
+
+    /// Checks if execute_txs_batch fails if it doesn't have enough balance.
+    #[test]
+    fn execute_txs_batch_fail() {
+        let mut tb = PlasmaTestBuilder::new();
+
+        let (account_id, account, sk) = tb.add_account(Unlocked);
+        tb.set_balance(account_id, 0, BigUint::from(99u32));
+
+        let withdraw1 = Withdraw::new_signed(
+            account_id,
+            account.address,
+            account.address,
+            0,
+            BigUint::from(48u32),
+            BigUint::from(2u32),
+            account.nonce,
+            &sk,
+        )
+        .unwrap();
+        let withdraw2 = Withdraw::new_signed(
+            account_id,
+            account.address,
+            account.address,
+            0,
+            BigUint::from(47u32),
+            BigUint::from(3u32),
+            account.nonce + 1,
+            &sk,
+        )
+        .unwrap();
+
+        let signed_zk_sync_tx1 = SignedZkSyncTx {
+            tx: ZkSyncTx::Withdraw(Box::new(withdraw1)),
+            eth_sign_data: None,
+        };
+        let signed_zk_sync_tx2 = SignedZkSyncTx {
+            tx: ZkSyncTx::Withdraw(Box::new(withdraw2)),
+            eth_sign_data: None,
+        };
+        tb.test_txs_batch_fail(
+            &[signed_zk_sync_tx1, signed_zk_sync_tx2],
+            "Batch execution failed, since tx #2 of batch failed with a reason: Not enough balance",
+        );
+    }
+
+    /// Checks if execute_txs_batch executes normally with valid operations.
+    #[test]
+    fn execute_txs_batch_success() {
+        let mut tb = PlasmaTestBuilder::new();
+
+        let (account_id, account, sk) = tb.add_account(Unlocked);
+        tb.set_balance(account_id, 0, BigUint::from(100u32));
+
+        let withdraw1 = Withdraw::new_signed(
+            account_id,
+            account.address,
+            account.address,
+            0,
+            BigUint::from(48u32),
+            BigUint::from(2u32),
+            account.nonce,
+            &sk,
+        )
+        .unwrap();
+        let withdraw2 = Withdraw::new_signed(
+            account_id,
+            account.address,
+            account.address,
+            0,
+            BigUint::from(47u32),
+            BigUint::from(3u32),
+            account.nonce + 1,
+            &sk,
+        )
+        .unwrap();
+
+        let signed_zk_sync_tx1 = SignedZkSyncTx {
+            tx: ZkSyncTx::Withdraw(Box::new(withdraw1)),
+            eth_sign_data: None,
+        };
+        let signed_zk_sync_tx2 = SignedZkSyncTx {
+            tx: ZkSyncTx::Withdraw(Box::new(withdraw2)),
+            eth_sign_data: None,
+        };
+        let expected_updates = vec![
+            (
+                0,
+                AccountUpdate::UpdateBalance {
+                    old_nonce: 0,
+                    new_nonce: 1,
+                    balance_update: (0, 100u32.into(), 50u32.into()),
+                },
+            ),
+            (
+                0,
+                AccountUpdate::UpdateBalance {
+                    old_nonce: 1,
+                    new_nonce: 2,
+                    balance_update: (0, 50u32.into(), 0u32.into()),
+                },
+            ),
+        ];
+        tb.test_txs_batch_success(&[signed_zk_sync_tx1, signed_zk_sync_tx2], &expected_updates);
+    }
+
+    /// Checks if apply_account_updates panics if there is deletion of unexisting account in updates.
+    #[test]
+    #[should_panic(expected = "account to delete must exist")]
+    fn delete_unexisting_account() {
+        let mut rng = XorShiftRng::from_seed([1, 2, 3, 4]);
+        let mut state = ZkSyncState::empty();
+        let updates = vec![(
+            0,
+            AccountUpdate::Delete {
+                address: Address::from(rng.gen::<[u8; 20]>()),
+                nonce: 0,
+            },
+        )];
+        state.apply_account_updates(updates);
+    }
+
+    /// Checks if apply_account_updates panics if its updates have mismatched nonces.
+    #[test]
+    #[should_panic]
+    fn mismatched_nonce() {
+        let mut rng = XorShiftRng::from_seed([1, 2, 3, 4]);
+        let mut state = ZkSyncState::empty();
+        let address = Address::from(rng.gen::<[u8; 20]>());
+        let updates = vec![
+            (0, AccountUpdate::Create { address, nonce: 0 }),
+            (
+                0,
+                AccountUpdate::UpdateBalance {
+                    old_nonce: 0,
+                    new_nonce: 1,
+                    balance_update: (0, 0u32.into(), 100u32.into()),
+                },
+            ),
+            (
+                0,
+                AccountUpdate::UpdateBalance {
+                    old_nonce: 0,
+                    new_nonce: 1,
+                    balance_update: (0, 100u32.into(), 200u32.into()),
+                },
+            ),
+        ];
+        state.apply_account_updates(updates);
+    }
+
+    /// Checks if apply_account_updates panics if its updates have mismatched balances.
+    #[test]
+    #[should_panic]
+    fn mismatched_old_balance() {
+        let mut rng = XorShiftRng::from_seed([1, 2, 3, 4]);
+        let mut state = ZkSyncState::empty();
+        let address = Address::from(rng.gen::<[u8; 20]>());
+        let updates = vec![
+            (0, AccountUpdate::Create { address, nonce: 0 }),
+            (
+                0,
+                AccountUpdate::UpdateBalance {
+                    old_nonce: 0,
+                    new_nonce: 1,
+                    balance_update: (0, 0u32.into(), 100u32.into()),
+                },
+            ),
+            (
+                0,
+                AccountUpdate::UpdateBalance {
+                    old_nonce: 1,
+                    new_nonce: 2,
+                    balance_update: (0, 0u32.into(), 200u32.into()),
+                },
+            ),
+        ];
+        state.apply_account_updates(updates);
+    }
+
+    /// Checks if apply_account_updates panics if there are creations of two accounts with the same addresses in updates.
+    #[test]
+    #[should_panic(expected = "assertion failed: self.get_account_by_address(&address).is_none()")]
+    fn create_two_accounts_with_same_addresses() {
+        let mut rng = XorShiftRng::from_seed([1, 2, 3, 4]);
+        let mut random_addresses = Vec::new();
+        random_addresses.push(Address::from(rng.gen::<[u8; 20]>()));
+        random_addresses.push(Address::from(rng.gen::<[u8; 20]>()));
+
+        let mut state = ZkSyncState::empty();
+        let updates = vec![
+            (
+                0,
+                AccountUpdate::Create {
+                    address: random_addresses[0],
+                    nonce: 0,
+                },
+            ),
+            (
+                1,
+                AccountUpdate::Create {
+                    address: random_addresses[0],
+                    nonce: 0,
+                },
+            ),
+        ];
+        state.apply_account_updates(updates);
+    }
+
+    /// Checks if all types of updates apply properly in apply_account_updates.
+    #[test]
+    fn apply_account_updates_success() {
+        let mut rng = XorShiftRng::from_seed([1, 2, 3, 4]);
+        let mut random_addresses = Vec::new();
+        let token_id = 0;
+        random_addresses.push(Address::from(rng.gen::<[u8; 20]>()));
+        random_addresses.push(Address::from(rng.gen::<[u8; 20]>()));
+
+        let mut state = ZkSyncState::empty();
+
+        let updates = vec![
+            (
+                0,
+                AccountUpdate::Create {
+                    address: random_addresses[0],
+                    nonce: 0,
+                },
+            ),
+            (
+                1,
+                AccountUpdate::Create {
+                    address: random_addresses[1],
+                    nonce: 0,
+                },
+            ),
+        ];
+        state.apply_account_updates(updates);
+        assert_eq!(
+            state.get_account(0).unwrap().get_balance(token_id),
+            0u32.into()
+        );
+        assert_eq!(
+            state.get_account(1).unwrap().get_balance(token_id),
+            0u32.into()
+        );
+
+        let updates = vec![(
+            0,
+            AccountUpdate::UpdateBalance {
+                old_nonce: 0,
+                new_nonce: 1,
+                balance_update: (token_id, 0u32.into(), 100u32.into()),
+            },
+        )];
+        state.apply_account_updates(updates);
+        assert_eq!(
+            state.get_account(0).unwrap().get_balance(token_id),
+            100u32.into()
+        );
+        assert_eq!(
+            state.get_account(1).unwrap().get_balance(token_id),
+            0u32.into()
+        );
+
+        let updates = vec![(
+            0,
+            AccountUpdate::ChangePubKeyHash {
+                old_pub_key_hash: state.get_account(0).unwrap().pub_key_hash,
+                new_pub_key_hash: state.get_account(1).unwrap().pub_key_hash,
+                old_nonce: 1,
+                new_nonce: 2,
+            },
+        )];
+        state.apply_account_updates(updates);
+        assert_eq!(
+            state.get_account(0).unwrap().pub_key_hash,
+            state.get_account(1).unwrap().pub_key_hash
+        );
+
+        let updates = vec![(
+            0,
+            AccountUpdate::Delete {
+                address: random_addresses[0],
+                nonce: 2,
+            },
+        )];
+        state.apply_account_updates(updates);
+        assert_eq!(state.get_account_by_address(&random_addresses[0]), None);
+    }
 
     #[test]
     fn plasma_state_reversing_updates() {

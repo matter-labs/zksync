@@ -17,7 +17,7 @@ ENV RUSTUP_HOME=/usr/local/rustup \
     PATH=/usr/local/cargo/bin:$PATH
 RUN curl https://sh.rustup.rs -sSf | bash -s -- -y
 RUN cargo install diesel_cli --no-default-features --features postgres
-RUN cargo install --version=0.2.0 sqlx-cli
+RUN cargo install sqlx-cli --git https://github.com/alekseysidorov/sqlx.git
 
 # Postgresql: Enable trust authentication to allow any connections.
 RUN mkdir -p /etc/postgresql/11/main

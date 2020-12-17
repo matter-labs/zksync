@@ -407,7 +407,7 @@ mod tests {
         *,
     };
     use crate::{
-        api_server::rest::helpers::try_parse_tx_hash,
+        api_server::helpers::try_parse_tx_hash,
         core_api_client::CoreApiClient,
         fee_ticker::{Fee, OutputFeeType::Withdraw, TickerRequest},
         signature_checker::{VerifiedTx, VerifyTxSignatureRequest},
@@ -430,8 +430,7 @@ mod tests {
                 .route("new_txs_batch", web::post().to(send_txs_batch))
         });
 
-        let mut url = server.url("");
-        url.pop(); // Pop last '/' symbol.
+        let url = server.url("").trim_end_matches('/').to_owned();
 
         (CoreApiClient::new(url), server)
     }
@@ -533,6 +532,10 @@ mod tests {
     }
 
     #[actix_rt::test]
+    #[cfg_attr(
+        not(feature = "api_test"),
+        ignore = "Use `zk test rust-api` command to perform this test"
+    )]
     async fn test_submit_txs_loopback() -> anyhow::Result<()> {
         let (core_client, core_server) = submit_txs_loopback();
 
@@ -549,6 +552,10 @@ mod tests {
     }
 
     #[actix_rt::test]
+    #[cfg_attr(
+        not(feature = "api_test"),
+        ignore = "Use `zk test rust-api` command to perform this test"
+    )]
     async fn test_transactions_scope() -> anyhow::Result<()> {
         let (client, server) = TestServer::new().await?;
 
@@ -686,6 +693,10 @@ mod tests {
     /// - Attempt to pay fees in an inappropriate token fails for single batch.
     /// - Batch with an inappropriate token still can be processed if the fee is covered with a common token.
     #[actix_rt::test]
+    #[cfg_attr(
+        not(feature = "api_test"),
+        ignore = "Use `zk test rust-api` command to perform this test"
+    )]
     async fn test_bad_fee_token() -> anyhow::Result<()> {
         let (client, server) = TestServer::new().await?;
 
@@ -772,6 +783,10 @@ mod tests {
     /// - Attempt to submit non-withdraw transaction with the disabled fast-processing.
     /// - Attempt to submit withdraw transaction with the enabled fast-processing.
     #[actix_rt::test]
+    #[cfg_attr(
+        not(feature = "api_test"),
+        ignore = "Use `zk test rust-api` command to perform this test"
+    )]
     async fn test_fast_processing_flag() -> anyhow::Result<()> {
         let (client, server) = TestServer::new().await?;
 

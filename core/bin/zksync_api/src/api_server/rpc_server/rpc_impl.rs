@@ -23,7 +23,7 @@ impl RpcApp {
     pub async fn _impl_account_info(self, address: Address) -> Result<AccountInfoResp> {
         let start = Instant::now();
 
-        let account_state = self.get_account_state(&address).await?;
+        let account_state = self.get_account_state(address).await?;
 
         let depositing_ops = self.get_ongoing_deposits_impl(address).await?;
         let depositing =
@@ -168,9 +168,21 @@ impl RpcApp {
             log::warn!("Internal Server Error: '{}'; input: N/A", err);
             Error::internal_error()
         })?;
-        let result = tokens
+
+        // HACK: Special case for the Golem:
+        //
+        // Currently, their token on Rinkeby is called GNT, but it's being renamed to the tGLM.
+        //
+        // TODO: Remove this case after Golem update [ZKS-173]
+        let mut has_gnt = None;
+        let mut result: HashMap<_, _> = tokens
             .drain()
             .map(|(id, token)| {
+                // TODO: Remove this case after Golem update [ZKS-173]
+                if token.symbol == "GNT" {
+                    has_gnt = Some(token.clone());
+                }
+
                 if id == 0 {
                     ("ETH".to_string(), token)
                 } else {
@@ -178,6 +190,14 @@ impl RpcApp {
                 }
             })
             .collect();
+
+        // So if we have `GNT` token in response we should also add `GLM` alias.
+        // TODO: Remove this case after Golem update [ZKS-173]
+        if let Some(mut token) = has_gnt {
+            token.symbol = "tGLM".to_string();
+            result.insert(token.symbol.clone(), token);
+        }
+
         metrics::histogram!("api.rpc.tokens", start.elapsed());
         Ok(result)
     }

@@ -33,8 +33,10 @@ async function checkEnv() {
     }
     await utils.exec('cargo sqlx --version');
     const { stdout: version } = await utils.exec('node --version');
-    if ('v14' >= version) {
-        throw new Error('Error, node.js version 14 or higher is required');
+    // Node v.14.14 is required because
+    // the `fs.rmSync` function was added in v14.14.0
+    if ('v14.14' >= version) {
+        throw new Error('Error, node.js version 14.14.0 or higher is required');
     }
 }
 
