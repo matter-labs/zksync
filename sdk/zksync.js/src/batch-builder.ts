@@ -63,8 +63,11 @@ export class BatchBuilder {
                 )
             );
             // It is necessary to store the hash, so the signature can be verified on smart contract.
-            this.changePubKeyTx.batchHash = batchHash;
-            this.changePubKeyTx.ethSignature = signature.signature;
+            this.changePubKeyTx.ethAuthData = {
+                type: 'ECDSA',
+                ethSignature: signature.signature,
+                batchHash
+            };
         } else {
             // The message is just keccak256(batchBytes).
             signature = await this.wallet.getEthMessageSignature(
