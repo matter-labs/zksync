@@ -3,6 +3,7 @@
 
 // Built-in uses
 use std::collections::{HashMap, HashSet};
+use zksync_storage::ConnectionPool;
 // Workspace uses
 use zksync_types::{
     tokens::{Token, TokenLike},
@@ -58,13 +59,13 @@ impl FeeTokenValidator {
 
 #[derive(Debug, Clone)]
 pub(crate) enum TokenCacheWrapper {
-    DB(TokenDBCache),
+    DB(ConnectionPool, TokenDBCache),
     Memory(HashMap<TokenLike, Token>),
 }
 
-impl From<TokenDBCache> for TokenCacheWrapper {
-    fn from(cache: TokenDBCache) -> Self {
-        Self::DB(cache)
+impl From<(ConnectionPool, TokenDBCache)> for TokenCacheWrapper {
+    fn from(inner: (ConnectionPool, TokenDBCache)) -> Self {
+        Self::DB(inner.0, inner.1)
     }
 }
 
@@ -77,7 +78,11 @@ impl From<HashMap<TokenLike, Token>> for TokenCacheWrapper {
 impl TokenCacheWrapper {
     pub async fn get_token(&self, token_like: TokenLike) -> anyhow::Result<Option<Token>> {
         match self {
-            Self::DB(cache) => cache.get_token(token_like).await,
+            Self::DB(pool, cache) => {
+                cache
+                    .get_token(&mut pool.access_storage().await?, token_like)
+                    .await
+            }
             Self::Memory(cache) => Ok(cache.get(&token_like).cloned()),
         }
     }

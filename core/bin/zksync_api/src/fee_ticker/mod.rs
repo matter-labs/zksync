@@ -192,8 +192,8 @@ pub fn run_ticker_task(
         not_subsidized_tokens: config.not_subsidized_tokens,
     };
 
-    let cache = TokenDBCache::new(db_pool.clone());
-    let validator = FeeTokenValidator::new(cache, config.disabled_tokens);
+    let cache = TokenDBCache::new();
+    let validator = FeeTokenValidator::new((db_pool.clone(), cache), config.disabled_tokens);
 
     let client = reqwest::ClientBuilder::new()
         .timeout(CONNECTION_TIMEOUT)

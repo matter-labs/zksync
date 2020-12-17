@@ -84,7 +84,7 @@ pub(super) struct TickerApi<T: TokenPriceAPI> {
 
 impl<T: TokenPriceAPI> TickerApi<T> {
     pub fn new(db_pool: ConnectionPool, token_price_api: T) -> Self {
-        let token_db_cache = TokenDBCache::new(db_pool.clone());
+        let token_db_cache = TokenDBCache::new();
         Self {
             db_pool,
             token_db_cache,
@@ -182,7 +182,7 @@ impl<T: TokenPriceAPI + Send + Sync> FeeTickerAPI for TickerApi<T> {
         let start = Instant::now();
         let token = self
             .token_db_cache
-            .get_token(token.clone())
+            .get_token(&mut self.db_pool.access_storage().await?, token.clone())
             .await?
             .ok_or_else(|| format_err!("Token not found: {:?}", token))?;
 
@@ -259,7 +259,7 @@ impl<T: TokenPriceAPI + Send + Sync> FeeTickerAPI for TickerApi<T> {
         let start = Instant::now();
         let result = self
             .token_db_cache
-            .get_token(token.clone())
+            .get_token(&mut self.db_pool.access_storage().await?, token.clone())
             .await?
             .ok_or_else(|| format_err!("Token not found: {:?}", token));
         metrics::histogram!("ticker.get_token", start.elapsed());

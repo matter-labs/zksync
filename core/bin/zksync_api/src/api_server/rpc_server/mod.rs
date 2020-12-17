@@ -330,13 +330,21 @@ impl RpcApp {
 
         if let Some((account_id, committed_state)) = account_info.committed {
             result.account_id = Some(account_id);
-            result.committed =
-                ResponseAccountState::try_restore(committed_state, &self.tx_sender.tokens).await?;
+            result.committed = ResponseAccountState::try_restore(
+                &mut storage,
+                &self.tx_sender.tokens,
+                committed_state,
+            )
+            .await?;
         };
 
         if let Some((_, verified_state)) = account_info.verified {
-            result.verified =
-                ResponseAccountState::try_restore(verified_state, &self.tx_sender.tokens).await?;
+            result.verified = ResponseAccountState::try_restore(
+                &mut storage,
+                &self.tx_sender.tokens,
+                verified_state,
+            )
+            .await?;
         };
 
         metrics::histogram!("api.rpc.get_account_state", start.elapsed());
