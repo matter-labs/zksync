@@ -231,7 +231,7 @@ pub fn run_ticker_task(
                 ticker_config,
                 validator,
                 tricker_requests,
-                db_pool.clone(),
+                db_pool,
                 5,
             );
             ticker_dispatcher.spawn_tickers();
