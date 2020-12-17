@@ -685,21 +685,18 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
     ///
     /// The response for "newer" receipts is sorted in ascending order by position and for "older"
     /// ones in descending order.
-    ///
-    /// Note that rejected transactions do not have a `block_number`, but since the indexes of
-    /// succeesed transactions start from 1, the indexes of rejected transactions is set to 0.
     pub async fn get_account_transactions_receipts(
         &mut self,
         address: Address,
         block_number: u64,
-        block_index: u32,
+        block_index: Option<u32>,
         direction: SearchDirection,
         limit: u64,
     ) -> QueryResult<Vec<AccountTxReceiptResponse>> {
         let start = Instant::now();
 
         let block_number = block_number as i64;
-        let block_index = block_index as i32;
+        let block_index = block_index.map(|x| x as i32).unwrap_or(-1);
 
         let receipts: Vec<_> = match direction {
             SearchDirection::Newer => {
@@ -743,13 +740,13 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
                         (from_account = $1 OR primary_account_address = $1)
                         AND (
                             block_number = $2 AND (
-                                COALESCE(block_index, 0) >= $3
+                                COALESCE(block_index, -1) >= $3
                             ) OR (
                                 block_number > $2
                             )
                         )
                     )
-                    ORDER BY block_number ASC, COALESCE(block_index, 0) ASC
+                    ORDER BY block_number ASC, COALESCE(block_index, -1) ASC
                     LIMIT $4
                     "#,
                     address.as_bytes(),
@@ -801,13 +798,13 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
                         (from_account = $1 OR primary_account_address = $1)
                         AND (
                             block_number = $2 AND (
-                                COALESCE(block_index, 0) <= $3
+                                COALESCE(block_index, -1) <= $3
                             ) OR (
                                 block_number < $2
                             )
                         )
                     )
-                    ORDER BY block_number DESC, COALESCE(block_index, 0) DESC
+                    ORDER BY block_number DESC, COALESCE(block_index, -1) DESC
                     LIMIT $4
                     "#,
                     address.as_bytes(),
@@ -886,13 +883,13 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
                         (from_account = $1)
                         AND (
                             block_number = $2 AND (
-                                COALESCE(block_index, 0) >= $3
+                                block_index >= $3
                             ) OR (
                                 block_number > $2
                             )
                         )
                     )
-                    ORDER BY block_number ASC, COALESCE(block_index, 0) ASC
+                    ORDER BY block_number ASC, block_index ASC
                     LIMIT $4
                     "#,
                     address.as_bytes(),
@@ -942,13 +939,13 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
                         (from_account = $1)
                         AND (
                             block_number = $2 AND (
-                                COALESCE(block_index, 0) <= $3
+                                block_index <= $3
                             ) OR (
                                 block_number < $2
                             )
                         )
                     )
-                    ORDER BY block_number DESC, COALESCE(block_index, 0) DESC
+                    ORDER BY block_number DESC, block_index DESC
                     LIMIT $4
                     "#,
                     address.as_bytes(),

@@ -6,14 +6,19 @@ use actix_web::{
     web::{self, Json},
     App,
 };
+use chrono::Utc;
 use serde_json::json;
 use tokio::sync::Mutex;
 
 // Workspace uses
 use zksync_storage::{
-    chain::operations_ext::records::AccountTxReceiptResponse, ConnectionPool, StorageProcessor,
+    chain::operations_ext::records::{AccountOpReceiptResponse, AccountTxReceiptResponse},
+    ConnectionPool, StorageProcessor,
 };
-use zksync_types::{tx::TxHash, Address, BlockNumber, H256};
+use zksync_types::{
+    tx::TxHash, AccountId, Address, BlockNumber, Deposit, DepositOp, ExecutedOperations,
+    ExecutedPriorityOp, PriorityOp, ZkSyncOp, H256,
+};
 
 // Local uses
 use crate::{
@@ -27,7 +32,7 @@ use crate::{
 
 use super::{
     api_scope,
-    types::{AccountReceipts, AccountTxReceipt},
+    types::{AccountOpReceipt, AccountReceipts, AccountTxReceipt},
 };
 
 type DepositsHandle = Arc<Mutex<serde_json::Value>>;
@@ -91,10 +96,10 @@ impl TestServer {
         ))
     }
 
-    async fn account_address(
+    async fn account_id(
         storage: &mut StorageProcessor<'_>,
         block: BlockNumber,
-    ) -> anyhow::Result<Address> {
+    ) -> anyhow::Result<AccountId> {
         let transactions = storage
             .chain()
             .block_schema()
@@ -104,14 +109,46 @@ impl TestServer {
         let tx = &transactions[0];
         let op = tx.op.as_object().unwrap();
 
-        let address = serde_json::from_value(op["to"].clone()).unwrap();
-        Ok(address)
+        let id = serde_json::from_value(op["accountId"].clone()).unwrap();
+        Ok(id)
     }
 
     async fn stop(self) {
         self.api_server.stop().await;
         self.core_server.stop().await;
     }
+}
+
+fn dummy_deposit_op(
+    address: Address,
+    account_id: AccountId,
+    serial_id: u64,
+    block_index: u32,
+) -> ExecutedOperations {
+    let deposit_op = ZkSyncOp::Deposit(Box::new(DepositOp {
+        priority_op: Deposit {
+            from: address,
+            token: 0,
+            amount: 1_u64.into(),
+            to: address,
+        },
+        account_id,
+    }));
+
+    let executed_op = ExecutedPriorityOp {
+        priority_op: PriorityOp {
+            serial_id,
+            data: deposit_op.try_get_priority_op().unwrap(),
+            deadline_block: 0,
+            eth_hash: H256::default().as_bytes().to_owned(),
+            eth_block: 10,
+        },
+        op: deposit_op,
+        block_index,
+        created_at: Utc::now(),
+    };
+
+    ExecutedOperations::PriorityOp(Box::new(executed_op))
 }
 
 #[actix_rt::test]
@@ -130,11 +167,11 @@ async fn accounts_scope() -> anyhow::Result<()> {
     let (client, server) = TestServer::new().await?;
 
     // Get account information.
-    let address = TestServer::account_address(&mut server.pool.access_storage().await?, 1).await?;
+    let account_id = TestServer::account_id(&mut server.pool.access_storage().await?, 1).await?;
 
-    let account_info = client.account_info(address).await?.unwrap();
-    let id = account_info.id;
-    assert_eq!(client.account_info(id).await?, Some(account_info));
+    let account_info = client.account_info(account_id).await?.unwrap();
+    let address = account_info.address;
+    assert_eq!(client.account_info(address).await?, Some(account_info));
 
     // Provide unconfirmed deposits
     let deposits = json!([
@@ -144,7 +181,7 @@ async fn accounts_scope() -> anyhow::Result<()> {
                 "serial_id": 1,
                 "data": {
                     "type": "Deposit",
-                    "account_id": id,
+                    "account_id": account_id,
                     "amount": "100500",
                     "from": Address::default(),
                     "to": address,
@@ -159,18 +196,18 @@ async fn accounts_scope() -> anyhow::Result<()> {
     *server.deposits.lock().await = deposits;
 
     // Check account information about unconfirmed deposits.
-    let account_info = client.account_info(id).await?.unwrap();
+    let account_info = client.account_info(account_id).await?.unwrap();
 
     let depositing_balances = &account_info.depositing.balances["ETH"];
     assert_eq!(depositing_balances.expected_accept_block, 5);
     assert_eq!(depositing_balances.amount.0, 100_500_u64.into());
 
-    // Get account tx receipts.
+    // Get account transaction receipts.
     let receipts = client
-        .account_tx_receipts(address, AccountReceipts::newer_than(1, 0), 10)
+        .account_tx_receipts(address, AccountReceipts::newer_than(0, None), 10)
         .await?;
 
-    assert_eq!(receipts[0].index, Some(2));
+    assert_eq!(receipts[0].index, Some(3));
     assert_eq!(receipts[0].receipt, TxReceipt::Verified { block: 1 });
 
     // Get same receipts by the different requests.
@@ -182,14 +219,63 @@ async fn accounts_scope() -> anyhow::Result<()> {
     );
     assert_eq!(
         client
-            .account_tx_receipts(address, AccountReceipts::older_than(10, 0), 10)
+            .account_tx_receipts(address, AccountReceipts::older_than(10, Some(0)), 10)
+            .await?,
+        receipts
+    );
+
+    // Save priority operation in block.
+    let deposit_op = dummy_deposit_op(address, account_id, 10234, 1);
+    server
+        .pool
+        .access_storage()
+        .await?
+        .chain()
+        .block_schema()
+        .save_block_transactions(1, vec![deposit_op])
+        .await?;
+
+    // Get account operation receipts.
+    let receipts = client
+        .account_op_receipts(address, AccountReceipts::newer_than(1, Some(0)), 10)
+        .await?;
+
+    assert_eq!(
+        receipts[0],
+        AccountOpReceipt {
+            hash: H256::default(),
+            index: 1,
+            receipt: TxReceipt::Verified { block: 1 }
+        }
+    );
+    assert_eq!(
+        client
+            .account_op_receipts(address, AccountReceipts::newer_than(1, Some(0)), 10)
+            .await?,
+        receipts
+    );
+    assert_eq!(
+        client
+            .account_op_receipts(address, AccountReceipts::older_than(2, Some(0)), 10)
+            .await?,
+        receipts
+    );
+    assert_eq!(
+        client
+            .account_op_receipts(account_id, AccountReceipts::newer_than(1, Some(0)), 10)
+            .await?,
+        receipts
+    );
+    assert_eq!(
+        client
+            .account_op_receipts(account_id, AccountReceipts::older_than(2, Some(0)), 10)
             .await?,
         receipts
     );
 
     // Get account pending receipts.
-    let pending_receipts = client.account_pending_ops(id).await?;
-    assert_eq!(pending_receipts[0].block, 5);
+    let pending_receipts = client.account_pending_ops(account_id).await?;
+    assert_eq!(pending_receipts[0].eth_block, 5);
     assert_eq!(pending_receipts[0].hash, H256::default());
 
     server.stop().await;
@@ -289,6 +375,63 @@ fn account_tx_response_to_receipt() {
 
     for (resp, expected_receipt) in cases {
         let actual_receipt = AccountTxReceipt::from(resp);
+        assert_eq!(actual_receipt, expected_receipt);
+    }
+}
+
+#[test]
+fn account_op_response_to_receipt() {
+    fn empty_hash() -> Vec<u8> {
+        H256::default().as_bytes().to_vec()
+    }
+
+    let cases = vec![
+        (
+            AccountOpReceiptResponse {
+                block_index: 1,
+                block_number: 1,
+                commit_tx_hash: None,
+                verify_tx_hash: None,
+                eth_hash: empty_hash(),
+            },
+            AccountOpReceipt {
+                index: 1,
+                hash: H256::default(),
+                receipt: TxReceipt::Executed,
+            },
+        ),
+        (
+            AccountOpReceiptResponse {
+                block_index: 1,
+                block_number: 1,
+                commit_tx_hash: Some(empty_hash()),
+                verify_tx_hash: None,
+                eth_hash: empty_hash(),
+            },
+            AccountOpReceipt {
+                index: 1,
+                hash: H256::default(),
+                receipt: TxReceipt::Committed { block: 1 },
+            },
+        ),
+        (
+            AccountOpReceiptResponse {
+                block_index: 1,
+                block_number: 1,
+                commit_tx_hash: Some(empty_hash()),
+                verify_tx_hash: Some(empty_hash()),
+                eth_hash: empty_hash(),
+            },
+            AccountOpReceipt {
+                index: 1,
+                hash: H256::default(),
+                receipt: TxReceipt::Verified { block: 1 },
+            },
+        ),
+    ];
+
+    for (resp, expected_receipt) in cases {
+        let actual_receipt = AccountOpReceipt::from(resp);
         assert_eq!(actual_receipt, expected_receipt);
     }
 }

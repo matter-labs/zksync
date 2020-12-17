@@ -22,10 +22,10 @@ use zksync_storage::{
 use zksync_test_account::ZkSyncAccount;
 use zksync_types::{
     ethereum::OperationType,
-    helpers::apply_updates,
+    helpers::{apply_updates, closest_packable_fee_amount, closest_packable_token_amount},
     operations::{ChangePubKeyOp, TransferToNewOp},
     AccountId, AccountMap, Action, Address, BlockNumber, ExecutedOperations, ExecutedTx, Token,
-    ZkSyncOp, ZkSyncTx,
+    Transfer, TransferOp, ZkSyncOp, ZkSyncTx,
 };
 
 // Local uses
@@ -127,7 +127,15 @@ impl TestServerConfig {
         // Transfer tx pair
         {
             let tx = from
-                .sign_transfer(0, "ETH", 1_u64.into(), fee.into(), &to.address, None, false)
+                .sign_transfer(
+                    0,
+                    "ETH",
+                    closest_packable_token_amount(&10_u64.into()),
+                    closest_packable_fee_amount(&fee.into()),
+                    &to.address,
+                    None,
+                    false,
+                )
                 .0;
 
             let zksync_op = ZkSyncOp::TransferToNew(Box::new(TransferToNewOp {
@@ -169,6 +177,40 @@ impl TestServerConfig {
                 op: Some(zksync_op),
                 fail_reason: Some("Unknown token".to_string()),
                 block_index: None,
+                created_at: chrono::Utc::now(),
+                batch_id: None,
+            };
+
+            txs.push((
+                ZkSyncTx::Transfer(Box::new(tx)),
+                ExecutedOperations::Tx(Box::new(executed_tx)),
+            ));
+        }
+        // Transfer back tx pair
+        {
+            let tx = Transfer::new(
+                to.get_account_id().unwrap(),
+                to.address,
+                from.address,
+                0,
+                2_u64.into(),
+                fee.into(),
+                0,
+                None,
+            );
+
+            let zksync_op = ZkSyncOp::Transfer(Box::new(TransferOp {
+                tx: tx.clone(),
+                from: to.get_account_id().unwrap(),
+                to: from.get_account_id().unwrap(),
+            }));
+
+            let executed_tx = ExecutedTx {
+                signed_tx: zksync_op.try_get_tx().unwrap().into(),
+                success: true,
+                op: Some(zksync_op),
+                fail_reason: None,
+                block_index: Some(3),
                 created_at: chrono::Utc::now(),
                 batch_id: None,
             };

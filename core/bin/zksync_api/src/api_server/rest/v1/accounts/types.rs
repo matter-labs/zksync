@@ -9,7 +9,8 @@ use serde::{Deserialize, Serialize};
 // Workspace uses
 use zksync_storage::{
     chain::operations_ext::{
-        records::AccountTxReceiptResponse, SearchDirection as StorageSearchDirection,
+        records::{AccountOpReceiptResponse, AccountTxReceiptResponse},
+        SearchDirection as StorageSearchDirection,
     },
     QueryResult, MAX_BLOCK_NUMBER,
 };
@@ -109,18 +110,12 @@ pub enum AccountReceipts {
 }
 
 impl AccountReceipts {
-    pub fn newer_than(block: BlockNumber, index: u32) -> Self {
-        Self::Newer(TxLocation {
-            block,
-            index: Some(index),
-        })
+    pub fn newer_than(block: BlockNumber, index: Option<u32>) -> Self {
+        Self::Newer(TxLocation { block, index })
     }
 
-    pub fn older_than(block: BlockNumber, index: u32) -> Self {
-        Self::Older(TxLocation {
-            block,
-            index: Some(index),
-        })
+    pub fn older_than(block: BlockNumber, index: Option<u32>) -> Self {
+        Self::Older(TxLocation { block, index })
     }
 }
 
@@ -154,8 +149,17 @@ pub struct AccountTxReceipt {
 
 #[derive(Debug, Deserialize, Serialize, Clone, PartialEq)]
 #[serde(rename_all = "camelCase")]
-pub struct PendingAccountTxReceipt {
-    pub block: u64,
+pub struct AccountOpReceipt {
+    pub index: u32,
+    #[serde(flatten)]
+    pub receipt: TxReceipt,
+    pub hash: H256,
+}
+
+#[derive(Debug, Deserialize, Serialize, Clone, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct PendingAccountOpReceipt {
+    pub eth_block: u64,
     pub hash: H256,
 }
 
@@ -389,10 +393,37 @@ impl From<AccountTxReceiptResponse> for AccountTxReceipt {
     }
 }
 
-impl PendingAccountTxReceipt {
+impl From<AccountOpReceiptResponse> for AccountOpReceipt {
+    fn from(inner: AccountOpReceiptResponse) -> Self {
+        let block = inner.block_number as BlockNumber;
+        let index = inner.block_index as u32;
+        let hash = H256::from_slice(&inner.eth_hash);
+
+        let receipt = match (
+            inner.commit_tx_hash.is_some(),
+            inner.verify_tx_hash.is_some(),
+        ) {
+            (false, false) => TxReceipt::Executed,
+            (true, false) => TxReceipt::Committed { block },
+            (true, true) => TxReceipt::Verified { block },
+            (false, true) => panic!(
+                "Database provided an incorrect account tx reciept: {:?}",
+                inner
+            ),
+        };
+
+        Self {
+            index,
+            receipt,
+            hash,
+        }
+    }
+}
+
+impl PendingAccountOpReceipt {
     pub fn from_priority_op(block_id: EthBlockId, op: PriorityOp) -> Self {
         Self {
-            block: block_id,
+            eth_block: block_id,
             hash: H256::from_slice(&op.eth_hash),
         }
     }
