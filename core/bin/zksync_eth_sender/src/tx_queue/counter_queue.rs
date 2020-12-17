@@ -53,6 +53,7 @@ impl<T: fmt::Debug> CounterQueue<T> {
     }
 
     /// Returns the value of the counter.
+    #[allow(dead_code)]
     pub fn get_count(&self) -> usize {
         self.counter
     }

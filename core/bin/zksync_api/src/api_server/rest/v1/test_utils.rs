@@ -7,26 +7,15 @@ use std::str::FromStr;
 use actix_web::{web, App, Scope};
 use once_cell::sync::Lazy;
 use tokio::sync::Mutex;
-use web3::types::H256;
 
 // Workspace uses
 use zksync_config::{ApiServerOptions, ConfigurationOptions};
-use zksync_crypto::rand::{SeedableRng, XorShiftRng};
-use zksync_storage::{
-    chain::operations::records::NewExecutedPriorityOperation,
-    test_data::{
-        dummy_ethereum_tx_hash, gen_acc_random_updates, gen_unique_operation,
-        gen_unique_operation_with_txs, BLOCK_SIZE_CHUNKS,
-    },
-    ConnectionPool,
-};
+// use zksync_crypto::rand::{SeedableRng, XorShiftRng};
+use zksync_storage::ConnectionPool;
 use zksync_test_account::ZkSyncAccount;
 use zksync_types::{
-    ethereum::OperationType,
-    helpers::apply_updates,
     operations::{ChangePubKeyOp, TransferToNewOp},
-    AccountId, AccountMap, Action, Address, BlockNumber, ExecutedOperations, ExecutedTx, Token,
-    ZkSyncOp, ZkSyncTx,
+    AccountId, Address, BlockNumber, ExecutedOperations, ExecutedTx, ZkSyncOp, ZkSyncTx,
 };
 
 // Local uses
@@ -37,8 +26,10 @@ pub const VERIFIED_OP_SERIAL_ID: u64 = 10;
 /// Serial ID of the committed priority operation.
 pub const COMMITTED_OP_SERIAL_ID: u64 = 243;
 /// Number of committed blocks.
+#[allow(dead_code)]
 pub const COMMITTED_BLOCKS_COUNT: BlockNumber = 8;
 /// Number of verified blocks.
+#[allow(dead_code)]
 pub const VERIFIED_BLOCKS_COUNT: BlockNumber = 3;
 
 #[derive(Debug, Clone)]

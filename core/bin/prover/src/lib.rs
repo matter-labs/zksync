@@ -6,31 +6,24 @@ pub mod plonk_step_by_step_prover;
 
 // Built-in deps
 use futures::{pin_mut, FutureExt};
+use std::fmt::Debug;
 use std::sync::{
     atomic::{AtomicBool, AtomicI32, Ordering},
     Arc,
 };
 use std::time::Duration;
-use std::{
-    fmt::{self, Debug},
-    thread,
-};
-use tokio::sync::{mpsc, oneshot};
+use tokio::sync::oneshot;
 // External deps
 use zksync_crypto::rand::{
     distributions::{IndependentSample, Range},
     thread_rng,
 };
 // Workspace deps
-use tokio::stream::StreamExt;
 use zksync_config::ProverOptions;
-use zksync_crypto::proof::{AggregatedProof, EncodedAggregatedProof, SingleProof};
-use zksync_crypto::Engine;
 use zksync_prover_utils::api::{
     JobRequestData, JobResultData, ProverId, ProverInputRequest, ProverInputRequestAuxData,
     ProverInputResponse, ProverOutputRequest,
 };
-use zksync_utils::panic_notify::ThreadPanicNotify;
 
 const ABSENT_PROVER_ID: i32 = -1;
 
@@ -108,25 +101,12 @@ where
     PROVER: ProverImpl + Send + Sync + 'static,
 {
     let (result_sender, result_receiver) = oneshot::channel();
-    let (panic_sender, panic_receiver) = oneshot::channel();
-    let (mut result_receiver, mut panic_receiver) = {
-        std::thread::spawn(move || {
-            // TODO: panic sender should work
-            // std::panic::set_hook(Box::new(|panic_info| {
-            //     log::error!("Prover panicked: {}", panic_info);
-            //     panic_sender.send(Err(anyhow::format_err!("Prover panicked")));
-            // }));
-
-            let prover_with_proof = prover.create_proof(data).map(|proof| (prover, proof));
-            result_sender.send(prover_with_proof);
-        });
-        (result_receiver.fuse(), panic_receiver.fuse())
-    };
-
-    futures::select! {
-        res = result_receiver => res?,
-        pan = panic_receiver => pan?,
-    }
+    // TODO: somehow kill prover on main thread kill
+    std::thread::spawn(move || {
+        let prover_with_proof = prover.create_proof(data).map(|proof| (prover, proof));
+        result_sender.send(prover_with_proof).unwrap_or_default();
+    });
+    result_receiver.await?
 }
 
 async fn prover_work_cycle<PROVER, CLIENT>(
@@ -175,7 +155,7 @@ async fn prover_work_cycle<PROVER, CLIENT>(
             continue;
         };
 
-        let mut heartbeat_future_handle = async {
+        let heartbeat_future_handle = async {
             loop {
                 let timeout_value = {
                     let between = Range::new(0.8f64, 2.0);
@@ -191,21 +171,21 @@ async fn prover_work_cycle<PROVER, CLIENT>(
                 client
                     .working_on(job_id, &prover_name)
                     .await
-                    .map_err(|e| log::warn!("Failed to send hearbeat"))
+                    .map_err(|e| log::warn!("Failed to send hearbeat: {}", e))
                     .unwrap_or_default();
             }
         }
         .fuse();
         pin_mut!(heartbeat_future_handle);
 
-        let mut compute_proof_future = compute_proof_no_blocking(prover, job_data).fuse();
+        let compute_proof_future = compute_proof_no_blocking(prover, job_data).fuse();
         pin_mut!(compute_proof_future);
 
         let (ret_prover, proof) = futures::select! {
             comp_proof = compute_proof_future => {
                 comp_proof.expect("Failed to compute proof")
             },
-            x = heartbeat_future_handle => { unreachable!() },
+            _ = heartbeat_future_handle => unreachable!(),
         };
         prover = ret_prover;
 

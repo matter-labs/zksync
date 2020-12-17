@@ -1,5 +1,5 @@
 use crate::helpers::{pack_fee_amount, unpack_fee_amount};
-use crate::tx::{ChangePubKey, ChangePubKeyEthAuthData};
+use crate::tx::ChangePubKey;
 use crate::AccountId;
 use crate::PubKeyHash;
 use anyhow::{ensure, format_err};

@@ -11,7 +11,6 @@ use crate::verifier_contract_generator::render_vk::{
 };
 use zksync_config::AvailableBlockSizesConfig;
 use zksync_prover_utils::fs_utils::{
-    get_block_verification_key_path, get_exodus_verification_key_path,
     get_recursive_verification_key_path, get_verifier_contract_key_path,
 };
 use zksync_utils::parse_env;

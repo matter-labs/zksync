@@ -20,6 +20,10 @@ impl TxHandler<ChangePubKey> for ZkSyncState {
             .get_account_by_address(&tx.account)
             .ok_or_else(|| format_err!("Account does not exist"))?;
         ensure!(
+            tx.account == account.address,
+            "ChangePubKey account address is incorrect"
+        );
+        ensure!(
             tx.is_eth_auth_data_valid(),
             "ChangePubKey Ethereum auth data is incorrect"
         );

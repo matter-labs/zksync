@@ -1,18 +1,10 @@
 // Built-in deps
 use crate::auth_utils::AuthTokenGenerator;
-use std::str::FromStr;
 use std::time::{self, Duration};
 // External deps
-use anyhow::bail;
 use anyhow::format_err;
-use backoff::Operation;
-use log::*;
 use reqwest::Url;
 // Workspace deps
-use crate::client;
-use zksync_circuit::circuit::ZkSyncCircuit;
-use zksync_circuit::serialization::ProverData;
-use zksync_crypto::Engine;
 use zksync_prover_utils::api::{
     ProverId, ProverInputRequest, ProverInputResponse, ProverOutputRequest, ProverStopped,
     WorkingOn,
@@ -59,6 +51,7 @@ impl ApiClient {
         }
     }
 
+    #[allow(dead_code)]
     fn get_encoded_token(&self) -> anyhow::Result<String> {
         self.auth_token_generator
             .encode()

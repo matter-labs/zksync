@@ -1,15 +1,14 @@
 // Built-in deps
 use std::time::Instant;
 // External imports
-use anyhow::format_err;
 // Workspace imports
-use zksync_types::{ethereum::CompleteWithdrawalsTx, tx::TxHash, ActionType, BlockNumber};
+use zksync_types::{tx::TxHash, ActionType, BlockNumber};
 // Local imports
 use self::records::{
     NewExecutedPriorityOperation, NewExecutedTransaction, NewOperation, StoredAggregatedOperation,
-    StoredCompleteWithdrawalsTransaction, StoredExecutedPriorityOperation,
-    StoredExecutedTransaction, StoredOperation, StoredPendingWithdrawal,
+    StoredExecutedPriorityOperation, StoredOperation,
 };
+use crate::chain::operations::records::StoredExecutedTransaction;
 use crate::chain::operations_ext::OperationsExtSchema;
 use crate::ethereum::EthereumSchema;
 use crate::{chain::mempool::MempoolSchema, QueryResult, StorageProcessor};

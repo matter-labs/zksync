@@ -1,5 +1,3 @@
-use anyhow::format_err;
-
 use zksync_storage::ConnectionPool;
 use zksync_types::ethereum::CompleteWithdrawalsTx;
 

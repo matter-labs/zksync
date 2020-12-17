@@ -1,15 +1,13 @@
 // Built-in deps
-use std::time::{self, Instant};
+use std::time::Instant;
 // External imports
 use sqlx::Done;
 // Workspace imports
 use zksync_types::BlockNumber;
 // Local imports
-use self::records::{
-    ActiveProver, ProverRun, StorageProverJobQueue, StoredAggregatedProof, StoredProof,
-};
+use self::records::{StorageProverJobQueue, StoredAggregatedProof, StoredProof};
 use crate::prover::records::StorageBlockWitness;
-use crate::{chain::block::BlockSchema, QueryResult, StorageProcessor};
+use crate::{QueryResult, StorageProcessor};
 use zksync_crypto::proof::{AggregatedProof, SingleProof};
 use zksync_types::prover::{ProverJob, ProverJobStatus, ProverJobType};
 
@@ -120,6 +118,7 @@ impl<'a, 'c> ProverSchema<'a, 'c> {
             None
         };
         transaction.commit().await?;
+        metrics::histogram!("sql", start.elapsed(), "prover" => "get_idle_prover_job_from_job_queue");
         Ok(prover_job)
     }
 

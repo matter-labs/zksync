@@ -1,13 +1,11 @@
-use crate::{ApiClient, ProverConfig, ProverImpl};
+use crate::{ProverConfig, ProverImpl};
 use std::sync::Mutex;
-use std::time::Duration;
 use zksync_config::AvailableBlockSizesConfig;
 use zksync_crypto::proof::{AggregatedProof, SingleProof};
 use zksync_crypto::Engine;
 use zksync_prover_utils::aggregated_proofs::{gen_aggregate_proof, prepare_proof_data};
 use zksync_prover_utils::api::{JobRequestData, JobResultData};
 use zksync_prover_utils::{PlonkVerificationKey, SetupForStepByStepProver};
-use zksync_types::BlockNumber;
 use zksync_utils::{get_env, parse_env};
 
 /// We prepare some data before making proof for each block size, so we cache it in case next block

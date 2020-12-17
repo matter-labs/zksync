@@ -1,19 +1,12 @@
 // Built-in deps
-use std::{
-    sync::{
-        atomic::{AtomicI32, Ordering},
-        mpsc, Arc,
-    },
-    thread,
-    time::Duration,
-};
+use std::time::Duration;
 // External deps
 use structopt::StructOpt;
 // Workspace deps
 use zksync_config::ProverOptions;
 use zksync_utils::{get_env, parse_env};
 // Local deps
-use crate::{client, prover_work_cycle, ApiClient, ProverConfig, ProverImpl, ShutdownRequest};
+use crate::{client, prover_work_cycle, ProverConfig, ProverImpl, ShutdownRequest};
 
 fn api_client_from_env(worker_name: &str) -> client::ApiClient {
     let server_api_url = parse_env("PROVER_SERVER_URL");
