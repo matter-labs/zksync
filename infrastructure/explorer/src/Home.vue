@@ -16,8 +16,9 @@
                         }}</span>
                     </div>
                     <div class="col-sm text-center">
-                        <i class="far fa-check-square"></i>
-                        <b>Blocks verified</b><br /><span class="num">{{ lastVerified }}</span>
+                        <i class="far fa-check-square"></i> <b>Blocks verified</b>
+                        <br />
+                        <span class="num">{{ lastVerified }}</span>
                     </div>
                     <div class="col-sm text-center">
                         <i class="fas fa-list"></i> <b>Total transactions</b><br /><span class="num">{{
