@@ -105,7 +105,7 @@ mod tests {
             requests: request_receiver,
         };
         tokio::spawn(dispatcher.run());
-        for i in 0..10 {
+        for i in 0..50 {
             let channel = oneshot::channel();
             request_sender
                 .send(TickerRequest::GetTxFee {
@@ -121,7 +121,7 @@ mod tests {
                 address: _,
                 token,
                 response: _,
-            }) = receivers[i as usize].next().await
+            }) = receivers[(i % 10) as usize].next().await
             {
                 assert_eq!(token, i.into());
             } else {
