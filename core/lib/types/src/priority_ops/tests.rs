@@ -2,7 +2,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     priority_ops::{FullExit, PriorityOp},
-    Address, SerialId, ZkSyncPriorityOp,
+    Address, SerialId, ZkSyncPriorityOp, H256,
 };
 
 /// Tests the migration of `PriorityOp::eth_hash` from the `Vec<u8>` to `H256` type
@@ -71,12 +71,38 @@ mod backward_compatibility {
     }
 
     #[test]
-    #[should_panic(expected = "31")]
-    /// If the `PriorityOp::eth_hash` size is not 32 bytes, the deserialization cannot happen
-    fn bad_format_cannot_be_deserialized() {
+    /// If the `PriorityOp::eth_hash` size is not 32 bytes, the deserialization
+    /// will pad the bytes from the beginning
+    fn short_vector_deserialization_padding() {
         let mut old_value = old_value();
         // remove the last element to shrink its size to 31
         let _ = old_value.eth_hash.pop().unwrap();
+
+        let old_serialized = serde_json::to_value(old_value.clone()).unwrap();
+
+        let new_value: PriorityOp = serde_json::from_value(old_serialized).unwrap();
+        assert_eq!(&new_value.eth_hash[1..], old_value.eth_hash.as_slice());
+        assert_eq!(new_value.eth_hash[0], 0);
+    }
+
+    #[test]
+    fn empty_vector_deserialized_into_zero_hash() {
+        let mut old_value = old_value();
+        old_value.eth_hash.clear();
+
+        let old_serialized = serde_json::to_value(old_value).unwrap();
+
+        let new_value: PriorityOp = serde_json::from_value(old_serialized).unwrap();
+        assert_eq!(new_value.eth_hash, H256::zero());
+    }
+
+    #[test]
+    #[should_panic(expected = "33")]
+    /// If the `PriorityOp::eth_hash` length is greater than 32 bytes, the deserialization cannot happen
+    fn big_vector_cannot_be_deserialized() {
+        let mut old_value = old_value();
+        // add one more item to grow it to 33 bytes
+        old_value.eth_hash.push(123);
 
         let old_serialized = serde_json::to_value(old_value).unwrap();
 
