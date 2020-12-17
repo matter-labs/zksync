@@ -1,22 +1,25 @@
 //! Definition of zkSync network priority operations: operations initiated from the L1.
+use std::convert::{TryFrom, TryInto};
 
-use super::AccountId;
-use super::TokenId;
 use anyhow::{bail, ensure, format_err};
 use ethabi::{decode, ParamType};
 use num::BigUint;
 use serde::{Deserialize, Serialize};
-use std::convert::{TryFrom, TryInto};
+
 use zksync_basic_types::{Address, Log, H256, U256};
-use zksync_crypto::params::{
-    ACCOUNT_ID_BIT_WIDTH, BALANCE_BIT_WIDTH, ETH_ADDRESS_BIT_WIDTH, FR_ADDRESS_LEN, TOKEN_BIT_WIDTH,
+use zksync_crypto::{
+    params::{
+        ACCOUNT_ID_BIT_WIDTH, BALANCE_BIT_WIDTH, ETH_ADDRESS_BIT_WIDTH, FR_ADDRESS_LEN,
+        TOKEN_BIT_WIDTH,
+    },
+    primitives::FromBytes,
 };
-use zksync_crypto::primitives::FromBytes;
 use zksync_utils::BigUintSerdeAsRadix10Str;
 
 use super::{
     operations::{DepositOp, FullExitOp},
-    SerialId,
+    tx::utils::h256_as_vec,
+    AccountId, SerialId, TokenId,
 };
 
 /// Deposit priority operation transfers funds from the L1 account to the desired L2 account.
@@ -168,31 +171,6 @@ pub struct PriorityOp {
     pub eth_hash: H256,
     /// Block in which Ethereum transaction was included.
     pub eth_block: u64,
-}
-
-/// Serialize `H256` as `Vec<u8>`.
-///
-/// This workaround used for backward compatibility
-/// with the old serialize/deserialize behaviour of the fields
-/// whose type changed from `Vec<u8>` to `H256`.
-mod h256_as_vec {
-    use serde::{Deserialize, Deserializer, Serialize, Serializer};
-    use zksync_basic_types::H256;
-
-    pub fn serialize<S>(val: &H256, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        let val = val.as_bytes().to_vec();
-        val.serialize(serializer)
-    }
-
-    pub fn deserialize<'de, D>(deserializer: D) -> Result<H256, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        Vec::deserialize(deserializer).map(|val| H256::from_slice(&val))
-    }
 }
 
 impl TryFrom<Log> for PriorityOp {

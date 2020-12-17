@@ -39,3 +39,28 @@ where
 
     deserializer.deserialize_any(StringOrVec)
 }
+
+/// Serialize `H256` as `Vec<u8>`.
+///
+/// This workaround used for backward compatibility
+/// with the old serialize/deserialize behaviour of the fields
+/// whose type changed from `Vec<u8>` to `H256`.
+pub mod h256_as_vec {
+    use serde::{Deserialize, Deserializer, Serialize, Serializer};
+    use zksync_basic_types::H256;
+
+    pub fn serialize<S>(val: &H256, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        let val = val.as_bytes().to_vec();
+        val.serialize(serializer)
+    }
+
+    pub fn deserialize<'de, D>(deserializer: D) -> Result<H256, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        Vec::deserialize(deserializer).map(|val| H256::from_slice(&val))
+    }
+}
