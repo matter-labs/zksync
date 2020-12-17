@@ -926,19 +926,6 @@
       ]
     }
   },
-  "3de98cdcdc7ca00173c1042fd21b88033bb209969c39d6ad44775c5fa3fa2c07": {
-    "query": "INSERT INTO pending_withdrawals (id, withdrawal_hash)\n            VALUES ($1, $2)\n            ON CONFLICT (id)\n            DO UPDATE\n            SET id = $1, withdrawal_hash = $2",
-    "describe": {
-      "columns": [],
-      "parameters": {
-        "Left": [
-          "Int8",
-          "Bytea"
-        ]
-      },
-      "nullable": []
-    }
-  },
   "3ed6f62aea4b0901e56abf35be76cf1f4f64d14dc0ef63de8b205fc472c4de97": {
     "query": "INSERT INTO data_restore_last_watched_eth_block (block_number) VALUES ($1)",
     "describe": {
@@ -1425,38 +1412,6 @@
       ]
     }
   },
-  "4fc97e18f8e63d63d3a52db84ddd38243a865011e69a60061af37ebc2a8f1566": {
-    "query": "SELECT * FROM complete_withdrawals_transactions\n                        WHERE pending_withdrawals_queue_start_index <= $1\n                            AND $1 < pending_withdrawals_queue_end_index\n                    LIMIT 1\n                    ",
-    "describe": {
-      "columns": [
-        {
-          "ordinal": 0,
-          "name": "tx_hash",
-          "type_info": "Bytea"
-        },
-        {
-          "ordinal": 1,
-          "name": "pending_withdrawals_queue_start_index",
-          "type_info": "Int8"
-        },
-        {
-          "ordinal": 2,
-          "name": "pending_withdrawals_queue_end_index",
-          "type_info": "Int8"
-        }
-      ],
-      "parameters": {
-        "Left": [
-          "Int8"
-        ]
-      },
-      "nullable": [
-        false,
-        false,
-        false
-      ]
-    }
-  },
   "51f7701a34610b1661c5f21b6dd31ddb9fbc3efea4397096eed7ccb42ed21071": {
     "query": "SELECT COUNT(*) FROM executed_priority_operations",
     "describe": {
@@ -1469,26 +1424,6 @@
       ],
       "parameters": {
         "Left": []
-      },
-      "nullable": [
-        null
-      ]
-    }
-  },
-  "573449897918b9e5129ff09921de257aa889cdb1f6095d54e4eb769ae5027ee6": {
-    "query": "SELECT COUNT(*) FROM aggregate_operations\n                  LEFT JOIN eth_aggregated_ops_binding ON eth_aggregated_ops_binding.op_id = aggregate_operations.id\n                  LEFT JOIN eth_operations ON eth_aggregated_ops_binding.eth_op_id = eth_operations.id\n            WHERE\n                  eth_operations.confirmed = true AND aggregate_operations.id = $1",
-    "describe": {
-      "columns": [
-        {
-          "ordinal": 0,
-          "name": "count",
-          "type_info": "Int8"
-        }
-      ],
-      "parameters": {
-        "Left": [
-          "Int8"
-        ]
       },
       "nullable": [
         null
@@ -1819,6 +1754,26 @@
       ]
     }
   },
+  "706ef27f938ebad45a346d50886fb9930f5ca72edf8ba7000ea3664f0e7e1e58": {
+    "query": "SELECT eth_operations.final_hash as final_hash FROM aggregate_operations\n                  LEFT JOIN eth_aggregated_ops_binding ON eth_aggregated_ops_binding.op_id = aggregate_operations.id\n                  LEFT JOIN eth_operations ON eth_aggregated_ops_binding.eth_op_id = eth_operations.id\n            WHERE\n                  eth_operations.confirmed = true AND aggregate_operations.id = $1",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "final_hash",
+          "type_info": "Bytea"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Int8"
+        ]
+      },
+      "nullable": [
+        true
+      ]
+    }
+  },
   "714d10cb76076a8c10d147a14bfda609e7d809186b602406b671d4dd79a0ca8e": {
     "query": "SELECT * FROM accounts",
     "describe": {
@@ -2046,32 +2001,6 @@
         ]
       },
       "nullable": []
-    }
-  },
-  "80c2eb3abd0f05fb464113ca06dc2a7f1fe860bc4fcac0da805f13e980ca75a5": {
-    "query": "SELECT * FROM pending_withdrawals WHERE withdrawal_hash = $1\n            LIMIT 1",
-    "describe": {
-      "columns": [
-        {
-          "ordinal": 0,
-          "name": "id",
-          "type_info": "Int8"
-        },
-        {
-          "ordinal": 1,
-          "name": "withdrawal_hash",
-          "type_info": "Bytea"
-        }
-      ],
-      "parameters": {
-        "Left": [
-          "Bytea"
-        ]
-      },
-      "nullable": [
-        false,
-        false
-      ]
     }
   },
   "83cc9ff843c9dd1c974b651f5ed1e0c6bea94454db1d6f01b8fdf556cdd77d81": {
@@ -2787,24 +2716,6 @@
       ]
     }
   },
-  "b63d28317d24ab750c214ab6d69fd71f1588cdf8a75f1ffd73f8260b5c51f078": {
-    "query": "SELECT max(id) from pending_withdrawals",
-    "describe": {
-      "columns": [
-        {
-          "ordinal": 0,
-          "name": "max",
-          "type_info": "Int8"
-        }
-      ],
-      "parameters": {
-        "Left": []
-      },
-      "nullable": [
-        null
-      ]
-    }
-  },
   "b63daeea7fab180b5eba3721d26ad0a8f89193b9e459339e76e1a1bd87d9f37b": {
     "query": "SELECT * FROM mempool_txs\n                ORDER BY batch_id DESC\n                LIMIT 1",
     "describe": {
@@ -3394,20 +3305,6 @@
       "nullable": []
     }
   },
-  "d8d94a30a654bf70f4465b9c33cf06cd14833ba35644db0f8d15182b64b04550": {
-    "query": "INSERT INTO complete_withdrawals_transactions (tx_hash, pending_withdrawals_queue_start_index, pending_withdrawals_queue_end_index)\n            VALUES ($1, $2, $3)\n            ON CONFLICT (tx_hash)\n            DO UPDATE\n            SET tx_hash = $1, pending_withdrawals_queue_start_index = $2, pending_withdrawals_queue_end_index = $3",
-    "describe": {
-      "columns": [],
-      "parameters": {
-        "Left": [
-          "Bytea",
-          "Int8",
-          "Int8"
-        ]
-      },
-      "nullable": []
-    }
-  },
   "db91278dbc648e1c7ebf4775d7927104e887c0bb338ed51c9aff21cfdecb2f27": {
     "query": "\n            INSERT INTO blocks (number, root_hash, fee_account_id, unprocessed_prior_op_before, unprocessed_prior_op_after, block_size, commit_gas_limit, verify_gas_limit, commitment, timestamp)\n            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)\n            ",
     "describe": {
@@ -3627,24 +3524,6 @@
         ]
       },
       "nullable": []
-    }
-  },
-  "ede4a4f728f00df1e8149f67bf3b3f1bdeb9733165163ac45338ed6fec037505": {
-    "query": "SELECT COUNT(*) as \"count!\" FROM pending_withdrawals",
-    "describe": {
-      "columns": [
-        {
-          "ordinal": 0,
-          "name": "count!",
-          "type_info": "Int8"
-        }
-      ],
-      "parameters": {
-        "Left": []
-      },
-      "nullable": [
-        null
-      ]
     }
   },
   "f057b85811c3991b73c58991fc8dae8bf4cdf9d2238171ca13a3fdf1172f2c91": {
