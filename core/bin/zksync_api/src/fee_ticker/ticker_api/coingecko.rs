@@ -102,7 +102,7 @@ impl TokenPriceAPI for CoinGeckoAPI {
             (last_updated_timestamp_ms % 1_000) as u32 * 1_000_000, // ms to ns
         );
         let last_updated = DateTime::<Utc>::from_utc(naive_last_updated, Utc);
-        metrics::histogram!("ticker.coingecko.", start.elapsed());
+        metrics::histogram!("ticker.coingecko.request", start.elapsed());
         Ok(TokenPrice {
             usd_price,
             last_updated,

@@ -2,7 +2,9 @@ use futures::{
     channel::mpsc::{self, Receiver, Sender},
     SinkExt, StreamExt,
 };
-use std::time::Instant;
+use std::{collections::HashMap, sync::Arc, time::Instant};
+
+use tokio::sync::Mutex;
 use zksync_storage::ConnectionPool;
 
 use crate::fee_ticker::{
@@ -11,12 +13,15 @@ use crate::fee_ticker::{
     ticker_info::FeeTickerInfo,
     FeeTicker, TickerConfig, TickerRequest,
 };
+use crate::utils::token_db_cache::TokenDBCache;
 
 pub(crate) struct Dispatcher<API: TokenPriceAPI, INFO> {
     tickers: Vec<FeeTicker<TickerApi<API>, INFO>>,
     channels: Vec<Sender<TickerRequest>>,
     requests: Receiver<TickerRequest>,
 }
+
+static TICKER_CHANNEL_SIZE: usize = 32000;
 
 impl<API, INFO> Dispatcher<API, INFO>
 where
@@ -34,9 +39,16 @@ where
     ) -> Self {
         let mut tickers = vec![];
         let mut channels = vec![];
+        let token_db_cache = TokenDBCache::new(db_pool.clone());
+        let price_cache = Arc::new(Mutex::new(HashMap::new()));
+        let gas_price_cache = Arc::new(Mutex::new(None));
+
         for _ in 0..number_of_tickers {
-            let ticker_api = TickerApi::new(db_pool.clone(), token_price_api.clone());
-            let (request_sender, request_receiver) = mpsc::channel(3000);
+            let ticker_api = TickerApi::new(db_pool.clone(), token_price_api.clone())
+                .with_token_db_cache(token_db_cache.clone())
+                .with_price_cache(price_cache.clone())
+                .with_gas_price_cache(gas_price_cache.clone());
+            let (request_sender, request_receiver) = mpsc::channel(TICKER_CHANNEL_SIZE);
             tickers.push(FeeTicker::new(
                 ticker_api,
                 ticker_info.clone(),
