@@ -38,7 +38,7 @@
 </template>
 
 <script>
-import { formatDate, makeEntry } from './utils';
+import { formatDate, makeEntry, readyStateFromString } from './utils';
 
 import TransactionList from './TransactionList.vue';
 import SearchField from './SearchField.vue';
@@ -106,7 +106,9 @@ export default {
                 .copyable();
         },
         statusEntry() {
-            return makeEntry('Status').innerHTML(this.status);
+            return makeEntry('Status')
+                .status(readyStateFromString(this.status))
+                .innerHTML(this.status);
         },
         commitHashEntry() {
             const entry = makeEntry('Commit tx hash').copyable();
@@ -124,11 +126,12 @@ export default {
             return makeEntry('Committed at').innerHTML(formatDate(this.committed_at));
         },
         verifyHashEntry() {
-            const entry = makeEntry('Verify tx hash').copyable();
+            const entry = makeEntry('Verify tx hash');
 
             if (this.verify_tx_hash) {
                 entry.outterLink(`${blockchainExplorerTx}/${this.verify_tx_hash}`);
                 entry.innerHTML(`${this.verify_tx_hash}`);
+                entry.copyable();
             } else {
                 entry.innerHTML(`Not yet sent on the chain.`);
             }

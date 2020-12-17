@@ -2,7 +2,7 @@ export function isTxPriorityOp(tx) {
     return tx.op.type === 'Deposit' || tx.op.type === 'FullExit';
 }
 
-export function getTxFromAddress(tx) {
+export function getFromAddressOfTx(tx) {
     if (isTxPriorityOp(tx)) {
         return tx.op.priority_op.from;
     }

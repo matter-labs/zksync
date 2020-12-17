@@ -1,4 +1,5 @@
 import store from './store';
+import { Readiness } from './Readiness';
 
 export const sleep = async ms => await new Promise(resolve => setTimeout(resolve, ms));
 
@@ -90,15 +91,14 @@ export function getBlockchainExplorerAddress(network) {
     return `https://${network}.etherscan.io/address`;
 }
 
-// FIXME: refactor this code
 export function readyStateFromString(s) {
     return {
-        Rejected: -1,
-        Initiated: 0,
-        Pending: 1,
-        Complete: 2,
+        Rejected: Readiness.Rejected,
+        Initiated: Readiness.Initiated,
+        Pending: Readiness.Committed,
+        Complete: Readiness.Verified,
         // 'Verified' is a block version of the word 'Complete'
-        Verified: 2
+        Verified: Readiness.Verified
     }[s];
 }
 
@@ -182,8 +182,12 @@ class Entry {
     }
 
     // Can be used to set readiness status of a transaction or block
-    // These should be values from range [-1, 2]
     status(status) {
+        const isValidStatus = Object.values(Readiness).includes(status);
+        if(!isValidStatus) {
+            throw new Error('Invalid status');
+        }
+
         this.value.status = status;
         return this;
     }

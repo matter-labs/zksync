@@ -2,7 +2,7 @@ import { shortenHash, formatDate, makeEntry, formatToken } from './utils';
 import { blockchainExplorerAddress } from './constants';
 
 import {
-    getTxFromAddress,
+    getFromAddressOfTx,
     getTxFromFallbackValue,
     getTxToAddress,
     getTxToFallbackValue,
@@ -27,7 +27,7 @@ function getTxTypeEntry(tx) {
 function getTxFromEntry(tx) {
     const entry = makeEntry('From');
 
-    const fromAddress = getTxFromAddress(tx);
+    const fromAddress = getFromAddressOfTx(tx);
     const fallback = getTxFromFallbackValue(tx);
 
     if (tx.op.type === 'Deposit') {

@@ -8,7 +8,7 @@ import {
     CACHE_VERSION_SLOT,
     CACHE_VERSION
 } from './constants';
-import { getTxFee, getTxFromAddress, getTxToAddress, getTxAmount, getTxToken } from './blockUtils';
+import { getTxFee, getFromAddressOfTx, getTxToAddress, getTxAmount, getTxToken } from './blockUtils';
 
 class Cacher {
     checkCacheVersion() {
@@ -72,7 +72,7 @@ class Cacher {
             const op = tx.op;
             this.cacheTransaction(tx.tx_hash, {
                 tx_type: op.type,
-                from: getTxFromAddress(tx),
+                from: getFromAddressOfTx(tx),
                 to: getTxToAddress(tx),
                 token: getTxToken(tx),
                 amount: await getTxAmount(tx, client),
