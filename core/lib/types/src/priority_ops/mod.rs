@@ -18,9 +18,12 @@ use zksync_utils::BigUintSerdeAsRadix10Str;
 
 use super::{
     operations::{DepositOp, FullExitOp},
-    tx::utils::h256_as_vec,
+    utils::h256_as_vec,
     AccountId, SerialId, TokenId,
 };
+
+#[cfg(test)]
+mod tests;
 
 /// Deposit priority operation transfers funds from the L1 account to the desired L2 account.
 /// If the target L2 account didn't exist at the moment of the operation execution, a new
