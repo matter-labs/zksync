@@ -419,9 +419,9 @@ async fn test_error_coingecko_api() {
 #[actix_rt::test]
 async fn test_error_api() {
     let validator = FeeTokenValidator::new(HashMap::new(), Default::default());
+    let connection_pool = ConnectionPool::new(Some(1));
     let second_connection_pool = connection_pool.clone();
     let ticker_api = TickerApi::new(second_connection_pool, ErrorTickerApi);
-    let connection_pool = ConnectionPool::new(Some(1));
     connection_pool
         .access_storage()
         .await
