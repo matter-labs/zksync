@@ -132,26 +132,6 @@ impl<W: EthClient, S: Storage> EthWatch<W, S> {
             .await
     }
 
-    async fn update_withdrawals(
-        &mut self,
-        previous_block_with_accepted_events: u64,
-        new_block_with_accepted_events: u64,
-    ) -> anyhow::Result<()> {
-        // Get new complete withdrawals events
-        let complete_withdrawals_txs = self
-            .client
-            .get_complete_withdrawals_event(
-                BlockNumber::Number(previous_block_with_accepted_events.into()),
-                BlockNumber::Number(new_block_with_accepted_events.into()),
-            )
-            .await?;
-
-        self.storage
-            .store_complete_withdrawals(complete_withdrawals_txs)
-            .await?;
-        Ok(())
-    }
-
     async fn process_new_blocks(&mut self, last_ethereum_block: u64) -> anyhow::Result<()> {
         debug_assert!(self.eth_state.last_ethereum_block() < last_ethereum_block);
 
@@ -191,12 +171,6 @@ impl<W: EthClient, S: Storage> EthWatch<W, S> {
             current_ethereum_block.saturating_sub(self.number_of_confirmations_for_event);
         let previous_block_with_accepted_events =
             new_block_with_accepted_events.saturating_sub(depth_of_last_approved_block);
-
-        self.update_withdrawals(
-            previous_block_with_accepted_events,
-            new_block_with_accepted_events,
-        )
-        .await?;
 
         let unconfirmed_queue = self.get_unconfirmed_ops(current_ethereum_block).await?;
         let priority_queue = self

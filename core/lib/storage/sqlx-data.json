@@ -195,6 +195,19 @@
       ]
     }
   },
+  "0c9fc29aabfefa38588a298002e7a60c0c6cf578f7a305e8e7f58695651662dc": {
+    "query": "UPDATE prover_job_queue\n            SET (updated_at, updated_by) = (now(), $1)\n            WHERE id = $2",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "Text",
+          "Int4"
+        ]
+      },
+      "nullable": []
+    }
+  },
   "0ce7ffaee2c0f1d90d1e206dd848a0a7970982f92b09872285ece9d24de1770f": {
     "query": "\n            SELECT * FROM account_tree_cache\n            WHERE block = $1\n            ",
     "describe": {
@@ -415,57 +428,6 @@
       ]
     }
   },
-  "17db5f9b97791dc5c8edbc69b5a780d68838adbb9debccdc678600673e328aae": {
-    "query": "\n                SELECT * FROM account_creates\n                WHERE address = $1 AND is_create = $2\n                ORDER BY block_number desc\n                LIMIT 1\n            ",
-    "describe": {
-      "columns": [
-        {
-          "ordinal": 0,
-          "name": "account_id",
-          "type_info": "Int8"
-        },
-        {
-          "ordinal": 1,
-          "name": "is_create",
-          "type_info": "Bool"
-        },
-        {
-          "ordinal": 2,
-          "name": "block_number",
-          "type_info": "Int8"
-        },
-        {
-          "ordinal": 3,
-          "name": "address",
-          "type_info": "Bytea"
-        },
-        {
-          "ordinal": 4,
-          "name": "nonce",
-          "type_info": "Int8"
-        },
-        {
-          "ordinal": 5,
-          "name": "update_order_id",
-          "type_info": "Int4"
-        }
-      ],
-      "parameters": {
-        "Left": [
-          "Bytea",
-          "Bool"
-        ]
-      },
-      "nullable": [
-        false,
-        false,
-        false,
-        false,
-        false,
-        false
-      ]
-    }
-  },
   "17fc469643c2d885502a9f3e5d44c2b7032e03f694c663215fe9160fc8db38df": {
     "query": "\n                        INSERT INTO accounts ( id, last_block, nonce, address, pubkey_hash )\n                        VALUES ( $1, $2, $3, $4, $5 )\n                        ",
     "describe": {
@@ -482,20 +444,6 @@
       "nullable": []
     }
   },
-  "1a67dacb8487735515f18c6710cd3b6ca0141f72e63ae44880b7c235e29768e4": {
-    "query": "UPDATE prover_job_queue \n            SET (updated_at, job_status) = (now(), $1)\n            WHERE updated_by = $2 and job_status = $3",
-    "describe": {
-      "columns": [],
-      "parameters": {
-        "Left": [
-          "Int4",
-          "Text",
-          "Int4"
-        ]
-      },
-      "nullable": []
-    }
-  },
   "222e3946401772e3f6e0d9ce9909e8e7ac2dc830c5ecfcd522f56b3bf70fd679": {
     "query": "INSERT INTO data_restore_storage_state_update (storage_state) VALUES ($1)",
     "describe": {
@@ -503,6 +451,19 @@
       "parameters": {
         "Left": [
           "Text"
+        ]
+      },
+      "nullable": []
+    }
+  },
+  "2343aca33094f426c4205d22e3c938dc1e69ea67267a5cf5223b7c6e4aaa139c": {
+    "query": "\n                UPDATE prover_job_queue\n                SET (job_status, updated_at, updated_by) = ($1, now(), 'server_give_job')\n                WHERE id = $2;\n            ",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "Int4",
+          "Int4"
         ]
       },
       "nullable": []
@@ -1000,6 +961,65 @@
       "nullable": []
     }
   },
+  "419577e7ea02c44212b54fafde7fbd774a288a7235b5c1bf8896ff79c27980ea": {
+    "query": "\n                    WITH block_details AS (\n                        WITH eth_ops AS (\n                            SELECT DISTINCT ON (block_number, action_type)\n                                operations.block_number,\n                                eth_tx_hashes.tx_hash,\n                                operations.action_type,\n                                operations.created_at,\n                                confirmed\n                            FROM operations\n                                left join eth_ops_binding on eth_ops_binding.op_id = operations.id\n                                left join eth_tx_hashes on eth_tx_hashes.eth_op_id = eth_ops_binding.eth_op_id\n                            ORDER BY block_number DESC, action_type, confirmed\n                        )\n                        SELECT\n                            blocks.number AS details_block_number,\n                            committed.tx_hash AS commit_tx_hash,\n                            verified.tx_hash AS verify_tx_hash\n                        FROM blocks\n                        INNER JOIN eth_ops committed ON\n                            committed.block_number = blocks.number AND committed.action_type = 'COMMIT' AND committed.confirmed = true\n                        LEFT JOIN eth_ops verified ON\n                            verified.block_number = blocks.number AND verified.action_type = 'VERIFY' AND verified.confirmed = true\n                    )\n                    SELECT\n                        block_number, \n                        block_index as \"block_index?\",\n                        tx_hash,\n                        success,\n                        fail_reason as \"fail_reason?\",\n                        details.commit_tx_hash as \"commit_tx_hash?\",\n                        details.verify_tx_hash as \"verify_tx_hash?\"\n                    FROM executed_transactions\n                    LEFT JOIN block_details details ON details.details_block_number = executed_transactions.block_number\n                    WHERE (\n                        (from_account = $1 OR to_account = $1 OR primary_account_address = $1)\n                        AND (\n                            block_number = $2 AND (\n                                COALESCE(block_index, 0) >= $3\n                            ) OR (\n                                block_number > $2\n                            )\n                        )\n                    )\n                    ORDER BY block_number ASC, COALESCE(block_index, 0) ASC\n                    LIMIT $4\n                    ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "block_number",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 1,
+          "name": "block_index?",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 2,
+          "name": "tx_hash",
+          "type_info": "Bytea"
+        },
+        {
+          "ordinal": 3,
+          "name": "success",
+          "type_info": "Bool"
+        },
+        {
+          "ordinal": 4,
+          "name": "fail_reason?",
+          "type_info": "Text"
+        },
+        {
+          "ordinal": 5,
+          "name": "commit_tx_hash?",
+          "type_info": "Bytea"
+        },
+        {
+          "ordinal": 6,
+          "name": "verify_tx_hash?",
+          "type_info": "Bytea"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Bytea",
+          "Int8",
+          "Int4",
+          "Int8"
+        ]
+      },
+      "nullable": [
+        false,
+        true,
+        false,
+        false,
+        true,
+        false,
+        false
+      ]
+    }
+  },
   "41a4d1c9fa9953cd94714a408afd892962f9eea9a9f1674b8dddfa72e2eb9ec2": {
     "query": "INSERT INTO eth_tx_hashes (eth_op_id, tx_hash) VALUES ($1, $2)",
     "describe": {
@@ -1475,6 +1495,50 @@
       ]
     }
   },
+  "59c4e0d8255c2e4dd6eece1b24245daf3414d4f15b6cba7b369dc1ac32bed018": {
+    "query": "\n                SELECT * FROM accounts\n                WHERE id = $1\n            ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "id",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 1,
+          "name": "last_block",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 2,
+          "name": "nonce",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 3,
+          "name": "address",
+          "type_info": "Bytea"
+        },
+        {
+          "ordinal": 4,
+          "name": "pubkey_hash",
+          "type_info": "Bytea"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Int8"
+        ]
+      },
+      "nullable": [
+        false,
+        false,
+        false,
+        false,
+        false
+      ]
+    }
+  },
   "5ab853a2edb8a8e2ac1c95f30aa209cb4e06f41fb55872e2d1f28e3a59e38517": {
     "query": "\n            INSERT INTO pending_block (number, chunks_left, unprocessed_priority_op_before, pending_block_iteration, previous_root_hash, timestamp)\n            VALUES ($1, $2, $3, $4, $5, $6)\n            ON CONFLICT (number)\n            DO UPDATE\n              SET chunks_left = $2, unprocessed_priority_op_before = $3, pending_block_iteration = $4, previous_root_hash = $5, timestamp = $6\n            ",
     "describe": {
@@ -1667,23 +1731,6 @@
       "nullable": []
     }
   },
-  "64e87611fad53aaa3b5cddddd468045d5870603f705ec1652eafb536e4a0658f": {
-    "query": "\n          WITH job_values as (\n            SELECT $1::int4, $2::int4, $3::text, 'server_add_job', $4::int8, $5::int8, $6::jsonb\n            WHERE NOT EXISTS (SELECT * FROM prover_job_queue WHERE first_block = $4 and last_block = $5 and job_type = $3 LIMIT 1)\n          ) \n          INSERT INTO prover_job_queue (job_status, job_priority, job_type, updated_by, first_block, last_block, job_data) \n          SELECT * from job_values\n        ",
-    "describe": {
-      "columns": [],
-      "parameters": {
-        "Left": [
-          "Int4",
-          "Int4",
-          "Text",
-          "Int8",
-          "Int8",
-          "Jsonb"
-        ]
-      },
-      "nullable": []
-    }
-  },
   "681359f99d0e4bafdd3109f67c7af4d235dc1197ba88cd0d6148f632ae0cdf8f": {
     "query": "SELECT * FROM aggregated_proofs WHERE first_block = $1 and last_block = $2",
     "describe": {
@@ -1831,6 +1878,78 @@
       },
       "nullable": [
         null
+      ]
+    }
+  },
+  "74a5cc4affa23433b5b7834df6dfa1a7a2c5a65f23289de3de5a4f1b93f89c06": {
+    "query": "SELECT address FROM account_creates WHERE account_id = $1",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "address",
+          "type_info": "Bytea"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Int8"
+        ]
+      },
+      "nullable": [
+        false
+      ]
+    }
+  },
+  "775393191c0f793a8431df81cdd8e5ec3121a22110d90974c903ae370366aa33": {
+    "query": "UPDATE prover_job_queue\n            SET (updated_at, job_status) = (now(), $1)\n            WHERE updated_by = $2 and job_status = $3",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "Int4",
+          "Text",
+          "Int4"
+        ]
+      },
+      "nullable": []
+    }
+  },
+  "779e2a1295e602dbc3d13bd1961769509f653a01cfbccfc3a5913e13a2c964df": {
+    "query": "\n          WITH job_values as (\n            SELECT $1::int4, $2::int4, $3::text, 'server_add_job', $4::int8, $5::int8, $6::jsonb\n            WHERE NOT EXISTS (SELECT * FROM prover_job_queue WHERE first_block = $4 and last_block = $5 and job_type = $3 LIMIT 1)\n          )\n          INSERT INTO prover_job_queue (job_status, job_priority, job_type, updated_by, first_block, last_block, job_data)\n          SELECT * from job_values\n        ",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "Int4",
+          "Int4",
+          "Text",
+          "Int8",
+          "Int8",
+          "Jsonb"
+        ]
+      },
+      "nullable": []
+    }
+  },
+  "790d46519ceaa7fbd152f1edf29b85c97ab491488b7302d8df3f57e5fc3eff55": {
+    "query": "\n                SELECT account_id FROM account_creates\n                WHERE address = $1 AND is_create = $2\n                ORDER BY block_number desc\n                LIMIT 1\n            ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "account_id",
+          "type_info": "Int8"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Bytea",
+          "Bool"
+        ]
+      },
+      "nullable": [
+        false
       ]
     }
   },
@@ -2142,6 +2261,21 @@
           "Int8",
           "Jsonb",
           "Int8"
+        ]
+      },
+      "nullable": []
+    }
+  },
+  "92ea6ba2573073b4ccb3823d09743295761c242d47bd96227a4379b014154e63": {
+    "query": "UPDATE operations\n                SET confirmed = $1\n                WHERE block_number >= $2 AND block_number <= $3 AND action_type = $4",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "Bool",
+          "Int8",
+          "Int8",
+          "Text"
         ]
       },
       "nullable": []
@@ -2556,6 +2690,65 @@
       "nullable": []
     }
   },
+  "b40c195936c0b364fe6cc25bded0b8952649171b8c7ac25a5f1562902a4dde69": {
+    "query": "\n                    WITH block_details AS (\n                        WITH eth_ops AS (\n                            SELECT DISTINCT ON (block_number, action_type)\n                                operations.block_number,\n                                eth_tx_hashes.tx_hash,\n                                operations.action_type,\n                                operations.created_at,\n                                confirmed\n                            FROM operations\n                                left join eth_ops_binding on eth_ops_binding.op_id = operations.id\n                                left join eth_tx_hashes on eth_tx_hashes.eth_op_id = eth_ops_binding.eth_op_id\n                            ORDER BY block_number DESC, action_type, confirmed\n                        )\n                        SELECT\n                            blocks.number AS details_block_number,\n                            committed.tx_hash AS commit_tx_hash,\n                            verified.tx_hash AS verify_tx_hash\n                        FROM blocks\n                        INNER JOIN eth_ops committed ON\n                            committed.block_number = blocks.number AND committed.action_type = 'COMMIT' AND committed.confirmed = true\n                        LEFT JOIN eth_ops verified ON\n                            verified.block_number = blocks.number AND verified.action_type = 'VERIFY' AND verified.confirmed = true\n                    )\n                    SELECT\n                        block_number, \n                        block_index as \"block_index?\",\n                        tx_hash,\n                        success,\n                        fail_reason as \"fail_reason?\",\n                        details.commit_tx_hash as \"commit_tx_hash?\",\n                        details.verify_tx_hash as \"verify_tx_hash?\"\n                    FROM executed_transactions\n                    LEFT JOIN block_details details ON details.details_block_number = executed_transactions.block_number\n                    WHERE (\n                        (from_account = $1 OR to_account = $1 OR primary_account_address = $1)\n                        AND (\n                            block_number = $2 AND (\n                                COALESCE(block_index, 0) <= $3\n                            ) OR (\n                                block_number < $2\n                            )\n                        )\n                    )\n                    ORDER BY block_number DESC, COALESCE(block_index, 0) DESC\n                    LIMIT $4\n                    ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "block_number",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 1,
+          "name": "block_index?",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 2,
+          "name": "tx_hash",
+          "type_info": "Bytea"
+        },
+        {
+          "ordinal": 3,
+          "name": "success",
+          "type_info": "Bool"
+        },
+        {
+          "ordinal": 4,
+          "name": "fail_reason?",
+          "type_info": "Text"
+        },
+        {
+          "ordinal": 5,
+          "name": "commit_tx_hash?",
+          "type_info": "Bytea"
+        },
+        {
+          "ordinal": 6,
+          "name": "verify_tx_hash?",
+          "type_info": "Bytea"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Bytea",
+          "Int8",
+          "Int4",
+          "Int8"
+        ]
+      },
+      "nullable": [
+        false,
+        true,
+        false,
+        false,
+        true,
+        false,
+        false
+      ]
+    }
+  },
   "b5e0f843d267576d57f41e2c4a63335749cb40e79bdb2b2cccbbaed5200abe96": {
     "query": "\n                    SELECT * FROM tokens\n                    WHERE address = $1\n                    LIMIT 1\n                    ",
     "describe": {
@@ -2658,19 +2851,6 @@
         true,
         false
       ]
-    }
-  },
-  "ba7b1041b86ef292034c6e53ee6347c458fea2d19c91b060179e7f01f7ea60fc": {
-    "query": "UPDATE prover_job_queue \n            SET (updated_at, updated_by) = (now(), $1)\n            WHERE id = $2",
-    "describe": {
-      "columns": [],
-      "parameters": {
-        "Left": [
-          "Text",
-          "Int4"
-        ]
-      },
-      "nullable": []
     }
   },
   "baaaff359564c5d1094fcf2650d53cf9dcac5d50fc3a549c6cff53dd472350f7": {
@@ -3092,19 +3272,6 @@
       ]
     }
   },
-  "c623ce8cb2f6e17285af5aa0fe4fddbb302f7dda343778690f299d49b832e273": {
-    "query": "\n                UPDATE prover_job_queue \n                SET (job_status, updated_at, updated_by) = ($1, now(), 'server_give_job')\n                WHERE id = $2;\n            ",
-    "describe": {
-      "columns": [],
-      "parameters": {
-        "Left": [
-          "Int4",
-          "Int4"
-        ]
-      },
-      "nullable": []
-    }
-  },
   "c7bc91425f35b3a77be36fe8ba80030445051a0bc2536fa4a0def7ac498fc5c2": {
     "query": "INSERT INTO mempool_txs (tx_hash, tx, created_at, eth_sign_data)\n                VALUES ($1, $2, $3, $4)",
     "describe": {
@@ -3260,50 +3427,6 @@
         ]
       },
       "nullable": []
-    }
-  },
-  "ddf29a55c76cb7c56286ef5a7095e44b350cf9b6dcf88b67f399483f76b8f36f": {
-    "query": "\n                SELECT * FROM accounts\n                WHERE id = $1\n                LIMIT 1\n            ",
-    "describe": {
-      "columns": [
-        {
-          "ordinal": 0,
-          "name": "id",
-          "type_info": "Int8"
-        },
-        {
-          "ordinal": 1,
-          "name": "last_block",
-          "type_info": "Int8"
-        },
-        {
-          "ordinal": 2,
-          "name": "nonce",
-          "type_info": "Int8"
-        },
-        {
-          "ordinal": 3,
-          "name": "address",
-          "type_info": "Bytea"
-        },
-        {
-          "ordinal": 4,
-          "name": "pubkey_hash",
-          "type_info": "Bytea"
-        }
-      ],
-      "parameters": {
-        "Left": [
-          "Int8"
-        ]
-      },
-      "nullable": [
-        false,
-        false,
-        false,
-        false,
-        false
-      ]
     }
   },
   "debbe23f0c730c331482c798387d1739911923edcafc2bd80463464ff98f3b71": {

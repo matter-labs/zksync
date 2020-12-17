@@ -37,7 +37,7 @@ impl<'a, 'c> EthereumSchema<'a, 'c> {
 
         // TODO: Currently `sqlx` doesn't work well with joins, thus we will perform one additional query
         // for each loaded operation. This is not crucial, as this operation is done once per node launch,
-        // but not effective and must be fixed as soon as `sqlx` 0.5 is released (#1114).
+        // but not effective and must be fixed as soon as `sqlx` 0.5 is released (ZKS-102).
         let eth_ops = sqlx::query_as!(
             StorageETHOperation,
             "SELECT * FROM eth_operations
@@ -190,19 +190,6 @@ impl<'a, 'c> EthereumSchema<'a, 'c> {
         .await?
         .id;
 
-        // // Add a hash entry.
-        // let hash_entry = NewETHTxHash {
-        //     eth_op_id,
-        //     tx_hash: hash.as_bytes().to_vec(),
-        // };
-        // let inserted_hashes_rows = insert_into(eth_tx_hashes::table)
-        //     .values(&hash_entry)
-        //     .execute(self.0.conn())?;
-        // assert_eq!(
-        //     inserted_hashes_rows, 1,
-        //     "Wrong amount of updated rows (eth_tx_hashes)"
-        // );
-
         // If the operation ID was provided, we should also insert a binding entry.
         if let Some(op_id) = op_id {
             sqlx::query!(
@@ -326,8 +313,7 @@ impl<'a, 'c> EthereumSchema<'a, 'c> {
     /// Updates the stored gas price limit and average gas price used by GasAdjuster.
     ///
     /// This method expects the database to be initially prepared with inserting the actual
-    /// gas limit value. Currently the script `db-insert-eth-data.sh` is responsible for that
-    /// and it's invoked within `db-reset` subcommand.
+    /// gas limit value. The command responsible for that is `zk db insert eth-data`.
     pub async fn update_gas_price(
         &mut self,
         gas_price_limit: U256,
@@ -500,9 +486,9 @@ impl<'a, 'c> EthereumSchema<'a, 'c> {
         Ok(())
     }
 
-    pub async fn is_aggregated_op_confirmed(&mut self, op_id: i64) -> QueryResult<bool> {
-        let confirmed_ops = sqlx::query!(
-            "SELECT COUNT(*) FROM aggregate_operations
+    pub async fn aggregated_op_final_hash(&mut self, op_id: i64) -> QueryResult<Option<H256>> {
+        let final_hash: Option<Vec<u8>> = sqlx::query!(
+            "SELECT eth_operations.final_hash as final_hash FROM aggregate_operations
                   LEFT JOIN eth_aggregated_ops_binding ON eth_aggregated_ops_binding.op_id = aggregate_operations.id
                   LEFT JOIN eth_operations ON eth_aggregated_ops_binding.eth_op_id = eth_operations.id
             WHERE
@@ -510,9 +496,9 @@ impl<'a, 'c> EthereumSchema<'a, 'c> {
             op_id
         )
         .fetch_one(self.0.conn())
-        .await?
-        .count
-        .unwrap_or(0);
-        Ok(confirmed_ops > 0)
+            .await?
+        .final_hash;
+
+        Ok(final_hash.map(|hash| H256::from_slice(&hash)))
     }
 }

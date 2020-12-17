@@ -128,7 +128,7 @@ impl ChangePubKey {
     /// Restores the `PubKeyHash` from the transaction signature.
     pub fn verify_signature(&self) -> Option<PubKeyHash> {
         if let VerifiedSignatureCache::Cached(cached_signer) = &self.cached_signer {
-            cached_signer.clone()
+            *cached_signer
         } else if let Some(pub_key) = self.signature.verify_musig(&self.get_bytes()) {
             Some(PubKeyHash::from_pubkey(&pub_key))
         } else {
@@ -193,7 +193,7 @@ impl ChangePubKey {
     /// - `fee` field must represent a packable value.
     pub fn check_correctness(&self) -> bool {
         (self.eth_signature.is_none() || self.verify_eth_signature() == Some(self.account))
-            && self.verify_signature() == Some(self.new_pk_hash.clone())
+            && self.verify_signature() == Some(self.new_pk_hash)
             && self.account_id <= max_account_id()
             && self.fee_token <= max_token_id()
             && is_fee_amount_packable(&self.fee)

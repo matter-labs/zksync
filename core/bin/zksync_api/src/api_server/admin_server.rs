@@ -4,7 +4,7 @@ use std::thread;
 
 // External uses
 use actix_web::dev::ServiceRequest;
-use actix_web::{web, App, Error, HttpResponse, HttpServer};
+use actix_web::{web, App, HttpResponse, HttpServer};
 use actix_web_httpauth::extractors::{
     bearer::{BearerAuth, Config},
     AuthenticationError,
@@ -21,8 +21,10 @@ use zksync_utils::panic_notify::ThreadPanicNotify;
 
 #[derive(Debug, Serialize, Deserialize)]
 struct PayloadAuthToken {
-    sub: String, // Subject (whom auth token refers to)
-    exp: usize,  // Expiration time (as UTC timestamp)
+    /// Subject (whom auth token refers to).
+    sub: String,
+    /// Expiration time (as UTC timestamp).
+    exp: usize,
 }
 
 #[derive(Debug, Clone)]
@@ -67,21 +69,22 @@ impl<'a> AuthTokenValidator<'a> {
 
     /// Validate JsonWebToken
     fn validate_auth_token(&self, token: &str) -> Result<(), JwtError> {
-        let token = decode::<PayloadAuthToken>(token, &self.decoding_key, &Validation::default());
+        decode::<PayloadAuthToken>(token, &self.decoding_key, &Validation::default())?;
 
-        token.map(drop)
+        Ok(())
     }
 
     async fn validator(
         &self,
         req: ServiceRequest,
         credentials: BearerAuth,
-    ) -> Result<ServiceRequest, Error> {
+    ) -> actix_web::Result<ServiceRequest> {
         let config = req.app_data::<Config>().cloned().unwrap_or_default();
 
         self.validate_auth_token(credentials.token())
-            .map(|_| req)
-            .map_err(|_| AuthenticationError::from(config).into())
+            .map_err(|_| AuthenticationError::from(config))?;
+
+        Ok(req)
     }
 }
 
@@ -125,7 +128,11 @@ async fn add_token(
 async fn run_server(app_state: AppState, bind_to: SocketAddr) {
     HttpServer::new(move || {
         let auth = HttpAuthentication::bearer(move |req, credentials| async {
-            let secret_auth = req.app_data::<AppState>().unwrap().secret_auth.clone();
+            let secret_auth = req
+                .app_data::<AppState>()
+                .expect("failed get AppState upon receipt of the authentication token")
+                .secret_auth
+                .clone();
             AuthTokenValidator::new(&secret_auth)
                 .validator(req, credentials)
                 .await

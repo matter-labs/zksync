@@ -1,3 +1,4 @@
+pub mod auth_utils;
 pub mod cli_utils;
 pub mod client;
 pub mod exit_proof;

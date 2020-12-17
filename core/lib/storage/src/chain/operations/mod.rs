@@ -10,6 +10,8 @@ use self::records::{
     StoredCompleteWithdrawalsTransaction, StoredExecutedPriorityOperation,
     StoredExecutedTransaction, StoredOperation, StoredPendingWithdrawal,
 };
+use crate::chain::operations_ext::OperationsExtSchema;
+use crate::ethereum::EthereumSchema;
 use crate::{chain::mempool::MempoolSchema, QueryResult, StorageProcessor};
 use zksync_basic_types::H256;
 use zksync_types::aggregated_operations::{AggregatedActionType, AggregatedOperation};
@@ -165,6 +167,28 @@ impl<'a, 'c> OperationsSchema<'a, 'c> {
         Ok(())
     }
 
+    pub async fn confirm_operations(
+        &mut self,
+        first_block: BlockNumber,
+        last_block: BlockNumber,
+        action_type: ActionType,
+    ) -> QueryResult<()> {
+        let start = Instant::now();
+        sqlx::query!(
+            "UPDATE operations
+                SET confirmed = $1
+                WHERE block_number >= $2 AND block_number <= $3 AND action_type = $4",
+            true,
+            i64::from(first_block),
+            i64::from(last_block),
+            action_type.to_string()
+        )
+        .execute(self.0.conn())
+        .await?;
+        metrics::histogram!("sql.chain.operations.confirm_operations", start.elapsed());
+        Ok(())
+    }
+
     /// Stores the executed transaction in the database.
     pub(crate) async fn store_executed_tx(
         &mut self,
@@ -238,7 +262,12 @@ impl<'a, 'c> OperationsSchema<'a, 'c> {
         Ok(())
     }
 
-    pub(crate) async fn store_executed_priority_op(
+    /// Stores executed priority operation in database.
+    ///
+    /// This method is made public to fill the database for tests, do not use it for
+    /// any other purposes.
+    #[doc = "hidden"]
+    pub async fn store_executed_priority_op(
         &mut self,
         operation: NewExecutedPriorityOperation,
     ) -> QueryResult<()> {
@@ -268,119 +297,36 @@ impl<'a, 'c> OperationsSchema<'a, 'c> {
         Ok(())
     }
 
-    /// Parameter id should be None if id equals to the (maximum stored id + 1)
-    pub async fn add_pending_withdrawal(
-        &mut self,
-        hash: &TxHash,
-        id: Option<i64>,
-    ) -> QueryResult<()> {
-        let start = Instant::now();
-        let pending_withdrawal_id = match id {
-            Some(id) => id,
-            None => {
-                let max_stored_pending_withdrawal_id =
-                    sqlx::query!("SELECT max(id) from pending_withdrawals",)
-                        .fetch_one(self.0.conn())
-                        .await?
-                        .max
-                        .ok_or_else(|| format_err!("there is no pending withdrawals in the db"))?;
-
-                max_stored_pending_withdrawal_id + 1
-            }
-        };
-        sqlx::query!(
-            "INSERT INTO pending_withdrawals (id, withdrawal_hash)
-            VALUES ($1, $2)
-            ON CONFLICT (id)
-            DO UPDATE
-            SET id = $1, withdrawal_hash = $2",
-            pending_withdrawal_id,
-            hash.as_ref().to_vec(),
-        )
-        .execute(self.0.conn())
-        .await?;
-        metrics::histogram!(
-            "sql.chain.operations.add_pending_withdrawal",
-            start.elapsed()
-        );
-        Ok(())
-    }
-
-    pub async fn add_complete_withdrawals_transaction(
-        &mut self,
-        tx: CompleteWithdrawalsTx,
-    ) -> QueryResult<()> {
-        let start = Instant::now();
-        sqlx::query!(
-            "INSERT INTO complete_withdrawals_transactions (tx_hash, pending_withdrawals_queue_start_index, pending_withdrawals_queue_end_index)
-            VALUES ($1, $2, $3)
-            ON CONFLICT (tx_hash)
-            DO UPDATE
-            SET tx_hash = $1, pending_withdrawals_queue_start_index = $2, pending_withdrawals_queue_end_index = $3",
-            tx.tx_hash.as_bytes().to_vec(),
-            tx.pending_withdrawals_queue_start_index as i64,
-            tx.pending_withdrawals_queue_end_index as i64,
-        )
-        .execute(self.0.conn())
-        .await?;
-        metrics::histogram!(
-            "sql.chain.operations.add_complete_withdrawals_transaction",
-            start.elapsed()
-        );
-        Ok(())
-    }
-
-    pub async fn no_stored_pending_withdrawals(&mut self) -> QueryResult<bool> {
-        let stored_pending_withdrawals =
-            sqlx::query!(r#"SELECT COUNT(*) as "count!" FROM pending_withdrawals"#,)
-                .fetch_one(self.0.conn())
-                .await?
-                .count;
-
-        Ok(stored_pending_withdrawals == 0)
-    }
-
     pub async fn eth_tx_for_withdrawal(
         &mut self,
         withdrawal_hash: &TxHash,
     ) -> QueryResult<Option<H256>> {
         let start = Instant::now();
-        let pending_withdrawal = sqlx::query_as!(
-            StoredPendingWithdrawal,
-            "SELECT * FROM pending_withdrawals WHERE withdrawal_hash = $1
-            LIMIT 1",
-            withdrawal_hash.as_ref().to_vec(),
-        )
-        .fetch_optional(self.0.conn())
-        .await?;
 
-        let res = match pending_withdrawal {
-            Some(pending_withdrawal) => {
-                let pending_withdrawal_id = pending_withdrawal.id;
+        let tx_by_hash = OperationsExtSchema(self.0)
+            .get_tx_by_hash(withdrawal_hash.as_ref())
+            .await?;
+        let block_number = if let Some(tx) = tx_by_hash {
+            tx.block_number as BlockNumber
+        } else {
+            return Ok(None);
+        };
 
-                sqlx::query_as!(
-                    StoredCompleteWithdrawalsTransaction,
-                    "SELECT * FROM complete_withdrawals_transactions
-                        WHERE pending_withdrawals_queue_start_index <= $1
-                            AND $1 < pending_withdrawals_queue_end_index
-                    LIMIT 1
-                    ",
-                    pending_withdrawal_id,
-                )
-                .fetch_optional(self.0.conn())
-                .await?
-                .map(|complete_withdrawals_transaction| {
-                    H256::from_slice(&complete_withdrawals_transaction.tx_hash)
-                })
-            }
-            None => None,
+        let execute_block_operation = self
+            .get_aggregated_op_that_affects_block(AggregatedActionType::ExecuteBlocks, block_number)
+            .await?;
+
+        let res = if let Some((op_id, _)) = execute_block_operation {
+            EthereumSchema(self.0).aggregated_op_final_hash(op_id).await
+        } else {
+            Ok(None)
         };
 
         metrics::histogram!(
             "sql.chain.operations.eth_tx_for_withdrawal",
             start.elapsed()
         );
-        Ok(res)
+        res
     }
 
     pub async fn store_aggregated_action(
@@ -424,7 +370,7 @@ impl<'a, 'c> OperationsSchema<'a, 'c> {
         &mut self,
         aggregated_action: AggregatedActionType,
         block_number: BlockNumber,
-    ) -> QueryResult<Option<AggregatedOperation>> {
+    ) -> QueryResult<Option<(i64, AggregatedOperation)>> {
         let aggregated_op = sqlx::query_as!(
             StoredAggregatedOperation,
             "SELECT * FROM aggregate_operations \
@@ -434,7 +380,12 @@ impl<'a, 'c> OperationsSchema<'a, 'c> {
         )
         .fetch_optional(self.0.conn())
         .await?
-        .map(|op| serde_json::from_value(op.arguments).expect("unparsable aggregated op"));
+        .map(|op| {
+            (
+                op.id,
+                serde_json::from_value(op.arguments).expect("unparsable aggregated op"),
+            )
+        });
         Ok(aggregated_op)
     }
 }

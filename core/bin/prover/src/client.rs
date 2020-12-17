@@ -1,11 +1,14 @@
 // Built-in deps
+use crate::auth_utils::AuthTokenGenerator;
 use futures::Future;
-use std::time::Duration;
+use std::str::FromStr;
+use std::time::{self, Duration};
 // External deps
 use backoff::future::FutureOperation;
 use log::*;
 use reqwest::Url;
 // Workspace deps
+use anyhow::format_err;
 use zksync_prover_utils::api::{
     ProverId, ProverInputRequest, ProverInputResponse, ProverOutputRequest, ProverStopped,
     WorkingOn,
@@ -17,12 +20,17 @@ pub struct ApiClient {
     working_on_url: Url,
     publish_url: Url,
     stopped_url: Url,
-    // client keeps connection pool inside, so it is recommended to reuse it (see docstring for reqwest::Client)
+    // Client keeps connection pool inside, so it is recommended to reuse it (see docstring for reqwest::Client)
     http_client: reqwest::Client,
+    // A generator that create the authentication token upon request to any endpoint
+    auth_token_generator: AuthTokenGenerator,
 }
 
 impl ApiClient {
-    pub fn new(base_url: &Url, worker: &str, req_server_timeout: Duration) -> Self {
+    // The time for which the authorization token will be valid
+    const AUTH_TOKEN_LIFETIME: Duration = Duration::from_secs(10);
+
+    pub fn new(base_url: &Url, worker: &str, req_server_timeout: Duration, secret: &str) -> Self {
         if worker == "" {
             panic!("worker name cannot be empty")
         }
@@ -30,12 +38,15 @@ impl ApiClient {
             .timeout(req_server_timeout)
             .build()
             .expect("Failed to create request client");
+        let auth_token_generator =
+            AuthTokenGenerator::new(secret.to_string(), Self::AUTH_TOKEN_LIFETIME);
         Self {
             get_job_url: base_url.join("/get_job").unwrap(),
             working_on_url: base_url.join("/working_on").unwrap(),
             publish_url: base_url.join("/publish").unwrap(),
             stopped_url: base_url.join("/stopped").unwrap(),
             http_client,
+            auth_token_generator,
         }
     }
 
@@ -68,6 +79,12 @@ impl ApiClient {
         backoff.max_interval = Duration::from_secs(10);
         backoff.max_elapsed_time = Some(Duration::from_secs(2 * 60));
         backoff
+    }
+
+    fn get_encoded_token(&self) -> anyhow::Result<String> {
+        self.auth_token_generator
+            .encode()
+            .map_err(|e| format_err!("failed generate authorization token: {}", e))
     }
 }
 

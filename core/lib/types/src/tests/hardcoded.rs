@@ -222,7 +222,7 @@ pub mod operations_test {
 
     #[test]
     fn test_eth_witness() {
-        // TODO: Change pre-defined input / output after merging breaking to dev (#1188).
+        // TODO: Change pre-defined input / output after merging breaking to dev (ZKS-131).
 
         let mut change_pubkey =
             ChangePubKeyOp::from_public_data(&hex::decode(CHANGE_PUBKEY_PUBLIC_DATA).unwrap())
@@ -263,7 +263,7 @@ pub mod tx_conversion_test {
         let change_pubkey = ChangePubKey::new(
             ACCOUNT_ID,
             *ALICE,
-            (*PK_HASH).clone(),
+            *PK_HASH,
             TOKEN_ID,
             (*FEE).clone(),
             NONCE,

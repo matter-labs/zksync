@@ -2,12 +2,12 @@
 use std::time::Duration;
 // External imports
 // Workspace imports
+use zksync_config::ConfigurationOptions;
 use zksync_types::{block::PendingBlock, Action};
 // Local imports
 use crate::tests::{chain::utils::get_operation, db_test};
 use crate::{chain::block::BlockSchema, prover::ProverSchema, QueryResult, StorageProcessor};
 use zksync_basic_types::H256;
-use zksync_config::ConfigurationOptions;
 
 /// Checks that the proof can be stored and loaded.
 #[db_test]
@@ -32,6 +32,60 @@ async fn test_store_proof(mut storage: StorageProcessor<'_>) -> QueryResult<()> 
     //
     // Ok(())
     todo!()
+}
+
+/// Checks that the witness can be stored and loaded.
+#[db_test]
+async fn test_store_witness(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
+    const BLOCK_NUMBER: u32 = 1;
+    const BLOCK_SIZE: usize = 100;
+    // No witness stored for the block.
+    assert!(storage
+        .prover_schema()
+        .get_witness(BLOCK_NUMBER)
+        .await?
+        .is_none());
+
+    // FK constraint.
+    storage
+        .chain()
+        .block_schema()
+        .execute_operation(get_operation(BLOCK_NUMBER, Action::Commit, BLOCK_SIZE))
+        .await?;
+
+    // Store the witness.
+    let expected = String::from("test");
+    let witness = serde_json::to_value(expected.clone()).unwrap();
+    storage
+        .prover_schema()
+        .store_witness(BLOCK_NUMBER, witness)
+        .await?;
+
+    // Now load it.
+    let loaded = storage
+        .prover_schema()
+        .get_witness(BLOCK_NUMBER)
+        .await?
+        .map(|value| serde_json::from_value(value).unwrap());
+    assert_eq!(loaded.as_ref(), Some(&expected));
+
+    // Do nothing on conflict.
+    let not_expected = String::from("__test");
+    let witness = serde_json::to_value(expected.clone()).unwrap();
+    storage
+        .prover_schema()
+        .store_witness(BLOCK_NUMBER, witness)
+        .await?;
+
+    let loaded = storage
+        .prover_schema()
+        .get_witness(BLOCK_NUMBER)
+        .await?
+        .map(|value| serde_json::from_value(value).unwrap());
+    assert_ne!(loaded, Some(not_expected));
+    assert_eq!(loaded, Some(expected));
+
+    Ok(())
 }
 
 /// Checks the prover registration workflow, including
@@ -82,7 +136,8 @@ async fn prover_run(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
     todo!()
     // // Add the prover.
     // let prover_name = "prover_10";
-    // let block_size = ConfigurationOptions::from_env().available_block_chunk_sizes[0]; //smallest block size
+    // // Smallest block size.
+    // let block_size = ConfigurationOptions::from_env().available_block_chunk_sizes[0];
     // let _prover_id = ProverSchema(&mut storage)
     //     .register_prover(prover_name, block_size)
     //     .await?;
@@ -113,7 +168,7 @@ async fn prover_run(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
     // );
     //
     // // Create & store proof for the first block.
-    // let proof = Default::default();
+    // let proof = EncodedProofPlonk::default();
     // assert!(ProverSchema(&mut storage)
     //     .store_proof(1, &proof)
     //     .await
@@ -150,9 +205,11 @@ async fn prover_run(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
 /// of blocks for which proof is not generating (or generated) yet.
 #[db_test]
 async fn unstarted_prover_jobs_count(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
+    todo!()
     // // Add the prover.
     // let prover_name = "prover_10";
-    // let block_size = ConfigurationOptions::from_env().available_block_chunk_sizes[0]; //smallest block size
+    // // Smallest block size.
+    // let block_size = ConfigurationOptions::from_env().available_block_chunk_sizes[0];
     // let _prover_id = ProverSchema(&mut storage)
     //     .register_prover(prover_name, block_size)
     //     .await?;
@@ -186,7 +243,7 @@ async fn unstarted_prover_jobs_count(mut storage: StorageProcessor<'_>) -> Query
     // assert_eq!(blocks_count, 2);
     //
     // // Create & store proof for the first block.
-    // let proof = Default::default();
+    // let proof = EncodedProofPlonk::default();
     // assert!(ProverSchema(&mut storage)
     //     .store_proof(1, &proof)
     //     .await
@@ -203,7 +260,7 @@ async fn unstarted_prover_jobs_count(mut storage: StorageProcessor<'_>) -> Query
     //
     // let blocks_count = ProverSchema(&mut storage).unstarted_jobs_count().await?;
     // assert_eq!(blocks_count, 1);
-    // let proof = Default::default();
+    // let proof = EncodedProofPlonk::default();
     // assert!(ProverSchema(&mut storage)
     //     .store_proof(2, &proof)
     //     .await
@@ -218,7 +275,7 @@ async fn unstarted_prover_jobs_count(mut storage: StorageProcessor<'_>) -> Query
     //
     // let blocks_count = ProverSchema(&mut storage).unstarted_jobs_count().await?;
     // assert_eq!(blocks_count, 0);
-    // let proof = Default::default();
+    // let proof = EncodedProofPlonk::default();
     // assert!(ProverSchema(&mut storage)
     //     .store_proof(3, &proof)
     //     .await
@@ -244,13 +301,10 @@ async fn unstarted_prover_jobs_count(mut storage: StorageProcessor<'_>) -> Query
     //         pending_block_iteration: 1,
     //         success_operations: vec![],
     //         failed_txs: Vec::new(),
-    //         previous_block_root_hash: H256::default(),
-    //         timestamp: 0,
     //     })
     //     .await?;
     // let blocks_count = ProverSchema(&mut storage).unstarted_jobs_count().await?;
     // assert_eq!(blocks_count, 2);
     //
     // Ok(())
-    todo!()
 }

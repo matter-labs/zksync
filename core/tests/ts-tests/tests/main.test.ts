@@ -22,12 +22,18 @@ describe(`ZkSync integration tests (token: ${token}, transport: ${transport})`, 
     let alice: Wallet;
     let bob: Wallet;
     let chuck: Wallet;
+    let david: Wallet;
+    let frank: Wallet;
+    let judy: Wallet;
     let operatorBalance: BigNumber;
 
     before('create tester and test wallets', async () => {
         tester = await Tester.init('localhost', transport);
         alice = await tester.fundedWallet('5.0');
         bob = await tester.emptyWallet();
+        david = await tester.fundedWallet('1.0');
+        frank = await tester.fundedWallet('1.0');
+        judy = await tester.emptyWallet();
         chuck = await tester.emptyWallet();
         operatorBalance = await tester.operatorBalance(token);
     });
@@ -61,23 +67,6 @@ describe(`ZkSync integration tests (token: ${token}, transport: ${transport})`, 
         await tester.testChangePubKey(alice, token, true);
     });
 
-    step('batch-builder tests', async () => {
-        const david = await tester.fundedWallet('1.0');
-        const frank = await tester.fundedWallet('1.0');
-        const feeToken = token == 'ETH' ? 'wBTC' : 'ETH';
-        // Add these accounts to the network.
-        await tester.testDeposit(david, token, DEPOSIT_AMOUNT, true);
-        await tester.testDeposit(frank, token, DEPOSIT_AMOUNT, true);
-        // Also deposit another token to pay with.
-        await tester.testDeposit(frank, feeToken, DEPOSIT_AMOUNT, true);
-
-        await tester.testBatchBuilderInvalidUsage(david, token);
-        await tester.testBatchBuilderChangePubKey(david, token, TX_AMOUNT, true);
-        await tester.testBatchBuilderChangePubKey(frank, token, TX_AMOUNT, false);
-        await tester.testBatchBuilderTransfers(david, frank, token, TX_AMOUNT);
-        await tester.testBatchBuilderPayInDifferentToken(frank, david, token, feeToken, TX_AMOUNT);
-    });
-
     step('should execute a transfer to new account', async () => {
         await tester.testTransfer(alice, chuck, token, TX_AMOUNT);
     });
@@ -107,6 +96,31 @@ describe(`ZkSync integration tests (token: ${token}, transport: ${transport})`, 
 
     step('should execute a ForcedExit', async () => {
         await tester.testVerifiedForcedExit(alice, bob, token);
+    });
+
+    step('should test batch-builder', async () => {
+        // We will pay with different token.
+        const feeToken = token == 'ETH' ? 'wBTC' : 'ETH';
+        // Add these accounts to the network.
+        await tester.testTransfer(alice, david, token, TX_AMOUNT.mul(10));
+        await tester.testTransfer(alice, judy, token, TX_AMOUNT.mul(10));
+        await tester.testTransfer(alice, frank, token, TX_AMOUNT.mul(10));
+        // Also deposit another token to pay with.
+        await tester.testDeposit(frank, feeToken, DEPOSIT_AMOUNT, true);
+
+        await tester.testBatchBuilderInvalidUsage(david, token);
+        await tester.testBatchBuilderChangePubKey(david, token, TX_AMOUNT, true);
+        await tester.testBatchBuilderChangePubKey(frank, token, TX_AMOUNT, false);
+        await tester.testBatchBuilderTransfers(david, frank, token, TX_AMOUNT);
+        await tester.testBatchBuilderPayInDifferentToken(frank, david, token, feeToken, TX_AMOUNT);
+        // Finally, transfer, withdraw and forcedexit in a single batch.
+        await tester.testBatchBuilderGenerisUsage(david, frank, judy, token, TX_AMOUNT);
+    });
+
+    step('should test multi-signers', async () => {
+        // At this point, all these wallets already have their public keys set.
+        await tester.testMultipleBatchSigners([alice, david, frank], token, TX_AMOUNT);
+        await tester.testMultipleWalletsWrongSignature(alice, david, token, TX_AMOUNT);
     });
 
     it('should check collected fees', async () => {

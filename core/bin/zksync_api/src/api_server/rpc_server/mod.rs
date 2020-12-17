@@ -1,5 +1,6 @@
 // Built-in uses
 use std::time::Instant;
+
 // External uses
 use futures::{
     channel::{mpsc, oneshot},
@@ -7,6 +8,7 @@ use futures::{
 };
 use jsonrpc_core::{Error, IoHandler, MetaIoHandler, Metadata, Middleware, Result};
 use jsonrpc_http_server::ServerBuilder;
+
 // Workspace uses
 use zksync_config::{ApiServerOptions, ConfigurationOptions};
 use zksync_storage::{
@@ -16,10 +18,10 @@ use zksync_storage::{
     },
     ConnectionPool, StorageProcessor,
 };
-use zksync_types::{tx::TxHash, Address, PriorityOp, TokenLike, TxFeeTypes};
+use zksync_types::{tx::TxHash, Address, TokenLike, TxFeeTypes};
+
 // Local uses
 use crate::{
-    core_api_client::{CoreApiClient, EthBlockId},
     fee_ticker::{Fee, TickerRequest, TokenPriceRequestType},
     signature_checker::VerifyTxSignatureRequest,
     utils::shared_lru_cache::SharedLruCache,
@@ -35,16 +37,6 @@ pub mod types;
 pub use self::rpc_trait::Rpc;
 use self::types::*;
 use super::tx_sender::TxSender;
-
-pub(crate) async fn get_ongoing_priority_ops(
-    api_client: &CoreApiClient,
-    address: Address,
-) -> Result<Vec<(EthBlockId, PriorityOp)>> {
-    api_client
-        .get_unconfirmed_deposits(address)
-        .await
-        .map_err(|_| Error::internal_error())
-}
 
 #[derive(Clone)]
 pub struct RpcApp {
@@ -114,8 +106,12 @@ impl RpcApp {
         let start = Instant::now();
         let confirmations_for_eth_event = self.confirmations_for_eth_event;
 
-        let ongoing_ops =
-            get_ongoing_priority_ops(&self.tx_sender.core_api_client, address).await?;
+        let ongoing_ops = self
+            .tx_sender
+            .core_api_client
+            .get_unconfirmed_deposits(address)
+            .await
+            .map_err(|_| Error::internal_error())?;
 
         let mut max_block_number = 0;
 
@@ -316,7 +312,7 @@ impl RpcApp {
         })
     }
 
-    async fn get_account_state(&self, address: &Address) -> Result<AccountStateInfo> {
+    async fn get_account_state(&self, address: Address) -> Result<AccountStateInfo> {
         let start = Instant::now();
         let mut storage = self.access_storage().await?;
         let account_info = storage
