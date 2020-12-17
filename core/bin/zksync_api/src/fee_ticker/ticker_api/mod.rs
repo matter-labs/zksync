@@ -108,6 +108,7 @@ impl<T: TokenPriceAPI> TickerApi<T> {
 
         let mut transaction = storage.start_transaction().await?;
 
+        // Redundant transaction
         transaction
             .tokens_schema()
             .update_historical_ticker_price(token_id, price)
@@ -125,11 +126,12 @@ impl<T: TokenPriceAPI> TickerApi<T> {
         price: TokenPrice,
         is_price_historical: bool,
     ) {
-        self.price_cache.lock().await.insert(
-            token_id,
-            TokenCacheEntry::new(price.clone(), Instant::now(), is_price_historical),
-        );
-
+        {
+            self.price_cache.lock().await.insert(
+                token_id,
+                TokenCacheEntry::new(price.clone(), Instant::now(), is_price_historical),
+            );
+        }
         if !is_price_historical {
             self._update_stored_value(token_id, price)
                 .await
@@ -219,7 +221,7 @@ impl<T: TokenPriceAPI + Send + Sync> FeeTickerAPI for TickerApi<T> {
                 .await;
             return Ok(historical_price);
         }
-
+        // It will never happen
         metrics::histogram!("ticker.get_last_quote", start.elapsed());
         anyhow::bail!("Token price api is not available right now.")
     }
@@ -236,6 +238,8 @@ impl<T: TokenPriceAPI + Send + Sync> FeeTickerAPI for TickerApi<T> {
             }
         }
 
+        drop(cached_value);
+
         let mut storage = self
             .db_pool
             .access_storage()
@@ -249,7 +253,7 @@ impl<T: TokenPriceAPI + Send + Sync> FeeTickerAPI for TickerApi<T> {
             .as_u64();
         let average_gas_price = BigUint::from(average_gas_price);
 
-        *cached_value = Some((average_gas_price.clone(), Instant::now()));
+        *self.gas_price_cache.lock().await = Some((average_gas_price.clone(), Instant::now()));
 
         metrics::histogram!("ticker.get_gas_price_wei", start.elapsed());
         Ok(average_gas_price)

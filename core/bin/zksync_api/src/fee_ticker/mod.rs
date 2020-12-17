@@ -38,6 +38,7 @@ use crate::fee_ticker::{
 use crate::utils::token_db_cache::TokenDBCache;
 
 pub use self::fee::*;
+use futures::executor::block_on;
 
 mod constants;
 mod fee;
@@ -217,8 +218,8 @@ pub fn run_ticker_task(
             tokio::spawn(fee_ticker.run())
         }
         TokenPriceSource::CoinGecko { base_url } => {
-            let token_price_api =
-                CoinGeckoAPI::new(client, base_url).expect("failed to init CoinGecko client");
+            let mut token_price_api = CoinGeckoAPI::new(client, base_url);
+            block_on(token_price_api.load_token_list()).expect("failed to init CoinGecko client");
 
             let ticker_api = TickerApi::new(db_pool.clone(), token_price_api);
             let ticker_info = TickerInfo::new(db_pool);

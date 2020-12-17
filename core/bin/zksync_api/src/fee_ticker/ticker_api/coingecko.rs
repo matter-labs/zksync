@@ -18,25 +18,32 @@ pub struct CoinGeckoAPI {
 }
 
 impl CoinGeckoAPI {
-    pub fn new(client: reqwest::Client, base_url: Url) -> Result<Self, Error> {
-        let token_list_url = base_url
+    pub fn new(client: reqwest::Client, base_url: Url) -> Self {
+        Self {
+            base_url,
+            client,
+            token_ids: HashMap::new(),
+        }
+    }
+
+    pub async fn load_token_list(&mut self) -> Result<(), anyhow::Error> {
+        let token_list_url = self
+            .base_url
             .join("api/v3/coins/list")
             .expect("failed to join URL path");
 
-        let token_list = reqwest::blocking::get(token_list_url)
+        let token_list = reqwest::get(token_list_url)
+            .await
             .map_err(|err| anyhow::format_err!("CoinGecko API request failed: {}", err))?
-            .json::<CoinGeckoTokenList>()?;
+            .json::<CoinGeckoTokenList>()
+            .await?;
 
         let mut token_ids = HashMap::new();
         for token in token_list.0 {
             token_ids.insert(token.symbol, token.id);
         }
-
-        Ok(Self {
-            base_url,
-            client,
-            token_ids,
-        })
+        self.token_ids = token_ids;
+        Ok(())
     }
 }
 
@@ -110,23 +117,23 @@ impl TokenPriceAPI for CoinGeckoAPI {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-struct CoinGeckoTokenInfo {
-    id: String,
-    symbol: String,
+pub struct CoinGeckoTokenInfo {
+    pub(crate) id: String,
+    pub(crate) symbol: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-struct CoinGeckoTokenList(Vec<CoinGeckoTokenInfo>);
+pub struct CoinGeckoTokenList(pub Vec<CoinGeckoTokenInfo>);
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-struct CoinGeckoTokenPrice(
+pub struct CoinGeckoTokenPrice(
     pub i64, // timestamp (milliseconds)
     #[serde(with = "UnsignedRatioSerializeAsDecimal")] pub Ratio<BigUint>, // price
 );
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-struct CoinGeckoMarketChart {
-    prices: Vec<CoinGeckoTokenPrice>,
+pub struct CoinGeckoMarketChart {
+    pub(crate) prices: Vec<CoinGeckoTokenPrice>,
 }
 
 #[cfg(test)]
@@ -134,18 +141,14 @@ mod tests {
     use super::*;
     use zksync_utils::parse_env;
 
-    #[test]
-    fn test_coingecko_api() {
-        let mut runtime = tokio::runtime::Builder::new()
-            .basic_scheduler()
-            .enable_all()
-            .build()
-            .expect("tokio runtime");
+    #[tokio::test]
+    async fn test_coingecko_api() {
         let ticker_url = parse_env("COINGECKO_BASE_URL");
         let client = reqwest::Client::new();
-        let api = CoinGeckoAPI::new(client, ticker_url).expect("coingecko init");
-        runtime
-            .block_on(api.get_price("ETH"))
+        let mut api = CoinGeckoAPI::new(client, ticker_url);
+        api.load_token_list().await.unwrap();
+        api.get_price("ETH")
+            .await
             .expect("Failed to get data from ticker");
     }
 }
