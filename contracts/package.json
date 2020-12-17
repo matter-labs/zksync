@@ -38,12 +38,12 @@
   },
   "scripts": {
     "build": "hardhat compile",
-    "build-dev": "hardhat compile",
-    "test": "zk f yarn run hardhat test",
+    "test": "CONTRACT_TESTS=1 zk f yarn run hardhat test",
     "deploy-no-build": "ts-node scripts/deploy.ts",
     "upgrade-testnet-no-build": "ts-node scripts/upgrade-testnet.ts",
     "deploy-eip1271": "ts-node scripts/deploy-eip1271.ts",
     "deploy-erc20": "ts-node scripts/deploy-erc20.ts",
+    "governance-add-erc20": "ts-node scripts/add-erc20-token.ts",
     "deploy-testkit": "ts-node scripts/deploy-testkit.ts",
     "publish-sources": "hardhat run --network env scripts/publish.ts",
     "deploy-testnet-erc20": "ts-node scripts/deploy-testnet-token.ts"

@@ -58,7 +58,6 @@ jobs:
         zk fmt --check
         yarn lint:md
         yarn lint:sol
-        zk dummy-prover ensure-disabled
         cargo fmt --all -- --check
         zk f cargo clippy --tests --benches -- -D warnings
         pushd sdk/zksync-crypto
@@ -72,7 +71,7 @@ jobs:
         # Unpack keys to build dev contracts
         zk run verify-keys unpack
         # EIP1271 contract is used in Rust & JS unit tests.
-        zk contract build-dev
+        zk contract build
         zk run deploy-eip1271
 
     - name: integration-tests

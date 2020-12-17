@@ -1,7 +1,19 @@
 import { Command } from 'commander';
 import * as utils from './utils';
 
-const IGNORED_DIRS = ['target', 'node_modules', 'volumes', 'build', 'dist', '.git', 'generated', 'grafonnet-lib'];
+const IGNORED_DIRS = [
+    'target',
+    'node_modules',
+    'volumes',
+    'build',
+    'dist',
+    '.git',
+    'generated',
+    'grafonnet-lib',
+    'cache',
+    'artifacts',
+    'typechain'
+];
 const IGNORED_FILES = ['KeysWithPlonkVerifier.sol', 'TokenInit.sol'];
 const EXTENSIONS = ['ts', 'md', 'sol'];
 

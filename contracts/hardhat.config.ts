@@ -1,8 +1,8 @@
 import '@nomiclabs/hardhat-waffle';
 import '@nomiclabs/hardhat-solpp';
+import '@nomiclabs/hardhat-etherscan';
 import 'hardhat-typechain';
 import 'hardhat-contract-sizer';
-import '@nomiclabs/hardhat-etherscan';
 
 const prodConfig = {
     // UPGRADE_NOTICE_PERIOD: 0,
@@ -24,7 +24,7 @@ const testConfig = {
 };
 
 const localConfig = Object.assign({}, prodConfig);
-localConfig.DUMMY_VERIFIER = process.env.DUMMY_VERIFIER === '1';
+localConfig.DUMMY_VERIFIER = process.env.DUMMY_VERIFIER === 'true';
 
 const contractDefs = {
     rinkeby: testnetConfig,
@@ -51,11 +51,19 @@ export default {
         sources: './contracts'
     },
     solpp: {
-        defs: process.env.ETH_NETWORK ? contractDefs[process.env.ETH_NETWORK] : contractDefs['test']
+        defs: (() => {
+            if (process.env.CONTRACT_TESTS) {
+                return contractDefs.test;
+            }
+            return contractDefs[process.env.ETH_NETWORK];
+        })()
     },
     networks: {
         env: {
             url: process.env.WEB3_URL
+        },
+        hardhat: {
+            allowUnlimitedContractSize: true
         }
     },
     etherscan: {

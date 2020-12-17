@@ -2,9 +2,7 @@ import { BigNumber } from 'ethers';
 import * as ethers from 'ethers';
 import Axios from 'axios';
 import WebSocketAsPromised = require('websocket-as-promised');
-import * as fs from 'fs';
 import * as websocket from 'websocket';
-import { parseHexWithPrefix, TokenSet } from './utils';
 import { PubKeyHash } from './types';
 import { Signer } from './signer';
 
@@ -171,11 +169,7 @@ export class DummyTransport extends AbstractJSONRPCTransport {
 
     getTokensList(network: string) {
         const configPath = `${process.env.ZKSYNC_HOME}/etc/tokens/${network}.json`;
-        return JSON.parse(
-            fs.readFileSync(configPath, {
-                encoding: 'utf-8'
-            })
-        );
+        return require(configPath);
     }
 
     async getPubKeyHash(): Promise<PubKeyHash> {

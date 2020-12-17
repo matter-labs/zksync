@@ -58,6 +58,14 @@ impl BlocksCommitOperation {
 
         vec![stored_block_info, Token::Array(blocks_to_commit)]
     }
+
+    pub fn block_range(&self) -> (BlockNumber, BlockNumber) {
+        let BlocksCommitOperation { blocks, .. } = self;
+        (
+            blocks.first().map(|b| b.block_number).unwrap_or_default(),
+            blocks.last().map(|b| b.block_number).unwrap_or_default(),
+        )
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -79,6 +87,14 @@ impl BlocksProofOperation {
         let proof = self.proof.get_eth_tx_args();
 
         vec![blocks_arg, proof]
+    }
+
+    pub fn block_range(&self) -> (BlockNumber, BlockNumber) {
+        let BlocksProofOperation { blocks, .. } = self;
+        (
+            blocks.first().map(|c| c.block_number).unwrap_or_default(),
+            blocks.last().map(|c| c.block_number).unwrap_or_default(),
+        )
     }
 }
 
@@ -109,6 +125,14 @@ impl BlocksExecuteOperation {
                 .map(BlocksExecuteOperation::get_eth_tx_args_for_block)
                 .collect(),
         )]
+    }
+
+    pub fn block_range(&self) -> (BlockNumber, BlockNumber) {
+        let BlocksExecuteOperation { blocks } = self;
+        (
+            blocks.first().map(|b| b.block_number).unwrap_or_default(),
+            blocks.last().map(|b| b.block_number).unwrap_or_default(),
+        )
     }
 }
 
@@ -168,26 +192,15 @@ impl AggregatedOperation {
 
     pub fn get_block_range(&self) -> (BlockNumber, BlockNumber) {
         match self {
-            AggregatedOperation::CommitBlocks(BlocksCommitOperation { blocks, .. }) => (
-                blocks.first().map(|b| b.block_number).unwrap_or_default(),
-                blocks.last().map(|b| b.block_number).unwrap_or_default(),
-            ),
+            AggregatedOperation::CommitBlocks(op) => op.block_range(),
             AggregatedOperation::CreateProofBlocks(BlocksCreateProofOperation {
                 blocks, ..
             }) => (
                 blocks.first().map(|c| c.block_number).unwrap_or_default(),
                 blocks.last().map(|c| c.block_number).unwrap_or_default(),
             ),
-            AggregatedOperation::PublishProofBlocksOnchain(BlocksProofOperation {
-                blocks, ..
-            }) => (
-                blocks.first().map(|c| c.block_number).unwrap_or_default(),
-                blocks.last().map(|c| c.block_number).unwrap_or_default(),
-            ),
-            AggregatedOperation::ExecuteBlocks(BlocksExecuteOperation { blocks }) => (
-                blocks.first().map(|b| b.block_number).unwrap_or_default(),
-                blocks.last().map(|b| b.block_number).unwrap_or_default(),
-            ),
+            AggregatedOperation::PublishProofBlocksOnchain(op) => op.block_range(),
+            AggregatedOperation::ExecuteBlocks(op) => op.block_range(),
         }
     }
 }
