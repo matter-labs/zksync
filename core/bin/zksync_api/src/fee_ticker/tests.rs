@@ -366,32 +366,6 @@ fn test_fee_for_unsubsidized_tokens() {
     }
 }
 
-async fn get_token_fee_in_usd(
-    ticker: &mut FeeTicker<TickerApi<ErrorTickerApi>, MockTickerInfo>,
-    tx_type: TxFeeTypes,
-    token: TokenLike,
-    address: Address,
-) -> Ratio<BigUint> {
-    let fee_in_token = ticker
-        .get_fee_from_ticker_in_wei(tx_type, token.clone(), address)
-        .await
-        .expect("failed to get fee in token");
-    let token_precision = MockApiProvider
-        .get_token(token.clone())
-        .await
-        .unwrap()
-        .decimals;
-
-    // Fee in usd
-    (MockApiProvider
-        .get_last_quote(token)
-        .await
-        .expect("failed to get fee in usd")
-        .usd_price
-        / BigUint::from(10u32).pow(u32::from(token_precision)))
-        * fee_in_token.total_fee
-}
-
 #[actix_rt::test]
 async fn test_error_coingecko_api() {
     let (address, handler) = run_server();
@@ -428,14 +402,16 @@ async fn test_error_coingecko_api() {
         config,
         validator,
     );
-    ticker
-        .get_fee_from_ticker_in_wei(TxFeeTypes::FastWithdraw, 1.into(), Address::default())
-        .await
-        .unwrap();
-    ticker
-        .get_token_price(1.into(), TokenPriceRequestType::USDForOneWei)
-        .await
-        .unwrap();
+    for _ in 0..1000 {
+        ticker
+            .get_fee_from_ticker_in_wei(TxFeeTypes::FastWithdraw, 1.into(), Address::default())
+            .await
+            .unwrap();
+        ticker
+            .get_token_price(1.into(), TokenPriceRequestType::USDForOneWei)
+            .await
+            .unwrap();
+    }
     handler.abort();
 }
 
@@ -463,15 +439,4 @@ async fn test_error_api() {
         .get_token_price(0.into(), TokenPriceRequestType::USDForOneWei)
         .await
         .unwrap();
-
-    let storage = connection_pool.access_storage().await.unwrap();
-
-    assert!(ticker
-        .get_fee_from_ticker_in_wei(TxFeeTypes::FastWithdraw, 0.into(), Address::default())
-        .await
-        .is_err());
-    assert!(ticker
-        .get_token_price(0.into(), TokenPriceRequestType::USDForOneWei)
-        .await
-        .is_err());
 }

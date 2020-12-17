@@ -106,16 +106,11 @@ impl<T: TokenPriceAPI> TickerApi<T> {
             .await
             .map_err(|e| format_err!("Can't access storage: {}", e))?;
 
-        let mut transaction = storage.start_transaction().await?;
-
-        // Redundant transaction
-        transaction
+        storage
             .tokens_schema()
             .update_historical_ticker_price(token_id, price)
             .await
             .map_err(|e| format_err!("Can't update historical ticker price from storage: {}", e))?;
-
-        transaction.commit().await?;
 
         Ok(())
     }
@@ -126,12 +121,10 @@ impl<T: TokenPriceAPI> TickerApi<T> {
         price: TokenPrice,
         is_price_historical: bool,
     ) {
-        {
-            self.price_cache.lock().await.insert(
-                token_id,
-                TokenCacheEntry::new(price.clone(), Instant::now(), is_price_historical),
-            );
-        }
+        self.price_cache.lock().await.insert(
+            token_id,
+            TokenCacheEntry::new(price.clone(), Instant::now(), is_price_historical),
+        );
         if !is_price_historical {
             self._update_stored_value(token_id, price)
                 .await

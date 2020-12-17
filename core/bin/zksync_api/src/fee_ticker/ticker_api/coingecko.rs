@@ -7,10 +7,11 @@ use num::BigUint;
 use reqwest::Url;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use std::time::Instant;
 use zksync_types::TokenPrice;
 use zksync_utils::UnsignedRatioSerializeAsDecimal;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct CoinGeckoAPI {
     base_url: Url,
     client: reqwest::Client,
@@ -50,6 +51,7 @@ impl CoinGeckoAPI {
 #[async_trait]
 impl TokenPriceAPI for CoinGeckoAPI {
     async fn get_price(&self, token_symbol: &str) -> Result<TokenPrice, Error> {
+        let start = Instant::now();
         let token_id = self
             .token_ids
             .get(&token_symbol.to_lowercase())
@@ -108,7 +110,7 @@ impl TokenPriceAPI for CoinGeckoAPI {
             (last_updated_timestamp_ms % 1_000) as u32 * 1_000_000, // ms to ns
         );
         let last_updated = DateTime::<Utc>::from_utc(naive_last_updated, Utc);
-
+        metrics::histogram!("ticker.coingecko.", start.elapsed());
         Ok(TokenPrice {
             usd_price,
             last_updated,
