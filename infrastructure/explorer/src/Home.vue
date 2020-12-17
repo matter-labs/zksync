@@ -85,7 +85,7 @@ export default {
         this.update();
     },
     timers: {
-        ticker: { time: 5000, autostart: true, repeat: true }
+        ticker: { time: 2000, autostart: true, repeat: true }
     },
     data() {
         return {
