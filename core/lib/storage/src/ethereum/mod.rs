@@ -5,10 +5,7 @@ use num::{BigInt, BigUint};
 use sqlx::types::BigDecimal;
 use zksync_basic_types::{H256, U256};
 // Workspace imports
-use zksync_types::{
-    ethereum::{ETHOperation, InsertedOperationResponse, OperationType},
-    Operation,
-};
+use zksync_types::ethereum::{ETHOperation, InsertedOperationResponse};
 // Local imports
 use self::records::{ETHParams, ETHStats, ETHTxHash, StorageETHOperation};
 use crate::chain::operations::records::StoredAggregatedOperation;

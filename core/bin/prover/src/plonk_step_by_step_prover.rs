@@ -1,14 +1,15 @@
-use crate::{ApiClient, ProverConfig, ProverImpl};
+// Built-in deps
 use std::sync::Mutex;
-use std::time::Duration;
+// Workspace deps
 use zksync_config::AvailableBlockSizesConfig;
 use zksync_crypto::proof::{AggregatedProof, SingleProof};
 use zksync_crypto::Engine;
 use zksync_prover_utils::aggregated_proofs::{gen_aggregate_proof, prepare_proof_data};
 use zksync_prover_utils::api::{JobRequestData, JobResultData};
 use zksync_prover_utils::{PlonkVerificationKey, SetupForStepByStepProver};
-use zksync_types::BlockNumber;
-use zksync_utils::{get_env, parse_env};
+use zksync_utils::{parse_env, parse_env_to_collection};
+// Local deps
+use crate::{ProverConfig, ProverImpl};
 
 /// We prepare some data before making proof for each block size, so we cache it in case next block
 /// would be of our size
@@ -30,17 +31,9 @@ pub struct PlonkStepByStepProverConfig {
 
 impl ProverConfig for PlonkStepByStepProverConfig {
     fn from_env() -> Self {
-        let all_block_sizes = get_env("SUPPORTED_BLOCK_CHUNKS_SIZES")
-            .split(',')
-            .map(|p| p.parse().unwrap())
-            .collect();
-        let block_sizes = get_env("BLOCK_CHUNK_SIZES")
-            .split(',')
-            .map(|p| p.parse().unwrap())
-            .collect();
         Self {
-            all_block_sizes,
-            block_sizes,
+            all_block_sizes: parse_env_to_collection("SUPPORTED_BLOCK_CHUNKS_SIZES"),
+            block_sizes: parse_env_to_collection("BLOCK_CHUNK_SIZES"),
             download_setup_from_network: parse_env("PROVER_DOWNLOAD_SETUP"),
         }
     }

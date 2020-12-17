@@ -625,6 +625,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "backoff"
+version = "0.2.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "721c249ab59cbc483ad4294c9ee2671835c1e43e9ffc277e6b4ecfef733cfdc5"
+dependencies = [
+ "futures-core",
+ "instant",
+ "pin-project 0.4.27",
+ "rand 0.7.3",
+ "tokio 0.2.23",
+]
+
+[[package]]
 name = "backtrace"
 version = "0.3.55"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -6072,7 +6085,7 @@ version = "1.0.0"
 dependencies = [
  "anyhow",
  "async-trait",
- "backoff",
+ "backoff 0.2.1",
  "chrono",
  "ctrlc",
  "env_logger 0.6.2",
@@ -6101,7 +6114,7 @@ name = "zksync_prover_utils"
 version = "1.0.0"
 dependencies = [
  "anyhow",
- "backoff",
+ "backoff 0.1.6",
  "lazy_static",
  "log 0.4.11",
  "reqwest",

@@ -1,11 +1,9 @@
 use anyhow::Error;
-use std::sync::mpsc;
-use std::time::Duration;
 use zksync_prover::cli_utils::main_for_prover_impl;
-use zksync_prover::{ApiClient, ProverConfig, ProverImpl};
+use zksync_prover::{ProverConfig, ProverImpl};
 use zksync_prover_utils::api::{JobRequestData, JobResultData};
 use zksync_prover_utils::fs_utils::{load_correct_aggregated_proof, load_correct_single_proof};
-use zksync_utils::get_env;
+use zksync_utils::parse_env_to_collection;
 
 #[derive(Debug)]
 pub struct DummyProverConfig {
@@ -15,10 +13,7 @@ pub struct DummyProverConfig {
 impl ProverConfig for DummyProverConfig {
     fn from_env() -> Self {
         Self {
-            block_sizes: get_env("SUPPORTED_BLOCK_CHUNKS_SIZES")
-                .split(',')
-                .map(|p| p.parse().unwrap())
-                .collect(),
+            block_sizes: parse_env_to_collection("SUPPORTED_BLOCK_CHUNKS_SIZES"),
         }
     }
 }
