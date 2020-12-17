@@ -417,6 +417,7 @@ async fn test_error_coingecko_api() {
 }
 
 #[actix_rt::test]
+#[ignore]
 async fn test_error_api() {
     let validator = FeeTokenValidator::new(HashMap::new(), Default::default());
     let connection_pool = ConnectionPool::new(Some(1));
