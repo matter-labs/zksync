@@ -152,6 +152,10 @@ fn dummy_deposit_op(
 }
 
 #[actix_rt::test]
+#[cfg_attr(
+    not(feature = "api_test"),
+    ignore = "Use `zk test rust-api` command to perform this test"
+)]
 async fn unconfirmed_deposits_loopback() -> anyhow::Result<()> {
     let (client, server) =
         get_unconfirmed_deposits_loopback(DepositsHandle::new(Mutex::new(json!([]))));
@@ -163,6 +167,10 @@ async fn unconfirmed_deposits_loopback() -> anyhow::Result<()> {
 }
 
 #[actix_rt::test]
+#[cfg_attr(
+    not(feature = "api_test"),
+    ignore = "Use `zk test rust-api` command to perform this test"
+)]
 async fn accounts_scope() -> anyhow::Result<()> {
     let (client, server) = TestServer::new().await?;
 

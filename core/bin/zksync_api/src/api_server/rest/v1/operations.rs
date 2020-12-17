@@ -270,6 +270,10 @@ mod tests {
     };
 
     #[actix_rt::test]
+    #[cfg_attr(
+        not(feature = "api_test"),
+        ignore = "Use `zk test rust-api` command to perform this test"
+    )]
     async fn operations_scope() -> anyhow::Result<()> {
         let cfg = TestServerConfig::default();
         cfg.fill_database().await?;

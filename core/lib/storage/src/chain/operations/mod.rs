@@ -22,6 +22,7 @@ pub mod records;
 pub struct OperationsSchema<'a, 'c>(pub &'a mut StorageProcessor<'c>);
 
 impl<'a, 'c> OperationsSchema<'a, 'c> {
+    /// Return the greatest block number with the given `action_type` and `confirmed` status.
     pub async fn get_last_block_by_action(
         &mut self,
         action_type: ActionType,
@@ -45,6 +46,8 @@ impl<'a, 'c> OperationsSchema<'a, 'c> {
         Ok(max_block as BlockNumber)
     }
 
+    /// Given block number and action type, retrieves the corresponding operation
+    /// from the database.
     pub async fn get_operation(
         &mut self,
         block_number: BlockNumber,
@@ -66,6 +69,7 @@ impl<'a, 'c> OperationsSchema<'a, 'c> {
         result
     }
 
+    /// Retrieves transaction from the database given its hash.
     pub async fn get_executed_operation(
         &mut self,
         op_hash: &[u8],
@@ -86,6 +90,7 @@ impl<'a, 'c> OperationsSchema<'a, 'c> {
         Ok(op)
     }
 
+    /// Retrieves priority operation from the database given its ID.
     pub async fn get_executed_priority_operation(
         &mut self,
         priority_op_id: u32,
@@ -106,6 +111,7 @@ impl<'a, 'c> OperationsSchema<'a, 'c> {
         Ok(op)
     }
 
+    /// Retrieves priority operation from the database given its hash.
     pub async fn get_executed_priority_operation_by_hash(
         &mut self,
         eth_hash: &[u8],
@@ -334,6 +340,7 @@ impl<'a, 'c> OperationsSchema<'a, 'c> {
         Ok(())
     }
 
+    /// Returns `true` if there're no pending withdrawals in the database, `false` otherwise.
     pub async fn no_stored_pending_withdrawals(&mut self) -> QueryResult<bool> {
         let stored_pending_withdrawals =
             sqlx::query!(r#"SELECT COUNT(*) as "count!" FROM pending_withdrawals"#,)
@@ -344,6 +351,8 @@ impl<'a, 'c> OperationsSchema<'a, 'c> {
         Ok(stored_pending_withdrawals == 0)
     }
 
+    /// Given hash of the withdrawal, attempts to retrieve hash of the
+    /// corresponding ethereum transaction.
     pub async fn eth_tx_for_withdrawal(
         &mut self,
         withdrawal_hash: &TxHash,
