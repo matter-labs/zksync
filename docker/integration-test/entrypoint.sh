@@ -13,9 +13,9 @@ zk dummy-prover enable --no-redeploy
 zk run verify-keys unpack
 zk run yarn || true # It can fail
 zk db setup
-zk contract build-dev
-zk run deploy-erc20 dev
 zk contract build
+zk run deploy-erc20 dev
+zk run governance-add-erc20 dev
 zk server --genesis
 zk contract redeploy
 

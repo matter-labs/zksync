@@ -24,6 +24,17 @@ export async function deployERC20(command: 'dev' | 'new', name?: string, symbol?
     }
 }
 
+export async function governanceAddERC20(command: 'dev' | 'new', address?: string) {
+    if (command == 'dev') {
+        const tokens = JSON.parse(fs.readFileSync('./etc/tokens/localhost.json', { encoding: 'utf-8' })).map(
+            (token: { address: string }) => token.address
+        );
+        await utils.spawn(`yarn --silent --cwd contracts governance-add-erc20 add-multi '${tokens}'`);
+    } else if (command == 'new') {
+        await utils.spawn(`yarn --cwd contracts governance-add-erc20 add --tokenAddress ${address}`);
+    }
+}
+
 // installs all dependencies and builds our js packages
 export async function yarn() {
     await utils.spawn('yarn');
@@ -121,6 +132,16 @@ command
             throw new Error('only "dev" and "new" subcommands are allowed');
         }
         await deployERC20(command, name, symbol, decimals);
+    });
+
+command
+    .command('governance-add-erc20 <dev|new> [address]')
+    .description('add testnet erc20 token to the governance')
+    .action(async (command: string, address?: string) => {
+        if (command != 'dev' && command != 'new') {
+            throw new Error('only "dev" and "new" subcommands are allowed');
+        }
+        await governanceAddERC20(command, address);
     });
 
 command

@@ -18,10 +18,10 @@ export async function init() {
     await run.plonkSetup();
     await run.verifyKeys.unpack();
     await db.setup();
-    await contract.buildDev();
-    await run.deployERC20('dev');
-    await run.deployEIP1271();
     await contract.build();
+    await run.deployERC20('dev');
+    await run.governanceAddERC20('dev');
+    await run.deployEIP1271();
     await server.genesis();
     await contract.redeploy();
 }
