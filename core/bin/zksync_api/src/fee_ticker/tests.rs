@@ -374,7 +374,7 @@ async fn test_error_coingecko_api() {
         .connect_timeout(CONNECTION_TIMEOUT)
         .build()
         .expect("Failed to build reqwest::Client");
-    let mut coingecko = CoinGeckoAPI::new(client, address.parse().unwrap());
+    let mut coingecko = CoinGeckoAPI::new(client, address.parse().unwrap()).unwrap();
     coingecko.load_token_list().await.unwrap();
     let validator = FeeTokenValidator::new(HashMap::new(), Default::default());
     let connection_pool = ConnectionPool::new(Some(1));

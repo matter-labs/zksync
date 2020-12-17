@@ -231,8 +231,6 @@ impl<T: TokenPriceAPI + Send + Sync> FeeTickerAPI for TickerApi<T> {
             }
         }
 
-        drop(cached_value);
-
         let mut storage = self
             .db_pool
             .access_storage()
@@ -246,8 +244,7 @@ impl<T: TokenPriceAPI + Send + Sync> FeeTickerAPI for TickerApi<T> {
             .as_u64();
         let average_gas_price = BigUint::from(average_gas_price);
 
-        *self.gas_price_cache.lock().await = Some((average_gas_price.clone(), Instant::now()));
-
+        *cached_value = Some((average_gas_price.clone(), Instant::now()));
         metrics::histogram!("ticker.get_gas_price_wei", start.elapsed());
         Ok(average_gas_price)
     }

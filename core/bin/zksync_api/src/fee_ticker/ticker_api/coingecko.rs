@@ -19,32 +19,24 @@ pub struct CoinGeckoAPI {
 }
 
 impl CoinGeckoAPI {
-    pub fn new(client: reqwest::Client, base_url: Url) -> Self {
-        Self {
-            base_url,
-            client,
-            token_ids: HashMap::new(),
-        }
-    }
-
-    pub async fn load_token_list(&mut self) -> Result<(), anyhow::Error> {
-        let token_list_url = self
-            .base_url
+    pub fn new(client: reqwest::Client, base_url: Url) -> anyhow::Result<Self> {
+        let token_list_url = base_url
             .join("api/v3/coins/list")
             .expect("failed to join URL path");
 
-        let token_list = reqwest::get(token_list_url)
-            .await
+        let token_list = reqwest::blocking::get(token_list_url)
             .map_err(|err| anyhow::format_err!("CoinGecko API request failed: {}", err))?
-            .json::<CoinGeckoTokenList>()
-            .await?;
+            .json::<CoinGeckoTokenList>()?;
 
         let mut token_ids = HashMap::new();
         for token in token_list.0 {
             token_ids.insert(token.symbol, token.id);
         }
-        self.token_ids = token_ids;
-        Ok(())
+        Ok(Self {
+            base_url,
+            client,
+            token_ids,
+        })
     }
 }
 
@@ -147,8 +139,7 @@ mod tests {
     async fn test_coingecko_api() {
         let ticker_url = parse_env("COINGECKO_BASE_URL");
         let client = reqwest::Client::new();
-        let mut api = CoinGeckoAPI::new(client, ticker_url);
-        api.load_token_list().await.unwrap();
+        let mut api = CoinGeckoAPI::new(client, ticker_url).unwrap();
         api.get_price("ETH")
             .await
             .expect("Failed to get data from ticker");

@@ -18,6 +18,7 @@ use num::{
 };
 use serde::{Deserialize, Serialize};
 use tokio::task::JoinHandle;
+use tokio::time::Instant;
 // Workspace deps
 use zksync_config::{FeeTickerOptions, TokenPriceSource};
 use zksync_storage::ConnectionPool;
@@ -39,8 +40,6 @@ use crate::utils::token_db_cache::TokenDBCache;
 
 pub use self::fee::*;
 use crate::fee_ticker::dispatcher::Dispatcher;
-use futures::executor::block_on;
-use tokio::time::Instant;
 
 mod constants;
 mod fee;
@@ -221,8 +220,8 @@ pub fn run_ticker_task(
             tokio::spawn(fee_ticker.run())
         }
         TokenPriceSource::CoinGecko { base_url } => {
-            let mut token_price_api = CoinGeckoAPI::new(client, base_url);
-            block_on(token_price_api.load_token_list()).expect("failed to init CoinGecko client");
+            let token_price_api =
+                CoinGeckoAPI::new(client, base_url).expect("CoinGecko initializing error");
             let ticker_info = TickerInfo::new(db_pool.clone());
 
             let mut ticker_dispatcher = Dispatcher::new(
