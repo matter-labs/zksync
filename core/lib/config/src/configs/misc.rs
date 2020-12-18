@@ -9,7 +9,7 @@ use crate::envy_load;
 ///
 /// While these options may not be used by the server, it's helpful to provide an interface for them too,
 /// so at the very least it will be checked for correctness and parseability within the tests.
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Clone, PartialEq)]
 pub struct MiscConfig {
     /// Download setup files from `prover_setup_network_dir` if `prover_download_setup` == 1
     /// or use local files if `prover_download_setup` == 0.
@@ -31,5 +31,42 @@ pub struct MiscConfig {
 impl MiscConfig {
     pub fn from_env() -> Self {
         envy_load!("misc", "MISC_")
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::configs::test_utils::{hash, set_env};
+
+    fn expected_config() -> MiscConfig {
+        MiscConfig {
+            prover_download_setup: false,
+            prover_setup_network_dir: "-".into(),
+            docker_dummy_prover: false,
+            zksync_action: "dont_ask".into(),
+            etherscan_api_key: "unset".into(),
+            max_liquidation_fee_percent: 5,
+            fee_account_private_key: hash(
+                "27593fea79697e947890ecbecce7901b0008345e5d7259710d0dd5e500d040be",
+            ),
+        }
+    }
+
+    #[test]
+    fn from_env() {
+        let config = r#"
+MISC_PROVER_DOWNLOAD_SETUP="false"
+MISC_PROVER_SETUP_NETWORK_DIR="-"
+MISC_DOCKER_DUMMY_PROVER="false"
+MISC_ZKSYNC_ACTION="dont_ask"
+MISC_ETHERSCAN_API_KEY="unset"
+MISC_MAX_LIQUIDATION_FEE_PERCENT="5"
+MISC_FEE_ACCOUNT_PRIVATE_KEY="0x27593fea79697e947890ecbecce7901b0008345e5d7259710d0dd5e500d040be"
+        "#;
+        set_env(config);
+
+        let actual = MiscConfig::from_env();
+        assert_eq!(actual, expected_config());
     }
 }

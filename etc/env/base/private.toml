@@ -22,4 +22,4 @@ secret_auth="sample"
 
 [misc]
 # Private key for the fee seller account
-fee_account_private_key="unset"
+fee_account_private_key="0x27593fea79697e947890ecbecce7901b0008345e5d7259710d0dd5e500d040be"

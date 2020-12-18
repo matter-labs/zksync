@@ -13,7 +13,7 @@ docker_dummy_prover=false
 zksync_action="dont_ask"
 
 # API key for the analytics script
-etherscan_api_key=""
+etherscan_api_key="unset"
 
 # Configuration for the fee seller script
 max_liquidation_fee_percent=5
