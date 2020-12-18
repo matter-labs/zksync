@@ -7,23 +7,27 @@ use std::{collections::HashMap, sync::Arc, time::Instant};
 use tokio::sync::Mutex;
 use zksync_storage::ConnectionPool;
 
-use crate::fee_ticker::{
-    fee_token_validator::FeeTokenValidator,
-    ticker_api::{TickerApi, TokenPriceAPI},
-    ticker_info::FeeTickerInfo,
-    FeeTicker, TickerConfig, TickerRequest,
+use crate::{
+    fee_ticker::{
+        fee_token_validator::FeeTokenValidator,
+        ticker_api::{TickerApi, TokenPriceAPI},
+        ticker_info::FeeTickerInfo,
+        FeeTicker, TickerConfig, TickerRequest,
+    },
+    utils::token_db_cache::TokenDBCache,
 };
-use crate::utils::token_db_cache::TokenDBCache;
 
-pub(crate) struct Dispatcher<API: TokenPriceAPI, INFO> {
+static TICKER_CHANNEL_SIZE: usize = 32000;
+
+/// TickerBalancer is the point to scale the ticker
+/// Create n numbers of tickers and balance the load between tickers
+pub(crate) struct TickerBalancer<API: TokenPriceAPI, INFO> {
     tickers: Vec<FeeTicker<TickerApi<API>, INFO>>,
     channels: Vec<Sender<TickerRequest>>,
     requests: Receiver<TickerRequest>,
 }
 
-static TICKER_CHANNEL_SIZE: usize = 32000;
-
-impl<API, INFO> Dispatcher<API, INFO>
+impl<API, INFO> TickerBalancer<API, INFO>
 where
     API: TokenPriceAPI + Clone + Sync + Send + 'static,
     INFO: FeeTickerInfo + Clone + Sync + Send + 'static,
@@ -71,6 +75,7 @@ where
         }
     }
 
+    /// It's an obvious way of balancing. Send an equal number of requests to each ticker
     pub async fn run(mut self) {
         let mut channel_indexes = (0..self.channels.len()).into_iter().cycle();
         // it's the easiest way how to cycle over channels, because cycle required clone trait
@@ -90,7 +95,7 @@ where
 
 #[cfg(test)]
 mod tests {
-    use super::Dispatcher;
+    use super::TickerBalancer;
     use crate::fee_ticker::ticker_api::coingecko::CoinGeckoAPI;
     use crate::fee_ticker::ticker_info::TickerInfo;
     use crate::fee_ticker::TickerRequest;
@@ -111,7 +116,7 @@ mod tests {
         }
         let (mut request_sender, request_receiver) = mpsc::channel(2);
 
-        let dispatcher = Dispatcher::<CoinGeckoAPI, TickerInfo> {
+        let dispatcher = TickerBalancer::<CoinGeckoAPI, TickerInfo> {
             tickers: vec![],
             channels: senders,
             requests: request_receiver,
