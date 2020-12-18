@@ -5600,6 +5600,7 @@ version = "1.0.0"
 dependencies = [
  "anyhow",
  "bigdecimal",
+ "criterion",
  "log 0.4.11",
  "num",
  "rayon",
