@@ -266,7 +266,7 @@ impl<W: EthClient, S: Storage> EthWatch<W, S> {
         self.eth_state
             .unconfirmed_queue()
             .iter()
-            .find(|op| op.eth_hash.as_slice() == eth_hash)
+            .find(|op| op.eth_hash.as_bytes() == eth_hash)
             .cloned()
     }
 

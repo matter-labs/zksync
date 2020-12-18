@@ -5515,7 +5515,7 @@ checksum = "05f33972566adbd2d3588b0491eb94b98b43695c4ef897903470ede4f3f5a28a"
 
 [[package]]
 name = "zksync"
-version = "0.2.1"
+version = "0.2.2"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -5600,6 +5600,7 @@ version = "1.0.0"
 dependencies = [
  "anyhow",
  "bigdecimal",
+ "criterion",
  "log 0.4.11",
  "num",
  "rayon",
