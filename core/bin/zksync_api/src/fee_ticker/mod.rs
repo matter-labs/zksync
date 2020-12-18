@@ -17,7 +17,7 @@ use num::{
     BigUint,
 };
 use serde::{Deserialize, Serialize};
-use tokio::task::JoinHandle;
+use tokio::{task::JoinHandle, time::Duration};
 // Workspace deps
 use zksync_config::{FeeTickerOptions, TokenPriceSource};
 use zksync_storage::ConnectionPool;
@@ -25,27 +25,29 @@ use zksync_types::{
     Address, ChangePubKeyOp, Token, TokenId, TokenLike, TransferOp, TransferToNewOp, TxFeeTypes,
     WithdrawOp,
 };
+
 use zksync_utils::ratio_to_big_decimal;
 // Local deps
 use crate::fee_ticker::{
-    fee_token_validator::FeeTokenValidator,
     ticker_api::{
         coingecko::CoinGeckoAPI, coinmarkercap::CoinMarketCapAPI, FeeTickerAPI, TickerApi,
         CONNECTION_TIMEOUT,
     },
     ticker_info::{FeeTickerInfo, TickerInfo},
+    validator::{
+        watcher::{TokenWatcher, UniswapTokenWatcher},
+        FeeTokenValidator,
+    },
 };
 use crate::utils::token_db_cache::TokenDBCache;
 
 pub use self::fee::*;
-use crate::fee_ticker::fee_token_validator::{TokenWatcher, UniswapTokenWatcher};
-use tokio::time::Duration;
 
 mod constants;
 mod fee;
-mod fee_token_validator;
 mod ticker_api;
 mod ticker_info;
+mod validator;
 
 #[cfg(test)]
 mod tests;

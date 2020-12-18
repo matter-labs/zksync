@@ -1,21 +1,30 @@
 //! This module contains the definition of the fee token validator,
 //! an entity which decides whether certain ERC20 token is suitable for paying fees.
 
+pub mod cache;
+pub mod watcher;
+
 // Built-in uses
 use std::{
-    collections::HashMap,
+    collections::{HashMap, HashSet},
     time::{Duration, Instant},
 };
+use tokio::sync::Mutex;
+
 // Workspace uses
 use zksync_types::{
-    tokens::{Token, TokenLike},
-    Address,
+    tokens::{Token, TokenLike, TokenMarketVolume},
+    Address, TokenId,
 };
 // Local uses
-use crate::fee_ticker::ticker_api::REQUEST_TIMEOUT;
+use crate::fee_ticker::{
+    ticker_api::REQUEST_TIMEOUT,
+    validator::{cache::TokenCacheWrapper, watcher::TokenWatcher},
+};
 use crate::utils::token_db_cache::TokenDBCache;
-use std::collections::HashSet;
-use tokio::sync::Mutex;
+
+use bigdecimal::BigDecimal;
+use chrono::Utc;
 
 #[derive(Clone, Debug)]
 struct AcceptanceData {
@@ -74,6 +83,35 @@ impl<W: TokenWatcher> FeeTokenValidator<W> {
         self.tokens_cache.get_token(token).await
     }
 
+    async fn update_token(&mut self, token: &Token) -> anyhow::Result<TokenMarketVolume> {
+        let amount = self.watcher.get_token_market_amount(&token).await?;
+        let market = TokenMarketVolume {
+            market_volume: BigDecimal::from(amount),
+            last_updated: Utc::now(),
+        };
+
+        self.tokens_cache
+            .update_token_market_volume(token.id, market.clone())
+            .await;
+        Ok(market)
+    }
+
+    async fn update_all_tokens(&mut self, tokens: &Vec<Token>) -> anyhow::Result<()> {
+        for token in tokens {
+            self.update_token(token).await?;
+        }
+        Ok(())
+    }
+
+    async fn keep_update(&mut self, tokens: Vec<Token>, duration_millis: u64) {
+        loop {
+            if let Err(e) = self.update_all_tokens(&tokens).await {
+                vlog::warn!("Error when updating token market volume", e)
+            }
+            tokio::time::delay_for(Duration::from_millis(duration_millis)).await
+        }
+    }
+
     async fn check_token(&mut self, token: Token) -> anyhow::Result<bool> {
         if let Some(acceptance_data) = self.tokens.get(&token.address) {
             if acceptance_data.last_refresh.elapsed() < self.available_time {
@@ -81,8 +119,13 @@ impl<W: TokenWatcher> FeeTokenValidator<W> {
             }
         }
 
-        let amount = self.get_token_market_amount(&token).await?;
-        let allowed = amount >= self.liquidity_volume;
+        let volume = self.get_token_market_amount(&token).await?;
+
+        if Instant::now() - volume.last_updated < self.available_time {
+            vlog::warn!("Token market amount is not relevant")
+        }
+
+        let allowed = volume.market_volume >= self.liquidity_volume;
         self.tokens.insert(
             token.address,
             AcceptanceData {
@@ -92,126 +135,19 @@ impl<W: TokenWatcher> FeeTokenValidator<W> {
         );
         Ok(allowed)
     }
-    async fn get_token_market_amount(&mut self, token: &Token) -> anyhow::Result<f64> {
-        self.watcher.get_token_market_amount(token).await
-    }
-}
 
-#[async_trait::async_trait]
-pub trait TokenWatcher {
-    async fn get_token_market_amount(&mut self, token: &Token) -> anyhow::Result<f64>;
-}
-
-/// Watcher for Uniswap protocol
-/// https://thegraph.com/explorer/subgraph/uniswap/uniswap-v2
-pub struct UniswapTokenWatcher {
-    client: reqwest::Client,
-    addr: String,
-    cache: Mutex<HashMap<Address, f64>>,
-}
-
-impl UniswapTokenWatcher {
-    pub fn new(addr: String) -> Self {
-        Self {
-            client: reqwest::Client::new(),
-            addr,
-            cache: Default::default(),
-        }
-    }
-    async fn get_token_amount(&mut self, address: Address) -> anyhow::Result<f64> {
-        // Uniswap has graphql API, using full graphql client for one query is overkill for current task
-        let query = format!("{{token(id: \"{:?}\"){{tradeVolumeUSD}}}}", address);
-        let request = self.client.post(&self.addr).json(&serde_json::json!({
-            "query": query,
-        }));
-
-        let api_request_future = tokio::time::timeout(REQUEST_TIMEOUT, request.send());
-
-        let response: GraphqlResponse = api_request_future
-            .await
-            .map_err(|_| anyhow::format_err!("Uniswap API request timeout"))?
-            .map_err(|err| anyhow::format_err!("Uniswap API request failed: {}", err))?
-            .json::<GraphqlResponse>()
-            .await?;
-
-        Ok(response.data.token.trade_volume_usd.parse()?)
-    }
-    async fn update_historical_amount(&mut self, address: Address, amount: f64) {
-        let mut cache = self.cache.lock().await;
-        cache.insert(address, amount);
-    }
-    async fn get_historical_amount(&mut self, address: Address) -> Option<f64> {
-        let cache = self.cache.lock().await;
-        cache.get(&address).cloned()
-    }
-}
-
-#[derive(serde::Serialize, serde::Deserialize, Debug)]
-struct GraphqlResponse {
-    data: GraphqlTokenResponse,
-}
-
-#[derive(serde::Serialize, serde::Deserialize, Debug)]
-struct GraphqlTokenResponse {
-    token: TokenResponse,
-}
-
-#[derive(serde::Serialize, serde::Deserialize, Debug)]
-struct TokenResponse {
-    #[serde(rename = "tradeVolumeUSD")]
-    trade_volume_usd: String,
-}
-
-#[async_trait::async_trait]
-impl TokenWatcher for UniswapTokenWatcher {
-    async fn get_token_market_amount(&mut self, token: &Token) -> anyhow::Result<f64> {
-        match self.get_token_amount(token.address).await {
-            Ok(amount) => {
-                self.update_historical_amount(token.address, amount).await;
-                return Ok(amount);
-            }
-            Err(err) => {
-                vlog::error!("Error in api: {:?}", err);
-            }
-        }
-
-        if let Some(amount) = self.get_historical_amount(token.address).await {
-            return Ok(amount);
-        };
-        anyhow::bail!("Token amount api is not available right now.")
-    }
-}
-
-#[derive(Debug, Clone)]
-pub(crate) enum TokenCacheWrapper {
-    DB(TokenDBCache),
-    Memory(HashMap<TokenLike, Token>),
-}
-
-impl From<TokenDBCache> for TokenCacheWrapper {
-    fn from(cache: TokenDBCache) -> Self {
-        Self::DB(cache)
-    }
-}
-
-impl From<HashMap<TokenLike, Token>> for TokenCacheWrapper {
-    fn from(cache: HashMap<TokenLike, Token>) -> Self {
-        Self::Memory(cache)
-    }
-}
-
-impl TokenCacheWrapper {
-    pub async fn get_token(&self, token_like: TokenLike) -> anyhow::Result<Option<Token>> {
-        match self {
-            Self::DB(cache) => cache.get_token(token_like).await,
-            Self::Memory(cache) => Ok(cache.get(&token_like).cloned()),
-        }
+    async fn get_token_market_amount(
+        &mut self,
+        token: &Token,
+    ) -> anyhow::Result<Option<TokenMarketVolume>> {
+        self.tokens_cache.get_token_market_volume(token.id).await
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::fee_ticker::validator::watcher::UniswapTokenWatcher;
     use std::str::FromStr;
 
     struct InMemoryTokenWatcher {

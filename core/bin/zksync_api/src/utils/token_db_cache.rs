@@ -2,8 +2,10 @@ use std::{collections::HashMap, sync::Arc};
 
 use tokio::sync::RwLock;
 
+use bigdecimal::BigDecimal;
 use zksync_storage::ConnectionPool;
-use zksync_types::{Token, TokenLike};
+use zksync_types::tokens::TokenMarketVolume;
+use zksync_types::{Token, TokenId, TokenLike};
 
 #[derive(Debug, Clone)]
 pub struct TokenDBCache {
@@ -66,5 +68,32 @@ impl TokenDBCache {
         }
 
         Ok(token)
+    }
+
+    pub async fn get_token_market_volume(
+        &self,
+        token: TokenId,
+    ) -> anyhow::Result<Option<TokenMarketVolume>> {
+        Ok(self
+            .db
+            .access_storage()
+            .await?
+            .tokens_schema()
+            .get_token_market_volume(token)
+            .await?)
+    }
+
+    pub async fn update_token_market_volume(
+        &self,
+        token: TokenId,
+        market: TokenMarketVolume,
+    ) -> anyhow::Result<()> {
+        Ok(self
+            .db
+            .access_storage()
+            .await?
+            .tokens_schema()
+            .update_token_market_volume(token, market)
+            .await?)
     }
 }

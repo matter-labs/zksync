@@ -1,0 +1,89 @@
+use crate::fee_ticker::ticker_api::REQUEST_TIMEOUT;
+use std::collections::HashMap;
+use tokio::sync::Mutex;
+use zksync_types::{Address, Token};
+
+#[async_trait::async_trait]
+pub trait TokenWatcher {
+    async fn get_token_market_amount(&mut self, token: &Token) -> anyhow::Result<f64>;
+}
+
+/// Watcher for Uniswap protocol
+/// https://thegraph.com/explorer/subgraph/uniswap/uniswap-v2
+pub struct UniswapTokenWatcher {
+    client: reqwest::Client,
+    addr: String,
+    cache: Mutex<HashMap<Address, f64>>,
+}
+
+impl UniswapTokenWatcher {
+    pub fn new(addr: String) -> Self {
+        Self {
+            client: reqwest::Client::new(),
+            addr,
+            cache: Default::default(),
+        }
+    }
+    async fn get_token_amount(&mut self, address: Address) -> anyhow::Result<f64> {
+        // Uniswap has graphql API, using full graphql client for one query is overkill for current task
+        let query = format!("{{token(id: \"{:?}\"){{tradeVolumeUSD}}}}", address);
+        let request = self.client.post(&self.addr).json(&serde_json::json!({
+            "query": query,
+        }));
+
+        let api_request_future = tokio::time::timeout(REQUEST_TIMEOUT, request.send());
+
+        let response: GraphqlResponse = api_request_future
+            .await
+            .map_err(|_| anyhow::format_err!("Uniswap API request timeout"))?
+            .map_err(|err| anyhow::format_err!("Uniswap API request failed: {}", err))?
+            .json::<GraphqlResponse>()
+            .await?;
+
+        Ok(response.data.token.trade_volume_usd.parse()?)
+    }
+    async fn update_historical_amount(&mut self, address: Address, amount: f64) {
+        let mut cache = self.cache.lock().await;
+        cache.insert(address, amount);
+    }
+    async fn get_historical_amount(&mut self, address: Address) -> Option<f64> {
+        let cache = self.cache.lock().await;
+        cache.get(&address).cloned()
+    }
+}
+
+#[derive(serde::Serialize, serde::Deserialize, Debug)]
+struct GraphqlResponse {
+    data: GraphqlTokenResponse,
+}
+
+#[derive(serde::Serialize, serde::Deserialize, Debug)]
+struct GraphqlTokenResponse {
+    token: TokenResponse,
+}
+
+#[derive(serde::Serialize, serde::Deserialize, Debug)]
+struct TokenResponse {
+    #[serde(rename = "tradeVolumeUSD")]
+    trade_volume_usd: String,
+}
+
+#[async_trait::async_trait]
+impl TokenWatcher for UniswapTokenWatcher {
+    async fn get_token_market_amount(&mut self, token: &Token) -> anyhow::Result<f64> {
+        match self.get_token_amount(token.address).await {
+            Ok(amount) => {
+                self.update_historical_amount(token.address, amount).await;
+                return Ok(amount);
+            }
+            Err(err) => {
+                vlog::error!("Error in api: {:?}", err);
+            }
+        }
+
+        if let Some(amount) = self.get_historical_amount(token.address).await {
+            return Ok(amount);
+        };
+        anyhow::bail!("Token amount api is not available right now.")
+    }
+}
