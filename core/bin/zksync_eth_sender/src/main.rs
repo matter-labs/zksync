@@ -1,6 +1,6 @@
 use futures::{channel::mpsc, executor::block_on, SinkExt, StreamExt};
 use std::cell::RefCell;
-use zksync_config::{EthClientOptions, EthSenderOptions};
+use zksync_config::configs::ZkSyncConfig;
 use zksync_eth_sender::run_eth_sender;
 use zksync_storage::ConnectionPool;
 
@@ -23,10 +23,9 @@ async fn main() -> anyhow::Result<()> {
     }
 
     let pool = ConnectionPool::new(Some(ETH_SENDER_CONNECTION_POOL_SIZE));
-    let eth_client_options = EthClientOptions::from_env();
-    let eth_sender_options = EthSenderOptions::from_env();
+    let config = ZkSyncConfig::from_env();
 
-    let task_handle = run_eth_sender(pool, eth_client_options, eth_sender_options);
+    let task_handle = run_eth_sender(pool, config);
 
     tokio::select! {
         _ = async { task_handle.await } => {

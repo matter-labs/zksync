@@ -10,7 +10,7 @@ use zksync_eth_signer::PrivateKeySigner;
 // Workspace uses
 use super::ExecutedTxStatus;
 use std::time::Duration;
-use zksync_config::EthClientOptions;
+use zksync_config::configs::ZkSyncConfig;
 use zksync_contracts::zksync_contract;
 use zksync_eth_client::{ETHClient, SignedCallResult};
 
@@ -78,22 +78,18 @@ pub struct EthereumHttpClient {
 }
 
 impl EthereumHttpClient {
-    pub fn new(options: &EthClientOptions) -> anyhow::Result<Self> {
-        let transport = Http::new(&options.web3_url)?;
-        let ethereum_signer = PrivateKeySigner::new(
-            options
-                .operator_private_key
-                .expect("Operator private key is required for eth_sender"),
-        );
+    pub fn new(options: &ZkSyncConfig) -> anyhow::Result<Self> {
+        let transport = Http::new(&options.eth_client.web3_url)?;
+        let ethereum_signer = PrivateKeySigner::new(options.eth_sender.sender.operator_private_key);
 
         let eth_client = ETHClient::new(
             transport,
             zksync_contract(),
-            options.operator_commit_eth_addr,
+            options.eth_sender.sender.operator_commit_eth_addr,
             ethereum_signer,
-            options.contract_eth_addr,
-            options.chain_id,
-            options.gas_price_factor,
+            options.contracts.contract_addr,
+            options.eth_client.chain_id,
+            options.eth_client.gas_price_factor,
         );
 
         Ok(Self { eth_client })
