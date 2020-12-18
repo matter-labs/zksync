@@ -23,7 +23,7 @@ impl ProverConfig {
     }
 
     pub fn from_toml(path: &str) -> Self {
-        toml_load!("eth_sender", path)
+        toml_load!("prover", path)
     }
 }
 

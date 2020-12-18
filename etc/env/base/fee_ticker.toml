@@ -1,5 +1,6 @@
 [fee_ticker]
-# Configuration for the fee ticker
+# Indicator of the API to be used for getting token prices.
+# Only supported options currently are "CoinGecko" and "CoinMarketCap".
 token_price_source="CoinGecko"
 # Set to be a development mock server.
 coinmarketcap_base_url="http://127.0.0.1:9876"
@@ -9,7 +10,7 @@ coingecko_base_url="http://127.0.0.1:9876"
 # Coefficient for the fee price for fast withdrawal requests.
 fast_processing_coeff=10.0
 # List of tokens not suitable for paying fees.
-disabled_tokens= [
+disabled_tokens=[
     "38A2fDc11f526Ddd5a607C1F251C065f40fBF2f7" # PHNX
 ]
 # List of tokens for which subsidions are disabled.

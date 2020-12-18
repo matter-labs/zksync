@@ -2,6 +2,7 @@
 pub use self::{
     api::ApiConfig, chain::ChainConfig, db::DBConfig, eth_client::ETHClientConfig,
     eth_sender::ETHSenderConfig, eth_watch::ETHWatchConfig, misc::MiscConfig, prover::ProverConfig,
+    ticker::TickerConfig,
 };
 
 pub mod api;
@@ -13,6 +14,7 @@ pub mod eth_sender;
 pub mod eth_watch;
 pub mod misc;
 pub mod prover;
+pub mod ticker;
 
 /// Convenience macro that loads the structure from the environment variable given the prefix.
 ///
