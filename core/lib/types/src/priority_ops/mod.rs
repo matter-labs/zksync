@@ -1,23 +1,29 @@
 //! Definition of zkSync network priority operations: operations initiated from the L1.
+use std::convert::{TryFrom, TryInto};
 
-use super::AccountId;
-use super::TokenId;
 use anyhow::{bail, ensure, format_err};
 use ethabi::{decode, ParamType};
 use num::BigUint;
 use serde::{Deserialize, Serialize};
-use std::convert::{TryFrom, TryInto};
-use zksync_basic_types::{Address, Log, U256};
-use zksync_crypto::params::{
-    ACCOUNT_ID_BIT_WIDTH, BALANCE_BIT_WIDTH, ETH_ADDRESS_BIT_WIDTH, FR_ADDRESS_LEN, TOKEN_BIT_WIDTH,
+
+use zksync_basic_types::{Address, Log, H256, U256};
+use zksync_crypto::{
+    params::{
+        ACCOUNT_ID_BIT_WIDTH, BALANCE_BIT_WIDTH, ETH_ADDRESS_BIT_WIDTH, FR_ADDRESS_LEN,
+        TOKEN_BIT_WIDTH,
+    },
+    primitives::FromBytes,
 };
-use zksync_crypto::primitives::FromBytes;
 use zksync_utils::BigUintSerdeAsRadix10Str;
 
 use super::{
     operations::{DepositOp, FullExitOp},
-    SerialId,
+    utils::h256_as_vec,
+    AccountId, SerialId, TokenId,
 };
+
+#[cfg(test)]
+mod tests;
 
 /// Deposit priority operation transfers funds from the L1 account to the desired L2 account.
 /// If the target L2 account didn't exist at the moment of the operation execution, a new
@@ -163,8 +169,9 @@ pub struct PriorityOp {
     pub data: ZkSyncPriorityOp,
     /// Ethereum deadline block until which operation must be processed.
     pub deadline_block: u64,
+    #[serde(with = "h256_as_vec")]
     /// Hash of the corresponding Ethereum transaction. Size should be 32 bytes
-    pub eth_hash: Vec<u8>,
+    pub eth_hash: H256,
     /// Block in which Ethereum transaction was included.
     pub eth_block: u64,
 }
@@ -212,9 +219,7 @@ impl TryFrom<Log> for PriorityOp {
                 .unwrap(),
             eth_hash: event
                 .transaction_hash
-                .expect("Event transaction hash is missing")
-                .as_bytes()
-                .to_vec(),
+                .expect("Event transaction hash is missing"),
             eth_block: event
                 .block_number
                 .expect("Event block number is missing")

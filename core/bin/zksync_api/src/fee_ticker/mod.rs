@@ -18,6 +18,7 @@ use num::{
 };
 use serde::{Deserialize, Serialize};
 use tokio::task::JoinHandle;
+use tokio::time::Instant;
 // Workspace deps
 use zksync_config::{FeeTickerOptions, TokenPriceSource};
 use zksync_storage::ConnectionPool;
@@ -38,6 +39,7 @@ use crate::fee_ticker::{
 use crate::utils::token_db_cache::TokenDBCache;
 
 pub use self::fee::*;
+use crate::fee_ticker::dispatcher::Dispatcher;
 
 mod constants;
 mod fee;
@@ -45,6 +47,7 @@ mod fee_token_validator;
 mod ticker_api;
 mod ticker_info;
 
+mod dispatcher;
 #[cfg(test)]
 mod tests;
 
@@ -218,19 +221,20 @@ pub fn run_ticker_task(
         }
         TokenPriceSource::CoinGecko { base_url } => {
             let token_price_api =
-                CoinGeckoAPI::new(client, base_url).expect("failed to init CoinGecko client");
+                CoinGeckoAPI::new(client, base_url).expect("CoinGecko initializing error");
+            let ticker_info = TickerInfo::new(db_pool.clone());
 
-            let ticker_api = TickerApi::new(db_pool.clone(), token_price_api);
-            let ticker_info = TickerInfo::new(db_pool);
-            let fee_ticker = FeeTicker::new(
-                ticker_api,
+            let mut ticker_dispatcher = Dispatcher::new(
+                token_price_api,
                 ticker_info,
-                tricker_requests,
                 ticker_config,
                 validator,
+                tricker_requests,
+                db_pool,
+                5,
             );
-
-            tokio::spawn(fee_ticker.run())
+            ticker_dispatcher.spawn_tickers();
+            tokio::spawn(ticker_dispatcher.run())
         }
     }
 }
@@ -254,6 +258,7 @@ impl<API: FeeTickerAPI, INFO: FeeTickerInfo> FeeTicker<API, INFO> {
 
     async fn run(mut self) {
         while let Some(request) = self.requests.next().await {
+            let start = Instant::now();
             match request {
                 TickerRequest::GetTxFee {
                     tx_type,
@@ -264,7 +269,8 @@ impl<API: FeeTickerAPI, INFO: FeeTickerInfo> FeeTicker<API, INFO> {
                     let fee = self
                         .get_fee_from_ticker_in_wei(tx_type, token, address)
                         .await;
-                    response.send(fee).unwrap_or_default();
+                    metrics::histogram!("ticker.get_tx_fee", start.elapsed());
+                    response.send(fee).unwrap_or_default()
                 }
                 TickerRequest::GetTokenPrice {
                     token,
@@ -272,10 +278,12 @@ impl<API: FeeTickerAPI, INFO: FeeTickerInfo> FeeTicker<API, INFO> {
                     req_type,
                 } => {
                     let price = self.get_token_price(token, req_type).await;
+                    metrics::histogram!("ticker.get_token_price", start.elapsed());
                     response.send(price).unwrap_or_default();
                 }
                 TickerRequest::IsTokenAllowed { token, response } => {
                     let allowed = self.validator.token_allowed(token).await;
+                    metrics::histogram!("ticker.is_token_allowed", start.elapsed());
                     response.send(allowed).unwrap_or_default();
                 }
             }
@@ -307,7 +315,7 @@ impl<API: FeeTickerAPI, INFO: FeeTickerInfo> FeeTicker<API, INFO> {
     }
 
     /// Returns `true` if the token is subsidized.
-    async fn is_token_subsidized(&mut self, token: Token) -> bool {
+    async fn is_token_subsidized(&self, token: Token) -> bool {
         !self.config.not_subsidized_tokens.contains(&token.address)
     }
 

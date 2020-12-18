@@ -140,7 +140,7 @@ fn dummy_deposit_op(
             serial_id,
             data: deposit_op.try_get_priority_op().unwrap(),
             deadline_block: 0,
-            eth_hash: H256::default().as_bytes().to_owned(),
+            eth_hash: H256::default(),
             eth_block: 10,
         },
         op: deposit_op,
