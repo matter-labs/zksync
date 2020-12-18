@@ -75,7 +75,7 @@ pub trait ProverConfig {
 /// It is still assumed that prover will use ApiClient methods to fetch data from server, but it
 /// allows to use common code for all provers (like sending heartbeats, registering prover, etc.)
 pub trait ProverImpl {
-    /// Config concrete type used by current prover
+    /// Config concrete type used by current prover.
     type Config: ProverConfig;
     /// Creates prover from config and API client.
     fn create_from_config(config: Self::Config) -> Self;
@@ -83,14 +83,14 @@ pub trait ProverImpl {
         Default::default()
     }
     /// Resource heavy operation
-    fn create_proof(&self, data: JobRequestData) -> Result<JobResultData, anyhow::Error>;
+    fn create_proof(&self, data: JobRequestData) -> anyhow::Result<JobResultData>;
 }
 #[async_trait::async_trait]
 pub trait ApiClient: Debug {
-    async fn get_job(&self, req: ProverInputRequest) -> Result<ProverInputResponse, anyhow::Error>;
-    async fn working_on(&self, job_id: i32, prover_name: &str) -> Result<(), anyhow::Error>;
-    async fn publish(&self, data: ProverOutputRequest) -> Result<(), anyhow::Error>;
-    async fn prover_stopped(&self, prover_id: ProverId) -> Result<(), anyhow::Error>;
+    async fn get_job(&self, req: ProverInputRequest) -> anyhow::Result<ProverInputResponse>;
+    async fn working_on(&self, job_id: i32, prover_name: &str) -> anyhow::Result<()>;
+    async fn publish(&self, data: ProverOutputRequest) -> anyhow::Result<()>;
+    async fn prover_stopped(&self, prover_id: ProverId) -> anyhow::Result<()>;
 }
 
 async fn compute_proof_no_blocking<PROVER>(
@@ -171,15 +171,14 @@ async fn prover_work_cycle<PROVER, CLIENT>(
                 client
                     .working_on(job_id, &prover_name)
                     .await
-                    .map_err(|e| log::warn!("Failed to send hearbeat: {}", e))
+                    .map_err(|e| log::warn!("Failed to send heartbeat: {}", e))
                     .unwrap_or_default();
             }
         }
         .fuse();
-        pin_mut!(heartbeat_future_handle);
-
         let compute_proof_future = compute_proof_no_blocking(prover, job_data).fuse();
-        pin_mut!(compute_proof_future);
+
+        pin_mut!(heartbeat_future_handle, compute_proof_future);
 
         let (ret_prover, proof) = futures::select! {
             comp_proof = compute_proof_future => {
