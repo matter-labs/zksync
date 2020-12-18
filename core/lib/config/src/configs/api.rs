@@ -1,7 +1,7 @@
 /// External uses
 use serde::Deserialize;
 // Local uses
-use crate::{envy_load, toml_load};
+use crate::envy_load;
 
 /// API configuration.
 #[derive(Debug, Deserialize)]
@@ -33,10 +33,6 @@ impl ApiConfig {
             prover: envy_load!("prover", "API_PROVER_"),
             prometheus: envy_load!("prometheus", "API_PROMETHEUS_"),
         }
-    }
-
-    pub fn from_toml(path: &str) -> Self {
-        toml_load!("api", path)
     }
 }
 

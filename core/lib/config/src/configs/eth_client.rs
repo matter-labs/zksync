@@ -1,7 +1,7 @@
 // External uses
 use serde::Deserialize;
 // Local uses
-use crate::{envy_load, toml_load};
+use crate::envy_load;
 
 /// Configuration for the Ethereum gateways.
 #[derive(Debug, Deserialize)]
@@ -19,9 +19,5 @@ pub struct ETHClientConfig {
 impl ETHClientConfig {
     pub fn from_env() -> Self {
         envy_load!("eth_client", "ETH_CLIENT_")
-    }
-
-    pub fn from_toml(path: &str) -> Self {
-        toml_load!("eth_client", path)
     }
 }

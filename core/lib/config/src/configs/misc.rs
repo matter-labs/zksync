@@ -3,7 +3,7 @@ use serde::Deserialize;
 // Workspace uses
 use zksync_types::H256;
 // Local uses
-use crate::{envy_load, toml_load};
+use crate::envy_load;
 
 /// Miscellaneous options for different infrastructure elements.
 ///
@@ -31,9 +31,5 @@ pub struct MiscConfig {
 impl MiscConfig {
     pub fn from_env() -> Self {
         envy_load!("misc", "MISC_")
-    }
-
-    pub fn from_toml(path: &str) -> Self {
-        toml_load!("misc", path)
     }
 }

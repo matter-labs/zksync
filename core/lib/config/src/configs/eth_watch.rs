@@ -1,7 +1,7 @@
 // External uses
 use serde::Deserialize;
 // Local uses
-use crate::{envy_load, toml_load};
+use crate::envy_load;
 
 /// Configuration for the Ethereum sender crate.
 #[derive(Debug, Deserialize)]
@@ -16,9 +16,5 @@ pub struct ETHWatchConfig {
 impl ETHWatchConfig {
     pub fn from_env() -> Self {
         envy_load!("eth_watch", "ETH_WATCH_")
-    }
-
-    pub fn from_toml(path: &str) -> Self {
-        toml_load!("eth_watch", path)
     }
 }

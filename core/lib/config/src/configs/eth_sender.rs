@@ -3,7 +3,7 @@ use serde::Deserialize;
 // Workspace uses
 use zksync_types::{Address, H256};
 // Local uses
-use crate::{envy_load, toml_load};
+use crate::envy_load;
 
 /// Configuration for the Ethereum sender crate.
 #[derive(Debug, Deserialize)]
@@ -20,10 +20,6 @@ impl ETHSenderConfig {
             sender: envy_load!("eth_sender", "ETH_SENDER_SENDER_"),
             gas_limit: envy_load!("eth_sender.gas_limit", "ETH_SENDER_GAS_LIMIT_"),
         }
-    }
-
-    pub fn from_toml(path: &str) -> Self {
-        toml_load!("eth_sender", path)
     }
 }
 

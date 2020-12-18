@@ -1,7 +1,7 @@
 // External uses
 use serde::Deserialize;
 // Local uses
-use crate::{envy_load, toml_load};
+use crate::envy_load;
 
 /// Used database configuration.
 #[derive(Debug, Deserialize)]
@@ -15,9 +15,5 @@ pub struct DBConfig {
 impl DBConfig {
     pub fn from_env() -> Self {
         envy_load!("db", "DB_")
-    }
-
-    pub fn from_toml(path: &str) -> Self {
-        toml_load!("db", path)
     }
 }

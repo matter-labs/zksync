@@ -3,7 +3,7 @@ use std::time::Duration;
 // External uses
 use serde::Deserialize;
 // Local uses
-use crate::{envy_load, toml_load};
+use crate::envy_load;
 
 /// Configuration for the prover application and part of the server that interact with it.
 #[derive(Debug, Deserialize)]
@@ -20,10 +20,6 @@ impl ProverConfig {
             core: envy_load!("prover.core", "PROVER_CORE_"),
             witness_generator: envy_load!("prover.witness_generator", "PROVER_WITNESS_GENERATOR_"),
         }
-    }
-
-    pub fn from_toml(path: &str) -> Self {
-        toml_load!("prover", path)
     }
 }
 

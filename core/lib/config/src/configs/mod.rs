@@ -16,6 +16,9 @@ pub mod misc;
 pub mod prover;
 pub mod ticker;
 
+#[cfg(test)]
+pub(crate) mod test_utils;
+
 /// Convenience macro that loads the structure from the environment variable given the prefix.
 ///
 /// # Panics
@@ -28,27 +31,4 @@ macro_rules! envy_load {
             .from_env()
             .unwrap_or_else(|err| panic!("Cannot load config <{}>: {}", $name, err))
     };
-}
-
-/// Convenience macro that loads the structure from the TOML file given the path.
-///
-/// # Panics
-///
-/// Panics if the config cannot be loaded from the file.
-#[macro_export]
-macro_rules! toml_load {
-    ($name:expr, $path:expr) => {{
-        let file_contents = std::fs::read_to_string($path).unwrap_or_else(|err| {
-            panic!(
-                "Cannot load config <{}> from file <{}>: {}",
-                $name, $path, err
-            )
-        });
-        toml::from_str(&file_contents).unwrap_or_else(|err| {
-            panic!(
-                "Cannot parse config <{}> from file <{}>: {}",
-                $name, $path, err
-            )
-        })
-    }};
 }

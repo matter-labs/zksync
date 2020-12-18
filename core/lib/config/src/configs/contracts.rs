@@ -3,7 +3,7 @@ use serde::Deserialize;
 // Workspace uses
 use zksync_types::{Address, H256};
 // Local uses
-use crate::{envy_load, toml_load};
+use crate::envy_load;
 
 /// Data about deployed contracts.
 #[derive(Debug, Deserialize)]
@@ -22,9 +22,5 @@ pub struct ContractsConfig {
 impl ContractsConfig {
     pub fn from_env() -> Self {
         envy_load!("contracts", "CONTRACTS_")
-    }
-
-    pub fn from_toml(path: &str) -> Self {
-        toml_load!("contracts", path)
     }
 }

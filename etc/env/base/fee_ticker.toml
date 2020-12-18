@@ -11,10 +11,10 @@ coingecko_base_url="http://127.0.0.1:9876"
 fast_processing_coeff=10.0
 # List of tokens not suitable for paying fees.
 disabled_tokens=[
-    "38A2fDc11f526Ddd5a607C1F251C065f40fBF2f7" # PHNX
+    "0x38A2fDc11f526Ddd5a607C1F251C065f40fBF2f7" # PHNX
 ]
 # List of tokens for which subsidions are disabled.
 not_subsidized_tokens=[
-    "2b591e99afe9f32eaa6214f7b7629768c40eeb39", # HEX
-    "34083bbd70d394110487feaa087da875a54624ec"  # Some sample token
+    "0x2b591e99afe9f32eaa6214f7b7629768c40eeb39", # HEX
+    "0x34083bbd70d394110487feaa087da875a54624ec"  # Some sample token
 ]

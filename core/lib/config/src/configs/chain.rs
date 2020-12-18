@@ -1,7 +1,7 @@
 /// External uses
 use serde::Deserialize;
 // Local uses
-use crate::{envy_load, toml_load};
+use crate::envy_load;
 
 #[derive(Debug, Deserialize)]
 pub struct ChainConfig {
@@ -20,10 +20,6 @@ impl ChainConfig {
             eth: envy_load!("eth", "CHAIN_ETH_"),
             state_keeper: envy_load!("state_keeper", "CHAIN_STATE_KEEPER_"),
         }
-    }
-
-    pub fn from_toml(path: &str) -> Self {
-        toml_load!("chain", path)
     }
 }
 
