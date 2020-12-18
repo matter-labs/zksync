@@ -1,7 +1,7 @@
 // Built-in uses.
 use std::{env, str::FromStr};
 // Workspace uses
-use zksync_types::Address;
+use zksync_types::{Address, H256};
 
 /// Parses the provided fixture in a form of `VARIABLE_NAME=variable_value` lines and
 /// sets the corresponding environment variables.
@@ -30,4 +30,9 @@ pub fn set_env(fixture: &str) {
 /// Parses the address panicking upon deserialization failure.
 pub fn addr(addr_str: &str) -> Address {
     Address::from_str(addr_str).expect("Incorrect address string")
+}
+
+/// Parses the H256 panicking upon deserialization failure.
+pub fn hash(addr_str: &str) -> H256 {
+    H256::from_str(addr_str).expect("Incorrect hash string")
 }
