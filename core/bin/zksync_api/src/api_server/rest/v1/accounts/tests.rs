@@ -6,7 +6,6 @@ use actix_web::{
     web::{self, Json},
     App,
 };
-use chrono::Utc;
 use serde_json::json;
 use tokio::sync::Mutex;
 
@@ -15,16 +14,13 @@ use zksync_storage::{
     chain::operations_ext::records::{AccountOpReceiptResponse, AccountTxReceiptResponse},
     ConnectionPool, StorageProcessor,
 };
-use zksync_types::{
-    tx::TxHash, AccountId, Address, BlockNumber, Deposit, DepositOp, ExecutedOperations,
-    ExecutedPriorityOp, PriorityOp, ZkSyncOp, H256,
-};
+use zksync_types::{tx::TxHash, AccountId, Address, BlockNumber, ExecutedOperations, H256};
 
 // Local uses
 use crate::{
     api_server::v1::{
         client::{Client, TxReceipt},
-        test_utils::TestServerConfig,
+        test_utils::{dummy_deposit_op, TestServerConfig},
     },
     core_api_client::CoreApiClient,
     utils::token_db_cache::TokenDBCache,
@@ -119,38 +115,6 @@ impl TestServer {
     }
 }
 
-fn dummy_deposit_op(
-    address: Address,
-    account_id: AccountId,
-    serial_id: u64,
-    block_index: u32,
-) -> ExecutedOperations {
-    let deposit_op = ZkSyncOp::Deposit(Box::new(DepositOp {
-        priority_op: Deposit {
-            from: address,
-            token: 0,
-            amount: 1_u64.into(),
-            to: address,
-        },
-        account_id,
-    }));
-
-    let executed_op = ExecutedPriorityOp {
-        priority_op: PriorityOp {
-            serial_id,
-            data: deposit_op.try_get_priority_op().unwrap(),
-            deadline_block: 0,
-            eth_hash: H256::default(),
-            eth_block: 10,
-        },
-        op: deposit_op,
-        block_index,
-        created_at: Utc::now(),
-    };
-
-    ExecutedOperations::PriorityOp(Box::new(executed_op))
-}
-
 #[actix_rt::test]
 #[cfg_attr(
     not(feature = "api_test"),
@@ -240,7 +204,10 @@ async fn accounts_scope() -> anyhow::Result<()> {
         .await?
         .chain()
         .block_schema()
-        .save_block_transactions(1, vec![deposit_op])
+        .save_block_transactions(
+            1,
+            vec![ExecutedOperations::PriorityOp(Box::new(deposit_op))],
+        )
         .await?;
 
     // Get account operation receipts.

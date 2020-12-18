@@ -5,6 +5,7 @@ use std::str::FromStr;
 
 // External uses
 use actix_web::{web, App, Scope};
+use chrono::Utc;
 use once_cell::sync::Lazy;
 use tokio::sync::Mutex;
 
@@ -24,8 +25,9 @@ use zksync_types::{
     ethereum::OperationType,
     helpers::{apply_updates, closest_packable_fee_amount, closest_packable_token_amount},
     operations::{ChangePubKeyOp, TransferToNewOp},
-    AccountId, AccountMap, Action, Address, BlockNumber, ExecutedOperations, ExecutedTx, Token,
-    Transfer, TransferOp, ZkSyncOp, ZkSyncTx,
+    AccountId, AccountMap, Action, Address, BlockNumber, Deposit, DepositOp, ExecutedOperations,
+    ExecutedPriorityOp, ExecutedTx, PriorityOp, Token, Transfer, TransferOp, ZkSyncOp, ZkSyncTx,
+    H256,
 };
 
 // Local uses
@@ -388,7 +390,13 @@ impl TestServerConfig {
             NewExecutedPriorityOperation {
                 block_number: 2,
                 block_index: 2,
-                operation: Default::default(),
+                operation: serde_json::to_value(dummy_deposit_op(
+                    Address::default(),
+                    1,
+                    VERIFIED_OP_SERIAL_ID,
+                    2,
+                ))
+                .unwrap(),
                 from_account: Default::default(),
                 to_account: Default::default(),
                 priority_op_serialid: VERIFIED_OP_SERIAL_ID as i64,
@@ -403,7 +411,13 @@ impl TestServerConfig {
             NewExecutedPriorityOperation {
                 block_number: VERIFIED_BLOCKS_COUNT as i64 + 1,
                 block_index: 1,
-                operation: Default::default(),
+                operation: serde_json::to_value(dummy_deposit_op(
+                    Address::default(),
+                    1,
+                    COMMITTED_OP_SERIAL_ID,
+                    3,
+                ))
+                .unwrap(),
                 from_account: Default::default(),
                 to_account: Default::default(),
                 priority_op_serialid: COMMITTED_OP_SERIAL_ID as i64,
@@ -444,5 +458,36 @@ impl TestServerConfig {
         drop(inited_guard);
 
         Ok(())
+    }
+}
+
+/// Creates dummy deposit priority operation.
+pub fn dummy_deposit_op(
+    address: Address,
+    account_id: AccountId,
+    serial_id: u64,
+    block_index: u32,
+) -> ExecutedPriorityOp {
+    let deposit_op = ZkSyncOp::Deposit(Box::new(DepositOp {
+        priority_op: Deposit {
+            from: address,
+            token: 0,
+            amount: 1_u64.into(),
+            to: address,
+        },
+        account_id,
+    }));
+
+    ExecutedPriorityOp {
+        priority_op: PriorityOp {
+            serial_id,
+            data: deposit_op.try_get_priority_op().unwrap(),
+            deadline_block: 0,
+            eth_hash: H256::default(),
+            eth_block: 10,
+        },
+        op: deposit_op,
+        block_index,
+        created_at: Utc::now(),
     }
 }

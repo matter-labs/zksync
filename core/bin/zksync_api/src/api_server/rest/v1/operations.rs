@@ -10,14 +10,13 @@ use actix_web::{
     Scope,
 };
 use serde::{Deserialize, Serialize};
-use serde_json::Value;
 
 // Workspace uses
 use zksync_storage::{
     chain::operations::records::StoredExecutedPriorityOperation, ConnectionPool, QueryResult,
     StorageProcessor,
 };
-use zksync_types::{BlockNumber, H256};
+use zksync_types::{BlockNumber, ExecutedPriorityOp, H256};
 
 // Local uses
 use super::{
@@ -115,11 +114,10 @@ pub struct PriorityOpReceipt {
     pub index: Option<u32>,
 }
 
-#[derive(Debug, Deserialize, Serialize, Clone, PartialEq)]
+#[derive(Debug, Deserialize, Serialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct PriorityOpData {
-    // TODO Use stronly typed value here.
-    pub data: Value,
+    pub data: ExecutedPriorityOp,
     pub eth_hash: H256,
     pub serial_id: u64,
 }
@@ -194,7 +192,12 @@ impl PriorityOpQuery {
 impl From<StoredExecutedPriorityOperation> for PriorityOpData {
     fn from(v: StoredExecutedPriorityOperation) -> Self {
         Self {
-            data: v.operation,
+            data: serde_json::from_value(v.operation.clone()).unwrap_or_else(|err|
+                panic!(
+                    "Database provided an incorrect priority operation data: {:?}, an error occurred: {}",
+                    v.operation, err
+                )
+            ),
             eth_hash: H256::from_slice(&v.eth_hash),
             serial_id: v.priority_op_serialid as u64,
         }
@@ -263,6 +266,9 @@ pub fn api_scope(pool: ConnectionPool) -> Scope {
 #[cfg(test)]
 mod tests {
     use zksync_storage::test_data::dummy_ethereum_tx_hash;
+    use zksync_types::Address;
+
+    use crate::api_server::v1::test_utils::dummy_deposit_op;
 
     use super::{
         super::test_utils::{TestServerConfig, COMMITTED_OP_SERIAL_ID, VERIFIED_OP_SERIAL_ID},
@@ -281,71 +287,82 @@ mod tests {
         let (client, server) = cfg.start_server(|cfg| api_scope(cfg.pool.clone()));
 
         // Check verified priority operation.
-        let expected_data = PriorityOpData {
-            data: Default::default(),
-            serial_id: VERIFIED_OP_SERIAL_ID,
-            eth_hash: dummy_ethereum_tx_hash(VERIFIED_OP_SERIAL_ID as i64),
-        };
+
+        let verified_op_hash = dummy_ethereum_tx_hash(VERIFIED_OP_SERIAL_ID as i64);
+
         let expected_receipt = PriorityOpReceipt {
             index: Some(2),
             status: TxReceipt::Verified { block: 2 },
         };
-
         assert_eq!(
             client.priority_op(VERIFIED_OP_SERIAL_ID).await?.as_ref(),
             Some(&expected_receipt)
         );
         assert_eq!(
-            client.priority_op(expected_data.eth_hash).await?.as_ref(),
+            client.priority_op(verified_op_hash).await?.as_ref(),
             Some(&expected_receipt)
         );
+
+        let expected_data = PriorityOpData {
+            data: dummy_deposit_op(Address::default(), 1, 15, 2),
+            serial_id: VERIFIED_OP_SERIAL_ID,
+            eth_hash: verified_op_hash,
+        };
+
         assert_eq!(
             client
                 .priority_op_data(VERIFIED_OP_SERIAL_ID)
                 .await?
-                .as_ref(),
-            Some(&expected_data)
+                .as_ref()
+                .unwrap()
+                .serial_id,
+            expected_data.serial_id
         );
         assert_eq!(
             client
-                .priority_op_data(expected_data.eth_hash)
+                .priority_op_data(verified_op_hash)
                 .await?
-                .as_ref(),
-            Some(&expected_data)
+                .unwrap()
+                .eth_hash,
+            expected_data.eth_hash
         );
 
         // Check committed priority operation.
-        let expected_data = PriorityOpData {
-            data: Default::default(),
-            serial_id: COMMITTED_OP_SERIAL_ID,
-            eth_hash: dummy_ethereum_tx_hash(COMMITTED_OP_SERIAL_ID as i64),
-        };
+        let committed_eth_hash = dummy_ethereum_tx_hash(COMMITTED_OP_SERIAL_ID as i64);
+
         let expected_receipt = PriorityOpReceipt {
             index: Some(1),
             status: TxReceipt::Committed { block: 4 },
         };
-
         assert_eq!(
             client.priority_op(COMMITTED_OP_SERIAL_ID).await?.as_ref(),
             Some(&expected_receipt)
         );
         assert_eq!(
-            client.priority_op(expected_data.eth_hash).await?.as_ref(),
+            client.priority_op(committed_eth_hash).await?.as_ref(),
             Some(&expected_receipt)
         );
+
+        let expected_data = PriorityOpData {
+            data: dummy_deposit_op(Address::default(), 1, 16, 3),
+            serial_id: COMMITTED_OP_SERIAL_ID,
+            eth_hash: committed_eth_hash,
+        };
         assert_eq!(
             client
                 .priority_op_data(COMMITTED_OP_SERIAL_ID)
                 .await?
-                .as_ref(),
-            Some(&expected_data)
+                .unwrap()
+                .eth_hash,
+            expected_data.eth_hash
         );
         assert_eq!(
             client
-                .priority_op_data(expected_data.eth_hash)
+                .priority_op_data(committed_eth_hash)
                 .await?
-                .as_ref(),
-            Some(&expected_data)
+                .unwrap()
+                .serial_id,
+            expected_data.serial_id
         );
 
         // Try to get non-existing priority operation.
