@@ -193,7 +193,7 @@ pub struct FeeTickerOptions {
     pub disabled_tokens: HashSet<Address>,
     /// Tokens for which subsidies are disabled.
     pub not_subsidized_tokens: HashSet<Address>,
-    /// Number of tickers for load balancing
+    /// Number of tickers for load balancing.
     pub number_of_ticker_actors: u8,
 }
 
