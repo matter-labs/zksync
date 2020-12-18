@@ -200,7 +200,7 @@ where
 
             aggregated_hash = self.hasher.compress(&lhs, &rhs, level);
         }
-        return proof_index == element_index && aggregated_hash == self.root_hash();
+        proof_index == element_index && aggregated_hash == self.root_hash()
     }
 
     /// Returns the Merkle root hash of the tree. This operation is O(1).
