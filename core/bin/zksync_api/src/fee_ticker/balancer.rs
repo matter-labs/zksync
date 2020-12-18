@@ -19,8 +19,8 @@ use crate::{
 
 static TICKER_CHANNEL_SIZE: usize = 32000;
 
-/// TickerBalancer is the point to scale the ticker
-/// Create n numbers of tickers and balance the load between tickers
+/// `TickerBalancer` is a struct used for scaling the ticker.
+/// Create `n` tickers and balance the load between them.
 pub(crate) struct TickerBalancer<API: TokenPriceAPI, INFO> {
     tickers: Vec<FeeTicker<TickerApi<API>, INFO>>,
     channels: Vec<Sender<TickerRequest>>,
