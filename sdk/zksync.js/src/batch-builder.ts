@@ -59,7 +59,7 @@ export class BatchBuilder {
                     this.changePubKeyTx.newPkHash,
                     this.changePubKeyTx.nonce,
                     this.wallet.accountId,
-                    batchHash.slice(2)
+                    batchHash
                 )
             );
             // It is necessary to store the hash, so the signature can be verified on smart contract.

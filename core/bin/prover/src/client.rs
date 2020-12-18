@@ -1,14 +1,14 @@
 // Built-in deps
-use crate::auth_utils::AuthTokenGenerator;
-use futures::Future;
-use std::str::FromStr;
-use std::time::{self, Duration};
+use std::time::Duration;
 // External deps
+use anyhow::format_err;
 use backoff::future::FutureOperation;
+use backoff::Error::Transient;
+use futures::Future;
 use log::*;
 use reqwest::Url;
 // Workspace deps
-use anyhow::format_err;
+use crate::auth_utils::AuthTokenGenerator;
 use zksync_prover_utils::api::{
     ProverId, ProverInputRequest, ProverInputResponse, ProverOutputRequest, ProverStopped,
     WorkingOn,
@@ -22,7 +22,7 @@ pub struct ApiClient {
     stopped_url: Url,
     // Client keeps connection pool inside, so it is recommended to reuse it (see docstring for reqwest::Client)
     http_client: reqwest::Client,
-    // A generator that create the authentication token upon request to any endpoint
+    // A generator that create the authentication token upon request to any endpoint.
     auth_token_generator: AuthTokenGenerator,
 }
 
@@ -50,6 +50,7 @@ impl ApiClient {
         }
     }
 
+    /// Repeats the function execution on the exponential backoff principle.
     async fn with_retries<I, E, Fn, Fut>(&self, operation: Fn) -> anyhow::Result<I>
     where
         Fn: FnMut() -> Fut,
@@ -68,9 +69,15 @@ impl ApiClient {
         operation
             .retry_notify(Self::get_backoff(), notify)
             .await
-            .map_err(|_| anyhow::anyhow!("TODO!"))
+            .map_err(|e| {
+                format_err!(
+                    "Prover can't reach server, for the max elapsed time of the backoff: {}",
+                    e
+                )
+            })
     }
 
+    /// Returns default prover options for backoff configuration.
     fn get_backoff() -> backoff::ExponentialBackoff {
         let mut backoff = backoff::ExponentialBackoff::default();
         backoff.current_interval = Duration::from_secs(1);
@@ -91,52 +98,72 @@ impl ApiClient {
 #[async_trait::async_trait]
 impl crate::ApiClient for ApiClient {
     async fn get_job(&self, req: ProverInputRequest) -> anyhow::Result<ProverInputResponse> {
-        let func = (|| async {
+        let operation = (|| async {
+            trace!("get prover job");
+
             let response = self
                 .http_client
                 .get(self.get_job_url.clone())
+                .bearer_auth(&self.get_encoded_token()?)
                 .json(&req)
                 .send()
-                .await?;
-            response.json().await.map_err(backoff::Error::Transient)
+                .await
+                .map_err(|e| format_err!("failed to send working on request: {}", e))?;
+
+            response
+                .json()
+                .await
+                .map_err(|e| Transient(format_err!("failed parse json on get job request: {}", e)))
         });
 
-        self.with_retries(func).await
+        self.with_retries(operation).await
     }
 
     async fn working_on(&self, job_id: i32, prover_name: &str) -> anyhow::Result<()> {
-        let func = (|| async {
-            self.http_client
-                .post(self.working_on_url.clone())
-                .json(&WorkingOn {
-                    job_id,
-                    prover_name: prover_name.to_string(),
-                })
-                .send()
-                .await?;
-            Ok(())
-        });
-        self.with_retries(func).await
+        trace!(
+            "sending working_on job_id: {}, prover_name: {}",
+            job_id,
+            prover_name
+        );
+
+        self.http_client
+            .post(self.working_on_url.clone())
+            .bearer_auth(&self.get_encoded_token()?)
+            .json(&WorkingOn {
+                job_id,
+                prover_name: prover_name.to_string(),
+            })
+            .send()
+            .await
+            .map_err(|e| format_err!("failed to send working_on request: {}", e))?;
+        Ok(())
     }
 
     async fn publish(&self, data: ProverOutputRequest) -> anyhow::Result<()> {
-        let func = (|| async {
+        let operation = (|| async {
+            trace!("Trying publish proof: {:?}", data);
+
             self.http_client
                 .post(self.publish_url.clone())
+                .bearer_auth(&self.get_encoded_token()?)
                 .json(&data)
                 .send()
-                .await?;
+                .await
+                .map_err(|e| format_err!("failed to send publish request: {}", e))?;
             Ok(())
         });
-        self.with_retries(func).await
+
+        self.with_retries(operation).await
     }
 
     async fn prover_stopped(&self, prover_id: ProverId) -> anyhow::Result<()> {
         self.http_client
             .post(self.stopped_url.clone())
+            .bearer_auth(&self.get_encoded_token()?)
             .json(&ProverStopped { prover_id })
             .send()
-            .await?;
+            .await
+            .map_err(|e| format_err!("failed to send prover_stopped request: {}", e))?;
         Ok(())
     }
 }

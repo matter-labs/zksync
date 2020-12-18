@@ -49,6 +49,8 @@ async function main() {
                 await governanceAddToken(token);
             }
         });
+
+    program.parse(process.argv);
 }
 
 main();

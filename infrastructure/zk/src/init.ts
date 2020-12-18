@@ -20,10 +20,10 @@ export async function init() {
     await db.setup();
     await contract.build();
     await run.deployERC20('dev');
-    await run.governanceAddERC20('dev');
     await run.deployEIP1271();
     await server.genesis();
     await contract.redeploy();
+    await run.governanceAddERC20('dev');
 }
 
 async function checkEnv() {
