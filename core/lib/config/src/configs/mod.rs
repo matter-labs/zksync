@@ -1,8 +1,8 @@
 // Public re-exports
 pub use self::{
-    api::ApiConfig, chain::ChainConfig, db::DBConfig, eth_client::ETHClientConfig,
-    eth_sender::ETHSenderConfig, eth_watch::ETHWatchConfig, misc::MiscConfig, prover::ProverConfig,
-    ticker::TickerConfig,
+    api::ApiConfig, chain::ChainConfig, contracts::ContractsConfig, db::DBConfig,
+    eth_client::ETHClientConfig, eth_sender::ETHSenderConfig, eth_watch::ETHWatchConfig,
+    misc::MiscConfig, prover::ProverConfig, ticker::TickerConfig,
 };
 
 pub mod api;

@@ -7,7 +7,7 @@ use handlebars::to_json;
 use handlebars::Handlebars;
 
 use crate::verifier_contract_generator::render_vk::rendered_key;
-use zksync_config::AvailableBlockSizesConfig;
+use zksync_config::configs::ChainConfig;
 use zksync_prover_utils::fs_utils::{
     get_block_verification_key_path, get_exodus_verification_key_path,
     get_verifier_contract_key_path,
@@ -18,16 +18,17 @@ mod render_vk;
 
 /// Creates verifier contract compatible with our main contract using generated verification keys.
 /// Contract is created from the template using `handlebars` crate.
-pub(crate) fn create_verifier_contract(config: AvailableBlockSizesConfig) {
+pub(crate) fn create_verifier_contract(config: ChainConfig) {
     let template = &std::fs::read_to_string(get_verifier_template_file())
         .expect("failed to read Verifier template file");
     let mut template_params = HashMap::new();
 
-    let sizes = to_json(config.blocks_chunks.clone());
+    let sizes = to_json(config.circuit.supported_block_chunks_sizes.clone());
     template_params.insert("chunks".to_string(), sizes);
 
     let mut templates_for_key_getters = config
-        .blocks_chunks
+        .circuit
+        .supported_block_chunks_sizes
         .into_iter()
         .map(|block_chunks| {
             let key_getter_name = format!("getVkBlock{}", block_chunks);

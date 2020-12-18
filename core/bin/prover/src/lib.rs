@@ -17,7 +17,7 @@ use std::{
 // External deps
 use zksync_crypto::rand::Rng;
 // Workspace deps
-use zksync_config::ProverOptions;
+use zksync_config::configs::ProverConfig as EnvProverConfig;
 use zksync_crypto::{proof::EncodedProofPlonk, Engine};
 
 const ABSENT_PROVER_ID: i32 = -1;
@@ -147,7 +147,7 @@ fn run_rounds<PROVER: ProverImpl<CLIENT>, CLIENT: ApiClient>(
     shutdown_request: ShutdownRequest,
 ) -> BabyProverError {
     log::info!("Running worker rounds");
-    let cycle_wait_interval = ProverOptions::from_env().cycle_wait;
+    let cycle_wait_interval = EnvProverConfig::from_env().prover.cycle_wait();
 
     loop {
         if shutdown_request.get() {

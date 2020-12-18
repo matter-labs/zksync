@@ -5911,7 +5911,6 @@ dependencies = [
  "sqlx",
  "tokio 0.2.22",
  "zksync_basic_types",
- "zksync_config",
  "zksync_crypto",
  "zksync_test_account",
  "zksync_types",
