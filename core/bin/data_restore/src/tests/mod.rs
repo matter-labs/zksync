@@ -66,7 +66,7 @@ fn create_deposit(from: Address, to: Address, amount: u32) -> ExecutedOperations
         serial_id: 0,
         data: deposit_op.try_get_priority_op().unwrap(),
         deadline_block: 0,
-        eth_hash: vec![],
+        eth_hash: H256::zero(),
         eth_block: 0,
     };
     let executed_deposit_op = ExecutedPriorityOp {
