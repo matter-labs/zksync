@@ -79,8 +79,7 @@ describe(`ZkSync integration tests (token: ${token}, transport: ${transport})`, 
     step('should test multi-transfers', async () => {
         await tester.testBatch(alice, bob, token, TX_AMOUNT);
         await tester.testIgnoredBatch(alice, bob, token, TX_AMOUNT);
-        // TODO: With subsidized costs, this test fails on CI due to low gas prices and high allowance. (ZKS-138)
-        // await tester.testFailedBatch(alice, bob, token, TX_AMOUNT);
+        await tester.testRejectedBatch(alice, bob, token, TX_AMOUNT);
     });
 
     step('should execute a withdrawal', async () => {

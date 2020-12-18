@@ -107,9 +107,10 @@ where
     /// via `Wallet::start_change_pubkey` method.
     pub async fn is_signing_key_set(&self) -> Result<bool, ClientError> {
         let account_info = self.provider.account_info(self.address()).await?;
+        let signer_pub_key_hash = self.signer.pubkey_hash();
 
-        let key_set =
-            account_info.id.is_some() && account_info.committed.pub_key_hash != Default::default();
+        let key_set = account_info.id.is_some()
+            && &account_info.committed.pub_key_hash == signer_pub_key_hash;
         Ok(key_set)
     }
 

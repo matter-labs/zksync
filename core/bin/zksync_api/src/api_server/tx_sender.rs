@@ -584,17 +584,65 @@ async fn verify_txs_batch_signature(
 /// We calculate both `provided_fee * 1.05` and `provided_fee + 1 cent` and choose the maximum.
 /// This is required since the price may change between signing the transaction and sending it to the server.
 fn scale_user_fee_up(provided_total_usd_fee: BigDecimal) -> BigDecimal {
+    let one_cent = BigDecimal::from_str("0.01").unwrap();
+
+    // This formula is needed when the fee is really small.
+    //
+    // We don't compare it with any of the following scaled numbers, because
+    // a) Scaling by two (100%) is always greater than scaling by 5%.
+    // b) It is intended as a smaller substitute for 1 cent scaling when
+    // scaling by 1 cent means scaling more than 2x.
+    if provided_total_usd_fee < one_cent {
+        let scaled_by_two_provided_fee_in_usd = provided_total_usd_fee * BigDecimal::from(2u32);
+
+        return scaled_by_two_provided_fee_in_usd;
+    }
+
     // Scale by 5%.
     let scaled_percent_provided_fee_in_usd =
         provided_total_usd_fee.clone() * BigDecimal::from(105u32) / BigDecimal::from(100u32);
 
     // Scale by 1 cent.
-    let scaled_one_cent_provided_fee_in_usd =
-        provided_total_usd_fee + BigDecimal::from_str("0.01").unwrap();
+    let scaled_one_cent_provided_fee_in_usd = provided_total_usd_fee + one_cent;
 
     // Choose the maximum of these two values.
     std::cmp::max(
         scaled_percent_provided_fee_in_usd,
         scaled_one_cent_provided_fee_in_usd,
     )
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_scaling_user_fee_by_two() {
+        let provided_fee = BigDecimal::from_str("0.005").unwrap();
+        let provided_fee_scaled_by_two = BigDecimal::from_str("0.01").unwrap();
+
+        let scaled_fee = scale_user_fee_up(provided_fee);
+
+        assert_eq!(provided_fee_scaled_by_two, scaled_fee);
+    }
+
+    #[test]
+    fn test_scaling_user_fee_by_one_cent() {
+        let provided_fee = BigDecimal::from_str("0.015").unwrap();
+        let provided_fee_scaled_by_cent = BigDecimal::from_str("0.025").unwrap();
+
+        let scaled_fee = scale_user_fee_up(provided_fee);
+
+        assert_eq!(provided_fee_scaled_by_cent, scaled_fee);
+    }
+
+    #[test]
+    fn test_scaling_user_fee_by_5_percent() {
+        let provided_fee = BigDecimal::from_str("0.30").unwrap();
+        let provided_fee_scaled_by_five_percent = BigDecimal::from_str("0.315").unwrap();
+
+        let scaled_fee = scale_user_fee_up(provided_fee);
+
+        assert_eq!(provided_fee_scaled_by_five_percent, scaled_fee);
+    }
 }

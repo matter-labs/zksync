@@ -163,8 +163,16 @@ impl<W: EthClient, S: Storage> EthWatch<W, S> {
     async fn process_new_blocks(&mut self, last_ethereum_block: u64) -> anyhow::Result<()> {
         debug_assert!(self.eth_state.last_ethereum_block() < last_ethereum_block);
 
+        // We have to process every block between the current and previous known values.
+        // This is crucial since `eth_watch` may enter the backoff mode in which it will skip many blocks.
+        // Note that we don't have to add `number_of_confirmations_for_event` here, because the check function takes
+        // care of it on its own. Here we calculate "how many blocks should we watch", and the offsets with respect
+        // to the `number_of_confirmations_for_event` are calculated by `update_eth_state`.
+        let block_difference =
+            last_ethereum_block.saturating_sub(self.eth_state.last_ethereum_block());
+
         let (unconfirmed_queue, received_priority_queue) = self
-            .update_eth_state(last_ethereum_block, self.number_of_confirmations_for_event)
+            .update_eth_state(last_ethereum_block, block_difference)
             .await?;
 
         // Extend the existing priority operations with the new ones.
@@ -193,12 +201,12 @@ impl<W: EthClient, S: Storage> EthWatch<W, S> {
     async fn update_eth_state(
         &mut self,
         current_ethereum_block: u64,
-        depth_of_last_approved_block: u64,
+        unprocessed_blocks_amount: u64,
     ) -> anyhow::Result<(Vec<PriorityOp>, HashMap<u64, ReceivedPriorityOp>)> {
         let new_block_with_accepted_events =
             current_ethereum_block.saturating_sub(self.number_of_confirmations_for_event);
         let previous_block_with_accepted_events =
-            new_block_with_accepted_events.saturating_sub(depth_of_last_approved_block);
+            new_block_with_accepted_events.saturating_sub(unprocessed_blocks_amount);
 
         self.update_withdrawals(
             previous_block_with_accepted_events,
