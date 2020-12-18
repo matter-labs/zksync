@@ -5,7 +5,7 @@ use super::ZkSyncOp;
 use super::{AccountId, BlockNumber, Fr};
 use crate::SignedZkSyncTx;
 use chrono::Utc;
-use chrono::{DateTime, NaiveDateTime, TimeZone};
+use chrono::{DateTime, TimeZone};
 use parity_crypto::digest::sha256;
 use parity_crypto::Keccak256;
 use serde::{Deserialize, Serialize};

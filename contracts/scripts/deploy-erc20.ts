@@ -46,12 +46,12 @@ async function main() {
 
     program
         .command('add')
-        .option('-n, --name <name>')
+        .option('-n, --token_name <token_name>')
         .option('-s, --symbol <symbol>')
         .option('-d, --decimals <decimals>')
         .description('Adds a new token with a given fields')
-        .action(async (name: string, symbol: string, decimals: number) => {
-            const token: Token = { address: null, name, symbol, decimals };
+        .action(async (token_name: string, symbol: string, decimals: number) => {
+            const token: Token = { address: null, name: token_name, symbol, decimals };
             console.log(JSON.stringify(deployToken(token), null, 2));
         });
 

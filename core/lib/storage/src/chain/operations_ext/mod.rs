@@ -15,7 +15,6 @@ use self::records::{
 };
 use crate::{
     chain::operations::{records::StoredExecutedPriorityOperation, OperationsSchema},
-    prover::{records::ProverRun, ProverSchema},
     tokens::TokensSchema,
     QueryResult, StorageProcessor,
 };

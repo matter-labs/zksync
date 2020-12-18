@@ -1,7 +1,7 @@
 use crate::block::Block;
 use ethabi::Token;
 use serde::{Deserialize, Serialize};
-use zksync_basic_types::{BlockNumber, H256, U256};
+use zksync_basic_types::{BlockNumber, U256};
 use zksync_crypto::proof::EncodedAggregatedProof;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

@@ -21,7 +21,6 @@ use crate::{
         },
         OperationsSchema,
     },
-    prover::ProverSchema,
     QueryResult, StorageProcessor,
 };
 

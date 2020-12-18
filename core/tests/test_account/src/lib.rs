@@ -6,7 +6,9 @@ use num::BigUint;
 use zksync_basic_types::H256;
 use zksync_crypto::rand::{thread_rng, Rng};
 use zksync_crypto::{priv_key_from_fs, PrivateKey};
-use zksync_types::tx::{ChangePubKey, PackedEthSignature, TxSignature};
+use zksync_types::tx::{
+    ChangePubKey, ChangePubKeyECDSAData, ChangePubKeyEthAuthData, PackedEthSignature, TxSignature,
+};
 use zksync_types::{
     AccountId, Address, Close, ForcedExit, Nonce, PubKeyHash, TokenId, Transfer, Withdraw,
 };
@@ -257,23 +259,24 @@ impl ZkSyncAccount {
             &self.private_key,
         )
         .expect("Can't sign ChangePubKey operation");
-        change_pubkey.eth_signature = if auth_onchain {
-            None
+        change_pubkey.eth_auth_data = if auth_onchain {
+            ChangePubKeyEthAuthData::Onchain
         } else {
             let sign_bytes = change_pubkey
                 .get_eth_signed_data()
                 .expect("Failed to construct change pubkey signed message.");
             let eth_signature = PackedEthSignature::sign(&self.eth_private_key, &sign_bytes)
                 .expect("Signature should succeed");
-            Some(eth_signature)
+            ChangePubKeyEthAuthData::ECDSA(ChangePubKeyECDSAData {
+                eth_signature,
+                batch_hash: H256::zero(),
+            })
         };
 
-        if !auth_onchain {
-            assert!(
-                change_pubkey.verify_eth_signature() == Some(self.address),
-                "eth signature is incorrect"
-            );
-        }
+        assert!(
+            change_pubkey.is_eth_auth_data_valid(),
+            "eth auth data is incorrect"
+        );
 
         if increment_nonce {
             *stored_nonce += 1;

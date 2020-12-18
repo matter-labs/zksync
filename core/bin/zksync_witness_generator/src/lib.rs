@@ -17,7 +17,6 @@ use serde::{Deserialize, Serialize};
 // Workspace deps
 use zksync_config::ProverOptions;
 use zksync_storage::{ConnectionPool, StorageProcessor};
-use zksync_types::BlockNumber;
 // Local deps
 use self::scaler::ScalerOracle;
 use zksync_circuit::serialization::ProverData;
@@ -153,28 +152,6 @@ async fn get_job(
             data: None,
         }))
     }
-}
-
-async fn prover_data(
-    data: web::Data<AppState>,
-    block: web::Json<BlockNumber>,
-) -> actix_web::Result<HttpResponse> {
-    log::trace!("Got request for prover_data for block {}", *block);
-    let mut storage = data
-        .access_storage()
-        .await
-        .map_err(actix_web::error::ErrorInternalServerError)?;
-    let witness = match storage.prover_schema().get_witness(block.0).await {
-        Ok(witness) => witness,
-        Err(_) => return Ok(HttpResponse::InternalServerError().finish()),
-    };
-    if witness.is_some() {
-        log::info!("Sent prover_data for block {}", *block);
-    } else {
-        // No witness, we should just wait
-        log::warn!("No witness for block {}", *block);
-    }
-    Ok(HttpResponse::Ok().json(witness))
 }
 
 async fn working_on(
@@ -457,7 +434,7 @@ pub fn run_prover_server(
                         idle_provers,
                     );
 
-                    let auth = HttpAuthentication::bearer(move |req, credentials| async {
+                    let _auth = HttpAuthentication::bearer(move |req, credentials| async {
                         let secret_auth = req
                             .app_data::<web::Data<AppState>>()
                             .expect("failed get AppState upon receipt of the authentication token")

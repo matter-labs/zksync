@@ -593,15 +593,6 @@ async fn verify_tx_info_message_signature(
     send_verify_request_and_recv(request, req_channel, receiever).await
 }
 
-pub(crate) fn get_batch_sign_message<'a, I: Iterator<Item = &'a ZkSyncTx>>(txs: I) -> Vec<u8> {
-    tiny_keccak::keccak256(
-        txs.flat_map(|tx| tx.get_bytes())
-            .collect::<Vec<u8>>()
-            .as_slice(),
-    )
-    .to_vec()
-}
-
 /// Send a request for Ethereum signature verification and wait for the response.
 /// Unlike in case of `verify_tx_info_message_signature`, we do not require
 /// every transaction from the batch to be signed. The signature must be obtained

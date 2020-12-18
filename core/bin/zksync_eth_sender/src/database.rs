@@ -202,8 +202,8 @@ impl DatabaseInterface for Database {
 
     async fn is_previous_operation_confirmed(
         &self,
-        connection: &mut StorageProcessor<'_>,
-        op: &ETHOperation,
+        _connection: &mut StorageProcessor<'_>,
+        _op: &ETHOperation,
     ) -> anyhow::Result<bool> {
         // TODO
         Ok(true)

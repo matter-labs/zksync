@@ -46,7 +46,7 @@ contract Storage {
     uint32 public numberOfPendingWithdrawals_DEPRECATED;
 
     /// @notice Total number of verified blocks i.e. blocks[totalBlocksVerified] points at the latest verified block (block 0 is genesis)
-    uint32 public totalBlocksVerified;
+    uint32 public totalBlocksExecuted;
 
     /// @notice Total number of committed blocks i.e. blocks[totalBlocksCommitted] points at the latest committed block
     uint32 public totalBlocksCommitted;
@@ -139,8 +139,8 @@ contract Storage {
     /// @notice Stored hashed StoredBlockInfo for some block number
     mapping(uint32 => bytes32) public storedBlockHashes;
 
-    /// @notice Total blocks proofed.
-    uint32 public totalBlocksProofed;
+    /// @notice Total blocks proven.
+    uint32 public totalBlocksProven;
 
     /// @notice Priority Operation container
     /// @member hashedPubData Hashed priority operation public data

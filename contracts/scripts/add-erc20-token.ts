@@ -8,7 +8,10 @@ const testConfigPath = path.join(process.env.ZKSYNC_HOME as string, `etc/test_co
 const ethTestConfig = JSON.parse(fs.readFileSync(`${testConfigPath}/eth.json`, { encoding: 'utf-8' }));
 const deployer = new Deployer({ deployWallet: ethers.Wallet.createRandom() });
 const provider = new ethers.providers.JsonRpcProvider(process.env.WEB3_URL);
-const governorWallet = Wallet.fromMnemonic(ethTestConfig.mnemonic, "m/44'/60'/0'/0/1").connect(provider);
+const governorWallet = Wallet.fromMnemonic(
+    process.env.MNEMONIC ? process.env.MNEMONIC : ethTestConfig.mnemonic,
+    "m/44'/60'/0'/0/1"
+).connect(provider);
 
 async function governanceAddToken(address: string) {
     console.log('Adding new ERC20 token to network: ', address);
@@ -33,7 +36,7 @@ async function main() {
 
     program
         .command('add')
-        .option('-a, --address <address>')
+        .option('--address <address>')
         .description('Adds a new token with a given address')
         .action(async (address: string) => {
             await governanceAddToken(address);
@@ -47,6 +50,21 @@ async function main() {
 
             for (const token of tokens) {
                 await governanceAddToken(token);
+            }
+        });
+
+    program
+        .command('add-multi-current-network')
+        .description('Adds a multiple tokens for current network')
+        .action(async () => {
+            const tokens = JSON.parse(
+                fs.readFileSync(`${process.env.ZKSYNC_HOME}/etc/tokens/${process.env.ETH_NETWORK}.json`, {
+                    encoding: 'utf-8'
+                })
+            );
+
+            for (const token of tokens) {
+                await governanceAddToken(token.address);
             }
         });
 

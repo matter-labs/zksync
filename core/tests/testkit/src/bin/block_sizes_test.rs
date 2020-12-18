@@ -1,7 +1,6 @@
 //! Block sizes test is used to create blocks of all available sizes, make proofs of them and verify onchain
 
 use log::info;
-use std::io::Write;
 use std::time::Instant;
 use web3::transports::Http;
 use zksync_circuit::witness::utils::build_block_witness;
@@ -11,14 +10,13 @@ use zksync_crypto::params::account_tree_depth;
 use zksync_prover_utils::aggregated_proofs::{gen_aggregate_proof, prepare_proof_data};
 use zksync_prover_utils::{PlonkVerificationKey, SetupForStepByStepProver};
 use zksync_testkit::eth_account::EthereumAccount;
-use zksync_testkit::external_commands::{deploy_contracts, get_test_accounts, js_revert_reason};
+use zksync_testkit::external_commands::{deploy_contracts, get_test_accounts};
 use zksync_testkit::zksync_account::ZkSyncAccount;
 use zksync_testkit::{
     genesis_state, spawn_state_keeper, AccountSet, ETHAccountId, TestSetup, TestkitConfig, Token,
     ZKSyncAccountId,
 };
 use zksync_types::aggregated_operations::BlocksProofOperation;
-use zksync_types::block::Block;
 use zksync_types::{DepositOp, U256};
 
 #[tokio::main]
@@ -150,7 +148,7 @@ async fn main() {
             proofs.push((proof.clone(), block_size));
         }
         let (vks, proof_data) = prepare_proof_data(&block_chunk_sizes, proofs);
-        let mut aggreagated_proof =
+        let aggreagated_proof =
             gen_aggregate_proof(vks, proof_data, &aggregated_proof_sizes, false)
                 .expect("Failed to generate aggreagated proof");
 
@@ -224,7 +222,7 @@ async fn main() {
         }
 
         let (vks, proof_data) = prepare_proof_data(&block_chunk_sizes, proofs);
-        let mut aggreagated_proof =
+        let aggreagated_proof =
             gen_aggregate_proof(vks, proof_data, &aggregated_proof_sizes, false)
                 .expect("Failed to generate aggreagated proof");
         // aggreagated_proof.individual_vk_inputs = block_commitments;

@@ -35,6 +35,18 @@ export async function getDefaultProvider(network: Network, transport: 'WS' | 'HT
         } else if (transport === 'HTTP') {
             return await Provider.newHttpProvider('https://rinkeby-api.zksync.io/jsrpc');
         }
+    } else if (network === 'ropsten-beta') {
+        if (transport === 'WS') {
+            return await Provider.newWebsocketProvider('wss://ropsten-beta-api.zksync.io/jsrpc-ws');
+        } else if (transport === 'HTTP') {
+            return await Provider.newHttpProvider('https://ropsten-beta-api.zksync.io/jsrpc');
+        }
+    } else if (network === 'rinkeby-beta') {
+        if (transport === 'WS') {
+            return await Provider.newWebsocketProvider('wss://rinkeby-beta-api.zksync.io/jsrpc-ws');
+        } else if (transport === 'HTTP') {
+            return await Provider.newHttpProvider('https://rinkeby-beta-api.zksync.io/jsrpc');
+        }
     } else if (network === 'mainnet') {
         if (transport === 'WS') {
             return await Provider.newWebsocketProvider('wss://api.zksync.io/jsrpc-ws');

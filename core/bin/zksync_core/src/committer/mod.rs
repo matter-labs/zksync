@@ -1,7 +1,6 @@
 // Built-in uses
 use std::time::{Duration, Instant};
 // External uses
-use anyhow::format_err;
 use futures::channel::mpsc::{Receiver, Sender};
 use futures::{SinkExt, StreamExt};
 use serde::{Deserialize, Serialize};
@@ -9,10 +8,6 @@ use tokio::{task::JoinHandle, time};
 // Workspace uses
 use crate::mempool::MempoolRequest;
 use zksync_storage::ConnectionPool;
-use zksync_types::aggregated_operations::{
-    AggregatedActionType, AggregatedOperation, BlocksCommitOperation, BlocksCreateProofOperation,
-    BlocksExecuteOperation, BlocksProofOperation,
-};
 use zksync_types::{
     block::{Block, ExecutedOperations, PendingBlock},
     AccountUpdates, Action, BlockNumber, Operation,

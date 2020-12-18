@@ -382,7 +382,7 @@ impl<'a, 'c> EthereumSchema<'a, 'c> {
         let eth_op_id = EthereumSchema(&mut transaction).get_eth_op_id(hash).await?;
 
         // Set the `confirmed` and `final_hash` field of the entry.
-        let eth_op_id: i64 = sqlx::query!(
+        let _eth_op_id: i64 = sqlx::query!(
             "UPDATE eth_operations
                 SET confirmed = $1, final_hash = $2
                 WHERE id = $3

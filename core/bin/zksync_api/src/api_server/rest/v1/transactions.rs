@@ -409,14 +409,11 @@ mod tests {
     use num::BigUint;
     use zksync_storage::ConnectionPool;
     use zksync_test_account::ZkSyncAccount;
-    use zksync_types::{tokens::TokenLike, tx::PackedEthSignature, SignedZkSyncTx};
+    use zksync_types::{tokens::TokenLike, SignedZkSyncTx};
 
-    use super::{
-        super::test_utils::{TestServerConfig, TestTransactions},
-        *,
-    };
+    use super::{super::test_utils::TestServerConfig, *};
     use crate::{
-        api_server::helpers::try_parse_tx_hash,
+        // api_server::helpers::try_parse_tx_hash,
         core_api_client::CoreApiClient,
         fee_ticker::{Fee, OutputFeeType::Withdraw, TickerRequest},
         signature_checker::{VerifiedTx, VerifyTxSignatureRequest},
@@ -500,6 +497,7 @@ mod tests {
     struct TestServer {
         core_server: actix_web::test::TestServer,
         api_server: actix_web::test::TestServer,
+        #[allow(dead_code)]
         pool: ConnectionPool,
     }
 

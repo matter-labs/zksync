@@ -2,7 +2,7 @@ import { BigNumber, BigNumberish, Contract, ContractTransaction, ethers } from '
 import { ErrorCode } from '@ethersproject/logger';
 import { EthMessageSigner } from './eth-message-signer';
 import { ETHProxy, Provider } from './provider';
-import { Signer } from './signer';
+import { Create2WalletSigner, Signer } from './signer';
 import { BatchBuilder } from './batch-builder';
 import {
     AccountState,
@@ -18,7 +18,11 @@ import {
     SignedTransaction,
     Transfer,
     ForcedExit,
-    Withdraw
+    Withdraw,
+    ChangePubkeyTypes,
+    ChangePubKeyOnchain,
+    ChangePubKeyECSDA,
+    ChangePubKeyCREATE2
 } from './types';
 import {
     ERC20_APPROVE_TRESHOLD,
@@ -398,7 +402,7 @@ export class Wallet {
         feeToken: TokenLike;
         fee: BigNumberish;
         nonce: number;
-        onchainAuth: boolean;
+        ethAuthData: ChangePubKeyOnchain | ChangePubKeyECSDA | ChangePubKeyCREATE2;
     }): Promise<ChangePubKey> {
         if (!this.signer) {
             throw new Error('ZKSync signer is required for current pubkey calculation.');
@@ -413,7 +417,8 @@ export class Wallet {
             newPkHash: await this.signer.pubKeyHash(),
             nonce: changePubKey.nonce,
             feeTokenId,
-            fee: BigNumber.from(changePubKey.fee).toString()
+            fee: BigNumber.from(changePubKey.fee).toString(),
+            ethAuthData: changePubKey.ethAuthData
         });
 
         return changePubKeyTx;
@@ -423,18 +428,48 @@ export class Wallet {
         feeToken: TokenLike;
         fee: BigNumberish;
         nonce: number;
-        onchainAuth: boolean;
+        ethAuthType: ChangePubkeyTypes;
+        batchHash?: string;
     }): Promise<SignedTransaction> {
-        const changePubKeyTx = await this.getChangePubKey(changePubKey);
-
         const newPubKeyHash = await this.signer.pubKeyHash();
 
-        const changePubKeyMessage = getChangePubkeyMessage(newPubKeyHash, changePubKey.nonce, this.accountId);
-        const ethSignature = changePubKey.onchainAuth
-            ? null
-            : (await this.getEthMessageSignature(changePubKeyMessage)).signature;
+        let ethAuthData;
+        if (changePubKey.ethAuthType === 'Onchain') {
+            ethAuthData = {
+                type: 'Onchain'
+            };
+        } else if (changePubKey.ethAuthType === 'ECDSA') {
+            await this.setRequiredAccountIdFromServer('ChangePubKey authorized by ECDSA.');
+            const changePubKeyMessage = getChangePubkeyMessage(
+                newPubKeyHash,
+                changePubKey.nonce,
+                this.accountId,
+                changePubKey.batchHash
+            );
+            const ethSignature = (await this.getEthMessageSignature(changePubKeyMessage)).signature;
+            ethAuthData = {
+                type: 'ECDSA',
+                ethSignature,
+                batchHash: changePubKey.batchHash
+            };
+        } else if (changePubKey.ethAuthType === 'CREATE2') {
+            if (this.ethSigner instanceof Create2WalletSigner) {
+                const create2data = this.ethSigner.create2WalletData;
+                ethAuthData = {
+                    type: 'Onchain',
+                    creatorAddress: create2data.creatorAddress,
+                    saltArg: create2data.saltArg,
+                    codeHash: create2data.codeHash
+                };
+            } else {
+                throw new Error('CREATE2 wallet authentication is only available for CREATE2 wallets');
+            }
+        } else {
+            throw new Error('Unsupported SetSigningKey type');
+        }
 
-        changePubKeyTx.ethSignature = ethSignature;
+        const changePubkeyTxUnsigned = Object.assign(changePubKey, { ethAuthData });
+        const changePubKeyTx = await this.getChangePubKey(changePubkeyTxUnsigned);
 
         return {
             tx: changePubKeyTx
@@ -443,23 +478,19 @@ export class Wallet {
 
     async setSigningKey(changePubKey: {
         feeToken: TokenLike;
+        ethAuthType: ChangePubkeyTypes;
         fee?: BigNumberish;
         nonce?: Nonce;
-        onchainAuth?: boolean;
     }): Promise<Transaction> {
         changePubKey.nonce =
             changePubKey.nonce != null ? await this.getNonce(changePubKey.nonce) : await this.getNonce();
-
-        if (changePubKey.onchainAuth == null) {
-            changePubKey.onchainAuth = false;
-        }
 
         if (changePubKey.fee == null) {
             changePubKey.fee = 0;
 
             const feeType = {
                 ChangePubKey: {
-                    onchainPubkeyAuth: changePubKey.onchainAuth
+                    onchainPubkeyAuth: changePubKey.ethAuthType === 'Onchain'
                 }
             };
             const fullFee = await this.provider.getTransactionFee(feeType, this.address(), changePubKey.feeToken);

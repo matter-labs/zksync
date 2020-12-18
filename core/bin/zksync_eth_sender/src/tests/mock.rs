@@ -152,7 +152,7 @@ impl DatabaseInterface for MockDatabase {
 
     async fn restore_state(
         &self,
-        connection: &mut StorageProcessor<'_>,
+        _connection: &mut StorageProcessor<'_>,
     ) -> anyhow::Result<(VecDeque<ETHOperation>, Vec<(i64, AggregatedOperation)>)> {
         todo!()
         // Ok((
@@ -163,12 +163,12 @@ impl DatabaseInterface for MockDatabase {
 
     async fn save_new_eth_tx(
         &self,
-        connection: &mut StorageProcessor<'_>,
-        op_type: AggregatedActionType,
-        op: Option<(i64, AggregatedOperation)>,
-        deadline_block: i64,
-        used_gas_price: U256,
-        raw_tx: Vec<u8>,
+        _connection: &mut StorageProcessor<'_>,
+        _op_type: AggregatedActionType,
+        _op: Option<(i64, AggregatedOperation)>,
+        _deadline_block: i64,
+        _used_gas_price: U256,
+        _raw_tx: Vec<u8>,
     ) -> anyhow::Result<InsertedOperationResponse> {
         todo!()
         // let id = *(self.pending_op_id.read().await);
@@ -251,7 +251,7 @@ impl DatabaseInterface for MockDatabase {
     async fn confirm_operation(
         &self,
         _connection: &mut StorageProcessor<'_>,
-        hash: &H256,
+        _hash: &H256,
         _op: &ETHOperation,
     ) -> anyhow::Result<()> {
         todo!()
