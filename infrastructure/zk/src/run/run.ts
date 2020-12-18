@@ -19,7 +19,7 @@ export async function deployERC20(command: 'dev' | 'new', name?: string, symbol?
             ]' > ./etc/tokens/localhost.json`);
     } else if (command == 'new') {
         await utils.spawn(
-            `yarn --cwd contracts deploy-erc20 add --name ${name} --symbol ${symbol} --decimals ${decimals}`
+            `yarn --cwd contracts deploy-erc20 add --token_name ${name} --symbol ${symbol} --decimals ${decimals}`
         );
     }
 }

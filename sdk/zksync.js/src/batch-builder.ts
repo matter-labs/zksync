@@ -158,11 +158,11 @@ export class BatchBuilder {
             feeToken: changePubKey.feeToken,
             fee: fee,
             nonce: null,
-            onchainAuth: onchainAuth
+            ethAuthType: onchainAuth ? 'Onchain' : 'ECDSA'
         };
         const feeType = {
             ChangePubKey: {
-                onchainPubkeyAuth: _changePubKey.onchainAuth
+                onchainPubkeyAuth: onchainAuth
             }
         };
         this.txs.push({
@@ -214,7 +214,7 @@ export class BatchBuilder {
                     processedTxs.push(transfer);
                     break;
                 case 'ChangePubKey':
-                    const changePubKey = { tx: await this.wallet.getChangePubKey(tx.tx) };
+                    const changePubKey = { tx: (await this.wallet.signSetSigningKey(tx.tx)).tx as ChangePubKey };
                     const currentPubKeyHash = await this.wallet.getCurrentPubKeyHash();
                     if (currentPubKeyHash === changePubKey.tx.newPkHash) {
                         throw new Error('Current signing key is already set');
