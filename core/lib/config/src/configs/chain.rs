@@ -1,5 +1,7 @@
 /// External uses
 use serde::Deserialize;
+/// Built-in uses
+use std::time::Duration;
 // Local uses
 use crate::envy_load;
 
@@ -63,6 +65,13 @@ pub struct StateKeeper {
     pub fast_block_miniblock_iterations: u64,
 }
 
+impl StateKeeper {
+    /// Converts `self.miniblock_iteration_interval` into `Duration`.
+    pub fn miniblock_iteration_interval(&self) -> Duration {
+        Duration::from_millis(self.miniblock_iteration_interval)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -109,5 +118,16 @@ CHAIN_STATE_KEEPER_FAST_BLOCK_MINIBLOCK_ITERATIONS="5"
 
         let actual = ChainConfig::from_env();
         assert_eq!(actual, expected_config());
+    }
+
+    /// Checks the correctness of the config helper methods.
+    #[test]
+    fn methods() {
+        let config = expected_config();
+
+        assert_eq!(
+            config.state_keeper.miniblock_iteration_interval(),
+            Duration::from_millis(config.state_keeper.miniblock_iteration_interval)
+        );
     }
 }

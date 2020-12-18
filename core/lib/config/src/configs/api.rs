@@ -1,5 +1,7 @@
 /// External uses
 use serde::Deserialize;
+/// Built-in uses
+use std::net::SocketAddr;
 // Local uses
 use crate::envy_load;
 
@@ -56,6 +58,12 @@ pub struct AdminApi {
     pub secret_auth: String,
 }
 
+impl AdminApi {
+    pub fn bind_addr(&self) -> SocketAddr {
+        SocketAddr::new("0.0.0.0".parse().unwrap(), self.port)
+    }
+}
+
 #[derive(Debug, Deserialize, Clone, PartialEq)]
 pub struct ProverApi {
     /// Port to which the API server is listening.
@@ -66,6 +74,12 @@ pub struct ProverApi {
     pub secret_auth: String,
 }
 
+impl ProverApi {
+    pub fn bind_addr(&self) -> SocketAddr {
+        SocketAddr::new("0.0.0.0".parse().unwrap(), self.port)
+    }
+}
+
 #[derive(Debug, Deserialize, Clone, PartialEq)]
 pub struct PrivateApi {
     /// Port to which the API server is listening.
@@ -74,12 +88,24 @@ pub struct PrivateApi {
     pub url: String,
 }
 
+impl PrivateApi {
+    pub fn bind_addr(&self) -> SocketAddr {
+        SocketAddr::new("0.0.0.0".parse().unwrap(), self.port)
+    }
+}
+
 #[derive(Debug, Deserialize, Clone, PartialEq)]
 pub struct RestApi {
     /// Port to which the API server is listening.
     pub port: u16,
     /// URL to access API server.
     pub url: String,
+}
+
+impl RestApi {
+    pub fn bind_addr(&self) -> SocketAddr {
+        SocketAddr::new("0.0.0.0".parse().unwrap(), self.port)
+    }
 }
 
 #[derive(Debug, Deserialize, Clone, PartialEq)]
@@ -104,6 +130,7 @@ pub struct Prometheus {
 mod tests {
     use super::*;
     use crate::configs::test_utils::set_env;
+    use std::net::IpAddr;
 
     fn expected_config() -> ApiConfig {
         ApiConfig {
@@ -164,5 +191,29 @@ API_PROMETHEUS_PORT="3312"
 
         let actual = ApiConfig::from_env();
         assert_eq!(actual, expected_config());
+    }
+
+    /// Checks the correctness of the config helper methods.
+    #[test]
+    fn methods() {
+        let config = expected_config();
+        let bind_broadcast_addr: IpAddr = "0.0.0.0".parse().unwrap();
+
+        assert_eq!(
+            config.admin.bind_addr(),
+            SocketAddr::new(bind_broadcast_addr, config.admin.port)
+        );
+        assert_eq!(
+            config.prover.bind_addr(),
+            SocketAddr::new(bind_broadcast_addr, config.prover.port)
+        );
+        assert_eq!(
+            config.rest.bind_addr(),
+            SocketAddr::new(bind_broadcast_addr, config.rest.port)
+        );
+        assert_eq!(
+            config.private.bind_addr(),
+            SocketAddr::new(bind_broadcast_addr, config.private.port)
+        );
     }
 }

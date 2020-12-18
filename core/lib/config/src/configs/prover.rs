@@ -121,4 +121,33 @@ PROVER_WITNESS_GENERATOR_WITNESS_GENERATORS="2"
         let actual = ProverConfig::from_env();
         assert_eq!(actual, expected_config());
     }
+
+    /// Checks the correctness of the config helper methods.
+    #[test]
+    fn methods() {
+        let config = expected_config();
+
+        assert_eq!(
+            config.prover.heartbeat_interval(),
+            Duration::from_millis(config.prover.heartbeat_interval)
+        );
+        assert_eq!(
+            config.prover.cycle_wait(),
+            Duration::from_millis(config.prover.cycle_wait)
+        );
+        assert_eq!(
+            config.prover.request_timeout(),
+            Duration::from_secs(config.prover.request_timeout)
+        );
+
+        assert_eq!(
+            config.core.gone_timeout(),
+            Duration::from_millis(config.core.gone_timeout)
+        );
+
+        assert_eq!(
+            config.witness_generator.prepare_data_interval(),
+            Duration::from_millis(config.witness_generator.prepare_data_interval)
+        );
+    }
 }

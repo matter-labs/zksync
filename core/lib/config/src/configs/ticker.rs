@@ -79,4 +79,28 @@ FEE_TICKER_NOT_SUBSIDIZED_TOKENS="0x2b591e99afe9f32eaa6214f7b7629768c40eeb39,0x3
         let actual = TickerConfig::from_env();
         assert_eq!(actual, expected_config());
     }
+
+    /// Checks the correctness of the config helper methods.
+    #[test]
+    fn methods() {
+        const COINGECKO_URL: &str = "http://coingecko";
+        const COINMARKETCAP_URL: &str = "http://coinmarketcap";
+
+        let mut config = expected_config();
+
+        config.coingecko_base_url = COINGECKO_URL.into();
+        config.coinmarketcap_base_url = COINMARKETCAP_URL.into();
+
+        config.token_price_source = TokenPriceSource::CoinGecko;
+        assert_eq!(
+            config.price_source(),
+            (TokenPriceSource::CoinGecko, COINGECKO_URL)
+        );
+
+        config.token_price_source = TokenPriceSource::CoinMarketCap;
+        assert_eq!(
+            config.price_source(),
+            (TokenPriceSource::CoinMarketCap, COINMARKETCAP_URL)
+        );
+    }
 }

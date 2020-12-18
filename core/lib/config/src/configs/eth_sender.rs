@@ -1,3 +1,5 @@
+// Built-in uses
+use std::time::Duration;
 // External uses
 use serde::Deserialize;
 // Workspace uses
@@ -44,16 +46,35 @@ pub struct Sender {
     pub is_enabled: bool,
 }
 
+impl Sender {
+    /// Converts `self.tx_poll_period` into `Duration`.
+    pub fn tx_poll_period(&self) -> Duration {
+        Duration::from_secs(self.tx_poll_period)
+    }
+}
+
 #[derive(Debug, Deserialize, Clone, PartialEq)]
 pub struct GasLimit {
     /// Gas price limit to be used by GasAdjuster until the statistics data is gathered.
     pub default: u64,
     /// Interval between updates of the gas price limit (used by GasAdjuster) in seconds.
     pub update_interval: u64,
-    /// Interval between adding the Ethereum node gas price to the GasAdjuster (in seconds).
+    /// Interval between adding the Ethereum node gas price to the GasAdjuster in seconds.
     pub sample_interval: u64,
     /// Scale factor for gas price limit (used by GasAdjuster).
     pub scale_factor: f64,
+}
+
+impl GasLimit {
+    /// Converts `self.update_interval` into `Duration`.
+    pub fn update_interval(&self) -> Duration {
+        Duration::from_secs(self.update_interval)
+    }
+
+    /// Converts `self.sample_interval` into `Duration`.
+    pub fn sample_interval(&self) -> Duration {
+        Duration::from_secs(self.sample_interval)
+    }
 }
 
 #[cfg(test)]
@@ -102,5 +123,25 @@ ETH_SENDER_GAS_PRICE_LIMIT_SCALE_FACTOR="1"
 
         let actual = ETHSenderConfig::from_env();
         assert_eq!(actual, expected_config());
+    }
+
+    /// Checks the correctness of the config helper methods.
+    #[test]
+    fn methods() {
+        let config = expected_config();
+
+        assert_eq!(
+            config.sender.tx_poll_period(),
+            Duration::from_secs(config.sender.tx_poll_period)
+        );
+
+        assert_eq!(
+            config.gas_price_limit.update_interval(),
+            Duration::from_secs(config.gas_price_limit.update_interval)
+        );
+        assert_eq!(
+            config.gas_price_limit.sample_interval(),
+            Duration::from_secs(config.gas_price_limit.sample_interval)
+        );
     }
 }

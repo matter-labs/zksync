@@ -50,4 +50,15 @@ ETH_WATCH_ETH_NODE_POLL_INTERVAL="300"
         let actual = ETHWatchConfig::from_env();
         assert_eq!(actual, expected_config());
     }
+
+    /// Checks the correctness of the config helper methods.
+    #[test]
+    fn methods() {
+        let config = expected_config();
+
+        assert_eq!(
+            config.poll_interval(),
+            Duration::from_millis(config.eth_node_poll_interval)
+        );
+    }
 }
