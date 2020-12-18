@@ -4,7 +4,7 @@ use serde::Deserialize;
 use crate::envy_load;
 
 /// API configuration.
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Clone, PartialEq)]
 pub struct ApiConfig {
     /// Common configuration options for the API.
     pub common: Common,
@@ -37,7 +37,7 @@ impl ApiConfig {
 }
 
 // Common configuration options for the API
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Clone, PartialEq)]
 pub struct Common {
     // Size of LRU caches for requests
     pub caches_size: usize,
@@ -46,7 +46,7 @@ pub struct Common {
     pub forced_exit_minimum_account_age_secs: u64,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Clone, PartialEq)]
 pub struct AdminApi {
     /// Port to which the API server is listening.
     pub port: u16,
@@ -56,7 +56,7 @@ pub struct AdminApi {
     pub secret_auth: String,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Clone, PartialEq)]
 pub struct ProverApi {
     /// Port to which the API server is listening.
     pub port: u16,
@@ -66,7 +66,7 @@ pub struct ProverApi {
     pub secret_auth: String,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Clone, PartialEq)]
 pub struct PrivateApi {
     /// Port to which the API server is listening.
     pub port: u16,
@@ -74,7 +74,7 @@ pub struct PrivateApi {
     pub url: String,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Clone, PartialEq)]
 pub struct RestApi {
     /// Port to which the API server is listening.
     pub port: u16,
@@ -82,7 +82,7 @@ pub struct RestApi {
     pub url: String,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Clone, PartialEq)]
 pub struct JsonRpc {
     /// Port to which the HTTP RPC server is listening.
     pub http_port: u16,
@@ -94,8 +94,75 @@ pub struct JsonRpc {
     pub ws_url: String,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Clone, PartialEq)]
 pub struct Prometheus {
     /// Port to which the Prometheus exporter server is listening.
     pub port: u16,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::configs::test_utils::set_env;
+
+    fn expected_config() -> ApiConfig {
+        ApiConfig {
+            common: Common {
+                caches_size: 10_000,
+                forced_exit_minimum_account_age_secs: 0,
+            },
+            admin: AdminApi {
+                port: 8080,
+                url: "http://127.0.0.1:8080".into(),
+                secret_auth: "sample".into(),
+            },
+            rest: RestApi {
+                port: 3001,
+                url: "http://127.0.0.1:3001".into(),
+            },
+            json_rpc: JsonRpc {
+                http_port: 3030,
+                http_url: "http://127.0.0.1:3030".into(),
+                ws_port: 3031,
+                ws_url: "ws://127.0.0.1:3031".into(),
+            },
+            private: PrivateApi {
+                port: 8090,
+                url: "http://127.0.0.1:8090".into(),
+            },
+            prover: ProverApi {
+                port: 8088,
+                url: "http://127.0.0.1:8088".into(),
+                secret_auth: "sample".into(),
+            },
+            prometheus: Prometheus { port: 3312 },
+        }
+    }
+
+    #[test]
+    fn from_env() {
+        let config = r#"
+API_COMMON_CACHES_SIZE="10000"
+API_COMMON_FORCED_EXIT_MINIMUM_ACCOUNT_AGE_SECS="0"
+API_ADMIN_PORT="8080"
+API_ADMIN_URL="http://127.0.0.1:8080"
+API_ADMIN_SECRET_AUTH="sample"
+API_REST_PORT="3001"
+API_REST_URL="http://127.0.0.1:3001"
+API_JSON_RPC_HTTP_PORT="3030"
+API_JSON_RPC_HTTP_URL="http://127.0.0.1:3030"
+API_JSON_RPC_WS_PORT="3031"
+API_JSON_RPC_WS_URL="ws://127.0.0.1:3031"
+API_PRIVATE_PORT="8090"
+API_PRIVATE_URL="http://127.0.0.1:8090"
+API_PROVER_PORT="8088"
+API_PROVER_URL="http://127.0.0.1:8088"
+API_PROVER_SECRET_AUTH="sample"
+API_PROMETHEUS_PORT="3312"
+        "#;
+        set_env(config);
+
+        let actual = ApiConfig::from_env();
+        assert_eq!(actual, expected_config());
+    }
 }
