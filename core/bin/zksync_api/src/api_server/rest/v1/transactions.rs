@@ -189,7 +189,7 @@ struct FastProcessingQuery {
 }
 
 /// This structure has the same layout as [`SignedZkSyncTx`],
-/// expect that it uses "camelCase" for serialization.
+/// the only difference is that it uses "camelCase" for serialization.
 ///
 /// [`SignedZkSyncTx`]: zksync_types::SignedZkSyncTx
 #[derive(Debug, Serialize, Deserialize, Clone)]
