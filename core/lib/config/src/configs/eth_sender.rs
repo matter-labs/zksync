@@ -6,24 +6,27 @@ use zksync_types::{Address, H256};
 use crate::envy_load;
 
 /// Configuration for the Ethereum sender crate.
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Clone, PartialEq)]
 pub struct ETHSenderConfig {
     /// Options related to the Ethereum sender directly.
     pub sender: Sender,
     /// Options related to the `gas_adjuster` submodule.
-    pub gas_limit: GasLimit,
+    pub gas_price_limit: GasLimit,
 }
 
 impl ETHSenderConfig {
     pub fn from_env() -> Self {
         Self {
             sender: envy_load!("eth_sender", "ETH_SENDER_SENDER_"),
-            gas_limit: envy_load!("eth_sender.gas_limit", "ETH_SENDER_GAS_LIMIT_"),
+            gas_price_limit: envy_load!(
+                "eth_sender.gas_price_limit",
+                "ETH_SENDER_GAS_PRICE_LIMIT_"
+            ),
         }
     }
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Clone, PartialEq)]
 pub struct Sender {
     /// Private key of the operator account.
     pub operator_private_key: H256,
@@ -41,7 +44,7 @@ pub struct Sender {
     pub is_enabled: bool,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Clone, PartialEq)]
 pub struct GasLimit {
     /// Gas price limit to be used by GasAdjuster until the statistics data is gathered.
     pub default: u64,
@@ -51,4 +54,53 @@ pub struct GasLimit {
     pub sample_interval: u64,
     /// Scale factor for gas price limit (used by GasAdjuster).
     pub scale_factor: f64,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::configs::test_utils::{addr, hash, set_env};
+
+    fn expected_config() -> ETHSenderConfig {
+        ETHSenderConfig {
+            sender: Sender {
+                wait_confirmations: 1,
+                expected_wait_time_block: 30,
+                tx_poll_period: 3,
+                max_txs_in_flight: 3,
+                is_enabled: true,
+                operator_private_key: hash(
+                    "27593fea79697e947890ecbecce7901b0008345e5d7259710d0dd5e500d040be",
+                ),
+                operator_commit_eth_addr: addr("de03a0B5963f75f1C8485B355fF6D30f3093BDE7"),
+            },
+            gas_price_limit: GasLimit {
+                default: 400000000000,
+                update_interval: 150,
+                sample_interval: 15,
+                scale_factor: 1.0f64,
+            },
+        }
+    }
+
+    #[test]
+    fn from_env() {
+        let config = r#"
+ETH_SENDER_SENDER_WAIT_CONFIRMATIONS="1"
+ETH_SENDER_SENDER_EXPECTED_WAIT_TIME_BLOCK="30"
+ETH_SENDER_SENDER_TX_POLL_PERIOD="3"
+ETH_SENDER_SENDER_MAX_TXS_IN_FLIGHT="3"
+ETH_SENDER_SENDER_IS_ENABLED="true"
+ETH_SENDER_SENDER_OPERATOR_PRIVATE_KEY="0x27593fea79697e947890ecbecce7901b0008345e5d7259710d0dd5e500d040be"
+ETH_SENDER_SENDER_OPERATOR_COMMIT_ETH_ADDR="0xde03a0B5963f75f1C8485B355fF6D30f3093BDE7"
+ETH_SENDER_GAS_PRICE_LIMIT_DEFAULT="400000000000"
+ETH_SENDER_GAS_PRICE_LIMIT_UPDATE_INTERVAL="150"
+ETH_SENDER_GAS_PRICE_LIMIT_SAMPLE_INTERVAL="15"
+ETH_SENDER_GAS_PRICE_LIMIT_SCALE_FACTOR="1"
+        "#;
+        set_env(config);
+
+        let actual = ETHSenderConfig::from_env();
+        assert_eq!(actual, expected_config());
+    }
 }
