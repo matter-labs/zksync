@@ -197,6 +197,6 @@ async fn prover_work_cycle<PROVER, CLIENT>(
             })
             .await
             .map_err(|e| log::warn!("Failed to publish proof: {}", e))
-            .unwrap_or_default();
+            .unwrap();
     }
 }

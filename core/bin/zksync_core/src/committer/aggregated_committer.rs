@@ -406,10 +406,18 @@ async fn create_aggregated_execute_operation_storage(
 pub async fn create_aggregated_operations_storage(
     storage: &mut StorageProcessor<'_>,
 ) -> anyhow::Result<()> {
-    while create_aggregated_commits_storage(storage).await? {}
-    while create_aggregated_prover_task_storage(storage).await? {}
-    while create_aggregated_publish_proof_operation_storage(storage).await? {}
-    while create_aggregated_execute_operation_storage(storage).await? {}
+    while create_aggregated_commits_storage(storage).await? {
+        log::warn!("create_aggregated_commits_storage");
+    }
+    while create_aggregated_prover_task_storage(storage).await? {
+        log::warn!("create_aggregated_prover_task_storage");
+    }
+    while create_aggregated_publish_proof_operation_storage(storage).await? {
+        log::warn!("create_aggregated_publish_proof_operation_storage");
+    }
+    while create_aggregated_execute_operation_storage(storage).await? {
+        log::warn!("create_aggregated_execute_operation_storage");
+    }
 
     Ok(())
 }
