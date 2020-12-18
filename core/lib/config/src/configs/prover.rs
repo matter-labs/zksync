@@ -6,7 +6,7 @@ use serde::Deserialize;
 use crate::envy_load;
 
 /// Configuration for the prover application and part of the server that interact with it.
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Clone, PartialEq)]
 pub struct ProverConfig {
     pub prover: Prover,
     pub core: Core,
@@ -24,7 +24,7 @@ impl ProverConfig {
 }
 
 /// Actual prover application settings.
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Clone, PartialEq)]
 pub struct Prover {
     /// Interval of notifying about an ongoing job in ms.
     pub heartbeat_interval: u64,
@@ -52,7 +52,7 @@ impl Prover {
 }
 
 /// Core settings related to the prover applications interacting with it.
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Clone, PartialEq)]
 pub struct Core {
     /// Timeout to consider prover gone in ms.
     pub gone_timeout: u64,
@@ -67,7 +67,7 @@ impl Core {
     }
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Clone, PartialEq)]
 pub struct WitnessGenerator {
     /// Interval to check whether a new witness generation job should be started in ms.
     pub prepare_data_interval: u64,
@@ -79,5 +79,46 @@ impl WitnessGenerator {
     /// Converts `self.prepare_data_interval` into `Duration`.
     pub fn prepare_data_interval(&self) -> Duration {
         Duration::from_millis(self.prepare_data_interval)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::configs::test_utils::set_env;
+
+    fn expected_config() -> ProverConfig {
+        ProverConfig {
+            prover: Prover {
+                heartbeat_interval: 1000,
+                cycle_wait: 500,
+                request_timeout: 10,
+            },
+            core: Core {
+                gone_timeout: 60000,
+                idle_provers: 1,
+            },
+            witness_generator: WitnessGenerator {
+                prepare_data_interval: 500,
+                witness_generators: 2,
+            },
+        }
+    }
+
+    #[test]
+    fn from_env() {
+        let config = r#"
+PROVER_PROVER_HEARTBEAT_INTERVAL="1000"
+PROVER_PROVER_CYCLE_WAIT="500"
+PROVER_PROVER_REQUEST_TIMEOUT="10"
+PROVER_CORE_GONE_TIMEOUT="60000"
+PROVER_CORE_IDLE_PROVERS="1"
+PROVER_WITNESS_GENERATOR_PREPARE_DATA_INTERVAL="500"
+PROVER_WITNESS_GENERATOR_WITNESS_GENERATORS="2"
+        "#;
+        set_env(config);
+
+        let actual = ProverConfig::from_env();
+        assert_eq!(actual, expected_config());
     }
 }
