@@ -5,7 +5,6 @@ mod close;
 mod forced_exit;
 mod primitives;
 mod transfer;
-mod utils;
 mod withdraw;
 mod zksync_tx;
 
