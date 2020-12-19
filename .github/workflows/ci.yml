@@ -45,7 +45,7 @@ jobs:
       # Upstream version of sqlx-cli has some incompatibilities with the sqlx version used zksync_storage.
       run: |
         rustup update stable
-        cargo install sqlx-cli --git https://github.com/alekseysidorov/sqlx.git
+        cargo install --version=0.2.0 sqlx-cli
         cargo install diesel_cli --no-default-features --features postgres
         docker pull matterlabs/ci-integration-test:zk-latest
 
