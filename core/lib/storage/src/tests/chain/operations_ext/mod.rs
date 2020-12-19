@@ -596,19 +596,20 @@ async fn get_account_transactions_receipts(mut storage: StorageProcessor<'_>) ->
     let reciept = receipts.into_iter().next().unwrap();
     assert!(reciept.commit_tx_hash.is_some());
     assert!(reciept.verify_tx_hash.is_some());
-    // Make sure that the receiver doesn't see the same receipts.
-    assert!(storage
+    // Make sure that the receiver see the same receipts.
+    let receipts = storage
         .chain()
         .operations_ext_schema()
         .get_account_transactions_receipts(to, 1, Some(1), SearchDirection::Newer, 1)
-        .await?
-        .is_empty());
-    assert!(storage
-        .chain()
-        .operations_ext_schema()
-        .get_account_transactions_receipts(to, 1, Some(1), SearchDirection::Older, 1)
-        .await?
-        .is_empty());
+        .await?;
+    assert_eq!(
+        storage
+            .chain()
+            .operations_ext_schema()
+            .get_account_transactions_receipts(to, 1, Some(1), SearchDirection::Older, 1)
+            .await?,
+        receipts
+    );
 
     Ok(())
 }
@@ -837,19 +838,20 @@ async fn get_account_operations_receipts(mut storage: StorageProcessor<'_>) -> Q
     let reciept = receipts.into_iter().next().unwrap();
     assert!(reciept.commit_tx_hash.is_some());
     assert!(reciept.verify_tx_hash.is_some());
-    // Make sure that the receiver doesn't see the same receipts.
-    assert!(storage
+    // Make sure that the receiver see the same receipts.
+    let receipts = storage
         .chain()
         .operations_ext_schema()
         .get_account_operations_receipts(to, 1, 0, SearchDirection::Newer, 1)
-        .await?
-        .is_empty());
-    assert!(storage
-        .chain()
-        .operations_ext_schema()
-        .get_account_operations_receipts(to, 1, 0, SearchDirection::Older, 1)
-        .await?
-        .is_empty());
+        .await?;
+    assert_eq!(
+        storage
+            .chain()
+            .operations_ext_schema()
+            .get_account_operations_receipts(to, 1, 0, SearchDirection::Older, 1)
+            .await?,
+        receipts
+    );
 
     Ok(())
 }

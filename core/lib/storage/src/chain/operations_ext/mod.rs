@@ -729,7 +729,7 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
                     FROM executed_transactions
                     LEFT JOIN block_details details ON details.details_block_number = executed_transactions.block_number
                     WHERE (
-                        (from_account = $1 OR primary_account_address = $1)
+                        (primary_account_address = $1 OR from_account = $1 OR to_account = $1)
                         AND (
                             block_number = $2 AND (
                                 COALESCE(block_index, -1) >= $3
@@ -787,7 +787,7 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
                     FROM executed_transactions
                     LEFT JOIN block_details details ON details.details_block_number = executed_transactions.block_number
                     WHERE (
-                        (from_account = $1 OR primary_account_address = $1)
+                        (primary_account_address = $1 OR from_account = $1 OR to_account = $1)
                         AND (
                             block_number = $2 AND (
                                 COALESCE(block_index, -1) <= $3
@@ -872,7 +872,7 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
                     FROM executed_priority_operations
                     LEFT JOIN block_details details ON details.details_block_number = executed_priority_operations.block_number
                     WHERE (
-                        (from_account = $1)
+                        (from_account = $1 OR to_account = $1)
                         AND (
                             block_number = $2 AND (
                                 block_index >= $3
@@ -928,7 +928,7 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
                     FROM executed_priority_operations
                     LEFT JOIN block_details details ON details.details_block_number = executed_priority_operations.block_number
                     WHERE (
-                        (from_account = $1)
+                        (from_account = $1 OR to_account = $1)
                         AND (
                             block_number = $2 AND (
                                 block_index <= $3
