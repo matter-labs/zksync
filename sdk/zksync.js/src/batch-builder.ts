@@ -73,7 +73,13 @@ export class BatchBuilder {
             signature = await this.wallet.getEthMessageSignature(
                 Uint8Array.from(Buffer.from(batchHash.slice(2), 'hex'))
             );
+            if (this.changePubKeyTx != null) {
+                this.changePubKeyTx.ethAuthData = {
+                    type: 'Onchain'
+                };
+            }
         }
+
         return {
             txs,
             signature,

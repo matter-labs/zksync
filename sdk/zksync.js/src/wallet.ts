@@ -21,7 +21,7 @@ import {
     Withdraw,
     ChangePubkeyTypes,
     ChangePubKeyOnchain,
-    ChangePubKeyECSDA,
+    ChangePubKeyECDSA,
     ChangePubKeyCREATE2
 } from './types';
 import {
@@ -402,7 +402,7 @@ export class Wallet {
         feeToken: TokenLike;
         fee: BigNumberish;
         nonce: number;
-        ethAuthData: ChangePubKeyOnchain | ChangePubKeyECSDA | ChangePubKeyCREATE2;
+        ethAuthData: ChangePubKeyOnchain | ChangePubKeyECDSA | ChangePubKeyCREATE2;
     }): Promise<ChangePubKey> {
         if (!this.signer) {
             throw new Error('ZKSync signer is required for current pubkey calculation.');

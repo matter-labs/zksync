@@ -22,7 +22,7 @@ import {
     ForcedExit,
     ChangePubKey,
     ChangePubKeyOnchain,
-    ChangePubKeyECSDA,
+    ChangePubKeyECDSA,
     ChangePubKeyCREATE2
 } from './types';
 
@@ -220,7 +220,7 @@ export class Signer {
         feeTokenId: number;
         fee: BigNumberish;
         nonce: number;
-        ethAuthData: ChangePubKeyOnchain | ChangePubKeyECSDA | ChangePubKeyCREATE2;
+        ethAuthData: ChangePubKeyOnchain | ChangePubKeyECDSA | ChangePubKeyCREATE2;
     }): Promise<ChangePubKey> {
         const msgBytes = this.changePubKeySignBytes(changePubKey);
         const signature = await signTransactionBytes(this.#privateKey, msgBytes);
