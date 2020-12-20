@@ -10,15 +10,26 @@ module.exports = {
     rules: {
         'no-console': 'off',
         'no-debugger': process.env.NODE_ENV === 'production' ? 'error' : 'off',
-        // 'no-unused-vars': 'warn',
         semi: 'warn',
         'no-extra-semi': 'off',
         'no-empty': 'warn',
         'spaced-comment': 'off',
         'eqeqeq': 'off',
-        'max-params': 'off'
+        'max-params': 'off',
+        'no-eq-null': 'off',
+        'no-implicit-coercion': 'off',
+        'accessor-pairs': 'off',
+        'no-promise-executor-return': 'off'
     },
     parserOptions: {
         parser: 'babel-eslint'
-    }
+    },
+    overrides: [
+        {
+            files: ['./contracts/test/**/*.js'],
+            rules: {
+                'no-invalid-this': 'off'
+            }
+        }
+    ]
 };

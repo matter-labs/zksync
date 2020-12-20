@@ -7,6 +7,9 @@ describe('Governance unit tests', function() {
     let testContract;
     before(async () => {
         let governanceAddressDeployed;
+        // The `governanceAddressDeployed` is indeed never used
+        // but it is worth assigning it for clarity.
+        // eslint-disable-next-line no-unused-vars
         [testContract, governanceAddressDeployed] = await deployProxyContract(
             wallet,
             require('../../build/Proxy'),
