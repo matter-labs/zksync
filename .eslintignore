@@ -1,0 +1,6 @@
+./volumes/**/*
+node_modules
+**/node_modules/** 
+build/
+dist/
+volumes/

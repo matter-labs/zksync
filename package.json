@@ -17,15 +17,9 @@
     ],
     "nohoist": [
       "**/@vue/**",
-      "**/babel-eslint/**",
-      "**/eslint/**",
-      "**/eslint-plugin-vue/**",
       "**/vue-template-compiler/**",
       "**/bootstrap-vue/**",
       "**/@vue",
-      "**/babel-eslint",
-      "**/eslint",
-      "**/eslint-plugin-vue",
       "**/vue-template-compiler",
       "**/bootstrap-vue"
     ]
@@ -40,9 +34,13 @@
     "explorer": "yarn workspace sync-explorer",
     "zk": "yarn workspace zk",
     "lint:md": "markdownlint $(find . -name '*.md' -print -o -path '*/node_modules' -prune)",
-    "lint:sol": "solhint contracts/{,dev-}contracts{,/**}/*.sol"
+    "lint:sol": "solhint contracts/{,dev-}contracts{,/**}/*.sol",
+    "lint:js": "eslint $(find . -name '*.js' | grep -v 'node_modules\\|build\\|dist')"
   },
   "devDependencies": {
+    "babel-eslint": "^10.1.0",
+    "eslint": "^7.16.0",
+    "eslint-config-alloy": "^3.8.2",
     "markdownlint-cli": "^0.24.0",
     "prettier": "^2.1.2",
     "prettier-plugin-solidity": "^1.0.0-alpha.60",
