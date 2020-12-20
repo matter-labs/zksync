@@ -268,7 +268,7 @@ mod tests {
     use zksync_storage::test_data::dummy_ethereum_tx_hash;
     use zksync_types::Address;
 
-    use crate::api_server::v1::test_utils::dummy_deposit_op;
+    use crate::api_server::v1::test_utils::{dummy_deposit_op, dummy_full_exit_op};
 
     use super::{
         super::test_utils::{TestServerConfig, COMMITTED_OP_SERIAL_ID, VERIFIED_OP_SERIAL_ID},
@@ -344,7 +344,7 @@ mod tests {
         );
 
         let expected_data = PriorityOpData {
-            data: dummy_deposit_op(Address::default(), 1, 16, 3),
+            data: dummy_full_exit_op(1, Address::default(), 16, 3),
             serial_id: COMMITTED_OP_SERIAL_ID,
             eth_hash: committed_eth_hash,
         };

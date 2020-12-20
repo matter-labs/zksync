@@ -49,6 +49,15 @@ impl CoreApiClient {
         self.get(&endpoint).await
     }
 
+    /// Queries information about unconfirmed priority operations for a certain address from a Core.
+    pub async fn get_unconfirmed_ops(
+        &self,
+        address: Address,
+    ) -> anyhow::Result<Vec<(EthBlockId, PriorityOp)>> {
+        let endpoint = format!("{}/unconfirmed_ops/0x{}", self.addr, hex::encode(address));
+        self.get(&endpoint).await
+    }
+
     /// Queries information about unconfirmed priority operation from a Core.
     pub async fn get_unconfirmed_op(
         &self,

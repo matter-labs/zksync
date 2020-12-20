@@ -26,8 +26,8 @@ use zksync_types::{
     helpers::{apply_updates, closest_packable_fee_amount, closest_packable_token_amount},
     operations::{ChangePubKeyOp, TransferToNewOp},
     AccountId, AccountMap, Action, Address, BlockNumber, Deposit, DepositOp, ExecutedOperations,
-    ExecutedPriorityOp, ExecutedTx, PriorityOp, Token, Transfer, TransferOp, ZkSyncOp, ZkSyncTx,
-    H256,
+    ExecutedPriorityOp, ExecutedTx, FullExit, FullExitOp, PriorityOp, Token, Transfer, TransferOp,
+    ZkSyncOp, ZkSyncTx, H256,
 };
 
 // Local uses
@@ -411,9 +411,9 @@ impl TestServerConfig {
             NewExecutedPriorityOperation {
                 block_number: VERIFIED_BLOCKS_COUNT as i64 + 1,
                 block_index: 1,
-                operation: serde_json::to_value(dummy_deposit_op(
-                    Address::default(),
+                operation: serde_json::to_value(dummy_full_exit_op(
                     1,
+                    Address::default(),
                     COMMITTED_OP_SERIAL_ID,
                     3,
                 ))
@@ -476,6 +476,36 @@ pub fn dummy_deposit_op(
             to: address,
         },
         account_id,
+    }));
+
+    ExecutedPriorityOp {
+        priority_op: PriorityOp {
+            serial_id,
+            data: deposit_op.try_get_priority_op().unwrap(),
+            deadline_block: 0,
+            eth_hash: H256::default(),
+            eth_block: 10,
+        },
+        op: deposit_op,
+        block_index,
+        created_at: Utc::now(),
+    }
+}
+
+/// Creates dummy full exit priority operation.
+pub fn dummy_full_exit_op(
+    account_id: AccountId,
+    eth_address: Address,
+    serial_id: u64,
+    block_index: u32,
+) -> ExecutedPriorityOp {
+    let deposit_op = ZkSyncOp::FullExit(Box::new(FullExitOp {
+        priority_op: FullExit {
+            account_id,
+            eth_address,
+            token: 0,
+        },
+        withdraw_amount: None,
     }));
 
     ExecutedPriorityOp {

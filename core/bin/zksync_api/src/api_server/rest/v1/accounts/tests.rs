@@ -31,13 +31,13 @@ use super::{
     types::{AccountOpReceipt, AccountReceipts, AccountTxReceipt},
 };
 
-type DepositsHandle = Arc<Mutex<serde_json::Value>>;
+type PendingOpsHandle = Arc<Mutex<serde_json::Value>>;
 
-fn get_unconfirmed_deposits_loopback(
-    handle: DepositsHandle,
+fn get_unconfirmed_ops_loopback(
+    handle: PendingOpsHandle,
 ) -> (CoreApiClient, actix_web::test::TestServer) {
-    async fn get_unconfirmed_deposits(
-        data: web::Data<DepositsHandle>,
+    async fn get_unconfirmed_ops(
+        data: web::Data<PendingOpsHandle>,
         _path: web::Path<String>,
     ) -> Json<serde_json::Value> {
         Json(data.lock().await.clone())
@@ -46,13 +46,12 @@ fn get_unconfirmed_deposits_loopback(
     let server = actix_web::test::start(move || {
         let handle = handle.clone();
         App::new().data(handle).route(
-            "unconfirmed_deposits/{address}",
-            web::get().to(get_unconfirmed_deposits),
+            "unconfirmed_ops/{address}",
+            web::get().to(get_unconfirmed_ops),
         )
     });
 
     let url = server.url("").trim_end_matches('/').to_owned();
-
     (CoreApiClient::new(url), server)
 }
 
@@ -60,7 +59,7 @@ struct TestServer {
     core_server: actix_web::test::TestServer,
     api_server: actix_web::test::TestServer,
     pool: ConnectionPool,
-    deposits: DepositsHandle,
+    pending_ops: PendingOpsHandle,
 }
 
 impl TestServer {
@@ -68,8 +67,8 @@ impl TestServer {
         let cfg = TestServerConfig::default();
         cfg.fill_database().await?;
 
-        let deposits = DepositsHandle::new(Mutex::new(json!([])));
-        let (core_client, core_server) = get_unconfirmed_deposits_loopback(deposits.clone());
+        let pending_ops = PendingOpsHandle::new(Mutex::new(json!([])));
+        let (core_client, core_server) = get_unconfirmed_ops_loopback(pending_ops.clone());
 
         let pool = cfg.pool.clone();
 
@@ -87,7 +86,7 @@ impl TestServer {
                 core_server,
                 api_server,
                 pool,
-                deposits,
+                pending_ops,
             },
         ))
     }
@@ -122,7 +121,7 @@ impl TestServer {
 )]
 async fn unconfirmed_deposits_loopback() -> anyhow::Result<()> {
     let (client, server) =
-        get_unconfirmed_deposits_loopback(DepositsHandle::new(Mutex::new(json!([]))));
+        get_unconfirmed_ops_loopback(PendingOpsHandle::new(Mutex::new(json!([]))));
 
     client.get_unconfirmed_deposits(Address::default()).await?;
 
@@ -145,8 +144,8 @@ async fn accounts_scope() -> anyhow::Result<()> {
     let address = account_info.address;
     assert_eq!(client.account_info(address).await?, Some(account_info));
 
-    // Provide unconfirmed deposits
-    let deposits = json!([
+    // Provide unconfirmed pending ops.
+    let pending_ops = json!([
         [
             5,
             {
@@ -160,12 +159,27 @@ async fn accounts_scope() -> anyhow::Result<()> {
                     "token": 0,
                 },
                 "deadline_block": 10,
-                "eth_hash": H256::default().as_ref().to_vec(),
+                "eth_hash": vec![0u8; 32],
                 "eth_block": 5,
             },
+        ],
+        [
+            5,
+            {
+                "serial_id": 2,
+                "data": {
+                  "type": "FullExit",
+                  "account_id": account_id,
+                  "eth_address": Address::default(),
+                  "token": 0
+                },
+                "deadline_block": 0,
+                "eth_hash": vec![1u8; 32],
+                "eth_block": 5
+              }
         ]
     ]);
-    *server.deposits.lock().await = deposits;
+    *server.pending_ops.lock().await = pending_ops;
 
     // Check account information about unconfirmed deposits.
     let account_info = client.account_info(account_id).await?.unwrap();
@@ -251,7 +265,9 @@ async fn accounts_scope() -> anyhow::Result<()> {
     // Get account pending receipts.
     let pending_receipts = client.account_pending_ops(account_id).await?;
     assert_eq!(pending_receipts[0].eth_block, 5);
-    assert_eq!(pending_receipts[0].hash, H256::default());
+    assert_eq!(pending_receipts[0].hash, [0u8; 32].into());
+    assert_eq!(pending_receipts[1].eth_block, 5);
+    assert_eq!(pending_receipts[1].hash, [1u8; 32].into());
 
     server.stop().await;
     Ok(())

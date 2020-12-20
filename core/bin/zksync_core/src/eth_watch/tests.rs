@@ -3,7 +3,9 @@ use std::collections::HashMap;
 
 use web3::types::{Address, BlockNumber};
 
-use zksync_types::{ethereum::CompleteWithdrawalsTx, Deposit, PriorityOp, ZkSyncPriorityOp};
+use zksync_types::{
+    ethereum::CompleteWithdrawalsTx, Deposit, FullExit, PriorityOp, ZkSyncPriorityOp,
+};
 
 use crate::eth_watch::{client::EthClient, storage::Storage, EthWatch};
 use std::sync::Arc;
@@ -147,15 +149,19 @@ fn create_watcher<T: EthClient>(client: T) -> EthWatch<T, FakeStorage> {
 #[tokio::test]
 async fn test_operation_queues() {
     let mut client = FakeEthClient::new();
+
+    let from_addr = [1u8; 20].into();
+    let to_addr = [2u8; 20].into();
+
     client
         .add_operations(&vec![
             PriorityOp {
                 serial_id: 0,
                 data: ZkSyncPriorityOp::Deposit(Deposit {
-                    from: Default::default(),
+                    from: from_addr,
                     token: 0,
                     amount: Default::default(),
-                    to: [2u8; 20].into(),
+                    to: to_addr,
                 }),
                 deadline_block: 0,
                 eth_hash: [2; 32].into(),
@@ -173,20 +179,47 @@ async fn test_operation_queues() {
                 eth_hash: [3; 32].into(),
                 eth_block: 3,
             },
+            PriorityOp {
+                serial_id: 2,
+                data: ZkSyncPriorityOp::FullExit(FullExit {
+                    account_id: 1,
+                    eth_address: from_addr,
+                    token: 0,
+                }),
+                deadline_block: 0,
+                eth_block: 4,
+                eth_hash: [4; 32].into(),
+            },
         ])
         .await;
+
     let mut watcher = create_watcher(client);
     watcher.poll_eth_node().await.unwrap();
     assert_eq!(watcher.eth_state.last_ethereum_block(), 4);
+
     let priority_queues = watcher.eth_state.priority_queue();
     let unconfirmed_queue = watcher.eth_state.unconfirmed_queue();
     assert_eq!(priority_queues.len(), 1);
-    assert_eq!(unconfirmed_queue.len(), 1);
+    assert_eq!(
+        priority_queues.values().next().unwrap().as_ref().serial_id,
+        1
+    );
+    assert_eq!(unconfirmed_queue.len(), 2);
     assert_eq!(unconfirmed_queue[0].serial_id, 0);
+    assert_eq!(unconfirmed_queue[1].serial_id, 2);
+
     priority_queues.get(&1).unwrap();
     watcher.find_ongoing_op_by_hash(&[2u8; 32]).unwrap();
-    let deposits = watcher.get_ongoing_deposits_for([2u8; 20].into());
+
+    // Make sure that the old behavior of the pending deposits getter has not changed.
+    let deposits = watcher.get_ongoing_deposits_for(to_addr);
     assert_eq!(deposits.len(), 1);
+    // Check that the new pending operations getter shows only deposits with the same `from` address.
+    let ops = watcher.get_ongoing_ops_for(from_addr);
+
+    assert_eq!(ops[0].serial_id, 0);
+    assert_eq!(ops[1].serial_id, 2);
+    assert!(watcher.get_ongoing_ops_for(to_addr).is_empty());
 }
 
 /// This test simulates the situation when eth watch module did not poll Ethereum node for some time
