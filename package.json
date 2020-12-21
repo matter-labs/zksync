@@ -45,7 +45,7 @@
     "eslint": "^7.16.0",
     "eslint-config-alloy": "^3.8.2",
     "markdownlint-cli": "^0.24.0",
-    "prettier": "^2.1.2",
+    "prettier": "^2.2.1",
     "prettier-plugin-solidity": "^1.0.0-alpha.60",
     "solhint": "^3.3.2"
   }

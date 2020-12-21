@@ -3,7 +3,7 @@ import * as utils from './utils';
 
 const IGNORED_DIRS = ['target', 'node_modules', 'volumes', 'build', 'dist', '.git', 'generated', 'grafonnet-lib'];
 const IGNORED_FILES = ['KeysWithPlonkVerifier.sol', 'TokenInit.sol'];
-const EXTENSIONS = ['ts', 'md', 'sol'];
+const EXTENSIONS = ['ts', 'md', 'sol', 'js', 'vue'];
 
 // If you wonder why this is written so obscurely through find and not through .prettierignore and globs,
 // it's because prettier *first* expands globs and *then* applies ignore rules, which leads to an error
