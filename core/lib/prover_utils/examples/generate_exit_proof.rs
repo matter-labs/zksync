@@ -80,7 +80,7 @@ async fn main() {
     log::info!("Restored state from db: {} s", timer.elapsed().as_secs());
 
     let (proof, amount) =
-        zksync_prover::exit_proof::create_exit_proof(accounts, account_id, address, token_id)
+        zksync_prover_utils::exit_proof::create_exit_proof(accounts, account_id, address, token_id)
             .expect("Failed to generate exit proof");
 
     let proof_data = ExitProofData {
