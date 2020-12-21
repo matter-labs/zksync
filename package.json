@@ -35,9 +35,12 @@
     "zk": "yarn workspace zk",
     "lint:md": "markdownlint $(find . -name '*.md' -print -o -path '*/node_modules' -prune)",
     "lint:sol": "solhint contracts/{,dev-}contracts{,/**}/*.sol",
-    "lint:js": "eslint $(find . -name '*.js' | grep -v 'node_modules\\|build\\|dist')"
+    "lint:js": "eslint $(find . -name '*.js' | grep -v 'node_modules\\|build\\|dist\\|.tslintrc.js')",
+    "lint:ts": "eslint --ext ts --no-eslintrc -c .tslintrc.js $(find . -name '*.ts' | grep -v 'node_modules\\|build\\|dist')"
   },
   "devDependencies": {
+    "@typescript-eslint/eslint-plugin": "^4.10.0",
+    "@typescript-eslint/parser": "^4.10.0",
     "babel-eslint": "^10.1.0",
     "eslint": "^7.16.0",
     "eslint-config-alloy": "^3.8.2",

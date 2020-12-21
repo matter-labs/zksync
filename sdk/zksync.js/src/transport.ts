@@ -13,6 +13,7 @@ export abstract class AbstractJSONRPCTransport {
     subscriptionsSupported(): boolean {
         return false;
     }
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     async subscribe(subMethod: string, subParams, unsubMethod: string, cb: (data: any) => void): Promise<Subscription> {
         throw new Error('subscription are not supported for this transport');
     }

@@ -4,11 +4,9 @@ import { ETHProxy } from 'zksync';
 import { Address, TokenAddress } from 'zksync/build/types';
 import { Deployer, readContractCode, readTestContracts } from '../../src.ts/deploy';
 
-const { simpleEncode } = require('ethereumjs-abi');
 const { expect } = require('chai');
 const { deployContract } = require('ethereum-waffle');
-const { wallet, exitWallet, deployTestContract, getCallRevertReason, IERC20_INTERFACE } = require('./common');
-import * as zksync from 'zksync';
+const { wallet, exitWallet, getCallRevertReason, IERC20_INTERFACE } = require('./common');
 
 async function onchainTokenBalanceOfContract(
     ethWallet: ethers.Wallet,

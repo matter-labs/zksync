@@ -1,10 +1,8 @@
-import { assert, expect } from 'chai';
-import { BigNumber, utils, ethers } from 'ethers';
+import { expect } from 'chai';
+import { BigNumber, ethers } from 'ethers';
 import { Wallet } from '../src/wallet';
 import { getTokens } from './helpers';
 
-import { TokenSet, parseHexWithPrefix } from '../src/utils';
-import { privateKeyFromSeed, signTransactionBytes } from '../src/crypto';
 import { Provider } from '../src/provider';
 
 describe('Wallet with mock provider', function () {

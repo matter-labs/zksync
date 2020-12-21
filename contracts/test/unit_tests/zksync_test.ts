@@ -33,7 +33,7 @@ describe('zkSync signature verification unit tests', function () {
         const signature = await randomWallet.signMessage(
             zksync.utils.getChangePubkeyMessage(pubkeyHash, nonce, accountId)
         );
-        const { revertReason, result } = await getCallRevertReason(() =>
+        const { result } = await getCallRevertReason(() =>
             testContract.changePubkeySignatureCheck(
                 signature,
                 pubkeyHash.replace('sync:', '0x'),
@@ -410,6 +410,7 @@ describe('zkSync withdraw unit tests', function () {
         await zksyncContract.setBalanceToWithdraw(wallet.address, tokenId, withdrawAmount);
 
         const onchainBalBefore = await onchainBalance(wallet, tokenContract.address);
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
         const { revertReason } = await getCallRevertReason(
             async () => await performWithdraw(wallet, tokenContract.address, tokenId, withdrawAmount.add(1))
         );
