@@ -2,7 +2,6 @@ use std::{collections::HashMap, sync::Arc};
 
 use tokio::sync::RwLock;
 
-use bigdecimal::BigDecimal;
 use zksync_storage::ConnectionPool;
 use zksync_types::tokens::TokenMarketVolume;
 use zksync_types::{Token, TokenId, TokenLike};

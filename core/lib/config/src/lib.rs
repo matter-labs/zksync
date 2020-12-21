@@ -177,7 +177,8 @@ pub struct FeeTickerOptions {
     pub not_subsidized_tokens: HashSet<Address>,
     pub uniswap_url: String,
     pub liquidity_volume: f64,
-    pub available_liquidity_seconds: u64,
+    pub available_liquidity_seconds: i64,
+    pub token_market_update_time: i64,
 }
 
 impl FeeTickerOptions {
@@ -199,6 +200,7 @@ impl FeeTickerOptions {
             uniswap_url: parse_env("TICKER_UNISWAP_URL"),
             liquidity_volume: parse_env("TICKER_LIQUIDITY_VOLUME"),
             available_liquidity_seconds: parse_env("TICKER_TOKEN_AVAILABLE_LIQUIDITY_SECONDS"),
+            token_market_update_time: parse_env("TICKER_TOKEN_TOKEN_MARKET_UPDATE_TIME_SECONDS"),
         }
     }
 }

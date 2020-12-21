@@ -6,9 +6,10 @@ use std::time::Instant;
 use zksync_types::{Token, TokenId, TokenLike, TokenPrice};
 use zksync_utils::ratio_to_big_decimal;
 // Local imports
-use self::records::{DbTickerPrice, DbToken};
+use self::records::{DBMarketVolume, DbTickerPrice, DbToken};
 use crate::tokens::utils::address_to_stored_string;
 use crate::{QueryResult, StorageProcessor};
+use zksync_types::tokens::TokenMarketVolume;
 
 pub mod records;
 mod utils;
@@ -137,6 +138,53 @@ impl<'a, 'c> TokensSchema<'a, 'c> {
         Ok(db_token.map(|t| t.into()))
     }
 
+    pub async fn get_token_market_volume(
+        &mut self,
+        token_id: TokenId,
+    ) -> QueryResult<Option<TokenMarketVolume>> {
+        let start = Instant::now();
+        let db_market_volume = sqlx::query_as!(
+            DBMarketVolume,
+            r#"
+            SELECT * FROM ticker_market_volume
+            WHERE token_id = $1
+            LIMIT 1
+            "#,
+            i32::from(token_id)
+        )
+        .fetch_optional(self.0.conn())
+        .await?;
+
+        metrics::histogram!("sql.token.get_market_volume", start.elapsed());
+        Ok(db_market_volume.map(|p| p.into()))
+    }
+
+    pub async fn update_token_market_volume(
+        &mut self,
+        token_id: TokenId,
+        market_volume: TokenMarketVolume,
+    ) -> QueryResult<()> {
+        let start = Instant::now();
+        let market_volume_rounded =
+            ratio_to_big_decimal(&market_volume.market_volume, STORED_USD_PRICE_PRECISION);
+        sqlx::query!(
+            r#"
+            INSERT INTO ticker_market_volume ( token_id, market_volume, last_updated )
+            VALUES ( $1, $2, $3 )
+            ON CONFLICT (token_id)
+            DO
+              UPDATE SET market_volume = $2, last_updated = $3
+            "#,
+            i32::from(token_id),
+            market_volume_rounded.clone(),
+            market_volume.last_updated
+        )
+        .fetch_optional(self.0.conn())
+        .await?;
+
+        metrics::histogram!("sql.token.update_market_volume", start.elapsed());
+        Ok(())
+    }
     pub async fn get_historical_ticker_price(
         &mut self,
         token_id: TokenId,

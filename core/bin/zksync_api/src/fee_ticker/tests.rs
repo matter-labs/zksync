@@ -1,12 +1,15 @@
-use super::*;
+use std::str::FromStr;
+
 use async_trait::async_trait;
 use bigdecimal::BigDecimal;
 use chrono::Utc;
-use futures::channel::mpsc;
-use futures::executor::block_on;
-use std::str::FromStr;
+use futures::{channel::mpsc, executor::block_on};
 use zksync_types::{Address, Token, TokenId, TokenPrice};
 use zksync_utils::{ratio_to_big_decimal, UnsignedRatioSerializeAsDecimal};
+
+use crate::fee_ticker::validator::cache::TokenInMemoryCache;
+
+use super::*;
 
 const TEST_FAST_WITHDRAW_COEFF: f64 = 10.0;
 
@@ -166,8 +169,8 @@ impl TokenWatcher for FakeTokenWatcher {
 #[test]
 fn test_ticker_formula() {
     let validator = FeeTokenValidator::new(
-        HashMap::new(),
-        Duration::from_secs(100),
+        TokenInMemoryCache::new(),
+        chrono::Duration::seconds(100),
         100.0,
         Default::default(),
         FakeTokenWatcher,
@@ -268,8 +271,8 @@ fn test_ticker_formula() {
 #[test]
 fn test_fee_for_unsubsidized_tokens() {
     let validator = FeeTokenValidator::new(
-        HashMap::new(),
-        Duration::from_secs(100),
+        TokenInMemoryCache::new(),
+        chrono::Duration::seconds(100),
         100.0,
         Default::default(),
         FakeTokenWatcher,

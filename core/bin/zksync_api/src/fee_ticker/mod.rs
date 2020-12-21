@@ -17,7 +17,7 @@ use num::{
     BigUint,
 };
 use serde::{Deserialize, Serialize};
-use tokio::{task::JoinHandle, time::Duration};
+use tokio::task::JoinHandle;
 // Workspace deps
 use zksync_config::{FeeTickerOptions, TokenPriceSource};
 use zksync_storage::ConnectionPool;
@@ -199,7 +199,7 @@ pub fn run_ticker_task(
     let cache = TokenDBCache::new(db_pool.clone());
     let validator = FeeTokenValidator::new(
         cache,
-        Duration::from_secs(config.available_liquidity_seconds),
+        chrono::Duration::seconds(config.available_liquidity_seconds),
         config.liquidity_volume,
         config.unconditionally_valid_tokens,
         UniswapTokenWatcher::new(config.uniswap_url),

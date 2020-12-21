@@ -9,22 +9,20 @@ use std::{
     collections::{HashMap, HashSet},
     time::{Duration, Instant},
 };
-use tokio::sync::Mutex;
+
+use bigdecimal::BigDecimal;
+use chrono::Utc;
 
 // Workspace uses
 use zksync_types::{
     tokens::{Token, TokenLike, TokenMarketVolume},
-    Address, TokenId,
+    Address,
 };
-// Local uses
-use crate::fee_ticker::{
-    ticker_api::REQUEST_TIMEOUT,
-    validator::{cache::TokenCacheWrapper, watcher::TokenWatcher},
-};
-use crate::utils::token_db_cache::TokenDBCache;
 
-use bigdecimal::BigDecimal;
-use chrono::Utc;
+// Local uses
+use crate::fee_ticker::validator::{cache::TokenCacheWrapper, watcher::TokenWatcher};
+
+use zksync_utils::{big_decimal_to_ratio, ratio_to_big_decimal};
 
 #[derive(Clone, Debug)]
 struct AcceptanceData {
@@ -41,16 +39,16 @@ pub(crate) struct FeeTokenValidator<W> {
     /// List of tokens that are accepted to pay fees in.
     /// Whitelist is better in this case, because it requires fewer requests to different APIs
     tokens: HashMap<Address, AcceptanceData>,
-    available_time: Duration,
+    available_time: chrono::Duration,
     // It's possible to use f64 here because precision doesn't matter
-    liquidity_volume: f64,
+    liquidity_volume: BigDecimal,
     watcher: W,
 }
 
 impl<W: TokenWatcher> FeeTokenValidator<W> {
     pub(crate) fn new(
         cache: impl Into<TokenCacheWrapper>,
-        available_time: Duration,
+        available_time: chrono::Duration,
         liquidity_volume: f64,
         unconditionally_valid: HashSet<Address>,
         watcher: W,
@@ -60,7 +58,7 @@ impl<W: TokenWatcher> FeeTokenValidator<W> {
             tokens_cache: cache.into(),
             tokens: Default::default(),
             available_time,
-            liquidity_volume,
+            liquidity_volume: BigDecimal::from(liquidity_volume),
             watcher,
         }
     }
@@ -86,46 +84,59 @@ impl<W: TokenWatcher> FeeTokenValidator<W> {
     async fn update_token(&mut self, token: &Token) -> anyhow::Result<TokenMarketVolume> {
         let amount = self.watcher.get_token_market_amount(&token).await?;
         let market = TokenMarketVolume {
-            market_volume: BigDecimal::from(amount),
+            market_volume: big_decimal_to_ratio(&BigDecimal::from(amount)).unwrap(),
             last_updated: Utc::now(),
         };
 
-        self.tokens_cache
+        if let Err(e) = self
+            .tokens_cache
             .update_token_market_volume(token.id, market.clone())
-            .await;
+            .await
+        {
+            vlog::error!("Error in updating token market volume {}", e);
+        }
         Ok(market)
     }
 
-    async fn update_all_tokens(&mut self, tokens: &Vec<Token>) -> anyhow::Result<()> {
+    pub async fn update_all_tokens(&mut self, tokens: &Vec<Token>) -> anyhow::Result<()> {
         for token in tokens {
             self.update_token(token).await?;
         }
         Ok(())
     }
 
-    async fn keep_update(&mut self, tokens: Vec<Token>, duration_millis: u64) {
+    pub async fn keep_updated(&mut self, tokens: Vec<Token>, duration_secs: u64) {
         loop {
             if let Err(e) = self.update_all_tokens(&tokens).await {
-                vlog::warn!("Error when updating token market volume", e)
+                vlog::warn!("Error when updating token market volume {:?}", e)
             }
-            tokio::time::delay_for(Duration::from_millis(duration_millis)).await
+            tokio::time::delay_for(Duration::from_secs(duration_secs)).await
         }
     }
 
     async fn check_token(&mut self, token: Token) -> anyhow::Result<bool> {
         if let Some(acceptance_data) = self.tokens.get(&token.address) {
-            if acceptance_data.last_refresh.elapsed() < self.available_time {
+            if chrono::Duration::from_std(acceptance_data.last_refresh.elapsed())
+                .expect("Correct duration")
+                < self.available_time
+            {
                 return Ok(acceptance_data.allowed);
             }
         }
 
-        let volume = self.get_token_market_amount(&token).await?;
+        let db_volume = self.get_token_market_amount(&token).await?;
 
-        if Instant::now() - volume.last_updated < self.available_time {
+        let volume = if db_volume.is_none() {
+            self.update_token(&token).await?
+        } else {
+            db_volume.unwrap()
+        };
+
+        if Utc::now() - volume.last_updated < self.available_time {
             vlog::warn!("Token market amount is not relevant")
         }
 
-        let allowed = volume.market_volume >= self.liquidity_volume;
+        let allowed = ratio_to_big_decimal(&volume.market_volume, 2) >= self.liquidity_volume;
         self.tokens.insert(
             token.address,
             AcceptanceData {
@@ -147,6 +158,7 @@ impl<W: TokenWatcher> FeeTokenValidator<W> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::fee_ticker::validator::cache::TokenInMemoryCache;
     use crate::fee_ticker::validator::watcher::UniswapTokenWatcher;
     use std::str::FromStr;
 
@@ -199,8 +211,8 @@ mod tests {
         unconditionally_valid.insert(eth_address);
 
         let mut validator = FeeTokenValidator::new(
-            tokens,
-            Duration::new(100, 0),
+            TokenInMemoryCache::new().with_tokens(tokens),
+            chrono::Duration::seconds(100),
             100.0,
             unconditionally_valid,
             InMemoryTokenWatcher { amounts },
