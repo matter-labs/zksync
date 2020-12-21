@@ -6,7 +6,7 @@ import { Deployer, readContractCode, readTestContracts } from '../../src.ts/depl
 
 const { expect } = require('chai');
 const { deployContract } = require('ethereum-waffle');
-const { wallet, exitWallet, getCallRevertReason, IERC20_INTERFACE } = require('./common');
+const { wallet, exitWallet, IERC20_INTERFACE } = require('./common');
 
 async function onchainTokenBalanceOfContract(
     ethWallet: ethers.Wallet,
@@ -98,10 +98,9 @@ describe('zkSync process tokens which have no return value in `transfer` and `tr
         await tokenContract.approve(zksyncContract.address, depositAmount.div(2));
 
         const balanceBefore = await tokenContract.balanceOf(wallet.address);
-        const { revertReason } = await getCallRevertReason(
-            async () => await zksyncContract.depositERC20(tokenContract.address, depositAmount, wallet.address)
-        );
+        await zksyncContract.depositERC20(tokenContract.address, depositAmount, wallet.address)
         const balanceAfter = await tokenContract.balanceOf(wallet.address);
+        
         expect(balanceBefore).eq(balanceAfter);
     });
 
@@ -137,11 +136,10 @@ describe('zkSync process tokens which have no return value in `transfer` and `tr
 
         await zksyncContract.setBalanceToWithdraw(wallet.address, tokenId, withdrawAmount);
 
-        const onchainBalBefore = await onchainBalance(wallet, tokenContract.address);
-        const { revertReason } = await getCallRevertReason(
-            async () => await performWithdraw(wallet, tokenContract.address, tokenId, withdrawAmount.add(1))
-        );
+        const onchainBalBefore = await onchainBalance(wallet, tokenContract.address);    
+        await performWithdraw(wallet, tokenContract.address, tokenId, withdrawAmount.add(1))
         const onchainBalAfter = await onchainBalance(wallet, tokenContract.address);
+        
         expect(onchainBalAfter).eq(onchainBalBefore);
     });
 
