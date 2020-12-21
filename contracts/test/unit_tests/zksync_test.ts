@@ -463,7 +463,6 @@ describe('zkSync auth pubkey onchain unit tests', function () {
 
     let zksyncContract;
     let tokenContract;
-    let ethProxy;
     before(async () => {
         const contracts = readTestContracts();
         const deployer = new Deployer({ deployWallet: wallet, contracts });
@@ -480,11 +479,6 @@ describe('zkSync auth pubkey onchain unit tests', function () {
 
         const govContract = deployer.governanceContract(wallet);
         await govContract.addToken(tokenContract.address);
-
-        ethProxy = new ETHProxy(wallet.provider, {
-            mainContract: zksyncContract.address,
-            govContract: govContract.address
-        });
     });
 
     it('Auth pubkey success', async () => {
@@ -533,7 +527,7 @@ describe('zkSync auth pubkey onchain unit tests', function () {
 
         for (const pkHash of [shortPubkeyHash, longPubkeyHash]) {
             const { revertReason } = await getCallRevertReason(
-                async () => await zksyncContract.setAuthPubkeyHash(shortPubkeyHash, nonce, { gasLimit: 300000 })
+                async () => await zksyncContract.setAuthPubkeyHash(pkHash, nonce, { gasLimit: 300000 })
             );
             expect(revertReason, 'revert reason incorrect').eq('ahf10');
         }
@@ -545,7 +539,6 @@ describe('zkSync test process next operation', function () {
 
     let zksyncContract;
     let tokenContract;
-    let incorrectTokenContract;
     let ethProxy;
     before(async () => {
         const contracts = readTestContracts();
@@ -570,12 +563,6 @@ describe('zkSync test process next operation', function () {
             govContract: govContract.address
         });
 
-        incorrectTokenContract = await deployContract(
-            wallet,
-            readContractCode('TestnetERC20Token'),
-            ['Matter Labs Trial Token', 'MLTT', 18],
-            { gasLimit: 5000000 }
-        );
         await tokenContract.mint(wallet.address, parseEther('1000000'));
     });
 
