@@ -315,7 +315,7 @@ impl<API: FeeTickerAPI, INFO: FeeTickerInfo> FeeTicker<API, INFO> {
     }
 
     /// Returns `true` if the token is subsidized.
-    async fn is_token_subsidized(&self, token: Token) -> bool {
+    fn is_token_subsidized(&self, token: Token) -> bool {
         // We have disabled the subsidies up until the contract upgrade (when the prices will indeed become that
         // low), but however we want to leave ourselves the possibility to easily enable them if required.
         // Thus:
@@ -367,7 +367,7 @@ impl<API: FeeTickerAPI, INFO: FeeTickerInfo> FeeTicker<API, INFO> {
         // Convert chunks amount to `BigUint`.
         let op_chunks = BigUint::from(op_chunks);
         let gas_tx_amount = {
-            let is_token_subsidized = self.is_token_subsidized(token.clone()).await;
+            let is_token_subsidized = self.is_token_subsidized(token.clone());
             if is_token_subsidized {
                 self.config
                     .gas_cost_tx
