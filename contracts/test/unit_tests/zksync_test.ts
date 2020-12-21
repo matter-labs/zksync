@@ -410,9 +410,9 @@ describe('zkSync withdraw unit tests', function () {
         await zksyncContract.setBalanceToWithdraw(wallet.address, tokenId, withdrawAmount);
 
         const onchainBalBefore = await onchainBalance(wallet, tokenContract.address);
-        await performWithdraw(wallet, tokenContract.address, tokenId, withdrawAmount.add(1))
+        await performWithdraw(wallet, tokenContract.address, tokenId, withdrawAmount.add(1));
         const onchainBalAfter = await onchainBalance(wallet, tokenContract.address);
-        
+
         expect(onchainBalAfter).eq(onchainBalBefore);
     });
 

@@ -9,8 +9,8 @@ module.exports = {
     extends: ['alloy'],
     rules: {
         'no-console': 'off',
-        'no-debugger': process.env.NODE_ENV === 'production' ? 'error' : 'off',
-        semi: 'warn',
+        'no-debugger': 'error',
+        'semi': 'warn',
         'no-extra-semi': 'off',
         'no-empty': 'warn',
         'spaced-comment': 'off',
