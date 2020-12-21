@@ -6,7 +6,7 @@ import { Deployer, readContractCode, readTestContracts } from '../../src.ts/depl
 
 const { expect } = require('chai');
 const { deployContract } = require('ethereum-waffle');
-const { wallet, exitWallet, IERC20_INTERFACE } = require('./common');
+const { wallet, exitWallet, getCallRevertReason, IERC20_INTERFACE, DEFAULT_REVERT_REASON } = require('./common');
 
 async function onchainTokenBalanceOfContract(
     ethWallet: ethers.Wallet,
@@ -98,10 +98,13 @@ describe('zkSync process tokens which have no return value in `transfer` and `tr
         await tokenContract.approve(zksyncContract.address, depositAmount.div(2));
 
         const balanceBefore = await tokenContract.balanceOf(wallet.address);
-        await zksyncContract.depositERC20(tokenContract.address, depositAmount, wallet.address);
+        const { revertReason } = await getCallRevertReason(
+            async () => await zksyncContract.depositERC20(tokenContract.address, depositAmount, wallet.address)
+        );
         const balanceAfter = await tokenContract.balanceOf(wallet.address);
 
         expect(balanceBefore).eq(balanceAfter);
+        expect(revertReason).to.not.equal(DEFAULT_REVERT_REASON);
     });
 
     it('Withdraw ERC20 success', async () => {
@@ -137,10 +140,13 @@ describe('zkSync process tokens which have no return value in `transfer` and `tr
         await zksyncContract.setBalanceToWithdraw(wallet.address, tokenId, withdrawAmount);
 
         const onchainBalBefore = await onchainBalance(wallet, tokenContract.address);
-        await performWithdraw(wallet, tokenContract.address, tokenId, withdrawAmount.add(1));
+        const { revertReason } = await getCallRevertReason(
+            async () => await performWithdraw(wallet, tokenContract.address, tokenId, withdrawAmount.add(1))
+        );
         const onchainBalAfter = await onchainBalance(wallet, tokenContract.address);
 
         expect(onchainBalAfter).eq(onchainBalBefore);
+        expect(revertReason).to.not.eq(DEFAULT_REVERT_REASON);
     });
 
     it('Complete pending withdawals', async () => {

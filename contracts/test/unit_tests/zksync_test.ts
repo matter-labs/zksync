@@ -7,7 +7,14 @@ import { Deployer, readContractCode, readTestContracts } from '../../src.ts/depl
 const { simpleEncode } = require('ethereumjs-abi');
 const { expect } = require('chai');
 const { deployContract } = require('ethereum-waffle');
-const { wallet, exitWallet, deployTestContract, getCallRevertReason, IERC20_INTERFACE } = require('./common');
+const {
+    wallet,
+    exitWallet,
+    deployTestContract,
+    getCallRevertReason,
+    IERC20_INTERFACE,
+    DEFAULT_REVERT_REASON
+} = require('./common');
 import * as zksync from 'zksync';
 
 const TEST_PRIORITY_EXPIRATION = 101;
@@ -410,10 +417,13 @@ describe('zkSync withdraw unit tests', function () {
         await zksyncContract.setBalanceToWithdraw(wallet.address, tokenId, withdrawAmount);
 
         const onchainBalBefore = await onchainBalance(wallet, tokenContract.address);
-        await performWithdraw(wallet, tokenContract.address, tokenId, withdrawAmount.add(1));
+        const { revertReason } = await getCallRevertReason(
+            async () => await performWithdraw(wallet, tokenContract.address, tokenId, withdrawAmount.add(1))
+        );
         const onchainBalAfter = await onchainBalance(wallet, tokenContract.address);
 
         expect(onchainBalAfter).eq(onchainBalBefore);
+        expect(revertReason).to.not.eq(DEFAULT_REVERT_REASON);
     });
 
     it('Withdraw ERC20 unsupported token', async () => {
