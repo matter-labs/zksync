@@ -92,6 +92,10 @@ mod tests {
     use super::{super::test_utils::TestServerConfig, *};
 
     #[actix_rt::test]
+    #[cfg_attr(
+        not(feature = "api_test"),
+        ignore = "Use `zk test rust-api` command to perform this test"
+    )]
     async fn test_config_scope() -> anyhow::Result<()> {
         let cfg = TestServerConfig::default();
         let (client, server) = cfg.start_server(|cfg| api_scope(&cfg.env_options));

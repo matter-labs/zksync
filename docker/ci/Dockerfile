@@ -4,6 +4,9 @@ RUN dnf install -y  gettext nodejs nodejs-yarn axel jq postgresql libpq-devel ru
   && curl https://sh.rustup.rs -sSf | bash -s -- -y \
   && ln -s /usr/bin/nodejs-yarn /usr/bin/yarn
 
+RUN useradd -u 8877 ci_user
+USER ci_user
+
 RUN cargo install diesel_cli --no-default-features --features postgres
 RUN cargo install wasm-pack
 

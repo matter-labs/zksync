@@ -86,7 +86,7 @@ impl<W: TokenWatcher> MarketUpdater<W> {
 
 /// Fee token validator decides whether certain ERC20 token is suitable for paying fees.
 #[derive(Debug, Clone)]
-pub(crate) struct FeeTokenValidator<W> {
+pub struct FeeTokenValidator<W> {
     // Storage for unconditionally valid tokens, such as ETH
     unconditionally_valid: HashSet<Address>,
     tokens_cache: TokenCacheWrapper,
@@ -103,7 +103,7 @@ impl<W: TokenWatcher> FeeTokenValidator<W> {
     pub(crate) fn new(
         cache: impl Into<TokenCacheWrapper>,
         available_time: chrono::Duration,
-        liquidity_volume: f64,
+        liquidity_volume: BigDecimal,
         unconditionally_valid: HashSet<Address>,
         watcher: W,
     ) -> Self {
@@ -112,7 +112,7 @@ impl<W: TokenWatcher> FeeTokenValidator<W> {
             tokens_cache: cache.into(),
             tokens: Default::default(),
             available_time,
-            liquidity_volume: BigDecimal::from(liquidity_volume),
+            liquidity_volume,
             watcher,
         }
     }
@@ -189,6 +189,7 @@ mod tests {
     use super::*;
     use crate::fee_ticker::validator::cache::TokenInMemoryCache;
     use crate::fee_ticker::validator::watcher::UniswapTokenWatcher;
+    use bigdecimal::Zero;
     use num::rational::Ratio;
     use num::BigUint;
     use std::str::FromStr;
@@ -197,13 +198,19 @@ mod tests {
 
     #[derive(Clone)]
     struct InMemoryTokenWatcher {
-        amounts: Arc<Mutex<HashMap<Address, f64>>>,
+        amounts: Arc<Mutex<HashMap<Address, BigDecimal>>>,
     }
 
     #[async_trait::async_trait]
     impl TokenWatcher for InMemoryTokenWatcher {
-        async fn get_token_market_volume(&mut self, token: &Token) -> anyhow::Result<f64> {
-            Ok(*self.amounts.lock().await.get(&token.address).unwrap())
+        async fn get_token_market_volume(&mut self, token: &Token) -> anyhow::Result<BigDecimal> {
+            Ok(self
+                .amounts
+                .lock()
+                .await
+                .get(&token.address)
+                .unwrap()
+                .clone())
         }
     }
 
@@ -217,8 +224,7 @@ mod tests {
         let dai_token = Token::new(1, dai_token_address, "DAI", 18);
 
         let amount = watcher.get_token_market_volume(&dai_token).await.unwrap();
-
-        assert!(amount > 0.0);
+        assert!(amount > BigDecimal::zero());
     }
 
     #[tokio::test]
@@ -255,8 +261,8 @@ mod tests {
         tokens.insert(TokenLike::Address(phnx_token_address), phnx_token.clone());
         tokens.insert(TokenLike::Address(eth_address), eth_token);
         let mut amounts = HashMap::new();
-        amounts.insert(dai_token_address, 200.0);
-        amounts.insert(phnx_token_address, 10.0);
+        amounts.insert(dai_token_address, BigDecimal::from(200));
+        amounts.insert(phnx_token_address, BigDecimal::from(10));
         let mut unconditionally_valid = HashSet::new();
         unconditionally_valid.insert(eth_address);
 
@@ -271,7 +277,7 @@ mod tests {
         let mut validator = FeeTokenValidator::new(
             cache.clone(),
             chrono::Duration::seconds(100),
-            100.0,
+            BigDecimal::from(100),
             unconditionally_valid,
             watcher.clone(),
         );

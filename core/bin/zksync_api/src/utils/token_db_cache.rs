@@ -8,15 +8,15 @@ use zksync_types::{Token, TokenId, TokenLike};
 
 #[derive(Debug, Clone)]
 pub struct TokenDBCache {
-    pub db: ConnectionPool,
+    pub pool: ConnectionPool,
     // TODO: handle stale entries, edge case when we rename token after adding it (ZKS-97)
     cache: Arc<RwLock<HashMap<TokenLike, Token>>>,
 }
 
 impl TokenDBCache {
-    pub fn new(db: ConnectionPool) -> Self {
+    pub fn new(pool: ConnectionPool) -> Self {
         Self {
-            db,
+            pool,
             cache: Arc::new(RwLock::new(HashMap::new())),
         }
     }
@@ -33,8 +33,8 @@ impl TokenDBCache {
         //
         // TODO: Remove this case after Golem update [ZKS-173]
         match token_query {
-            TokenLike::Symbol(symbol) if symbol == "GLM" => {
-                // Try to lookup Golem token as "GLM".
+            TokenLike::Symbol(symbol) if symbol == "tGLM" => {
+                // Try to lookup Golem token as "tGLM".
                 if let Some(token) = self.get_token_impl(TokenLike::Symbol(symbol)).await? {
                     // If such token exists, use it.
                     Ok(Some(token))
@@ -55,7 +55,7 @@ impl TokenDBCache {
         }
         // Tries to fetch token from the underlying database.
         let token = {
-            let mut storage = self.db.access_storage().await?;
+            let mut storage = self.pool.access_storage().await?;
             storage
                 .tokens_schema()
                 .get_token(token_query.clone())
@@ -69,9 +69,14 @@ impl TokenDBCache {
         Ok(token)
     }
 
+    pub async fn token_symbol(&self, token_id: TokenId) -> anyhow::Result<Option<String>> {
+        let token = self.get_token(token_id).await?;
+        Ok(token.map(|token| token.symbol))
+    }
+
     pub async fn get_all_tokens(&self) -> Result<Vec<Token>, anyhow::Error> {
         let tokens = self
-            .db
+            .pool
             .access_storage()
             .await?
             .tokens_schema()
@@ -86,7 +91,7 @@ impl TokenDBCache {
         token: TokenId,
     ) -> anyhow::Result<Option<TokenMarketVolume>> {
         Ok(self
-            .db
+            .pool
             .access_storage()
             .await?
             .tokens_schema()
@@ -100,7 +105,7 @@ impl TokenDBCache {
         market: TokenMarketVolume,
     ) -> anyhow::Result<()> {
         Ok(self
-            .db
+            .pool
             .access_storage()
             .await?
             .tokens_schema()

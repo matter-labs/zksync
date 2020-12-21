@@ -5,10 +5,11 @@ use tokio::sync::Mutex;
 use zksync_types::{Address, Token};
 
 use crate::fee_ticker::ticker_api::REQUEST_TIMEOUT;
+use bigdecimal::BigDecimal;
 
 #[async_trait::async_trait]
 pub trait TokenWatcher {
-    async fn get_token_market_volume(&mut self, token: &Token) -> anyhow::Result<f64>;
+    async fn get_token_market_volume(&mut self, token: &Token) -> anyhow::Result<BigDecimal>;
 }
 
 /// Watcher for Uniswap protocol
@@ -17,7 +18,7 @@ pub trait TokenWatcher {
 pub struct UniswapTokenWatcher {
     client: reqwest::Client,
     addr: String,
-    cache: Arc<Mutex<HashMap<Address, f64>>>,
+    cache: Arc<Mutex<HashMap<Address, BigDecimal>>>,
 }
 
 impl UniswapTokenWatcher {
@@ -28,7 +29,7 @@ impl UniswapTokenWatcher {
             cache: Default::default(),
         }
     }
-    async fn get_market_volume(&mut self, address: Address) -> anyhow::Result<f64> {
+    async fn get_market_volume(&mut self, address: Address) -> anyhow::Result<BigDecimal> {
         // Uniswap has graphql API, using full graphql client for one query is overkill for current task
         let query = format!("{{token(id: \"{:?}\"){{tradeVolumeUSD}}}}", address);
 
@@ -46,11 +47,11 @@ impl UniswapTokenWatcher {
 
         Ok(response.data.token.trade_volume_usd.parse()?)
     }
-    async fn update_historical_amount(&mut self, address: Address, amount: f64) {
+    async fn update_historical_amount(&mut self, address: Address, amount: BigDecimal) {
         let mut cache = self.cache.lock().await;
         cache.insert(address, amount);
     }
-    async fn get_historical_amount(&mut self, address: Address) -> Option<f64> {
+    async fn get_historical_amount(&mut self, address: Address) -> Option<BigDecimal> {
         let cache = self.cache.lock().await;
         cache.get(&address).cloned()
     }
@@ -74,10 +75,11 @@ struct TokenResponse {
 
 #[async_trait::async_trait]
 impl TokenWatcher for UniswapTokenWatcher {
-    async fn get_token_market_volume(&mut self, token: &Token) -> anyhow::Result<f64> {
+    async fn get_token_market_volume(&mut self, token: &Token) -> anyhow::Result<BigDecimal> {
         match self.get_market_volume(token.address).await {
             Ok(amount) => {
-                self.update_historical_amount(token.address, amount).await;
+                self.update_historical_amount(token.address, amount.clone())
+                    .await;
                 return Ok(amount);
             }
             Err(err) => {

@@ -7,7 +7,7 @@ use std::convert::TryFrom;
 // External imports
 // Workspace imports
 use zksync_types::{
-    Action, ActionType, Operation,
+    Action, ActionType, Operation, SignedZkSyncTx, H256,
     {
         block::{ExecutedPriorityOp, ExecutedTx},
         BlockNumber, PriorityOp, ZkSyncOp, ZkSyncTx,
@@ -25,7 +25,6 @@ use crate::{
     prover::ProverSchema,
     QueryResult, StorageProcessor,
 };
-use zksync_types::SignedZkSyncTx;
 
 impl StoredOperation {
     pub async fn into_op(self, conn: &mut StorageProcessor<'_>) -> QueryResult<Operation> {
@@ -85,7 +84,7 @@ impl StoredExecutedPriorityOperation {
                     .try_get_priority_op()
                     .expect("ZkSyncOp should have priority op"),
                 deadline_block: self.deadline_block as u64,
-                eth_hash: self.eth_hash,
+                eth_hash: H256::from_slice(&self.eth_hash),
                 eth_block: self.eth_block as u64,
             },
             op: franklin_op,
@@ -122,7 +121,7 @@ impl NewExecutedPriorityOperation {
             to_account: to_account.as_ref().to_vec(),
             priority_op_serialid: exec_prior_op.priority_op.serial_id as i64,
             deadline_block: exec_prior_op.priority_op.deadline_block as i64,
-            eth_hash: exec_prior_op.priority_op.eth_hash,
+            eth_hash: exec_prior_op.priority_op.eth_hash.as_bytes().to_vec(),
             eth_block: exec_prior_op.priority_op.eth_block as i64,
             created_at: exec_prior_op.created_at,
         }

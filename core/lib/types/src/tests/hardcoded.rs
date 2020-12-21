@@ -1,7 +1,7 @@
 //! Tests strictly validating the output for hardcoded input data
 //!
 //! These tests only check the code that should not change, and if it does change, then this may be a critical change.
-//!  
+//!
 //! If after changing some code, the tests stopped passing, then not only change the expected
 //! answer for the tests but also be sure to notify the command about the changes introduced!
 
@@ -263,7 +263,7 @@ pub mod tx_conversion_test {
         let change_pubkey = ChangePubKey::new(
             ACCOUNT_ID,
             *ALICE,
-            (*PK_HASH).clone(),
+            *PK_HASH,
             TOKEN_ID,
             (*FEE).clone(),
             NONCE,

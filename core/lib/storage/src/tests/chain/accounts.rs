@@ -3,9 +3,9 @@
 use zksync_types::AccountMap;
 use zksync_types::Action;
 // Local imports
-use super::{block::apply_random_updates, utils::get_operation};
-use crate::chain::state::StateSchema;
+use super::block::apply_random_updates;
 use crate::tests::{create_rng, db_test};
+use crate::{chain::state::StateSchema, test_data::gen_operation};
 use crate::{
     chain::{account::AccountSchema, block::BlockSchema},
     prover::ProverSchema,
@@ -26,7 +26,7 @@ async fn stored_accounts(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
     // Execute and commit block with them.
     // Also store account updates.
     BlockSchema(&mut storage)
-        .execute_operation(get_operation(1, Action::Commit, block_size))
+        .execute_operation(gen_operation(1, Action::Commit, block_size))
         .await?;
     StateSchema(&mut storage)
         .commit_state_update(1, &updates_block, 0)
@@ -36,7 +36,7 @@ async fn stored_accounts(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
     for (account_id, account) in accounts_block.iter() {
         let mut account = account.clone();
         let account_state = AccountSchema(&mut storage)
-            .account_state_by_address(&account.address)
+            .account_state_by_address(account.address)
             .await?;
 
         // Check that committed state is available, but verified is not.
@@ -53,7 +53,7 @@ async fn stored_accounts(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
         let (got_account_id, got_account) = account_state.committed.unwrap();
 
         // We have to copy this field, since it is not initialized by default.
-        account.pub_key_hash = got_account.pub_key_hash.clone();
+        account.pub_key_hash = got_account.pub_key_hash;
 
         assert_eq!(got_account_id, *account_id);
         assert_eq!(got_account, account);
@@ -65,6 +65,20 @@ async fn stored_accounts(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
                 .await?,
             Some(got_account)
         );
+
+        // Check account address and ID getters.
+        assert_eq!(
+            AccountSchema(&mut storage)
+                .account_address_by_id(*account_id)
+                .await?,
+            Some(account.address)
+        );
+        assert_eq!(
+            AccountSchema(&mut storage)
+                .account_id_by_address(account.address)
+                .await?,
+            Some(*account_id)
+        );
     }
 
     // Now add a proof, verify block and apply a state update.
@@ -72,7 +86,7 @@ async fn stored_accounts(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
         .store_proof(1, &Default::default())
         .await?;
     BlockSchema(&mut storage)
-        .execute_operation(get_operation(
+        .execute_operation(gen_operation(
             1,
             Action::Verify {
                 proof: Default::default(),
@@ -85,7 +99,7 @@ async fn stored_accounts(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
     // After that all the accounts should have a verified state.
     for (account_id, account) in accounts_block {
         let account_state = AccountSchema(&mut storage)
-            .account_state_by_address(&account.address)
+            .account_state_by_id(account_id)
             .await?;
 
         assert!(

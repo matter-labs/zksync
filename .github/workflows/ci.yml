@@ -9,7 +9,7 @@ jobs:
   ci-all:
     # We currently have two self-hosted runners, one of which is marked "DEV-CI" and other one is marder "MAIN".
     # "MAIN" is the current CI runner, "DEV-CI" is currently used to experiment with CI optimizing.
-    runs-on: [self-hosted, MAIN]
+    runs-on: self-hosted
 
     steps:
     - uses: actions/checkout@v2
@@ -23,10 +23,29 @@ jobs:
         echo CI=1 >> $GITHUB_ENV
         echo $(pwd)/bin >> $GITHUB_PATH
 
+    - name: cache-contracts
+      uses: actions/cache@v2
+      with:
+        path: |
+          contracts/build
+          contracts/node_modules
+          contracts/dev-contracts/generated
+        key: ${{ runner.os }}-contracts-${{ hashFiles('contracts/contracts/*.sol') }}
+
+    - name: cache-rust
+      uses: actions/cache@v2
+      with:
+        path: |
+          ~/.cargo/registry
+          ~/.cargo/git
+          target
+        key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+
     - name: update-deps
       run: |
         rustup update stable
-        cargo sqlx --version || cargo install --version=0.2.0 sqlx-cli
+        cargo install --version=0.2.0 sqlx-cli
+        cargo install diesel_cli --no-default-features --features postgres
         docker pull matterlabs/ci-integration-test:latest
 
     - name: zk
@@ -38,16 +57,15 @@ jobs:
         zk fmt --check
         yarn lint:md
         yarn lint:sol
-        # So database will be created for compilation.
-        zk db setup
         zk dummy-prover ensure-disabled
         cargo fmt --all -- --check
-        # For some reason, `cargo clippy` currently doesn't work in sqlx offline mod. So, we're checking it in online mode.
         zk f cargo clippy --tests --benches -- -D warnings
         pushd sdk/zksync-crypto
         cargo fmt -- --check
         cargo clippy --all --tests --benches -- -D warnings
-    
+      env:
+        SQLX_OFFLINE: "true"
+
     - name: generic-init
       run: |
         # Unpack keys to build dev contracts
@@ -61,6 +79,8 @@ jobs:
 
     - name: integration-testkit
       run: zk test integration testkit
+      env:
+        SQLX_OFFLINE: "true"
 
     - name: contracts-unit-tests
       run: zk test contracts
@@ -69,7 +89,10 @@ jobs:
       run: zk test js
 
     - name: rust-unit-tests
-      run: zk test rust
+      run: |
+        # Api tests require database setup
+        zk db setup
+        zk test rust
 
     - name: zksync-crypto-tests
       run: pushd sdk/zksync-crypto && zk f cargo test --release

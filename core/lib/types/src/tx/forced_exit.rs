@@ -6,7 +6,6 @@ use num::BigUint;
 
 use crate::account::PubKeyHash;
 use crate::Engine;
-use anyhow::bail;
 use serde::{Deserialize, Serialize};
 use zksync_basic_types::Address;
 use zksync_crypto::franklin_crypto::eddsa::PrivateKey;
@@ -90,7 +89,7 @@ impl ForcedExit {
         let mut tx = Self::new(initiator_account_id, target, token, fee, nonce, None);
         tx.signature = TxSignature::sign_musig(private_key, &tx.get_bytes());
         if !tx.check_correctness() {
-            bail!("Transfer is incorrect, check amounts");
+            anyhow::bail!(crate::tx::TRANSACTION_SIGNATURE_ERROR);
         }
         Ok(tx)
     }
@@ -129,7 +128,7 @@ impl ForcedExit {
     /// Restores the `PubKeyHash` from the transaction signature.
     pub fn verify_signature(&self) -> Option<PubKeyHash> {
         if let VerifiedSignatureCache::Cached(cached_signer) = &self.cached_signer {
-            cached_signer.clone()
+            *cached_signer
         } else if let Some(pub_key) = self.signature.verify_musig(&self.get_bytes()) {
             Some(PubKeyHash::from_pubkey(&pub_key))
         } else {

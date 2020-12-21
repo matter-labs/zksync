@@ -577,7 +577,9 @@ impl ZkSyncStateKeeper {
         } else {
             self.max_miniblock_iterations
         };
-        if self.pending_block.pending_block_iteration > max_miniblock_iterations {
+        if self.pending_block.chunks_left == 0
+            || self.pending_block.pending_block_iteration > max_miniblock_iterations
+        {
             self.seal_pending_block().await;
         } else {
             // We've already incremented the pending block iteration, so this iteration will count towards

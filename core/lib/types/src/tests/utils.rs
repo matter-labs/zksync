@@ -13,7 +13,7 @@ pub fn create_full_exit_op() -> ExecutedOperations {
             serial_id: 0,
             data: ZkSyncPriorityOp::FullExit(priority_op.clone()),
             deadline_block: 0,
-            eth_hash: Vec::new(),
+            eth_hash: H256::zero(),
             eth_block: 0,
         },
         op: ZkSyncOp::FullExit(Box::new(FullExitOp {

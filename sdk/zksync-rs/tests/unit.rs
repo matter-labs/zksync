@@ -294,7 +294,7 @@ mod signatures_with_vectors {
                     sign_data.account_id,
                 )
                 .await;
-                signer.pubkey_hash = change_pubkey_tx.new_pk_hash.clone();
+                signer.pubkey_hash = change_pubkey_tx.new_pk_hash;
 
                 let token = Token {
                     id: change_pubkey_tx.fee_token_id,
@@ -378,8 +378,10 @@ mod wallet_tests {
     use zksync::{
         error::ClientError,
         provider::Provider,
+        signer::Signer,
         types::{
-            AccountInfo, AccountState, BlockStatus, ContractAddress, Fee, Tokens, TransactionInfo,
+            AccountInfo, AccountState, BlockStatus, ContractAddress, EthOpInfo, Fee, Tokens,
+            TransactionInfo,
         },
         Network, Wallet, WalletCredentials,
     };
@@ -395,12 +397,27 @@ mod wallet_tests {
     /// without communicating with the network
     struct MockProvider {
         network: Network,
+        eth_private_key: H256,
+    }
+
+    impl MockProvider {
+        async fn pub_key_hash(&self) -> PubKeyHash {
+            let address =
+                PackedEthSignature::address_from_private_key(&self.eth_private_key).unwrap();
+            let eth_signer = PrivateKeySigner::new(self.eth_private_key);
+            let creds = WalletCredentials::from_eth_signer(address, eth_signer, self.network)
+                .await
+                .unwrap();
+            let signer = Signer::with_credentials(creds);
+            signer.pubkey_hash
+        }
     }
 
     #[async_trait::async_trait]
     impl Provider for MockProvider {
         /// Returns the example `AccountInfo` instance:
         ///  - assigns the '42' value to account_id;
+        ///  - assigns the PubKeyHash to match the wallet's signer's PubKeyHash
         ///  - adds single entry of "DAI" token to the committed balances;
         ///  - adds single entry of "USDC" token to the verified balances.
         async fn account_info(&self, address: Address) -> Result<AccountInfo, ClientError> {
@@ -417,10 +434,7 @@ mod wallet_tests {
                 committed: AccountState {
                     balances: committed_balances,
                     nonce: 0,
-                    pub_key_hash: PubKeyHash::from_hex(
-                        "sync:0102030405060708091011121314151617181920",
-                    )
-                    .unwrap(),
+                    pub_key_hash: self.pub_key_hash().await,
                 },
                 verified: AccountState {
                     balances: verified_balances,
@@ -463,16 +477,15 @@ mod wallet_tests {
             unreachable!()
         }
 
-        async fn send_tx(
-            &self,
-            _tx: ZkSyncTx,
-            _eth_signature: Option<PackedEthSignature>,
-        ) -> Result<TxHash, ClientError> {
+        async fn ethop_info(&self, _serial_id: u32) -> Result<EthOpInfo, ClientError> {
             unreachable!()
         }
 
-        fn network(&self) -> Network {
-            self.network
+        async fn get_eth_tx_for_withdrawal(
+            &self,
+            _withdrawal_hash: TxHash,
+        ) -> Result<Option<String>, ClientError> {
+            unreachable!()
         }
 
         /// Returns the example `ContractAddress` instance:
@@ -483,6 +496,26 @@ mod wallet_tests {
                 main_contract: "0x000102030405060708090a0b0c0d0e0f10111213".to_string(),
                 gov_contract: "".to_string(),
             })
+        }
+
+        async fn send_tx(
+            &self,
+            _tx: ZkSyncTx,
+            _eth_signature: Option<PackedEthSignature>,
+        ) -> Result<TxHash, ClientError> {
+            unreachable!()
+        }
+
+        async fn send_txs_batch(
+            &self,
+            _txs_signed: Vec<(ZkSyncTx, Option<PackedEthSignature>)>,
+            _eth_signature: Option<PackedEthSignature>,
+        ) -> Result<Vec<TxHash>, ClientError> {
+            unreachable!()
+        }
+
+        fn network(&self) -> Network {
+            self.network
         }
     }
 
@@ -498,7 +531,10 @@ mod wallet_tests {
             .await
             .unwrap();
 
-        let provider = MockProvider { network };
+        let provider = MockProvider {
+            network,
+            eth_private_key: private_key,
+        };
         Wallet::new(provider, creds).await.unwrap()
     }
 

@@ -149,7 +149,8 @@ async fn gas_price_limit_scaling() {
     let mut expected_price = PRICE_LIMIT;
 
     // Initial phase: stats are not yet initialized, we are based on the DB limit.
-    for _ in 0..N_SAMPLES {
+    // The reason for the dividing is that we update samples it twice per iteration
+    for _ in 0..N_SAMPLES / 2 {
         let suggested_price = gas_adjuster
             .get_gas_price(&ethereum, Some(expected_price.into()))
             .await

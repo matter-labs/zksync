@@ -185,6 +185,7 @@ impl<'a, 'c> TokensSchema<'a, 'c> {
         metrics::histogram!("sql.token.update_market_volume", start.elapsed());
         Ok(())
     }
+    /// Given token id, returns its price in USD and a timestamp of the last update.
     pub async fn get_historical_ticker_price(
         &mut self,
         token_id: TokenId,
@@ -206,6 +207,10 @@ impl<'a, 'c> TokensSchema<'a, 'c> {
         Ok(db_price.map(|p| p.into()))
     }
 
+    /// Updates price in USD for the given token.
+    ///
+    /// Note, that the price precision cannot be greater than `STORED_USD_PRICE_PRECISION`,
+    /// so the number might get rounded.
     pub async fn update_historical_ticker_price(
         &mut self,
         token_id: TokenId,
