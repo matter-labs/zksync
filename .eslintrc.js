@@ -10,11 +10,11 @@ module.exports = {
     rules: {
         'no-console': 'off',
         'no-debugger': 'error',
-        'semi': 'warn',
+        semi: 'warn',
         'no-extra-semi': 'off',
         'no-empty': 'warn',
         'spaced-comment': 'off',
-        'eqeqeq': 'off',
+        eqeqeq: 'off',
         'max-params': 'off',
         'no-eq-null': 'off',
         'no-implicit-coercion': 'off',

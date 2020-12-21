@@ -3,7 +3,7 @@ import * as utils from './utils';
 
 const IGNORED_DIRS = ['target', 'node_modules', 'volumes', 'build', 'dist', '.git', 'generated', 'grafonnet-lib'];
 const IGNORED_FILES = ['KeysWithPlonkVerifier.sol', 'TokenInit.sol'];
-const EXTENSIONS = ['ts', 'md', 'sol', 'vue'];
+const EXTENSIONS = ['ts', 'md', 'sol', 'js', 'vue'];
 
 // If you wonder why this is written so obscurely through find and not through .prettierignore and globs,
 // it's because prettier *first* expands globs and *then* applies ignore rules, which leads to an error
@@ -21,8 +21,9 @@ export async function fmt(extension: string, check: boolean = false) {
     const ignored_dirs = IGNORED_DIRS.map((dir) => `-o -path '*/${dir}' -prune`).join(' ');
     const ignored_files = IGNORED_FILES.map((file) => `-a ! -name '${file}'`).join(' ');
     const { stdout: files } = await utils.exec(
-        `find ${root} -name '*.${extension}' ${ignored_files} -print ${ignored_dirs}`
+        `find ${root} -type f -name '*.${extension}' ${ignored_files} -print ${ignored_dirs}`
     );
+
     await utils.spawn(`yarn --silent prettier --config .prettier-${extension}.json --${command} ${files}`);
 }
 

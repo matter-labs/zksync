@@ -55,7 +55,7 @@ window.app = new Vue({
     created() {
         document.title = `zkSync ${store.capitalizedNetwork} Explorer — trustless scalable payments`;
     },
-    render: h => h(App)
+    render: (h) => h(App)
 });
 
 // debug utils
@@ -65,6 +65,6 @@ window.ethers = ethers;
 window.p = {
     // promise printer for debugging in console
     set p(promise) {
-        promise.then(r => console.log(r));
+        promise.then((r) => console.log(r));
     }
 };
