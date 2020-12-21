@@ -221,7 +221,7 @@ impl ApiAccountsData {
 
         let receipts = ongoing_ops
             .into_iter()
-            .map(|(block_id, op)| PendingAccountOpReceipt::from_priority_op(block_id, op))
+            .map(PendingAccountOpReceipt::from_priority_op)
             .collect();
 
         Ok(receipts)

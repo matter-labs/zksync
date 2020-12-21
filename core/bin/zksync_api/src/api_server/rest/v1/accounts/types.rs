@@ -22,7 +22,6 @@ use zksync_utils::BigUintSerdeWrapper;
 // Local uses
 use crate::{
     api_server::{helpers::remove_prefix, v1::MAX_LIMIT},
-    core_api_client::EthBlockId,
     utils::token_db_cache::TokenDBCache,
 };
 
@@ -254,13 +253,14 @@ impl From<SearchDirection> for StorageSearchDirection {
 
 impl DepositingBalances {
     pub(crate) async fn from_pending_ops(
-        ongoing_ops: Vec<(EthBlockId, PriorityOp)>,
+        ongoing_ops: Vec<PriorityOp>,
         confirmations_for_eth_event: BlockNumber,
         tokens: &TokenDBCache,
     ) -> QueryResult<Self> {
         let mut balances = BTreeMap::new();
 
-        for (received_on_block, op) in ongoing_ops {
+        for op in ongoing_ops {
+            let received_on_block = op.eth_block;
             let (amount, token_id) = match op.data {
                 zksync_types::ZkSyncPriorityOp::Deposit(deposit) => (deposit.amount, deposit.token),
                 zksync_types::ZkSyncPriorityOp::FullExit(other) => {
@@ -421,9 +421,9 @@ impl From<AccountOpReceiptResponse> for AccountOpReceipt {
 }
 
 impl PendingAccountOpReceipt {
-    pub fn from_priority_op(block_id: EthBlockId, op: PriorityOp) -> Self {
+    pub fn from_priority_op(op: PriorityOp) -> Self {
         Self {
-            eth_block: block_id,
+            eth_block: op.eth_block,
             hash: op.eth_hash,
         }
     }

@@ -164,23 +164,20 @@ async fn accounts_scope() -> anyhow::Result<()> {
 
     // Provide unconfirmed pending deposits.
     *server.pending_deposits.lock().await = json!([
-        [
-            5,
-            {
-                "serial_id": 1,
-                "data": {
-                    "type": "Deposit",
-                    "account_id": account_id,
-                    "amount": "100500",
-                    "from": Address::default(),
-                    "to": address,
-                    "token": 0,
-                },
-                "deadline_block": 10,
-                "eth_hash": vec![0u8; 32],
-                "eth_block": 5,
+        {
+            "serial_id": 1,
+            "data": {
+                "type": "Deposit",
+                "account_id": account_id,
+                "amount": "100500",
+                "from": Address::default(),
+                "to": address,
+                "token": 0,
             },
-        ],
+            "deadline_block": 10,
+            "eth_hash": vec![0u8; 32],
+            "eth_block": 5,
+        },
     ]);
 
     // Check account information about unconfirmed deposits.
@@ -274,38 +271,32 @@ async fn accounts_scope() -> anyhow::Result<()> {
 
     // Get account pending receipts.
     *server.pending_ops.lock().await = json!([
-        [
-            5,
-            {
-                "serial_id": 1,
-                "data": {
-                    "type": "Deposit",
-                    "account_id": account_id,
-                    "amount": "100500",
-                    "from": Address::default(),
-                    "to": address,
-                    "token": 0,
-                },
-                "deadline_block": 10,
-                "eth_hash": vec![0u8; 32],
-                "eth_block": 5,
+        {
+            "serial_id": 1,
+            "data": {
+                "type": "Deposit",
+                "account_id": account_id,
+                "amount": "100500",
+                "from": Address::default(),
+                "to": address,
+                "token": 0,
             },
-        ],
-        [
-            5,
-            {
-                "serial_id": 2,
-                "data": {
-                  "type": "FullExit",
-                  "account_id": account_id,
-                  "eth_address": Address::default(),
-                  "token": 0
-                },
-                "deadline_block": 0,
-                "eth_hash": vec![1u8; 32],
-                "eth_block": 5
-            }
-        ]
+            "deadline_block": 10,
+            "eth_hash": vec![0u8; 32],
+            "eth_block": 5,
+        },
+        {
+            "serial_id": 2,
+            "data": {
+                "type": "FullExit",
+                "account_id": account_id,
+                "eth_address": Address::default(),
+                "token": 0
+            },
+            "deadline_block": 0,
+            "eth_hash": vec![1u8; 32],
+            "eth_block": 5
+        }
     ]);
     let pending_receipts = client.account_pending_ops(account_id).await?;
 

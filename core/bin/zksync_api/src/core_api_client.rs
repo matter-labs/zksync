@@ -40,7 +40,7 @@ impl CoreApiClient {
     pub async fn get_unconfirmed_deposits(
         &self,
         address: Address,
-    ) -> anyhow::Result<Vec<(EthBlockId, PriorityOp)>> {
+    ) -> anyhow::Result<Vec<PriorityOp>> {
         let endpoint = format!(
             "{}/unconfirmed_deposits/0x{}",
             self.addr,
@@ -50,10 +50,7 @@ impl CoreApiClient {
     }
 
     /// Queries information about unconfirmed priority operations for a certain address from a Core.
-    pub async fn get_unconfirmed_ops(
-        &self,
-        address: Address,
-    ) -> anyhow::Result<Vec<(EthBlockId, PriorityOp)>> {
+    pub async fn get_unconfirmed_ops(&self, address: Address) -> anyhow::Result<Vec<PriorityOp>> {
         let endpoint = format!("{}/unconfirmed_ops/0x{}", self.addr, hex::encode(address));
         self.get(&endpoint).await
     }
