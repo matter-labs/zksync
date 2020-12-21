@@ -21,7 +21,7 @@ use zksync_types::{BlockNumber, ExecutedPriorityOp, H256};
 // Local uses
 use super::{
     client::{Client, ClientError},
-    transactions::TxReceipt,
+    transactions::Receipt,
     Error as ApiError, JsonResult,
 };
 
@@ -75,17 +75,17 @@ impl ApiOperationsData {
 
         let receipt = if block_info.verify_tx_hash.is_some() {
             PriorityOpReceipt {
-                status: TxReceipt::Verified { block },
+                status: Receipt::Verified { block },
                 index: Some(index),
             }
         } else if block_info.commit_tx_hash.is_some() {
             PriorityOpReceipt {
-                status: TxReceipt::Committed { block },
+                status: Receipt::Committed { block },
                 index: Some(index),
             }
         } else {
             PriorityOpReceipt {
-                status: TxReceipt::Executed,
+                status: Receipt::Executed,
                 index: None,
             }
         };
@@ -110,7 +110,7 @@ pub enum PriorityOpQuery {
 #[serde(rename_all = "camelCase")]
 pub struct PriorityOpReceipt {
     #[serde(flatten)]
-    pub status: TxReceipt,
+    pub status: Receipt,
     pub index: Option<u32>,
 }
 
@@ -292,7 +292,7 @@ mod tests {
 
         let expected_receipt = PriorityOpReceipt {
             index: Some(2),
-            status: TxReceipt::Verified { block: 2 },
+            status: Receipt::Verified { block: 2 },
         };
         assert_eq!(
             client.priority_op(VERIFIED_OP_SERIAL_ID).await?.as_ref(),
@@ -332,7 +332,7 @@ mod tests {
 
         let expected_receipt = PriorityOpReceipt {
             index: Some(1),
-            status: TxReceipt::Committed { block: 4 },
+            status: Receipt::Committed { block: 4 },
         };
         assert_eq!(
             client.priority_op(COMMITTED_OP_SERIAL_ID).await?.as_ref(),

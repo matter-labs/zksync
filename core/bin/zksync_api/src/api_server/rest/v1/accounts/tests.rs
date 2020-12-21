@@ -19,7 +19,7 @@ use zksync_types::{tx::TxHash, AccountId, Address, BlockNumber, ExecutedOperatio
 // Local uses
 use crate::{
     api_server::v1::{
-        client::{Client, TxReceipt},
+        client::{Client, Receipt},
         test_utils::{dummy_deposit_op, TestServerConfig},
     },
     core_api_client::CoreApiClient,
@@ -33,10 +33,15 @@ use super::{
 
 type PendingOpsHandle = Arc<Mutex<serde_json::Value>>;
 
+fn create_pending_ops_handle() -> PendingOpsHandle {
+    Arc::new(Mutex::new(json!([])))
+}
+
 fn get_unconfirmed_ops_loopback(
-    handle: PendingOpsHandle,
+    ops_handle: PendingOpsHandle,
+    deposits_handle: PendingOpsHandle,
 ) -> (CoreApiClient, actix_web::test::TestServer) {
-    async fn get_unconfirmed_ops(
+    async fn get_ops(
         data: web::Data<PendingOpsHandle>,
         _path: web::Path<String>,
     ) -> Json<serde_json::Value> {
@@ -44,11 +49,19 @@ fn get_unconfirmed_ops_loopback(
     };
 
     let server = actix_web::test::start(move || {
-        let handle = handle.clone();
-        App::new().data(handle).route(
-            "unconfirmed_ops/{address}",
-            web::get().to(get_unconfirmed_ops),
-        )
+        let ops_handle = ops_handle.clone();
+        let deposits_handle = deposits_handle.clone();
+        App::new()
+            .service(
+                web::scope("unconfirmed_ops")
+                    .data(ops_handle)
+                    .route("{address}", web::get().to(get_ops)),
+            )
+            .service(
+                web::scope("unconfirmed_deposits")
+                    .data(deposits_handle)
+                    .route("{address}", web::get().to(get_ops)),
+            )
     });
 
     let url = server.url("").trim_end_matches('/').to_owned();
@@ -60,6 +73,7 @@ struct TestServer {
     api_server: actix_web::test::TestServer,
     pool: ConnectionPool,
     pending_ops: PendingOpsHandle,
+    pending_deposits: PendingOpsHandle,
 }
 
 impl TestServer {
@@ -67,8 +81,10 @@ impl TestServer {
         let cfg = TestServerConfig::default();
         cfg.fill_database().await?;
 
-        let pending_ops = PendingOpsHandle::new(Mutex::new(json!([])));
-        let (core_client, core_server) = get_unconfirmed_ops_loopback(pending_ops.clone());
+        let pending_ops = create_pending_ops_handle();
+        let pending_deposits = create_pending_ops_handle();
+        let (core_client, core_server) =
+            get_unconfirmed_ops_loopback(pending_ops.clone(), pending_deposits.clone());
 
         let pool = cfg.pool.clone();
 
@@ -87,6 +103,7 @@ impl TestServer {
                 api_server,
                 pool,
                 pending_ops,
+                pending_deposits,
             },
         ))
     }
@@ -121,9 +138,10 @@ impl TestServer {
 )]
 async fn unconfirmed_deposits_loopback() -> anyhow::Result<()> {
     let (client, server) =
-        get_unconfirmed_ops_loopback(PendingOpsHandle::new(Mutex::new(json!([]))));
+        get_unconfirmed_ops_loopback(create_pending_ops_handle(), create_pending_ops_handle());
 
     client.get_unconfirmed_deposits(Address::default()).await?;
+    client.get_unconfirmed_ops(Address::default()).await?;
 
     server.stop().await;
     Ok(())
@@ -144,8 +162,8 @@ async fn accounts_scope() -> anyhow::Result<()> {
     let address = account_info.address;
     assert_eq!(client.account_info(address).await?, Some(account_info));
 
-    // Provide unconfirmed pending ops.
-    let pending_ops = json!([
+    // Provide unconfirmed pending deposits.
+    *server.pending_deposits.lock().await = json!([
         [
             5,
             {
@@ -163,23 +181,7 @@ async fn accounts_scope() -> anyhow::Result<()> {
                 "eth_block": 5,
             },
         ],
-        [
-            5,
-            {
-                "serial_id": 2,
-                "data": {
-                  "type": "FullExit",
-                  "account_id": account_id,
-                  "eth_address": Address::default(),
-                  "token": 0
-                },
-                "deadline_block": 0,
-                "eth_hash": vec![1u8; 32],
-                "eth_block": 5
-              }
-        ]
     ]);
-    *server.pending_ops.lock().await = pending_ops;
 
     // Check account information about unconfirmed deposits.
     let account_info = client.account_info(account_id).await?.unwrap();
@@ -193,10 +195,18 @@ async fn accounts_scope() -> anyhow::Result<()> {
         .account_tx_receipts(address, AccountReceipts::newer_than(0, None), 10)
         .await?;
 
-    assert_eq!(receipts[0].index, Some(3));
-    assert_eq!(receipts[0].receipt, TxReceipt::Verified { block: 1 });
+    assert_eq!(receipts[0].index, None);
+    assert_eq!(
+        receipts[0].receipt,
+        Receipt::Rejected {
+            reason: Some("Unknown token".to_string())
+        }
+    );
+    assert_eq!(receipts[2].index, Some(3));
+    assert_eq!(receipts[2].receipt, Receipt::Verified { block: 1 });
 
-    // Get same receipts by the different requests.
+    // Get a reversed list of receipts with requests from the end.
+    let receipts: Vec<_> = receipts.into_iter().rev().collect();
     assert_eq!(
         client
             .account_tx_receipts(address, AccountReceipts::Latest, 10)
@@ -234,7 +244,7 @@ async fn accounts_scope() -> anyhow::Result<()> {
         AccountOpReceipt {
             hash: H256::default(),
             index: 1,
-            receipt: TxReceipt::Verified { block: 1 }
+            receipt: Receipt::Verified { block: 1 }
         }
     );
     assert_eq!(
@@ -263,7 +273,42 @@ async fn accounts_scope() -> anyhow::Result<()> {
     );
 
     // Get account pending receipts.
+    *server.pending_ops.lock().await = json!([
+        [
+            5,
+            {
+                "serial_id": 1,
+                "data": {
+                    "type": "Deposit",
+                    "account_id": account_id,
+                    "amount": "100500",
+                    "from": Address::default(),
+                    "to": address,
+                    "token": 0,
+                },
+                "deadline_block": 10,
+                "eth_hash": vec![0u8; 32],
+                "eth_block": 5,
+            },
+        ],
+        [
+            5,
+            {
+                "serial_id": 2,
+                "data": {
+                  "type": "FullExit",
+                  "account_id": account_id,
+                  "eth_address": Address::default(),
+                  "token": 0
+                },
+                "deadline_block": 0,
+                "eth_hash": vec![1u8; 32],
+                "eth_block": 5
+            }
+        ]
+    ]);
     let pending_receipts = client.account_pending_ops(account_id).await?;
+
     assert_eq!(pending_receipts[0].eth_block, 5);
     assert_eq!(pending_receipts[0].hash, [0u8; 32].into());
     assert_eq!(pending_receipts[1].eth_block, 5);
@@ -293,7 +338,7 @@ fn account_tx_response_to_receipt() {
             AccountTxReceipt {
                 index: Some(1),
                 hash: TxHash::default(),
-                receipt: TxReceipt::Executed,
+                receipt: Receipt::Executed,
             },
         ),
         (
@@ -309,7 +354,7 @@ fn account_tx_response_to_receipt() {
             AccountTxReceipt {
                 index: None,
                 hash: TxHash::default(),
-                receipt: TxReceipt::Executed,
+                receipt: Receipt::Executed,
             },
         ),
         (
@@ -325,7 +370,7 @@ fn account_tx_response_to_receipt() {
             AccountTxReceipt {
                 index: Some(1),
                 hash: TxHash::default(),
-                receipt: TxReceipt::Rejected {
+                receipt: Receipt::Rejected {
                     reason: Some("Oops".to_string()),
                 },
             },
@@ -343,7 +388,7 @@ fn account_tx_response_to_receipt() {
             AccountTxReceipt {
                 index: Some(1),
                 hash: TxHash::default(),
-                receipt: TxReceipt::Committed { block: 1 },
+                receipt: Receipt::Committed { block: 1 },
             },
         ),
         (
@@ -359,7 +404,7 @@ fn account_tx_response_to_receipt() {
             AccountTxReceipt {
                 index: Some(1),
                 hash: TxHash::default(),
-                receipt: TxReceipt::Verified { block: 1 },
+                receipt: Receipt::Verified { block: 1 },
             },
         ),
     ];
@@ -388,7 +433,7 @@ fn account_op_response_to_receipt() {
             AccountOpReceipt {
                 index: 1,
                 hash: H256::default(),
-                receipt: TxReceipt::Executed,
+                receipt: Receipt::Executed,
             },
         ),
         (
@@ -402,7 +447,7 @@ fn account_op_response_to_receipt() {
             AccountOpReceipt {
                 index: 1,
                 hash: H256::default(),
-                receipt: TxReceipt::Committed { block: 1 },
+                receipt: Receipt::Committed { block: 1 },
             },
         ),
         (
@@ -416,7 +461,7 @@ fn account_op_response_to_receipt() {
             AccountOpReceipt {
                 index: 1,
                 hash: H256::default(),
-                receipt: TxReceipt::Verified { block: 1 },
+                receipt: Receipt::Verified { block: 1 },
             },
         ),
     ];

@@ -6,7 +6,7 @@ pub use super::{
     config::Contracts,
     operations::{PriorityOpData, PriorityOpQuery, PriorityOpReceipt},
     tokens::TokenPriceKind,
-    transactions::{SumbitErrorCode, TxReceipt},
+    transactions::{Receipt, SumbitErrorCode},
 };
 
 // Built-in uses

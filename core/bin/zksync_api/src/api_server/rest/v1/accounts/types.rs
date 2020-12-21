@@ -27,7 +27,7 @@ use crate::{
 };
 
 use super::{
-    super::{transactions::TxReceipt, ApiError},
+    super::{transactions::Receipt, ApiError},
     unable_to_find_token,
 };
 
@@ -143,7 +143,7 @@ pub struct AccountReceiptsQuery {
 pub struct AccountTxReceipt {
     pub index: Option<u32>,
     #[serde(flatten)]
-    pub receipt: TxReceipt,
+    pub receipt: Receipt,
     pub hash: TxHash,
 }
 
@@ -152,7 +152,7 @@ pub struct AccountTxReceipt {
 pub struct AccountOpReceipt {
     pub index: u32,
     #[serde(flatten)]
-    pub receipt: TxReceipt,
+    pub receipt: Receipt,
     pub hash: H256,
 }
 
@@ -366,7 +366,7 @@ impl From<AccountTxReceiptResponse> for AccountTxReceipt {
             return Self {
                 index,
                 hash,
-                receipt: TxReceipt::Rejected {
+                receipt: Receipt::Rejected {
                     reason: inner.fail_reason,
                 },
             };
@@ -376,9 +376,9 @@ impl From<AccountTxReceiptResponse> for AccountTxReceipt {
             inner.commit_tx_hash.is_some(),
             inner.verify_tx_hash.is_some(),
         ) {
-            (false, false) => TxReceipt::Executed,
-            (true, false) => TxReceipt::Committed { block },
-            (true, true) => TxReceipt::Verified { block },
+            (false, false) => Receipt::Executed,
+            (true, false) => Receipt::Committed { block },
+            (true, true) => Receipt::Verified { block },
             (false, true) => panic!(
                 "Database provided an incorrect account tx reciept: {:?}",
                 inner
@@ -403,9 +403,9 @@ impl From<AccountOpReceiptResponse> for AccountOpReceipt {
             inner.commit_tx_hash.is_some(),
             inner.verify_tx_hash.is_some(),
         ) {
-            (false, false) => TxReceipt::Executed,
-            (true, false) => TxReceipt::Committed { block },
-            (true, true) => TxReceipt::Verified { block },
+            (false, false) => Receipt::Executed,
+            (true, false) => Receipt::Committed { block },
+            (true, true) => Receipt::Verified { block },
             (false, true) => panic!(
                 "Database provided an incorrect account tx reciept: {:?}",
                 inner

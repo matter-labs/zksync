@@ -217,10 +217,7 @@ impl ApiAccountsData {
         &self,
         address: Address,
     ) -> QueryResult<Vec<PendingAccountOpReceipt>> {
-        let ongoing_ops = self
-            .core_api_client
-            .get_unconfirmed_deposits(address)
-            .await?;
+        let ongoing_ops = self.core_api_client.get_unconfirmed_ops(address).await?;
 
         let receipts = ongoing_ops
             .into_iter()

@@ -93,7 +93,7 @@ impl ApiTransactionsData {
             .await
     }
 
-    async fn tx_status(&self, tx_hash: TxHash) -> QueryResult<Option<TxReceipt>> {
+    async fn tx_status(&self, tx_hash: TxHash) -> QueryResult<Option<Receipt>> {
         let mut storage = self.tx_sender.pool.access_storage().await?;
 
         let tx_receipt = {
@@ -107,7 +107,7 @@ impl ApiTransactionsData {
                     .await?;
 
                 let tx_receipt = if tx_in_mempool {
-                    Some(TxReceipt::Pending)
+                    Some(Receipt::Pending)
                 } else {
                     None
                 };
@@ -118,13 +118,13 @@ impl ApiTransactionsData {
         let block_number = tx_receipt.block_number as BlockNumber;
         // Check the cases where we don't need to get block details.
         if !tx_receipt.success {
-            return Ok(Some(TxReceipt::Rejected {
+            return Ok(Some(Receipt::Rejected {
                 reason: tx_receipt.fail_reason,
             }));
         }
 
         if tx_receipt.verified {
-            return Ok(Some(TxReceipt::Verified {
+            return Ok(Some(Receipt::Verified {
                 block: block_number,
             }));
         }
@@ -147,11 +147,11 @@ impl ApiTransactionsData {
             .is_some();
 
         let tx_receipt = if is_committed {
-            TxReceipt::Committed {
+            Receipt::Committed {
                 block: block_number,
             }
         } else {
-            TxReceipt::Executed
+            Receipt::Executed
         };
 
         Ok(Some(tx_receipt))
@@ -201,9 +201,10 @@ struct IncomingTxBatch {
     signature: Option<TxEthSignature>,
 }
 
+/// Transaction (or priority operation) receipt.
 #[derive(Debug, Deserialize, Serialize, Clone, PartialEq)]
 #[serde(tag = "status", rename_all = "camelCase")]
-pub enum TxReceipt {
+pub enum Receipt {
     /// The transaction is awaiting execution in the memorypool.
     Pending,
     /// The transaction has been executed, but the block containing this transaction has not
@@ -248,7 +249,7 @@ impl Client {
     }
 
     /// Gets actual transaction receipt.
-    pub async fn tx_status(&self, tx_hash: TxHash) -> Result<Option<TxReceipt>, ClientError> {
+    pub async fn tx_status(&self, tx_hash: TxHash) -> Result<Option<Receipt>, ClientError> {
         self.get(&format!("transactions/{}", tx_hash.to_string()))
             .send()
             .await
@@ -266,7 +267,7 @@ impl Client {
         &self,
         tx_hash: TxHash,
         receipt_id: u32,
-    ) -> Result<Option<TxReceipt>, ClientError> {
+    ) -> Result<Option<Receipt>, ClientError> {
         self.get(&format!(
             "transactions/{}/receipts/{}",
             tx_hash.to_string(),
@@ -282,7 +283,7 @@ impl Client {
         tx_hash: TxHash,
         from: Pagination,
         limit: BlockNumber,
-    ) -> Result<Vec<TxReceipt>, ClientError> {
+    ) -> Result<Vec<Receipt>, ClientError> {
         self.get(&format!("transactions/{}/receipts", tx_hash.to_string()))
             .query(&from.into_query(limit))
             .send()
@@ -295,7 +296,7 @@ impl Client {
 async fn tx_status(
     data: web::Data<ApiTransactionsData>,
     web::Path(tx_hash): web::Path<TxHash>,
-) -> JsonResult<Option<TxReceipt>> {
+) -> JsonResult<Option<Receipt>> {
     let tx_status = data.tx_status(tx_hash).await.map_err(ApiError::internal)?;
 
     Ok(Json(tx_status))
@@ -313,7 +314,7 @@ async fn tx_data(
 async fn tx_receipt_by_id(
     data: web::Data<ApiTransactionsData>,
     web::Path((tx_hash, receipt_id)): web::Path<(TxHash, u32)>,
-) -> JsonResult<Option<TxReceipt>> {
+) -> JsonResult<Option<Receipt>> {
     // At the moment we store only last receipt, so this endpoint is just only a stub.
     if receipt_id > 0 {
         return Ok(Json(None));
@@ -328,7 +329,7 @@ async fn tx_receipts(
     data: web::Data<ApiTransactionsData>,
     web::Path(tx_hash): web::Path<TxHash>,
     web::Query(pagination): web::Query<PaginationQuery>,
-) -> JsonResult<Vec<TxReceipt>> {
+) -> JsonResult<Vec<Receipt>> {
     let (pagination, _limit) = pagination.into_inner()?;
     // At the moment we store only last receipt, so this endpoint is just only a stub.
     let is_some = match pagination {
@@ -587,15 +588,15 @@ mod tests {
         let queries = vec![
             (
                 (committed_tx_hash, Pagination::Before(1), 1),
-                vec![TxReceipt::Verified { block: 1 }],
+                vec![Receipt::Verified { block: 1 }],
             ),
             (
                 (committed_tx_hash, Pagination::Last, 1),
-                vec![TxReceipt::Verified { block: 1 }],
+                vec![Receipt::Verified { block: 1 }],
             ),
             (
                 (committed_tx_hash, Pagination::Before(2), 1),
-                vec![TxReceipt::Verified { block: 1 }],
+                vec![Receipt::Verified { block: 1 }],
             ),
             ((committed_tx_hash, Pagination::After(0), 1), vec![]),
             ((unknown_tx_hash, Pagination::Last, 1), vec![]),
@@ -617,7 +618,7 @@ mod tests {
         // Tx status and data for committed transaction.
         assert_eq!(
             client.tx_status(committed_tx_hash).await?,
-            Some(TxReceipt::Verified { block: 1 })
+            Some(Receipt::Verified { block: 1 })
         );
         assert_eq!(
             client.tx_data(committed_tx_hash).await?.unwrap().hash(),
@@ -641,7 +642,7 @@ mod tests {
 
             tx_hash
         };
-        assert_eq!(client.tx_status(tx_hash).await?, Some(TxReceipt::Pending));
+        assert_eq!(client.tx_status(tx_hash).await?, Some(Receipt::Pending));
         assert_eq!(client.tx_data(tx_hash).await?.unwrap().hash(), tx_hash);
 
         // Tx status for unknown transaction.
