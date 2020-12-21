@@ -105,9 +105,9 @@ impl<W: TokenWatcher> FeeTokenValidator<W> {
         Ok(())
     }
 
-    pub async fn keep_updated(&mut self, tokens: Vec<Token>, duration_secs: u64) {
+    pub async fn keep_updated(&mut self, tokens: &Vec<Token>, duration_secs: u64) {
         loop {
-            if let Err(e) = self.update_all_tokens(&tokens).await {
+            if let Err(e) = self.update_all_tokens(tokens).await {
                 vlog::warn!("Error when updating token market volume {:?}", e)
             }
             tokio::time::delay_for(Duration::from_secs(duration_secs)).await
@@ -124,12 +124,9 @@ impl<W: TokenWatcher> FeeTokenValidator<W> {
             }
         }
 
-        let db_volume = self.get_token_market_amount(&token).await?;
-
-        let volume = if db_volume.is_none() {
-            self.update_token(&token).await?
-        } else {
-            db_volume.unwrap()
+        let volume = match self.get_token_market_volume(&token).await? {
+            Some(volume) => volume,
+            None => self.update_token(&token).await?,
         };
 
         if Utc::now() - volume.last_updated < self.available_time {
@@ -147,7 +144,7 @@ impl<W: TokenWatcher> FeeTokenValidator<W> {
         Ok(allowed)
     }
 
-    async fn get_token_market_amount(
+    async fn get_token_market_volume(
         &mut self,
         token: &Token,
     ) -> anyhow::Result<Option<TokenMarketVolume>> {
@@ -160,6 +157,8 @@ mod tests {
     use super::*;
     use crate::fee_ticker::validator::cache::TokenInMemoryCache;
     use crate::fee_ticker::validator::watcher::UniswapTokenWatcher;
+    use num::rational::Ratio;
+    use num::BigUint;
     use std::str::FromStr;
 
     struct InMemoryTokenWatcher {
@@ -198,12 +197,28 @@ mod tests {
 
         let eth_address = Address::from_str("0000000000000000000000000000000000000000").unwrap();
         let eth_token = Token::new(2, eth_address, "ETH", 18);
+        let all_tokens = vec![dai_token.clone(), phnx_token.clone()];
+
+        let mut market = HashMap::new();
+        market.insert(
+            dai_token.id,
+            TokenMarketVolume {
+                market_volume: Ratio::new(BigUint::from(10u32), BigUint::from(1u32)),
+                last_updated: Utc::now(),
+            },
+        );
+        market.insert(
+            phnx_token.id,
+            TokenMarketVolume {
+                market_volume: Ratio::new(BigUint::from(200u32), BigUint::from(1u32)),
+                last_updated: Utc::now(),
+            },
+        );
 
         let mut tokens = HashMap::new();
-        tokens.insert(TokenLike::Address(dai_token_address), dai_token);
-        tokens.insert(TokenLike::Address(phnx_token_address), phnx_token);
+        tokens.insert(TokenLike::Address(dai_token_address), dai_token.clone());
+        tokens.insert(TokenLike::Address(phnx_token_address), phnx_token.clone());
         tokens.insert(TokenLike::Address(eth_address), eth_token);
-
         let mut amounts = HashMap::new();
         amounts.insert(dai_token_address, 200.0);
         amounts.insert(phnx_token_address, 10.0);
@@ -211,11 +226,36 @@ mod tests {
         unconditionally_valid.insert(eth_address);
 
         let mut validator = FeeTokenValidator::new(
-            TokenInMemoryCache::new().with_tokens(tokens),
+            TokenInMemoryCache::new()
+                .with_tokens(tokens)
+                .with_market(market),
             chrono::Duration::seconds(100),
             100.0,
             unconditionally_valid,
             InMemoryTokenWatcher { amounts },
+        );
+        validator.update_all_tokens(&all_tokens).await.unwrap();
+        let new_dai_token_market = validator
+            .tokens_cache
+            .get_token_market_volume(dai_token.id)
+            .await
+            .unwrap()
+            .unwrap();
+
+        assert_eq!(
+            new_dai_token_market.market_volume,
+            big_decimal_to_ratio(&BigDecimal::from(200)).unwrap()
+        );
+
+        let new_phnx_token_market = validator
+            .tokens_cache
+            .get_token_market_volume(phnx_token.id)
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(
+            new_phnx_token_market.market_volume,
+            big_decimal_to_ratio(&BigDecimal::from(10)).unwrap()
         );
 
         let dai_allowed = validator
