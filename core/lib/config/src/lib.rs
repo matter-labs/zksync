@@ -178,7 +178,7 @@ pub struct FeeTickerOptions {
     pub uniswap_url: String,
     pub liquidity_volume: f64,
     pub available_liquidity_seconds: i64,
-    pub token_market_update_time: i64,
+    pub token_market_update_time: u64,
 }
 
 impl FeeTickerOptions {

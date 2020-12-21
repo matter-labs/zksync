@@ -3,6 +3,8 @@ use std::collections::HashMap;
 use zksync_types::{tokens::TokenMarketVolume, Token, TokenId, TokenLike};
 
 use crate::utils::token_db_cache::TokenDBCache;
+use std::sync::Arc;
+use tokio::sync::Mutex;
 
 #[derive(Debug, Clone)]
 pub(crate) enum TokenCacheWrapper {
@@ -12,8 +14,8 @@ pub(crate) enum TokenCacheWrapper {
 
 #[derive(Debug, Clone)]
 pub(crate) struct TokenInMemoryCache {
-    tokens: HashMap<TokenLike, Token>,
-    market: HashMap<TokenId, TokenMarketVolume>,
+    tokens: Arc<Mutex<HashMap<TokenLike, Token>>>,
+    market: Arc<Mutex<HashMap<TokenId, TokenMarketVolume>>>,
 }
 
 impl TokenInMemoryCache {
@@ -25,11 +27,17 @@ impl TokenInMemoryCache {
     }
 
     pub fn with_tokens(self, tokens: HashMap<TokenLike, Token>) -> Self {
-        Self { tokens, ..self }
+        Self {
+            tokens: Arc::new(Mutex::new(tokens)),
+            ..self
+        }
     }
 
     pub fn with_market(self, market: HashMap<TokenId, TokenMarketVolume>) -> Self {
-        Self { market, ..self }
+        Self {
+            market: Arc::new(Mutex::new(market)),
+            ..self
+        }
     }
 }
 
@@ -49,7 +57,7 @@ impl TokenCacheWrapper {
     pub async fn get_token(&self, token_like: TokenLike) -> anyhow::Result<Option<Token>> {
         match self {
             Self::DB(cache) => cache.get_token(token_like).await,
-            Self::Memory(cache) => Ok(cache.tokens.get(&token_like).cloned()),
+            Self::Memory(cache) => Ok(cache.tokens.lock().await.get(&token_like).cloned()),
         }
     }
 
@@ -59,7 +67,7 @@ impl TokenCacheWrapper {
     ) -> anyhow::Result<Option<TokenMarketVolume>> {
         match self {
             Self::DB(cache) => cache.get_token_market_volume(token_id).await,
-            Self::Memory(cache) => Ok(cache.market.get(&token_id).cloned()),
+            Self::Memory(cache) => Ok(cache.market.lock().await.get(&token_id).cloned()),
         }
     }
 
@@ -75,9 +83,21 @@ impl TokenCacheWrapper {
                     .await
             }
             Self::Memory(cache) => {
-                cache.market.insert(token_id, market_volume);
+                cache.market.lock().await.insert(token_id, market_volume);
                 Ok(())
             }
+        }
+    }
+    pub async fn get_all_tokens(&self) -> anyhow::Result<Vec<Token>> {
+        match self {
+            Self::DB(cache) => cache.get_all_tokens().await,
+            Self::Memory(cache) => Ok(cache
+                .tokens
+                .lock()
+                .await
+                .iter()
+                .map(|(_k, v)| v.clone())
+                .collect()),
         }
     }
 }

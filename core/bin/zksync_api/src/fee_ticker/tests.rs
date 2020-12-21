@@ -161,7 +161,7 @@ fn format_with_dot(num: &Ratio<BigUint>, precision: usize) -> String {
 struct FakeTokenWatcher;
 #[async_trait::async_trait]
 impl TokenWatcher for FakeTokenWatcher {
-    async fn get_token_market_amount(&mut self, _token: &Token) -> anyhow::Result<f64> {
+    async fn get_token_market_volume(&mut self, _token: &Token) -> anyhow::Result<f64> {
         unreachable!()
     }
 }

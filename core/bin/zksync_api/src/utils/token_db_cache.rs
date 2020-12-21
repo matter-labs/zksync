@@ -69,6 +69,18 @@ impl TokenDBCache {
         Ok(token)
     }
 
+    pub async fn get_all_tokens(&self) -> Result<Vec<Token>, anyhow::Error> {
+        let tokens = self
+            .db
+            .access_storage()
+            .await?
+            .tokens_schema()
+            .load_tokens()
+            .await?;
+
+        Ok(tokens.into_iter().map(|(_k, v)| v).collect())
+    }
+
     pub async fn get_token_market_volume(
         &self,
         token: TokenId,

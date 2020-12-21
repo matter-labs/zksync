@@ -1,19 +1,23 @@
-use crate::fee_ticker::ticker_api::REQUEST_TIMEOUT;
 use std::collections::HashMap;
+use std::sync::Arc;
 use tokio::sync::Mutex;
+
 use zksync_types::{Address, Token};
+
+use crate::fee_ticker::ticker_api::REQUEST_TIMEOUT;
 
 #[async_trait::async_trait]
 pub trait TokenWatcher {
-    async fn get_token_market_amount(&mut self, token: &Token) -> anyhow::Result<f64>;
+    async fn get_token_market_volume(&mut self, token: &Token) -> anyhow::Result<f64>;
 }
 
 /// Watcher for Uniswap protocol
 /// https://thegraph.com/explorer/subgraph/uniswap/uniswap-v2
+#[derive(Clone)]
 pub struct UniswapTokenWatcher {
     client: reqwest::Client,
     addr: String,
-    cache: Mutex<HashMap<Address, f64>>,
+    cache: Arc<Mutex<HashMap<Address, f64>>>,
 }
 
 impl UniswapTokenWatcher {
@@ -24,13 +28,13 @@ impl UniswapTokenWatcher {
             cache: Default::default(),
         }
     }
-    async fn get_token_amount(&mut self, address: Address) -> anyhow::Result<f64> {
+    async fn get_market_volume(&mut self, address: Address) -> anyhow::Result<f64> {
         // Uniswap has graphql API, using full graphql client for one query is overkill for current task
         let query = format!("{{token(id: \"{:?}\"){{tradeVolumeUSD}}}}", address);
-        let request = self.client.post(&self.addr).json(&serde_json::json!({
-            "query": query,
-        }));
 
+        let request = self.client.post(&self.addr).json(&serde_json::json!({
+            "query": query.clone(),
+        }));
         let api_request_future = tokio::time::timeout(REQUEST_TIMEOUT, request.send());
 
         let response: GraphqlResponse = api_request_future
@@ -70,8 +74,8 @@ struct TokenResponse {
 
 #[async_trait::async_trait]
 impl TokenWatcher for UniswapTokenWatcher {
-    async fn get_token_market_amount(&mut self, token: &Token) -> anyhow::Result<f64> {
-        match self.get_token_amount(token.address).await {
+    async fn get_token_market_volume(&mut self, token: &Token) -> anyhow::Result<f64> {
+        match self.get_market_volume(token.address).await {
             Ok(amount) => {
                 self.update_historical_amount(token.address, amount).await;
                 return Ok(amount);

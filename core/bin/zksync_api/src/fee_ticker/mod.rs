@@ -42,6 +42,7 @@ use crate::fee_ticker::{
 use crate::utils::token_db_cache::TokenDBCache;
 
 pub use self::fee::*;
+use crate::fee_ticker::validator::MarketUpdater;
 
 mod constants;
 mod fee;
@@ -197,14 +198,17 @@ pub fn run_ticker_task(
     };
 
     let cache = TokenDBCache::new(db_pool.clone());
+    let watcher = UniswapTokenWatcher::new(config.uniswap_url);
     let validator = FeeTokenValidator::new(
-        cache,
+        cache.clone(),
         chrono::Duration::seconds(config.available_liquidity_seconds),
         config.liquidity_volume,
         config.unconditionally_valid_tokens,
-        UniswapTokenWatcher::new(config.uniswap_url),
+        watcher.clone(),
     );
 
+    let updater = MarketUpdater::new(cache.clone(), watcher);
+    tokio::spawn(updater.keep_updated(config.token_market_update_time));
     let client = reqwest::ClientBuilder::new()
         .timeout(CONNECTION_TIMEOUT)
         .connect_timeout(CONNECTION_TIMEOUT)
@@ -226,6 +230,7 @@ pub fn run_ticker_task(
 
             tokio::spawn(fee_ticker.run())
         }
+
         TokenPriceSource::CoinGecko { base_url } => {
             let token_price_api =
                 CoinGeckoAPI::new(client, base_url).expect("failed to init CoinGecko client");

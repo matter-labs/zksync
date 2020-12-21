@@ -30,6 +30,60 @@ struct AcceptanceData {
     allowed: bool,
 }
 
+#[derive(Clone, Debug)]
+pub(crate) struct MarketUpdater<W> {
+    tokens_cache: TokenCacheWrapper,
+    watcher: W,
+}
+
+impl<W: TokenWatcher> MarketUpdater<W> {
+    pub(crate) fn new(cache: impl Into<TokenCacheWrapper>, watcher: W) -> Self {
+        Self {
+            tokens_cache: cache.into(),
+            watcher,
+        }
+    }
+
+    async fn update_token(&mut self, token: &Token) -> anyhow::Result<TokenMarketVolume> {
+        let amount = self.watcher.get_token_market_volume(&token).await?;
+        let market = TokenMarketVolume {
+            market_volume: big_decimal_to_ratio(&BigDecimal::from(amount)).unwrap(),
+            last_updated: Utc::now(),
+        };
+
+        if let Err(e) = self
+            .tokens_cache
+            .update_token_market_volume(token.id, market.clone())
+            .await
+        {
+            vlog::error!("Error in updating token market volume {}", e);
+        }
+        Ok(market)
+    }
+
+    pub async fn update_all_tokens(&mut self, tokens: &Vec<Token>) -> anyhow::Result<()> {
+        for token in tokens {
+            self.update_token(token).await?;
+        }
+        Ok(())
+    }
+
+    pub async fn keep_updated(mut self, duration_secs: u64) {
+        let tokens = self
+            .tokens_cache
+            .get_all_tokens()
+            .await
+            .expect("Error to connect in db");
+
+        loop {
+            if let Err(e) = self.update_all_tokens(&tokens).await {
+                vlog::warn!("Error when updating token market volume {:?}", e)
+            }
+            tokio::time::delay_for(Duration::from_secs(duration_secs)).await
+        }
+    }
+}
+
 /// Fee token validator decides whether certain ERC20 token is suitable for paying fees.
 #[derive(Debug, Clone)]
 pub(crate) struct FeeTokenValidator<W> {
@@ -81,39 +135,6 @@ impl<W: TokenWatcher> FeeTokenValidator<W> {
         self.tokens_cache.get_token(token).await
     }
 
-    async fn update_token(&mut self, token: &Token) -> anyhow::Result<TokenMarketVolume> {
-        let amount = self.watcher.get_token_market_amount(&token).await?;
-        let market = TokenMarketVolume {
-            market_volume: big_decimal_to_ratio(&BigDecimal::from(amount)).unwrap(),
-            last_updated: Utc::now(),
-        };
-
-        if let Err(e) = self
-            .tokens_cache
-            .update_token_market_volume(token.id, market.clone())
-            .await
-        {
-            vlog::error!("Error in updating token market volume {}", e);
-        }
-        Ok(market)
-    }
-
-    pub async fn update_all_tokens(&mut self, tokens: &Vec<Token>) -> anyhow::Result<()> {
-        for token in tokens {
-            self.update_token(token).await?;
-        }
-        Ok(())
-    }
-
-    pub async fn keep_updated(&mut self, tokens: &Vec<Token>, duration_secs: u64) {
-        loop {
-            if let Err(e) = self.update_all_tokens(tokens).await {
-                vlog::warn!("Error when updating token market volume {:?}", e)
-            }
-            tokio::time::delay_for(Duration::from_secs(duration_secs)).await
-        }
-    }
-
     async fn check_token(&mut self, token: Token) -> anyhow::Result<bool> {
         if let Some(acceptance_data) = self.tokens.get(&token.address) {
             if chrono::Duration::from_std(acceptance_data.last_refresh.elapsed())
@@ -126,7 +147,7 @@ impl<W: TokenWatcher> FeeTokenValidator<W> {
 
         let volume = match self.get_token_market_volume(&token).await? {
             Some(volume) => volume,
-            None => self.update_token(&token).await?,
+            None => self.get_remote_token_market(&token).await?,
         };
 
         if Utc::now() - volume.last_updated < self.available_time {
@@ -142,6 +163,17 @@ impl<W: TokenWatcher> FeeTokenValidator<W> {
             },
         );
         Ok(allowed)
+    }
+    // I think, it's redundant method and we could remove watcher from validator and store it only in updater
+    async fn get_remote_token_market(
+        &mut self,
+        token: &Token,
+    ) -> anyhow::Result<TokenMarketVolume> {
+        let volume = self.watcher.get_token_market_volume(token).await?;
+        Ok(TokenMarketVolume {
+            market_volume: big_decimal_to_ratio(&BigDecimal::from(volume)).unwrap(),
+            last_updated: Utc::now(),
+        })
     }
 
     async fn get_token_market_volume(
@@ -160,15 +192,18 @@ mod tests {
     use num::rational::Ratio;
     use num::BigUint;
     use std::str::FromStr;
+    use std::sync::Arc;
+    use tokio::sync::Mutex;
 
+    #[derive(Clone)]
     struct InMemoryTokenWatcher {
-        amounts: HashMap<Address, f64>,
+        amounts: Arc<Mutex<HashMap<Address, f64>>>,
     }
 
     #[async_trait::async_trait]
     impl TokenWatcher for InMemoryTokenWatcher {
-        async fn get_token_market_amount(&mut self, token: &Token) -> anyhow::Result<f64> {
-            Ok(*self.amounts.get(&token.address).unwrap())
+        async fn get_token_market_volume(&mut self, token: &Token) -> anyhow::Result<f64> {
+            Ok(*self.amounts.lock().await.get(&token.address).unwrap())
         }
     }
 
@@ -181,7 +216,7 @@ mod tests {
             Address::from_str("6b175474e89094c44da98b954eedeac495271d0f").unwrap();
         let dai_token = Token::new(1, dai_token_address, "DAI", 18);
 
-        let amount = watcher.get_token_market_amount(&dai_token).await.unwrap();
+        let amount = watcher.get_token_market_volume(&dai_token).await.unwrap();
 
         assert!(amount > 0.0);
     }
@@ -225,16 +260,25 @@ mod tests {
         let mut unconditionally_valid = HashSet::new();
         unconditionally_valid.insert(eth_address);
 
+        let cache = TokenInMemoryCache::new()
+            .with_tokens(tokens)
+            .with_market(market);
+
+        let watcher = InMemoryTokenWatcher {
+            amounts: Arc::new(Mutex::new(amounts)),
+        };
+
         let mut validator = FeeTokenValidator::new(
-            TokenInMemoryCache::new()
-                .with_tokens(tokens)
-                .with_market(market),
+            cache.clone(),
             chrono::Duration::seconds(100),
             100.0,
             unconditionally_valid,
-            InMemoryTokenWatcher { amounts },
+            watcher.clone(),
         );
-        validator.update_all_tokens(&all_tokens).await.unwrap();
+
+        let mut updater = MarketUpdater::new(cache.clone(), watcher);
+        updater.update_all_tokens(&all_tokens).await.unwrap();
+
         let new_dai_token_market = validator
             .tokens_cache
             .get_token_market_volume(dai_token.id)
