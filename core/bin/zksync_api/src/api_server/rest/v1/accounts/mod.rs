@@ -1,8 +1,5 @@
 //! Accounts part of API implementation.
 
-// Public uses
-pub use self::types::{AccountInfo, AccountState, DepositingBalances, DepositingFunds};
-
 // Built-in uses
 
 // External uses
@@ -20,13 +17,20 @@ use zksync_types::{AccountId, Address, BlockNumber, TokenId};
 // Local uses
 use crate::{core_api_client::CoreApiClient, utils::token_db_cache::TokenDBCache};
 
-use self::types::{
-    AccountQuery, AccountReceiptsQuery, AccountTxReceipt, PendingAccountOpReceipt, SearchDirection,
-    TxLocation,
-};
 use super::{ApiError, JsonResult};
 
-mod client;
+use self::types::{
+    convert::{
+        depositing_balances_from_pending_ops, op_receipt_from_response,
+        pending_account_op_receipt_from_priority_op, search_direction_as_storage,
+        tx_receipt_from_response, validate_receipts_query,
+    },
+    AccountInfo, AccountQuery, AccountReceiptsQuery, AccountState, AccountTxReceipt,
+    PendingAccountOpReceipt, SearchDirection, TxLocation,
+};
+// Public uses
+pub use self::types::convert::account_state_from_storage;
+
 #[cfg(test)]
 mod tests;
 mod types;
@@ -134,9 +138,9 @@ impl ApiAccountsData {
             return Ok(None);
         };
 
-        let committed = AccountState::from_storage(&account, &self.tokens).await?;
+        let committed = account_state_from_storage(&account, &self.tokens).await?;
         let verified = match account_state.verified {
-            Some(state) => AccountState::from_storage(&state.1, &self.tokens).await?,
+            Some((_id, account)) => account_state_from_storage(&account, &self.tokens).await?,
             None => AccountState::default(),
         };
 
@@ -146,7 +150,7 @@ impl ApiAccountsData {
                 .get_unconfirmed_deposits(account.address)
                 .await?;
 
-            DepositingBalances::from_pending_ops(
+            depositing_balances_from_pending_ops(
                 ongoing_ops,
                 self.confirmations_for_eth_event,
                 &self.tokens,
@@ -181,12 +185,12 @@ impl ApiAccountsData {
                 address,
                 location.block as u64,
                 location.index,
-                direction.into(),
+                search_direction_as_storage(direction),
                 limit as u64,
             )
             .await?;
 
-        Ok(items.into_iter().map(AccountTxReceipt::from).collect())
+        Ok(items.into_iter().map(tx_receipt_from_response).collect())
     }
 
     async fn op_receipts(
@@ -205,12 +209,12 @@ impl ApiAccountsData {
                 address,
                 location.block as u64,
                 location.index.unwrap_or_default(),
-                direction.into(),
+                search_direction_as_storage(direction),
                 limit as u64,
             )
             .await?;
 
-        Ok(items.into_iter().map(AccountOpReceipt::from).collect())
+        Ok(items.into_iter().map(op_receipt_from_response).collect())
     }
 
     async fn pending_op_receipts(
@@ -221,7 +225,7 @@ impl ApiAccountsData {
 
         let receipts = ongoing_ops
             .into_iter()
-            .map(PendingAccountOpReceipt::from_priority_op)
+            .map(pending_account_op_receipt_from_priority_op)
             .collect();
 
         Ok(receipts)
@@ -247,7 +251,7 @@ async fn account_tx_receipts(
     web::Path(account_query): web::Path<String>,
     web::Query(location_query): web::Query<AccountReceiptsQuery>,
 ) -> JsonResult<Vec<AccountTxReceipt>> {
-    let (location, direction, limit) = location_query.validate()?;
+    let (location, direction, limit) = validate_receipts_query(location_query)?;
     let address = data.find_account_address(account_query).await?;
 
     let receipts = data
@@ -263,7 +267,7 @@ async fn account_op_receipts(
     web::Path(account_query): web::Path<String>,
     web::Query(location_query): web::Query<AccountReceiptsQuery>,
 ) -> JsonResult<Vec<AccountOpReceipt>> {
-    let (location, direction, limit) = location_query.validate()?;
+    let (location, direction, limit) = validate_receipts_query(location_query)?;
     let address = data.find_account_address(account_query).await?;
 
     let receipts = data

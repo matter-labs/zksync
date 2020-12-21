@@ -8,25 +8,23 @@ use actix_web::{
     Scope,
 };
 use bigdecimal::BigDecimal;
-use serde::{Deserialize, Serialize};
-
-// Workspace uses
 use futures::{
     channel::{mpsc, oneshot},
     prelude::*,
 };
+
+// Workspace uses
+use zksync_api_client::rest::v1::{TokenPriceKind, TokenPriceQuery};
 use zksync_storage::QueryResult;
 use zksync_types::{Token, TokenLike};
 
-// Local uses
-use super::{
-    client::{self, Client},
-    Error as ApiError, JsonResult,
-};
 use crate::{
     fee_ticker::{TickerRequest, TokenPriceRequestType},
     utils::token_db_cache::TokenDBCache,
 };
+
+// Local uses
+use super::{ApiError, JsonResult};
 
 /// Shared data between `api/v1/tokens` endpoints.
 #[derive(Clone)]
@@ -79,46 +77,6 @@ impl ApiTokensData {
                 }
             }
         }
-    }
-}
-
-// Data transfer objects.
-
-#[derive(Debug, Deserialize, Serialize, Copy, Clone, PartialEq)]
-#[serde(rename_all = "camelCase")]
-pub enum TokenPriceKind {
-    Currency,
-    Token,
-}
-
-#[derive(Debug, Deserialize, Serialize, Copy, Clone, PartialEq)]
-#[serde(rename_all = "camelCase")]
-struct TokenPriceQuery {
-    #[serde(rename = "in")]
-    kind: TokenPriceKind,
-}
-
-// Client implementation
-
-/// Tokens API part.
-impl Client {
-    pub async fn tokens(&self) -> client::Result<Vec<Token>> {
-        self.get("tokens").send().await
-    }
-
-    pub async fn token_by_id(&self, token: &TokenLike) -> client::Result<Option<Token>> {
-        self.get(&format!("tokens/{}", token)).send().await
-    }
-
-    pub async fn token_price(
-        &self,
-        token: &TokenLike,
-        kind: TokenPriceKind,
-    ) -> client::Result<Option<BigDecimal>> {
-        self.get(&format!("tokens/{}/price", token))
-            .query(&TokenPriceQuery { kind })
-            .send()
-            .await
     }
 }
 
