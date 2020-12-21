@@ -316,6 +316,17 @@ impl<API: FeeTickerAPI, INFO: FeeTickerInfo> FeeTicker<API, INFO> {
 
     /// Returns `true` if the token is subsidized.
     async fn is_token_subsidized(&self, token: Token) -> bool {
+        // We have disabled the subsidies up until the contract upgrade (when the prices will indeed become that
+        // low), but however we want to leave ourselves the possibility to easily enable them if required.
+        // Thus:
+        // TODO: Remove subsidies completely (ZKS-226)
+        let subsidies_enabled = std::env::var("TICKER_SUBSIDIES_ENABLED")
+            .map(|val| val == "true")
+            .unwrap_or(false);
+        if !subsidies_enabled {
+            return false;
+        }
+
         !self.config.not_subsidized_tokens.contains(&token.address)
     }
 
