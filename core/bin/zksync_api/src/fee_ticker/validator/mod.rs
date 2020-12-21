@@ -47,7 +47,7 @@ impl<W: TokenWatcher> MarketUpdater<W> {
     async fn update_token(&mut self, token: &Token) -> anyhow::Result<TokenMarketVolume> {
         let amount = self.watcher.get_token_market_volume(&token).await?;
         let market = TokenMarketVolume {
-            market_volume: big_decimal_to_ratio(&BigDecimal::from(amount)).unwrap(),
+            market_volume: big_decimal_to_ratio(&amount.into()).unwrap(),
             last_updated: Utc::now(),
         };
 
@@ -61,7 +61,7 @@ impl<W: TokenWatcher> MarketUpdater<W> {
         Ok(market)
     }
 
-    pub async fn update_all_tokens(&mut self, tokens: &Vec<Token>) -> anyhow::Result<()> {
+    pub async fn update_all_tokens(&mut self, tokens: &[Token]) -> anyhow::Result<()> {
         for token in tokens {
             self.update_token(token).await?;
         }
@@ -171,7 +171,7 @@ impl<W: TokenWatcher> FeeTokenValidator<W> {
     ) -> anyhow::Result<TokenMarketVolume> {
         let volume = self.watcher.get_token_market_volume(token).await?;
         Ok(TokenMarketVolume {
-            market_volume: big_decimal_to_ratio(&BigDecimal::from(volume)).unwrap(),
+            market_volume: big_decimal_to_ratio(&volume.into()).unwrap(),
             last_updated: Utc::now(),
         })
     }
@@ -282,7 +282,7 @@ mod tests {
             watcher.clone(),
         );
 
-        let mut updater = MarketUpdater::new(cache.clone(), watcher);
+        let mut updater = MarketUpdater::new(cache, watcher);
         updater.update_all_tokens(&all_tokens).await.unwrap();
 
         let new_dai_token_market = validator

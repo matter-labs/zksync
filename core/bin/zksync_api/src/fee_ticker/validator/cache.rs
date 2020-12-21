@@ -18,6 +18,7 @@ pub(crate) struct TokenInMemoryCache {
     market: Arc<Mutex<HashMap<TokenId, TokenMarketVolume>>>,
 }
 
+#[cfg(test)]
 impl TokenInMemoryCache {
     pub fn new() -> Self {
         Self {
