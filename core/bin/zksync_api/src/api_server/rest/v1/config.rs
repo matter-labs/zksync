@@ -37,6 +37,7 @@ impl ApiConfigData {
 // Data transfer objects.
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Clone)]
+#[serde(rename_all = "camelCase")]
 pub struct Contracts {
     pub contract: Address,
 }
