@@ -22,7 +22,7 @@ log = "0.4"
 backoff = "0.1.6"
 reqwest = { version = "0.10.6", features = ["blocking"] }
 serde = "1.0"
-num = { version = "0.2", features = ["serde"] }
+num = { version = "0.3.1", features = ["serde"] }
 
 [dev-dependencies]
 zksync_storage = { path = "../../lib/storage", version = "1.0" }
