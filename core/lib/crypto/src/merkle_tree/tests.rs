@@ -3,7 +3,7 @@ use crate::rand::{Rng, SeedableRng, XorShiftRng};
 use crate::{Engine, Fr};
 use serde::{Deserialize, Serialize};
 
-/// Checks if verify_proof method works correctly
+/// Checks if verify_proof method works correctly using merkle_path method
 #[test]
 fn test_verify_proof() {
     let depth = 4;
@@ -17,6 +17,8 @@ fn test_verify_proof() {
 
     let elements: Vec<u64> = elements.collect();
     for (idx, item) in elements.iter().enumerate() {
+        // Insert the same element in both trees.
+        // Then check if verify_proof returns true for the path that merkle_path method returns.
         let idx = idx as u32;
         par_tree.insert(idx, *item);
         seq_tree.insert(idx as usize, *item);
@@ -30,6 +32,7 @@ fn test_verify_proof() {
     let par_merkle_path = par_tree.merkle_path(0);
     let seq_merkle_path = seq_tree.merkle_path(0);
 
+    // Check if verify_proof returns false if the element or its index is mismatched with path.
     assert!(!par_tree.verify_proof(0, elements[1], par_merkle_path.clone()));
     assert!(!par_tree.verify_proof(1, elements[0], par_merkle_path));
     assert!(!seq_tree.verify_proof(0, elements[1], seq_merkle_path.clone()));
