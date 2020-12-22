@@ -4,13 +4,13 @@
 pub use super::{
     accounts::{
         AccountInfo, AccountQuery, AccountReceipts, AccountState, DepositingBalances,
-        DepositingFunds, TxLocation,
+        DepositingFunds,
     },
     blocks::{BlockInfo, TransactionInfo},
     config::Contracts,
-    operations::PriorityOpReceipt,
+    operations::{PriorityOpData, PriorityOpQuery, PriorityOpReceipt},
     tokens::TokenPriceKind,
-    transactions::{SumbitErrorCode, TxData, TxReceipt},
+    transactions::{Receipt, SumbitErrorCode, TxData},
     Pagination,
 };
 

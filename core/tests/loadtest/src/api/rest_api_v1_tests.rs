@@ -99,11 +99,11 @@ async fn random_account_query(pool: &ApiDataPool) -> AccountQuery {
     }
 }
 
-async fn random_account_receipts(pool: &ApiDataPool) -> AccountReceipts {
+async fn random_account_receipts_query(pool: &ApiDataPool) -> AccountReceipts {
     let location = pool.read().await.random_tx_location();
     match thread_rng().gen_range(0, 3) {
-        0 => AccountReceipts::older_than(location.0, location.1 as u32),
-        1 => AccountReceipts::newer_than(location.0, location.1 as u32),
+        0 => AccountReceipts::older_than(location.0, Some(location.1 as u32)),
+        1 => AccountReceipts::newer_than(location.0, Some(location.1 as u32)),
         2 => AccountReceipts::Latest,
         _ => unreachable!(),
     }
@@ -131,19 +131,36 @@ pub fn wire_tests<'a>(builder: ApiTestsBuilder<'a>, monitor: &'a Monitor) -> Api
             client.account_info(address).await?;
             Ok(())
         })
-        .append("accounts/receipts", |client, monitor| async move {
-            let address = random_account_query(&monitor.api_data_pool).await;
-            let receipts = random_account_receipts(&monitor.api_data_pool).await;
-            client
-                .account_receipts(address, receipts, MAX_LIMIT)
-                .await?;
-            Ok(())
-        })
-        .append("accounts/receipts/pending", |client, monitor| async move {
-            let address = random_account_query(&monitor.api_data_pool).await;
-            client.account_pending_receipts(address).await?;
-            Ok(())
-        })
+        .append(
+            "accounts/transactions/receipts",
+            |client, monitor| async move {
+                let address = random_account_query(&monitor.api_data_pool).await;
+                let receipts = random_account_receipts_query(&monitor.api_data_pool).await;
+                client
+                    .account_tx_receipts(address, receipts, MAX_LIMIT)
+                    .await?;
+                Ok(())
+            },
+        )
+        .append(
+            "accounts/operations/receipts",
+            |client, monitor| async move {
+                let address = random_account_query(&monitor.api_data_pool).await;
+                let receipts = random_account_receipts_query(&monitor.api_data_pool).await;
+                client
+                    .account_op_receipts(address, receipts, MAX_LIMIT)
+                    .await?;
+                Ok(())
+            },
+        )
+        .append(
+            "accounts/operations/pending_receipts",
+            |client, monitor| async move {
+                let address = random_account_query(&monitor.api_data_pool).await;
+                client.account_pending_ops(address).await?;
+                Ok(())
+            },
+        )
         // blocks endpoints.
         .append("blocks/info", |client, monitor| async move {
             let block_number = monitor.api_data_pool.read().await.random_block();
@@ -177,9 +194,33 @@ pub fn wire_tests<'a>(builder: ApiTestsBuilder<'a>, monitor: &'a Monitor) -> Api
             Ok(())
         })
         // operations endpoints.
-        .append("operations/by_serial_id", |client, monitor| async move {
+        .append(
+            "operations/receipt/by_serial_id",
+            |client, monitor| async move {
+                let op = monitor.api_data_pool.read().await.random_priority_op();
+                client.priority_op(op.serial_id).await?;
+                Ok(())
+            },
+        )
+        .append(
+            "operations/receipt/eth_hash",
+            |client, monitor| async move {
+                let op = monitor.api_data_pool.read().await.random_priority_op();
+                client.priority_op(op.eth_hash).await?;
+                Ok(())
+            },
+        )
+        .append(
+            "operations/data/by_serial_id",
+            |client, monitor| async move {
+                let op = monitor.api_data_pool.read().await.random_priority_op();
+                client.priority_op_data(op.serial_id).await?;
+                Ok(())
+            },
+        )
+        .append("operations/data/eth_hash", |client, monitor| async move {
             let op = monitor.api_data_pool.read().await.random_priority_op();
-            client.priority_op(op.serial_id).await?;
+            client.priority_op_data(op.eth_hash).await?;
             Ok(())
         })
         // search endpoints.

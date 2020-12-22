@@ -122,3 +122,22 @@ pub struct AccountTxReceiptResponse {
     /// May only exists for successful transactions.
     pub verify_tx_hash: Option<Vec<u8>>,
 }
+
+/// Raw response of the [`get_account_operations_receipts`] query.
+///
+/// [`get_account_operations_receipts`]: super::OperationsExtSchema::get_account_operations_receipts()
+#[derive(Debug, FromRow, PartialEq)]
+pub struct AccountOpReceiptResponse {
+    /// The block containing the operation.
+    pub block_number: i64,
+    /// Operation index in block.
+    pub block_index: i32,
+    /// Raw operation hash bytes.
+    pub eth_hash: Vec<u8>,
+    /// The raw hash bytes of the corresponding "COMMIT" Ethereum operation for block with
+    /// given priority operation.
+    pub commit_tx_hash: Option<Vec<u8>>,
+    /// The raw hash bytes of the corresponding "VERIFY" Ethereum operation for block with
+    /// given priority operation.
+    pub verify_tx_hash: Option<Vec<u8>>,
+}
