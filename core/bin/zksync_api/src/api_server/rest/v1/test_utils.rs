@@ -5,9 +5,9 @@ use std::str::FromStr;
 
 // External uses
 use actix_web::{web, App, Scope};
+use chrono::Utc;
 use once_cell::sync::Lazy;
 use tokio::sync::Mutex;
-use web3::types::H256;
 
 // Workspace uses
 use zksync_config::{ApiServerOptions, ConfigurationOptions};
@@ -23,10 +23,11 @@ use zksync_storage::{
 use zksync_test_account::ZkSyncAccount;
 use zksync_types::{
     ethereum::OperationType,
-    helpers::apply_updates,
+    helpers::{apply_updates, closest_packable_fee_amount, closest_packable_token_amount},
     operations::{ChangePubKeyOp, TransferToNewOp},
-    AccountId, AccountMap, Action, Address, BlockNumber, ExecutedOperations, ExecutedTx, Token,
-    ZkSyncOp, ZkSyncTx,
+    AccountId, AccountMap, Action, Address, BlockNumber, Deposit, DepositOp, ExecutedOperations,
+    ExecutedPriorityOp, ExecutedTx, FullExit, FullExitOp, PriorityOp, Token, Transfer, TransferOp,
+    ZkSyncOp, ZkSyncTx, H256,
 };
 
 // Local uses
@@ -128,7 +129,15 @@ impl TestServerConfig {
         // Transfer tx pair
         {
             let tx = from
-                .sign_transfer(0, "ETH", 1_u64.into(), fee.into(), &to.address, None, false)
+                .sign_transfer(
+                    0,
+                    "ETH",
+                    closest_packable_token_amount(&10_u64.into()),
+                    closest_packable_fee_amount(&fee.into()),
+                    &to.address,
+                    None,
+                    false,
+                )
                 .0;
 
             let zksync_op = ZkSyncOp::TransferToNew(Box::new(TransferToNewOp {
@@ -170,6 +179,40 @@ impl TestServerConfig {
                 op: Some(zksync_op),
                 fail_reason: Some("Unknown token".to_string()),
                 block_index: None,
+                created_at: chrono::Utc::now(),
+                batch_id: None,
+            };
+
+            txs.push((
+                ZkSyncTx::Transfer(Box::new(tx)),
+                ExecutedOperations::Tx(Box::new(executed_tx)),
+            ));
+        }
+        // Transfer back tx pair
+        {
+            let tx = Transfer::new(
+                to.get_account_id().unwrap(),
+                to.address,
+                from.address,
+                0,
+                2_u64.into(),
+                fee.into(),
+                0,
+                None,
+            );
+
+            let zksync_op = ZkSyncOp::Transfer(Box::new(TransferOp {
+                tx: tx.clone(),
+                from: to.get_account_id().unwrap(),
+                to: from.get_account_id().unwrap(),
+            }));
+
+            let executed_tx = ExecutedTx {
+                signed_tx: zksync_op.try_get_tx().unwrap().into(),
+                success: true,
+                op: Some(zksync_op),
+                fail_reason: None,
+                block_index: Some(3),
                 created_at: chrono::Utc::now(),
                 batch_id: None,
             };
@@ -347,12 +390,20 @@ impl TestServerConfig {
             NewExecutedPriorityOperation {
                 block_number: 2,
                 block_index: 2,
-                operation: Default::default(),
+                operation: serde_json::to_value(dummy_deposit_op(
+                    Address::default(),
+                    1,
+                    VERIFIED_OP_SERIAL_ID,
+                    2,
+                ))
+                .unwrap(),
                 from_account: Default::default(),
                 to_account: Default::default(),
                 priority_op_serialid: VERIFIED_OP_SERIAL_ID as i64,
                 deadline_block: 100,
-                eth_hash: H256::default().as_bytes().to_vec(),
+                eth_hash: dummy_ethereum_tx_hash(VERIFIED_OP_SERIAL_ID as i64)
+                    .as_bytes()
+                    .to_vec(),
                 eth_block: 10,
                 created_at: chrono::Utc::now(),
             },
@@ -360,12 +411,20 @@ impl TestServerConfig {
             NewExecutedPriorityOperation {
                 block_number: VERIFIED_BLOCKS_COUNT as i64 + 1,
                 block_index: 1,
-                operation: Default::default(),
+                operation: serde_json::to_value(dummy_full_exit_op(
+                    1,
+                    Address::default(),
+                    COMMITTED_OP_SERIAL_ID,
+                    3,
+                ))
+                .unwrap(),
                 from_account: Default::default(),
                 to_account: Default::default(),
                 priority_op_serialid: COMMITTED_OP_SERIAL_ID as i64,
                 deadline_block: 200,
-                eth_hash: H256::default().as_bytes().to_vec(),
+                eth_hash: dummy_ethereum_tx_hash(COMMITTED_OP_SERIAL_ID as i64)
+                    .as_bytes()
+                    .to_vec(),
                 eth_block: 14,
                 created_at: chrono::Utc::now(),
             },
@@ -399,5 +458,66 @@ impl TestServerConfig {
         drop(inited_guard);
 
         Ok(())
+    }
+}
+
+/// Creates dummy deposit priority operation.
+pub fn dummy_deposit_op(
+    address: Address,
+    account_id: AccountId,
+    serial_id: u64,
+    block_index: u32,
+) -> ExecutedPriorityOp {
+    let deposit_op = ZkSyncOp::Deposit(Box::new(DepositOp {
+        priority_op: Deposit {
+            from: address,
+            token: 0,
+            amount: 1_u64.into(),
+            to: address,
+        },
+        account_id,
+    }));
+
+    ExecutedPriorityOp {
+        priority_op: PriorityOp {
+            serial_id,
+            data: deposit_op.try_get_priority_op().unwrap(),
+            deadline_block: 0,
+            eth_hash: H256::default(),
+            eth_block: 10,
+        },
+        op: deposit_op,
+        block_index,
+        created_at: Utc::now(),
+    }
+}
+
+/// Creates dummy full exit priority operation.
+pub fn dummy_full_exit_op(
+    account_id: AccountId,
+    eth_address: Address,
+    serial_id: u64,
+    block_index: u32,
+) -> ExecutedPriorityOp {
+    let deposit_op = ZkSyncOp::FullExit(Box::new(FullExitOp {
+        priority_op: FullExit {
+            account_id,
+            eth_address,
+            token: 0,
+        },
+        withdraw_amount: None,
+    }));
+
+    ExecutedPriorityOp {
+        priority_op: PriorityOp {
+            serial_id,
+            data: deposit_op.try_get_priority_op().unwrap(),
+            deadline_block: 0,
+            eth_hash: H256::default(),
+            eth_block: 10,
+        },
+        op: deposit_op,
+        block_index,
+        created_at: Utc::now(),
     }
 }
