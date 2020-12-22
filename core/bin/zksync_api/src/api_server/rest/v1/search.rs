@@ -48,6 +48,7 @@ impl ApiSearchData {
 // Data transfer objects.
 
 #[derive(Debug, Deserialize, Serialize, Clone, PartialEq)]
+#[serde(rename_all = "camelCase")]
 pub struct BlockSearchQuery {
     query: String,
 }

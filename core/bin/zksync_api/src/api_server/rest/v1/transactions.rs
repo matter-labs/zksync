@@ -14,7 +14,7 @@ use zksync_storage::{
     chain::operations_ext::records::TxReceiptResponse, QueryResult, StorageProcessor,
 };
 use zksync_types::{
-    tx::{TxEthSignature, TxHash},
+    tx::{EthSignData, TxEthSignature, TxHash},
     BlockNumber, SignedZkSyncTx, ZkSyncTx,
 };
 
@@ -182,20 +182,38 @@ impl ApiTransactionsData {
 
 // Data transfer objects.
 
-#[derive(Debug, Serialize, Deserialize, PartialEq, Clone)]
+#[derive(Debug, Serialize, Deserialize, PartialEq, Clone, Copy)]
+#[serde(rename_all = "camelCase")]
 struct FastProcessingQuery {
     fast_processing: Option<bool>,
+}
+
+/// This structure has the same layout as [`SignedZkSyncTx`],
+/// the only difference is that it uses "camelCase" for serialization.
+///
+/// [`SignedZkSyncTx`]: zksync_types::SignedZkSyncTx
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct TxData {
+    /// Underlying zkSync transaction.
+    pub tx: ZkSyncTx,
+    /// Tuple of the Ethereum signature and the message
+    /// which user should have signed with their private key.
+    /// Can be `None` if the Ethereum signature is not required.
+    pub eth_sign_data: Option<EthSignData>,
 }
 
 /// This struct has the same layout as `SignedZkSyncTx`, expect that it used
 /// `TxEthSignature` directly instead of `EthSignData`.
 #[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
 struct IncomingTx {
     tx: ZkSyncTx,
     signature: Option<TxEthSignature>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
 struct IncomingTxBatch {
     txs: Vec<ZkSyncTx>,
     signature: Option<TxEthSignature>,
@@ -216,6 +234,24 @@ pub enum Receipt {
     Verified { block: BlockNumber },
     /// The transaction has been rejected for some reasons.
     Rejected { reason: Option<String> },
+}
+
+impl From<TxData> for SignedZkSyncTx {
+    fn from(inner: TxData) -> Self {
+        Self {
+            tx: inner.tx,
+            eth_sign_data: inner.eth_sign_data,
+        }
+    }
+}
+
+impl From<SignedZkSyncTx> for TxData {
+    fn from(inner: SignedZkSyncTx) -> Self {
+        Self {
+            tx: inner.tx,
+            eth_sign_data: inner.eth_sign_data,
+        }
+    }
 }
 
 // Client implementation
@@ -256,7 +292,7 @@ impl Client {
     }
 
     /// Gets transaction content.
-    pub async fn tx_data(&self, tx_hash: TxHash) -> Result<Option<SignedZkSyncTx>, ClientError> {
+    pub async fn tx_data(&self, tx_hash: TxHash) -> Result<Option<TxData>, ClientError> {
         self.get(&format!("transactions/{}/data", tx_hash.to_string()))
             .send()
             .await
@@ -305,10 +341,10 @@ async fn tx_status(
 async fn tx_data(
     data: web::Data<ApiTransactionsData>,
     web::Path(tx_hash): web::Path<TxHash>,
-) -> JsonResult<Option<SignedZkSyncTx>> {
+) -> JsonResult<Option<TxData>> {
     let tx_data = data.tx_data(tx_hash).await.map_err(ApiError::internal)?;
 
-    Ok(Json(tx_data))
+    Ok(Json(tx_data.map(TxData::from)))
 }
 
 async fn tx_receipt_by_id(
@@ -621,7 +657,7 @@ mod tests {
             Some(Receipt::Verified { block: 1 })
         );
         assert_eq!(
-            client.tx_data(committed_tx_hash).await?.unwrap().hash(),
+            SignedZkSyncTx::from(client.tx_data(committed_tx_hash).await?.unwrap()).hash(),
             committed_tx_hash
         );
 
@@ -643,7 +679,10 @@ mod tests {
             tx_hash
         };
         assert_eq!(client.tx_status(tx_hash).await?, Some(Receipt::Pending));
-        assert_eq!(client.tx_data(tx_hash).await?.unwrap().hash(), tx_hash);
+        assert_eq!(
+            SignedZkSyncTx::from(client.tx_data(tx_hash).await?.unwrap()).hash(),
+            tx_hash
+        );
 
         // Tx status for unknown transaction.
         let tx_hash = TestServerConfig::gen_zk_txs(1_u64).txs[1].0.hash();
