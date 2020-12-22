@@ -6,7 +6,7 @@ import readline from 'readline';
 export type { ChildProcess } from 'child_process';
 
 const IGNORED_DIRS = ['target', 'node_modules', 'volumes', 'build', 'dist', '.git', 'generated', 'grafonnet-lib'];
-const IGNORED_FILES = ['KeysWithPlonkVerifier.sol', 'TokenInit.sol'];
+const IGNORED_FILES = ['KeysWithPlonkVerifier.sol', 'TokenInit.sol', '.tslintrc.js'];
 
 // async executor of shell commands
 // spawns a new shell and can execute arbitrary commands, like "ls -la | grep .env"
