@@ -1,5 +1,3 @@
 status = ["ci-all"]
-required_approvals = 2
-use_codeowners = true
 delete_merged_branches = true
 update_base_for_deletes = true
