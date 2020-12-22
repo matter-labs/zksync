@@ -5,6 +5,9 @@ import readline from 'readline';
 
 export type { ChildProcess } from 'child_process';
 
+const IGNORED_DIRS = ['target', 'node_modules', 'volumes', 'build', 'dist', '.git', 'generated', 'grafonnet-lib'];
+const IGNORED_FILES = ['KeysWithPlonkVerifier.sol', 'TokenInit.sol'];
+
 // async executor of shell commands
 // spawns a new shell and can execute arbitrary commands, like "ls -la | grep .env"
 // returns { stdout, stderr }
@@ -20,6 +23,7 @@ export function spawn(command: string) {
     command = command.replace(/\n/g, ' ');
     const child = _spawn(command, { stdio: 'inherit', shell: true });
     return new Promise((resolve, reject) => {
+
         child.on('error', reject);
         child.on('close', (code) => {
             code == 0 ? resolve() : reject(`Child process exited with code ${code}`);
@@ -91,4 +95,22 @@ export function replaceInFile(filename: string, before: string | RegExp, after: 
 export function modifyFile(filename: string, modifier: (s: string) => string) {
     const source = fs.readFileSync(filename).toString();
     fs.writeFileSync(filename, modifier(source));
+}
+
+// If you wonder why this is written so obscurely through find and not through .prettierignore and globs,
+// it's because prettier *first* expands globs and *then* applies ignore rules, which leads to an error
+// because it can't expand into volumes folder with not enough access rights, even if it is ignored.
+//
+// And if we let the shell handle glob expansion instead of prettier, `shopt -s globstar` will be
+// disabled (because yarn spawns its own shell that does not load .bashrc) and thus glob patterns
+// with double-stars will not work
+export async function getUnignoredFiles(extension: string) {
+    const root = extension == 'sol' ? 'contracts' : '.';
+    const ignored_dirs = IGNORED_DIRS.map((dir) => `-o -path '*/${dir}' -prune`).join(' ');
+    const ignored_files = IGNORED_FILES.map((file) => `-a ! -name '${file}'`).join(' ');
+    const { stdout: files } = await exec(
+        `find ${root} -type f -name '*.${extension}' ${ignored_files} -print ${ignored_dirs}`
+    );
+
+    return files;
 }

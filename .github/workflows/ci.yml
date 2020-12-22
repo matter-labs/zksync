@@ -56,10 +56,7 @@ jobs:
       run: |
         # lint non-rust code
         zk fmt --check
-        yarn lint:md
-        yarn lint:sol
-        yarn lint:js
-        yarn lint:ts
+        zk lint
         zk dummy-prover ensure-disabled
         cargo fmt --all -- --check
         zk f cargo clippy --tests --benches -- -D warnings

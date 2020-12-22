@@ -1,8 +1,6 @@
 import { Command } from 'commander';
 import * as utils from './utils';
 
-const IGNORED_DIRS = ['target', 'node_modules', 'volumes', 'build', 'dist', '.git', 'generated', 'grafonnet-lib'];
-const IGNORED_FILES = ['KeysWithPlonkVerifier.sol', 'TokenInit.sol'];
 const EXTENSIONS = ['ts', 'md', 'sol', 'js', 'vue'];
 
 // If you wonder why this is written so obscurely through find and not through .prettierignore and globs,
@@ -16,13 +14,9 @@ export async function fmt(extension: string, check: boolean = false) {
     if (!EXTENSIONS.includes(extension)) {
         throw new Error('Unsupported extension');
     }
+    
     const command = check ? 'check' : 'write';
-    const root = extension == 'sol' ? 'contracts' : '.';
-    const ignored_dirs = IGNORED_DIRS.map((dir) => `-o -path '*/${dir}' -prune`).join(' ');
-    const ignored_files = IGNORED_FILES.map((file) => `-a ! -name '${file}'`).join(' ');
-    const { stdout: files } = await utils.exec(
-        `find ${root} -type f -name '*.${extension}' ${ignored_files} -print ${ignored_dirs}`
-    );
+    const files = await utils.getUnignoredFiles(extension);
 
     await utils.spawn(`yarn --silent prettier --config .prettier-${extension}.json --${command} ${files}`);
 }
