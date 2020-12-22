@@ -21,7 +21,7 @@ jobs:
 
     - name: init
       run: |
-        cargo sqlx --version || cargo install --version=0.1.0-beta.1 sqlx-cli
+        cargo sqlx --version || cargo install --version=0.2.0 sqlx-cli
         zk
         zk run yarn
         cp etc/tokens/{test,localhost}.json

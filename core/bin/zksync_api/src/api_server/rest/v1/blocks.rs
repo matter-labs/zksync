@@ -105,6 +105,7 @@ impl ApiBlocksData {
 // Data transfer objects.
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Clone)]
+#[serde(rename_all = "camelCase")]
 pub struct BlockInfo {
     pub block_number: BlockNumber,
     #[serde(with = "FrSerde")]
@@ -117,6 +118,7 @@ pub struct BlockInfo {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
+#[serde(rename_all = "camelCase")]
 pub struct TransactionInfo {
     pub tx_hash: TxHash,
     pub block_number: BlockNumber,
