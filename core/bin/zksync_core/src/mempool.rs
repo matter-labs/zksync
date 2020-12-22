@@ -18,9 +18,13 @@
 use std::collections::{HashMap, VecDeque};
 // External uses
 use futures::{
-    channel::{mpsc, oneshot},
+    channel::{
+        mpsc::{self, Receiver, Sender},
+        oneshot,
+    },
     SinkExt, StreamExt,
 };
+
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use tokio::task::JoinHandle;
@@ -34,6 +38,10 @@ use zksync_types::{
 };
 // Local uses
 use crate::eth_watch::EthWatchRequest;
+use serde::export::PhantomData;
+use std::sync::Arc;
+use std::time::Instant;
+use tokio::sync::Mutex;
 use zksync_config::ConfigurationOptions;
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, Error)]
@@ -97,7 +105,7 @@ pub struct GetBlockRequest {
 }
 
 #[derive(Debug)]
-pub enum MempoolRequest {
+pub enum MempoolTransactionRequest {
     /// Add new transaction to mempool, transaction should be previously checked
     /// for correctness (including its Ethereum and ZKSync signatures).
     /// oneshot is used to receive tx add result.
@@ -111,6 +119,10 @@ pub enum MempoolRequest {
         Option<TxEthSignature>,
         oneshot::Sender<Result<(), TxAddError>>,
     ),
+}
+
+#[derive(Debug)]
+pub enum MempoolBlocksRequest {
     /// When block is committed, nonces of the account tree should be updated too.
     UpdateNonces(AccountUpdates),
     /// Get transactions from the mempool.
@@ -237,161 +249,20 @@ impl MempoolState {
     }
 }
 
-struct Mempool {
-    db_pool: ConnectionPool,
-    mempool_state: MempoolState,
-    requests: mpsc::Receiver<MempoolRequest>,
+struct MempoolBlocks {
+    mempool_state: Arc<Mutex<MempoolState>>,
+    requests: mpsc::Receiver<MempoolBlocksRequest>,
     eth_watch_req: mpsc::Sender<EthWatchRequest>,
     max_block_size_chunks: usize,
-    max_number_of_withdrawals_per_block: usize,
 }
 
-impl Mempool {
-    async fn add_tx(&mut self, tx: SignedZkSyncTx) -> Result<(), TxAddError> {
-        let mut storage = self.db_pool.access_storage().await.map_err(|err| {
-            log::warn!("Mempool storage access error: {}", err);
-            TxAddError::DbError
-        })?;
-
-        let mut transaction = storage.start_transaction().await.map_err(|err| {
-            log::warn!("Mempool storage access error: {}", err);
-            TxAddError::DbError
-        })?;
-        transaction
-            .chain()
-            .mempool_schema()
-            .insert_tx(&tx)
-            .await
-            .map_err(|err| {
-                log::warn!("Mempool storage access error: {}", err);
-                TxAddError::DbError
-            })?;
-
-        transaction.commit().await.map_err(|err| {
-            log::warn!("Mempool storage access error: {}", err);
-            TxAddError::DbError
-        })?;
-
-        self.mempool_state.add_tx(tx)
-    }
-
-    async fn add_batch(
-        &mut self,
-        txs: Vec<SignedZkSyncTx>,
-        eth_signature: Option<TxEthSignature>,
-    ) -> Result<(), TxAddError> {
-        let mut storage = self.db_pool.access_storage().await.map_err(|err| {
-            log::warn!("Mempool storage access error: {}", err);
-            TxAddError::DbError
-        })?;
-
-        let mut batch: SignedTxsBatch = SignedTxsBatch {
-            txs: txs.clone(),
-            batch_id: 0, // Will be determined after inserting to the database
-            eth_signature: eth_signature.clone(),
-        };
-
-        if self.mempool_state.chunks_for_batch(&batch) > self.max_block_size_chunks {
-            return Err(TxAddError::BatchTooBig);
-        }
-
-        let mut number_of_withdrawals = 0;
-        for tx in txs {
-            if tx.tx.is_withdraw() {
-                number_of_withdrawals += 1;
-            }
-        }
-        if number_of_withdrawals > self.max_number_of_withdrawals_per_block {
-            return Err(TxAddError::BatchWithdrawalsOverload);
-        }
-
-        let mut transaction = storage.start_transaction().await.map_err(|err| {
-            log::warn!("Mempool storage access error: {}", err);
-            TxAddError::DbError
-        })?;
-        let batch_id = transaction
-            .chain()
-            .mempool_schema()
-            .insert_batch(&batch.txs, eth_signature)
-            .await
-            .map_err(|err| {
-                log::warn!("Mempool storage access error: {}", err);
-                TxAddError::DbError
-            })?;
-        transaction.commit().await.map_err(|err| {
-            log::warn!("Mempool storage access error: {}", err);
-            TxAddError::DbError
-        })?;
-
-        batch.batch_id = batch_id;
-
-        self.mempool_state.add_batch(batch)
-    }
-
-    async fn run(mut self) {
-        while let Some(request) = self.requests.next().await {
-            match request {
-                MempoolRequest::NewTx(tx, resp) => {
-                    let tx_add_result = self.add_tx(*tx).await;
-                    resp.send(tx_add_result).unwrap_or_default();
-                }
-                MempoolRequest::NewTxsBatch(txs, eth_signature, resp) => {
-                    let tx_add_result = self.add_batch(txs, eth_signature).await;
-                    resp.send(tx_add_result).unwrap_or_default();
-                }
-                MempoolRequest::GetBlock(block) => {
-                    // Generate proposed block.
-                    let proposed_block =
-                        self.propose_new_block(block.last_priority_op_number).await;
-
-                    // Send the proposed block to the request initiator.
-                    block
-                        .response_sender
-                        .send(proposed_block)
-                        .expect("mempool proposed block response send failed");
-                }
-                MempoolRequest::UpdateNonces(updates) => {
-                    for (id, update) in updates {
-                        match update {
-                            AccountUpdate::Create { address, nonce } => {
-                                self.mempool_state.account_ids.insert(id, address);
-                                self.mempool_state.account_nonces.insert(address, nonce);
-                            }
-                            AccountUpdate::Delete { address, .. } => {
-                                self.mempool_state.account_ids.remove(&id);
-                                self.mempool_state.account_nonces.remove(&address);
-                            }
-                            AccountUpdate::UpdateBalance { new_nonce, .. } => {
-                                if let Some(address) = self.mempool_state.account_ids.get(&id) {
-                                    if let Some(nonce) =
-                                        self.mempool_state.account_nonces.get_mut(address)
-                                    {
-                                        *nonce = new_nonce;
-                                    }
-                                }
-                            }
-                            AccountUpdate::ChangePubKeyHash { new_nonce, .. } => {
-                                if let Some(address) = self.mempool_state.account_ids.get(&id) {
-                                    if let Some(nonce) =
-                                        self.mempool_state.account_nonces.get_mut(address)
-                                    {
-                                        *nonce = new_nonce;
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-
+impl MempoolBlocks {
     async fn propose_new_block(&mut self, current_unprocessed_priority_op: u64) -> ProposedBlock {
         let start = std::time::Instant::now();
         let (chunks_left, priority_ops) = self
             .select_priority_ops(current_unprocessed_priority_op)
             .await;
-        let (_chunks_left, txs) = self.prepare_tx_for_block(chunks_left);
+        let (_chunks_left, txs) = self.prepare_tx_for_block(chunks_left).await;
 
         log::trace!("Proposed priority ops for block: {:#?}", priority_ops);
         log::trace!("Proposed txs for block: {:#?}", txs);
@@ -427,49 +298,313 @@ impl Mempool {
         )
     }
 
-    fn prepare_tx_for_block(&mut self, mut chunks_left: usize) -> (usize, Vec<SignedTxVariant>) {
+    async fn prepare_tx_for_block(
+        &mut self,
+        mut chunks_left: usize,
+    ) -> (usize, Vec<SignedTxVariant>) {
         let mut txs_for_commit = Vec::new();
 
-        while let Some(tx) = self.mempool_state.ready_txs.pop_front() {
-            let chunks_for_tx = self.mempool_state.required_chunks(&tx);
+        let mut mempool = self.mempool_state.lock().await;
+        while let Some(tx) = mempool.ready_txs.pop_front() {
+            let chunks_for_tx = mempool.required_chunks(&tx);
             if chunks_left >= chunks_for_tx {
                 txs_for_commit.push(tx);
                 chunks_left -= chunks_for_tx;
             } else {
                 // Push the taken tx back, it does not fit.
-                self.mempool_state.ready_txs.push_front(tx);
+                mempool.ready_txs.push_front(tx);
                 break;
             }
         }
 
         (chunks_left, txs_for_commit)
     }
+
+    async fn run(mut self) {
+        while let Some(request) = self.requests.next().await {
+            match request {
+                MempoolBlocksRequest::GetBlock(block) => {
+                    // Generate proposed block.
+                    let proposed_block =
+                        self.propose_new_block(block.last_priority_op_number).await;
+
+                    // Send the proposed block to the request initiator.
+                    block
+                        .response_sender
+                        .send(proposed_block)
+                        .expect("mempool proposed block response send failed");
+                }
+                MempoolBlocksRequest::UpdateNonces(updates) => {
+                    for (id, update) in updates {
+                        match update {
+                            AccountUpdate::Create { address, nonce } => {
+                                let mut mempool = self.mempool_state.lock().await;
+                                mempool.account_ids.insert(id, address);
+                                mempool.account_nonces.insert(address, nonce);
+                            }
+                            AccountUpdate::Delete { address, .. } => {
+                                let mut mempool = self.mempool_state.lock().await;
+                                mempool.account_ids.remove(&id);
+                                mempool.account_nonces.remove(&address);
+                            }
+                            AccountUpdate::UpdateBalance { new_nonce, .. } => {
+                                if let Some(address) =
+                                    self.mempool_state.lock().await.account_ids.get(&id)
+                                {
+                                    if let Some(nonce) = self
+                                        .mempool_state
+                                        .lock()
+                                        .await
+                                        .account_nonces
+                                        .get_mut(address)
+                                    {
+                                        *nonce = new_nonce;
+                                    }
+                                }
+                            }
+                            AccountUpdate::ChangePubKeyHash { new_nonce, .. } => {
+                                if let Some(address) =
+                                    self.mempool_state.lock().await.account_ids.get(&id)
+                                {
+                                    if let Some(nonce) = self
+                                        .mempool_state
+                                        .lock()
+                                        .await
+                                        .account_nonces
+                                        .get_mut(address)
+                                    {
+                                        *nonce = new_nonce;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+struct MempoolTransactionsHandler {
+    db_pool: ConnectionPool,
+    mempool_state: Arc<Mutex<MempoolState>>,
+    requests: mpsc::Receiver<MempoolTransactionRequest>,
+    max_block_size_chunks: usize,
+    max_number_of_withdrawals_per_block: usize,
+}
+
+impl Balanced<MempoolTransactionRequest> for MempoolTransactionsHandler {
+    fn clone_with_receiver(&self, receiver: Receiver<MempoolTransactionRequest>) -> Self {
+        Self {
+            db_pool: self.db_pool.clone(),
+            mempool_state: self.mempool_state.clone(),
+            requests: receiver,
+            max_block_size_chunks: self.max_block_size_chunks,
+            max_number_of_withdrawals_per_block: self.max_number_of_withdrawals_per_block,
+        }
+    }
+}
+
+impl MempoolTransactionsHandler {
+    async fn add_tx(&mut self, tx: SignedZkSyncTx) -> Result<(), TxAddError> {
+        let mut storage = self.db_pool.access_storage().await.map_err(|err| {
+            log::warn!("Mempool storage access error: {}", err);
+            TxAddError::DbError
+        })?;
+
+        let mut transaction = storage.start_transaction().await.map_err(|err| {
+            log::warn!("Mempool storage access error: {}", err);
+            TxAddError::DbError
+        })?;
+        transaction
+            .chain()
+            .mempool_schema()
+            .insert_tx(&tx)
+            .await
+            .map_err(|err| {
+                log::warn!("Mempool storage access error: {}", err);
+                TxAddError::DbError
+            })?;
+
+        transaction.commit().await.map_err(|err| {
+            log::warn!("Mempool storage access error: {}", err);
+            TxAddError::DbError
+        })?;
+
+        self.mempool_state.lock().await.add_tx(tx)
+    }
+
+    async fn add_batch(
+        &mut self,
+        txs: Vec<SignedZkSyncTx>,
+        eth_signature: Option<TxEthSignature>,
+    ) -> Result<(), TxAddError> {
+        let mut storage = self.db_pool.access_storage().await.map_err(|err| {
+            log::warn!("Mempool storage access error: {}", err);
+            TxAddError::DbError
+        })?;
+
+        let mut batch: SignedTxsBatch = SignedTxsBatch {
+            txs: txs.clone(),
+            batch_id: 0, // Will be determined after inserting to the database
+            eth_signature: eth_signature.clone(),
+        };
+
+        if self.mempool_state.lock().await.chunks_for_batch(&batch) > self.max_block_size_chunks {
+            return Err(TxAddError::BatchTooBig);
+        }
+
+        let mut number_of_withdrawals = 0;
+        for tx in txs {
+            if tx.tx.is_withdraw() {
+                number_of_withdrawals += 1;
+            }
+        }
+        if number_of_withdrawals > self.max_number_of_withdrawals_per_block {
+            return Err(TxAddError::BatchWithdrawalsOverload);
+        }
+
+        let mut transaction = storage.start_transaction().await.map_err(|err| {
+            log::warn!("Mempool storage access error: {}", err);
+            TxAddError::DbError
+        })?;
+        let batch_id = transaction
+            .chain()
+            .mempool_schema()
+            .insert_batch(&batch.txs, eth_signature)
+            .await
+            .map_err(|err| {
+                log::warn!("Mempool storage access error: {}", err);
+                TxAddError::DbError
+            })?;
+        transaction.commit().await.map_err(|err| {
+            log::warn!("Mempool storage access error: {}", err);
+            TxAddError::DbError
+        })?;
+
+        batch.batch_id = batch_id;
+
+        self.mempool_state.lock().await.add_batch(batch)
+    }
+
+    async fn run(mut self) {
+        while let Some(request) = self.requests.next().await {
+            match request {
+                MempoolTransactionRequest::NewTx(tx, resp) => {
+                    let tx_add_result = self.add_tx(*tx).await;
+                    resp.send(tx_add_result).unwrap_or_default();
+                }
+                MempoolTransactionRequest::NewTxsBatch(txs, eth_signature, resp) => {
+                    let tx_add_result = self.add_batch(txs, eth_signature).await;
+                    resp.send(tx_add_result).unwrap_or_default();
+                }
+            }
+        }
+    }
 }
 
 #[must_use]
-pub fn run_mempool_task(
+pub fn run_mempool_tasks(
     db_pool: ConnectionPool,
-    requests: mpsc::Receiver<MempoolRequest>,
+    tx_requests: mpsc::Receiver<MempoolTransactionRequest>,
+    block_requests: mpsc::Receiver<MempoolBlocksRequest>,
     eth_watch_req: mpsc::Sender<EthWatchRequest>,
     config: &ConfigurationOptions,
+    number_of_mempool_transaction_handlers: u8,
+    channel_capacity: usize,
 ) -> JoinHandle<()> {
     let config = config.clone();
     tokio::spawn(async move {
-        let mempool_state = MempoolState::restore_from_db(&db_pool).await;
+        let mempool_state = Arc::new(Mutex::new(MempoolState::restore_from_db(&db_pool).await));
+        let tmp_channel = mpsc::channel(channel_capacity);
+        let max_block_size_chunks = *config
+            .available_block_chunk_sizes
+            .iter()
+            .max()
+            .expect("failed to find max block chunks size");
 
-        let mempool = Mempool {
-            db_pool,
+        let (balancer, mut tx_handlers) = Balancer::new(
+            MempoolTransactionsHandler {
+                db_pool: db_pool.clone(),
+                mempool_state: mempool_state.clone(),
+                requests: tmp_channel.1,
+                max_block_size_chunks,
+                max_number_of_withdrawals_per_block: config.max_number_of_withdrawals_per_block,
+            },
+            tx_requests,
+            number_of_mempool_transaction_handlers,
+            channel_capacity,
+        );
+
+        let mut tasks = vec![];
+        while let Some(tx_handler) = tx_handlers.pop() {
+            tasks.push(tokio::spawn(tx_handler.run()));
+        }
+
+        tasks.push(tokio::spawn(balancer.run()));
+        let blocks_handler = MempoolBlocks {
             mempool_state,
-            requests,
+            requests: block_requests,
             eth_watch_req,
-            max_block_size_chunks: *config
-                .available_block_chunk_sizes
-                .iter()
-                .max()
-                .expect("failed to find max block chunks size"),
-            max_number_of_withdrawals_per_block: config.max_number_of_withdrawals_per_block,
+            max_block_size_chunks,
         };
-
-        mempool.run().await
+        tasks.push(tokio::spawn(blocks_handler.run()));
     })
+}
+
+pub struct Balancer<T, REQUESTS> {
+    channels: Vec<Sender<REQUESTS>>,
+    requests: Receiver<REQUESTS>,
+    _items: PhantomData<T>,
+}
+
+pub trait Balanced<REQUESTS> {
+    fn clone_with_receiver(&self, receiver: Receiver<REQUESTS>) -> Self;
+}
+
+impl<T, REQUESTS> Balancer<T, REQUESTS>
+where
+    T: Balanced<REQUESTS> + Sync + Send + 'static,
+{
+    pub fn new(
+        balanced_item: T,
+        requests: Receiver<REQUESTS>,
+        number_of_items: u8,
+        channel_capacity: usize,
+    ) -> (Self, Vec<T>) {
+        let mut balanced_items = vec![];
+        let mut channels = vec![];
+
+        for _ in 0..number_of_items {
+            let (request_sender, request_receiver) = mpsc::channel(channel_capacity);
+            channels.push(request_sender);
+            balanced_items.push(balanced_item.clone_with_receiver(request_receiver));
+        }
+
+        (
+            Self {
+                channels,
+                requests,
+                _items: PhantomData,
+            },
+            balanced_items,
+        )
+    }
+
+    pub async fn run(mut self) {
+        // It's an obvious way of balancing. Send an equal number of requests to each ticker
+        let mut channel_indexes = (0..self.channels.len()).into_iter().cycle();
+        // it's the easiest way how to cycle over channels, because cycle required clone trait
+        while let Some(request) = self.requests.next().await {
+            let channel_index = channel_indexes
+                .next()
+                .expect("Exactly one channel should exists");
+            let start = Instant::now();
+            self.channels[channel_index]
+                .send(request)
+                .await
+                .unwrap_or_default();
+            metrics::histogram!("ticker.dispatcher.request", start.elapsed());
+        }
+    }
 }
