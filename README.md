@@ -47,6 +47,16 @@ The following guides for developers are available:
 - [JavaScript SDK](sdk/zksync.js)
 - [Rust SDK](sdk/zksync-rs)
 
+## Changelog
+
+Since the repository is big and is split into independent components, there is a different changelog for each of its major parts:
+
+- [Smart contracts](contracts/CHANGELOG.md)
+- [Core](core/CHANGELOG.md)
+- [Infrastructure](infrastructure/CHANGELOG.md)
+- [JavaScript SDK](sdk/zksync.js/CHANGELOG.md)
+- [Rust SDK](sdk/zksync-rs/CHANGELOG.md)
+
 ## License
 
 zkSync is distributed under the terms of both the MIT license and the Apache License (Version 2.0).
