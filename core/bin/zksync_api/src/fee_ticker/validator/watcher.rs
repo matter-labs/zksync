@@ -6,6 +6,7 @@ use zksync_types::{Address, Token};
 
 use crate::fee_ticker::ticker_api::REQUEST_TIMEOUT;
 use bigdecimal::BigDecimal;
+use std::time::Instant;
 
 #[async_trait::async_trait]
 pub trait TokenWatcher {
@@ -31,6 +32,8 @@ impl UniswapTokenWatcher {
     }
     async fn get_market_volume(&mut self, address: Address) -> anyhow::Result<BigDecimal> {
         // Uniswap has graphql API, using full graphql client for one query is overkill for current task
+        let start = Instant::now();
+
         let query = format!("{{token(id: \"{:?}\"){{tradeVolumeUSD}}}}", address);
 
         let request = self.client.post(&self.addr).json(&serde_json::json!({
@@ -45,6 +48,7 @@ impl UniswapTokenWatcher {
             .json::<GraphqlResponse>()
             .await?;
 
+        metrics::histogram!("ticker.uniswap_watcher.get_market_volume", start.elapsed());
         Ok(response.data.token.trade_volume_usd.parse()?)
     }
     async fn update_historical_amount(&mut self, address: Address, amount: BigDecimal) {

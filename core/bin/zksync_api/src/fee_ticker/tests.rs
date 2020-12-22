@@ -168,7 +168,9 @@ fn format_with_dot(num: &Ratio<BigUint>, precision: usize) -> String {
     UnsignedRatioSerializeAsDecimal::serialize_to_str_with_dot(num, precision)
 }
 
+#[derive(Debug)]
 struct FakeTokenWatcher;
+
 #[async_trait::async_trait]
 impl TokenWatcher for FakeTokenWatcher {
     async fn get_token_market_volume(&mut self, _token: &Token) -> anyhow::Result<BigDecimal> {

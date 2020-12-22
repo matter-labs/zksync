@@ -24,12 +24,16 @@ use crate::fee_ticker::validator::{cache::TokenCacheWrapper, watcher::TokenWatch
 
 use zksync_utils::{big_decimal_to_ratio, ratio_to_big_decimal};
 
+const CRITICAL_NUMBER_OF_ERRORS: u32 = 500;
+
 #[derive(Clone, Debug)]
 struct AcceptanceData {
     last_refresh: Instant,
     allowed: bool,
 }
 
+/// We don't want to send requests to the Internet for every request from users.
+/// Market updater periodically updates the values of the token market in the cache  
 #[derive(Clone, Debug)]
 pub(crate) struct MarketUpdater<W> {
     tokens_cache: TokenCacheWrapper,
@@ -62,9 +66,11 @@ impl<W: TokenWatcher> MarketUpdater<W> {
     }
 
     pub async fn update_all_tokens(&mut self, tokens: &[Token]) -> anyhow::Result<()> {
+        let start = Instant::now();
         for token in tokens {
             self.update_token(token).await?;
         }
+        metrics::histogram!("ticker.validator.update_all_tokens", start.elapsed());
         Ok(())
     }
 
@@ -75,9 +81,17 @@ impl<W: TokenWatcher> MarketUpdater<W> {
             .await
             .expect("Error to connect in db");
 
+        let mut error_counter = 0;
+
         loop {
             if let Err(e) = self.update_all_tokens(&tokens).await {
-                vlog::warn!("Error when updating token market volume {:?}", e)
+                error_counter += 1;
+                vlog::warn!("Error when updating token market volume {:?}", e);
+                if error_counter >= CRITICAL_NUMBER_OF_ERRORS {
+                    vlog::error!(
+                        "Critical number of error were produced when updating tokens market"
+                    );
+                }
             }
             tokio::time::delay_for(Duration::from_secs(duration_secs)).await
         }
@@ -94,7 +108,6 @@ pub struct FeeTokenValidator<W> {
     /// Whitelist is better in this case, because it requires fewer requests to different APIs
     tokens: HashMap<Address, AcceptanceData>,
     available_time: chrono::Duration,
-    // It's possible to use f64 here because precision doesn't matter
     liquidity_volume: BigDecimal,
     watcher: W,
 }
@@ -136,6 +149,7 @@ impl<W: TokenWatcher> FeeTokenValidator<W> {
     }
 
     async fn check_token(&mut self, token: Token) -> anyhow::Result<bool> {
+        let start = Instant::now();
         if let Some(acceptance_data) = self.tokens.get(&token.address) {
             if chrono::Duration::from_std(acceptance_data.last_refresh.elapsed())
                 .expect("Correct duration")
@@ -151,9 +165,8 @@ impl<W: TokenWatcher> FeeTokenValidator<W> {
         };
 
         if Utc::now() - volume.last_updated < self.available_time {
-            vlog::warn!("Token market amount is not relevant")
+            vlog::warn!("Token market amount for {} is not relevant", &token.symbol)
         }
-
         let allowed = ratio_to_big_decimal(&volume.market_volume, 2) >= self.liquidity_volume;
         self.tokens.insert(
             token.address,
@@ -162,6 +175,7 @@ impl<W: TokenWatcher> FeeTokenValidator<W> {
                 allowed,
             },
         );
+        metrics::histogram!("ticker.validator.check_token", start.elapsed());
         Ok(allowed)
     }
     // I think, it's redundant method and we could remove watcher from validator and store it only in updater
