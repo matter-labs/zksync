@@ -43,7 +43,7 @@ use crate::fee_ticker::{
 use crate::utils::token_db_cache::TokenDBCache;
 
 pub use self::fee::*;
-use crate::fee_ticker::dispatcher::Dispatcher;
+use crate::fee_ticker::balancer::TickerBalancer;
 use crate::fee_ticker::validator::MarketUpdater;
 use std::convert::TryFrom;
 
@@ -53,7 +53,7 @@ mod ticker_api;
 mod ticker_info;
 mod validator;
 
-mod dispatcher;
+mod balancer;
 #[cfg(test)]
 mod tests;
 
@@ -240,17 +240,17 @@ pub fn run_ticker_task(
                 CoinGeckoAPI::new(client, base_url).expect("CoinGecko initializing error");
             let ticker_info = TickerInfo::new(db_pool.clone());
 
-            let mut ticker_dispatcher = Dispatcher::new(
+            let mut ticker_balancer = TickerBalancer::new(
                 token_price_api,
                 ticker_info,
                 ticker_config,
                 validator,
                 tricker_requests,
                 db_pool,
-                5,
+                config.number_of_ticker_actors,
             );
-            ticker_dispatcher.spawn_tickers();
-            tokio::spawn(ticker_dispatcher.run())
+            ticker_balancer.spawn_tickers();
+            tokio::spawn(ticker_balancer.run())
         }
     }
 }
