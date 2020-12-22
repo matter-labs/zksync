@@ -383,12 +383,6 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
         //   same way as it done for "verified" flag. Later we've decided that if tx was added
         //   to the `executed_*` table, it actually **is** committed, thus now we just add
         //   `true`.
-        // let query = format!(
-        //     ,
-        //     address = hex::encode(address.as_ref().to_vec()),
-        //     offset = offset,
-        //     limit = limit
-        // );
         let mut tx_history = sqlx::query_as!(
             TransactionsHistoryItem,
             r#"
@@ -465,7 +459,6 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
         ).fetch_all(self.0.conn())
         .await?;
 
-        // diesel::sql_query(query).load::<TransactionsHistoryItem>(self.0.conn())?;
         if !tx_history.is_empty() {
             let tokens = TokensSchema(self.0).load_tokens().await?;
             for tx_item in &mut tx_history {
@@ -637,7 +630,6 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
         ).fetch_all(self.0.conn())
         .await?;
 
-        // diesel::sql_query(query).load::<TransactionsHistoryItem>(self.0.conn())?;
         if !tx_history.is_empty() {
             let tokens = TokensSchema(self.0).load_tokens().await?;
             for tx_item in &mut tx_history {

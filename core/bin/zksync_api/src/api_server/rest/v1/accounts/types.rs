@@ -90,6 +90,7 @@ pub struct AccountInfo {
 /// The unique transaction location, which is describes by a pair:
 /// (block number, transaction index in it).
 #[derive(Debug, Deserialize, Serialize, Clone, Copy, PartialEq)]
+#[serde(rename_all = "camelCase")]
 pub struct TxLocation {
     /// The block containing the transaction.
     pub block: BlockNumber,
@@ -393,7 +394,7 @@ impl PendingAccountTxReceipt {
     pub fn from_priority_op(block_id: EthBlockId, op: PriorityOp) -> Self {
         Self {
             block: block_id,
-            hash: H256::from_slice(&op.eth_hash),
+            hash: op.eth_hash,
         }
     }
 }

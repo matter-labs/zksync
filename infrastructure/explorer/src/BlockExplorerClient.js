@@ -7,8 +7,6 @@ export class BlockExplorerClient {
 
     async getAccountTransactions(address, offset, limit) {
         const transactionsUrl = `${this.providerAddress}/api/v0.1/account/${address}/history/${offset}/${limit}`;
-        return await Axios
-            .get(transactionsUrl)
-            .then(res => res.data);
+        return await Axios.get(transactionsUrl).then(res => res.data);
     }
 }
