@@ -90,6 +90,7 @@ pub struct AccountInfo {
 /// The unique transaction location, which is describes by a pair:
 /// (block number, transaction index in it).
 #[derive(Debug, Deserialize, Serialize, Clone, Copy, PartialEq)]
+#[serde(rename_all = "camelCase")]
 pub struct TxLocation {
     /// The block containing the transaction.
     pub block: BlockNumber,

@@ -16,6 +16,7 @@ use zksync_crypto::proof::EncodedProofPlonk;
 use zksync_crypto::{Engine, Fr};
 
 pub mod api;
+pub mod exit_proof;
 pub mod fs_utils;
 pub mod network_utils;
 pub mod prover_data;

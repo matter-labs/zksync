@@ -10,7 +10,7 @@ pub use super::{
     config::Contracts,
     operations::PriorityOpReceipt,
     tokens::TokenPriceKind,
-    transactions::{SumbitErrorCode, TxReceipt},
+    transactions::{SumbitErrorCode, TxData, TxReceipt},
     Pagination,
 };
 
