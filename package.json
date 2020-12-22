@@ -32,11 +32,7 @@
     "zcli": "yarn workspace zcli",
     "ts-tests": "yarn workspace ts-tests",
     "explorer": "yarn workspace sync-explorer",
-    "zk": "yarn workspace zk",
-    "lint:md": "markdownlint $(find . -name '*.md' -print -o -path '*/node_modules' -prune)",
-    "lint:sol": "solhint contracts/{,dev-}contracts{,/**}/*.sol",
-    "lint:js": "eslint $(find . -name '*.js' | grep -v 'node_modules\\|build\\|dist\\|.tslintrc.js')",
-    "lint:ts": "eslint --ext ts --no-eslintrc -c .tslintrc.js $(find . -name '*.ts' | grep -v 'node_modules\\|build\\|dist')"
+    "zk": "yarn workspace zk"
   },
   "devDependencies": {
     "@typescript-eslint/eslint-plugin": "^4.10.0",

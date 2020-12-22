@@ -5,7 +5,7 @@ const LINT_COMMANDS = {
     md: 'markdownlint',
     sol: 'solhint',
     js: 'eslint',
-    // This line is needed to make eslint ignore eslintrc.js when using .ts files.
+    // Use .tslintrc.js as the config for linting *.ts files 
     ts: 'eslint --ext ts --no-eslintrc -c .tslintrc.js'
     // This is needed to silence typescipt. It is possible to create type 
     // guards, but unfortunately they would have rather weird type, so 
