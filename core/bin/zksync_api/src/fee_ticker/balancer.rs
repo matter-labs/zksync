@@ -75,8 +75,8 @@ where
         }
     }
 
-    /// It's an obvious way of balancing. Send an equal number of requests to each ticker
     pub async fn run(mut self) {
+        // It's an obvious way of balancing. Send an equal number of requests to each ticker
         let mut channel_indexes = (0..self.channels.len()).into_iter().cycle();
         // it's the easiest way how to cycle over channels, because cycle required clone trait
         while let Some(request) = self.requests.next().await {
