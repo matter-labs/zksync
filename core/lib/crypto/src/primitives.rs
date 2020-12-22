@@ -282,7 +282,7 @@ impl FloatConversions {
                 (exponent - 1, max_mantissa)
             }
         };
-        
+
         // encode into bits. First bits of mantissa in LE order
 
         let mut encoding = Vec::with_capacity(exponent_length + mantissa_length);

@@ -139,6 +139,36 @@ export function integerToFloat(
     return bitsIntoBytesInBEOrder(encoding.reverse()).reverse();
 }
 
+export function integerToFloatUp(
+    integer: BigNumber,
+    exp_bits: number,
+    mantissa_bits: number,
+    exp_base: number
+): Uint8Array {
+    const max_exponent = BigNumber.from(10).pow(Math.pow(2, exp_bits) - 1);
+    const max_mantissa = BigNumber.from(2).pow(mantissa_bits).sub(1);
+
+    if (integer.gt(max_mantissa.mul(max_exponent))) {
+        throw new Error('Integer is too big');
+    }
+    let exponent = 0;
+    let exponent_temp = BigNumber.from(1);
+    while (integer.div(exponent_temp).add(BigNumber.from(integer.mod(exponent_temp) != BigNumber.from(0))).gt(max_mantissa)) {
+        exponent_temp = exponent_temp.mul(exp_base);
+        exponent += 1;
+    }
+    let mantissa = integer.div(exponent_temp).add(BigNumber.from(integer.mod(exponent_temp) != BigNumber.from(0)));
+
+    // encode into bits. First bits of mantissa in LE order
+    const encoding = [];
+
+    encoding.push(...numberToBits(exponent, exp_bits));
+    const mantissaNumber = mantissa.toNumber();
+    encoding.push(...numberToBits(mantissaNumber, mantissa_bits));
+
+    return bitsIntoBytesInBEOrder(encoding.reverse()).reverse();
+}
+
 export function reverseBits(buffer: Uint8Array): Uint8Array {
     const reversed = buffer.reverse();
     reversed.map((b) => {
@@ -155,8 +185,16 @@ function packAmount(amount: BigNumber): Uint8Array {
     return reverseBits(integerToFloat(amount, AMOUNT_EXPONENT_BIT_WIDTH, AMOUNT_MANTISSA_BIT_WIDTH, 10));
 }
 
+function packAmountUp(amount: BigNumber): Uint8Array {
+    return reverseBits(integerToFloatUp(amount, AMOUNT_EXPONENT_BIT_WIDTH, AMOUNT_MANTISSA_BIT_WIDTH, 10));
+}
+
 function packFee(amount: BigNumber): Uint8Array {
     return reverseBits(integerToFloat(amount, FEE_EXPONENT_BIT_WIDTH, FEE_MANTISSA_BIT_WIDTH, 10));
+}
+
+function packFeeUp(amount: BigNumber): Uint8Array {
+    return reverseBits(integerToFloatUp(amount, FEE_EXPONENT_BIT_WIDTH, FEE_MANTISSA_BIT_WIDTH, 10));
 }
 
 export function packAmountChecked(amount: BigNumber): Uint8Array {
@@ -183,6 +221,11 @@ export function closestPackableTransactionAmount(amount: BigNumberish): BigNumbe
     return floatToInteger(packedAmount, AMOUNT_EXPONENT_BIT_WIDTH, AMOUNT_MANTISSA_BIT_WIDTH, 10);
 }
 
+export function closestGreaterOrEqPackableTransactionAmount(amount: BigNumberish): BigNumber {
+    const packedAmount = packAmountUp(BigNumber.from(amount));
+    return floatToInteger(packedAmount, AMOUNT_EXPONENT_BIT_WIDTH, AMOUNT_MANTISSA_BIT_WIDTH, 10);
+}
+
 export function isTransactionAmountPackable(amount: BigNumberish): boolean {
     return closestPackableTransactionAmount(amount).eq(amount);
 }
@@ -194,6 +237,11 @@ export function isTransactionAmountPackable(amount: BigNumberish): boolean {
  */
 export function closestPackableTransactionFee(fee: BigNumberish): BigNumber {
     const packedFee = packFee(BigNumber.from(fee));
+    return floatToInteger(packedFee, FEE_EXPONENT_BIT_WIDTH, FEE_MANTISSA_BIT_WIDTH, 10);
+}
+
+export function closestGreaterOrEqPackableTransactionFee(fee: BigNumberish): BigNumber {
+    const packedFee = packFeeUp(BigNumber.from(fee));
     return floatToInteger(packedFee, FEE_EXPONENT_BIT_WIDTH, FEE_MANTISSA_BIT_WIDTH, 10);
 }
 
