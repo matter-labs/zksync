@@ -18,4 +18,4 @@
 
 ### zksync.js
 
-- Support of WalletConnect was added. [16dd987](https://github.com/matter-labs/zksync/commit/16dd987)
+- Support of WalletConnect was added.
