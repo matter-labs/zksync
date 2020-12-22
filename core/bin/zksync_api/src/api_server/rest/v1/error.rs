@@ -12,6 +12,7 @@ use serde::{Deserialize, Serialize};
 
 /// The error body that is returned in the response content.
 #[derive(Debug, Serialize, Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
 pub struct ErrorBody {
     /// A URI reference that identifies the problem type.
     #[serde(rename = "type", default, skip_serializing_if = "String::is_empty")]
