@@ -33,7 +33,7 @@ metrics = "0.13.0-alpha.8"
 tokio = { version = "0.2", features = ["full"] }
 futures = "0.3"
 
-num = { version = "0.2", features = ["serde"] }
+num = { version = "0.3.1", features = ["serde"] }
 ctrlc = { version = "3.1", features = ["termination"] }
 anyhow = "1.0"
 async-trait = "0.1.31"

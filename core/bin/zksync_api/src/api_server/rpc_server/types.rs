@@ -164,7 +164,7 @@ pub struct OngoingDeposit {
 }
 
 impl OngoingDeposit {
-    pub fn new(received_on_block: u64, priority_op: PriorityOp) -> Self {
+    pub fn new(priority_op: PriorityOp) -> Self {
         let (token_id, amount) = match priority_op.data {
             ZkSyncPriorityOp::Deposit(deposit) => (
                 deposit.token,
@@ -181,7 +181,7 @@ impl OngoingDeposit {
         let eth_tx_hash = hex::encode(&priority_op.eth_hash);
 
         Self {
-            received_on_block,
+            received_on_block: priority_op.eth_block,
             token_id,
             amount,
             eth_tx_hash,

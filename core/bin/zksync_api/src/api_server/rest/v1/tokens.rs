@@ -103,6 +103,7 @@ pub enum TokenPriceKind {
 }
 
 #[derive(Debug, Deserialize, Serialize, Copy, Clone, PartialEq)]
+#[serde(rename_all = "camelCase")]
 struct TokenPriceQuery {
     #[serde(rename = "in")]
     kind: TokenPriceKind,

@@ -10,8 +10,8 @@ use zksync_types::{Address, TokenId};
 
 // Local imports
 use self::records::{
-    AccountCreatedAt, AccountTxReceiptResponse, PriorityOpReceiptResponse, TransactionsHistoryItem,
-    TxByHashResponse, TxReceiptResponse,
+    AccountCreatedAt, AccountOpReceiptResponse, AccountTxReceiptResponse,
+    PriorityOpReceiptResponse, TransactionsHistoryItem, TxByHashResponse, TxReceiptResponse,
 };
 use crate::{
     chain::operations::{records::StoredExecutedPriorityOperation, OperationsSchema},
@@ -677,21 +677,18 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
     ///
     /// The response for "newer" receipts is sorted in ascending order by position and for "older"
     /// ones in descending order.
-    ///
-    /// Note that rejected transactions do not have a `block_number`, but since the indexes of
-    /// succeesed transactions start from 1, the indexes of rejected transactions is set to 0.
     pub async fn get_account_transactions_receipts(
         &mut self,
         address: Address,
         block_number: u64,
-        block_index: u32,
+        block_index: Option<u32>,
         direction: SearchDirection,
         limit: u64,
     ) -> QueryResult<Vec<AccountTxReceiptResponse>> {
         let start = Instant::now();
 
         let block_number = block_number as i64;
-        let block_index = block_index as i32;
+        let block_index = block_index.map(|x| x as i32).unwrap_or(-1);
 
         let receipts: Vec<_> = match direction {
             SearchDirection::Newer => {
@@ -732,16 +729,16 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
                     FROM executed_transactions
                     LEFT JOIN block_details details ON details.details_block_number = executed_transactions.block_number
                     WHERE (
-                        (from_account = $1 OR to_account = $1 OR primary_account_address = $1)
+                        (primary_account_address = $1 OR from_account = $1 OR to_account = $1)
                         AND (
                             block_number = $2 AND (
-                                COALESCE(block_index, 0) >= $3
+                                COALESCE(block_index, -1) >= $3
                             ) OR (
                                 block_number > $2
                             )
                         )
                     )
-                    ORDER BY block_number ASC, COALESCE(block_index, 0) ASC
+                    ORDER BY block_number ASC, COALESCE(block_index, -1) ASC
                     LIMIT $4
                     "#,
                     address.as_bytes(),
@@ -790,16 +787,16 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
                     FROM executed_transactions
                     LEFT JOIN block_details details ON details.details_block_number = executed_transactions.block_number
                     WHERE (
-                        (from_account = $1 OR to_account = $1 OR primary_account_address = $1)
+                        (primary_account_address = $1 OR from_account = $1 OR to_account = $1)
                         AND (
                             block_number = $2 AND (
-                                COALESCE(block_index, 0) <= $3
+                                COALESCE(block_index, -1) <= $3
                             ) OR (
                                 block_number < $2
                             )
                         )
                     )
-                    ORDER BY block_number DESC, COALESCE(block_index, 0) DESC
+                    ORDER BY block_number DESC, COALESCE(block_index, -1) DESC
                     LIMIT $4
                     "#,
                     address.as_bytes(),
@@ -813,6 +810,147 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
 
         metrics::histogram!(
             "sql.chain.operations_ext.get_account_transactions_receipts",
+            start.elapsed()
+        );
+        Ok(receipts)
+    }
+
+    /// Loads the range of priority operation receipts applied to the given account address
+    /// starting from the specified operation location. Transaction location is defined
+    /// by the (`block_number`, `block index`) pair. This method can be used to get receipts
+    /// "older" than some location or "newer" than one.
+    ///
+    /// The response for "newer" receipts is sorted in ascending order by position and for "older"
+    /// ones in descending order.
+    pub async fn get_account_operations_receipts(
+        &mut self,
+        address: Address,
+        block_number: u64,
+        block_index: u32,
+        direction: SearchDirection,
+        limit: u64,
+    ) -> QueryResult<Vec<AccountOpReceiptResponse>> {
+        let start = Instant::now();
+
+        let block_number = block_number as i64;
+        let block_index = block_index as i32;
+
+        let receipts: Vec<_> = match direction {
+            SearchDirection::Newer => {
+                sqlx::query_as!(
+                    AccountOpReceiptResponse,
+                    r#"
+                    WITH block_details AS (
+                        WITH eth_ops AS (
+                            SELECT DISTINCT ON (block_number, action_type)
+                                operations.block_number,
+                                eth_tx_hashes.tx_hash,
+                                operations.action_type,
+                                operations.created_at,
+                                confirmed
+                            FROM operations
+                                left join eth_ops_binding on eth_ops_binding.op_id = operations.id
+                                left join eth_tx_hashes on eth_tx_hashes.eth_op_id = eth_ops_binding.eth_op_id
+                            ORDER BY block_number DESC, action_type, confirmed
+                        )
+                        SELECT
+                            blocks.number AS details_block_number,
+                            committed.tx_hash AS commit_tx_hash,
+                            verified.tx_hash AS verify_tx_hash
+                        FROM blocks
+                        INNER JOIN eth_ops committed ON
+                            committed.block_number = blocks.number AND committed.action_type = 'COMMIT' AND committed.confirmed = true
+                        LEFT JOIN eth_ops verified ON
+                            verified.block_number = blocks.number AND verified.action_type = 'VERIFY' AND verified.confirmed = true
+                    )
+                    SELECT
+                        block_number, 
+                        block_index,
+                        eth_hash,
+                        details.commit_tx_hash as "commit_tx_hash?",
+                        details.verify_tx_hash as "verify_tx_hash?"
+                    FROM executed_priority_operations
+                    LEFT JOIN block_details details ON details.details_block_number = executed_priority_operations.block_number
+                    WHERE (
+                        (from_account = $1 OR to_account = $1)
+                        AND (
+                            block_number = $2 AND (
+                                block_index >= $3
+                            ) OR (
+                                block_number > $2
+                            )
+                        )
+                    )
+                    ORDER BY block_number ASC, block_index ASC
+                    LIMIT $4
+                    "#,
+                    address.as_bytes(),
+                    block_number,
+                    block_index,
+                    limit as i64,
+                ).fetch_all(self.0.conn())
+                .await?
+            },
+
+            SearchDirection::Older => {
+                sqlx::query_as!(
+                    AccountOpReceiptResponse,
+                    r#"
+                    WITH block_details AS (
+                        WITH eth_ops AS (
+                            SELECT DISTINCT ON (block_number, action_type)
+                                operations.block_number,
+                                eth_tx_hashes.tx_hash,
+                                operations.action_type,
+                                operations.created_at,
+                                confirmed
+                            FROM operations
+                                left join eth_ops_binding on eth_ops_binding.op_id = operations.id
+                                left join eth_tx_hashes on eth_tx_hashes.eth_op_id = eth_ops_binding.eth_op_id
+                            ORDER BY block_number DESC, action_type, confirmed
+                        )
+                        SELECT
+                            blocks.number AS details_block_number,
+                            committed.tx_hash AS commit_tx_hash,
+                            verified.tx_hash AS verify_tx_hash
+                        FROM blocks
+                        INNER JOIN eth_ops committed ON
+                            committed.block_number = blocks.number AND committed.action_type = 'COMMIT' AND committed.confirmed = true
+                        LEFT JOIN eth_ops verified ON
+                            verified.block_number = blocks.number AND verified.action_type = 'VERIFY' AND verified.confirmed = true
+                    )
+                    SELECT
+                        block_number, 
+                        block_index,
+                        eth_hash,
+                        details.commit_tx_hash as "commit_tx_hash?",
+                        details.verify_tx_hash as "verify_tx_hash?"
+                    FROM executed_priority_operations
+                    LEFT JOIN block_details details ON details.details_block_number = executed_priority_operations.block_number
+                    WHERE (
+                        (from_account = $1 OR to_account = $1)
+                        AND (
+                            block_number = $2 AND (
+                                block_index <= $3
+                            ) OR (
+                                block_number < $2
+                            )
+                        )
+                    )
+                    ORDER BY block_number DESC, block_index DESC
+                    LIMIT $4
+                    "#,
+                    address.as_bytes(),
+                    block_number,
+                    block_index,
+                    limit as i64,
+                ).fetch_all(self.0.conn())
+                .await?
+            }
+        };
+
+        metrics::histogram!(
+            "sql.chain.operations_ext.get_account_operations_receipts",
             start.elapsed()
         );
         Ok(receipts)

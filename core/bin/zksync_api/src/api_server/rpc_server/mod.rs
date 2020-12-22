@@ -119,12 +119,12 @@ impl RpcApp {
         // single pass.
         let deposits: Vec<_> = ongoing_ops
             .into_iter()
-            .map(|(block, op)| {
-                if block > max_block_number {
-                    max_block_number = block;
+            .map(|op| {
+                if op.eth_block > max_block_number {
+                    max_block_number = op.eth_block;
                 }
 
-                OngoingDeposit::new(block, op)
+                OngoingDeposit::new(op)
             })
             .collect();
 

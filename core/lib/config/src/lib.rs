@@ -193,6 +193,8 @@ pub struct FeeTickerOptions {
     pub disabled_tokens: HashSet<Address>,
     /// Tokens for which subsidies are disabled.
     pub not_subsidized_tokens: HashSet<Address>,
+    /// Number of tickers for load balancing.
+    pub number_of_ticker_actors: u8,
 }
 
 impl FeeTickerOptions {
@@ -207,6 +209,7 @@ impl FeeTickerOptions {
         Self {
             token_price_source: TokenPriceSource::from_env(),
             fast_processing_coeff: parse_env("TICKER_FAST_PROCESSING_COEFF"),
+            number_of_ticker_actors: parse_env("TICKER_NUMBER_OF_ACTORS"),
             disabled_tokens: Self::comma_separated_addresses("TICKER_DISABLED_TOKENS"),
             not_subsidized_tokens: Self::comma_separated_addresses("NOT_SUBSIDIZED_TOKENS"),
         }

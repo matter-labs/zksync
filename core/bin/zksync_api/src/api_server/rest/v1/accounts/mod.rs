@@ -11,6 +11,7 @@ use actix_web::{
     Scope,
 };
 
+use types::AccountOpReceipt;
 // Workspace uses
 use zksync_config::ConfigurationOptions;
 use zksync_storage::{ConnectionPool, QueryResult, StorageProcessor};
@@ -20,7 +21,7 @@ use zksync_types::{AccountId, Address, BlockNumber, TokenId};
 use crate::{core_api_client::CoreApiClient, utils::token_db_cache::TokenDBCache};
 
 use self::types::{
-    AccountQuery, AccountReceiptsQuery, AccountTxReceipt, PendingAccountTxReceipt, SearchDirection,
+    AccountQuery, AccountReceiptsQuery, AccountTxReceipt, PendingAccountOpReceipt, SearchDirection,
     TxLocation,
 };
 use super::{ApiError, JsonResult};
@@ -179,7 +180,7 @@ impl ApiAccountsData {
             .get_account_transactions_receipts(
                 address,
                 location.block as u64,
-                location.index.unwrap_or_default(),
+                location.index,
                 direction.into(),
                 limit as u64,
             )
@@ -188,18 +189,39 @@ impl ApiAccountsData {
         Ok(items.into_iter().map(AccountTxReceipt::from).collect())
     }
 
-    async fn pending_tx_receipts(
+    async fn op_receipts(
         &self,
         address: Address,
-    ) -> QueryResult<Vec<PendingAccountTxReceipt>> {
-        let ongoing_ops = self
-            .core_api_client
-            .get_unconfirmed_deposits(address)
+        location: TxLocation,
+        direction: SearchDirection,
+        limit: u32,
+    ) -> QueryResult<Vec<AccountOpReceipt>> {
+        let mut storage = self.access_storage().await?;
+
+        let items = storage
+            .chain()
+            .operations_ext_schema()
+            .get_account_operations_receipts(
+                address,
+                location.block as u64,
+                location.index.unwrap_or_default(),
+                direction.into(),
+                limit as u64,
+            )
             .await?;
+
+        Ok(items.into_iter().map(AccountOpReceipt::from).collect())
+    }
+
+    async fn pending_op_receipts(
+        &self,
+        address: Address,
+    ) -> QueryResult<Vec<PendingAccountOpReceipt>> {
+        let ongoing_ops = self.core_api_client.get_unconfirmed_ops(address).await?;
 
         let receipts = ongoing_ops
             .into_iter()
-            .map(|(block_id, op)| PendingAccountTxReceipt::from_priority_op(block_id, op))
+            .map(PendingAccountOpReceipt::from_priority_op)
             .collect();
 
         Ok(receipts)
@@ -220,7 +242,7 @@ async fn account_info(
         .map_err(ApiError::internal)
 }
 
-async fn account_receipts(
+async fn account_tx_receipts(
     data: web::Data<ApiAccountsData>,
     web::Path(account_query): web::Path<String>,
     web::Query(location_query): web::Query<AccountReceiptsQuery>,
@@ -236,14 +258,30 @@ async fn account_receipts(
     Ok(Json(receipts))
 }
 
-async fn account_pending_receipts(
+async fn account_op_receipts(
     data: web::Data<ApiAccountsData>,
     web::Path(account_query): web::Path<String>,
-) -> JsonResult<Vec<PendingAccountTxReceipt>> {
+    web::Query(location_query): web::Query<AccountReceiptsQuery>,
+) -> JsonResult<Vec<AccountOpReceipt>> {
+    let (location, direction, limit) = location_query.validate()?;
     let address = data.find_account_address(account_query).await?;
 
     let receipts = data
-        .pending_tx_receipts(address)
+        .op_receipts(address, location, direction, limit)
+        .await
+        .map_err(ApiError::internal)?;
+
+    Ok(Json(receipts))
+}
+
+async fn account_pending_receipts(
+    data: web::Data<ApiAccountsData>,
+    web::Path(account_query): web::Path<String>,
+) -> JsonResult<Vec<PendingAccountOpReceipt>> {
+    let address = data.find_account_address(account_query).await?;
+
+    let receipts = data
+        .pending_op_receipts(address)
         .await
         .map_err(ApiError::internal)?;
 
@@ -266,9 +304,16 @@ pub fn api_scope(
     web::scope("accounts")
         .data(data)
         .route("{id}", web::get().to(account_info))
-        .route("{id}/receipts", web::get().to(account_receipts))
         .route(
-            "{id}/receipts/pending",
+            "{id}/transactions/receipts",
+            web::get().to(account_tx_receipts),
+        )
+        .route(
+            "{id}/operations/receipts",
+            web::get().to(account_op_receipts),
+        )
+        .route(
+            "{id}/operations/pending",
             web::get().to(account_pending_receipts),
         )
 }
