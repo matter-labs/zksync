@@ -2644,7 +2644,7 @@ dependencies = [
  "futures 0.3.6",
  "hex",
  "log 0.4.11",
- "num",
+ "num 0.3.1",
  "once_cell",
  "rand 0.4.6",
  "reqwest",
@@ -2992,15 +2992,29 @@ dependencies = [
 
 [[package]]
 name = "num"
+version = "0.2.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b8536030f9fea7127f841b45bb6243b27255787fb4eb83958aa1ef9d2fdc0c36"
+dependencies = [
+ "num-bigint 0.2.6",
+ "num-complex 0.2.4",
+ "num-integer",
+ "num-iter",
+ "num-rational 0.2.4",
+ "num-traits",
+]
+
+[[package]]
+name = "num"
 version = "0.3.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8b7a8e9be5e039e2ff869df49155f1c06bd01ade2117ec783e56ab0932b67a8f"
 dependencies = [
  "num-bigint 0.3.1",
- "num-complex",
+ "num-complex 0.3.1",
  "num-integer",
  "num-iter",
- "num-rational",
+ "num-rational 0.3.2",
  "num-traits",
 ]
 
@@ -3013,6 +3027,7 @@ dependencies = [
  "autocfg 1.0.1",
  "num-integer",
  "num-traits",
+ "serde",
 ]
 
 [[package]]
@@ -3023,6 +3038,17 @@ checksum = "5e9a41747ae4633fce5adffb4d2e81ffc5e89593cb19917f8fb2cc5ff76507bf"
 dependencies = [
  "autocfg 1.0.1",
  "num-integer",
+ "num-traits",
+ "serde",
+]
+
+[[package]]
+name = "num-complex"
+version = "0.2.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b6b19411a9719e753aff12e5187b74d60d3dc449ec3f4dc21e3989c3f554bc95"
+dependencies = [
+ "autocfg 1.0.1",
  "num-traits",
  "serde",
 ]
@@ -3056,6 +3082,19 @@ dependencies = [
  "autocfg 1.0.1",
  "num-integer",
  "num-traits",
+]
+
+[[package]]
+name = "num-rational"
+version = "0.2.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5c000134b5dbf44adc5cb772486d335293351644b801551abe8f75c84cfa4aef"
+dependencies = [
+ "autocfg 1.0.1",
+ "num-bigint 0.2.6",
+ "num-integer",
+ "num-traits",
+ "serde",
 ]
 
 [[package]]
@@ -5614,7 +5653,7 @@ dependencies = [
  "ethabi 12.0.0",
  "hex",
  "jsonrpc-core",
- "num",
+ "num 0.3.1",
  "reqwest",
  "serde",
  "serde_json",
@@ -5659,7 +5698,7 @@ dependencies = [
  "log 0.4.11",
  "lru-cache",
  "metrics",
- "num",
+ "num 0.3.1",
  "once_cell",
  "reqwest",
  "serde",
@@ -5694,7 +5733,7 @@ dependencies = [
  "bigdecimal",
  "criterion",
  "log 0.4.11",
- "num",
+ "num 0.3.1",
  "rayon",
  "rust-crypto",
  "serde",
@@ -5709,7 +5748,7 @@ name = "zksync_config"
 version = "1.0.0"
 dependencies = [
  "log 0.4.11",
- "num",
+ "num 0.3.1",
  "serde",
  "serde_json",
  "url 2.1.1",
@@ -5741,7 +5780,7 @@ dependencies = [
  "itertools 0.9.0",
  "log 0.4.11",
  "metrics",
- "num",
+ "num 0.3.1",
  "serde",
  "serde_json",
  "thiserror",
@@ -5766,7 +5805,7 @@ dependencies = [
  "franklin-crypto",
  "hex",
  "lazy_static",
- "num",
+ "num 0.3.1",
  "rand 0.4.6",
  "rayon",
  "serde",
@@ -5788,7 +5827,7 @@ dependencies = [
  "hex",
  "jsonrpc-core",
  "log 0.4.11",
- "num",
+ "num 0.3.1",
  "serde",
  "serde_json",
  "structopt",
@@ -5833,7 +5872,7 @@ dependencies = [
  "lazy_static",
  "log 0.4.11",
  "metrics",
- "num",
+ "num 0.3.1",
  "serde",
  "serde_json",
  "tokio 0.2.22",
@@ -5898,7 +5937,7 @@ dependencies = [
  "hex",
  "jsonwebtoken",
  "log 0.4.11",
- "num",
+ "num 0.3.1",
  "reqwest",
  "rust-crypto",
  "serde",
@@ -5924,7 +5963,7 @@ dependencies = [
  "env_logger 0.6.2",
  "lazy_static",
  "log 0.4.11",
- "num",
+ "num 0.2.1",
  "reqwest",
  "serde",
  "serde_json",
@@ -5947,7 +5986,7 @@ dependencies = [
  "env_logger 0.6.2",
  "futures 0.3.6",
  "log 0.4.11",
- "num",
+ "num 0.3.1",
  "serde",
  "serde_json",
  "structopt",
@@ -5973,7 +6012,7 @@ dependencies = [
  "criterion",
  "log 0.4.11",
  "metrics",
- "num",
+ "num 0.3.1",
  "web3 0.13.0",
  "zksync_crypto",
  "zksync_types",
@@ -5994,7 +6033,7 @@ dependencies = [
  "itertools 0.8.2",
  "log 0.4.11",
  "metrics",
- "num",
+ "num 0.3.1",
  "parity-crypto",
  "serde",
  "serde_json",
@@ -6012,7 +6051,7 @@ dependencies = [
 name = "zksync_test_account"
 version = "1.0.0"
 dependencies = [
- "num",
+ "num 0.3.1",
  "zksync_basic_types",
  "zksync_crypto",
  "zksync_types",
@@ -6028,7 +6067,7 @@ dependencies = [
  "futures 0.3.6",
  "itertools 0.9.0",
  "log 0.4.11",
- "num",
+ "num 0.3.1",
  "serde",
  "serde_json",
  "tokio 0.2.22",
@@ -6058,7 +6097,7 @@ dependencies = [
  "hex",
  "lazy_static",
  "log 0.4.11",
- "num",
+ "num 0.3.1",
  "parity-crypto",
  "secp256k1",
  "serde",
@@ -6077,7 +6116,7 @@ dependencies = [
  "bigdecimal",
  "futures 0.3.6",
  "hex",
- "num",
+ "num 0.3.1",
  "serde",
  "serde_json",
 ]
@@ -6097,7 +6136,7 @@ dependencies = [
  "jsonwebtoken",
  "log 0.4.11",
  "metrics",
- "num",
+ "num 0.3.1",
  "reqwest",
  "serde",
  "serde_json",
