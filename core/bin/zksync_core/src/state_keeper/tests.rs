@@ -183,7 +183,7 @@ pub fn create_deposit(token: TokenId, amount: impl Into<BigUint>) -> PriorityOp 
         data: ZkSyncPriorityOp::Deposit(deposit),
         serial_id: 0,
         deadline_block: 0,
-        eth_hash: vec![],
+        eth_hash: H256::zero(),
         eth_block: 0,
     }
 }
@@ -330,7 +330,7 @@ mod apply_tx {
         let pending_block = tester.state_keeper.pending_block;
 
         assert!(result.is_ok());
-        assert!(pending_block.chunks_left == old_pending_block.chunks_left);
+        assert_eq!(pending_block.chunks_left, old_pending_block.chunks_left);
         assert_eq!(
             pending_block.pending_op_block_index,
             old_pending_block.pending_op_block_index

@@ -1,7 +1,15 @@
+import config from './env-config';
+import { capitalize } from './utils';
+
+const network = config.ETH_NETWORK;
+const walletLinkPrefix = network == 'mainnet' ? 'wallet' : network;
+
 const store = {
-    contractAddress: null,
-    config:          null,
-    network:         null,
+    contractAddress: undefined,
+    config: network,
+    network: network,
+    capitalizedNetwork: capitalize(network),
+    walletLink: `https://${walletLinkPrefix}.zksync.io`
 };
 
 export default store;
