@@ -114,14 +114,14 @@ async fn prover_work_cycle<PROVER, CLIENT>(
     client: CLIENT,
     shutdown: ShutdownRequest,
     prover_options: ProverOptions,
+    prover_name: &str,
 ) where
     CLIENT: 'static + Sync + Send + ApiClient,
     PROVER: ProverImpl + Send + Sync + 'static,
 {
-    let prover_name = String::from("localhost");
-
     let mut new_job_poll_timer = tokio::time::interval(prover_options.cycle_wait);
     loop {
+        log::info!("Tick");
         new_job_poll_timer.tick().await;
 
         if shutdown.get() {
@@ -131,7 +131,7 @@ async fn prover_work_cycle<PROVER, CLIENT>(
         let aux_data = prover.get_request_aux_data();
         let prover_input_response = match client
             .get_job(ProverInputRequest {
-                prover_name: prover_name.clone(),
+                prover_name: prover_name.to_string(),
                 aux_data,
             })
             .await

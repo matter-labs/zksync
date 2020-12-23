@@ -66,5 +66,12 @@ where
         .expect("Failed to register ctrlc handler");
     }
 
-    prover_work_cycle(prover, api_client, shutdown_request, prover_options).await;
+    prover_work_cycle(
+        prover,
+        api_client,
+        shutdown_request,
+        prover_options,
+        &worker_name,
+    )
+    .await;
 }

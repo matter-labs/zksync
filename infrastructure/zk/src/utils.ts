@@ -17,21 +17,25 @@ export function exec(command: string) {
 // executes a command in a new shell
 // but pipes data to parent's stdout/stderr
 export function spawn(command: string) {
+    // do not handle `Ctrl + C` presses by main process
+    // however child processes will react
+    process.on('SIGINT', () => {});
+
     command = command.replace(/\n/g, ' ');
     const child = _spawn(command, { stdio: 'inherit', shell: true });
     return new Promise((resolve, reject) => {
         child.on('error', reject);
         child.on('close', (code) => {
-            code == 0 ? resolve() : reject(`Child process exited with code ${code}`);
+            code == 0 ? resolve(code) : reject(`Child process exited with code ${code}`);
         });
     });
 }
 
 // executes a command in background and returns a child process handle
-// by default pipes data to parent's stdio but this can be overriden
+// by default pipes data to parent's stdio but this can be overridden
 export function background(command: string, stdio: any = 'inherit') {
     command = command.replace(/\n/g, ' ');
-    return _spawn(command, { stdio, shell: true, detached: true });
+    return _spawn(command, { stdio: stdio, shell: true, detached: true });
 }
 
 export async function confirmAction() {
