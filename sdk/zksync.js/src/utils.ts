@@ -130,10 +130,10 @@ export function integerToFloat(
         exponent += 1;
         exponent_temp = exponent_temp.mul(exp_base);
     }
-    if(exponent != 0) {
+    if (exponent != 0) {
         let diff1 = integer.sub(exponent_temp.mul(mantissa));
         let diff2 = integer.sub(exponent_temp.div(exp_base).mul(max_mantissa));
-        if(diff2.lt(diff1)) {
+        if (diff2.lt(diff1)) {
             mantissa = max_mantissa;
             exponent -= 1;
         }
@@ -285,7 +285,7 @@ export function isTokenETH(token: TokenLike): boolean {
 
 export class TokenSet {
     // TODO: handle stale entries, edge case when we rename token after adding it (ZKS-120).
-    constructor(private tokensBySymbol: Tokens) {}
+    constructor(private tokensBySymbol: Tokens) { }
 
     private resolveTokenObject(tokenLike: TokenLike) {
         if (this.tokensBySymbol[tokenLike]) {
