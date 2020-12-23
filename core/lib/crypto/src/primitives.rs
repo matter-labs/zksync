@@ -249,12 +249,9 @@ impl FloatConversions {
     ) -> Result<Vec<bool>, anyhow::Error> {
         let exponent_base = u128::from(exponent_base);
 
-        let mut max_exponent = 1u128;
         let max_power = (1 << exponent_length) - 1;
 
-        for _ in 0..max_power {
-            max_exponent = max_exponent.saturating_mul(exponent_base);
-        }
+        let max_exponent = (exponent_base as u128).saturating_pow(max_power);
 
         let max_mantissa = (1u128 << mantissa_length) - 1;
 
@@ -262,11 +259,15 @@ impl FloatConversions {
             bail!("Integer is too big");
         }
 
+        // The algortihm is as follows: calculate minimal exponent
+        // such that integer <= max_mantissa * exponent_base ^ exponent,
+        // then if this minimal exponent is 0 we can choose mantissa equals integer and exponent equals 0
+        // else we need to check two variants:
+        // 1) with that minimal exponent
+        // 2) with that minimal exponent minus 1
         let mut exponent: usize = 0;
         let mut exponent_temp: u128 = 1;
-        let mut integer_copy = integer;
-        while integer_copy > max_mantissa {
-            integer_copy /= exponent_base;
+        while integer > max_mantissa * exponent_temp {
             exponent_temp *= exponent_base;
             exponent += 1;
         }
@@ -318,12 +319,9 @@ impl FloatConversions {
     ) -> Result<Vec<bool>, anyhow::Error> {
         let exponent_base = u128::from(exponent_base);
 
-        let mut max_exponent = 1u128;
         let max_power = (1 << exponent_length) - 1;
 
-        for _ in 0..max_power {
-            max_exponent = max_exponent.saturating_mul(exponent_base);
-        }
+        let max_exponent = (exponent_base as u128).saturating_pow(max_power);
 
         let max_mantissa = (1u128 << mantissa_length) - 1;
 
@@ -331,9 +329,12 @@ impl FloatConversions {
             bail!("Integer is too big");
         }
 
+        // The algortihm is as follows: calculate minimal exponent
+        // such that integer <= max_mantissa * exponent_base ^ exponent,
+        // then mantissa is calculated as integer divided by exponent_base ^ exponent and rounded up
         let mut exponent: usize = 0;
         let mut exponent_temp: u128 = 1;
-        while (integer / exponent_temp + ((integer % exponent_temp != 0) as u128)) > max_mantissa {
+        while integer > max_mantissa * exponent_temp {
             exponent_temp *= exponent_base;
             exponent += 1;
         }

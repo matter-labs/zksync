@@ -122,14 +122,19 @@ export function integerToFloat(
         throw new Error('Integer is too big');
     }
 
+    // The algortihm is as follows: calculate minimal exponent
+    // such that integer <= max_mantissa * exponent_base ^ exponent,
+    // then if this minimal exponent is 0 we can choose mantissa equals integer and exponent equals 0
+    // else we need to check two variants:
+    // 1) with that minimal exponent
+    // 2) with that minimal exponent minus 1
     let exponent = 0;
-    let mantissa = integer;
     let exponent_temp = BigNumber.from(1);
-    while (mantissa.gt(max_mantissa)) {
-        mantissa = mantissa.div(exp_base);
-        exponent += 1;
+    while (integer.gt(max_mantissa.mul(exponent_temp))) {
         exponent_temp = exponent_temp.mul(exp_base);
+        exponent += 1;
     }
+    let mantissa = integer.div(exponent_temp);
     if (exponent != 0) {
         let diff1 = integer.sub(exponent_temp.mul(mantissa));
         let diff2 = integer.sub(exponent_temp.div(exp_base).mul(max_mantissa));
@@ -161,14 +166,13 @@ export function integerToFloatUp(
     if (integer.gt(max_mantissa.mul(max_exponent))) {
         throw new Error('Integer is too big');
     }
+
+    // The algortihm is as follows: calculate minimal exponent
+    // such that integer <= max_mantissa * exponent_base ^ exponent,
+    // then mantissa is calculated as integer divided by exponent_base ^ exponent and rounded up
     let exponent = 0;
     let exponent_temp = BigNumber.from(1);
-    while (
-        integer
-            .div(exponent_temp)
-            .add(BigNumber.from(integer.mod(exponent_temp).eq(BigNumber.from(0)) ? 0 : 1))
-            .gt(max_mantissa)
-    ) {
+    while (integer.gt(max_mantissa.mul(exponent_temp))) {
         exponent_temp = exponent_temp.mul(exp_base);
         exponent += 1;
     }
