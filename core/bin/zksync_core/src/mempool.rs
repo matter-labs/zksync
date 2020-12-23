@@ -47,6 +47,7 @@ use zksync_types::{
 use crate::{
     balancer::{Balanced, Balancer},
     eth_watch::EthWatchRequest,
+    wait_for_tasks,
 };
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, Error)]
@@ -326,6 +327,7 @@ impl MempoolBlocksHandler {
     }
 
     async fn run(mut self) {
+        log::info!("Block mempool handler is  running");
         while let Some(request) = self.requests.next().await {
             match request {
                 MempoolBlocksRequest::GetBlock(block) => {
@@ -493,6 +495,7 @@ impl MempoolTransactionsHandler {
     }
 
     async fn run(mut self) {
+        log::info!("Transaction mempool handler is  running");
         while let Some(request) = self.requests.next().await {
             match request {
                 MempoolTransactionRequest::NewTx(tx, resp) => {
@@ -540,8 +543,8 @@ pub fn run_mempool_tasks(
             number_of_mempool_transaction_handlers,
             channel_capacity,
         );
-
         let mut tasks = vec![];
+
         while let Some(item) = handlers.pop() {
             tasks.push(tokio::spawn(item.run()));
         }
@@ -555,5 +558,6 @@ pub fn run_mempool_tasks(
             max_block_size_chunks,
         };
         tasks.push(tokio::spawn(blocks_handler.run()));
+        wait_for_tasks(tasks).await
     })
 }
