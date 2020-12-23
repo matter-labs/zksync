@@ -1,4 +1,5 @@
 # JavaScript SDK changelog
+
 All notable changes to `zksync.js` will be documented in this file.
 
 ## Unreleased

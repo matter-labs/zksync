@@ -49,7 +49,8 @@ The following guides for developers are available:
 
 ## Changelog
 
-Since the repository is big and is split into independent components, there is a different changelog for each of its major parts:
+Since the repository is big and is split into independent components, there is a different changelog for each of its
+major parts:
 
 - [Smart contracts](changelog/contracts.md)
 - [Core](changelog/core.md)
