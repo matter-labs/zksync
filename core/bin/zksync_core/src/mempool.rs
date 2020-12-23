@@ -528,7 +528,7 @@ pub fn run_mempool_tasks(
             .max()
             .expect("failed to find max block chunks size");
 
-        let (balancer, mut tx_handlers) = Balancer::new(
+        let (balancer, mut handlers) = Balancer::new(
             MempoolTransactionsHandler {
                 db_pool: db_pool.clone(),
                 mempool_state: mempool_state.clone(),
@@ -542,11 +542,12 @@ pub fn run_mempool_tasks(
         );
 
         let mut tasks = vec![];
-        while let Some(tx_handler) = tx_handlers.pop() {
-            tasks.push(tokio::spawn(tx_handler.run()));
+        while let Some(item) = handlers.pop() {
+            tasks.push(tokio::spawn(item.run()));
         }
 
         tasks.push(tokio::spawn(balancer.run()));
+
         let blocks_handler = MempoolBlocksHandler {
             mempool_state,
             requests: block_requests,
