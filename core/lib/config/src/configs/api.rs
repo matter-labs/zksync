@@ -120,6 +120,12 @@ pub struct JsonRpc {
     pub ws_url: String,
 }
 
+impl JsonRpc {
+    pub fn http_bind_addr(&self) -> SocketAddr {
+        SocketAddr::new("0.0.0.0".parse().unwrap(), self.http_port)
+    }
+}
+
 #[derive(Debug, Deserialize, Clone, PartialEq)]
 pub struct Prometheus {
     /// Port to which the Prometheus exporter server is listening.
@@ -214,6 +220,10 @@ API_PROMETHEUS_PORT="3312"
         assert_eq!(
             config.private.bind_addr(),
             SocketAddr::new(bind_broadcast_addr, config.private.port)
+        );
+        assert_eq!(
+            config.json_rpc.http_bind_addr(),
+            SocketAddr::new(bind_broadcast_addr, config.json_rpc.http_port)
         );
     }
 }
