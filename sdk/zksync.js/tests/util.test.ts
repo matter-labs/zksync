@@ -1,5 +1,7 @@
 import { expect } from 'chai';
 import {
+    closestGreaterOrEqPackableTransactionAmount,
+    closestGreaterOrEqPackableTransactionFee,
     closestPackableTransactionAmount,
     closestPackableTransactionFee,
     isTransactionAmountPackable,
@@ -17,13 +19,29 @@ describe('Packing and unpacking', function () {
                 bigNumberAmount.toString(),
                 'fee packing'
             );
+            expect(closestGreaterOrEqPackableTransactionFee(bigNumberAmount).toString()).equal(
+                bigNumberAmount.toString(),
+                'fee packing up'
+            );
             expect(isTransactionAmountPackable(bigNumberAmount), 'check amount pack').eq(true);
             expect(closestPackableTransactionAmount(bigNumberAmount).toString()).equal(
                 bigNumberAmount.toString(),
                 'amount packing'
             );
+            expect(closestGreaterOrEqPackableTransactionAmount(bigNumberAmount).toString()).equal(
+                bigNumberAmount.toString(),
+                'amount packing up'
+            );
             expect(isTransactionFeePackable(bigNumberAmount), 'check fee pack').eq(true);
         }
+        expect(closestPackableTransactionFee('2048').toString()).equal(
+            '2047',
+            'fee packing'
+        );
+        expect(closestGreaterOrEqPackableTransactionFee('2048').toString()).equal(
+            '2050',
+            'fee packing up'
+        );
     });
 });
 

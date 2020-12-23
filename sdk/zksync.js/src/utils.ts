@@ -124,9 +124,19 @@ export function integerToFloat(
 
     let exponent = 0;
     let mantissa = integer;
+    let exponent_temp = BigNumber.from(1);
     while (mantissa.gt(max_mantissa)) {
         mantissa = mantissa.div(exp_base);
         exponent += 1;
+        exponent_temp = exponent_temp.mul(exp_base);
+    }
+    if(exponent != 0) {
+        let diff1 = integer.sub(exponent_temp.mul(mantissa));
+        let diff2 = integer.sub(exponent_temp.div(exp_base).mul(max_mantissa));
+        if(diff2.lt(diff1)) {
+            mantissa = max_mantissa;
+            exponent -= 1;
+        }
     }
 
     // encode into bits. First bits of mantissa in LE order
@@ -153,11 +163,11 @@ export function integerToFloatUp(
     }
     let exponent = 0;
     let exponent_temp = BigNumber.from(1);
-    while (integer.div(exponent_temp).add(BigNumber.from(integer.mod(exponent_temp) != BigNumber.from(0))).gt(max_mantissa)) {
+    while (integer.div(exponent_temp).add(BigNumber.from(integer.mod(exponent_temp).eq(BigNumber.from(0)) ? 0 : 1)).gt(max_mantissa)) {
         exponent_temp = exponent_temp.mul(exp_base);
         exponent += 1;
     }
-    let mantissa = integer.div(exponent_temp).add(BigNumber.from(integer.mod(exponent_temp) != BigNumber.from(0)));
+    const mantissa = integer.div(exponent_temp).add(BigNumber.from(integer.mod(exponent_temp).eq(BigNumber.from(0)) ? 0 : 1));
 
     // encode into bits. First bits of mantissa in LE order
     const encoding = [];
