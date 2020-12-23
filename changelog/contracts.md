@@ -1,10 +1,19 @@
-### Contracts v3 and protocol (4.09.2020)
+# Smart Contracts' Changelog
+All notable changes to the contracts will be documented in this file.
+
+## Unreleased
+
+## 2020-09-04
+
+**Version 3** is released.
 
 - Change pubkey operation requires fee for processing.
 - Added support for the forced exit operation which allows user to force a withdrawal from another account that does not
   have signing key set and is older than 24h.
 
-### Contracts v2 (20.07.2020)
+## 2020-07-20
+
+**Version 2** is released.
 
 - Added event denoting information about pending and completed withdrawals.
 - Added support for tokens that aren't fully compatible with ERC20.

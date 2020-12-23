@@ -1,4 +1,9 @@
 # JavaScript SDK changelog
+All notable changes to `zksync.js` will be documented in this file.
+
+## Unreleased
+
+## Prior to 2020-12-23
 
 ### 0.6.5
 

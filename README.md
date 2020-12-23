@@ -51,11 +51,11 @@ The following guides for developers are available:
 
 Since the repository is big and is split into independent components, there is a different changelog for each of its major parts:
 
-- [Smart contracts](contracts/CHANGELOG.md)
-- [Core](core/CHANGELOG.md)
-- [Infrastructure](infrastructure/CHANGELOG.md)
-- [JavaScript SDK](sdk/zksync.js/CHANGELOG.md)
-- [Rust SDK](sdk/zksync-rs/CHANGELOG.md)
+- [Smart contracts](changelog/contracts.md)
+- [Core](changelog/core.md)
+- [Infrastructure](changelog/infrastructure.md)
+- [JavaScript SDK](changelog/js-sdk.md)
+- [Rust SDK](changelog/rust-sdk.md)
 
 ## License
 
