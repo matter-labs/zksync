@@ -5,7 +5,7 @@ ETH and ERC20 tokens in the Ethereum network.
 
 This document is a description of the supplementary infrastructure of the project.
 
-## Who is this for?
+## Who is this for
 
 The majority of the projects are developer infrastructure, targeted at those who contribute to zkSync.
 

@@ -4,7 +4,16 @@ All notable changes to `zksync.js` will be documented in this file.
 
 ## Unreleased
 
-## Prior to 2020-12-23
+**Version 0.8.4** is being developed.
+
+### Added
+
+- `updateTokenSet` function that updates the `tokenSet` stored in the `Provider`.
+- `newMockProvider` and `DummyTransport`. Tests for the library.
+
+## Prior to 2020-12-10
+
+**Version 0.8.3** is released.
 
 **Version 0.6.5** is released.
 
