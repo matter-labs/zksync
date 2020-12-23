@@ -1,17 +1,18 @@
 //! Token watcher implementation for dev environment
 //!
 //! Implements Uniswap API for token which are deployed in localhost network
+use std::{collections::HashMap, fs::File, io::BufReader, path::Path};
 
 use actix_cors::Cors;
 use actix_web::{middleware, web, App, HttpResponse, HttpServer, Result};
 use bigdecimal::BigDecimal;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
-use serde_json::{json, Value};
-use std::collections::HashMap;
-use std::fs::File;
-use std::io::BufReader;
-use std::path::Path;
+use serde_json::Value;
+
+use zksync_api::fee_ticker::validator::watcher::{
+    GraphqlResponse, GraphqlTokenResponse, TokenResponse,
+};
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 struct TokenData {
@@ -40,14 +41,13 @@ async fn handle_graphql(
     } else {
         BigDecimal::from(0)
     };
-
-    let response = json!({
-        "data": {
-            "token": {
-                "tradeVolumeUSD": volume.to_string()
-            }
+    let response = GraphqlResponse {
+        data: GraphqlTokenResponse {
+            token: TokenResponse {
+                trade_volume_usd: volume.to_string(),
+            },
         },
-    });
+    };
     Ok(HttpResponse::Ok().json(response))
 }
 

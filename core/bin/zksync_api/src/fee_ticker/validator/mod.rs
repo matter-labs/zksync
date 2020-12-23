@@ -229,6 +229,8 @@ mod tests {
     }
 
     #[tokio::test]
+    #[ignore]
+    // We can use this test only online, run it manually if you need to test connection to uniswap
     async fn get_real_token_amount() {
         let mut watcher = UniswapTokenWatcher::new(
             "https://api.thegraph.com/subgraphs/name/uniswap/uniswap-v2".to_string(),

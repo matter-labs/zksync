@@ -51,7 +51,7 @@ mod constants;
 mod fee;
 mod ticker_api;
 mod ticker_info;
-mod validator;
+pub mod validator;
 
 mod balancer;
 #[cfg(test)]
@@ -205,7 +205,7 @@ pub fn run_ticker_task(
     let watcher = UniswapTokenWatcher::new(config.uniswap_url);
     let validator = FeeTokenValidator::new(
         cache.clone(),
-        chrono::Duration::seconds(config.available_liquidity_seconds),
+        chrono::Duration::seconds(config.available_liquidity_seconds as i64),
         BigDecimal::try_from(config.liquidity_volume).expect("Valid f64 for decimal"),
         config.unconditionally_valid_tokens,
         watcher.clone(),

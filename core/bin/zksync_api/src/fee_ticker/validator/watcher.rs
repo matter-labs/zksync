@@ -1,12 +1,13 @@
 use std::collections::HashMap;
 use std::sync::Arc;
-use tokio::sync::Mutex;
+use std::time::Instant;
 
+use bigdecimal::BigDecimal;
+use serde::{Deserialize, Serialize};
+use tokio::sync::Mutex;
 use zksync_types::{Address, Token};
 
 use crate::fee_ticker::ticker_api::REQUEST_TIMEOUT;
-use bigdecimal::BigDecimal;
-use std::time::Instant;
 
 #[async_trait::async_trait]
 pub trait TokenWatcher {
@@ -34,7 +35,7 @@ impl UniswapTokenWatcher {
         // Uniswap has graphql API, using full graphql client for one query is overkill for current task
         let start = Instant::now();
 
-        let query = format!("{{token(id: \"{:?}\"){{tradeVolumeUSD}}}}", address);
+        let query = format!("{{token(id: \"{:#x}\"){{tradeVolumeUSD}}}}", address);
 
         let request = self.client.post(&self.addr).json(&serde_json::json!({
             "query": query.clone(),
@@ -61,20 +62,20 @@ impl UniswapTokenWatcher {
     }
 }
 
-#[derive(serde::Serialize, serde::Deserialize, Debug)]
-struct GraphqlResponse {
-    data: GraphqlTokenResponse,
+#[derive(Serialize, Deserialize, Debug)]
+pub struct GraphqlResponse {
+    pub data: GraphqlTokenResponse,
 }
 
-#[derive(serde::Serialize, serde::Deserialize, Debug)]
-struct GraphqlTokenResponse {
-    token: TokenResponse,
+#[derive(Serialize, Deserialize, Debug)]
+pub struct GraphqlTokenResponse {
+    pub token: TokenResponse,
 }
 
-#[derive(serde::Serialize, serde::Deserialize, Debug)]
-struct TokenResponse {
+#[derive(Serialize, Deserialize, Debug)]
+pub struct TokenResponse {
     #[serde(rename = "tradeVolumeUSD")]
-    trade_volume_usd: String,
+    pub trade_volume_usd: String,
 }
 
 #[async_trait::async_trait]

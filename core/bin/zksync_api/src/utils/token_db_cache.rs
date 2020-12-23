@@ -90,13 +90,14 @@ impl TokenDBCache {
         &self,
         token: TokenId,
     ) -> anyhow::Result<Option<TokenMarketVolume>> {
-        Ok(self
+        let volume = self
             .pool
             .access_storage()
             .await?
             .tokens_schema()
             .get_token_market_volume(token)
-            .await?)
+            .await?;
+        Ok(volume)
     }
 
     pub async fn update_token_market_volume(
