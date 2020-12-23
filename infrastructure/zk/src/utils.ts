@@ -17,10 +17,6 @@ export function exec(command: string) {
 // executes a command in a new shell
 // but pipes data to parent's stdout/stderr
 export function spawn(command: string) {
-    // do not handle `Ctrl + C` presses by main process
-    // however child processes will react
-    process.on('SIGINT', () => {});
-
     command = command.replace(/\n/g, ' ');
     const child = _spawn(command, { stdio: 'inherit', shell: true });
     return new Promise((resolve, reject) => {

@@ -101,12 +101,38 @@ where
     PROVER: ProverImpl + Send + Sync + 'static,
 {
     let (result_sender, result_receiver) = oneshot::channel();
-    // TODO: somehow kill prover on main thread kill
     std::thread::spawn(move || {
         let prover_with_proof = prover.create_proof(data).map(|proof| (prover, proof));
         result_sender.send(prover_with_proof).unwrap_or_default();
     });
     result_receiver.await?
+}
+
+/// Endlessly sends requests to the server, in case of not receiving a response
+/// notifies about it in the logs, but does not quit.
+async fn heartbeat_future_handle<CLIENT>(
+    client: CLIENT,
+    prover_name: &str,
+    job_id: i32,
+    heartbeat_interval: Duration,
+) where
+    CLIENT: 'static + Sync + Send + ApiClient,
+{
+    loop {
+        let timeout_value = {
+            let between = Range::new(0.8f64, 2.0);
+            let mut rng = thread_rng();
+            let random_multiplier = between.ind_sample(&mut rng);
+            Duration::from_secs((heartbeat_interval.as_secs_f64() * random_multiplier) as u64)
+        };
+
+        tokio::time::delay_for(timeout_value).await;
+        client
+            .working_on(job_id, &prover_name)
+            .await
+            .map_err(|e| log::warn!("Failed to send heartbeat: {}", e))
+            .unwrap_or_default();
+    }
 }
 
 async fn prover_work_cycle<PROVER, CLIENT>(
@@ -116,12 +142,11 @@ async fn prover_work_cycle<PROVER, CLIENT>(
     prover_options: ProverOptions,
     prover_name: &str,
 ) where
-    CLIENT: 'static + Sync + Send + ApiClient,
+    CLIENT: 'static + Sync + Send + ApiClient + Clone,
     PROVER: ProverImpl + Send + Sync + 'static,
 {
     let mut new_job_poll_timer = tokio::time::interval(prover_options.cycle_wait);
     loop {
-        log::info!("Tick");
         new_job_poll_timer.tick().await;
 
         if shutdown.get() {
@@ -155,26 +180,12 @@ async fn prover_work_cycle<PROVER, CLIENT>(
             continue;
         };
 
-        let heartbeat_future_handle = async {
-            loop {
-                let timeout_value = {
-                    let between = Range::new(0.8f64, 2.0);
-                    let mut rng = thread_rng();
-                    let random_multiplier = between.ind_sample(&mut rng);
-                    Duration::from_secs(
-                        (prover_options.heartbeat_interval.as_secs_f64() * random_multiplier)
-                            as u64,
-                    )
-                };
-
-                tokio::time::delay_for(timeout_value).await;
-                client
-                    .working_on(job_id, &prover_name)
-                    .await
-                    .map_err(|e| log::warn!("Failed to send heartbeat: {}", e))
-                    .unwrap_or_default();
-            }
-        }
+        let heartbeat_future_handle = heartbeat_future_handle(
+            client.clone(),
+            prover_name,
+            job_id,
+            prover_options.heartbeat_interval,
+        )
         .fuse();
         let compute_proof_future = compute_proof_no_blocking(prover, job_data).fuse();
 
