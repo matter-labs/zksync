@@ -8,7 +8,7 @@ All notable changes to `zksync_rs` will be documented in this file.
 
 ### Added
 
-- Additional Unit tests.
+- Additional unit tests.
 
 ### Changed
 
