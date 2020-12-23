@@ -9,7 +9,6 @@ components, the logs will have the following format:
 
 ## Unreleased
 
-## Prior to 2020-12-23
+### Changed
 
-- (Explorer): A link to the wallet was added to the explorer.
-- (Explorer): Fixed bug with accessing non-existent blocks in explorer.
+- `explorer` was refactored and optimized.
