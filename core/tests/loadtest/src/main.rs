@@ -117,10 +117,17 @@ async fn main() -> Result<(), anyhow::Error> {
         println!("{}", serde_json::to_string_pretty(&report)?);
     } else {
         println!("Loadtest finished.");
+        println!();
+        println!("Statistics for transactions:");
 
-        println!("Statistics for scenarios:");
-        for (category, stats) in &report.scenarios.summary {
-            print_stats_summary(category, Some(stats));
+        for (variant, report) in &report.scenarios.summary {
+            println!(
+                "Sending {} transaction:",
+                variant.to_string().bright_green()
+            );
+            for (category, stats) in &report.stats {
+                print_stats_summary(category, Some(stats));
+            }
         }
         print_counters(
             report.scenarios.failed_txs_count,

@@ -28,3 +28,11 @@ withdraw_rounds = 1
 [[scenarios]]
 name = "full_exit"
 wallets_amount = 10
+
+[[scenarios]]
+name = 'batch_transfers'
+# Amount of money to be used in the transfer, in gwei.
+transfer_size = 1
+transfer_rounds = 5
+wallets_amount = 20
+max_batch_size = 5
