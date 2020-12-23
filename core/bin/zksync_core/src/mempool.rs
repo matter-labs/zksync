@@ -15,11 +15,14 @@
 //! on restart mempool restores nonces of the accounts that are stored in the account tree.
 
 // Built-in deps
-use std::collections::{HashMap, VecDeque};
+use std::{
+    collections::{HashMap, VecDeque},
+    sync::Arc,
+};
 // External uses
 use futures::{
     channel::{
-        mpsc::{self, Receiver, Sender},
+        mpsc::{self, Receiver},
         oneshot,
     },
     SinkExt, StreamExt,
@@ -27,8 +30,11 @@ use futures::{
 
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
+use tokio::sync::Mutex;
 use tokio::task::JoinHandle;
+
 // Workspace uses
+use zksync_config::ConfigurationOptions;
 use zksync_storage::ConnectionPool;
 use zksync_types::{
     mempool::{SignedTxVariant, SignedTxsBatch},
@@ -36,13 +42,12 @@ use zksync_types::{
     AccountId, AccountUpdate, AccountUpdates, Address, Nonce, PriorityOp, SignedZkSyncTx,
     TransferOp, TransferToNewOp, ZkSyncTx,
 };
+
 // Local uses
-use crate::eth_watch::EthWatchRequest;
-use serde::export::PhantomData;
-use std::sync::Arc;
-use std::time::Instant;
-use tokio::sync::Mutex;
-use zksync_config::ConfigurationOptions;
+use crate::{
+    balancer::{Balanced, Balancer},
+    eth_watch::EthWatchRequest,
+};
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, Error)]
 pub enum TxAddError {
@@ -249,14 +254,14 @@ impl MempoolState {
     }
 }
 
-struct MempoolBlocks {
+struct MempoolBlocksHandler {
     mempool_state: Arc<Mutex<MempoolState>>,
     requests: mpsc::Receiver<MempoolBlocksRequest>,
     eth_watch_req: mpsc::Sender<EthWatchRequest>,
     max_block_size_chunks: usize,
 }
 
-impl MempoolBlocks {
+impl MempoolBlocksHandler {
     async fn propose_new_block(&mut self, current_unprocessed_priority_op: u64) -> ProposedBlock {
         let start = std::time::Instant::now();
         let (chunks_left, priority_ops) = self
@@ -542,7 +547,7 @@ pub fn run_mempool_tasks(
         }
 
         tasks.push(tokio::spawn(balancer.run()));
-        let blocks_handler = MempoolBlocks {
+        let blocks_handler = MempoolBlocksHandler {
             mempool_state,
             requests: block_requests,
             eth_watch_req,
@@ -550,61 +555,4 @@ pub fn run_mempool_tasks(
         };
         tasks.push(tokio::spawn(blocks_handler.run()));
     })
-}
-
-pub struct Balancer<T, REQUESTS> {
-    channels: Vec<Sender<REQUESTS>>,
-    requests: Receiver<REQUESTS>,
-    _items: PhantomData<T>,
-}
-
-pub trait Balanced<REQUESTS> {
-    fn clone_with_receiver(&self, receiver: Receiver<REQUESTS>) -> Self;
-}
-
-impl<T, REQUESTS> Balancer<T, REQUESTS>
-where
-    T: Balanced<REQUESTS> + Sync + Send + 'static,
-{
-    pub fn new(
-        balanced_item: T,
-        requests: Receiver<REQUESTS>,
-        number_of_items: u8,
-        channel_capacity: usize,
-    ) -> (Self, Vec<T>) {
-        let mut balanced_items = vec![];
-        let mut channels = vec![];
-
-        for _ in 0..number_of_items {
-            let (request_sender, request_receiver) = mpsc::channel(channel_capacity);
-            channels.push(request_sender);
-            balanced_items.push(balanced_item.clone_with_receiver(request_receiver));
-        }
-
-        (
-            Self {
-                channels,
-                requests,
-                _items: PhantomData,
-            },
-            balanced_items,
-        )
-    }
-
-    pub async fn run(mut self) {
-        // It's an obvious way of balancing. Send an equal number of requests to each ticker
-        let mut channel_indexes = (0..self.channels.len()).into_iter().cycle();
-        // it's the easiest way how to cycle over channels, because cycle required clone trait
-        while let Some(request) = self.requests.next().await {
-            let channel_index = channel_indexes
-                .next()
-                .expect("Exactly one channel should exists");
-            let start = Instant::now();
-            self.channels[channel_index]
-                .send(request)
-                .await
-                .unwrap_or_default();
-            metrics::histogram!("ticker.dispatcher.request", start.elapsed());
-        }
-    }
 }
