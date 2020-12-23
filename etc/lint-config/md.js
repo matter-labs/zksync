@@ -1,4 +1,4 @@
-{
+module.exports = {
     "default": true,
     "header-increment": false,
     "no-duplicate-header": false,
