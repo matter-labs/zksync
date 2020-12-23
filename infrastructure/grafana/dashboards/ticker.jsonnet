@@ -9,6 +9,9 @@ local metrics = [
   "ticker.get_token_price",
   "ticker.is_token_allowed",
   "ticker.coingecko_request",
+  "ticker.validator.update_all_tokens",
+  "ticker.validator.check_token",
+  "ticker.uniswap_watcher.get_market_volume"
 ];
 
 G.dashboard(

@@ -23,10 +23,16 @@ zk contract redeploy
 zk f cargo build --bin zksync_server --release
 zk f cargo build --bin dummy_prover --release
 zk f cargo build --bin dev-ticker-server --release
+zk f cargo build --bin dev-liquidity-token-watcher --release
 
 # Launch binaries
 echo "Launching dev-ticker-server..."
 nohup zk f $ZKSYNC_HOME/target/release/dev-ticker-server &>/dev/null &
+sleep 1
+
+# Launch binaries
+echo "Launching dev-liquidity-token-watcher..."
+nohup zk f $ZKSYNC_HOME/target/release/dev-liquidity-token-watcher &>/dev/null &
 sleep 1
 
 echo "Launching server..."

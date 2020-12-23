@@ -5661,6 +5661,7 @@ dependencies = [
  "metrics",
  "num",
  "once_cell",
+ "regex",
  "reqwest",
  "serde",
  "serde_json",
