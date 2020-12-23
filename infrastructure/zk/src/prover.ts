@@ -13,15 +13,10 @@ export async function prover(totalProvers: number) {
     }
 
     process.on('SIGINT', () => {
-        console.log('Killing provers...');
         for (const child of children) {
-            child.kill();
+            child.kill('SIGINT');
         }
-        process.exit();
     });
-
-    // now we have to just wait for ctrl+c
-    while (true) await utils.sleep(1000);
 }
 
 export const command = new Command('prover')
