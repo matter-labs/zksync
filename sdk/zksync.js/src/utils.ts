@@ -163,11 +163,18 @@ export function integerToFloatUp(
     }
     let exponent = 0;
     let exponent_temp = BigNumber.from(1);
-    while (integer.div(exponent_temp).add(BigNumber.from(integer.mod(exponent_temp).eq(BigNumber.from(0)) ? 0 : 1)).gt(max_mantissa)) {
+    while (
+        integer
+            .div(exponent_temp)
+            .add(BigNumber.from(integer.mod(exponent_temp).eq(BigNumber.from(0)) ? 0 : 1))
+            .gt(max_mantissa)
+    ) {
         exponent_temp = exponent_temp.mul(exp_base);
         exponent += 1;
     }
-    const mantissa = integer.div(exponent_temp).add(BigNumber.from(integer.mod(exponent_temp).eq(BigNumber.from(0)) ? 0 : 1));
+    const mantissa = integer
+        .div(exponent_temp)
+        .add(BigNumber.from(integer.mod(exponent_temp).eq(BigNumber.from(0)) ? 0 : 1));
 
     // encode into bits. First bits of mantissa in LE order
     const encoding = [];
@@ -285,7 +292,7 @@ export function isTokenETH(token: TokenLike): boolean {
 
 export class TokenSet {
     // TODO: handle stale entries, edge case when we rename token after adding it (ZKS-120).
-    constructor(private tokensBySymbol: Tokens) { }
+    constructor(private tokensBySymbol: Tokens) {}
 
     private resolveTokenObject(tokenLike: TokenLike) {
         if (this.tokensBySymbol[tokenLike]) {

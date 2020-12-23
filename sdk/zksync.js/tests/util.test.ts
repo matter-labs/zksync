@@ -34,14 +34,8 @@ describe('Packing and unpacking', function () {
             );
             expect(isTransactionFeePackable(bigNumberAmount), 'check fee pack').eq(true);
         }
-        expect(closestPackableTransactionFee('2048').toString()).equal(
-            '2047',
-            'fee packing'
-        );
-        expect(closestGreaterOrEqPackableTransactionFee('2048').toString()).equal(
-            '2050',
-            'fee packing up'
-        );
+        expect(closestPackableTransactionFee('2048').toString()).equal('2047', 'fee packing');
+        expect(closestGreaterOrEqPackableTransactionFee('2048').toString()).equal('2050', 'fee packing up');
     });
 });
 
