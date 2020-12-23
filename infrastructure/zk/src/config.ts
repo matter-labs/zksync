@@ -17,7 +17,7 @@ const CONFIG_FILES = [
     'misc.toml',
     'prover.toml',
     'rust.toml',
-    'private.toml',
+    'private.toml'
 ];
 
 async function getEnvironment(): Promise<string> {

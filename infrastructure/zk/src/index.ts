@@ -35,7 +35,7 @@ const COMMANDS = [
     docker,
     config,
     env.command,
-    completion(program as Command),
+    completion(program as Command)
 ];
 
 async function main() {
@@ -50,10 +50,7 @@ async function main() {
 
     env.load();
 
-    program
-        .version('0.1.0')
-        .name('zk')
-        .description('zksync workflow tools');
+    program.version('0.1.0').name('zk').description('zksync workflow tools');
 
     for (const command of COMMANDS) {
         program.addCommand(command);

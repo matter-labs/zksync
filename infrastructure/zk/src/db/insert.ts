@@ -32,15 +32,15 @@ export async function ethData() {
         jsonrpc: '2.0',
         method: 'eth_getTransactionCount',
         params: [process.env.OPERATOR_COMMIT_ETH_ADDRESS as string, 'pending'],
-        id: 1,
+        id: 1
     };
     const reponse = await fetch(process.env.WEB3_URL as string, {
         method: 'post',
         body: JSON.stringify(body),
         headers: {
             Accept: 'application/json',
-            'Content-type': 'application/json',
-        },
+            'Content-type': 'application/json'
+        }
     });
     const nonce = parseInt((await reponse.json()).result);
     await utils.exec(`${SQL()} "INSERT INTO eth_parameters (nonce, gas_price_limit, commit_ops, verify_ops, withdraw_ops)
