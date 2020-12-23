@@ -195,7 +195,7 @@ impl FloatConversions {
         BitConvert::into_bytes_ordered(vec)
     }
 
-    /// Packs a BigUint less than 2 ^ 128 to a floating-point number with an exponent base = 10 that is grater or equal to initial number.
+    /// Packs a BigUint less than 2 ^ 128 to a floating-point number with an exponent base = 10 that is greater or equal to initial number.
     /// Can lose accuracy with small parameters `exponent_len` and `mantissa_len`.
     pub fn pack_up(number: &BigUint, exponent_len: usize, mantissa_len: usize) -> Vec<u8> {
         let uint = number.to_u128().expect("Only u128 allowed");
