@@ -4,9 +4,9 @@
 pub use super::{
     blocks::{BlockInfo, TransactionInfo},
     config::Contracts,
-    operations::PriorityOpReceipt,
+    operations::{PriorityOpData, PriorityOpQuery, PriorityOpReceipt},
     tokens::TokenPriceKind,
-    transactions::{SumbitErrorCode, TxData, TxReceipt},
+    transactions::{Receipt, SumbitErrorCode, TxData},
 };
 
 // Built-in uses

@@ -39,7 +39,7 @@ RUN chmod +x solc-static-linux
 RUN mv solc-static-linux /usr/local/bin/solc
 
 # Copy the setup script
-COPY entrypoint.sh /usr/local/bin/
+COPY docker/ci-integration-test/entrypoint.sh /usr/local/bin/
 
 # Setup the environment
 ENV ZKSYNC_HOME=/usr/src/zksync
