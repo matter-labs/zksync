@@ -12,7 +12,7 @@ use zksync_storage::{
         records::{AccountOpReceiptResponse, AccountTxReceiptResponse},
         SearchDirection as StorageSearchDirection,
     },
-    QueryResult, MAX_BLOCK_NUMBER,
+    QueryResult, StorageProcessor, MAX_BLOCK_NUMBER,
 };
 use zksync_types::{
     tx::TxHash, Account, AccountId, Address, BlockNumber, Nonce, PriorityOp, PubKeyHash, H256,
@@ -222,13 +222,14 @@ impl FromStr for SearchDirection {
 
 impl AccountState {
     pub(crate) async fn from_storage(
-        account: &Account,
+        storage: &mut StorageProcessor<'_>,
         tokens: &TokenDBCache,
+        account: &Account,
     ) -> QueryResult<Self> {
         let mut balances = BTreeMap::new();
         for (token_id, balance) in account.get_nonzero_balances() {
             let token_symbol = tokens
-                .token_symbol(token_id)
+                .token_symbol(storage, token_id)
                 .await?
                 .ok_or_else(|| unable_to_find_token(token_id))?;
 
@@ -254,9 +255,10 @@ impl From<SearchDirection> for StorageSearchDirection {
 
 impl DepositingBalances {
     pub(crate) async fn from_pending_ops(
+        storage: &mut StorageProcessor<'_>,
+        tokens: &TokenDBCache,
         ongoing_ops: Vec<PriorityOp>,
         confirmations_for_eth_event: BlockNumber,
-        tokens: &TokenDBCache,
     ) -> QueryResult<Self> {
         let mut balances = BTreeMap::new();
 
@@ -270,7 +272,7 @@ impl DepositingBalances {
             };
 
             let token_symbol = tokens
-                .token_symbol(token_id)
+                .token_symbol(storage, token_id)
                 .await?
                 .ok_or_else(|| unable_to_find_token(token_id))?;
 
