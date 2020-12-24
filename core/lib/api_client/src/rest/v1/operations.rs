@@ -13,7 +13,7 @@ use super::{
 };
 
 // Workspace uses
-use zksync_types::{ExecutedPriorityOp, H256};
+use zksync_types::{ZkSyncOp, H256};
 
 // Data transfer objects.
 
@@ -38,7 +38,7 @@ pub struct PriorityOpReceipt {
 #[derive(Debug, Deserialize, Serialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct PriorityOpData {
-    pub data: ExecutedPriorityOp,
+    pub data: ZkSyncOp,
     pub eth_hash: H256,
     pub serial_id: u64,
 }

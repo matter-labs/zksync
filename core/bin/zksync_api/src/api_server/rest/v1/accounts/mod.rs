@@ -8,7 +8,6 @@ use actix_web::{
     Scope,
 };
 
-use types::AccountOpReceipt;
 // Workspace uses
 use zksync_config::ConfigurationOptions;
 use zksync_storage::{QueryResult, StorageProcessor};
@@ -25,11 +24,14 @@ use self::types::{
         pending_account_op_receipt_from_priority_op, search_direction_as_storage,
         tx_receipt_from_response, validate_receipts_query,
     },
-    AccountInfo, AccountQuery, AccountReceiptsQuery, AccountState, AccountTxReceipt,
-    PendingAccountOpReceipt, SearchDirection, TxLocation,
+    AccountReceiptsQuery, SearchDirection,
 };
 // Public uses
-pub use self::types::convert::account_state_from_storage;
+pub use self::types::{
+    convert::account_state_from_storage, AccountInfo, AccountOpReceipt, AccountQuery,
+    AccountReceipts, AccountState, AccountTxReceipt, DepositingBalances, DepositingFunds,
+    PendingAccountOpReceipt, TxLocation,
+};
 
 #[cfg(test)]
 mod tests;

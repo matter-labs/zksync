@@ -7,11 +7,16 @@ use thiserror::Error;
 
 // Public uses
 pub use super::{
+    accounts::{
+        AccountInfo, AccountQuery, AccountReceipts, AccountState, DepositingBalances,
+        DepositingFunds,
+    },
     blocks::{BlockInfo, TransactionInfo},
     config::Contracts,
     operations::{PriorityOpData, PriorityOpQuery, PriorityOpReceipt},
     tokens::TokenPriceKind,
     transactions::{Receipt, TxData},
+    Pagination,
 };
 // Local uses
 use super::error::ErrorBody;

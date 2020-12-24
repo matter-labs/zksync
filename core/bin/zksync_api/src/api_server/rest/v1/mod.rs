@@ -8,7 +8,9 @@ use actix_web::{
 
 use Error as ApiError;
 // Workspace uses
-pub use zksync_api_client::rest::v1::{Client, ClientError, Pagination, PaginationQuery};
+pub use zksync_api_client::rest::v1::{
+    Client, ClientError, Pagination, PaginationQuery, MAX_LIMIT,
+};
 use zksync_config::{ApiServerOptions, ConfigurationOptions};
 
 // Local uses
@@ -27,9 +29,6 @@ mod search;
 mod test_utils;
 mod tokens;
 mod transactions;
-
-/// Maximum limit value in the requests.
-pub const MAX_LIMIT: u32 = 100;
 
 type JsonResult<T> = std::result::Result<web::Json<T>, Error>;
 
