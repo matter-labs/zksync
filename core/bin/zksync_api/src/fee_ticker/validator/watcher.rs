@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::Instant;
 
-use bigdecimal::BigDecimal;
+use bigdecimal::{BigDecimal, Zero};
 use serde::{Deserialize, Serialize};
 use tokio::sync::Mutex;
 use zksync_types::{Address, Token};
@@ -50,7 +50,13 @@ impl UniswapTokenWatcher {
             .await?;
 
         metrics::histogram!("ticker.uniswap_watcher.get_market_volume", start.elapsed());
-        Ok(response.data.token.trade_volume_usd.parse()?)
+
+        let volume = if let Some(token) = response.data.token {
+            token.trade_volume_usd.parse()?
+        } else {
+            BigDecimal::zero()
+        };
+        Ok(volume)
     }
     async fn update_historical_amount(&mut self, address: Address, amount: BigDecimal) {
         let mut cache = self.cache.lock().await;
@@ -69,7 +75,7 @@ pub struct GraphqlResponse {
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct GraphqlTokenResponse {
-    pub token: TokenResponse,
+    pub token: Option<TokenResponse>,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
