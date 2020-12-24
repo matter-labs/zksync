@@ -30,7 +30,7 @@ use futures::{
 
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
-use tokio::sync::Mutex;
+use tokio::sync::RwLock;
 use tokio::task::JoinHandle;
 
 // Workspace uses
@@ -256,7 +256,7 @@ impl MempoolState {
 }
 
 struct MempoolBlocksHandler {
-    mempool_state: Arc<Mutex<MempoolState>>,
+    mempool_state: Arc<RwLock<MempoolState>>,
     requests: mpsc::Receiver<MempoolBlocksRequest>,
     eth_watch_req: mpsc::Sender<EthWatchRequest>,
     max_block_size_chunks: usize,
@@ -310,7 +310,7 @@ impl MempoolBlocksHandler {
     ) -> (usize, Vec<SignedTxVariant>) {
         let mut txs_for_commit = Vec::new();
 
-        let mut mempool = self.mempool_state.lock().await;
+        let mut mempool = self.mempool_state.write().await;
         while let Some(tx) = mempool.ready_txs.pop_front() {
             let chunks_for_tx = mempool.required_chunks(&tx);
             if chunks_left >= chunks_for_tx {
@@ -345,40 +345,51 @@ impl MempoolBlocksHandler {
                     for (id, update) in updates {
                         match update {
                             AccountUpdate::Create { address, nonce } => {
-                                let mut mempool = self.mempool_state.lock().await;
+                                let mut mempool = self.mempool_state.write().await;
                                 mempool.account_ids.insert(id, address);
                                 mempool.account_nonces.insert(address, nonce);
                             }
                             AccountUpdate::Delete { address, .. } => {
-                                let mut mempool = self.mempool_state.lock().await;
+                                let mut mempool = self.mempool_state.write().await;
                                 mempool.account_ids.remove(&id);
                                 mempool.account_nonces.remove(&address);
                             }
                             AccountUpdate::UpdateBalance { new_nonce, .. } => {
-                                if let Some(address) =
-                                    self.mempool_state.lock().await.account_ids.get(&id)
-                                {
+                                let address = self
+                                    .mempool_state
+                                    .read()
+                                    .await
+                                    .account_ids
+                                    .get(&id)
+                                    .cloned();
+                                if let Some(address) = address {
                                     if let Some(nonce) = self
                                         .mempool_state
-                                        .lock()
+                                        .write()
                                         .await
                                         .account_nonces
-                                        .get_mut(address)
+                                        .get_mut(&address)
                                     {
                                         *nonce = new_nonce;
                                     }
                                 }
                             }
                             AccountUpdate::ChangePubKeyHash { new_nonce, .. } => {
-                                if let Some(address) =
-                                    self.mempool_state.lock().await.account_ids.get(&id)
-                                {
+                                let address = self
+                                    .mempool_state
+                                    .read()
+                                    .await
+                                    .account_ids
+                                    .get(&id)
+                                    .cloned();
+
+                                if let Some(address) = address {
                                     if let Some(nonce) = self
                                         .mempool_state
-                                        .lock()
+                                        .write()
                                         .await
                                         .account_nonces
-                                        .get_mut(address)
+                                        .get_mut(&address)
                                     {
                                         *nonce = new_nonce;
                                     }
@@ -394,7 +405,7 @@ impl MempoolBlocksHandler {
 
 struct MempoolTransactionsHandler {
     db_pool: ConnectionPool,
-    mempool_state: Arc<Mutex<MempoolState>>,
+    mempool_state: Arc<RwLock<MempoolState>>,
     requests: mpsc::Receiver<MempoolTransactionRequest>,
     max_block_size_chunks: usize,
     max_number_of_withdrawals_per_block: usize,
@@ -438,7 +449,7 @@ impl MempoolTransactionsHandler {
             TxAddError::DbError
         })?;
 
-        self.mempool_state.lock().await.add_tx(tx)
+        self.mempool_state.write().await.add_tx(tx)
     }
 
     async fn add_batch(
@@ -457,7 +468,7 @@ impl MempoolTransactionsHandler {
             eth_signature: eth_signature.clone(),
         };
 
-        if self.mempool_state.lock().await.chunks_for_batch(&batch) > self.max_block_size_chunks {
+        if self.mempool_state.read().await.chunks_for_batch(&batch) > self.max_block_size_chunks {
             return Err(TxAddError::BatchTooBig);
         }
 
@@ -491,7 +502,7 @@ impl MempoolTransactionsHandler {
 
         batch.batch_id = batch_id;
 
-        self.mempool_state.lock().await.add_batch(batch)
+        self.mempool_state.write().await.add_batch(batch)
     }
 
     async fn run(mut self) {
@@ -523,7 +534,7 @@ pub fn run_mempool_tasks(
 ) -> JoinHandle<()> {
     let config = config.clone();
     tokio::spawn(async move {
-        let mempool_state = Arc::new(Mutex::new(MempoolState::restore_from_db(&db_pool).await));
+        let mempool_state = Arc::new(RwLock::new(MempoolState::restore_from_db(&db_pool).await));
         let tmp_channel = mpsc::channel(channel_capacity);
         let max_block_size_chunks = *config
             .available_block_chunk_sizes
@@ -531,6 +542,7 @@ pub fn run_mempool_tasks(
             .max()
             .expect("failed to find max block chunks size");
 
+        let mut tasks = vec![];
         let (balancer, mut handlers) = Balancer::new(
             MempoolTransactionsHandler {
                 db_pool: db_pool.clone(),
@@ -543,7 +555,6 @@ pub fn run_mempool_tasks(
             number_of_mempool_transaction_handlers,
             channel_capacity,
         );
-        let mut tasks = vec![];
 
         while let Some(item) = handlers.pop() {
             tasks.push(tokio::spawn(item.run()));
