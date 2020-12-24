@@ -33,6 +33,6 @@ wallets_amount = 10
 name = 'batch_transfers'
 # Amount of money to be used in the transfer, in gwei.
 transfer_size = 1
-transfer_rounds = 100
+transfer_rounds = 50
 wallets_amount = 100
 max_batch_size = 15

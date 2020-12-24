@@ -35,4 +35,4 @@ name = 'batch_transfers'
 transfer_size = 1
 transfer_rounds = 10
 wallets_amount = 20
-max_batch_size = 4
+max_batch_size = 10

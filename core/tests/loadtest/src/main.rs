@@ -65,6 +65,8 @@ fn print_stats_summary(name: impl AsRef<str>, summary: Option<&FiveSummaryStats>
             pretty_fmt!(summary.max).dimmed(),
             pretty_fmt!(summary.std_dev).yellow()
         );
+    } else {
+        println!("        not enough data to collect statisics");
     }
 }
 
@@ -126,7 +128,7 @@ async fn main() -> Result<(), anyhow::Error> {
                 variant.to_string().bright_green()
             );
             for (category, stats) in &report.stats {
-                print_stats_summary(category, Some(stats));
+                print_stats_summary(category, stats.as_ref());
             }
         }
         print_counters(

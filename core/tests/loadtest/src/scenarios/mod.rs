@@ -112,7 +112,7 @@ impl ScenarioConfig {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct TxVariantTestsReport {
     /// A five numbers summary statistic for each transaction lifecycle step.
-    pub stats: BTreeMap<String, FiveSummaryStats>,
+    pub stats: BTreeMap<String, Option<FiveSummaryStats>>,
 }
 
 /// Load test report for the transactions scenarios.
