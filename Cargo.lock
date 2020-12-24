@@ -2655,6 +2655,7 @@ dependencies = [
  "toml",
  "web3 0.13.0",
  "zksync",
+ "zksync_api",
  "zksync_config",
  "zksync_eth_signer",
  "zksync_types",
