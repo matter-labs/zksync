@@ -3,6 +3,7 @@ use std::fmt;
 // External uses
 use async_trait::async_trait;
 use num::BigUint;
+use rand::{thread_rng, Rng};
 use serde::{Deserialize, Serialize};
 // Workspace uses
 use zksync::utils::closest_packable_token_amount;
@@ -140,11 +141,19 @@ impl Scenario for BatchTransferScenario {
         _fees: &Fees,
         _wallets: &[TestWallet],
     ) -> anyhow::Result<()> {
+        let max_batch_size = self.max_batch_size;
+        let batch_sizes = std::iter::repeat_with(move || match thread_rng().gen_range(0, 3) {
+            0 => 2,
+            1 => max_batch_size / 2,
+            2 => max_batch_size,
+            _ => unreachable!(),
+        });
+
+        let txs = self.txs.drain(..);
         wait_all_failsafe_chunks(
             "run/batch_transfers",
             &[1, 2, 3, 2, 1],
-            DynamicChunks::new(self.txs.drain(..), &[self.max_batch_size])
-                .map(|txs| monitor.send_txs_batch(txs)),
+            DynamicChunks::new(txs, batch_sizes).map(|txs| monitor.send_txs_batch(txs)),
         )
         .await?;
 
