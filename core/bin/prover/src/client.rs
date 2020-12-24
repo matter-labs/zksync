@@ -20,14 +20,14 @@ pub struct ApiClient {
     working_on_url: Url,
     publish_url: Url,
     stopped_url: Url,
-    // Client keeps connection pool inside, so it is recommended to reuse it (see docstring for reqwest::Client)
+    // Client keeps connection pool inside, so it is recommended to reuse it (see docstring for reqwest::Client).
     http_client: reqwest::Client,
     // A generator that create the authentication token upon request to any endpoint.
     auth_token_generator: AuthTokenGenerator,
 }
 
 impl ApiClient {
-    // The time for which the authorization token will be valid
+    // The time for which the authorization token will be valid.
     const AUTH_TOKEN_LIFETIME: Duration = Duration::from_secs(10);
 
     pub fn new(base_url: &Url, worker: &str, req_server_timeout: Duration, secret: &str) -> Self {

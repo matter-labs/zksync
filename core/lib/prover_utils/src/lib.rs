@@ -23,8 +23,6 @@ pub mod aggregated_proofs;
 pub mod api;
 pub mod fs_utils;
 pub mod network_utils;
-pub mod prover_data;
-pub mod serialization;
 
 pub const SETUP_MIN_POW2: u32 = 20;
 pub const SETUP_MAX_POW2: u32 = 26;

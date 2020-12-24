@@ -36,7 +36,7 @@ async function main() {
 
     program
         .command('add')
-        .option('-a, --address <address>')
+        .option('--address <address>')
         .description('Adds a new token with a given address')
         .action(async (address: string) => {
             await governanceAddToken(address);
@@ -68,7 +68,7 @@ async function main() {
             }
         });
 
-    return await program.parseAsync(process.argv);
+    program.parse(process.argv);
 }
 
 main()

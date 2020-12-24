@@ -106,7 +106,7 @@ export interface ChangePubKeyOnchain {
     type: 'Onchain';
 }
 
-export interface ChangePubKeyECSDA {
+export interface ChangePubKeyECDSA {
     type: 'ECDSA';
     ethSignature: string;
     batchHash?: string;
@@ -128,7 +128,7 @@ export interface ChangePubKey {
     fee: BigNumberish;
     nonce: number;
     signature: Signature;
-    ethAuthData: ChangePubKeyOnchain | ChangePubKeyECSDA | ChangePubKeyCREATE2;
+    ethAuthData: ChangePubKeyOnchain | ChangePubKeyECDSA | ChangePubKeyCREATE2;
 }
 
 export interface CloseAccount {
