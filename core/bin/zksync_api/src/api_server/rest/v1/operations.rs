@@ -16,7 +16,7 @@ use zksync_storage::{
     chain::operations::records::StoredExecutedPriorityOperation, ConnectionPool, QueryResult,
     StorageProcessor,
 };
-use zksync_types::{BlockNumber, ExecutedPriorityOp, H256};
+use zksync_types::{BlockNumber, ZkSyncOp, H256};
 
 // Local uses
 use super::{
@@ -117,7 +117,7 @@ pub struct PriorityOpReceipt {
 #[derive(Debug, Deserialize, Serialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct PriorityOpData {
-    pub data: ExecutedPriorityOp,
+    pub data: ZkSyncOp,
     pub eth_hash: H256,
     pub serial_id: u64,
 }
@@ -304,7 +304,7 @@ mod tests {
         );
 
         let expected_data = PriorityOpData {
-            data: dummy_deposit_op(Address::default(), 1, 15, 2),
+            data: dummy_deposit_op(Address::default(), 1, 15, 2).op,
             serial_id: VERIFIED_OP_SERIAL_ID,
             eth_hash: verified_op_hash,
         };
@@ -344,7 +344,7 @@ mod tests {
         );
 
         let expected_data = PriorityOpData {
-            data: dummy_full_exit_op(1, Address::default(), 16, 3),
+            data: dummy_full_exit_op(1, Address::default(), 16, 3).op,
             serial_id: COMMITTED_OP_SERIAL_ID,
             eth_hash: committed_eth_hash,
         };
