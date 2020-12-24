@@ -3,6 +3,7 @@ use std::{collections::HashMap, sync::Arc};
 use tokio::sync::RwLock;
 
 use zksync_storage::StorageProcessor;
+use zksync_types::tokens::TokenMarketVolume;
 use zksync_types::{Token, TokenId, TokenLike};
 
 #[derive(Debug, Clone, Default)]
@@ -78,5 +79,34 @@ impl TokenDBCache {
     ) -> anyhow::Result<Option<String>> {
         let token = self.get_token(storage, token_id).await?;
         Ok(token.map(|token| token.symbol))
+    }
+
+    pub async fn get_all_tokens(
+        storage: &mut StorageProcessor<'_>,
+    ) -> Result<Vec<Token>, anyhow::Error> {
+        let tokens = storage.tokens_schema().load_tokens().await?;
+        Ok(tokens.into_iter().map(|(_k, v)| v).collect())
+    }
+
+    pub async fn get_token_market_volume(
+        storage: &mut StorageProcessor<'_>,
+        token: TokenId,
+    ) -> anyhow::Result<Option<TokenMarketVolume>> {
+        let volume = storage
+            .tokens_schema()
+            .get_token_market_volume(token)
+            .await?;
+        Ok(volume)
+    }
+
+    pub async fn update_token_market_volume(
+        storage: &mut StorageProcessor<'_>,
+        token: TokenId,
+        market: TokenMarketVolume,
+    ) -> anyhow::Result<()> {
+        Ok(storage
+            .tokens_schema()
+            .update_token_market_volume(token, market)
+            .await?)
     }
 }

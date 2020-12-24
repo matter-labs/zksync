@@ -1,7 +1,10 @@
 //! Accounts part of API implementation.
 
 // Public uses
-pub use self::types::{AccountInfo, AccountState, DepositingBalances, DepositingFunds};
+pub use self::types::{
+    AccountInfo, AccountOpReceipt, AccountQuery, AccountReceipts, AccountState, AccountTxReceipt,
+    DepositingBalances, DepositingFunds, PendingAccountOpReceipt, TxLocation,
+};
 
 // Built-in uses
 
@@ -11,7 +14,6 @@ use actix_web::{
     Scope,
 };
 
-use types::AccountOpReceipt;
 // Workspace uses
 use zksync_config::ConfigurationOptions;
 use zksync_storage::{ConnectionPool, QueryResult, StorageProcessor};
@@ -20,10 +22,7 @@ use zksync_types::{AccountId, Address, BlockNumber, TokenId};
 // Local uses
 use crate::{core_api_client::CoreApiClient, utils::token_db_cache::TokenDBCache};
 
-use self::types::{
-    AccountQuery, AccountReceiptsQuery, AccountTxReceipt, PendingAccountOpReceipt, SearchDirection,
-    TxLocation,
-};
+use self::types::{AccountReceiptsQuery, SearchDirection};
 use super::{ApiError, JsonResult};
 
 mod client;
