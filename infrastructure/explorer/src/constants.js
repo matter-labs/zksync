@@ -12,7 +12,7 @@ export const CACHE_VERSION_SLOT = 'CACHE_VERSION';
 //
 // If the CACHE_VERSION on a client's computer is incorrect,
 // it wiil be reset.
-export const CACHE_VERSION = 1;
+export const CACHE_VERSION = '2';
 
 export const blockchainExplorerTx = getBlockchainExplorerTx(store.network);
 
