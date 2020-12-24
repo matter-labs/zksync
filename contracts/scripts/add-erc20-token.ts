@@ -71,7 +71,9 @@ async function main() {
     return await program.parseAsync(process.argv);
 }
 
-main().catch((err: Error) => {
-    console.error('Error:', err.message || err);
-    process.exit(1);
-});
+main()
+    .then(() => process.exit(0))
+    .catch((err) => {
+        console.error('Error:', err.message || err);
+        process.exit(1);
+    });

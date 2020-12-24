@@ -67,7 +67,7 @@ async function main() {
 
 main()
     .then(() => process.exit(0))
-    .catch((error) => {
-        console.error(error);
+    .catch((err) => {
+        console.error('Error:', err.message || err);
         process.exit(1);
     });
