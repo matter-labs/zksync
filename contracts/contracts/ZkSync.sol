@@ -326,7 +326,7 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
         for (uint32 i = 0; i < _newBlocksData.length; ++i) {
             lastCommittedBlock = commitOneBlock(lastCommittedBlock, _newBlocksData[i]);
 
-            committedPriorityRequests += lastCommittedBlock.priorityOperations;
+            totalCommittedPriorityRequests += lastCommittedBlock.priorityOperations;
             storedBlockHashes[lastCommittedBlock.blockNumber] = hashStoredBlockInfo(lastCommittedBlock);
 
             emit BlockCommit(lastCommittedBlock.blockNumber);
@@ -334,7 +334,6 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
 
         totalBlocksCommitted += uint32(_newBlocksData.length);
 
-        totalCommittedPriorityRequests += committedPriorityRequests;
         require(totalCommittedPriorityRequests <= totalOpenPriorityRequests, "ay");
     }
 

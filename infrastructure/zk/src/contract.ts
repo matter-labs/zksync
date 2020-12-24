@@ -4,6 +4,7 @@ import * as env from './env';
 import fs from 'fs';
 
 import * as db from './db/db';
+import * as run from './run/run';
 
 export function prepareVerify() {
     const keyDir = process.env.KEY_DIR;
@@ -57,6 +58,7 @@ export async function deploy() {
 export async function redeploy() {
     await deploy();
     await db.insert.contract();
+    await run.governanceAddERC20('dev');
     await publish();
 }
 

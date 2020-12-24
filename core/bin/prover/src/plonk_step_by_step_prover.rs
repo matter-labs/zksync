@@ -2,7 +2,7 @@
 use std::sync::Mutex;
 // Workspace deps
 use zksync_config::AvailableBlockSizesConfig;
-use zksync_crypto::proof::{AggregatedProof, SingleProof};
+use zksync_crypto::proof::{AggregatedProof, PrecomputedSampleProofs, SingleProof};
 use zksync_crypto::Engine;
 use zksync_prover_utils::aggregated_proofs::{gen_aggregate_proof, prepare_proof_data};
 use zksync_prover_utils::api::{JobRequestData, JobResultData};
@@ -10,6 +10,7 @@ use zksync_prover_utils::{PlonkVerificationKey, SetupForStepByStepProver};
 use zksync_utils::{parse_env, parse_env_to_collection};
 // Local deps
 use crate::{ProverConfig, ProverImpl};
+use zksync_prover_utils::fs_utils::load_precomputed_proofs;
 
 /// We prepare some data before making proof for each block size, so we cache it in case next block
 /// would be of our size
@@ -21,12 +22,14 @@ struct PreparedComputations {
 pub struct PlonkStepByStepProver {
     config: PlonkStepByStepProverConfig,
     prepared_computations: Mutex<Option<PreparedComputations>>,
+    precomputed_sample_proofs: PrecomputedSampleProofs,
 }
 
 pub struct PlonkStepByStepProverConfig {
     pub all_block_sizes: Vec<usize>,
     pub block_sizes: Vec<usize>,
     pub download_setup_from_network: bool,
+    pub aggregated_proof_sizes_with_setup_pow: Vec<(usize, u32)>,
 }
 
 impl ProverConfig for PlonkStepByStepProverConfig {
@@ -35,6 +38,8 @@ impl ProverConfig for PlonkStepByStepProverConfig {
             all_block_sizes: parse_env_to_collection("SUPPORTED_BLOCK_CHUNKS_SIZES"),
             block_sizes: parse_env_to_collection("BLOCK_CHUNK_SIZES"),
             download_setup_from_network: parse_env("PROVER_DOWNLOAD_SETUP"),
+            aggregated_proof_sizes_with_setup_pow: AvailableBlockSizesConfig::from_env()
+                .aggregated_proof_sizes_with_setup_pow(),
         }
     }
 }
@@ -81,14 +86,42 @@ impl PlonkStepByStepProver {
         {
             self.prepared_computations.lock().unwrap().take();
         }
-        let (vks, proof_data) = prepare_proof_data(&self.config.all_block_sizes, proofs);
 
-        let aggregated_proof_sizes_with_setup_pow =
-            AvailableBlockSizesConfig::from_env().aggregated_proof_sizes_with_setup_pow();
+        let proofs_to_pad = {
+            let aggregate_size = self.config.aggregated_proof_sizes_with_setup_pow.iter().find(|(aggregate_size, _)| aggregate_size >= &proofs.len())
+                .ok_or_else(|| {
+                    anyhow::anyhow!("Failed to find aggregate proof size to fit all proofs, size: {:?}, proofs: {}", self.config.aggregated_proof_sizes_with_setup_pow, proofs.len())
+                })?.0;
+            aggregate_size
+                .checked_sub(proofs.len())
+                .expect("Aggregate size should be <= number of proofs")
+        };
+
+        if proofs_to_pad > 0 {
+            log::info!(
+                "Padding aggregated proofs. proofs: {}, proofs to pad: {}, aggregate_size: {}",
+                proofs.len(),
+                proofs_to_pad,
+                proofs.len() + proofs_to_pad
+            );
+        }
+
+        let padded_proofs = proofs
+            .into_iter()
+            .chain(
+                self.precomputed_sample_proofs
+                    .single_proofs
+                    .iter()
+                    .cloned()
+                    .take(proofs_to_pad),
+            )
+            .collect();
+
+        let (vks, proof_data) = prepare_proof_data(&self.config.all_block_sizes, padded_proofs);
         gen_aggregate_proof(
             vks,
             proof_data,
-            &aggregated_proof_sizes_with_setup_pow,
+            &self.config.aggregated_proof_sizes_with_setup_pow,
             self.config.download_setup_from_network,
         )
     }
@@ -135,6 +168,8 @@ impl ProverImpl for PlonkStepByStepProver {
         PlonkStepByStepProver {
             config,
             prepared_computations: Mutex::new(None),
+            precomputed_sample_proofs: load_precomputed_proofs()
+                .expect("Failed to load precomputed sample proofs"),
         }
     }
 }

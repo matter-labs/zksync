@@ -29,7 +29,6 @@ pub struct ProverInputResponse {
 pub enum JobRequestData {
     BlockProof(
         ProverData,
-        // zksync_circuit::circuit::ZkSyncCircuit<'static, Engine>,
         usize, // block size
     ),
     AggregatedBlockProof(Vec<(SingleProof, usize)>),

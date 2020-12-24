@@ -2616,6 +2616,7 @@ dependencies = [
 name = "key_generator"
 version = "1.0.0"
 dependencies = [
+ "anyhow",
  "env_logger 0.6.2",
  "handlebars",
  "hex",
