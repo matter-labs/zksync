@@ -46,6 +46,7 @@ pub(crate) fn api_scope(
     web::scope("/api/v1")
         .service(accounts::api_scope(
             &env_options,
+            tx_sender.pool.clone(),
             tx_sender.tokens.clone(),
             tx_sender.core_api_client.clone(),
         ))
@@ -58,6 +59,7 @@ pub(crate) fn api_scope(
         .service(operations::api_scope(tx_sender.pool.clone()))
         .service(search::api_scope(tx_sender.pool.clone()))
         .service(tokens::api_scope(
+            tx_sender.pool.clone(),
             tx_sender.tokens,
             tx_sender.ticker_requests,
         ))

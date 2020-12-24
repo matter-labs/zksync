@@ -201,7 +201,7 @@ pub fn run_ticker_task(
         not_subsidized_tokens: config.not_subsidized_tokens,
     };
 
-    let cache = TokenDBCache::new(db_pool.clone());
+    let cache = (db_pool.clone(), TokenDBCache::new());
     let watcher = UniswapTokenWatcher::new(config.uniswap_url);
     let validator = FeeTokenValidator::new(
         cache.clone(),
