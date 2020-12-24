@@ -125,8 +125,10 @@ async fn heartbeat_future_handle<CLIENT>(
             let random_multiplier = between.ind_sample(&mut rng);
             Duration::from_secs((heartbeat_interval.as_secs_f64() * random_multiplier) as u64)
         };
-
         tokio::time::delay_for(timeout_value).await;
+
+        log::info!("Starting sending heartbeats for job with ID: {}", job_id);
+
         client
             .working_on(job_id, &prover_name)
             .await
@@ -145,6 +147,7 @@ async fn prover_work_cycle<PROVER, CLIENT>(
     CLIENT: 'static + Sync + Send + ApiClient + Clone,
     PROVER: ProverImpl + Send + Sync + 'static,
 {
+    log::info!("Running worker cycle");
     let mut new_job_poll_timer = tokio::time::interval(prover_options.cycle_wait);
     loop {
         new_job_poll_timer.tick().await;
@@ -180,6 +183,13 @@ async fn prover_work_cycle<PROVER, CLIENT>(
             continue;
         };
 
+        log::info!(
+            "got job id: {}, blocks: [{}, {}]",
+            job_id,
+            first_block,
+            last_block
+        );
+
         let heartbeat_future_handle = heartbeat_future_handle(
             client.clone(),
             prover_name,
@@ -190,6 +200,12 @@ async fn prover_work_cycle<PROVER, CLIENT>(
         let compute_proof_future = compute_proof_no_blocking(prover, job_data).fuse();
 
         pin_mut!(heartbeat_future_handle, compute_proof_future);
+
+        log::info!(
+            "starting to compute proof for blocks: [{}, {}]",
+            first_block,
+            last_block
+        );
 
         let (ret_prover, proof) = futures::select! {
             comp_proof = compute_proof_future => {
@@ -208,6 +224,12 @@ async fn prover_work_cycle<PROVER, CLIENT>(
             })
             .await
             .map_err(|e| log::warn!("Failed to publish proof: {}", e))
-            .unwrap();
+            .unwrap_or_default();
+
+        log::info!(
+            "finished and published proof for blocks: [{}, {}]",
+            first_block,
+            last_block
+        );
     }
 }

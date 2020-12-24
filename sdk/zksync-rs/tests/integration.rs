@@ -4,9 +4,9 @@
 //! instance of zkSync server and prover:
 //!
 //! ```bash
-//! zksync server &!
-//! zksync dummy-prover &!
-//! zksync sdk-test
+//! zk server &!
+//! zk dummy-prover run &!
+//! zk test integration rust-sdk
 //! ```
 //!
 //! Note: If tests are failing, first check the following two things:
