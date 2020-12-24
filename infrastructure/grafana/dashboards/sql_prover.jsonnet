@@ -14,7 +14,4 @@ local metrics = [
   "sql.prover.unstarted_jobs_count",
 ];
 
-G.dashboard(
-  'Metrics / sql / prover',
-  [ G.panel(metric) for metric in metrics ]
-)
+G.dashboard('sql / prover', metrics)

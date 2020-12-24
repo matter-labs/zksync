@@ -23,7 +23,4 @@ local metrics = [
   "sql.chain.operations.store_operation",
 ];
 
-G.dashboard(
-  'Metrics / sql / chain / operations',
-  [ G.panel(metric) for metric in metrics ]
-)
+G.dashboard('sql / chain / operations', metrics)
