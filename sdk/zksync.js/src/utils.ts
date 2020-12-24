@@ -109,12 +109,7 @@ function numberToBits(integer: number, bits: number): number[] {
     return result;
 }
 
-export function integerToFloat(
-    integer: BigNumber,
-    expBits: number,
-    mantissaBits: number,
-    expBase: number
-): Uint8Array {
+export function integerToFloat(integer: BigNumber, expBits: number, mantissaBits: number, expBase: number): Uint8Array {
     const maxExponentPower = Math.pow(2, expBits) - 1;
     const maxExponent = BigNumber.from(10).pow(maxExponentPower);
     const maxMantissa = BigNumber.from(2).pow(mantissaBits).sub(1);
@@ -181,7 +176,7 @@ export function integerToFloatUp(
         exponent += 1;
     }
     let mantissa = integer.div(exponentTemp);
-    if(!integer.mod(exponentTemp).eq(BigNumber.from(0))) {
+    if (!integer.mod(exponentTemp).eq(BigNumber.from(0))) {
         mantissa = mantissa.add(1);
     }
 
