@@ -411,9 +411,21 @@ struct MempoolTransactionsHandler {
     max_number_of_withdrawals_per_block: usize,
 }
 
-impl Balanced<MempoolTransactionRequest> for MempoolTransactionsHandler {
-    fn clone_with_receiver(&self, receiver: Receiver<MempoolTransactionRequest>) -> Self {
-        Self {
+struct MempoolTransactionsHandlerBuilder {
+    db_pool: ConnectionPool,
+    mempool_state: Arc<RwLock<MempoolState>>,
+    max_block_size_chunks: usize,
+    max_number_of_withdrawals_per_block: usize,
+}
+
+impl Balanced<MempoolTransactionRequest, MempoolTransactionsHandler>
+    for MempoolTransactionsHandlerBuilder
+{
+    fn build_with_receiver(
+        &self,
+        receiver: Receiver<MempoolTransactionRequest>,
+    ) -> MempoolTransactionsHandler {
+        MempoolTransactionsHandler {
             db_pool: self.db_pool.clone(),
             mempool_state: self.mempool_state.clone(),
             requests: receiver,
@@ -535,7 +547,6 @@ pub fn run_mempool_tasks(
     let config = config.clone();
     tokio::spawn(async move {
         let mempool_state = Arc::new(RwLock::new(MempoolState::restore_from_db(&db_pool).await));
-        let tmp_channel = mpsc::channel(channel_capacity);
         let max_block_size_chunks = *config
             .available_block_chunk_sizes
             .iter()
@@ -543,11 +554,10 @@ pub fn run_mempool_tasks(
             .expect("failed to find max block chunks size");
 
         let mut tasks = vec![];
-        let (balancer, mut handlers) = Balancer::new(
-            MempoolTransactionsHandler {
+        let (balancer, handlers) = Balancer::new(
+            MempoolTransactionsHandlerBuilder {
                 db_pool: db_pool.clone(),
                 mempool_state: mempool_state.clone(),
-                requests: tmp_channel.1,
                 max_block_size_chunks,
                 max_number_of_withdrawals_per_block: config.max_number_of_withdrawals_per_block,
             },
@@ -556,7 +566,7 @@ pub fn run_mempool_tasks(
             channel_capacity,
         );
 
-        while let Some(item) = handlers.pop() {
+        for item in handlers.into_iter() {
             tasks.push(tokio::spawn(item.run()));
         }
 

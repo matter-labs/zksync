@@ -5,24 +5,24 @@ use futures::{
     SinkExt, StreamExt,
 };
 
-pub struct Balancer<REQUESTS> {
-    channels: Vec<Sender<REQUESTS>>,
-    requests: Receiver<REQUESTS>,
+pub struct Balancer<R> {
+    channels: Vec<Sender<R>>,
+    requests: Receiver<R>,
 }
 
-pub trait Balanced<REQUESTS> {
-    fn clone_with_receiver(&self, receiver: Receiver<REQUESTS>) -> Self;
+pub trait Balanced<R, S> {
+    fn build_with_receiver(&self, receiver: Receiver<R>) -> S;
 }
 
-impl<REQUESTS> Balancer<REQUESTS> {
-    pub fn new<T>(
+impl<R> Balancer<R> {
+    pub fn new<T, S>(
         balanced_item: T,
-        requests: Receiver<REQUESTS>,
+        requests: Receiver<R>,
         number_of_items: u8,
         channel_capacity: usize,
-    ) -> (Self, Vec<T>)
+    ) -> (Self, Vec<S>)
     where
-        T: Balanced<REQUESTS> + Sync + Send + 'static,
+        T: Balanced<R, S> + Sync + Send + 'static,
     {
         let mut balanced_items = vec![];
         let mut channels = vec![];
@@ -30,7 +30,7 @@ impl<REQUESTS> Balancer<REQUESTS> {
         for _ in 0..number_of_items {
             let (request_sender, request_receiver) = mpsc::channel(channel_capacity);
             channels.push(request_sender);
-            balanced_items.push(balanced_item.clone_with_receiver(request_receiver));
+            balanced_items.push(balanced_item.build_with_receiver(request_receiver));
         }
 
         (Self { channels, requests }, balanced_items)
@@ -39,7 +39,7 @@ impl<REQUESTS> Balancer<REQUESTS> {
     pub async fn run(mut self) {
         // It's an obvious way of balancing. Send an equal number of requests to each ticker
         let mut channel_indexes = (0..self.channels.len()).into_iter().cycle();
-        // it's the easiest way how to cycle over channels, because cycle required clone trait
+        // It's the easiest way how to cycle over channels, because cycle required clone trait.
         while let Some(request) = self.requests.next().await {
             let channel_index = channel_indexes
                 .next()
@@ -65,8 +65,8 @@ mod tests {
         receiver: Receiver<i32>,
     }
 
-    impl Balanced<i32> for SomeBalancedItem {
-        fn clone_with_receiver(&self, receiver: Receiver<i32>) -> Self {
+    impl Balanced<i32, SomeBalancedItem> for SomeBalancedItem {
+        fn build_with_receiver(&self, receiver: Receiver<i32>) -> Self {
             Self { receiver }
         }
     }
