@@ -275,8 +275,10 @@ impl FloatConversions {
             (0, integer)
         } else {
             let mantissa = integer / exponent_temp;
-            let diff1 = integer - mantissa * exponent_temp;
-            let diff2 = integer - max_mantissa * exponent_temp / exponent_base;
+            let variant1 = mantissa * exponent_temp;
+            let variant2 = max_mantissa * exponent_temp / exponent_base;
+            let diff1 = integer - variant1;
+            let diff2 = integer - variant2;
             if diff1 < diff2 {
                 (exponent, mantissa)
             } else {
@@ -338,7 +340,10 @@ impl FloatConversions {
             exponent_temp *= exponent_base;
             exponent += 1;
         }
-        let mantissa = integer / exponent_temp + ((integer % exponent_temp != 0) as u128);
+        let mut mantissa = integer / exponent_temp;
+        if integer % exponent_temp != 0 {
+            mantissa += 1;
+        }
 
         // encode into bits. First bits of mantissa in LE order
 

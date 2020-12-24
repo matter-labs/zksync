@@ -111,14 +111,15 @@ function numberToBits(integer: number, bits: number): number[] {
 
 export function integerToFloat(
     integer: BigNumber,
-    exp_bits: number,
-    mantissa_bits: number,
-    exp_base: number
+    expBits: number,
+    mantissaBits: number,
+    expBase: number
 ): Uint8Array {
-    const max_exponent = BigNumber.from(10).pow(Math.pow(2, exp_bits) - 1);
-    const max_mantissa = BigNumber.from(2).pow(mantissa_bits).sub(1);
+    const maxExponentPower = Math.pow(2, expBits) - 1;
+    const maxExponent = BigNumber.from(10).pow(maxExponentPower);
+    const maxMantissa = BigNumber.from(2).pow(mantissaBits).sub(1);
 
-    if (integer.gt(max_mantissa.mul(max_exponent))) {
+    if (integer.gt(maxMantissa.mul(maxExponent))) {
         throw new Error('Integer is too big');
     }
 
@@ -129,17 +130,19 @@ export function integerToFloat(
     // 1) with that minimal exponent
     // 2) with that minimal exponent minus 1
     let exponent = 0;
-    let exponent_temp = BigNumber.from(1);
-    while (integer.gt(max_mantissa.mul(exponent_temp))) {
-        exponent_temp = exponent_temp.mul(exp_base);
+    let exponentTemp = BigNumber.from(1);
+    while (integer.gt(maxMantissa.mul(exponentTemp))) {
+        exponentTemp = exponentTemp.mul(expBase);
         exponent += 1;
     }
-    let mantissa = integer.div(exponent_temp);
-    if (exponent != 0) {
-        let diff1 = integer.sub(exponent_temp.mul(mantissa));
-        let diff2 = integer.sub(exponent_temp.div(exp_base).mul(max_mantissa));
+    let mantissa = integer.div(exponentTemp);
+    if (exponent !== 0) {
+        const variant1 = exponentTemp.mul(mantissa);
+        const variant2 = exponentTemp.div(expBase).mul(maxMantissa);
+        const diff1 = integer.sub(variant1);
+        const diff2 = integer.sub(variant2);
         if (diff2.lt(diff1)) {
-            mantissa = max_mantissa;
+            mantissa = maxMantissa;
             exponent -= 1;
         }
     }
@@ -147,23 +150,24 @@ export function integerToFloat(
     // encode into bits. First bits of mantissa in LE order
     const encoding = [];
 
-    encoding.push(...numberToBits(exponent, exp_bits));
+    encoding.push(...numberToBits(exponent, expBits));
     const mantissaNumber = mantissa.toNumber();
-    encoding.push(...numberToBits(mantissaNumber, mantissa_bits));
+    encoding.push(...numberToBits(mantissaNumber, mantissaBits));
 
     return bitsIntoBytesInBEOrder(encoding.reverse()).reverse();
 }
 
 export function integerToFloatUp(
     integer: BigNumber,
-    exp_bits: number,
-    mantissa_bits: number,
-    exp_base: number
+    expBits: number,
+    mantissaBits: number,
+    expBase: number
 ): Uint8Array {
-    const max_exponent = BigNumber.from(10).pow(Math.pow(2, exp_bits) - 1);
-    const max_mantissa = BigNumber.from(2).pow(mantissa_bits).sub(1);
+    const maxExponentPower = Math.pow(2, expBits) - 1;
+    const maxExponent = BigNumber.from(10).pow(maxExponentPower);
+    const maxMantissa = BigNumber.from(2).pow(mantissaBits).sub(1);
 
-    if (integer.gt(max_mantissa.mul(max_exponent))) {
+    if (integer.gt(maxMantissa.mul(maxExponent))) {
         throw new Error('Integer is too big');
     }
 
@@ -171,21 +175,22 @@ export function integerToFloatUp(
     // such that integer <= max_mantissa * exponent_base ^ exponent,
     // then mantissa is calculated as integer divided by exponent_base ^ exponent and rounded up
     let exponent = 0;
-    let exponent_temp = BigNumber.from(1);
-    while (integer.gt(max_mantissa.mul(exponent_temp))) {
-        exponent_temp = exponent_temp.mul(exp_base);
+    let exponentTemp = BigNumber.from(1);
+    while (integer.gt(maxMantissa.mul(exponentTemp))) {
+        exponentTemp = exponentTemp.mul(expBase);
         exponent += 1;
     }
-    const mantissa = integer
-        .div(exponent_temp)
-        .add(BigNumber.from(integer.mod(exponent_temp).eq(BigNumber.from(0)) ? 0 : 1));
+    let mantissa = integer.div(exponentTemp);
+    if(!integer.mod(exponentTemp).eq(BigNumber.from(0))) {
+        mantissa = mantissa.add(1);
+    }
 
     // encode into bits. First bits of mantissa in LE order
     const encoding = [];
 
-    encoding.push(...numberToBits(exponent, exp_bits));
+    encoding.push(...numberToBits(exponent, expBits));
     const mantissaNumber = mantissa.toNumber();
-    encoding.push(...numberToBits(mantissaNumber, mantissa_bits));
+    encoding.push(...numberToBits(mantissaNumber, mantissaBits));
 
     return bitsIntoBytesInBEOrder(encoding.reverse()).reverse();
 }
