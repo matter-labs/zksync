@@ -2,12 +2,13 @@
 
 All notable changes to the core components will be documented in this file.
 
-## Prior to 2020-12-23
+## Prior to 2020-12-25
 
 ### Added
 
 - A possibility to get an Ethereum tx hash for withdrawal operation.
 - Support for non-standard Ethereum signatures.
+- Loadtest scenario for stressing transaction batches
 
 ### Changed
 
