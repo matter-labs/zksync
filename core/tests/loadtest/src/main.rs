@@ -123,12 +123,21 @@ async fn main() -> Result<(), anyhow::Error> {
         println!("Statistics for transactions:");
 
         for (variant, report) in &report.scenarios.summary {
-            println!(
-                "Sending {} transaction:",
-                variant.to_string().bright_green()
-            );
-            for (category, stats) in &report.stats {
-                print_stats_summary(category, stats.as_ref());
+            let has_enough_data = report
+                .stats
+                .iter()
+                .next()
+                .filter(|(_k, v)| v.is_some())
+                .is_some();
+
+            if has_enough_data {
+                println!(
+                    "Sending {} transaction:",
+                    variant.to_string().bright_green()
+                );
+                for (category, stats) in &report.stats {
+                    print_stats_summary(category, stats.as_ref());
+                }
             }
         }
         print_counters(
