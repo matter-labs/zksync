@@ -176,27 +176,37 @@ impl<'a, 'c> MempoolSchema<'a, 'c> {
         };
 
         // Processing of all batch transactions, except the first
-        for tx_data in txs[1..].iter() {
-            let tx_hash = hex::encode(tx_data.hash().as_ref());
-            let tx = serde_json::to_value(&tx_data.tx)
-                .expect("Unserializable TX provided to the database");
-            let eth_sign_data = tx_data
-                .eth_sign_data
-                .as_ref()
-                .map(|sd| serde_json::to_value(sd).expect("failed to encode EthSignData"));
+        let mut tx_hashes = Vec::with_capacity(txs.len());
+        let mut tx_values = Vec::with_capacity(txs.len());
+        let mut txs_sign_data = Vec::with_capacity(txs.len());
 
-            sqlx::query!(
-                "INSERT INTO mempool_txs (tx_hash, tx, created_at, eth_sign_data, batch_id)
-                VALUES ($1, $2, $3, $4, $5)",
-                tx_hash,
-                tx,
-                chrono::Utc::now(),
-                eth_sign_data,
-                batch_id,
-            )
-            .execute(self.0.conn())
-            .await?;
+        for tx_data in txs[1..].iter() {
+            tx_hashes.push(hex::encode(tx_data.hash().as_ref()));
+            tx_values.push(
+                serde_json::to_value(&tx_data.tx)
+                    .expect("Unserializable TX provided to the database"),
+            );
+            txs_sign_data.push(
+                tx_data
+                    .eth_sign_data
+                    .as_ref()
+                    .map(|sd| serde_json::to_value(sd).expect("failed to encode EthSignData"))
+                    .unwrap_or_default(),
+            );
         }
+        sqlx::query!(
+            "INSERT INTO mempool_txs (tx_hash, tx, eth_sign_data, created_at, batch_id)
+            SELECT u.tx_hash, u.tx, u.eth_sign_data, $4, $5
+                FROM UNNEST ($1::text[], $2::jsonb[], $3::jsonb[])
+                AS u(tx_hash, tx, eth_sign_data)",
+            &tx_hashes,
+            &tx_values,
+            &txs_sign_data,
+            chrono::Utc::now(),
+            batch_id
+        )
+        .execute(self.0.conn())
+        .await?;
 
         // If there's a signature for the whole batch, store it too.
         if let Some(signature) = eth_signature {

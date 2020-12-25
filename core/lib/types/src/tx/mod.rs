@@ -5,7 +5,6 @@ mod close;
 mod forced_exit;
 mod primitives;
 mod transfer;
-mod utils;
 mod withdraw;
 mod zksync_tx;
 
@@ -31,3 +30,9 @@ pub use self::primitives::{
 };
 
 pub(crate) use self::primitives::signature_cache::VerifiedSignatureCache;
+
+pub(crate) static TRANSACTION_SIGNATURE_ERROR: &str = "\
+The transaction signature is incorrect. \
+Check if the sender address matches the private key, \
+the recipient address is not zero, \
+and the amount is correct and packable";

@@ -2,11 +2,16 @@
 
 // Public uses
 pub use super::{
+    accounts::{
+        AccountInfo, AccountQuery, AccountReceipts, AccountState, DepositingBalances,
+        DepositingFunds,
+    },
     blocks::{BlockInfo, TransactionInfo},
     config::Contracts,
-    operations::PriorityOpReceipt,
+    operations::{PriorityOpData, PriorityOpQuery, PriorityOpReceipt},
     tokens::TokenPriceKind,
-    transactions::{SumbitErrorCode, TxReceipt},
+    transactions::{Receipt, SumbitErrorCode, TxData},
+    Pagination,
 };
 
 // Built-in uses

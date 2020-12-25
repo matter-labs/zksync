@@ -3,6 +3,7 @@ use std::collections::HashMap;
 use jsonrpc_core::{Error, Result};
 use num::{BigUint, ToPrimitive};
 use serde::{Deserialize, Serialize};
+use zksync_storage::StorageProcessor;
 // Workspace uses
 use zksync_types::{
     tx::TxEthSignature, Account, AccountId, Address, Nonce, PriorityOp, PubKeyHash,
@@ -28,8 +29,12 @@ pub struct ResponseAccountState {
 }
 
 impl ResponseAccountState {
-    pub async fn try_restore(account: Account, tokens: &TokenDBCache) -> Result<Self> {
-        let inner = AccountState::from_storage(&account, tokens)
+    pub async fn try_restore(
+        storage: &mut StorageProcessor<'_>,
+        tokens: &TokenDBCache,
+        account: Account,
+    ) -> Result<Self> {
+        let inner = AccountState::from_storage(storage, tokens, &account)
             .await
             .map_err(|_| Error::internal_error())?;
 
@@ -68,8 +73,9 @@ pub struct DepositingAccountBalances {
 
 impl DepositingAccountBalances {
     pub async fn from_pending_ops(
-        pending_ops: OngoingDepositsResp,
+        storage: &mut StorageProcessor<'_>,
         tokens: &TokenDBCache,
+        pending_ops: OngoingDepositsResp,
     ) -> Result<Self> {
         let mut balances = HashMap::new();
 
@@ -78,7 +84,7 @@ impl DepositingAccountBalances {
                 "ETH".to_string()
             } else {
                 tokens
-                    .get_token(op.token_id)
+                    .get_token(storage, op.token_id)
                     .await
                     .map_err(|_| Error::internal_error())?
                     .ok_or_else(Error::internal_error)?
@@ -158,7 +164,7 @@ pub struct OngoingDeposit {
 }
 
 impl OngoingDeposit {
-    pub fn new(received_on_block: u64, priority_op: PriorityOp) -> Self {
+    pub fn new(priority_op: PriorityOp) -> Self {
         let (token_id, amount) = match priority_op.data {
             ZkSyncPriorityOp::Deposit(deposit) => (
                 deposit.token,
@@ -175,7 +181,7 @@ impl OngoingDeposit {
         let eth_tx_hash = hex::encode(&priority_op.eth_hash);
 
         Self {
-            received_on_block,
+            received_on_block: priority_op.eth_block,
             token_id,
             amount,
             eth_tx_hash,

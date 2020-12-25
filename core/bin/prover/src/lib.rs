@@ -1,7 +1,6 @@
 pub mod auth_utils;
 pub mod cli_utils;
 pub mod client;
-pub mod exit_proof;
 pub mod plonk_step_by_step_prover;
 
 // Built-in deps

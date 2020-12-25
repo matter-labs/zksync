@@ -15,7 +15,7 @@ use futures::{
     channel::{mpsc, oneshot},
     prelude::*,
 };
-use zksync_storage::QueryResult;
+use zksync_storage::{ConnectionPool, QueryResult};
 use zksync_types::{Token, TokenLike};
 
 // Local uses
@@ -33,15 +33,24 @@ use crate::{
 struct ApiTokensData {
     fee_ticker: mpsc::Sender<TickerRequest>,
     tokens: TokenDBCache,
+    pool: ConnectionPool,
 }
 
 impl ApiTokensData {
-    fn new(tokens: TokenDBCache, fee_ticker: mpsc::Sender<TickerRequest>) -> Self {
-        Self { tokens, fee_ticker }
+    fn new(
+        pool: ConnectionPool,
+        tokens: TokenDBCache,
+        fee_ticker: mpsc::Sender<TickerRequest>,
+    ) -> Self {
+        Self {
+            pool,
+            tokens,
+            fee_ticker,
+        }
     }
 
     async fn tokens(&self) -> QueryResult<Vec<Token>> {
-        let mut storage = self.tokens.pool.access_storage().await?;
+        let mut storage = self.pool.access_storage().await?;
 
         let tokens = storage.tokens_schema().load_tokens().await?;
 
@@ -53,7 +62,9 @@ impl ApiTokensData {
     }
 
     async fn token(&self, token_like: TokenLike) -> QueryResult<Option<Token>> {
-        self.tokens.get_token(token_like).await
+        let mut storage = self.pool.access_storage().await?;
+
+        self.tokens.get_token(&mut storage, token_like).await
     }
 
     async fn token_price_usd(&self, token: TokenLike) -> QueryResult<Option<BigDecimal>> {
@@ -92,6 +103,7 @@ pub enum TokenPriceKind {
 }
 
 #[derive(Debug, Deserialize, Serialize, Copy, Clone, PartialEq)]
+#[serde(rename_all = "camelCase")]
 struct TokenPriceQuery {
     #[serde(rename = "in")]
     kind: TokenPriceKind,
@@ -162,8 +174,12 @@ async fn token_price(
     Ok(Json(price))
 }
 
-pub fn api_scope(tokens_db: TokenDBCache, fee_ticker: mpsc::Sender<TickerRequest>) -> Scope {
-    let data = ApiTokensData::new(tokens_db, fee_ticker);
+pub fn api_scope(
+    pool: ConnectionPool,
+    tokens_db: TokenDBCache,
+    fee_ticker: mpsc::Sender<TickerRequest>,
+) -> Scope {
+    let data = ApiTokensData::new(pool, tokens_db, fee_ticker);
 
     web::scope("tokens")
         .data(data)
@@ -233,7 +249,7 @@ mod tests {
         let fee_ticker = dummy_fee_ticker(&prices);
 
         let (client, server) = cfg.start_server(move |cfg| {
-            api_scope(TokenDBCache::new(cfg.pool.clone()), fee_ticker.clone())
+            api_scope(cfg.pool.clone(), TokenDBCache::new(), fee_ticker.clone())
         });
 
         // Fee requests
@@ -324,7 +340,7 @@ mod tests {
 
         let fee_ticker = dummy_fee_ticker(&[]);
         let (client, server) = cfg.start_server(move |cfg| {
-            api_scope(TokenDBCache::new(cfg.pool.clone()), fee_ticker.clone())
+            api_scope(cfg.pool.clone(), TokenDBCache::new(), fee_ticker.clone())
         });
 
         // Get Golem token as GNT.

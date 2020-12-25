@@ -42,6 +42,7 @@ pub(crate) fn api_scope(tx_sender: TxSender, zk_config: &ZkSyncConfig) -> Scope 
     web::scope("/api/v1")
         .service(accounts::api_scope(
             &zk_config,
+            tx_sender.pool.clone(),
             tx_sender.tokens.clone(),
             tx_sender.core_api_client.clone(),
         ))
@@ -51,6 +52,7 @@ pub(crate) fn api_scope(tx_sender: TxSender, zk_config: &ZkSyncConfig) -> Scope 
         .service(operations::api_scope(tx_sender.pool.clone()))
         .service(search::api_scope(tx_sender.pool.clone()))
         .service(tokens::api_scope(
+            tx_sender.pool.clone(),
             tx_sender.tokens,
             tx_sender.ticker_requests,
         ))

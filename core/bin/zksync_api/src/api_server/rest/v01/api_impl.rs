@@ -98,13 +98,13 @@ impl ApiV01 {
             })?;
 
         // Sort operations by block number from smaller (older) to greater (newer).
-        ongoing_ops.sort_by(|lhs, rhs| rhs.0.cmp(&lhs.0));
+        ongoing_ops.sort_by(|lhs, rhs| rhs.eth_block.cmp(&lhs.eth_block));
 
         // Collect the unconfirmed priority operations with respect to the
         // `offset` and `limit` parameters.
         let mut ongoing_transactions_history: Vec<_> = ongoing_ops
             .iter()
-            .map(|(block, op)| priority_op_to_tx_history(&tokens, *block, op))
+            .map(|op| priority_op_to_tx_history(&tokens, op.eth_block, op))
             .skip(offset as usize)
             .take(limit as usize)
             .collect();
@@ -249,7 +249,7 @@ impl ApiV01 {
                 })?;
 
             // Sort operations by block number from smaller (older) to greater (newer).
-            ongoing_ops.sort_by(|lhs, rhs| rhs.0.cmp(&lhs.0));
+            ongoing_ops.sort_by(|lhs, rhs| rhs.eth_block.cmp(&lhs.eth_block));
 
             let tokens = self_
                 .access_storage()
@@ -271,7 +271,7 @@ impl ApiV01 {
             // `limit` parameters.
             let mut txs: Vec<_> = ongoing_ops
                 .iter()
-                .map(|(block, op)| priority_op_to_tx_history(&tokens, *block, op))
+                .map(|op| priority_op_to_tx_history(&tokens, op.eth_block, op))
                 .take(limit as usize)
                 .collect();
 

@@ -48,6 +48,7 @@ pub mod operations;
 pub mod priority_ops;
 pub mod tokens;
 pub mod tx;
+mod utils;
 
 #[cfg(test)]
 mod tests;

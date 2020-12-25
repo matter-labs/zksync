@@ -1,7 +1,10 @@
 //! Accounts part of API implementation.
 
 // Public uses
-pub use self::types::{AccountInfo, AccountState, DepositingBalances, DepositingFunds};
+pub use self::types::{
+    AccountInfo, AccountOpReceipt, AccountQuery, AccountReceipts, AccountState, AccountTxReceipt,
+    DepositingBalances, DepositingFunds, PendingAccountOpReceipt, TxLocation,
+};
 
 // Built-in uses
 
@@ -12,16 +15,14 @@ use actix_web::{
 };
 
 // Workspace uses
-use zksync_storage::{QueryResult, StorageProcessor};
+use zksync_config::ConfigurationOptions;
+use zksync_storage::{ConnectionPool, QueryResult, StorageProcessor};
 use zksync_types::{AccountId, Address, BlockNumber, TokenId};
 
 // Local uses
 use crate::{core_api_client::CoreApiClient, utils::token_db_cache::TokenDBCache};
 
-use self::types::{
-    AccountQuery, AccountReceiptsQuery, AccountTxReceipt, PendingAccountTxReceipt, SearchDirection,
-    TxLocation,
-};
+use self::types::{AccountReceiptsQuery, SearchDirection};
 use super::{ApiError, JsonResult};
 use zksync_config::configs::ZkSyncConfig;
 
@@ -45,6 +46,7 @@ fn parse_account_query(query: String) -> Result<AccountQuery, ApiError> {
 /// Shared data between `api/v1/accounts` endpoints.
 #[derive(Clone)]
 struct ApiAccountsData {
+    pool: ConnectionPool,
     tokens: TokenDBCache,
     core_api_client: CoreApiClient,
     confirmations_for_eth_event: BlockNumber,
@@ -52,11 +54,13 @@ struct ApiAccountsData {
 
 impl ApiAccountsData {
     fn new(
+        pool: ConnectionPool,
         tokens: TokenDBCache,
         core_api_client: CoreApiClient,
         confirmations_for_eth_event: BlockNumber,
     ) -> Self {
         Self {
+            pool,
             tokens,
             core_api_client,
             confirmations_for_eth_event,
@@ -64,7 +68,7 @@ impl ApiAccountsData {
     }
 
     async fn access_storage(&self) -> QueryResult<StorageProcessor<'_>> {
-        self.tokens.pool.access_storage().await.map_err(From::from)
+        self.pool.access_storage().await.map_err(From::from)
     }
 
     async fn find_account_address(&self, query: String) -> Result<Address, ApiError> {
@@ -122,10 +126,6 @@ impl ApiAccountsData {
             .account_state_by_id(account_id)
             .await?;
 
-        // Drop storage access to avoid deadlocks.
-        // TODO Rewrite `TokensDBCache` logic to make such errors impossible. ZKS-169
-        drop(storage);
-
         let (account_id, account) = if let Some(state) = account_state.committed {
             state
         } else {
@@ -133,9 +133,9 @@ impl ApiAccountsData {
             return Ok(None);
         };
 
-        let committed = AccountState::from_storage(&account, &self.tokens).await?;
+        let committed = AccountState::from_storage(&mut storage, &self.tokens, &account).await?;
         let verified = match account_state.verified {
-            Some(state) => AccountState::from_storage(&state.1, &self.tokens).await?,
+            Some(state) => AccountState::from_storage(&mut storage, &self.tokens, &state.1).await?,
             None => AccountState::default(),
         };
 
@@ -146,9 +146,10 @@ impl ApiAccountsData {
                 .await?;
 
             DepositingBalances::from_pending_ops(
+                &mut storage,
+                &self.tokens,
                 ongoing_ops,
                 self.confirmations_for_eth_event,
-                &self.tokens,
             )
             .await?
         };
@@ -179,7 +180,7 @@ impl ApiAccountsData {
             .get_account_transactions_receipts(
                 address,
                 location.block as u64,
-                location.index.unwrap_or_default(),
+                location.index,
                 direction.into(),
                 limit as u64,
             )
@@ -188,18 +189,39 @@ impl ApiAccountsData {
         Ok(items.into_iter().map(AccountTxReceipt::from).collect())
     }
 
-    async fn pending_tx_receipts(
+    async fn op_receipts(
         &self,
         address: Address,
-    ) -> QueryResult<Vec<PendingAccountTxReceipt>> {
-        let ongoing_ops = self
-            .core_api_client
-            .get_unconfirmed_deposits(address)
+        location: TxLocation,
+        direction: SearchDirection,
+        limit: u32,
+    ) -> QueryResult<Vec<AccountOpReceipt>> {
+        let mut storage = self.access_storage().await?;
+
+        let items = storage
+            .chain()
+            .operations_ext_schema()
+            .get_account_operations_receipts(
+                address,
+                location.block as u64,
+                location.index.unwrap_or_default(),
+                direction.into(),
+                limit as u64,
+            )
             .await?;
+
+        Ok(items.into_iter().map(AccountOpReceipt::from).collect())
+    }
+
+    async fn pending_op_receipts(
+        &self,
+        address: Address,
+    ) -> QueryResult<Vec<PendingAccountOpReceipt>> {
+        let ongoing_ops = self.core_api_client.get_unconfirmed_ops(address).await?;
 
         let receipts = ongoing_ops
             .into_iter()
-            .map(|(block_id, op)| PendingAccountTxReceipt::from_priority_op(block_id, op))
+            .map(PendingAccountOpReceipt::from_priority_op)
             .collect();
 
         Ok(receipts)
@@ -220,7 +242,7 @@ async fn account_info(
         .map_err(ApiError::internal)
 }
 
-async fn account_receipts(
+async fn account_tx_receipts(
     data: web::Data<ApiAccountsData>,
     web::Path(account_query): web::Path<String>,
     web::Query(location_query): web::Query<AccountReceiptsQuery>,
@@ -236,14 +258,30 @@ async fn account_receipts(
     Ok(Json(receipts))
 }
 
-async fn account_pending_receipts(
+async fn account_op_receipts(
     data: web::Data<ApiAccountsData>,
     web::Path(account_query): web::Path<String>,
-) -> JsonResult<Vec<PendingAccountTxReceipt>> {
+    web::Query(location_query): web::Query<AccountReceiptsQuery>,
+) -> JsonResult<Vec<AccountOpReceipt>> {
+    let (location, direction, limit) = location_query.validate()?;
     let address = data.find_account_address(account_query).await?;
 
     let receipts = data
-        .pending_tx_receipts(address)
+        .op_receipts(address, location, direction, limit)
+        .await
+        .map_err(ApiError::internal)?;
+
+    Ok(Json(receipts))
+}
+
+async fn account_pending_receipts(
+    data: web::Data<ApiAccountsData>,
+    web::Path(account_query): web::Path<String>,
+) -> JsonResult<Vec<PendingAccountOpReceipt>> {
+    let address = data.find_account_address(account_query).await?;
+
+    let receipts = data
+        .pending_op_receipts(address)
         .await
         .map_err(ApiError::internal)?;
 
@@ -251,11 +289,13 @@ async fn account_pending_receipts(
 }
 
 pub fn api_scope(
+    pool: ConnectionPool,
     config: &ZkSyncConfig,
     tokens: TokenDBCache,
     core_api_client: CoreApiClient,
 ) -> Scope {
     let data = ApiAccountsData::new(
+        pool,
         tokens,
         core_api_client,
         config.eth_watch.confirmations_for_eth_event as BlockNumber,
@@ -264,9 +304,16 @@ pub fn api_scope(
     web::scope("accounts")
         .data(data)
         .route("{id}", web::get().to(account_info))
-        .route("{id}/receipts", web::get().to(account_receipts))
         .route(
-            "{id}/receipts/pending",
+            "{id}/transactions/receipts",
+            web::get().to(account_tx_receipts),
+        )
+        .route(
+            "{id}/operations/receipts",
+            web::get().to(account_op_receipts),
+        )
+        .route(
+            "{id}/operations/pending",
             web::get().to(account_pending_receipts),
         )
 }

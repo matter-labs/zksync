@@ -158,7 +158,13 @@ impl TestWallet {
 
     // Updates ZKSync account id.
     pub async fn update_account_id(&mut self) -> Result<(), ClientError> {
-        self.inner.update_account_id().await
+        self.inner.update_account_id().await?;
+        self.monitor
+            .api_data_pool
+            .write()
+            .await
+            .set_account_id(self.address(), self.account_id().unwrap());
+        Ok(())
     }
 
     // Creates a signed change public key transaction.

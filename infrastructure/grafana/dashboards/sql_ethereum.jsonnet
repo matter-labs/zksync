@@ -13,7 +13,4 @@ local metrics = [
   "sql.ethereum.update_gas_price",
 ];
 
-G.dashboard(
-  'Metrics / sql / ethereum',
-  [ G.panel(metric) for metric in metrics ]
-)
+G.dashboard('sql / ethereum', metrics)
