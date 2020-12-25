@@ -15,7 +15,6 @@ use actix_web::{
 };
 
 // Workspace uses
-use zksync_config::ConfigurationOptions;
 use zksync_storage::{ConnectionPool, QueryResult, StorageProcessor};
 use zksync_types::{AccountId, Address, BlockNumber, TokenId};
 

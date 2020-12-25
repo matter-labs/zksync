@@ -183,7 +183,7 @@ pub mod test_config;
 //     }
 // }
 
-/// Configuration options related to fee ticker.
+// /// Configuration options related to fee ticker.
 // #[derive(Debug)]
 // pub struct FeeTickerOptions {
 //     /// Source to fetch token prices from (e.g. CoinGecko or coinmarketcap).

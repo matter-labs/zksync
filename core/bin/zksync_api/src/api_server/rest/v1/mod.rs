@@ -41,8 +41,8 @@ type JsonResult<T> = std::result::Result<web::Json<T>, Error>;
 pub(crate) fn api_scope(tx_sender: TxSender, zk_config: &ZkSyncConfig) -> Scope {
     web::scope("/api/v1")
         .service(accounts::api_scope(
-            &zk_config,
             tx_sender.pool.clone(),
+            zk_config,
             tx_sender.tokens.clone(),
             tx_sender.core_api_client.clone(),
         ))

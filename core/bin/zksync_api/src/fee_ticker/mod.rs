@@ -202,23 +202,18 @@ pub fn run_ticker_task(
         not_subsidized_tokens: HashSet::from_iter(config.ticker.not_subsidized_tokens.clone()),
     };
 
-    let cache = TokenDBCache::new(db_pool.clone());
-    let validator = FeeTokenValidator::new(
-        cache,
-        HashSet::from_iter(config.ticker.disabled_tokens.clone()),
-    );
     let cache = (db_pool.clone(), TokenDBCache::new());
-    let watcher = UniswapTokenWatcher::new(config.uniswap_url);
+    let watcher = UniswapTokenWatcher::new(config.ticker.uniswap_url.clone());
     let validator = FeeTokenValidator::new(
         cache.clone(),
-        chrono::Duration::seconds(config.available_liquidity_seconds as i64),
-        BigDecimal::try_from(config.liquidity_volume).expect("Valid f64 for decimal"),
-        config.unconditionally_valid_tokens,
+        chrono::Duration::seconds(config.ticker.available_liquidity_seconds as i64),
+        BigDecimal::try_from(config.ticker.liquidity_volume).expect("Valid f64 for decimal"),
+        HashSet::from_iter(config.ticker.unconditionally_valid_tokens.clone()),
         watcher.clone(),
     );
 
     let updater = MarketUpdater::new(cache, watcher);
-    tokio::spawn(updater.keep_updated(config.token_market_update_time));
+    tokio::spawn(updater.keep_updated(config.ticker.token_market_update_time));
     let client = reqwest::ClientBuilder::new()
         .timeout(CONNECTION_TIMEOUT)
         .connect_timeout(CONNECTION_TIMEOUT)
@@ -256,7 +251,7 @@ pub fn run_ticker_task(
                 validator,
                 tricker_requests,
                 db_pool,
-                config.number_of_ticker_actors,
+                config.ticker.number_of_ticker_actors,
             );
             ticker_balancer.spawn_tickers();
             tokio::spawn(ticker_balancer.run())
