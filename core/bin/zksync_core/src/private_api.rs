@@ -14,7 +14,7 @@ use futures::{
     sink::SinkExt,
 };
 use std::thread;
-use zksync_config::ApiServerOptions;
+use zksync_config::configs::api::PrivateApi;
 use zksync_types::{tx::TxEthSignature, Address, SignedZkSyncTx, H256};
 use zksync_utils::panic_notify::ThreadPanicNotify;
 
@@ -123,7 +123,7 @@ pub fn start_private_core_api(
     panic_notify: mpsc::Sender<bool>,
     mempool_tx_sender: mpsc::Sender<MempoolRequest>,
     eth_watch_req_sender: mpsc::Sender<EthWatchRequest>,
-    api_server_options: ApiServerOptions,
+    config: PrivateApi,
 ) {
     thread::Builder::new()
         .name("core-private-api".to_string())
@@ -149,7 +149,7 @@ pub fn start_private_core_api(
                         .service(unconfirmed_op)
                         .service(unconfirmed_deposits)
                 })
-                .bind(&api_server_options.core_server_address)
+                .bind(&config.bind_addr())
                 .expect("failed to bind")
                 .run()
                 .await

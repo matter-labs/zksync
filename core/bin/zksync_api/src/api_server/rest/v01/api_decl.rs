@@ -9,7 +9,7 @@ use crate::{
 };
 use actix_web::{web, HttpResponse, Result as ActixResult};
 use futures::channel::mpsc;
-use zksync_config::{ApiServerOptions, ConfigurationOptions};
+use zksync_config::configs::ZkSyncConfig;
 use zksync_storage::{
     chain::{
         block::records::BlockDetails,
@@ -31,26 +31,23 @@ pub struct ApiV01 {
     pub(crate) api_client: CoreApiClient,
     pub(crate) network_status: SharedNetworkStatus,
     pub(crate) contract_address: String,
-    pub(crate) config_options: ConfigurationOptions,
-    pub(crate) api_server_options: ApiServerOptions,
+    pub(crate) config: ZkSyncConfig,
 }
 
 impl ApiV01 {
     pub fn new(
         connection_pool: ConnectionPool,
         contract_address: H160,
-        config_options: ConfigurationOptions,
-        api_server_options: ApiServerOptions,
+        config: ZkSyncConfig,
     ) -> Self {
-        let api_client = CoreApiClient::new(api_server_options.core_server_url.clone());
+        let api_client = CoreApiClient::new(config.api.private.url.clone());
         Self {
-            caches: Caches::new(api_server_options.api_requests_caches_size),
+            caches: Caches::new(config.api.common.caches_size),
             connection_pool,
             api_client,
             network_status: SharedNetworkStatus::default(),
             contract_address: format!("{:?}", contract_address),
-            config_options,
-            api_server_options,
+            config,
         }
     }
 

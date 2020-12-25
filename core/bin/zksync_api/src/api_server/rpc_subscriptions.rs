@@ -9,7 +9,6 @@ use jsonrpc_derive::rpc;
 use jsonrpc_pubsub::{typed::Subscriber, PubSubHandler, Session, SubscriptionId};
 use jsonrpc_ws_server::RequestContext;
 // Workspace uses
-use zksync_config::{ApiServerOptions, ConfigurationOptions};
 use zksync_storage::ConnectionPool;
 use zksync_types::{tx::TxHash, ActionType, Address};
 // Local uses
@@ -19,6 +18,7 @@ use crate::{
     api_server::rpc_server::types::{ETHOpInfoResp, ResponseAccountState, TransactionInfoResp},
     signature_checker::VerifyTxSignatureRequest,
 };
+use zksync_config::configs::ZkSyncConfig;
 use zksync_utils::panic_notify::ThreadPanicNotify;
 
 #[rpc]
@@ -179,29 +179,24 @@ pub fn start_ws_server(
     sign_verify_request_sender: mpsc::Sender<VerifyTxSignatureRequest>,
     ticker_request_sender: mpsc::Sender<TickerRequest>,
     panic_notify: mpsc::Sender<bool>,
-    config_options: ConfigurationOptions,
-    api_server_options: ApiServerOptions,
+    config: &ZkSyncConfig,
 ) {
-    let api_caches_size = api_server_options.api_requests_caches_size;
-    let addr = api_server_options.json_rpc_ws_server_address;
+    let addr = config.api.json_rpc.http_bind_addr();
 
     let (event_sub_sender, event_sub_receiver) = mpsc::channel(2048);
 
     start_sub_notifier(
         db_pool.clone(),
         event_sub_receiver,
-        api_caches_size,
-        config_options
-            .miniblock_timings
-            .miniblock_iteration_interval,
+        config.api.common.caches_size,
+        config.chain.state_keeper.miniblock_iteration_interval(),
     );
 
     let req_rpc_app = super::rpc_server::RpcApp::new(
         db_pool,
         sign_verify_request_sender,
         ticker_request_sender,
-        &config_options,
-        &api_server_options,
+        config,
     );
 
     std::thread::spawn(move || {

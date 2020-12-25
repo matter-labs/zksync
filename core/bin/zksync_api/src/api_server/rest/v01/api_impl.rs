@@ -479,13 +479,13 @@ impl ApiV01 {
 
     pub async fn withdrawal_processing_time(self_: web::Data<Self>) -> ActixResult<HttpResponse> {
         let start = Instant::now();
-        let miniblock_timings = &self_.config_options.miniblock_timings;
+        let state_keeper_config = &self_.config.chain.state_keeper;
         let processing_time = WithdrawalProcessingTimeResponse {
-            normal: (miniblock_timings.miniblock_iteration_interval
-                * miniblock_timings.max_miniblock_iterations as u32)
+            normal: (state_keeper_config.miniblock_iteration_interval()
+                * state_keeper_config.miniblock_iterations as u32)
                 .as_secs(),
-            fast: (miniblock_timings.miniblock_iteration_interval
-                * miniblock_timings.fast_miniblock_iterations as u32)
+            fast: (state_keeper_config.miniblock_iteration_interval()
+                * state_keeper_config.fast_block_miniblock_iterations as u32)
                 .as_secs(),
         };
 

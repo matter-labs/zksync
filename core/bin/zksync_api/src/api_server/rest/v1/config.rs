@@ -7,7 +7,6 @@ use actix_web::{web, Scope};
 use serde::{Deserialize, Serialize};
 
 // Workspace uses
-use zksync_config::ConfigurationOptions;
 use zksync_types::{network::Network, Address};
 
 // Local uses
@@ -15,6 +14,7 @@ use super::{
     client::{self, Client},
     Json,
 };
+use zksync_config::configs::ZkSyncConfig;
 
 /// Shared data between `api/v1/config` endpoints.
 #[derive(Debug, Clone)]
@@ -25,11 +25,11 @@ struct ApiConfigData {
 }
 
 impl ApiConfigData {
-    fn new(env_options: &ConfigurationOptions) -> Self {
+    fn new(config: &ZkSyncConfig) -> Self {
         Self {
-            contract_address: env_options.contract_eth_addr,
-            deposit_confirmations: env_options.confirmations_for_eth_event,
-            network: env_options.eth_network.parse().unwrap(),
+            contract_address: config.contracts.contract_addr,
+            deposit_confirmations: config.eth_watch.confirmations_for_eth_event,
+            network: config.chain.eth.eth_network.parse().unwrap(),
         }
     }
 }
@@ -74,8 +74,8 @@ async fn network(data: web::Data<ApiConfigData>) -> Json<Network> {
     Json(data.network)
 }
 
-pub fn api_scope(env_options: &ConfigurationOptions) -> Scope {
-    let data = ApiConfigData::new(env_options);
+pub fn api_scope(config: &ZkSyncConfig) -> Scope {
+    let data = ApiConfigData::new(config);
 
     web::scope("config")
         .data(data)

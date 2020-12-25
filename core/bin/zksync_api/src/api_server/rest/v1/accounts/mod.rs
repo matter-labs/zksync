@@ -12,7 +12,6 @@ use actix_web::{
 };
 
 // Workspace uses
-use zksync_config::ConfigurationOptions;
 use zksync_storage::{QueryResult, StorageProcessor};
 use zksync_types::{AccountId, Address, BlockNumber, TokenId};
 
@@ -24,6 +23,7 @@ use self::types::{
     TxLocation,
 };
 use super::{ApiError, JsonResult};
+use zksync_config::configs::ZkSyncConfig;
 
 mod client;
 #[cfg(test)]
@@ -251,14 +251,14 @@ async fn account_pending_receipts(
 }
 
 pub fn api_scope(
-    env_options: &ConfigurationOptions,
+    config: &ZkSyncConfig,
     tokens: TokenDBCache,
     core_api_client: CoreApiClient,
 ) -> Scope {
     let data = ApiAccountsData::new(
         tokens,
         core_api_client,
-        env_options.confirmations_for_eth_event as BlockNumber,
+        config.eth_watch.confirmations_for_eth_event as BlockNumber,
     );
 
     web::scope("accounts")

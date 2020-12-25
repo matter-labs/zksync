@@ -382,7 +382,7 @@ pub fn start_rpc_server(
     sign_verify_request_sender: mpsc::Sender<VerifyTxSignatureRequest>,
     ticker_request_sender: mpsc::Sender<TickerRequest>,
     panic_notify: mpsc::Sender<bool>,
-    config: ZkSyncConfig,
+    config: &ZkSyncConfig,
 ) {
     let addr = config.api.json_rpc.http_bind_addr();
 

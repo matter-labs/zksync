@@ -12,7 +12,6 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 // Workspace uses
-use zksync_config::ApiServerOptions;
 use zksync_crypto::{convert::FeConvert, serialization::FrSerde, Fr};
 use zksync_storage::{chain::block::records, ConnectionPool, QueryResult};
 use zksync_types::{tx::TxHash, BlockNumber};
@@ -23,6 +22,7 @@ use super::{
     Error as ApiError, JsonResult, Pagination, PaginationQuery,
 };
 use crate::{api_server::helpers::try_parse_tx_hash, utils::shared_lru_cache::AsyncLruCache};
+use zksync_config::configs::ZkSyncConfig;
 
 /// Shared data between `api/v1/blocks` endpoints.
 #[derive(Debug, Clone)]
@@ -269,8 +269,8 @@ async fn blocks_range(
     Ok(Json(range))
 }
 
-pub fn api_scope(api_server_options: &ApiServerOptions, pool: ConnectionPool) -> Scope {
-    let data = ApiBlocksData::new(pool, api_server_options.api_requests_caches_size);
+pub fn api_scope(config: &ZkSyncConfig, pool: ConnectionPool) -> Scope {
+    let data = ApiBlocksData::new(pool, config.api.common.caches_size);
 
     web::scope("blocks")
         .data(data)

@@ -12,7 +12,7 @@ use futures::{
 };
 use tokio::{task::JoinHandle, time};
 // Workspace deps
-use zksync_config::ConfigurationOptions;
+use zksync_config::configs::ZkSyncConfig;
 // Local deps
 use crate::{
     mempool::{GetBlockRequest, MempoolRequest, ProposedBlock},
@@ -64,13 +64,11 @@ impl BlockProposer {
 // driving engine of the application
 #[must_use]
 pub fn run_block_proposer_task(
-    config_options: &ConfigurationOptions,
+    config: &ZkSyncConfig,
     mempool_requests: mpsc::Sender<MempoolRequest>,
     mut statekeeper_requests: mpsc::Sender<StateKeeperRequest>,
 ) -> JoinHandle<()> {
-    let miniblock_interval = config_options
-        .miniblock_timings
-        .miniblock_iteration_interval;
+    let miniblock_interval = config.chain.state_keeper.miniblock_iteration_interval();
     tokio::spawn(async move {
         let mut timer = time::interval(miniblock_interval);
 

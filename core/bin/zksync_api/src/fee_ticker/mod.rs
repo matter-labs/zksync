@@ -19,7 +19,6 @@ use num::{
 use serde::{Deserialize, Serialize};
 use tokio::task::JoinHandle;
 // Workspace deps
-use zksync_config::{FeeTickerOptions, TokenPriceSource};
 use zksync_storage::ConnectionPool;
 use zksync_types::{
     Address, ChangePubKeyOp, Token, TokenId, TokenLike, TransferOp, TransferToNewOp, TxFeeTypes,
@@ -38,6 +37,9 @@ use crate::fee_ticker::{
 use crate::utils::token_db_cache::TokenDBCache;
 
 pub use self::fee::*;
+use std::iter::FromIterator;
+use zksync_config::configs::ticker::TokenPriceSource;
+use zksync_config::configs::ZkSyncConfig;
 
 mod constants;
 mod fee;
@@ -182,27 +184,31 @@ struct FeeTicker<API, INFO> {
 pub fn run_ticker_task(
     db_pool: ConnectionPool,
     tricker_requests: Receiver<TickerRequest>,
+    config: &ZkSyncConfig,
 ) -> JoinHandle<()> {
-    let config = FeeTickerOptions::from_env();
-
     let ticker_config = TickerConfig {
         zkp_cost_chunk_usd: Ratio::from_integer(BigUint::from(10u32).pow(3u32)).inv(),
-        gas_cost_tx: GasOperationsCost::from_constants(config.fast_processing_coeff),
+        gas_cost_tx: GasOperationsCost::from_constants(config.ticker.fast_processing_coeff),
         tokens_risk_factors: HashMap::new(),
-        not_subsidized_tokens: config.not_subsidized_tokens,
+        not_subsidized_tokens: HashSet::from_iter(config.ticker.not_subsidized_tokens.clone()),
     };
 
     let cache = TokenDBCache::new(db_pool.clone());
-    let validator = FeeTokenValidator::new(cache, config.disabled_tokens);
+    let validator = FeeTokenValidator::new(
+        cache,
+        HashSet::from_iter(config.ticker.disabled_tokens.clone()),
+    );
 
     let client = reqwest::ClientBuilder::new()
         .timeout(CONNECTION_TIMEOUT)
         .connect_timeout(CONNECTION_TIMEOUT)
         .build()
         .expect("Failed to build reqwest::Client");
-    match config.token_price_source {
-        TokenPriceSource::CoinMarketCap { base_url } => {
-            let token_price_api = CoinMarketCapAPI::new(client, base_url);
+    let (price_source, base_url) = config.ticker.price_source();
+    match price_source {
+        TokenPriceSource::CoinMarketCap => {
+            let token_price_api =
+                CoinMarketCapAPI::new(client, base_url.parse().expect("Correct CoinMarketCap url"));
 
             let ticker_api = TickerApi::new(db_pool.clone(), token_price_api);
             let ticker_info = TickerInfo::new(db_pool);
@@ -216,9 +222,10 @@ pub fn run_ticker_task(
 
             tokio::spawn(fee_ticker.run())
         }
-        TokenPriceSource::CoinGecko { base_url } => {
+        TokenPriceSource::CoinGecko => {
             let token_price_api =
-                CoinGeckoAPI::new(client, base_url).expect("failed to init CoinGecko client");
+                CoinGeckoAPI::new(client, base_url.parse().expect("Correct CoinGecko url"))
+                    .expect("failed to init CoinGecko client");
 
             let ticker_api = TickerApi::new(db_pool.clone(), token_price_api);
             let ticker_info = TickerInfo::new(db_pool);

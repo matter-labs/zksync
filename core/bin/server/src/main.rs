@@ -2,12 +2,12 @@ use futures::{channel::mpsc, executor::block_on, SinkExt, StreamExt};
 use std::cell::RefCell;
 use structopt::StructOpt;
 use zksync_api::run_api;
-use zksync_config::{ConfigurationOptions, EthClientOptions, EthSenderOptions, ProverOptions};
 use zksync_core::{genesis_init, run_core, wait_for_tasks};
 use zksync_eth_sender::run_eth_sender;
 use zksync_prometheus_exporter::run_prometheus_exporter;
 use zksync_witness_generator::run_prover_server;
 
+use zksync_config::configs::ZkSyncConfig;
 use zksync_storage::ConnectionPool;
 
 #[derive(Debug, Clone, Copy)]
@@ -29,6 +29,7 @@ async fn main() -> anyhow::Result<()> {
     env_logger::init();
     let opt = Opt::from_args();
 
+    let config = ZkSyncConfig::from_env();
     let server_mode = if opt.genesis {
         ServerCommand::Genesis
     } else {
@@ -37,7 +38,7 @@ async fn main() -> anyhow::Result<()> {
 
     if let ServerCommand::Genesis = server_mode {
         log::info!("Performing the server genesis initialization");
-        genesis_init().await;
+        genesis_init(&config).await;
         return Ok(());
     }
 
@@ -45,10 +46,6 @@ async fn main() -> anyhow::Result<()> {
     log::info!("Running the zkSync server");
 
     let connection_pool = ConnectionPool::new(None);
-    let config_options = ConfigurationOptions::from_env();
-    let eth_client_options = EthClientOptions::from_env();
-    let eth_sender_options = EthSenderOptions::from_env();
-    let prover_options = ProverOptions::from_env();
 
     // Handle Ctrl+C
     let (stop_signal_sender, mut stop_signal_receiver) = mpsc::channel(256);
@@ -62,32 +59,26 @@ async fn main() -> anyhow::Result<()> {
     }
 
     // Run prometheus data exporter.
-    let (prometheus_task_handle, counter_task_handle) = run_prometheus_exporter(
-        connection_pool.clone(),
-        config_options.prometheus_export_port,
-    );
+    let (prometheus_task_handle, counter_task_handle) =
+        run_prometheus_exporter(connection_pool.clone(), config.api.prometheus.port);
 
     // Run core actors.
     log::info!("Starting the Core actors");
-    let core_task_handles = run_core(connection_pool.clone(), stop_signal_sender.clone())
+    let core_task_handles = run_core(connection_pool.clone(), stop_signal_sender.clone(), &config)
         .await
         .expect("Unable to start Core actors");
 
     // Run API actors.
     log::info!("Starting the API server actors");
-    let api_task_handle = run_api(connection_pool.clone(), stop_signal_sender.clone());
+    let api_task_handle = run_api(connection_pool.clone(), stop_signal_sender.clone(), &config);
 
     // Run Ethereum sender actors.
     log::info!("Starting the Ethereum sender actors");
-    let eth_sender_task_handle = run_eth_sender(
-        connection_pool.clone(),
-        eth_client_options,
-        eth_sender_options,
-    );
+    let eth_sender_task_handle = run_eth_sender(connection_pool.clone(), config.clone());
 
     // Run prover server & witness generator.
     log::info!("Starting the Prover server actors");
-    run_prover_server(connection_pool, stop_signal_sender, prover_options);
+    run_prover_server(connection_pool, stop_signal_sender, config);
 
     tokio::select! {
         _ = async { wait_for_tasks(core_task_handles).await } => {

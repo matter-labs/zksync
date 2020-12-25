@@ -124,8 +124,7 @@ impl TxSender {
         let enforce_pubkey_change_fee = true;
         let forced_exit_minimum_account_age = chrono::Duration::seconds(
             config.api.common.forced_exit_minimum_account_age_secs as i64,
-        )
-        .expect("Unable to convert std::Duration to chrono::Duration");
+        );
 
         Self {
             core_api_client,

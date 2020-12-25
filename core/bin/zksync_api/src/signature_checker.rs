@@ -233,7 +233,7 @@ pub fn start_sign_checker_detached(
     let transport = web3::transports::Http::new(&config.eth_client.web3_url).unwrap();
     let web3 = web3::Web3::new(transport);
 
-    let eth_checker = EthereumChecker::new(web3, config.contracts.contract_eth_addr);
+    let eth_checker = EthereumChecker::new(web3, config.contracts.contract_addr);
 
     /// Main signature check requests handler.
     /// Basically it receives the requests through the channel and verifies signatures,

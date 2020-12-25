@@ -2,7 +2,7 @@
 use num::BigUint;
 use std::collections::HashMap;
 use web3::types::TransactionReceipt;
-use zksync_config::{ConfigurationOptions, EthClientOptions};
+use zksync_config::configs::ZkSyncConfig;
 use zksync_types::TokenId;
 
 #[derive(Debug)]
@@ -15,14 +15,12 @@ pub struct TestkitConfig {
 
 impl TestkitConfig {
     pub fn from_env() -> Self {
-        let env_config = ConfigurationOptions::from_env();
-        let eth_client_options = EthClientOptions::from_env();
-
+        let config = ZkSyncConfig::from_env();
         TestkitConfig {
-            chain_id: eth_client_options.chain_id,
-            gas_price_factor: eth_client_options.gas_price_factor,
-            web3_url: env_config.web3_url,
-            available_block_chunk_sizes: env_config.available_block_chunk_sizes,
+            chain_id: config.eth_client.chain_id,
+            gas_price_factor: config.eth_client.gas_price_factor,
+            web3_url: config.eth_client.web3_url,
+            available_block_chunk_sizes: config.chain.state_keeper.block_chunk_sizes.clone(),
         }
     }
 }

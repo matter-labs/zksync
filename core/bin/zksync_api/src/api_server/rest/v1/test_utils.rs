@@ -10,7 +10,6 @@ use tokio::sync::Mutex;
 use web3::types::H256;
 
 // Workspace uses
-use zksync_config::{ApiServerOptions, ConfigurationOptions};
 use zksync_crypto::rand::{SeedableRng, XorShiftRng};
 use zksync_storage::{
     chain::operations::records::NewExecutedPriorityOperation,
@@ -31,6 +30,7 @@ use zksync_types::{
 
 // Local uses
 use super::client::Client;
+use zksync_config::configs::ZkSyncConfig;
 
 /// Serial ID of the verified priority operation.
 pub const VERIFIED_OP_SERIAL_ID: u64 = 10;
@@ -43,16 +43,14 @@ pub const VERIFIED_BLOCKS_COUNT: BlockNumber = 3;
 
 #[derive(Debug, Clone)]
 pub struct TestServerConfig {
-    pub env_options: ConfigurationOptions,
-    pub api_server_options: ApiServerOptions,
+    pub config: ZkSyncConfig,
     pub pool: ConnectionPool,
 }
 
 impl Default for TestServerConfig {
     fn default() -> Self {
         Self {
-            env_options: ConfigurationOptions::from_env(),
-            api_server_options: ApiServerOptions::from_env(),
+            config: ZkSyncConfig::from_env(),
             pool: ConnectionPool::new(Some(1)),
         }
     }
