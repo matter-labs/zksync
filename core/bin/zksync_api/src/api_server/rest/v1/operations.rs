@@ -38,7 +38,7 @@ impl ApiOperationsData {
     ) -> QueryResult<Option<PriorityOpData>> {
         let mut storage = self.pool.access_storage().await?;
 
-        let executed_op = convert::executed_priority_op_for_query(query, &mut storage).await?;
+        let executed_op = executed_priority_op_for_query(query, &mut storage).await?;
         Ok(executed_op.map(convert::priority_op_data_from_stored))
     }
 
@@ -48,7 +48,7 @@ impl ApiOperationsData {
     ) -> QueryResult<Option<PriorityOpReceipt>> {
         let mut storage = self.pool.access_storage().await?;
 
-        let executed_op = convert::executed_priority_op_for_query(query, &mut storage).await?;
+        let executed_op = executed_priority_op_for_query(query, &mut storage).await?;
         let executed_op = if let Some(executed_op) = executed_op {
             executed_op
         } else {
@@ -90,30 +90,28 @@ impl ApiOperationsData {
     }
 }
 
-mod convert {
-    use super::*;
+async fn executed_priority_op_for_query(
+    query: PriorityOpQuery,
+    storage: &mut StorageProcessor<'_>,
+) -> QueryResult<Option<StoredExecutedPriorityOperation>> {
+    let mut schema = storage.chain().operations_schema();
 
-    pub async fn executed_priority_op_for_query(
-        query: PriorityOpQuery,
-        storage: &mut StorageProcessor<'_>,
-    ) -> QueryResult<Option<StoredExecutedPriorityOperation>> {
-        match query {
-            PriorityOpQuery::Id(serial_id) => {
-                storage
-                    .chain()
-                    .operations_schema()
-                    .get_executed_priority_operation(serial_id as u32)
-                    .await
-            }
-            PriorityOpQuery::Hash(eth_hash) => {
-                storage
-                    .chain()
-                    .operations_schema()
-                    .get_executed_priority_operation_by_hash(eth_hash.as_bytes())
-                    .await
-            }
+    match query {
+        PriorityOpQuery::Id(serial_id) => {
+            schema
+                .get_executed_priority_operation(serial_id as u32)
+                .await
+        }
+        PriorityOpQuery::Hash(eth_hash) => {
+            schema
+                .get_executed_priority_operation_by_hash(eth_hash.as_bytes())
+                .await
         }
     }
+}
+
+mod convert {
+    use super::*;
 
     pub fn priority_op_data_from_stored(v: StoredExecutedPriorityOperation) -> PriorityOpData {
         PriorityOpData {

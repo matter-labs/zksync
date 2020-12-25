@@ -1,5 +1,7 @@
-use crate::tx_error::TxAddError;
+pub use zksync_types::EthBlockId;
 use zksync_types::{tx::TxEthSignature, Address, PriorityOp, SignedZkSyncTx, H256};
+
+use crate::tx_error::TxAddError;
 
 /// `CoreApiClient` is capable of interacting with a private zkSync Core API.
 #[derive(Debug, Clone)]
@@ -7,8 +9,6 @@ pub struct CoreApiClient {
     client: reqwest::Client,
     addr: String,
 }
-
-pub type EthBlockId = u64;
 
 impl CoreApiClient {
     pub fn new(addr: String) -> Self {
