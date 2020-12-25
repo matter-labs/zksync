@@ -434,7 +434,7 @@ pub fn run_prover_server(
                         idle_provers,
                     );
 
-                    let _auth = HttpAuthentication::bearer(move |req, credentials| async {
+                    let auth = HttpAuthentication::bearer(move |req, credentials| async {
                         let secret_auth = req
                             .app_data::<web::Data<AppState>>()
                             .expect("failed get AppState upon receipt of the authentication token")
@@ -448,7 +448,7 @@ pub fn run_prover_server(
                     // By calling `register_data` instead of `data` we're avoiding double
                     // `Arc` wrapping of the object.
                     App::new()
-                        // .wrap(auth) // TODO: restore auth
+                        .wrap(auth)
                         .app_data(web::Data::new(app_state))
                         .route("/status", web::get().to(status))
                         .route("/get_job", web::get().to(get_job))
