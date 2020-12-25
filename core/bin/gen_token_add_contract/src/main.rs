@@ -3,8 +3,8 @@
 //! TokenDeployInit contract contains list of tokens that we add to the Governance contract when
 //! we first deploy it.
 //!
-//! List of tokens for initial deployment depends on current `ETH_NETWORK` and is available in the
-//! `etc/tokens/${ETH_NETWORK}.json`
+//! List of tokens for initial deployment depends on current `CHAIN_ETH_ETH_NETWORK` and is available in the
+//! `etc/tokens/${CHAIN_ETH_ETH_NETWORK}.json`
 //!
 //! For localhost network we deploy test ERC20 token and generate token list file in the `zksync init` script.
 
@@ -16,7 +16,7 @@ use zksync_types::tokens::get_genesis_token_list;
 use zksync_utils::{get_env, parse_env};
 
 fn main() {
-    let network = get_env("ETH_NETWORK");
+    let network = get_env("CHAIN_ETH_ETH_NETWORK");
 
     let token_list = get_genesis_token_list(&network).expect("Initial tokens list not found");
     let template = &read_to_string(get_token_add_template_file())

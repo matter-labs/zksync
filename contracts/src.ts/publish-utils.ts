@@ -14,7 +14,7 @@ export async function publishSourceCodeToEtherscan(
     const contractPath = `${contractDirPath}/${contractName}.sol`;
     const sourceCode = await getSolidityInput(contractPath);
 
-    const network = process.env.ETH_NETWORK;
+    const network = process.env.CHAIN_ETH_ETH_NETWORK;
     if (SUPPORTED_NETWORKS.find((supportedNetwork) => supportedNetwork === network) == null) {
         throw new Error(
             `Current network ${network} is not supported by etherscan, should be one of the ${SUPPORTED_NETWORKS.toString()}`
@@ -43,7 +43,7 @@ export async function publishSourceCodeToEtherscan(
 }
 
 export async function publishAbiToTesseracts(address: string, contractCode) {
-    const network = process.env.ETH_NETWORK;
+    const network = process.env.CHAIN_ETH_ETH_NETWORK;
     if (network !== 'localhost') {
         throw new Error('Only localhost network is supported by Tesseracts');
     }

@@ -4,11 +4,13 @@ import * as utils from './utils';
 import * as db from './db/db';
 import * as server from './server';
 import * as contract from './contract';
+import * as config from './config';
 import * as run from './run/run';
 import * as env from './env';
 import { up } from './up';
 
 export async function init() {
+    await config.compileConfig();
     await createVolumes();
     if (!process.env.CI) {
         await checkEnv();

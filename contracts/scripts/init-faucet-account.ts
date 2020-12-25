@@ -5,9 +5,9 @@ import * as zksync from 'zksync';
 import { ethers } from 'ethers';
 
 const DEPOSIT_AMOUNT = ethers.utils.parseEther('10000000000');
-const network = process.env.ETH_NETWORK;
+const network = process.env.CHAIN_ETH_ETH_NETWORK;
 
-const provider = new ethers.providers.JsonRpcProvider(process.env.WEB3_URL);
+const provider = new ethers.providers.JsonRpcProvider(process.env.ETH_CLIENT_WEB3_URL);
 const testConfigPath = path.join(process.env.ZKSYNC_HOME as string, `etc/test_config/constant`);
 const ethTestConfig = JSON.parse(fs.readFileSync(`${testConfigPath}/eth.json`, { encoding: 'utf-8' }));
 
@@ -61,7 +61,7 @@ async function main() {
             type: 'function'
         }
     ];
-    if (process.env.NETWORK !== 'localhost') {
+    if (process.env.CHAIN_ETH_ETH_NETWORK !== 'localhost') {
         const erc20Mintable = new ethers.Contract(TOKEN_ADDRESS, ABI, deployerEthWallet);
         const mintTx = await erc20Mintable.mint(deployerEthWallet.address, DEPOSIT_AMOUNT);
         await mintTx.wait();

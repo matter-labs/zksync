@@ -1,7 +1,5 @@
 // External uses
 use serde::Deserialize;
-// Local uses
-use crate::envy_load;
 
 /// Used database configuration.
 #[derive(Debug, Deserialize, Clone, PartialEq)]
@@ -14,7 +12,10 @@ pub struct DBConfig {
 
 impl DBConfig {
     pub fn from_env() -> Self {
-        envy_load!("db", "DB_")
+        Self {
+            pool_size: env!("DB_POOL_SIZE").parse().unwrap(),
+            url: env!("DATABASE_URL").to_string(),
+        }
     }
 }
 
@@ -34,7 +35,7 @@ mod tests {
     fn from_env() {
         let config = r#"
 DB_POOL_SIZE="10"
-DB_URL="postgres://postgres@localhost/plasma"
+DATABASE_URL="postgres://postgres@localhost/plasma"
         "#;
         set_env(config);
 

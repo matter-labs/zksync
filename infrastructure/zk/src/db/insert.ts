@@ -15,8 +15,8 @@ export async function token(id: string, address: string, symbol: string, preciso
 export async function contract() {
     // force read env
     env.reload();
-    const contractAddress = process.env.CONTRACT_ADDR;
-    const governanceAddress = process.env.GOVERNANCE_ADDR;
+    const contractAddress = process.env.CONTRACTS_CONTRACT_ADDR;
+    const governanceAddress = process.env.CONTRACTS_GOVERNANCE_ADDR;
     await utils.exec(`${SQL()} "INSERT INTO server_config (contract_addr, gov_contract_addr)
 					 VALUES ('${contractAddress}', '${governanceAddress}')
 					 ON CONFLICT (id) DO UPDATE
@@ -31,10 +31,10 @@ export async function ethData() {
     const body = {
         jsonrpc: '2.0',
         method: 'eth_getTransactionCount',
-        params: [process.env.OPERATOR_COMMIT_ETH_ADDRESS as string, 'pending'],
+        params: [process.env.ETH_SENDER_SENDER_OPERATOR_COMMIT_ETH_ADDR as string, 'pending'],
         id: 1
     };
-    const reponse = await fetch(process.env.WEB3_URL as string, {
+    const reponse = await fetch(process.env.ETH_CLIENT_WEB3_URL as string, {
         method: 'post',
         body: JSON.stringify(body),
         headers: {
@@ -44,7 +44,7 @@ export async function ethData() {
     });
     const nonce = parseInt((await reponse.json()).result);
     await utils.exec(`${SQL()} "INSERT INTO eth_parameters (nonce, gas_price_limit, commit_ops, verify_ops, withdraw_ops)
-                     VALUES ('${nonce}', '${process.env.ETH_GAS_PRICE_LIMIT_DEFAULT}', 0, 0, 0)
+                     VALUES ('${nonce}', '${process.env.ETH_SENDER_GAS_PRICE_LIMIT_DEFAULT}', 0, 0, 0)
                      ON CONFLICT (id) DO UPDATE SET (commit_ops, verify_ops, withdraw_ops) = (0, 0, 0)"`);
 }
 

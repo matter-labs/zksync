@@ -61,14 +61,14 @@ export function readTestContracts(): Contracts {
 
 export function deployedAddressesFromEnv(): DeployedAddresses {
     return {
-        DeployFactory: process.env.DEPLOY_FACTORY_ADDR,
-        Governance: process.env.GOVERNANCE_ADDR,
-        GovernanceTarget: process.env.GOVERNANCE_TARGET_ADDR,
-        UpgradeGatekeeper: process.env.UPGRADE_GATEKEEPER_ADDR,
-        Verifier: process.env.VERIFIER_ADDR,
-        VerifierTarget: process.env.VERIFIER_TARGET_ADDR,
-        ZkSync: process.env.CONTRACT_ADDR,
-        ZkSyncTarget: process.env.CONTRACT_TARGET_ADDR
+        DeployFactory: process.env.CONTRACTS_DEPLOY_FACTORY_ADDR,
+        Governance: process.env.CONTRACTS_GOVERNANCE_ADDR,
+        GovernanceTarget: process.env.CONTRACTS_GOVERNANCE_TARGET_ADDR,
+        UpgradeGatekeeper: process.env.CONTRACTS_UPGRADE_GATEKEEPER_ADDR,
+        Verifier: process.env.CONTRACTS_VERIFIER_ADDR,
+        VerifierTarget: process.env.CONTRACTS_VERIFIER_TARGET_ADDR,
+        ZkSync: process.env.CONTRACTS_CONTRACT_ADDR,
+        ZkSyncTarget: process.env.CONTRACTS_CONTRACT_TARGET_ADDR
     };
 }
 
@@ -93,6 +93,7 @@ export class Deployer {
         if (this.verbose) {
             console.log('Deploying governance target');
         }
+
         const govContract = await deployContract(this.deployWallet, this.contracts.governance, [], {
             gasLimit: 600000,
             ...ethTxOptions
@@ -163,10 +164,10 @@ export class Deployer {
                 this.addresses.GovernanceTarget,
                 this.addresses.VerifierTarget,
                 this.addresses.ZkSyncTarget,
-                process.env.GENESIS_ROOT,
-                process.env.OPERATOR_COMMIT_ETH_ADDRESS,
+                process.env.CONTRACTS_GENESIS_TX_HASH,
+                process.env.ETH_SENDER_SENDER_OPERATOR_COMMIT_ETH_ADDR,
                 this.governorAddress,
-                process.env.OPERATOR_FEE_ETH_ADDRESS
+                process.env.CHAIN_STATE_KEEPER_FEE_ACCOUNT_ADDR
             ],
             { gasLimit: 5000000, ...ethTxOptions }
         );
@@ -233,7 +234,7 @@ export class Deployer {
             encodeProxyContstuctorArgs(
                 this.contracts.proxy,
                 this.addresses.ZkSyncTarget,
-                [this.addresses.Governance, this.addresses.Verifier, process.env.GENESIS_ROOT],
+                [this.addresses.Governance, this.addresses.Verifier, process.env.CONTRACTS_GENESIS_TX_HASH],
                 ['address', 'address', 'bytes32']
             )
         );

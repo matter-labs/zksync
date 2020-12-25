@@ -4,6 +4,7 @@ use serde::Deserialize;
 use std::time::Duration;
 // Local uses
 use crate::envy_load;
+use zksync_types::Address;
 
 #[derive(Debug, Deserialize, Clone, PartialEq)]
 pub struct ChainConfig {
@@ -63,6 +64,7 @@ pub struct StateKeeper {
     pub miniblock_iterations: u64,
     /// Maximum amount of miniblock iterations in case of block containing a fast withdrawal request.
     pub fast_block_miniblock_iterations: u64,
+    pub fee_account_addr: Address,
 }
 
 impl StateKeeper {
@@ -75,7 +77,7 @@ impl StateKeeper {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::configs::test_utils::set_env;
+    use crate::configs::test_utils::{addr, set_env};
 
     fn expected_config() -> ChainConfig {
         ChainConfig {
@@ -95,6 +97,7 @@ mod tests {
                 miniblock_iteration_interval: 200,
                 miniblock_iterations: 10,
                 fast_block_miniblock_iterations: 5,
+                fee_account_addr: addr("de03a0B5963f75f1C8485B355fF6D30f3093BDE7"),
             },
         }
     }
@@ -113,6 +116,7 @@ CHAIN_STATE_KEEPER_BLOCK_CHUNK_SIZES="6,30"
 CHAIN_STATE_KEEPER_MINIBLOCK_ITERATION_INTERVAL="200"
 CHAIN_STATE_KEEPER_MINIBLOCK_ITERATIONS="10"
 CHAIN_STATE_KEEPER_FAST_BLOCK_MINIBLOCK_ITERATIONS="5"
+CHAIN_STATE_KEEPER_FEE_ACCOUNT_ADDR="0xde03a0B5963f75f1C8485B355fF6D30f3093BDE7"
         "#;
         set_env(config);
 

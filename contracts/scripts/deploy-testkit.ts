@@ -23,12 +23,12 @@ const ethTestConfig = JSON.parse(fs.readFileSync(`${testConfigPath}/eth.json`, {
     const args = parser.parseArgs(process.argv.slice(2));
     process.env.GENESIS_ROOT = args.genesisRoot;
 
-    if (process.env.ETH_NETWORK !== 'test') {
+    if (process.env.CHAIN_ETH_ETH_NETWORK !== 'test') {
         console.error('This deploy script is only for localhost-test network');
         process.exit(1);
     }
 
-    const provider = new ethers.providers.JsonRpcProvider(process.env.WEB3_URL);
+    const provider = new ethers.providers.JsonRpcProvider(process.env.ETH_CLIENT_WEB3_URL);
     provider.pollingInterval = 10;
 
     const deployWallet = ethers.Wallet.fromMnemonic(ethTestConfig.test_mnemonic, "m/44'/60'/0'/0/0").connect(provider);

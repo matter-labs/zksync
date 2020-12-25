@@ -97,7 +97,7 @@ pub async fn genesis_init(config: &ZkSyncConfig) {
     log::info!("Generating genesis block.");
     ZkSyncStateKeeper::create_genesis_block(
         pool.clone(),
-        &config.eth_sender.sender.operator_commit_eth_addr,
+        &config.chain.state_keeper.fee_account_addr,
     )
     .await;
     log::info!("Adding initial tokens to db");
@@ -169,7 +169,7 @@ pub async fn run_core(
 
     let state_keeper = ZkSyncStateKeeper::new(
         state_keeper_init,
-        config.eth_sender.sender.operator_commit_eth_addr,
+        config.chain.state_keeper.fee_account_addr,
         state_keeper_req_receiver,
         proposed_blocks_sender,
         config.chain.state_keeper.block_chunk_sizes.clone(),

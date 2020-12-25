@@ -30,3 +30,4 @@ miniblock_iteration_interval=200
 miniblock_iterations=10
 # Maximum amount of miniblock iterations in case of block containing a fast withdrawal request.
 fast_block_miniblock_iterations=5
+
