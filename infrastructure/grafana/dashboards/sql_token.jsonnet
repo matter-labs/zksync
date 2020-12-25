@@ -9,7 +9,4 @@ local metrics = [
   "sql.token.update_market_volume",
 ];
 
-G.dashboard(
-  'Metrics / sql / token',
-  [ G.panel(metric) for metric in metrics ]
-)
+G.dashboard('sql / token', metrics)
