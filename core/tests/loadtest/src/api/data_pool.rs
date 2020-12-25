@@ -9,8 +9,9 @@ use std::{
 // External uses
 use rand::{thread_rng, Rng};
 use tokio::sync::{RwLock, RwLockReadGuard, RwLockWriteGuard};
+
 // Workspace uses
-use zksync_api::client::Pagination;
+use zksync_api_client::rest::v1::Pagination;
 use zksync_types::{tx::TxHash, AccountId, Address, BlockNumber, PriorityOp, ZkSyncPriorityOp};
 // Local uses
 

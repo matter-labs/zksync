@@ -31,7 +31,7 @@ use zksync_types::{
 };
 
 // Local uses
-use super::client::Client;
+use super::Client;
 
 /// Serial ID of the verified priority operation.
 pub const VERIFIED_OP_SERIAL_ID: u64 = 10;
