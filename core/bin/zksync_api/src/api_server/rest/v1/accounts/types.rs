@@ -14,7 +14,7 @@ use zksync_storage::{
         records::{AccountOpReceiptResponse, AccountTxReceiptResponse},
         SearchDirection as StorageSearchDirection,
     },
-    QueryResult,
+    QueryResult, StorageProcessor,
 };
 use zksync_types::{tx::TxHash, Account, BlockNumber, PriorityOp, ZkSyncPriorityOp, H256};
 
@@ -30,13 +30,14 @@ pub(super) mod convert {
     use super::*;
 
     pub async fn account_state_from_storage(
-        account: &Account,
+        storage: &mut StorageProcessor<'_>,
         tokens: &TokenDBCache,
+        account: &Account,
     ) -> QueryResult<AccountState> {
         let mut balances = BTreeMap::new();
         for (token_id, balance) in account.get_nonzero_balances() {
             let token_symbol = tokens
-                .token_symbol(token_id)
+                .token_symbol(storage, token_id)
                 .await?
                 .ok_or_else(|| unable_to_find_token(token_id))?;
 
@@ -58,9 +59,10 @@ pub(super) mod convert {
     }
 
     pub async fn depositing_balances_from_pending_ops(
+        storage: &mut StorageProcessor<'_>,
+        tokens: &TokenDBCache,
         ongoing_ops: Vec<PriorityOp>,
         confirmations_for_eth_event: BlockNumber,
-        tokens: &TokenDBCache,
     ) -> QueryResult<DepositingBalances> {
         let mut balances = BTreeMap::new();
 
@@ -74,7 +76,7 @@ pub(super) mod convert {
             };
 
             let token_symbol = tokens
-                .token_symbol(token_id)
+                .token_symbol(storage, token_id)
                 .await?
                 .ok_or_else(|| unable_to_find_token(token_id))?;
 

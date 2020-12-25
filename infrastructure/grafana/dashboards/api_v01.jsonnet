@@ -17,7 +17,4 @@ local metrics = [
   "api.v01.withdrawal_processing_time",
 ];
 
-G.dashboard(
-  'Metrics / api v0.1',
-  [ G.panel(metric) for metric in metrics ]
-)
+G.dashboard('api v0.1', metrics)

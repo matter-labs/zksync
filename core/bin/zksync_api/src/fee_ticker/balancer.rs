@@ -44,7 +44,8 @@ where
     ) -> Self {
         let mut tickers = vec![];
         let mut channels = vec![];
-        let token_db_cache = TokenDBCache::new(db_pool.clone());
+
+        let token_db_cache = TokenDBCache::new();
         let price_cache = Arc::new(Mutex::new(HashMap::new()));
         let gas_price_cache = Arc::new(Mutex::new(None));
 

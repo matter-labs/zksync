@@ -546,6 +546,22 @@
       ]
     }
   },
+  "1ce3fbb6c510621c830b0b4679d51fb2ac4379a474d7ee7074500d786102fcd3": {
+    "query": "INSERT INTO mempool_txs (tx_hash, tx, eth_sign_data, created_at, batch_id)\n            SELECT u.tx_hash, u.tx, u.eth_sign_data, $4, $5\n                FROM UNNEST ($1::text[], $2::jsonb[], $3::jsonb[])\n                AS u(tx_hash, tx, eth_sign_data)",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "TextArray",
+          "JsonbArray",
+          "JsonbArray",
+          "Timestamptz",
+          "Int8"
+        ]
+      },
+      "nullable": []
+    }
+  },
   "222e3946401772e3f6e0d9ce9909e8e7ac2dc830c5ecfcd522f56b3bf70fd679": {
     "query": "INSERT INTO data_restore_storage_state_update (storage_state) VALUES ($1)",
     "describe": {
@@ -3437,22 +3453,6 @@
         false,
         false
       ]
-    }
-  },
-  "cd155debc525d539341b88e30a9ba9d3f130c4934883d945fa4abcb528ffc80f": {
-    "query": "INSERT INTO mempool_txs (tx_hash, tx, created_at, eth_sign_data, batch_id)\n                VALUES ($1, $2, $3, $4, $5)",
-    "describe": {
-      "columns": [],
-      "parameters": {
-        "Left": [
-          "Text",
-          "Jsonb",
-          "Timestamptz",
-          "Jsonb",
-          "Int8"
-        ]
-      },
-      "nullable": []
     }
   },
   "cdc6f84e5eee67e085706daa75f69a498adcedd7093288bd7ec84813e5066075": {

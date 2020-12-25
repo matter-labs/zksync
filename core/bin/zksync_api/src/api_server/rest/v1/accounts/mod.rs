@@ -10,7 +10,7 @@ use actix_web::{
 
 // Workspace uses
 use zksync_config::ConfigurationOptions;
-use zksync_storage::{QueryResult, StorageProcessor};
+use zksync_storage::{ConnectionPool, QueryResult, StorageProcessor};
 use zksync_types::{AccountId, Address, BlockNumber, TokenId};
 
 // Local uses
@@ -52,6 +52,7 @@ fn parse_account_query(query: String) -> Result<AccountQuery, ApiError> {
 /// Shared data between `api/v1/accounts` endpoints.
 #[derive(Clone)]
 struct ApiAccountsData {
+    pool: ConnectionPool,
     tokens: TokenDBCache,
     core_api_client: CoreApiClient,
     confirmations_for_eth_event: BlockNumber,
@@ -59,11 +60,13 @@ struct ApiAccountsData {
 
 impl ApiAccountsData {
     fn new(
+        pool: ConnectionPool,
         tokens: TokenDBCache,
         core_api_client: CoreApiClient,
         confirmations_for_eth_event: BlockNumber,
     ) -> Self {
         Self {
+            pool,
             tokens,
             core_api_client,
             confirmations_for_eth_event,
@@ -71,7 +74,7 @@ impl ApiAccountsData {
     }
 
     async fn access_storage(&self) -> QueryResult<StorageProcessor<'_>> {
-        self.tokens.pool.access_storage().await.map_err(From::from)
+        self.pool.access_storage().await.map_err(From::from)
     }
 
     async fn find_account_address(&self, query: String) -> Result<Address, ApiError> {
@@ -129,10 +132,6 @@ impl ApiAccountsData {
             .account_state_by_id(account_id)
             .await?;
 
-        // Drop storage access to avoid deadlocks.
-        // TODO Rewrite `TokensDBCache` logic to make such errors impossible. ZKS-169
-        drop(storage);
-
         let (account_id, account) = if let Some(state) = account_state.committed {
             state
         } else {
@@ -140,9 +139,11 @@ impl ApiAccountsData {
             return Ok(None);
         };
 
-        let committed = account_state_from_storage(&account, &self.tokens).await?;
+        let committed = account_state_from_storage(&mut storage, &self.tokens, &account).await?;
         let verified = match account_state.verified {
-            Some((_id, account)) => account_state_from_storage(&account, &self.tokens).await?,
+            Some((_id, account)) => {
+                account_state_from_storage(&mut storage, &self.tokens, &account).await?
+            }
             None => AccountState::default(),
         };
 
@@ -153,9 +154,10 @@ impl ApiAccountsData {
                 .await?;
 
             depositing_balances_from_pending_ops(
+                &mut storage,
+                &self.tokens,
                 ongoing_ops,
                 self.confirmations_for_eth_event,
-                &self.tokens,
             )
             .await?
         };
@@ -296,10 +298,12 @@ async fn account_pending_receipts(
 
 pub fn api_scope(
     env_options: &ConfigurationOptions,
+    pool: ConnectionPool,
     tokens: TokenDBCache,
     core_api_client: CoreApiClient,
 ) -> Scope {
     let data = ApiAccountsData::new(
+        pool,
         tokens,
         core_api_client,
         env_options.confirmations_for_eth_event as BlockNumber,

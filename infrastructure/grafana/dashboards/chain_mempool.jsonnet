@@ -8,7 +8,4 @@ local metrics = [
   "sql.chain.mempool.remove_txs",
 ];
 
-G.dashboard(
-  'Metrics / sql / chain / mempool',
-  [ G.panel(metric) for metric in metrics ]
-)
+G.dashboard('sql / chain / mempool', metrics)
