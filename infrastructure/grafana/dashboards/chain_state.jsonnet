@@ -8,7 +8,4 @@ local metrics = [
   "sql.chain.state.load_verified_state",
 ];
 
-G.dashboard(
-  'Metrics / sql / chain / state',
-  [ G.panel(metric) for metric in metrics ]
-)
+G.dashboard('sql / chain / state', metrics)

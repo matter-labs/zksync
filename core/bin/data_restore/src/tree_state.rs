@@ -1,6 +1,5 @@
 use crate::rollup_ops::RollupOpsBlock;
 use anyhow::format_err;
-use web3::types::Address;
 use zksync_crypto::Fr;
 use zksync_state::{
     handler::TxHandler,
@@ -12,7 +11,7 @@ use zksync_types::operations::ZkSyncOp;
 use zksync_types::priority_ops::PriorityOp;
 use zksync_types::priority_ops::ZkSyncPriorityOp;
 use zksync_types::tx::{ChangePubKey, Close, ForcedExit, Transfer, Withdraw, ZkSyncTx};
-use zksync_types::{AccountId, AccountMap, AccountUpdates, H256};
+use zksync_types::{AccountId, AccountMap, AccountUpdates, Address, H256};
 
 /// Rollup accounts states
 pub struct TreeState {
@@ -352,7 +351,7 @@ impl TreeState {
                 serial_id: 0,
                 data: priority_op,
                 deadline_block: 0,
-                eth_hash: Vec::new(),
+                eth_hash: H256::zero(),
                 eth_block: 0,
             },
             block_index,

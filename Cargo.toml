@@ -28,6 +28,7 @@ members = [
     "core/lib/prover_utils",
     "core/lib/config",
     "core/lib/contracts",
+    "core/lib/api_client",
 
     # Test infrastructure
     "core/tests/test_account",

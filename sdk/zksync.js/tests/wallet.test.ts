@@ -1,6 +1,7 @@
 import { assert, expect } from 'chai';
 import { BigNumber, utils, ethers } from 'ethers';
 import { Wallet } from '../src/wallet';
+import { getTokens } from './helpers';
 
 import { TokenSet, parseHexWithPrefix } from '../src/utils';
 import { privateKeyFromSeed, signTransactionBytes } from '../src/crypto';
@@ -9,7 +10,8 @@ import { Provider } from '../src/provider';
 describe('Wallet with mock provider', function () {
     async function getWallet(ethPrivateKey: Uint8Array, network: string): Promise<Wallet> {
         const ethWallet = new ethers.Wallet(ethPrivateKey);
-        const mockProvider = await Provider.newMockProvider(network, ethPrivateKey);
+        const tokens = getTokens(network);
+        const mockProvider = await Provider.newMockProvider(network, ethPrivateKey, () => [...tokens]);
         const wallet = await Wallet.fromEthSigner(ethWallet, mockProvider);
         return wallet;
     }

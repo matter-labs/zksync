@@ -95,6 +95,7 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
         Ok(())
     }
 
+    // Helper method for retrieving blocks from the database.
     async fn get_storage_block(&mut self, block: BlockNumber) -> QueryResult<Option<StorageBlock>> {
         let start = Instant::now();
         let block = sqlx::query_as!(
@@ -167,6 +168,7 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
         Ok(result)
     }
 
+    /// Retrieves both L1 and L2 operations stored in the block with the given number.
     pub async fn get_block_transactions(
         &mut self,
         block: BlockNumber,
@@ -505,6 +507,7 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
         result
     }
 
+    /// Helper method for retrieving pending blocks from the database.
     async fn load_storage_pending_block(&mut self) -> QueryResult<Option<StoragePendingBlock>> {
         let start = Instant::now();
         let maybe_block = sqlx::query_as!(
@@ -523,6 +526,7 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
         Ok(maybe_block)
     }
 
+    /// Retrieves the latest pending block from the database, if such is present.
     pub async fn load_pending_block(&mut self) -> QueryResult<Option<PendingBlock>> {
         let start = Instant::now();
         let mut transaction = self.0.start_transaction().await?;
@@ -535,7 +539,7 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
             Some(block) => block,
             None => return Ok(None),
         };
-
+        // Fill the block that's going to be returned with its operations.
         let executed_ops = BlockSchema(&mut transaction)
             .get_block_executed_ops(block.number as u32)
             .await?;
@@ -575,6 +579,7 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
         Ok(result)
     }
 
+    /// Stores given pending block into the database.
     pub async fn save_pending_block(&mut self, pending_block: PendingBlock) -> QueryResult<()> {
         let start = Instant::now();
         let mut transaction = self.0.start_transaction().await?;
@@ -622,6 +627,7 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
         Ok(())
     }
 
+    /// Returns the number of operations with the given `action_type` and `is_confirmed` status.
     pub async fn count_operations(
         &mut self,
         action_type: ActionType,

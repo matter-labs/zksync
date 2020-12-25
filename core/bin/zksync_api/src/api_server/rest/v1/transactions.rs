@@ -7,21 +7,18 @@ use actix_web::{
     web::{self, Json},
     Scope,
 };
-use serde::{Deserialize, Serialize};
 
 // Workspace uses
+pub use zksync_api_client::rest::v1::{
+    FastProcessingQuery, IncomingTx, IncomingTxBatch, Receipt, TxData,
+};
 use zksync_storage::{
     chain::operations_ext::records::TxReceiptResponse, QueryResult, StorageProcessor,
 };
-use zksync_types::{
-    tx::{TxEthSignature, TxHash},
-    BlockNumber, SignedZkSyncTx, ZkSyncTx,
-};
+use zksync_types::{tx::TxHash, BlockNumber, SignedZkSyncTx};
 
 // Local uses
-use super::{
-    client::Client, client::ClientError, Error as ApiError, JsonResult, Pagination, PaginationQuery,
-};
+use super::{Client, ClientError, Error as ApiError, JsonResult, Pagination, PaginationQuery};
 use crate::api_server::rpc_server::types::TxWithSignature;
 use crate::api_server::tx_sender::{SubmitError, TxSender};
 
@@ -94,7 +91,7 @@ impl ApiTransactionsData {
             .await
     }
 
-    async fn tx_status(&self, tx_hash: TxHash) -> QueryResult<Option<TxReceipt>> {
+    async fn tx_status(&self, tx_hash: TxHash) -> QueryResult<Option<Receipt>> {
         let mut storage = self.tx_sender.pool.access_storage().await?;
 
         let tx_receipt = {
@@ -108,7 +105,7 @@ impl ApiTransactionsData {
                     .await?;
 
                 let tx_receipt = if tx_in_mempool {
-                    Some(TxReceipt::Pending)
+                    Some(Receipt::Pending)
                 } else {
                     None
                 };
@@ -119,13 +116,13 @@ impl ApiTransactionsData {
         let block_number = tx_receipt.block_number as BlockNumber;
         // Check the cases where we don't need to get block details.
         if !tx_receipt.success {
-            return Ok(Some(TxReceipt::Rejected {
+            return Ok(Some(Receipt::Rejected {
                 reason: tx_receipt.fail_reason,
             }));
         }
 
         if tx_receipt.verified {
-            return Ok(Some(TxReceipt::Verified {
+            return Ok(Some(Receipt::Verified {
                 block: block_number,
             }));
         }
@@ -148,11 +145,11 @@ impl ApiTransactionsData {
             .is_some();
 
         let tx_receipt = if is_committed {
-            TxReceipt::Committed {
+            Receipt::Committed {
                 block: block_number,
             }
         } else {
-            TxReceipt::Executed
+            Receipt::Executed
         };
 
         Ok(Some(tx_receipt))
@@ -181,123 +178,12 @@ impl ApiTransactionsData {
     }
 }
 
-// Data transfer objects.
-
-#[derive(Debug, Serialize, Deserialize, PartialEq, Clone)]
-struct FastProcessingQuery {
-    fast_processing: Option<bool>,
-}
-
-/// This struct has the same layout as `SignedZkSyncTx`, expect that it used
-/// `TxEthSignature` directly instead of `EthSignData`.
-#[derive(Debug, Serialize, Deserialize, Clone)]
-struct IncomingTx {
-    tx: ZkSyncTx,
-    signature: Option<TxEthSignature>,
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone)]
-struct IncomingTxBatch {
-    txs: Vec<ZkSyncTx>,
-    #[serde(default)]
-    signatures: Vec<TxEthSignature>,
-}
-
-#[derive(Debug, Deserialize, Serialize, Clone, PartialEq)]
-#[serde(tag = "status", rename_all = "camelCase")]
-pub enum TxReceipt {
-    /// The transaction is awaiting execution in the memorypool.
-    Pending,
-    /// The transaction has been executed, but the block containing this transaction has not
-    /// yet been committed.
-    Executed,
-    /// The block which contains this transaction has been committed.
-    Committed { block: BlockNumber },
-    /// The block which contains this transaction has been verified.
-    Verified { block: BlockNumber },
-    /// The transaction has been rejected for some reasons.
-    Rejected { reason: Option<String> },
-}
-
-// Client implementation
-
-/// Transactions API part.
-impl Client {
-    /// Sends a new transaction to the memory pool.
-    pub async fn submit_tx(
-        &self,
-        tx: ZkSyncTx,
-        signature: Option<TxEthSignature>,
-        fast_processing: Option<bool>,
-    ) -> Result<TxHash, ClientError> {
-        self.post("transactions/submit")
-            .query(&FastProcessingQuery { fast_processing })
-            .body(&IncomingTx { tx, signature })
-            .send()
-            .await
-    }
-
-    /// Sends a new transactions batch to the memory pool.
-    pub async fn submit_tx_batch(
-        &self,
-        txs: Vec<ZkSyncTx>,
-        signatures: Vec<TxEthSignature>,
-    ) -> Result<Vec<TxHash>, ClientError> {
-        self.post("transactions/submit/batch")
-            .body(&IncomingTxBatch { txs, signatures })
-            .send()
-            .await
-    }
-
-    /// Gets actual transaction receipt.
-    pub async fn tx_status(&self, tx_hash: TxHash) -> Result<Option<TxReceipt>, ClientError> {
-        self.get(&format!("transactions/{}", tx_hash.to_string()))
-            .send()
-            .await
-    }
-
-    /// Gets transaction content.
-    pub async fn tx_data(&self, tx_hash: TxHash) -> Result<Option<SignedZkSyncTx>, ClientError> {
-        self.get(&format!("transactions/{}/data", tx_hash.to_string()))
-            .send()
-            .await
-    }
-
-    /// Gets transaction receipt by ID.
-    pub async fn tx_receipt_by_id(
-        &self,
-        tx_hash: TxHash,
-        receipt_id: u32,
-    ) -> Result<Option<TxReceipt>, ClientError> {
-        self.get(&format!(
-            "transactions/{}/receipts/{}",
-            tx_hash.to_string(),
-            receipt_id
-        ))
-        .send()
-        .await
-    }
-
-    /// Gets transaction receipts.
-    pub async fn tx_receipts(
-        &self,
-        tx_hash: TxHash,
-        from: Pagination,
-        limit: BlockNumber,
-    ) -> Result<Vec<TxReceipt>, ClientError> {
-        self.get(&format!("transactions/{}/receipts", tx_hash.to_string()))
-            .query(&from.into_query(limit))
-            .send()
-            .await
-    }
-}
-
 // Server implementation
 
 async fn tx_status(
     data: web::Data<ApiTransactionsData>,
     web::Path(tx_hash): web::Path<TxHash>,
-) -> JsonResult<Option<TxReceipt>> {
+) -> JsonResult<Option<Receipt>> {
     let tx_status = data.tx_status(tx_hash).await.map_err(ApiError::internal)?;
 
     Ok(Json(tx_status))
@@ -306,16 +192,16 @@ async fn tx_status(
 async fn tx_data(
     data: web::Data<ApiTransactionsData>,
     web::Path(tx_hash): web::Path<TxHash>,
-) -> JsonResult<Option<SignedZkSyncTx>> {
+) -> JsonResult<Option<TxData>> {
     let tx_data = data.tx_data(tx_hash).await.map_err(ApiError::internal)?;
 
-    Ok(Json(tx_data))
+    Ok(Json(tx_data.map(TxData::from)))
 }
 
 async fn tx_receipt_by_id(
     data: web::Data<ApiTransactionsData>,
     web::Path((tx_hash, receipt_id)): web::Path<(TxHash, u32)>,
-) -> JsonResult<Option<TxReceipt>> {
+) -> JsonResult<Option<Receipt>> {
     // At the moment we store only last receipt, so this endpoint is just only a stub.
     if receipt_id > 0 {
         return Ok(Json(None));
@@ -330,7 +216,7 @@ async fn tx_receipts(
     data: web::Data<ApiTransactionsData>,
     web::Path(tx_hash): web::Path<TxHash>,
     web::Query(pagination): web::Query<PaginationQuery>,
-) -> JsonResult<Vec<TxReceipt>> {
+) -> JsonResult<Vec<Receipt>> {
     let (pagination, _limit) = pagination.into_inner()?;
     // At the moment we store only last receipt, so this endpoint is just only a stub.
     let is_some = match pagination {
@@ -375,9 +261,15 @@ async fn submit_tx_batch(
         })
         .collect();
 
+    // TODO: multiple authors per batch in API
+    let signatures = if let Some(signature) = body.signature {
+        vec![signature]
+    } else {
+        Vec::new()
+    };
     let tx_hashes = data
         .tx_sender
-        .submit_txs_batch(txs, body.signatures)
+        .submit_txs_batch(txs, signatures)
         .await
         .map_err(ApiError::from)?;
 
@@ -403,21 +295,28 @@ pub fn api_scope(tx_sender: TxSender) -> Scope {
 #[cfg(test)]
 mod tests {
     use actix_web::App;
-
     use bigdecimal::BigDecimal;
-    use futures::{channel::mpsc, prelude::*};
+    use futures::{channel::mpsc, StreamExt};
     use num::BigUint;
+
+    use zksync_api_client::rest::v1::Client;
     use zksync_storage::ConnectionPool;
     use zksync_test_account::ZkSyncAccount;
-    use zksync_types::{tokens::TokenLike, SignedZkSyncTx};
+    use zksync_types::{
+        tokens::TokenLike,
+        tx::{PackedEthSignature, TxEthSignature},
+        ZkSyncTx,
+    };
 
-    use super::{super::test_utils::TestServerConfig, *};
     use crate::{
         // api_server::helpers::try_parse_tx_hash,
         core_api_client::CoreApiClient,
         fee_ticker::{Fee, OutputFeeType::Withdraw, TickerRequest},
         signature_checker::{VerifiedTx, VerifyTxSignatureRequest},
     };
+
+    use super::super::test_utils::{TestServerConfig, TestTransactions};
+    use super::*;
 
     fn submit_txs_loopback() -> (CoreApiClient, actix_web::test::TestServer) {
         async fn send_tx(_tx: Json<SignedZkSyncTx>) -> Json<Result<(), ()>> {
@@ -539,6 +438,10 @@ mod tests {
     }
 
     #[actix_rt::test]
+    #[cfg_attr(
+        not(feature = "api_test"),
+        ignore = "Use `zk test rust-api` command to perform this test"
+    )]
     async fn test_submit_txs_loopback() -> anyhow::Result<()> {
         let (core_client, core_server) = submit_txs_loopback();
 
@@ -557,7 +460,12 @@ mod tests {
     }
 
     #[actix_rt::test]
+    #[cfg_attr(
+        not(feature = "api_test"),
+        ignore = "Use `zk test rust-api` command to perform this test"
+    )]
     async fn test_transactions_scope() -> anyhow::Result<()> {
+        todo!();
         // let (client, server) = TestServer::new().await?;
         //
         // let committed_tx_hash = {
@@ -588,15 +496,15 @@ mod tests {
         // let queries = vec![
         //     (
         //         (committed_tx_hash, Pagination::Before(1), 1),
-        //         vec![TxReceipt::Verified { block: 1 }],
+        //         vec![Receipt::Verified { block: 1 }],
         //     ),
         //     (
         //         (committed_tx_hash, Pagination::Last, 1),
-        //         vec![TxReceipt::Verified { block: 1 }],
+        //         vec![Receipt::Verified { block: 1 }],
         //     ),
         //     (
         //         (committed_tx_hash, Pagination::Before(2), 1),
-        //         vec![TxReceipt::Verified { block: 1 }],
+        //         vec![Receipt::Verified { block: 1 }],
         //     ),
         //     ((committed_tx_hash, Pagination::After(0), 1), vec![]),
         //     ((unknown_tx_hash, Pagination::Last, 1), vec![]),
@@ -618,10 +526,10 @@ mod tests {
         // // Tx status and data for committed transaction.
         // assert_eq!(
         //     client.tx_status(committed_tx_hash).await?,
-        //     Some(TxReceipt::Verified { block: 1 })
+        //     Some(Receipt::Verified { block: 1 })
         // );
         // assert_eq!(
-        //     client.tx_data(committed_tx_hash).await?.unwrap().hash(),
+        //     SignedZkSyncTx::from(client.tx_data(committed_tx_hash).await?.unwrap()).hash(),
         //     committed_tx_hash
         // );
         //
@@ -642,8 +550,11 @@ mod tests {
         //
         //     tx_hash
         // };
-        // assert_eq!(client.tx_status(tx_hash).await?, Some(TxReceipt::Pending));
-        // assert_eq!(client.tx_data(tx_hash).await?.unwrap().hash(), tx_hash);
+        // assert_eq!(client.tx_status(tx_hash).await?, Some(Receipt::Pending));
+        // assert_eq!(
+        //     SignedZkSyncTx::from(client.tx_data(tx_hash).await?.unwrap()).hash(),
+        //     tx_hash
+        // );
         //
         // // Tx status for unknown transaction.
         // let tx_hash = TestServerConfig::gen_zk_txs(1_u64).txs[1].0.hash();
@@ -679,14 +590,13 @@ mod tests {
         //
         // assert_eq!(
         //     client
-        //         .submit_tx_batch(txs, Vec(TxEthSignature::EthereumSignature(signature)))
+        //         .submit_tx_batch(txs, Some(TxEthSignature::EthereumSignature(signature)))
         //         .await?,
         //     tx_hashes
         // );
         //
         // server.stop().await;
         // Ok(())
-        todo!()
     }
 
     /// This test checks the following criteria:
@@ -695,6 +605,10 @@ mod tests {
     /// - Attempt to pay fees in an inappropriate token fails for single batch.
     /// - Batch with an inappropriate token still can be processed if the fee is covered with a common token.
     #[actix_rt::test]
+    #[cfg_attr(
+        not(feature = "api_test"),
+        ignore = "Use `zk test rust-api` command to perform this test"
+    )]
     async fn test_bad_fee_token() -> anyhow::Result<()> {
         todo!()
         // let (client, server) = TestServer::new().await?;
@@ -782,6 +696,10 @@ mod tests {
     /// - Attempt to submit non-withdraw transaction with the disabled fast-processing.
     /// - Attempt to submit withdraw transaction with the enabled fast-processing.
     #[actix_rt::test]
+    #[cfg_attr(
+        not(feature = "api_test"),
+        ignore = "Use `zk test rust-api` command to perform this test"
+    )]
     async fn test_fast_processing_flag() -> anyhow::Result<()> {
         let (client, server) = TestServer::new().await?;
 

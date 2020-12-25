@@ -32,11 +32,19 @@ sudo usermod -a -G docker your_user_name
 After that, you should logout and login again (user groups are refreshed after the login). The problem should be solved
 at this step.
 
+If logging out does not help, restarting the computer should.
+
 ## `Node` & `Yarn`
 
-1. Install `Node` (requires version 14.13.1 or higher).
+1. Install `Node` (requires version 14.14.0 or higher). Since our team attempts to always use the latest LTS version of
+   `Node.js`, we suggest you to install [nvm](https://github.com/nvm-sh/nvm). It will allow you to update `Node.js`
+   version easily in the future.
 
-2. Install `yarn`. Instructions can be found on the [official site](https://classic.yarnpkg.com/en/docs/install/).
+2. Install `yarn`. Instructions can be found on the [official site](https://classic.yarnpkg.com/en/docs/install/). Check
+   if `yarn` is installed by running `yarn -v`.<!-- This is needed for multiparagraph list item.--> <br/><br/> If you
+   face any problems when installing `yarn`, it might be the case that your package manager installed the wrong package.
+   Make sure to thoroughly follow the instructions above on the official website. It contains a lot of troubleshooting
+   guides in it.
 
 3. Run `yarn global add @vue/cli-service`
 
@@ -56,6 +64,14 @@ On debian-based linux:
 sudo apt-get install axel
 ```
 
+Check the version of `axel` with the following command:
+
+```sh
+axel --version
+```
+
+Make sure the version is `2.17.10`.
+
 ## `Rust`
 
 Install the latest `rust` version.
@@ -66,7 +82,7 @@ Verify the `rust` installation:
 
 ```
 rustc --version
-rustc 1.41.0 (5e1a79984 2020-01-27)
+rustc 1.48.0 (7eac88abb 2020-11-16)
 ```
 
 ### `lld`
@@ -110,12 +126,43 @@ On debian-based linux:
 sudo apt-get install libpq-dev
 ```
 
+If you still see the errors, install the `build-essential` package. On debian-based linux:
+
+```sh
+sudo apt install build-essential
+```
+
 ## `sqlx` CLI
 
 Also, we need [`sqlx`](https://github.com/launchbadge/sqlx) CLI (it is used to generate database wrappers):
 
 ```sh
 cargo install --version=0.2.0 sqlx-cli
+```
+
+If you face an error `Could not find directory of OpenSSL installation`, then you should do the following. The
+instruction is targeted on debian-based Linux, but generally, the steps are similar for all OS.
+
+- Install `libssl-dev`:
+
+```sh
+sudo apt install libssl-dev
+```
+
+- Install OpenSSL. Here is
+  [the instruction for Ubuntu](https://www.notion.so/matterlabs/Setup-checklist-056a2e5c3a104608a5a25788520ef0ff#5f34729bdffe496f9d38c46787c640d7),
+  but the steps should be similar for the debian-based Linux distros.
+- Add `OPENSSL_DIR` variable to your environment. This would typically be `/usr/local/ssl`. You can do this by adding
+  the following line to your shell profile file (e.g. `~/.bash_profile`):
+
+```sh
+export OPENSSL_DIR=/usr/local/ssl
+```
+
+- Install `package-config`:
+
+```sh
+sudo apt-get install -y pkg-config
 ```
 
 ## `solc`

@@ -93,8 +93,8 @@ export class Provider {
      * Provides some hardcoded values the `Provider` responsible for
      * without communicating with the network
      */
-    static async newMockProvider(network: string, ethPrivateKey: Uint8Array): Promise<Provider> {
-        const transport = new DummyTransport(network, ethPrivateKey);
+    static async newMockProvider(network: string, ethPrivateKey: Uint8Array, getTokens: Function): Promise<Provider> {
+        const transport = new DummyTransport(network, ethPrivateKey, getTokens);
         const provider = new Provider(transport);
 
         provider.contractAddress = await provider.getContractAddress();
@@ -125,6 +125,11 @@ export class Provider {
 
     async getTokens(): Promise<Tokens> {
         return await this.transport.request('tokens', null);
+    }
+
+    async updateTokenSet(): Promise<void> {
+        const updatedTokenSet = new TokenSet(await this.getTokens());
+        this.tokenSet = updatedTokenSet;
     }
 
     async getState(address: Address): Promise<AccountState> {
