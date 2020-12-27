@@ -13,6 +13,7 @@
       "infrastructure/zcli",
       "infrastructure/explorer",
       "infrastructure/zk",
+      "infrastructure/eth_transfer",
       "core/tests/ts-tests"
     ],
     "nohoist": [
