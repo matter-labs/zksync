@@ -29,12 +29,12 @@ export const command = new Command('lint')
     .description('lint non-rust code')
     .option('--check')
     .arguments('[extension]')
-    .action(async (extension: string | null) => {
+    .action(async (extension: string | null, cmd: Command) => {
         if (extension) {
-            await lint(extension);
-        } else {    
+            await lint(extension, cmd.check);
+        } else {
             for (const ext of EXTENSIONS) {
-                await lint(ext);
+                await lint(ext, cmd.check);
             }
         }
     });
