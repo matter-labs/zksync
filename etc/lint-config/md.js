@@ -5,4 +5,4 @@ module.exports = {
     "no-inline-html": false,
     "line-length": false,
     "fenced-code-language": false
-}
+};

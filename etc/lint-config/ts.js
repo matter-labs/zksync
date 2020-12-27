@@ -1,6 +1,3 @@
-// This file has nothing to do with TSLint library
-// It's just ESLint config file for the typescript language
-
 module.exports = {
     root: true,
     env: {

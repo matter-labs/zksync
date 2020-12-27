@@ -12,7 +12,7 @@ export async function fmt(extension: string, check: boolean = false) {
     const command = check ? 'check' : 'write';
     const files = await utils.getUnignoredFiles(extension);
 
-    await utils.spawn(`yarn --silent prettier --config ${CONFIG_PATH}/${extension}.json --${command} ${files}`);
+    await utils.spawn(`yarn --silent prettier --config ${CONFIG_PATH}/${extension}.js --${command} ${files}`);
 }
 
 export const command = new Command('fmt')
