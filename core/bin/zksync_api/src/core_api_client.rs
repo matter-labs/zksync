@@ -1,5 +1,7 @@
-use crate::tx_error::TxAddError;
+pub use zksync_types::EthBlockId;
 use zksync_types::{tx::TxEthSignature, Address, PriorityOp, SignedZkSyncTx, H256};
+
+use crate::tx_error::TxAddError;
 
 /// `CoreApiClient` is capable of interacting with a private zkSync Core API.
 #[derive(Debug, Clone)]
@@ -7,8 +9,6 @@ pub struct CoreApiClient {
     client: reqwest::Client,
     addr: String,
 }
-
-pub type EthBlockId = u64;
 
 impl CoreApiClient {
     pub fn new(addr: String) -> Self {
@@ -40,12 +40,18 @@ impl CoreApiClient {
     pub async fn get_unconfirmed_deposits(
         &self,
         address: Address,
-    ) -> anyhow::Result<Vec<(EthBlockId, PriorityOp)>> {
+    ) -> anyhow::Result<Vec<PriorityOp>> {
         let endpoint = format!(
             "{}/unconfirmed_deposits/0x{}",
             self.addr,
             hex::encode(address)
         );
+        self.get(&endpoint).await
+    }
+
+    /// Queries information about unconfirmed priority operations for a certain address from a Core.
+    pub async fn get_unconfirmed_ops(&self, address: Address) -> anyhow::Result<Vec<PriorityOp>> {
+        let endpoint = format!("{}/unconfirmed_ops/0x{}", self.addr, hex::encode(address));
         self.get(&endpoint).await
     }
 

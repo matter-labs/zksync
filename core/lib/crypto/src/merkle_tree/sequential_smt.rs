@@ -186,29 +186,22 @@ where
             .collect()
     }
 
-    // pub fn verify_proof(&self, index: ItemIndex, item: T, proof: Vec<(Hash, bool)>) -> bool {
-    //     assert!(index < self.capacity());
-    //     let item_bits = item.get_bits_le();
-    //     let mut hash = self.hasher.hash_bits(item_bits);
-    //     let mut proof_index: ItemIndex = 0;
+    /// Verifies the given proof for the given element and index.
+    pub fn verify_proof(&self, element_index: u32, element: T, proof: Vec<(Hash, bool)>) -> bool {
+        let mut proof_index = 0;
+        let mut aggregated_hash = self.hasher.hash_bits(element.get_bits_le());
+        for (level, (hash, dir)) in proof.into_iter().enumerate() {
+            let (lhs, rhs) = if dir {
+                proof_index |= 1 << level;
+                (hash, aggregated_hash)
+            } else {
+                (aggregated_hash, hash)
+            };
 
-    //     for (i, e) in proof.clone().into_iter().enumerate() {
-    //         if e.1 {
-    //             // current is right
-    //             proof_index |= 1 << i;
-    //             hash = self.hasher.compress(&e.0, &hash, i);
-    //         } else {
-    //             // current is left
-    //             hash = self.hasher.compress(&hash, &e.0, i);
-    //         }
-    //     }
-
-    //     if proof_index != index {
-    //         return false;
-    //     }
-
-    //     hash == self.root_hash()
-    // }
+            aggregated_hash = self.hasher.compress(&lhs, &rhs, level);
+        }
+        proof_index == element_index && aggregated_hash == self.root_hash()
+    }
 
     /// Returns the Merkle root hash of the tree. This operation is O(1).
     pub fn root_hash(&self) -> Hash {

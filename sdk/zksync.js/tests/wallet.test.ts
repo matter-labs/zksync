@@ -9,7 +9,7 @@ describe('Wallet with mock provider', function () {
     async function getWallet(ethPrivateKey: Uint8Array, network: string): Promise<Wallet> {
         const ethWallet = new ethers.Wallet(ethPrivateKey);
         const tokens = getTokens(network);
-        const mockProvider = await Provider.newMockProvider(network, ethPrivateKey, tokens);
+        const mockProvider = await Provider.newMockProvider(network, ethPrivateKey, () => [...tokens]);
         const wallet = await Wallet.fromEthSigner(ethWallet, mockProvider);
         return wallet;
     }

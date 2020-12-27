@@ -150,7 +150,7 @@ class TxSubmitter {
     private constructor(private syncProvider: zksync.Provider, private syncWallet: zksync.Wallet) {}
 
     static async submit(
-        type: 'deposit' | 'transfer',
+        type: 'deposit' | 'transfer' | 'withdraw',
         txDetails: TxDetails,
         fast: boolean = false,
         network: Network = 'localhost'
@@ -193,6 +193,23 @@ class TxSubmitter {
         });
         if (!fast) await depositHandle.awaitReceipt();
         return depositHandle.ethTx.hash;
+    }
+
+    private async withdraw(txDetails: TxDetails, fast: boolean) {
+        const { to: ethAddress, token, amount } = txDetails;
+        if (!(await this.syncWallet.isSigningKeySet())) {
+            const changePubkey = await this.syncWallet.setSigningKey({
+                feeToken: token
+            });
+            await changePubkey.awaitReceipt();
+        }
+        const txHandle = await this.syncWallet.withdrawFromSyncToEthereum({
+            ethAddress,
+            token,
+            amount: this.syncProvider.tokenSet.parseToken(token, amount)
+        });
+        if (!fast) await txHandle.awaitReceipt();
+        return txHandle.txHash;
     }
 }
 

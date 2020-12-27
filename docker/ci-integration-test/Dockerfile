@@ -17,7 +17,7 @@ ENV RUSTUP_HOME=/usr/local/rustup \
     PATH=/usr/local/cargo/bin:$PATH
 RUN curl https://sh.rustup.rs -sSf | bash -s -- -y
 RUN cargo install diesel_cli --no-default-features --features postgres
-RUN cargo install sqlx-cli --git https://github.com/alekseysidorov/sqlx.git
+RUN cargo install --version=0.2.0 sqlx-cli
 
 # Postgresql: Enable trust authentication to allow any connections.
 RUN mkdir -p /etc/postgresql/11/main
@@ -39,7 +39,7 @@ RUN chmod +x solc-static-linux
 RUN mv solc-static-linux /usr/local/bin/solc
 
 # Copy the setup script
-COPY entrypoint.sh /usr/local/bin/
+COPY docker/ci-integration-test/entrypoint.sh /usr/local/bin/
 
 # Setup the environment
 ENV ZKSYNC_HOME=/usr/src/zksync

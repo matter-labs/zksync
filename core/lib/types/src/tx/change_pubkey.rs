@@ -111,7 +111,7 @@ impl ChangePubKey {
         );
         tx.signature = TxSignature::sign_musig(private_key, &tx.get_bytes());
         if !tx.check_correctness() {
-            anyhow::bail!("Transfer is incorrect, check amounts");
+            anyhow::bail!(crate::tx::TRANSACTION_SIGNATURE_ERROR);
         }
         Ok(tx)
     }

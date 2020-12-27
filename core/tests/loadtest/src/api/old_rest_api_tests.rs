@@ -157,7 +157,7 @@ impl RestApiClient {
     }
 
     pub async fn block_tx(&self) -> anyhow::Result<()> {
-        let (block_id, tx_id) = self.pool.read().await.random_tx_id();
+        let (block_id, tx_id) = self.pool.read().await.random_tx_location();
         let url = format!("/blocks/{}/transactions/{}", block_id, tx_id);
         self.get(&url).await?;
         Ok(())
@@ -203,7 +203,7 @@ impl RestApiClient {
 macro_rules! declare_tests {
     (($builder:expr, $client:expr) => $($method:ident,)*) => {
         $builder $(
-            .append(concat!("rest_api/", stringify!($method)), {
+            .append(concat!("rest/old/", stringify!($method)), {
                 let client = $client.clone();
                 move || {
                     let client = client.clone();
