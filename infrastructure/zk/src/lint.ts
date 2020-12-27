@@ -4,10 +4,10 @@ import * as utils from './utils';
 const LINT_COMMANDS = {
     md: 'markdownlint',
     sol: 'solhint',
-    js: 'eslint', 
+    js: 'eslint',
     ts: 'eslint --ext ts'
-    // This is needed to silence typescipt. It is possible to create type 
-    // guards, but unfortunately they would have rather weird type, so 
+    // This is needed to silence typescipt. It is possible to create type
+    // guards, but unfortunately they would have rather weird type, so
     // Record<string, string> is a better solution.
 } as Record<string, string>;
 const EXTENSIONS = Object.keys(LINT_COMMANDS);

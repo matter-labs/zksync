@@ -5,7 +5,18 @@ import readline from 'readline';
 
 export type { ChildProcess } from 'child_process';
 
-const IGNORED_DIRS = ['target', 'node_modules', 'volumes', 'build', 'dist', '.git', 'generated', 'grafonnet-lib'];
+const IGNORED_DIRS = [
+    'target',
+    'node_modules',
+    'volumes',
+    'build',
+    'dist',
+    '.git',
+    'generated',
+    'grafonnet-lib',
+    'prettier-config',
+    'lint-config'
+];
 const IGNORED_FILES = ['KeysWithPlonkVerifier.sol', 'TokenInit.sol', '.tslintrc.js'];
 
 // async executor of shell commands
@@ -23,7 +34,6 @@ export function spawn(command: string) {
     command = command.replace(/\n/g, ' ');
     const child = _spawn(command, { stdio: 'inherit', shell: true });
     return new Promise((resolve, reject) => {
-
         child.on('error', reject);
         child.on('close', (code) => {
             code == 0 ? resolve() : reject(`Child process exited with code ${code}`);

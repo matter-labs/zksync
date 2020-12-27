@@ -8,7 +8,7 @@ export async function fmt(extension: string, check: boolean = false) {
     if (!EXTENSIONS.includes(extension)) {
         throw new Error('Unsupported extension');
     }
-    
+
     const command = check ? 'check' : 'write';
     const files = await utils.getUnignoredFiles(extension);
 
