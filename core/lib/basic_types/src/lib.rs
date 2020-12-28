@@ -13,3 +13,6 @@ pub type BlockNumber = u32;
 pub type Nonce = u32;
 /// Unique identifier of the priority operation in the zkSync network.
 pub type PriorityOpId = u64;
+
+/// Block number in the Ethereum network.
+pub type EthBlockId = u64;

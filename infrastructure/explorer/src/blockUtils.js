@@ -3,8 +3,12 @@ export function isTxPriorityOp(tx) {
 }
 
 export function getFromAddressOfTx(tx) {
-    if (isTxPriorityOp(tx)) {
+    if (tx.op.type === 'Deposit') {
         return tx.op.priority_op.from;
+    }
+
+    if (tx.op.type === 'FullExit') {
+        return tx.op.priority_op.eth_address;
     }
 
     if (tx.op.type === 'ChangePubKey') {
@@ -38,8 +42,12 @@ export function getTxFromFallbackValue(tx) {
 }
 
 export function getTxToAddress(tx) {
-    if (isTxPriorityOp(tx)) {
+    if (tx.op.type === 'Deposit') {
         return tx.op.priority_op.to;
+    }
+
+    if (tx.op.type === 'FullExit') {
+        return tx.op.priority_op.eth_address;
     }
 
     if (tx.op.type === 'ChangePubKey') {
@@ -83,7 +91,7 @@ export function getTxToken(tx) {
 }
 
 export async function getTxAmount(tx, client) {
-    if (isTxPriorityOp(tx)) {
+    if (tx.op.type === 'Deposit') {
         return tx.op.priority_op.amount;
     }
 
