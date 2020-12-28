@@ -477,9 +477,9 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
 
     pub async fn load_committed_block(&mut self, block_number: BlockNumber) -> Option<Block> {
         let start = Instant::now();
-        let r = self.load_commit_op(block_number).await;
+        let op = self.load_commit_op(block_number).await;
         metrics::histogram!("sql.chain.block.load_committed_block", start.elapsed());
-        r.map(|r| r.block)
+        op.map(|op| op.block)
     }
 
     /// Returns the number of last block
