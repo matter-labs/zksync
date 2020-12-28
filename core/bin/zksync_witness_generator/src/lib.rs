@@ -389,7 +389,7 @@ pub fn run_prover_server(
                             web::post().to(required_replicas),
                         )
                 })
-                .bind(&prover_api_opts.url)
+                .bind(&prover_api_opts.bind_addr())
                 .expect("failed to bind")
                 .run()
                 .await

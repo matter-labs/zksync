@@ -124,6 +124,10 @@ impl JsonRpc {
     pub fn http_bind_addr(&self) -> SocketAddr {
         SocketAddr::new("0.0.0.0".parse().unwrap(), self.http_port)
     }
+
+    pub fn ws_bind_addr(&self) -> SocketAddr {
+        SocketAddr::new("0.0.0.0".parse().unwrap(), self.ws_port)
+    }
 }
 
 #[derive(Debug, Deserialize, Clone, PartialEq)]

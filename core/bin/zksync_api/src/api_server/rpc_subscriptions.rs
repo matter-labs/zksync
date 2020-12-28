@@ -181,7 +181,7 @@ pub fn start_ws_server(
     panic_notify: mpsc::Sender<bool>,
     config: &ZkSyncConfig,
 ) {
-    let addr = config.api.json_rpc.http_bind_addr();
+    let addr = config.api.json_rpc.ws_bind_addr();
 
     let (event_sub_sender, event_sub_receiver) = mpsc::channel(2048);
 
