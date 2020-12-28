@@ -287,9 +287,12 @@ async function sendETH(zksWallet: zksync.Wallet, feeAccumulatorAddress: string) 
         let operatorBalance = await ethProvider.getBalance(OPERATOR_FEE_ETH_ADDRESS);
         let feeAccountBalance = await ethProvider.getBalance(ethWallet.address);
 
+        // If the operator has enough funds for work
+        // and fee account have at least half of his threshold
+        // use reserve fee accumulator
         if (
-            feeAccountBalance.gte(ETH_TRANSFER_THRESHOLD) &&
-            operatorBalance.gte(THRESHOLD_AMOUNT_TO_USE_RESERVE_ADDRESS)
+            operatorBalance.gte(THRESHOLD_AMOUNT_TO_USE_RESERVE_ADDRESS) &&
+            feeAccountBalance.gte(ETH_TRANSFER_THRESHOLD.div(2))
         ) {
             // special scenario: send assets to the reserve fee accumulator
             console.log('All funds to be sent to the reserve fee accumulator address');
