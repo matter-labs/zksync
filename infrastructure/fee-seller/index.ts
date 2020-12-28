@@ -29,6 +29,16 @@ import {
 const FEE_ACCOUNT_PRIVATE_KEY = process.env.FEE_ACCOUNT_PRIVATE_KEY;
 const MAX_LIQUIDATION_FEE_PERCENT = parseInt(process.env.MAX_LIQUIDATION_FEE_PERCENT);
 const OPERATOR_FEE_ETH_ADDRESS = process.env.OPERATOR_FEE_ETH_ADDRESS;
+
+/** The threshold amount of the operator address to use reserve fee accumulator due to security reasons */
+const THRESHOLD_AMOUNT_TO_USE_RESERVE_ADDRESS =
+    process.env.THRESHOLD_AMOUNT_TO_USE_RESERVE_ADDRESS
+    ? ethers.utils.parseEther(process.env.THRESHOLD_AMOUNT_TO_USE_RESERVE_ADDRESS)
+    : ethers.utils.parseEther('25.0');
+const RESERVE_FEE_ACCUMULATOR_ADDRESS = process.env.RESERVE_FEE_ACCUMULATOR_ADDRESS;
+/** These assets will be transferred to the reserve fee accumulator address through the ZkSync network */
+const ESTABLISHED_ASSETS_FOR_WITHDRAWING_THROUGH_ZKSYNC = process.env.ESTABLISHED_ASSETS_FOR_WITHDRAWING_THROUGH_ZKSYNC.split(',');
+
 const ETH_NETWORK = process.env.ETH_NETWORK as any;
 const WEB3_URL = process.env.WEB3_URL;
 const MAX_LIQUIDATION_FEE_SLIPPAGE = parseInt(process.env.MAX_LIQUIDATION_FEE_SLIPPAGE) || 5;
@@ -81,6 +91,52 @@ async function withdrawTokens(zksWallet: zksync.Wallet) {
 
             await sendNotification(
                 `Withdrawn ${await fmtTokenWithETHValue(provider, token, amountAfterWithdraw)}, tx hash: ${
+                    transaction.txHash
+                }`,
+                NOTIFICATION_WEBHOOK_URL
+            );
+        }
+    }
+}
+
+/** Transfer established tokens through ZkSync to the accumulator account */
+/** Only tokens from the `establishedTokens` list should be transferred */
+async function transferEstablishedTokens(zksWallet: zksync.Wallet, establishedTokens, feeAccumulatorAddress: string) {
+    const provider = zksWallet.provider;
+    const accountState = await zksWallet.getAccountState();
+    for (const token in accountState.committed.balances) {
+        if (provider.tokenSet.resolveTokenSymbol(token) === 'MLTT') {
+            continue;
+        }
+
+        if (!establishedTokens.includes(provider.tokenSet.resolveTokenSymbol(token))) {
+            continue;
+        }
+
+        const tokenCommittedBalance = BigNumber.from(accountState.committed.balances[token]);
+
+        const transferFee = (await provider.getTransactionFee('Transfer', feeAccumulatorAddress, token)).totalFee;
+
+        if (isOperationFeeAcceptable(tokenCommittedBalance, transferFee, MAX_LIQUIDATION_FEE_PERCENT)) {
+            const amountToTransfer = tokenCommittedBalance.sub(transferFee);
+            console.log(
+                `Transferring token, amount to transfer: ${fmtToken(
+                    provider,
+                    token,
+                    amountToTransfer
+                )}, fee: ${fmtToken(provider, token, transferFee)}`
+            );
+            const transaction = await zksWallet.syncTransfer({
+                to: feeAccumulatorAddress,
+                token,
+                amount: amountToTransfer,
+                fee: transferFee
+            });
+            console.log(`Tx hash: ${transaction.txHash}`);
+            await transaction.awaitReceipt();
+
+            await sendNotification(
+                `Transfer ${await fmtTokenWithETHValue(provider, token, amountToTransfer)}, accumulator address: ${feeAccumulatorAddress}, tx hash: ${
                     transaction.txHash
                 }`,
                 NOTIFICATION_WEBHOOK_URL
@@ -187,8 +243,8 @@ async function sellTokens(zksWallet: zksync.Wallet) {
     }
 }
 
-/** Send ETH to the accumulator account account */
-async function sendETH(zksWallet: zksync.Wallet) {
+/** Send ETH to the accumulator account */
+async function sendETH(zksWallet: zksync.Wallet, feeAccumulatorAddress: string) {
     const ethWallet = zksWallet.ethSigner;
     const ethProvider = ethWallet.provider;
     const ethBalance = await ethWallet.getBalance();
@@ -196,12 +252,12 @@ async function sendETH(zksWallet: zksync.Wallet) {
         const ethTransferFee = BigNumber.from('21000').mul(await ethProvider.getGasPrice());
         const ethToSend = ethBalance.sub(ETH_TRANSFER_THRESHOLD);
         if (isOperationFeeAcceptable(ethToSend, ethTransferFee, MAX_LIQUIDATION_FEE_PERCENT)) {
-            console.log(`Sending ${fmtToken(zksWallet.provider, 'ETH', ethToSend)} to ${OPERATOR_FEE_ETH_ADDRESS}`);
-            const tx = await ethWallet.sendTransaction({ to: OPERATOR_FEE_ETH_ADDRESS, value: ethToSend });
+            console.log(`Sending ${fmtToken(zksWallet.provider, 'ETH', ethToSend)} to ${feeAccumulatorAddress}`);
+            const tx = await ethWallet.sendTransaction({ to: feeAccumulatorAddress, value: ethToSend });
             console.log(`Tx hash: ${tx.hash}`);
 
             await sendNotification(
-                `Send ${fmtToken(zksWallet.provider, 'ETH', ethToSend)}, tx hash: ${tx.hash}`,
+                `Send ${fmtToken(zksWallet.provider, 'ETH', ethToSend)}, accumulator address: ${feeAccumulatorAddress}, tx hash: ${tx.hash}`,
                 NOTIFICATION_WEBHOOK_URL
             );
         }
@@ -220,16 +276,40 @@ async function sendETH(zksWallet: zksync.Wallet) {
             await signingKeyTx.awaitReceipt();
         }
 
-        console.log('Step 1 - withdrawing tokens');
-        await withdrawTokens(zksWallet);
+        let operatorBalance = await ethProvider.getBalance(OPERATOR_FEE_ETH_ADDRESS);
 
-        // Step 2 sell onchain balance tokens
-        console.log('Step 2 - selling tokens');
-        await sellTokens(zksWallet);
+        if (operatorBalance.gte(THRESHOLD_AMOUNT_TO_USE_RESERVE_ADDRESS)) {
+            // special scenario: send assets to the reserve fee accumulator
+            console.log('All funds to be sent to the reserve fee accumulator address');
 
-        // Step 3 - moving Ethereum to the operator account
-        console.log('Step 2 - sending ETH');
-        await sendETH(zksWallet);
+            console.log('Step 1 - transferring established tokens through ZkSync');
+            await transferEstablishedTokens(
+                zksWallet,
+                ESTABLISHED_ASSETS_FOR_WITHDRAWING_THROUGH_ZKSYNC,
+                RESERVE_FEE_ACCUMULATOR_ADDRESS
+            );
+
+            console.log('Step 2 - withdrawing tokens from ZkSync');
+            await withdrawTokens(zksWallet);
+
+            console.log('Step 3 - selling tokens for ETH');
+            await sellTokens(zksWallet);
+
+            console.log('Step 4 - sending ETH to the reserve fee accumulator address');
+            await sendETH(zksWallet, RESERVE_FEE_ACCUMULATOR_ADDRESS);
+        } else {
+            // default scenario: all funds to be sent to the operator
+            console.log('All funds to be sent to the operator address');
+
+            console.log('Step 1 - withdrawing tokens from ZkSync');
+            await withdrawTokens(zksWallet);
+
+            console.log('Step 2 - selling tokens for ETH');
+            await sellTokens(zksWallet);
+
+            console.log('Step 3 - sending ETH to the operator address');
+            await sendETH(zksWallet, OPERATOR_FEE_ETH_ADDRESS);
+        }
     } catch (e) {
         console.error('Failed to proceed with fee liquidation: ', e);
         process.exit(1);

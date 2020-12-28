@@ -28,21 +28,21 @@ export function numberAsFractionInBIPs(number: BigNumberish, baseFraction: BigNu
 
 export function isOperationFeeAcceptable(
     balance: BigNumberish,
-    withdrawFee: BigNumberish,
+    fee: BigNumberish,
     operationFeeThreshold: number
 ): boolean {
     balance = BigNumber.from(balance);
-    withdrawFee = BigNumber.from(withdrawFee);
+    fee = BigNumber.from(fee);
 
     if (balance.eq(0)) {
         return false;
     }
 
-    if (balance.lte(withdrawFee)) {
+    if (balance.lte(fee)) {
         return false;
     }
 
-    return numberAsFractionInBIPs(withdrawFee, balance).lte(operationFeeThreshold * 100);
+    return numberAsFractionInBIPs(fee, balance).lte(operationFeeThreshold * 100);
 }
 
 export async function approveTokenIfNotApproved(signer: ethers.Signer, tokenAddress: string, contractAddress: string) {
