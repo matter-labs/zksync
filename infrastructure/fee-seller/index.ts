@@ -31,13 +31,14 @@ const MAX_LIQUIDATION_FEE_PERCENT = parseInt(process.env.MAX_LIQUIDATION_FEE_PER
 const OPERATOR_FEE_ETH_ADDRESS = process.env.OPERATOR_FEE_ETH_ADDRESS;
 
 /** The threshold amount of the operator address to use reserve fee accumulator due to security reasons */
-const THRESHOLD_AMOUNT_TO_USE_RESERVE_ADDRESS =
-    process.env.THRESHOLD_AMOUNT_TO_USE_RESERVE_ADDRESS
+const THRESHOLD_AMOUNT_TO_USE_RESERVE_ADDRESS = process.env.THRESHOLD_AMOUNT_TO_USE_RESERVE_ADDRESS
     ? ethers.utils.parseEther(process.env.THRESHOLD_AMOUNT_TO_USE_RESERVE_ADDRESS)
     : ethers.utils.parseEther('25.0');
 const RESERVE_FEE_ACCUMULATOR_ADDRESS = process.env.RESERVE_FEE_ACCUMULATOR_ADDRESS;
 /** These assets will be transferred to the reserve fee accumulator address through the ZkSync network */
-const ESTABLISHED_ASSETS_FOR_WITHDRAWING_THROUGH_ZKSYNC = process.env.ESTABLISHED_ASSETS_FOR_WITHDRAWING_THROUGH_ZKSYNC.split(',');
+const ESTABLISHED_ASSETS_FOR_WITHDRAWING_THROUGH_ZKSYNC = process.env.ESTABLISHED_ASSETS_FOR_WITHDRAWING_THROUGH_ZKSYNC.split(
+    ','
+);
 
 const ETH_NETWORK = process.env.ETH_NETWORK as any;
 const WEB3_URL = process.env.WEB3_URL;
@@ -136,9 +137,11 @@ async function transferEstablishedTokens(zksWallet: zksync.Wallet, establishedTo
             await transaction.awaitReceipt();
 
             await sendNotification(
-                `Transfer ${await fmtTokenWithETHValue(provider, token, amountToTransfer)}, accumulator address: ${feeAccumulatorAddress}, tx hash: ${
-                    transaction.txHash
-                }`,
+                `Transfer ${await fmtTokenWithETHValue(
+                    provider,
+                    token,
+                    amountToTransfer
+                )}, accumulator address: ${feeAccumulatorAddress}, tx hash: ${transaction.txHash}`,
                 NOTIFICATION_WEBHOOK_URL
             );
         }
@@ -257,7 +260,11 @@ async function sendETH(zksWallet: zksync.Wallet, feeAccumulatorAddress: string) 
             console.log(`Tx hash: ${tx.hash}`);
 
             await sendNotification(
-                `Send ${fmtToken(zksWallet.provider, 'ETH', ethToSend)}, accumulator address: ${feeAccumulatorAddress}, tx hash: ${tx.hash}`,
+                `Send ${fmtToken(
+                    zksWallet.provider,
+                    'ETH',
+                    ethToSend
+                )}, accumulator address: ${feeAccumulatorAddress}, tx hash: ${tx.hash}`,
                 NOTIFICATION_WEBHOOK_URL
             );
         }
