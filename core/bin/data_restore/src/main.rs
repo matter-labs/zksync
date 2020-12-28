@@ -106,7 +106,7 @@ async fn main() {
         config.contract_addr,
         ETH_BLOCKS_STEP,
         END_ETH_BLOCKS_OFFSET,
-        config.available_block_chunk_sizes,
+        config.available_block_chunk_sizes.clone(),
         finite_mode,
         final_hash,
     );
@@ -116,7 +116,7 @@ async fn main() {
     if opt.genesis {
         // We have to load pre-defined tokens into the database before restoring state,
         // since these tokens do not have a corresponding Ethereum events.
-        add_tokens_to_storage(&mut interactor, &config.network).await;
+        add_tokens_to_storage(&mut interactor, &config.eth_network).await;
 
         driver
             .set_genesis_state(&mut interactor, config.genesis_tx_hash)

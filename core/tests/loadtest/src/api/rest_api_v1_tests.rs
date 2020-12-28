@@ -5,13 +5,13 @@
 use std::str::FromStr;
 
 // External uses
-
-// Workspace uses
 use futures::prelude::*;
 use rand::{thread_rng, Rng};
-use zksync_api::{
-    api_server::v1::MAX_LIMIT,
-    client::{AccountQuery, AccountReceipts, Client, TokenPriceKind},
+
+// Workspace uses
+use zksync_api_client::rest::v1::{
+    accounts::{AccountQuery, AccountReceipts},
+    Client, TokenPriceKind, MAX_LIMIT,
 };
 use zksync_config::test_config::TestConfig;
 use zksync_types::{Address, TokenLike};

@@ -23,6 +23,7 @@ zksync_crypto = { path = "../../lib/crypto", version = "1.0" }
 zksync_config = { path = "../../lib/config", version = "1.0" }
 zksync_utils = { path = "../../lib/utils", version = "1.0" }
 zksync_contracts = { path = "../../lib/contracts", version = "1.0" }
+zksync_api_client  = { path = "../../lib/api_client", version = "0.1" }
 
 hex = "0.4"
 ethabi = "12.0.0"

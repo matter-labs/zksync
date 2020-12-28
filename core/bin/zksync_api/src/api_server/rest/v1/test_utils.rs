@@ -10,6 +10,7 @@ use once_cell::sync::Lazy;
 use tokio::sync::Mutex;
 
 // Workspace uses
+use zksync_config::configs::ZkSyncConfig;
 use zksync_crypto::rand::{SeedableRng, XorShiftRng};
 use zksync_storage::{
     chain::operations::records::NewExecutedPriorityOperation,
@@ -30,8 +31,7 @@ use zksync_types::{
 };
 
 // Local uses
-use super::client::Client;
-use zksync_config::configs::ZkSyncConfig;
+use super::Client;
 
 /// Serial ID of the verified priority operation.
 pub const VERIFIED_OP_SERIAL_ID: u64 = 10;

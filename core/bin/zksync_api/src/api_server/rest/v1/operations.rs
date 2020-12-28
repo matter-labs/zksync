@@ -2,28 +2,24 @@
 
 // Built-in uses
 
-use std::{fmt::Display, str::FromStr};
-
 // External uses
 use actix_web::{
     web::{self, Json},
     Scope,
 };
-use serde::{Deserialize, Serialize};
 
 // Workspace uses
+use zksync_api_client::rest::v1::{
+    PriorityOpData, PriorityOpQuery, PriorityOpQueryError, PriorityOpReceipt,
+};
 use zksync_storage::{
     chain::operations::records::StoredExecutedPriorityOperation, ConnectionPool, QueryResult,
     StorageProcessor,
 };
-use zksync_types::{BlockNumber, ZkSyncOp, H256};
+use zksync_types::{BlockNumber, H256};
 
 // Local uses
-use super::{
-    client::{Client, ClientError},
-    transactions::Receipt,
-    Error as ApiError, JsonResult,
-};
+use super::{transactions::Receipt, Error as ApiError, JsonResult};
 
 /// Shared data between `api/v1/operations` endpoints.
 #[derive(Debug, Clone)]
@@ -42,8 +38,8 @@ impl ApiOperationsData {
     ) -> QueryResult<Option<PriorityOpData>> {
         let mut storage = self.pool.access_storage().await?;
 
-        let executed_op = query.executed_priority_op(&mut storage).await?;
-        Ok(executed_op.map(PriorityOpData::from))
+        let executed_op = executed_priority_op_for_query(query, &mut storage).await?;
+        Ok(executed_op.map(convert::priority_op_data_from_stored))
     }
 
     pub async fn priority_op(
@@ -52,7 +48,7 @@ impl ApiOperationsData {
     ) -> QueryResult<Option<PriorityOpReceipt>> {
         let mut storage = self.pool.access_storage().await?;
 
-        let executed_op = query.executed_priority_op(&mut storage).await?;
+        let executed_op = executed_priority_op_for_query(query, &mut storage).await?;
         let executed_op = if let Some(executed_op) = executed_op {
             executed_op
         } else {
@@ -94,138 +90,46 @@ impl ApiOperationsData {
     }
 }
 
-// Data transfer objects.
+async fn executed_priority_op_for_query(
+    query: PriorityOpQuery,
+    storage: &mut StorageProcessor<'_>,
+) -> QueryResult<Option<StoredExecutedPriorityOperation>> {
+    let mut schema = storage.chain().operations_schema();
 
-/// Priority op search query.
-#[derive(Debug, Serialize, Copy, Clone, PartialEq, Eq, Ord, PartialOrd, Hash)]
-#[serde(untagged, rename_all = "camelCase")]
-pub enum PriorityOpQuery {
-    /// Search priority operation by serial ID.
-    Id(u64),
-    /// Search priority operation by hash.
-    Hash(H256),
-}
-
-#[derive(Debug, Deserialize, Serialize, Clone, PartialEq)]
-#[serde(rename_all = "camelCase")]
-pub struct PriorityOpReceipt {
-    #[serde(flatten)]
-    pub status: Receipt,
-    pub index: Option<u32>,
-}
-
-#[derive(Debug, Deserialize, Serialize, Clone)]
-#[serde(rename_all = "camelCase")]
-pub struct PriorityOpData {
-    pub data: ZkSyncOp,
-    pub eth_hash: H256,
-    pub serial_id: u64,
-}
-
-impl From<u64> for PriorityOpQuery {
-    fn from(v: u64) -> Self {
-        Self::Id(v)
-    }
-}
-
-impl From<H256> for PriorityOpQuery {
-    fn from(v: H256) -> Self {
-        Self::Hash(v)
-    }
-}
-
-impl Display for PriorityOpQuery {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::Id(id) => id.fmt(f),
-            Self::Hash(hash) => write!(f, "{:x}", hash),
+    match query {
+        PriorityOpQuery::Id(serial_id) => {
+            schema
+                .get_executed_priority_operation(serial_id as u32)
+                .await
+        }
+        PriorityOpQuery::Hash(eth_hash) => {
+            schema
+                .get_executed_priority_operation_by_hash(eth_hash.as_bytes())
+                .await
         }
     }
 }
 
-impl FromStr for PriorityOpQuery {
-    type Err = String;
+mod convert {
+    use super::*;
 
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        if let Ok(id) = s.parse::<u64>() {
-            return Ok(Self::Id(id));
-        }
-
-        s.parse::<H256>().map(Self::Hash).map_err(|e| e.to_string())
-    }
-}
-
-impl PriorityOpQuery {
-    /// Additional parser because actix-web doesn't understand enums in path extractor.
-    fn from_path(path: String) -> Result<Self, ApiError> {
-        path.parse().map_err(|err| {
-            ApiError::bad_request(
-                "Must be specified either a serial ID or a priority operation hash.",
-            )
-            .detail(format!("An error occurred: {}", err))
-        })
-    }
-
-    async fn executed_priority_op(
-        self,
-        storage: &mut StorageProcessor<'_>,
-    ) -> QueryResult<Option<StoredExecutedPriorityOperation>> {
-        match self {
-            Self::Id(serial_id) => {
-                storage
-                    .chain()
-                    .operations_schema()
-                    .get_executed_priority_operation(serial_id as u32)
-                    .await
+    pub fn priority_op_data_from_stored(v: StoredExecutedPriorityOperation) -> PriorityOpData {
+        PriorityOpData {
+                data: serde_json::from_value(v.operation.clone()).unwrap_or_else(|err|
+                    panic!(
+                        "Database provided an incorrect priority operation data: {:?}, an error occurred: {}",
+                        v.operation, err
+                    )
+                ),
+                eth_hash: H256::from_slice(&v.eth_hash),
+                serial_id: v.priority_op_serialid as u64,
             }
-            Self::Hash(eth_hash) => {
-                storage
-                    .chain()
-                    .operations_schema()
-                    .get_executed_priority_operation_by_hash(eth_hash.as_bytes())
-                    .await
-            }
+    }
+
+    impl From<PriorityOpQueryError> for ApiError {
+        fn from(err: PriorityOpQueryError) -> Self {
+            ApiError::bad_request("Cannot parse PrioorityOpQuery").detail(err.detail)
         }
-    }
-}
-
-impl From<StoredExecutedPriorityOperation> for PriorityOpData {
-    fn from(v: StoredExecutedPriorityOperation) -> Self {
-        Self {
-            data: serde_json::from_value(v.operation.clone()).unwrap_or_else(|err|
-                panic!(
-                    "Database provided an incorrect priority operation data: {:?}, an error occurred: {}",
-                    v.operation, err
-                )
-            ),
-            eth_hash: H256::from_slice(&v.eth_hash),
-            serial_id: v.priority_op_serialid as u64,
-        }
-    }
-}
-
-// Client implementation
-
-/// Operations API part.
-impl Client {
-    /// Gets priority operation receipt.
-    pub async fn priority_op(
-        &self,
-        query: impl Into<PriorityOpQuery>,
-    ) -> Result<Option<PriorityOpReceipt>, ClientError> {
-        self.get(&format!("operations/{}", query.into()))
-            .send()
-            .await
-    }
-
-    /// Gets priority operation receipt.
-    pub async fn priority_op_data(
-        &self,
-        query: impl Into<PriorityOpQuery>,
-    ) -> Result<Option<PriorityOpData>, ClientError> {
-        self.get(&format!("operations/{}/data", query.into()))
-            .send()
-            .await
     }
 }
 

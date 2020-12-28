@@ -1,17 +1,22 @@
 use std::collections::HashMap;
+
 // External uses
 use jsonrpc_core::{Error, Result};
 use num::{BigUint, ToPrimitive};
 use serde::{Deserialize, Serialize};
-use zksync_storage::StorageProcessor;
+
 // Workspace uses
+use zksync_storage::StorageProcessor;
 use zksync_types::{
     tx::TxEthSignature, Account, AccountId, Address, Nonce, PriorityOp, PubKeyHash,
     ZkSyncPriorityOp, ZkSyncTx,
 };
 use zksync_utils::{BigUintSerdeAsRadix10Str, BigUintSerdeWrapper};
+
 // Local uses
-use crate::{api_server::v1::accounts::AccountState, utils::token_db_cache::TokenDBCache};
+use crate::{
+    api_server::v1::accounts::account_state_from_storage, utils::token_db_cache::TokenDBCache,
+};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -34,7 +39,7 @@ impl ResponseAccountState {
         tokens: &TokenDBCache,
         account: Account,
     ) -> Result<Self> {
-        let inner = AccountState::from_storage(storage, tokens, &account)
+        let inner = account_state_from_storage(storage, tokens, &account)
             .await
             .map_err(|_| Error::internal_error())?;
 
