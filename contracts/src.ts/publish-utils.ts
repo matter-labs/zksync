@@ -25,7 +25,7 @@ export async function publishSourceCodeToEtherscan(
 
     const data = {
         action: 'verifysourcecode', // Do not change
-        apikey: process.env.ETHERSCAN_API_KEY, // A valid API-Key is required
+        apikey: process.env.MISC_ETHERSCAN_API_KEY, // A valid API-Key is required
         codeformat: 'solidity-standard-json-input',
         compilerversion: 'v0.5.17+commit.d19bba13', // from http://etherscan.io/solcversions
         constructorArguements: constructorArguments, // if applicable. How nice, they have a typo in their api

@@ -2,6 +2,7 @@ import { Command } from 'commander';
 import fs from 'fs';
 import dotenv from 'dotenv';
 import * as utils from './utils';
+import * as config from './config';
 
 export function get() {
     fs.readdirSync('etc/env').forEach((file) => {
@@ -48,13 +49,13 @@ export function reload() {
 }
 
 // loads environment variables
-export function load() {
+export async function load() {
     const current = 'etc/env/current';
     const zksyncEnv =
         process.env.ZKSYNC_ENV || (fs.existsSync(current) ? fs.readFileSync(current).toString().trim() : 'dev');
     const envFile = `etc/env/${zksyncEnv}.env`;
     if (zksyncEnv == 'dev' && !fs.existsSync('etc/env/dev.env')) {
-        fs.copyFileSync('etc/env/dev.env.example', 'etc/env/dev.env');
+        await config.compileConfig();
     }
     if (!fs.existsSync(envFile)) {
         throw new Error('ZkSync config file not found: ' + envFile);
