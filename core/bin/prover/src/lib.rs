@@ -1,6 +1,7 @@
 pub mod auth_utils;
 pub mod cli_utils;
 pub mod client;
+pub mod dummy_prover;
 pub mod plonk_step_by_step_prover;
 
 // Built-in deps
@@ -80,6 +81,7 @@ pub trait ProverImpl {
     fn create_from_config(config: Self::Config) -> Self;
     fn get_request_aux_data(&self) -> ProverInputRequestAuxData {
         Default::default()
+        // TODO: Add the ability to define different config (ZKS-283).
     }
     /// Resource heavy operation
     fn create_proof(&self, data: JobRequestData) -> anyhow::Result<JobResultData>;
@@ -136,7 +138,7 @@ async fn heartbeat_future_handle<CLIENT>(
     }
 }
 
-async fn prover_work_cycle<PROVER, CLIENT>(
+pub async fn prover_work_cycle<PROVER, CLIENT>(
     mut prover: PROVER,
     client: CLIENT,
     shutdown: ShutdownRequest,
