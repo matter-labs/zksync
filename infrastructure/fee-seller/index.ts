@@ -251,12 +251,13 @@ async function sendETH(zksWallet: zksync.Wallet, feeAccumulatorAddress: string) 
     const ethWallet = zksWallet.ethSigner;
     const ethProvider = ethWallet.provider;
     const ethBalance = await ethWallet.getBalance();
-    const ethTransferFee = BigNumber.from('21000').mul(await ethProvider.getGasPrice());
+    const gasPrice = await ethProvider.getGasPrice();
+    const ethTransferFee = BigNumber.from('21000').mul(gasPrice);
     if (ethBalance.gt(ETH_TRANSFER_THRESHOLD.add(ethTransferFee))) {
         const ethToSend = ethBalance.sub(ETH_TRANSFER_THRESHOLD.add(ethTransferFee));
         if (isOperationFeeAcceptable(ethToSend, ethTransferFee, MAX_LIQUIDATION_FEE_PERCENT)) {
             console.log(`Sending ${fmtToken(zksWallet.provider, 'ETH', ethToSend)} to ${feeAccumulatorAddress}`);
-            const tx = await ethWallet.sendTransaction({ to: feeAccumulatorAddress, value: ethToSend });
+            const tx = await ethWallet.sendTransaction({ to: feeAccumulatorAddress, value: ethToSend, gasPrice });
             console.log(`Tx hash: ${tx.hash}`);
 
             await sendNotification(
