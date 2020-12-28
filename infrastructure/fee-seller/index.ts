@@ -251,9 +251,9 @@ async function sendETH(zksWallet: zksync.Wallet, feeAccumulatorAddress: string) 
     const ethWallet = zksWallet.ethSigner;
     const ethProvider = ethWallet.provider;
     const ethBalance = await ethWallet.getBalance();
-    if (ethBalance.gt(ETH_TRANSFER_THRESHOLD)) {
-        const ethTransferFee = BigNumber.from('21000').mul(await ethProvider.getGasPrice());
-        const ethToSend = ethBalance.sub(ETH_TRANSFER_THRESHOLD);
+    const ethTransferFee = BigNumber.from('21000').mul(await ethProvider.getGasPrice());
+    if (ethBalance.gt(ETH_TRANSFER_THRESHOLD.add(ethTransferFee))) {
+        const ethToSend = ethBalance.sub(ETH_TRANSFER_THRESHOLD.add(ethTransferFee));
         if (isOperationFeeAcceptable(ethToSend, ethTransferFee, MAX_LIQUIDATION_FEE_PERCENT)) {
             console.log(`Sending ${fmtToken(zksWallet.provider, 'ETH', ethToSend)} to ${feeAccumulatorAddress}`);
             const tx = await ethWallet.sendTransaction({ to: feeAccumulatorAddress, value: ethToSend });
@@ -284,8 +284,12 @@ async function sendETH(zksWallet: zksync.Wallet, feeAccumulatorAddress: string) 
         }
 
         let operatorBalance = await ethProvider.getBalance(OPERATOR_FEE_ETH_ADDRESS);
+        let feeAccountBalance = await ethProvider.getBalance(ethWallet.address);
 
-        if (operatorBalance.gte(THRESHOLD_AMOUNT_TO_USE_RESERVE_ADDRESS)) {
+        if (
+            feeAccountBalance.gte(ETH_TRANSFER_THRESHOLD) &&
+            operatorBalance.gte(THRESHOLD_AMOUNT_TO_USE_RESERVE_ADDRESS)
+        ) {
             // special scenario: send assets to the reserve fee accumulator
             console.log('All funds to be sent to the reserve fee accumulator address');
 

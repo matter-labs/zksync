@@ -27,22 +27,22 @@ export function numberAsFractionInBIPs(number: BigNumberish, baseFraction: BigNu
 }
 
 export function isOperationFeeAcceptable(
-    balance: BigNumberish,
+    amount: BigNumberish,
     fee: BigNumberish,
     operationFeeThreshold: number
 ): boolean {
-    balance = BigNumber.from(balance);
+    amount = BigNumber.from(amount);
     fee = BigNumber.from(fee);
 
-    if (balance.eq(0)) {
+    if (amount.eq(0)) {
         return false;
     }
 
-    if (balance.lte(fee)) {
+    if (amount.lte(fee)) {
         return false;
     }
 
-    return numberAsFractionInBIPs(fee, balance).lte(operationFeeThreshold * 100);
+    return numberAsFractionInBIPs(fee, amount).lte(operationFeeThreshold * 100);
 }
 
 export async function approveTokenIfNotApproved(signer: ethers.Signer, tokenAddress: string, contractAddress: string) {
