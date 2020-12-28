@@ -21,7 +21,7 @@ const ethTestConfig = JSON.parse(fs.readFileSync(`${testConfigPath}/eth.json`, {
     });
     parser.addArgument('--genesisRoot', { required: true, help: 'genesis root' });
     const args = parser.parseArgs(process.argv.slice(2));
-    process.env.GENESIS_ROOT = args.genesisRoot;
+    process.env.CONTRACTS_GENESIS_ROOT = args.genesisRoot;
 
     if (process.env.CHAIN_ETH_ETH_NETWORK !== 'test') {
         console.error('This deploy script is only for localhost-test network');

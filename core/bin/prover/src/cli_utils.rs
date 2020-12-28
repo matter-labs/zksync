@@ -16,9 +16,9 @@ use zksync_utils::{get_env, parse_env};
 use crate::{client, start, ApiClient, ProverConfig, ProverImpl, ShutdownRequest};
 
 fn api_client_from_env(worker_name: &str) -> client::ApiClient {
-    let server_api_url = parse_env("PROVER_SERVER_URL");
-    let request_timout = Duration::from_secs(parse_env::<u64>("REQ_SERVER_TIMEOUT"));
-    let secret = get_env("PROVER_SECRET_AUTH");
+    let server_api_url = parse_env("API_PROVER_URL");
+    let request_timout = Duration::from_secs(parse_env::<u64>("PROVER_PROVER_REQUEST_TIMEOUT"));
+    let secret = get_env("API_PROVER_SECRET_AUTH");
     client::ApiClient::new(&server_api_url, worker_name, request_timout, &secret)
 }
 

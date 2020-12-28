@@ -25,14 +25,11 @@ async fn spawn_server(prover_timeout: time::Duration, rounds_interval: time::Dur
     // TODO: make single server spawn for all tests (ZKS-99).
     let bind_to = "127.0.0.1:8088";
 
-    let mut prover_options = ZkSyncConfig::from_env();
-    prover_options
-        .prover
-        .witness_generator
-        .prepare_data_interval = rounds_interval.as_millis() as u64;
-    prover_options.prover.core.gone_timeout = prover_timeout.as_millis() as u64;
-    prover_options.api.prover.url = bind_to.into();
-    prover_options.api.prover.secret_auth = CORRECT_PROVER_SECRET_AUTH.to_string();
+    let mut config = ZkSyncConfig::from_env();
+    config.prover.witness_generator.prepare_data_interval = rounds_interval.as_millis() as u64;
+    config.prover.core.gone_timeout = prover_timeout.as_millis() as u64;
+    config.api.prover.url = bind_to.into();
+    config.api.prover.secret_auth = CORRECT_PROVER_SECRET_AUTH.to_string();
 
     let conn_pool = connect_to_db().await;
     let (tx, _rx) = mpsc::channel(1);

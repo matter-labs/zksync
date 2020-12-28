@@ -164,7 +164,7 @@ export class Deployer {
                 this.addresses.GovernanceTarget,
                 this.addresses.VerifierTarget,
                 this.addresses.ZkSyncTarget,
-                process.env.CONTRACTS_GENESIS_TX_HASH,
+                process.env.CONTRACTS_GENESIS_ROOT,
                 process.env.ETH_SENDER_SENDER_OPERATOR_COMMIT_ETH_ADDR,
                 this.governorAddress,
                 process.env.CHAIN_STATE_KEEPER_FEE_ACCOUNT_ADDR
@@ -234,7 +234,7 @@ export class Deployer {
             encodeProxyContstuctorArgs(
                 this.contracts.proxy,
                 this.addresses.ZkSyncTarget,
-                [this.addresses.Governance, this.addresses.Verifier, process.env.CONTRACTS_GENESIS_TX_HASH],
+                [this.addresses.Governance, this.addresses.Verifier, process.env.CONTRACTS_GENESIS_ROOT],
                 ['address', 'address', 'bytes32']
             )
         );
