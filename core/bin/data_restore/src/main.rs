@@ -64,7 +64,7 @@ impl ContractsConfig {
         let chain_opts = ChainConfig::from_env();
 
         Self {
-            eth_network: chain_opts.eth.eth_network,
+            eth_network: chain_opts.eth.network,
             governance_addr: contracts_opts.governance_addr,
             genesis_tx_hash: contracts_opts.genesis_tx_hash,
             contract_addr: contracts_opts.contract_addr,
@@ -116,7 +116,7 @@ async fn main() {
     if opt.genesis {
         // We have to load pre-defined tokens into the database before restoring state,
         // since these tokens do not have a corresponding Ethereum events.
-        add_tokens_to_storage(&mut interactor, &config.eth_network).await;
+        add_tokens_to_storage(&mut interactor, &config.network).await;
 
         driver
             .set_genesis_state(&mut interactor, config.genesis_tx_hash)

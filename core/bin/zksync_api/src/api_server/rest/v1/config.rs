@@ -29,7 +29,7 @@ impl ApiConfigData {
         Self {
             contract_address: config.contracts.contract_addr,
             deposit_confirmations: config.eth_watch.confirmations_for_eth_event,
-            network: config.chain.eth.eth_network.parse().unwrap(),
+            network: config.chain.eth.network.parse().unwrap(),
         }
     }
 }
@@ -106,7 +106,7 @@ mod tests {
             cfg.env_options.confirmations_for_eth_event
         );
 
-        assert_eq!(client.network().await?, cfg.env_options.eth_network);
+        assert_eq!(client.network().await?, cfg.env_options.network);
         assert_eq!(
             client.contracts().await?,
             Contracts {

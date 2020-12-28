@@ -155,7 +155,7 @@ export async function testkit(command: string, timeout: number) {
         }
     });
 
-    process.env.CHAIN_ETH_ETH_NETWORK = 'test';
+    process.env.CHAIN_ETH_NETWORK = 'test';
     await run.verifyKeys.unpack();
     await contract.build();
 

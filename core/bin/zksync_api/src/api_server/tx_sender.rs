@@ -121,7 +121,6 @@ impl TxSender {
         ticker_request_sender: mpsc::Sender<TickerRequest>,
         config: &ZkSyncConfig,
     ) -> Self {
-        let enforce_pubkey_change_fee = true;
         let forced_exit_minimum_account_age = chrono::Duration::seconds(
             config.api.common.forced_exit_minimum_account_age_secs as i64,
         );
@@ -133,7 +132,7 @@ impl TxSender {
             ticker_requests: ticker_request_sender,
             tokens: TokenDBCache::new(),
 
-            enforce_pubkey_change_fee,
+            enforce_pubkey_change_fee: config.api.common.enforce_pubkey_change_fee,
             forced_exit_minimum_account_age,
         }
     }

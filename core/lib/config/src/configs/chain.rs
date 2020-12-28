@@ -49,7 +49,7 @@ pub struct Eth {
     /// the remaining withdrawals will go to the next block.
     pub max_number_of_withdrawals_per_block: usize,
     /// Name of the used Ethereum network, e.g. `localhost` or `rinkeby`.
-    pub eth_network: String,
+    pub network: String,
 }
 
 #[derive(Debug, Deserialize, Clone, PartialEq)]
@@ -90,7 +90,7 @@ mod tests {
             },
             eth: Eth {
                 max_number_of_withdrawals_per_block: 10,
-                eth_network: "localhost".into(),
+                network: "localhost".into(),
             },
             state_keeper: StateKeeper {
                 block_chunk_sizes: vec![6, 30],
@@ -111,7 +111,7 @@ CHAIN_CIRCUIT_SUPPORTED_BLOCK_CHUNKS_SIZES_SETUP_POWERS="21,22,23,24,25,26"
 CHAIN_CIRCUIT_ACCOUNT_TREE_DEPTH="32"
 CHAIN_CIRCUIT_BALANCE_TREE_DEPTH="11"
 CHAIN_ETH_MAX_NUMBER_OF_WITHDRAWALS_PER_BLOCK="10"
-CHAIN_ETH_ETH_NETWORK="localhost"
+CHAIN_ETH_NETWORK="localhost"
 CHAIN_STATE_KEEPER_BLOCK_CHUNK_SIZES="6,30"
 CHAIN_STATE_KEEPER_MINIBLOCK_ITERATION_INTERVAL="200"
 CHAIN_STATE_KEEPER_MINIBLOCK_ITERATIONS="10"

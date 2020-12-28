@@ -32,7 +32,7 @@ const ethTestConfig = JSON.parse(fs.readFileSync(`${testConfigPath}/eth.json`, {
 
     const contractCode = readContractCode('TestnetERC20Token');
 
-    if (process.env.CHAIN_ETH_ETH_NETWORK === 'mainnet') {
+    if (process.env.CHAIN_ETH_NETWORK === 'mainnet') {
         throw new Error('Test ERC20 tokens should not be deployed to mainnet');
     }
 
@@ -47,7 +47,7 @@ const ethTestConfig = JSON.parse(fs.readFileSync(`${testConfigPath}/eth.json`, {
             try {
                 console.log(`Publishing code for : ${token.symbol}, ${token.address}`);
                 const constructorArgs = [
-                    `${token.name} (${process.env.CHAIN_ETH_ETH_NETWORK})`,
+                    `${token.name} (${process.env.CHAIN_ETH_NETWORK})`,
                     token.symbol,
                     token.decimals
                 ];
@@ -64,7 +64,7 @@ const ethTestConfig = JSON.parse(fs.readFileSync(`${testConfigPath}/eth.json`, {
     const result = [];
 
     for (const token of mainnetTokens) {
-        const constructorArgs = [`${token.name} (${process.env.CHAIN_ETH_ETH_NETWORK})`, token.symbol, token.decimals];
+        const constructorArgs = [`${token.name} (${process.env.CHAIN_ETH_NETWORK})`, token.symbol, token.decimals];
 
         console.log(`Deploying testnet ERC20: ${constructorArgs.toString()}`);
         const erc20 = await deployContract(wallet, contractCode, constructorArgs, { gasLimit: 800000 });
@@ -75,7 +75,7 @@ const ethTestConfig = JSON.parse(fs.readFileSync(`${testConfigPath}/eth.json`, {
     }
 
     fs.writeFileSync(
-        `${process.env.ZKSYNC_HOME}/etc/tokens/${process.env.CHAIN_ETH_ETH_NETWORK}.json`,
+        `${process.env.ZKSYNC_HOME}/etc/tokens/${process.env.CHAIN_ETH_NETWORK}.json`,
         JSON.stringify(result, null, 2)
     );
 })();

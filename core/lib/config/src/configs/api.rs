@@ -46,6 +46,7 @@ pub struct Common {
     // Determines the required minimum account age for `ForcedExit` operation to be allowed.
     // Type of value is seconds.
     pub forced_exit_minimum_account_age_secs: u64,
+    pub enforce_pubkey_change_fee: bool,
 }
 
 #[derive(Debug, Deserialize, Clone, PartialEq)]
@@ -147,6 +148,7 @@ mod tests {
             common: Common {
                 caches_size: 10_000,
                 forced_exit_minimum_account_age_secs: 0,
+                enforce_pubkey_change_fee: true,
             },
             admin: AdminApi {
                 port: 8080,
@@ -181,6 +183,7 @@ mod tests {
         let config = r#"
 API_COMMON_CACHES_SIZE="10000"
 API_COMMON_FORCED_EXIT_MINIMUM_ACCOUNT_AGE_SECS="0"
+API_COMMON_ENFORCE_PUBKEY_CHANGE_FEE=true
 API_ADMIN_PORT="8080"
 API_ADMIN_URL="http://127.0.0.1:8080"
 API_ADMIN_SECRET_AUTH="sample"
