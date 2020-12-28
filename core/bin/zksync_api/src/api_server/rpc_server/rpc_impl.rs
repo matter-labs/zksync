@@ -26,9 +26,12 @@ impl RpcApp {
         let account_state = self.get_account_state(address).await?;
 
         let depositing_ops = self.get_ongoing_deposits_impl(address).await?;
-        let depositing =
-            DepositingAccountBalances::from_pending_ops(depositing_ops, &self.tx_sender.tokens)
-                .await?;
+        let depositing = DepositingAccountBalances::from_pending_ops(
+            &mut self.access_storage().await?,
+            &self.tx_sender.tokens,
+            depositing_ops,
+        )
+        .await?;
 
         log::trace!(
             "account_info: address {}, total request processing {}ms",

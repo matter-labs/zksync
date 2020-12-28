@@ -88,7 +88,7 @@ contract Config {
         );
 
     /// @dev Timestamp - seconds since unix epoch
-    uint256 constant COMMIT_TIMESTAMP_NOT_OLDER = 8 hours;
+    uint256 constant COMMIT_TIMESTAMP_NOT_OLDER = 24 hours;
 
     /// @dev Maximum available error between real commit block timestamp and analog used in the verifier (in seconds)
     /// @dev Must be used cause miner's `block.timestamp` value can differ on some small value (as we know - 15 seconds)

@@ -9,13 +9,11 @@
 // use num::BigUint;
 // use zksync_circuit::witness::{deposit::DepositWitness, Witness};
 // use zksync_config::{ConfigurationOptions, ProverOptions};
-// use zksync_crypto::params::total_tokens;
+// use zksync_crypto::{params::total_tokens, proof::EncodedProofPlonk};
 // use zksync_prover::{client, ApiClient};
 // use zksync_types::{block::Block, Address, H256};
 // // Local deps
 // use zksync_circuit::witness::utils::get_used_subtree_root_hash;
-// use zksync_crypto::params::CHUNK_BIT_WIDTH;
-// use zksync_types::operations::NoopOp;
 // use zksync_witness_generator::run_prover_server;
 //
 // const CORRECT_PROVER_SECRET_AUTH: &str = "42";
@@ -52,6 +50,28 @@
 //         "",
 //         Duration::from_secs(1),
 //         CORRECT_PROVER_SECRET_AUTH,
+//     );
+// }
+//
+// #[tokio::test]
+// #[cfg_attr(not(feature = "db_test"), ignore)]
+// async fn client_with_incorrect_secret_auth() {
+//     let block_size_chunks = ConfigurationOptions::from_env().available_block_chunk_sizes[0];
+//     let addr = spawn_server(Duration::from_secs(1), Duration::from_secs(1)).await;
+//     let client = client::ApiClient::new(
+//         &format!("http://{}", &addr).parse().unwrap(),
+//         "foo",
+//         Duration::from_secs(1),
+//         INCORRECT_PROVER_SECRET_AUTH,
+//     );
+//
+//     assert_eq!(
+//         &client
+//             .register_prover(block_size_chunks)
+//             .err()
+//             .unwrap()
+//             .to_string(),
+//         "failed generate authorization token"
 //     );
 // }
 //
@@ -255,7 +275,7 @@
 //                 serial_id: 0,
 //                 data: deposit_priority_op.clone(),
 //                 deadline_block: 2,
-//                 eth_hash: vec![0; 8],
+//                 eth_hash: H256::zero(),
 //                 eth_block: 10,
 //             },
 //             block_index: 0,
@@ -370,26 +390,4 @@
 //         .expect("failed to send publish request");
 //
 //     assert_eq!(res.status(), reqwest::StatusCode::OK);
-// }
-//
-// #[tokio::test]
-// #[cfg_attr(not(feature = "db_test"), ignore)]
-// async fn client_with_incorrect_secret_auth() {
-//     let block_size_chunks = ConfigurationOptions::from_env().available_block_chunk_sizes[0];
-//     let addr = spawn_server(Duration::from_secs(1), Duration::from_secs(1)).await;
-//     let client = client::ApiClient::new(
-//         &format!("http://{}", &addr).parse().unwrap(),
-//         "foo",
-//         Duration::from_secs(1),
-//         INCORRECT_PROVER_SECRET_AUTH,
-//     );
-//
-//     assert_eq!(
-//         &client
-//             .register_prover(block_size_chunks)
-//             .err()
-//             .unwrap()
-//             .to_string(),
-//         "failed generate authorization token"
-//     );
 // }

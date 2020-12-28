@@ -21,6 +21,7 @@ use zksync_crypto::{Engine, Fr};
 
 pub mod aggregated_proofs;
 pub mod api;
+pub mod exit_proof;
 pub mod fs_utils;
 pub mod network_utils;
 

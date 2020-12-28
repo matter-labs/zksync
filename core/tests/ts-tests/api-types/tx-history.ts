@@ -1,19 +1,19 @@
-interface ChangePubKeyOnchain {
+type ChangePubKeyOnchain = {
     type: 'Onchain';
-}
+};
 
-interface ChangePubKeyECDSA {
+type ChangePubKeyECDSA = {
     type: 'ECDSA';
     ethSignature: string;
     batchHash?: string;
-}
+};
 
-interface ChangePubKeyCREATE2 {
+type ChangePubKeyCREATE2 = {
     type: 'CREATE2';
     creatorAddress: string;
     saltArg: string;
     codeHash: string;
-}
+};
 
 type Deposit = {
     tx_id: string;

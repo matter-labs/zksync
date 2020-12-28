@@ -9,6 +9,7 @@ use bigdecimal::BigDecimal;
 use chrono::{SecondsFormat, Utc};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
+use std::convert::TryFrom;
 use zksync_crypto::rand::{thread_rng, Rng};
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -23,13 +24,13 @@ async fn handle_coinmarketcap_token_price_query(
     let base_price = match symbol.as_str() {
         "ETH" => BigDecimal::from(200),
         "wBTC" => BigDecimal::from(9000),
-        "BAT" => BigDecimal::from(0.2),
+        "BAT" => BigDecimal::try_from(0.2).unwrap(),
         "DAI" => BigDecimal::from(1),
         _ => BigDecimal::from(0),
     };
     let random_multiplier = thread_rng().gen_range(0.9, 1.1);
 
-    let price = base_price * BigDecimal::from(random_multiplier);
+    let price = base_price * BigDecimal::try_from(random_multiplier).unwrap();
 
     let last_updated = Utc::now().to_rfc3339_opts(SecondsFormat::Millis, true);
     let resp = json!({
@@ -64,12 +65,12 @@ async fn handle_coingecko_token_price_query(req: HttpRequest) -> Result<HttpResp
     let base_price = match coin_id {
         Some("ethereum") => BigDecimal::from(200),
         Some("wrapped-bitcoin") => BigDecimal::from(9000),
-        Some("basic-attention-token") => BigDecimal::from(0.2),
+        Some("basic-attention-token") => BigDecimal::try_from(0.2).unwrap(),
         Some("dai") => BigDecimal::from(1),
         _ => BigDecimal::from(0),
     };
     let random_multiplier = thread_rng().gen_range(0.9, 1.1);
-    let price = base_price * BigDecimal::from(random_multiplier);
+    let price = base_price * BigDecimal::try_from(random_multiplier).unwrap();
 
     let last_updated = Utc::now().timestamp_millis();
     let resp = json!({

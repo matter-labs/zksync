@@ -190,7 +190,7 @@ async fn poll_for_new_proofs_task(pool: ConnectionPool) {
         aggregated_committer::create_aggregated_operations_storage(&mut storage)
             .await
             .map_err(|e| log::error!("Failed to create aggregated operation: {}", e))
-            .unwrap();
+            .unwrap_or_default();
     }
 }
 

@@ -16,6 +16,7 @@ pub trait FeeTickerInfo {
     async fn is_account_new(&mut self, address: Address) -> bool;
 }
 
+#[derive(Clone)]
 pub struct TickerInfo {
     db: ConnectionPool,
 }

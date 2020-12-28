@@ -18,6 +18,7 @@ use num::{
 };
 use serde::{Deserialize, Serialize};
 use tokio::task::JoinHandle;
+use tokio::time::Instant;
 // Workspace deps
 use zksync_config::{FeeTickerOptions, TokenPriceSource};
 use zksync_storage::ConnectionPool;
@@ -25,26 +26,34 @@ use zksync_types::{
     Address, ChangePubKeyOp, Token, TokenId, TokenLike, TransferOp, TransferToNewOp, TxFeeTypes,
     WithdrawOp,
 };
+
 use zksync_utils::ratio_to_big_decimal;
 // Local deps
 use crate::fee_ticker::{
-    fee_token_validator::FeeTokenValidator,
     ticker_api::{
         coingecko::CoinGeckoAPI, coinmarkercap::CoinMarketCapAPI, FeeTickerAPI, TickerApi,
         CONNECTION_TIMEOUT,
     },
     ticker_info::{FeeTickerInfo, TickerInfo},
+    validator::{
+        watcher::{TokenWatcher, UniswapTokenWatcher},
+        FeeTokenValidator,
+    },
 };
 use crate::utils::token_db_cache::TokenDBCache;
 
 pub use self::fee::*;
+use crate::fee_ticker::balancer::TickerBalancer;
+use crate::fee_ticker::validator::MarketUpdater;
+use std::convert::TryFrom;
 
 mod constants;
 mod fee;
-mod fee_token_validator;
 mod ticker_api;
 mod ticker_info;
+pub mod validator;
 
+mod balancer;
 #[cfg(test)]
 mod tests;
 
@@ -170,12 +179,12 @@ pub enum TickerRequest {
     },
 }
 
-struct FeeTicker<API, INFO> {
+struct FeeTicker<API, INFO, WATCHER> {
     api: API,
     info: INFO,
     requests: Receiver<TickerRequest>,
     config: TickerConfig,
-    validator: FeeTokenValidator,
+    validator: FeeTokenValidator<WATCHER>,
 }
 
 #[must_use]
@@ -192,9 +201,18 @@ pub fn run_ticker_task(
         not_subsidized_tokens: config.not_subsidized_tokens,
     };
 
-    let cache = TokenDBCache::new(db_pool.clone());
-    let validator = FeeTokenValidator::new(cache, config.disabled_tokens);
+    let cache = (db_pool.clone(), TokenDBCache::new());
+    let watcher = UniswapTokenWatcher::new(config.uniswap_url);
+    let validator = FeeTokenValidator::new(
+        cache.clone(),
+        chrono::Duration::seconds(config.available_liquidity_seconds as i64),
+        BigDecimal::try_from(config.liquidity_volume).expect("Valid f64 for decimal"),
+        config.unconditionally_valid_tokens,
+        watcher.clone(),
+    );
 
+    let updater = MarketUpdater::new(cache, watcher);
+    tokio::spawn(updater.keep_updated(config.token_market_update_time));
     let client = reqwest::ClientBuilder::new()
         .timeout(CONNECTION_TIMEOUT)
         .connect_timeout(CONNECTION_TIMEOUT)
@@ -216,32 +234,34 @@ pub fn run_ticker_task(
 
             tokio::spawn(fee_ticker.run())
         }
+
         TokenPriceSource::CoinGecko { base_url } => {
             let token_price_api =
-                CoinGeckoAPI::new(client, base_url).expect("failed to init CoinGecko client");
+                CoinGeckoAPI::new(client, base_url).expect("CoinGecko initializing error");
+            let ticker_info = TickerInfo::new(db_pool.clone());
 
-            let ticker_api = TickerApi::new(db_pool.clone(), token_price_api);
-            let ticker_info = TickerInfo::new(db_pool);
-            let fee_ticker = FeeTicker::new(
-                ticker_api,
+            let mut ticker_balancer = TickerBalancer::new(
+                token_price_api,
                 ticker_info,
-                tricker_requests,
                 ticker_config,
                 validator,
+                tricker_requests,
+                db_pool,
+                config.number_of_ticker_actors,
             );
-
-            tokio::spawn(fee_ticker.run())
+            ticker_balancer.spawn_tickers();
+            tokio::spawn(ticker_balancer.run())
         }
     }
 }
 
-impl<API: FeeTickerAPI, INFO: FeeTickerInfo> FeeTicker<API, INFO> {
+impl<API: FeeTickerAPI, INFO: FeeTickerInfo, WATCHER: TokenWatcher> FeeTicker<API, INFO, WATCHER> {
     fn new(
         api: API,
         info: INFO,
         requests: Receiver<TickerRequest>,
         config: TickerConfig,
-        validator: FeeTokenValidator,
+        validator: FeeTokenValidator<WATCHER>,
     ) -> Self {
         Self {
             api,
@@ -254,6 +274,7 @@ impl<API: FeeTickerAPI, INFO: FeeTickerInfo> FeeTicker<API, INFO> {
 
     async fn run(mut self) {
         while let Some(request) = self.requests.next().await {
+            let start = Instant::now();
             match request {
                 TickerRequest::GetTxFee {
                     tx_type,
@@ -264,7 +285,8 @@ impl<API: FeeTickerAPI, INFO: FeeTickerInfo> FeeTicker<API, INFO> {
                     let fee = self
                         .get_fee_from_ticker_in_wei(tx_type, token, address)
                         .await;
-                    response.send(fee).unwrap_or_default();
+                    metrics::histogram!("ticker.get_tx_fee", start.elapsed());
+                    response.send(fee).unwrap_or_default()
                 }
                 TickerRequest::GetTokenPrice {
                     token,
@@ -272,10 +294,12 @@ impl<API: FeeTickerAPI, INFO: FeeTickerInfo> FeeTicker<API, INFO> {
                     req_type,
                 } => {
                     let price = self.get_token_price(token, req_type).await;
+                    metrics::histogram!("ticker.get_token_price", start.elapsed());
                     response.send(price).unwrap_or_default();
                 }
                 TickerRequest::IsTokenAllowed { token, response } => {
                     let allowed = self.validator.token_allowed(token).await;
+                    metrics::histogram!("ticker.is_token_allowed", start.elapsed());
                     response.send(allowed).unwrap_or_default();
                 }
             }
@@ -307,7 +331,18 @@ impl<API: FeeTickerAPI, INFO: FeeTickerInfo> FeeTicker<API, INFO> {
     }
 
     /// Returns `true` if the token is subsidized.
-    async fn is_token_subsidized(&mut self, token: Token) -> bool {
+    fn is_token_subsidized(&self, token: Token) -> bool {
+        // We have disabled the subsidies up until the contract upgrade (when the prices will indeed become that
+        // low), but however we want to leave ourselves the possibility to easily enable them if required.
+        // Thus:
+        // TODO: Remove subsidies completely (ZKS-226)
+        let subsidies_enabled = std::env::var("TICKER_SUBSIDIES_ENABLED")
+            .map(|val| val == "true")
+            .unwrap_or(false);
+        if !subsidies_enabled {
+            return false;
+        }
+
         !self.config.not_subsidized_tokens.contains(&token.address)
     }
 
@@ -348,7 +383,7 @@ impl<API: FeeTickerAPI, INFO: FeeTickerInfo> FeeTicker<API, INFO> {
         // Convert chunks amount to `BigUint`.
         let op_chunks = BigUint::from(op_chunks);
         let gas_tx_amount = {
-            let is_token_subsidized = self.is_token_subsidized(token.clone()).await;
+            let is_token_subsidized = self.is_token_subsidized(token.clone());
             if is_token_subsidized {
                 self.config
                     .gas_cost_tx

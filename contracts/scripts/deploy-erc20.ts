@@ -69,7 +69,12 @@ async function main() {
             console.log(JSON.stringify(result, null, 2));
         });
 
-    program.parse(process.argv);
+    return await program.parseAsync(process.argv);
 }
 
-main();
+main()
+    .then(() => process.exit(0))
+    .catch((err) => {
+        console.error('Error:', err.message || err);
+        process.exit(1);
+    });
