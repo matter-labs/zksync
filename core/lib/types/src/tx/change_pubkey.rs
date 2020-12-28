@@ -258,7 +258,7 @@ impl ChangePubKey {
         }
         ensure!(
             eth_signed_msg.len() == CHANGE_PUBKEY_SIGNATURE_LEN,
-            "Change pubkey signed message len is too big: {}, expected: {}",
+            "Change pubkey signed message does not match in size: {}, expected: {}",
             eth_signed_msg.len(),
             CHANGE_PUBKEY_SIGNATURE_LEN
         );

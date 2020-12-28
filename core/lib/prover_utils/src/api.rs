@@ -3,11 +3,9 @@ use zksync_basic_types::BlockNumber;
 use zksync_circuit::serialization::ProverData;
 use zksync_crypto::proof::{AggregatedProof, SingleProof};
 
-pub type ProverId = String;
-
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
 pub struct ProverInputRequest {
-    pub prover_name: ProverId,
+    pub prover_name: String,
     pub aux_data: ProverInputRequestAuxData,
 }
 
@@ -56,5 +54,5 @@ pub struct WorkingOn {
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
 pub struct ProverStopped {
-    pub prover_id: ProverId,
+    pub prover_name: String,
 }

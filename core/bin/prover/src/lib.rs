@@ -21,7 +21,7 @@ use zksync_crypto::rand::{
 // Workspace deps
 use zksync_config::ProverOptions;
 use zksync_prover_utils::api::{
-    JobRequestData, JobResultData, ProverId, ProverInputRequest, ProverInputRequestAuxData,
+    JobRequestData, JobResultData, ProverInputRequest, ProverInputRequestAuxData,
     ProverInputResponse, ProverOutputRequest,
 };
 
@@ -90,7 +90,7 @@ pub trait ApiClient: Debug {
     async fn get_job(&self, req: ProverInputRequest) -> anyhow::Result<ProverInputResponse>;
     async fn working_on(&self, job_id: i32, prover_name: &str) -> anyhow::Result<()>;
     async fn publish(&self, data: ProverOutputRequest) -> anyhow::Result<()>;
-    async fn prover_stopped(&self, prover_id: ProverId) -> anyhow::Result<()>;
+    async fn prover_stopped(&self, prover_name: String) -> anyhow::Result<()>;
 }
 
 async fn compute_proof_no_blocking<PROVER>(
