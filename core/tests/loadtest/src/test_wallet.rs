@@ -97,6 +97,13 @@ impl TestWallet {
             .await
             .store_address(inner.address());
 
+        if !token_name.is_eth() {
+            eth_provider
+                .approve_erc20_token_deposits(token_name.clone())
+                .await
+                .expect("Unable to approve ERC20 token");
+        }
+
         Self {
             monitor,
             inner,
