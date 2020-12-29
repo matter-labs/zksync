@@ -10,7 +10,7 @@ use once_cell::sync::Lazy;
 use tokio::sync::Mutex;
 
 // Workspace uses
-use zksync_config::{ApiServerOptions, ConfigurationOptions};
+use zksync_config::configs::ZkSyncConfig;
 use zksync_crypto::rand::{SeedableRng, XorShiftRng};
 use zksync_storage::{
     chain::operations::records::NewExecutedPriorityOperation,
@@ -44,16 +44,14 @@ pub const VERIFIED_BLOCKS_COUNT: BlockNumber = 3;
 
 #[derive(Debug, Clone)]
 pub struct TestServerConfig {
-    pub env_options: ConfigurationOptions,
-    pub api_server_options: ApiServerOptions,
+    pub config: ZkSyncConfig,
     pub pool: ConnectionPool,
 }
 
 impl Default for TestServerConfig {
     fn default() -> Self {
         Self {
-            env_options: ConfigurationOptions::from_env(),
-            api_server_options: ApiServerOptions::from_env(),
+            config: ZkSyncConfig::from_env(),
             pool: ConnectionPool::new(Some(1)),
         }
     }

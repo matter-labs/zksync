@@ -10,12 +10,12 @@ use actix_web::{
 
 // Workspace uses
 pub use zksync_api_client::rest::v1::{BlockInfo, TransactionInfo};
-use zksync_config::ApiServerOptions;
 use zksync_crypto::{convert::FeConvert, Fr};
 use zksync_storage::{chain::block::records, ConnectionPool, QueryResult};
 use zksync_types::{tx::TxHash, BlockNumber};
 
 use crate::{api_server::helpers::try_parse_tx_hash, utils::shared_lru_cache::AsyncLruCache};
+use zksync_config::configs::ZkSyncConfig;
 
 // Local uses
 use super::{Error as ApiError, JsonResult, Pagination, PaginationQuery};
@@ -219,8 +219,8 @@ async fn blocks_range(
     Ok(Json(range))
 }
 
-pub fn api_scope(api_server_options: &ApiServerOptions, pool: ConnectionPool) -> Scope {
-    let data = ApiBlocksData::new(pool, api_server_options.api_requests_caches_size);
+pub fn api_scope(config: &ZkSyncConfig, pool: ConnectionPool) -> Scope {
+    let data = ApiBlocksData::new(pool, config.api.common.caches_size);
 
     web::scope("blocks")
         .data(data)
@@ -242,8 +242,7 @@ mod tests {
         let cfg = TestServerConfig::default();
         cfg.fill_database().await?;
 
-        let (client, server) =
-            cfg.start_server(|cfg| api_scope(&cfg.api_server_options, cfg.pool.clone()));
+        let (client, server) = cfg.start_server(|cfg| api_scope(&cfg.config, cfg.pool.clone()));
 
         // Block requests part
         let blocks: Vec<BlockInfo> = {

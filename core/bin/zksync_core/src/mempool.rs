@@ -34,7 +34,7 @@ use zksync_types::{
 };
 // Local uses
 use crate::eth_watch::EthWatchRequest;
-use zksync_config::ConfigurationOptions;
+use zksync_config::configs::ZkSyncConfig;
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, Error)]
 pub enum TxAddError {
@@ -451,7 +451,7 @@ pub fn run_mempool_task(
     db_pool: ConnectionPool,
     requests: mpsc::Receiver<MempoolRequest>,
     eth_watch_req: mpsc::Sender<EthWatchRequest>,
-    config: &ConfigurationOptions,
+    config: &ZkSyncConfig,
 ) -> JoinHandle<()> {
     let config = config.clone();
     tokio::spawn(async move {
@@ -463,11 +463,16 @@ pub fn run_mempool_task(
             requests,
             eth_watch_req,
             max_block_size_chunks: *config
-                .available_block_chunk_sizes
+                .chain
+                .state_keeper
+                .block_chunk_sizes
                 .iter()
                 .max()
                 .expect("failed to find max block chunks size"),
-            max_number_of_withdrawals_per_block: config.max_number_of_withdrawals_per_block,
+            max_number_of_withdrawals_per_block: config
+                .chain
+                .eth
+                .max_number_of_withdrawals_per_block,
         };
 
         mempool.run().await

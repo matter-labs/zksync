@@ -15,7 +15,7 @@ use web3::{
 };
 
 // Workspace uses
-use zksync_config::{EthClientOptions, EthSenderOptions};
+use zksync_config::configs::{ETHSenderConfig, ZkSyncConfig};
 use zksync_contracts::zksync_contract;
 use zksync_eth_client::{
     ETHDirectClient, EthereumGateway, MultiplexerEthereumClient, SignedCallResult,
@@ -126,11 +126,11 @@ struct ETHSender<DB: DatabaseInterface> {
     /// Utility for managing the gas price for transactions.
     gas_adjuster: GasAdjuster<DB>,
     /// Settings for the `ETHSender`.
-    options: EthSenderOptions,
+    options: ETHSenderConfig,
 }
 
 impl<DB: DatabaseInterface> ETHSender<DB> {
-    pub async fn new(options: EthSenderOptions, db: DB, ethereum: EthereumGateway) -> Self {
+    pub async fn new(options: ETHSenderConfig, db: DB, ethereum: EthereumGateway) -> Self {
         let mut connection = db
             .acquire_connection()
             .await
@@ -146,7 +146,7 @@ impl<DB: DatabaseInterface> ETHSender<DB> {
             .await
             .expect("Failed loading ETH operations stats");
 
-        let tx_queue = TxQueueBuilder::new(options.max_txs_in_flight as usize)
+        let tx_queue = TxQueueBuilder::new(options.sender.max_txs_in_flight as usize)
             .with_sent_pending_txs(ongoing_ops.len())
             .with_commit_operations_count(stats.commit_ops)
             .with_verify_operations_count(stats.verify_ops)
@@ -182,11 +182,14 @@ impl<DB: DatabaseInterface> ETHSender<DB> {
     /// Main routine of `ETHSender`.
     pub async fn run(mut self) {
         loop {
-            time::timeout(self.options.tx_poll_period, self.load_new_operations())
-                .await
-                .unwrap_or_default();
+            time::timeout(
+                self.options.sender.tx_poll_period(),
+                self.load_new_operations(),
+            )
+            .await
+            .unwrap_or_default();
 
-            if self.options.is_enabled {
+            if self.options.sender.is_enabled {
                 // ...and proceed them.
                 self.proceed_next_operations().await;
                 // Update the gas adjuster to maintain the up-to-date max gas price limit.
@@ -562,7 +565,7 @@ impl<DB: DatabaseInterface> ETHSender<DB> {
 
     /// Helper method encapsulating the logic of determining the next deadline block.
     fn get_deadline_block(&self, current_block: u64) -> u64 {
-        current_block + self.options.expected_wait_time_block
+        current_block + self.options.sender.expected_wait_time_block
     }
 
     /// Looks up for a transaction state on the Ethereum chain
@@ -580,7 +583,7 @@ impl<DB: DatabaseInterface> ETHSender<DB> {
             // Successful execution.
             Some(status) if status.success => {
                 // Check if transaction has enough confirmations.
-                if status.confirmations >= self.options.wait_confirmations {
+                if status.confirmations >= self.options.sender.wait_confirmations {
                     TxCheckOutcome::Committed
                 } else {
                     TxCheckOutcome::Pending
@@ -589,7 +592,7 @@ impl<DB: DatabaseInterface> ETHSender<DB> {
             // Non-successful execution, report the failure with details.
             Some(status) => {
                 // Check if transaction has enough confirmations.
-                if status.confirmations >= self.options.wait_confirmations {
+                if status.confirmations >= self.options.sender.wait_confirmations {
                     assert!(
                         status.receipt.is_some(),
                         "Receipt should exist for a failed transaction"
@@ -831,34 +834,26 @@ impl<DB: DatabaseInterface> ETHSender<DB> {
 }
 
 #[must_use]
-pub fn run_eth_sender(
-    pool: ConnectionPool,
-    eth_client_options: EthClientOptions,
-    eth_sender_options: EthSenderOptions,
-) -> JoinHandle<()> {
-    let transport = Http::new(&eth_client_options.web3_url).expect("Wrong web3 url");
-    let ethereum_signer = PrivateKeySigner::new(
-        eth_client_options
-            .operator_private_key
-            .expect("Operator private key is required for eth_sender"),
-    );
+pub fn run_eth_sender(pool: ConnectionPool, config: ZkSyncConfig) -> JoinHandle<()> {
+    let transport = Http::new(&config.eth_client.web3_url).expect("Wrong web3 url");
+    let ethereum_signer = PrivateKeySigner::new(config.eth_sender.sender.operator_private_key);
 
     let ethereum = EthereumGateway::Multiplexed(MultiplexerEthereumClient::new().add_client(
         "infura".to_string(),
         ETHDirectClient::new(
             transport,
             zksync_contract(),
-            eth_client_options.operator_commit_eth_addr,
+            config.eth_sender.sender.operator_commit_eth_addr,
             ethereum_signer,
-            eth_client_options.contract_eth_addr,
-            eth_client_options.chain_id,
-            eth_client_options.gas_price_factor,
+            config.contracts.contract_addr,
+            config.eth_client.chain_id,
+            config.eth_client.gas_price_factor,
         ),
     ));
     let db = Database::new(pool);
 
     tokio::spawn(async move {
-        let eth_sender = ETHSender::new(eth_sender_options, db, ethereum).await;
+        let eth_sender = ETHSender::new(config.eth_sender.clone(), db, ethereum).await;
 
         eth_sender.run().await
     })

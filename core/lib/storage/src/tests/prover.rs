@@ -2,12 +2,17 @@
 use std::time::Duration;
 // External imports
 // Workspace imports
-use zksync_config::ConfigurationOptions;
 use zksync_crypto::proof::EncodedProofPlonk;
 use zksync_types::{block::PendingBlock, Action};
 // Local imports
 use crate::{chain::block::BlockSchema, prover::ProverSchema, QueryResult, StorageProcessor};
 use crate::{test_data::gen_operation, tests::db_test};
+
+/// Returns the smallest supported block size.
+fn smallest_block_size() -> usize {
+    // Value corresponds to the actual value valid for the moment of writing this code.
+    6
+}
 
 /// Checks that the proof can be stored and loaded.
 #[db_test]
@@ -134,7 +139,7 @@ async fn prover_run(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
     // Add the prover.
     let prover_name = "prover_10";
     // Smallest block size.
-    let block_size = ConfigurationOptions::from_env().available_block_chunk_sizes[0];
+    let block_size = smallest_block_size();
     let _prover_id = ProverSchema(&mut storage)
         .register_prover(prover_name, block_size)
         .await?;
@@ -205,7 +210,7 @@ async fn unstarted_prover_jobs_count(mut storage: StorageProcessor<'_>) -> Query
     // Add the prover.
     let prover_name = "prover_10";
     // Smallest block size.
-    let block_size = ConfigurationOptions::from_env().available_block_chunk_sizes[0];
+    let block_size = smallest_block_size();
     let _prover_id = ProverSchema(&mut storage)
         .register_prover(prover_name, block_size)
         .await?;

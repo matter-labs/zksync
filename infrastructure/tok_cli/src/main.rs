@@ -14,13 +14,13 @@ use web3::{
 use cli::App;
 use token::Token;
 use utils::{get_matches_from_lines, run_external_command, str_to_address};
-use zksync_config::{AdminServerOptions, ConfigurationOptions};
+use zksync_config::configs::{ApiConfig, ETHClientConfig};
 
 #[tokio::main]
 async fn main() -> Result<()> {
     env_logger::init();
 
-    let config_opts = ConfigurationOptions::from_env();
+    let config_opts = ETHClientConfig::from_env();
 
     let (_event_loop, transport) =
         Http::new(&config_opts.web3_url).expect("failed to start web3 transport");
@@ -49,10 +49,10 @@ async fn main() -> Result<()> {
             let addr = str_to_address(&cmd.address)?;
             let token = Token::new(addr, &cmd.name, &cmd.symbol, cmd.decimals);
 
-            let admin_server_opts = AdminServerOptions::from_env();
+            let api_config = ApiConfig::from_env();
 
-            let endpoint_addr = admin_server_opts.admin_http_server_url;
-            let secret_auth = admin_server_opts.secret_auth;
+            let endpoint_addr = api_config.admin.url.parse().unwrap();
+            let secret_auth = api_config.admin.secret_auth;
 
             let token_from_server = token.add_to_server(endpoint_addr, &secret_auth).await?;
 

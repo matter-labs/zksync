@@ -14,7 +14,7 @@ use num::bigint::ToBigInt;
 use thiserror::Error;
 
 // Workspace uses
-use zksync_config::ApiServerOptions;
+use zksync_config::configs::ZkSyncConfig;
 use zksync_storage::ConnectionPool;
 use zksync_types::{
     tx::EthSignData,
@@ -101,16 +101,16 @@ impl TxSender {
         connection_pool: ConnectionPool,
         sign_verify_request_sender: mpsc::Sender<VerifyTxSignatureRequest>,
         ticker_request_sender: mpsc::Sender<TickerRequest>,
-        api_server_options: &ApiServerOptions,
+        config: &ZkSyncConfig,
     ) -> Self {
-        let core_api_client = CoreApiClient::new(api_server_options.core_server_url.clone());
+        let core_api_client = CoreApiClient::new(config.api.private.url.clone());
 
         Self::with_client(
             core_api_client,
             connection_pool,
             sign_verify_request_sender,
             ticker_request_sender,
-            api_server_options,
+            config,
         )
     }
 
@@ -119,12 +119,11 @@ impl TxSender {
         connection_pool: ConnectionPool,
         sign_verify_request_sender: mpsc::Sender<VerifyTxSignatureRequest>,
         ticker_request_sender: mpsc::Sender<TickerRequest>,
-        api_server_options: &ApiServerOptions,
+        config: &ZkSyncConfig,
     ) -> Self {
-        let enforce_pubkey_change_fee = api_server_options.enforce_pubkey_change_fee;
-        let forced_exit_minimum_account_age =
-            chrono::Duration::from_std(api_server_options.forced_exit_minimum_account_age)
-                .expect("Unable to convert std::Duration to chrono::Duration");
+        let forced_exit_minimum_account_age = chrono::Duration::seconds(
+            config.api.common.forced_exit_minimum_account_age_secs as i64,
+        );
 
         Self {
             core_api_client,
@@ -133,7 +132,7 @@ impl TxSender {
             ticker_requests: ticker_request_sender,
             tokens: TokenDBCache::new(),
 
-            enforce_pubkey_change_fee,
+            enforce_pubkey_change_fee: config.api.common.enforce_pubkey_change_fee,
             forced_exit_minimum_account_age,
         }
     }

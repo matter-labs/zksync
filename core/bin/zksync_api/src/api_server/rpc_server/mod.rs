@@ -10,7 +10,7 @@ use jsonrpc_core::{Error, IoHandler, MetaIoHandler, Metadata, Middleware, Result
 use jsonrpc_http_server::ServerBuilder;
 
 // Workspace uses
-use zksync_config::{ApiServerOptions, ConfigurationOptions};
+use zksync_config::configs::ZkSyncConfig;
 use zksync_storage::{
     chain::{
         block::records::BlockDetails, operations::records::StoredExecutedPriorityOperation,
@@ -57,20 +57,19 @@ impl RpcApp {
         connection_pool: ConnectionPool,
         sign_verify_request_sender: mpsc::Sender<VerifyTxSignatureRequest>,
         ticker_request_sender: mpsc::Sender<TickerRequest>,
-        config_options: &ConfigurationOptions,
-        api_server_options: &ApiServerOptions,
+        config: &ZkSyncConfig,
     ) -> Self {
         let runtime_handle = tokio::runtime::Handle::try_current()
             .expect("RpcApp must be created from the context of Tokio Runtime");
 
-        let api_requests_caches_size = api_server_options.api_requests_caches_size;
-        let confirmations_for_eth_event = config_options.confirmations_for_eth_event;
+        let api_requests_caches_size = config.api.common.caches_size;
+        let confirmations_for_eth_event = config.eth_watch.confirmations_for_eth_event;
 
         let tx_sender = TxSender::new(
             connection_pool,
             sign_verify_request_sender,
             ticker_request_sender,
-            api_server_options,
+            config,
         );
 
         RpcApp {
@@ -391,17 +390,15 @@ pub fn start_rpc_server(
     sign_verify_request_sender: mpsc::Sender<VerifyTxSignatureRequest>,
     ticker_request_sender: mpsc::Sender<TickerRequest>,
     panic_notify: mpsc::Sender<bool>,
-    config_options: ConfigurationOptions,
-    api_server_options: ApiServerOptions,
+    config: &ZkSyncConfig,
 ) {
-    let addr = api_server_options.json_rpc_http_server_address;
+    let addr = config.api.json_rpc.http_bind_addr();
 
     let rpc_app = RpcApp::new(
         connection_pool,
         sign_verify_request_sender,
         ticker_request_sender,
-        &config_options,
-        &api_server_options,
+        &config,
     );
     std::thread::spawn(move || {
         let _panic_sentinel = ThreadPanicNotify(panic_notify);

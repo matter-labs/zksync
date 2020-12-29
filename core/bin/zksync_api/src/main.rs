@@ -1,12 +1,14 @@
 use futures::{channel::mpsc, executor::block_on, SinkExt, StreamExt};
 use std::cell::RefCell;
 use zksync_api::run_api;
+use zksync_config::configs::ZkSyncConfig;
 use zksync_storage::ConnectionPool;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     env_logger::init();
     // handle ctrl+c
+    let config = ZkSyncConfig::from_env();
     let (stop_signal_sender, mut stop_signal_receiver) = mpsc::channel(256);
     {
         let stop_signal_sender = RefCell::new(stop_signal_sender.clone());
@@ -18,7 +20,7 @@ async fn main() -> anyhow::Result<()> {
     }
     let connection_pool = ConnectionPool::new(None);
 
-    let task_handle = run_api(connection_pool, stop_signal_sender);
+    let task_handle = run_api(connection_pool, stop_signal_sender, &config);
 
     tokio::select! {
         _ = async { task_handle.await } => {

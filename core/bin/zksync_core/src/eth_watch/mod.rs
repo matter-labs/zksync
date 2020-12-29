@@ -21,7 +21,6 @@ use tokio::{task::JoinHandle, time};
 use web3::types::{Address, BlockNumber};
 
 // Workspace deps
-use zksync_config::ConfigurationOptions;
 use zksync_crypto::params::PRIORITY_EXPIRATION;
 use zksync_storage::ConnectionPool;
 use zksync_types::{Nonce, PriorityOp, PubKeyHash, ZkSyncPriorityOp};
@@ -36,6 +35,7 @@ use self::{
 
 pub use client::EthHttpClient;
 pub use storage::DBStorage;
+use zksync_config::configs::ZkSyncConfig;
 
 use zksync_contracts::zksync_contract;
 use zksync_eth_client::{
@@ -450,40 +450,39 @@ impl<W: EthClient, S: Storage> EthWatch<W, S> {
 
 #[must_use]
 pub fn start_eth_watch(
-    config_options: ConfigurationOptions,
+    config_options: &ZkSyncConfig,
     eth_req_sender: mpsc::Sender<EthWatchRequest>,
     eth_req_receiver: mpsc::Receiver<EthWatchRequest>,
     db_pool: ConnectionPool,
 ) -> JoinHandle<()> {
-    let transport = web3::transports::Http::new(&config_options.web3_url).unwrap();
-    let eth_signer = PrivateKeySigner::new(Default::default());
-    // TODO find pk
+    let transport = web3::transports::Http::new(&config_options.eth_client.web3_url).unwrap();
     let client = EthereumGateway::Multiplexed(MultiplexerEthereumClient::new().add_client(
-        config_options.eth_network.clone(),
+        "infura".to_string(),
         ETHDirectClient::new(
             transport,
             zksync_contract(),
-            config_options.operator_fee_eth_addr,
-            eth_signer,
-            config_options.contract_eth_addr,
-            1, // TODO find chain id
-            1.5f64,
+            config_options.eth_sender.sender.operator_commit_eth_addr,
+            PrivateKeySigner::new(config_options.eth_sender.sender.operator_private_key),
+            config_options.contracts.contract_addr,
+            config_options.eth_client.chain_id,
+            config_options.eth_client.gas_price_factor,
         ),
     ));
-    let eth_client = EthHttpClient::new(client, config_options.contract_eth_addr);
+    let eth_client = EthHttpClient::new(client, config_options.contracts.contract_addr);
 
     let storage = DBStorage::new(db_pool);
 
     let eth_watch = EthWatch::new(
         eth_client,
         storage,
-        config_options.confirmations_for_eth_event,
+        config_options.eth_watch.confirmations_for_eth_event,
     );
 
     tokio::spawn(eth_watch.run(eth_req_receiver));
 
+    let poll_interval = config_options.eth_watch.poll_interval();
     tokio::spawn(async move {
-        let mut timer = time::interval(config_options.eth_watch_poll_interval);
+        let mut timer = time::interval(poll_interval);
 
         loop {
             timer.tick().await;

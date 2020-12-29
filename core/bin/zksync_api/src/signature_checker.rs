@@ -17,7 +17,7 @@ use tokio::runtime::{Builder, Handle};
 use zksync_types::{tx::TxEthSignature, SignedZkSyncTx, ZkSyncTx};
 // Local uses
 use crate::{eth_checker::EthereumChecker, tx_error::TxAddError};
-use zksync_config::ConfigurationOptions;
+use zksync_config::configs::ZkSyncConfig;
 use zksync_contracts::zksync_contract;
 use zksync_eth_client::{
     ethereum_gateway::EthereumGateway, ETHDirectClient, MultiplexerEthereumClient,
@@ -231,22 +231,22 @@ pub struct VerifyTxSignatureRequest {
 /// Main routine of the concurrent signature checker.
 /// See the module documentation for details.
 pub fn start_sign_checker_detached(
-    config_options: ConfigurationOptions,
+    config: ZkSyncConfig,
     input: mpsc::Receiver<VerifyTxSignatureRequest>,
     panic_notify: mpsc::Sender<bool>,
 ) {
     // TODO Update config
-    let transport = web3::transports::Http::new(&config_options.web3_url).unwrap();
+    let transport = web3::transports::Http::new(&config.eth_client.web3_url).unwrap();
     let client = EthereumGateway::Multiplexed(MultiplexerEthereumClient::new().add_client(
-        config_options.eth_network,
+        "infura".to_string(),
         ETHDirectClient::new(
             transport,
             zksync_contract(),
-            config_options.operator_fee_eth_addr,
-            PrivateKeySigner::new(Default::default()),
-            config_options.contract_eth_addr,
-            0,
-            1.0,
+            config.eth_sender.sender.operator_commit_eth_addr,
+            PrivateKeySigner::new(config.eth_sender.sender.operator_private_key),
+            config.contracts.contract_addr,
+            config.eth_client.chain_id,
+            config.eth_client.gas_price_factor,
         ),
     ));
 

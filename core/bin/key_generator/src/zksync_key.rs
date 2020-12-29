@@ -8,7 +8,7 @@ use zksync_circuit::exit_circuit::ZkSyncExitCircuit;
 use zksync_circuit::operation::{
     Operation, OperationArguments, OperationBranch, OperationBranchWitness, SignatureData,
 };
-use zksync_config::AvailableBlockSizesConfig;
+use zksync_config::configs::ChainConfig;
 use zksync_crypto::bellman::plonk::{make_verification_key, setup, transpile_with_gates_count};
 use zksync_crypto::bellman::Circuit;
 use zksync_crypto::params;
@@ -28,12 +28,13 @@ pub(crate) fn make_plonk_exodus_verify_key() {
 }
 
 /// Generates and saves verification keys for given block sizes. (high of memory consumption)
-pub(crate) fn make_plonk_blocks_verify_keys(config: AvailableBlockSizesConfig) {
-    for (block_chunks, setup_power) in config
-        .blocks_chunks
-        .into_iter()
-        .zip(config.blocks_setup_power2.into_iter())
-    {
+pub(crate) fn make_plonk_blocks_verify_keys(config: ChainConfig) {
+    for (block_chunks, setup_power) in config.circuit.supported_block_chunks_sizes.into_iter().zip(
+        config
+            .circuit
+            .supported_block_chunks_sizes_setup_powers
+            .into_iter(),
+    ) {
         let key_path = get_block_verification_key_path(block_chunks);
         log::info!(
             "Generating block: {} verification key into: {}",
@@ -42,7 +43,7 @@ pub(crate) fn make_plonk_blocks_verify_keys(config: AvailableBlockSizesConfig) {
         );
         let result_setup_power = generate_verification_key(zksync_circuit(block_chunks), key_path);
         assert_eq!(
-            result_setup_power, setup_power,
+            result_setup_power, setup_power as u32,
             "setup power actually needed by circuit of size {} is not equal to that from SUPPORTED_BLOCK_CHUNKS_SIZES env variable", block_chunks
         );
     }

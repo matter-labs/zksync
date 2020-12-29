@@ -7,7 +7,7 @@ use actix_web::{web, Scope};
 
 // Workspace uses
 use zksync_api_client::rest::v1::Contracts;
-use zksync_config::ConfigurationOptions;
+use zksync_config::configs::ZkSyncConfig;
 use zksync_types::{network::Network, Address};
 
 // Local uses
@@ -22,11 +22,11 @@ struct ApiConfigData {
 }
 
 impl ApiConfigData {
-    fn new(env_options: &ConfigurationOptions) -> Self {
+    fn new(config: &ZkSyncConfig) -> Self {
         Self {
-            contract_address: env_options.contract_eth_addr,
-            deposit_confirmations: env_options.confirmations_for_eth_event,
-            network: env_options.eth_network.parse().unwrap(),
+            contract_address: config.contracts.contract_addr,
+            deposit_confirmations: config.eth_watch.confirmations_for_eth_event,
+            network: config.chain.eth.network.parse().unwrap(),
         }
     }
 }
@@ -47,8 +47,8 @@ async fn network(data: web::Data<ApiConfigData>) -> Json<Network> {
     Json(data.network)
 }
 
-pub fn api_scope(env_options: &ConfigurationOptions) -> Scope {
-    let data = ApiConfigData::new(env_options);
+pub fn api_scope(config: &ZkSyncConfig) -> Scope {
+    let data = ApiConfigData::new(config);
 
     web::scope("config")
         .data(data)
@@ -71,18 +71,18 @@ mod tests {
     )]
     async fn test_config_scope() -> anyhow::Result<()> {
         let cfg = TestServerConfig::default();
-        let (client, server) = cfg.start_server(|cfg| api_scope(&cfg.env_options));
+        let (client, server) = cfg.start_server(|cfg| api_scope(&cfg.config));
 
         assert_eq!(
             client.deposit_confirmations().await?,
-            cfg.env_options.confirmations_for_eth_event
+            cfg.config.eth_watch.confirmations_for_eth_event
         );
 
-        assert_eq!(client.network().await?, cfg.env_options.eth_network);
+        assert_eq!(client.network().await?, cfg.config.chain.eth.network);
         assert_eq!(
             client.contracts().await?,
             Contracts {
-                contract: cfg.env_options.contract_eth_addr
+                contract: cfg.config.contracts.contract_addr
             },
         );
 

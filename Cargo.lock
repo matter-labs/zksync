@@ -1483,6 +1483,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "envy"
+version = "0.4.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f938a4abd5b75fe3737902dbc2e79ca142cc1526827a9e40b829a086758531a9"
+dependencies = [
+ "serde",
+]
+
+[[package]]
 name = "error-chain"
 version = "0.12.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5729,10 +5738,12 @@ dependencies = [
 name = "zksync_config"
 version = "1.0.0"
 dependencies = [
+ "envy",
  "log 0.4.11",
  "num",
  "serde",
  "serde_json",
+ "toml",
  "url 2.1.1",
  "zksync_types",
  "zksync_utils",
@@ -5871,7 +5882,6 @@ dependencies = [
  "zksync_eth_signer",
  "zksync_storage",
  "zksync_types",
- "zksync_utils",
 ]
 
 [[package]]
@@ -6027,7 +6037,6 @@ dependencies = [
  "sqlx",
  "tokio 0.2.22",
  "zksync_basic_types",
- "zksync_config",
  "zksync_crypto",
  "zksync_test_account",
  "zksync_types",

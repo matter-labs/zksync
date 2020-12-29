@@ -4,7 +4,7 @@ use log::info;
 use std::time::Instant;
 use web3::transports::Http;
 use zksync_circuit::witness::utils::build_block_witness;
-use zksync_config::AvailableBlockSizesConfig;
+use zksync_config::configs::ZkSyncConfig;
 use zksync_crypto::circuit::CircuitAccountTree;
 use zksync_crypto::params::account_tree_depth;
 use zksync_prover_utils::{PlonkVerificationKey, SetupForStepByStepProver};
@@ -84,7 +84,10 @@ async fn main() {
         circuit_account_tree.insert(id, account.into());
     }
 
-    let block_chunk_sizes = AvailableBlockSizesConfig::from_env().blocks_chunks;
+    let block_chunk_sizes = ZkSyncConfig::from_env()
+        .chain
+        .state_keeper
+        .block_chunk_sizes;
     info!(
         "Checking keys and onchain verification for block sizes: {:?}",
         block_chunk_sizes

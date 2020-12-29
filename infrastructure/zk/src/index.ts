@@ -16,6 +16,7 @@ import { command as test } from './test/test';
 import { command as docker } from './docker';
 import { command as fmt } from './fmt';
 import { command as completion } from './completion';
+import { command as config } from './config';
 import * as env from './env';
 
 const COMMANDS = [
@@ -32,6 +33,7 @@ const COMMANDS = [
     test,
     fmt,
     docker,
+    config,
     env.command,
     completion(program as Command)
 ];
@@ -46,7 +48,7 @@ async function main() {
         process.chdir(ZKSYNC_HOME);
     }
 
-    env.load();
+    await env.load();
 
     program.version('0.1.0').name('zk').description('zksync workflow tools');
 

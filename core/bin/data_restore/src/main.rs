@@ -1,7 +1,7 @@
 use serde::Deserialize;
 use structopt::StructOpt;
 use web3::transports::Http;
-use zksync_config::ConfigurationOptions;
+use zksync_config::configs::{ChainConfig, ContractsConfig as EnvContractsConfig, ETHClientConfig};
 use zksync_crypto::convert::FeConvert;
 use zksync_storage::ConnectionPool;
 use zksync_types::{Address, H256};
@@ -60,14 +60,15 @@ impl ContractsConfig {
     }
 
     pub fn from_env() -> Self {
-        let config_opts = ConfigurationOptions::from_env();
+        let contracts_opts = EnvContractsConfig::from_env();
+        let chain_opts = ChainConfig::from_env();
 
         Self {
-            eth_network: config_opts.eth_network,
-            governance_addr: config_opts.governance_eth_addr,
-            genesis_tx_hash: config_opts.genesis_tx_hash,
-            contract_addr: config_opts.contract_eth_addr,
-            available_block_chunk_sizes: config_opts.available_block_chunk_sizes,
+            eth_network: chain_opts.eth.network,
+            governance_addr: contracts_opts.governance_addr,
+            genesis_tx_hash: contracts_opts.genesis_tx_hash,
+            contract_addr: contracts_opts.contract_addr,
+            available_block_chunk_sizes: chain_opts.state_keeper.block_chunk_sizes,
         }
     }
 }
@@ -77,7 +78,7 @@ async fn main() {
     log::info!("Restoring zkSync state from the contract");
     env_logger::init();
     let connection_pool = ConnectionPool::new(Some(1));
-    let config_opts = ConfigurationOptions::from_env();
+    let config_opts = ETHClientConfig::from_env();
 
     let opt = Opt::from_args();
 
@@ -105,7 +106,7 @@ async fn main() {
         config.contract_addr,
         ETH_BLOCKS_STEP,
         END_ETH_BLOCKS_OFFSET,
-        config.available_block_chunk_sizes,
+        config.available_block_chunk_sizes.clone(),
         finite_mode,
         final_hash,
     );

@@ -2,9 +2,12 @@
 
 // Built-in deps
 use crate::database::DatabaseInterface;
+use crate::ethereum_interface::FailureInfo;
 use crate::EthSenderOptions;
+use std::collections::{BTreeMap, HashMap, VecDeque};
 use std::collections::{BTreeMap, VecDeque};
 use tokio::sync::RwLock;
+use zksync_config::configs::eth_sender::{ETHSenderConfig, GasLimit, Sender};
 // External uses
 use web3::contract::Options;
 use zksync_basic_types::{H256, U256};
@@ -50,7 +53,7 @@ impl MockDatabase {
         let unconfirmed_operations: BTreeMap<i64, ETHOperation> =
             restore_state.iter().map(|op| (op.id, op.clone())).collect();
 
-        let gas_price_limit: u64 = zksync_utils::parse_env("ETH_GAS_PRICE_DEFAULT_LIMIT");
+        let gas_price_limit: u64 = 400000000000;
 
         Self {
             restore_state,
@@ -355,12 +358,22 @@ async fn build_eth_sender(
     let ethereum = EthereumGateway::Mock(MockEthereum::default());
     let db = MockDatabase::with_restorable_state(restore_state, stats);
 
-    let options = EthSenderOptions {
-        max_txs_in_flight,
-        expected_wait_time_block: super::EXPECTED_WAIT_TIME_BLOCKS,
-        wait_confirmations: super::WAIT_CONFIRMATIONS,
-        tx_poll_period: Default::default(),
-        is_enabled: true,
+    let options = ETHSenderConfig {
+        sender: Sender {
+            max_txs_in_flight,
+            expected_wait_time_block: super::EXPECTED_WAIT_TIME_BLOCKS,
+            wait_confirmations: super::WAIT_CONFIRMATIONS,
+            tx_poll_period: 0,
+            is_enabled: true,
+            operator_commit_eth_addr: Default::default(),
+            operator_private_key: Default::default(),
+        },
+        gas_price_limit: GasLimit {
+            default: 1000,
+            sample_interval: 15,
+            update_interval: 15,
+            scale_factor: 1.0f64,
+        },
     };
 
     ETHSender::new(options, db, ethereum).await

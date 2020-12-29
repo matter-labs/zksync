@@ -26,11 +26,11 @@ import {
 } from './utils';
 
 /** Env parameters. */
-const FEE_ACCOUNT_PRIVATE_KEY = process.env.FEE_ACCOUNT_PRIVATE_KEY;
-const MAX_LIQUIDATION_FEE_PERCENT = parseInt(process.env.MAX_LIQUIDATION_FEE_PERCENT);
-const OPERATOR_FEE_ETH_ADDRESS = process.env.OPERATOR_FEE_ETH_ADDRESS;
-const ETH_NETWORK = process.env.ETH_NETWORK as any;
-const WEB3_URL = process.env.WEB3_URL;
+const FEE_ACCOUNT_PRIVATE_KEY = process.env.MISC_FEE_ACCOUNT_PRIVATE_KEY;
+const MAX_LIQUIDATION_FEE_PERCENT = parseInt(process.env.MISC_MAX_LIQUIDATION_FEE_PERCENT);
+const OPERATOR_FEE_ETH_ADDRESS = process.env.CHAIN_STATE_KEEPER_FEE_ACCOUNT_ADDR;
+const ETH_NETWORK = process.env.CHAIN_ETH_NETWORK as any;
+const WEB3_URL = process.env.ETH_CLIENT_WEB3_URL;
 const MAX_LIQUIDATION_FEE_SLIPPAGE = parseInt(process.env.MAX_LIQUIDATION_FEE_SLIPPAGE) || 5;
 /** Amount of ETH that should be left on the fee account after third step. */
 const ETH_TRANSFER_THRESHOLD = process.env.ETH_TRANSFER_THRESHOLD

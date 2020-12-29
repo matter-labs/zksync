@@ -1,5 +1,6 @@
 use futures::{channel::mpsc, executor::block_on, SinkExt, StreamExt};
 use std::cell::RefCell;
+use zksync_config::configs::ZkSyncConfig;
 use zksync_core::{run_core, wait_for_tasks};
 use zksync_storage::ConnectionPool;
 
@@ -7,6 +8,7 @@ use zksync_storage::ConnectionPool;
 async fn main() -> anyhow::Result<()> {
     env_logger::init();
     // handle ctrl+c
+    let config = ZkSyncConfig::from_env();
     let (stop_signal_sender, mut stop_signal_receiver) = mpsc::channel(256);
     {
         let stop_signal_sender = RefCell::new(stop_signal_sender.clone());
@@ -18,7 +20,7 @@ async fn main() -> anyhow::Result<()> {
     }
     let connection_pool = ConnectionPool::new(None);
 
-    let task_handles = run_core(connection_pool, stop_signal_sender)
+    let task_handles = run_core(connection_pool, stop_signal_sender, &config)
         .await
         .expect("Unable to start Core actors");
 
