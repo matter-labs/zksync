@@ -23,9 +23,7 @@ All notable changes to the core components will be documented in this file.
 
 ## Unreleased
 
-## 2020-12-29
-
 ### Changed
 
 - Metrics were added to some functions from lib/storage.
-- get_tx_by_hash function was simplified.
+- `get_tx_by_hash` function was simplified.
