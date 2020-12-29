@@ -13,8 +13,6 @@ components, the logs will have the following format:
 
 - `explorer` was refactored and optimized.
 
-## 2020-12-29
-
 ### Added
 
 - Link to status page was added to explorer.
