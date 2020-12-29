@@ -27,7 +27,7 @@ async function main() {
             process.exit(1);
         }
 
-        const provider = new ethers.providers.JsonRpcProvider(process.env.ETH_CLIENT_WEB3_URL);
+        const provider = new ethers.providers.JsonRpcProvider(process.env.ETH_CLIENT_WEB3_URLS.split(',')[0]);
 
         const wallet = ethers.Wallet.fromMnemonic(ethTestConfig.test_mnemonic, "m/44'/60'/0'/0/0").connect(provider);
 

@@ -34,7 +34,8 @@ export async function ethData() {
         params: [process.env.ETH_SENDER_SENDER_OPERATOR_COMMIT_ETH_ADDR as string, 'pending'],
         id: 1
     };
-    const reponse = await fetch(process.env.ETH_CLIENT_WEB3_URL as string, {
+    // @ts-ignore
+    const reponse = await fetch(process.env.ETH_CLIENT_WEB3_URLS.split(',')[0] as string, {
         method: 'post',
         body: JSON.stringify(body),
         headers: {

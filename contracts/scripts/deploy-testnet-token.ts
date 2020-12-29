@@ -25,7 +25,7 @@ const ethTestConfig = JSON.parse(fs.readFileSync(`${testConfigPath}/eth.json`, {
     parser.addArgument('--deployerPrivateKey', { required: false, help: 'Wallet used to deploy contracts' });
     const args = parser.parseArgs(process.argv.slice(2));
 
-    const provider = new ethers.providers.JsonRpcProvider(process.env.ETH_CLIENT_WEB3_URL);
+    const provider = new ethers.providers.JsonRpcProvider(process.env.ETH_CLIENT_WEB3_URLS.split(',')[0]);
     const wallet = args.deployerPrivateKey
         ? new Wallet(args.deployerPrivateKey, provider)
         : Wallet.fromMnemonic(ethTestConfig.mnemonic, "m/44'/60'/0'/0/1").connect(provider);

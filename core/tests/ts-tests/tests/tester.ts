@@ -25,8 +25,10 @@ export class Tester {
 
     // prettier-ignore
     static async init(network: Network, transport: 'WS' | 'HTTP') {
-        const ethProvider = network == 'localhost' 
-            ? new ethers.providers.JsonRpcProvider(process.env.ETH_CLIENT_WEB3_URL)
+        // @ts-ignore
+        let web3_url = process.env.ETH_CLIENT_WEB3_URLS.split(",")[0];
+        const ethProvider = network == 'localhost'
+            ? new ethers.providers.JsonRpcProvider(web3_url)
             : ethers.getDefaultProvider(network);
         if (network == 'localhost') {
             ethProvider.pollingInterval = 100;

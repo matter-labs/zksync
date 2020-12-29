@@ -4,7 +4,7 @@ import * as path from 'path';
 import { Wallet } from 'ethers';
 import { Deployer } from '../src.ts/deploy';
 
-const provider = new ethers.providers.JsonRpcProvider(process.env.ETH_CLIENT_WEB3_URL);
+const provider = new ethers.providers.JsonRpcProvider(process.env.ETH_CLIENT_WEB3_URLS.split(',')[0]);
 const testConfigPath = path.join(process.env.ZKSYNC_HOME as string, `etc/test_config/constant`);
 const ethTestConfig = JSON.parse(fs.readFileSync(`${testConfigPath}/eth.json`, { encoding: 'utf-8' }));
 

@@ -7,7 +7,7 @@ import { ethers } from 'ethers';
 const DEPOSIT_AMOUNT = ethers.utils.parseEther('10000000000');
 const network = process.env.CHAIN_ETH_NETWORK;
 
-const provider = new ethers.providers.JsonRpcProvider(process.env.ETH_CLIENT_WEB3_URL);
+const provider = new ethers.providers.JsonRpcProvider(process.env.ETH_CLIENT_WEB3_URLS.split(',')[0]);
 const testConfigPath = path.join(process.env.ZKSYNC_HOME as string, `etc/test_config/constant`);
 const ethTestConfig = JSON.parse(fs.readFileSync(`${testConfigPath}/eth.json`, { encoding: 'utf-8' }));
 

@@ -1,5 +1,5 @@
 const ethers = require('ethers');
-const provider = new ethers.providers.JsonRpcProvider(process.env.ETH_CLIENT_WEB3_URL);
+const provider = new ethers.providers.JsonRpcProvider(process.env.ETH_CLIENT_WEB3_URLS.split(',')[0]);
 
 const rinkeby = ethers.getDefaultProvider('rinkeby');
 const mainnet = new ethers.providers.InfuraProvider();
