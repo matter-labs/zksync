@@ -20,7 +20,7 @@ impl TestkitConfig {
             chain_id: config.eth_client.chain_id,
             gas_price_factor: config.eth_client.gas_price_factor,
             web3_url: config.eth_client.web3_url,
-            available_block_chunk_sizes: config.chain.state_keeper.block_chunk_sizes.clone(),
+            available_block_chunk_sizes: config.chain.state_keeper.block_chunk_sizes,
         }
     }
 }
