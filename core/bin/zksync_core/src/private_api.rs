@@ -7,7 +7,7 @@
 //! All the incoming data is assumed to be correct and not double-checked
 //! for correctness.
 
-use crate::{eth_watch::EthWatchRequest, mempool::MempoolRequest};
+use crate::{eth_watch::EthWatchRequest, mempool::MempoolTransactionRequest};
 use actix_web::{web, App, HttpResponse, HttpServer};
 use futures::{
     channel::{mpsc, oneshot},
@@ -20,7 +20,7 @@ use zksync_utils::panic_notify::ThreadPanicNotify;
 
 #[derive(Debug, Clone)]
 struct AppState {
-    mempool_tx_sender: mpsc::Sender<MempoolRequest>,
+    mempool_tx_sender: mpsc::Sender<MempoolTransactionRequest>,
     eth_watch_req_sender: mpsc::Sender<EthWatchRequest>,
 }
 
@@ -33,7 +33,7 @@ async fn new_tx(
     web::Json(tx): web::Json<SignedZkSyncTx>,
 ) -> actix_web::Result<HttpResponse> {
     let (sender, receiver) = oneshot::channel();
-    let item = MempoolRequest::NewTx(Box::new(tx), sender);
+    let item = MempoolTransactionRequest::NewTx(Box::new(tx), sender);
     let mut mempool_sender = data.mempool_tx_sender.clone();
     mempool_sender
         .send(item)
@@ -56,7 +56,7 @@ async fn new_txs_batch(
     web::Json((txs, eth_signature)): web::Json<(Vec<SignedZkSyncTx>, Option<TxEthSignature>)>,
 ) -> actix_web::Result<HttpResponse> {
     let (sender, receiver) = oneshot::channel();
-    let item = MempoolRequest::NewTxsBatch(txs, eth_signature, sender);
+    let item = MempoolTransactionRequest::NewTxsBatch(txs, eth_signature, sender);
     let mut mempool_sender = data.mempool_tx_sender.clone();
     mempool_sender
         .send(item)
@@ -145,7 +145,7 @@ async fn unconfirmed_op(
 #[allow(clippy::too_many_arguments)]
 pub fn start_private_core_api(
     panic_notify: mpsc::Sender<bool>,
-    mempool_tx_sender: mpsc::Sender<MempoolRequest>,
+    mempool_tx_sender: mpsc::Sender<MempoolTransactionRequest>,
     eth_watch_req_sender: mpsc::Sender<EthWatchRequest>,
     api_server_options: ApiServerOptions,
 ) {
