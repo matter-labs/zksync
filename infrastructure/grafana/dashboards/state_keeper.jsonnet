@@ -10,7 +10,4 @@ local metrics = [
   "state_keeper.store_pending_block",
 ];
 
-G.dashboard(
-  'Metrics / state_keeper',
-  [ G.panel(metric) for metric in metrics ]
-)
+G.dashboard('state_keeper', metrics)

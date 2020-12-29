@@ -1,32 +1,36 @@
 //! Built-in API client.
 
-// Public uses
-pub use super::{
-    blocks::{BlockInfo, TransactionInfo},
-    config::Contracts,
-    operations::{PriorityOpData, PriorityOpQuery, PriorityOpReceipt},
-    tokens::TokenPriceKind,
-    transactions::{Receipt, SumbitErrorCode, TxData},
-};
-
-// Built-in uses
-
 // External uses
 use reqwest::StatusCode;
 use serde::{de::DeserializeOwned, ser::Serialize};
 use thiserror::Error;
 
-// Workspace uses
-
+// Public uses
+pub use super::{
+    accounts::{
+        AccountInfo, AccountQuery, AccountReceipts, AccountState, DepositingBalances,
+        DepositingFunds,
+    },
+    blocks::{BlockInfo, TransactionInfo},
+    config::Contracts,
+    operations::{PriorityOpData, PriorityOpQuery, PriorityOpReceipt},
+    tokens::TokenPriceKind,
+    transactions::{Receipt, TxData},
+    Pagination,
+};
 // Local uses
+use super::error::ErrorBody;
 
 pub type Result<T> = std::result::Result<T, ClientError>;
 
 // TODO Make error handling as correct as possible. (ZKS-125)
 #[derive(Debug, Error)]
 pub enum ClientError {
-    #[error("Bad request: {0}")]
-    BadRequest(super::Error),
+    #[error("Bad request: {http_code} ({body})")]
+    BadRequest {
+        http_code: StatusCode,
+        body: ErrorBody,
+    },
     #[error("A parse JSON error occurred: {0}")]
     Parse(reqwest::Error),
     #[error("An other error occurred: {0}")]
@@ -126,10 +130,10 @@ impl ClientRequestBuilder {
                 return Err(ClientError::NotFound(self.url));
             }
 
-            Err(ClientError::BadRequest(super::Error {
+            Err(ClientError::BadRequest {
                 http_code: status,
                 body: response.json().await.map_err(ClientError::Parse)?,
-            }))
+            })
         }
     }
 }

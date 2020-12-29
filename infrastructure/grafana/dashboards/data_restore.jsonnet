@@ -11,7 +11,4 @@ local metrics = [
   "sql.data_restore.update_storage_state",
 ];
 
-G.dashboard(
-  'Metrics / data_restore',
-  [ G.panel(metric) for metric in metrics ]
-)
+G.dashboard('data_restore', metrics)

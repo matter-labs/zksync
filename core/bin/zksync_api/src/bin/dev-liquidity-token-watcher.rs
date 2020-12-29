@@ -43,9 +43,9 @@ async fn handle_graphql(
     };
     let response = GraphqlResponse {
         data: GraphqlTokenResponse {
-            token: TokenResponse {
+            token: Some(TokenResponse {
                 trade_volume_usd: volume.to_string(),
-            },
+            }),
         },
     };
     Ok(HttpResponse::Ok().json(response))

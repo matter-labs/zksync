@@ -93,19 +93,6 @@ output.
 
 ## Troubleshooting
 
-### Invalid mount config for type "bind"
-
-**Problem.** `zk init` fails with the following error:
-
-```
-Cannot create container for service geth: invalid mount config for type "bind": bind source path does not exist: /home/stanislav/matter-labs/zksync-dev/volumes/geth
-```
-
-You might also see these errors not only for `geth` but also for `postgres` and `tesseracts`.
-
-**Solution**. In the repository folder, there should be a folder `volumes`, with three folders inside of it: `geth`,
-`tesseracts`, `postgres`. If some of these are missing, you must create them on your own.
-
 ### SSL error: certificate verify failed
 
 **Problem**. `zk init` fails with the following error:

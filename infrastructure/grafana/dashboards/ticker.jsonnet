@@ -14,7 +14,4 @@ local metrics = [
   "ticker.uniswap_watcher.get_market_volume"
 ];
 
-G.dashboard(
-  'Metrics / ticker',
-  [ G.panel(metric) for metric in metrics ]
-)
+G.dashboard('ticker', metrics)

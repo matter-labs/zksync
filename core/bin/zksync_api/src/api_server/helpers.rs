@@ -6,20 +6,9 @@
 
 // Workspace uses
 use zksync_types::{tx::TxHash, H256};
+use zksync_utils::remove_prefix;
 
 // Local uses
-
-pub fn remove_prefix(query: &str) -> &str {
-    if let Some(query) = query.strip_prefix("0x") {
-        query
-    } else if let Some(query) = query.strip_prefix("sync-bl:") {
-        query
-    } else if let Some(query) = query.strip_prefix("sync-tx:") {
-        query
-    } else {
-        query
-    }
-}
 
 pub fn try_parse_hash(query: &str) -> Result<H256, hex::FromHexError> {
     const HASH_SIZE: usize = 32; // 32 bytes
