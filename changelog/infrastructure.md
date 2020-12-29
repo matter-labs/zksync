@@ -17,4 +17,4 @@ components, the logs will have the following format:
 
 ### Added
 
-- Link to status page was added to explorer
+- Link to status page was added to explorer.
