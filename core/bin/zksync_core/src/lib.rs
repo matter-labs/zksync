@@ -6,7 +6,7 @@ use crate::{
     block_proposer::run_block_proposer_task,
     committer::run_committer,
     eth_watch::start_eth_watch,
-    mempool::run_mempool_task,
+    mempool::run_mempool_tasks,
     private_api::start_private_core_api,
     state_keeper::{start_state_keeper, ZkSyncStateInitParams, ZkSyncStateKeeper},
 };
@@ -20,6 +20,7 @@ use zksync_storage::ConnectionPool;
 
 const DEFAULT_CHANNEL_CAPACITY: usize = 32_768;
 
+pub mod balancer;
 pub mod block_proposer;
 pub mod committer;
 pub mod eth_watch;
@@ -146,7 +147,9 @@ pub async fn run_core(
     let (state_keeper_req_sender, state_keeper_req_receiver) =
         mpsc::channel(DEFAULT_CHANNEL_CAPACITY);
     let (eth_watch_req_sender, eth_watch_req_receiver) = mpsc::channel(DEFAULT_CHANNEL_CAPACITY);
-    let (mempool_request_sender, mempool_request_receiver) =
+    let (mempool_tx_request_sender, mempool_tx_request_receiver) =
+        mpsc::channel(DEFAULT_CHANNEL_CAPACITY);
+    let (mempool_block_request_sender, mempool_block_request_receiver) =
         mpsc::channel(DEFAULT_CHANNEL_CAPACITY);
 
     // Start Ethereum Watcher.
@@ -182,29 +185,32 @@ pub async fn run_core(
     // Start committer.
     let committer_task = run_committer(
         proposed_blocks_receiver,
-        mempool_request_sender.clone(),
+        mempool_block_request_sender.clone(),
         connection_pool.clone(),
     );
 
     // Start mempool.
-    let mempool_task = run_mempool_task(
+    let mempool_task = run_mempool_tasks(
         connection_pool.clone(),
-        mempool_request_receiver,
+        mempool_tx_request_receiver,
+        mempool_block_request_receiver,
         eth_watch_req_sender.clone(),
         &config_opts,
+        4,
+        DEFAULT_CHANNEL_CAPACITY,
     );
 
     // Start block proposer.
     let proposer_task = run_block_proposer_task(
         &config_opts,
-        mempool_request_sender.clone(),
+        mempool_block_request_sender.clone(),
         state_keeper_req_sender.clone(),
     );
 
     // Start private API.
     start_private_core_api(
         panic_notify.clone(),
-        mempool_request_sender,
+        mempool_tx_request_sender,
         eth_watch_req_sender,
         api_server_options,
     );
