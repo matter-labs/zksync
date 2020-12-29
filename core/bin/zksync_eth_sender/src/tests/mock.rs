@@ -2,9 +2,6 @@
 
 // Built-in deps
 use crate::database::DatabaseInterface;
-use crate::ethereum_interface::FailureInfo;
-use crate::EthSenderOptions;
-use std::collections::{BTreeMap, HashMap, VecDeque};
 use std::collections::{BTreeMap, VecDeque};
 use tokio::sync::RwLock;
 use zksync_config::configs::eth_sender::{ETHSenderConfig, GasLimit, Sender};
