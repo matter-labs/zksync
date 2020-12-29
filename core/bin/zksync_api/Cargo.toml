@@ -25,6 +25,7 @@ zksync_utils = { path = "../../lib/utils", version = "1.0" }
 zksync_contracts = { path = "../../lib/contracts", version = "1.0" }
 zksync_eth_client = { path = "../../lib/eth_client", version = "1.0" }
 zksync_eth_signer = { path = "../../lib/eth_signer", version = "1.0" }
+zksync_api_client  = { path = "../../lib/api_client", version = "0.1" }
 
 hex = "0.4"
 ethabi = "12.0.0"
@@ -49,8 +50,8 @@ actix-cors = "0.3.0"
 actix-web = "3.0.0"
 actix-web-httpauth = "0.5.0"
 
-num = { version = "0.2", features = ["serde"] }
-bigdecimal = { version = "0.1", features = ["serde"]}
+num = { version = "0.3.1", features = ["serde"] }
+bigdecimal = { version = "0.2.0", features = ["serde"]}
 chrono = { version = "0.4", features = ["serde", "rustc-serialize"] }
 ctrlc = { version = "3.1", features = ["termination"] }
 anyhow = "1.0"
@@ -64,6 +65,7 @@ jsonwebtoken = "7"
 metrics = "0.13.0-alpha.8"
 lru-cache = "0.1.2"
 once_cell = "1.4"
+regex = "1"
 
 [dev-dependencies]
 zksync_test_account = { path = "../../tests/test_account" }

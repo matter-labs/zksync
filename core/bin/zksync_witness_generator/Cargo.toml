@@ -40,6 +40,6 @@ anyhow = "1.0"
 
 [dev-dependencies]
 zksync_prover = { path = "../prover", version = "1.0" }
-num = { version = "0.2", features = ["serde"] }
+num = { version = "0.3.1", features = ["serde"] }
 chrono = { version = "0.4", features = ["serde"] }
 reqwest = { version = "0.10", features = ["blocking"] }

@@ -14,7 +14,7 @@ readme = "README.md"
 franklin_crypto = { package = "franklin-crypto", version = "0.0.5", git = "https://github.com/matter-labs/franklin-crypto.git", branch="check-franklin-circuit-transpile"}
 rand = "0.4"
 
-num = { version = "0.2", features = ["serde"] }
+num = { version = "0.3.1", features = ["serde"] }
 zksync_basic_types = { path = "../basic_types", version = "1.0" }
 
 serde = "1.0"

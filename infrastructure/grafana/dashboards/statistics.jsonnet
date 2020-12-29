@@ -1,6 +1,6 @@
 local G = import '../generator.libsonnet';
 
-local gauge(title, metric) =
+local stat(title, metric) =
   G.grafana.statPanel.new(
     title,
     datasource = 'Prometheus',
@@ -12,14 +12,14 @@ local gauge(title, metric) =
     )
   ) + { gridPos: { h: G.height, w: G.width } };
 
-G.dashboard(
-  'Metrics / statistics',
+G.dashboardRaw(
+  'statistics',
   [
-    gauge('COMMIT not confirmed operations', 'count_operations{action="COMMIT", confirmed="false"}'),
-    gauge('VERIFY not confirmed operations', 'count_operations{action="VERIFY", confirmed="false"}'),
-    gauge('COMMIT confirmed operations', 'count_operations{action="COMMIT", confirmed="true"}'),
-    gauge('VERIFY confirmed operations', 'count_operations{action="VERIFY", confirmed="true"}'),
-    gauge('Transaction batch sizes', 'tx_batch_size'),
+    stat('COMMIT not confirmed operations', 'count_operations{action="COMMIT", confirmed="false"}'),
+    stat('VERIFY not confirmed operations', 'count_operations{action="VERIFY", confirmed="false"}'),
+    stat('COMMIT confirmed operations', 'count_operations{action="COMMIT", confirmed="true"}'),
+    stat('VERIFY confirmed operations', 'count_operations{action="VERIFY", confirmed="true"}'),
+    stat('Transaction batch sizes', 'tx_batch_size'),
   ]
 )
 

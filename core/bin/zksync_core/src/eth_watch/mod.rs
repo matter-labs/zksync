@@ -89,6 +89,10 @@ pub enum EthWatchRequest {
         address: Address,
         resp: oneshot::Sender<Vec<PriorityOp>>,
     },
+    GetUnconfirmedOps {
+        address: Address,
+        resp: oneshot::Sender<Vec<PriorityOp>>,
+    },
     GetUnconfirmedOpByHash {
         eth_hash: Vec<u8>,
         resp: oneshot::Sender<Option<PriorityOp>>,
@@ -273,7 +277,7 @@ impl<W: EthClient, S: Storage> EthWatch<W, S> {
         self.eth_state
             .unconfirmed_queue()
             .iter()
-            .find(|op| op.eth_hash.as_slice() == eth_hash)
+            .find(|op| op.eth_hash.as_bytes() == eth_hash)
             .cloned()
     }
 
@@ -287,6 +291,21 @@ impl<W: EthClient, S: Storage> EthWatch<W, S> {
                     deposit.from == address || deposit.to == address
                 }
                 _ => false,
+            })
+            .cloned()
+            .collect()
+    }
+
+    fn get_ongoing_ops_for(&self, address: Address) -> Vec<PriorityOp> {
+        self.eth_state
+            .unconfirmed_queue()
+            .iter()
+            .filter(|op| match &op.data {
+                ZkSyncPriorityOp::Deposit(deposit) => {
+                    // Address may be set to sender.
+                    deposit.from == address
+                }
+                ZkSyncPriorityOp::FullExit(full_exit) => full_exit.eth_address == address,
             })
             .cloned()
             .collect()
@@ -395,7 +414,11 @@ impl<W: EthClient, S: Storage> EthWatch<W, S> {
                 }
                 EthWatchRequest::GetUnconfirmedDeposits { address, resp } => {
                     let deposits_for_address = self.get_ongoing_deposits_for(address);
-                    resp.send(deposits_for_address).unwrap_or_default();
+                    resp.send(deposits_for_address).ok();
+                }
+                EthWatchRequest::GetUnconfirmedOps { address, resp } => {
+                    let deposits_for_address = self.get_ongoing_ops_for(address);
+                    resp.send(deposits_for_address).ok();
                 }
                 EthWatchRequest::GetUnconfirmedOpByHash { eth_hash, resp } => {
                     let unconfirmed_op = self.find_ongoing_op_by_hash(&eth_hash);

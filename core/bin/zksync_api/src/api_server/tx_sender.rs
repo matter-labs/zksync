@@ -128,10 +128,10 @@ impl TxSender {
 
         Self {
             core_api_client,
-            pool: connection_pool.clone(),
+            pool: connection_pool,
             sign_verify_requests: sign_verify_request_sender,
             ticker_requests: ticker_request_sender,
-            tokens: TokenDBCache::new(connection_pool),
+            tokens: TokenDBCache::new(),
 
             enforce_pubkey_change_fee,
             forced_exit_minimum_account_age,
@@ -415,8 +415,14 @@ impl TxSender {
     }
 
     async fn token_info_from_id(&self, token_id: TokenId) -> Result<Token, SubmitError> {
+        let mut storage = self
+            .pool
+            .access_storage()
+            .await
+            .map_err(SubmitError::internal)?;
+
         self.tokens
-            .get_token(token_id)
+            .get_token(&mut storage, token_id)
             .await
             .map_err(SubmitError::internal)?
             // TODO Make error more clean
