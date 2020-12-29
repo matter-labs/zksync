@@ -85,6 +85,7 @@ impl LoadtestExecutor {
         // Create main account to deposit money from and to return money back later.
         let main_wallet =
             TestWallet::from_info(monitor.clone(), &config.main_wallet, &env_options).await;
+        main_wallet.approve().await?;
 
         let default_fee = main_wallet.sufficient_fee().await?;
         let fees = Fees::from_config(&config.network, default_fee);
@@ -134,7 +135,8 @@ impl LoadtestExecutor {
 
         // Create intermediate wallets and compute total amount to deposit and needed
         // balances for wallets.
-        let mut amount_to_deposit = &self.fees.eth + &self.fees.zksync * BigUint::from(10_u64);
+        let mut amount_to_deposit =
+            &self.fees.eth * BigUint::from(4_u64) + &self.fees.zksync * BigUint::from(10_u64);
         let mut wallets = Vec::new();
         for resource in resources {
             let wallet_balance = closest_packable_token_amount(
@@ -157,6 +159,17 @@ impl LoadtestExecutor {
                 }),
             )
             .await;
+
+            if !self.main_wallet.token_name().is_eth() {
+                for wallet in &scenario_wallets {
+                    let eth_balance =
+                        closest_packable_fee_amount(&(&self.fees.eth * BigUint::from(4_u64)));
+                    self.main_wallet
+                        .transfer_to("ETH", eth_balance, wallet.address())
+                        .await?;
+                    wallet.approve().await?;
+                }
+            }
 
             wallets.push((scenario_wallets, wallet_balance));
         }

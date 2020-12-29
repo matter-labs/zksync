@@ -97,13 +97,6 @@ impl TestWallet {
             .await
             .store_address(inner.address());
 
-        if !token_name.is_eth() {
-            eth_provider
-                .approve_erc20_token_deposits(token_name.clone())
-                .await
-                .expect("Unable to approve ERC20 token");
-        }
-
         Self {
             monitor,
             inner,
@@ -271,6 +264,43 @@ impl TestWallet {
     /// Returns an underlying wallet.
     pub fn into_inner(self) -> Wallet<PrivateKeySigner, RpcProvider> {
         self.inner
+    }
+
+    // TODO
+    pub async fn approve(&self) -> anyhow::Result<()> {
+        if self.token_name.is_eth() {
+            return Ok(());
+        }
+
+        if !self
+            .eth_provider
+            .is_erc20_deposit_approved(self.token_name.clone())
+            .await?
+        {
+            let tx_hash = self
+                .eth_provider
+                .approve_erc20_token_deposits(self.token_name.clone())
+                .await?;
+            self.eth_provider.wait_for_tx(tx_hash).await?;
+        }
+
+        Ok(())
+    }
+
+    // TODO
+    pub async fn transfer_to(
+        &self,
+        token: impl Into<TokenLike>,
+        amount: impl Into<BigUint>,
+        to: Address,
+    ) -> anyhow::Result<()> {
+        let tx_hash = self
+            .eth_provider
+            .transfer(token, biguint_to_u256(amount.into()), to)
+            .await?;
+        self.eth_provider.wait_for_tx(tx_hash).await?;
+
+        Ok(())
     }
 
     /// Returns appropriate nonce for the new transaction and increments the nonce.
