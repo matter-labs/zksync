@@ -242,8 +242,7 @@ mod tests {
         let cfg = TestServerConfig::default();
         cfg.fill_database().await?;
 
-        let (client, server) =
-            cfg.start_server(|cfg| api_scope(&cfg.api_server_options, cfg.pool.clone()));
+        let (client, server) = cfg.start_server(|cfg| api_scope(&cfg.config, cfg.pool.clone()));
 
         // Block requests part
         let blocks: Vec<BlockInfo> = {

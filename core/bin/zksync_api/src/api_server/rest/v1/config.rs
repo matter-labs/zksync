@@ -71,18 +71,18 @@ mod tests {
     )]
     async fn test_config_scope() -> anyhow::Result<()> {
         let cfg = TestServerConfig::default();
-        let (client, server) = cfg.start_server(|cfg| api_scope(&cfg.env_options));
+        let (client, server) = cfg.start_server(|cfg| api_scope(&cfg.config));
 
         assert_eq!(
             client.deposit_confirmations().await?,
-            cfg.env_options.confirmations_for_eth_event
+            cfg.config.eth_watch.confirmations_for_eth_event
         );
 
-        assert_eq!(client.network().await?, cfg.env_options.network);
+        assert_eq!(client.network().await?, cfg.config.chain.eth.network);
         assert_eq!(
             client.contracts().await?,
             Contracts {
-                contract: cfg.env_options.contract_eth_addr
+                contract: cfg.config.contracts.contract_addr
             },
         );
 

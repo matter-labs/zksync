@@ -66,11 +66,11 @@ mod tests {
             coinmarketcap_base_url: "http://127.0.0.1:9876".into(),
             coingecko_base_url: "http://127.0.0.1:9876".into(),
             fast_processing_coeff: 10.0f64,
-            uniswap_url: "http://127.0.0.1:9876".to_string(),
+            uniswap_url: "http://127.0.0.1:9975/graphql".to_string(),
             liquidity_volume: 100.0,
             available_liquidity_seconds: 1000,
-            unconditionally_valid_tokens: vec![addr("38A2fDc11f526Ddd5a607C1F251C065f40fBF2f7")],
-            token_market_update_time: 1000,
+            unconditionally_valid_tokens: vec![addr("0000000000000000000000000000000000000000")],
+            token_market_update_time: 120,
             number_of_ticker_actors: 4,
             not_subsidized_tokens: vec![
                 addr("2b591e99afe9f32eaa6214f7b7629768c40eeb39"),
@@ -86,13 +86,13 @@ FEE_TICKER_TOKEN_PRICE_SOURCE="CoinGecko"
 FEE_TICKER_COINMARKETCAP_BASE_URL="http://127.0.0.1:9876"
 FEE_TICKER_COINGECKO_BASE_URL="http://127.0.0.1:9876"
 FEE_TICKER_FAST_PROCESSING_COEFF="10"
-FEE_TICKER_DISABLED_TOKENS="0x38A2fDc11f526Ddd5a607C1F251C065f40fBF2f7"
-FEE_TICKER_NOT_SUBSIDIZED_TOKENS="0x2b591e99afe9f32eaa6214f7b7629768c40eeb39,0x34083bbd70d394110487feaa087da875a54624ec"
 FEE_TICKER_UNISWAP_URL=http://127.0.0.1:9975/graphql
-FEE_TICKER_TOKEN_AVAILABLE_LIQUIDITY_SECONDS=720
-FEE_TICKER_TOKEN_TOKEN_MARKET_UPDATE_TIME_SECONDS=120
-FEE_TICKER_UNCONDITIONALLY_VALID_TOKENS=0000000000000000000000000000000000000000
+FEE_TICKER_NOT_SUBSIDIZED_TOKENS="0x2b591e99afe9f32eaa6214f7b7629768c40eeb39,0x34083bbd70d394110487feaa087da875a54624ec"
+FEE_TICKER_AVAILABLE_LIQUIDITY_SECONDS=1000
+FEE_TICKER_TOKEN_MARKET_UPDATE_TIME=120
+FEE_TICKER_UNCONDITIONALLY_VALID_TOKENS="0x0000000000000000000000000000000000000000"
 FEE_TICKER_LIQUIDITY_VOLUME=100
+FEE_TICKER_NUMBER_OF_TICKER_ACTORS="4"
         "#;
         set_env(config);
 

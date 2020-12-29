@@ -35,7 +35,7 @@ async fn spawn_server(prover_timeout: time::Duration, rounds_interval: time::Dur
     let (tx, _rx) = mpsc::channel(1);
 
     thread::spawn(move || {
-        run_prover_server(conn_pool, tx, prover_options);
+        run_prover_server(conn_pool, tx, config);
     });
     bind_to.to_string()
 }
