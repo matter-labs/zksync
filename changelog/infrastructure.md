@@ -9,6 +9,10 @@ components, the logs will have the following format:
 
 ## Unreleased
 
+### Added
+
+- (zk): `lint` command.
+
 ### Changed
 
-- `explorer` was refactored and optimized.
+- (explorer): optimized by caching.
