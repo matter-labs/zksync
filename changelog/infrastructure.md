@@ -9,10 +9,10 @@ components, the logs will have the following format:
 
 ## Unreleased
 
-### Changed
-
-- `explorer` was refactored and optimized.
-
 ### Added
 
 - Link to status page was added to explorer.
+
+### Changed
+
+- `explorer` was refactored and optimized.
