@@ -10,7 +10,7 @@ pub struct Balancer<R> {
     requests: Receiver<R>,
 }
 
-pub trait Balanced<R, S> {
+pub trait BuildBalancedItem<R, S> {
     fn build_with_receiver(&self, receiver: Receiver<R>) -> S;
 }
 
@@ -22,7 +22,7 @@ impl<R> Balancer<R> {
         channel_capacity: usize,
     ) -> (Self, Vec<S>)
     where
-        T: Balanced<R, S> + Sync + Send + 'static,
+        T: BuildBalancedItem<R, S> + Sync + Send + 'static,
     {
         let mut balanced_items = vec![];
         let mut channels = vec![];
@@ -56,34 +56,27 @@ impl<R> Balancer<R> {
 
 #[cfg(test)]
 mod tests {
-    use crate::balancer::{Balanced, Balancer};
+    use crate::balancer::{Balancer, BuildBalancedItem};
     use futures::channel::mpsc;
     use futures::channel::mpsc::Receiver;
     use futures::{SinkExt, StreamExt};
 
+    struct SomeBalancedItemBuilder;
     struct SomeBalancedItem {
         receiver: Receiver<i32>,
     }
 
-    impl Balanced<i32, SomeBalancedItem> for SomeBalancedItem {
-        fn build_with_receiver(&self, receiver: Receiver<i32>) -> Self {
-            Self { receiver }
+    impl BuildBalancedItem<i32, SomeBalancedItem> for SomeBalancedItemBuilder {
+        fn build_with_receiver(&self, receiver: Receiver<i32>) -> SomeBalancedItem {
+            SomeBalancedItem { receiver }
         }
     }
 
     #[tokio::test]
     async fn load_balance() {
         let (mut request_sender, request_receiver) = mpsc::channel(2);
-        let (_, tmp_request_receiver) = mpsc::channel(2);
 
-        let (balancer, mut items) = Balancer::new(
-            SomeBalancedItem {
-                receiver: tmp_request_receiver,
-            },
-            request_receiver,
-            10,
-            2,
-        );
+        let (balancer, mut items) = Balancer::new(SomeBalancedItemBuilder, request_receiver, 10, 2);
 
         tokio::spawn(balancer.run());
         for i in 0..50 {

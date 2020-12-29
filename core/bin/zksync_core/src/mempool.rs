@@ -45,7 +45,7 @@ use zksync_types::{
 
 // Local uses
 use crate::{
-    balancer::{Balanced, Balancer},
+    balancer::{Balancer, BuildBalancedItem},
     eth_watch::EthWatchRequest,
     wait_for_tasks,
 };
@@ -418,7 +418,7 @@ struct MempoolTransactionsHandlerBuilder {
     max_number_of_withdrawals_per_block: usize,
 }
 
-impl Balanced<MempoolTransactionRequest, MempoolTransactionsHandler>
+impl BuildBalancedItem<MempoolTransactionRequest, MempoolTransactionsHandler>
     for MempoolTransactionsHandlerBuilder
 {
     fn build_with_receiver(
