@@ -2,8 +2,7 @@
 // Workspace imports
 use zksync_types::{helpers::apply_updates, AccountMap, Action, ActionType};
 // Local imports
-use super::{block::apply_random_updates, utils::get_operation};
-use crate::tests::{create_rng, db_test};
+use super::block::apply_random_updates;
 use crate::{
     chain::{
         block::BlockSchema,
@@ -11,6 +10,8 @@ use crate::{
         state::StateSchema,
     },
     prover::ProverSchema,
+    test_data::gen_operation,
+    tests::{create_rng, db_test},
     QueryResult, StorageProcessor,
 };
 
@@ -163,7 +164,7 @@ async fn state_diff(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
         accounts_map = new_accounts_map;
 
         BlockSchema(&mut storage)
-            .execute_operation(get_operation(block_number, Action::Commit, block_size))
+            .execute_operation(gen_operation(block_number, Action::Commit, block_size))
             .await?;
         StateSchema(&mut storage)
             .commit_state_update(block_number, &updates, 0)
@@ -173,7 +174,7 @@ async fn state_diff(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
             .store_proof(block_number, &Default::default())
             .await?;
         BlockSchema(&mut storage)
-            .execute_operation(get_operation(
+            .execute_operation(gen_operation(
                 block_number,
                 Action::Verify {
                     proof: Default::default(),
