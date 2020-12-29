@@ -14,17 +14,14 @@ use futures::{
 };
 use tokio::runtime::{Builder, Handle};
 // Workspace uses
+use zksync_config::configs::ZkSyncConfig;
+use zksync_eth_client::ethereum_gateway::EthereumGateway;
+use zksync_types::tx::EthSignData;
 use zksync_types::{tx::TxEthSignature, SignedZkSyncTx, ZkSyncTx};
+use zksync_utils::panic_notify::ThreadPanicNotify;
+
 // Local uses
 use crate::{eth_checker::EthereumChecker, tx_error::TxAddError};
-use zksync_config::configs::ZkSyncConfig;
-use zksync_contracts::zksync_contract;
-use zksync_eth_client::{
-    ethereum_gateway::EthereumGateway, ETHDirectClient, MultiplexerEthereumClient,
-};
-use zksync_eth_signer::PrivateKeySigner;
-use zksync_types::tx::EthSignData;
-use zksync_utils::panic_notify::ThreadPanicNotify;
 
 /// `TxVariant` is used to form a verify request. It is possible to wrap
 /// either a single transaction, or the transaction batch.
@@ -235,21 +232,7 @@ pub fn start_sign_checker_detached(
     input: mpsc::Receiver<VerifyTxSignatureRequest>,
     panic_notify: mpsc::Sender<bool>,
 ) {
-    // TODO Update config
-    let transport = web3::transports::Http::new(&config.eth_client.web3_url).unwrap();
-    let client = EthereumGateway::Multiplexed(MultiplexerEthereumClient::new().add_client(
-        "infura".to_string(),
-        ETHDirectClient::new(
-            transport,
-            zksync_contract(),
-            config.eth_sender.sender.operator_commit_eth_addr,
-            PrivateKeySigner::new(config.eth_sender.sender.operator_private_key),
-            config.contracts.contract_addr,
-            config.eth_client.chain_id,
-            config.eth_client.gas_price_factor,
-        ),
-    ));
-
+    let client = EthereumGateway::from_config(&config);
     let eth_checker = EthereumChecker::new(client);
 
     /// Main signature check requests handler.

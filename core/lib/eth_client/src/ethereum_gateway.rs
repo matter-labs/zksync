@@ -3,12 +3,14 @@ use web3::contract::Options;
 use web3::types::{Address, BlockId, Filter, Log, U64};
 
 use std::fmt::Debug;
+use zksync_config::configs::ZkSyncConfig;
 use zksync_eth_signer::PrivateKeySigner;
 use zksync_types::{TransactionReceipt, H160, H256, U256};
 
 use crate::clients::mock::MockEthereum;
 use crate::clients::multiplexer::MultiplexerEthereumClient;
 use crate::ETHDirectClient;
+use zksync_contracts::zksync_contract;
 // pub struct anyhow::Error;
 
 #[derive(Debug, Clone, PartialEq)]
@@ -44,6 +46,44 @@ pub enum EthereumGateway {
     Direct(ETHDirectClient<PrivateKeySigner>),
     Multiplexed(MultiplexerEthereumClient),
     Mock(MockEthereum),
+}
+
+impl EthereumGateway {
+    pub fn from_config(config: &ZkSyncConfig) -> Self {
+        if config.eth_client.web3_urls.len() == 1 {
+            let transport = web3::transports::Http::new(&config.eth_client.web3_url()).unwrap();
+
+            EthereumGateway::Direct(ETHDirectClient::new(
+                transport,
+                zksync_contract(),
+                config.eth_sender.sender.operator_commit_eth_addr,
+                PrivateKeySigner::new(config.eth_sender.sender.operator_private_key),
+                config.contracts.contract_addr,
+                config.eth_client.chain_id,
+                config.eth_client.gas_price_factor,
+            ))
+        } else {
+            let mut client = MultiplexerEthereumClient::new();
+
+            let contract = zksync_contract();
+            for web3_url in config.eth_client.web3_urls.iter() {
+                let transport = web3::transports::Http::new(web3_url).unwrap();
+                client = client.add_client(
+                    web3_url.clone(),
+                    ETHDirectClient::new(
+                        transport,
+                        contract.clone(),
+                        config.eth_sender.sender.operator_commit_eth_addr,
+                        PrivateKeySigner::new(config.eth_sender.sender.operator_private_key),
+                        config.contracts.contract_addr,
+                        config.eth_client.chain_id,
+                        config.eth_client.gas_price_factor,
+                    ),
+                );
+            }
+            EthereumGateway::Multiplexed(client)
+        }
+    }
 }
 
 macro_rules! delegate_call {

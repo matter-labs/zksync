@@ -12,6 +12,8 @@ categories = ["cryptography"]
 [dependencies]
 zksync_types = { path = "../types", version = "1.0" }
 zksync_eth_signer = { path = "../eth_signer", version = "1.0" }
+zksync_config = { path = "../config", version = "1.0" }
+zksync_contracts = { path = "../contracts", version = "1.0" }
 
 serde = "1.0.90"
 ethabi = "12.0.0"

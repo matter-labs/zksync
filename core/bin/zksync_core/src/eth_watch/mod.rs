@@ -37,12 +37,7 @@ pub use client::EthHttpClient;
 pub use storage::DBStorage;
 use zksync_config::configs::ZkSyncConfig;
 
-use zksync_contracts::zksync_contract;
-use zksync_eth_client::{
-    ethereum_gateway::EthereumGateway,
-    {ETHDirectClient, MultiplexerEthereumClient},
-};
-use zksync_eth_signer::PrivateKeySigner;
+use zksync_eth_client::ethereum_gateway::EthereumGateway;
 
 mod client;
 mod eth_state;
@@ -455,19 +450,7 @@ pub fn start_eth_watch(
     eth_req_receiver: mpsc::Receiver<EthWatchRequest>,
     db_pool: ConnectionPool,
 ) -> JoinHandle<()> {
-    let transport = web3::transports::Http::new(&config_options.eth_client.web3_url).unwrap();
-    let client = EthereumGateway::Multiplexed(MultiplexerEthereumClient::new().add_client(
-        "infura".to_string(),
-        ETHDirectClient::new(
-            transport,
-            zksync_contract(),
-            config_options.eth_sender.sender.operator_commit_eth_addr,
-            PrivateKeySigner::new(config_options.eth_sender.sender.operator_private_key),
-            config_options.contracts.contract_addr,
-            config_options.eth_client.chain_id,
-            config_options.eth_client.gas_price_factor,
-        ),
-    ));
+    let client = EthereumGateway::from_config(&config_options);
     let eth_client = EthHttpClient::new(client, config_options.contracts.contract_addr);
 
     let storage = DBStorage::new(db_pool);

@@ -89,7 +89,7 @@ fn print_counters(failed: usize, total: usize) {
 async fn main() -> Result<(), anyhow::Error> {
     env_logger::init();
     let env_config = ETHClientConfig::from_env();
-    let web3_url = env_config.web3_url;
+    let web3_url = env_config.web3_url();
 
     let opts = LoadtestOpts::from_args();
 

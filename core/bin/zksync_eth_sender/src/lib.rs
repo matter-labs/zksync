@@ -10,17 +10,12 @@ use std::time::{Duration, Instant};
 use tokio::{task::JoinHandle, time};
 use web3::{
     contract::Options,
-    transports::Http,
     types::{TransactionReceipt, H256, U256},
 };
 
 // Workspace uses
 use zksync_config::configs::{ETHSenderConfig, ZkSyncConfig};
-use zksync_contracts::zksync_contract;
-use zksync_eth_client::{
-    ETHDirectClient, EthereumGateway, MultiplexerEthereumClient, SignedCallResult,
-};
-use zksync_eth_signer::PrivateKeySigner;
+use zksync_eth_client::{EthereumGateway, SignedCallResult};
 use zksync_storage::ConnectionPool;
 use zksync_types::{
     config,
@@ -835,25 +830,11 @@ impl<DB: DatabaseInterface> ETHSender<DB> {
 
 #[must_use]
 pub fn run_eth_sender(pool: ConnectionPool, config: ZkSyncConfig) -> JoinHandle<()> {
-    let transport = Http::new(&config.eth_client.web3_url).expect("Wrong web3 url");
-    let ethereum_signer = PrivateKeySigner::new(config.eth_sender.sender.operator_private_key);
-
-    let ethereum = EthereumGateway::Multiplexed(MultiplexerEthereumClient::new().add_client(
-        "infura".to_string(),
-        ETHDirectClient::new(
-            transport,
-            zksync_contract(),
-            config.eth_sender.sender.operator_commit_eth_addr,
-            ethereum_signer,
-            config.contracts.contract_addr,
-            config.eth_client.chain_id,
-            config.eth_client.gas_price_factor,
-        ),
-    ));
+    let client = EthereumGateway::from_config(&config);
     let db = Database::new(pool);
 
     tokio::spawn(async move {
-        let eth_sender = ETHSender::new(config.eth_sender.clone(), db, ethereum).await;
+        let eth_sender = ETHSender::new(config.eth_sender.clone(), db, client).await;
 
         eth_sender.run().await
     })

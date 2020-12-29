@@ -23,7 +23,7 @@ async fn main() -> Result<()> {
     let config_opts = ETHClientConfig::from_env();
 
     let (_event_loop, transport) =
-        Http::new(&config_opts.web3_url).expect("failed to start web3 transport");
+        Http::new(&config_opts.web3_url()).expect("failed to start web3 transport");
 
     let eth = Eth::new(transport);
 
