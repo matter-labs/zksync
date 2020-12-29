@@ -64,16 +64,12 @@ async function withdrawTokens(zksWallet: zksync.Wallet) {
             continue;
         }
 
-        const tokenBalance = BigNumber.from(accountState.verified.balances[token]);
         const tokenCommittedBalance = BigNumber.from(accountState.committed.balances[token]);
-        if (tokenCommittedBalance.lt(tokenBalance)) {
-            continue;
-        }
 
         const withdrawFee = (await provider.getTransactionFee('Withdraw', zksWallet.address(), token)).totalFee;
 
-        if (isOperationFeeAcceptable(tokenBalance, withdrawFee, MAX_LIQUIDATION_FEE_PERCENT)) {
-            const amountAfterWithdraw = tokenBalance.sub(withdrawFee);
+        if (isOperationFeeAcceptable(tokenCommittedBalance, withdrawFee, MAX_LIQUIDATION_FEE_PERCENT)) {
+            const amountAfterWithdraw = tokenCommittedBalance.sub(withdrawFee);
             console.log(
                 `Withdrawing token, amount after withdraw: ${fmtToken(
                     provider,
@@ -110,16 +106,12 @@ async function transferEstablishedTokens(zksWallet: zksync.Wallet, establishedTo
             continue;
         }
 
-        const tokenBalance = BigNumber.from(accountState.verified.balances[token]);
         const tokenCommittedBalance = BigNumber.from(accountState.committed.balances[token]);
-        if (tokenCommittedBalance.lt(tokenBalance)) {
-            continue;
-        }
 
         const transferFee = (await provider.getTransactionFee('Transfer', feeAccumulatorAddress, token)).totalFee;
 
-        if (isOperationFeeAcceptable(tokenBalance, transferFee, MAX_LIQUIDATION_FEE_PERCENT)) {
-            const amountToTransfer = tokenBalance.sub(transferFee);
+        if (isOperationFeeAcceptable(tokenCommittedBalance, transferFee, MAX_LIQUIDATION_FEE_PERCENT)) {
+            const amountToTransfer = tokenCommittedBalance.sub(transferFee);
             console.log(
                 `Transferring token, amount to transfer: ${fmtToken(
                     provider,
