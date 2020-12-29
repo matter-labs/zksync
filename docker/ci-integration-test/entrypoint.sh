@@ -10,15 +10,7 @@ service postgresql restart
 zk dummy-prover enable --no-redeploy
 
 # Initialize the stack
-zk config compile
-zk run verify-keys unpack
-zk run yarn || true # It can fail
-zk db setup
-zk contract build-dev
-zk run deploy-erc20 dev
-zk contract build
-zk server --genesis
-zk contract redeploy
+zk init
 
 # Compile required dependencies
 zk f cargo build --bin zksync_server --release

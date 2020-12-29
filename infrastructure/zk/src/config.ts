@@ -149,6 +149,7 @@ export async function compileConfig(environment?: string) {
 
     const outputFileName = path.join(envDirPath(), `${environment}.env`);
     await fs.promises.writeFile(outputFileName, outputFileContents);
+    console.log('Configs compiled');
 }
 
 export const command = new Command('config').description('config management');

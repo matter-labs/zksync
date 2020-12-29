@@ -10,7 +10,6 @@ import * as env from './env';
 import { up } from './up';
 
 export async function init() {
-    await config.compileConfig();
     await createVolumes();
     if (!process.env.CI) {
         await checkEnv();
