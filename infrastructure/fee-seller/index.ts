@@ -106,10 +106,6 @@ async function transferEstablishedTokens(zksWallet: zksync.Wallet, establishedTo
     const provider = zksWallet.provider;
     const accountState = await zksWallet.getAccountState();
     for (const token in accountState.committed.balances) {
-        if (provider.tokenSet.resolveTokenSymbol(token) === 'MLTT') {
-            continue;
-        }
-
         if (!establishedTokens.includes(provider.tokenSet.resolveTokenSymbol(token))) {
             continue;
         }
