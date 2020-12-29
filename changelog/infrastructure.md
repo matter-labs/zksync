@@ -9,6 +9,14 @@ components, the logs will have the following format:
 
 ## Unreleased
 
+### Added
+
+- (fee-seller): reserve fee accumulator address.
+
 ### Changed
 
 - `explorer` was refactored and optimized.
+
+### Fixed
+
+- (fee-seller): the logic of amount to withdraw/transfer through ZkSync network.
