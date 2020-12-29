@@ -120,17 +120,15 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
         let start = Instant::now();
 
         // Attempt to find the transaction in the list of executed operations.
-        // If the transaction is not found in the list of executed operations check executed priority operations list.
         let result = if let Some(response) = self.find_tx_by_hash(hash).await? {
             Some(response)
-        } else if let Some(response) = self.find_priority_op_by_hash(hash).await? {
-            Some(response)
-        } else {
-            None
+        }
+        else {
+            // If the transaction is not found in the list of executed operations check executed priority operations list.
+            self.find_priority_op_by_hash(hash).await?
         };
 
         metrics::histogram!("sql.chain.operations_ext.get_tx_by_hash", start.elapsed());
-        // There is no executed transaction with the provided hash.
         Ok(result)
     }
 
