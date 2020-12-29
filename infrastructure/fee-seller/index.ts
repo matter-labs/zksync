@@ -110,12 +110,16 @@ async function transferEstablishedTokens(zksWallet: zksync.Wallet, establishedTo
             continue;
         }
 
+        const tokenBalance = BigNumber.from(accountState.verified.balances[token]);
         const tokenCommittedBalance = BigNumber.from(accountState.committed.balances[token]);
+        if (tokenCommittedBalance.lt(tokenBalance)) {
+            continue;
+        }
 
         const transferFee = (await provider.getTransactionFee('Transfer', feeAccumulatorAddress, token)).totalFee;
 
-        if (isOperationFeeAcceptable(tokenCommittedBalance, transferFee, MAX_LIQUIDATION_FEE_PERCENT)) {
-            const amountToTransfer = tokenCommittedBalance.sub(transferFee);
+        if (isOperationFeeAcceptable(tokenBalance, transferFee, MAX_LIQUIDATION_FEE_PERCENT)) {
+            const amountToTransfer = tokenBalance.sub(transferFee);
             console.log(
                 `Transferring token, amount to transfer: ${fmtToken(
                     provider,
