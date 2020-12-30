@@ -46,13 +46,13 @@ async function main() {
 
     program
         .command('add')
-        .option('-n, --name <name>')
+        .option('-n, --token_name <token_name>')
         .option('-s, --symbol <symbol>')
         .option('-d, --decimals <decimals>')
         .description('Adds a new token with a given fields')
-        .action(async (name: string, symbol: string, decimals: number) => {
-            const token: Token = { address: null, name, symbol, decimals };
-            console.log(JSON.stringify(deployToken(token), null, 2));
+        .action(async (cmd: Command) => {
+            const token: Token = { address: null, name: cmd.token_name, symbol: cmd.symbol, decimals: cmd.decimals };
+            console.log(JSON.stringify(await deployToken(token), null, 2));
         });
 
     program
@@ -69,7 +69,12 @@ async function main() {
             console.log(JSON.stringify(result, null, 2));
         });
 
-    program.parse(process.argv);
+    await program.parseAsync(process.argv);
 }
 
-main();
+main()
+    .then(() => process.exit(0))
+    .catch((err) => {
+        console.error('Error:', err.message || err);
+        process.exit(1);
+    });
