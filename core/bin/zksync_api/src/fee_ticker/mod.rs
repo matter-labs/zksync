@@ -26,26 +26,32 @@ use zksync_types::{
     Address, ChangePubKeyOp, Token, TokenId, TokenLike, TransferOp, TransferToNewOp, TxFeeTypes,
     WithdrawOp,
 };
+
 use zksync_utils::ratio_to_big_decimal;
 // Local deps
 use crate::fee_ticker::{
-    fee_token_validator::FeeTokenValidator,
     ticker_api::{
         coingecko::CoinGeckoAPI, coinmarkercap::CoinMarketCapAPI, FeeTickerAPI, TickerApi,
         CONNECTION_TIMEOUT,
     },
     ticker_info::{FeeTickerInfo, TickerInfo},
+    validator::{
+        watcher::{TokenWatcher, UniswapTokenWatcher},
+        FeeTokenValidator,
+    },
 };
 use crate::utils::token_db_cache::TokenDBCache;
 
 pub use self::fee::*;
 use crate::fee_ticker::balancer::TickerBalancer;
+use crate::fee_ticker::validator::MarketUpdater;
+use std::convert::TryFrom;
 
 mod constants;
 mod fee;
-mod fee_token_validator;
 mod ticker_api;
 mod ticker_info;
+pub mod validator;
 
 mod balancer;
 #[cfg(test)]
@@ -173,12 +179,12 @@ pub enum TickerRequest {
     },
 }
 
-struct FeeTicker<API, INFO> {
+struct FeeTicker<API, INFO, WATCHER> {
     api: API,
     info: INFO,
     requests: Receiver<TickerRequest>,
     config: TickerConfig,
-    validator: FeeTokenValidator,
+    validator: FeeTokenValidator<WATCHER>,
 }
 
 #[must_use]
@@ -195,9 +201,18 @@ pub fn run_ticker_task(
         not_subsidized_tokens: config.not_subsidized_tokens,
     };
 
-    let cache = TokenDBCache::new(db_pool.clone());
-    let validator = FeeTokenValidator::new(cache, config.disabled_tokens);
+    let cache = (db_pool.clone(), TokenDBCache::new());
+    let watcher = UniswapTokenWatcher::new(config.uniswap_url);
+    let validator = FeeTokenValidator::new(
+        cache.clone(),
+        chrono::Duration::seconds(config.available_liquidity_seconds as i64),
+        BigDecimal::try_from(config.liquidity_volume).expect("Valid f64 for decimal"),
+        config.unconditionally_valid_tokens,
+        watcher.clone(),
+    );
 
+    let updater = MarketUpdater::new(cache, watcher);
+    tokio::spawn(updater.keep_updated(config.token_market_update_time));
     let client = reqwest::ClientBuilder::new()
         .timeout(CONNECTION_TIMEOUT)
         .connect_timeout(CONNECTION_TIMEOUT)
@@ -219,12 +234,13 @@ pub fn run_ticker_task(
 
             tokio::spawn(fee_ticker.run())
         }
+
         TokenPriceSource::CoinGecko { base_url } => {
             let token_price_api =
                 CoinGeckoAPI::new(client, base_url).expect("CoinGecko initializing error");
             let ticker_info = TickerInfo::new(db_pool.clone());
 
-            let mut ticker_dispatcher = TickerBalancer::new(
+            let mut ticker_balancer = TickerBalancer::new(
                 token_price_api,
                 ticker_info,
                 ticker_config,
@@ -233,19 +249,19 @@ pub fn run_ticker_task(
                 db_pool,
                 config.number_of_ticker_actors,
             );
-            ticker_dispatcher.spawn_tickers();
-            tokio::spawn(ticker_dispatcher.run())
+            ticker_balancer.spawn_tickers();
+            tokio::spawn(ticker_balancer.run())
         }
     }
 }
 
-impl<API: FeeTickerAPI, INFO: FeeTickerInfo> FeeTicker<API, INFO> {
+impl<API: FeeTickerAPI, INFO: FeeTickerInfo, WATCHER: TokenWatcher> FeeTicker<API, INFO, WATCHER> {
     fn new(
         api: API,
         info: INFO,
         requests: Receiver<TickerRequest>,
         config: TickerConfig,
-        validator: FeeTokenValidator,
+        validator: FeeTokenValidator<WATCHER>,
     ) -> Self {
         Self {
             api,

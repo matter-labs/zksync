@@ -8,40 +8,47 @@ use actix_web::{
     Scope,
 };
 use bigdecimal::BigDecimal;
-use serde::{Deserialize, Serialize};
-
-// Workspace uses
 use futures::{
     channel::{mpsc, oneshot},
     prelude::*,
 };
-use zksync_storage::QueryResult;
+
+// Workspace uses
+use zksync_api_client::rest::v1::{TokenPriceKind, TokenPriceQuery};
+use zksync_storage::{ConnectionPool, QueryResult};
 use zksync_types::{Token, TokenLike};
 
-// Local uses
-use super::{
-    client::{self, Client},
-    Error as ApiError, JsonResult,
-};
 use crate::{
     fee_ticker::{TickerRequest, TokenPriceRequestType},
     utils::token_db_cache::TokenDBCache,
 };
+
+// Local uses
+use super::{ApiError, JsonResult};
 
 /// Shared data between `api/v1/tokens` endpoints.
 #[derive(Clone)]
 struct ApiTokensData {
     fee_ticker: mpsc::Sender<TickerRequest>,
     tokens: TokenDBCache,
+    pool: ConnectionPool,
 }
 
 impl ApiTokensData {
-    fn new(tokens: TokenDBCache, fee_ticker: mpsc::Sender<TickerRequest>) -> Self {
-        Self { tokens, fee_ticker }
+    fn new(
+        pool: ConnectionPool,
+        tokens: TokenDBCache,
+        fee_ticker: mpsc::Sender<TickerRequest>,
+    ) -> Self {
+        Self {
+            pool,
+            tokens,
+            fee_ticker,
+        }
     }
 
     async fn tokens(&self) -> QueryResult<Vec<Token>> {
-        let mut storage = self.tokens.pool.access_storage().await?;
+        let mut storage = self.pool.access_storage().await?;
 
         let tokens = storage.tokens_schema().load_tokens().await?;
 
@@ -53,7 +60,9 @@ impl ApiTokensData {
     }
 
     async fn token(&self, token_like: TokenLike) -> QueryResult<Option<Token>> {
-        self.tokens.get_token(token_like).await
+        let mut storage = self.pool.access_storage().await?;
+
+        self.tokens.get_token(&mut storage, token_like).await
     }
 
     async fn token_price_usd(&self, token: TokenLike) -> QueryResult<Option<BigDecimal>> {
@@ -79,46 +88,6 @@ impl ApiTokensData {
                 }
             }
         }
-    }
-}
-
-// Data transfer objects.
-
-#[derive(Debug, Deserialize, Serialize, Copy, Clone, PartialEq)]
-#[serde(rename_all = "camelCase")]
-pub enum TokenPriceKind {
-    Currency,
-    Token,
-}
-
-#[derive(Debug, Deserialize, Serialize, Copy, Clone, PartialEq)]
-#[serde(rename_all = "camelCase")]
-struct TokenPriceQuery {
-    #[serde(rename = "in")]
-    kind: TokenPriceKind,
-}
-
-// Client implementation
-
-/// Tokens API part.
-impl Client {
-    pub async fn tokens(&self) -> client::Result<Vec<Token>> {
-        self.get("tokens").send().await
-    }
-
-    pub async fn token_by_id(&self, token: &TokenLike) -> client::Result<Option<Token>> {
-        self.get(&format!("tokens/{}", token)).send().await
-    }
-
-    pub async fn token_price(
-        &self,
-        token: &TokenLike,
-        kind: TokenPriceKind,
-    ) -> client::Result<Option<BigDecimal>> {
-        self.get(&format!("tokens/{}/price", token))
-            .query(&TokenPriceQuery { kind })
-            .send()
-            .await
     }
 }
 
@@ -163,8 +132,12 @@ async fn token_price(
     Ok(Json(price))
 }
 
-pub fn api_scope(tokens_db: TokenDBCache, fee_ticker: mpsc::Sender<TickerRequest>) -> Scope {
-    let data = ApiTokensData::new(tokens_db, fee_ticker);
+pub fn api_scope(
+    pool: ConnectionPool,
+    tokens_db: TokenDBCache,
+    fee_ticker: mpsc::Sender<TickerRequest>,
+) -> Scope {
+    let data = ApiTokensData::new(pool, tokens_db, fee_ticker);
 
     web::scope("tokens")
         .data(data)
@@ -234,7 +207,7 @@ mod tests {
         let fee_ticker = dummy_fee_ticker(&prices);
 
         let (client, server) = cfg.start_server(move |cfg| {
-            api_scope(TokenDBCache::new(cfg.pool.clone()), fee_ticker.clone())
+            api_scope(cfg.pool.clone(), TokenDBCache::new(), fee_ticker.clone())
         });
 
         // Fee requests
@@ -325,7 +298,7 @@ mod tests {
 
         let fee_ticker = dummy_fee_ticker(&[]);
         let (client, server) = cfg.start_server(move |cfg| {
-            api_scope(TokenDBCache::new(cfg.pool.clone()), fee_ticker.clone())
+            api_scope(cfg.pool.clone(), TokenDBCache::new(), fee_ticker.clone())
         });
 
         // Get Golem token as GNT.

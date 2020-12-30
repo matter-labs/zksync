@@ -2655,6 +2655,7 @@ dependencies = [
  "toml",
  "web3 0.13.0",
  "zksync",
+ "zksync_api_client",
  "zksync_config",
  "zksync_eth_signer",
  "zksync_types",
@@ -5661,6 +5662,7 @@ dependencies = [
  "metrics",
  "num",
  "once_cell",
+ "regex",
  "reqwest",
  "serde",
  "serde_json",
@@ -5670,11 +5672,28 @@ dependencies = [
  "tokio 0.2.22",
  "vlog",
  "web3 0.13.0",
+ "zksync_api_client",
  "zksync_config",
  "zksync_contracts",
  "zksync_crypto",
  "zksync_storage",
  "zksync_test_account",
+ "zksync_types",
+ "zksync_utils",
+]
+
+[[package]]
+name = "zksync_api_client"
+version = "0.1.0"
+dependencies = [
+ "bigdecimal",
+ "chrono",
+ "hex",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "thiserror",
+ "zksync_crypto",
  "zksync_types",
  "zksync_utils",
 ]

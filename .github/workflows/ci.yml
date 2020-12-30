@@ -11,7 +11,7 @@ jobs:
   ci-all:
     # We currently have two self-hosted runners, one of which is marked "DEV-CI" and other one is marder "MAIN".
     # "MAIN" is the current CI runner, "DEV-CI" is currently used to experiment with CI optimizing.
-    runs-on: self-hosted
+    runs-on: [self-hosted, MAIN]
 
     steps:
     - uses: actions/checkout@v2
@@ -48,7 +48,7 @@ jobs:
         rustup update stable
         cargo install --version=0.2.0 sqlx-cli
         cargo install diesel_cli --no-default-features --features postgres
-        docker pull matterlabs/ci-integration-test:zk-latest
+        docker pull matterlabs/ci-integration-test:latest
 
     - name: zk
       run: zk

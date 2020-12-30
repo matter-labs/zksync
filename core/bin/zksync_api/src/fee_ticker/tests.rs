@@ -1,18 +1,25 @@
-use super::*;
-use crate::fee_ticker::ticker_api::coingecko::{CoinGeckoTokenInfo, CoinGeckoTokenList};
-use crate::fee_ticker::ticker_api::TokenPriceAPI;
 use actix_web::{web, App, HttpResponse, HttpServer};
+
 use async_trait::async_trait;
 use bigdecimal::BigDecimal;
 use chrono::Utc;
-use futures::channel::mpsc;
-use futures::executor::block_on;
 use futures::future::{AbortHandle, Abortable};
+use futures::{channel::mpsc, executor::block_on};
 use std::str::FromStr;
 use std::thread::sleep;
 use tokio::time::Duration;
 use zksync_types::{Address, Token, TokenId, TokenPrice};
 use zksync_utils::{big_decimal_to_ratio, ratio_to_big_decimal, UnsignedRatioSerializeAsDecimal};
+
+use crate::fee_ticker::{
+    ticker_api::{
+        coingecko::{CoinGeckoTokenInfo, CoinGeckoTokenList},
+        TokenPriceAPI,
+    },
+    validator::{cache::TokenInMemoryCache, FeeTokenValidator},
+};
+
+use super::*;
 
 const TEST_FAST_WITHDRAW_COEFF: f64 = 10.0;
 
@@ -161,6 +168,16 @@ fn format_with_dot(num: &Ratio<BigUint>, precision: usize) -> String {
     UnsignedRatioSerializeAsDecimal::serialize_to_str_with_dot(num, precision)
 }
 
+#[derive(Debug)]
+struct FakeTokenWatcher;
+
+#[async_trait::async_trait]
+impl TokenWatcher for FakeTokenWatcher {
+    async fn get_token_market_volume(&mut self, _token: &Token) -> anyhow::Result<BigDecimal> {
+        unreachable!()
+    }
+}
+
 struct ErrorTickerApi;
 
 #[async_trait::async_trait]
@@ -209,7 +226,13 @@ fn run_server() -> (String, AbortHandle) {
 
 #[test]
 fn test_ticker_formula() {
-    let validator = FeeTokenValidator::new(HashMap::new(), Default::default());
+    let validator = FeeTokenValidator::new(
+        TokenInMemoryCache::new(),
+        chrono::Duration::seconds(100),
+        BigDecimal::from(100),
+        Default::default(),
+        FakeTokenWatcher,
+    );
 
     let config = get_test_ticker_config();
     let mut ticker = FeeTicker::new(
@@ -314,7 +337,13 @@ async fn test_error_coingecko_api() {
         .build()
         .expect("Failed to build reqwest::Client");
     let coingecko = CoinGeckoAPI::new(client, address.parse().unwrap()).unwrap();
-    let validator = FeeTokenValidator::new(HashMap::new(), Default::default());
+    let validator = FeeTokenValidator::new(
+        TokenInMemoryCache::new(),
+        chrono::Duration::seconds(100),
+        BigDecimal::from(100),
+        Default::default(),
+        FakeTokenWatcher,
+    );
     let connection_pool = ConnectionPool::new(Some(1));
     connection_pool
         .access_storage()
@@ -356,7 +385,13 @@ async fn test_error_coingecko_api() {
 #[tokio::test]
 #[ignore]
 async fn test_error_api() {
-    let validator = FeeTokenValidator::new(HashMap::new(), Default::default());
+    let validator = FeeTokenValidator::new(
+        TokenInMemoryCache::new(),
+        chrono::Duration::seconds(100),
+        BigDecimal::from(100),
+        Default::default(),
+        FakeTokenWatcher,
+    );
     let connection_pool = ConnectionPool::new(Some(1));
     let second_connection_pool = connection_pool.clone();
     let ticker_api = TickerApi::new(second_connection_pool, ErrorTickerApi);
