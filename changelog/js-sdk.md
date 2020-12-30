@@ -10,7 +10,8 @@ All notable changes to `zksync.js` will be documented in this file.
 
 - `updateTokenSet` function that updates the `tokenSet` stored in the `Provider`.
 - `newMockProvider` and `DummyTransport`. Tests for the library.
-- `closestGreaterOrEqPackableTransactionAmount` and `closestGreaterOrEqPackableTransactionFee` functions. Tests for them.
+- `closestGreaterOrEqPackableTransactionAmount` and `closestGreaterOrEqPackableTransactionFee` functions. Tests for
+  them.
 
 ### Fixed
 
