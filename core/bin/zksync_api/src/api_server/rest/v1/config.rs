@@ -78,7 +78,10 @@ mod tests {
             cfg.config.eth_watch.confirmations_for_eth_event
         );
 
-        assert_eq!(client.network().await?, cfg.config.chain.eth.network);
+        assert_eq!(
+            client.network().await?,
+            cfg.config.chain.eth.network.to_string()
+        );
         assert_eq!(
             client.contracts().await?,
             Contracts {
