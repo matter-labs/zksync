@@ -14,24 +14,21 @@ use crate::{
 };
 
 #[derive(Debug)]
-pub struct Wallet<S: EthereumSigner> {
-    pub provider: Provider,
+pub struct Wallet<S: EthereumSigner, P: Provider> {
+    pub provider: P,
     pub signer: Signer<S>,
     pub tokens: TokensCache,
 }
 
-impl<S: EthereumSigner + Clone> Wallet<S> {
-    pub async fn new(
-        provider: Provider,
-        credentials: WalletCredentials<S>,
-    ) -> Result<Self, ClientError> {
-        let mut signer = Signer::new(
-            credentials.zksync_private_key,
-            credentials.eth_address,
-            credentials.eth_signer,
-        );
-
+impl<S, P> Wallet<S, P>
+where
+    S: EthereumSigner + Clone,
+    P: Provider + Clone,
+{
+    pub async fn new(provider: P, credentials: WalletCredentials<S>) -> Result<Self, ClientError> {
         let account_info = provider.account_info(credentials.eth_address).await?;
+
+        let mut signer = Signer::with_credentials(credentials);
         signer.set_account_id(account_info.id);
 
         let tokens = TokensCache::new(provider.tokens().await?);
@@ -110,24 +107,25 @@ impl<S: EthereumSigner + Clone> Wallet<S> {
     /// via `Wallet::start_change_pubkey` method.
     pub async fn is_signing_key_set(&self) -> Result<bool, ClientError> {
         let account_info = self.provider.account_info(self.address()).await?;
+        let signer_pub_key_hash = self.signer.pubkey_hash();
 
-        let key_set =
-            account_info.id.is_some() && account_info.committed.pub_key_hash != Default::default();
+        let key_set = account_info.id.is_some()
+            && &account_info.committed.pub_key_hash == signer_pub_key_hash;
         Ok(key_set)
     }
 
     /// Initializes `Transfer` transaction sending.
-    pub fn start_transfer(&self) -> TransferBuilder<'_, S> {
+    pub fn start_transfer(&self) -> TransferBuilder<'_, S, P> {
         TransferBuilder::new(self)
     }
 
     /// Initializes `ChangePubKey` transaction sending.
-    pub fn start_change_pubkey(&self) -> ChangePubKeyBuilder<'_, S> {
+    pub fn start_change_pubkey(&self) -> ChangePubKeyBuilder<'_, S, P> {
         ChangePubKeyBuilder::new(self)
     }
 
     /// Initializes `Withdraw` transaction sending.
-    pub fn start_withdraw(&self) -> WithdrawBuilder<'_, S> {
+    pub fn start_withdraw(&self) -> WithdrawBuilder<'_, S, P> {
         WithdrawBuilder::new(self)
     }
 

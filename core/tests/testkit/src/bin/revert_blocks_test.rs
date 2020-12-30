@@ -2,7 +2,6 @@ use crate::eth_account::{parse_ether, EthereumAccount};
 use crate::external_commands::{deploy_contracts, get_test_accounts, Contracts};
 use crate::zksync_account::ZkSyncAccount;
 use itertools::Itertools;
-use std::thread::JoinHandle;
 use web3::transports::Http;
 use zksync_core::state_keeper::ZkSyncStateInitParams;
 use zksync_testkit::data_restore::verify_restore;

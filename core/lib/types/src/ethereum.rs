@@ -6,7 +6,6 @@ use ethabi::{decode, ParamType};
 use serde::{Deserialize, Serialize};
 // Local uses
 use crate::aggregated_operations::{AggregatedActionType, AggregatedOperation};
-use crate::{Action, Operation};
 use zksync_basic_types::{Log, H256, U256};
 
 /// Numerical identifier of the Ethereum operation.

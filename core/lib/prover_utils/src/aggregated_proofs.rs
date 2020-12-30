@@ -1,45 +1,20 @@
 use crate::fs_utils::get_recursive_verification_key_path;
 use crate::{get_universal_setup_monomial_form, PlonkVerificationKey};
-use serde::export::Formatter;
-use serde::{Deserialize, Serialize};
 use std::fs::File;
-use zksync_basic_types::U256;
-use zksync_crypto::bellman::pairing::ff::{BitIterator, Field, PrimeField, PrimeFieldRepr};
 use zksync_crypto::bellman::pairing::{CurveAffine, Engine as EngineTrait};
-use zksync_crypto::bellman::plonk::better_better_cs::cs::Circuit as NewCircuit;
-use zksync_crypto::bellman::plonk::better_better_cs::proof::Proof as NewProof;
 use zksync_crypto::bellman::plonk::better_better_cs::{
     setup::VerificationKey as VkAggregate, verifier::verify,
 };
-use zksync_crypto::bellman::plonk::better_cs::{
-    cs::PlonkCsWidth4WithNextStepParams,
-    keys::{Proof, VerificationKey as SingleVk},
-};
 use zksync_crypto::bellman::worker::Worker;
 use zksync_crypto::ff::ScalarEngine;
-use zksync_crypto::franklin_crypto::bellman::pairing::bn256::Bn256;
 use zksync_crypto::franklin_crypto::bellman::plonk::commitments::transcript::keccak_transcript::RollingKeccakTranscript;
-use zksync_crypto::params::{
-    RECURSIVE_CIRCUIT_NUM_INPUTS, RECURSIVE_CIRCUIT_SIZES, RECURSIVE_CIRCUIT_VK_TREE_DEPTH,
-};
-use zksync_crypto::proof::{AggregatedProof, EncodedAggregatedProof, SingleProof, Vk};
+use zksync_crypto::params::{RECURSIVE_CIRCUIT_NUM_INPUTS, RECURSIVE_CIRCUIT_VK_TREE_DEPTH};
+use zksync_crypto::proof::{AggregatedProof, SingleProof, Vk};
 use zksync_crypto::recursive_aggregation_circuit::circuit::{
     create_recursive_circuit_setup, create_zksync_recursive_aggregate,
-    proof_recursive_aggregate_for_zksync, RecursiveAggregationCircuitBn256,
+    proof_recursive_aggregate_for_zksync,
 };
-use zksync_crypto::serialization::VecFrSerde;
-use zksync_crypto::{Engine, Fr};
-// use models::config_options::{get_env, parse_env, AvailableBlockSizesConfig};
-// use models::primitives::serialize_fe_for_ethereum;
-// use models::prover_utils::fs_utils::get_recursive_verification_key_path;
-// use models::prover_utils::{
-//     get_universal_setup_monomial_form, save_to_cache_universal_setup_monomial_form,
-//     serialize_new_proof, EncodedProofPlonk,
-// };
-// use models::prover_utils::{PlonkVerificationKey, SetupForStepByStepProver};
-// use std::fs::File;
-// use std::sync::{mpsc, Mutex};
-// use std::time::Duration;
+use zksync_crypto::Engine;
 #[derive(Clone)]
 pub struct SingleProofData {
     pub proof: SingleProof,
@@ -64,7 +39,7 @@ pub fn prepare_proof_data(
         let (vk_idx, _) = available_chunks
             .iter()
             .enumerate()
-            .find(|(idx, size)| **size == block_size)
+            .find(|(_, size)| **size == block_size)
             .expect("block size not found");
 
         single_proof_data.push(SingleProofData { proof, vk_idx });
@@ -75,6 +50,7 @@ pub fn prepare_proof_data(
 pub fn gen_aggregate_proof(
     single_vks: Vec<Vk>,
     proofs: Vec<SingleProofData>,
+    available_aggregated_proof_sizes: &[(usize, u32)],
     download_setup_network: bool,
 ) -> anyhow::Result<AggregatedProof> {
     // proofs: Vec<SingleProofData>,
@@ -95,7 +71,7 @@ pub fn gen_aggregate_proof(
     let worker = Worker::new();
 
     let universal_setup = {
-        let setup_power = RECURSIVE_CIRCUIT_SIZES
+        let setup_power = available_aggregated_proof_sizes
             .iter()
             .find_map(|(aggr_size, aggregate_setup_power)| {
                 if *aggr_size == proofs.len() {

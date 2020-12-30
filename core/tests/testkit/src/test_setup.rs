@@ -12,10 +12,7 @@ use zksync_core::committer::{BlockCommitRequest, CommitRequest};
 use zksync_core::mempool::ProposedBlock;
 use zksync_core::state_keeper::{StateKeeperRequest, ZkSyncStateInitParams};
 use zksync_types::{
-    aggregated_operations::{
-        BlockExecuteOperationArg, BlocksCommitOperation, BlocksExecuteOperation,
-        BlocksProofOperation,
-    },
+    aggregated_operations::{BlocksCommitOperation, BlocksExecuteOperation, BlocksProofOperation},
     block::Block,
     mempool::SignedTxVariant,
     tx::SignedZkSyncTx,
@@ -716,9 +713,7 @@ impl TestSetup {
             .expect_success();
 
         let block_execute_op = BlocksExecuteOperation {
-            blocks: vec![BlockExecuteOperationArg {
-                block: new_block.clone(),
-            }],
+            blocks: vec![new_block.clone()],
         };
         let withdrawals_result = self
             .commit_account
@@ -909,7 +904,12 @@ impl TestSetup {
             .get_account_id()
             .expect("Account should have id to exit");
         // restore account state
-        zksync_prover::exit_proof::create_exit_proof(accounts, owner_id, owner.address, token.0)
-            .expect("Failed to generate exit proof")
+        zksync_prover_utils::exit_proof::create_exit_proof(
+            accounts,
+            owner_id,
+            owner.address,
+            token.0,
+        )
+        .expect("Failed to generate exit proof")
     }
 }

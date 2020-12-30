@@ -65,8 +65,8 @@ contract Governance is Config {
     /// @param _token Token address
     function addToken(address _token) external {
         requireGovernor(msg.sender);
-        require(tokenIds[_token] == 0, "gan11"); // token exists
-        require(totalTokens < MAX_AMOUNT_OF_REGISTERED_TOKENS, "gan12"); // no free identifiers for tokens
+        require(tokenIds[_token] == 0, "bz"); // token exists
+        require(totalTokens < MAX_AMOUNT_OF_REGISTERED_TOKENS, "ca"); // no free identifiers for tokens
 
         totalTokens++;
         uint16 newTokenId = totalTokens; // it is not `totalTokens - 1` because tokenId = 0 is reserved for eth
@@ -103,13 +103,13 @@ contract Governance is Config {
     /// @notice Check if specified address is is governor
     /// @param _address Address to check
     function requireGovernor(address _address) public view {
-        require(_address == networkGovernor, "grr11"); // only by governor
+        require(_address == networkGovernor, "cb"); // only by governor
     }
 
     /// @notice Checks if validator is active
     /// @param _address Validator address
     function requireActiveValidator(address _address) external view {
-        require(validators[_address], "grr21"); // validator is not active
+        require(validators[_address], "cc"); // validator is not active
     }
 
     /// @notice Validate token id (must be less than or equal to total tokens amount)
@@ -124,7 +124,7 @@ contract Governance is Config {
     /// @return tokens id
     function validateTokenAddress(address _tokenAddr) external view returns (uint16) {
         uint16 tokenId = tokenIds[_tokenAddr];
-        require(tokenId != 0, "gvs11"); // 0 is not a valid token
+        require(tokenId != 0, "cd"); // 0 is not a valid token
         return tokenId;
     }
 }

@@ -10,6 +10,7 @@ use futures::{
     channel::{mpsc, oneshot},
     prelude::*,
 };
+use itertools::izip;
 use num::bigint::ToBigInt;
 use thiserror::Error;
 
@@ -17,8 +18,7 @@ use thiserror::Error;
 use zksync_config::ApiServerOptions;
 use zksync_storage::ConnectionPool;
 use zksync_types::{
-    tx::EthSignData,
-    tx::{SignedZkSyncTx, TxEthSignature, TxHash},
+    tx::{BatchSignData, EthSignData, SignedZkSyncTx, TxEthSignature, TxHash},
     Address, Token, TokenId, TokenLike, TxFeeTypes, ZkSyncTx,
 };
 
@@ -31,7 +31,6 @@ use crate::{
     tx_error::TxAddError,
     utils::token_db_cache::TokenDBCache,
 };
-use zksync_types::tx::BatchSignData;
 
 #[derive(Clone)]
 pub struct TxSender {
@@ -44,6 +43,9 @@ pub struct TxSender {
     /// Mimimum age of the account for `ForcedExit` operations to be allowed.
     pub forced_exit_minimum_account_age: chrono::Duration,
     pub enforce_pubkey_change_fee: bool,
+    // Limit the number of both transactions and Ethereum signatures per batch.
+    pub max_number_of_transactions_per_batch: usize,
+    pub max_number_of_authors_per_batch: usize,
 }
 
 #[derive(Debug, Error)]
@@ -128,15 +130,39 @@ impl TxSender {
             chrono::Duration::from_std(api_server_options.forced_exit_minimum_account_age)
                 .expect("Unable to convert std::Duration to chrono::Duration");
 
+        let max_number_of_transactions_per_batch =
+            api_server_options.max_number_of_transactions_per_batch;
+        let max_number_of_authors_per_batch = api_server_options.max_number_of_authors_per_batch;
+
         Self {
             core_api_client,
-            pool: connection_pool.clone(),
+            pool: connection_pool,
             sign_verify_requests: sign_verify_request_sender,
             ticker_requests: ticker_request_sender,
-            tokens: TokenDBCache::new(connection_pool),
+            tokens: TokenDBCache::new(),
 
             enforce_pubkey_change_fee,
             forced_exit_minimum_account_age,
+            max_number_of_transactions_per_batch,
+            max_number_of_authors_per_batch,
+        }
+    }
+
+    /// If `ForcedExit` has Ethereum siganture (e.g. it's a part of a batch), an actual signer
+    /// is initiator, not the target, thus, this function will perform a database query to acquire
+    /// the corresponding address.
+    async fn get_tx_sender(&self, tx: &ZkSyncTx) -> Result<Address, anyhow::Error> {
+        match tx {
+            ZkSyncTx::ForcedExit(tx) => self
+                .pool
+                .access_storage()
+                .await?
+                .chain()
+                .account_schema()
+                .account_address_by_id(tx.initiator_account_id)
+                .await?
+                .ok_or_else(|| anyhow::anyhow!("Forced Exit account is not found in db")),
+            _ => Ok(tx.account()),
         }
     }
 
@@ -155,8 +181,7 @@ impl TxSender {
         }
 
         let fast_processing = fast_processing.unwrap_or_default(); // `None` => false
-
-        if fast_processing && tx.is_withdraw() {
+        if fast_processing && !tx.is_withdraw() {
             return Err(SubmitError::UnsupportedFastProcessing);
         }
 
@@ -214,8 +239,14 @@ impl TxSender {
             }
         }
 
+        let tx_sender = self
+            .get_tx_sender(&tx)
+            .await
+            .or(Err(SubmitError::TxAdd(TxAddError::DbError)))?;
+
         let verified_tx = verify_tx_info_message_signature(
             &tx,
+            tx_sender,
             signature.clone(),
             msg_to_sign,
             sign_verify_channel,
@@ -236,16 +267,24 @@ impl TxSender {
     pub async fn submit_txs_batch(
         &self,
         txs: Vec<TxWithSignature>,
-        eth_signature: Option<TxEthSignature>,
+        eth_signatures: Vec<TxEthSignature>,
     ) -> Result<Vec<TxHash>, SubmitError> {
         if txs.is_empty() {
             return Err(SubmitError::TxAdd(TxAddError::EmptyBatch));
         }
+        // Even though this is going to be checked on the Mempool part,
+        // we don't want to verify huge batches as long as this operation
+        // is expensive.
+        if txs.len() > self.max_number_of_transactions_per_batch {
+            return Err(SubmitError::TxAdd(TxAddError::BatchTooBig));
+        }
+        // Same check but in terms of signatures.
+        if eth_signatures.len() > self.max_number_of_authors_per_batch {
+            return Err(SubmitError::TxAdd(TxAddError::EthSignaturesLimitExceeded));
+        }
 
-        for tx in &txs {
-            if tx.tx.is_close() {
-                return Err(SubmitError::AccountCloseDisabled);
-            }
+        if txs.iter().any(|tx| tx.tx.is_close()) {
+            return Err(SubmitError::AccountCloseDisabled);
         }
 
         // Checking fees data
@@ -309,41 +348,47 @@ impl TxSender {
             return Err(SubmitError::TxAdd(TxAddError::TxBatchFeeTooLow));
         }
 
-        let mut verified_txs = Vec::new();
-        let mut verified_signature = None;
+        let mut verified_txs = Vec::with_capacity(txs.len());
+        let mut verified_signatures = Vec::new();
 
-        let mut messages_to_sign = vec![];
+        let mut messages_to_sign = Vec::with_capacity(txs.len());
+        let mut tx_senders = Vec::with_capacity(txs.len());
         for tx in &txs {
             messages_to_sign.push(self.tx_message_to_sign(&tx.tx).await?);
+            tx_senders.push(
+                self.get_tx_sender(&tx.tx)
+                    .await
+                    .or(Err(SubmitError::TxAdd(TxAddError::DbError)))?,
+            );
         }
 
-        if let Some(signature) = eth_signature {
-            // User provided the signature for the whole batch.
+        if !eth_signatures.is_empty() {
+            // User provided at least one signature for the whole batch.
             let _txs = txs
                 .iter()
                 .map(|tx| tx.tx.clone())
                 .collect::<Vec<ZkSyncTx>>();
             // Create batch signature data.
             let batch_sign_data =
-                BatchSignData::new(&_txs, signature).map_err(SubmitError::other)?;
-
-            // Send batch and provided signature for verification.
-            let (verified_batch, signature) = verify_txs_batch_signature(
+                BatchSignData::new(&_txs, eth_signatures).map_err(SubmitError::other)?;
+            let (verified_batch, sign_data) = verify_txs_batch_signature(
                 txs,
-                batch_sign_data.0.signature,
+                tx_senders,
+                batch_sign_data,
                 messages_to_sign,
                 self.sign_verify_requests.clone(),
             )
             .await?
             .unwrap_batch();
 
-            verified_signature = Some(signature.signature);
+            verified_signatures.extend(sign_data.signatures.into_iter());
             verified_txs.extend(verified_batch.into_iter());
         } else {
             // Otherwise, we process every transaction in turn.
-            for (tx, msg_to_sign) in txs.into_iter().zip(messages_to_sign.into_iter()) {
+            for (tx, sender, msg_to_sign) in izip!(txs, tx_senders, messages_to_sign) {
                 let verified_tx = verify_tx_info_message_signature(
                     &tx.tx,
+                    sender,
                     tx.signature.clone(),
                     msg_to_sign,
                     self.sign_verify_requests.clone(),
@@ -354,19 +399,15 @@ impl TxSender {
                 verified_txs.push(verified_tx);
             }
         }
-
         let tx_hashes: Vec<TxHash> = verified_txs.iter().map(|tx| tx.tx.hash()).collect();
-
         // Send verified transactions to the mempool.
-        let tx_add_result = self
-            .core_api_client
-            .send_txs_batch(verified_txs, verified_signature)
+        self.core_api_client
+            .send_txs_batch(verified_txs, verified_signatures)
             .await
-            .map_err(SubmitError::internal)
-            .map_err(|_| SubmitError::other("Error communicating core server"))?;
+            .map_err(SubmitError::communication_core_server)?
+            .map_err(SubmitError::TxAdd)?;
 
-        // Check the mempool response and, if everything is OK, return the transactions hashes.
-        tx_add_result.map(|_| tx_hashes).map_err(SubmitError::TxAdd)
+        Ok(tx_hashes)
     }
 
     /// For forced exits, we must check that target account exists for more
@@ -434,8 +475,14 @@ impl TxSender {
     }
 
     async fn token_info_from_id(&self, token_id: TokenId) -> Result<Token, SubmitError> {
+        let mut storage = self
+            .pool
+            .access_storage()
+            .await
+            .map_err(SubmitError::internal)?;
+
         self.tokens
-            .get_token(token_id)
+            .get_token(&mut storage, token_id)
             .await
             .map_err(SubmitError::internal)?
             // TODO Make error more clean
@@ -521,6 +568,7 @@ async fn send_verify_request_and_recv(
 /// If `msg_to_sign` is not `None`, then the signature must be present.
 async fn verify_tx_info_message_signature(
     tx: &ZkSyncTx,
+    tx_sender: Address,
     signature: Option<TxEthSignature>,
     msg_to_sign: Option<Vec<u8>>,
     req_channel: mpsc::Sender<VerifyTxSignatureRequest>,
@@ -544,19 +592,11 @@ async fn verify_tx_info_message_signature(
             tx: tx.clone(),
             eth_sign_data,
         }),
+        senders: vec![tx_sender],
         response: sender,
     };
 
     send_verify_request_and_recv(request, req_channel, receiever).await
-}
-
-pub(crate) fn get_batch_sign_message<'a, I: Iterator<Item = &'a ZkSyncTx>>(txs: I) -> Vec<u8> {
-    tiny_keccak::keccak256(
-        txs.flat_map(|tx| tx.get_bytes())
-            .collect::<Vec<u8>>()
-            .as_slice(),
-    )
-    .to_vec()
 }
 
 /// Send a request for Ethereum signature verification and wait for the response.
@@ -565,7 +605,8 @@ pub(crate) fn get_batch_sign_message<'a, I: Iterator<Item = &'a ZkSyncTx>>(txs: 
 /// through signing hash of concatenated transactions bytes.
 async fn verify_txs_batch_signature(
     batch: Vec<TxWithSignature>,
-    signature: TxEthSignature,
+    senders: Vec<Address>,
+    batch_sign_data: BatchSignData,
     msgs_to_sign: Vec<Option<Vec<u8>>>,
     req_channel: mpsc::Sender<VerifyTxSignatureRequest>,
 ) -> Result<VerifiedTx, SubmitError> {
@@ -583,14 +624,12 @@ async fn verify_txs_batch_signature(
             eth_sign_data,
         });
     }
-    // User is expected to sign hash of the data of all transactions in the batch.
-    let message = get_batch_sign_message(txs.iter().map(|tx| &tx.tx));
-    let eth_sign_data = EthSignData { signature, message };
 
     let (sender, receiver) = oneshot::channel();
 
     let request = VerifyTxSignatureRequest {
-        tx: TxVariant::Batch(txs, BatchSignData(eth_sign_data)),
+        tx: TxVariant::Batch(txs, batch_sign_data),
+        senders,
         response: sender,
     };
 
@@ -603,17 +642,65 @@ async fn verify_txs_batch_signature(
 /// We calculate both `provided_fee * 1.05` and `provided_fee + 1 cent` and choose the maximum.
 /// This is required since the price may change between signing the transaction and sending it to the server.
 fn scale_user_fee_up(provided_total_usd_fee: BigDecimal) -> BigDecimal {
+    let one_cent = BigDecimal::from_str("0.01").unwrap();
+
+    // This formula is needed when the fee is really small.
+    //
+    // We don't compare it with any of the following scaled numbers, because
+    // a) Scaling by two (100%) is always greater than scaling by 5%.
+    // b) It is intended as a smaller substitute for 1 cent scaling when
+    // scaling by 1 cent means scaling more than 2x.
+    if provided_total_usd_fee < one_cent {
+        let scaled_by_two_provided_fee_in_usd = provided_total_usd_fee * BigDecimal::from(2u32);
+
+        return scaled_by_two_provided_fee_in_usd;
+    }
+
     // Scale by 5%.
     let scaled_percent_provided_fee_in_usd =
         provided_total_usd_fee.clone() * BigDecimal::from(105u32) / BigDecimal::from(100u32);
 
     // Scale by 1 cent.
-    let scaled_one_cent_provided_fee_in_usd =
-        provided_total_usd_fee + BigDecimal::from_str("0.01").unwrap();
+    let scaled_one_cent_provided_fee_in_usd = provided_total_usd_fee + one_cent;
 
     // Choose the maximum of these two values.
     std::cmp::max(
         scaled_percent_provided_fee_in_usd,
         scaled_one_cent_provided_fee_in_usd,
     )
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_scaling_user_fee_by_two() {
+        let provided_fee = BigDecimal::from_str("0.005").unwrap();
+        let provided_fee_scaled_by_two = BigDecimal::from_str("0.01").unwrap();
+
+        let scaled_fee = scale_user_fee_up(provided_fee);
+
+        assert_eq!(provided_fee_scaled_by_two, scaled_fee);
+    }
+
+    #[test]
+    fn test_scaling_user_fee_by_one_cent() {
+        let provided_fee = BigDecimal::from_str("0.015").unwrap();
+        let provided_fee_scaled_by_cent = BigDecimal::from_str("0.025").unwrap();
+
+        let scaled_fee = scale_user_fee_up(provided_fee);
+
+        assert_eq!(provided_fee_scaled_by_cent, scaled_fee);
+    }
+
+    #[test]
+    fn test_scaling_user_fee_by_5_percent() {
+        let provided_fee = BigDecimal::from_str("0.30").unwrap();
+        let provided_fee_scaled_by_five_percent = BigDecimal::from_str("0.315").unwrap();
+
+        let scaled_fee = scale_user_fee_up(provided_fee);
+
+        assert_eq!(provided_fee_scaled_by_five_percent, scaled_fee);
+    }
 }

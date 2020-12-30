@@ -19,6 +19,8 @@ use crate::witness::WitnessBuilder;
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct ProverData {
     #[serde(with = "FrSerde")]
+    pub block_number: Fr,
+    #[serde(with = "FrSerde")]
     pub public_data_commitment: Fr,
     #[serde(with = "FrSerde")]
     pub old_root: Fr,
@@ -26,7 +28,8 @@ pub struct ProverData {
     pub initial_used_subtree_root: Fr,
     #[serde(with = "FrSerde")]
     pub new_root: Fr,
-    pub block_timestamp: u64,
+    #[serde(with = "FrSerde")]
+    pub block_timestamp: Fr,
     #[serde(with = "FrSerde")]
     pub validator_address: Fr,
     #[serde(with = "VecOptionalFrSerde")]
@@ -46,7 +49,10 @@ impl From<WitnessBuilder<'_>> for ProverData {
             old_root: witness_builder.initial_root_hash,
             initial_used_subtree_root: witness_builder.initial_used_subtree_root_hash,
             new_root: witness_builder.root_after_fees.unwrap(),
-            block_timestamp: witness_builder.timestamp,
+            block_timestamp: Fr::from_str(&witness_builder.timestamp.to_string())
+                .expect("failed to parse"),
+            block_number: Fr::from_str(&witness_builder.block_number.to_string())
+                .expect("failed to parse"),
             validator_address: Fr::from_str(&witness_builder.fee_account_id.to_string())
                 .expect("failed to parse"),
             operations: witness_builder.operations,
@@ -58,14 +64,14 @@ impl From<WitnessBuilder<'_>> for ProverData {
 }
 
 impl ProverData {
-    pub fn into_circuit(self, block: i64) -> ZkSyncCircuit<'static, Engine> {
+    pub fn into_circuit(self) -> ZkSyncCircuit<'static, Engine> {
         ZkSyncCircuit {
             rescue_params: &zksync_crypto::params::RESCUE_PARAMS as &Bn256RescueParams,
             jubjub_params: &zksync_crypto::params::JUBJUB_PARAMS as &AltJubjubBn256,
             old_root: Some(self.old_root),
             initial_used_subtree_root: Some(self.initial_used_subtree_root),
-            block_number: Fr::from_str(&block.to_string()),
-            block_timestamp: Fr::from_str(&self.block_timestamp.to_string()),
+            block_number: Some(self.block_number),
+            block_timestamp: Some(self.block_timestamp),
             validator_address: Some(self.validator_address),
             pub_data_commitment: Some(self.public_data_commitment),
             operations: self.operations,

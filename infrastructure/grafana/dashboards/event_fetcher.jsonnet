@@ -8,7 +8,4 @@ local metrics = [
   "api.event_fetcher.update_pending_block",
 ];
 
-G.dashboard(
-  'Metrics / event_fetcher',
-  [ G.panel(metric) for metric in metrics ]
-)
+G.dashboard('event_fetcher', metrics)

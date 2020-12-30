@@ -1,7 +1,7 @@
 use crate::block::Block;
 use ethabi::Token;
 use serde::{Deserialize, Serialize};
-use zksync_basic_types::{BlockNumber, H256, U256};
+use zksync_basic_types::{BlockNumber, U256};
 use zksync_crypto::proof::EncodedAggregatedProof;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -58,11 +58,19 @@ impl BlocksCommitOperation {
 
         vec![stored_block_info, Token::Array(blocks_to_commit)]
     }
+
+    pub fn block_range(&self) -> (BlockNumber, BlockNumber) {
+        let BlocksCommitOperation { blocks, .. } = self;
+        (
+            blocks.first().map(|b| b.block_number).unwrap_or_default(),
+            blocks.last().map(|b| b.block_number).unwrap_or_default(),
+        )
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BlocksCreateProofOperation {
-    pub blocks: Vec<BlockNumber>,
+    pub blocks: Vec<Block>,
     pub proofs_to_pad: usize,
 }
 
@@ -80,19 +88,27 @@ impl BlocksProofOperation {
 
         vec![blocks_arg, proof]
     }
+
+    pub fn block_range(&self) -> (BlockNumber, BlockNumber) {
+        let BlocksProofOperation { blocks, .. } = self;
+        (
+            blocks.first().map(|c| c.block_number).unwrap_or_default(),
+            blocks.last().map(|c| c.block_number).unwrap_or_default(),
+        )
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct BlockExecuteOperationArg {
-    pub block: Block,
+pub struct BlocksExecuteOperation {
+    pub blocks: Vec<Block>,
 }
 
-impl BlockExecuteOperationArg {
-    fn get_eth_tx_args(&self) -> Token {
-        let stored_block = stored_block_info(&self.block);
+impl BlocksExecuteOperation {
+    fn get_eth_tx_args_for_block(block: &Block) -> Token {
+        let stored_block = stored_block_info(&block);
 
         let processable_ops_pubdata = Token::Array(
-            self.block
+            block
                 .processable_ops_pubdata()
                 .into_iter()
                 .map(|pubdata| Token::Bytes(pubdata))
@@ -101,21 +117,22 @@ impl BlockExecuteOperationArg {
 
         Token::Tuple(vec![stored_block, processable_ops_pubdata])
     }
-}
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct BlocksExecuteOperation {
-    pub blocks: Vec<BlockExecuteOperationArg>,
-}
-
-impl BlocksExecuteOperation {
     pub fn get_eth_tx_args(&self) -> Vec<Token> {
         vec![Token::Array(
             self.blocks
                 .iter()
-                .map(|arg| arg.get_eth_tx_args())
+                .map(BlocksExecuteOperation::get_eth_tx_args_for_block)
                 .collect(),
         )]
+    }
+
+    pub fn block_range(&self) -> (BlockNumber, BlockNumber) {
+        let BlocksExecuteOperation { blocks } = self;
+        (
+            blocks.first().map(|b| b.block_number).unwrap_or_default(),
+            blocks.last().map(|b| b.block_number).unwrap_or_default(),
+        )
     }
 }
 
@@ -175,32 +192,38 @@ impl AggregatedOperation {
 
     pub fn get_block_range(&self) -> (BlockNumber, BlockNumber) {
         match self {
-            AggregatedOperation::CommitBlocks(BlocksCommitOperation { blocks, .. }) => (
-                blocks.first().map(|b| b.block_number).unwrap_or_default(),
-                blocks.last().map(|b| b.block_number).unwrap_or_default(),
-            ),
+            AggregatedOperation::CommitBlocks(op) => op.block_range(),
             AggregatedOperation::CreateProofBlocks(BlocksCreateProofOperation {
-                blocks, ..
-            }) => (
-                blocks.first().cloned().unwrap_or_default(),
-                blocks.last().cloned().unwrap_or_default(),
-            ),
-            AggregatedOperation::PublishProofBlocksOnchain(BlocksProofOperation {
                 blocks, ..
             }) => (
                 blocks.first().map(|c| c.block_number).unwrap_or_default(),
                 blocks.last().map(|c| c.block_number).unwrap_or_default(),
             ),
-            AggregatedOperation::ExecuteBlocks(BlocksExecuteOperation { blocks }) => (
-                blocks
-                    .first()
-                    .map(|b| b.block.block_number)
-                    .unwrap_or_default(),
-                blocks
-                    .last()
-                    .map(|b| b.block.block_number)
-                    .unwrap_or_default(),
-            ),
+            AggregatedOperation::PublishProofBlocksOnchain(op) => op.block_range(),
+            AggregatedOperation::ExecuteBlocks(op) => op.block_range(),
         }
+    }
+}
+
+impl From<BlocksCommitOperation> for AggregatedOperation {
+    fn from(other: BlocksCommitOperation) -> Self {
+        Self::CommitBlocks(other)
+    }
+}
+impl From<BlocksCreateProofOperation> for AggregatedOperation {
+    fn from(other: BlocksCreateProofOperation) -> Self {
+        Self::CreateProofBlocks(other)
+    }
+}
+
+impl From<BlocksProofOperation> for AggregatedOperation {
+    fn from(other: BlocksProofOperation) -> Self {
+        Self::PublishProofBlocksOnchain(other)
+    }
+}
+
+impl From<BlocksExecuteOperation> for AggregatedOperation {
+    fn from(other: BlocksExecuteOperation) -> Self {
+        Self::ExecuteBlocks(other)
     }
 }

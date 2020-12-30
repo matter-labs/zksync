@@ -167,8 +167,6 @@ pub const SIGNED_CHANGE_PUBKEY_BIT_WIDTH: usize = TX_TYPE_BIT_WIDTH
 
 pub const TIMESTAMP_BIT_WIDTH: usize = 8 * 8;
 
-/// (Number of proofs, setup power) in different recursive circuit variants
-pub const RECURSIVE_CIRCUIT_SIZES: &[(usize, u32)] = &[(1, 22), (5, 24), (10, 25), (20, 26)];
 /// Number of inputs in the basic circuit that is aggregated by recursive circuit
 pub const RECURSIVE_CIRCUIT_NUM_INPUTS: usize = 1;
 /// Depth of the tree which contains different verification keys for basic circuit

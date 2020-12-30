@@ -5,6 +5,7 @@ use parity_crypto::{
 };
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use zksync_basic_types::{Address, H256};
+use zksync_utils::ZeroPrefixHexSerde;
 
 /// Struct used for working with ethereum signatures created using eth_sign (using geth, ethers.js, etc)
 /// message is serialized as 65 bytes long `0x` prefixed string.
@@ -82,7 +83,7 @@ impl Serialize for PackedEthSignature {
         S: Serializer,
     {
         let packed_signature = self.serialize_packed();
-        serializer.serialize_str(&format!("0x{}", &hex::encode(&packed_signature[..])))
+        ZeroPrefixHexSerde::serialize(&packed_signature, serializer)
     }
 }
 
@@ -91,13 +92,7 @@ impl<'de> Deserialize<'de> for PackedEthSignature {
     where
         D: Deserializer<'de>,
     {
-        use serde::de::Error;
-        String::deserialize(deserializer).and_then(|string| {
-            if !string.starts_with("0x") {
-                return Err(Error::custom("Packed eth signature should start with 0x"));
-            }
-            let bytes = hex::decode(&string[2..]).map_err(|e| Error::custom(e.to_string()))?;
-            PackedEthSignature::deserialize_packed(&bytes).map_err(|e| Error::custom(e.to_string()))
-        })
+        let bytes = ZeroPrefixHexSerde::deserialize(deserializer)?;
+        Self::deserialize_packed(&bytes).map_err(serde::de::Error::custom)
     }
 }

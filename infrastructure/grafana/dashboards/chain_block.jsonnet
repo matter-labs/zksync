@@ -20,7 +20,4 @@ local metrics = [
   "sql.chain.block.store_account_tree_cache",
 ];
 
-G.dashboard(
-  'Metrics / sql / chain / block',
-  [ G.panel(metric) for metric in metrics ]
-)
+G.dashboard('sql / chain / block', metrics)

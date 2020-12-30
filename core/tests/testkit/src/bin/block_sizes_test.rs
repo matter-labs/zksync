@@ -10,14 +10,13 @@ use zksync_crypto::params::account_tree_depth;
 use zksync_prover_utils::aggregated_proofs::{gen_aggregate_proof, prepare_proof_data};
 use zksync_prover_utils::{PlonkVerificationKey, SetupForStepByStepProver};
 use zksync_testkit::eth_account::EthereumAccount;
-use zksync_testkit::external_commands::{deploy_contracts, get_test_accounts, js_revert_reason};
+use zksync_testkit::external_commands::{deploy_contracts, get_test_accounts};
 use zksync_testkit::zksync_account::ZkSyncAccount;
 use zksync_testkit::{
     genesis_state, spawn_state_keeper, AccountSet, ETHAccountId, TestSetup, TestkitConfig, Token,
     ZKSyncAccountId,
 };
 use zksync_types::aggregated_operations::BlocksProofOperation;
-use zksync_types::block::Block;
 use zksync_types::{DepositOp, U256};
 
 #[tokio::main]
@@ -95,6 +94,8 @@ async fn main() {
     }
 
     let block_chunk_sizes = AvailableBlockSizesConfig::from_env().blocks_chunks;
+    let aggregated_proof_sizes =
+        AvailableBlockSizesConfig::from_env().aggregated_proof_sizes_with_setup_pow();
     info!(
         "Checking keys and onchain verification for block sizes: {:?}",
         block_chunk_sizes
@@ -149,8 +150,9 @@ async fn main() {
             proofs.push((proof.clone(), block_size));
         }
         let (vks, proof_data) = prepare_proof_data(&block_chunk_sizes, proofs);
-        let mut aggreagated_proof = gen_aggregate_proof(vks, proof_data, false)
-            .expect("Failed to generate aggreagated proof");
+        let aggreagated_proof =
+            gen_aggregate_proof(vks, proof_data, &aggregated_proof_sizes, false)
+                .expect("Failed to generate aggreagated proof");
 
         let proof_op = BlocksProofOperation {
             blocks: vec![block],
@@ -223,8 +225,9 @@ async fn main() {
         }
 
         let (vks, proof_data) = prepare_proof_data(&block_chunk_sizes, proofs);
-        let mut aggreagated_proof = gen_aggregate_proof(vks, proof_data, false)
-            .expect("Failed to generate aggreagated proof");
+        let aggreagated_proof =
+            gen_aggregate_proof(vks, proof_data, &aggregated_proof_sizes, false)
+                .expect("Failed to generate aggreagated proof");
         // aggreagated_proof.individual_vk_inputs = block_commitments;
 
         let proof_op = BlocksProofOperation {

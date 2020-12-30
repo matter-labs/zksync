@@ -41,4 +41,7 @@ pub enum TxAddError {
 
     #[error("The number of withdrawals in the batch is too big")]
     BatchWithdrawalsOverload,
+
+    #[error("Too many Ethereum signatures provided")]
+    EthSignaturesLimitExceeded,
 }

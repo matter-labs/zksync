@@ -454,47 +454,47 @@ async fn exit_test() {
     )
     .await;
 
-    // check_exit_correct_proof_other_token(
-    //     &mut test_setup,
-    //     verified_accounts_state.clone(),
-    //     ETHAccountId(1),
-    //     ZKSyncAccountId(1),
-    //     Token(0),
-    //     &deposit_amount,
-    //     Token(1),
-    // )
-    // .await;
-    // let incorrect_amount = BigUint::from(2u32) * deposit_amount.clone();
-    // check_exit_correct_proof_other_amount(
-    //     &mut test_setup,
-    //     verified_accounts_state.clone(),
-    //     ETHAccountId(1),
-    //     ZKSyncAccountId(1),
-    //     Token(0),
-    //     &deposit_amount,
-    //     &incorrect_amount,
-    // )
-    // .await;
-    //
-    // check_exit_garbage_proof(
-    //     &mut test_setup,
-    //     ETHAccountId(1),
-    //     ZKSyncAccountId(1),
-    //     Token(0),
-    //     &deposit_amount,
-    // )
-    // .await;
-    //
-    // check_exit_correct_proof_incorrect_sender(
-    //     &mut test_setup,
-    //     verified_accounts_state.clone(),
-    //     ETHAccountId(0),
-    //     ZKSyncAccountId(1),
-    //     Token(0),
-    //     &deposit_amount,
-    // )
-    // .await;
-    //
+    check_exit_correct_proof_other_token(
+        &mut test_setup,
+        verified_accounts_state.clone(),
+        ETHAccountId(1),
+        ZKSyncAccountId(1),
+        Token(0),
+        &deposit_amount,
+        Token(1),
+    )
+    .await;
+    let incorrect_amount = BigUint::from(2u32) * deposit_amount.clone();
+    check_exit_correct_proof_other_amount(
+        &mut test_setup,
+        verified_accounts_state.clone(),
+        ETHAccountId(1),
+        ZKSyncAccountId(1),
+        Token(0),
+        &deposit_amount,
+        &incorrect_amount,
+    )
+    .await;
+
+    check_exit_garbage_proof(
+        &mut test_setup,
+        ETHAccountId(1),
+        ZKSyncAccountId(1),
+        Token(0),
+        &deposit_amount,
+    )
+    .await;
+
+    check_exit_correct_proof_incorrect_sender(
+        &mut test_setup,
+        verified_accounts_state.clone(),
+        ETHAccountId(0),
+        ZKSyncAccountId(1),
+        Token(0),
+        &deposit_amount,
+    )
+    .await;
+
     check_exit_correct_proof(
         &mut test_setup,
         verified_accounts_state.clone(),
@@ -504,16 +504,16 @@ async fn exit_test() {
         &deposit_amount,
     )
     .await;
-    //
-    // check_exit_correct_proof_second_time(
-    //     &mut test_setup,
-    //     verified_accounts_state,
-    //     ETHAccountId(1),
-    //     ZKSyncAccountId(1),
-    //     Token(0),
-    //     &deposit_amount,
-    // )
-    // .await;
+
+    check_exit_correct_proof_second_time(
+        &mut test_setup,
+        verified_accounts_state,
+        ETHAccountId(1),
+        ZKSyncAccountId(1),
+        Token(0),
+        &deposit_amount,
+    )
+    .await;
 
     stop_state_keeper_sender.send(()).expect("sk stop send");
     sk_thread_handle.join().expect("sk thread join");

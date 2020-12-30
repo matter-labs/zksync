@@ -1,12 +1,25 @@
-use super::*;
+use actix_web::{web, App, HttpResponse, HttpServer};
+
 use async_trait::async_trait;
 use bigdecimal::BigDecimal;
 use chrono::Utc;
-use futures::channel::mpsc;
-use futures::executor::block_on;
+use futures::future::{AbortHandle, Abortable};
+use futures::{channel::mpsc, executor::block_on};
 use std::str::FromStr;
+use std::thread::sleep;
+use tokio::time::Duration;
 use zksync_types::{Address, Token, TokenId, TokenPrice};
-use zksync_utils::{ratio_to_big_decimal, UnsignedRatioSerializeAsDecimal};
+use zksync_utils::{big_decimal_to_ratio, ratio_to_big_decimal, UnsignedRatioSerializeAsDecimal};
+
+use crate::fee_ticker::{
+    ticker_api::{
+        coingecko::{CoinGeckoTokenInfo, CoinGeckoTokenList},
+        TokenPriceAPI,
+    },
+    validator::{cache::TokenInMemoryCache, FeeTokenValidator},
+};
+
+use super::*;
 
 const TEST_FAST_WITHDRAW_COEFF: f64 = 10.0;
 
@@ -155,9 +168,71 @@ fn format_with_dot(num: &Ratio<BigUint>, precision: usize) -> String {
     UnsignedRatioSerializeAsDecimal::serialize_to_str_with_dot(num, precision)
 }
 
+#[derive(Debug)]
+struct FakeTokenWatcher;
+
+#[async_trait::async_trait]
+impl TokenWatcher for FakeTokenWatcher {
+    async fn get_token_market_volume(&mut self, _token: &Token) -> anyhow::Result<BigDecimal> {
+        unreachable!()
+    }
+}
+
+struct ErrorTickerApi;
+
+#[async_trait::async_trait]
+impl TokenPriceAPI for ErrorTickerApi {
+    async fn get_price(&self, _token_symbol: &str) -> anyhow::Result<TokenPrice> {
+        anyhow::bail!("Wrong token")
+    }
+}
+
+fn run_server() -> (String, AbortHandle) {
+    let mut url = None;
+    let mut server = None;
+    for i in 9000..9999 {
+        let new_url = format!("127.0.0.1:{}", i);
+        // Try to bind to some port, hope that 999 variants will be enough
+        if let Ok(ser) = HttpServer::new(move || {
+            App::new()
+                .service(
+                    web::resource("/api/v3/coins/DAI/market_chart").route(web::get().to(|| {
+                        sleep(Duration::from_secs(100));
+                        HttpResponse::MethodNotAllowed()
+                    })),
+                )
+                .service(web::resource("/api/v3/coins/list").to(|| {
+                    HttpResponse::Ok().json(CoinGeckoTokenList(vec![CoinGeckoTokenInfo {
+                        id: "DAI".to_string(),
+                        symbol: "DAI".to_string(),
+                    }]))
+                }))
+        })
+        .bind(new_url.clone())
+        {
+            server = Some(ser);
+            url = Some(new_url);
+            break;
+        }
+    }
+
+    let server = server.expect("Could not bind to port from 9000 to 9999");
+    let (abort_handle, abort_registration) = AbortHandle::new_pair();
+    let future = Abortable::new(server.run(), abort_registration);
+    tokio::spawn(future);
+    let address = format!("http://{}/", &url.unwrap());
+    (address, abort_handle)
+}
+
 #[test]
 fn test_ticker_formula() {
-    let validator = FeeTokenValidator::new(HashMap::new(), Default::default());
+    let validator = FeeTokenValidator::new(
+        TokenInMemoryCache::new(),
+        chrono::Duration::seconds(100),
+        BigDecimal::from(100),
+        Default::default(),
+        FakeTokenWatcher,
+    );
 
     let config = get_test_ticker_config();
     let mut ticker = FeeTicker::new(
@@ -251,65 +326,104 @@ fn test_ticker_formula() {
     }
 }
 
-#[test]
-fn test_fee_for_unsubsidized_tokens() {
-    let validator = FeeTokenValidator::new(HashMap::new(), Default::default());
+#[actix_rt::test]
+#[ignore]
+// It's ignore because we can't initialize coingecko in current way with block
+async fn test_error_coingecko_api() {
+    let (address, handler) = run_server();
+    let client = reqwest::ClientBuilder::new()
+        .timeout(CONNECTION_TIMEOUT)
+        .connect_timeout(CONNECTION_TIMEOUT)
+        .build()
+        .expect("Failed to build reqwest::Client");
+    let coingecko = CoinGeckoAPI::new(client, address.parse().unwrap()).unwrap();
+    let validator = FeeTokenValidator::new(
+        TokenInMemoryCache::new(),
+        chrono::Duration::seconds(100),
+        BigDecimal::from(100),
+        Default::default(),
+        FakeTokenWatcher,
+    );
+    let connection_pool = ConnectionPool::new(Some(1));
+    connection_pool
+        .access_storage()
+        .await
+        .unwrap()
+        .tokens_schema()
+        .update_historical_ticker_price(
+            1,
+            TokenPrice {
+                usd_price: big_decimal_to_ratio(&BigDecimal::from(10)).unwrap(),
+                last_updated: chrono::offset::Utc::now(),
+            },
+        )
+        .await
+        .unwrap();
+    let ticker_api = TickerApi::new(connection_pool, coingecko);
 
     let config = get_test_ticker_config();
     let mut ticker = FeeTicker::new(
-        MockApiProvider,
+        ticker_api,
+        MockTickerInfo,
+        mpsc::channel(1).1,
+        config,
+        validator,
+    );
+    for _ in 0..1000 {
+        ticker
+            .get_fee_from_ticker_in_wei(TxFeeTypes::FastWithdraw, 1.into(), Address::default())
+            .await
+            .unwrap();
+        ticker
+            .get_token_price(1.into(), TokenPriceRequestType::USDForOneWei)
+            .await
+            .unwrap();
+    }
+    handler.abort();
+}
+
+#[tokio::test]
+#[ignore]
+async fn test_error_api() {
+    let validator = FeeTokenValidator::new(
+        TokenInMemoryCache::new(),
+        chrono::Duration::seconds(100),
+        BigDecimal::from(100),
+        Default::default(),
+        FakeTokenWatcher,
+    );
+    let connection_pool = ConnectionPool::new(Some(1));
+    let second_connection_pool = connection_pool.clone();
+    let ticker_api = TickerApi::new(second_connection_pool, ErrorTickerApi);
+    connection_pool
+        .access_storage()
+        .await
+        .unwrap()
+        .tokens_schema()
+        .update_historical_ticker_price(
+            1,
+            TokenPrice {
+                usd_price: big_decimal_to_ratio(&BigDecimal::from(10)).unwrap(),
+                last_updated: chrono::offset::Utc::now(),
+            },
+        )
+        .await
+        .unwrap();
+    let config = get_test_ticker_config();
+    let mut ticker = FeeTicker::new(
+        ticker_api,
         MockTickerInfo,
         mpsc::channel(1).1,
         config,
         validator,
     );
 
-    let mut get_gas_amount =
-        |tx_type: TxFeeTypes, token: TokenLike, address: Address| -> num::BigUint {
-            block_on(ticker.get_fee_from_ticker_in_wei(tx_type, token, address))
-                .expect("failed to get fee in token")
-                .gas_tx_amount
-        };
-
-    for subsidized_tokens in TestToken::subsidized_tokens() {
-        for unsubsidized_tokens in TestToken::unsubsidized_tokens() {
-            assert!(
-                get_gas_amount(
-                    TxFeeTypes::Transfer,
-                    subsidized_tokens.id.into(),
-                    Address::default()
-                ) < get_gas_amount(
-                    TxFeeTypes::Transfer,
-                    unsubsidized_tokens.id.into(),
-                    Address::default()
-                )
-            );
-            assert!(
-                get_gas_amount(
-                    TxFeeTypes::Withdraw,
-                    subsidized_tokens.id.into(),
-                    Address::default()
-                ) < get_gas_amount(
-                    TxFeeTypes::Withdraw,
-                    unsubsidized_tokens.id.into(),
-                    Address::default()
-                )
-            );
-            assert!(
-                get_gas_amount(
-                    TxFeeTypes::ChangePubKey {
-                        onchain_pubkey_auth: false
-                    },
-                    subsidized_tokens.id.into(),
-                    Address::default()
-                ) < get_gas_amount(
-                    TxFeeTypes::ChangePubKey {
-                        onchain_pubkey_auth: false
-                    },
-                    unsubsidized_tokens.id.into(),
-                    Address::default()
-                )
-            );
-        }
-    }
+    ticker
+        .get_fee_from_ticker_in_wei(TxFeeTypes::FastWithdraw, 1.into(), Address::default())
+        .await
+        .unwrap();
+    ticker
+        .get_token_price(1.into(), TokenPriceRequestType::USDForOneWei)
+        .await
+        .unwrap();
 }

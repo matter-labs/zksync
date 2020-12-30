@@ -8,17 +8,17 @@ const wasmData = fs.readFileSync(wasmFile);
 // Strings that are inserted automatically by wasm-pack, but
 // break library in it's current implementation
 const brokenStrings = [
-  // This substring is unique, had to
-  // write only part of line to make the RegExp works.
-  // Probably will rewrite in the future
-  `input = import.meta.url.replace`
+    // This substring is unique, had to
+    // write only part of line to make the RegExp works.
+    // Probably will rewrite in the future
+    `input = import.meta.url.replace`
 ];
 
 let jsCode = fs.readFileSync(jsFile).toString();
 
 // Commenting out broken strings
-brokenStrings.forEach((str) => {
-  jsCode = jsCode.replace(new RegExp(str, 'g'), '// ' + str);
+brokenStrings.forEach(str => {
+    jsCode = jsCode.replace(new RegExp(str, 'g'), '// ' + str);
 });
 
 jsCode += `
