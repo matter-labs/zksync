@@ -2,6 +2,12 @@
 
 All notable changes to the core components will be documented in this file.
 
+## Unreleased
+
+### Changed
+
+- `gen_token_add_contract` crate is rewritten in ts.
+
 ## Prior to 2020-12-23
 
 ### Added
