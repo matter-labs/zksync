@@ -122,8 +122,7 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
         // Attempt to find the transaction in the list of executed operations.
         let result = if let Some(response) = self.find_tx_by_hash(hash).await? {
             Some(response)
-        }
-        else {
+        } else {
             // If the transaction is not found in the list of executed operations check executed priority operations list.
             self.find_priority_op_by_hash(hash).await?
         };
