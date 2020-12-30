@@ -256,7 +256,15 @@ impl EthereumAccount {
 
     pub async fn erc20_balance(&self, token_contract: &Address) -> Result<BigUint, anyhow::Error> {
         self.main_contract_eth_client
-            .contract_balance(*token_contract, erc20_contract(), self.address)
+            .call_contract_function(
+                "balanceOf",
+                self.address,
+                None,
+                Options::default(),
+                None,
+                *token_contract,
+                erc20_contract(),
+            )
             .await
             .map(u256_to_big_dec)
             .map_err(|e| format_err!("Contract query fail: {}", e))

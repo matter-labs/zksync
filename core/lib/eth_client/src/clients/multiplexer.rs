@@ -158,24 +158,6 @@ impl MultiplexerEthereumClient {
         anyhow::bail!("All interfaces was wrong please try again")
     }
 
-    pub async fn contract_balance(
-        &self,
-        token_address: Address,
-        abi: ethabi::Contract,
-        address: Address,
-    ) -> Result<U256, anyhow::Error> {
-        for (name, client) in self.clients.iter() {
-            match client
-                .contract_balance(token_address, abi.clone(), address)
-                .await
-            {
-                Ok(res) => return Ok(res),
-                Err(err) => log::error!("Error in interface: {}, {} ", name, err),
-            }
-        }
-        anyhow::bail!("All interfaces was wrong please try again")
-    }
-
     pub async fn allowance(
         &self,
         token_address: Address,

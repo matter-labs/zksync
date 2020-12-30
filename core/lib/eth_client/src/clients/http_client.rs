@@ -13,6 +13,7 @@ use web3::{
 // Workspace uses
 use crate::ethereum_gateway::{ExecutedTxStatus, FailureInfo, SignedCallResult};
 
+use std::time::Instant;
 use web3::contract::tokens::{Detokenize, Tokenize};
 use web3::types::{Filter, Log};
 use zksync_eth_signer::{raw_ethereum_tx::RawTransaction, EthereumSigner};
@@ -76,34 +77,48 @@ impl<S: EthereumSigner> ETHDirectClient<S> {
         self.main_contract_with_address(self.contract_addr)
     }
     pub async fn pending_nonce(&self) -> Result<U256, anyhow::Error> {
-        Ok(self
+        let start = Instant::now();
+        let count = self
             .web3
             .eth()
             .transaction_count(self.sender_account, Some(BlockNumber::Pending))
-            .await?)
+            .await?;
+        metrics::histogram!("eth_client.direct.pending_nonce", start.elapsed());
+        Ok(count)
     }
 
     pub async fn current_nonce(&self) -> Result<U256, anyhow::Error> {
-        Ok(self
+        let start = Instant::now();
+        let nonce = self
             .web3
             .eth()
             .transaction_count(self.sender_account, Some(BlockNumber::Latest))
-            .await?)
+            .await?;
+        metrics::histogram!("eth_client.direct.current_nonce", start.elapsed());
+        Ok(nonce)
     }
 
     pub async fn block_number(&self) -> Result<U64, anyhow::Error> {
-        Ok(self.web3.eth().block_number().await?)
+        let start = Instant::now();
+        let block_number = self.web3.eth().block_number().await?;
+        metrics::histogram!("eth_client.direct.current_nonce", start.elapsed());
+        Ok(block_number)
     }
 
     pub async fn get_gas_price(&self) -> Result<U256, anyhow::Error> {
+        let start = Instant::now();
         let mut network_gas_price = self.web3.eth().gas_price().await?;
         let percent_gas_price_factor = U256::from((self.gas_price_factor * 100.0).round() as u64);
         network_gas_price = (network_gas_price * percent_gas_price_factor) / U256::from(100);
+        metrics::histogram!("eth_client.direct.get_gas_price", start.elapsed());
         Ok(network_gas_price)
     }
 
     pub async fn balance(&self) -> Result<U256, anyhow::Error> {
-        Ok(self.web3.eth().balance(self.sender_account, None).await?)
+        let start = Instant::now();
+        let balance = self.web3.eth().balance(self.sender_account, None).await?;
+        metrics::histogram!("eth_client.direct.balance", start.elapsed());
+        Ok(balance)
     }
 
     pub async fn sign_prepared_tx(
@@ -122,6 +137,8 @@ impl<S: EthereumSigner> ETHDirectClient<S> {
         options: Options,
     ) -> Result<SignedCallResult, anyhow::Error> {
         // fetch current gas_price
+        let start = Instant::now();
+
         let gas_price = match options.gas_price {
             Some(gas_price) => gas_price,
             None => self.get_gas_price().await?,
@@ -161,6 +178,10 @@ impl<S: EthereumSigner> ETHDirectClient<S> {
         let signed_tx = self.eth_signer.sign_transaction(tx).await?;
         let hash = self.web3.web3().sha3(Bytes(signed_tx.clone())).await?;
 
+        metrics::histogram!(
+            "eth_client.direct.sign_prepared_tx_for_addr",
+            start.elapsed()
+        );
         Ok(SignedCallResult {
             raw_tx: signed_tx,
             gas_price,
@@ -170,20 +191,27 @@ impl<S: EthereumSigner> ETHDirectClient<S> {
     }
 
     pub async fn send_raw_tx(&self, tx: Vec<u8>) -> Result<H256, anyhow::Error> {
-        Ok(self.web3.eth().send_raw_transaction(Bytes(tx)).await?)
+        let start = Instant::now();
+        let tx = self.web3.eth().send_raw_transaction(Bytes(tx)).await?;
+        metrics::histogram!("eth_client.direct.send_raw_tx", start.elapsed());
+        Ok(tx)
     }
 
     pub async fn tx_receipt(
         &self,
         tx_hash: H256,
     ) -> Result<Option<TransactionReceipt>, anyhow::Error> {
-        Ok(self.web3.eth().transaction_receipt(tx_hash).await?)
+        let start = Instant::now();
+        let receipt = self.web3.eth().transaction_receipt(tx_hash).await?;
+        metrics::histogram!("eth_client.direct.tx_receipt", start.elapsed());
+        Ok(receipt)
     }
 
     pub async fn failure_reason(
         &self,
         tx_hash: H256,
     ) -> Result<Option<FailureInfo>, anyhow::Error> {
+        let start = Instant::now();
         let transaction = self.web3.eth().transaction(tx_hash.into()).await?.unwrap();
         let receipt = self.web3.eth().transaction_receipt(tx_hash).await?.unwrap();
 
@@ -221,6 +249,7 @@ impl<S: EthereumSigner> ETHDirectClient<S> {
             "unknown".to_string()
         };
 
+        metrics::histogram!("eth_client.direct.failure_reason", start.elapsed());
         Ok(Some(FailureInfo {
             gas_limit,
             gas_used,
@@ -229,25 +258,10 @@ impl<S: EthereumSigner> ETHDirectClient<S> {
         }))
     }
     pub async fn eth_balance(&self, address: Address) -> Result<U256, anyhow::Error> {
-        Ok(self.web3.eth().balance(address, None).await?)
-    }
-    // TODO remove it from basic interface
-    pub async fn contract_balance(
-        &self,
-        token_address: Address,
-        abi: ethabi::Contract,
-        address: Address,
-    ) -> Result<U256, anyhow::Error> {
-        self.call_contract_function(
-            "balanceOf",
-            address,
-            None,
-            Options::default(),
-            None,
-            token_address,
-            abi,
-        )
-        .await
+        let start = Instant::now();
+        let balance = self.web3.eth().balance(address, None).await?;
+        metrics::histogram!("eth_client.direct.eth_balance", start.elapsed());
+        Ok(balance)
     }
 
     pub async fn allowance(
@@ -255,16 +269,20 @@ impl<S: EthereumSigner> ETHDirectClient<S> {
         token_address: Address,
         erc20_abi: ethabi::Contract,
     ) -> Result<U256, anyhow::Error> {
-        self.call_contract_function(
-            "allowance",
-            (self.sender_account, self.contract_addr),
-            None,
-            Options::default(),
-            None,
-            token_address,
-            erc20_abi,
-        )
-        .await
+        let start = Instant::now();
+        let res = self
+            .call_contract_function(
+                "allowance",
+                (self.sender_account, self.contract_addr),
+                None,
+                Options::default(),
+                None,
+                token_address,
+                erc20_abi,
+            )
+            .await?;
+        metrics::histogram!("eth_client.direct.allowance", start.elapsed());
+        Ok(res)
     }
 
     pub async fn call_main_contract_function<R, A, P, B>(
@@ -310,14 +328,18 @@ impl<S: EthereumSigner> ETHDirectClient<S> {
         B: Into<Option<BlockId>>,
         P: Tokenize,
     {
+        let start = Instant::now();
         let contract = Contract::new(self.web3.eth(), token_address, erc20_abi);
-        Ok(contract.query(func, params, from, options, block).await?)
+        let res = contract.query(func, params, from, options, block).await?;
+        metrics::histogram!("eth_client.direct.call_contract_function", start.elapsed());
+        Ok(res)
     }
 
     pub async fn get_tx_status(&self, hash: &H256) -> anyhow::Result<Option<ExecutedTxStatus>> {
-        let receipt = self.tx_receipt(*hash).await?;
+        let start = Instant::now();
 
-        match receipt {
+        let receipt = self.tx_receipt(*hash).await?;
+        let res: Result<Option<ExecutedTxStatus>, anyhow::Error> = match receipt {
             Some(TransactionReceipt {
                 block_number: Some(tx_block_number),
                 status: Some(status),
@@ -344,11 +366,16 @@ impl<S: EthereumSigner> ETHDirectClient<S> {
                 }))
             }
             _ => Ok(None),
-        }
+        };
+        metrics::histogram!("eth_client.direct.get_tx_status", start.elapsed());
+        Ok(res?)
     }
 
     pub async fn logs(&self, filter: Filter) -> anyhow::Result<Vec<Log>> {
-        Ok(self.web3.eth().logs(filter).await?)
+        let start = Instant::now();
+        let logs = self.web3.eth().logs(filter).await?;
+        metrics::histogram!("eth_client.direct.logs", start.elapsed());
+        Ok(logs)
     }
 
     pub fn contract(&self) -> &ethabi::Contract {

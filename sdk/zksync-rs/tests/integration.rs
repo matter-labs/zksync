@@ -74,10 +74,17 @@ async fn get_ethereum_balance<S: EthereumSigner + Send + Sync + Clone + Send + S
             .await
             .map_err(|_e| anyhow::anyhow!("failed to request balance from Ethereum {}", _e));
     }
-
     eth_provider
         .client()
-        .contract_balance(token.address, ierc20_contract(), address)
+        .call_contract_function(
+            "balanceOf",
+            address,
+            None,
+            Options::default(),
+            None,
+            token.address,
+            ierc20_contract(),
+        )
         .await
         .map_err(|_e| anyhow::anyhow!("failed to request erc20 balance from Ethereum"))
 }

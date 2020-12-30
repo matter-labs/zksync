@@ -182,15 +182,6 @@ impl EthereumGateway {
         delegate_call!(self.eth_balance(address))
     }
 
-    pub async fn contract_balance(
-        &self,
-        token_address: Address,
-        abi: ethabi::Contract,
-        address: Address,
-    ) -> Result<U256, anyhow::Error> {
-        delegate_call!(self.contract_balance(token_address, abi, address))
-    }
-
     pub async fn allowance(
         &self,
         token_address: Address,

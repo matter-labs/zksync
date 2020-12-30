@@ -23,5 +23,5 @@ async-trait = "0.1"
 hex = "0.4.2"
 log = "0.4"
 anyhow = "1.0"
-
+metrics = "0.13.0-alpha.8"
 tokio = { version = "0.2", features = ["full"] }
