@@ -36,9 +36,6 @@ members = [
     "core/tests/testkit",
     "core/tests/loadtest",
 
-    # Infrastructure applications
-    "infrastructure/tok_cli",
-
     # SDK section
     "sdk/zksync-rs",
 ]
