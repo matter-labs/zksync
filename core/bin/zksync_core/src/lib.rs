@@ -102,8 +102,8 @@ pub async fn genesis_init(config: &ZkSyncConfig) {
     )
     .await;
     log::info!("Adding initial tokens to db");
-    let genesis_tokens =
-        get_genesis_token_list(&config.chain.eth.network).expect("Initial token list not found");
+    let genesis_tokens = get_genesis_token_list(&config.chain.eth.network.to_string())
+        .expect("Initial token list not found");
     for (id, token) in (1..).zip(genesis_tokens) {
         log::info!(
             "Adding token: {}, id:{}, address: {}, decimals: {}",

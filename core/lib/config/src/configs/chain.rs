@@ -3,8 +3,10 @@ use serde::Deserialize;
 /// Built-in uses
 use std::time::Duration;
 // Local uses
-use crate::envy_load;
+use zksync_types::network::Network;
 use zksync_types::Address;
+
+use crate::envy_load;
 
 #[derive(Debug, Deserialize, Clone, PartialEq)]
 pub struct ChainConfig {
@@ -49,7 +51,7 @@ pub struct Eth {
     /// the remaining withdrawals will go to the next block.
     pub max_number_of_withdrawals_per_block: usize,
     /// Name of the used Ethereum network, e.g. `localhost` or `rinkeby`.
-    pub network: String,
+    pub network: Network,
 }
 
 #[derive(Debug, Deserialize, Clone, PartialEq)]
@@ -90,7 +92,7 @@ mod tests {
             },
             eth: Eth {
                 max_number_of_withdrawals_per_block: 10,
-                network: "localhost".into(),
+                network: "localhost".parse().unwrap(),
             },
             state_keeper: StateKeeper {
                 block_chunk_sizes: vec![6, 30],

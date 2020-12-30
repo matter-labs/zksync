@@ -26,7 +26,7 @@ impl ApiConfigData {
         Self {
             contract_address: config.contracts.contract_addr,
             deposit_confirmations: config.eth_watch.confirmations_for_eth_event,
-            network: config.chain.eth.network.parse().unwrap(),
+            network: config.chain.eth.network,
         }
     }
 }

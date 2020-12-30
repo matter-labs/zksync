@@ -2,6 +2,7 @@
 use std::time::Duration;
 // External imports
 // Workspace imports
+use zksync_config::configs::ZkSyncConfig;
 use zksync_crypto::proof::EncodedProofPlonk;
 use zksync_types::{block::PendingBlock, Action};
 // Local imports
@@ -9,9 +10,15 @@ use crate::{chain::block::BlockSchema, prover::ProverSchema, QueryResult, Storag
 use crate::{test_data::gen_operation, tests::db_test};
 
 /// Returns the smallest supported block size.
+fn supported_block_sizes() -> Vec<usize> {
+    ZkSyncConfig::from_env()
+        .chain
+        .circuit
+        .supported_block_chunks_sizes
+}
+
 fn smallest_block_size() -> usize {
-    // Value corresponds to the actual value valid for the moment of writing this code.
-    6
+    supported_block_sizes()[0]
 }
 
 /// Checks that the proof can be stored and loaded.
