@@ -99,16 +99,16 @@ pub fn deploy_contracts(use_prod_contracts: bool, genesis_root: Fr) -> Contracts
 
     Contracts {
         governance: contracts
-            .remove("GOVERNANCE_ADDR")
+            .remove("CONTRACTS_GOVERNANCE_ADDR")
             .expect("GOVERNANCE_ADDR missing"),
         verifier: contracts
-            .remove("VERIFIER_ADDR")
+            .remove("CONTRACTS_VERIFIER_ADDR")
             .expect("VERIFIER_ADDR missing"),
         contract: contracts
-            .remove("CONTRACT_ADDR")
+            .remove("CONTRACTS_CONTRACT_ADDR")
             .expect("CONTRACT_ADDR missing"),
         upgrade_gatekeeper: contracts
-            .remove("UPGRADE_GATEKEEPER_ADDR")
+            .remove("CONTRACTS_UPGRADE_GATEKEEPER_ADDR")
             .expect("UPGRADE_GATEKEEPER_ADDR missing"),
         test_erc20_address: contracts.remove("TEST_ERC20").expect("TEST_ERC20 missing"),
     }
