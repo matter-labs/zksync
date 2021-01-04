@@ -10,13 +10,11 @@ use zksync_crypto::Fr;
 
 use zksync_types::{AccountMap, AccountUpdate};
 // Local deps
+use crate::contract::{ZkSyncContractVersion, ZkSyncDeployedContract};
 use crate::storage_interactor::StorageInteractor;
 use crate::{
-    contract_functions::{get_genesis_account, get_total_verified_blocks},
-    eth_tx_helpers::get_ethereum_transaction,
-    events_state::EventsState,
-    rollup_ops::RollupOpsBlock,
-    tree_state::TreeState,
+    contract::get_genesis_account, eth_tx_helpers::get_ethereum_transaction,
+    events_state::EventsState, rollup_ops::RollupOpsBlock, tree_state::TreeState,
 };
 use serde::export::PhantomData;
 
@@ -51,7 +49,7 @@ pub struct DataRestoreDriver<T: Transport, I> {
     /// Provides Ethereum Governance contract unterface
     pub governance_contract: (ethabi::Contract, Contract<T>),
     /// Provides Ethereum Rollup contract unterface
-    pub zksync_contract: (ethabi::Contract, Contract<T>),
+    pub zksync_contract: ZkSyncDeployedContract<T>,
     /// Rollup contract events state
     pub events_state: EventsState,
     /// Rollup accounts state
@@ -108,12 +106,12 @@ where
             )
         };
 
-        let zksync_contract = {
-            let abi = zksync_contract();
-            (
-                abi.clone(),
-                Contract::new(web3.eth(), zksync_contract_eth_addr, abi),
-            )
+        let abi = zksync_contract();
+
+        let zksync_contract = ZkSyncDeployedContract {
+            abi: abi.clone(),
+            web3_contract: Contract::new(web3.eth(), zksync_contract_eth_addr, abi),
+            version: ZkSyncContractVersion::V4,
         };
 
         let events_state = EventsState::default();
@@ -225,7 +223,7 @@ where
             }
             StorageUpdateState::None => {}
         }
-        let total_verified_blocks = get_total_verified_blocks(&self.zksync_contract).await;
+        let total_verified_blocks = self.zksync_contract.get_total_verified_blocks().await;
         let last_verified_block = self.tree_state.state.block_number;
         log::info!(
             "State has been loaded\nProcessed {:?} blocks of total {:?} verified on contract\nRoot hash: {:?}\n",
@@ -254,7 +252,7 @@ where
                     self.update_tree_state(interactor, new_ops_blocks).await;
 
                     let total_verified_blocks =
-                        get_total_verified_blocks(&self.zksync_contract).await;
+                        self.zksync_contract.get_total_verified_blocks().await;
                     let last_verified_block = self.tree_state.state.block_number;
 
                     // We must update the Ethereum stats table to match the actual stored state

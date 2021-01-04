@@ -75,19 +75,33 @@ pub fn get_genesis_account(genesis_transaction: &Transaction) -> Result<Account,
 /// * `web3` - Web3 provider url
 /// * `zksync_contract` - Rollup contract
 ///
-pub async fn get_total_verified_blocks<T: Transport>(
-    zksync_contract: &(ethabi::Contract, Contract<T>),
-) -> u32 {
-    zksync_contract
-        .1
-        .query::<U256, Option<Address>, Option<BlockId>, ()>(
-            "totalBlocksVerified",
-            (),
-            None,
-            Options::default(),
-            None,
-        )
-        .await
-        .unwrap()
-        .as_u32()
+
+pub enum ZkSyncContractVersion {
+    V0,
+    V1,
+    V2,
+    V3,
+    V4,
+}
+
+pub struct ZkSyncDeployedContract<T: Transport> {
+    pub web3_contract: web3::contract::Contract<T>,
+    pub abi: ethabi::Contract,
+    pub version: ZkSyncContractVersion,
+}
+
+impl<T: Transport> ZkSyncDeployedContract<T> {
+    pub async fn get_total_verified_blocks(&self) -> u32 {
+        self.web3_contract
+            .query::<U256, Option<Address>, Option<BlockId>, ()>(
+                "totalBlocksVerified",
+                (),
+                None,
+                Options::default(),
+                None,
+            )
+            .await
+            .unwrap()
+            .as_u32()
+    }
 }

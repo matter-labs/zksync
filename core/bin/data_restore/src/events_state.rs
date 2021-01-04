@@ -6,6 +6,7 @@ use web3::types::Transaction;
 use web3::types::{BlockNumber, FilterBuilder, Log, H256, U256};
 use web3::{Transport, Web3};
 // Workspace deps
+use crate::contract::ZkSyncDeployedContract;
 use crate::eth_tx_helpers::get_block_number_from_ethereum_transaction;
 use crate::events::{BlockEvent, EventType};
 use zksync_types::{Address, TokenId};
@@ -84,7 +85,7 @@ impl EventsState {
     pub async fn update_events_state<T: Transport>(
         &mut self,
         web3: &Web3<T>,
-        zksync_contract: &(ethabi::Contract, Contract<T>),
+        zksync_contract: ZkSyncDeployedContract<T>,
         governance_contract: &(ethabi::Contract, Contract<T>),
         eth_blocks_step: u64,
         end_eth_blocks_offset: u64,
@@ -141,7 +142,7 @@ impl EventsState {
     ///
     async fn get_new_events_and_last_watched_block<T: Transport>(
         web3: &Web3<T>,
-        zksync_contract: &(ethabi::Contract, Contract<T>),
+        zksync_contract: &ZkSyncDeployedContract<T>,
         governance_contract: &(ethabi::Contract, Contract<T>),
         last_watched_block_number: u64,
         eth_blocks_step: u64,
