@@ -50,8 +50,7 @@ impl PlasmaTestBuilder {
         let address = PackedEthSignature::address_from_private_key(&eth_sk)
             .expect("Can't get address from the ETH secret key");
 
-        let mut account = Account::default();
-        account.address = address;
+        let mut account = Account::default_with_address(&address);
         if let AccountState::Unlocked = state {
             account.pub_key_hash = PubKeyHash::from_privkey(&sk);
         }
