@@ -53,11 +53,12 @@ fn try_to_download_setup(
 }
 
 fn get_backoff() -> backoff::ExponentialBackoff {
-    let mut backoff = backoff::ExponentialBackoff::default();
-    backoff.current_interval = Duration::from_secs(5);
-    backoff.initial_interval = Duration::from_secs(5);
-    backoff.multiplier = 1.2f64;
-    backoff.max_interval = Duration::from_secs(80);
-    backoff.max_elapsed_time = Some(Duration::from_secs(10 * 60));
-    backoff
+    backoff::ExponentialBackoff {
+        current_interval: Duration::from_secs(5),
+        initial_interval: Duration::from_secs(5),
+        multiplier: 1.2f64,
+        max_interval: Duration::from_secs(80),
+        max_elapsed_time: Some(Duration::from_secs(10 * 60)),
+        ..Default::default()
+    }
 }

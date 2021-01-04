@@ -1,5 +1,5 @@
 // Built-in
-use std::sync::{Arc, RwLock};
+use std::sync::Arc;
 use std::thread;
 use std::time::Duration;
 // External
@@ -14,6 +14,7 @@ use futures::channel::mpsc;
 use jsonwebtoken::errors::Error as JwtError;
 use jsonwebtoken::{decode, DecodingKey, Validation};
 use serde::{Deserialize, Serialize};
+use tokio::sync::RwLock;
 // Workspace deps
 use zksync_config::configs::ZkSyncConfig;
 use zksync_prover_utils::api::{BlockToProveRes, ProverReq, PublishReq, WorkingOnReq};
@@ -109,7 +110,7 @@ async fn status() -> actix_web::Result<String> {
 
 async fn register(data: web::Data<AppState>, r: web::Json<ProverReq>) -> actix_web::Result<String> {
     log::info!("register request for prover with name: {}", r.name);
-    if r.name == "" {
+    if r.name.is_empty() {
         return Err(actix_web::error::ErrorBadRequest("empty name"));
     }
     let mut storage = data.access_storage().await?;
@@ -129,7 +130,7 @@ async fn block_to_prove(
     r: web::Json<ProverReq>,
 ) -> actix_web::Result<HttpResponse> {
     log::trace!("request block to prove from worker: {}", r.name);
-    if r.name == "" {
+    if r.name.is_empty() {
         return Err(actix_web::error::ErrorBadRequest("empty name"));
     }
     let mut storage = data.access_storage().await?;
@@ -289,7 +290,7 @@ async fn required_replicas(
     data: web::Data<AppState>,
     _input: web::Json<RequiredReplicasInput>,
 ) -> actix_web::Result<HttpResponse> {
-    let mut oracle = data.scaler_oracle.write().expect("Expected write lock");
+    let mut oracle = data.scaler_oracle.write().await;
 
     let needed_count = oracle
         .provers_required()

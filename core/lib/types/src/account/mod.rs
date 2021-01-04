@@ -232,8 +232,10 @@ mod test {
 
         {
             {
-                let mut created_account = Account::default();
-                created_account.nonce = 1;
+                let created_account = Account {
+                    nonce: 1,
+                    ..Default::default()
+                };
                 assert_eq!(
                     Account::apply_update(None, create.clone())
                         .unwrap()
@@ -253,8 +255,10 @@ mod test {
                 Account::default().get_bits_le()
             );
             {
-                let mut updated_account = Account::default();
-                updated_account.nonce = 2;
+                let mut updated_account = Account {
+                    nonce: 2,
+                    ..Default::default()
+                };
                 updated_account.set_balance(0, 5u32.into());
                 assert_eq!(
                     Account::apply_update(Some(Account::default()), bal_update)
