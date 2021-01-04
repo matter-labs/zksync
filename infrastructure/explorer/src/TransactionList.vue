@@ -1,41 +1,56 @@
 <template>
-<div>
-    <b-table 
-        responsive 
-        id="my-table" 
-        hover 
-        outlined 
-        :items="transactions" 
-        :per-page="rowsPerPage" 
-        :current-page="currentPage"
-        :fields="fields" 
-        class="nowrap"
-    >
-        <template v-slot:cell(tx_hash)="data">
-            <a :href="`/transactions/${data.item['tx_hash']}`">
-                {{ shortenHash(data.item['tx_hash']) }}
-            </a>
-        </template>
-        <template v-slot:cell(type)="data"><span v-html="data.item['type']" /></template>
-        <template v-slot:cell(from)="data"><span v-html="data.item['from']" /></template>
-        <template v-slot:cell(to)="data"><span v-html="data.item['to']" /></template>
-    </b-table>
-    <b-pagination 
-        v-if="transactions.length > rowsPerPage"
-        class="mt-2 mb-2"
-        v-model="currentPage" 
-        :per-page="rowsPerPage" 
-        :total-rows="transactions.length"
-    ></b-pagination>
-</div>
+    <div>
+        <b-table
+            responsive
+            id="my-table"
+            hover
+            outlined
+            :items="transactions"
+            :per-page="rowsPerPage"
+            :current-page="currentPage"
+            :fields="fields"
+            class="nowrap"
+        >
+            <template v-slot:cell(txHash)="data">
+                <Entry :value="data.item['txHash'].value" />
+            </template>
+            <template v-slot:cell(type)="data">
+                <Entry :value="data.item['type'].value" />
+            </template>
+            <template v-slot:cell(from)="data">
+                <Entry :value="data.item['from'].value" />
+            </template>
+            <template v-slot:cell(to)="data">
+                <Entry :value="data.item['to'].value" />
+            </template>
+            <template v-slot:cell(amount)="data">
+                <Entry :value="data.item['amount'].value" />
+            </template>
+            <template v-slot:cell(fee)="data">
+                <Entry :value="data.item['fee'].value" />
+            </template>
+            <template v-slot:cell(createdAt)="data">
+                <Entry :value="data.item['createdAt'].value" />
+            </template>
+        </b-table>
+        <b-pagination
+            v-if="transactions.length > rowsPerPage"
+            class="mt-2 mb-2"
+            v-model="currentPage"
+            :per-page="rowsPerPage"
+            :total-rows="transactions.length"
+        ></b-pagination>
+    </div>
 </template>
 
 <script>
 import CopyableAddress from './CopyableAddress.vue';
 import { shortenHash } from './utils';
+import Entry from './links/Entry.vue';
 
 const components = {
     CopyableAddress,
+    Entry
 };
 
 export default {
@@ -43,23 +58,23 @@ export default {
     props: ['blockNumber', 'transactions'],
     data: () => ({
         currentPage: 1,
-        rowsPerPage: 1000,
+        rowsPerPage: 1000
     }),
     methods: {
-        onRowClicked(item) {
-            this.$parent.$router.push('/transactions/' + item.tx_hash);
-        },
-        shortenHash,
+        shortenHash
     },
     computed: {
         fields() {
-            return this.transactions.length == 0 ? []
-                 : Object.keys(this.transactions[0]).filter(k => ! ['fromAddr', 'toAddr', 'success'].includes(k));
-        },
+            if (this.transactions.length == 0) {
+                return [];
+            }
+
+            const hiddenFields = ['fromAddr', 'toAddr', 'success', 'from_explorer_link', 'to_explorer_link'];
+            return Object.keys(this.transactions[0]).filter(k => !hiddenFields.includes(k));
+        }
     },
-    components,
+    components
 };
 </script>
 
-<style>
-</style>
+<style></style>

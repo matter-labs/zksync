@@ -53,10 +53,10 @@ async fn new_tx(
 #[actix_web::post("/new_txs_batch")]
 async fn new_txs_batch(
     data: web::Data<AppState>,
-    web::Json((txs, eth_signature)): web::Json<(Vec<SignedZkSyncTx>, Option<TxEthSignature>)>,
+    web::Json((txs, eth_signatures)): web::Json<(Vec<SignedZkSyncTx>, Vec<TxEthSignature>)>,
 ) -> actix_web::Result<HttpResponse> {
     let (sender, receiver) = oneshot::channel();
-    let item = MempoolRequest::NewTxsBatch(txs, eth_signature, sender);
+    let item = MempoolRequest::NewTxsBatch(txs, eth_signatures, sender);
     let mut mempool_sender = data.mempool_tx_sender.clone();
     mempool_sender
         .send(item)
@@ -78,6 +78,30 @@ async fn unconfirmed_deposits(
 ) -> actix_web::Result<HttpResponse> {
     let (sender, receiver) = oneshot::channel();
     let item = EthWatchRequest::GetUnconfirmedDeposits {
+        address,
+        resp: sender,
+    };
+    let mut eth_watch_sender = data.eth_watch_req_sender.clone();
+    eth_watch_sender
+        .send(item)
+        .await
+        .map_err(|_err| HttpResponse::InternalServerError().finish())?;
+
+    let response = receiver
+        .await
+        .map_err(|_err| HttpResponse::InternalServerError().finish())?;
+
+    Ok(HttpResponse::Ok().json(response))
+}
+
+/// Obtains information about unconfirmed operations known for a certain address.
+#[actix_web::get("/unconfirmed_ops/{address}")]
+async fn unconfirmed_ops(
+    data: web::Data<AppState>,
+    web::Path(address): web::Path<Address>,
+) -> actix_web::Result<HttpResponse> {
+    let (sender, receiver) = oneshot::channel();
+    let item = EthWatchRequest::GetUnconfirmedOps {
         address,
         resp: sender,
     };
@@ -147,6 +171,7 @@ pub fn start_private_core_api(
                         .service(new_tx)
                         .service(new_txs_batch)
                         .service(unconfirmed_op)
+                        .service(unconfirmed_ops)
                         .service(unconfirmed_deposits)
                 })
                 .bind(&api_server_options.core_server_address)

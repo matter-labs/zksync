@@ -1,6 +1,4 @@
-use crate::eth_watch::EthWatchRequest;
-use zksync_storage::StorageProcessor;
-use zksync_types::{tokens::get_genesis_token_list, tx::TxHash, Token, TokenId};
+use zksync_types::{tokens::get_genesis_token_list, Token, TokenId};
 
 use crate::state_keeper::ZkSyncStateInitParams;
 use crate::{
@@ -11,10 +9,7 @@ use crate::{
     private_api::start_private_core_api,
     state_keeper::{start_state_keeper, ZkSyncStateKeeper},
 };
-use futures::{
-    channel::{mpsc, oneshot},
-    future, SinkExt,
-};
+use futures::{channel::mpsc, future};
 use tokio::task::JoinHandle;
 use zksync_config::{ApiServerOptions, ConfigurationOptions};
 use zksync_storage::ConnectionPool;

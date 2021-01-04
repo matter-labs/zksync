@@ -9,8 +9,10 @@ use std::{
 // External uses
 use rand::{thread_rng, Rng};
 use tokio::sync::{RwLock, RwLockReadGuard, RwLockWriteGuard};
+
 // Workspace uses
-use zksync_types::{tx::TxHash, Address, BlockNumber, PriorityOp, ZkSyncPriorityOp};
+use zksync_api_client::rest::v1::Pagination;
+use zksync_types::{tx::TxHash, AccountId, Address, BlockNumber, PriorityOp, ZkSyncPriorityOp};
 // Local uses
 
 /// Maximum limit value in the requests.
@@ -24,6 +26,8 @@ pub struct AddressData {
     pub txs_count: usize,
     /// Total count of priority operations related to the address.
     pub ops_count: usize,
+    /// Associated account ID.
+    pub account_id: Option<AccountId>,
 }
 
 /// Generates a `(offset, limit)` pair for the corresponding API request.
@@ -49,7 +53,7 @@ impl AddressData {
     }
 }
 
-// TODO: In theory, we can use a simpler, fixed size deque instead of the standard one (#1116).
+// TODO: In theory, we can use a simpler, fixed size deque instead of the standard one (ZKS-104).
 
 /// API data pool contents.
 #[derive(Debug, Default)]
@@ -67,6 +71,10 @@ impl ApiDataPoolInner {
     pub fn store_address(&mut self, address: Address) -> &mut AddressData {
         self.addresses.push(address);
         self.data_by_address.entry(address).or_default()
+    }
+
+    pub fn set_account_id(&mut self, address: Address, account_id: AccountId) {
+        self.store_address(address).account_id = Some(account_id);
     }
 
     pub fn random_address(&self) -> (Address, &AddressData) {
@@ -111,7 +119,7 @@ impl ApiDataPoolInner {
         *self.blocks.entry(number).or_default() += 1;
 
         if self.blocks.len() > MAX_QUEUE_LEN {
-            // TODO: replace by the pop_first then the `map_first_last` becomes stable (#1116).
+            // TODO: replace by the pop_first then the `map_first_last` becomes stable (ZKS-104).
             let key = *self.blocks.keys().next().unwrap();
             self.blocks.remove(&key);
         }
@@ -119,11 +127,27 @@ impl ApiDataPoolInner {
 
     /// Generates a random block number in range [0, max block number].
     pub fn random_block(&self) -> BlockNumber {
-        self.random_tx_id().0
+        self.random_tx_location().0
+    }
+
+    /// Generates a random pagination block range.
+    pub fn random_block_range(&self) -> (Pagination, BlockNumber) {
+        let mut rng = thread_rng();
+
+        let block_number = self.random_block();
+        let pagination = match rng.gen_range(0, 3) {
+            0 => Pagination::Before(block_number),
+            1 => Pagination::After(block_number),
+            2 => Pagination::Last,
+            _ => unreachable!(),
+        };
+
+        let limit = rng.gen_range(1, MAX_REQUEST_LIMIT + 1);
+        (pagination, limit as BlockNumber)
     }
 
     /// Generates a random transaction identifier (block number, position in block).
-    pub fn random_tx_id(&self) -> (BlockNumber, usize) {
+    pub fn random_tx_location(&self) -> (BlockNumber, usize) {
         let from = *self.blocks.keys().next().unwrap();
         let to = self.max_block_number;
 

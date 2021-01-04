@@ -9,7 +9,7 @@ const provider = new ethers.providers.JsonRpcProvider(process.env.WEB3_URL);
 const testConfigPath = path.join(process.env.ZKSYNC_HOME as string, `etc/test_config/constant`);
 const ethTestConfig = JSON.parse(fs.readFileSync(`${testConfigPath}/eth.json`, { encoding: 'utf-8' }));
 
-(async () => {
+async function main() {
     const parser = new ArgumentParser({
         version: '0.1.0',
         addHelp: true,
@@ -132,4 +132,11 @@ const ethTestConfig = JSON.parse(fs.readFileSync(`${testConfigPath}/eth.json`, {
     await finishUpgradeTx.wait();
 
     console.info('Upgrade successful');
-})();
+}
+
+main()
+    .then(() => process.exit(0))
+    .catch((err) => {
+        console.error('Error:', err.message || err);
+        process.exit(1);
+    });

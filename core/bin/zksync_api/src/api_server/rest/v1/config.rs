@@ -4,17 +4,14 @@
 
 // External uses
 use actix_web::{web, Scope};
-use serde::{Deserialize, Serialize};
 
 // Workspace uses
+use zksync_api_client::rest::v1::Contracts;
 use zksync_config::ConfigurationOptions;
 use zksync_types::{network::Network, Address};
 
 // Local uses
-use super::{
-    client::{self, Client},
-    Json,
-};
+use super::Json;
 
 /// Shared data between `api/v1/config` endpoints.
 #[derive(Debug, Clone)]
@@ -31,30 +28,6 @@ impl ApiConfigData {
             deposit_confirmations: env_options.confirmations_for_eth_event,
             network: env_options.eth_network.parse().unwrap(),
         }
-    }
-}
-
-// Data transfer objects.
-
-#[derive(Debug, Serialize, Deserialize, PartialEq, Clone)]
-pub struct Contracts {
-    pub contract: Address,
-}
-
-// Client implementation
-
-/// Configuration API part.
-impl Client {
-    pub async fn contracts(&self) -> client::Result<Contracts> {
-        self.get("config/contracts").send().await
-    }
-
-    pub async fn deposit_confirmations(&self) -> client::Result<u64> {
-        self.get("config/deposit_confirmations").send().await
-    }
-
-    pub async fn network(&self) -> client::Result<String> {
-        self.get("config/network").send().await
     }
 }
 
@@ -92,6 +65,10 @@ mod tests {
     use super::{super::test_utils::TestServerConfig, *};
 
     #[actix_rt::test]
+    #[cfg_attr(
+        not(feature = "api_test"),
+        ignore = "Use `zk test rust-api` command to perform this test"
+    )]
     async fn test_config_scope() -> anyhow::Result<()> {
         let cfg = TestServerConfig::default();
         let (client, server) = cfg.start_server(|cfg| api_scope(&cfg.env_options));

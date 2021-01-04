@@ -26,7 +26,7 @@ fn get_operation(id: i64, block_number: u32, action: Action) -> Operation {
                 serial_id: 0,
                 data: ZkSyncPriorityOp::FullExit(priority_op.clone()),
                 deadline_block: 0,
-                eth_hash: Vec::new(),
+                eth_hash: H256::zero(),
                 eth_block: 0,
             },
             op: ZkSyncOp::FullExit(Box::new(FullExitOp {

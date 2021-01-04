@@ -5,6 +5,7 @@ use chrono::Utc;
 use num::rational::Ratio;
 use num::BigUint;
 use std::collections::HashMap;
+use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tokio::sync::Mutex;
 use zksync_storage::ConnectionPool;
@@ -39,7 +40,7 @@ pub trait FeeTickerAPI {
 }
 
 #[derive(Debug, Clone)]
-struct TokenCacheEntry {
+pub(crate) struct TokenCacheEntry {
     price: TokenPrice,
     creation_time: Instant,
     is_price_historical: bool,
@@ -76,21 +77,47 @@ pub(super) struct TickerApi<T: TokenPriceAPI> {
     db_pool: ConnectionPool,
 
     token_db_cache: TokenDBCache,
-    price_cache: Mutex<HashMap<TokenId, TokenCacheEntry>>,
-    gas_price_cache: Mutex<Option<(BigUint, Instant)>>,
+    price_cache: Arc<Mutex<HashMap<TokenId, TokenCacheEntry>>>,
+    gas_price_cache: Arc<Mutex<Option<(BigUint, Instant)>>>,
 
     token_price_api: T,
 }
 
 impl<T: TokenPriceAPI> TickerApi<T> {
     pub fn new(db_pool: ConnectionPool, token_price_api: T) -> Self {
-        let token_db_cache = TokenDBCache::new(db_pool.clone());
+        let token_db_cache = TokenDBCache::new();
         Self {
             db_pool,
             token_db_cache,
-            price_cache: Mutex::new(HashMap::new()),
-            gas_price_cache: Mutex::new(None),
+            price_cache: Default::default(),
+            gas_price_cache: Default::default(),
             token_price_api,
+        }
+    }
+    pub fn with_token_db_cache(self, token_db_cache: TokenDBCache) -> Self {
+        Self {
+            token_db_cache,
+            ..self
+        }
+    }
+
+    pub fn with_gas_price_cache(
+        self,
+        gas_price_cache: Arc<Mutex<Option<(BigUint, Instant)>>>,
+    ) -> Self {
+        Self {
+            gas_price_cache,
+            ..self
+        }
+    }
+
+    pub fn with_price_cache(
+        self,
+        price_cache: Arc<Mutex<HashMap<TokenId, TokenCacheEntry>>>,
+    ) -> Self {
+        Self {
+            price_cache,
+            ..self
         }
     }
 
@@ -106,15 +133,11 @@ impl<T: TokenPriceAPI> TickerApi<T> {
             .await
             .map_err(|e| format_err!("Can't access storage: {}", e))?;
 
-        let mut transaction = storage.start_transaction().await?;
-
-        transaction
+        storage
             .tokens_schema()
             .update_historical_ticker_price(token_id, price)
             .await
             .map_err(|e| format_err!("Can't update historical ticker price from storage: {}", e))?;
-
-        transaction.commit().await?;
 
         Ok(())
     }
@@ -182,12 +205,13 @@ impl<T: TokenPriceAPI + Send + Sync> FeeTickerAPI for TickerApi<T> {
         let start = Instant::now();
         let token = self
             .token_db_cache
-            .get_token(token.clone())
+            .get_token(&mut self.db_pool.access_storage().await?, token.clone())
             .await?
             .ok_or_else(|| format_err!("Token not found: {:?}", token))?;
 
-        // TODO: remove hardcode for Matter Labs Trial Token (#1036).
+        // TODO: remove hardcode for Matter Labs Trial Token (ZKS-63).
         if token.symbol == "MLTT" {
+            metrics::histogram!("ticker.get_last_quote", start.elapsed());
             return Ok(TokenPrice {
                 usd_price: Ratio::from_integer(1u32.into()),
                 last_updated: Utc::now(),
@@ -195,6 +219,7 @@ impl<T: TokenPriceAPI + Send + Sync> FeeTickerAPI for TickerApi<T> {
         }
 
         if let Some(cached_value) = self.get_stored_value(token.id).await {
+            metrics::histogram!("ticker.get_last_quote", start.elapsed());
             return Ok(cached_value);
         }
 
@@ -206,6 +231,7 @@ impl<T: TokenPriceAPI + Send + Sync> FeeTickerAPI for TickerApi<T> {
         if let Ok(api_price) = api_price {
             self.update_stored_value(token.id, api_price.clone(), false)
                 .await;
+            metrics::histogram!("ticker.get_last_quote", start.elapsed());
             return Ok(api_price);
         }
 
@@ -217,10 +243,10 @@ impl<T: TokenPriceAPI + Send + Sync> FeeTickerAPI for TickerApi<T> {
         if let Ok(Some(historical_price)) = historical_price {
             self.update_stored_value(token.id, historical_price.clone(), true)
                 .await;
+            metrics::histogram!("ticker.get_last_quote", start.elapsed());
             return Ok(historical_price);
         }
 
-        metrics::histogram!("ticker.get_last_quote", start.elapsed());
         anyhow::bail!("Token price api is not available right now.")
     }
 
@@ -235,6 +261,7 @@ impl<T: TokenPriceAPI + Send + Sync> FeeTickerAPI for TickerApi<T> {
                 return Ok(cached_gas_price);
             }
         }
+        drop(cached_value);
 
         let mut storage = self
             .db_pool
@@ -249,8 +276,7 @@ impl<T: TokenPriceAPI + Send + Sync> FeeTickerAPI for TickerApi<T> {
             .as_u64();
         let average_gas_price = BigUint::from(average_gas_price);
 
-        *cached_value = Some((average_gas_price.clone(), Instant::now()));
-
+        *self.gas_price_cache.lock().await = Some((average_gas_price.clone(), Instant::now()));
         metrics::histogram!("ticker.get_gas_price_wei", start.elapsed());
         Ok(average_gas_price)
     }
@@ -259,7 +285,7 @@ impl<T: TokenPriceAPI + Send + Sync> FeeTickerAPI for TickerApi<T> {
         let start = Instant::now();
         let result = self
             .token_db_cache
-            .get_token(token.clone())
+            .get_token(&mut self.db_pool.access_storage().await?, token.clone())
             .await?
             .ok_or_else(|| format_err!("Token not found: {:?}", token));
         metrics::histogram!("ticker.get_token", start.elapsed());

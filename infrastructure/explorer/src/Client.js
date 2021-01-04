@@ -1,14 +1,26 @@
 import config from './env-config';
 import * as constants from './constants';
-import {
-    formatToken
-} from './utils';
-import {
-    BlockExplorerClient
-} from './BlockExplorerClient';
-const zksync_promise = import('zksync');
+import { formatToken, isBlockVerified } from './utils';
+import { BlockExplorerClient } from './BlockExplorerClient';
+import timeConstants from './timeConstants';
+
+import { Provider } from 'zksync';
+
 import axios from 'axios';
 import * as ethers from 'ethers';
+
+import Cacher from './Cacher';
+
+function initOnUnloadSaving(cacher) {
+    // Unfortunately there is no reliable way to save cache
+    // upon user leaving the page.
+    //
+    // window.onunload just does not give us enough time
+    // window.onbeforeunload might show weird popups in some browsers
+    setInterval(() => {
+        cacher.saveCacheToLocalStorage();
+    }, timeConstants.cacheSaving);
+}
 
 async function fetch(req) {
     let r = await axios(req);
@@ -28,35 +40,38 @@ export class Client {
     }
 
     static async new() {
-        const zksync = await zksync_promise;
-        window.syncProvider = await zksync.Provider.newHttpProvider(config.HTTP_RPC_API_ADDR);
-        const tokensPromise = window.syncProvider.getTokens()
-            .then(tokens => {
-                const res = {};
-                for (const token of Object.values(tokens)) {
-                    const symbol = token.symbol || `${token.id.toString().padStart(3, '0')}`;
-                    const syncSymbol = `${symbol}`;
-                    res[token.id] = {
-                        ...token,
-                        symbol,
-                        syncSymbol,
-                    };
-                }
-                return res;
-            });
+        window.syncProvider = await Provider.newHttpProvider(config.HTTP_RPC_API_ADDR);
+        const tokensPromise = window.syncProvider.getTokens().then(tokens => {
+            const res = {};
+            for (const token of Object.values(tokens)) {
+                const symbol = token.symbol || `${token.id.toString().padStart(3, '0')}`;
+                const syncSymbol = `${symbol}`;
+                res[token.id] = {
+                    ...token,
+                    symbol,
+                    syncSymbol
+                };
+            }
+            return res;
+        });
         const blockExplorerClient = new BlockExplorerClient(config.API_SERVER);
-        const ethersProvider = config.ETH_NETWORK == 'localhost' ?
-            new ethers.providers.JsonRpcProvider('http://localhost:8545') :
-            ethers.getDefaultProvider();
+        const ethersProvider =
+            config.ETH_NETWORK == 'localhost'
+                ? new ethers.providers.JsonRpcProvider('http://localhost:8545')
+                : ethers.getDefaultProvider();
 
         const props = {
             blockExplorerClient,
             tokensPromise,
             ethersProvider,
-            syncProvider: window.syncProvider,
+            syncProvider: window.syncProvider
         };
 
-        return new Client(props);
+        const client = new Client(props);
+        const cacher = new Cacher(client);
+        initOnUnloadSaving(cacher);
+        client.cacher = cacher;
+        return client;
     }
 
     async getNumConfirmationsToWait(txEthBlock) {
@@ -69,36 +84,60 @@ export class Client {
     async testnetConfig() {
         return fetch({
             method: 'get',
-            url: `${baseUrl()}/testnet_config`,
+            url: `${baseUrl()}/testnet_config`
         });
     }
 
     async status() {
         return fetch({
             method: 'get',
-            url: `${baseUrl()}/status`,
+            url: `${baseUrl()}/status`
         });
     }
 
     async loadBlocks(max_block) {
         return fetch({
             method: 'get',
-            url: `${baseUrl()}/blocks?max_block=${max_block}&limit=${constants.PAGE_SIZE}`,
+            url: `${baseUrl()}/blocks?max_block=${max_block}&limit=${constants.PAGE_SIZE}`
         });
     }
 
     async getBlock(blockNumber) {
-        return fetch({
+        const cached = this.cacher.getCachedBlock(blockNumber);
+        if (cached) {
+            return cached;
+        }
+
+        const block = await fetch({
             method: 'get',
-            url: `${baseUrl()}/blocks/${blockNumber}`,
+            url: `${baseUrl()}/blocks/${blockNumber}`
         });
+
+        // Cache only verified blocks since
+        // these will definitely never change again
+        if (isBlockVerified(block)) {
+            this.cacher.cacheBlock(blockNumber, block);
+        }
+
+        return block;
     }
 
-    async getBlockTransactions(blockNumber) {
+    async getBlockTransactions(blockNumber, blockInfo) {
+        const cached = this.cacher.getCachedBlockTransactions(blockNumber);
+        if (cached) {
+            return cached;
+        }
+
         let txs = await fetch({
             method: 'get',
-            url: `${baseUrl()}/blocks/${blockNumber}/transactions`,
+            url: `${baseUrl()}/blocks/${blockNumber}/transactions`
         });
+
+        // We can cache only verified transactions
+        if (blockInfo && isBlockVerified(blockInfo)) {
+            this.cacher.cacheBlockTransactions(blockNumber, txs);
+            this.cacher.cacheTransactionsFromBlock(txs, this);
+        }
 
         return txs;
     }
@@ -106,15 +145,22 @@ export class Client {
     searchBlock(query) {
         return fetch({
             method: 'get',
-            url: `${baseUrl()}/search?query=${query}`,
+            url: `${baseUrl()}/search?query=${query}`
         });
     }
 
-    searchTx(txHash) {
-        return fetch({
+    async searchTx(txHash) {
+        const cached = this.cacher.getCachedTransaction(txHash);
+        if (cached) {
+            return cached;
+        }
+
+        const tx = await fetch({
             method: 'get',
-            url: `${baseUrl()}/transactions_all/${txHash}`,
+            url: `${baseUrl()}/transactions_all/${txHash}`
         });
+
+        return tx;
     }
 
     getAccount(address) {
@@ -124,13 +170,12 @@ export class Client {
     async getCommitedBalances(address) {
         const account = await this.getAccount(address);
 
-        let balances = Object.entries(account.committed.balances)
-            .map(([tokenSymbol, balance]) => {
-                return {
-                    tokenSymbol,
-                    balance: formatToken(balance, tokenSymbol),
-                };
-            });
+        let balances = Object.entries(account.committed.balances).map(([tokenSymbol, balance]) => {
+            return {
+                tokenSymbol,
+                balance: formatToken(balance, tokenSymbol)
+            };
+        });
 
         balances.sort((a, b) => a.tokenSymbol.localeCompare(b.tokenSymbol));
         return balances;
@@ -146,11 +191,10 @@ export class Client {
 
     async transactionsList(address, offset, limit) {
         if (!address) {
-            console.log(address);
             return [];
         }
         const transactions = await this.blockExplorerClient.getAccountTransactions(address, offset, limit);
-        const res = transactions.map(async (tx, index) => {
+        const res = transactions.map(async tx => {
             const type = tx.tx.type || '';
             const hash = tx.hash;
             const created_at = tx.created_at;
@@ -161,7 +205,7 @@ export class Client {
                 type,
                 success,
                 hash,
-                created_at,
+                created_at
             };
 
             switch (true) {
@@ -173,7 +217,7 @@ export class Client {
                         from: tx.tx.priority_op.from,
                         to: tx.tx.priority_op.to,
                         token,
-                        amount,
+                        amount
                     };
                 }
                 case type == 'FullExit': {
@@ -184,8 +228,7 @@ export class Client {
                         from: tx.tx.priority_op.eth_address,
                         to: tx.tx.priority_op.eth_address,
                         token,
-                        amount,
-
+                        amount
                     };
                 }
                 case type == 'Transfer' || type == 'Withdraw': {
@@ -196,13 +239,13 @@ export class Client {
                         from: tx.tx.from,
                         to: tx.tx.to,
                         token,
-                        amount,
+                        amount
                     };
                 }
                 case type == 'ForcedExit': {
                     const token = this.tokenNameFromSymbol(tx.tx.token);
                     let amount = (await this.searchTx(hash)).amount;
-                    if (amount != "unknown amount") {
+                    if (amount != 'unknown amount') {
                         amount = formatToken(amount || 0, token);
                     }
                     return {
@@ -210,14 +253,14 @@ export class Client {
                         from: tx.tx.target,
                         to: tx.tx.target,
                         token,
-                        amount,
+                        amount
                     };
                 }
                 case type == 'Close' || type == 'ChangePubKey': {
                     return {
                         ...data,
                         from: tx.tx.account,
-                        to: '',
+                        to: ''
                     };
                 }
             }
@@ -230,9 +273,9 @@ export class Client {
     async loadTokens() {
         return fetch({
             method: 'get',
-            url: `${baseUrl()}/tokens`,
+            url: `${baseUrl()}/tokens`
         });
     }
-};
+}
 
 export const clientPromise = Client.new();

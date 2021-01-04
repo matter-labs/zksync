@@ -1,16 +1,22 @@
 //! This file contains representation of not signed transactions and builders for them.
 
-use crate::{error::ClientError, provider::Provider, types::TransactionInfo};
 use std::time::{Duration, Instant};
+
 use zksync_types::tx::TxHash;
 
-mod change_pubkey;
-mod transfer;
-mod withdraw;
+use crate::{
+    error::ClientError,
+    provider::Provider,
+    types::{BlockInfo, TransactionInfo},
+};
 
 pub use self::{
     change_pubkey::ChangePubKeyBuilder, transfer::TransferBuilder, withdraw::WithdrawBuilder,
 };
+
+mod change_pubkey;
+mod transfer;
+mod withdraw;
 
 /// Handle for transaction, providing an interface to control its execution.
 /// For obtained handle it's possible to set the polling interval, commit timeout
@@ -19,16 +25,16 @@ pub use self::{
 /// By default, awaiting for transaction may run up to forever, and the polling is
 /// performed once a second.
 #[derive(Debug)]
-pub struct SyncTransactionHandle {
+pub struct SyncTransactionHandle<P: Provider> {
     hash: TxHash,
-    provider: Provider,
+    provider: P,
     polling_interval: Duration,
     commit_timeout: Option<Duration>,
     verify_timeout: Option<Duration>,
 }
 
-impl SyncTransactionHandle {
-    pub fn new(hash: TxHash, provider: Provider) -> Self {
+impl<P: Provider> SyncTransactionHandle<P> {
+    pub fn new(hash: TxHash, provider: P) -> Self {
         Self {
             hash,
             provider,
@@ -38,9 +44,11 @@ impl SyncTransactionHandle {
         }
     }
 
+    const MIN_POLLING_INTERVAL: Duration = Duration::from_millis(200);
+
     /// Sets the polling interval. Must be at least 200 milliseconds.
     pub fn polling_interval(&mut self, polling_interval: Duration) -> Result<(), ClientError> {
-        if polling_interval >= Duration::from_millis(200) {
+        if polling_interval >= Self::MIN_POLLING_INTERVAL {
             self.polling_interval = polling_interval;
             Ok(())
         } else {
@@ -69,46 +77,42 @@ impl SyncTransactionHandle {
         self
     }
 
-    /// Awaits for the transaction commit and returns the information about execution.
+    /// Awaits for the transaction commit and returns the information about its execution.
     pub async fn wait_for_commit(&self) -> Result<TransactionInfo, ClientError> {
-        let mut timer = tokio::time::interval(self.polling_interval);
-        let start = Instant::now();
-
-        loop {
-            timer.tick().await;
-
-            if let Some(commit_timeout) = self.commit_timeout {
-                if start.elapsed() >= commit_timeout {
-                    return Err(ClientError::OperationTimeout);
-                }
-            }
-
-            let response = self.provider.tx_info(self.hash).await?;
-            if let Some(block) = &response.block {
-                if block.committed {
-                    return Ok(response);
-                }
-            }
-        }
+        self.wait_for(|block| block.committed, self.commit_timeout)
+            .await
     }
 
-    /// Awaits for the transaction verification and returns the information about execution.
+    /// Awaits for the transaction verification and returns the information about its execution.
     pub async fn wait_for_verify(&self) -> Result<TransactionInfo, ClientError> {
+        self.wait_for(|block| block.verified, self.verify_timeout)
+            .await
+    }
+
+    /// Awaits for the transaction to reach given state and returns the information about its execution.
+    async fn wait_for<WaitPredicate>(
+        &self,
+        condition: WaitPredicate,
+        timeout: Option<Duration>,
+    ) -> Result<TransactionInfo, ClientError>
+    where
+        WaitPredicate: Fn(&BlockInfo) -> bool,
+    {
         let mut timer = tokio::time::interval(self.polling_interval);
         let start = Instant::now();
 
         loop {
             timer.tick().await;
 
-            if let Some(verify_timeout) = self.verify_timeout {
-                if start.elapsed() >= verify_timeout {
+            if let Some(timeout) = timeout {
+                if start.elapsed() >= timeout {
                     return Err(ClientError::OperationTimeout);
                 }
             }
 
             let response = self.provider.tx_info(self.hash).await?;
             if let Some(block) = &response.block {
-                if block.verified {
+                if condition(block) {
                     return Ok(response);
                 }
             }

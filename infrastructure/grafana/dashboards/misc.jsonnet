@@ -12,7 +12,4 @@ local metrics = [
   "sql.connection_acquire",
 ];
 
-G.dashboard(
-  'Metrics / miscellaneous',
-  [ G.panel(metric) for metric in metrics ]
-)
+G.dashboard('miscellaneous', metrics)

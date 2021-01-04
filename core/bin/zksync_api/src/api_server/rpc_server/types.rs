@@ -1,16 +1,22 @@
 use std::collections::HashMap;
+
 // External uses
 use jsonrpc_core::{Error, Result};
 use num::{BigUint, ToPrimitive};
 use serde::{Deserialize, Serialize};
+
 // Workspace uses
+use zksync_storage::StorageProcessor;
 use zksync_types::{
     tx::TxEthSignature, Account, AccountId, Address, Nonce, PriorityOp, PubKeyHash,
     ZkSyncPriorityOp, ZkSyncTx,
 };
 use zksync_utils::{BigUintSerdeAsRadix10Str, BigUintSerdeWrapper};
+
 // Local uses
-use crate::utils::token_db_cache::TokenDBCache;
+use crate::{
+    api_server::v1::accounts::account_state_from_storage, utils::token_db_cache::TokenDBCache,
+};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -28,26 +34,23 @@ pub struct ResponseAccountState {
 }
 
 impl ResponseAccountState {
-    pub async fn try_restore(account: Account, tokens: &TokenDBCache) -> Result<Self> {
-        let mut balances = HashMap::new();
-        for (token_id, balance) in account.get_nonzero_balances() {
-            if token_id == 0 {
-                balances.insert("ETH".to_string(), balance);
-            } else {
-                let token = tokens
-                    .get_token(token_id)
-                    .await
-                    .ok()
-                    .flatten()
-                    .ok_or_else(Error::internal_error)?;
-                balances.insert(token.symbol.clone(), balance);
-            }
-        }
+    pub async fn try_restore(
+        storage: &mut StorageProcessor<'_>,
+        tokens: &TokenDBCache,
+        account: Account,
+    ) -> Result<Self> {
+        let inner = account_state_from_storage(storage, tokens, &account)
+            .await
+            .map_err(|_| Error::internal_error())?;
+
+        // Old code used `HashMap` as well and didn't rely on the particular order,
+        // so here we use `HashMap` as well for the consistency.
+        let balances: HashMap<_, _> = inner.balances.into_iter().collect();
 
         Ok(Self {
             balances,
-            nonce: account.nonce,
-            pub_key_hash: account.pub_key_hash,
+            nonce: inner.nonce,
+            pub_key_hash: inner.pub_key_hash,
         })
     }
 }
@@ -75,8 +78,9 @@ pub struct DepositingAccountBalances {
 
 impl DepositingAccountBalances {
     pub async fn from_pending_ops(
-        pending_ops: OngoingDepositsResp,
+        storage: &mut StorageProcessor<'_>,
         tokens: &TokenDBCache,
+        pending_ops: OngoingDepositsResp,
     ) -> Result<Self> {
         let mut balances = HashMap::new();
 
@@ -85,7 +89,7 @@ impl DepositingAccountBalances {
                 "ETH".to_string()
             } else {
                 tokens
-                    .get_token(op.token_id)
+                    .get_token(storage, op.token_id)
                     .await
                     .map_err(|_| Error::internal_error())?
                     .ok_or_else(Error::internal_error)?
@@ -165,7 +169,7 @@ pub struct OngoingDeposit {
 }
 
 impl OngoingDeposit {
-    pub fn new(received_on_block: u64, priority_op: PriorityOp) -> Self {
+    pub fn new(priority_op: PriorityOp) -> Self {
         let (token_id, amount) = match priority_op.data {
             ZkSyncPriorityOp::Deposit(deposit) => (
                 deposit.token,
@@ -182,7 +186,7 @@ impl OngoingDeposit {
         let eth_tx_hash = hex::encode(&priority_op.eth_hash);
 
         Self {
-            received_on_block,
+            received_on_block: priority_op.eth_block,
             token_id,
             amount,
             eth_tx_hash,

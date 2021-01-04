@@ -1,6 +1,11 @@
+import { BigNumber } from 'ethers';
+import * as ethers from 'ethers';
 import Axios from 'axios';
 import WebSocketAsPromised = require('websocket-as-promised');
 import * as websocket from 'websocket';
+import { PubKeyHash } from './types';
+import { Signer } from './signer';
+
 const W3CWebSocket = websocket.w3cwebsocket;
 
 export abstract class AbstractJSONRPCTransport {
@@ -155,4 +160,81 @@ export class WSTransport extends AbstractJSONRPCTransport {
     async disconnect() {
         await this.ws.close();
     }
+}
+
+export class DummyTransport extends AbstractJSONRPCTransport {
+    public constructor(public network: string, public ethPrivateKey: Uint8Array, public getTokens: Function) {
+        super();
+    }
+
+    async getPubKeyHash(): Promise<PubKeyHash> {
+        const ethWallet = new ethers.Wallet(this.ethPrivateKey);
+        const { signer } = await Signer.fromETHSignature(ethWallet);
+        return await signer.pubKeyHash();
+    }
+
+    async request(method: string, params = null): Promise<any> {
+        if (method == 'contract_address') {
+            return {
+                // The HEX-encoded sequence of bytes [0..20) provided as the `mainContract`.
+                mainContract: '0x000102030405060708090a0b0c0d0e0f10111213',
+                //  The `govContract` is not used in tests and it is simply an empty string.
+                govContract: ''
+            };
+        }
+
+        if (method == 'tokens') {
+            const tokensList = this.getTokens();
+            const tokens = {};
+
+            let id = 1;
+            for (const tokenItem of tokensList.slice(0, 3)) {
+                const token = {
+                    address: tokenItem.address,
+                    id: id,
+                    symbol: tokenItem.symbol,
+                    decimals: tokenItem.decimals
+                };
+
+                tokens[tokenItem.symbol] = token;
+                id++;
+            }
+
+            return tokens;
+        }
+
+        if (method == 'account_info') {
+            // The example `AccountState` instance:
+            //  - assigns the '42' value to account_id;
+            //  - assigns the committed.pubKeyHash to match the wallet's signer's PubKeyHash
+            //  - adds single entry of "DAI" token to the committed balances;
+            //  - adds single entry of "USDC" token to the verified balances.
+            return {
+                address: params[0],
+                id: 42,
+                depositing: {},
+                committed: {
+                    balances: {
+                        DAI: BigNumber.from(12345)
+                    },
+                    nonce: 0,
+                    pubKeyHash: await this.getPubKeyHash()
+                },
+                verified: {
+                    balances: {
+                        USDC: BigNumber.from(98765)
+                    },
+                    nonce: 0,
+                    pubKeyHash: ''
+                }
+            };
+        }
+
+        return {
+            method,
+            params
+        };
+    }
+
+    async disconnect() {}
 }

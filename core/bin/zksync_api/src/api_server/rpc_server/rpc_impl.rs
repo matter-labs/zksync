@@ -23,12 +23,15 @@ impl RpcApp {
     pub async fn _impl_account_info(self, address: Address) -> Result<AccountInfoResp> {
         let start = Instant::now();
 
-        let account_state = self.get_account_state(&address).await?;
+        let account_state = self.get_account_state(address).await?;
 
         let depositing_ops = self.get_ongoing_deposits_impl(address).await?;
-        let depositing =
-            DepositingAccountBalances::from_pending_ops(depositing_ops, &self.tx_sender.tokens)
-                .await?;
+        let depositing = DepositingAccountBalances::from_pending_ops(
+            &mut self.access_storage().await?,
+            &self.tx_sender.tokens,
+            depositing_ops,
+        )
+        .await?;
 
         log::trace!(
             "account_info: address {}, total request processing {}ms",
@@ -118,12 +121,12 @@ impl RpcApp {
     pub async fn _impl_submit_txs_batch(
         self,
         txs: Vec<TxWithSignature>,
-        eth_signature: Option<TxEthSignature>,
+        eth_signatures: Vec<TxEthSignature>,
     ) -> Result<Vec<TxHash>> {
         let start = Instant::now();
         let result = self
             .tx_sender
-            .submit_txs_batch(txs, eth_signature)
+            .submit_txs_batch(txs, eth_signatures)
             .await
             .map_err(Error::from);
         metrics::histogram!("api.rpc.submit_txs_batch", start.elapsed());
@@ -167,9 +170,21 @@ impl RpcApp {
             log::warn!("Internal Server Error: '{}'; input: N/A", err);
             Error::internal_error()
         })?;
-        let result = tokens
+
+        // HACK: Special case for the Golem:
+        //
+        // Currently, their token on Rinkeby is called GNT, but it's being renamed to the tGLM.
+        //
+        // TODO: Remove this case after Golem update [ZKS-173]
+        let mut has_gnt = None;
+        let mut result: HashMap<_, _> = tokens
             .drain()
             .map(|(id, token)| {
+                // TODO: Remove this case after Golem update [ZKS-173]
+                if token.symbol == "GNT" {
+                    has_gnt = Some(token.clone());
+                }
+
                 if id == 0 {
                     ("ETH".to_string(), token)
                 } else {
@@ -177,6 +192,14 @@ impl RpcApp {
                 }
             })
             .collect();
+
+        // So if we have `GNT` token in response we should also add `GLM` alias.
+        // TODO: Remove this case after Golem update [ZKS-173]
+        if let Some(mut token) = has_gnt {
+            token.symbol = "tGLM".to_string();
+            result.insert(token.symbol.clone(), token);
+        }
+
         metrics::histogram!("api.rpc.tokens", start.elapsed());
         Ok(result)
     }

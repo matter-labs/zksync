@@ -1,12 +1,6 @@
 import { BigNumber, BigNumberish, ethers } from 'ethers';
 import { Address, TokenLike, Nonce, ChangePubKey, ChangePubKeyFee, SignedTransaction, TxEthSignature } from './types';
-import {
-    getChangePubkeyMessage,
-    serializeChangePubKey,
-    serializeForcedExit,
-    serializeTransfer,
-    serializeWithdraw
-} from './utils';
+import { getChangePubkeyMessage, serializeTx } from './utils';
 import { Wallet } from './wallet';
 
 /**
@@ -65,18 +59,27 @@ export class BatchBuilder {
                     this.changePubKeyTx.newPkHash,
                     this.changePubKeyTx.nonce,
                     this.wallet.accountId,
-                    batchHash.slice(2)
+                    batchHash
                 )
             );
             // It is necessary to store the hash, so the signature can be verified on smart contract.
-            this.changePubKeyTx.batchHash = batchHash;
-            this.changePubKeyTx.ethSignature = signature.signature;
+            this.changePubKeyTx.ethAuthData = {
+                type: 'ECDSA',
+                ethSignature: signature.signature,
+                batchHash
+            };
         } else {
             // The message is just keccak256(batchBytes).
             signature = await this.wallet.getEthMessageSignature(
                 Uint8Array.from(Buffer.from(batchHash.slice(2), 'hex'))
             );
+            if (this.changePubKeyTx != null) {
+                this.changePubKeyTx.ethAuthData = {
+                    type: 'Onchain'
+                };
+            }
         }
+
         return {
             txs,
             signature,
@@ -200,21 +203,21 @@ export class BatchBuilder {
      * Sets transactions nonces, assembles the batch and serializes them into single array.
      */
     private async processTransactions(): Promise<{ txs: SignedTransaction[]; bytes: Uint8Array }> {
-        let txs: SignedTransaction[] = [];
-        let _bytes: Uint8Array[] = [];
+        const processedTxs: SignedTransaction[] = [];
+        const _bytes: Uint8Array[] = [];
         let nonce: number = await this.wallet.getNonce(this.nonce);
-        for (let tx of this.txs) {
+        for (const tx of this.txs) {
             tx.tx.nonce = nonce++;
             switch (tx.type) {
                 case 'Withdraw':
                     const withdraw = { tx: await this.wallet.getWithdrawFromSyncToEthereum(tx.tx) };
-                    _bytes.push(serializeWithdraw(withdraw.tx));
-                    txs.push(withdraw);
+                    _bytes.push(serializeTx(withdraw.tx));
+                    processedTxs.push(withdraw);
                     break;
                 case 'Transfer':
                     const transfer = { tx: await this.wallet.getTransfer(tx.tx) };
-                    _bytes.push(serializeTransfer(transfer.tx));
-                    txs.push(transfer);
+                    _bytes.push(serializeTx(transfer.tx));
+                    processedTxs.push(transfer);
                     break;
                 case 'ChangePubKey':
                     const changePubKey = { tx: await this.wallet.getChangePubKey(tx.tx) };
@@ -224,18 +227,18 @@ export class BatchBuilder {
                     }
                     // We will sign it if necessary and store the batch hash.
                     this.changePubKeyTx = changePubKey.tx;
-                    _bytes.push(serializeChangePubKey(changePubKey.tx));
-                    txs.push(changePubKey);
+                    _bytes.push(serializeTx(changePubKey.tx));
+                    processedTxs.push(changePubKey);
                     break;
                 case 'ForcedExit':
                     const forcedExit = { tx: await this.wallet.getForcedExit(tx.tx) };
-                    txs.push(forcedExit);
-                    _bytes.push(serializeForcedExit(forcedExit.tx));
+                    _bytes.push(serializeTx(forcedExit.tx));
+                    processedTxs.push(forcedExit);
                     break;
             }
         }
         return {
-            txs: txs,
+            txs: processedTxs,
             bytes: ethers.utils.concat(_bytes)
         };
     }

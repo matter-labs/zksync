@@ -1,6 +1,6 @@
 [package]
 name = "zksync"
-version = "0.1.1"
+version = "0.2.2"
 authors = ["The Matter Labs Team <hello@matterlabs.dev>"]
 edition = "2018"
 
@@ -8,6 +8,7 @@ edition = "2018"
 zksync_types = { path = "../../core/lib/types", version = "1.0" }
 zksync_eth_client = { path = "../../core/lib/eth_client", version = "1.0" }
 zksync_eth_signer = { path = "../../core/lib/eth_signer", version = "1.0" }
+zksync_config = { path = "../../core/lib/config", version = "1.0" }
 zksync_crypto = { path = "../../core/lib/crypto", version = "1.0" }
 zksync_utils = { path = "../../core/lib/utils", version = "1.0" }
 
@@ -19,13 +20,15 @@ tokio = { version = "0.2", features = ["time"] }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 jsonrpc-core = "14.0.3"
-num = { version = "0.2", features = ["serde"] }
+num = { version = "0.3.1", features = ["serde"] }
 reqwest = { version = "0.10", features = ["json", "blocking"] }
 thiserror = "1.0"
+async-trait = "0.1"
 
 [dev-dependencies]
 tokio = { version = "0.2", features = ["full"] }
 anyhow = "1.0"
+hex = "0.4"
 
 [features]
 integration-tests = []

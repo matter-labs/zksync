@@ -1,24 +1,18 @@
 // Built-in deps
-use std::{
-    sync::{
-        atomic::{AtomicI32, Ordering},
-        mpsc, Arc,
-    },
-    thread,
-    time::Duration,
-};
+use std::time::Duration;
 // External deps
 use structopt::StructOpt;
 // Workspace deps
 use zksync_config::ProverOptions;
-use zksync_utils::parse_env;
+use zksync_utils::{get_env, parse_env};
 // Local deps
-use crate::{client, prover_work_cycle, ApiClient, ProverConfig, ProverImpl, ShutdownRequest};
+use crate::{client, prover_work_cycle, ProverConfig, ProverImpl, ShutdownRequest};
 
 fn api_client_from_env(worker_name: &str) -> client::ApiClient {
     let server_api_url = parse_env("PROVER_SERVER_URL");
     let request_timout = Duration::from_secs(parse_env::<u64>("REQ_SERVER_TIMEOUT"));
-    client::ApiClient::new(&server_api_url, worker_name, request_timout)
+    let secret = get_env("PROVER_SECRET_AUTH");
+    client::ApiClient::new(&server_api_url, worker_name, request_timout, &secret)
 }
 
 #[derive(StructOpt)]
@@ -33,20 +27,24 @@ struct Opt {
     worker_name: String,
 }
 
-pub async fn main_for_prover_impl<P: ProverImpl + 'static + Send + Sync>() {
+pub async fn main_for_prover_impl<PROVER>()
+where
+    PROVER: ProverImpl + Send + Sync + 'static,
+{
     let opt = Opt::from_args();
     let worker_name = opt.worker_name;
 
     // used env
-    let prover_config = <P as ProverImpl>::Config::from_env();
+    let prover_options = ProverOptions::from_env();
+    let prover_config = <PROVER as ProverImpl>::Config::from_env();
     let api_client = api_client_from_env(&worker_name);
-    let prover = P::create_from_config(prover_config);
+    let prover = PROVER::create_from_config(prover_config);
 
     env_logger::init();
 
     log::info!("creating prover, worker name: {}", worker_name);
 
-    // Create client
+    // Create client.
 
     let shutdown_request = ShutdownRequest::new();
 
@@ -68,6 +66,12 @@ pub async fn main_for_prover_impl<P: ProverImpl + 'static + Send + Sync>() {
         .expect("Failed to register ctrlc handler");
     }
 
-    let prover_options = ProverOptions::from_env();
-    prover_work_cycle(prover, api_client, shutdown_request, prover_options).await;
+    prover_work_cycle(
+        prover,
+        api_client,
+        shutdown_request,
+        prover_options,
+        &worker_name,
+    )
+    .await;
 }

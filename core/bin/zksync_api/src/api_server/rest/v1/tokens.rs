@@ -8,40 +8,47 @@ use actix_web::{
     Scope,
 };
 use bigdecimal::BigDecimal;
-use serde::{Deserialize, Serialize};
-
-// Workspace uses
 use futures::{
     channel::{mpsc, oneshot},
     prelude::*,
 };
-use zksync_storage::QueryResult;
+
+// Workspace uses
+use zksync_api_client::rest::v1::{TokenPriceKind, TokenPriceQuery};
+use zksync_storage::{ConnectionPool, QueryResult};
 use zksync_types::{Token, TokenLike};
 
-// Local uses
-use super::{
-    client::{self, Client},
-    Error as ApiError, JsonResult,
-};
 use crate::{
     fee_ticker::{TickerRequest, TokenPriceRequestType},
     utils::token_db_cache::TokenDBCache,
 };
+
+// Local uses
+use super::{ApiError, JsonResult};
 
 /// Shared data between `api/v1/tokens` endpoints.
 #[derive(Clone)]
 struct ApiTokensData {
     fee_ticker: mpsc::Sender<TickerRequest>,
     tokens: TokenDBCache,
+    pool: ConnectionPool,
 }
 
 impl ApiTokensData {
-    fn new(tokens: TokenDBCache, fee_ticker: mpsc::Sender<TickerRequest>) -> Self {
-        Self { tokens, fee_ticker }
+    fn new(
+        pool: ConnectionPool,
+        tokens: TokenDBCache,
+        fee_ticker: mpsc::Sender<TickerRequest>,
+    ) -> Self {
+        Self {
+            pool,
+            tokens,
+            fee_ticker,
+        }
     }
 
     async fn tokens(&self) -> QueryResult<Vec<Token>> {
-        let mut storage = self.tokens.db.access_storage().await?;
+        let mut storage = self.pool.access_storage().await?;
 
         let tokens = storage.tokens_schema().load_tokens().await?;
 
@@ -53,7 +60,9 @@ impl ApiTokensData {
     }
 
     async fn token(&self, token_like: TokenLike) -> QueryResult<Option<Token>> {
-        self.tokens.get_token(token_like).await
+        let mut storage = self.pool.access_storage().await?;
+
+        self.tokens.get_token(&mut storage, token_like).await
     }
 
     async fn token_price_usd(&self, token: TokenLike) -> QueryResult<Option<BigDecimal>> {
@@ -79,45 +88,6 @@ impl ApiTokensData {
                 }
             }
         }
-    }
-}
-
-// Data transfer objects.
-
-#[derive(Debug, Deserialize, Serialize, Copy, Clone, PartialEq)]
-#[serde(rename_all = "camelCase")]
-pub enum TokenPriceKind {
-    Currency,
-    Token,
-}
-
-#[derive(Debug, Deserialize, Serialize, Copy, Clone, PartialEq)]
-struct TokenPriceQuery {
-    #[serde(rename = "in")]
-    kind: TokenPriceKind,
-}
-
-// Client implementation
-
-/// Tokens API part.
-impl Client {
-    pub async fn tokens(&self) -> client::Result<Vec<Token>> {
-        self.get("tokens").send().await
-    }
-
-    pub async fn token_by_id(&self, token: &TokenLike) -> client::Result<Option<Token>> {
-        self.get(&format!("tokens/{}", token)).send().await
-    }
-
-    pub async fn token_price(
-        &self,
-        token: &TokenLike,
-        kind: TokenPriceKind,
-    ) -> client::Result<Option<BigDecimal>> {
-        self.get(&format!("tokens/{}/price", token))
-            .query(&TokenPriceQuery { kind })
-            .send()
-            .await
     }
 }
 
@@ -162,8 +132,12 @@ async fn token_price(
     Ok(Json(price))
 }
 
-pub fn api_scope(tokens_db: TokenDBCache, fee_ticker: mpsc::Sender<TickerRequest>) -> Scope {
-    let data = ApiTokensData::new(tokens_db, fee_ticker);
+pub fn api_scope(
+    pool: ConnectionPool,
+    tokens_db: TokenDBCache,
+    fee_ticker: mpsc::Sender<TickerRequest>,
+) -> Scope {
+    let data = ApiTokensData::new(pool, tokens_db, fee_ticker);
 
     web::scope("tokens")
         .data(data)
@@ -216,6 +190,10 @@ mod tests {
     }
 
     #[actix_rt::test]
+    #[cfg_attr(
+        not(feature = "api_test"),
+        ignore = "Use `zk test rust-api` command to perform this test"
+    )]
     async fn test_tokens_scope() -> anyhow::Result<()> {
         let cfg = TestServerConfig::default();
         cfg.fill_database().await?;
@@ -229,7 +207,7 @@ mod tests {
         let fee_ticker = dummy_fee_ticker(&prices);
 
         let (client, server) = cfg.start_server(move |cfg| {
-            api_scope(TokenDBCache::new(cfg.pool.clone()), fee_ticker.clone())
+            api_scope(cfg.pool.clone(), TokenDBCache::new(), fee_ticker.clone())
         });
 
         // Fee requests
@@ -248,7 +226,7 @@ mod tests {
                 .await?,
             None
         );
-        // TODO Check error (#1152)
+        // TODO Check error (ZKS-125)
         client
             .token_price(&TokenLike::Id(2), TokenPriceKind::Token)
             .await
@@ -299,6 +277,43 @@ mod tests {
             expected_token
         );
         assert_eq!(client.token_by_id(&TokenLike::parse("XM")).await?, None);
+
+        server.stop().await;
+        Ok(())
+    }
+
+    // Test special case for Golem: tGLM token name should be alias for the GNT.
+    // By the way, since `TokenDBCache` is shared between this API implementation
+    // and the old RPC code, there is no need to write a test for the old implementation.
+    //
+    // TODO: Remove this case after Golem update [ZKS-173]
+    #[actix_rt::test]
+    #[cfg_attr(
+        not(feature = "api_test"),
+        ignore = "Use `zk test rust-api` command to perform this test"
+    )]
+    async fn gnt_as_tglm_alias() -> anyhow::Result<()> {
+        let cfg = TestServerConfig::default();
+        cfg.fill_database().await?;
+
+        let fee_ticker = dummy_fee_ticker(&[]);
+        let (client, server) = cfg.start_server(move |cfg| {
+            api_scope(cfg.pool.clone(), TokenDBCache::new(), fee_ticker.clone())
+        });
+
+        // Get Golem token as GNT.
+        let golem_gnt = client
+            .token_by_id(&TokenLike::from("GNT"))
+            .await?
+            .expect("Golem token should be exist");
+        // Get Golem token as GMT.
+        let golem_tglm = client
+            .token_by_id(&TokenLike::from("tGLM"))
+            .await?
+            .expect("Golem token should be exist");
+        // Check that GNT is alias to GMT.
+        assert_eq!(golem_gnt, golem_tglm);
+        assert_eq!(golem_gnt.id, 16);
 
         server.stop().await;
         Ok(())

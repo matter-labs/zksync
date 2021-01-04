@@ -5,10 +5,9 @@ use std::fs::File;
 use std::sync::{Arc, Mutex};
 use zksync_crypto::bellman::kate_commitment::{Crs, CrsForMonomialForm};
 use zksync_crypto::bellman::plonk::better_cs::{
-    adaptor::TranspilationVariant, cs::PlonkCsWidth4WithNextStepParams, keys::Proof,
-    keys::SetupPolynomials, keys::VerificationKey, verifier::verify,
+    adaptor::TranspilationVariant, cs::PlonkCsWidth4WithNextStepParams, keys::SetupPolynomials,
+    keys::VerificationKey, verifier::verify,
 };
-use zksync_crypto::bellman::plonk::commitments::transcript::keccak_transcript::RollingKeccakTranscript;
 use zksync_crypto::bellman::plonk::{prove_by_steps, setup, transpile};
 use zksync_crypto::franklin_crypto::bellman::Circuit;
 use zksync_crypto::franklin_crypto::plonk::circuit::bigint::field::RnsParameters;
@@ -16,17 +15,15 @@ use zksync_crypto::franklin_crypto::rescue::bn256::Bn256RescueParams;
 use zksync_crypto::franklin_crypto::rescue::rescue_transcript::RescueTranscriptForRNS;
 use zksync_crypto::pairing::Engine as EngineTrait;
 use zksync_crypto::params::RECURSIVE_CIRCUIT_VK_TREE_DEPTH;
-use zksync_crypto::primitives::EthereumSerializer;
 use zksync_crypto::proof::SingleProof;
 use zksync_crypto::recursive_aggregation_circuit::circuit::create_vks_tree;
 use zksync_crypto::{Engine, Fr};
 
 pub mod aggregated_proofs;
 pub mod api;
+pub mod exit_proof;
 pub mod fs_utils;
 pub mod network_utils;
-pub mod prover_data;
-pub mod serialization;
 
 pub const SETUP_MIN_POW2: u32 = 20;
 pub const SETUP_MAX_POW2: u32 = 26;

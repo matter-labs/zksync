@@ -10,7 +10,4 @@ local metrics = [
   "state.withdraw",
 ];
 
-G.dashboard(
-  'Metrics / plasma (state)',
-  [ G.panel(metric) for metric in metrics ]
-)
+G.dashboard('plasma (state)', metrics)

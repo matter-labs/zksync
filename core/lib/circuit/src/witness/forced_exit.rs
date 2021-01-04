@@ -31,7 +31,6 @@ use crate::{
         Witness,
     },
 };
-use zksync_types::operations::ZkSyncOp::ForcedExit;
 
 pub struct ForcedExitData {
     pub amount: u128,

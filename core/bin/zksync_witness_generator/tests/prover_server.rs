@@ -1,55 +1,80 @@
-// Built-in deps
-use std::{net, str::FromStr, thread, time, time::Duration};
-// External deps
-use futures::channel::mpsc;
-use zksync_crypto::pairing::ff::{Field, PrimeField};
-// Workspace deps
-use num::BigUint;
-use zksync_circuit::witness::{deposit::DepositWitness, Witness};
-use zksync_config::{ConfigurationOptions, ProverOptions};
-use zksync_crypto::params::total_tokens;
-use zksync_prover::{client, ApiClient};
-use zksync_types::{block::Block, Address, H256};
-// Local deps
-use zksync_circuit::witness::utils::get_used_subtree_root_hash;
-use zksync_crypto::params::CHUNK_BIT_WIDTH;
-use zksync_types::operations::NoopOp;
-use zksync_witness_generator::run_prover_server;
-
-async fn connect_to_db() -> zksync_storage::ConnectionPool {
-    zksync_storage::ConnectionPool::new(Some(1))
-}
-
-async fn spawn_server(prover_timeout: time::Duration, rounds_interval: time::Duration) -> String {
-    // TODO: make single server spawn for all tests (#1108).
-    let bind_to = "127.0.0.1:8088";
-
-    let mut prover_options = ProverOptions::from_env();
-    prover_options.prepare_data_interval = rounds_interval;
-    prover_options.gone_timeout = prover_timeout;
-    prover_options.prover_server_address = net::SocketAddr::from_str(bind_to).unwrap();
-
-    let conn_pool = connect_to_db().await;
-    let (tx, _rx) = mpsc::channel(1);
-
-    thread::spawn(move || {
-        run_prover_server(conn_pool, tx, prover_options);
-    });
-    bind_to.to_string()
-}
-
-#[test]
-#[should_panic]
-fn client_with_empty_worker_name_panics() {
-    client::ApiClient::new(
-        &"http:://example.com".parse().unwrap(),
-        "",
-        Duration::from_secs(1),
-    );
-}
-
 // TODO: prover server tests
 
+// // Built-in deps
+// use std::{net, str::FromStr, thread, time, time::Duration};
+// // External deps
+// use futures::channel::mpsc;
+// use zksync_crypto::pairing::ff::{Field, PrimeField};
+// // Workspace deps
+// use num::BigUint;
+// use zksync_circuit::witness::{deposit::DepositWitness, Witness};
+// use zksync_config::{ConfigurationOptions, ProverOptions};
+// use zksync_crypto::{params::total_tokens, proof::EncodedProofPlonk};
+// use zksync_prover::{client, ApiClient};
+// use zksync_types::{block::Block, Address, H256};
+// // Local deps
+// use zksync_circuit::witness::utils::get_used_subtree_root_hash;
+// use zksync_witness_generator::run_prover_server;
+//
+// const CORRECT_PROVER_SECRET_AUTH: &str = "42";
+// const INCORRECT_PROVER_SECRET_AUTH: &str = "123";
+//
+// async fn connect_to_db() -> zksync_storage::ConnectionPool {
+//     zksync_storage::ConnectionPool::new(Some(1))
+// }
+//
+// async fn spawn_server(prover_timeout: time::Duration, rounds_interval: time::Duration) -> String {
+//     // TODO: make single server spawn for all tests (ZKS-99).
+//     let bind_to = "127.0.0.1:8088";
+//
+//     let mut prover_options = ProverOptions::from_env();
+//     prover_options.prepare_data_interval = rounds_interval;
+//     prover_options.gone_timeout = prover_timeout;
+//     prover_options.prover_server_address = net::SocketAddr::from_str(bind_to).unwrap();
+//     prover_options.secret_auth = CORRECT_PROVER_SECRET_AUTH.to_string();
+//
+//     let conn_pool = connect_to_db().await;
+//     let (tx, _rx) = mpsc::channel(1);
+//
+//     thread::spawn(move || {
+//         run_prover_server(conn_pool, tx, prover_options);
+//     });
+//     bind_to.to_string()
+// }
+//
+// #[test]
+// #[should_panic]
+// fn client_with_empty_worker_name_panics() {
+//     client::ApiClient::new(
+//         &"http:://example.com".parse().unwrap(),
+//         "",
+//         Duration::from_secs(1),
+//         CORRECT_PROVER_SECRET_AUTH,
+//     );
+// }
+//
+// #[tokio::test]
+// #[cfg_attr(not(feature = "db_test"), ignore)]
+// async fn client_with_incorrect_secret_auth() {
+//     let block_size_chunks = ConfigurationOptions::from_env().available_block_chunk_sizes[0];
+//     let addr = spawn_server(Duration::from_secs(1), Duration::from_secs(1)).await;
+//     let client = client::ApiClient::new(
+//         &format!("http://{}", &addr).parse().unwrap(),
+//         "foo",
+//         Duration::from_secs(1),
+//         INCORRECT_PROVER_SECRET_AUTH,
+//     );
+//
+//     assert_eq!(
+//         &client
+//             .register_prover(block_size_chunks)
+//             .err()
+//             .unwrap()
+//             .to_string(),
+//         "failed generate authorization token"
+//     );
+// }
+//
 // #[tokio::test]
 // #[cfg_attr(not(feature = "db_test"), ignore)]
 // async fn api_client_register_start_and_stop_of_prover() {
@@ -59,6 +84,7 @@ fn client_with_empty_worker_name_panics() {
 //         &format!("http://{}", &addr).parse().unwrap(),
 //         "foo",
 //         Duration::from_secs(1),
+//         CORRECT_PROVER_SECRET_AUTH,
 //     );
 //     let id = client
 //         .register_prover(block_size_chunks)
@@ -97,6 +123,7 @@ fn client_with_empty_worker_name_panics() {
 //         &format!("http://{}", &addr).parse().unwrap(),
 //         "foo",
 //         time::Duration::from_secs(1),
+//         CORRECT_PROVER_SECRET_AUTH,
 //     );
 //
 //     // call block_to_prove and check its none
@@ -248,7 +275,7 @@ fn client_with_empty_worker_name_panics() {
 //                 serial_id: 0,
 //                 data: deposit_priority_op.clone(),
 //                 deadline_block: 2,
-//                 eth_hash: vec![0; 8],
+//                 eth_hash: H256::zero(),
 //                 eth_block: 10,
 //             },
 //             block_index: 0,
@@ -268,13 +295,10 @@ fn client_with_empty_worker_name_panics() {
 //         &ConfigurationOptions::from_env().available_block_chunk_sizes,
 //         1_000_000.into(),
 //         1_500_000.into(),
-//         H256::default(),
-//         0,
 //     );
 //
 //     let mut pub_data = vec![];
 //     let mut operations = vec![];
-//     let mut offset_commitment = vec![];
 //
 //     if let zksync_types::ZkSyncPriorityOp::Deposit(deposit_op) = deposit_priority_op {
 //         let deposit_witness = DepositWitness::apply_tx(
@@ -288,7 +312,6 @@ fn client_with_empty_worker_name_panics() {
 //         let deposit_operations = deposit_witness.calculate_operations(());
 //         operations.extend(deposit_operations);
 //         pub_data.extend(deposit_witness.get_pubdata());
-//         offset_commitment.extend(deposit_witness.get_offset_commitment_data());
 //     }
 //
 //     for _ in 0..block_size_chunks - operations.len() {
@@ -296,8 +319,7 @@ fn client_with_empty_worker_name_panics() {
 //             &circuit_tree,
 //             block.fee_account,
 //         ));
-//         pub_data.extend(vec![false; NoopOp::CHUNKS * CHUNK_BIT_WIDTH]);
-//         offset_commitment.extend(vec![false; NoopOp::CHUNKS * 8]);
+//         pub_data.extend(vec![false; 64]);
 //     }
 //     assert_eq!(pub_data.len(), 64 * block_size_chunks);
 //     assert_eq!(operations.len(), block_size_chunks);
@@ -327,8 +349,6 @@ fn client_with_empty_worker_name_panics() {
 //             Some(root_after_fee),
 //             Some(zksync_crypto::Fr::from_str(&block.fee_account.to_string()).unwrap()),
 //             Some(zksync_crypto::Fr::from_str(&(block.block_number).to_string()).unwrap()),
-//             Some(zksync_crypto::Fr::from_str(&(block.timestamp).to_string()).unwrap()),
-//             &offset_commitment,
 //         );
 //
 //     (
@@ -347,7 +367,6 @@ fn client_with_empty_worker_name_panics() {
 //             validator_balances,
 //             validator_audit_path,
 //             validator_account: validator_account_witness,
-//             block_timestamp: block.timestamp,
 //         },
 //     )
 // }

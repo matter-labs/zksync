@@ -4,8 +4,8 @@ use super::PriorityOp;
 use super::ZkSyncOp;
 use super::{AccountId, BlockNumber, Fr};
 use crate::SignedZkSyncTx;
-use chrono::DateTime;
 use chrono::Utc;
+use chrono::{DateTime, TimeZone};
 use parity_crypto::digest::sha256;
 use parity_crypto::Keccak256;
 use serde::{Deserialize, Serialize};
@@ -371,6 +371,10 @@ impl Block {
                 }
             })
             .collect()
+    }
+
+    pub fn timestamp_utc(&self) -> DateTime<Utc> {
+        Utc.timestamp(self.timestamp as i64, 0)
     }
 }
 

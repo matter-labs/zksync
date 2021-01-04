@@ -1,6 +1,7 @@
 import { Tester } from './tester';
 import { expect } from 'chai';
 import { Wallet, types } from 'zksync';
+import { ChangePubkeyTypes } from 'zksync/build/types';
 
 type TokenLike = types.TokenLike;
 
@@ -25,7 +26,7 @@ Tester.prototype.testChangePubKey = async function (wallet: Wallet, feeToken: To
     const changePubkeyHandle = await wallet.setSigningKey({
         feeToken,
         fee,
-        onchainAuth: onchain
+        ethAuthType: onchain ? 'Onchain' : 'ECDSA'
     });
 
     const receipt = await changePubkeyHandle.awaitReceipt();
