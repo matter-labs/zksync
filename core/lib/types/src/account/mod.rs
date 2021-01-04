@@ -88,16 +88,16 @@ impl GetBits for Account {
 impl Account {
     /// Creates a new empty account object, and sets its address.
     pub fn default_with_address(address: &Address) -> Account {
-        let mut account = Account::default();
-        account.address = *address;
-        account
+        Account {
+            address: *address,
+            ..Default::default()
+        }
     }
 
     /// Creates a new account object and the list of updates that has to be applied on the state
     /// in order to get this account created within the network.
     pub fn create_account(id: AccountId, address: Address) -> (Account, AccountUpdates) {
-        let mut account = Account::default();
-        account.address = address;
+        let account = Account::default_with_address(&address);
         let updates = vec![(
             id,
             AccountUpdate::Create {
@@ -177,12 +177,11 @@ impl Account {
                 }
             },
             None => match update {
-                AccountUpdate::Create { address, nonce, .. } => {
-                    let mut new_account = Account::default();
-                    new_account.address = address;
-                    new_account.nonce = nonce;
-                    Some(new_account)
-                }
+                AccountUpdate::Create { address, nonce, .. } => Some(Account {
+                    address,
+                    nonce,
+                    ..Default::default()
+                }),
                 _ => {
                     log::error!("Incorrect update received {:?} for empty account", update);
                     None
@@ -276,10 +275,14 @@ mod test {
 
         let account_map_initial = {
             let mut map = AccountMap::default();
-            let mut account_0 = Account::default();
-            account_0.nonce = 8;
-            let mut account_1 = Account::default();
-            account_1.nonce = 16;
+            let account_0 = Account {
+                nonce: 8,
+                ..Default::default()
+            };
+            let account_1 = Account {
+                nonce: 16,
+                ..Default::default()
+            };
             map.insert(0, account_0);
             map.insert(1, account_1);
             map
@@ -287,12 +290,16 @@ mod test {
 
         let account_map_updated_expected = {
             let mut map = AccountMap::default();
-            let mut account_1 = Account::default();
-            account_1.nonce = 17;
+            let mut account_1 = Account {
+                nonce: 17,
+                ..Default::default()
+            };
             account_1.set_balance(0, 256u32.into());
             map.insert(1, account_1);
-            let mut account_2 = Account::default();
-            account_2.nonce = 36;
+            let account_2 = Account {
+                nonce: 36,
+                ..Default::default()
+            };
             map.insert(2, account_2);
             map
         };
