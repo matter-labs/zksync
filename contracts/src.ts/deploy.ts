@@ -157,7 +157,7 @@ export class Deployer {
     }
 
     public async deployProxiesAndGatekeeper(ethTxOptions?: ethers.providers.TransactionRequest) {
-        let genesis_root = process.env.CONTRACTS_GENESIS_ROOT || process.env.GENESIS_ROOT;
+        let genesis_root = process.env.CONTRACTS_GENESIS_ROOT;
         const deployFactoryContract = await deployContract(
             this.deployWallet,
             this.deployFactoryCode,
