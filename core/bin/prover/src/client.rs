@@ -28,10 +28,7 @@ impl ApiClient {
     // The time for which the authorization token will be valid.
     const AUTH_TOKEN_LIFETIME: Duration = Duration::from_secs(10);
 
-    pub fn new(base_url: &Url, worker: &str, req_server_timeout: Duration, secret: &str) -> Self {
-        if worker == "" {
-            panic!("worker name cannot be empty")
-        }
+    pub fn new(base_url: &Url, req_server_timeout: Duration, secret: &str) -> Self {
         let http_client = reqwest::ClientBuilder::new()
             .timeout(req_server_timeout)
             .build()

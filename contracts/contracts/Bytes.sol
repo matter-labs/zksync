@@ -140,7 +140,6 @@ library Bytes {
         bytes memory tempBytes = new bytes(_length);
 
         if (_length != 0) {
-            // TODO: Review this thoroughly.
             assembly {
                 let slice_curr := add(tempBytes, 0x20)
                 let slice_end := add(slice_curr, _length)

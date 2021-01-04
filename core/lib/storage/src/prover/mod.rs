@@ -61,7 +61,7 @@ impl<'a, 'c> ProverSchema<'a, 'c> {
         ).execute(self.0.conn()).await?;
         Ok(())
     }
-    //
+
     pub async fn mark_stale_jobs_as_idle(&mut self) -> QueryResult<()> {
         sqlx::query!(
             "UPDATE prover_job_queue SET (job_status, updated_at, updated_by) = ($1, now(), 'server_clean_idle')

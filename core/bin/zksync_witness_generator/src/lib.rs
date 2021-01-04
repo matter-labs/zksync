@@ -288,7 +288,9 @@ async fn update_prover_job_queue_loop(connection_pool: ConnectionPool) {
         if let Ok(mut storage) = connection_pool.access_storage().await {
             update_prover_job_queue(&mut storage)
                 .await
-                .unwrap_or_default();
+                .unwrap_or_else(|e| {
+                    log::warn!("Failed to update prover job queue: {}", e);
+                });
         }
     }
 }
