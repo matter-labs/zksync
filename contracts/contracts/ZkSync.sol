@@ -510,24 +510,26 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
 
     /// @notice Withdraws token from ZkSync to root chain in case of exodus mode. User must provide proof that he owns funds
     /// @param _storedBlockInfo Last verified block
+    /// @param _owner Owner of the account
     /// @param _accountId Id of the account in the tree
     /// @param _proof Proof
     /// @param _tokenId Verified token id
     /// @param _amount Amount for owner (must be total amount, not part of it)
     function exit(
         StoredBlockInfo memory _storedBlockInfo,
+        address _owner,
         uint32 _accountId,
         uint16 _tokenId,
         uint128 _amount,
         ProofInput memory _proof
     ) external nonReentrant {
-        bytes22 packedBalanceKey = packAddressAndTokenId(msg.sender, _tokenId);
+        bytes22 packedBalanceKey = packAddressAndTokenId(_owner, _tokenId);
         require(exodusMode, "bg"); // must be in exodus mode
         require(!exited[_accountId][_tokenId], "bh"); // already exited
         require(storedBlockHashes[totalBlocksExecuted] == hashStoredBlockInfo(_storedBlockInfo), "bi"); // incorrect sotred block info
 
         uint256 commitment =
-            uint256(sha256(abi.encodePacked(_storedBlockInfo.stateHash, _accountId, msg.sender, _tokenId, _amount)));
+            uint256(sha256(abi.encodePacked(_storedBlockInfo.stateHash, _accountId, _owner, _tokenId, _amount)));
         require(_proof.commitments.length == 1, "bj");
         commitment = commitment & INPUT_MASK;
         require(_proof.commitments[0] == commitment, "bk");
