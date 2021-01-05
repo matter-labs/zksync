@@ -120,7 +120,7 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
 
     /// @notice zkSync contract upgrade. Can be external because Proxy contract intercepts illegal calls of this function.
     /// @param upgradeParameters Encoded representation of upgrade parameters
-    function upgrade(bytes calldata upgradeParameters) external {
+    function upgrade(bytes calldata upgradeParameters) external nonReentrant {
         require(upgradeParameters.length == 0, "af"); // upgrade parameters should be empty
 
         // Convert last verified block from old format to new format
