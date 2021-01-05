@@ -16,8 +16,8 @@ use jsonwebtoken::{decode, DecodingKey, Validation};
 use serde::{Deserialize, Serialize};
 // Workspace deps
 use zksync_config::ProverOptions;
-use zksync_storage::{ConnectionPool, StorageProcessor};
 // Local deps
+use self::database_interface::DatabaseInterface;
 use self::scaler::ScalerOracle;
 use zksync_circuit::serialization::ProverData;
 use zksync_prover_utils::api::{
@@ -32,6 +32,8 @@ use zksync_types::prover::{
 };
 use zksync_utils::panic_notify::ThreadPanicNotify;
 
+pub mod database;
+mod database_interface;
 mod scaler;
 mod witness_generator;
 
@@ -44,35 +46,35 @@ struct PayloadAuthToken {
 }
 
 #[derive(Debug, Clone)]
-struct AppState {
+struct AppState<DB: DatabaseInterface> {
     secret_auth: String,
-    connection_pool: zksync_storage::ConnectionPool,
-    scaler_oracle: Arc<RwLock<ScalerOracle>>,
+    database: DB,
+    scaler_oracle: Arc<RwLock<ScalerOracle<DB>>>,
     prover_timeout: Duration,
 }
 
-impl AppState {
+impl<DB: DatabaseInterface> AppState<DB> {
     pub fn new(
         secret_auth: String,
-        connection_pool: ConnectionPool,
+        database: DB,
         prover_timeout: Duration,
         idle_provers: u32,
     ) -> Self {
         let scaler_oracle = Arc::new(RwLock::new(ScalerOracle::new(
-            connection_pool.clone(),
+            database.clone(),
             idle_provers,
         )));
 
         Self {
             secret_auth,
-            connection_pool,
+            database,
             scaler_oracle,
             prover_timeout,
         }
     }
 
     async fn access_storage(&self) -> actix_web::Result<zksync_storage::StorageProcessor<'_>> {
-        self.connection_pool.access_storage().await.map_err(|e| {
+        self.database.acquire_connection().await.map_err(|e| {
             vlog::warn!("Failed to access storage: {}", e);
             actix_web::error::ErrorInternalServerError(e)
         })
@@ -116,8 +118,8 @@ async fn status() -> actix_web::Result<String> {
     Ok("alive".into())
 }
 
-async fn get_job(
-    data: web::Data<AppState>,
+async fn get_job<DB: DatabaseInterface>(
+    data: web::Data<AppState<DB>>,
     r: web::Json<ProverInputRequest>,
 ) -> actix_web::Result<HttpResponse> {
     log::trace!("request block to prove from worker: {}", r.prover_name);
@@ -125,9 +127,9 @@ async fn get_job(
         return Err(actix_web::error::ErrorBadRequest("empty name"));
     }
     let mut storage = data.access_storage().await?;
-    let ret = storage
-        .prover_schema()
-        .get_idle_prover_job_from_job_queue()
+    let ret = data
+        .database
+        .load_idle_prover_job_from_job_queue(&mut storage)
         .await
         .map_err(|e| {
             vlog::warn!("could not get next unverified commit operation: {}", e);
@@ -154,8 +156,8 @@ async fn get_job(
     }
 }
 
-async fn working_on(
-    data: web::Data<AppState>,
+async fn working_on<DB: DatabaseInterface>(
+    data: web::Data<AppState<DB>>,
     r: web::Json<WorkingOn>,
 ) -> actix_web::Result<HttpResponse> {
     // These heartbeats aren't really important, as they're sent
@@ -165,9 +167,8 @@ async fn working_on(
         .access_storage()
         .await
         .map_err(actix_web::error::ErrorInternalServerError)?;
-    storage
-        .prover_schema()
-        .record_prover_is_working(r.job_id, &r.prover_name)
+    data.database
+        .record_prover_is_working(&mut storage, r.job_id, &r.prover_name)
         .await
         .map_err(|e| {
             vlog::warn!("failed to record prover work in progress request: {}", e);
@@ -177,8 +178,8 @@ async fn working_on(
     Ok(HttpResponse::Ok().finish())
 }
 
-async fn publish(
-    data: web::Data<AppState>,
+async fn publish<DB: DatabaseInterface>(
+    data: web::Data<AppState<DB>>,
     r: web::Json<ProverOutputRequest>,
 ) -> actix_web::Result<HttpResponse> {
     let mut storage = data
@@ -192,9 +193,8 @@ async fn publish(
                 r.job_id,
                 r.first_block
             );
-            storage
-                .prover_schema()
-                .store_proof(r.job_id, r.first_block, single_proof)
+            data.database
+                .store_proof(&mut storage, r.job_id, r.first_block, single_proof)
                 .await
         }
         JobResultData::AggregatedBlockProof(aggregated_proof) => {
@@ -204,9 +204,14 @@ async fn publish(
                 r.first_block,
                 r.last_block
             );
-            storage
-                .prover_schema()
-                .store_aggregated_proof(r.job_id, r.first_block, r.last_block, aggregated_proof)
+            data.database
+                .store_aggregated_proof(
+                    &mut storage,
+                    r.job_id,
+                    r.first_block,
+                    r.last_block,
+                    aggregated_proof,
+                )
                 .await
         }
     };
@@ -223,8 +228,8 @@ async fn publish(
     Ok(HttpResponse::Ok().finish())
 }
 
-async fn stopped(
-    data: web::Data<AppState>,
+async fn stopped<DB: DatabaseInterface>(
+    data: web::Data<AppState<DB>>,
     prover_name: web::Json<String>,
 ) -> actix_web::Result<HttpResponse> {
     let mut storage = data
@@ -237,9 +242,8 @@ async fn stopped(
         &prover_name
     );
 
-    storage
-        .prover_schema()
-        .record_prover_stop(&prover_name)
+    data.database
+        .record_prover_stop(&mut storage, &prover_name)
         .await
         .map_err(|e| {
             vlog::warn!("failed to record prover stop: {}", e);
@@ -264,8 +268,8 @@ pub struct RequiredReplicasOutput {
     needed_count: u32,
 }
 
-async fn required_replicas(
-    data: web::Data<AppState>,
+async fn required_replicas<DB: DatabaseInterface>(
+    data: web::Data<AppState<DB>>,
     _input: web::Json<RequiredReplicasInput>,
 ) -> actix_web::Result<HttpResponse> {
     let mut oracle = data.scaler_oracle.write().expect("Expected write lock");
@@ -280,30 +284,29 @@ async fn required_replicas(
     Ok(HttpResponse::Ok().json(response))
 }
 
-async fn update_prover_job_queue_loop(connection_pool: ConnectionPool) {
+async fn update_prover_job_queue_loop<DB: DatabaseInterface>(database: DB) {
     let mut interval = tokio::time::interval(Duration::from_secs(5));
     loop {
         interval.tick().await;
 
-        if let Ok(mut storage) = connection_pool.access_storage().await {
-            update_prover_job_queue(&mut storage)
-                .await
-                .unwrap_or_else(|e| {
-                    log::warn!("Failed to update prover job queue: {}", e);
-                });
-        }
+        update_prover_job_queue(database.clone())
+            .await
+            .unwrap_or_else(|e| {
+                log::warn!("Failed to update prover job queue: {}", e);
+            });
     }
 }
 
-async fn update_prover_job_queue(storage: &mut StorageProcessor<'_>) -> anyhow::Result<()> {
+async fn update_prover_job_queue<DB: DatabaseInterface>(database: DB) -> anyhow::Result<()> {
+    let mut connection = database.acquire_connection().await?;
     {
-        let mut prover_schema = storage.prover_schema();
-        let next_single_block_to_add = prover_schema
-            .get_last_block_prover_job_queue(ProverJobType::SingleProof)
+        let next_single_block_to_add = database
+            .load_last_block_prover_job_queue(&mut connection, ProverJobType::SingleProof)
             .await?
             + 1;
-        let witness_for_next_single_block =
-            prover_schema.get_witness(next_single_block_to_add).await?;
+        let witness_for_next_single_block = database
+            .load_witness(&mut connection, next_single_block_to_add)
+            .await?;
         if let Some(witness) = witness_for_next_single_block {
             let prover_data: ProverData =
                 serde_json::from_value(witness).expect("incorrect single block witness");
@@ -311,8 +314,9 @@ async fn update_prover_job_queue(storage: &mut StorageProcessor<'_>) -> anyhow::
             let job_data =
                 serde_json::to_value(JobRequestData::BlockProof(prover_data, block_size))
                     .expect("Failed to serialize single proof job data");
-            prover_schema
+            database
                 .add_prover_job_to_job_queue(
+                    &mut connection,
                     next_single_block_to_add,
                     next_single_block_to_add,
                     job_data,
@@ -324,15 +328,13 @@ async fn update_prover_job_queue(storage: &mut StorageProcessor<'_>) -> anyhow::
     }
 
     {
-        let next_aggregated_proof_block = storage
-            .prover_schema()
-            .get_last_block_prover_job_queue(ProverJobType::AggregatedProof)
+        let next_aggregated_proof_block = database
+            .load_last_block_prover_job_queue(&mut connection, ProverJobType::AggregatedProof)
             .await?
             + 1;
-        let create_block_proof_action = storage
-            .chain()
-            .operations_schema()
-            .get_aggregated_op_that_affects_block(
+        let create_block_proof_action = database
+            .load_aggregated_op_that_affects_block(
+                &mut connection,
                 AggregatedActionType::CreateProofBlocks,
                 next_aggregated_proof_block,
             )
@@ -352,9 +354,8 @@ async fn update_prover_job_queue(storage: &mut StorageProcessor<'_>) -> anyhow::
                 .expect("should have 1 block");
             let mut data = Vec::new();
             for block in blocks {
-                let proof = storage
-                    .prover_schema()
-                    .load_proof(block.block_number)
+                let proof = database
+                    .load_proof(&mut connection, block.block_number)
                     .await?
                     .expect("Single proof should exist");
                 let block_size = block.block_chunks_size;
@@ -362,9 +363,9 @@ async fn update_prover_job_queue(storage: &mut StorageProcessor<'_>) -> anyhow::
             }
             let job_data = serde_json::to_value(JobRequestData::AggregatedBlockProof(data))
                 .expect("Failed to serialize aggregated proof job");
-            storage
-                .prover_schema()
+            database
                 .add_prover_job_to_job_queue(
+                    &mut connection,
                     first_block,
                     last_block,
                     job_data,
@@ -374,12 +375,13 @@ async fn update_prover_job_queue(storage: &mut StorageProcessor<'_>) -> anyhow::
                 .await?;
         }
     }
-    storage.prover_schema().mark_stale_jobs_as_idle().await?;
+    database.mark_stale_jobs_as_idle(&mut connection).await?;
+
     Ok(())
 }
 
-pub fn run_prover_server(
-    connection_pool: zksync_storage::ConnectionPool,
+pub fn run_prover_server<DB: DatabaseInterface>(
+    database: DB,
     panic_notify: mpsc::Sender<bool>,
     prover_options: ProverOptions,
 ) {
@@ -390,18 +392,16 @@ pub fn run_prover_server(
             let mut actix_runtime = actix_rt::System::new("prover-server");
 
             actix_runtime.block_on(async move {
-                tokio::spawn(update_prover_job_queue_loop(connection_pool.clone()));
+                tokio::spawn(update_prover_job_queue_loop(database.clone()));
 
                 let last_verified_block = {
-                    let mut storage = connection_pool
-                        .access_storage()
+                    let mut storage = database
+                        .acquire_connection()
                         .await
                         .expect("Failed to access storage");
 
-                    storage
-                        .chain()
-                        .block_schema()
-                        .get_last_verified_block()
+                    database
+                        .load_last_verified_block(&mut storage)
                         .await
                         .expect("Failed to get last verified block number")
                         as usize
@@ -417,7 +417,7 @@ pub fn run_prover_server(
                         block_step
                     );
                     let pool_maintainer = witness_generator::WitnessGenerator::new(
-                        connection_pool.clone(),
+                        database.clone(),
                         prover_options.prepare_data_interval,
                         start_block,
                         block_step,
@@ -431,14 +431,14 @@ pub fn run_prover_server(
                 HttpServer::new(move || {
                     let app_state = AppState::new(
                         secret_auth.clone(),
-                        connection_pool.clone(),
+                        database.clone(),
                         gone_timeout,
                         idle_provers,
                     );
 
                     let auth = HttpAuthentication::bearer(move |req, credentials| async {
                         let secret_auth = req
-                            .app_data::<web::Data<AppState>>()
+                            .app_data::<web::Data<AppState<DB>>>()
                             .expect("failed get AppState upon receipt of the authentication token")
                             .secret_auth
                             .clone();
@@ -453,13 +453,13 @@ pub fn run_prover_server(
                         .wrap(auth)
                         .app_data(web::Data::new(app_state))
                         .route("/status", web::get().to(status))
-                        .route("/get_job", web::get().to(get_job))
-                        .route("/working_on", web::post().to(working_on))
-                        .route("/publish", web::post().to(publish))
-                        .route("/stopped", web::post().to(stopped))
+                        .route("/get_job", web::get().to(get_job::<DB>))
+                        .route("/working_on", web::post().to(working_on::<DB>))
+                        .route("/publish", web::post().to(publish::<DB>))
+                        .route("/stopped", web::post().to(stopped::<DB>))
                         .route(
                             "/api/internal/prover/replicas",
-                            web::post().to(required_replicas),
+                            web::post().to(required_replicas::<DB>),
                         )
                 })
                 .bind(&prover_options.prover_server_address)
