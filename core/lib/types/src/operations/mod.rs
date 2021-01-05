@@ -195,22 +195,25 @@ impl ZkSyncOp {
     }
 
     pub fn is_onchain_operation(&self) -> bool {
-        matches!(self, &ZkSyncOp::Deposit(_)
-        | &ZkSyncOp::Withdraw(_)
-        | &ZkSyncOp::FullExit(_)
-        | &ZkSyncOp::ChangePubKeyOffchain(_)
-        | &ZkSyncOp::ForcedExit(_))
+        matches!(
+            self,
+            &ZkSyncOp::Deposit(_)
+                | &ZkSyncOp::Withdraw(_)
+                | &ZkSyncOp::FullExit(_)
+                | &ZkSyncOp::ChangePubKeyOffchain(_)
+                | &ZkSyncOp::ForcedExit(_)
+        )
     }
 
     pub fn is_processable_onchain_operation(&self) -> bool {
-        matches!(self, &ZkSyncOp::Withdraw(_)
-        | &ZkSyncOp::FullExit(_)
-        | &ZkSyncOp::ForcedExit(_))
+        matches!(
+            self,
+            &ZkSyncOp::Withdraw(_) | &ZkSyncOp::FullExit(_) | &ZkSyncOp::ForcedExit(_)
+        )
     }
 
     pub fn is_priority_op(&self) -> bool {
-        matches!(self, &ZkSyncOp::Deposit(_)
-        | &ZkSyncOp::FullExit(_))
+        matches!(self, &ZkSyncOp::Deposit(_) | &ZkSyncOp::FullExit(_))
     }
 }
 
