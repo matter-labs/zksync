@@ -236,7 +236,11 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
     /// @param _owner The owner of the withdrawn assets
     /// @param _token Token address
     /// @param _amount amount to withdraw
-    function withdrawERC20(address _owner, address _token, uint128 _amount) external nonReentrant {
+    function withdrawERC20(
+        address _owner,
+        address _token,
+        uint128 _amount
+    ) external nonReentrant {
         uint16 tokenId = governance.validateTokenAddress(_token);
         bytes22 packedBalanceKey = packAddressAndTokenId(_owner, tokenId);
         uint128 balance = balancesToWithdraw[packedBalanceKey].balanceToWithdraw;
