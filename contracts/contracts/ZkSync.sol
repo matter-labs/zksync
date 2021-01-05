@@ -353,7 +353,7 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
             sent = Utils.sendETHNoRevert(toPayable, _amount);
         } else {
             address tokenAddr = governance.tokenAddresses(_tokenId);
-            try this.withdrawERC20Guarded{gas: ERC20_WITHDRAWAL_GAS_LIMIT}(tokenAddr, _recipient, _amount, _amount) {
+            try this.withdrawERC20Guarded{gas: WITHDRAWAL_GAS_LIMIT}(tokenAddr, _recipient, _amount, _amount) {
                 sent = true;
             } catch {
                 sent = false;
