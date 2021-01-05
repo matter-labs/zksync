@@ -507,8 +507,10 @@ pub(in crate) async fn create_signed_tx(
     deadline_block: u64,
     nonce: i64,
 ) -> ETHOperation {
-    let mut options = Options::default();
-    options.nonce = Some(nonce.into());
+    let options = Options {
+        nonce: Some(nonce.into()),
+        ..Default::default()
+    };
 
     let raw_tx = eth_sender.operation_to_raw_tx(&operation);
     let signed_tx = eth_sender
@@ -543,9 +545,10 @@ pub(in crate) async fn create_signed_withdraw_tx(
     deadline_block: u64,
     nonce: i64,
 ) -> ETHOperation {
-    let mut options = Options::default();
-    options.nonce = Some(nonce.into());
-
+    let options = Options {
+        nonce: Some(nonce.into()),
+        ..Default::default()
+    };
     let raw_tx = eth_sender.ethereum.encode_tx_data(
         "completeWithdrawals",
         zksync_types::config::MAX_WITHDRAWALS_TO_COMPLETE_IN_A_CALL,
