@@ -27,8 +27,8 @@ pub async fn state_keeper_get_account(
 }
 
 pub struct StateKeeperChannels {
-    pub(crate) requests: mpsc::Sender<StateKeeperRequest>,
-    pub(crate) new_blocks: mpsc::Receiver<CommitRequest>,
+    pub requests: mpsc::Sender<StateKeeperRequest>,
+    pub new_blocks: mpsc::Receiver<CommitRequest>,
 }
 
 // Thread join handle and stop channel sender.

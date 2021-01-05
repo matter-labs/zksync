@@ -4,6 +4,8 @@ use num::BigUint;
 use std::time::Instant;
 use web3::transports::Http;
 
+use zksync_types::{block::Block, PriorityOp};
+
 use crate::{
     data_restore::verify_restore,
     eth_account::{parse_ether, EthereumAccount},
@@ -13,8 +15,6 @@ use crate::{
 };
 
 use super::*;
-use zksync_types::block::Block;
-use zksync_types::PriorityOp;
 
 /// Performs a fixed set of operations which covers most of the main server's functionality.
 /// Aim is to cover operations processed by state keeper, while manually simulating everything else around it.

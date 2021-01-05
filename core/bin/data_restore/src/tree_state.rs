@@ -430,6 +430,7 @@ impl TreeState {
 
 #[cfg(test)]
 mod test {
+    use crate::contract::get_rollup_ops_from_data;
     use crate::rollup_ops::RollupOpsBlock;
     use crate::tree_state::TreeState;
     use num::BigUint;
@@ -453,8 +454,7 @@ mod test {
             account_id: 0,
         }));
         let pub_data1 = op1.public_data();
-        let ops1 =
-            RollupOpsBlock::get_rollup_ops_from_data(&pub_data1).expect("cant get ops from data 1");
+        let ops1 = get_rollup_ops_from_data(&pub_data1).expect("cant get ops from data 1");
         let block1 = RollupOpsBlock {
             block_num: 1,
             ops: ops1,
@@ -477,8 +477,7 @@ mod test {
             account_id: 0,
         }));
         let pub_data2 = op2.public_data();
-        let ops2 =
-            RollupOpsBlock::get_rollup_ops_from_data(&pub_data2).expect("cant get ops from data 2");
+        let ops2 = get_rollup_ops_from_data(&pub_data2).expect("cant get ops from data 2");
         let block2 = RollupOpsBlock {
             block_num: 2,
             ops: ops2,
@@ -502,8 +501,7 @@ mod test {
             to: 1,
         }));
         let pub_data3 = op3.public_data();
-        let ops3 =
-            RollupOpsBlock::get_rollup_ops_from_data(&pub_data3).expect("cant get ops from data 3");
+        let ops3 = get_rollup_ops_from_data(&pub_data3).expect("cant get ops from data 3");
         let block3 = RollupOpsBlock {
             block_num: 3,
             ops: ops3,
@@ -527,8 +525,7 @@ mod test {
             to: 0,
         }));
         let pub_data4 = op4.public_data();
-        let ops4 =
-            RollupOpsBlock::get_rollup_ops_from_data(&pub_data4).expect("cant get ops from data 4");
+        let ops4 = get_rollup_ops_from_data(&pub_data4).expect("cant get ops from data 4");
         let block4 = RollupOpsBlock {
             block_num: 4,
             ops: ops4,
@@ -552,8 +549,7 @@ mod test {
             account_id: 0,
         }));
         let pub_data5 = op5.public_data();
-        let ops5 =
-            RollupOpsBlock::get_rollup_ops_from_data(&pub_data5).expect("cant get ops from data 5");
+        let ops5 = get_rollup_ops_from_data(&pub_data5).expect("cant get ops from data 5");
         let block5 = RollupOpsBlock {
             block_num: 5,
             ops: ops5,
@@ -571,8 +567,7 @@ mod test {
             withdraw_amount: Some(BigUint::from(980u32).into()),
         }));
         let pub_data6 = op6.public_data();
-        let ops6 =
-            RollupOpsBlock::get_rollup_ops_from_data(&pub_data6).expect("cant get ops from data 5");
+        let ops6 = get_rollup_ops_from_data(&pub_data6).expect("cant get ops from data 5");
         let block6 = RollupOpsBlock {
             block_num: 5,
             ops: ops6,
@@ -587,8 +582,7 @@ mod test {
             withdraw_amount: Some(BigUint::from(960u32).into()),
         }));
         let pub_data7 = op7.public_data();
-        let ops7 =
-            RollupOpsBlock::get_rollup_ops_from_data(&pub_data7).expect("cant get ops from data 5");
+        let ops7 = get_rollup_ops_from_data(&pub_data7).expect("cant get ops from data 5");
         let block7 = RollupOpsBlock {
             block_num: 7,
             ops: ops7,
@@ -774,8 +768,7 @@ mod test {
         pub_data.extend_from_slice(&pub_data6);
         pub_data.extend_from_slice(&pub_data7);
 
-        let ops = RollupOpsBlock::get_rollup_ops_from_data(pub_data.as_slice())
-            .expect("cant get ops from data 1");
+        let ops = get_rollup_ops_from_data(pub_data.as_slice()).expect("cant get ops from data 1");
         let block = RollupOpsBlock {
             block_num: 1,
             ops,

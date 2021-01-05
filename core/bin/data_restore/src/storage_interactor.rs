@@ -10,6 +10,7 @@ use zksync_types::{
 };
 
 use crate::{
+    contract::ZkSyncContractVersion,
     data_restore_driver::StorageUpdateState,
     events::{BlockEvent, EventType},
     events_state::{EventsState, NewTokenEvent},
@@ -106,6 +107,8 @@ pub fn stored_block_event_into_block_event(block: StoredBlockEvent) -> BlockEven
             v if v == "Verified" => EventType::Verified,
             _ => panic!("Wrong block type"),
         },
+        // TODO Store ZkSyncContractVersion
+        contract_version: ZkSyncContractVersion::V4,
     }
 }
 

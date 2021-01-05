@@ -121,7 +121,7 @@ async fn execute_blocks(
     let priority_ops = priority_ops_states
         .into_iter()
         .rev()
-        .take((number_of_reverted_iterations_blocks - 1) as usize)
+        .take((number_of_reverted_iterations_blocks) as usize)
         .rev()
         .concat();
 
@@ -176,7 +176,7 @@ async fn revert_blocks_test() {
         None,
     );
 
-    let (state, block, priority_ops) = execute_blocks(
+    execute_blocks(
         &contracts,
         &fee_account,
         &mut test_setup,
@@ -184,33 +184,6 @@ async fn revert_blocks_test() {
         1,
         2,
         1,
-    )
-    .await;
-    sender.send(()).expect("sk stop send");
-    handler.join().expect("sk thread join");
-
-    let hash = state.tree.root_hash();
-    let (handler, sender, channels) = spawn_state_keeper(&fee_account.address, state);
-    let account_set = test_setup.accounts;
-    let mut test_setup = TestSetup::new(
-        channels,
-        account_set,
-        &contracts,
-        commit_account,
-        hash,
-        Some(block),
-    );
-    for op in priority_ops.into_iter() {
-        test_setup.execute_priority_op(op).await
-    }
-    let state = execute_blocks(
-        &contracts,
-        &fee_account,
-        &mut test_setup,
-        &test_config,
-        1,
-        2,
-        0,
     )
     .await;
     sender.send(()).expect("sk stop send");
