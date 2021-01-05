@@ -36,8 +36,6 @@ contract Governance is Config {
     /// @notice Paused tokens list, deposits are impossible to create for paused tokens
     mapping(uint16 => bool) public pausedTokens;
 
-    constructor() {}
-
     /// @notice Governance contract initialization. Can be external because Proxy contract intercepts illegal calls of this function.
     /// @param initializationParameters Encoded representation of initialization parameters:
     ///     _networkGovernor The address of network governor
