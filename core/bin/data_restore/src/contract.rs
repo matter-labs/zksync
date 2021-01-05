@@ -109,6 +109,17 @@ impl TryFrom<u32> for ZkSyncContractVersion {
         res
     }
 }
+impl Into<i32> for ZkSyncContractVersion {
+    fn into(self) -> i32 {
+        match self {
+            ZkSyncContractVersion::V0 => 0,
+            ZkSyncContractVersion::V1 => 1,
+            ZkSyncContractVersion::V2 => 2,
+            ZkSyncContractVersion::V3 => 3,
+            ZkSyncContractVersion::V4 => 4,
+        }
+    }
+}
 
 pub struct ZkSyncDeployedContract<T: Transport> {
     pub web3_contract: web3::contract::Contract<T>,

@@ -126,7 +126,7 @@ pub fn block_event_into_stored_block_event(event: &BlockEvent) -> NewBlockEvent 
         },
         transaction_hash: event.transaction_hash.as_bytes().to_vec(),
         block_num: i64::from(event.block_num),
-        contract_version: event.contract_version as i32,
+        contract_version: event.contract_version.into(),
     }
 }
 

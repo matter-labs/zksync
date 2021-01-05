@@ -105,7 +105,7 @@ impl EventsState {
 
         self.last_watched_eth_block_number = to_block_number;
         for (zksync_contract, block_events) in events {
-            self.update_blocks_state(zksync_contract, &block_events)
+            self.update_blocks_state(zksync_contract, &block_events);
         }
 
         let mut events_to_return = self.committed_events.clone();

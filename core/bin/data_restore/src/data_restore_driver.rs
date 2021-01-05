@@ -89,17 +89,15 @@ where
     /// * `end_eth_blocks_offset` - The distance to the last ethereum block
     ///
     #[allow(clippy::too_many_arguments)]
-    pub async fn new(
+    pub fn new(
         web3_transport: T,
         governance_contract_eth_addr: H160,
-        upgrade_gatekeeper_contract_addr: Address,
-        zksync_contract_addr: Address,
         eth_blocks_step: u64,
         end_eth_blocks_offset: u64,
         available_block_chunk_sizes: Vec<usize>,
         finite_mode: bool,
         final_hash: Option<Fr>,
-    ) -> anyhow::Result<Self> {
+    ) -> Self {
         let web3 = Web3::new(web3_transport);
 
         let governance_contract = {
@@ -113,7 +111,7 @@ where
         let events_state = EventsState::default();
 
         let tree_state = TreeState::new(available_block_chunk_sizes.clone());
-        let mut driver = Self {
+        Self {
             web3,
             governance_contract,
             zksync_contracts: vec![],
@@ -125,11 +123,7 @@ where
             finite_mode,
             final_hash,
             phantom_data: Default::default(),
-        };
-        driver
-            .init_contracts(upgrade_gatekeeper_contract_addr, zksync_contract_addr)
-            .await?;
-        Ok(driver)
+        }
     }
 
     pub async fn get_gatekeeper_logs(
@@ -157,7 +151,7 @@ where
             .map_err(|e| anyhow::format_err!("No new logs: {}", e))?;
         Ok(result)
     }
-    async fn init_contracts(
+    pub async fn init_contracts(
         &mut self,
         upgrade_gatekeeper_contract_addr: Address,
         zksync_contract_addr: Address,
