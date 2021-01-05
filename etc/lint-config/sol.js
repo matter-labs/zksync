@@ -6,7 +6,8 @@ module.exports = {
     // files require an audit, it was decided to postpone the changes to make the solhint
     // pass.
     //
-    // TODO: Turn on the majority of the rules and make the solhint comply to them.
+    // TODO: Turn on the majority of the rules 
+    // and make the solhint comply to them. (ZKS-329)
     "state-visibility": "off",
     "var-name-mixedcase": "off",
     "avoid-call-value": "off",
