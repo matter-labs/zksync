@@ -45,7 +45,7 @@ contract Storage {
     uint32 public firstPendingWithdrawalIndex_DEPRECATED;
     uint32 public numberOfPendingWithdrawals_DEPRECATED;
 
-    /// @notice Total number of verified blocks i.e. blocks[totalBlocksVerified] points at the latest verified block (block 0 is genesis)
+    /// @notice Total number of executed blocks i.e. blocks[totalBlocksExecuted] points at the latest executed block (block 0 is genesis)
     uint32 public totalBlocksExecuted;
 
     /// @notice Total number of committed blocks i.e. blocks[totalBlocksCommitted] points at the latest committed block
