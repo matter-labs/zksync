@@ -112,7 +112,8 @@ async fn main() {
     );
     driver
         .init_contracts(config.upgrade_gatekeeper_addr, config.contract_addr)
-        .await;
+        .await
+        .expect("Init contracts error");
 
     let mut interactor = DatabaseStorageInteractor::new(storage);
     // If genesis is argument is present - there will be fetching contracts creation transactions to get first eth block and genesis acc address
