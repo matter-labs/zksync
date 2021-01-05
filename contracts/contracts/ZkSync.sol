@@ -196,7 +196,7 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
     /// @notice Withdraw ETH to Layer 1 - register withdrawal and transfer ether to sender
     /// @param _owner The owner of the withdrawn assets
     /// @param _amount Ether amount to withdraw
-    function withdrawETH(address _owner, uint128 _amount) external nonReentrant {
+    function withdrawETH(address payable _owner, uint128 _amount) external nonReentrant {
         registerWithdrawal(0, _amount, _owner);
         (bool success, ) = _owner.call{value: _amount}("");
         require(success, "aq"); // ETH withdraw failed
@@ -237,7 +237,7 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
     /// @param _token Token address
     /// @param _amount amount to withdraw
     function withdrawERC20(
-        address _owner,
+        address payable _owner,
         address _token,
         uint128 _amount
     ) external nonReentrant {

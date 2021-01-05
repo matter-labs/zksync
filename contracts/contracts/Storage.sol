@@ -33,7 +33,7 @@ contract Storage {
         uint8 gasReserveValue; // gives user opportunity to fill storage slot with nonzero value
     }
 
-    /// @notice Root-chain balances (per owner and token id, see packAddressAndTokenId) to withdraw
+    /// @dev Root-chain balances (per owner and token id, see packAddressAndTokenId) to withdraw
     mapping(bytes22 => BalanceToWithdraw) internal balancesToWithdraw;
 
     // @dev Pending withdrawals are not used in this version
