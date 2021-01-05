@@ -641,7 +641,7 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
 
             uint256 pubdataOffset = onchainOpData.publicDataOffset;
             require(pubdataOffset % CHUNK_BYTES == 0, "bp"); // offsets should be on chunks boundaries
-            uint chunkId = pubdataOffset / CHUNK_BYTES;
+            uint256 chunkId = pubdataOffset / CHUNK_BYTES;
             require(offsetsCommitment[chunkId] == 0x00, "bq"); // offset commitment should be empty
             offsetsCommitment[chunkId] = bytes1(0x01);
 
@@ -667,7 +667,7 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
                     bool valid = authFacts[op.owner][op.nonce] == keccak256(abi.encodePacked(op.pubKeyHash));
                     require(valid, "bs"); // new pub key hash is not authenticated properly
                 }
-            } else{
+            } else {
                 bytes memory opPubData;
 
                 if (opType == Operations.OpType.PartialExit) {
@@ -680,7 +680,10 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
                     Operations.FullExit memory fullExitData = Operations.readFullExitPubdata(opPubData);
                     emitFullExitCommitEvent(_newBlockData.blockNumber, fullExitData);
 
-                    checkPriorityOperation(fullExitData, uncommittedPriorityRequestsOffset + priorityOperationsProcessed);
+                    checkPriorityOperation(
+                        fullExitData,
+                        uncommittedPriorityRequestsOffset + priorityOperationsProcessed
+                    );
                     priorityOperationsProcessed++;
                 } else {
                     revert("fpp14"); // unsupported op
