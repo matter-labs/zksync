@@ -17,6 +17,9 @@ interface Events {
     /// @notice Event emitted when user funds are withdrawn from the account
     event OnchainWithdrawal(address indexed owner, uint16 indexed tokenId, uint128 amount);
 
+    /// @notice Event emitted when user funds withdrawal from the contract failed in the executeBlocks function.
+    event FailedOnchainWithdrawal(address indexed owner, uint16 indexed tokenId, uint128 amount);
+
     /// @notice Event emitted when user funds are withdrawn from the rollup
     event RollupWithdrawal(address indexed owner, uint16 indexed tokenId, uint128 amount);
 

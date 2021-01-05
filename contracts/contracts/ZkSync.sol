@@ -362,6 +362,7 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
         if (sent) {
             emit OnchainWithdrawal(_recipient, _tokenId, _amount);
         } else {
+            emit FailedOnchainWithdrawal(_recipient, _tokenId, _amount);
             increaseBalanceToWithdraw(packedBalanceKey, _amount);
         }
     }
