@@ -1,7 +1,7 @@
 // Built-in deps
 use std::cmp::Ordering;
 // External deps
-use crate::contract::ContractVersion;
+use crate::contract::ZkSyncContractVersion;
 use web3::types::H256;
 
 /// Rollup contract event type describing the state of the corresponding Rollup block
@@ -23,7 +23,7 @@ pub struct BlockEvent {
     /// Rollup block type
     pub block_type: EventType,
     /// Version of ZkSync contract
-    pub contract_version: ContractVersion,
+    pub contract_version: ZkSyncContractVersion,
 }
 
 impl PartialOrd for BlockEvent {

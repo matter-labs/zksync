@@ -85,17 +85,17 @@ impl EventsState {
     pub async fn update_events_state<T: Transport>(
         &mut self,
         web3: &Web3<T>,
-        zksync_contract: ZkSyncDeployedContract<T>,
+        zksync_contracts: &[ZkSyncDeployedContract<T>],
         governance_contract: &(ethabi::Contract, Contract<T>),
         eth_blocks_step: u64,
         end_eth_blocks_offset: u64,
     ) -> Result<(Vec<BlockEvent>, Vec<NewTokenEvent>, u64), anyhow::Error> {
         self.remove_verified_events();
 
-        let (block_events, token_events, to_block_number): (Vec<Log>, Vec<NewTokenEvent>, u64) =
+        let (events, token_events, to_block_number) =
             EventsState::get_new_events_and_last_watched_block(
                 web3,
-                zksync_contract,
+                zksync_contracts,
                 governance_contract,
                 self.last_watched_eth_block_number,
                 eth_blocks_step,
@@ -104,12 +104,13 @@ impl EventsState {
             .await?;
 
         self.last_watched_eth_block_number = to_block_number;
-
-        if !self.update_blocks_state(zksync_contract, &block_events) {
-            return Ok((vec![], token_events, self.last_watched_eth_block_number));
+        for (zksync_contract, block_events) in events {
+            if !self.update_blocks_state(zksync_contract, &block_events) {
+                return Ok((vec![], token_events, self.last_watched_eth_block_number));
+            }
         }
 
-        let mut events_to_return: Vec<BlockEvent> = self.committed_events.clone();
+        let mut events_to_return = self.committed_events.clone();
         events_to_return.extend(self.verified_events.clone());
 
         Ok((
@@ -140,14 +141,21 @@ impl EventsState {
     /// * `eth_blocks_step` - Ethereum blocks delta step
     /// * `end_eth_blocks_offset` - last block delta
     ///
-    async fn get_new_events_and_last_watched_block<T: Transport>(
+    async fn get_new_events_and_last_watched_block<'a, T: Transport>(
         web3: &Web3<T>,
-        zksync_contract: &ZkSyncDeployedContract<T>,
+        zksync_contracts: &'a [ZkSyncDeployedContract<T>],
         governance_contract: &(ethabi::Contract, Contract<T>),
         last_watched_block_number: u64,
         eth_blocks_step: u64,
         end_eth_blocks_offset: u64,
-    ) -> Result<(Vec<Log>, Vec<NewTokenEvent>, u64), anyhow::Error> {
+    ) -> Result<
+        (
+            Vec<(&'a ZkSyncDeployedContract<T>, Vec<Log>)>,
+            Vec<NewTokenEvent>,
+            u64,
+        ),
+        anyhow::Error,
+    > {
         let latest_eth_block_minus_delta =
             EventsState::get_last_block_number(web3).await? - end_eth_blocks_offset;
 
@@ -155,7 +163,7 @@ impl EventsState {
             return Ok((vec![], vec![], last_watched_block_number)); // No new eth blocks
         }
 
-        let from_block_number_u64 = last_watched_block_number + 1;
+        let mut from_block_number_u64 = last_watched_block_number + 1;
 
         let to_block_number_u64 =
         // if (latest eth block < last watched + delta) then choose it
@@ -165,23 +173,53 @@ impl EventsState {
             from_block_number_u64 + eth_blocks_step
         };
 
-        let to_block_number = BlockNumber::Number(to_block_number_u64.into());
-
-        let from_block_number = BlockNumber::Number(from_block_number_u64.into());
-
-        let block_logs =
-            EventsState::get_block_logs(web3, zksync_contract, from_block_number, to_block_number)
-                .await?;
-
         let token_logs = EventsState::get_token_added_logs(
             web3,
             governance_contract,
-            from_block_number,
-            to_block_number,
+            BlockNumber::Number(from_block_number_u64.into()),
+            BlockNumber::Number(to_block_number_u64.into()),
         )
         .await?;
+        let mut logs = vec![];
+        for zksync_contract in zksync_contracts {
+            let from_block_number = match zksync_contract.from {
+                BlockNumber::Latest => panic!("Wrong number"),
+                BlockNumber::Earliest => BlockNumber::Number(from_block_number_u64.into()),
+                BlockNumber::Pending => unreachable!(),
+                BlockNumber::Number(n) => {
+                    if from_block_number_u64 > n.as_u64() {
+                        continue;
+                    }
+                    BlockNumber::Number(from_block_number_u64.into())
+                }
+            };
 
-        Ok((block_logs, token_logs, to_block_number_u64))
+            let to_block_number = match zksync_contract.to {
+                BlockNumber::Latest => BlockNumber::Number(to_block_number_u64.into()),
+                BlockNumber::Earliest => unreachable!(),
+                BlockNumber::Pending => unreachable!(),
+                BlockNumber::Number(n) => {
+                    let number = if to_block_number_u64 < n.as_u64() {
+                        BlockNumber::Number(to_block_number_u64.into())
+                    } else {
+                        from_block_number_u64 = n.as_u64();
+                        BlockNumber::Number(n)
+                    };
+                    number
+                }
+            };
+
+            let block_logs = EventsState::get_block_logs(
+                web3,
+                zksync_contract,
+                from_block_number,
+                to_block_number,
+            )
+            .await?;
+            logs.push((zksync_contract, block_logs));
+        }
+
+        Ok((logs, token_logs, to_block_number_u64))
     }
 
     /// Returns new added token logs
@@ -233,24 +271,24 @@ impl EventsState {
     ///
     async fn get_block_logs<T: Transport>(
         web3: &Web3<T>,
-        contract: &(ethabi::Contract, Contract<T>),
+        contract: &ZkSyncDeployedContract<T>,
         from_block_number: BlockNumber,
         to_block_number: BlockNumber,
     ) -> Result<Vec<Log>, anyhow::Error> {
         let block_verified_topic = contract
-            .0
+            .abi
             .event("BlockVerification")
             .expect("Main contract abi error")
             .signature();
 
         let block_comitted_topic = contract
-            .0
+            .abi
             .event("BlockCommit")
             .expect("Main contract abi error")
             .signature();
 
         let reverted_topic = contract
-            .0
+            .abi
             .event("BlocksRevert")
             .expect("Main contract abi error")
             .signature();
@@ -259,7 +297,7 @@ impl EventsState {
             vec![block_verified_topic, block_comitted_topic, reverted_topic];
 
         let filter = FilterBuilder::default()
-            .address(vec![contract.1.address()])
+            .address(vec![contract.web3_contract.address()])
             .from_block(from_block_number)
             .to_block(to_block_number)
             .topics(Some(topics_vec), None, None, None)
@@ -284,7 +322,7 @@ impl EventsState {
     ///
     fn update_blocks_state<T: Transport>(
         &mut self,
-        contract: &(ethabi::Contract, Contract<T>),
+        contract: &ZkSyncDeployedContract<T>,
         logs: &[Log],
     ) -> bool {
         if logs.is_empty() {
@@ -292,17 +330,17 @@ impl EventsState {
         }
 
         let block_verified_topic = contract
-            .0
+            .abi
             .event("BlockVerification")
             .expect("Main contract abi error")
             .signature();
         let block_comitted_topic = contract
-            .0
+            .abi
             .event("BlockCommit")
             .expect("Main contract abi error")
             .signature();
         let reverted_topic = contract
-            .0
+            .abi
             .event("BlocksRevert")
             .expect("Main contract abi error")
             .signature();
@@ -327,20 +365,18 @@ impl EventsState {
             }
 
             // Go into new blocks
-            let mut block: BlockEvent = BlockEvent {
-                block_num: 0,
-                transaction_hash: H256::zero(),
-                block_type: EventType::Committed,
-            };
 
-            let tx_hash = log
+            let transaction_hash = log
                 .transaction_hash
                 .expect("There are no tx hash in block event");
             let block_num = log.topics[1];
 
-            block.block_num = U256::from(block_num.as_bytes()).as_u32();
-            block.transaction_hash = tx_hash;
-
+            let mut block = BlockEvent {
+                block_num: U256::from(block_num.as_bytes()).as_u32(),
+                transaction_hash,
+                block_type: EventType::Committed,
+                contract_version: contract.version,
+            };
             if topic == block_verified_topic {
                 block.block_type = EventType::Verified;
                 self.verified_events.push(block);
@@ -370,34 +406,35 @@ mod test {
     use super::EventsState;
     use web3::{
         api::{Eth, Namespace},
-        contract::Contract,
         types::Bytes,
     };
-    use zksync_contracts::zksync_contract;
 
+    use crate::contract::ZkSyncDeployedContract;
     use crate::tests::utils::{create_log, u32_to_32bytes, FakeTransport};
+    use web3::types::BlockNumber;
 
     #[test]
     fn event_state() {
         let mut events_state = EventsState::default();
-        let abi_contract = zksync_contract();
 
-        let contract = (
-            abi_contract.clone(),
-            Contract::new(Eth::new(FakeTransport), [1u8; 20].into(), abi_contract),
+        let contract = ZkSyncDeployedContract::version4(
+            Eth::new(FakeTransport),
+            [1u8; 20].into(),
+            BlockNumber::Earliest,
         );
+
         let block_verified_topic = contract
-            .0
+            .abi
             .event("BlockVerification")
             .expect("Main contract abi error")
             .signature();
         let block_committed_topic = contract
-            .0
+            .abi
             .event("BlockCommit")
             .expect("Main contract abi error")
             .signature();
         let reverted_topic = contract
-            .0
+            .abi
             .event("BlocksRevert")
             .expect("Main contract abi error")
             .signature();
