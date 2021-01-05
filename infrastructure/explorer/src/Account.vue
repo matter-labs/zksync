@@ -7,12 +7,8 @@
             <b-card no-body class="table-margin-hack">
                 <b-table responsive thead-class="displaynone" class="nowrap" :items="accountDataProps">
                     <template v-slot:cell(value)="data">
-                        <CopyableAddress
-                            class="bigger-text"
-                            :address="address"
-                            :linkHtml="data.item['value']"
-                            :tooltipRight="true"
-                        />
+                        <Entry v-if="data.item.name == 'Address'" :value="data.item.value" />
+                        <Entry v-else-if="data.item.name == 'Account Id'" :value="data.item.value" />
                     </template>
                 </b-table>
             </b-card>
@@ -72,6 +68,7 @@ import timeConstants from './timeConstants';
 import { clientPromise } from './Client';
 import SearchField from './SearchField.vue';
 import CopyableAddress from './CopyableAddress.vue';
+import { accountStateToBalances, makeEntry } from './utils';  
 import Navbar from './Navbar.vue';
 
 import Entry from './links/Entry.vue';
@@ -100,7 +97,8 @@ export default {
 
         intervalHandle: null,
         client: null,
-        nextAddress: ''
+        nextAddress: '',
+        accountId: 'loading...',
     }),
     watch: {
         async currentPage() {
@@ -158,7 +156,8 @@ export default {
             // tries to update the page, according to the previous address
             const addressAtBeginning = this.nextAddress;
 
-            const balances = await this.client.getCommitedBalances(addressAtBeginning);
+            const account = await this.client.getAccount(addressAtBeginning);
+            const balances = accountStateToBalances(account);
             this.balances = balances.map(bal => ({
                 name: bal.tokenSymbol,
                 value: bal.balance
@@ -204,6 +203,7 @@ export default {
 
             if (this.nextAddress === addressAtBeginning) {
                 this.loading = false;
+                this.accountId = account.id;
             }
         },
         loadNewTransactions() {
@@ -217,7 +217,21 @@ export default {
             return this.$route.params.address;
         },
         accountDataProps() {
-            return [{ name: 'Address', value: `<a>${this.address}</a> ` }];
+            const dataProps = [
+                this.addressEntry,
+                this.accountIdEntry
+            ];
+            return dataProps; 
+        },
+        addressEntry() {
+            return makeEntry('Address')
+                .innerHTML(`<a class="bigger-text">${this.address}</a> `)
+                .copyable()
+                .tooltipRight(true);
+        },
+        accountIdEntry() {
+            return makeEntry('Account Id')
+                .innerHTML(this.accountId);
         },
         balancesProps() {
             return this.balances;

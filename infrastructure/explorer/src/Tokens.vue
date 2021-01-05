@@ -14,7 +14,7 @@
                     hover
                     outlined
                     :items="tokens"
-                    :fields="['symbol', 'address', 'decimals']"
+                    :fields="['symbol', 'address', 'decimals', 'id']"
                     class="nowrap"
                 >
                     <template v-slot:cell(symbol)="data"><span v-html="data.item['symbol']"/></template>
@@ -29,6 +29,7 @@
                         </a>
                     </template>
                     <template v-slot:cell(decimals)="data"><span v-html="data.item['decimals']"/></template>
+                    <template v-slot:cell(id)="data"><span v-html="data.item['id']"/></template>
                 </b-table>
             </div>
         </b-container>

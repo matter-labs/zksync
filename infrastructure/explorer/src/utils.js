@@ -102,6 +102,19 @@ export function readyStateFromString(s) {
     }[s];
 }
 
+export function accountStateToBalances(account) {
+    let balances = Object.entries(account.committed.balances).map(([tokenSymbol, balance]) => {
+        return {
+            tokenSymbol,
+            balance: formatToken(balance, tokenSymbol)
+        };
+    });
+
+    balances.sort((a, b) => a.tokenSymbol.localeCompare(b.tokenSymbol));
+
+    return balances;
+}
+
 // Note that this class follows Builder pattern
 // If you see any of it's methods not returning `this`
 // it is a bug.
