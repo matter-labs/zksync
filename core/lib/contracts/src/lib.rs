@@ -3,14 +3,10 @@ use std::fs;
 use std::io;
 use std::str::FromStr;
 
-const ZKSYNC_CONTRACT_FILE_V0: &str =
-    "contracts/artifacts/cache/solpp-generated-contracts/ZkSync.sol/ZkSync.json";
-const ZKSYNC_CONTRACT_FILE_V1: &str =
-    "contracts/artifacts/cache/solpp-generated-contracts/ZkSync.sol/ZkSync.json";
-const ZKSYNC_CONTRACT_FILE_V2: &str =
-    "contracts/artifacts/cache/solpp-generated-contracts/ZkSync.sol/ZkSync.json";
-const ZKSYNC_CONTRACT_FILE_V3: &str =
-    "contracts/artifacts/cache/solpp-generated-contracts/ZkSync.sol/ZkSync.json";
+const ZKSYNC_CONTRACT_FILE_V0: &str = "contracts/old_contracts/ZkSync.json";
+const ZKSYNC_CONTRACT_FILE_V1: &str = "contracts/old_contracts/ZkSync.json";
+const ZKSYNC_CONTRACT_FILE_V2: &str = "contracts/old_contracts/ZkSync.json";
+const ZKSYNC_CONTRACT_FILE_V3: &str = "contracts/old_contracts/ZkSync.json";
 const ZKSYNC_CONTRACT_FILE_V4: &str =
     "contracts/artifacts/cache/solpp-generated-contracts/ZkSync.sol/ZkSync.json";
 const GOVERNANCE_CONTRACT_FILE: &str =

@@ -343,9 +343,15 @@ async fn test_run_state_update(mut storage: StorageProcessor<'_>) {
         true,
         None,
     );
+    let eth = Eth::new(transport.clone());
     driver
-        .init_contracts([1u8; 20].into(), [1u8; 20].into())
-        .await;
+        .zksync_contracts
+        .push(ZkSyncDeployedContract::version3(
+            eth,
+            [1u8; 20].into(),
+            BlockNumber::Earliest,
+            BlockNumber::Latest,
+        ));
     driver.run_state_update(&mut interactor).await;
 
     // Check that it's stores some account, created by deposit
@@ -376,9 +382,15 @@ async fn test_run_state_update(mut storage: StorageProcessor<'_>) {
         true,
         None,
     );
+    let eth = Eth::new(transport.clone());
     driver
-        .init_contracts([1u8; 20].into(), [1u8; 20].into())
-        .await;
+        .zksync_contracts
+        .push(ZkSyncDeployedContract::version3(
+            eth,
+            [1u8; 20].into(),
+            BlockNumber::Earliest,
+            BlockNumber::Latest,
+        ));
 
     // Load state from db and check it
     assert!(driver.load_state_from_storage(&mut interactor).await);
