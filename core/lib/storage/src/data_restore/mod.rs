@@ -314,8 +314,8 @@ impl<'a, 'c> DataRestoreSchema<'a, 'c> {
 
         for event in events.iter() {
             sqlx::query!(
-                "INSERT INTO data_restore_events_state (block_type, transaction_hash, block_num) VALUES ($1, $2, $3)",
-                event.block_type, event.transaction_hash, event.block_num
+                "INSERT INTO data_restore_events_state (block_type, transaction_hash, block_num, contract_version) VALUES ($1, $2, $3, $4)",
+                event.block_type, event.transaction_hash, event.block_num, event.contract_version
             )
             .execute(transaction.conn())
             .await?;

@@ -805,6 +805,21 @@
       ]
     }
   },
+  "357d6ead6603c088c16ca1257981f85d316a31d6aee3f867f3646f0783f6fb43": {
+    "query": "INSERT INTO data_restore_events_state (block_type, transaction_hash, block_num, contract_version) VALUES ($1, $2, $3, $4)",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "Text",
+          "Bytea",
+          "Int8",
+          "Int4"
+        ]
+      },
+      "nullable": []
+    }
+  },
   "37fb5b679f6b5cfb4d1d5deaba54f98016095be89dd76580eb4e257f0164f39f": {
     "query": "SELECT count(*) as \"count!\" FROM operations WHERE action_type = $1 AND confirmed = $2",
     "describe": {
@@ -2745,20 +2760,6 @@
       "nullable": []
     }
   },
-  "aae869d2576af175768951c1e4b6fa26ac34661cc10f977b1a6c77adf363eb0c": {
-    "query": "INSERT INTO data_restore_events_state (block_type, transaction_hash, block_num) VALUES ($1, $2, $3)",
-    "describe": {
-      "columns": [],
-      "parameters": {
-        "Left": [
-          "Text",
-          "Bytea",
-          "Int8"
-        ]
-      },
-      "nullable": []
-    }
-  },
   "ab8774812664b1c1d4207e7fcd5e04a078293d295c469f043e5bc4933c0c2944": {
     "query": "SELECT * FROM aggregate_operations\n            WHERE NOT EXISTS (SELECT * FROM eth_aggregated_ops_binding WHERE op_id = aggregate_operations.id)\n            ORDER BY id ASC",
     "describe": {
@@ -3689,6 +3690,11 @@
           "ordinal": 3,
           "name": "block_num",
           "type_info": "Int8"
+        },
+        {
+          "ordinal": 4,
+          "name": "contract_version",
+          "type_info": "Int4"
         }
       ],
       "parameters": {
@@ -3697,6 +3703,7 @@
         ]
       },
       "nullable": [
+        false,
         false,
         false,
         false,

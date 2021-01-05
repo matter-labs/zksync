@@ -105,9 +105,7 @@ impl EventsState {
 
         self.last_watched_eth_block_number = to_block_number;
         for (zksync_contract, block_events) in events {
-            if !self.update_blocks_state(zksync_contract, &block_events) {
-                return Ok((vec![], token_events, self.last_watched_eth_block_number));
-            }
+            self.update_blocks_state(zksync_contract, &block_events)
         }
 
         let mut events_to_return = self.committed_events.clone();
@@ -183,7 +181,7 @@ impl EventsState {
         let mut logs = vec![];
         for zksync_contract in zksync_contracts {
             let from_block_number = match zksync_contract.from {
-                BlockNumber::Latest => panic!("Wrong number"),
+                BlockNumber::Latest => panic!("Impossible in from block"),
                 BlockNumber::Earliest => BlockNumber::Number(from_block_number_u64.into()),
                 BlockNumber::Pending => unreachable!(),
                 BlockNumber::Number(n) => {
@@ -196,7 +194,7 @@ impl EventsState {
 
             let to_block_number = match zksync_contract.to {
                 BlockNumber::Latest => BlockNumber::Number(to_block_number_u64.into()),
-                BlockNumber::Earliest => unreachable!(),
+                BlockNumber::Earliest => panic!("Impossible in to block"),
                 BlockNumber::Pending => unreachable!(),
                 BlockNumber::Number(n) => {
                     let number = if to_block_number_u64 < n.as_u64() {

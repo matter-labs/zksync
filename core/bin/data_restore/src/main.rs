@@ -104,16 +104,16 @@ async fn main() {
     let mut driver = DataRestoreDriver::new(
         transport,
         config.governance_addr,
+        config.upgrade_gatekeeper_addr,
+        config.contract_addr,
         ETH_BLOCKS_STEP,
         END_ETH_BLOCKS_OFFSET,
         config.available_block_chunk_sizes,
         finite_mode,
         final_hash,
-    );
-    driver
-        .init_contracts(config.upgrade_gatekeeper_addr, config.contract_addr)
-        .await
-        .expect("Init contracts error");
+    )
+    .await
+    .expect("Wrong driver initialization");
 
     let mut interactor = DatabaseStorageInteractor::new(storage);
     // If genesis is argument is present - there will be fetching contracts creation transactions to get first eth block and genesis acc address

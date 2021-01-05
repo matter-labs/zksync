@@ -89,15 +89,17 @@ where
     /// * `end_eth_blocks_offset` - The distance to the last ethereum block
     ///
     #[allow(clippy::too_many_arguments)]
-    pub fn new(
+    pub async fn new(
         web3_transport: T,
         governance_contract_eth_addr: H160,
+        upgrade_gatekeeper_contract_addr: Address,
+        zksync_contract_addr: Address,
         eth_blocks_step: u64,
         end_eth_blocks_offset: u64,
         available_block_chunk_sizes: Vec<usize>,
         finite_mode: bool,
         final_hash: Option<Fr>,
-    ) -> Self {
+    ) -> anyhow::Result<Self> {
         let web3 = Web3::new(web3_transport);
 
         let governance_contract = {
@@ -111,8 +113,7 @@ where
         let events_state = EventsState::default();
 
         let tree_state = TreeState::new(available_block_chunk_sizes.clone());
-
-        Self {
+        let mut driver = Self {
             web3,
             governance_contract,
             zksync_contracts: vec![],
@@ -124,7 +125,11 @@ where
             finite_mode,
             final_hash,
             phantom_data: Default::default(),
-        }
+        };
+        driver
+            .init_contracts(upgrade_gatekeeper_contract_addr, zksync_contract_addr)
+            .await?;
+        Ok(driver)
     }
 
     pub async fn get_gatekeeper_logs(
@@ -152,7 +157,7 @@ where
             .map_err(|e| anyhow::format_err!("No new logs: {}", e))?;
         Ok(result)
     }
-    pub async fn init_contracts(
+    async fn init_contracts(
         &mut self,
         upgrade_gatekeeper_contract_addr: Address,
         zksync_contract_addr: Address,
@@ -276,6 +281,11 @@ where
         self.tree_state = tree_state;
     }
 
+    fn actual_zksync_contract(&self) -> &ZkSyncDeployedContract<T> {
+        self.zksync_contracts
+            .last()
+            .expect("At least one should exist")
+    }
     /// Stops states from storage
     pub async fn load_state_from_storage(&mut self, interactor: &mut I) -> bool {
         log::info!("Loading state from storage");
@@ -304,6 +314,11 @@ where
             }
             StorageUpdateState::None => {}
         }
+        let total_verified_blocks = self
+            .actual_zksync_contract()
+            .get_total_verified_blocks()
+            .await;
+
         let last_verified_block = self.tree_state.state.block_number;
         log::info!(
             "State has been loaded\nProcessed {:?} blocks on contract\nRoot hash: {:?}\n",
@@ -311,8 +326,7 @@ where
             self.tree_state.root_hash()
         );
 
-        true
-        // self.finite_mode && (total_verified_blocks == last_verified_block)
+        self.finite_mode && (total_verified_blocks == last_verified_block)
     }
 
     /// Activates states updates
@@ -332,11 +346,10 @@ where
                     self.update_tree_state(interactor, new_ops_blocks).await;
 
                     let total_verified_blocks = self
-                        .zksync_contracts
-                        .last()
-                        .expect("One should exists")
+                        .actual_zksync_contract()
                         .get_total_verified_blocks()
                         .await;
+
                     let last_verified_block = self.tree_state.state.block_number;
 
                     // We must update the Ethereum stats table to match the actual stored state

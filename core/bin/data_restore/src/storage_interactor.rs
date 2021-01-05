@@ -107,8 +107,8 @@ pub fn stored_block_event_into_block_event(block: StoredBlockEvent) -> BlockEven
             v if v == "Verified" => EventType::Verified,
             _ => panic!("Wrong block type"),
         },
-        // TODO Store ZkSyncContractVersion
-        contract_version: ZkSyncContractVersion::V4,
+        contract_version: ZkSyncContractVersion::try_from(block.contract_version as u32)
+            .unwrap_or(ZkSyncContractVersion::V0),
     }
 }
 
@@ -126,6 +126,7 @@ pub fn block_event_into_stored_block_event(event: &BlockEvent) -> NewBlockEvent 
         },
         transaction_hash: event.transaction_hash.as_bytes().to_vec(),
         block_num: i64::from(event.block_num),
+        contract_version: event.contract_version as i32,
     }
 }
 
