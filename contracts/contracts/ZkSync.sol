@@ -194,10 +194,11 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
     }
 
     /// @notice Withdraw ETH to Layer 1 - register withdrawal and transfer ether to sender
+    /// @param _owner The owner of the withdrawn assets
     /// @param _amount Ether amount to withdraw
-    function withdrawETH(uint128 _amount) external nonReentrant {
-        registerWithdrawal(0, _amount, msg.sender);
-        (bool success, ) = msg.sender.call{value: _amount}("");
+    function withdrawETH(address _owner, uint128 _amount) external nonReentrant {
+        registerWithdrawal(0, _amount, _owner);
+        (bool success, ) = _owner.call{value: _amount}("");
         require(success, "aq"); // ETH withdraw failed
     }
 
@@ -232,14 +233,15 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
     }
 
     /// @notice Withdraw ERC20 token to Layer 1 - register withdrawal and transfer ERC20 to sender
+    /// @param _owner The owner of the withdrawn assets
     /// @param _token Token address
     /// @param _amount amount to withdraw
-    function withdrawERC20(address _token, uint128 _amount) external nonReentrant {
+    function withdrawERC20(address _owner, address _token, uint128 _amount) external nonReentrant {
         uint16 tokenId = governance.validateTokenAddress(_token);
-        bytes22 packedBalanceKey = packAddressAndTokenId(msg.sender, tokenId);
+        bytes22 packedBalanceKey = packAddressAndTokenId(_owner, tokenId);
         uint128 balance = balancesToWithdraw[packedBalanceKey].balanceToWithdraw;
-        uint128 withdrawnAmount = this.withdrawERC20Guarded(_token, msg.sender, _amount, balance);
-        registerWithdrawal(tokenId, withdrawnAmount, msg.sender);
+        uint128 withdrawnAmount = this.withdrawERC20Guarded(_token, _owner, _amount, balance);
+        registerWithdrawal(tokenId, withdrawnAmount, _owner);
     }
 
     /// @notice Register full exit request - pack pubdata, add priority request
