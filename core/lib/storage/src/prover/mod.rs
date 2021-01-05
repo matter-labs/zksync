@@ -292,7 +292,7 @@ impl<'a, 'c> ProverSchema<'a, 'c> {
         Ok(())
     }
 
-    /// Gets stored witness for a block
+    /// Gets stored witness for a block.
     pub async fn get_witness(
         &mut self,
         block_number: BlockNumber,

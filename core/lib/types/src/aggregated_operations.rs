@@ -111,7 +111,7 @@ impl BlocksExecuteOperation {
             block
                 .processable_ops_pubdata()
                 .into_iter()
-                .map(|pubdata| Token::Bytes(pubdata))
+                .map(Token::Bytes)
                 .collect(),
         );
 

@@ -61,17 +61,11 @@ pub enum ChangePubKeyEthAuthData {
 
 impl ChangePubKeyEthAuthData {
     pub fn is_ecdsa(&self) -> bool {
-        match self {
-            ChangePubKeyEthAuthData::ECDSA(..) => true,
-            _ => false,
-        }
+        matches!(self, ChangePubKeyEthAuthData::ECDSA(..))
     }
 
     pub fn is_onchain(&self) -> bool {
-        match self {
-            ChangePubKeyEthAuthData::Onchain => true,
-            _ => false,
-        }
+        matches!(self, ChangePubKeyEthAuthData::Onchain)
     }
 
     pub fn get_eth_witness(&self) -> Vec<u8> {
