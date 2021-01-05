@@ -9,6 +9,10 @@ components, the logs will have the following format:
 
 ## Unreleased
 
+### Added
+
+- (`explorer`): account and token ids. 
+
 ### Changed
 
 - `explorer` was refactored and optimized.
