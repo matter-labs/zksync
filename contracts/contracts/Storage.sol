@@ -34,7 +34,7 @@ contract Storage {
     }
 
     /// @notice Root-chain balances (per owner and token id, see packAddressAndTokenId) to withdraw
-    mapping(bytes22 => BalanceToWithdraw) public balancesToWithdraw;
+    mapping(bytes22 => BalanceToWithdraw) internal balancesToWithdraw;
 
     // @dev Pending withdrawals are not used in this version
     struct PendingWithdrawal_DEPRECATED {
