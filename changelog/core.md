@@ -2,6 +2,12 @@
 
 All notable changes to the core components will be documented in this file.
 
+## Unreleased
+
+### Fixed
+
+- Wrong index type used in the database causing some queries to take too much time.
+
 ## Prior to 2020-12-23
 
 ### Added
