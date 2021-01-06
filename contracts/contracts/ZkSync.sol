@@ -273,7 +273,7 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
                 tokenId: tokenId,
                 amount: 0 // unknown at this point
             });
-        bytes memory pubData = Operations.writeFullExitPubdata(op);
+        bytes memory pubData = Operations.writeFullExitPubdataForPriorityQueue(op);
         addPriorityRequest(Operations.OpType.FullExit, pubData);
 
         // User must fill storage slot of balancesToWithdraw(msg.sender, tokenId) with nonzero value
@@ -329,7 +329,6 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
         // Check that we commit blocks after last committed block
         require(storedBlockHashes[totalBlocksCommitted] == hashStoredBlockInfo(_lastCommittedBlockData), "ax"); // incorrect previous block data
 
-        uint64 committedPriorityRequests = 0;
         for (uint32 i = 0; i < _newBlocksData.length; ++i) {
             _lastCommittedBlockData = commitOneBlock(_lastCommittedBlockData, _newBlocksData[i]);
 
@@ -574,7 +573,7 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
                 tokenId: _tokenId,
                 amount: _amount
             });
-        bytes memory pubData = Operations.writeDepositPubdata(op);
+        bytes memory pubData = Operations.writeDepositPubdataForPriorityQueue(op);
         addPriorityRequest(Operations.OpType.Deposit, pubData);
 
         emit OnchainDeposit(msg.sender, _tokenId, _amount, _owner);
