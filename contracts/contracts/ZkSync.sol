@@ -273,7 +273,7 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
                 tokenId: tokenId,
                 amount: 0 // unknown at this point
             });
-        bytes memory pubData = Operations.writeFullExitPubdata(op);
+        bytes memory pubData = Operations.writeFullExitPubdataForPriorityQueue(op);
         addPriorityRequest(Operations.OpType.FullExit, pubData);
 
         // User must fill storage slot of balancesToWithdraw(msg.sender, tokenId) with nonzero value
@@ -329,7 +329,6 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
         // Check that we commit blocks after last committed block
         require(storedBlockHashes[totalBlocksCommitted] == hashStoredBlockInfo(_lastCommittedBlockData), "ax"); // incorrect previous block data
 
-        uint64 committedPriorityRequests = 0;
         for (uint32 i = 0; i < _newBlocksData.length; ++i) {
             _lastCommittedBlockData = commitOneBlock(_lastCommittedBlockData, _newBlocksData[i]);
 
@@ -357,7 +356,7 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
         bool sent = false;
         if (_tokenId == 0) {
             address payable toPayable = address(uint160(_recipient));
-            sent = Utils.sendETHNoRevert(toPayable, _amount);
+            sent = sendETHNoRevert(toPayable, _amount);
         } else {
             address tokenAddr = governance.tokenAddresses(_tokenId);
             try this.withdrawERC20Guarded{gas: WITHDRAWAL_GAS_LIMIT}(IERC20(tokenAddr), _recipient, _amount, _amount) {
@@ -366,11 +365,10 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
                 sent = false;
             }
         }
-        if (sent) {
-            emit OnchainWithdrawal(_recipient, _tokenId, _amount);
-        } else {
+        if (!sent) {
             increaseBalanceToWithdraw(packedBalanceKey, _amount);
         }
+        emit OnchainWithdrawal(_recipient, _tokenId, _amount, sent);
     }
 
     /// @dev Executes one block
@@ -575,7 +573,7 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
                 tokenId: _tokenId,
                 amount: _amount
             });
-        bytes memory pubData = Operations.writeDepositPubdata(op);
+        bytes memory pubData = Operations.writeDepositPubdataForPriorityQueue(op);
         addPriorityRequest(Operations.OpType.Deposit, pubData);
 
         emit OnchainDeposit(msg.sender, _tokenId, _amount, _owner);
@@ -593,7 +591,7 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
         bytes22 packedBalanceKey = packAddressAndTokenId(_to, _token);
         uint128 balance = balancesToWithdraw[packedBalanceKey].balanceToWithdraw;
         balancesToWithdraw[packedBalanceKey].balanceToWithdraw = balance.sub(_amount);
-        emit OnchainWithdrawal(_to, _token, _amount);
+        emit OnchainWithdrawal(_to, _token, _amount, true);
     }
 
     function emitDepositCommitEvent(uint32 _blockNumber, Operations.Deposit memory depositData) internal {
@@ -871,5 +869,14 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
     function increaseBalanceToWithdraw(bytes22 _packedBalanceKey, uint128 _amount) internal {
         uint128 balance = balancesToWithdraw[_packedBalanceKey].balanceToWithdraw;
         balancesToWithdraw[_packedBalanceKey] = BalanceToWithdraw(balance.add(_amount), FILLED_GAS_RESERVE_VALUE);
+    }
+
+    /// @notice Sends ETH
+    /// @param _to Address of recipient
+    /// @param _amount Amount of tokens to transfer
+    /// @return bool flag indicating that transfer is successful
+    function sendETHNoRevert(address payable _to, uint256 _amount) internal returns (bool) {
+        (bool callSuccess, ) = _to.call{gas: WITHDRAWAL_GAS_LIMIT, value: _amount}("");
+        return callSuccess;
     }
 }
