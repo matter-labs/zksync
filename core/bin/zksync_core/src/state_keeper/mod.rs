@@ -682,10 +682,6 @@ impl ZkSyncStateKeeper {
             .success_operations
             .push(exec_result.clone());
         self.current_unprocessed_priority_op += 1;
-        println!(
-            "current_unprocessed_priority_op : {:?}",
-            self.current_unprocessed_priority_op
-        );
 
         metrics::histogram!("state_keeper.apply_priority_op", start.elapsed());
         Ok(exec_result)

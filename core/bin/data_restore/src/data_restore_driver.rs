@@ -160,12 +160,13 @@ where
             .get_gatekeeper_logs(upgrade_gatekeeper_contract_addr)
             .await?;
         const U256_SIZE: usize = 32;
+
         let mut previous_block = BlockNumber::Earliest;
         for log in logs {
             let block_number = log.block_number.expect("Block number should exist");
-            let version = ZkSyncContractVersion::try_from(
-                U256::from_big_endian(&log.data.0[..U256_SIZE]).as_u32(),
-            )?;
+            let version = U256::from(log.topics[1].as_bytes()).as_u32();
+            println!("Version {:?}", version);
+            let version = ZkSyncContractVersion::try_from(version)?;
             match version {
                 ZkSyncContractVersion::V0 => previous_block = BlockNumber::Number(block_number),
                 ZkSyncContractVersion::V1 => {
