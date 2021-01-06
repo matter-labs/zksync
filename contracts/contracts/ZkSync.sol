@@ -357,7 +357,7 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
         bool sent = false;
         if (_tokenId == 0) {
             address payable toPayable = address(uint160(_recipient));
-            sent = Utils.sendETHNoRevert(toPayable, _amount);
+            sent = sendETHNoRevert(toPayable, _amount);
         } else {
             address tokenAddr = governance.tokenAddresses(_tokenId);
             try this.withdrawERC20Guarded{gas: WITHDRAWAL_GAS_LIMIT}(IERC20(tokenAddr), _recipient, _amount, _amount) {
@@ -871,5 +871,14 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
     function increaseBalanceToWithdraw(bytes22 _packedBalanceKey, uint128 _amount) internal {
         uint128 balance = balancesToWithdraw[_packedBalanceKey].balanceToWithdraw;
         balancesToWithdraw[_packedBalanceKey] = BalanceToWithdraw(balance.add(_amount), FILLED_GAS_RESERVE_VALUE);
+    }
+
+    /// @notice Sends ETH
+    /// @param _to Address of recipient
+    /// @param _amount Amount of tokens to transfer
+    /// @return bool flag indicating that transfer is successful
+    function sendETHNoRevert(address payable _to, uint256 _amount) internal returns (bool) {
+        (bool callSuccess, ) = _to.call{gas: WITHDRAWAL_GAS_LIMIT, value: _amount}("");
+        return callSuccess;
     }
 }
