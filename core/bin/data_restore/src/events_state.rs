@@ -165,7 +165,7 @@ impl EventsState {
 
         let to_block_number_u64 =
         // if (latest eth block < last watched + delta) then choose it
-        if from_block_number_u64 + eth_blocks_step <= latest_eth_block_minus_delta {
+        if from_block_number_u64 + eth_blocks_step > latest_eth_block_minus_delta {
             latest_eth_block_minus_delta
         } else {
             from_block_number_u64 + eth_blocks_step

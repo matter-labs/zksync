@@ -1,7 +1,3 @@
-use crate::eth_tx_helpers::get_input_data_from_ethereum_transaction;
-use crate::rollup_ops::RollupOpsBlock;
-use ethabi::{ParamType, Token};
-use std::convert::TryFrom;
 use web3::api::Eth;
 use web3::contract::Options;
 use web3::types::{Address, BlockId, BlockNumber, U256};
@@ -10,7 +6,6 @@ use web3::Transport;
 use zksync_contracts::{
     zksync_contract, zksync_contract_v0, zksync_contract_v1, zksync_contract_v2, zksync_contract_v3,
 };
-use zksync_types::ZkSyncOp;
 
 pub use crate::contract::utils::get_genesis_account;
 pub use crate::contract::version::ZkSyncContractVersion;
