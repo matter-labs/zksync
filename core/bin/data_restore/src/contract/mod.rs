@@ -4,13 +4,12 @@ use ethabi::{ParamType, Token};
 use std::convert::TryFrom;
 use web3::api::Eth;
 use web3::contract::Options;
-use web3::types::{Address, BlockId, BlockNumber, Transaction, U256};
+use web3::types::{Address, BlockId, BlockNumber, U256};
 use web3::Transport;
+
 use zksync_contracts::{
     zksync_contract, zksync_contract_v0, zksync_contract_v1, zksync_contract_v2, zksync_contract_v3,
 };
-use zksync_crypto::params::{INPUT_DATA_ADDRESS_BYTES_WIDTH, INPUT_DATA_ROOT_HASH_BYTES_WIDTH};
-use zksync_types::account::Account;
 use zksync_types::ZkSyncOp;
 
 pub use crate::contract::utils::get_genesis_account;

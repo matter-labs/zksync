@@ -352,11 +352,6 @@ where
 
                 if !new_ops_blocks.is_empty() {
                     // Update tree
-                    log::info!(
-                        "new ops blocks {:?} {:?}",
-                        &new_ops_blocks.len(),
-                        new_ops_blocks.last()
-                    );
                     self.update_tree_state(interactor, new_ops_blocks).await;
 
                     let total_verified_blocks = self
@@ -428,7 +423,6 @@ where
             )
             .await
             .expect("Updating events state: cant update events state");
-        log::info!("Before saving to store");
         interactor
             .save_events_state(
                 &block_events,
@@ -436,7 +430,6 @@ where
                 last_watched_eth_block_number,
             )
             .await;
-        log::info!("Updated events storage");
 
         !block_events.is_empty()
     }
@@ -452,7 +445,6 @@ where
         let mut updates = vec![];
         let mut count = 0;
         for op_block in new_ops_blocks {
-            log::info!("Block number {:?}", op_block.block_num);
             let (block, acc_updates) = self
                 .tree_state
                 .update_tree_states_from_ops_block(&op_block)
@@ -473,9 +465,7 @@ where
     /// Gets new operations blocks from events, updates rollup operations stored state.
     /// Returns new rollup operations blocks
     async fn update_operations_state(&mut self, interactor: &mut I) -> Vec<RollupOpsBlock> {
-        log::info!("Pre get new operations");
         let new_blocks = self.get_new_operation_blocks_from_events().await;
-        log::info!("Post get new operations");
 
         interactor.save_rollup_ops(&new_blocks).await;
 
