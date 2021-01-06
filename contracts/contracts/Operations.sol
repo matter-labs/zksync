@@ -125,14 +125,13 @@ library Operations {
     }
 
     function checkFullExitInPriorityQueue(FullExit memory op, bytes20 hashedPubdata) internal pure returns (bool) {
-        op.amount = 0;
         return Utils.hashBytesToBytes20(writeFullExitPubdata(op)) == hashedPubdata;
     }
 
     // PartialExit pubdata
 
     struct PartialExit {
-        //uint8 opType
+        //uint8 opType; -- present in pubdata, ignored at serialization
         //uint32 accountId; -- present in pubdata, ignored at serialization
         uint16 tokenId;
         uint128 amount;

@@ -14,17 +14,18 @@ use tokio::{task::JoinHandle, time};
 // Workspace deps
 use zksync_config::ConfigurationOptions;
 // Local deps
+use crate::mempool::MempoolBlocksRequest;
 use crate::{
-    mempool::{GetBlockRequest, MempoolRequest, ProposedBlock},
+    mempool::{GetBlockRequest, ProposedBlock},
     state_keeper::StateKeeperRequest,
 };
 
 fn create_mempool_req(
     last_priority_op_number: u64,
-) -> (MempoolRequest, oneshot::Receiver<ProposedBlock>) {
+) -> (MempoolBlocksRequest, oneshot::Receiver<ProposedBlock>) {
     let (response_sender, receiver) = oneshot::channel();
     (
-        MempoolRequest::GetBlock(GetBlockRequest {
+        MempoolBlocksRequest::GetBlock(GetBlockRequest {
             last_priority_op_number,
             response_sender,
         }),
@@ -35,7 +36,7 @@ fn create_mempool_req(
 struct BlockProposer {
     current_priority_op_number: u64,
 
-    mempool_requests: mpsc::Sender<MempoolRequest>,
+    mempool_requests: mpsc::Sender<MempoolBlocksRequest>,
     statekeeper_requests: mpsc::Sender<StateKeeperRequest>,
 }
 
@@ -65,7 +66,7 @@ impl BlockProposer {
 #[must_use]
 pub fn run_block_proposer_task(
     config_options: &ConfigurationOptions,
-    mempool_requests: mpsc::Sender<MempoolRequest>,
+    mempool_requests: mpsc::Sender<MempoolBlocksRequest>,
     mut statekeeper_requests: mpsc::Sender<StateKeeperRequest>,
 ) -> JoinHandle<()> {
     let miniblock_interval = config_options

@@ -35,9 +35,8 @@ fn generate_account() -> (H256, PrivateKey, Account) {
     let address = PackedEthSignature::address_from_private_key(&eth_sk)
         .expect("Can't get address from the ETH secret key");
 
-    let mut account = Account::default();
+    let mut account = Account::default_with_address(&address);
     account.pub_key_hash = PubKeyHash::from_privkey(&sk);
-    account.address = address;
     account.set_balance(ETH_TOKEN_ID, default_balance);
 
     (eth_sk, sk, account)

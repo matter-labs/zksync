@@ -5,11 +5,8 @@ pragma solidity ^0.7.0;
 /// @title zkSync configuration constants
 /// @author Matter Labs
 contract Config {
-    /// @dev ERC20 token withdrawal gas limit, used only for complete withdrawals
-    uint256 constant ERC20_WITHDRAWAL_GAS_LIMIT = 50000;
-
-    /// @dev ETH token withdrawal gas limit, used only for complete withdrawals
-    uint256 constant ETH_WITHDRAWAL_GAS_LIMIT = 10000;
+    /// @dev ERC20 tokens and ETH withdrawals gas limit, used only for complete withdrawals
+    uint256 constant WITHDRAWAL_GAS_LIMIT = 50000;
 
     /// @dev Bytes in one chunk
     uint8 constant CHUNK_BYTES = 9;
