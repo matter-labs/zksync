@@ -155,7 +155,7 @@ export class Wallet {
             nonce: transfer.nonce
         };
 
-        return this.signer.signSyncTransfer(transactionData);
+        return this.signer.signSyncTransfer(transactionData, this.provider.zkSyncVersion);
     }
 
     async signSyncTransfer(transfer: {
@@ -205,7 +205,7 @@ export class Wallet {
             nonce: forcedExit.nonce
         };
 
-        return await this.signer.signSyncForcedExit(transactionData);
+        return await this.signer.signSyncForcedExit(transactionData, this.provider.zkSyncVersion);
     }
 
     async signSyncForcedExit(forcedExit: {
@@ -337,7 +337,7 @@ export class Wallet {
             nonce: withdraw.nonce
         };
 
-        return await this.signer.signSyncWithdraw(transactionData);
+        return await this.signer.signSyncWithdraw(transactionData, this.provider.zkSyncVersion);
     }
 
     async signWithdrawFromSyncToEthereum(withdraw: {
@@ -411,15 +411,18 @@ export class Wallet {
         const feeTokenId = this.provider.tokenSet.resolveTokenId(changePubKey.feeToken);
         await this.setRequiredAccountIdFromServer('Set Signing Key');
 
-        const changePubKeyTx: ChangePubKey = await this.signer.signSyncChangePubKey({
-            accountId: this.accountId,
-            account: this.address(),
-            newPkHash: await this.signer.pubKeyHash(),
-            nonce: changePubKey.nonce,
-            feeTokenId,
-            fee: BigNumber.from(changePubKey.fee).toString(),
-            ethAuthData: changePubKey.ethAuthData
-        });
+        const changePubKeyTx: ChangePubKey = await this.signer.signSyncChangePubKey(
+            {
+                accountId: this.accountId,
+                account: this.address(),
+                newPkHash: await this.signer.pubKeyHash(),
+                nonce: changePubKey.nonce,
+                feeTokenId,
+                fee: BigNumber.from(changePubKey.fee).toString(),
+                ethAuthData: changePubKey.ethAuthData
+            },
+            this.provider.zkSyncVersion
+        );
 
         return changePubKeyTx;
     }

@@ -23,7 +23,8 @@ import {
     ChangePubKey,
     ChangePubKeyOnchain,
     ChangePubKeyECDSA,
-    ChangePubKeyCREATE2
+    ChangePubKeyCREATE2,
+    ZkSyncVersion
 } from './types';
 
 export class Signer {
@@ -59,15 +60,21 @@ export class Signer {
         return msgBytes;
     }
 
-    async signSyncTransfer(transfer: {
-        accountId: number;
-        from: Address;
-        to: Address;
-        tokenId: number;
-        amount: BigNumberish;
-        fee: BigNumberish;
-        nonce: number;
-    }): Promise<Transfer> {
+    async signSyncTransfer(
+        transfer: {
+            accountId: number;
+            from: Address;
+            to: Address;
+            tokenId: number;
+            amount: BigNumberish;
+            fee: BigNumberish;
+            nonce: number;
+        },
+        zkSyncVersion: ZkSyncVersion
+    ): Promise<Transfer> {
+        if (zkSyncVersion === 'contracts-3') {
+            throw new Error('Contracts-3 version is not supported by this version of sdk');
+        }
         const msgBytes = this.transferSignBytes(transfer);
         const signature = await signTransactionBytes(this.#privateKey, msgBytes);
 
@@ -115,15 +122,21 @@ export class Signer {
         return msgBytes;
     }
 
-    async signSyncWithdraw(withdraw: {
-        accountId: number;
-        from: Address;
-        ethAddress: string;
-        tokenId: number;
-        amount: BigNumberish;
-        fee: BigNumberish;
-        nonce: number;
-    }): Promise<Withdraw> {
+    async signSyncWithdraw(
+        withdraw: {
+            accountId: number;
+            from: Address;
+            ethAddress: string;
+            tokenId: number;
+            amount: BigNumberish;
+            fee: BigNumberish;
+            nonce: number;
+        },
+        zkSyncVersion: ZkSyncVersion
+    ): Promise<Withdraw> {
+        if (zkSyncVersion === 'contracts-3') {
+            throw new Error('Contracts-3 version is not supported by this version of sdk');
+        }
         const msgBytes = this.withdrawSignBytes(withdraw);
         const signature = await signTransactionBytes(this.#privateKey, msgBytes);
 
@@ -165,13 +178,19 @@ export class Signer {
         return msgBytes;
     }
 
-    async signSyncForcedExit(forcedExit: {
-        initiatorAccountId: number;
-        target: Address;
-        tokenId: number;
-        fee: BigNumberish;
-        nonce: number;
-    }): Promise<ForcedExit> {
+    async signSyncForcedExit(
+        forcedExit: {
+            initiatorAccountId: number;
+            target: Address;
+            tokenId: number;
+            fee: BigNumberish;
+            nonce: number;
+        },
+        zkSyncVersion: ZkSyncVersion
+    ): Promise<ForcedExit> {
+        if (zkSyncVersion === 'contracts-3') {
+            throw new Error('Contracts-3 version is not supported by this version of sdk');
+        }
         const msgBytes = this.forcedExitSignBytes(forcedExit);
         const signature = await signTransactionBytes(this.#privateKey, msgBytes);
         return {
@@ -213,15 +232,21 @@ export class Signer {
         return msgBytes;
     }
 
-    async signSyncChangePubKey(changePubKey: {
-        accountId: number;
-        account: Address;
-        newPkHash: PubKeyHash;
-        feeTokenId: number;
-        fee: BigNumberish;
-        nonce: number;
-        ethAuthData: ChangePubKeyOnchain | ChangePubKeyECDSA | ChangePubKeyCREATE2;
-    }): Promise<ChangePubKey> {
+    async signSyncChangePubKey(
+        changePubKey: {
+            accountId: number;
+            account: Address;
+            newPkHash: PubKeyHash;
+            feeTokenId: number;
+            fee: BigNumberish;
+            nonce: number;
+            ethAuthData: ChangePubKeyOnchain | ChangePubKeyECDSA | ChangePubKeyCREATE2;
+        },
+        zkSyncVersion: ZkSyncVersion
+    ): Promise<ChangePubKey> {
+        if (zkSyncVersion === 'contracts-3') {
+            throw new Error('Contracts-3 version is not supported by this version of sdk');
+        }
         const msgBytes = this.changePubKeySignBytes(changePubKey);
         const signature = await signTransactionBytes(this.#privateKey, msgBytes);
         return {

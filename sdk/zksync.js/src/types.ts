@@ -16,6 +16,8 @@ export type Nonce = number | 'committed';
 
 export type Network = 'localhost' | 'rinkeby' | 'ropsten' | 'mainnet' | 'rinkeby-beta' | 'ropsten-beta';
 
+export type ZkSyncVersion = 'contracts-3' | 'contracts-4';
+
 export interface AccountState {
     address: Address;
     id?: number;
