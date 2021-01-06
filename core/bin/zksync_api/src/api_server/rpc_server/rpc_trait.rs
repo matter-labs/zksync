@@ -4,6 +4,7 @@ use futures::{FutureExt, TryFutureExt};
 use jsonrpc_core::Error;
 use jsonrpc_derive::rpc;
 // Workspace uses
+use zksync_crypto::params::ZKSYNC_VERSION;
 use zksync_types::{
     tx::{TxEthSignature, TxHash},
     Address, Token, TokenLike, TxFeeTypes, ZkSyncTx,
@@ -74,6 +75,9 @@ pub trait Rpc {
 
     #[rpc(name = "get_eth_tx_for_withdrawal", returns = "Option<String>")]
     fn get_eth_tx_for_withdrawal(&self, withdrawal_hash: TxHash) -> FutureResp<Option<String>>;
+
+    #[rpc(name = "get_zksync_version", returns = "String")]
+    fn get_zksync_version(&self) -> Result<String, Error>;
 }
 
 impl Rpc for RpcApp {
@@ -218,5 +222,9 @@ impl Rpc for RpcApp {
                 .unwrap()
         };
         Box::new(resp.boxed().compat())
+    }
+
+    fn get_zksync_version(&self) -> Result<String, Error> {
+        Ok(String::from(ZKSYNC_VERSION))
     }
 }
