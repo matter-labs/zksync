@@ -371,7 +371,7 @@ pub fn is_rescue_signature_verified<E: RescueEngine + JubjubEngine, CS: Constrai
     bits.extend_from_slice(&s1_bits[0..take_bits]);
     assert!(bits.len() == E::Fs::CAPACITY as usize);
 
-    let max_message_len = 32 as usize; //since it is the result of sha256 hash
+    let max_message_len = 32_usize; //since it is the result of sha256 hash
 
     // we can use lowest bits of the challenge
     let is_sig_verified = verify_schnorr_relationship(
