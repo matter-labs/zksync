@@ -164,33 +164,21 @@ impl<'a, 'c> ProverSchema<'a, 'c> {
     /// Stores the proof for a block.
     pub async fn store_proof(
         &mut self,
-        job_id: i32,
         block_number: BlockNumber,
         proof: &SingleProof,
     ) -> QueryResult<usize> {
         let start = Instant::now();
-        let mut transaction = self.0.start_transaction().await?;
-        sqlx::query!(
-            "UPDATE prover_job_queue
-            SET (updated_at, job_status, updated_by) = (now(), $1, 'server_finish_job')
-            WHERE id = $2",
-            ProverJobStatus::Done.to_number(),
-            job_id,
-        )
-        .execute(transaction.conn())
-        .await?;
         let updated_rows = sqlx::query!(
             "INSERT INTO proofs (block_number, proof)
             VALUES ($1, $2)",
             i64::from(block_number),
             serde_json::to_value(proof).unwrap()
         )
-        .execute(transaction.conn())
+        .execute(self.0.conn())
         .await?
         .rows_affected() as usize;
-        transaction.commit().await?;
 
-        metrics::histogram!("sql", start.elapsed(), "prover" => "store_proof");
+        metrics::histogram!("sql.prover.store_proof", start.elapsed());
         Ok(updated_rows)
     }
 

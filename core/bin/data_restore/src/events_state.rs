@@ -165,7 +165,7 @@ impl EventsState {
 
         let to_block_number_u64 =
         // if (latest eth block < last watched + delta) then choose it
-        if from_block_number_u64 + eth_blocks_step >= latest_eth_block_minus_delta {
+        if from_block_number_u64 + eth_blocks_step <= latest_eth_block_minus_delta {
             latest_eth_block_minus_delta
         } else {
             from_block_number_u64 + eth_blocks_step
@@ -180,6 +180,10 @@ impl EventsState {
         .await?;
         let mut logs = vec![];
         for zksync_contract in zksync_contracts {
+            if from_block_number_u64 > to_block_number_u64 {
+                // Stop if all necessary blocks are loaded
+                break;
+            }
             let from_block_number = match zksync_contract.from {
                 BlockNumber::Latest => panic!("Impossible in from block"),
                 BlockNumber::Earliest => BlockNumber::Number(from_block_number_u64.into()),
@@ -193,11 +197,15 @@ impl EventsState {
             };
 
             let to_block_number = match zksync_contract.to {
-                BlockNumber::Latest => BlockNumber::Number(to_block_number_u64.into()),
+                BlockNumber::Latest => {
+                    from_block_number_u64 = to_block_number_u64;
+                    BlockNumber::Number(to_block_number_u64.into())
+                }
                 BlockNumber::Earliest => panic!("Impossible in to block"),
                 BlockNumber::Pending => unreachable!(),
                 BlockNumber::Number(n) => {
                     let number = if to_block_number_u64 < n.as_u64() {
+                        from_block_number_u64 = n.as_u64();
                         BlockNumber::Number(to_block_number_u64.into())
                     } else {
                         from_block_number_u64 = n.as_u64();

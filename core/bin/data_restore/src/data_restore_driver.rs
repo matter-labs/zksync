@@ -159,55 +159,69 @@ where
         let logs = self
             .get_gatekeeper_logs(upgrade_gatekeeper_contract_addr)
             .await?;
-        const U256_SIZE: usize = 32;
 
-        let mut previous_block = BlockNumber::Earliest;
+        let mut last_updated_block = BlockNumber::Earliest;
+        let mut contract_version = vec![];
+        let mut previous_version: Option<ZkSyncContractVersion> = None;
+        // Find starts and ends for contracts
         for log in logs {
             let block_number = log.block_number.expect("Block number should exist");
             let version = U256::from(log.topics[1].as_bytes()).as_u32();
-            println!("Version {:?}", version);
             let version = ZkSyncContractVersion::try_from(version)?;
+            let current_block = BlockNumber::Number(block_number);
+            if let Some(previous_version) = previous_version {
+                contract_version.push((last_updated_block, current_block, previous_version));
+            }
+            previous_version = Some(version);
+            last_updated_block = current_block;
+        }
+        contract_version.push((
+            last_updated_block,
+            BlockNumber::Latest,
+            previous_version.expect("At least one contract should exist"),
+        ));
+
+        for (from, to, version) in contract_version {
             match version {
-                ZkSyncContractVersion::V0 => previous_block = BlockNumber::Number(block_number),
-                ZkSyncContractVersion::V1 => {
+                ZkSyncContractVersion::V0 => {
                     self.zksync_contracts.push(ZkSyncDeployedContract::version0(
                         self.web3.eth(),
                         zksync_contract_addr,
-                        previous_block,
-                        BlockNumber::Number(block_number),
-                    ));
-                    previous_block = BlockNumber::Number(block_number);
+                        from,
+                        to,
+                    ))
                 }
-                ZkSyncContractVersion::V2 => {
+                ZkSyncContractVersion::V1 => {
                     self.zksync_contracts.push(ZkSyncDeployedContract::version1(
                         self.web3.eth(),
                         zksync_contract_addr,
-                        previous_block,
-                        BlockNumber::Number(block_number),
-                    ));
-                    previous_block = BlockNumber::Number(block_number);
+                        from,
+                        to,
+                    ))
                 }
-                ZkSyncContractVersion::V3 => {
+                ZkSyncContractVersion::V2 => {
                     self.zksync_contracts.push(ZkSyncDeployedContract::version2(
                         self.web3.eth(),
                         zksync_contract_addr,
-                        previous_block,
-                        BlockNumber::Number(block_number),
-                    ));
-                    previous_block = BlockNumber::Number(block_number);
+                        from,
+                        to,
+                    ))
                 }
-                ZkSyncContractVersion::V4 => {
+                ZkSyncContractVersion::V3 => {
                     self.zksync_contracts.push(ZkSyncDeployedContract::version3(
                         self.web3.eth(),
                         zksync_contract_addr,
-                        previous_block,
-                        BlockNumber::Number(block_number),
-                    ));
+                        from,
+                        to,
+                    ))
+                }
+                ZkSyncContractVersion::V4 => {
                     self.zksync_contracts.push(ZkSyncDeployedContract::version4(
                         self.web3.eth(),
                         zksync_contract_addr,
-                        BlockNumber::Number(block_number),
-                    ));
+                        from,
+                        to,
+                    ))
                 }
             }
         }
@@ -329,7 +343,7 @@ where
         let mut last_watched_block: u64 = self.events_state.last_watched_eth_block_number;
         let mut final_hash_was_found = false;
         loop {
-            log::debug!("Last watched ethereum block: {:?}", last_watched_block);
+            log::info!("Last watched ethereum block: {:?}", last_watched_block);
 
             // Update events
             if self.update_events_state(interactor).await {
@@ -338,6 +352,11 @@ where
 
                 if !new_ops_blocks.is_empty() {
                     // Update tree
+                    log::info!(
+                        "new ops blocks {:?} {:?}",
+                        &new_ops_blocks.len(),
+                        new_ops_blocks.last()
+                    );
                     self.update_tree_state(interactor, new_ops_blocks).await;
 
                     let total_verified_blocks = self
@@ -387,6 +406,7 @@ where
             }
 
             if last_watched_block == self.events_state.last_watched_eth_block_number {
+                log::info!("sleep block");
                 std::thread::sleep(std::time::Duration::from_secs(5));
             } else {
                 last_watched_block = self.events_state.last_watched_eth_block_number;
@@ -408,7 +428,7 @@ where
             )
             .await
             .expect("Updating events state: cant update events state");
-
+        log::info!("Before saving to store");
         interactor
             .save_events_state(
                 &block_events,
@@ -416,7 +436,7 @@ where
                 last_watched_eth_block_number,
             )
             .await;
-        log::debug!("Updated events storage");
+        log::info!("Updated events storage");
 
         !block_events.is_empty()
     }
@@ -432,6 +452,7 @@ where
         let mut updates = vec![];
         let mut count = 0;
         for op_block in new_ops_blocks {
+            log::info!("Block number {:?}", op_block.block_num);
             let (block, acc_updates) = self
                 .tree_state
                 .update_tree_states_from_ops_block(&op_block)
@@ -452,7 +473,9 @@ where
     /// Gets new operations blocks from events, updates rollup operations stored state.
     /// Returns new rollup operations blocks
     async fn update_operations_state(&mut self, interactor: &mut I) -> Vec<RollupOpsBlock> {
+        log::info!("Pre get new operations");
         let new_blocks = self.get_new_operation_blocks_from_events().await;
+        log::info!("Post get new operations");
 
         interactor.save_rollup_ops(&new_blocks).await;
 
@@ -478,5 +501,4 @@ where
 
         blocks
     }
-    pub async fn get_contract_range_version() {}
 }

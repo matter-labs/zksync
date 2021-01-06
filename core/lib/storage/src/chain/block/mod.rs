@@ -21,6 +21,7 @@ use crate::{
         },
         OperationsSchema,
     },
+    prover::ProverSchema,
     QueryResult, StorageProcessor,
 };
 
@@ -48,7 +49,19 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
             Action::Commit => {
                 BlockSchema(&mut transaction).save_block(op.block).await?;
             }
-            Action::Verify { .. } => {}
+            Action::Verify { proof } => {
+                let stored_proof = ProverSchema(&mut transaction)
+                    .load_proof(block_number)
+                    .await?;
+                match stored_proof {
+                    None => {
+                        ProverSchema(&mut transaction)
+                            .store_proof(block_number, proof)
+                            .await?;
+                    }
+                    Some(_) => {}
+                };
+            }
         };
 
         let new_operation = NewOperation {

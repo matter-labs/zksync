@@ -194,7 +194,7 @@ async fn publish(
             );
             storage
                 .prover_schema()
-                .store_proof(r.job_id, r.first_block, single_proof)
+                .store_proof(r.first_block, single_proof)
                 .await
         }
         JobResultData::AggregatedBlockProof(aggregated_proof) => {
