@@ -14,7 +14,7 @@
                     hover
                     outlined
                     :items="tokens"
-                    :fields="['symbol', 'address', 'decimals', 'id']"
+                    :fields="tokenFields"
                     class="nowrap"
                 >
                     <template v-slot:cell(symbol)="data"><span v-html="data.item['symbol']"/></template>
@@ -65,6 +65,21 @@ export default {
                     text: 'Tokens',
                     active: true
                 }
+            ],
+            tokenFields: [
+                {
+                    key: 'symbol'
+                }, 
+                {
+                    key: 'address'
+                }, 
+                {
+                    key: 'decimals'
+                }, 
+                {
+                    key: 'id',
+                    label: 'Internal Id'
+                }
             ]
         };
     },
@@ -72,7 +87,7 @@ export default {
         async update() {
             const client = await clientPromise;
             this.tokens = await client.loadTokens();
-            this.tokens.sort((a, b) => a.symbol.localeCompare(b.symbol)).map(t => t.symbol);
+            this.tokens.sort((a, b) => a.symbol.localeCompare(b.symbol));
             this.loading = false;
         },
         urlForToken(address) {
