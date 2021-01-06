@@ -50,6 +50,7 @@ pub mod priority_ops;
 pub mod prover;
 pub mod tokens;
 pub mod tx;
+mod utils;
 
 #[cfg(test)]
 mod tests;

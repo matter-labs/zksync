@@ -12,7 +12,6 @@ use web3::types::{
 };
 use web3::{Transport, Web3};
 use zksync_contracts::{erc20_contract, zksync_contract};
-use zksync_crypto::convert::FeConvert;
 use zksync_crypto::proof::EncodedAggregatedProof;
 use zksync_eth_client::ETHClient;
 use zksync_eth_signer::PrivateKeySigner;
@@ -166,8 +165,11 @@ impl<T: Transport> EthereumAccount<T> {
         amount: &BigUint,
         proof: EncodedAggregatedProof,
     ) -> Result<ETHExecResult, anyhow::Error> {
-        let mut options = Options::default();
-        options.gas = Some(3_000_000.into()); // `exit` function requires more gas to operate.
+        let options = Options {
+            gas: Some(3_000_000.into()),
+            // `exit` function requires more gas to operate.
+            ..Default::default()
+        };
 
         let stored_block_info = stored_block_info(last_block);
         let signed_tx = self
@@ -613,11 +615,11 @@ async fn send_raw_tx_wait_confirmation<T: Transport>(
 }
 
 fn default_tx_options() -> Options {
-    let mut options = Options::default();
     // Set the gas limit, so `eth_client` won't complain about it.
-    options.gas = Some(500_000.into());
-
-    options
+    Options {
+        gas: Some(500_000.into()),
+        ..Default::default()
+    }
 }
 
 /// Get fee paid in wei for tx execution

@@ -9,7 +9,4 @@ local metrics = [
   "eth_sender.proceed_next_operations",
 ];
 
-G.dashboard(
-  'Metrics / eth_sender & eth_watcher',
-  [ G.panel(metric) for metric in metrics ]
-)
+G.dashboard('eth_sender & eth_watcher', metrics)

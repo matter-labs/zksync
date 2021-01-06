@@ -2,14 +2,16 @@ name: CI
 
 on:
   pull_request:
+  push:
     branches:
-     - '*'
+    - staging
+    - trying
 
 jobs:
   ci-all:
     # We currently have two self-hosted runners, one of which is marked "DEV-CI" and other one is marder "MAIN".
     # "MAIN" is the current CI runner, "DEV-CI" is currently used to experiment with CI optimizing.
-    runs-on: self-hosted
+    runs-on: [self-hosted, MAIN]
 
     steps:
     - uses: actions/checkout@v2
@@ -42,12 +44,11 @@ jobs:
         key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
 
     - name: update-deps
-      # Upstream version of sqlx-cli has some incompatibilities with the sqlx version used zksync_storage.
       run: |
         rustup update stable
-        cargo install sqlx-cli --git https://github.com/alekseysidorov/sqlx.git
+        cargo install --version=0.2.0 sqlx-cli
         cargo install diesel_cli --no-default-features --features postgres
-        docker pull matterlabs/ci-integration-test:zk-latest
+        docker pull matterlabs/ci-integration-test:latest
 
     - name: zk
       run: zk
@@ -58,7 +59,6 @@ jobs:
         zk fmt --check
         yarn lint:md
         yarn lint:sol
-        zk dummy-prover ensure-disabled
         cargo fmt --all -- --check
         zk f cargo clippy --tests --benches -- -D warnings
         pushd sdk/zksync-crypto
@@ -72,7 +72,7 @@ jobs:
         # Unpack keys to build dev contracts
         zk run verify-keys unpack
         # EIP1271 contract is used in Rust & JS unit tests.
-        zk contract build-dev
+        zk contract build
         zk run deploy-eip1271
 
     - name: integration-tests

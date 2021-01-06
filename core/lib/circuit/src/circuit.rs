@@ -158,7 +158,7 @@ impl<'a, E: RescueEngine + JubjubEngine> Circuit<E> for ZkSyncCircuit<'a, E> {
             params::TIMESTAMP_BIT_WIDTH,
         )?;
 
-        let mut chunk_data: AllocatedChunkData<E> = AllocatedChunkData {
+        let chunk_data: AllocatedChunkData<E> = AllocatedChunkData {
             is_chunk_last: Boolean::constant(false),
             is_chunk_first: Boolean::constant(false),
             chunk_number: zero_circuit_element.get_number(),

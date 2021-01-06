@@ -166,3 +166,9 @@ impl Default for EncodedAggregatedProof {
         }
     }
 }
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PrecomputedSampleProofs {
+    pub single_proofs: Vec<(SingleProof, usize)>,
+    pub aggregated_proof: AggregatedProof,
+}

@@ -5,7 +5,6 @@ members = [
     "core/bin/key_generator",
     "core/bin/server",
     "core/bin/prover",
-    "core/bin/gen_token_add_contract",
     "core/bin/parse_pub_data",
 
     # Server micro-services
@@ -29,6 +28,7 @@ members = [
     "core/lib/prover_utils",
     "core/lib/config",
     "core/lib/contracts",
+    "core/lib/api_client",
 
     # Test infrastructure
     "core/tests/test_account",

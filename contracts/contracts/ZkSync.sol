@@ -124,24 +124,24 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
         require(upgradeParameters.length == 0, "af"); // upgrade parameters should be empty
 
         // Convert last verified block from old format to new format
-        require(totalBlocksCommitted == totalBlocksVerified, "ag"); // all blocks should be verified
+        require(totalBlocksCommitted == totalBlocksExecuted, "ag"); // all blocks should be verified
         require(numberOfPendingWithdrawals_DEPRECATED == 0, "ah"); // pending withdrawal is not used anymore
         require(totalOpenPriorityRequests == 0, "ai"); // no uncommitted priority requests
 
-        Block_DEPRECATED memory lastBlock = blocks_DEPRECATED[totalBlocksVerified];
+        Block_DEPRECATED memory lastBlock = blocks_DEPRECATED[totalBlocksExecuted];
         require(lastBlock.priorityOperations == 0, "aj"); // last block should not contain priority operations
 
         StoredBlockInfo memory rehashedLastBlock =
             StoredBlockInfo(
-                totalBlocksVerified,
+                totalBlocksExecuted,
                 lastBlock.priorityOperations,
                 EMPTY_STRING_KECCAK,
                 0,
                 lastBlock.stateRoot,
                 lastBlock.commitment
             );
-        storedBlockHashes[totalBlocksVerified] = hashStoredBlockInfo(rehashedLastBlock);
-        totalBlocksProofed = totalBlocksVerified;
+        storedBlockHashes[totalBlocksExecuted] = hashStoredBlockInfo(rehashedLastBlock);
+        totalBlocksProven = totalBlocksExecuted;
     }
 
     /// @notice Sends tokens
@@ -326,7 +326,7 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
         for (uint32 i = 0; i < _newBlocksData.length; ++i) {
             lastCommittedBlock = commitOneBlock(lastCommittedBlock, _newBlocksData[i]);
 
-            committedPriorityRequests += lastCommittedBlock.priorityOperations;
+            totalCommittedPriorityRequests += lastCommittedBlock.priorityOperations;
             storedBlockHashes[lastCommittedBlock.blockNumber] = hashStoredBlockInfo(lastCommittedBlock);
 
             emit BlockCommit(lastCommittedBlock.blockNumber);
@@ -334,7 +334,6 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
 
         totalBlocksCommitted += uint32(_newBlocksData.length);
 
-        totalCommittedPriorityRequests += committedPriorityRequests;
         require(totalCommittedPriorityRequests <= totalOpenPriorityRequests, "ay");
     }
 
@@ -378,8 +377,8 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
                 storedBlockHashes[_blockExecuteData.storedBlock.blockNumber],
             "exe10" // executing block should be committed
         );
-        require(_blockExecuteData.storedBlock.blockNumber == totalBlocksVerified + _executedBlockIdx + 1, "az"); // Execute blocks in order
-        require(_blockExecuteData.storedBlock.blockNumber <= totalBlocksProofed, "ba"); // Can't execute blocks more then committed and proofed currently.
+        require(_blockExecuteData.storedBlock.blockNumber == totalBlocksExecuted + _executedBlockIdx + 1, "az"); // Execute blocks in order
+        require(_blockExecuteData.storedBlock.blockNumber <= totalBlocksProven, "ba"); // Can't execute blocks more then committed and proven currently.
 
         bytes32 pendingOnchainOpsHash = EMPTY_STRING_KECCAK;
         for (uint32 i = 0; i < _blockExecuteData.pendingOnchainOpsPubdata.length; ++i) {
@@ -424,22 +423,21 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
         totalCommittedPriorityRequests -= priorityRequestsExecuted;
         totalOpenPriorityRequests -= priorityRequestsExecuted;
 
-        totalBlocksVerified += nBlocks;
+        totalBlocksExecuted += nBlocks;
     }
 
     /// @notice Blocks commitment verification.
     /// @notice Only verifies block commitments without any other processing
-    function proofBlocks(StoredBlockInfo[] memory _committedBlocks, ProofInput memory _proof) external nonReentrant {
-        uint32 currentTotalBlocksProofed = totalBlocksProofed;
+    function proveBlocks(StoredBlockInfo[] memory _committedBlocks, ProofInput memory _proof) external nonReentrant {
+        uint32 currentTotalBlocksProven = totalBlocksProven;
         for (uint256 i = 0; i < _committedBlocks.length; ++i) {
             require(
-                hashStoredBlockInfo(_committedBlocks[i]) == storedBlockHashes[currentTotalBlocksProofed + 1],
+                hashStoredBlockInfo(_committedBlocks[i]) == storedBlockHashes[currentTotalBlocksProven + 1],
                 "pbl2"
             );
-            ++currentTotalBlocksProofed;
+            ++currentTotalBlocksProven;
 
-            uint256 mask = (~uint256(0)) >> 3;
-            require(_proof.commitments[i] & mask == uint256(_committedBlocks[i].commitment) & mask, "bc"); // incorrect block commitment in proof
+            require(_proof.commitments[i] & INPUT_MASK == uint256(_committedBlocks[i].commitment) & INPUT_MASK, "bc"); // incorrect block commitment in proof
         }
 
         bool success =
@@ -453,8 +451,8 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
             );
         require(success, "bd"); // Aggregated proof verification fail
 
-        require(currentTotalBlocksProofed <= totalBlocksCommitted, "be");
-        totalBlocksProofed = currentTotalBlocksProofed;
+        require(currentTotalBlocksProven <= totalBlocksCommitted, "be");
+        totalBlocksProven = currentTotalBlocksProven;
     }
 
     /// @notice Reverts unverified blocks
@@ -462,7 +460,7 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
         governance.requireActiveValidator(msg.sender);
 
         uint32 blocksCommitted = totalBlocksCommitted;
-        uint32 blocksToRevert = Utils.minU32(uint32(_blocksToRevert.length), blocksCommitted - totalBlocksVerified);
+        uint32 blocksToRevert = Utils.minU32(uint32(_blocksToRevert.length), blocksCommitted - totalBlocksExecuted);
         uint64 revertedPriorityRequests = 0;
 
         for (uint32 i = 0; i < blocksToRevert; ++i) {
@@ -477,11 +475,11 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
 
         totalBlocksCommitted = blocksCommitted;
         totalCommittedPriorityRequests -= revertedPriorityRequests;
-        if (totalBlocksCommitted < totalBlocksProofed) {
-            totalBlocksProofed = totalBlocksCommitted;
+        if (totalBlocksCommitted < totalBlocksProven) {
+            totalBlocksProven = totalBlocksCommitted;
         }
 
-        emit BlocksRevert(totalBlocksVerified, blocksCommitted);
+        emit BlocksRevert(totalBlocksExecuted, blocksCommitted);
     }
 
     /// @notice Checks if Exodus mode must be entered. If true - enters exodus mode and emits ExodusMode event.
@@ -519,13 +517,12 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
         bytes22 packedBalanceKey = packAddressAndTokenId(msg.sender, _tokenId);
         require(exodusMode, "bg"); // must be in exodus mode
         require(!exited[_accountId][_tokenId], "bh"); // already exited
-        require(storedBlockHashes[totalBlocksVerified] == hashStoredBlockInfo(_storedBlockInfo), "bi"); // incorrect sotred block info
+        require(storedBlockHashes[totalBlocksExecuted] == hashStoredBlockInfo(_storedBlockInfo), "bi"); // incorrect sotred block info
 
         uint256 commitment =
             uint256(sha256(abi.encodePacked(_storedBlockInfo.stateHash, _accountId, msg.sender, _tokenId, _amount)));
         require(_proof.commitments.length == 1, "bj");
-        uint256 mask = (~uint256(0)) >> 3;
-        commitment = commitment & mask;
+        commitment = commitment & INPUT_MASK;
         require(_proof.commitments[0] == commitment, "bk");
 
         bool proofCorrect =
@@ -723,7 +720,7 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
                 )
             );
         address recoveredAddress = Utils.recoverAddressFromEthSignature(signature, messageHash);
-        return recoveredAddress == _changePk.owner;
+        return recoveredAddress == _changePk.owner && recoveredAddress != address(0);
     }
 
     /// @notice Checks that signature is valid for pubkey change message
@@ -742,7 +739,7 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
         (offset, saltArg) = Bytes.readBytes32(_ethWitness, offset);
         (offset, codeHash) = Bytes.readBytes32(_ethWitness, offset);
         // salt from CREATE2 specification
-        bytes32 salt = keccak256(abi.encodePacked(_changePk.pubKeyHash, saltArg));
+        bytes32 salt = keccak256(abi.encodePacked(saltArg, _changePk.pubKeyHash));
         // Address computation according to CREATE2 definition: https://eips.ethereum.org/EIPS/eip-1014
         address recoveredAddress =
             address(uint160(uint256(keccak256(abi.encodePacked(bytes1(0xff), creatorAddress, salt, codeHash)))));

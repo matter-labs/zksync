@@ -4,9 +4,9 @@
 //! instance of zkSync server and prover:
 //!
 //! ```bash
-//! zksync server &!
-//! zksync dummy-prover &!
-//! zksync sdk-test
+//! zk server &!
+//! zk dummy-prover run &!
+//! zk test integration rust-sdk
 //! ```
 //!
 //! Note: If tests are failing, first check the following two things:
@@ -741,7 +741,7 @@ async fn batch_transfer() -> Result<(), anyhow::Error> {
     // Send the batch and store its transaction hashes
     let handles = wallet
         .provider
-        .send_txs_batch(signed_transfers, vec![])
+        .send_txs_batch(signed_transfers, None)
         .await?
         .into_iter()
         .map(|tx_hash| SyncTransactionHandle::new(tx_hash, wallet.provider.clone()));

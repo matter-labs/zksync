@@ -115,7 +115,7 @@ async fn verify_eth_signature_single_tx(
     let start = Instant::now();
     // Check if the tx is a `ChangePubKey` operation without an Ethereum signature.
     if let ZkSyncTx::ChangePubKey(change_pk) = &tx.tx {
-        if change_pk.eth_signature.is_none() {
+        if change_pk.eth_auth_data.is_onchain() {
             // Check that user is allowed to perform this operation.
             let is_authorized = eth_checker
                 .is_new_pubkey_hash_authorized(

@@ -11,7 +11,4 @@ local metrics = [
   "sql.chain.stats.count_total_transactions",
 ];
 
-G.dashboard(
-  'Metrics / sql / chain / account & stats',
-  [ G.panel(metric) for metric in metrics ]
-)
+G.dashboard('sql / chain / account & stats', metrics)

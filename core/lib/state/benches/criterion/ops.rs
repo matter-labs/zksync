@@ -16,6 +16,7 @@ use zksync_types::{
 };
 // Local uses
 use zksync_state::state::ZkSyncState;
+use zksync_types::tx::{ChangePubKeyECDSAData, ChangePubKeyEthAuthData};
 
 const ETH_TOKEN_ID: TokenId = 0x00;
 // The amount is not important, since we always work with 1 account.
@@ -34,9 +35,8 @@ fn generate_account() -> (H256, PrivateKey, Account) {
     let address = PackedEthSignature::address_from_private_key(&eth_sk)
         .expect("Can't get address from the ETH secret key");
 
-    let mut account = Account::default();
+    let mut account = Account::default_with_address(&address);
     account.pub_key_hash = PubKeyHash::from_privkey(&sk);
-    account.address = address;
     account.set_balance(ETH_TOKEN_ID, default_balance);
 
     (eth_sk, sk, account)
@@ -239,13 +239,16 @@ fn apply_change_pubkey_op(b: &mut Bencher<'_>) {
         None,
     );
 
-    change_pubkey.eth_signature = {
+    change_pubkey.eth_auth_data = {
         let sign_bytes = change_pubkey
             .get_eth_signed_data()
             .expect("Failed to construct ChangePubKey signed message.");
         let eth_signature =
             PackedEthSignature::sign(eth_private_key, &sign_bytes).expect("Signing failed");
-        Some(eth_signature)
+        ChangePubKeyEthAuthData::ECDSA(ChangePubKeyECDSAData {
+            eth_signature,
+            batch_hash: H256::zero(),
+        })
     };
 
     let change_pubkey_tx = ZkSyncTx::ChangePubKey(Box::new(change_pubkey));

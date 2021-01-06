@@ -2,13 +2,15 @@
 use std::fmt;
 use zksync_eth_signer::error::SignerError;
 use zksync_eth_signer::EthereumSigner;
-use zksync_types::tx::TxEthSignature;
+use zksync_types::tx::{ChangePubKeyECDSAData, ChangePubKeyEthAuthData, TxEthSignature};
 // External uses
 use num::BigUint;
 // Workspace uses
 use zksync_crypto::PrivateKey;
 use zksync_types::tx::{ChangePubKey, PackedEthSignature};
-use zksync_types::{AccountId, Address, ForcedExit, Nonce, PubKeyHash, Token, Transfer, Withdraw};
+use zksync_types::{
+    AccountId, Address, ForcedExit, Nonce, PubKeyHash, Token, Transfer, Withdraw, H256,
+};
 // Local imports
 use crate::WalletCredentials;
 
@@ -92,8 +94,8 @@ impl<S: EthereumSigner> Signer<S> {
         )
         .map_err(signing_failed_error)?;
 
-        let eth_signature = if auth_onchain {
-            None
+        let eth_auth_data = if auth_onchain {
+            ChangePubKeyEthAuthData::Onchain
         } else {
             let eth_signer = self
                 .eth_signer
@@ -108,21 +110,24 @@ impl<S: EthereumSigner> Signer<S> {
                 .await
                 .map_err(signing_failed_error)?;
 
-            match eth_signature {
-                TxEthSignature::EthereumSignature(packed_signature) => Some(packed_signature),
-                _ => None,
-            }
+            let eth_signature = match eth_signature {
+                TxEthSignature::EthereumSignature(packed_signature) => Ok(packed_signature),
+                TxEthSignature::EIP1271Signature(..) => Err(SignerError::CustomError(
+                    "Can't sign ChangePubKey message with EIP1271 signer".to_string(),
+                )),
+            }?;
+
+            ChangePubKeyEthAuthData::ECDSA(ChangePubKeyECDSAData {
+                eth_signature,
+                batch_hash: H256::zero(),
+            })
         };
+        change_pubkey.eth_auth_data = eth_auth_data;
 
-        change_pubkey.eth_signature = eth_signature;
-
-        if !auth_onchain {
-            assert_eq!(
-                change_pubkey.verify_eth_signature(),
-                Some(self.address),
-                "eth signature is incorrect"
-            );
-        }
+        assert!(
+            change_pubkey.is_eth_auth_data_valid(),
+            "eth auth data is incorrect"
+        );
 
         Ok(change_pubkey)
     }

@@ -536,3 +536,40 @@ function numberToBytesBE(number: number, bytes: number): Uint8Array {
 export function parseHexWithPrefix(str) {
     return Uint8Array.from(Buffer.from(str.slice(2), 'hex'));
 }
+
+export function getCREATE2AddressAndSalt(
+    syncPubkeyHash: string,
+    create2Data: {
+        creatorAddress: string;
+        saltArg: string;
+        codeHash: string;
+    }
+): { salt: string; address: string } {
+    const pubkeyHashHex = syncPubkeyHash.replace('sync:', '0x');
+
+    const additionalSaltArgument = ethers.utils.arrayify(create2Data.saltArg);
+    if (additionalSaltArgument.length !== 32) {
+        throw new Error('create2Data.saltArg should be exactly 32 bytes long');
+    }
+
+    // CREATE2 salt
+    const salt = ethers.utils.keccak256(
+        ethers.utils.concat([additionalSaltArgument, ethers.utils.arrayify(pubkeyHashHex)])
+    );
+
+    // Address according to CREATE2 specification
+    const address =
+        '0x' +
+        ethers.utils
+            .keccak256(
+                ethers.utils.concat([
+                    ethers.utils.arrayify(0xff),
+                    ethers.utils.arrayify(create2Data.creatorAddress),
+                    salt,
+                    ethers.utils.arrayify(create2Data.codeHash)
+                ])
+            )
+            .slice(2 + 12 * 2);
+
+    return { address: address, salt: ethers.utils.hexlify(salt) };
+}

@@ -1,18 +1,19 @@
-import { AbstractJSONRPCTransport, HTTPTransport, WSTransport, DummyTransport } from './transport';
-import { ethers, Contract, BigNumber } from 'ethers';
+import { AbstractJSONRPCTransport, DummyTransport, HTTPTransport, WSTransport } from './transport';
+import { BigNumber, Contract, ethers } from 'ethers';
 import {
     AccountState,
     Address,
-    TokenLike,
-    TransactionReceipt,
-    PriorityOperationReceipt,
-    ContractAddress,
-    Tokens,
-    TokenAddress,
-    TxEthSignature,
-    Fee,
     ChangePubKeyFee,
-    Network
+    ContractAddress,
+    Fee,
+    Network,
+    PriorityOperationReceipt,
+    TokenAddress,
+    TokenLike,
+    Tokens,
+    TransactionReceipt,
+    TxEthSignature,
+    ZkSyncVersion
 } from './types';
 import { isTokenETH, sleep, SYNC_GOV_CONTRACT_INTERFACE, TokenSet } from './utils';
 
@@ -35,6 +36,18 @@ export async function getDefaultProvider(network: Network, transport: 'WS' | 'HT
         } else if (transport === 'HTTP') {
             return await Provider.newHttpProvider('https://rinkeby-api.zksync.io/jsrpc');
         }
+    } else if (network === 'ropsten-beta') {
+        if (transport === 'WS') {
+            return await Provider.newWebsocketProvider('wss://ropsten-beta-api.zksync.io/jsrpc-ws');
+        } else if (transport === 'HTTP') {
+            return await Provider.newHttpProvider('https://ropsten-beta-api.zksync.io/jsrpc');
+        }
+    } else if (network === 'rinkeby-beta') {
+        if (transport === 'WS') {
+            return await Provider.newWebsocketProvider('wss://rinkeby-beta-api.zksync.io/jsrpc-ws');
+        } else if (transport === 'HTTP') {
+            return await Provider.newHttpProvider('https://rinkeby-beta-api.zksync.io/jsrpc');
+        }
     } else if (network === 'mainnet') {
         if (transport === 'WS') {
             return await Provider.newWebsocketProvider('wss://api.zksync.io/jsrpc-ws');
@@ -52,6 +65,7 @@ export class Provider {
 
     // For HTTP provider
     public pollIntervalMilliSecs = 500;
+    public zkSyncVersion: ZkSyncVersion;
 
     private constructor(public transport: AbstractJSONRPCTransport) {}
 
@@ -60,6 +74,7 @@ export class Provider {
         const provider = new Provider(transport);
         provider.contractAddress = await provider.getContractAddress();
         provider.tokenSet = new TokenSet(await provider.getTokens());
+        provider.zkSyncVersion = await provider.getZkSyncVersion();
         return provider;
     }
 
@@ -74,6 +89,7 @@ export class Provider {
         }
         provider.contractAddress = await provider.getContractAddress();
         provider.tokenSet = new TokenSet(await provider.getTokens());
+        provider.zkSyncVersion = await provider.getZkSyncVersion();
         return provider;
     }
 
@@ -81,12 +97,13 @@ export class Provider {
      * Provides some hardcoded values the `Provider` responsible for
      * without communicating with the network
      */
-    static async newMockProvider(network: string, ethPrivateKey: Uint8Array): Promise<Provider> {
-        const transport = new DummyTransport(network, ethPrivateKey);
+    static async newMockProvider(network: string, ethPrivateKey: Uint8Array, getTokens: Function): Promise<Provider> {
+        const transport = new DummyTransport(network, ethPrivateKey, getTokens);
         const provider = new Provider(transport);
 
         provider.contractAddress = await provider.getContractAddress();
         provider.tokenSet = new TokenSet(await provider.getTokens());
+        provider.zkSyncVersion = await provider.getZkSyncVersion();
         return provider;
     }
 
@@ -113,6 +130,11 @@ export class Provider {
 
     async getTokens(): Promise<Tokens> {
         return await this.transport.request('tokens', null);
+    }
+
+    async updateTokenSet(): Promise<void> {
+        const updatedTokenSet = new TokenSet(await this.getTokens());
+        this.tokenSet = updatedTokenSet;
     }
 
     async getState(address: Address): Promise<AccountState> {
@@ -221,6 +243,10 @@ export class Provider {
     async getTokenPrice(tokenLike: TokenLike): Promise<number> {
         const tokenPrice = await this.transport.request('get_token_price', [tokenLike]);
         return parseFloat(tokenPrice);
+    }
+
+    async getZkSyncVersion(): Promise<ZkSyncVersion> {
+        return await this.transport.request('get_zksync_version', []);
     }
 
     async disconnect() {

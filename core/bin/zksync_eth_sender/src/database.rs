@@ -13,7 +13,7 @@ use zksync_basic_types::{H256, U256};
 use zksync_storage::{ConnectionPool, StorageProcessor};
 use zksync_types::{
     ethereum::{ETHOperation, EthOpId, InsertedOperationResponse, OperationType},
-    Action, Operation,
+    Action, ActionType, Operation,
 };
 // Local uses
 use super::transactions::ETHStats;
@@ -202,8 +202,8 @@ impl DatabaseInterface for Database {
 
     async fn is_previous_operation_confirmed(
         &self,
-        connection: &mut StorageProcessor<'_>,
-        op: &ETHOperation,
+        _connection: &mut StorageProcessor<'_>,
+        _op: &ETHOperation,
     ) -> anyhow::Result<bool> {
         // TODO
         Ok(true)
@@ -224,35 +224,50 @@ impl DatabaseInterface for Database {
         hash: &H256,
         op: &ETHOperation,
     ) -> anyhow::Result<()> {
-        if let Some((_, AggregatedOperation::ExecuteBlocks(op))) = &op.op {
-            let mut transaction = connection.start_transaction().await?;
+        let mut transaction = connection.start_transaction().await?;
 
-            transaction.ethereum_schema().confirm_eth_tx(hash).await?;
-
-            for block in &op.blocks {
-                let block_number = block.block_number;
+        match &op.op {
+            Some((_, AggregatedOperation::CommitBlocks(op))) => {
+                let (first_block, last_block) = op.block_range();
                 transaction
                     .chain()
-                    .state_schema()
-                    .apply_state_update(block_number)
-                    .await?;
-                transaction
-                    .chain()
-                    .block_schema()
-                    .execute_operation(Operation {
-                        id: None,
-                        action: Action::Verify {
-                            proof: Default::default(),
-                        },
-                        block: block.clone(),
-                    })
+                    .operations_schema()
+                    .confirm_operations(first_block, last_block, ActionType::COMMIT)
                     .await?;
             }
+            Some((_, AggregatedOperation::ExecuteBlocks(op))) => {
+                let (first_block, last_block) = op.block_range();
+                for block in &op.blocks {
+                    transaction
+                        .chain()
+                        .state_schema()
+                        .apply_state_update(block.block_number)
+                        .await?;
+                    transaction
+                        .chain()
+                        .block_schema()
+                        .execute_operation(Operation {
+                            id: None,
+                            action: Action::Verify {
+                                proof: Default::default(),
+                            },
+                            block: block.clone(),
+                        })
+                        .await?;
+                }
 
-            transaction.commit().await?;
-        } else {
-            connection.ethereum_schema().confirm_eth_tx(hash).await?;
+                transaction
+                    .chain()
+                    .operations_schema()
+                    .confirm_operations(first_block, last_block, ActionType::VERIFY)
+                    .await?;
+            }
+            _ => {}
         }
+
+        transaction.ethereum_schema().confirm_eth_tx(hash).await?;
+        transaction.commit().await?;
+
         Ok(())
     }
 

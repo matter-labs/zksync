@@ -2,7 +2,19 @@ import { Command } from 'commander';
 import * as utils from './utils';
 import * as contract from './contract';
 
-const IMAGES = ['server', 'prover', 'nginx', 'geth', 'dev-ticker', 'keybase', 'ci', 'fee-seller', 'exit-tool'];
+const IMAGES = [
+    'server',
+    'prover',
+    'nginx',
+    'geth',
+    'dev-ticker',
+    'keybase',
+    'ci',
+    'fee-seller',
+    'exit-tool',
+    'dev-liquidity-token-watcher',
+    'ci-integration-test'
+];
 
 async function dockerCommand(command: 'push' | 'build', image: string) {
     if (image == 'rust') {
@@ -29,7 +41,6 @@ async function _build(image: string) {
     }
     if (image == 'server' || image == 'prover') {
         await contract.build();
-        await contract.buildDev();
     }
     const { stdout: imageTag } = await utils.exec('git rev-parse --short HEAD');
     const latestImage = `-t matterlabs/${image}:latest`;

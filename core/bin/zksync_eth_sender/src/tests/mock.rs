@@ -152,7 +152,7 @@ impl DatabaseInterface for MockDatabase {
 
     async fn restore_state(
         &self,
-        connection: &mut StorageProcessor<'_>,
+        _connection: &mut StorageProcessor<'_>,
     ) -> anyhow::Result<(VecDeque<ETHOperation>, Vec<(i64, AggregatedOperation)>)> {
         todo!()
         // Ok((
@@ -163,12 +163,12 @@ impl DatabaseInterface for MockDatabase {
 
     async fn save_new_eth_tx(
         &self,
-        connection: &mut StorageProcessor<'_>,
-        op_type: AggregatedActionType,
-        op: Option<(i64, AggregatedOperation)>,
-        deadline_block: i64,
-        used_gas_price: U256,
-        raw_tx: Vec<u8>,
+        _connection: &mut StorageProcessor<'_>,
+        _op_type: AggregatedActionType,
+        _op: Option<(i64, AggregatedOperation)>,
+        _deadline_block: i64,
+        _used_gas_price: U256,
+        _raw_tx: Vec<u8>,
     ) -> anyhow::Result<InsertedOperationResponse> {
         todo!()
         // let id = *(self.pending_op_id.read().await);
@@ -251,7 +251,7 @@ impl DatabaseInterface for MockDatabase {
     async fn confirm_operation(
         &self,
         _connection: &mut StorageProcessor<'_>,
-        hash: &H256,
+        _hash: &H256,
         _op: &ETHOperation,
     ) -> anyhow::Result<()> {
         todo!()
@@ -514,8 +514,10 @@ pub(in crate) async fn create_signed_tx(
     nonce: i64,
 ) -> ETHOperation {
     todo!()
-    // let mut options = Options::default();
-    // options.nonce = Some(nonce.into());
+    // let options = Options {
+    //     nonce: Some(nonce.into()),
+    //     ..Default::default()
+    // };
     //
     // let raw_tx = eth_sender.operation_to_raw_tx(&operation);
     // let signed_tx = eth_sender
@@ -551,9 +553,10 @@ pub(in crate) async fn create_signed_withdraw_tx(
     nonce: i64,
 ) -> ETHOperation {
     todo!()
-    // let mut options = Options::default();
-    // options.nonce = Some(nonce.into());
-    //
+    // let options = Options {
+    //     nonce: Some(nonce.into()),
+    //     ..Default::default()
+    // };
     // let raw_tx = eth_sender.ethereum.encode_tx_data(
     //     "completeWithdrawals",
     //     zksync_types::config::MAX_WITHDRAWALS_TO_COMPLETE_IN_A_CALL,

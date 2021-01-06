@@ -12,7 +12,4 @@ local metrics = [
   "api.notifier.get_account_state",
 ];
 
-G.dashboard(
-  'Metrics / notifier',
-  [ G.panel(metric) for metric in metrics ]
-)
+G.dashboard('notifier', metrics)

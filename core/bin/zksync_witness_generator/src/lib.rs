@@ -1,5 +1,5 @@
 // Built-in
-use std::sync::{Arc, RwLock};
+use std::sync::Arc;
 use std::thread;
 use std::time::Duration;
 // External
@@ -14,10 +14,10 @@ use futures::channel::mpsc;
 use jsonwebtoken::errors::Error as JwtError;
 use jsonwebtoken::{decode, DecodingKey, Validation};
 use serde::{Deserialize, Serialize};
+use tokio::sync::RwLock;
 // Workspace deps
 use zksync_config::ProverOptions;
 use zksync_storage::{ConnectionPool, StorageProcessor};
-use zksync_types::BlockNumber;
 // Local deps
 use self::scaler::ScalerOracle;
 use zksync_circuit::serialization::ProverData;
@@ -155,28 +155,6 @@ async fn get_job(
     }
 }
 
-async fn prover_data(
-    data: web::Data<AppState>,
-    block: web::Json<BlockNumber>,
-) -> actix_web::Result<HttpResponse> {
-    log::trace!("Got request for prover_data for block {}", *block);
-    let mut storage = data
-        .access_storage()
-        .await
-        .map_err(actix_web::error::ErrorInternalServerError)?;
-    let witness = match storage.prover_schema().get_witness(block.0).await {
-        Ok(witness) => witness,
-        Err(_) => return Ok(HttpResponse::InternalServerError().finish()),
-    };
-    if witness.is_some() {
-        log::info!("Sent prover_data for block {}", *block);
-    } else {
-        // No witness, we should just wait
-        log::warn!("No witness for block {}", *block);
-    }
-    Ok(HttpResponse::Ok().json(witness))
-}
-
 async fn working_on(
     data: web::Data<AppState>,
     r: web::Json<WorkingOn>,
@@ -291,7 +269,7 @@ async fn required_replicas(
     data: web::Data<AppState>,
     _input: web::Json<RequiredReplicasInput>,
 ) -> actix_web::Result<HttpResponse> {
-    let mut oracle = data.scaler_oracle.write().expect("Expected write lock");
+    let mut oracle = data.scaler_oracle.write().await;
 
     let needed_count = oracle
         .provers_required()
@@ -358,10 +336,10 @@ async fn update_prover_job_queue(storage: &mut StorageProcessor<'_>) -> anyhow::
                 next_aggregated_proof_block,
             )
             .await?;
-        if let Some(AggregatedOperation::CreateProofBlocks(BlocksCreateProofOperation {
-            blocks,
-            ..
-        })) = create_block_proof_action
+        if let Some((
+            _,
+            AggregatedOperation::CreateProofBlocks(BlocksCreateProofOperation { blocks, .. }),
+        )) = create_block_proof_action
         {
             let first_block = blocks
                 .first()

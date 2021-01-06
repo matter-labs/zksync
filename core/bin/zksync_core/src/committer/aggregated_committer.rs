@@ -1,7 +1,6 @@
-use anyhow::Context;
 use chrono::{DateTime, Utc};
 use std::cmp::max;
-use std::time::{Duration, Instant, UNIX_EPOCH};
+use std::time::Duration;
 use zksync_crypto::proof::AggregatedProof;
 use zksync_storage::chain::block::BlockSchema;
 use zksync_storage::chain::operations::OperationsSchema;
@@ -76,7 +75,7 @@ fn create_new_create_proof_operation(
     available_aggregate_proof_sizes: &[usize],
     current_time: DateTime<Utc>,
     block_verify_deadline: Duration,
-    max_gas_for_tx: U256,
+    _max_gas_for_tx: U256,
 ) -> Option<BlocksCreateProofOperation> {
     let max_aggregate_size = available_aggregate_proof_sizes
         .last()
@@ -310,7 +309,7 @@ async fn create_aggregated_publish_proof_operation_storage(
     }
 
     let last_unpublished_create_proof_operation = {
-        let aggregated_operation = OperationsSchema(storage)
+        let (_, aggregated_operation) = OperationsSchema(storage)
             .get_aggregated_op_that_affects_block(
                 AggregatedActionType::CreateProofBlocks,
                 last_aggregate_publish_proof_block + 1,

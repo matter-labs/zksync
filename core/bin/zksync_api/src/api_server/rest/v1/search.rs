@@ -7,17 +7,14 @@ use actix_web::{
     web::{self, Json},
     Scope,
 };
-use serde::{Deserialize, Serialize};
 
 // Workspace uses
-use zksync_crypto::{convert::FeConvert, Fr};
+use zksync_api_client::rest::v1::BlockSearchQuery;
 use zksync_storage::{ConnectionPool, QueryResult};
-use zksync_types::{tx::TxHash, BlockNumber};
 
 // Local uses
 use super::{
-    blocks::BlockInfo,
-    client::{self, Client},
+    blocks::{convert::block_info_from_details, BlockInfo},
     Error as ApiError, JsonResult,
 };
 
@@ -41,59 +38,7 @@ impl ApiSearchData {
             .find_block_by_height_or_hash(query)
             .await;
 
-        Ok(block.map(BlockInfo::from))
-    }
-}
-
-// Data transfer objects.
-
-#[derive(Debug, Deserialize, Serialize, Clone, PartialEq)]
-pub struct BlockSearchQuery {
-    query: String,
-}
-
-// Client implementation
-
-impl From<BlockNumber> for BlockSearchQuery {
-    /// Convert the block number into the search query.
-    fn from(inner: BlockNumber) -> Self {
-        Self {
-            query: inner.to_string(),
-        }
-    }
-}
-
-impl From<Fr> for BlockSearchQuery {
-    /// Converts the state root hash of the block into the search query.
-    fn from(inner: Fr) -> Self {
-        Self {
-            query: inner.to_hex(),
-        }
-    }
-}
-
-impl From<TxHash> for BlockSearchQuery {
-    /// Converts the commit/verify Ethereum transaction hash into the search query.
-    fn from(inner: TxHash) -> Self {
-        Self {
-            // Serialize without prefix.
-            query: hex::encode(inner),
-        }
-    }
-}
-
-/// Search API part.
-impl Client {
-    /// Performs a block search with an uncertain query, which can be either of:
-    ///
-    /// - Hash of commit/verify Ethereum transaction for the block.
-    /// - The state root hash of the block.
-    /// - The number of the block.
-    pub async fn search_block(
-        &self,
-        query: impl Into<BlockSearchQuery>,
-    ) -> client::Result<Option<BlockInfo>> {
-        self.get("search").query(&query.into()).send().await
+        Ok(block.map(block_info_from_details))
     }
 }
 
@@ -124,6 +69,10 @@ mod tests {
     use super::{super::test_utils::TestServerConfig, *};
 
     #[actix_rt::test]
+    #[cfg_attr(
+        not(feature = "api_test"),
+        ignore = "Use `zk test rust-api` command to perform this test"
+    )]
     async fn search_scope() -> anyhow::Result<()> {
         let cfg = TestServerConfig::default();
         cfg.fill_database().await?;

@@ -18,6 +18,9 @@ zk init
 During the first initialization you have to download around 8 GB of setup files, this should be done once. If you have a
 problem on this step of the initialization, see help for the `zk run plonk-setup` command.
 
+If you face any other problems with the `zk init` command, go to the [Troubleshooting](#Troubleshooting) section at the
+end of this file. There are solutions for some common error cases.
+
 To completely reset the dev environment:
 
 - Stop services:
@@ -87,3 +90,26 @@ zk prover
 
 Make sure you have environment variables set right, you can check it by running: `zk env`. You should see `* dev` in
 output.
+
+## Troubleshooting
+
+### SSL error: certificate verify failed
+
+**Problem**. `zk init` fails with the following error:
+
+```sh
+Initializing download: https://universal-setup.ams3.digitaloceanspaces.com/setup_2%5E20.key
+SSL error: certificate verify failed
+```
+
+**Solution**. Make sure that the version of `axel` on your computer is `2.17.10`.
+
+### rmSync is not a function
+
+**Problem**. `zk init` fails with the following error:
+
+```sh
+fs_1.default.rmSync is not a function
+```
+
+**Solution**. Make sure that the version of `node.js` installed on your computer is `14.14.0` or higher.

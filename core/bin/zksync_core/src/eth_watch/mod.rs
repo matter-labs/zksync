@@ -82,6 +82,10 @@ pub enum EthWatchRequest {
         address: Address,
         resp: oneshot::Sender<Vec<PriorityOp>>,
     },
+    GetUnconfirmedOps {
+        address: Address,
+        resp: oneshot::Sender<Vec<PriorityOp>>,
+    },
     GetUnconfirmedOpByHash {
         eth_hash: Vec<u8>,
         resp: oneshot::Sender<Option<PriorityOp>>,
@@ -132,31 +136,19 @@ impl<W: EthClient, S: Storage> EthWatch<W, S> {
             .await
     }
 
-    async fn update_withdrawals(
-        &mut self,
-        previous_block_with_accepted_events: u64,
-        new_block_with_accepted_events: u64,
-    ) -> anyhow::Result<()> {
-        // Get new complete withdrawals events
-        let complete_withdrawals_txs = self
-            .client
-            .get_complete_withdrawals_event(
-                BlockNumber::Number(previous_block_with_accepted_events.into()),
-                BlockNumber::Number(new_block_with_accepted_events.into()),
-            )
-            .await?;
-
-        self.storage
-            .store_complete_withdrawals(complete_withdrawals_txs)
-            .await?;
-        Ok(())
-    }
-
     async fn process_new_blocks(&mut self, last_ethereum_block: u64) -> anyhow::Result<()> {
         debug_assert!(self.eth_state.last_ethereum_block() < last_ethereum_block);
 
+        // We have to process every block between the current and previous known values.
+        // This is crucial since `eth_watch` may enter the backoff mode in which it will skip many blocks.
+        // Note that we don't have to add `number_of_confirmations_for_event` here, because the check function takes
+        // care of it on its own. Here we calculate "how many blocks should we watch", and the offsets with respect
+        // to the `number_of_confirmations_for_event` are calculated by `update_eth_state`.
+        let block_difference =
+            last_ethereum_block.saturating_sub(self.eth_state.last_ethereum_block());
+
         let (unconfirmed_queue, received_priority_queue) = self
-            .update_eth_state(last_ethereum_block, self.number_of_confirmations_for_event)
+            .update_eth_state(last_ethereum_block, block_difference)
             .await?;
 
         // Extend the existing priority operations with the new ones.
@@ -185,18 +177,12 @@ impl<W: EthClient, S: Storage> EthWatch<W, S> {
     async fn update_eth_state(
         &mut self,
         current_ethereum_block: u64,
-        depth_of_last_approved_block: u64,
+        unprocessed_blocks_amount: u64,
     ) -> anyhow::Result<(Vec<PriorityOp>, HashMap<u64, ReceivedPriorityOp>)> {
         let new_block_with_accepted_events =
             current_ethereum_block.saturating_sub(self.number_of_confirmations_for_event);
         let previous_block_with_accepted_events =
-            new_block_with_accepted_events.saturating_sub(depth_of_last_approved_block);
-
-        self.update_withdrawals(
-            previous_block_with_accepted_events,
-            new_block_with_accepted_events,
-        )
-        .await?;
+            new_block_with_accepted_events.saturating_sub(unprocessed_blocks_amount);
 
         let unconfirmed_queue = self.get_unconfirmed_ops(current_ethereum_block).await?;
         let priority_queue = self
@@ -246,7 +232,7 @@ impl<W: EthClient, S: Storage> EthWatch<W, S> {
         self.eth_state
             .unconfirmed_queue()
             .iter()
-            .find(|op| op.eth_hash.as_slice() == eth_hash)
+            .find(|op| op.eth_hash.as_bytes() == eth_hash)
             .cloned()
     }
 
@@ -260,6 +246,21 @@ impl<W: EthClient, S: Storage> EthWatch<W, S> {
                     deposit.from == address || deposit.to == address
                 }
                 _ => false,
+            })
+            .cloned()
+            .collect()
+    }
+
+    fn get_ongoing_ops_for(&self, address: Address) -> Vec<PriorityOp> {
+        self.eth_state
+            .unconfirmed_queue()
+            .iter()
+            .filter(|op| match &op.data {
+                ZkSyncPriorityOp::Deposit(deposit) => {
+                    // Address may be set to sender.
+                    deposit.from == address
+                }
+                ZkSyncPriorityOp::FullExit(full_exit) => full_exit.eth_address == address,
             })
             .cloned()
             .collect()
@@ -368,7 +369,11 @@ impl<W: EthClient, S: Storage> EthWatch<W, S> {
                 }
                 EthWatchRequest::GetUnconfirmedDeposits { address, resp } => {
                     let deposits_for_address = self.get_ongoing_deposits_for(address);
-                    resp.send(deposits_for_address).unwrap_or_default();
+                    resp.send(deposits_for_address).ok();
+                }
+                EthWatchRequest::GetUnconfirmedOps { address, resp } => {
+                    let deposits_for_address = self.get_ongoing_ops_for(address);
+                    resp.send(deposits_for_address).ok();
                 }
                 EthWatchRequest::GetUnconfirmedOpByHash { eth_hash, resp } => {
                     let unconfirmed_op = self.find_ongoing_op_by_hash(&eth_hash);

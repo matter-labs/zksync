@@ -39,7 +39,7 @@ function completer(env: any, info: CommandInfo) {
     info.subcommands.map((subcmd) => completer(env, subcmd));
 }
 
-// the commant `completion` without subcommands
+// the command `completion` without subcommands
 // is only meant to be used internally by the completion
 // engine of the shell and not by actual users.
 export function command(program: Command) {

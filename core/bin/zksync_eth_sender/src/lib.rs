@@ -598,10 +598,6 @@ impl<ETH: EthereumInterface, DB: DatabaseInterface> ETHSender<ETH, DB> {
     /// Creates a new Ethereum operation.
     async fn sign_new_tx(ethereum: &ETH, op: &ETHOperation) -> anyhow::Result<SignedCallResult> {
         let tx_options = {
-            let mut options = Options::default();
-            options.nonce = Some(op.nonce);
-            options.gas_price = Some(op.last_used_gas_price);
-
             // We set the gas limit for commit / verify operations as pre-calculated estimation.
             // This estimation is a higher bound based on a pre-calculated cost of every operation in the block.
             let gas_limit = Self::gas_limit_for_op(op);
@@ -618,9 +614,12 @@ impl<ETH: EthereumInterface, DB: DatabaseInterface> ETHSender<ETH, DB> {
                 gas_limit
             );
 
-            options.gas = Some(gas_limit);
-
-            options
+            Options {
+                nonce: Some(op.nonce),
+                gas_price: Some(op.last_used_gas_price),
+                gas: Some(gas_limit),
+                ..Default::default()
+            }
         };
 
         let signed_tx = ethereum
@@ -722,7 +721,7 @@ impl<ETH: EthereumInterface, DB: DatabaseInterface> ETHSender<ETH, DB> {
             } // not for eth sender
             AggregatedOperation::PublishProofBlocksOnchain(operation) => {
                 let args = operation.get_eth_tx_args();
-                self.ethereum.encode_tx_data("proofBlocks", args.as_slice())
+                self.ethereum.encode_tx_data("proveBlocks", args.as_slice())
             }
             AggregatedOperation::ExecuteBlocks(operation) => {
                 let args = operation.get_eth_tx_args();

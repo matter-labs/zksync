@@ -18,7 +18,4 @@ local metrics = [
   "api.rpc.get_account_state",
 ];
 
-G.dashboard(
-  'Metrics / rpc',
-  [ G.panel(metric) for metric in metrics ]
-)
+G.dashboard('rpc', metrics)

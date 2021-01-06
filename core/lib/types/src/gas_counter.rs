@@ -2,7 +2,6 @@
 //! the transactions that server sends to the Ethereum network.
 //! Server uses this module to ensure that generated transactions
 //! won't run out of the gas and won't trespass the block gas limit.
-
 // Workspace deps
 use zksync_basic_types::U256;
 // Local deps
@@ -38,11 +37,13 @@ impl CommitCost {
     }
 
     pub fn op_cost(op: &ZkSyncOp) -> U256 {
+        // let x = ChangePubKeyEthAuthDa;
         let cost = match op {
             ZkSyncOp::Noop(_) => 0,
             ZkSyncOp::Deposit(_) => Self::DEPOSIT_COST,
             ZkSyncOp::ChangePubKeyOffchain(change_pubkey) => {
-                if change_pubkey.tx.eth_signature.is_some() {
+                // TODO: determine correct cost of this tx
+                if change_pubkey.tx.eth_auth_data.is_ecdsa() {
                     Self::CHANGE_PUBKEY_COST_OFFCHAIN
                 } else {
                     Self::CHANGE_PUBKEY_COST_ONCHAIN
@@ -126,6 +127,17 @@ impl Default for GasCounter {
     }
 }
 
+#[derive(Debug)]
+pub struct WrongTransaction;
+
+impl std::fmt::Display for WrongTransaction {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "Wrong transaction in gas counter")
+    }
+}
+
+impl std::error::Error for WrongTransaction {}
+
 impl GasCounter {
     /// Base cost of `completeWithdrawals` contract method call.
     pub const COMPLETE_WITHDRAWALS_BASE_COST: u64 = 30_307;
@@ -140,15 +152,15 @@ impl GasCounter {
     ///
     /// Returns `Ok(())` if transaction fits, and returns `Err(())` if
     /// the block must be sealed without this transaction.
-    pub fn add_op(&mut self, op: &ZkSyncOp) -> Result<(), ()> {
+    pub fn add_op(&mut self, op: &ZkSyncOp) -> Result<(), WrongTransaction> {
         let new_commit_cost = self.commit_cost + CommitCost::op_cost(op);
         if Self::scale_up(new_commit_cost) > U256::from(TX_GAS_LIMIT) {
-            return Err(());
+            return Err(WrongTransaction);
         }
 
         let new_verify_cost = self.verify_cost + VerifyCost::op_cost(op);
         if Self::scale_up(new_verify_cost) > U256::from(TX_GAS_LIMIT) {
-            return Err(());
+            return Err(WrongTransaction);
         }
 
         self.commit_cost = new_commit_cost;
@@ -185,10 +197,17 @@ impl GasCounter {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{operations::ChangePubKeyOp, tx::ChangePubKey};
+    use crate::{
+        operations::{
+            ChangePubKeyOp, DepositOp, ForcedExitOp, FullExitOp, NoopOp, TransferOp,
+            TransferToNewOp, WithdrawOp,
+        },
+        priority_ops::{Deposit, FullExit},
+        tx::{ChangePubKey, ForcedExit, Transfer, Withdraw},
+    };
 
     #[test]
-    fn commit_cost() {
+    fn commit_and_verify_cost() {
         let change_pubkey_op = ChangePubKeyOp {
             tx: ChangePubKey::new(
                 1,
@@ -202,43 +221,124 @@ mod tests {
             ),
             account_id: 1,
         };
+        let deposit_op = DepositOp {
+            priority_op: Deposit {
+                from: Default::default(),
+                token: 0,
+                amount: Default::default(),
+                to: Default::default(),
+            },
+            account_id: 1,
+        };
+        let transfer_op = TransferOp {
+            tx: Transfer::new(
+                1,
+                Default::default(),
+                Default::default(),
+                0,
+                Default::default(),
+                Default::default(),
+                0,
+                0,
+                u64::MAX,
+                None,
+            ),
+            from: 1,
+            to: 1,
+        };
+        let transfer_to_new_op = TransferToNewOp {
+            tx: Transfer::new(
+                1,
+                Default::default(),
+                Default::default(),
+                0,
+                Default::default(),
+                Default::default(),
+                0,
+                0,
+                u64::MAX,
+                None,
+            ),
+            from: 1,
+            to: 1,
+        };
+        let noop_op = NoopOp {};
+        let full_exit_op = FullExitOp {
+            priority_op: FullExit {
+                account_id: 0,
+                eth_address: Default::default(),
+                token: 0,
+            },
+            withdraw_amount: None,
+        };
+        let forced_exit_op = ForcedExitOp {
+            tx: ForcedExit::new(1, Default::default(), 0, Default::default(), 0, None),
+            target_account_id: 1,
+            withdraw_amount: None,
+        };
+        let withdraw_op = WithdrawOp {
+            tx: Withdraw::new(
+                1,
+                Default::default(),
+                Default::default(),
+                0,
+                Default::default(),
+                Default::default(),
+                0,
+                None,
+            ),
+            account_id: 1,
+        };
 
-        // TODO: add other operations to this test (ZKS-110).
+        let test_vector_commit = vec![
+            (
+                ZkSyncOp::from(change_pubkey_op.clone()),
+                CommitCost::CHANGE_PUBKEY_COST_ONCHAIN,
+            ),
+            (ZkSyncOp::from(deposit_op.clone()), CommitCost::DEPOSIT_COST),
+            (
+                ZkSyncOp::from(transfer_op.clone()),
+                CommitCost::TRANSFER_COST,
+            ),
+            (
+                ZkSyncOp::from(transfer_to_new_op.clone()),
+                CommitCost::TRANSFER_TO_NEW_COST,
+            ),
+            (ZkSyncOp::from(noop_op.clone()), 0),
+            (
+                ZkSyncOp::from(full_exit_op.clone()),
+                CommitCost::FULL_EXIT_COST,
+            ),
+            (
+                ZkSyncOp::from(forced_exit_op.clone()),
+                CommitCost::FORCED_EXIT_COST,
+            ),
+            (
+                ZkSyncOp::from(withdraw_op.clone()),
+                CommitCost::WITHDRAW_COST,
+            ),
+        ];
+        let test_vector_verify = vec![
+            (
+                ZkSyncOp::from(change_pubkey_op),
+                VerifyCost::CHANGE_PUBKEY_COST,
+            ),
+            (ZkSyncOp::from(deposit_op), VerifyCost::DEPOSIT_COST),
+            (ZkSyncOp::from(transfer_op), VerifyCost::TRANSFER_COST),
+            (
+                ZkSyncOp::from(transfer_to_new_op),
+                VerifyCost::TRANSFER_TO_NEW_COST,
+            ),
+            (ZkSyncOp::from(noop_op), 0),
+            (ZkSyncOp::from(full_exit_op), VerifyCost::FULL_EXIT_COST),
+            (ZkSyncOp::from(forced_exit_op), VerifyCost::FORCED_EXIT_COST),
+            (ZkSyncOp::from(withdraw_op), VerifyCost::WITHDRAW_COST),
+        ];
 
-        let test_vector = vec![(
-            ZkSyncOp::from(change_pubkey_op),
-            CommitCost::CHANGE_PUBKEY_COST_ONCHAIN,
-        )];
-
-        for (op, expected_cost) in test_vector {
+        for (op, expected_cost) in test_vector_commit {
             assert_eq!(CommitCost::op_cost(&op), U256::from(expected_cost));
         }
-    }
-
-    #[test]
-    fn verify_cost() {
-        let change_pubkey_op = ChangePubKeyOp {
-            tx: ChangePubKey::new(
-                1,
-                Default::default(),
-                Default::default(),
-                0,
-                Default::default(),
-                Default::default(),
-                None,
-                None,
-            ),
-            account_id: 1,
-        };
-
-        // TODO: add other operations to this test (ZKS-110).
-
-        let test_vector = vec![(
-            ZkSyncOp::from(change_pubkey_op),
-            VerifyCost::CHANGE_PUBKEY_COST,
-        )];
-
-        for (op, expected_cost) in test_vector {
+        for (op, expected_cost) in test_vector_verify {
             assert_eq!(VerifyCost::op_cost(&op), U256::from(expected_cost));
         }
     }
