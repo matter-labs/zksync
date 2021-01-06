@@ -62,9 +62,9 @@ library Utils {
     /// @return bool flag indicating that transfer is successful
     function sendETHNoRevert(address payable _to, uint256 _amount) internal returns (bool) {
         // TODO: Use constant from Config
-        uint256 ETH_WITHDRAWAL_GAS_LIMIT = 10000;
+        uint256 WITHDRAWAL_GAS_LIMIT = 50000;
 
-        (bool callSuccess, ) = _to.call{gas: ETH_WITHDRAWAL_GAS_LIMIT, value: _amount}("");
+        (bool callSuccess, ) = _to.call{gas: WITHDRAWAL_GAS_LIMIT, value: _amount}("");
         return callSuccess;
     }
 
