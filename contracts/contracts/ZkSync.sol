@@ -366,12 +366,10 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
                 sent = false;
             }
         }
-        if (sent) {
-            emit OnchainWithdrawal(_recipient, _tokenId, _amount);
-        } else {
-            emit FailedOnchainWithdrawal(_recipient, _tokenId, _amount);
+        if (!sent) {
             increaseBalanceToWithdraw(packedBalanceKey, _amount);
         }
+        emit OnchainWithdrawal(_recipient, _tokenId, _amount, sent);
     }
 
     /// @dev Executes one block
@@ -594,7 +592,7 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
         bytes22 packedBalanceKey = packAddressAndTokenId(_to, _token);
         uint128 balance = balancesToWithdraw[packedBalanceKey].balanceToWithdraw;
         balancesToWithdraw[packedBalanceKey].balanceToWithdraw = balance.sub(_amount);
-        emit OnchainWithdrawal(_to, _token, _amount);
+        emit OnchainWithdrawal(_to, _token, _amount, true);
     }
 
     function emitDepositCommitEvent(uint32 _blockNumber, Operations.Deposit memory depositData) internal {
