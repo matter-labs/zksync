@@ -125,6 +125,10 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
     /// @notice zkSync contract upgrade. Can be external because Proxy contract intercepts illegal calls of this function.
     /// @param upgradeParameters Encoded representation of upgrade parameters
     function upgrade(bytes calldata upgradeParameters) external nonReentrant {
+        // NOTE: this line does not have any effect in contracts-4 upgrade since we require priority queue to be empty,
+        // but this should be enabled in future upgrades.
+        triggerExodusIfNeeded();
+
         require(upgradeParameters.length == 0, "af"); // upgrade parameters should be empty
 
         // Convert last verified block from old format to new format
@@ -491,7 +495,7 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
     /// @dev Exodus mode must be entered in case of current ethereum block number is higher than the oldest
     /// @dev of existed priority requests expiration block number.
     /// @return bool flag that is true if the Exodus mode must be entered.
-    function triggerExodusIfNeeded() external returns (bool) {
+    function triggerExodusIfNeeded() public returns (bool) {
         bool trigger =
             block.number >= priorityRequests[firstPriorityRequestId].expirationBlock &&
                 priorityRequests[firstPriorityRequestId].expirationBlock != 0;

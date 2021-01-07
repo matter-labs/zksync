@@ -69,18 +69,25 @@ library Utils {
 
         bytes32 signR;
         bytes32 signS;
-        uint256 offset = 0;
-
-        (offset, signR) = Bytes.readBytes32(_signature, offset);
-        (offset, signS) = Bytes.readBytes32(_signature, offset);
-        uint8 signV = uint8(_signature[offset]);
+        uint8 signV;
+        assembly {
+            signR := mload(add(_signature, 32))
+            signS := mload(add(_signature, 64))
+            signV := byte(0, mload(add(_signature, 96)))
+        }
 
         return ecrecover(_messageHash, signV, signR, signS);
     }
 
     /// @notice Returns new_hash = hash(old_hash + bytes)
     function concatHash(bytes32 _hash, bytes memory _bytes) internal pure returns (bytes32) {
-        return keccak256(abi.encodePacked(_hash, _bytes));
+        bytes32 result;
+        assembly {
+            let bytesLen := add(mload(_bytes), 32)
+            mstore(_bytes, _hash)
+            result := keccak256(_bytes, bytesLen)
+        }
+        return result;
     }
 
     function hashBytesToBytes20(bytes memory _bytes) internal pure returns (bytes20) {

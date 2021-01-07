@@ -70,7 +70,7 @@ contract Config {
     uint64 constant MAX_PRIORITY_REQUESTS_TO_DELETE_IN_VERIFY = 6;
 
     /// @dev Reserved time for users to send full exit priority operation in case of an upgrade (in seconds)
-    uint256 constant MASS_FULL_EXIT_PERIOD = 3 days;
+    uint256 constant MASS_FULL_EXIT_PERIOD = 9 days;
 
     /// @dev Reserved time for users to withdraw funds from full exit priority operation in case of an upgrade (in seconds)
     uint256 constant TIME_TO_WITHDRAW_FUNDS_FROM_FULL_EXIT = 2 days;
