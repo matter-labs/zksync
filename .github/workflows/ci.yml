@@ -45,8 +45,8 @@ jobs:
 
       - name: update-deps
         run: |
-          rustup update 1.47.0
-          rustup default 1.47.0
+          rustup update stable
+          rustup default stable
           cargo install --version=0.2.0 sqlx-cli
           cargo install diesel_cli --no-default-features --features postgres
           docker pull matterlabs/ci-integration-test:latest
@@ -57,10 +57,12 @@ jobs:
       - name: lints
         run: |
           # lint non-rust code
+
           zk fmt --check
           yarn lint:md
           yarn lint:sol
           zk dummy-prover ensure-disabled
+          ulimit -c
           cargo fmt --all -- --check
           zk f cargo clippy --tests --benches -- -D warnings
           pushd sdk/zksync-crypto
