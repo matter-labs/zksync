@@ -9,6 +9,7 @@ All notable changes to `zksync_rs` will be documented in this file.
 ### Added
 
 - Additional unit tests.
+- Exporting `closest_greater_or_eq_packable_fee_amount` and `closest_greater_or_eq_packable_token_amount` functions.
 
 ### Changed
 
