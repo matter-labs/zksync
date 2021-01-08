@@ -15,7 +15,6 @@ use zksync_types::{ethereum::CompleteWithdrawalsTx, Address, Nonce, PriorityOp, 
 
 struct ContractTopics {
     new_priority_request: Hash,
-    complete_withdrawals_event: Hash,
 }
 
 impl ContractTopics {
@@ -23,11 +22,6 @@ impl ContractTopics {
         Self {
             new_priority_request: zksync_contract
                 .event("NewPriorityRequest")
-                .expect("main contract abi error")
-                .signature(),
-
-            complete_withdrawals_event: zksync_contract
-                .event("PendingWithdrawalsComplete")
                 .expect("main contract abi error")
                 .signature(),
         }
@@ -41,15 +35,8 @@ pub trait EthClient {
         from: BlockNumber,
         to: BlockNumber,
     ) -> anyhow::Result<Vec<PriorityOp>>;
-    async fn get_complete_withdrawals_event(
-        &self,
-        from: BlockNumber,
-        to: BlockNumber,
-    ) -> anyhow::Result<Vec<CompleteWithdrawalsTx>>;
     async fn block_number(&self) -> anyhow::Result<u64>;
     async fn get_auth_fact(&self, address: Address, nonce: Nonce) -> anyhow::Result<Vec<u8>>;
-    async fn get_first_pending_withdrawal_index(&self) -> anyhow::Result<u32>;
-    async fn get_number_of_pending_withdrawals(&self) -> anyhow::Result<u32>;
 }
 
 pub struct EthHttpClient {
@@ -116,24 +103,6 @@ impl EthClient for EthHttpClient {
         result
     }
 
-    async fn get_complete_withdrawals_event(
-        &self,
-        from: BlockNumber,
-        to: BlockNumber,
-    ) -> anyhow::Result<Vec<CompleteWithdrawalsTx>> {
-        let start = Instant::now();
-
-        let result = self
-            .get_events(from, to, vec![self.topics.complete_withdrawals_event])
-            .await;
-
-        metrics::histogram!(
-            "eth_watcher.get_complete_withdrawals_event",
-            start.elapsed()
-        );
-        result
-    }
-
     async fn block_number(&self) -> anyhow::Result<u64> {
         Ok(self.web3.eth().block_number().await?.as_u64())
     }
@@ -149,36 +118,5 @@ impl EthClient for EthHttpClient {
             )
             .await
             .map_err(|e| format_err!("Failed to query contract authFacts: {}", e))
-    }
-
-    async fn get_first_pending_withdrawal_index(&self) -> anyhow::Result<u32> {
-        self.zksync_contract
-            .query(
-                "firstPendingWithdrawalIndex",
-                (),
-                None,
-                Options::default(),
-                None,
-            )
-            .await
-            .map_err(|e| {
-                format_err!(
-                    "Failed to query contract firstPendingWithdrawalIndex: {}",
-                    e
-                )
-            })
-    }
-
-    async fn get_number_of_pending_withdrawals(&self) -> anyhow::Result<u32> {
-        self.zksync_contract
-            .query(
-                "numberOfPendingWithdrawals",
-                (),
-                None,
-                Options::default(),
-                None,
-            )
-            .await
-            .map_err(|e| format_err!("Failed to query contract numberOfPendingWithdrawals: {}", e))
     }
 }

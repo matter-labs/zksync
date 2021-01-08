@@ -481,8 +481,7 @@ impl ZkSyncStateKeeper {
             last_committed == 0 && accounts.is_empty(),
             "db should be empty"
         );
-        let mut fee_account = Account::default();
-        fee_account.address = *fee_account_address;
+        let fee_account = Account::default_with_address(fee_account_address);
         let db_account_update = AccountUpdate::Create {
             address: *fee_account_address,
             nonce: fee_account.nonce,

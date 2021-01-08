@@ -1,5 +1,5 @@
 // Built-in
-use std::sync::{Arc, RwLock};
+use std::sync::Arc;
 use std::thread;
 use std::time::Duration;
 // External
@@ -14,6 +14,7 @@ use futures::channel::mpsc;
 use jsonwebtoken::errors::Error as JwtError;
 use jsonwebtoken::{decode, DecodingKey, Validation};
 use serde::{Deserialize, Serialize};
+use tokio::sync::RwLock;
 // Workspace deps
 use zksync_config::ProverOptions;
 use zksync_storage::{ConnectionPool, StorageProcessor};
@@ -268,7 +269,7 @@ async fn required_replicas(
     data: web::Data<AppState>,
     _input: web::Json<RequiredReplicasInput>,
 ) -> actix_web::Result<HttpResponse> {
-    let mut oracle = data.scaler_oracle.write().expect("Expected write lock");
+    let mut oracle = data.scaler_oracle.write().await;
 
     let needed_count = oracle
         .provers_required()

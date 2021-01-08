@@ -149,8 +149,7 @@ impl ZkSyncState {
                 AccountUpdate::Create { address, nonce } => {
                     assert!(self.get_account_by_address(&address).is_none());
 
-                    let mut account = Account::default();
-                    account.address = address;
+                    let mut account = Account::default_with_address(&address);
                     account.nonce = nonce;
                     self.insert_account(account_id, account);
                 }

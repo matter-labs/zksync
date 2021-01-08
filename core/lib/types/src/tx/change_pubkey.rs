@@ -256,7 +256,7 @@ impl ChangePubKey {
         {
             eth_signed_msg.extend_from_slice(batch_hash.as_bytes());
         } else {
-            eth_signed_msg.extend_from_slice(H256::zero().as_bytes());
+            eth_signed_msg.extend_from_slice(H256::default().as_bytes());
         }
         ensure!(
             eth_signed_msg.len() == CHANGE_PUBKEY_SIGNATURE_LEN,

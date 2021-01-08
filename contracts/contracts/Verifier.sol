@@ -34,7 +34,7 @@ contract Verifier is KeysWithPlonkVerifier, Config {
         // #endif
         for (uint256 i = 0; i < _individual_vks_inputs.length; ++i) {
             uint256 commitment = _individual_vks_inputs[i];
-            _individual_vks_inputs[i] = uint256(commitment) & INPUT_MASK;
+            _individual_vks_inputs[i] = commitment & INPUT_MASK;
         }
         VerificationKey memory vk = getVkAggregated(uint32(_vkIndexes.length));
 
