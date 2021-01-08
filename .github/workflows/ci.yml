@@ -62,7 +62,7 @@ jobs:
           yarn lint:md
           yarn lint:sol
           zk dummy-prover ensure-disabled
-          ulimit -c
+          ulimit -S -c unlimited
           cargo fmt --all -- --check
           zk f cargo clippy --tests --benches -- -D warnings
           pushd sdk/zksync-crypto
@@ -117,21 +117,21 @@ jobs:
         ports:
           - 9876:9876
 
-  integration-test:
-    runs-on: [ self-hosted, DEV-CI ]
-    steps:
-      - name: setup-env
-        run: |
-          echo ZKSYNC_HOME=$(pwd) >> $GITHUB_ENV
-          echo CI=1 >> $GITHUB_ENV
-          echo $(pwd)/bin >> $GITHUB_PATH
-
-      - name: integration-tests
-        run: zk test integration all --in-docker
-
-      - name: setup-env
-        run: |
-          echo ZKSYNC_HOME=$(pwd) >> $GITHUB_ENV
-          echo CI=1 >> $GITHUB_ENV
-          echo $(pwd)/bin >> $GITHUB_PATH
-
+#  integration-test:
+#    runs-on: [ self-hosted, DEV-CI ]
+#    steps:
+#      - name: setup-env
+#        run: |
+#          echo ZKSYNC_HOME=$(pwd) >> $GITHUB_ENV
+#          echo CI=1 >> $GITHUB_ENV
+#          echo $(pwd)/bin >> $GITHUB_PATH
+#
+#      - name: integration-tests
+#        run: zk test integration all --in-docker
+#
+#      - name: setup-env
+#        run: |
+#          echo ZKSYNC_HOME=$(pwd) >> $GITHUB_ENV
+#          echo CI=1 >> $GITHUB_ENV
+#          echo $(pwd)/bin >> $GITHUB_PATH
+#
