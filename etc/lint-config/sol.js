@@ -1,7 +1,7 @@
 module.exports = {
   "extends": "solhint:recommended",
   "rules": {
-    // Unfortunately on the time of this writing, `--quiet` option of solhint is not woring.
+    // Unfortunately on the time of this writing, `--quiet` option of solhint is not working.
     // And also there were >290 warnings on *.sol files. Since changes to *.sol 
     // files require an audit, it was decided to postpone the changes to make the solhint
     // pass.
