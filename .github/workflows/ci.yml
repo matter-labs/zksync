@@ -147,20 +147,20 @@ jobs:
           echo CI=1 >> $GITHUB_ENV
           echo $(pwd)/bin >> $GITHUB_PATH
 
-    - name: contracts-unit-tests
-      run: zk test contracts
+      - name: contracts-unit-tests
+        run: zk test contracts
 
-    - name: js-unit-tests
-      run: zk test js
+      - name: js-unit-tests
+        run: zk test js
 
-    - name: rust-unit-tests
-      run: |
-        # Api tests require database setup
-        zk db setup
-        zk test rust
+      - name: rust-unit-tests
+        run: |
+          # Api tests require database setup
+          zk db setup
+          zk test rust
 
-    - name: zksync-crypto-tests
-      run: pushd sdk/zksync-crypto && zk f cargo test --release
+      - name: zksync-crypto-tests
+        run: pushd sdk/zksync-crypto && zk f cargo test --release
 
     services:
       geth:
