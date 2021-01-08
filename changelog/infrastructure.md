@@ -11,7 +11,7 @@ components, the logs will have the following format:
 
 ### Added
 
-- (`explorer`): account and token ids.
+- (`explorer`): account and token ids, verified and committed nonces. 
 
 ### Changed
 
