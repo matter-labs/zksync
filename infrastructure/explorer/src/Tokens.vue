@@ -17,7 +17,7 @@
                     :fields="['symbol', 'address', 'decimals']"
                     class="nowrap"
                 >
-                    <template v-slot:cell(symbol)="data"><span v-html="data.item['symbol']"/></template>
+                    <template v-slot:cell(symbol)="data"><span v-html="data.item['symbol']" /></template>
                     <template v-slot:cell(address)="data">
                         <a
                             target="_blank"
@@ -28,7 +28,7 @@
                             <i class="fas fa-external-link-alt"></i>
                         </a>
                     </template>
-                    <template v-slot:cell(decimals)="data"><span v-html="data.item['decimals']"/></template>
+                    <template v-slot:cell(decimals)="data"><span v-html="data.item['decimals']" /></template>
                 </b-table>
             </div>
         </b-container>
@@ -71,7 +71,7 @@ export default {
         async update() {
             const client = await clientPromise;
             this.tokens = await client.loadTokens();
-            this.tokens.sort((a, b) => a.symbol.localeCompare(b.symbol)).map(t => t.symbol);
+            this.tokens.sort((a, b) => a.symbol.localeCompare(b.symbol)).map((t) => t.symbol);
             this.loading = false;
         },
         urlForToken(address) {

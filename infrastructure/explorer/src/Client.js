@@ -41,7 +41,7 @@ export class Client {
 
     static async new() {
         window.syncProvider = await Provider.newHttpProvider(config.HTTP_RPC_API_ADDR);
-        const tokensPromise = window.syncProvider.getTokens().then(tokens => {
+        const tokensPromise = window.syncProvider.getTokens().then((tokens) => {
             const res = {};
             for (const token of Object.values(tokens)) {
                 const symbol = token.symbol || `${token.id.toString().padStart(3, '0')}`;
@@ -194,7 +194,7 @@ export class Client {
             return [];
         }
         const transactions = await this.blockExplorerClient.getAccountTransactions(address, offset, limit);
-        const res = transactions.map(async tx => {
+        const res = transactions.map(async (tx) => {
             const type = tx.tx.type || '';
             const hash = tx.hash;
             const created_at = tx.created_at;

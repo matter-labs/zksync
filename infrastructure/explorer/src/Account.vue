@@ -21,7 +21,7 @@
             <div v-else-if="balances.length == 0">No balances yet.</div>
             <b-card v-else no-body class="table-margin-hack table-width-hack">
                 <b-table responsive thead-class="displaynone" class="nowrap" :items="balancesProps">
-                    <template v-slot:cell(value)="data"><span v-html="data.item.value"/></template>
+                    <template v-slot:cell(value)="data"><span v-html="data.item.value" /></template>
                 </b-table>
             </b-card>
             <h5 class="mt-3 mb-2">Account transactions</h5>
@@ -126,7 +126,7 @@ export default {
     },
     beforeRouteEnter(to, from, next) {
         if (to.params.address) {
-            next(vm => (vm.nextAddress = to.params.address));
+            next((vm) => (vm.nextAddress = to.params.address));
         }
         next();
     },
@@ -159,7 +159,7 @@ export default {
             const addressAtBeginning = this.nextAddress;
 
             const balances = await this.client.getCommitedBalances(addressAtBeginning);
-            this.balances = balances.map(bal => ({
+            this.balances = balances.map((bal) => ({
                 name: bal.tokenSymbol,
                 value: bal.balance
             }));
@@ -236,7 +236,7 @@ export default {
         },
 
         transactionProps() {
-            return this.transactions.map(tx => {
+            return this.transactions.map((tx) => {
                 if (tx.type == 'Withdraw') {
                     tx.type = 'Withdrawal';
                 }
@@ -253,7 +253,7 @@ export default {
         transactionFields() {
             if (this.transactionProps && this.transactionProps.length) {
                 return Object.keys(this.transactionProps[0]).filter(
-                    k => !['hash', 'fromAddr', 'toAddr', 'success'].includes(k)
+                    (k) => !['hash', 'fromAddr', 'toAddr', 'success'].includes(k)
                 );
             }
             return [];
