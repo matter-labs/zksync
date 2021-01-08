@@ -8,7 +8,7 @@ on:
     - trying
 
 jobs:
-  pre-run:
+  unit:
     # We currently have two self-hosted runners, one of which is marked "DEV-CI" and other one is marder "MAIN".
     # "MAIN" is the current CI runner, "DEV-CI" is currently used to experiment with CI optimizing.
     runs-on: [self-hosted, DEV-CI]
@@ -116,7 +116,6 @@ jobs:
 
   integration-test:
     runs-on: [ self-hosted, DEV-CI ]
-    needs: pre-run
     steps:
       - name: setup-env
         run: |
