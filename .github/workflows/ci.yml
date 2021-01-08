@@ -8,10 +8,10 @@ on:
     - trying
 
 jobs:
-  ci-all:
+  pre-run:
     # We currently have two self-hosted runners, one of which is marked "DEV-CI" and other one is marder "MAIN".
     # "MAIN" is the current CI runner, "DEV-CI" is currently used to experiment with CI optimizing.
-    runs-on: [self-hosted, MAIN, DEV-CI]
+    runs-on: [self-hosted, DEV-CI]
 
     steps:
     - uses: actions/checkout@v2
@@ -75,15 +75,51 @@ jobs:
         # EIP1271 contract is used in Rust & JS unit tests.
         zk contract build-dev
         zk run deploy-eip1271
+    services:
+      postgres:
+        image: postgres:10.4
+        ports:
+          - 5432:5432
 
-    - name: integration-tests
-      run: zk test integration all --in-docker
+  integration-test:
+    runs-on: [ self-hosted, DEV-CI ]
+    needs: pre-run
+    steps:
+      - name: integration-tests
+        run: zk test integration all --in-docker
 
-    - name: integration-testkit
-      run: zk test integration testkit
-      env:
-        SQLX_OFFLINE: "true"
+  integration-testkit:
+    runs-on: [ self-hosted, DEV-CI ]
+    needs: pre-run
+    steps:
+      - name: integration-testkit
+        run: zk test integration testkit
+        env:
+          SQLX_OFFLINE: "true"
 
+    services:
+      geth:
+        image: matterlabs/geth:latest
+        ports:
+          - 8545:8545
+          - 8546:8546
+        env:
+          CONFIG: standard
+
+      postgres:
+        image: postgres:10.4
+        ports:
+          - 5432:5432
+
+      dev-ticker:
+        image: matterlabs/dev-ticker:latest
+        ports:
+          - 9876:9876
+
+  unit-tests:
+    runs-on: [ self-hosted, DEV-CI ]
+    needs: pre-run
+    steps:
     - name: contracts-unit-tests
       run: zk test contracts
 
