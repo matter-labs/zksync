@@ -45,7 +45,8 @@ jobs:
 
     - name: update-deps
       run: |
-        rustup update stable
+        rustup update 1.48.0
+        rustup default 1.48.0
         cargo install --version=0.2.0 sqlx-cli
         cargo install diesel_cli --no-default-features --features postgres
         docker pull matterlabs/ci-integration-test:latest
