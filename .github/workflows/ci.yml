@@ -8,10 +8,10 @@ on:
     - trying
 
 jobs:
-  unit:
+  ci-all:
     # We currently have two self-hosted runners, one of which is marked "DEV-CI" and other one is marder "MAIN".
     # "MAIN" is the current CI runner, "DEV-CI" is currently used to experiment with CI optimizing.
-    runs-on: [self-hosted, DEV-CI]
+    runs-on: [self-hosted, DEV-CI, MAIN]
 
     steps:
       - uses: actions/checkout@v2
@@ -80,6 +80,9 @@ jobs:
           zk contract build-dev
           zk run deploy-eip1271
 
+      - name: integration-tests
+        run: zk test integration all --in-docker
+
       - name: integration-testkit
         run: zk test integration testkit
         env:
@@ -117,22 +120,3 @@ jobs:
         image: matterlabs/dev-ticker:latest
         ports:
           - 9876:9876
-
-  integration-test:
-    runs-on: [ self-hosted, DEV-CI ]
-    steps:
-      - name: setup-env
-        run: |
-          echo ZKSYNC_HOME=$(pwd) >> $GITHUB_ENV
-          echo CI=1 >> $GITHUB_ENV
-          echo $(pwd)/bin >> $GITHUB_PATH
-
-      - name: integration-tests
-        run: zk test integration all --in-docker
-
-      - name: setup-env
-        run: |
-          echo ZKSYNC_HOME=$(pwd) >> $GITHUB_ENV
-          echo CI=1 >> $GITHUB_ENV
-          echo $(pwd)/bin >> $GITHUB_PATH
-
