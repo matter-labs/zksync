@@ -17,7 +17,7 @@
                     :fields="tokenFields"
                     class="nowrap"
                 >
-                    <template v-slot:cell(symbol)="data"><span v-html="data.item['symbol']"/></template>
+                    <template v-slot:cell(symbol)="data"><span v-html="data.item['symbol']" /></template>
                     <template v-slot:cell(address)="data">
                         <a
                             target="_blank"

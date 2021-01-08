@@ -146,7 +146,7 @@ command
 command
     .command('deploy-eip1271')
     .description('deploy test EIP-1271 "smart wallet"')
-    .action(async (cmd: Command) => {
+    .action(async () => {
         await deployEIP1271();
     });
 

@@ -158,6 +158,18 @@ async fn commit_block(
         }
     }
 
+    // This is needed to keep track of how many priority ops are in each block
+    // and trigger grafana alerts if there are suspiciously few
+    let total_priority_ops = block
+        .block_transactions
+        .iter()
+        .filter(|tx| matches!(tx, ExecutedOperations::PriorityOp(_)))
+        .count();
+    metrics::histogram!(
+        "committer.priority_ops_per_block",
+        total_priority_ops as u64
+    );
+
     transaction
         .chain()
         .state_schema()
