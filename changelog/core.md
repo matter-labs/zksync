@@ -31,3 +31,10 @@ All notable changes to the core components will be documented in this file.
 ### Fixed
 
 - Bug with delay between receiving a job and starting sending heartbeats.
+
+## Unreleased
+
+### Changed
+
+- Metrics were added to some functions from lib/storage.
+- `get_tx_by_hash` function was simplified.
