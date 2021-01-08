@@ -75,11 +75,19 @@ jobs:
         # EIP1271 contract is used in Rust & JS unit tests.
         zk contract build-dev
         zk run deploy-eip1271
+
     services:
       postgres:
         image: postgres:10.4
         ports:
           - 5432:5432
+      geth:
+        image: matterlabs/geth:latest
+        ports:
+          - 8545:8545
+          - 8546:8546
+        env:
+          CONFIG: standard
 
   integration-test:
     runs-on: [ self-hosted, DEV-CI ]
