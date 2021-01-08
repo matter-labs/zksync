@@ -93,6 +93,12 @@ jobs:
     runs-on: [ self-hosted, DEV-CI ]
     needs: pre-run
     steps:
+      - name: setup-env
+        run: |
+          echo ZKSYNC_HOME=$(pwd) >> $GITHUB_ENV
+          echo CI=1 >> $GITHUB_ENV
+          echo $(pwd)/bin >> $GITHUB_PATH
+
       - name: integration-tests
         run: zk test integration all --in-docker
 
@@ -100,6 +106,12 @@ jobs:
     runs-on: [ self-hosted, DEV-CI ]
     needs: pre-run
     steps:
+      - name: setup-env
+        run: |
+          echo ZKSYNC_HOME=$(pwd) >> $GITHUB_ENV
+          echo CI=1 >> $GITHUB_ENV
+          echo $(pwd)/bin >> $GITHUB_PATH
+
       - name: integration-testkit
         run: zk test integration testkit
         env:
@@ -127,7 +139,14 @@ jobs:
   unit-tests:
     runs-on: [ self-hosted, DEV-CI ]
     needs: pre-run
+
     steps:
+      - name: setup-env
+        run: |
+          echo ZKSYNC_HOME=$(pwd) >> $GITHUB_ENV
+          echo CI=1 >> $GITHUB_ENV
+          echo $(pwd)/bin >> $GITHUB_PATH
+
     - name: contracts-unit-tests
       run: zk test contracts
 
