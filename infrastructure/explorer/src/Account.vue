@@ -9,6 +9,8 @@
                     <template v-slot:cell(value)="data">
                         <Entry v-if="data.item.name == 'Address'" :value="data.item.value" />
                         <Entry v-else-if="data.item.name == 'Account Id'" :value="data.item.value" />
+                        <Entry v-else-if="data.item.name == 'Verified nonce'" :value="data.item.value" />
+                        <Entry v-else-if="data.item.name == 'Committed nonce'" :value="data.item.value" />
                     </template>
                 </b-table>
             </b-card>
@@ -99,6 +101,8 @@ export default {
         client: null,
         nextAddress: '',
         accountId: 'loading...',
+        verifiedNonce: 'loading...',
+        committedNonce: 'loading...',
     }),
     watch: {
         async currentPage() {
@@ -157,6 +161,8 @@ export default {
             const addressAtBeginning = this.nextAddress;
 
             const account = await this.client.getAccount(addressAtBeginning);
+            this.verifiedNonce = account.verified.nonce;
+            this.committedNonce = account.committed.nonce;
             const balances = accountStateToBalances(account);
             this.balances = balances.map(bal => ({
                 name: bal.tokenSymbol,
@@ -219,7 +225,9 @@ export default {
         accountDataProps() {
             const dataProps = [
                 this.addressEntry,
-                this.accountIdEntry
+                this.accountIdEntry,
+                this.verifiedNonceEntry,
+                this.committedNonceEntry
             ];
             return dataProps; 
         },
@@ -232,6 +240,14 @@ export default {
         accountIdEntry() {
             return makeEntry('Account Id')
                 .innerHTML(this.accountId);
+        },
+        verifiedNonceEntry() {
+            return makeEntry('Verified nonce')
+                .innerHTML(this.verifiedNonce);
+        },
+        committedNonceEntry() {
+            return makeEntry('Committed nonce')
+                .innerHTML(this.committedNonce);
         },
         balancesProps() {
             return this.balances;
