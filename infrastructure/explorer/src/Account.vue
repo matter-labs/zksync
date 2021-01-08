@@ -70,7 +70,7 @@ import timeConstants from './timeConstants';
 import { clientPromise } from './Client';
 import SearchField from './SearchField.vue';
 import CopyableAddress from './CopyableAddress.vue';
-import { accountStateToBalances, makeEntry } from './utils';  
+import { accountStateToBalances, makeEntry } from './utils';
 import Navbar from './Navbar.vue';
 
 import Entry from './links/Entry.vue';
@@ -102,7 +102,7 @@ export default {
         nextAddress: '',
         accountId: 'loading...',
         verifiedNonce: 'loading...',
-        committedNonce: 'loading...',
+        committedNonce: 'loading...'
     }),
     watch: {
         async currentPage() {
@@ -164,7 +164,7 @@ export default {
             this.verifiedNonce = account.verified.nonce;
             this.committedNonce = account.committed.nonce;
             const balances = accountStateToBalances(account);
-            this.balances = balances.map(bal => ({
+            this.balances = balances.map((bal) => ({
                 name: bal.tokenSymbol,
                 value: bal.balance
             }));
@@ -229,7 +229,7 @@ export default {
                 this.verifiedNonceEntry,
                 this.committedNonceEntry
             ];
-            return dataProps; 
+            return dataProps;
         },
         addressEntry() {
             return makeEntry('Address')
@@ -238,16 +238,13 @@ export default {
                 .tooltipRight(true);
         },
         accountIdEntry() {
-            return makeEntry('Account Id')
-                .innerHTML(this.accountId);
+            return makeEntry('Account Id').innerHTML(this.accountId);
         },
         verifiedNonceEntry() {
-            return makeEntry('Verified nonce')
-                .innerHTML(this.verifiedNonce);
+            return makeEntry('Verified nonce').innerHTML(this.verifiedNonce);
         },
         committedNonceEntry() {
-            return makeEntry('Committed nonce')
-                .innerHTML(this.committedNonce);
+            return makeEntry('Committed nonce').innerHTML(this.committedNonce);
         },
         balancesProps() {
             return this.balances;
