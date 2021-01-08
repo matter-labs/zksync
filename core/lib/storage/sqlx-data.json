@@ -446,57 +446,6 @@
       ]
     }
   },
-  "17db5f9b97791dc5c8edbc69b5a780d68838adbb9debccdc678600673e328aae": {
-    "query": "\n                SELECT * FROM account_creates\n                WHERE address = $1 AND is_create = $2\n                ORDER BY block_number desc\n                LIMIT 1\n            ",
-    "describe": {
-      "columns": [
-        {
-          "ordinal": 0,
-          "name": "account_id",
-          "type_info": "Int8"
-        },
-        {
-          "ordinal": 1,
-          "name": "is_create",
-          "type_info": "Bool"
-        },
-        {
-          "ordinal": 2,
-          "name": "block_number",
-          "type_info": "Int8"
-        },
-        {
-          "ordinal": 3,
-          "name": "address",
-          "type_info": "Bytea"
-        },
-        {
-          "ordinal": 4,
-          "name": "nonce",
-          "type_info": "Int8"
-        },
-        {
-          "ordinal": 5,
-          "name": "update_order_id",
-          "type_info": "Int4"
-        }
-      ],
-      "parameters": {
-        "Left": [
-          "Bytea",
-          "Bool"
-        ]
-      },
-      "nullable": [
-        false,
-        false,
-        false,
-        false,
-        false,
-        false
-      ]
-    }
-  },
   "17fc469643c2d885502a9f3e5d44c2b7032e03f694c663215fe9160fc8db38df": {
     "query": "\n                        INSERT INTO accounts ( id, last_block, nonce, address, pubkey_hash )\n                        VALUES ( $1, $2, $3, $4, $5 )\n                        ",
     "describe": {

@@ -12,6 +12,7 @@ All notable changes to the core components will be documented in this file.
 ### Fixed
 
 - Bug with `to_float` function. Now, it really rounds to the closest less or equal float number.
+- Wrong index type used in the database causing some queries to take too much time.
 
 ## Prior to 2020-12-23
 

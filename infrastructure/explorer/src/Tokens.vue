@@ -8,15 +8,7 @@
             </div>
             <div v-else>
                 <h5>Supported Tokens</h5>
-                <b-table
-                    responsive
-                    id="my-table"
-                    hover
-                    outlined
-                    :items="tokens"
-                    :fields="['symbol', 'address', 'decimals']"
-                    class="nowrap"
-                >
+                <b-table responsive id="my-table" hover outlined :items="tokens" :fields="tokenFields" class="nowrap">
                     <template v-slot:cell(symbol)="data"><span v-html="data.item['symbol']" /></template>
                     <template v-slot:cell(address)="data">
                         <a
@@ -29,6 +21,7 @@
                         </a>
                     </template>
                     <template v-slot:cell(decimals)="data"><span v-html="data.item['decimals']" /></template>
+                    <template v-slot:cell(id)="data"><span v-html="data.item['id']" /></template>
                 </b-table>
             </div>
         </b-container>
@@ -64,6 +57,21 @@ export default {
                     text: 'Tokens',
                     active: true
                 }
+            ],
+            tokenFields: [
+                {
+                    key: 'symbol'
+                },
+                {
+                    key: 'address'
+                },
+                {
+                    key: 'decimals'
+                },
+                {
+                    key: 'id',
+                    label: 'Internal Id'
+                }
             ]
         };
     },
@@ -71,7 +79,7 @@ export default {
         async update() {
             const client = await clientPromise;
             this.tokens = await client.loadTokens();
-            this.tokens.sort((a, b) => a.symbol.localeCompare(b.symbol)).map((t) => t.symbol);
+            this.tokens.sort((a, b) => a.symbol.localeCompare(b.symbol));
             this.loading = false;
         },
         urlForToken(address) {
