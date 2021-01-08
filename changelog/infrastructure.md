@@ -12,3 +12,4 @@ components, the logs will have the following format:
 ### Changed
 
 - `explorer` was refactored and optimized.
+- `tok_cli` was removed and all commands from it have been moved to `zk`.

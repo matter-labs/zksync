@@ -46,7 +46,7 @@ async function main() {
 
     program
         .command('add')
-        .option('-n, --token_name <token_name>')
+        .option('-n, --token-name <token_name>')
         .option('-s, --symbol <symbol>')
         .option('-d, --decimals <decimals>')
         .description('Adds a new token with a given fields')
