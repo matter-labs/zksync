@@ -1,5 +1,4 @@
-import { types } from 'zksync';
-import { BigNumber, BigNumberish, utils } from 'ethers';
+import { BigNumber, utils } from 'ethers';
 import { expect } from 'chai';
 import { isOperationFeeAcceptable, numberAsFractionInBIPs } from './utils';
 
