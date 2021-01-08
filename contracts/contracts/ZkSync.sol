@@ -722,8 +722,8 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
         pure
         returns (bool)
     {
-        (uint256 offset, bytes memory signature) = Bytes.read(_ethWitness, 1, 65); // offset is 1 because we skip type of ChangePubkey
-        (, bytes32 additionalData) = Bytes.readBytes32(_ethWitness, offset);
+        (, bytes memory signature) = Bytes.read(_ethWitness, 1, 65); // offset is 1 because we skip type of ChangePubkey
+        //        (, bytes32 additionalData) = Bytes.readBytes32(_ethWitness, offset);
         bytes32 messageHash =
             keccak256(
                 abi.encodePacked(
@@ -731,7 +731,7 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
                     _changePk.pubKeyHash,
                     _changePk.nonce,
                     _changePk.accountId,
-                    additionalData
+                    bytes32(0)
                 )
             );
         address recoveredAddress = Utils.recoverAddressFromEthSignature(signature, messageHash);
