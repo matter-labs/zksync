@@ -28,8 +28,7 @@ impl StateKeeperTester {
         let (_request_tx, request_rx) = mpsc::channel(CHANNEL_SIZE);
         let (response_tx, response_rx) = mpsc::channel(CHANNEL_SIZE);
 
-        let mut fee_collector = Account::default();
-        fee_collector.address = H160::random();
+        let fee_collector = Account::default_with_address(&H160::random());
 
         let mut init_params = ZkSyncStateInitParams::default();
         init_params.insert_account(0, fee_collector.clone());
@@ -76,8 +75,7 @@ impl StateKeeperTester {
         let address = PackedEthSignature::address_from_private_key(&eth_sk)
             .expect("Can't get address from the ETH secret key");
 
-        let mut account = Account::default();
-        account.address = address;
+        let mut account = Account::default_with_address(&address);
         account.pub_key_hash = PubKeyHash::from_privkey(&sk);
         self.state_keeper
             .state
@@ -229,8 +227,7 @@ fn test_create_incorrect_state_keeper() {
     let (_request_tx, request_rx) = mpsc::channel(CHANNEL_SIZE);
     let (response_tx, _response_rx) = mpsc::channel(CHANNEL_SIZE);
 
-    let mut fee_collector = Account::default();
-    fee_collector.address = H160::random();
+    let fee_collector = Account::default_with_address(&H160::random());
 
     let mut init_params = ZkSyncStateInitParams::default();
     init_params.insert_account(0, fee_collector.clone());

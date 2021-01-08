@@ -17,9 +17,10 @@ const N_ACCOUNTS: u32 = 100;
 type RealSMT = SparseMerkleTree<CircuitAccount<Engine>, Fr, RescueHasher<Engine>>;
 
 fn gen_account(id: u32) -> CircuitAccount<Engine> {
-    let mut account = CircuitAccount::<Engine>::default();
-    account.address = Fr::from_str(&id.to_string()).unwrap();
-    account
+    CircuitAccount::<Engine> {
+        address: Fr::from_str(&id.to_string()).unwrap(),
+        ..Default::default()
+    }
 }
 
 /// Measures the time of `RealSMT` creation time.
