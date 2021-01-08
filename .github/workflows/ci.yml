@@ -24,7 +24,7 @@ jobs:
           echo ZKSYNC_HOME=$(pwd) >> $GITHUB_ENV
           echo CI=1 >> $GITHUB_ENV
           echo $(pwd)/bin >> $GITHUB_PATH
-          RUNNER_HOST_NAME=$(hostname)
+          echo RUNNER_HOST_NAME=$(hostname) >> $GITHUB_ENV
 
       - name: cache-contracts
         uses: actions/cache@v2
