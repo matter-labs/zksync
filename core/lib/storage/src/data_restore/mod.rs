@@ -34,21 +34,21 @@ impl<'a, 'c> DataRestoreSchema<'a, 'c> {
         let mut transaction = self.0.start_transaction().await?;
 
         let commit_op = BlockSchema(&mut transaction)
-            .execute_operation(commit_op)
+            .store_operation(commit_op)
             .await?;
         let verify_op = BlockSchema(&mut transaction)
-            .execute_operation(verify_op)
+            .store_operation(verify_op)
             .await?;
         // The state is expected to be updated, so it's necessary
         // to do it here.
         StateSchema(&mut transaction)
-            .apply_state_update(verify_op.block.block_number)
+            .apply_state_update(commit_op.block_number as u32)
             .await?;
         OperationsSchema(&mut transaction)
-            .confirm_operation(commit_op.block.block_number, ActionType::COMMIT)
+            .confirm_operation(commit_op.block_number as u32, ActionType::COMMIT)
             .await?;
         OperationsSchema(&mut transaction)
-            .confirm_operation(verify_op.block.block_number, ActionType::VERIFY)
+            .confirm_operation(verify_op.block_number as u32, ActionType::VERIFY)
             .await?;
 
         DataRestoreSchema(&mut transaction)

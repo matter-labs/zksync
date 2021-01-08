@@ -39,6 +39,7 @@ pub async fn verify_restore(
             driver.web3.eth(),
             contracts.contract,
             BlockNumber::Earliest,
+            BlockNumber::Latest,
         ));
     interactor.insert_new_account(0, &fee_account_address);
     driver.load_state_from_storage(&mut interactor).await;
