@@ -154,11 +154,13 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
 
     /// @notice Sends tokens
     /// @dev NOTE: will revert if transfer call fails or rollup balance difference (before and after transfer) is bigger than _maxAmount
+    /// @dev This function is used to allow tokens to spend zkSync contract balance up to amount that is
+    /// @dev requested
     /// @param _token Token address
     /// @param _to Address of recipient
     /// @param _amount Amount of tokens to transfer
     /// @param _maxAmount Maximum possible amount of tokens to transfer to this account
-    function withdrawERC20Guarded(
+    function _transferERC20(
         IERC20 _token,
         address _to,
         uint128 _amount,
@@ -243,7 +245,7 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
             uint16 tokenId = governance.validateTokenAddress(_token);
             bytes22 packedBalanceKey = packAddressAndTokenId(_owner, tokenId);
             uint128 balance = pendingBalances[packedBalanceKey].balanceToWithdraw;
-            uint128 withdrawnAmount = this.withdrawERC20Guarded(IERC20(_token), _owner, _amount, balance);
+            uint128 withdrawnAmount = this._transferERC20(IERC20(_token), _owner, _amount, balance);
             registerWithdrawal(tokenId, withdrawnAmount, _owner);
         }
     }
@@ -356,7 +358,7 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
             sent = sendETHNoRevert(toPayable, _amount);
         } else {
             address tokenAddr = governance.tokenAddresses(_tokenId);
-            try this.withdrawERC20Guarded{gas: WITHDRAWAL_GAS_LIMIT}(IERC20(tokenAddr), _recipient, _amount, _amount) {
+            try this._transferERC20{gas: WITHDRAWAL_GAS_LIMIT}(IERC20(tokenAddr), _recipient, _amount, _amount) {
                 sent = true;
             } catch {
                 sent = false;
