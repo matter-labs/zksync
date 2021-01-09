@@ -34,6 +34,16 @@
                         Wallet
                         <span style="font-size: 0.9em"><i class="fas fa-external-link-alt"></i></span>
                     </b-nav-item>
+                    <b-nav-item
+                        v-if="store.statusLink"
+                        v-bind:href="store.statusLink"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        class="nowrap"
+                    >
+                        Status
+                        <span style="font-size: 0.9em"><i class="fas fa-external-link-alt"></i></span>
+                    </b-nav-item>
                 </b-navbar-nav>
                 <b-navbar-nav class="ml-auto">
                     <b-nav-form>

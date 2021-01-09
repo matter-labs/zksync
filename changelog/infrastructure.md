@@ -11,6 +11,7 @@ components, the logs will have the following format:
 
 ### Added
 
+- Link to status page was added to explorer.
 - (`explorer`): account and token ids, verified and committed nonces.
 - (zk): `lint` command.
 
