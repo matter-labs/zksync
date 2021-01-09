@@ -4,6 +4,10 @@ All notable changes to the core components will be documented in this file.
 
 ## Unreleased
 
+### Changed
+
+- `gen_token_add_contract` crate is rewritten in ts.
+
 ### Added
 
 - `closest_greater_or_eq_packable_fee_amount` and `closest_greater_or_eq_packable_token_amount` functions.
