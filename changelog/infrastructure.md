@@ -11,18 +11,19 @@ components, the logs will have the following format:
 
 ### Added
 
-- (fee-seller): reserve fee accumulator address.
+- (`fee-seller`): reserve fee accumulator address.
 
 ### Changed
 
-- `explorer` was refactored and optimized.
+- (`explorer`) was refactored and optimized.
 
 ### Fixed
 
-- (fee-seller): the logic of amount to withdraw/transfer through ZkSync network.
+- (`fee-seller`): the logic of amount to withdraw/transfer through ZkSync network.
+- Link to status page was added to explorer.
 - (`explorer`): account and token ids, verified and committed nonces.
-- (zk): `lint` command.
+- (`zk`): `lint` command.
 
 ### Changed
 
-- (explorer): optimized by caching.
+- (`explorer`): optimized by caching.
