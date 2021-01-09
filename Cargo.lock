@@ -5830,6 +5830,7 @@ dependencies = [
  "anyhow",
  "ethabi 12.0.0",
  "log 0.4.11",
+ "metrics",
  "parity-crypto",
  "serde",
  "web3 0.13.0",

@@ -2,6 +2,18 @@
 
 All notable changes to the core components will be documented in this file.
 
+## Unreleased
+
+### Added
+
+- `closest_greater_or_eq_packable_fee_amount` and `closest_greater_or_eq_packable_token_amount` functions.
+  `test_float_conversions` test was expanded.
+
+### Fixed
+
+- Bug with `to_float` function. Now, it really rounds to the closest less or equal float number.
+- Wrong index type used in the database causing some queries to take too much time.
+
 ## Prior to 2020-12-23
 
 ### Added
@@ -20,3 +32,10 @@ All notable changes to the core components will be documented in this file.
 ### Fixed
 
 - Bug with delay between receiving a job and starting sending heartbeats.
+
+## Unreleased
+
+### Changed
+
+- Metrics were added to some functions from lib/storage.
+- `get_tx_by_hash` function was simplified.

@@ -17,7 +17,7 @@ const brokenStrings = [
 let jsCode = fs.readFileSync(jsFile).toString();
 
 // Commenting out broken strings
-brokenStrings.forEach(str => {
+brokenStrings.forEach((str) => {
     jsCode = jsCode.replace(new RegExp(str, 'g'), '// ' + str);
 });
 

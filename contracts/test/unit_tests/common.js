@@ -1,9 +1,10 @@
 const ethers = require('ethers');
-const { expect, use } = require('chai');
-const { defaultAccounts, solidity, deployContract, MockProvider } = require('ethereum-waffle');
+const { use } = require('chai');
+const { solidity, deployContract, MockProvider } = require('ethereum-waffle');
 
 const IERC20_INTERFACE = require('openzeppelin-solidity/build/contracts/IERC20');
 const { rawEncode } = require('ethereumjs-abi');
+const DEFAULT_REVERT_REASON = 'VM did not revert';
 
 // For: geth
 
@@ -46,7 +47,7 @@ async function deployProxyContract(wallet, proxyCode, contractCode, initArgs, in
 }
 
 async function getCallRevertReason(f) {
-    let revertReason = 'VM did not revert';
+    let revertReason = DEFAULT_REVERT_REASON;
     let result;
     try {
         result = await f();

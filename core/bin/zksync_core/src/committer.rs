@@ -7,7 +7,7 @@ use futures::{SinkExt, StreamExt};
 use serde::{Deserialize, Serialize};
 use tokio::{task::JoinHandle, time};
 // Workspace uses
-use crate::mempool::MempoolRequest;
+use crate::mempool::MempoolBlocksRequest;
 use zksync_storage::ConnectionPool;
 use zksync_types::{
     block::{Block, ExecutedOperations, PendingBlock},
@@ -41,7 +41,7 @@ const PROOF_POLL_INTERVAL: Duration = Duration::from_secs(1);
 
 async fn handle_new_commit_task(
     mut rx_for_ops: Receiver<CommitRequest>,
-    mut mempool_req_sender: Sender<MempoolRequest>,
+    mut mempool_req_sender: Sender<MempoolBlocksRequest>,
     pool: ConnectionPool,
 ) {
     while let Some(request) = rx_for_ops.next().await {
@@ -120,7 +120,7 @@ async fn commit_block(
     block_commit_request: BlockCommitRequest,
     applied_updates_request: AppliedUpdatesRequest,
     pool: &ConnectionPool,
-    mempool_req_sender: &mut Sender<MempoolRequest>,
+    mempool_req_sender: &mut Sender<MempoolBlocksRequest>,
 ) {
     let start = Instant::now();
     let BlockCommitRequest {
@@ -158,6 +158,18 @@ async fn commit_block(
         }
     }
 
+    // This is needed to keep track of how many priority ops are in each block
+    // and trigger grafana alerts if there are suspiciously few
+    let total_priority_ops = block
+        .block_transactions
+        .iter()
+        .filter(|tx| matches!(tx, ExecutedOperations::PriorityOp(_)))
+        .count();
+    metrics::histogram!(
+        "committer.priority_ops_per_block",
+        total_priority_ops as u64
+    );
+
     transaction
         .chain()
         .state_schema()
@@ -183,7 +195,7 @@ async fn commit_block(
         .expect("committer must commit the op into db");
 
     mempool_req_sender
-        .send(MempoolRequest::UpdateNonces(accounts_updated))
+        .send(MempoolBlocksRequest::UpdateNonces(accounts_updated))
         .await
         .map_err(|e| log::warn!("Failed notify mempool about account updates: {}", e))
         .unwrap_or_default();
@@ -265,7 +277,7 @@ async fn poll_for_new_proofs_task(pool: ConnectionPool) {
 #[must_use]
 pub fn run_committer(
     rx_for_ops: Receiver<CommitRequest>,
-    mempool_req_sender: Sender<MempoolRequest>,
+    mempool_req_sender: Sender<MempoolBlocksRequest>,
     pool: ConnectionPool,
 ) -> JoinHandle<()> {
     tokio::spawn(handle_new_commit_task(

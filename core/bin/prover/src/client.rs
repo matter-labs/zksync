@@ -41,7 +41,7 @@ impl ApiClient {
         req_server_timeout: time::Duration,
         secret: &str,
     ) -> Self {
-        if worker == "" {
+        if worker.is_empty() {
             panic!("worker name cannot be empty")
         }
         let http_client = reqwest::blocking::ClientBuilder::new()
@@ -95,13 +95,14 @@ impl ApiClient {
     }
 
     fn get_backoff() -> backoff::ExponentialBackoff {
-        let mut backoff = backoff::ExponentialBackoff::default();
-        backoff.current_interval = Duration::from_secs(1);
-        backoff.initial_interval = Duration::from_secs(1);
-        backoff.multiplier = 1.5f64;
-        backoff.max_interval = Duration::from_secs(10);
-        backoff.max_elapsed_time = Some(Duration::from_secs(2 * 60));
-        backoff
+        backoff::ExponentialBackoff {
+            current_interval: Duration::from_secs(1),
+            initial_interval: Duration::from_secs(1),
+            multiplier: 1.5f64,
+            max_interval: Duration::from_secs(10),
+            max_elapsed_time: Some(Duration::from_secs(2 * 60)),
+            ..Default::default()
+        }
     }
 
     pub fn register_prover(&self, block_size: usize) -> anyhow::Result<i32> {

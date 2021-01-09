@@ -348,35 +348,43 @@ impl<'a, 'c> EthereumSchema<'a, 'c> {
     }
 
     pub async fn load_gas_price_limit(&mut self) -> QueryResult<U256> {
+        let start = Instant::now();
         let params = self.load_eth_params().await?;
 
         let gas_price_limit =
             U256::try_from(params.gas_price_limit).expect("Negative gas limit value stored in DB");
 
+        metrics::histogram!("sql.ethereum.load_gas_price_limit", start.elapsed());
         Ok(gas_price_limit)
     }
 
     pub async fn load_average_gas_price(&mut self) -> QueryResult<Option<U256>> {
+        let start = Instant::now();
         let params = self.load_eth_params().await?;
 
         let average_gas_price = params
             .average_gas_price
             .map(|price| U256::try_from(price).expect("Negative average gas price stored in DB"));
 
+        metrics::histogram!("sql.ethereum.load_average_gas_price", start.elapsed());
         Ok(average_gas_price)
     }
 
     /// Loads the stored Ethereum operations stats.
     pub async fn load_stats(&mut self) -> QueryResult<ETHStats> {
+        let start = Instant::now();
         let params = self.load_eth_params().await?;
 
+        metrics::histogram!("sql.ethereum.load_stats", start.elapsed());
         Ok(params.into())
     }
 
     async fn load_eth_params(&mut self) -> QueryResult<ETHParams> {
+        let start = Instant::now();
         let params = sqlx::query_as!(ETHParams, "SELECT * FROM eth_parameters WHERE id = true",)
             .fetch_one(self.0.conn())
             .await?;
+        metrics::histogram!("sql.ethereum.load_eth_params", start.elapsed());
         Ok(params)
     }
 
