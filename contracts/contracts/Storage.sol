@@ -156,4 +156,7 @@ contract Storage {
     /// @dev Contains op type, pubdata and expiration block of unsatisfied requests.
     /// @dev Numbers are in order of requests receiving
     mapping(uint64 => PriorityOperation) public priorityRequests;
+
+    /// @notice Timer for authFacts entry reset (address, nonce -> timer).
+    mapping(address => mapping(uint32 => uint256)) public authFactsResetTimer;
 }

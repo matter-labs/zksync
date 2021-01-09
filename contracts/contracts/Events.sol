@@ -41,6 +41,21 @@ interface Events {
         uint256 expirationBlock
     );
 
+    /// @notice New priority request event. Emitted when a request is placed into mapping
+    event NewPriorityRequest2(
+        address sender,
+        uint64 serialId,
+        Operations.OpType opType,
+        bytes pubData,
+        uint256 expirationBlock
+    );
+
+    /// @notice New priority request event. Emitted when a request is placed into mapping
+    event NewPriorityRequest3(
+        uint64 serialId,
+        bytes pubData
+    );
+
     /// @notice Deposit committed event.
     event DepositCommit(
         uint32 indexed zkSyncBlockId,

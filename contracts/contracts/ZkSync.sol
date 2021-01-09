@@ -211,7 +211,7 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
 
     /// @notice Deposit ETH to Layer 2 - transfer ether from user into contract, validate it, register deposit
     /// @param _zkSyncAddress The receiver Layer 2 address
-    function depositETH(address _zkSyncAddress) external payable nonReentrant {
+    function depositETH(address _zkSyncAddress) external payable {
         requireActive();
         registerDeposit(0, SafeCast.toUint128(msg.value), _zkSyncAddress);
     }
@@ -354,7 +354,6 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
         address _recipient,
         uint128 _amount
     ) internal {
-        emit RollupWithdrawal(_recipient, _tokenId, _amount);
         bytes22 packedBalanceKey = packAddressAndTokenId(_recipient, _tokenId);
 
         bool sent = false;
@@ -372,7 +371,6 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
         if (!sent) {
             increaseBalanceToWithdraw(packedBalanceKey, _amount);
         }
-        emit OnchainWithdrawal(_recipient, _tokenId, _amount, sent);
     }
 
     /// @dev Executes one block
@@ -551,13 +549,19 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
         exited[_accountId][_tokenId] = true;
     }
 
-    function setAuthPubkeyHash(bytes calldata _pubkey_hash, uint32 _nonce) external nonReentrant {
+    function setAuthPubkeyHash(bytes calldata _pubkey_hash, uint32 _nonce) external {
         require(_pubkey_hash.length == PUBKEY_HASH_BYTES, "bm"); // PubKeyHash should be 20 bytes.
-        require(authFacts[msg.sender][_nonce] == bytes32(0), "bn"); // auth fact for nonce should be empty
-
-        authFacts[msg.sender][_nonce] = keccak256(_pubkey_hash);
-
-        emit FactAuth(msg.sender, _nonce, _pubkey_hash);
+        if (authFacts[msg.sender][_nonce] == bytes32(0)) {
+            authFacts[msg.sender][_nonce] = keccak256(_pubkey_hash);
+        } else {
+            uint256 currentResetTimer = authFactsResetTimer[msg.sender][_nonce];
+            if (currentResetTimer == 0) {
+                authFactsResetTimer[msg.sender][_nonce] = block.timestamp;
+            } else {
+                require(block.timestamp.sub(currentResetTimer) >= AUTH_FACT_RESET_TIMELOCK, "bM");
+                authFacts[msg.sender][_nonce] = keccak256(_pubkey_hash);
+            }
+        }
     }
 
     /// @notice Register deposit request - pack pubdata, add priority request and emit OnchainDeposit event
@@ -579,8 +583,6 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
             });
         bytes memory pubData = Operations.writeDepositPubdataForPriorityQueue(op);
         addPriorityRequest(Operations.OpType.Deposit, pubData);
-
-        emit OnchainDeposit(msg.sender, _tokenId, _amount, _owner);
     }
 
     /// @notice Register withdrawal - update user balance and emit OnchainWithdrawal event
@@ -595,27 +597,6 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
         bytes22 packedBalanceKey = packAddressAndTokenId(_to, _token);
         uint128 balance = balancesToWithdraw[packedBalanceKey].balanceToWithdraw;
         balancesToWithdraw[packedBalanceKey].balanceToWithdraw = balance.sub(_amount);
-        emit OnchainWithdrawal(_to, _token, _amount, true);
-    }
-
-    function emitDepositCommitEvent(uint32 _blockNumber, Operations.Deposit memory depositData) internal {
-        emit DepositCommit(
-            _blockNumber,
-            depositData.accountId,
-            depositData.owner,
-            depositData.tokenId,
-            depositData.amount
-        );
-    }
-
-    function emitFullExitCommitEvent(uint32 _blockNumber, Operations.FullExit memory fullExitData) internal {
-        emit FullExitCommit(
-            _blockNumber,
-            fullExitData.accountId,
-            fullExitData.owner,
-            fullExitData.tokenId,
-            fullExitData.amount
-        );
     }
 
     /// @dev Gets operations packed in bytes array. Unpacks it and stores onchain operations.
@@ -655,7 +636,6 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
                 bytes memory opPubData = Bytes.slice(pubData, pubdataOffset, DEPOSIT_BYTES);
 
                 Operations.Deposit memory depositData = Operations.readDepositPubdata(opPubData);
-                emitDepositCommitEvent(_newBlockData.blockNumber, depositData);
 
                 checkPriorityOperation(depositData, uncommittedPriorityRequestsOffset + priorityOperationsProcessed);
                 priorityOperationsProcessed++;
@@ -682,7 +662,6 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
                     opPubData = Bytes.slice(pubData, pubdataOffset, FULL_EXIT_BYTES);
 
                     Operations.FullExit memory fullExitData = Operations.readFullExitPubdata(opPubData);
-                    emitFullExitCommitEvent(_newBlockData.blockNumber, fullExitData);
 
                     checkPriorityOperation(
                         fullExitData,
