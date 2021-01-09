@@ -20,3 +20,9 @@ components, the logs will have the following format:
 ### Fixed
 
 - (fee-seller): the logic of amount to withdraw/transfer through ZkSync network.
+- (`explorer`): account and token ids, verified and committed nonces.
+- (zk): `lint` command.
+
+### Changed
+
+- (explorer): optimized by caching.

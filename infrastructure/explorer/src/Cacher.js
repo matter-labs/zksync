@@ -68,7 +68,7 @@ class Cacher {
         // a) JS is single-threaded, no data-races possible
         // b) By the time we will want to reuse these transactions there is a
         // 99% change they will be set, or, if not, it does not ruin anything.
-        txs.forEach(async tx => {
+        txs.forEach(async (tx) => {
             const op = tx.op;
             this.cacheTransaction(tx.tx_hash, {
                 tx_type: op.type,
@@ -113,7 +113,7 @@ class Cacher {
         this.load(this.blocksCache, BLOCK_STORAGE_SLOT);
         this.load(this.blocksTxsCache, BLOCK_TRANSACTIONS_STORAGE_SLOT);
 
-        this.blocksTxsCache.values().forEach(txs => {
+        this.blocksTxsCache.values().forEach((txs) => {
             this.cacheTransactionsFromBlock(txs, client);
         });
     }

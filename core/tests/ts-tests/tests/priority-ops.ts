@@ -2,7 +2,6 @@ import { Tester } from './tester';
 import { expect } from 'chai';
 import { Wallet, types } from 'zksync';
 import { BigNumber } from 'ethers';
-import { sleep } from 'zksync/build/utils';
 
 type TokenLike = types.TokenLike;
 

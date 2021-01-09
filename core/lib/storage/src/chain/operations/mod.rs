@@ -342,12 +342,17 @@ impl<'a, 'c> OperationsSchema<'a, 'c> {
 
     /// Returns `true` if there're no pending withdrawals in the database, `false` otherwise.
     pub async fn no_stored_pending_withdrawals(&mut self) -> QueryResult<bool> {
+        let start = Instant::now();
         let stored_pending_withdrawals =
             sqlx::query!(r#"SELECT COUNT(*) as "count!" FROM pending_withdrawals"#,)
                 .fetch_one(self.0.conn())
                 .await?
                 .count;
 
+        metrics::histogram!(
+            "sql.chain.operations.no_stored_pending_withdrawals",
+            start.elapsed()
+        );
         Ok(stored_pending_withdrawals == 0)
     }
 
