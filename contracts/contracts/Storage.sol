@@ -13,13 +13,13 @@ import "./Operations.sol";
 /// @title zkSync storage contract
 /// @author Matter Labs
 contract Storage {
-    /// @notice Flag indicates that upgrade preparation status is active
+    /// @dev Flag indicates that upgrade preparation status is active
     /// @dev Will store false in case of not active upgrade mode
-    bool public upgradePreparationActive;
+    bool internal upgradePreparationActive;
 
-    /// @notice Upgrade preparation activation timestamp (as seconds since unix epoch)
+    /// @dev Upgrade preparation activation timestamp (as seconds since unix epoch)
     /// @dev Will be equal to zero in case of not active upgrade mode
-    uint256 public upgradePreparationActivationTime;
+    uint256 internal upgradePreparationActivationTime;
 
     /// @dev Verifier contract. Used to verify block proof and exit proof
     Verifier public verifier;
@@ -27,23 +27,23 @@ contract Storage {
     /// @dev Governance contract. Contains the governor (the owner) of whole system, validators list, possible tokens list
     Governance public governance;
 
-    uint8 constant FILLED_GAS_RESERVE_VALUE = 0xff; // we use it to set gas revert value so slot will not be emptied with 0 balance
-    struct BalanceToWithdraw {
+    uint8 internal constant FILLED_GAS_RESERVE_VALUE = 0xff; // we use it to set gas revert value so slot will not be emptied with 0 balance
+    struct PendingBalance {
         uint128 balanceToWithdraw;
         uint8 gasReserveValue; // gives user opportunity to fill storage slot with nonzero value
     }
 
     /// @dev Root-chain balances (per owner and token id, see packAddressAndTokenId) to withdraw
-    mapping(bytes22 => BalanceToWithdraw) internal balancesToWithdraw;
+    mapping(bytes22 => PendingBalance) internal pendingBalances;
 
     // @dev Pending withdrawals are not used in this version
     struct PendingWithdrawal_DEPRECATED {
         address to;
         uint16 tokenId;
     }
-    mapping(uint32 => PendingWithdrawal_DEPRECATED) public pendingWithdrawals_DEPRECATED;
-    uint32 public firstPendingWithdrawalIndex_DEPRECATED;
-    uint32 public numberOfPendingWithdrawals_DEPRECATED;
+    mapping(uint32 => PendingWithdrawal_DEPRECATED) internal pendingWithdrawals_DEPRECATED;
+    uint32 internal firstPendingWithdrawalIndex_DEPRECATED;
+    uint32 internal numberOfPendingWithdrawals_DEPRECATED;
 
     /// @notice Total number of executed blocks i.e. blocks[totalBlocksExecuted] points at the latest executed block (block 0 is genesis)
     uint32 public totalBlocksExecuted;
@@ -68,10 +68,10 @@ contract Storage {
         bytes32 commitment;
         bytes32 stateRoot;
     }
-    mapping(uint32 => Block_DEPRECATED) public blocks_DEPRECATED;
+    mapping(uint32 => Block_DEPRECATED) internal blocks_DEPRECATED;
 
-    /// @notice Flag indicates that a user has exited certain token balance (per account id and tokenId)
-    mapping(uint32 => mapping(uint16 => bool)) public exited;
+    /// @notice Flag indicates that a user has exited in the exodus mode certain token balance (per account id and tokenId)
+    mapping(uint32 => mapping(uint16 => bool)) public performedExodus;
 
     /// @notice Flag indicates that exodus (mass exit) mode is triggered
     /// @notice Once it was raised, it can not be cleared again, and all users must exit
@@ -90,10 +90,10 @@ contract Storage {
         uint256 expirationBlock;
     }
 
-    /// @notice Priority Requests mapping (request id - operation)
+    /// @dev Priority Requests mapping (request id - operation)
     /// @dev Contains op type, pubdata and expiration block of unsatisfied requests.
     /// @dev Numbers are in order of requests receiving
-    mapping(uint64 => PriorityOperation_DEPRECATED) public priorityRequests_DEPRECATED;
+    mapping(uint64 => PriorityOperation_DEPRECATED) internal priorityRequests_DEPRECATED;
 
     /// @notice First open priority request id
     uint64 public firstPriorityRequestId;
@@ -111,8 +111,8 @@ contract Storage {
     }
 
     /// @notice Gets value from balancesToWithdraw
-    function getBalanceToWithdraw(address _address, uint16 _tokenId) public view returns (uint128) {
-        return balancesToWithdraw[packAddressAndTokenId(_address, _tokenId)].balanceToWithdraw;
+    function getPendingBalances(address _address, uint16 _tokenId) public view returns (uint128) {
+        return pendingBalances[packAddressAndTokenId(_address, _tokenId)].balanceToWithdraw;
     }
 
     /// @Rollup block stored data
@@ -136,8 +136,8 @@ contract Storage {
         return keccak256(abi.encode(_storedBlockInfo));
     }
 
-    /// @notice Stored hashed StoredBlockInfo for some block number
-    mapping(uint32 => bytes32) public storedBlockHashes;
+    /// @dev Stored hashed StoredBlockInfo for some block number
+    mapping(uint32 => bytes32) internal storedBlockHashes;
 
     /// @notice Total blocks proven.
     uint32 public totalBlocksProven;
@@ -152,8 +152,8 @@ contract Storage {
         Operations.OpType opType;
     }
 
-    /// @notice Priority Requests mapping (request id - operation)
+    /// @dev Priority Requests mapping (request id - operation)
     /// @dev Contains op type, pubdata and expiration block of unsatisfied requests.
     /// @dev Numbers are in order of requests receiving
-    mapping(uint64 => PriorityOperation) public priorityRequests;
+    mapping(uint64 => PriorityOperation) internal priorityRequests;
 }
