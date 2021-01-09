@@ -1,6 +1,6 @@
 const { expect } = require('chai');
 const { deployContract } = require('ethereum-waffle');
-const { wallet, wallet1, wallet2, deployTestContract, getCallRevertReason } = require('./common');
+const { wallet, wallet2, deployTestContract, getCallRevertReason } = require('./common');
 
 import { Contract, constants } from 'ethers';
 

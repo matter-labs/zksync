@@ -20,4 +20,4 @@ parity-crypto = {version = "0.6.2", features = ["publickey"] }
 
 log = "0.4"
 anyhow = "1.0"
-
+metrics = "0.13.0-alpha.8"
