@@ -20,7 +20,9 @@ jobs:
       - name: cache
         run: docker-compose -f docker-compose-runner.yml exec -T zk sh infrastructure/ci-scripts/find_cache.sh
       - name: init
-        run: docker-compose -f docker-compose-runner.yml exec -T zk zk && zk init
+        run: |
+            docker-compose -f docker-compose-runner.yml exec -T zk zk
+            docker-compose -f docker-compose-runner.yml exec -T zk zk init
       - name: lints
         run: docker-compose -f docker-compose-runner.yml exec -T zk sh infrastructure/ci-scripts/lints.sh
 
