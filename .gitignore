@@ -26,7 +26,6 @@ Cargo.lock
 /etc/env/*
 !/etc/env/dev.env.example
 !/etc/env/docker.env
-!/etc/env/ci.env
 /etc/tokens/localhost.json
 !/keys
 /keys/*
