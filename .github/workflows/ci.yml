@@ -16,7 +16,7 @@ jobs:
     steps:
       - uses: actions/checkout@v2
       - name: test
-        run: docker-compose up geth
+        run: docker-compose -f docker-compose-runner.yml up -d geth postgres
 
 #      - name: link-setup-keys
 #        run: ln -s ~/setup keys/setup
