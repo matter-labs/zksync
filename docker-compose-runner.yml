@@ -38,3 +38,4 @@ services:
     environment:
       - IN_DOCKER=true
       - CACHE_DIR=/usr/src/cache
+      - CI=1

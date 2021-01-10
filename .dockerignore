@@ -6,6 +6,7 @@
 !docker/ci-integration-test/entrypoint.sh
 !docker/zk/entrypoint.sh
 !etc/env/dev.env.example
+!etc/env/docker.env
 !etc/tokens
 !keys/packed
 !docker/nginx/nginx.conf
