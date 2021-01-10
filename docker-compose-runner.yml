@@ -23,3 +23,18 @@ services:
     command: --cfg /tesseracts.toml -vvv
     ports:
       - "8000:8000"
+  zk:
+    build:
+      context: .
+      dockerfile: docker/zk/Dockerfile
+    depends_on:
+      - postgres
+      - geth
+    command: tail -f /dev/null
+    volumes:
+      - .:/usr/src/zksync
+      - /usr/src/cache:/usr/src/cache
+      - /usr/src/keys:/usr/src/keys
+    environment:
+      - IN_DOCKER=true
+      - CACHE_DIR=/usr/src/cache

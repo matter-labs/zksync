@@ -45,6 +45,18 @@ export function reload() {
     for (const envVar in env) {
         process.env[envVar] = env[envVar];
     }
+    load_docker();
+}
+
+export function load_docker() {
+    if (!process.env.IN_DOCKER) {
+        return;
+    }
+    const envFile = process.env.DOCKER_ENV_FILE as string;
+    const env = dotenv.parse(fs.readFileSync(envFile));
+    for (const envVar in env) {
+        process.env[envVar] = env[envVar];
+    }
 }
 
 // loads environment variables
@@ -53,15 +65,20 @@ export function load() {
     const zksyncEnv =
         process.env.ZKSYNC_ENV || (fs.existsSync(current) ? fs.readFileSync(current).toString().trim() : 'dev');
     const envFile = `etc/env/${zksyncEnv}.env`;
+    const dockerEnvFile = `etc/env/docker.env`;
     if (zksyncEnv == 'dev' && !fs.existsSync('etc/env/dev.env')) {
         fs.copyFileSync('etc/env/dev.env.example', 'etc/env/dev.env');
     }
     if (!fs.existsSync(envFile)) {
         throw new Error('ZkSync config file not found: ' + envFile);
     }
+    if (fs.existsSync(dockerEnvFile)) {
+        process.env.DOCKER_ENV_FILE = dockerEnvFile;
+    }
     process.env.ZKSYNC_ENV = zksyncEnv;
     process.env.ENV_FILE = envFile;
     dotenv.config({ path: envFile });
+    load_docker();
 }
 
 // replaces an env variable in current .env file

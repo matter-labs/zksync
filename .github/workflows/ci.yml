@@ -15,8 +15,16 @@ jobs:
 
     steps:
       - uses: actions/checkout@v2
-      - name: test
-        run: docker-compose -f docker-compose-runner.yml up -d geth postgres
+      - name: start-services
+        run: docker-compose -f docker-compose-runner.yml up -d geth postgres zk
+      - name: cache
+        run: docker-compose -f docker-compose-runner.yml exec sh infrastructure/ci-scripts/find_cache.sh
+      - name: init
+        run: docker-compose -f docker-compose-runner.yml exec zk init
+      - name: lints
+        run: docker-compose -f docker-compose-runner.yml exec sh infrastructure/ci-scripts/lints.sh
+
+
 
 #      - name: link-setup-keys
 #        run: ln -s ~/setup keys/setup

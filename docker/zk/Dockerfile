@@ -1,4 +1,3 @@
-FROM matterlabs/geth:latest as geth
 FROM debian:buster-slim
 
 WORKDIR /usr/src/zksync
@@ -28,7 +27,8 @@ RUN mv solc-static-linux /usr/local/bin/solc
 ENV ZKSYNC_HOME=/usr/src/zksync
 ENV PATH="${ZKSYNC_HOME}/bin:${PATH}"
 ENV CI=1
-COPY docker/zk/entrypoint.sh /usr/local/bin/
+
+COPY docker/zk/entrypoint.sh /usr/local/bin/entrypoint.sh
 
 
-ENTRYPOINT "/usr/local/bin/entrypoint.sh"
+#ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]

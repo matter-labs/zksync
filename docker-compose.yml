@@ -41,19 +41,13 @@ services:
       source: ./volumes/tesseracts
       target: /var/lib/tesseracts/data
 
-  zk:
-    build:
-      context: .
-      dockerfile: docker/zk/Dockerfile
-    volumes:
-      - .:/usr/src/zksync
 
   runner:
     image: myoung34/github-runner:latest
     environment:
       REPO_URL: https://github.com/matter-labs/zksync-dev
       RUNNER_NAME: example-name
-      RUNNER_TOKEN: AB5IZDXCJNZXBCONB6HESOK77LQYI
+      RUNNER_TOKEN: AB5IZDTSBRUNUZCLXD3M4TS77MWVC
       RUNNER_WORKDIR: /tmp/runner/work
       RUNNER_GROUP: my-group
       ORG_RUNNER: 'false'
@@ -64,7 +58,6 @@ services:
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - /tmp/runner:/tmp/runner
-      - .:/usr/src/zksync
-      # note: a quirk of docker-in-docker is that this path
-      # needs to be the same path on host and inside the container,
-      # docker mgmt cmds run outside of docker but expect the paths from within
+      - /Users/danillugovskoy/cache:/usr/src/cache
+      - ./keys:/usr/src/keys
+

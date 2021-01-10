@@ -4,6 +4,7 @@
 !docker/exit-tool/configs
 !docker/keybase-secrets/entrypoint.sh
 !docker/ci-integration-test/entrypoint.sh
+!docker/zk/entrypoint.sh
 !etc/env/dev.env.example
 !etc/tokens
 !keys/packed
