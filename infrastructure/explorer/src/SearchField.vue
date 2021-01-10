@@ -10,9 +10,7 @@
                     <b-button
                         @click="search"
                         :variant="searchFieldInMenu ? 'info' : 'info'"
-                        style="
-                            box-shadow: inset 0 0 2px rgba(255, 255, 255, 0.4);
-                        "
+                        style="box-shadow: inset 0 0 2px rgba(255, 255, 255, 0.4)"
                         :disabled="searching"
                     >
                         <b-spinner v-if="searching" small></b-spinner>
@@ -88,7 +86,7 @@ export default {
 
             this.searching = false;
             this.notFound = true;
-            await new Promise(resolve => setTimeout(resolve, 3600));
+            await new Promise((resolve) => setTimeout(resolve, 3600));
             this.notFound = false;
         }
     }

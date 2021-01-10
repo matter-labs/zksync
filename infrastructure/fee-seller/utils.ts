@@ -104,7 +104,7 @@ export async function approveTokenIfNotApproved(signer: ethers.Signer, tokenAddr
     const approved = BigNumber.from(currentAllowance).gte(ERC20_APPROVE_TRESHOLD);
     if (!approved) {
         console.log(`Approving token ${tokenAddress}`);
-        const tx = await erc20contract.approve(contractAddress, MAX_ERC20_APPROVE_AMOUNT);
+        await erc20contract.approve(contractAddress, MAX_ERC20_APPROVE_AMOUNT);
     }
 }
 

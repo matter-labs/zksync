@@ -60,8 +60,6 @@ This section provides an overview on folders / sub-projects that exist in this r
     - `/prover`: zkSync prover application.
     - `/data_restore`: Utility to restore a state of the zkSync network from a smart contract.
     - `/key_generator`: Utility to generate verification keys for network.
-    - `/gen_token_add_contract`: Utility to generate `TokenDeployInit` smart contract, required for initial network
-      launch.
     - `/parse_pub_data`: Utility to parse zkSync operation pubdata.
     - `/zksync_core`: zkSync server Core microservice.
     - `/zksync_api`: zkSync server API microservice.

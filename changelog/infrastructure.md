@@ -9,6 +9,12 @@ components, the logs will have the following format:
 
 ## Unreleased
 
+### Added
+
+- Link to status page was added to explorer.
+- (`explorer`): account and token ids, verified and committed nonces.
+- (zk): `lint` command.
+
 ### Changed
 
-- `explorer` was refactored and optimized.
+- (explorer): optimized by caching.
