@@ -21,6 +21,7 @@ jobs:
         run: docker-compose -f docker-compose-runner.yml exec -T zk sh infrastructure/ci-scripts/find_cache.sh
       - name: init
         run: |
+            docker-compose -f docker-compose-runner.yml exec -T ln -s /usr/src/keys/setup keys/setup
             docker-compose -f docker-compose-runner.yml exec -T zk zk
             docker-compose -f docker-compose-runner.yml exec -T zk zk init
       - name: lints
