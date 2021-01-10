@@ -11,104 +11,106 @@ jobs:
   ci-all:
     # We currently have two self-hosted runners, one of which is marked "DEV-CI" and other one is marder "MAIN".
     # "MAIN" is the current CI runner, "DEV-CI" is currently used to experiment with CI optimizing.
-    runs-on: [self-hosted, DEV-CI, MAIN]
+    runs-on: [self-hosted, TEST]
 
     steps:
       - uses: actions/checkout@v2
+      - name: test
+        run: docker-compose up geth
 
-      - name: link-setup-keys
-        run: ln -s ~/setup keys/setup
-
-      - name: setup-env
-        run: |
-          echo ZKSYNC_HOME=$(pwd) >> $GITHUB_ENV
-          echo CI=1 >> $GITHUB_ENV
-          echo $(pwd)/bin >> $GITHUB_PATH
-          echo RUNNER_HOST_NAME=$(hostname) >> $GITHUB_ENV
-
-      - name: cache-contracts
-        uses: actions/cache@v2
-        with:
-          path: |
-            contracts/build
-            contracts/node_modules
-            contracts/dev-contracts/generated
-          key: ${{ runner.os }}-contracts-${{ hashFiles('contracts/contracts/*.sol') }}
-
-
-      - name: update-deps
-        run: |
-          rustup update stable
-          rustup default stable
-          cargo install --version=0.2.0 sqlx-cli
-          cargo install diesel_cli --no-default-features --features postgres
-          docker pull matterlabs/ci-integration-test:latest
-
-      - name: zk
-        run: zk
-
-      - name: lints
-        run: |
-          # lint non-rust code
-
-          zk fmt --check
-          yarn lint:md
-          yarn lint:sol
-          zk dummy-prover ensure-disabled
-          ulimit -S -c unlimited
-          cargo fmt --all -- --check
-          zk f cargo clippy --tests --benches -- -D warnings
-          pushd sdk/zksync-crypto
-          cargo fmt -- --check
-          cargo clippy --all --tests --benches -- -D warnings
-        env:
-          SQLX_OFFLINE: "true"
-
-      - name: generic-init
-        run: |
-          # Unpack keys to build dev contracts
-          zk run verify-keys unpack
-          # EIP1271 contract is used in Rust & JS unit tests.
-          zk contract build-dev
-          zk run deploy-eip1271
-
-      - name: integration-tests
-        run: zk test integration all --in-docker
-
-      - name: integration-testkit
-        run: zk test integration testkit
-        env:
-          SQLX_OFFLINE: "true"
-
-      - name: contracts-unit-tests
-        run: zk test contracts
-
-      - name: js-unit-tests
-        run: zk test js
-
-      - name: rust-unit-tests
-        run: |
-          # Api tests require database setup
-          zk db setup
-          zk test rust
-
-      - name: zksync-crypto-tests
-        run: pushd sdk/zksync-crypto && zk f cargo test --release
-    services:
-      geth:
-        image: matterlabs/geth:latest
-        ports:
-          - 8545:8545
-          - 8546:8546
-        env:
-          CONFIG: standard
-
-      postgres:
-        image: postgres:10.4
-        ports:
-          - 5432:5432
-
-      dev-ticker:
-        image: matterlabs/dev-ticker:latest
-        ports:
-          - 9876:9876
+#      - name: link-setup-keys
+#        run: ln -s ~/setup keys/setup
+#
+#      - name: setup-env
+#        run: |
+#          echo ZKSYNC_HOME=$(pwd) >> $GITHUB_ENV
+#          echo CI=1 >> $GITHUB_ENV
+#          echo $(pwd)/bin >> $GITHUB_PATH
+#          echo RUNNER_HOST_NAME=$(hostname) >> $GITHUB_ENV
+#
+#      - name: cache-contracts
+#        uses: actions/cache@v2
+#        with:
+#          path: |
+#            contracts/build
+#            contracts/node_modules
+#            contracts/dev-contracts/generated
+#          key: ${{ runner.os }}-contracts-${{ hashFiles('contracts/contracts/*.sol') }}
+#
+#
+#      - name: update-deps
+#        run: |
+#          rustup update stable
+#          rustup default stable
+#          cargo install --version=0.2.0 sqlx-cli
+#          cargo install diesel_cli --no-default-features --features postgres
+#          docker pull matterlabs/ci-integration-test:latest
+#
+#      - name: zk
+#        run: zk
+#
+#      - name: lints
+#        run: |
+#          # lint non-rust code
+#
+#          zk fmt --check
+#          yarn lint:md
+#          yarn lint:sol
+#          zk dummy-prover ensure-disabled
+#          ulimit -S -c unlimited
+#          cargo fmt --all -- --check
+#          zk f cargo clippy --tests --benches -- -D warnings
+#          pushd sdk/zksync-crypto
+#          cargo fmt -- --check
+#          cargo clippy --all --tests --benches -- -D warnings
+#        env:
+#          SQLX_OFFLINE: "true"
+#
+#      - name: generic-init
+#        run: |
+#          # Unpack keys to build dev contracts
+#          zk run verify-keys unpack
+#          # EIP1271 contract is used in Rust & JS unit tests.
+#          zk contract build-dev
+#          zk run deploy-eip1271
+#
+#      - name: integration-tests
+#        run: zk test integration all --in-docker
+#
+#      - name: integration-testkit
+#        run: zk test integration testkit
+#        env:
+#          SQLX_OFFLINE: "true"
+#
+#      - name: contracts-unit-tests
+#        run: zk test contracts
+#
+#      - name: js-unit-tests
+#        run: zk test js
+#
+#      - name: rust-unit-tests
+#        run: |
+#          # Api tests require database setup
+#          zk db setup
+#          zk test rust
+#
+#      - name: zksync-crypto-tests
+#        run: pushd sdk/zksync-crypto && zk f cargo test --release
+#    services:
+#      geth:
+#        image: matterlabs/geth:latest
+#        ports:
+#          - 8545:8545
+#          - 8546:8546
+#        env:
+#          CONFIG: standard
+#
+#      postgres:
+#        image: postgres:10.4
+#        ports:
+#          - 5432:5432
+#
+#      dev-ticker:
+#        image: matterlabs/dev-ticker:latest
+#        ports:
+#          - 9876:9876
