@@ -26,8 +26,6 @@ jobs:
             docker-compose -f docker-compose-runner.yml exec -T zk zk init
       - name: lints
         run: docker-compose -f docker-compose-runner.yml exec -T zk sh infrastructure/ci-scripts/lints.sh
-      - name: cache
-        run: docker-compose -f docker-compose-runner.yml exec -T zk sh infrastructure/ci-scripts/cache.sh
 
       - name: generic-init
         run: |
@@ -60,3 +58,6 @@ jobs:
 
       - name: zksync-crypto-tests
         run: docker-compose -f docker-compose-runner.yml exec -T zk pushd sdk/zksync-crypto && zk f cargo test --release
+
+      - name: cache
+        run: docker-compose -f docker-compose-runner.yml exec -T zk sh infrastructure/ci-scripts/cache.sh

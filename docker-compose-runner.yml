@@ -17,6 +17,12 @@ services:
     image: "matterlabs/dev-ticker:latest"
     ports:
       - "9876:9876"
+  dev-liquidity-token-watcher:
+    image: "matterlabs/dev-liquidity-token-watcher:latest"
+    ports:
+      - "9975:9975"
+    volumes:
+      - ./etc/tokens/:/etc/tokens
 
   tesseracts:
     image: "adria0/tesseracts"
@@ -30,6 +36,8 @@ services:
     depends_on:
       - postgres
       - geth
+      - dev-ticker
+      -
     command: tail -f /dev/null
     volumes:
       - .:/usr/src/zksync
