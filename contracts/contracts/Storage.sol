@@ -110,11 +110,6 @@ contract Storage {
         return bytes22((uint176(_address) | (uint176(_tokenId) << 160)));
     }
 
-    /// @notice Gets value from balancesToWithdraw
-    function getPendingBalances(address _address, uint16 _tokenId) public view returns (uint128) {
-        return pendingBalances[packAddressAndTokenId(_address, _tokenId)].balanceToWithdraw;
-    }
-
     /// @Rollup block stored data
     /// @member blockNumber Rollup block number
     /// @member priorityOperations Number of priority operations processed

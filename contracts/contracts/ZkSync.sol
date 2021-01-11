@@ -154,8 +154,7 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
 
     /// @notice Sends tokens
     /// @dev NOTE: will revert if transfer call fails or rollup balance difference (before and after transfer) is bigger than _maxAmount
-    /// @dev This function is used to allow tokens to spend zkSync contract balance up to amount that is
-    /// @dev requested
+    /// @dev This function is used to allow tokens to spend zkSync contract balance up to amount that is requested
     /// @param _token Token address
     /// @param _to Address of recipient
     /// @param _amount Amount of tokens to transfer
@@ -232,6 +231,23 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
         registerDeposit(tokenId, depositAmount, _zkSyncAddress);
     }
 
+    /// @notice Returns amount of tokens that can be withdrawn by `address` from zkSync contract
+    /// @param _address Address of the tokens owner
+    /// @param _token Address of token, zero address is used for ETH
+    function getPendingBalance(address _address, address _token) public view returns (uint128) {
+        uint16 tokenId = 0;
+        if (_token != address(0)) {
+            tokenId = governance.validateTokenAddress(_token);
+        }
+        return pendingBalances[packAddressAndTokenId(_address, tokenId)].balanceToWithdraw;
+    }
+
+    /// @notice  Withdraws tokens from zkSync contract to the owner
+    /// @param _owner Address of the tokens owner
+    /// @param _token Address of tokens, zero address is used for ETH
+    /// @param _amount Amount to withdraw to request.
+    ///         NOTE: We will call ERC20.transfer(.., _amount), but if according to internal logic of ERC20 token zkSync contract
+    ///         balance will be decreased by value more then _amount we will try to subtract this value from user pending balance
     function withdrawPendingBalance(
         address payable _owner,
         address _token,
@@ -245,6 +261,9 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
             uint16 tokenId = governance.validateTokenAddress(_token);
             bytes22 packedBalanceKey = packAddressAndTokenId(_owner, tokenId);
             uint128 balance = pendingBalances[packedBalanceKey].balanceToWithdraw;
+            // We will allow withdrawals of `value` such that:
+            // `value` <= user pending balance
+            // `value` can be bigger then `_amount` requested if token takes fee from sender in addition to `_amount` requested
             uint128 withdrawnAmount = this._transferERC20(IERC20(_token), _owner, _amount, balance);
             registerWithdrawal(tokenId, withdrawnAmount, _owner);
         }
@@ -358,6 +377,9 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
             sent = sendETHNoRevert(toPayable, _amount);
         } else {
             address tokenAddr = governance.tokenAddresses(_tokenId);
+            // We use `_transferERC20` here to check that `ERC20` token indeed transferred `_amount`
+            // and fail if token subtracted from zkSync balance more then `_amount` that was requested.
+            // This can happen if token subtracts fee from sender while transferring `_amount` that was requested to transfer.
             try this._transferERC20{gas: WITHDRAWAL_GAS_LIMIT}(IERC20(tokenAddr), _recipient, _amount, _amount) {
                 sent = true;
             } catch {
