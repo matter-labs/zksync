@@ -55,6 +55,10 @@ export async function prover() {
     await utils.spawn('cargo test -p zksync_prover --release -- --ignored');
 }
 
+export async function witness_generator() {
+    await utils.spawn('cargo test -p zksync_witness_generator --release');
+}
+
 export async function js() {
     await utils.spawn('yarn zksync tests');
     await utils.spawn('yarn fee-seller tests');
@@ -73,6 +77,7 @@ export const command = new Command('test').description('run test suites').addCom
 
 command.command('js').description('run unit-tests for javascript packages').action(js);
 command.command('prover').description('run unit-tests for the prover').action(prover);
+command.command('witness-generator').description('run unit-tests for the witness-generator').action(witness_generator);
 command.command('contracts').description('run unit-tests for the contracts').action(contracts);
 command.command('rust').description('run unit-tests for all rust binaries and libraries').action(rust);
 
