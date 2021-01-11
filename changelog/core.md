@@ -2,13 +2,31 @@
 
 All notable changes to the core components will be documented in this file.
 
-## Prior to 2020-12-25
+## Unreleased
+
+### Changed
+
+- `gen_token_add_contract` crate is rewritten in ts.
+- Metrics were added to some functions from lib/storage.
+- `get_tx_by_hash` function was simplified.
+
+### Added
+
+- `closest_greater_or_eq_packable_fee_amount` and `closest_greater_or_eq_packable_token_amount` functions.
+  `test_float_conversions` test was expanded.
+- Loadtest scenario for stressing transaction batches
+
+### Fixed
+
+- Bug with `to_float` function. Now, it really rounds to the closest less or equal float number.
+- Wrong index type used in the database causing some queries to take too much time.
+
+## Prior to 2020-12-23
 
 ### Added
 
 - A possibility to get an Ethereum tx hash for withdrawal operation.
 - Support for non-standard Ethereum signatures.
-- Loadtest scenario for stressing transaction batches
 
 ### Changed
 

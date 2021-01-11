@@ -167,9 +167,7 @@ export default {
         },
         hashEntry() {
             const entry = this.onChainTx
-                ? makeEntry('ETH Tx hash')
-                      .outterLink(`${blockchainExplorerTx}/${this.tx_hash}`)
-                      .innerHTML(this.tx_hash)
+                ? makeEntry('ETH Tx hash').outterLink(`${blockchainExplorerTx}/${this.tx_hash}`).innerHTML(this.tx_hash)
                 : makeEntry('zkSync tx hash').innerHTML(this.tx_hash);
 
             return entry.copyable();

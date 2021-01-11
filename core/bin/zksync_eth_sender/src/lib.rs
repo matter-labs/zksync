@@ -234,21 +234,7 @@ impl<ETH: EthereumInterface, DB: DatabaseInterface> ETHSender<ETH, DB> {
 
         while let Some(tx) = self.tx_queue.pop_front() {
             if let Err(e) = self.initialize_operation(tx.clone()).await {
-                log::warn!(
-                    "[{}:{}:{}] Error while trying to complete uncommitted op: {}",
-                    file!(),
-                    line!(),
-                    column!(),
-                    e
-                );
-                if e.to_string().contains(RATE_LIMIT_HTTP_CODE) {
-                    log::warn!(
-                        "Received rate limit response, waiting for {}s",
-                        RATE_LIMIT_BACKOFF_PERIOD.as_secs()
-                    );
-                    time::delay_for(RATE_LIMIT_BACKOFF_PERIOD).await;
-                }
-
+                Self::process_error(e).await;
                 // Return the unperformed operation to the queue, since failing the
                 // operation initialization means that it was not stored in the database.
                 self.tx_queue.return_popped(tx);
@@ -264,14 +250,7 @@ impl<ETH: EthereumInterface, DB: DatabaseInterface> ETHSender<ETH, DB> {
             let commitment = match self.perform_commitment_step(&mut current_op).await {
                 Ok(commitment) => commitment,
                 Err(e) => {
-                    log::warn!("Error while trying to complete uncommitted op: {}", e);
-                    if e.to_string().contains(RATE_LIMIT_HTTP_CODE) {
-                        log::warn!(
-                            "Received rate limit response, waiting for {}s",
-                            RATE_LIMIT_BACKOFF_PERIOD.as_secs()
-                        );
-                        time::delay_for(RATE_LIMIT_BACKOFF_PERIOD).await;
-                    }
+                    Self::process_error(e).await;
                     OperationCommitment::Pending
                 }
             };
@@ -306,6 +285,20 @@ impl<ETH: EthereumInterface, DB: DatabaseInterface> ETHSender<ETH, DB> {
         // Store the ongoing operations for the next round.
         self.ongoing_ops = new_ongoing_ops;
         metrics::histogram!("eth_sender.proceed_next_operations", start.elapsed());
+    }
+
+    async fn process_error(err: anyhow::Error) {
+        log::warn!("Error while trying to complete uncommitted op: {}", err);
+        if err.to_string().contains(RATE_LIMIT_HTTP_CODE) {
+            log::warn!(
+                "Received rate limit response, waiting for {}s",
+                RATE_LIMIT_BACKOFF_PERIOD.as_secs()
+            );
+            // This metric is needed to track how much time is spent in backoff mode
+            // and trigger grafana alerts
+            metrics::histogram!("eth_sender.backoff_mode", RATE_LIMIT_BACKOFF_PERIOD);
+            time::delay_for(RATE_LIMIT_BACKOFF_PERIOD).await;
+        }
     }
 
     /// Stores the new operation in the database and sends the corresponding transaction.
@@ -607,10 +600,6 @@ impl<ETH: EthereumInterface, DB: DatabaseInterface> ETHSender<ETH, DB> {
     /// Creates a new Ethereum operation.
     async fn sign_new_tx(ethereum: &ETH, op: &ETHOperation) -> anyhow::Result<SignedCallResult> {
         let tx_options = {
-            let mut options = Options::default();
-            options.nonce = Some(op.nonce);
-            options.gas_price = Some(op.last_used_gas_price);
-
             // We set the gas limit for commit / verify operations as pre-calculated estimation.
             // This estimation is a higher bound based on a pre-calculated cost of every operation in the block.
             let gas_limit = Self::gas_limit_for_op(op);
@@ -627,9 +616,12 @@ impl<ETH: EthereumInterface, DB: DatabaseInterface> ETHSender<ETH, DB> {
                 gas_limit
             );
 
-            options.gas = Some(gas_limit);
-
-            options
+            Options {
+                nonce: Some(op.nonce),
+                gas_price: Some(op.last_used_gas_price),
+                gas: Some(gas_limit),
+                ..Default::default()
+            }
         };
 
         let signed_tx = ethereum
