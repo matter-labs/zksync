@@ -3,17 +3,19 @@
 //! the database interaction, so no real database is needed to run
 //! the prover-server, which is required for tests.
 
+// Built-in
+use std::clone::Clone;
 // Workspace uses
+use zksync_crypto::proof::{AggregatedProof, SingleProof};
 use zksync_storage::{ConnectionPool, StorageProcessor};
+use zksync_types::{
+    aggregated_operations::{AggregatedActionType, AggregatedOperation},
+    block::Block,
+    prover::{ProverJob, ProverJobType},
+    AccountMap, AccountUpdates, BlockNumber,
+};
 // Local uses
 use crate::DatabaseInterface;
-use std::clone::Clone;
-use zksync_crypto::proof::{AggregatedProof, SingleProof};
-use zksync_types::aggregated_operations::{AggregatedActionType, AggregatedOperation};
-use zksync_types::block::Block;
-use zksync_types::prover::{ProverJob, ProverJobType};
-use zksync_types::BlockNumber;
-use zksync_types::{AccountMap, AccountUpdates};
 
 /// The actual database wrapper.
 /// This structure uses `StorageProcessor` to interact with an existing database.
@@ -179,14 +181,13 @@ impl DatabaseInterface for Database {
         job_id: i32,
         block_number: BlockNumber,
         proof: &SingleProof,
-    ) -> anyhow::Result<usize> {
-        /// TODO(Vlad): what really return store_proof?
-        let result = connection
+    ) -> anyhow::Result<()> {
+        connection
             .prover_schema()
             .store_proof(job_id, block_number, proof)
             .await?;
 
-        Ok(result)
+        Ok(())
     }
 
     async fn store_aggregated_proof(
@@ -196,13 +197,13 @@ impl DatabaseInterface for Database {
         first_block: BlockNumber,
         last_block: BlockNumber,
         proof: &AggregatedProof,
-    ) -> anyhow::Result<usize> {
-        let result = connection
+    ) -> anyhow::Result<()> {
+        connection
             .prover_schema()
             .store_aggregated_proof(job_id, first_block, last_block, proof)
             .await?;
 
-        Ok(result)
+        Ok(())
     }
 
     async fn record_prover_stop(

@@ -2,6 +2,7 @@
 use std::{thread, time};
 // External
 use futures::channel::mpsc;
+use tokio::time::delay_for;
 // Workspace deps
 use crate::database_interface::DatabaseInterface;
 use zksync_circuit::serialization::ProverData;
@@ -11,6 +12,7 @@ use zksync_crypto::params::account_tree_depth;
 use zksync_types::block::Block;
 use zksync_types::BlockNumber;
 use zksync_utils::panic_notify::ThreadPanicNotify;
+
 /// The essential part of this structure is `maintain` function
 /// which runs forever and adds data to the database.
 ///
@@ -181,7 +183,7 @@ impl<DB: DatabaseInterface> WitnessGenerator<DB> {
         Ok(circuit_account_tree)
     }
 
-    async fn prepare_witness_and_save_it(&self, block: Block) -> Result<(), anyhow::Error> {
+    async fn prepare_witness_and_save_it(&self, block: Block) -> anyhow::Result<()> {
         let start = time::Instant::now();
         let timer = time::Instant::now();
         let mut storage = self.database.acquire_connection().await?;
@@ -236,7 +238,7 @@ impl<DB: DatabaseInterface> WitnessGenerator<DB> {
         );
         let mut current_block = self.start_block;
         loop {
-            std::thread::sleep(self.rounds_interval);
+            delay_for(self.rounds_interval).await;
             let should_work = match self.should_work_on_block(current_block).await {
                 Ok(should_work) => should_work,
                 Err(err) => {
@@ -264,17 +266,18 @@ impl<DB: DatabaseInterface> WitnessGenerator<DB> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::database::Database;
     use zksync_crypto::Fr;
     use zksync_types::{H256, U256};
 
     #[test]
     fn test_next_witness_block() {
         assert_eq!(
-            WitnessGenerator::next_witness_block(3, 4, &BlockInfo::NotReadyBlock),
+            WitnessGenerator::<Database>::next_witness_block(3, 4, &BlockInfo::NotReadyBlock),
             3
         );
         assert_eq!(
-            WitnessGenerator::next_witness_block(3, 4, &BlockInfo::WithWitness),
+            WitnessGenerator::<Database>::next_witness_block(3, 4, &BlockInfo::WithWitness),
             7
         );
         let empty_block = Block::new(
@@ -290,7 +293,11 @@ mod tests {
             0,
         );
         assert_eq!(
-            WitnessGenerator::next_witness_block(3, 4, &BlockInfo::NoWitness(empty_block)),
+            WitnessGenerator::<Database>::next_witness_block(
+                3,
+                4,
+                &BlockInfo::NoWitness(empty_block)
+            ),
             7
         );
     }

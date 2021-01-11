@@ -53,10 +53,9 @@ impl Default for MockProverConfigs {
         };
         let prover_options = ProverOptions {
             secret_auth: "".to_string(),
-            prepare_data_interval: Duration::from_millis(5000),
-            heartbeat_interval: Duration::from_millis(0),
+            prepare_data_interval: Duration::from_secs(5),
+            heartbeat_interval: Duration::from_secs(0),
             cycle_wait: Duration::from_millis(500),
-            gone_timeout: Duration::from_millis(60000),
             prover_server_address: "0.0.0.0:8088"
                 .parse::<SocketAddr>()
                 .expect("Can't get address from port"),

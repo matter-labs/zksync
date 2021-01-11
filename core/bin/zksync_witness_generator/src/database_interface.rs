@@ -3,17 +3,18 @@
 //! the database interaction, so no real database is needed to run
 //! the prover-server, which is required for tests.
 
-// Workspace uses
-use zksync_storage::StorageProcessor;
-// Local uses
+// Built-in
 use std::clone::Clone;
 use std::marker::{Send, Sync};
+// Workspace uses
 use zksync_crypto::proof::{AggregatedProof, SingleProof};
+use zksync_storage::StorageProcessor;
 use zksync_types::aggregated_operations::{AggregatedActionType, AggregatedOperation};
-use zksync_types::block::Block;
-use zksync_types::prover::{ProverJob, ProverJobType};
-use zksync_types::BlockNumber;
-use zksync_types::{AccountMap, AccountUpdates};
+use zksync_types::{
+    block::Block,
+    prover::{ProverJob, ProverJobType},
+    AccountMap, AccountUpdates, BlockNumber,
+};
 
 /// Abstract database access trait.
 #[async_trait::async_trait]
@@ -21,12 +22,14 @@ pub trait DatabaseInterface: Send + Sync + Clone + 'static {
     /// Returns connection to the database.
     async fn acquire_connection(&self) -> anyhow::Result<StorageProcessor<'_>>;
 
+    /// Returns the block number with the largest last block.
     async fn load_last_block_prover_job_queue(
         &self,
         connection: &mut StorageProcessor<'_>,
         job_type: ProverJobType,
     ) -> anyhow::Result<BlockNumber>;
 
+    /// Returns stored witness for a block.
     async fn load_witness(
         &self,
         connection: &mut StorageProcessor<'_>,
@@ -95,7 +98,7 @@ pub trait DatabaseInterface: Send + Sync + Clone + 'static {
         job_id: i32,
         block_number: BlockNumber,
         proof: &SingleProof,
-    ) -> anyhow::Result<usize>;
+    ) -> anyhow::Result<()>;
 
     async fn store_aggregated_proof(
         &self,
@@ -104,7 +107,7 @@ pub trait DatabaseInterface: Send + Sync + Clone + 'static {
         first_block: BlockNumber,
         last_block: BlockNumber,
         proof: &AggregatedProof,
-    ) -> anyhow::Result<usize>;
+    ) -> anyhow::Result<()>;
 
     async fn record_prover_stop(
         &self,

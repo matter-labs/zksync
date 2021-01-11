@@ -32,6 +32,9 @@ use zksync_types::prover::{
 };
 use zksync_utils::panic_notify::ThreadPanicNotify;
 
+#[cfg(test)]
+mod tests;
+
 pub mod database;
 mod database_interface;
 mod scaler;
@@ -50,16 +53,10 @@ struct AppState<DB: DatabaseInterface> {
     secret_auth: String,
     database: DB,
     scaler_oracle: Arc<RwLock<ScalerOracle<DB>>>,
-    prover_timeout: Duration,
 }
 
 impl<DB: DatabaseInterface> AppState<DB> {
-    pub fn new(
-        secret_auth: String,
-        database: DB,
-        prover_timeout: Duration,
-        idle_provers: u32,
-    ) -> Self {
+    pub fn new(secret_auth: String, database: DB, idle_provers: u32) -> Self {
         let scaler_oracle = Arc::new(RwLock::new(ScalerOracle::new(
             database.clone(),
             idle_provers,
@@ -69,7 +66,6 @@ impl<DB: DatabaseInterface> AppState<DB> {
             secret_auth,
             database,
             scaler_oracle,
-            prover_timeout,
         }
     }
 
@@ -426,15 +422,10 @@ pub fn run_prover_server<DB: DatabaseInterface>(
                 }
                 // Start HTTP server.
                 let secret_auth = prover_options.secret_auth.clone();
-                let gone_timeout = prover_options.gone_timeout;
                 let idle_provers = prover_options.idle_provers;
                 HttpServer::new(move || {
-                    let app_state = AppState::new(
-                        secret_auth.clone(),
-                        database.clone(),
-                        gone_timeout,
-                        idle_provers,
-                    );
+                    let app_state =
+                        AppState::new(secret_auth.clone(), database.clone(), idle_provers);
 
                     let auth = HttpAuthentication::bearer(move |req, credentials| async {
                         let secret_auth = req

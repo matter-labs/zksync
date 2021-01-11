@@ -1,7 +1,6 @@
 // Built-in deps
 use std::time::Instant;
 // External imports
-use sqlx::Done;
 // Workspace imports
 use zksync_types::BlockNumber;
 // Local imports
@@ -167,7 +166,7 @@ impl<'a, 'c> ProverSchema<'a, 'c> {
         job_id: i32,
         block_number: BlockNumber,
         proof: &SingleProof,
-    ) -> QueryResult<usize> {
+    ) -> QueryResult<()> {
         let start = Instant::now();
         let mut transaction = self.0.start_transaction().await?;
         sqlx::query!(
@@ -179,19 +178,18 @@ impl<'a, 'c> ProverSchema<'a, 'c> {
         )
         .execute(transaction.conn())
         .await?;
-        let updated_rows = sqlx::query!(
+        sqlx::query!(
             "INSERT INTO proofs (block_number, proof)
             VALUES ($1, $2)",
             i64::from(block_number),
             serde_json::to_value(proof).unwrap()
         )
         .execute(transaction.conn())
-        .await?
-        .rows_affected() as usize;
+        .await?;
         transaction.commit().await?;
 
         metrics::histogram!("sql", start.elapsed(), "prover" => "store_proof");
-        Ok(updated_rows)
+        Ok(())
     }
 
     /// Stores the aggregated proof for blocks.
@@ -201,7 +199,7 @@ impl<'a, 'c> ProverSchema<'a, 'c> {
         first_block: BlockNumber,
         last_block: BlockNumber,
         proof: &AggregatedProof,
-    ) -> QueryResult<usize> {
+    ) -> QueryResult<()> {
         let start = Instant::now();
         let mut transaction = self.0.start_transaction().await?;
         sqlx::query!(
@@ -213,7 +211,7 @@ impl<'a, 'c> ProverSchema<'a, 'c> {
         )
         .execute(transaction.conn())
         .await?;
-        let updated_rows = sqlx::query!(
+        sqlx::query!(
             "INSERT INTO aggregated_proofs (first_block, last_block, proof)
             VALUES ($1, $2, $3)",
             i64::from(first_block),
@@ -221,12 +219,11 @@ impl<'a, 'c> ProverSchema<'a, 'c> {
             serde_json::to_value(proof).unwrap()
         )
         .execute(transaction.conn())
-        .await?
-        .rows_affected() as usize;
+        .await?;
         transaction.commit().await?;
 
         metrics::histogram!("sql", start.elapsed(), "prover" => "store_aggregated_proof");
-        Ok(updated_rows)
+        Ok(())
     }
 
     /// Gets the stored proof for a block.

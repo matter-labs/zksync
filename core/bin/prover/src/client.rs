@@ -104,7 +104,7 @@ impl crate::ApiClient for ApiClient {
                 .json(&req)
                 .send()
                 .await
-                .map_err(|e| format_err!("failed to send working on request: {}", e))?;
+                .map_err(|e| format_err!("failed to send get job request: {}", e))?;
 
             if response.status() == reqwest::StatusCode::UNAUTHORIZED {
                 return Err(Permanent(format_err!("authorization error")));
