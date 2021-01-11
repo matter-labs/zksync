@@ -1,8 +1,3 @@
-//! Module encapsulating the database interaction.
-//! The essential part of this module is the trait that abstracts
-//! the database interaction, so `ETHSender` won't require an actual
-//! database to run, which is required for tests.
-
 // Built-in deps
 use std::collections::VecDeque;
 use std::str::FromStr;
