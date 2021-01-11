@@ -47,3 +47,4 @@ services:
       - IN_DOCKER=true
       - CACHE_DIR=/usr/src/cache
       - CI=1
+      - ZKSYNC_ENV=ci
