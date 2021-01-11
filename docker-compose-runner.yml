@@ -37,7 +37,7 @@ services:
       - postgres
       - geth
       - dev-ticker
-      -
+      - dev-liquidity-token-watcher
     command: tail -f /dev/null
     volumes:
       - .:/usr/src/zksync
