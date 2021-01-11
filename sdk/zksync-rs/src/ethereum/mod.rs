@@ -278,16 +278,20 @@ impl<S: EthereumSigner> EthereumProvider<S> {
             .ok_or(ClientError::UnknownToken)?;
 
         let signed_tx = if self.tokens_cache.is_eth(token) {
-            let mut options = Options::default();
-            options.value = Some(amount);
-            options.gas = Some(200_000.into());
+            let options = Options {
+                value: Some(amount),
+                gas: Some(200_000.into()),
+                ..Default::default()
+            };
             self.eth_client
                 .sign_call_tx("depositETH", sync_address, options)
                 .await
                 .map_err(|_| ClientError::IncorrectCredentials)?
         } else {
-            let mut options = Options::default();
-            options.gas = Some(300_000.into());
+            let options = Options {
+                gas: Some(300_000.into()),
+                ..Default::default()
+            };
             let params = (token_info.address, amount, sync_address);
             self.eth_client
                 .sign_call_tx("depositERC20", params, options)
@@ -317,8 +321,10 @@ impl<S: EthereumSigner> EthereumProvider<S> {
             .ok_or(ClientError::UnknownToken)?;
         let account_id = U256::from(account_id);
 
-        let mut options = Options::default();
-        options.gas = Some(500_000.into());
+        let options = Options {
+            gas: Some(500_000.into()),
+            ..Default::default()
+        };
 
         let signed_tx = self
             .eth_client

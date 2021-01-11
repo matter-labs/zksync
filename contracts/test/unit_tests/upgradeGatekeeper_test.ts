@@ -2,14 +2,14 @@ import { constants } from 'ethers';
 
 const { expect } = require('chai');
 const { deployContract } = require('ethereum-waffle');
-const { provider, wallet, wallet1, wallet2, deployTestContract, getCallRevertReason } = require('./common');
+const { provider, wallet, wallet2, deployTestContract, getCallRevertReason } = require('./common');
 
 const { performance } = require('perf_hooks');
 
 // some random constants for checking write and read from storage
 const bytes = [133, 174, 97, 255];
 
-import { Contract, ethers } from 'ethers';
+import { Contract } from 'ethers';
 
 const TX_OPTIONS = {
     gasLimit: 900000
