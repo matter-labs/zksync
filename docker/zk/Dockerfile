@@ -22,7 +22,7 @@ RUN cargo install --version=0.2.0 sqlx-cli
 RUN curl -LO https://github.com/ethereum/solidity/releases/download/v0.5.16/solc-static-linux
 RUN chmod +x solc-static-linux
 RUN mv solc-static-linux /usr/local/bin/solc
-RUN apt-get install -y axel
+RUN apt-get install -y axel postgresql
 
 # Setup the environment
 ENV ZKSYNC_HOME=/usr/src/zksync

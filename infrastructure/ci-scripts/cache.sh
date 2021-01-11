@@ -1,6 +1,6 @@
 #!/bin/bash
 
-rust_hash=$(md5sum Cargo.toml | awk '{ print $1 }')
+rust_hash=$(md5sum Cargo.lock | awk '{ print $1 }')
 if [ ! -d "$CACHE_DIR/$rust_hash" ]; then
   mkdir -p "$CACHE_DIR/$rust_hash"
 fi

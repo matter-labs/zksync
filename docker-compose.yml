@@ -47,7 +47,7 @@ services:
     environment:
       REPO_URL: https://github.com/matter-labs/zksync-dev
       RUNNER_NAME: example-name
-      RUNNER_TOKEN: AB5IZDURVSI24K4DVZALQDC77QR6E
+      RUNNER_TOKEN: AB5IZDU7NT2PPJRG4LLJLFK77Q3OI
       RUNNER_WORKDIR: /tmp/runner/work
       RUNNER_GROUP: my-group
       ORG_RUNNER: 'false'
@@ -58,7 +58,7 @@ services:
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - /tmp/runner:/tmp/runner
-      - /Users/danillugovskoy/cache:/usr/src/cache
+      - /Users/danillugovskoy/cache:/Users/danillugovskoy/cache
       - /Users/danillugovskoy/keys:/Users/danillugovskoy/keys
 
 volumes:

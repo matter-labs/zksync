@@ -33,7 +33,7 @@ services:
     command: tail -f /dev/null
     volumes:
       - .:/usr/src/zksync
-      - /usr/src/cache:/usr/src/cache
+      - /Users/danillugovskoy/cache:/usr/src/cache
       - /Users/danillugovskoy/keys:/usr/src/keys
     environment:
       - IN_DOCKER=true
