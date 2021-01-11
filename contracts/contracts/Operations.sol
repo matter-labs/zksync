@@ -75,7 +75,7 @@ library Operations {
     }
 
     /// Serialize deposit pubdata
-    function writeDepositPubdata(Deposit memory op) internal pure returns (bytes memory buf) {
+    function writeDepositPubdataForPriorityQueue(Deposit memory op) internal pure returns (bytes memory buf) {
         buf = abi.encodePacked(
             uint8(OpType.Deposit),
             bytes4(0), // accountId (ignored) (update when ACCOUNT_ID_BYTES is changed)
@@ -87,7 +87,7 @@ library Operations {
 
     /// @notice Write deposit pubdata for priority queue check.
     function checkDepositInPriorityQueue(Deposit memory op, bytes20 hashedPubdata) internal pure returns (bool) {
-        return Utils.hashBytesToBytes20(writeDepositPubdata(op)) == hashedPubdata;
+        return Utils.hashBytesToBytes20(writeDepositPubdataForPriorityQueue(op)) == hashedPubdata;
     }
 
     // FullExit pubdata
@@ -114,7 +114,7 @@ library Operations {
         require(offset == PACKED_FULL_EXIT_PUBDATA_BYTES, "n"); // reading invalid full exit pubdata size
     }
 
-    function writeFullExitPubdata(FullExit memory op) internal pure returns (bytes memory buf) {
+    function writeFullExitPubdataForPriorityQueue(FullExit memory op) internal pure returns (bytes memory buf) {
         buf = abi.encodePacked(
             uint8(OpType.FullExit),
             op.accountId, // accountId
@@ -125,14 +125,13 @@ library Operations {
     }
 
     function checkFullExitInPriorityQueue(FullExit memory op, bytes20 hashedPubdata) internal pure returns (bool) {
-        op.amount = 0;
-        return Utils.hashBytesToBytes20(writeFullExitPubdata(op)) == hashedPubdata;
+        return Utils.hashBytesToBytes20(writeFullExitPubdataForPriorityQueue(op)) == hashedPubdata;
     }
 
     // PartialExit pubdata
 
     struct PartialExit {
-        //uint8 opType
+        //uint8 opType; -- present in pubdata, ignored at serialization
         //uint32 accountId; -- present in pubdata, ignored at serialization
         uint16 tokenId;
         uint128 amount;

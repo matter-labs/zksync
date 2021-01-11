@@ -75,13 +75,14 @@ impl ApiClient {
 
     /// Returns default prover options for backoff configuration.
     fn get_backoff() -> backoff::ExponentialBackoff {
-        let mut backoff = backoff::ExponentialBackoff::default();
-        backoff.current_interval = Duration::from_secs(1);
-        backoff.initial_interval = Duration::from_secs(1);
-        backoff.multiplier = 1.5f64;
-        backoff.max_interval = Duration::from_secs(10);
-        backoff.max_elapsed_time = Some(Duration::from_secs(2 * 60));
-        backoff
+        backoff::ExponentialBackoff {
+            current_interval: Duration::from_secs(1),
+            initial_interval: Duration::from_secs(1),
+            multiplier: 1.5f64,
+            max_interval: Duration::from_secs(10),
+            max_elapsed_time: Some(Duration::from_secs(2 * 60)),
+            ..Default::default()
+        }
     }
 
     fn get_encoded_token(&self) -> anyhow::Result<String> {

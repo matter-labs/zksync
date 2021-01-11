@@ -14,9 +14,9 @@ contract ZkSyncProcessOpUnitTest is ZkSync {
         bytes memory offsetsCommitment
     ) external {
         (bytes32 resOpHash, uint64 resPriorOps, bytes memory resOffsetsCommitment) = collectOnchainOps(_newBlockData);
-        require(resOpHash == processableOperationsHash, "hash");
-        require(resPriorOps == priorityOperationsProcessed, "prop");
-        require(keccak256(resOffsetsCommitment) == keccak256(offsetsCommitment), "offComm");
+        require(resOpHash == processableOperationsHash, "h");
+        require(resPriorOps == priorityOperationsProcessed, "p");
+        require(keccak256(resOffsetsCommitment) == keccak256(offsetsCommitment), "o");
     }
 
     function commitPriorityRequests() external {

@@ -17,7 +17,7 @@ pub fn big_decimal_to_ratio(num: &BigDecimal) -> Result<Ratio<BigUint>, anyhow::
     let (big_int, exp) = num.as_bigint_and_exponent();
     anyhow::ensure!(!big_int.is_negative(), "BigDecimal should be unsigned");
     let big_uint = big_int.to_biguint().unwrap();
-    let ten_pow = BigUint::from(10 as u32).pow(exp as u128);
+    let ten_pow = BigUint::from(10_u32).pow(exp as u128);
     Ok(Ratio::new(big_uint, ten_pow))
 }
 

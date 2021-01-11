@@ -165,8 +165,11 @@ impl<T: Transport> EthereumAccount<T> {
         amount: &BigUint,
         proof: EncodedAggregatedProof,
     ) -> Result<ETHExecResult, anyhow::Error> {
-        let mut options = Options::default();
-        options.gas = Some(3_000_000.into()); // `exit` function requires more gas to operate.
+        let options = Options {
+            gas: Some(3_000_000.into()),
+            // `exit` function requires more gas to operate.
+            ..Default::default()
+        };
 
         let stored_block_info = stored_block_info(last_block);
         let signed_tx = self
@@ -395,7 +398,7 @@ impl<T: Transport> EthereumAccount<T> {
         let signed_tx = self
             .main_contract_eth_client
             .sign_call_tx(
-                "proofBlocks",
+                "proveBlocks",
                 proof_operation.get_eth_tx_args().as_slice(),
                 Options::with(|f| f.gas = Some(U256::from(10 * 10u64.pow(6)))),
             )
@@ -612,11 +615,11 @@ async fn send_raw_tx_wait_confirmation<T: Transport>(
 }
 
 fn default_tx_options() -> Options {
-    let mut options = Options::default();
     // Set the gas limit, so `eth_client` won't complain about it.
-    options.gas = Some(500_000.into());
-
-    options
+    Options {
+        gas: Some(500_000.into()),
+        ..Default::default()
+    }
 }
 
 /// Get fee paid in wei for tx execution

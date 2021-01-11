@@ -54,7 +54,7 @@ impl FakeEthClientData {
             self.last_block_number = max(op.eth_block, self.last_block_number);
             self.priority_ops
                 .entry(op.eth_block)
-                .or_insert(vec![])
+                .or_insert_with(Vec::new)
                 .push(op.clone());
         }
     }
@@ -104,22 +104,6 @@ impl EthClient for FakeEthClient {
         Ok(operations)
     }
 
-    async fn get_complete_withdrawals_event(
-        &self,
-        from: BlockNumber,
-        to: BlockNumber,
-    ) -> Result<Vec<CompleteWithdrawalsTx>, anyhow::Error> {
-        let from = self.block_to_number(&from).await;
-        let to = self.block_to_number(&to).await;
-        let mut withdrawals = vec![];
-        for number in from..=to {
-            if let Some(ops) = self.inner.read().await.withdrawals.get(&number) {
-                withdrawals.extend_from_slice(ops);
-            }
-        }
-        Ok(withdrawals)
-    }
-
     async fn block_number(&self) -> Result<u64, anyhow::Error> {
         Ok(self.inner.read().await.last_block_number)
     }
@@ -129,14 +113,6 @@ impl EthClient for FakeEthClient {
         _address: Address,
         _nonce: u32,
     ) -> Result<Vec<u8>, anyhow::Error> {
-        unreachable!()
-    }
-
-    async fn get_first_pending_withdrawal_index(&self) -> Result<u32, anyhow::Error> {
-        unreachable!()
-    }
-
-    async fn get_number_of_pending_withdrawals(&self) -> Result<u32, anyhow::Error> {
         unreachable!()
     }
 }

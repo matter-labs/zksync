@@ -21,7 +21,6 @@ async function main() {
     parser.addArgument('--contract', {
         required: false,
         help: 'Contract name: Governance, ZkSync, Verifier or all by default.'
-        //help: 'Contract name: Governance, ZkSync, Verifier, Proxies or all by default.'
     });
     parser.addArgument('--gasPrice', { required: false, help: 'Gas price in GWei.' });
     parser.addArgument('--nonce', { required: false, help: 'nonce (requires --contract argument)' });

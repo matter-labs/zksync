@@ -71,14 +71,11 @@ impl ChangePubKeyEthAuthData {
     pub fn get_eth_witness(&self) -> Vec<u8> {
         match self {
             ChangePubKeyEthAuthData::Onchain => Vec::new(),
-            ChangePubKeyEthAuthData::ECDSA(ChangePubKeyECDSAData {
-                eth_signature,
-                batch_hash,
-            }) => {
+            ChangePubKeyEthAuthData::ECDSA(ChangePubKeyECDSAData { eth_signature, .. }) => {
                 let mut bytes = Vec::new();
                 bytes.push(0x00);
                 bytes.extend_from_slice(&eth_signature.serialize_packed());
-                bytes.extend_from_slice(batch_hash.as_bytes());
+                // bytes.extend_from_slice(batch_hash.as_bytes());
                 bytes
             }
             ChangePubKeyEthAuthData::CREATE2(ChangePubKeyCREATE2Data {
@@ -249,6 +246,8 @@ impl ChangePubKey {
             self.eth_auth_data
         {
             eth_signed_msg.extend_from_slice(batch_hash.as_bytes());
+        } else {
+            eth_signed_msg.extend_from_slice(H256::default().as_bytes());
         }
         ensure!(
             eth_signed_msg.len() == CHANGE_PUBKEY_SIGNATURE_LEN,
