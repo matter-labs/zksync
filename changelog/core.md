@@ -15,7 +15,7 @@ All notable changes to the core components will be documented in this file.
 
 ### Removed
 
-- Sequential smt.
+- Sequential Sparse Merkle Tree implementation was removed because it has been replaced by the parallel implementation.
 
 ### Fixed
 
