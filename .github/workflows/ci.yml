@@ -17,7 +17,7 @@ jobs:
       - uses: actions/checkout@v2
       - name: start-services
         run: docker-compose -f docker-compose-runner.yml up -d geth postgres zk
-      - name: cache
+      - name: find_cache
         run: docker-compose -f docker-compose-runner.yml exec -T zk sh infrastructure/ci-scripts/find_cache.sh
       - name: init
         run: |
@@ -26,6 +26,9 @@ jobs:
             docker-compose -f docker-compose-runner.yml exec -T zk zk init
       - name: lints
         run: docker-compose -f docker-compose-runner.yml exec -T zk sh infrastructure/ci-scripts/lints.sh
+      - name: cache
+        run: docker-compose -f docker-compose-runner.yml exec -T zk sh infrastructure/ci-scripts/cache.sh
+
 
 #      - name: generic-init
 #        run: |
