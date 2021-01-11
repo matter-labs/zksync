@@ -167,8 +167,12 @@ export class Wallet {
     }): Promise<SignedTransaction> {
         const signedTransferTransaction = await this.getTransfer(transfer);
 
-        const stringAmount = this.provider.tokenSet.formatToken(transfer.token, transfer.amount);
-        const stringFee = this.provider.tokenSet.formatToken(transfer.token, transfer.fee);
+        const stringAmount = BigNumber.from(transfer.amount).isZero()
+            ? null
+            : this.provider.tokenSet.formatToken(transfer.token, transfer.amount);
+        const stringFee = BigNumber.from(transfer.fee).isZero()
+            ? null
+            : this.provider.tokenSet.formatToken(transfer.token, transfer.fee);
         const stringToken = this.provider.tokenSet.resolveTokenSymbol(transfer.token);
         const txMessageEthSignature = await this.ethMessageSigner.ethSignTransfer({
             stringAmount,
@@ -349,8 +353,12 @@ export class Wallet {
     }): Promise<SignedTransaction> {
         const signedWithdrawTransaction = await this.getWithdrawFromSyncToEthereum(withdraw);
 
-        const stringAmount = this.provider.tokenSet.formatToken(withdraw.token, withdraw.amount);
-        const stringFee = this.provider.tokenSet.formatToken(withdraw.token, withdraw.fee);
+        const stringAmount = BigNumber.from(withdraw.amount).isZero()
+            ? null
+            : this.provider.tokenSet.formatToken(withdraw.token, withdraw.amount);
+        const stringFee = BigNumber.from(withdraw.fee).isZero()
+            ? null
+            : this.provider.tokenSet.formatToken(withdraw.token, withdraw.fee);
         const stringToken = this.provider.tokenSet.resolveTokenSymbol(withdraw.token);
         const txMessageEthSignature = await this.ethMessageSigner.ethSignWithdraw({
             stringAmount,
@@ -409,6 +417,8 @@ export class Wallet {
         }
 
         const feeTokenId = this.provider.tokenSet.resolveTokenId(changePubKey.feeToken);
+        const newPubKeyHash = await this.signer.pubKeyHash();
+
         await this.setRequiredAccountIdFromServer('Set Signing Key');
 
         const changePubKeyTx: ChangePubKey = await this.signer.signSyncChangePubKey(

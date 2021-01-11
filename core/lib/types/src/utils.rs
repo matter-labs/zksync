@@ -74,3 +74,46 @@ pub mod h256_as_vec {
         Ok(H256::from_slice(&val))
     }
 }
+
+/// Construct the first part of the message that should be signed by Ethereum key.
+/// The pattern is as follows:
+/// ```
+/// [{Transfer/Withdraw} {amount} {token} to: {to_address}]
+/// [Fee: {fee} {token}]
+/// ```
+/// Note that both lines are optional.
+#[macro_export]
+macro_rules! ethereum_sign_message_part {
+    ($self_:ident, $tx_type:ty, $token_symbol:ident, $decimals:ident) => {{
+        let mut message = if !num::Zero::is_zero(&$self_.amount) {
+            let tx_type = match <$tx_type>::TX_TYPE {
+                $crate::Transfer::TX_TYPE => "Transfer",
+                $crate::Withdraw::TX_TYPE => "Withdraw",
+                _ => panic!("Invalid transaction type"),
+            };
+            format!(
+                "{tx_type} {amount} {token} to: {to:?}",
+                tx_type = tx_type,
+                amount = zksync_utils::format_units(&$self_.amount, $decimals),
+                token = $token_symbol,
+                to = $self_.to
+            )
+        } else {
+            String::new()
+        };
+        if !num::Zero::is_zero(&$self_.fee) {
+            if !message.is_empty() {
+                message.push('\n');
+            }
+            message.push_str(
+                format!(
+                    "Fee: {fee} {token}",
+                    fee = zksync_utils::format_units(&$self_.fee, $decimals),
+                    token = $token_symbol,
+                )
+                .as_str(),
+            );
+        }
+        message
+    }};
+}

@@ -31,12 +31,16 @@ export class EthMessageSigner {
         nonce: number;
         accountId: number;
     }): string {
-        const humanReadableTxInfo =
-            `Transfer ${transfer.stringAmount} ${transfer.stringToken}\n` +
-            `To: ${transfer.to.toLowerCase()}\n` +
-            `Nonce: ${transfer.nonce}\n` +
-            `Fee: ${transfer.stringFee} ${transfer.stringToken}\n` +
-            `Account Id: ${transfer.accountId}`;
+        let humanReadableTxInfo = '';
+        if (transfer.stringAmount != null) {
+            humanReadableTxInfo += `Transfer ${transfer.stringAmount} ${
+                transfer.stringToken
+            } to: ${transfer.to.toLowerCase()}\n`;
+        }
+        if (transfer.stringFee != null) {
+            humanReadableTxInfo += `Fee: ${transfer.stringFee} ${transfer.stringToken}\n`;
+        }
+        humanReadableTxInfo += `Nonce: ${transfer.nonce}`;
 
         return humanReadableTxInfo;
     }
@@ -61,12 +65,16 @@ export class EthMessageSigner {
         nonce: number;
         accountId: number;
     }): string {
-        const humanReadableTxInfo =
-            `Withdraw ${withdraw.stringAmount} ${withdraw.stringToken}\n` +
-            `To: ${withdraw.ethAddress.toLowerCase()}\n` +
-            `Nonce: ${withdraw.nonce}\n` +
-            `Fee: ${withdraw.stringFee} ${withdraw.stringToken}\n` +
-            `Account Id: ${withdraw.accountId}`;
+        let humanReadableTxInfo = '';
+        if (withdraw.stringAmount != null) {
+            humanReadableTxInfo += `Withdraw ${withdraw.stringAmount} ${
+                withdraw.stringToken
+            } to: ${withdraw.ethAddress.toLowerCase()}\n`;
+        }
+        if (withdraw.stringFee != null) {
+            humanReadableTxInfo += `Fee: ${withdraw.stringFee} ${withdraw.stringToken}\n`;
+        }
+        humanReadableTxInfo += `Nonce: ${withdraw.nonce}`;
 
         return humanReadableTxInfo;
     }

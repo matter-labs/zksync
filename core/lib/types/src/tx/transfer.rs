@@ -7,12 +7,12 @@ use crate::{
 use num::BigUint;
 
 use crate::account::PubKeyHash;
+use crate::ethereum_sign_message_part;
 use crate::Engine;
 use serde::{Deserialize, Serialize};
 use zksync_basic_types::Address;
 use zksync_crypto::franklin_crypto::eddsa::PrivateKey;
 use zksync_crypto::params::{max_account_id, max_token_id};
-use zksync_utils::format_units;
 use zksync_utils::BigUintSerdeAsRadix10Str;
 
 use super::{TxSignature, VerifiedSignatureCache};
@@ -149,20 +149,20 @@ impl Transfer {
         }
     }
 
+    /// Get the first part of the message we expect to be signed by Ethereum account key.
+    /// The only difference is the missing `nonce` since it's added at the end of the transactions
+    /// batch message.
+    pub fn get_ethereum_sign_message_part(&self, token_symbol: &str, decimals: u8) -> String {
+        ethereum_sign_message_part!(self, Transfer, token_symbol, decimals)
+    }
+
     /// Gets message that should be signed by Ethereum keys of the account for 2-Factor authentication.
     pub fn get_ethereum_sign_message(&self, token_symbol: &str, decimals: u8) -> String {
-        format!(
-            "Transfer {amount} {token}\n\
-            To: {to:?}\n\
-            Nonce: {nonce}\n\
-            Fee: {fee} {token}\n\
-            Account Id: {account_id}",
-            amount = format_units(&self.amount, decimals),
-            token = token_symbol,
-            to = self.to,
-            nonce = self.nonce,
-            fee = format_units(&self.fee, decimals),
-            account_id = self.account_id,
-        )
+        let mut message = self.get_ethereum_sign_message_part(token_symbol, decimals);
+        if !message.is_empty() {
+            message.push('\n');
+        }
+        message.push_str(format!("Nonce: {}", self.nonce).as_str());
+        message
     }
 }
