@@ -41,6 +41,8 @@ jobs:
           docker-compose -f docker-compose-runner.yml exec -T zk zk run deploy-eip1271
       - name: run-services
         run: docker-compose -f docker-compose-runner.yml exec -T zk sh infrastructure/ci-scripts/run_services.sh
+      - name: cache
+        run: docker-compose -f docker-compose-runner.yml exec -T zk sh infrastructure/ci-scripts/cache.sh
       - name: integration-tests
         run: docker-compose -f docker-compose-runner.yml exec -T zk zk test integration all
 
