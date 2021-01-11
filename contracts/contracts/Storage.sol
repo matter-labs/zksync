@@ -151,4 +151,8 @@ contract Storage {
     /// @dev Contains op type, pubdata and expiration block of unsatisfied requests.
     /// @dev Numbers are in order of requests receiving
     mapping(uint64 => PriorityOperation) internal priorityRequests;
+
+    /// @dev Timer for authFacts entry reset (address, nonce -> timer).
+    /// @dev Used when user wants to reset `authFacts` for some nonce.
+    mapping(address => mapping(uint32 => uint256)) internal authFactsResetTimer;
 }

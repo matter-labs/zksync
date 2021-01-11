@@ -94,8 +94,9 @@ async fn cancel_outstanding_deposits(
     call_cancel_account: ETHAccountId,
 ) {
     info!("Canceling outstangind deposits");
+    let token_address = test_setup.tokens[&deposit_token.0];
     let balance_to_withdraw_before = test_setup
-        .get_balance_to_withdraw(deposit_receiver_account, deposit_token)
+        .get_balance_to_withdraw(deposit_receiver_account, token_address)
         .await;
 
     test_setup
@@ -103,7 +104,7 @@ async fn cancel_outstanding_deposits(
         .await;
 
     let balance_to_withdraw_after = test_setup
-        .get_balance_to_withdraw(deposit_receiver_account, deposit_token)
+        .get_balance_to_withdraw(deposit_receiver_account, token_address)
         .await;
 
     assert_eq!(
@@ -148,8 +149,9 @@ async fn check_exit_correct_proof(
     amount: &BigUint,
 ) {
     info!("Checking exit with correct proof");
+    let token_address = test_setup.tokens[&token.0];
     let balance_to_withdraw_before = test_setup
-        .get_balance_to_withdraw(send_account, token)
+        .get_balance_to_withdraw(send_account, token_address)
         .await;
 
     let (proof, exit_amount) = test_setup.gen_exit_proof(accounts, fund_owner, token);
@@ -173,7 +175,7 @@ async fn check_exit_correct_proof(
         .expect_success();
 
     let balance_to_withdraw_after = test_setup
-        .get_balance_to_withdraw(send_account, token)
+        .get_balance_to_withdraw(send_account, token_address)
         .await;
 
     assert_eq!(
@@ -193,8 +195,9 @@ async fn check_exit_correct_proof_second_time(
     amount: &BigUint,
 ) {
     info!("Checking exit with correct proof twice");
+    let token_address = test_setup.tokens[&token.0];
     let balance_to_withdraw_before = test_setup
-        .get_balance_to_withdraw(send_account, token)
+        .get_balance_to_withdraw(send_account, token_address)
         .await;
 
     let (proof, exit_amount) = test_setup.gen_exit_proof(accounts, fund_owner, token);
@@ -213,7 +216,7 @@ async fn check_exit_correct_proof_second_time(
         .expect_revert("fet12");
 
     let balance_to_withdraw_after = test_setup
-        .get_balance_to_withdraw(send_account, token)
+        .get_balance_to_withdraw(send_account, token_address)
         .await;
 
     assert_eq!(
@@ -233,8 +236,9 @@ async fn check_exit_correct_proof_other_token(
     false_token: Token,
 ) {
     info!("Checking exit with correct proof other token");
+    let token_address = test_setup.tokens[&token.0];
     let balance_to_withdraw_before = test_setup
-        .get_balance_to_withdraw(send_account, token)
+        .get_balance_to_withdraw(send_account, token_address)
         .await;
 
     let (proof, exit_amount) = test_setup.gen_exit_proof(accounts, fund_owner, token);
@@ -253,7 +257,7 @@ async fn check_exit_correct_proof_other_token(
         .expect_revert("fet13");
 
     let balance_to_withdraw_after = test_setup
-        .get_balance_to_withdraw(send_account, token)
+        .get_balance_to_withdraw(send_account, token_address)
         .await;
 
     assert_eq!(
@@ -273,8 +277,9 @@ async fn check_exit_correct_proof_other_amount(
     false_amount: &BigUint,
 ) {
     info!("Checking exit with correct proof other amount");
+    let token_address = test_setup.tokens[&token.0];
     let balance_to_withdraw_before = test_setup
-        .get_balance_to_withdraw(send_account, token)
+        .get_balance_to_withdraw(send_account, token_address)
         .await;
 
     let (proof, exit_amount) = test_setup.gen_exit_proof(accounts, fund_owner, token);
@@ -293,7 +298,7 @@ async fn check_exit_correct_proof_other_amount(
         .expect_revert("fet13");
 
     let balance_to_withdraw_after = test_setup
-        .get_balance_to_withdraw(send_account, token)
+        .get_balance_to_withdraw(send_account, token_address)
         .await;
 
     assert_eq!(
@@ -311,9 +316,10 @@ async fn check_exit_correct_proof_incorrect_sender(
     token: Token,
     amount: &BigUint,
 ) {
+    let token_address = test_setup.tokens[&token.0];
     info!("Checking exit with correct proof and incorrect sender");
     let balance_to_withdraw_before = test_setup
-        .get_balance_to_withdraw(send_account, token)
+        .get_balance_to_withdraw(send_account, token_address)
         .await;
 
     let (proof, exit_amount) = test_setup.gen_exit_proof(accounts, fund_owner, token);
@@ -332,7 +338,7 @@ async fn check_exit_correct_proof_incorrect_sender(
         .expect_revert("fet13");
 
     let balance_to_withdraw_after = test_setup
-        .get_balance_to_withdraw(send_account, token)
+        .get_balance_to_withdraw(send_account, token_address)
         .await;
 
     assert_eq!(
