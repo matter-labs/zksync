@@ -116,7 +116,7 @@ export async function server() {
 export async function testkit(command: string, timeout: number) {
     let containerID = '';
     const prevUrl = process.env.WEB3_URL;
-    if (process.env.ZKSYNC_ENV == 'ci') {
+    if (process.env.CI == '1') {
         process.env.WEB3_URL = 'http://geth:8545';
     } else if (process.env.ZKSYNC_ENV == 'dev') {
         const { stdout } = await utils.exec('docker run --rm -d -p 7545:8545 matterlabs/geth:latest fast');
