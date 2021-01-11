@@ -129,15 +129,15 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
         // but this should be enabled in future upgrades.
         activateExodusMode();
 
-        require(upgradeParameters.length == 0, "af"); // upgrade parameters should be empty
+        require(upgradeParameters.length == 0, "0"); // upgrade parameters should be empty
 
         // Convert last verified block from old format to new format
-        require(totalBlocksCommitted == totalBlocksExecuted, "ag"); // all blocks should be verified
-        require(numberOfPendingWithdrawals_DEPRECATED == 0, "ah"); // pending withdrawal is not used anymore
-        require(totalOpenPriorityRequests == 0, "ai"); // no uncommitted priority requests
+        require(totalBlocksCommitted == totalBlocksExecuted, "1"); // all blocks should be verified
+        require(numberOfPendingWithdrawals_DEPRECATED == 0, "2"); // pending withdrawal is not used anymore
+        require(totalOpenPriorityRequests == 0, "3"); // no uncommitted priority requests
 
         Block_DEPRECATED memory lastBlock = blocks_DEPRECATED[totalBlocksExecuted];
-        require(lastBlock.priorityOperations == 0, "aj"); // last block should not contain priority operations
+        require(lastBlock.priorityOperations == 0, "4"); // last block should not contain priority operations
 
         StoredBlockInfo memory rehashedLastBlock =
             StoredBlockInfo(
@@ -165,13 +165,13 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
         uint128 _amount,
         uint128 _maxAmount
     ) external returns (uint128 withdrawnAmount) {
-        require(msg.sender == address(this), "ak"); // wtg10 - can be called only from this contract as one "external" call (to revert all this function state changes if it is needed)
+        require(msg.sender == address(this), "5"); // wtg10 - can be called only from this contract as one "external" call (to revert all this function state changes if it is needed)
 
         uint256 balanceBefore = _token.balanceOf(address(this));
-        require(Utils.sendERC20(_token, _to, _amount), "al"); // wtg11 - ERC20 transfer fails
+        require(Utils.sendERC20(_token, _to, _amount), "6"); // wtg11 - ERC20 transfer fails
         uint256 balanceAfter = _token.balanceOf(address(this));
         uint256 balanceDiff = balanceBefore.sub(balanceAfter);
-        require(balanceDiff <= _maxAmount, "am"); // wtg12 - rollup balance difference (before and after transfer) is bigger than _maxAmount
+        require(balanceDiff <= _maxAmount, "7"); // wtg12 - rollup balance difference (before and after transfer) is bigger than _maxAmount
 
         return SafeCast.toUint128(balanceDiff);
     }
@@ -181,14 +181,14 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
     /// @dev Canceling may take several separate transactions to be completed
     /// @param _n number of requests to process
     function cancelOutstandingDepositsForExodusMode(uint64 _n, bytes[] memory _depositsPubdata) external nonReentrant {
-        require(exodusMode, "an"); // exodus mode not active
+        require(exodusMode, "8"); // exodus mode not active
         uint64 toProcess = Utils.minU64(totalOpenPriorityRequests, _n);
-        require(toProcess > 0, "ao"); // no deposits to process
+        require(toProcess > 0, "9"); // no deposits to process
         uint64 currentDepositIdx = 0;
         for (uint64 id = firstPriorityRequestId; id < firstPriorityRequestId + toProcess; id++) {
             if (priorityRequests[id].opType == Operations.OpType.Deposit) {
                 bytes memory depositPubdata = _depositsPubdata[currentDepositIdx];
-                require(Utils.hashBytesToBytes20(depositPubdata) == priorityRequests[id].hashedPubData, "ap");
+                require(Utils.hashBytesToBytes20(depositPubdata) == priorityRequests[id].hashedPubData, "a");
                 ++currentDepositIdx;
 
                 Operations.Deposit memory op = Operations.readDepositPubdata(depositPubdata);
@@ -221,10 +221,10 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
 
         // Get token id by its address
         uint16 tokenId = governance.validateTokenAddress(address(_token));
-        require(!governance.pausedTokens(tokenId), "ar"); // token deposits are paused
+        require(!governance.pausedTokens(tokenId), "b"); // token deposits are paused
 
         uint256 balanceBefore = _token.balanceOf(address(this));
-        require(Utils.transferFromERC20(_token, msg.sender, address(this), SafeCast.toUint128(_amount)), "as"); // token transfer failed deposit
+        require(Utils.transferFromERC20(_token, msg.sender, address(this), SafeCast.toUint128(_amount)), "c"); // token transfer failed deposit
         uint256 balanceAfter = _token.balanceOf(address(this));
         uint128 depositAmount = SafeCast.toUint128(balanceAfter.sub(balanceBefore));
 
@@ -256,7 +256,7 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
         if (_token == address(0)) {
             registerWithdrawal(0, _amount, _owner);
             (bool success, ) = _owner.call{value: _amount}("");
-            require(success, "aq"); // ETH withdraw failed
+            require(success, "d"); // ETH withdraw failed
         } else {
             uint16 tokenId = governance.validateTokenAddress(_token);
             bytes22 packedBalanceKey = packAddressAndTokenId(_owner, tokenId);
@@ -274,7 +274,7 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
     /// @param _token Token address, 0 address for ether
     function requestFullExit(uint32 _accountId, address _token) external nonReentrant {
         requireActive();
-        require(_accountId <= MAX_ACCOUNT_ID, "at");
+        require(_accountId <= MAX_ACCOUNT_ID, "e");
 
         uint16 tokenId;
         if (_token == address(0)) {
@@ -308,14 +308,14 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
         view
         returns (StoredBlockInfo memory storedNewBlock)
     {
-        require(_newBlock.blockNumber == _previousBlock.blockNumber + 1, "au"); // only commit next block
+        require(_newBlock.blockNumber == _previousBlock.blockNumber + 1, "f"); // only commit next block
 
         // Check timestamp of the new block
         {
-            require(_newBlock.timestamp >= _previousBlock.timestamp, "av"); // Block should be after previous block
+            require(_newBlock.timestamp >= _previousBlock.timestamp, "g"); // Block should be after previous block
             bool timestampNotTooSmall = block.timestamp - COMMIT_TIMESTAMP_NOT_OLDER <= _newBlock.timestamp;
             bool timestampNotTooBig = _newBlock.timestamp <= block.timestamp + COMMIT_TIMESTAMP_APPROXIMATION_DELTA;
-            require(timestampNotTooSmall && timestampNotTooBig, "aw"); // New block timestamp is not valid
+            require(timestampNotTooSmall && timestampNotTooBig, "h"); // New block timestamp is not valid
         }
 
         // Check onchain operations
@@ -346,7 +346,7 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
         requireActive();
         governance.requireActiveValidator(msg.sender);
         // Check that we commit blocks after last committed block
-        require(storedBlockHashes[totalBlocksCommitted] == hashStoredBlockInfo(_lastCommittedBlockData), "ax"); // incorrect previous block data
+        require(storedBlockHashes[totalBlocksCommitted] == hashStoredBlockInfo(_lastCommittedBlockData), "i"); // incorrect previous block data
 
         for (uint32 i = 0; i < _newBlocksData.length; ++i) {
             _lastCommittedBlockData = commitOneBlock(_lastCommittedBlockData, _newBlocksData[i]);
@@ -359,7 +359,7 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
 
         totalBlocksCommitted += uint32(_newBlocksData.length);
 
-        require(totalCommittedPriorityRequests <= totalOpenPriorityRequests, "ay");
+        require(totalCommittedPriorityRequests <= totalOpenPriorityRequests, "j");
     }
 
     /// @dev 1. Try to send token to _recipients
@@ -402,7 +402,7 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
                 storedBlockHashes[_blockExecuteData.storedBlock.blockNumber],
             "exe10" // executing block should be committed
         );
-        require(_blockExecuteData.storedBlock.blockNumber == totalBlocksExecuted + _executedBlockIdx + 1, "az"); // Execute blocks in order
+        require(_blockExecuteData.storedBlock.blockNumber == totalBlocksExecuted + _executedBlockIdx + 1, "k"); // Execute blocks in order
 
         bytes32 pendingOnchainOpsHash = EMPTY_STRING_KECCAK;
         for (uint32 i = 0; i < _blockExecuteData.pendingOnchainOpsPubdata.length; ++i) {
@@ -420,12 +420,12 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
                 Operations.FullExit memory op = Operations.readFullExitPubdata(pubData);
                 withdrawOrStore(op.tokenId, op.owner, op.amount);
             } else {
-                revert("exe13"); // unsupported op in block execution
+                revert("l"); // unsupported op in block execution
             }
 
             pendingOnchainOpsHash = Utils.concatHash(pendingOnchainOpsHash, pubData);
         }
-        require(pendingOnchainOpsHash == _blockExecuteData.storedBlock.pendingOnchainOperationsHash, "bb"); // incorrect onchain ops executed
+        require(pendingOnchainOpsHash == _blockExecuteData.storedBlock.pendingOnchainOperationsHash, "m"); // incorrect onchain ops executed
     }
 
     /// @notice Execute blocks, completing priority operations and processing withdrawals.
@@ -448,7 +448,7 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
         totalOpenPriorityRequests -= priorityRequestsExecuted;
 
         totalBlocksExecuted += nBlocks;
-        require(totalBlocksExecuted <= totalBlocksProven, "ba"); // Can't execute blocks more then committed and proven currently.
+        require(totalBlocksExecuted <= totalBlocksProven, "n"); // Can't execute blocks more then committed and proven currently.
     }
 
     /// @notice Blocks commitment verification.
@@ -462,7 +462,7 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
             );
             ++currentTotalBlocksProven;
 
-            require(_proof.commitments[i] & INPUT_MASK == uint256(_committedBlocks[i].commitment) & INPUT_MASK, "bc"); // incorrect block commitment in proof
+            require(_proof.commitments[i] & INPUT_MASK == uint256(_committedBlocks[i].commitment) & INPUT_MASK, "o"); // incorrect block commitment in proof
         }
 
         bool success =
@@ -474,9 +474,9 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
                 _proof.subproofsLimbs,
                 true
             );
-        require(success, "bd"); // Aggregated proof verification fail
+        require(success, "p"); // Aggregated proof verification fail
 
-        require(currentTotalBlocksProven <= totalBlocksCommitted, "be");
+        require(currentTotalBlocksProven <= totalBlocksCommitted, "q");
         totalBlocksProven = currentTotalBlocksProven;
     }
 
@@ -490,7 +490,7 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
 
         for (uint32 i = 0; i < blocksToRevert; ++i) {
             StoredBlockInfo memory storedBlockInfo = _blocksToRevert[i];
-            require(storedBlockHashes[blocksCommitted] == hashStoredBlockInfo(storedBlockInfo), "bf"); // incorrect stored block info
+            require(storedBlockHashes[blocksCommitted] == hashStoredBlockInfo(storedBlockInfo), "r"); // incorrect stored block info
 
             delete storedBlockHashes[blocksCommitted];
 
@@ -542,15 +542,15 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
         ProofInput memory _proof
     ) external nonReentrant {
         bytes22 packedBalanceKey = packAddressAndTokenId(_owner, _tokenId);
-        require(exodusMode, "bg"); // must be in exodus mode
-        require(!performedExodus[_accountId][_tokenId], "bh"); // already exited
-        require(storedBlockHashes[totalBlocksExecuted] == hashStoredBlockInfo(_storedBlockInfo), "bi"); // incorrect sotred block info
+        require(exodusMode, "s"); // must be in exodus mode
+        require(!performedExodus[_accountId][_tokenId], "t"); // already exited
+        require(storedBlockHashes[totalBlocksExecuted] == hashStoredBlockInfo(_storedBlockInfo), "u"); // incorrect sotred block info
 
         uint256 commitment =
             uint256(sha256(abi.encodePacked(_storedBlockInfo.stateHash, _accountId, _owner, _tokenId, _amount)));
-        require(_proof.commitments.length == 1, "bj");
+        require(_proof.commitments.length == 1, "v");
         commitment = commitment & INPUT_MASK;
-        require(_proof.commitments[0] == commitment, "bk");
+        require(_proof.commitments[0] == commitment, "w");
 
         bool proofCorrect =
             verifier.verifyAggregatedProof(
@@ -561,7 +561,7 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
                 _proof.subproofsLimbs,
                 false
             );
-        require(proofCorrect, "bl");
+        require(proofCorrect, "x");
 
         increaseBalanceToWithdraw(packedBalanceKey, _amount);
         performedExodus[_accountId][_tokenId] = true;
@@ -575,7 +575,7 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
     /// @param _pubkey_hash New pubkey hash
     /// @param _nonce Nonce of the change pubkey L2 transaction
     function setAuthPubkeyHash(bytes calldata _pubkey_hash, uint32 _nonce) external {
-        require(_pubkey_hash.length == PUBKEY_HASH_BYTES, "bm"); // PubKeyHash should be 20 bytes.
+        require(_pubkey_hash.length == PUBKEY_HASH_BYTES, "y"); // PubKeyHash should be 20 bytes.
         if (authFacts[msg.sender][_nonce] == bytes32(0)) {
             authFacts[msg.sender][_nonce] = keccak256(_pubkey_hash);
         } else {
@@ -583,7 +583,7 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
             if (currentResetTimer == 0) {
                 authFactsResetTimer[msg.sender][_nonce] = block.timestamp;
             } else {
-                require(block.timestamp.sub(currentResetTimer) >= AUTH_FACT_RESET_TIMELOCK, "bM");
+                require(block.timestamp.sub(currentResetTimer) >= AUTH_FACT_RESET_TIMELOCK, "z");
                 authFactsResetTimer[msg.sender][_nonce] = 0;
                 authFacts[msg.sender][_nonce] = keccak256(_pubkey_hash);
             }
@@ -646,15 +646,15 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
         priorityOperationsProcessed = 0;
         processableOperationsHash = EMPTY_STRING_KECCAK;
 
-        require(pubData.length % CHUNK_BYTES == 0, "bo"); // pubdata length must be a multiple of CHUNK_BYTES
+        require(pubData.length % CHUNK_BYTES == 0, "A"); // pubdata length must be a multiple of CHUNK_BYTES
         offsetsCommitment = new bytes(pubData.length / CHUNK_BYTES);
         for (uint256 i = 0; i < _newBlockData.onchainOperations.length; ++i) {
             OnchainOperationData memory onchainOpData = _newBlockData.onchainOperations[i];
 
             uint256 pubdataOffset = onchainOpData.publicDataOffset;
-            require(pubdataOffset % CHUNK_BYTES == 0, "bp"); // offsets should be on chunks boundaries
+            require(pubdataOffset % CHUNK_BYTES == 0, "B"); // offsets should be on chunks boundaries
             uint256 chunkId = pubdataOffset / CHUNK_BYTES;
-            require(offsetsCommitment[chunkId] == 0x00, "bq"); // offset commitment should be empty
+            require(offsetsCommitment[chunkId] == 0x00, "C"); // offset commitment should be empty
             offsetsCommitment[chunkId] = bytes1(0x01);
 
             Operations.OpType opType = Operations.OpType(uint8(pubData[pubdataOffset]));
@@ -673,10 +673,10 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
 
                 if (onchainOpData.ethWitness.length != 0) {
                     bool valid = verifyChangePubkey(onchainOpData.ethWitness, op);
-                    require(valid, "br"); // failed to verify change pubkey hash signature
+                    require(valid, "D"); // failed to verify change pubkey hash signature
                 } else {
                     bool valid = authFacts[op.owner][op.nonce] == keccak256(abi.encodePacked(op.pubKeyHash));
-                    require(valid, "bs"); // new pub key hash is not authenticated properly
+                    require(valid, "E"); // new pub key hash is not authenticated properly
                 }
             } else {
                 bytes memory opPubData;
@@ -696,7 +696,7 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
                     );
                     priorityOperationsProcessed++;
                 } else {
-                    revert("fpp14"); // unsupported op
+                    revert("F"); // unsupported op
                 }
 
                 processableOperationsHash = Utils.concatHash(processableOperationsHash, opPubData);
@@ -716,7 +716,7 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
         } else if (changePkType == Operations.ChangePubkeyType.CREATE2) {
             return verifyChangePubkeyCREATE2(_ethWitness, _changePk);
         } else {
-            revert("chp13"); // Incorrect ChangePubKey type
+            revert("G"); // Incorrect ChangePubKey type
         }
     }
 
@@ -813,10 +813,10 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
     /// @param _priorityRequestId Operation's id in priority queue
     function checkPriorityOperation(Operations.Deposit memory _deposit, uint64 _priorityRequestId) internal view {
         Operations.OpType priorReqType = priorityRequests[_priorityRequestId].opType;
-        require(priorReqType == Operations.OpType.Deposit, "bt"); // incorrect priority op type
+        require(priorReqType == Operations.OpType.Deposit, "H"); // incorrect priority op type
 
         bytes20 hashedPubdata = priorityRequests[_priorityRequestId].hashedPubData;
-        require(Operations.checkDepositInPriorityQueue(_deposit, hashedPubdata), "bu");
+        require(Operations.checkDepositInPriorityQueue(_deposit, hashedPubdata), "I");
     }
 
     /// @notice Checks that FullExit is same as operation in priority queue
@@ -824,15 +824,15 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
     /// @param _priorityRequestId Operation's id in priority queue
     function checkPriorityOperation(Operations.FullExit memory _fullExit, uint64 _priorityRequestId) internal view {
         Operations.OpType priorReqType = priorityRequests[_priorityRequestId].opType;
-        require(priorReqType == Operations.OpType.FullExit, "bv"); // incorrect priority op type
+        require(priorReqType == Operations.OpType.FullExit, "J"); // incorrect priority op type
 
         bytes20 hashedPubdata = priorityRequests[_priorityRequestId].hashedPubData;
-        require(Operations.checkFullExitInPriorityQueue(_fullExit, hashedPubdata), "bw");
+        require(Operations.checkFullExitInPriorityQueue(_fullExit, hashedPubdata), "K");
     }
 
     /// @notice Checks that current state not is exodus mode
     function requireActive() internal view {
-        require(!exodusMode, "bx"); // exodus mode activated
+        require(!exodusMode, "L"); // exodus mode activated
     }
 
     // Priority queue
@@ -863,7 +863,7 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
     /// @notice Deletes processed priority requests
     /// @param _number The number of requests
     function deleteRequests(uint64 _number) internal {
-        require(_number <= totalOpenPriorityRequests, "by"); // number is higher than total priority requests number
+        require(_number <= totalOpenPriorityRequests, "M"); // number is higher than total priority requests number
 
         uint64 numberOfRequestsToClear = Utils.minU64(_number, MAX_PRIORITY_REQUESTS_TO_DELETE_IN_VERIFY);
         uint64 startIndex = firstPriorityRequestId;

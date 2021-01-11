@@ -71,7 +71,7 @@ library Operations {
         (offset, parsed.amount) = Bytes.readUInt128(_data, offset); // amount
         (offset, parsed.owner) = Bytes.readAddress(_data, offset); // owner
 
-        require(offset == PACKED_DEPOSIT_PUBDATA_BYTES, "m"); // reading invalid deposit pubdata size
+        require(offset == PACKED_DEPOSIT_PUBDATA_BYTES, "N"); // reading invalid deposit pubdata size
     }
 
     /// Serialize deposit pubdata
@@ -111,7 +111,7 @@ library Operations {
         (offset, parsed.tokenId) = Bytes.readUInt16(_data, offset); // tokenId
         (offset, parsed.amount) = Bytes.readUInt128(_data, offset); // amount
 
-        require(offset == PACKED_FULL_EXIT_PUBDATA_BYTES, "n"); // reading invalid full exit pubdata size
+        require(offset == PACKED_FULL_EXIT_PUBDATA_BYTES, "O"); // reading invalid full exit pubdata size
     }
 
     function writeFullExitPubdataForPriorityQueue(FullExit memory op) internal pure returns (bytes memory buf) {

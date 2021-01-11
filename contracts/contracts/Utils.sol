@@ -65,7 +65,7 @@ library Utils {
         pure
         returns (address)
     {
-        require(_signature.length == 65, "ae"); // incorrect signature length
+        require(_signature.length == 65, "P"); // incorrect signature length
 
         bytes32 signR;
         bytes32 signS;
