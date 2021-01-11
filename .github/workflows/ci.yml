@@ -23,7 +23,7 @@ jobs:
         run: |
           docker-compose -f docker-compose-runner.yml exec -T zk ln -s /usr/src/keys/setup keys/setup
           docker-compose -f docker-compose-runner.yml exec -T zk zk
-          docker-compose -f docker-compose-runner.yml exec -T zk dummy-prover enable --no-redeploy
+          docker-compose -f docker-compose-runner.yml exec -T zk zk dummy-prover enable --no-redeploy
           docker-compose -f docker-compose-runner.yml exec -T zk zk init
       - name: liquidity-token
         run: docker-compose -f docker-compose-runner.yml restart dev-liquidity-token-watcher
