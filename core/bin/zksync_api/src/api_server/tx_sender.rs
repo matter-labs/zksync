@@ -19,7 +19,7 @@ use zksync_storage::ConnectionPool;
 use zksync_types::{
     tx::EthSignData,
     tx::{SignedZkSyncTx, TxEthSignature, TxHash},
-    Address, Token, TokenId, TokenLike, TxFeeTypes, ZkSyncTx,
+    Token, TokenId, TokenLike, TxFeeTypes, ZkSyncTx,
 };
 
 // Local uses
@@ -178,7 +178,7 @@ impl TxSender {
         let sign_verify_channel = self.sign_verify_requests.clone();
         let ticker_request_sender = self.ticker_requests.clone();
 
-        if let Some((tx_type, token, address, provided_fee)) = tx_fee_info {
+        if let Some((tx_type, token, provided_fee)) = tx_fee_info {
             let should_enforce_fee =
                 !matches!(tx_type, TxFeeTypes::ChangePubKey{..}) || self.enforce_pubkey_change_fee;
 
@@ -190,7 +190,7 @@ impl TxSender {
             }
 
             let required_fee =
-                Self::ticker_request(ticker_request_sender, tx_type, address, token.clone())
+                Self::ticker_request(ticker_request_sender, tx_type, token.clone())
                     .await?;
             // Converting `BitUint` to `BigInt` is safe.
             let required_fee: BigDecimal = required_fee.total_fee.to_bigint().unwrap().into();
@@ -247,7 +247,7 @@ impl TxSender {
         for tx in &txs {
             let tx_fee_info = tx.0.get_fee_info();
 
-            if let Some((tx_type, token, address, provided_fee)) = tx_fee_info {
+            if let Some((tx_type, token, provided_fee)) = tx_fee_info {
                 let fee_allowed =
                     Self::token_allowed_for_fees(self.ticker_requests.clone(), token.clone())
                         .await?;
@@ -270,7 +270,6 @@ impl TxSender {
                 let required_fee = Self::ticker_request(
                     self.ticker_requests.clone(),
                     tx_type,
-                    address,
                     check_token.clone(),
                 )
                 .await?;
@@ -432,14 +431,12 @@ impl TxSender {
     async fn ticker_request(
         mut ticker_request_sender: mpsc::Sender<TickerRequest>,
         tx_type: TxFeeTypes,
-        address: Address,
         token: TokenLike,
     ) -> Result<Fee, SubmitError> {
         let req = oneshot::channel();
         ticker_request_sender
             .send(TickerRequest::GetTxFee {
                 tx_type,
-                address,
                 token: token.clone(),
                 response: req.0,
             })
