@@ -7,7 +7,7 @@
     "@types/chai": "^4.2.14",
     "@types/mocha": "^8.0.3",
     "argparse": "^1.0.10",
-    "axios": "^0.21.0",
+    "axios": "^0.21.1",
     "chai": "^4.2.0",
     "chalk": "^4.1.0",
     "ethereum-waffle": "^3.1.2",
@@ -15,6 +15,7 @@
     "ethers": "^5.0.19",
     "ethjs": "^0.4.0",
     "fs": "^0.0.1-security",
+    "handlebars": "^4.7.6",
     "mocha": "^8.2.0",
     "openzeppelin-solidity": "^2.3.0",
     "path": "^0.12.7",
@@ -41,6 +42,7 @@
     "token-info": "ts-node scripts/token-info.ts",
     "deploy-testkit": "ts-node scripts/deploy-testkit.ts",
     "publish-sources": "ts-node scripts/publish.ts",
-    "deploy-testnet-erc20": "ts-node scripts/deploy-testnet-token.ts"
+    "deploy-testnet-erc20": "ts-node scripts/deploy-testnet-token.ts",
+    "gen-token-add-contract": "ts-node scripts/gen-token-add-contract.ts"
   }
 }

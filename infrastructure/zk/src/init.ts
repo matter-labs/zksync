@@ -15,7 +15,7 @@ export async function init() {
         await env.gitHooks();
         await up();
     }
-    await utils.allowFail(run.yarn());
+    await run.yarn();
     await run.plonkSetup();
     await run.verifyKeys.unpack();
     await db.setup();

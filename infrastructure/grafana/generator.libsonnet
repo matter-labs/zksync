@@ -8,6 +8,7 @@
     $.grafana.graphPanel.new(
       title = metric,
       datasource = 'Prometheus',
+      format = 'ns',
     ).addTarget(
       $.grafana.prometheus.target(
         'rate(%s_sum[%s]) / rate(%s_count[%s])' 
