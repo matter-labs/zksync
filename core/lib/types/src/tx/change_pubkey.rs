@@ -5,7 +5,7 @@ use crate::{
 
 use crate::account::PubKeyHash;
 use anyhow::ensure;
-use num::BigUint;
+use num::{BigUint, Zero};
 use parity_crypto::Keccak256;
 use serde::{Deserialize, Serialize};
 use zksync_basic_types::{Address, TokenId, H256};
@@ -13,7 +13,7 @@ use zksync_crypto::{
     params::{max_account_id, max_token_id},
     PrivateKey,
 };
-use zksync_utils::BigUintSerdeAsRadix10Str;
+use zksync_utils::{format_units, BigUintSerdeAsRadix10Str};
 
 use super::{PackedEthSignature, TxSignature, VerifiedSignatureCache};
 
@@ -294,5 +294,30 @@ impl ChangePubKey {
             && self.account_id <= max_account_id()
             && self.fee_token <= max_token_id()
             && is_fee_amount_packable(&self.fee)
+    }
+
+    /// Get part of the message that should be signed with Ethereum account key for the batch of transactions.
+    /// The message for single `ChangePubKey` transaction is defined differently. The pattern is:
+    ///
+    /// Set signing key: {pubKeyHash}
+    /// [Fee: {fee} {token}]
+    ///
+    /// Note that the second line is optional.
+    pub fn get_ethereum_sign_message_part(&self, token_symbol: &str, decimals: u8) -> String {
+        let mut message = format!(
+            "Set signing key: {}",
+            hex::encode(&self.new_pk_hash.data).to_ascii_lowercase()
+        );
+        if !self.fee.is_zero() {
+            message.push_str(
+                format!(
+                    "\nFee: {fee} {token}",
+                    fee = format_units(&self.fee, decimals),
+                    token = token_symbol,
+                )
+                .as_str(),
+            );
+        }
+        message
     }
 }

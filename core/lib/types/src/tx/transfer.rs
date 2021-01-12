@@ -153,7 +153,7 @@ impl Transfer {
     /// The only difference is the missing `nonce` since it's added at the end of the transactions
     /// batch message.
     pub fn get_ethereum_sign_message_part(&self, token_symbol: &str, decimals: u8) -> String {
-        ethereum_sign_message_part!(self, Transfer, token_symbol, decimals)
+        ethereum_sign_message_part!(&self, Transfer, token_symbol, decimals)
     }
 
     /// Gets message that should be signed by Ethereum keys of the account for 2-Factor authentication.
