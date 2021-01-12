@@ -2,7 +2,7 @@
 
 All notable changes to `zksync_rs` will be documented in this file.
 
-## Unrealesed
+## Unreleased
 
 **Version 0.2.2** is being developed.
 

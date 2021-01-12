@@ -6,6 +6,14 @@ All notable changes to the core components will be documented in this file.
 
 ### Changed
 
+### Added
+
+### Fixed
+
+## Release 2021-01-12
+
+### Changed
+
 - `gen_token_add_contract` crate is rewritten in ts.
 - Metrics were added to some functions from lib/storage.
 - `get_tx_by_hash` function was simplified.
