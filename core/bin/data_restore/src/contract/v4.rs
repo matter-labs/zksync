@@ -4,21 +4,21 @@ use crate::{contract::default::get_rollup_ops_from_data, rollup_ops::RollupOpsBl
 
 fn decode_commitment_parameters(input_data: Vec<u8>) -> anyhow::Result<Vec<Token>> {
     let commit_operation = ParamType::Tuple(vec![
-        Box::new(ParamType::Uint(32)),       // uint32 _blockNumber,
-        Box::new(ParamType::Uint(32)),       // uint32 _feeAccount,
         Box::new(ParamType::FixedBytes(32)), // bytes32 encoded_root,
         Box::new(ParamType::Bytes),          // bytes calldata _publicData,
-        Box::new(ParamType::Uint(32)),       // uint64 _timestamp,
+        Box::new(ParamType::Uint(256)),      // uint64 _timestamp,
         Box::new(ParamType::Array(Box::new(ParamType::Tuple(vec![
-            Box::new(ParamType::Uint(32)), //uint32 public_data_offset
             Box::new(ParamType::Bytes),    // bytes eht_witness
-        ])))), // uint32[] calldata onchainOps
+            Box::new(ParamType::Uint(32)), //uint32 public_data_offset
+        ])))),
+        Box::new(ParamType::Uint(32)), // uint32 _blockNumber,
+        Box::new(ParamType::Uint(32)), // uint32 _feeAccount,
     ]);
     let stored_block = ParamType::Tuple(vec![
         Box::new(ParamType::Uint(32)),       // uint32 _block_number
-        Box::new(ParamType::Uint(32)),       // uint32 _number_of_processed_prior_ops
+        Box::new(ParamType::Uint(64)),       // uint32 _number_of_processed_prior_ops
         Box::new(ParamType::FixedBytes(32)), //bytes32  processable_ops_hash
-        Box::new(ParamType::Uint(32)),       // uint256 timestamp
+        Box::new(ParamType::Uint(256)),      // uint256 timestamp
         Box::new(ParamType::FixedBytes(32)), // bytes32 eth_encoded_root
         Box::new(ParamType::FixedBytes(32)), // commitment
     ]);
@@ -35,8 +35,8 @@ fn decode_commitment_parameters(input_data: Vec<u8>) -> anyhow::Result<Vec<Token
 }
 
 pub fn rollup_ops_blocks_from_bytes(data: Vec<u8>) -> anyhow::Result<Vec<RollupOpsBlock>> {
-    let fee_account_argument_id = 1;
-    let public_data_argument_id = 3;
+    let fee_account_argument_id = 5;
+    let public_data_argument_id = 1;
 
     let decoded_commitment_parameters = decode_commitment_parameters(data)?;
     assert_eq!(decoded_commitment_parameters.len(), 2);

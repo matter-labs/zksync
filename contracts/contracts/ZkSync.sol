@@ -125,6 +125,7 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
     /// @notice zkSync contract upgrade. Can be external because Proxy contract intercepts illegal calls of this function.
     /// @param upgradeParameters Encoded representation of upgrade parameters
     function upgrade(bytes calldata upgradeParameters) external nonReentrant {
+        // #if UPGRADE_FROM_V3
         // NOTE: this line does not have any effect in contracts-4 upgrade since we require priority queue to be empty,
         // but this should be enabled in future upgrades.
         activateExodusMode();
@@ -150,6 +151,7 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
             );
         storedBlockHashes[totalBlocksExecuted] = hashStoredBlockInfo(rehashedLastBlock);
         totalBlocksProven = totalBlocksExecuted;
+        // #endif
     }
 
     /// @notice Sends tokens

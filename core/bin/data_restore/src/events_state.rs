@@ -427,6 +427,7 @@ mod test {
             Eth::new(FakeTransport),
             [1u8; 20].into(),
             BlockNumber::Earliest,
+            BlockNumber::Latest,
         );
 
         let block_verified_topic = contract
