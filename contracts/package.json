@@ -7,7 +7,7 @@
     "@types/chai": "^4.2.14",
     "@types/mocha": "^8.0.3",
     "argparse": "^1.0.10",
-    "axios": "^0.21.0",
+    "axios": "^0.21.1",
     "chai": "^4.2.0",
     "chalk": "^4.1.0",
     "ethereum-waffle": "^3.1.2",
