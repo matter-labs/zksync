@@ -37,6 +37,7 @@
 //! [`Account`]: ./account/struct.Account.html
 
 pub mod account;
+pub mod aggregated_operations;
 pub mod block;
 pub mod config;
 pub mod ethereum;
@@ -46,6 +47,7 @@ pub mod mempool;
 pub mod network;
 pub mod operations;
 pub mod priority_ops;
+pub mod prover;
 pub mod tokens;
 pub mod tx;
 mod utils;
@@ -76,17 +78,17 @@ pub type SerialId = u64;
 use crate::block::Block;
 pub use zksync_crypto::{
     merkle_tree::{RescueHasher, SparseMerkleTree},
-    proof::EncodedProofPlonk,
     Engine, Fr,
 };
 
 use serde::{Deserialize, Serialize};
+use zksync_crypto::proof::SingleProof;
 
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(tag = "type")]
 pub enum Action {
     Commit,
-    Verify { proof: Box<EncodedProofPlonk> },
+    Verify { proof: Box<SingleProof> },
 }
 
 impl Action {

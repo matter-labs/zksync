@@ -1,4 +1,6 @@
-pragma solidity >=0.5.8 <0.7.0;
+// SPDX-License-Identifier: MIT OR Apache-2.0
+
+pragma solidity ^0.7.0;
 
 import "./Governance.sol";
 import "./Proxy.sol";
@@ -32,7 +34,7 @@ contract DeployFactory is TokenDeployInit {
         address _firstValidator,
         address _governor,
         address _feeAccountAddress
-    ) public {
+    ) {
         require(_firstValidator != address(0));
         require(_governor != address(0));
         require(_feeAccountAddress != address(0));

@@ -1,12 +1,8 @@
 # syntax=docker/dockerfile:experimental
-FROM rust:1.45 as builder
-RUN --mount=type=cache,target=/usr/local/cargo/registry \
-    cargo install sccache
+FROM rust:1.48 as builder
 WORKDIR /usr/src/zksync
 COPY . .
 RUN --mount=type=cache,target=/usr/local/cargo/registry \
-    --mount=type=cache,target=/root/.cache/sccache \
-    RUSTC_WRAPPER=/usr/local/cargo/bin/sccache \
     cargo build --release
 
 FROM debian:buster-slim
@@ -35,6 +31,6 @@ COPY --from=builder /usr/src/zksync/target/release/plonk_step_by_step_prover /bi
 COPY --from=builder /usr/src/zksync/target/release/dummy_prover /bin/
 COPY docker/prover/prover-entry.sh /bin/
 COPY keys/packed /keys/packed
-COPY contracts/build /contracts/build
+COPY contracts/artifacts/ /contracts/artifacts/
 
 CMD ["prover-entry.sh"]

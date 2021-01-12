@@ -119,6 +119,12 @@ impl Witness for ForcedExitWitness<Bn256> {
         pubdata_bits
     }
 
+    fn get_offset_commitment_data(&self) -> Vec<bool> {
+        let mut commitment = vec![false; ForcedExitOp::CHUNKS * 8];
+        commitment[7] = true;
+        commitment
+    }
+
     fn calculate_operations(&self, input: SigDataInput) -> Vec<Operation<Bn256>> {
         let pubdata_chunks: Vec<_> = self
             .get_pubdata()

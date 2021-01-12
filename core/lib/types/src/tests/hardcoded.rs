@@ -26,6 +26,8 @@ use zksync_basic_types::{Address, H256};
 #[cfg(test)]
 pub mod operations_test {
     use super::*;
+    use crate::tx::{ChangePubKeyECDSAData, ChangePubKeyEthAuthData};
+
     // Public data parameters, using them we can restore `ZkSyncOp`.
     const NOOP_PUBLIC_DATA: &str = "000000000000000000";
     const DEPOSIT_PUBLIC_DATA: &str = "010000002a002a0000000000000000000000000000002a21abaed8712072e918632259780e587698ef58da0000000000000000000000";
@@ -228,13 +230,16 @@ pub mod operations_test {
             ChangePubKeyOp::from_public_data(&hex::decode(CHANGE_PUBKEY_PUBLIC_DATA).unwrap())
                 .unwrap();
 
-        change_pubkey.tx.eth_signature = PackedEthSignature::deserialize_packed(
+        change_pubkey.tx.eth_auth_data = ChangePubKeyEthAuthData::ECDSA(ChangePubKeyECDSAData {
+            eth_signature: PackedEthSignature::deserialize_packed(
             &hex::decode("2a0a81e257a2f5d6ed4f07b81dbda09f107bd026dbda09f107bd026f5d6ed4f02a0a81e257a2f5d6ed4f07b81dbda09f107bd026dbda09f107bd026f5d6ed4f0d4").unwrap(),
-        ).ok();
+            ).expect("Hex signature deserialization"),
+            batch_hash: H256::from([0xCEu8; 32])
+        });
 
         assert_eq!(
             hex::encode(change_pubkey.get_eth_witness()),
-            "2a0a81e257a2f5d6ed4f07b81dbda09f107bd026dbda09f107bd026f5d6ed4f02a0a81e257a2f5d6ed4f07b81dbda09f107bd026dbda09f107bd026f5d6ed4f0d4"
+            "002a0a81e257a2f5d6ed4f07b81dbda09f107bd026dbda09f107bd026f5d6ed4f02a0a81e257a2f5d6ed4f07b81dbda09f107bd026dbda09f107bd026f5d6ed4f0d4cececececececececececececececececececececececececececececececece"
         );
     }
 }

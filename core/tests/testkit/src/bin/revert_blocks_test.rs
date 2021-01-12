@@ -9,16 +9,18 @@ use zksync_testkit::{
 use crate::eth_account::{parse_ether, EthereumAccount};
 use crate::external_commands::{deploy_contracts, get_test_accounts, Contracts};
 use crate::zksync_account::ZkSyncAccount;
+use zksync_crypto::Fr;
 
 /// Executes blocks with some basic operations with new state keeper
 /// if block_processing is equal to BlockProcessing::NoVerify this should revert all not verified blocks
 async fn execute_blocks_with_new_state_keeper(
     contracts: Contracts,
     block_processing: BlockProcessing,
+    fee_account: &ZkSyncAccount,
+    genesis_hash: Fr,
 ) {
     let testkit_config = TestkitConfig::from_env();
 
-    let fee_account = ZkSyncAccount::rand();
     let (sk_thread_handle, stop_state_keeper_sender, sk_channels) =
         spawn_state_keeper(&fee_account.address);
 
@@ -49,7 +51,7 @@ async fn execute_blocks_with_new_state_keeper(
 
     let zksync_accounts = {
         let mut zksync_accounts = Vec::new();
-        zksync_accounts.push(fee_account);
+        zksync_accounts.push(fee_account.clone());
         zksync_accounts.extend(eth_accounts.iter().map(|eth_account| {
             let rng_zksync_key = ZkSyncAccount::rand().private_key;
             ZkSyncAccount::new(
@@ -68,13 +70,20 @@ async fn execute_blocks_with_new_state_keeper(
         fee_account_id: ZKSyncAccountId(0),
     };
 
-    let mut test_setup = TestSetup::new(sk_channels, accounts, &contracts, commit_account);
+    let mut test_setup = TestSetup::new(
+        sk_channels,
+        accounts,
+        &contracts,
+        commit_account,
+        genesis_hash,
+    );
 
     let deposit_amount = parse_ether("1.0").unwrap();
 
+    let mut executed_blocks = Vec::new();
     let mut tokens = vec![];
     for token in 0..=1 {
-        perform_basic_operations(
+        let blocks = perform_basic_operations(
             token,
             &mut test_setup,
             deposit_amount.clone(),
@@ -82,6 +91,7 @@ async fn execute_blocks_with_new_state_keeper(
         )
         .await;
         tokens.push(token);
+        executed_blocks.extend(blocks.into_iter());
     }
 
     if block_processing == BlockProcessing::NoVerify {
@@ -94,8 +104,10 @@ async fn execute_blocks_with_new_state_keeper(
             .await
             .expect("total_blocks_verified call fails");
         assert_ne!(blocks_committed, blocks_verified, "no blocks to revert");
+
+        let executed_blocks_reverse_order = executed_blocks.into_iter().rev().collect::<Vec<_>>();
         test_setup
-            .revert_blocks(blocks_committed - blocks_verified)
+            .revert_blocks(&executed_blocks_reverse_order)
             .await
             .expect("revert_blocks call fails");
     } else {
@@ -109,7 +121,7 @@ async fn execute_blocks_with_new_state_keeper(
             fee_account_address,
             test_setup.get_accounts_state().await,
             tokens,
-            test_setup.current_state_root.expect("Should exist"),
+            test_setup.last_committed_block.new_root_hash,
         )
         .await;
     }
@@ -119,14 +131,28 @@ async fn execute_blocks_with_new_state_keeper(
 }
 
 async fn revert_blocks_test() {
+    let fee_account = ZkSyncAccount::rand();
+    let genesis_hash = genesis_state(&fee_account.address).tree.root_hash();
     println!("deploying contracts");
-    let contracts = deploy_contracts(false, Default::default());
+    let contracts = deploy_contracts(false, genesis_hash);
     println!("contracts deployed");
 
-    execute_blocks_with_new_state_keeper(contracts.clone(), BlockProcessing::NoVerify).await;
-    println!("some blocks are committed and reverted");
+    execute_blocks_with_new_state_keeper(
+        contracts.clone(),
+        BlockProcessing::NoVerify,
+        &fee_account,
+        genesis_hash,
+    )
+    .await;
+    println!("some blocks are committed and reverted\n\n");
 
-    execute_blocks_with_new_state_keeper(contracts, BlockProcessing::CommitAndVerify).await;
+    execute_blocks_with_new_state_keeper(
+        contracts,
+        BlockProcessing::CommitAndVerify,
+        &fee_account,
+        genesis_hash,
+    )
+    .await;
 }
 
 #[tokio::main]

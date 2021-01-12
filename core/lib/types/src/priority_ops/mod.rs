@@ -1,18 +1,14 @@
 //! Definition of zkSync network priority operations: operations initiated from the L1.
-use std::convert::{TryFrom, TryInto};
 
 use anyhow::{bail, ensure, format_err};
 use ethabi::{decode, ParamType};
 use num::BigUint;
 use serde::{Deserialize, Serialize};
-
+use std::convert::{TryFrom, TryInto};
 use zksync_basic_types::{Address, Log, H256, U256};
-use zksync_crypto::{
-    params::{
-        ACCOUNT_ID_BIT_WIDTH, BALANCE_BIT_WIDTH, ETH_ADDRESS_BIT_WIDTH, FR_ADDRESS_LEN,
-        TOKEN_BIT_WIDTH,
-    },
-    primitives::FromBytes,
+use zksync_crypto::params::{
+    ACCOUNT_ID_BIT_WIDTH, BALANCE_BIT_WIDTH, ETH_ADDRESS_BIT_WIDTH, FR_ADDRESS_LEN,
+    TOKEN_BIT_WIDTH, TX_TYPE_BIT_WIDTH,
 };
 use zksync_utils::BigUintSerdeAsRadix10Str;
 
@@ -21,6 +17,7 @@ use super::{
     utils::h256_as_vec,
     AccountId, SerialId, TokenId,
 };
+use zksync_crypto::primitives::FromBytes;
 
 #[cfg(test)]
 mod tests;
@@ -79,6 +76,8 @@ impl ZkSyncPriorityOp {
             DepositOp::OP_CODE => {
                 let pub_data_left = pub_data;
 
+                let (_, pub_data_left) = pub_data_left.split_at(TX_TYPE_BIT_WIDTH / 8);
+
                 // account_id
                 let (_, pub_data_left) = pub_data_left.split_at(ACCOUNT_ID_BIT_WIDTH / 8);
 
@@ -114,9 +113,11 @@ impl ZkSyncPriorityOp {
                 }))
             }
             FullExitOp::OP_CODE => {
+                let (_, pub_data_left) = pub_data.split_at(TX_TYPE_BIT_WIDTH / 8);
+
                 // account_id
                 let (account_id, pub_data_left) = {
-                    let (account_id, left) = pub_data.split_at(ACCOUNT_ID_BIT_WIDTH / 8);
+                    let (account_id, left) = pub_data_left.split_at(ACCOUNT_ID_BIT_WIDTH / 8);
                     (u32::from_bytes(account_id).unwrap(), left)
                 };
 

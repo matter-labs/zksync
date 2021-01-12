@@ -2,13 +2,15 @@ import { Contract, ethers, constants, BigNumber } from 'ethers';
 import { parseEther } from 'ethers/lib/utils';
 import { ETHProxy } from 'zksync';
 import { Address, TokenAddress } from 'zksync/build/types';
-import { Deployer, readContractCode, readTestContracts } from '../../src.ts/deploy';
+import { Deployer, readContractCode, readProductionContracts, readTestContracts } from '../../src.ts/deploy';
+import { ZkSyncWithdrawalUnitTestFactory } from '../../typechain';
 
-const { simpleEncode } = require('ethereumjs-abi');
+const hardhat = require('hardhat');
 const { expect } = require('chai');
 const { deployContract } = require('ethereum-waffle');
-const { wallet, exitWallet, deployTestContract, getCallRevertReason, IERC20_INTERFACE } = require('./common');
-import * as zksync from 'zksync';
+const { getCallRevertReason, IERC20_INTERFACE } = require('./common');
+
+let wallet, exitWallet;
 
 async function onchainTokenBalanceOfContract(
     ethWallet: ethers.Wallet,
@@ -35,15 +37,18 @@ describe('zkSync process tokens which have no return value in `transfer` and `tr
     let tokenContract;
     let ethProxy;
     before(async () => {
-        const contracts = readTestContracts();
-        contracts.zkSync = readContractCode('ZkSyncWithdrawalUnitTest');
+        [wallet, exitWallet] = await hardhat.ethers.getSigners();
+
+        const contracts = readProductionContracts();
+        contracts.zkSync = readContractCode('dev-contracts/ZkSyncWithdrawalUnitTest');
         const deployer = new Deployer({ deployWallet: wallet, contracts });
         await deployer.deployAll({ gasLimit: 6500000 });
-        zksyncContract = deployer.zkSyncContract(wallet);
+        zksyncContract = ZkSyncWithdrawalUnitTestFactory.connect(deployer.addresses.ZkSync, wallet);
 
-        tokenContract = await deployContract(wallet, readContractCode('MintableERC20NoTransferReturnValueTest'), [], {
-            gasLimit: 5000000
-        });
+        const tokenContractDeployFactory = await hardhat.ethers.getContractFactory(
+            'MintableERC20NoTransferReturnValueTest'
+        );
+        tokenContract = await tokenContractDeployFactory.deploy();
         await tokenContract.mint(wallet.address, parseEther('1000000'));
 
         const govContract = deployer.governanceContract(wallet);
@@ -58,15 +63,17 @@ describe('zkSync process tokens which have no return value in `transfer` and `tr
     async function performWithdraw(ethWallet: ethers.Wallet, token: TokenAddress, tokenId: number, amount: BigNumber) {
         let gasFee: BigNumber;
         const balanceBefore = await onchainBalance(ethWallet, token);
-        const contractBalanceBefore = BigNumber.from(
-            await zksyncContract.getBalanceToWithdraw(ethWallet.address, tokenId)
-        );
+        const contractBalanceBefore = BigNumber.from(await zksyncContract.getPendingBalance(ethWallet.address, token));
         if (token === ethers.constants.AddressZero) {
-            const tx = await zksyncContract.withdrawETH(amount);
+            const tx = await zksyncContract.withdrawPendingBalance(
+                ethWallet.address,
+                ethers.constants.AddressZero,
+                amount
+            );
             const receipt = await tx.wait();
             gasFee = receipt.gasUsed.mul(await ethWallet.provider.getGasPrice());
         } else {
-            await zksyncContract.withdrawERC20(token, amount);
+            await zksyncContract.withdrawPendingBalance(ethWallet.address, token, amount);
         }
         const balanceAfter = await onchainBalance(ethWallet, token);
 
@@ -74,9 +81,7 @@ describe('zkSync process tokens which have no return value in `transfer` and `tr
             token == constants.AddressZero ? balanceBefore.add(amount).sub(gasFee) : balanceBefore.add(amount);
         expect(balanceAfter.toString(), 'withdraw account balance mismatch').eq(expectedBalance.toString());
 
-        const contractBalanceAfter = BigNumber.from(
-            await zksyncContract.getBalanceToWithdraw(ethWallet.address, tokenId)
-        );
+        const contractBalanceAfter = BigNumber.from(await zksyncContract.getPendingBalance(ethWallet.address, token));
         const expectedContractBalance = contractBalanceBefore.sub(amount);
         expect(contractBalanceAfter.toString(), 'withdraw contract balance mismatch').eq(
             expectedContractBalance.toString()
@@ -88,10 +93,7 @@ describe('zkSync process tokens which have no return value in `transfer` and `tr
         const depositAmount = parseEther('1.0');
         await tokenContract.approve(zksyncContract.address, depositAmount);
 
-        const tokenId = await ethProxy.resolveTokenId(tokenContract.address);
-        await expect(zksyncContract.depositERC20(tokenContract.address, depositAmount, wallet.address))
-            .to.emit(zksyncContract, 'OnchainDeposit')
-            .withArgs(wallet.address, tokenId, depositAmount, wallet.address);
+        await zksyncContract.depositERC20(tokenContract.address, depositAmount, wallet.address);
     });
 
     it('Deposit ERC20 fail', async () => {
@@ -100,9 +102,11 @@ describe('zkSync process tokens which have no return value in `transfer` and `tr
         await tokenContract.approve(zksyncContract.address, depositAmount.div(2));
 
         const balanceBefore = await tokenContract.balanceOf(wallet.address);
-        const { revertReason } = await getCallRevertReason(
-            async () => await zksyncContract.depositERC20(tokenContract.address, depositAmount, wallet.address)
-        );
+        try {
+            const { revertReason } = await getCallRevertReason(
+                async () => await zksyncContract.depositERC20(tokenContract.address, depositAmount, wallet.address)
+            );
+        } catch (e) {}
         const balanceAfter = await tokenContract.balanceOf(wallet.address);
         expect(balanceBefore).eq(balanceAfter);
     });
@@ -150,20 +154,17 @@ describe('zkSync process tokens which have no return value in `transfer` and `tr
     it('Complete pending withdawals', async () => {
         zksyncContract.connect(wallet);
         const withdrawAmount = parseEther('1.0');
-        const withdrawsToCancel = 5;
 
         await tokenContract.transfer(zksyncContract.address, withdrawAmount);
 
         for (const tokenAddress of [tokenContract.address]) {
             const tokenId = await ethProxy.resolveTokenId(tokenAddress);
 
-            await zksyncContract.setBalanceToWithdraw(exitWallet.address, tokenId, 0);
-            await zksyncContract.addPendingWithdrawal(exitWallet.address, tokenId, withdrawAmount.div(2));
-            await zksyncContract.addPendingWithdrawal(exitWallet.address, tokenId, withdrawAmount.div(2));
+            await zksyncContract.setBalanceToWithdraw(exitWallet.address, tokenId, withdrawAmount);
 
             const onchainBalBefore = await onchainBalance(exitWallet, tokenAddress);
 
-            await zksyncContract.completeWithdrawals(withdrawsToCancel);
+            await zksyncContract.withdrawOrStoreExternal(tokenId, exitWallet.address, withdrawAmount);
 
             const onchainBalAfter = await onchainBalance(exitWallet, tokenAddress);
 
@@ -180,18 +181,16 @@ describe('zkSync process tokens which take fee from sender', function () {
     let ethProxy;
     let FEE_AMOUNT;
     before(async () => {
-        const contracts = readTestContracts();
-        contracts.zkSync = readContractCode('ZkSyncWithdrawalUnitTest');
+        [wallet, exitWallet] = await hardhat.ethers.getSigners();
+
+        const contracts = readProductionContracts();
+        contracts.zkSync = readContractCode('dev-contracts/ZkSyncWithdrawalUnitTest');
         const deployer = new Deployer({ deployWallet: wallet, contracts });
         await deployer.deployAll({ gasLimit: 6500000 });
-        zksyncContract = deployer.zkSyncContract(wallet);
+        zksyncContract = ZkSyncWithdrawalUnitTestFactory.connect(deployer.addresses.ZkSync, wallet);
 
-        tokenContract = await deployContract(
-            wallet,
-            readContractCode('MintableERC20FeeAndDividendsTest'),
-            [true, true],
-            { gasLimit: 5000000 }
-        );
+        const tokenContractDeployFactory = await hardhat.ethers.getContractFactory('MintableERC20FeeAndDividendsTest');
+        tokenContract = await tokenContractDeployFactory.deploy(true, true);
         FEE_AMOUNT = BigNumber.from(await tokenContract.FEE_AMOUNT_AS_VALUE());
         await tokenContract.mint(wallet.address, parseEther('1000000'));
 
@@ -213,11 +212,15 @@ describe('zkSync process tokens which take fee from sender', function () {
         let gasFee: BigNumber;
         const balanceBefore = await onchainBalance(ethWallet, token);
         if (token === ethers.constants.AddressZero) {
-            const tx = await zksyncContract.withdrawETH(amount);
+            const tx = await zksyncContract.withdrawPendingBalance(
+                ethWallet.address,
+                ethers.constants.AddressZero,
+                amount
+            );
             const receipt = await tx.wait();
             gasFee = receipt.gasUsed.mul(await ethWallet.provider.getGasPrice());
         } else {
-            await zksyncContract.withdrawERC20(token, amount);
+            await zksyncContract.withdrawPendingBalance(ethWallet.address, token, amount);
         }
         const balanceAfter = await onchainBalance(ethWallet, token);
 
@@ -232,7 +235,8 @@ describe('zkSync process tokens which take fee from sender', function () {
 
         const sendERC20 = await tokenContract.transfer(zksyncContract.address, withdrawAmount.mul(2));
         await sendERC20.wait();
-        const tokenId = await ethProxy.resolveTokenId(tokenContract.address);
+        const token = tokenContract.address;
+        const tokenId = await ethProxy.resolveTokenId(token);
 
         // test one withdrawal
         await zksyncContract.setBalanceToWithdraw(wallet.address, tokenId, withdrawAmount);
@@ -244,7 +248,7 @@ describe('zkSync process tokens which take fee from sender', function () {
             tokenId,
             withdrawAmount.sub(FEE_AMOUNT)
         );
-        expect(await zksyncContract.getBalanceToWithdraw(wallet.address, tokenId)).eq('0');
+        expect(await zksyncContract.getPendingBalance(wallet.address, token)).eq('0');
         expect(await onchainTokenBalanceOfContract(wallet, zksyncContract.address, tokenContract.address)).eq(
             withdrawAmount
         );
@@ -264,7 +268,7 @@ describe('zkSync process tokens which take fee from sender', function () {
             tokenId,
             withdrawAmount.div(2).sub(FEE_AMOUNT)
         );
-        expect(await zksyncContract.getBalanceToWithdraw(wallet.address, tokenId)).eq(withdrawAmount.div(2).toString());
+        expect(await zksyncContract.getPendingBalance(wallet.address, token)).eq(withdrawAmount.div(2).toString());
         expect(await onchainTokenBalanceOfContract(wallet, zksyncContract.address, tokenContract.address)).eq(
             withdrawAmount.div(2).toString()
         );
@@ -274,7 +278,7 @@ describe('zkSync process tokens which take fee from sender', function () {
             tokenId,
             withdrawAmount.div(2).sub(FEE_AMOUNT)
         );
-        expect(await zksyncContract.getBalanceToWithdraw(wallet.address, tokenId)).eq('0');
+        expect(await zksyncContract.getPendingBalance(wallet.address, token)).eq('0');
         expect(await onchainTokenBalanceOfContract(wallet, zksyncContract.address, tokenContract.address)).eq('0');
 
         const onchainBalAfter_second_subtest = await onchainBalance(wallet, tokenContract.address);
@@ -286,7 +290,6 @@ describe('zkSync process tokens which take fee from sender', function () {
     it('Complete pending withdawals => should not complete transfer because of token fee', async () => {
         zksyncContract.connect(wallet);
         const withdrawAmount = parseEther('1.0');
-        const withdrawsToCancel = 5;
 
         await tokenContract.transfer(zksyncContract.address, withdrawAmount);
 
@@ -294,17 +297,16 @@ describe('zkSync process tokens which take fee from sender', function () {
             const tokenId = await ethProxy.resolveTokenId(tokenAddress);
 
             await zksyncContract.setBalanceToWithdraw(exitWallet.address, tokenId, 0);
-            await zksyncContract.addPendingWithdrawal(exitWallet.address, tokenId, withdrawAmount);
 
             const onchainBalBefore = await onchainBalance(exitWallet, tokenAddress);
 
-            await zksyncContract.completeWithdrawals(withdrawsToCancel);
+            await zksyncContract.withdrawOrStoreExternal(tokenId, exitWallet.address, withdrawAmount);
 
             const onchainBalAfter = await onchainBalance(exitWallet, tokenAddress);
 
             expect(onchainBalAfter).eq(onchainBalBefore);
 
-            expect(await zksyncContract.getBalanceToWithdraw(exitWallet.address, tokenId)).eq(withdrawAmount);
+            expect(await zksyncContract.getPendingBalance(exitWallet.address, tokenAddress)).eq(withdrawAmount);
 
             // contract balance should not change
             expect(await onchainTokenBalanceOfContract(wallet, zksyncContract.address, tokenContract.address)).eq(
@@ -322,18 +324,16 @@ describe('zkSync process tokens which take fee from recipient', function () {
     let ethProxy;
     let FEE_AMOUNT;
     before(async () => {
-        const contracts = readTestContracts();
-        contracts.zkSync = readContractCode('ZkSyncWithdrawalUnitTest');
+        [wallet, exitWallet] = await hardhat.ethers.getSigners();
+
+        const contracts = readProductionContracts();
+        contracts.zkSync = readContractCode('dev-contracts/ZkSyncWithdrawalUnitTest');
         const deployer = new Deployer({ deployWallet: wallet, contracts });
         await deployer.deployAll({ gasLimit: 6500000 });
-        zksyncContract = deployer.zkSyncContract(wallet);
+        zksyncContract = ZkSyncWithdrawalUnitTestFactory.connect(deployer.addresses.ZkSync, wallet);
 
-        tokenContract = await deployContract(
-            wallet,
-            readContractCode('MintableERC20FeeAndDividendsTest'),
-            [true, false],
-            { gasLimit: 5000000 }
-        );
+        const tokenContractDeployFactory = await hardhat.ethers.getContractFactory('MintableERC20FeeAndDividendsTest');
+        tokenContract = await tokenContractDeployFactory.deploy(true, false);
         FEE_AMOUNT = BigNumber.from(await tokenContract.FEE_AMOUNT_AS_VALUE());
         await tokenContract.mint(wallet.address, parseEther('1000000'));
 
@@ -351,10 +351,7 @@ describe('zkSync process tokens which take fee from recipient', function () {
         const depositAmount = parseEther('1.0');
         await tokenContract.approve(zksyncContract.address, depositAmount);
 
-        const tokenId = await ethProxy.resolveTokenId(tokenContract.address);
-        await expect(zksyncContract.depositERC20(tokenContract.address, depositAmount, wallet.address))
-            .to.emit(zksyncContract, 'OnchainDeposit')
-            .withArgs(wallet.address, tokenId, depositAmount.sub(FEE_AMOUNT), wallet.address);
+        await zksyncContract.depositERC20(tokenContract.address, depositAmount, wallet.address);
     });
 });
 
@@ -366,18 +363,16 @@ describe('zkSync process tokens which adds dividends to recipient', function () 
     let ethProxy;
     let DIVIDEND_AMOUNT;
     before(async () => {
-        const contracts = readTestContracts();
-        contracts.zkSync = readContractCode('ZkSyncWithdrawalUnitTest');
+        [wallet, exitWallet] = await hardhat.ethers.getSigners();
+
+        const contracts = readProductionContracts();
+        contracts.zkSync = readContractCode('dev-contracts/ZkSyncWithdrawalUnitTest');
         const deployer = new Deployer({ deployWallet: wallet, contracts });
         await deployer.deployAll({ gasLimit: 6500000 });
-        zksyncContract = deployer.zkSyncContract(wallet);
+        zksyncContract = ZkSyncWithdrawalUnitTestFactory.connect(deployer.addresses.ZkSync, wallet);
 
-        tokenContract = await deployContract(
-            wallet,
-            readContractCode('MintableERC20FeeAndDividendsTest'),
-            [false, false],
-            { gasLimit: 5000000 }
-        );
+        const tokenContractDeployFactory = await hardhat.ethers.getContractFactory('MintableERC20FeeAndDividendsTest');
+        tokenContract = await tokenContractDeployFactory.deploy(false, false);
         DIVIDEND_AMOUNT = BigNumber.from(await tokenContract.DIVIDEND_AMOUNT_AS_VALUE());
         await tokenContract.mint(wallet.address, parseEther('1000000'));
 
@@ -395,9 +390,6 @@ describe('zkSync process tokens which adds dividends to recipient', function () 
         const depositAmount = parseEther('1.0');
         await tokenContract.approve(zksyncContract.address, depositAmount);
 
-        const tokenId = await ethProxy.resolveTokenId(tokenContract.address);
-        await expect(zksyncContract.depositERC20(tokenContract.address, depositAmount, wallet.address))
-            .to.emit(zksyncContract, 'OnchainDeposit')
-            .withArgs(wallet.address, tokenId, depositAmount.add(DIVIDEND_AMOUNT), wallet.address);
+        await zksyncContract.depositERC20(tokenContract.address, depositAmount, wallet.address);
     });
 });

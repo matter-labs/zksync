@@ -38,6 +38,7 @@ impl From<TxAddError> for RpcErrorCodes {
             TxAddError::EmptyBatch => Self::Other,
             TxAddError::BatchTooBig => Self::Other,
             TxAddError::BatchWithdrawalsOverload => Self::Other,
+            TxAddError::EthSignaturesLimitExceeded => Self::Other,
         }
     }
 }

@@ -3,6 +3,7 @@
 use chrono::{DateTime, Duration, Utc};
 use num::BigUint;
 // Workspace imports
+use zksync_basic_types::H256;
 use zksync_crypto::franklin_crypto::bellman::pairing::ff::Field;
 use zksync_crypto::Fr;
 use zksync_test_account::ZkSyncAccount;
@@ -11,7 +12,7 @@ use zksync_types::operations::{ChangePubKeyOp, ZkSyncOp};
 use zksync_types::priority_ops::PriorityOp;
 use zksync_types::{
     Address, CloseOp, Deposit, DepositOp, FullExit, FullExitOp, Token, TransferOp, TransferToNewOp,
-    WithdrawOp, H256,
+    WithdrawOp,
 };
 // Local imports
 
@@ -88,6 +89,8 @@ impl TransactionsHistoryTestSetup {
             100,
             1_000_000.into(), // Not important
             1_500_000.into(), // Not important
+            H256::default(),
+            0,
         );
 
         self.blocks.push(block);
@@ -123,6 +126,8 @@ impl TransactionsHistoryTestSetup {
             100,
             1_000_000.into(), // Not important
             1_500_000.into(), // Not important
+            Default::default(),
+            0,
         );
 
         self.blocks.push(block);

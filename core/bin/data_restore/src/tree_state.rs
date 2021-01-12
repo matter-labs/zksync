@@ -1,6 +1,5 @@
 use crate::rollup_ops::RollupOpsBlock;
 use anyhow::format_err;
-use web3::types::{Address, H256};
 use zksync_crypto::Fr;
 use zksync_state::{
     handler::TxHandler,
@@ -12,7 +11,7 @@ use zksync_types::operations::ZkSyncOp;
 use zksync_types::priority_ops::PriorityOp;
 use zksync_types::priority_ops::ZkSyncPriorityOp;
 use zksync_types::tx::{ChangePubKey, Close, ForcedExit, Transfer, Withdraw, ZkSyncTx};
-use zksync_types::{AccountId, AccountMap, AccountUpdates};
+use zksync_types::{AccountId, AccountMap, AccountUpdates, Address, H256};
 
 /// Rollup accounts states
 pub struct TreeState {
@@ -311,6 +310,8 @@ impl TreeState {
             &self.available_block_chunk_sizes,
             gas_limit,
             gas_limit,
+            H256::default(),
+            0,
         );
 
         self.state.block_number += 1;

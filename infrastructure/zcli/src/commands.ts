@@ -170,7 +170,8 @@ class TxSubmitter {
         const { to, token, amount } = txDetails;
         if (!(await this.syncWallet.isSigningKeySet())) {
             const changePubkey = await this.syncWallet.setSigningKey({
-                feeToken: token
+                feeToken: token,
+                ethAuthType: 'ECDSA'
             });
             await changePubkey.awaitReceipt();
         }

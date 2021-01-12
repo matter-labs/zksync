@@ -33,7 +33,8 @@ async function reason() {
         try {
             const parsedTransaction = franklinInterface.parseTransaction({ data: tx.data });
             if (parsedTransaction) {
-                console.log('parsed tx: ', parsedTransaction);
+                console.log('parsed tx: ', parsedTransaction.name, parsedTransaction);
+                console.log('tx args: ', parsedTransaction.name, JSON.stringify(parsedTransaction.args, null, 2));
             } else {
                 console.log('tx:', tx);
             }
@@ -92,4 +93,9 @@ async function reason() {
     }
 }
 
-reason();
+reason()
+    .then(() => process.exit(0))
+    .catch((err) => {
+        console.error('Error:', err.message || err);
+        process.exit(1);
+    });

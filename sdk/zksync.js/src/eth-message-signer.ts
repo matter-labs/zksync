@@ -83,7 +83,11 @@ export class EthMessageSigner {
         return await this.getEthMessageSignature(message);
     }
 
-    getChangePubKeyEthSignMessage(changePubKey: { pubKeyHash: PubKeyHash; nonce: number; accountId: number }): string {
+    getChangePubKeyEthSignMessage(changePubKey: {
+        pubKeyHash: PubKeyHash;
+        nonce: number;
+        accountId: number;
+    }): Uint8Array {
         return getChangePubkeyMessage(changePubKey.pubKeyHash, changePubKey.nonce, changePubKey.accountId);
     }
 

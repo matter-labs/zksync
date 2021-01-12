@@ -2,8 +2,8 @@ const ethers = require('ethers');
 const { expect, use } = require('chai');
 const { defaultAccounts, solidity, deployContract, MockProvider } = require('ethereum-waffle');
 
-const IERC20_INTERFACE = require('openzeppelin-solidity/build/contracts/IERC20');
-const { rawEncode } = require('ethereumjs-abi');
+const IERC20_INTERFACE = require("@openzeppelin/contracts/build/contracts/IERC20");
+const {rawEncode} = require('ethereumjs-abi')
 
 // For: geth
 
@@ -50,10 +50,16 @@ async function getCallRevertReason(f) {
     let result;
     try {
         result = await f();
-    } catch (e) {
-        revertReason = (e.reason && e.reason[0]) || e.results[e.hashes[0]].reason;
-    }
-    return { revertReason, result };
+    } catch(e) {
+        try {
+            const data = e.stackTrace[e.stackTrace.length - 1].message.slice(4);
+            revertReason = ethers.utils.defaultAbiCoder.decode(["string"], data)[0];
+        } catch (err2) {
+            throw e;
+        }
+        // revertReason = (e.reason && e.reason[0]) || e.results[e.hashes[0]].reason
+    } 
+    return {revertReason, result};
 }
 
 module.exports = {

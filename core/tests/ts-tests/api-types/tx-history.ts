@@ -1,3 +1,20 @@
+type ChangePubKeyOnchain = {
+    type: 'Onchain';
+};
+
+type ChangePubKeyECDSA = {
+    type: 'ECDSA';
+    ethSignature: string;
+    batchHash?: string;
+};
+
+type ChangePubKeyCREATE2 = {
+    type: 'CREATE2';
+    creatorAddress: string;
+    saltArg: string;
+    codeHash: string;
+};
+
 type Deposit = {
     tx_id: string;
     hash: string;
@@ -75,12 +92,12 @@ type ChangePubKey = {
     tx: {
         account: string;
         accountId: number;
-        ethSignature: string | null;
         newPkHash: string;
         nonce: number;
         type: string;
         feeToken: number;
         fee: string;
+        ethAuthData: ChangePubKeyOnchain | ChangePubKeyECDSA | ChangePubKeyCREATE2;
         signature: {
             pubKey: string;
             signature: string;

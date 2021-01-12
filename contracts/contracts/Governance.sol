@@ -1,4 +1,6 @@
-pragma solidity ^0.5.8;
+// SPDX-License-Identifier: MIT OR Apache-2.0
+
+pragma solidity ^0.7.0;
 
 import "./Config.sol";
 
@@ -13,6 +15,8 @@ contract Governance is Config {
 
     /// @notice Validator's status changed
     event ValidatorStatusUpdate(address indexed validatorAddress, bool isActive);
+
+    event TokenPausedUpdate(address indexed token, bool paused);
 
     /// @notice Address which will exercise governance over the network i.e. add tokens, change validator set, conduct upgrades
     address public networkGovernor;
@@ -29,7 +33,8 @@ contract Governance is Config {
     /// @notice List of permitted validators
     mapping(address => bool) public validators;
 
-    constructor() public {}
+    /// @notice Paused tokens list, deposits are impossible to create for paused tokens
+    mapping(uint16 => bool) public pausedTokens;
 
     /// @notice Governance contract initialization. Can be external because Proxy contract intercepts illegal calls of this function.
     /// @param initializationParameters Encoded representation of initialization parameters:
@@ -58,8 +63,8 @@ contract Governance is Config {
     /// @param _token Token address
     function addToken(address _token) external {
         requireGovernor(msg.sender);
-        require(tokenIds[_token] == 0, "gan11"); // token exists
-        require(totalTokens < MAX_AMOUNT_OF_REGISTERED_TOKENS, "gan12"); // no free identifiers for tokens
+        require(tokenIds[_token] == 0, "1e"); // token exists
+        require(totalTokens < MAX_AMOUNT_OF_REGISTERED_TOKENS, "1f"); // no free identifiers for tokens
 
         totalTokens++;
         uint16 newTokenId = totalTokens; // it is not `totalTokens - 1` because tokenId = 0 is reserved for eth
@@ -67,6 +72,19 @@ contract Governance is Config {
         tokenAddresses[newTokenId] = _token;
         tokenIds[_token] = newTokenId;
         emit NewToken(_token, newTokenId);
+    }
+
+    /// @notice Pause token deposits for the given token
+    /// @param _tokenAddr Token address
+    /// @param _tokenPaused Token paused status
+    function setTokenPaused(address _tokenAddr, bool _tokenPaused) external {
+        requireGovernor(msg.sender);
+
+        uint16 tokenId = this.validateTokenAddress(_tokenAddr);
+        if (pausedTokens[tokenId] != _tokenPaused) {
+            pausedTokens[tokenId] = _tokenPaused;
+            emit TokenPausedUpdate(_tokenAddr, _tokenPaused);
+        }
     }
 
     /// @notice Change validator status (active or not active)
@@ -83,13 +101,13 @@ contract Governance is Config {
     /// @notice Check if specified address is is governor
     /// @param _address Address to check
     function requireGovernor(address _address) public view {
-        require(_address == networkGovernor, "grr11"); // only by governor
+        require(_address == networkGovernor, "1g"); // only by governor
     }
 
     /// @notice Checks if validator is active
     /// @param _address Validator address
     function requireActiveValidator(address _address) external view {
-        require(validators[_address], "grr21"); // validator is not active
+        require(validators[_address], "1h"); // validator is not active
     }
 
     /// @notice Validate token id (must be less than or equal to total tokens amount)
@@ -104,7 +122,7 @@ contract Governance is Config {
     /// @return tokens id
     function validateTokenAddress(address _tokenAddr) external view returns (uint16) {
         uint16 tokenId = tokenIds[_tokenAddr];
-        require(tokenId != 0, "gvs11"); // 0 is not a valid token
+        require(tokenId != 0, "1i"); // 0 is not a valid token
         return tokenId;
     }
 }

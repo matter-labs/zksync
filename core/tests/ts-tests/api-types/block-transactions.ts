@@ -1,3 +1,20 @@
+interface ChangePubKeyOnchain {
+    type: 'Onchain';
+}
+
+interface ChangePubKeyECDSA {
+    type: 'ECDSA';
+    ethSignature: string;
+    batchHash: string;
+}
+
+interface ChangePubKeyCREATE2 {
+    type: 'CREATE2';
+    creatorAddress: string;
+    saltArg: string;
+    codeHash: string;
+}
+
 type Transfer = {
     tx_hash: string;
     block_number: number;
@@ -44,11 +61,11 @@ type ChangePubKey = {
     op: {
         account: string;
         accountId: number;
-        ethSignature: string | null;
         newPkHash: string;
         feeToken: number;
         fee: string;
         nonce: number;
+        ethAuthData: ChangePubKeyOnchain | ChangePubKeyECDSA | ChangePubKeyCREATE2;
         signature: {
             pubKey: string;
             signature: string;

@@ -46,6 +46,9 @@ pub trait Witness {
     /// Obtains the pubdata from the witness.
     fn get_pubdata(&self) -> Vec<bool>;
 
+    /// Obtains offset commitment data from the witness.
+    fn get_offset_commitment_data(&self) -> Vec<bool>;
+
     /// Calculates the list of Circuit operations from the witness data.
     fn calculate_operations(&self, input: Self::CalculateOpsInput) -> Vec<Operation<Bn256>>;
 }

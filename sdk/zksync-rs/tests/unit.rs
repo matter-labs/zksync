@@ -154,6 +154,7 @@ mod signatures_with_vectors {
     use zksync::{signer::Signer, WalletCredentials};
     use zksync_config::test_config::unit_vectors::TxData;
     use zksync_eth_signer::PrivateKeySigner;
+    use zksync_types::tx::{ChangePubKeyECDSAData, ChangePubKeyEthAuthData};
     use zksync_types::{network::Network, AccountId, Address, H256};
 
     async fn get_signer(
@@ -220,7 +221,7 @@ mod signatures_with_vectors {
 
                 if let Some(expected_eth_signature) = outputs.eth_signature {
                     let eth_signature = eth_signature.unwrap().serialize_packed();
-                    assert_eq!(&eth_signature, expected_eth_signature.as_slice());
+                    assert_eq!(&eth_signature[..], expected_eth_signature.as_slice());
                 }
             }
         }
@@ -273,7 +274,7 @@ mod signatures_with_vectors {
 
                 if let Some(expected_eth_signature) = outputs.eth_signature {
                     let eth_signature = eth_signature.unwrap().serialize_packed();
-                    assert_eq!(&eth_signature, expected_eth_signature.as_slice());
+                    assert_eq!(&eth_signature[..], expected_eth_signature.as_slice());
                 }
             }
         }
@@ -325,8 +326,14 @@ mod signatures_with_vectors {
                 );
 
                 if let Some(expected_eth_signature) = outputs.eth_signature {
-                    let eth_signature = change_pub_key.eth_signature.unwrap().serialize_packed();
-                    assert_eq!(&eth_signature, expected_eth_signature.as_slice());
+                    let eth_signature = match &change_pub_key.eth_auth_data {
+                        ChangePubKeyEthAuthData::ECDSA(ChangePubKeyECDSAData {
+                            eth_signature,
+                            ..
+                        }) => eth_signature.serialize_packed(),
+                        _ => panic!("No ChangePubKey ethereum siganture"),
+                    };
+                    assert_eq!(&eth_signature[..], expected_eth_signature.as_slice());
                 }
             }
         }

@@ -7,6 +7,7 @@ use zksync_circuit::witness::utils::build_block_witness;
 use zksync_config::AvailableBlockSizesConfig;
 use zksync_crypto::circuit::CircuitAccountTree;
 use zksync_crypto::params::account_tree_depth;
+use zksync_prover_utils::aggregated_proofs::{gen_aggregate_proof, prepare_proof_data};
 use zksync_prover_utils::{PlonkVerificationKey, SetupForStepByStepProver};
 use zksync_testkit::eth_account::EthereumAccount;
 use zksync_testkit::external_commands::{deploy_contracts, get_test_accounts};
@@ -15,7 +16,8 @@ use zksync_testkit::{
     genesis_state, spawn_state_keeper, AccountSet, ETHAccountId, TestSetup, TestkitConfig, Token,
     ZKSyncAccountId,
 };
-use zksync_types::DepositOp;
+use zksync_types::aggregated_operations::BlocksProofOperation;
+use zksync_types::{DepositOp, U256};
 
 #[tokio::main]
 async fn main() {
@@ -76,7 +78,13 @@ async fn main() {
         fee_account_id: ZKSyncAccountId(0),
     };
 
-    let mut test_setup = TestSetup::new(sk_channels, accounts, &contracts, commit_account);
+    let mut test_setup = TestSetup::new(
+        sk_channels,
+        accounts,
+        &contracts,
+        commit_account,
+        genesis_root,
+    );
 
     let account_state = test_setup.get_accounts_state().await;
     let mut circuit_account_tree = CircuitAccountTree::new(account_tree_depth());
@@ -85,12 +93,14 @@ async fn main() {
     }
 
     let block_chunk_sizes = AvailableBlockSizesConfig::from_env().blocks_chunks;
+    let aggregated_proof_sizes =
+        AvailableBlockSizesConfig::from_env().aggregated_proof_sizes_with_setup_pow();
     info!(
         "Checking keys and onchain verification for block sizes: {:?}",
         block_chunk_sizes
     );
 
-    for block_size in block_chunk_sizes {
+    for block_size in block_chunk_sizes.clone() {
         info!("Checking keys for block size: {}", block_size);
 
         test_setup.start_block();
@@ -102,7 +112,7 @@ async fn main() {
                 .cloned()
                 .expect("At least one receipt is expected for deposit");
         }
-        let (_, mut block) = test_setup.execute_commit_block().await;
+        let mut block = test_setup.execute_commit_block().await;
         assert!(block.block_chunks_size <= block_size);
         // complete block to the correct size with noops
         block.block_chunks_size = block_size;
@@ -133,8 +143,96 @@ async fn main() {
             .expect("Failed to gen proof");
         info!("Proof done in {} s", timer.elapsed().as_secs());
 
+        let mut proofs = Vec::new();
+        for _ in 0..1 {
+            proofs.push((proof.clone(), block_size));
+        }
+        let (vks, proof_data) = prepare_proof_data(&block_chunk_sizes, proofs);
+        let aggreagated_proof =
+            gen_aggregate_proof(vks, proof_data, &aggregated_proof_sizes, false)
+                .expect("Failed to generate aggreagated proof");
+
+        let proof_op = BlocksProofOperation {
+            blocks: vec![block],
+            proof: aggreagated_proof.serialize_aggregated_proof(),
+        };
         test_setup
-            .execute_verify_block(&block, proof)
+            .execute_verify_commitments(proof_op)
+            .await
+            .expect_success();
+    }
+
+    {
+        let block_size = *block_chunk_sizes.first().unwrap();
+        info!("Checking recursive keys for block size: {}", block_size);
+
+        let recursive_size = 5;
+        let mut proofs = Vec::new();
+        let mut block_commitments = Vec::new();
+        let mut blocks = Vec::new();
+        let mut block_idxs_in_proof = Vec::new();
+
+        for idx in 0..recursive_size {
+            test_setup.start_block();
+            for _ in 1..=(block_size / DepositOp::CHUNKS) {
+                test_setup
+                    .deposit(ETHAccountId(1), ZKSyncAccountId(2), Token(0), 1u32.into())
+                    .await
+                    .last()
+                    .cloned()
+                    .expect("At least one receipt is expected for deposit");
+            }
+            let mut block = test_setup.execute_commit_block().await;
+            assert!(block.block_chunks_size <= block_size);
+            // complete block to the correct size with noops
+            block.block_chunks_size = block_size;
+            blocks.push(block.clone());
+            block_idxs_in_proof.push(idx);
+
+            let timer = Instant::now();
+            let witness = build_block_witness(&mut circuit_account_tree, &block)
+                .expect("failed to build block witness");
+            assert_eq!(
+                witness.root_after_fees.unwrap(),
+                block.new_root_hash,
+                "witness root hash is incorrect"
+            );
+            info!("Witness done in {} ms", timer.elapsed().as_millis());
+
+            let circuit = witness.into_circuit_instance();
+
+            let timer = Instant::now();
+            let prover_setup = SetupForStepByStepProver::prepare_setup_for_step_by_step_prover(
+                circuit.clone(),
+                false,
+            )
+            .expect("failed to prepare setup for plonk prover");
+            info!("Setup done in {} s", timer.elapsed().as_secs());
+
+            let vk = PlonkVerificationKey::read_verification_key_for_main_circuit(block_size)
+                .expect("Failed to get vk");
+            let timer = Instant::now();
+            let proof = prover_setup
+                .gen_step_by_step_proof_using_prepared_setup(circuit, &vk)
+                .expect("Failed to gen proof");
+            info!("Proof done in {} s", timer.elapsed().as_secs());
+
+            proofs.push((proof.clone(), block_size));
+            block_commitments.push(U256::from_big_endian(block.block_commitment.as_bytes()));
+        }
+
+        let (vks, proof_data) = prepare_proof_data(&block_chunk_sizes, proofs);
+        let aggreagated_proof =
+            gen_aggregate_proof(vks, proof_data, &aggregated_proof_sizes, false)
+                .expect("Failed to generate aggreagated proof");
+        // aggreagated_proof.individual_vk_inputs = block_commitments;
+
+        let proof_op = BlocksProofOperation {
+            blocks,
+            proof: aggreagated_proof.serialize_aggregated_proof(),
+        };
+        test_setup
+            .execute_verify_commitments(proof_op)
             .await
             .expect_success();
     }

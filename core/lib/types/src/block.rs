@@ -4,12 +4,14 @@ use super::PriorityOp;
 use super::ZkSyncOp;
 use super::{AccountId, BlockNumber, Fr};
 use crate::SignedZkSyncTx;
-use chrono::DateTime;
 use chrono::Utc;
+use chrono::{DateTime, TimeZone};
+use parity_crypto::digest::sha256;
+use parity_crypto::Keccak256;
 use serde::{Deserialize, Serialize};
 use zksync_basic_types::{H256, U256};
 use zksync_crypto::franklin_crypto::bellman::pairing::ff::{PrimeField, PrimeFieldRepr};
-use zksync_crypto::params::CHUNK_BIT_WIDTH;
+use zksync_crypto::params::{CHUNK_BIT_WIDTH, CHUNK_BYTES};
 use zksync_crypto::serialization::FrSerde;
 
 /// An intermediate state of the block in the zkSync network.
@@ -30,8 +32,12 @@ pub struct PendingBlock {
     pub pending_block_iteration: usize,
     /// List of successfully executed operations.
     pub success_operations: Vec<ExecutedOperations>,
-    /// Lit of failed operations.
+    /// List of failed operations.
     pub failed_txs: Vec<ExecutedTx>,
+    /// Previous block root hash
+    pub previous_block_root_hash: H256,
+    /// Timestamp
+    pub timestamp: u64,
 }
 
 /// Executed L2 transaction.
@@ -126,6 +132,10 @@ pub struct Block {
     pub commit_gas_limit: U256,
     /// Gas limit to be set for the Verify Ethereum transaction.
     pub verify_gas_limit: U256,
+    /// Commitment
+    pub block_commitment: H256,
+    /// Timestamp
+    pub timestamp: u64,
 }
 
 impl Block {
@@ -140,6 +150,8 @@ impl Block {
         block_chunks_size: usize,
         commit_gas_limit: U256,
         verify_gas_limit: U256,
+        block_commitment: H256,
+        timestamp: u64,
     ) -> Self {
         Self {
             block_number,
@@ -150,6 +162,8 @@ impl Block {
             block_chunks_size,
             commit_gas_limit,
             verify_gas_limit,
+            block_commitment,
+            timestamp,
         }
     }
 
@@ -169,6 +183,8 @@ impl Block {
         available_block_chunks_sizes: &[usize],
         commit_gas_limit: U256,
         verify_gas_limit: U256,
+        previous_block_root_hash: H256,
+        timestamp: u64,
     ) -> Self {
         let mut block = Self {
             block_number,
@@ -179,8 +195,19 @@ impl Block {
             block_chunks_size: 0,
             commit_gas_limit,
             verify_gas_limit,
+            block_commitment: H256::default(),
+            timestamp,
         };
         block.block_chunks_size = block.smallest_block_size(available_block_chunks_sizes);
+        block.block_commitment = Block::get_commitment(
+            block_number,
+            fee_account,
+            previous_block_root_hash,
+            block.get_eth_encoded_root(),
+            block.timestamp,
+            &block.get_onchain_op_commitment(),
+            &block.get_eth_public_data(),
+        );
         block
     }
 
@@ -258,6 +285,97 @@ impl Block {
 
         withdrawals_data
     }
+
+    pub fn get_onchain_operations_block_info(
+        &self,
+    ) -> (Vec<OnchainOperationsBlockInfo>, H256, u64) {
+        let mut onchain_ops = Vec::new();
+        let mut processable_ops_hash = Vec::new().keccak256();
+        let mut public_data_offset = 0;
+        let mut priority_ops = 0;
+
+        for op in &self.block_transactions {
+            if let Some(executed_op) = op.get_executed_op() {
+                if executed_op.is_onchain_operation() {
+                    onchain_ops.push(OnchainOperationsBlockInfo {
+                        public_data_offset,
+                        eth_witness: executed_op.eth_witness().unwrap_or_default(),
+                    })
+                }
+
+                if executed_op.is_processable_onchain_operation() {
+                    processable_ops_hash =
+                        [&processable_ops_hash, executed_op.public_data().as_slice()]
+                            .concat()
+                            .keccak256();
+                }
+
+                if executed_op.is_priority_op() {
+                    priority_ops += 1;
+                }
+
+                public_data_offset += (CHUNK_BIT_WIDTH / 8 * executed_op.chunks()) as u32;
+            }
+        }
+
+        (onchain_ops, H256::from(processable_ops_hash), priority_ops)
+    }
+
+    /// Returns the public data for the Ethereum Commit operation.
+    pub fn get_onchain_op_commitment(&self) -> Vec<u8> {
+        let mut res = vec![0u8; self.block_chunks_size];
+        for op in self.get_onchain_operations_block_info().0 {
+            res[op.public_data_offset as usize / CHUNK_BYTES] = 0x01;
+        }
+        res
+    }
+
+    fn get_commitment(
+        block_number: BlockNumber,
+        fee_account: AccountId,
+        old_state_hash: H256,
+        new_state_hash: H256,
+        timestamp: u64,
+        onchain_op_commitment: &[u8],
+        public_data: &[u8],
+    ) -> H256 {
+        let mut hash_arg = vec![0u8; 64];
+        U256::from(block_number).to_big_endian(&mut hash_arg[0..32]);
+        U256::from(fee_account).to_big_endian(&mut hash_arg[32..]);
+        hash_arg = sha256(&hash_arg).to_vec();
+
+        hash_arg.extend_from_slice(&old_state_hash.as_bytes());
+        hash_arg = sha256(&hash_arg).to_vec();
+
+        hash_arg.extend_from_slice(&new_state_hash.as_bytes());
+        hash_arg = sha256(&hash_arg).to_vec();
+
+        hash_arg.resize(64, 0u8);
+        U256::from(timestamp).to_big_endian(&mut hash_arg[32..]);
+        hash_arg = sha256(&hash_arg).to_vec();
+
+        hash_arg.extend_from_slice(&public_data);
+        hash_arg.extend_from_slice(&onchain_op_commitment);
+        H256::from_slice(&sha256(&hash_arg))
+    }
+
+    pub fn processable_ops_pubdata(&self) -> Vec<Vec<u8>> {
+        self.block_transactions
+            .iter()
+            .filter_map(|tx| tx.get_executed_op())
+            .filter_map(|op| {
+                if op.is_processable_onchain_operation() {
+                    Some(op.public_data())
+                } else {
+                    None
+                }
+            })
+            .collect()
+    }
+
+    pub fn timestamp_utc(&self) -> DateTime<Utc> {
+        Utc.timestamp(self.timestamp as i64, 0)
+    }
 }
 
 /// Gets smallest block size given the list of supported chunk sizes.
@@ -275,4 +393,10 @@ pub fn smallest_block_size_for_chunks(
         chunks_used,
         available_block_sizes.last().unwrap()
     );
+}
+
+#[derive(Debug, Clone)]
+pub struct OnchainOperationsBlockInfo {
+    pub public_data_offset: u32,
+    pub eth_witness: Vec<u8>,
 }

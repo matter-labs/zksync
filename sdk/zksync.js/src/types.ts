@@ -14,7 +14,9 @@ export type TokenAddress = string;
 
 export type Nonce = number | 'committed';
 
-export type Network = 'localhost' | 'rinkeby' | 'ropsten' | 'mainnet';
+export type Network = 'localhost' | 'rinkeby' | 'ropsten' | 'mainnet' | 'rinkeby-beta' | 'ropsten-beta';
+
+export type ZkSyncVersion = 'contracts-3' | 'contracts-4';
 
 export interface AccountState {
     address: Address;
@@ -100,6 +102,25 @@ export interface ForcedExit {
     signature: Signature;
 }
 
+export type ChangePubkeyTypes = 'Onchain' | 'ECDSA' | 'CREATE2';
+
+export interface ChangePubKeyOnchain {
+    type: 'Onchain';
+}
+
+export interface ChangePubKeyECDSA {
+    type: 'ECDSA';
+    ethSignature: string;
+    batchHash?: string;
+}
+
+export interface ChangePubKeyCREATE2 {
+    type: 'CREATE2';
+    creatorAddress: string;
+    saltArg: string;
+    codeHash: string;
+}
+
 export interface ChangePubKey {
     type: 'ChangePubKey';
     accountId: number;
@@ -109,7 +130,7 @@ export interface ChangePubKey {
     fee: BigNumberish;
     nonce: number;
     signature: Signature;
-    ethSignature: string;
+    ethAuthData: ChangePubKeyOnchain | ChangePubKeyECDSA | ChangePubKeyCREATE2;
 }
 
 export interface CloseAccount {

@@ -15,7 +15,7 @@ use log::*;
 use num::BigUint;
 use std::time::Instant;
 use web3::transports::Http;
-use zksync_crypto::proof::EncodedProofPlonk;
+use zksync_crypto::proof::EncodedAggregatedProof;
 use zksync_testkit::*;
 use zksync_types::{AccountId, AccountMap};
 
@@ -55,11 +55,11 @@ async fn commit_deposit_to_expire(
     deposit_amount: &BigUint,
 ) -> u64 {
     info!("Commit deposit to expire");
-    test_setup.start_block();
+    // test_setup.start_block();
     test_setup
         .deposit(from, to, token, deposit_amount.clone())
         .await;
-    test_setup.execute_commit_block().await.0.expect_success();
+    // test_setup.execute_commit_block().await.0.expect_success();
 
     info!("Done commit deposit to expire");
     test_setup.eth_block_number().await
@@ -94,8 +94,9 @@ async fn cancel_outstanding_deposits(
     call_cancel_account: ETHAccountId,
 ) {
     info!("Canceling outstangind deposits");
+    let token_address = test_setup.tokens[&deposit_token.0];
     let balance_to_withdraw_before = test_setup
-        .get_balance_to_withdraw(deposit_receiver_account, deposit_token)
+        .get_balance_to_withdraw(deposit_receiver_account, token_address)
         .await;
 
     test_setup
@@ -103,7 +104,7 @@ async fn cancel_outstanding_deposits(
         .await;
 
     let balance_to_withdraw_after = test_setup
-        .get_balance_to_withdraw(deposit_receiver_account, deposit_token)
+        .get_balance_to_withdraw(deposit_receiver_account, token_address)
         .await;
 
     assert_eq!(
@@ -125,7 +126,7 @@ async fn check_exit_garbage_proof(
         "Checking exit with garbage proof token: {}, amount: {}",
         token.0, amount
     );
-    let proof = EncodedProofPlonk::default();
+    let proof = EncodedAggregatedProof::default();
     test_setup
         .exit(
             send_account,
@@ -148,8 +149,9 @@ async fn check_exit_correct_proof(
     amount: &BigUint,
 ) {
     info!("Checking exit with correct proof");
+    let token_address = test_setup.tokens[&token.0];
     let balance_to_withdraw_before = test_setup
-        .get_balance_to_withdraw(send_account, token)
+        .get_balance_to_withdraw(send_account, token_address)
         .await;
 
     let (proof, exit_amount) = test_setup.gen_exit_proof(accounts, fund_owner, token);
@@ -173,7 +175,7 @@ async fn check_exit_correct_proof(
         .expect_success();
 
     let balance_to_withdraw_after = test_setup
-        .get_balance_to_withdraw(send_account, token)
+        .get_balance_to_withdraw(send_account, token_address)
         .await;
 
     assert_eq!(
@@ -193,8 +195,9 @@ async fn check_exit_correct_proof_second_time(
     amount: &BigUint,
 ) {
     info!("Checking exit with correct proof twice");
+    let token_address = test_setup.tokens[&token.0];
     let balance_to_withdraw_before = test_setup
-        .get_balance_to_withdraw(send_account, token)
+        .get_balance_to_withdraw(send_account, token_address)
         .await;
 
     let (proof, exit_amount) = test_setup.gen_exit_proof(accounts, fund_owner, token);
@@ -213,7 +216,7 @@ async fn check_exit_correct_proof_second_time(
         .expect_revert("fet12");
 
     let balance_to_withdraw_after = test_setup
-        .get_balance_to_withdraw(send_account, token)
+        .get_balance_to_withdraw(send_account, token_address)
         .await;
 
     assert_eq!(
@@ -233,8 +236,9 @@ async fn check_exit_correct_proof_other_token(
     false_token: Token,
 ) {
     info!("Checking exit with correct proof other token");
+    let token_address = test_setup.tokens[&token.0];
     let balance_to_withdraw_before = test_setup
-        .get_balance_to_withdraw(send_account, token)
+        .get_balance_to_withdraw(send_account, token_address)
         .await;
 
     let (proof, exit_amount) = test_setup.gen_exit_proof(accounts, fund_owner, token);
@@ -253,7 +257,7 @@ async fn check_exit_correct_proof_other_token(
         .expect_revert("fet13");
 
     let balance_to_withdraw_after = test_setup
-        .get_balance_to_withdraw(send_account, token)
+        .get_balance_to_withdraw(send_account, token_address)
         .await;
 
     assert_eq!(
@@ -273,8 +277,9 @@ async fn check_exit_correct_proof_other_amount(
     false_amount: &BigUint,
 ) {
     info!("Checking exit with correct proof other amount");
+    let token_address = test_setup.tokens[&token.0];
     let balance_to_withdraw_before = test_setup
-        .get_balance_to_withdraw(send_account, token)
+        .get_balance_to_withdraw(send_account, token_address)
         .await;
 
     let (proof, exit_amount) = test_setup.gen_exit_proof(accounts, fund_owner, token);
@@ -293,7 +298,7 @@ async fn check_exit_correct_proof_other_amount(
         .expect_revert("fet13");
 
     let balance_to_withdraw_after = test_setup
-        .get_balance_to_withdraw(send_account, token)
+        .get_balance_to_withdraw(send_account, token_address)
         .await;
 
     assert_eq!(
@@ -311,9 +316,10 @@ async fn check_exit_correct_proof_incorrect_sender(
     token: Token,
     amount: &BigUint,
 ) {
+    let token_address = test_setup.tokens[&token.0];
     info!("Checking exit with correct proof and incorrect sender");
     let balance_to_withdraw_before = test_setup
-        .get_balance_to_withdraw(send_account, token)
+        .get_balance_to_withdraw(send_account, token_address)
         .await;
 
     let (proof, exit_amount) = test_setup.gen_exit_proof(accounts, fund_owner, token);
@@ -332,7 +338,7 @@ async fn check_exit_correct_proof_incorrect_sender(
         .expect_revert("fet13");
 
     let balance_to_withdraw_after = test_setup
-        .get_balance_to_withdraw(send_account, token)
+        .get_balance_to_withdraw(send_account, token_address)
         .await;
 
     assert_eq!(
@@ -350,9 +356,11 @@ async fn exit_test() {
     let (sk_thread_handle, stop_state_keeper_sender, sk_channels) =
         spawn_state_keeper(&fee_account.address);
 
+    let initial_root_hash = genesis_state(&fee_account.address).tree.root_hash();
+
     let deploy_timer = Instant::now();
     info!("deploying contracts");
-    let contracts = deploy_contracts(false, Default::default());
+    let contracts = deploy_contracts(false, initial_root_hash);
     info!(
         "contracts deployed {:#?}, {} secs",
         contracts,
@@ -411,7 +419,13 @@ async fn exit_test() {
         fee_account_id: ZKSyncAccountId(fee_account_id),
     };
 
-    let mut test_setup = TestSetup::new(sk_channels, accounts, &contracts, commit_account);
+    let mut test_setup = TestSetup::new(
+        sk_channels,
+        accounts,
+        &contracts,
+        commit_account,
+        initial_root_hash,
+    );
 
     let deposit_amount = parse_ether("0.1").unwrap();
     let tokens = test_setup.get_tokens();

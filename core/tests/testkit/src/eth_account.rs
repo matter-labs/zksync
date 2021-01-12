@@ -1,7 +1,7 @@
 use crate::external_commands::js_revert_reason;
 
 use anyhow::{bail, ensure, format_err};
-use ethabi::ParamType;
+use ethabi::{ParamType, Token};
 use num::{BigUint, ToPrimitive};
 use std::convert::TryFrom;
 use std::str::FromStr;
@@ -12,9 +12,12 @@ use web3::types::{
 };
 use web3::{Transport, Web3};
 use zksync_contracts::{erc20_contract, zksync_contract};
-use zksync_crypto::proof::EncodedProofPlonk;
+use zksync_crypto::proof::EncodedAggregatedProof;
 use zksync_eth_client::ETHClient;
 use zksync_eth_signer::PrivateKeySigner;
+use zksync_types::aggregated_operations::{
+    stored_block_info, BlocksCommitOperation, BlocksExecuteOperation, BlocksProofOperation,
+};
 use zksync_types::block::Block;
 use zksync_types::{AccountId, Address, Nonce, PriorityOp, PubKeyHash, TokenId};
 
@@ -136,7 +139,7 @@ impl<T: Transport> EthereumAccount<T> {
         let signed_tx = self
             .main_contract_eth_client
             .sign_call_tx(
-                "fullExit",
+                "requestFullExit",
                 (u64::from(account_id), token_address),
                 default_tx_options(),
             )
@@ -156,23 +159,29 @@ impl<T: Transport> EthereumAccount<T> {
 
     pub async fn exit(
         &self,
+        last_block: &Block,
         account_id: AccountId,
         token_id: TokenId,
         amount: &BigUint,
-        proof: EncodedProofPlonk,
+        proof: EncodedAggregatedProof,
     ) -> Result<ETHExecResult, anyhow::Error> {
-        let mut options = Options::default();
-        options.gas = Some(3_000_000.into()); // `exit` function requires more gas to operate.
+        let options = Options {
+            gas: Some(3_000_000.into()),
+            // `exit` function requires more gas to operate.
+            ..Default::default()
+        };
 
+        let stored_block_info = stored_block_info(last_block);
         let signed_tx = self
             .main_contract_eth_client
             .sign_call_tx(
                 "exit",
                 (
+                    stored_block_info,
                     u64::from(account_id),
                     u64::from(token_id),
                     U128::from(amount.to_u128().unwrap()),
-                    proof.proof,
+                    proof.get_eth_tx_args(),
                 ),
                 options,
             )
@@ -279,7 +288,7 @@ impl<T: Transport> EthereumAccount<T> {
             .map_err(|e| format_err!("Contract query fail: {}", e))
     }
 
-    pub async fn balances_to_withdraw(&self, token: TokenId) -> Result<BigUint, anyhow::Error> {
+    pub async fn balances_to_withdraw(&self, token: Address) -> Result<BigUint, anyhow::Error> {
         let contract = Contract::new(
             self.main_contract_eth_client.web3.eth(),
             self.main_contract_eth_client.contract_addr,
@@ -288,8 +297,8 @@ impl<T: Transport> EthereumAccount<T> {
 
         Ok(contract
             .query(
-                "getBalanceToWithdraw",
-                (self.address, u64::from(token)),
+                "getPendingBalance",
+                (self.address, token),
                 None,
                 default_tx_options(),
                 None,
@@ -361,20 +370,15 @@ impl<T: Transport> EthereumAccount<T> {
         Ok((vec![approve_receipt, receipt], priority_op))
     }
 
-    pub async fn commit_block(&self, block: &Block) -> Result<ETHExecResult, anyhow::Error> {
-        let witness_data = block.get_eth_witness_data();
+    pub async fn commit_block(
+        &self,
+        commit_operation: &BlocksCommitOperation,
+    ) -> Result<ETHExecResult, anyhow::Error> {
         let signed_tx = self
             .main_contract_eth_client
             .sign_call_tx(
-                "commitBlock",
-                (
-                    u64::from(block.block_number),
-                    u64::from(block.fee_account),
-                    vec![block.get_eth_encoded_root()],
-                    block.get_eth_public_data(),
-                    witness_data.0,
-                    witness_data.1,
-                ),
+                "commitBlocks",
+                commit_operation.get_eth_tx_args().as_slice(),
                 Options::with(|f| f.gas = Some(U256::from(9 * 10u64.pow(6)))),
             )
             .await
@@ -389,18 +393,13 @@ impl<T: Transport> EthereumAccount<T> {
     // Verifies block using provided proof or empty proof if None is provided. (`DUMMY_VERIFIER` should be enabled on the contract).
     pub async fn verify_block(
         &self,
-        block: &Block,
-        proof: Option<EncodedProofPlonk>,
+        proof_operation: &BlocksProofOperation,
     ) -> Result<ETHExecResult, anyhow::Error> {
         let signed_tx = self
             .main_contract_eth_client
             .sign_call_tx(
-                "verifyBlock",
-                (
-                    u64::from(block.block_number),
-                    proof.unwrap_or_default().proof,
-                    block.get_withdrawals_data(),
-                ),
+                "proveBlocks",
+                proof_operation.get_eth_tx_args().as_slice(),
                 Options::with(|f| f.gas = Some(U256::from(10 * 10u64.pow(6)))),
             )
             .await
@@ -411,13 +410,15 @@ impl<T: Transport> EthereumAccount<T> {
     }
 
     // Completes pending withdrawals.
-    pub async fn complete_withdrawals(&self) -> Result<ETHExecResult, anyhow::Error> {
-        let max_withdrawals_to_complete: u64 = 999;
+    pub async fn execute_block(
+        &self,
+        execute_operation: &BlocksExecuteOperation,
+    ) -> Result<ETHExecResult, anyhow::Error> {
         let signed_tx = self
             .main_contract_eth_client
             .sign_call_tx(
-                "completeWithdrawals",
-                max_withdrawals_to_complete,
+                "executeBlocks",
+                execute_operation.get_eth_tx_args().as_slice(),
                 Options::with(|f| f.gas = Some(U256::from(9 * 10u64.pow(6)))),
             )
             .await
@@ -428,15 +429,14 @@ impl<T: Transport> EthereumAccount<T> {
         Ok(ETHExecResult::new(receipt, &self.main_contract_eth_client.web3).await)
     }
 
-    pub async fn revert_blocks(
-        &self,
-        blocks_to_revert: u64,
-    ) -> Result<ETHExecResult, anyhow::Error> {
+    pub async fn revert_blocks(&self, blocks: &[Block]) -> Result<ETHExecResult, anyhow::Error> {
+        let tx_arg = Token::Array(blocks.iter().map(stored_block_info).collect());
+
         let signed_tx = self
             .main_contract_eth_client
             .sign_call_tx(
                 "revertBlocks",
-                blocks_to_revert,
+                tx_arg,
                 Options::with(|f| f.gas = Some(U256::from(9 * 10u64.pow(6)))),
             )
             .await
@@ -615,11 +615,11 @@ async fn send_raw_tx_wait_confirmation<T: Transport>(
 }
 
 fn default_tx_options() -> Options {
-    let mut options = Options::default();
     // Set the gas limit, so `eth_client` won't complain about it.
-    options.gas = Some(500_000.into());
-
-    options
+    Options {
+        gas: Some(500_000.into()),
+        ..Default::default()
+    }
 }
 
 /// Get fee paid in wei for tx execution

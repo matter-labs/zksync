@@ -3,10 +3,14 @@ use std::fs;
 use std::io;
 use std::str::FromStr;
 
-const ZKSYNC_CONTRACT_FILE: &str = "contracts/build/ZkSync.json";
-const GOVERNANCE_CONTRACT_FILE: &str = "contracts/build/Governance.json";
-const IERC20_CONTRACT_FILE: &str = "contracts/build/IERC20.json";
-const IEIP1271_CONTRACT_FILE: &str = "contracts/build/IEIP1271.json";
+const ZKSYNC_CONTRACT_FILE: &str =
+    "contracts/artifacts/cache/solpp-generated-contracts/ZkSync.sol/ZkSync.json";
+const GOVERNANCE_CONTRACT_FILE: &str =
+    "contracts/artifacts/cache/solpp-generated-contracts/Governance.sol/Governance.json";
+const IERC20_CONTRACT_FILE: &str =
+    "contracts/artifacts/cache/solpp-generated-contracts/IERC20.sol/IERC20.json";
+const IEIP1271_CONTRACT_FILE: &str =
+    "contracts/artifacts/cache/solpp-generated-contracts/IEIP1271.sol/IEIP1271.json";
 
 fn read_file_to_json_value(path: &str) -> io::Result<serde_json::Value> {
     let zksync_home = std::env::var("ZKSYNC_HOME").unwrap_or_else(|_| ".".into());

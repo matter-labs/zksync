@@ -96,6 +96,8 @@ pub fn gen_operation_with_txs(
             block_chunks_size,
             commit_gas_limit: 1_000_000.into(),
             verify_gas_limit: 1_500_000.into(),
+            block_commitment: H256::zero(),
+            timestamp: 0,
         },
     }
 }
@@ -152,6 +154,8 @@ pub fn gen_unique_operation_with_txs(
             block_chunks_size,
             commit_gas_limit: 1_000_000.into(),
             verify_gas_limit: 1_500_000.into(),
+            block_commitment: H256::zero(),
+            timestamp: 0,
         },
     }
 }

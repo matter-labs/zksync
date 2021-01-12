@@ -22,7 +22,7 @@ type Token = {
 async function deployToken(token: Token): Promise<Token> {
     const erc20 = await deployContract(
         wallet,
-        readContractCode('TestnetERC20Token'),
+        readContractCode('dev-contracts/TestnetERC20Token'),
         [token.name, token.symbol, token.decimals],
         { gasLimit: 5000000 }
     );
@@ -46,12 +46,12 @@ async function main() {
 
     program
         .command('add')
-        .option('-n, --name <name>')
+        .option('-n, --token_name <token_name>')
         .option('-s, --symbol <symbol>')
         .option('-d, --decimals <decimals>')
         .description('Adds a new token with a given fields')
-        .action(async (name: string, symbol: string, decimals: number) => {
-            const token: Token = { address: null, name, symbol, decimals };
+        .action(async (token_name: string, symbol: string, decimals: number) => {
+            const token: Token = { address: null, name: token_name, symbol, decimals };
             console.log(JSON.stringify(deployToken(token), null, 2));
         });
 
@@ -69,7 +69,12 @@ async function main() {
             console.log(JSON.stringify(result, null, 2));
         });
 
-    program.parse(process.argv);
+    return await program.parseAsync(process.argv);
 }
 
-main();
+main()
+    .then(() => process.exit(0))
+    .catch((err) => {
+        console.error('Error:', err.message || err);
+        process.exit(1);
+    });

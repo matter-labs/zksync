@@ -10,9 +10,22 @@ import {
     serializeAmountPacked,
     serializeFeePacked,
     serializeNonce,
-    serializeAmountFull
+    serializeAmountFull,
+    getCREATE2AddressAndSalt
 } from './utils';
-import { Address, EthSignerType, PubKeyHash, Transfer, Withdraw, ForcedExit, ChangePubKey } from './types';
+import {
+    Address,
+    EthSignerType,
+    PubKeyHash,
+    Transfer,
+    Withdraw,
+    ForcedExit,
+    ChangePubKey,
+    ChangePubKeyOnchain,
+    ChangePubKeyECDSA,
+    ChangePubKeyCREATE2,
+    ZkSyncVersion
+} from './types';
 
 export class Signer {
     readonly #privateKey: Uint8Array;
@@ -47,15 +60,21 @@ export class Signer {
         return msgBytes;
     }
 
-    async signSyncTransfer(transfer: {
-        accountId: number;
-        from: Address;
-        to: Address;
-        tokenId: number;
-        amount: BigNumberish;
-        fee: BigNumberish;
-        nonce: number;
-    }): Promise<Transfer> {
+    async signSyncTransfer(
+        transfer: {
+            accountId: number;
+            from: Address;
+            to: Address;
+            tokenId: number;
+            amount: BigNumberish;
+            fee: BigNumberish;
+            nonce: number;
+        },
+        zkSyncVersion: ZkSyncVersion
+    ): Promise<Transfer> {
+        if (zkSyncVersion === 'contracts-3') {
+            throw new Error('Contracts-3 version is not supported by this version of sdk');
+        }
         const msgBytes = this.transferSignBytes(transfer);
         const signature = await signTransactionBytes(this.#privateKey, msgBytes);
 
@@ -103,15 +122,21 @@ export class Signer {
         return msgBytes;
     }
 
-    async signSyncWithdraw(withdraw: {
-        accountId: number;
-        from: Address;
-        ethAddress: string;
-        tokenId: number;
-        amount: BigNumberish;
-        fee: BigNumberish;
-        nonce: number;
-    }): Promise<Withdraw> {
+    async signSyncWithdraw(
+        withdraw: {
+            accountId: number;
+            from: Address;
+            ethAddress: string;
+            tokenId: number;
+            amount: BigNumberish;
+            fee: BigNumberish;
+            nonce: number;
+        },
+        zkSyncVersion: ZkSyncVersion
+    ): Promise<Withdraw> {
+        if (zkSyncVersion === 'contracts-3') {
+            throw new Error('Contracts-3 version is not supported by this version of sdk');
+        }
         const msgBytes = this.withdrawSignBytes(withdraw);
         const signature = await signTransactionBytes(this.#privateKey, msgBytes);
 
@@ -153,13 +178,19 @@ export class Signer {
         return msgBytes;
     }
 
-    async signSyncForcedExit(forcedExit: {
-        initiatorAccountId: number;
-        target: Address;
-        tokenId: number;
-        fee: BigNumberish;
-        nonce: number;
-    }): Promise<ForcedExit> {
+    async signSyncForcedExit(
+        forcedExit: {
+            initiatorAccountId: number;
+            target: Address;
+            tokenId: number;
+            fee: BigNumberish;
+            nonce: number;
+        },
+        zkSyncVersion: ZkSyncVersion
+    ): Promise<ForcedExit> {
+        if (zkSyncVersion === 'contracts-3') {
+            throw new Error('Contracts-3 version is not supported by this version of sdk');
+        }
         const msgBytes = this.forcedExitSignBytes(forcedExit);
         const signature = await signTransactionBytes(this.#privateKey, msgBytes);
         return {
@@ -201,14 +232,21 @@ export class Signer {
         return msgBytes;
     }
 
-    async signSyncChangePubKey(changePubKey: {
-        accountId: number;
-        account: Address;
-        newPkHash: PubKeyHash;
-        feeTokenId: number;
-        fee: BigNumberish;
-        nonce: number;
-    }): Promise<ChangePubKey> {
+    async signSyncChangePubKey(
+        changePubKey: {
+            accountId: number;
+            account: Address;
+            newPkHash: PubKeyHash;
+            feeTokenId: number;
+            fee: BigNumberish;
+            nonce: number;
+            ethAuthData: ChangePubKeyOnchain | ChangePubKeyECDSA | ChangePubKeyCREATE2;
+        },
+        zkSyncVersion: ZkSyncVersion
+    ): Promise<ChangePubKey> {
+        if (zkSyncVersion === 'contracts-3') {
+            throw new Error('Contracts-3 version is not supported by this version of sdk');
+        }
         const msgBytes = this.changePubKeySignBytes(changePubKey);
         const signature = await signTransactionBytes(this.#privateKey, msgBytes);
         return {
@@ -220,7 +258,7 @@ export class Signer {
             fee: BigNumber.from(changePubKey.fee).toString(),
             nonce: changePubKey.nonce,
             signature,
-            ethSignature: null
+            ethAuthData: changePubKey.ethAuthData
         };
     }
 
@@ -254,5 +292,49 @@ export class Signer {
         const seed = ethers.utils.arrayify(signature);
         const signer = await Signer.fromSeed(seed);
         return { signer, ethSignatureType };
+    }
+}
+
+export class Create2WalletSigner extends ethers.Signer {
+    public readonly address: string;
+    // salt for create2 function call
+    public readonly salt: string;
+    constructor(
+        public zkSyncPubkeyHash: string,
+        public create2WalletData: {
+            creatorAddress: string;
+            saltArg: string;
+            codeHash: string;
+        },
+        provider?: ethers.providers.Provider
+    ) {
+        super();
+        Object.defineProperty(this, 'provider', {
+            enumerable: true,
+            value: provider,
+            writable: false
+        });
+        const create2Info = getCREATE2AddressAndSalt(zkSyncPubkeyHash, create2WalletData);
+        this.address = create2Info.address;
+        this.salt = create2Info.salt;
+    }
+
+    async getAddress() {
+        return this.address;
+    }
+
+    /**
+     * This signer can't sign messages but we return zeroed signature bytes to comply with zksync API for now.
+     */
+    async signMessage(_message) {
+        return '0x0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000';
+    }
+
+    async signTransaction(_message): Promise<string> {
+        throw new Error("Create2Wallet signer can't sign transactions");
+    }
+
+    connect(provider: ethers.providers.Provider): ethers.Signer {
+        return new Create2WalletSigner(this.zkSyncPubkeyHash, this.create2WalletData, provider);
     }
 }

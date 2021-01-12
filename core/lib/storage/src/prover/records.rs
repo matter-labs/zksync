@@ -27,6 +27,14 @@ pub struct StoredProof {
     pub created_at: DateTime<Utc>,
 }
 
+#[derive(Debug, FromRow)]
+pub struct StoredAggregatedProof {
+    pub first_block: i64,
+    pub last_block: i64,
+    pub proof: serde_json::Value,
+    pub created_at: DateTime<Utc>,
+}
+
 // Every time before a prover worker starts generating the proof, a prover run is recorded for monitoring purposes
 #[derive(Debug, Clone, FromRow, Serialize, Deserialize)]
 pub struct ProverRun {
@@ -46,4 +54,18 @@ pub struct IntegerNumber {
 pub struct StorageBlockWitness {
     pub block: i64,
     pub witness: String,
+}
+
+#[derive(Debug, FromRow)]
+pub struct StorageProverJobQueue {
+    pub id: i32,
+    pub job_status: i32,
+    pub job_priority: i32,
+    pub job_type: String,
+    pub created_at: DateTime<Utc>,
+    pub updated_by: String,
+    pub updated_at: DateTime<Utc>,
+    pub first_block: i64,
+    pub last_block: i64,
+    pub job_data: serde_json::Value,
 }

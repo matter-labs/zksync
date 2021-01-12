@@ -1,7 +1,6 @@
 // Built-in deps
 use std::str::FromStr;
 // Workspace deps
-use zksync_crypto::proof::EncodedProofPlonk;
 use zksync_storage::{data_restore::records::NewBlockEvent, StorageProcessor};
 use zksync_types::{
     Action, Operation, Token, TokenGenesisListItem, TokenId,
@@ -91,7 +90,7 @@ impl StorageInteractor for DatabaseStorageInteractor<'_> {
 
         let verify_op = Operation {
             action: Action::Verify {
-                proof: Box::new(EncodedProofPlonk::default()),
+                proof: Box::new(Default::default()),
             },
             block: block.clone(),
             id: None,

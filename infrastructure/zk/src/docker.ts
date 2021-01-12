@@ -41,7 +41,6 @@ async function _build(image: string) {
     }
     if (image == 'server' || image == 'prover') {
         await contract.build();
-        await contract.buildDev();
     }
     const { stdout: imageTag } = await utils.exec('git rev-parse --short HEAD');
     const latestImage = `-t matterlabs/${image}:latest`;

@@ -3,7 +3,8 @@ import * as zksync from 'zksync';
 import * as fs from 'fs';
 import * as path from 'path';
 
-const franklin_abi = require('../../../../contracts/build/ZkSync.json').abi;
+const franklin_abi = require('../../../../contracts/artifacts/cache/solpp-generated-contracts/ZkSync.sol/ZkSync.json')
+    .abi;
 type Network = 'localhost' | 'rinkeby' | 'ropsten';
 
 const testConfigPath = path.join(process.env.ZKSYNC_HOME as string, `etc/test_config/constant`);

@@ -8,7 +8,7 @@ import * as path from 'path';
 const testConfigPath = path.join(process.env.ZKSYNC_HOME as string, `etc/test_config/constant`);
 const ethTestConfig = JSON.parse(fs.readFileSync(`${testConfigPath}/eth.json`, { encoding: 'utf-8' }));
 
-(async () => {
+async function main() {
     const parser = new ArgumentParser({
         version: '0.1.0',
         addHelp: true,
@@ -32,7 +32,8 @@ const ethTestConfig = JSON.parse(fs.readFileSync(`${testConfigPath}/eth.json`, {
     provider.pollingInterval = 10;
 
     const deployWallet = ethers.Wallet.fromMnemonic(ethTestConfig.test_mnemonic, "m/44'/60'/0'/0/0").connect(provider);
-    const contracts = args.prodContracts ? readProductionContracts() : readTestContracts();
+    // todo: should be decided when building
+    const contracts = readProductionContracts();
     const deployer = new Deployer({ deployWallet, contracts, verbose: true });
     await deployer.deployAll();
     const governance = deployer.governanceContract(deployWallet);
@@ -40,7 +41,7 @@ const ethTestConfig = JSON.parse(fs.readFileSync(`${testConfigPath}/eth.json`, {
 
     const erc20 = await deployContract(
         deployWallet,
-        readContractCode('TestnetERC20Token'),
+        readContractCode('dev-contracts/TestnetERC20Token'),
         ['Matter Labs Trial Token', 'MLTT', 18],
         { gasLimit: 5000000 }
     );
@@ -55,4 +56,11 @@ const ethTestConfig = JSON.parse(fs.readFileSync(`${testConfigPath}/eth.json`, {
         const testWallet = Wallet.fromMnemonic(ethTestConfig.test_mnemonic, "m/44'/60'/0'/0/" + i).connect(provider);
         await (await erc20.mint(testWallet.address, '0x4B3B4CA85A86C47A098A224000000000')).wait();
     }
-})();
+}
+
+main()
+    .then(() => process.exit(0))
+    .catch((err) => {
+        console.error('Error:', err.message || err);
+        process.exit(1);
+    });

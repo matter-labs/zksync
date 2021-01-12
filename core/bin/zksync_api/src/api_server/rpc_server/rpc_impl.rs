@@ -121,13 +121,12 @@ impl RpcApp {
     pub async fn _impl_submit_txs_batch(
         self,
         txs: Vec<TxWithSignature>,
-        eth_signature: Option<TxEthSignature>,
+        eth_signatures: Vec<TxEthSignature>,
     ) -> Result<Vec<TxHash>> {
         let start = Instant::now();
-        let txs = txs.into_iter().map(|tx| (tx.tx, tx.signature)).collect();
         let result = self
             .tx_sender
-            .submit_txs_batch(txs, eth_signature)
+            .submit_txs_batch(txs, eth_signatures)
             .await
             .map_err(Error::from);
         metrics::histogram!("api.rpc.submit_txs_batch", start.elapsed());
@@ -205,11 +204,7 @@ impl RpcApp {
         Ok(result)
     }
 
-    pub async fn _impl_get_tx_fee(
-        self,
-        tx_type: TxFeeTypes,
-        token: TokenLike,
-    ) -> Result<Fee> {
+    pub async fn _impl_get_tx_fee(self, tx_type: TxFeeTypes, token: TokenLike) -> Result<Fee> {
         let start = Instant::now();
         let ticker = self.tx_sender.ticker_requests.clone();
         let token_allowed = Self::token_allowed_for_fees(ticker.clone(), token.clone()).await?;

@@ -36,11 +36,7 @@ impl ChangePubKeyOp {
     }
 
     pub fn get_eth_witness(&self) -> Vec<u8> {
-        if let Some(eth_signature) = &self.tx.eth_signature {
-            eth_signature.serialize_packed().to_vec()
-        } else {
-            Vec::new()
-        }
+        self.tx.eth_auth_data.get_eth_witness()
     }
 
     pub fn from_public_data(bytes: &[u8]) -> Result<Self, anyhow::Error> {

@@ -2,7 +2,6 @@
 //! the transactions that server sends to the Ethereum network.
 //! Server uses this module to ensure that generated transactions
 //! won't run out of the gas and won't trespass the block gas limit.
-
 // Workspace deps
 use zksync_basic_types::U256;
 // Local deps
@@ -38,11 +37,13 @@ impl CommitCost {
     }
 
     pub fn op_cost(op: &ZkSyncOp) -> U256 {
+        // let x = ChangePubKeyEthAuthDa;
         let cost = match op {
             ZkSyncOp::Noop(_) => 0,
             ZkSyncOp::Deposit(_) => Self::DEPOSIT_COST,
             ZkSyncOp::ChangePubKeyOffchain(change_pubkey) => {
-                if change_pubkey.tx.eth_signature.is_some() {
+                // TODO: determine correct cost of this tx
+                if change_pubkey.tx.eth_auth_data.is_ecdsa() {
                     Self::CHANGE_PUBKEY_COST_OFFCHAIN
                 } else {
                     Self::CHANGE_PUBKEY_COST_ONCHAIN
@@ -126,6 +127,17 @@ impl Default for GasCounter {
     }
 }
 
+#[derive(Debug)]
+pub struct WrongTransaction;
+
+impl std::fmt::Display for WrongTransaction {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "Wrong transaction in gas counter")
+    }
+}
+
+impl std::error::Error for WrongTransaction {}
+
 impl GasCounter {
     /// Base cost of `completeWithdrawals` contract method call.
     pub const COMPLETE_WITHDRAWALS_BASE_COST: u64 = 30_307;
@@ -140,15 +152,15 @@ impl GasCounter {
     ///
     /// Returns `Ok(())` if transaction fits, and returns `Err(())` if
     /// the block must be sealed without this transaction.
-    pub fn add_op(&mut self, op: &ZkSyncOp) -> Result<(), ()> {
+    pub fn add_op(&mut self, op: &ZkSyncOp) -> Result<(), WrongTransaction> {
         let new_commit_cost = self.commit_cost + CommitCost::op_cost(op);
         if Self::scale_up(new_commit_cost) > U256::from(TX_GAS_LIMIT) {
-            return Err(());
+            return Err(WrongTransaction);
         }
 
         let new_verify_cost = self.verify_cost + VerifyCost::op_cost(op);
         if Self::scale_up(new_verify_cost) > U256::from(TX_GAS_LIMIT) {
-            return Err(());
+            return Err(WrongTransaction);
         }
 
         self.commit_cost = new_commit_cost;

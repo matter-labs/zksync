@@ -18,7 +18,7 @@ export async function gen(command: 'contract' | 'all') {
 
     if (command == 'all') {
         const time = new Date();
-        fs.utimesSync('core/models/src/lib.rs', time, time);
+        fs.utimesSync('core/lib/crypto/src/params.rs', time, time);
         fs.mkdirSync(outputDir, { recursive: true });
         await utils.spawn('cargo run --bin key_generator --release -- keys');
     }
@@ -38,9 +38,8 @@ export async function unpack() {
 
 export async function pack() {
     const keysTarball = verfiyKeysTarball();
-    await utils.exec(`tar cvzf ${keysTarball}`);
     fs.mkdirSync('keys/packed', { recursive: true });
-    fs.renameSync(keysTarball, `keys/packed/${keysTarball}`);
+    await utils.exec(`tar cvzf keys/packed/${keysTarball}  ${process.env.KEY_DIR}/*`);
     console.log('Keys packed');
 }
 

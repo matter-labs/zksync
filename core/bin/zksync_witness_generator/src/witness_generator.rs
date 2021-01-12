@@ -3,10 +3,10 @@ use std::{thread, time};
 // External
 use futures::channel::mpsc;
 // Workspace deps
+use zksync_circuit::serialization::ProverData;
 use zksync_circuit::witness::utils::build_block_witness;
 use zksync_crypto::circuit::CircuitAccountTree;
 use zksync_crypto::params::account_tree_depth;
-use zksync_prover_utils::prover_data::ProverData;
 use zksync_storage::StorageProcessor;
 use zksync_types::block::Block;
 use zksync_types::BlockNumber;
@@ -273,7 +273,7 @@ impl WitnessGenerator {
 mod tests {
     use super::*;
     use zksync_crypto::Fr;
-    use zksync_types::U256;
+    use zksync_types::{H256, U256};
 
     #[test]
     fn test_next_witness_block() {
@@ -294,6 +294,8 @@ mod tests {
             0,
             U256::default(),
             U256::default(),
+            H256::default(),
+            0,
         );
         assert_eq!(
             WitnessGenerator::next_witness_block(3, 4, &BlockInfo::NoWitness(empty_block)),

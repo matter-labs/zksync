@@ -1,4 +1,6 @@
-pragma solidity ^0.5.8;
+// SPDX-License-Identifier: MIT OR Apache-2.0
+
+pragma solidity ^0.7.0;
 
 /**
  * @dev Contract module that helps prevent reentrant calls to a function.
@@ -20,8 +22,8 @@ pragma solidity ^0.5.8;
  * metering changes introduced in the Istanbul hardfork.
  */
 contract ReentrancyGuard {
-    /// Address of lock flag variable.
-    /// Flag is placed at random memory location to not interfere with Storage contract.
+    /// @dev Address of lock flag variable.
+    /// @dev Flag is placed at random memory location to not interfere with Storage contract.
     uint256 private constant LOCK_FLAG_ADDRESS = 0x8e94fed44239eb2314ab7a406345e6c5a8f0ccedf3b600de3d004e672c33abf4; // keccak256("ReentrancyGuard") - 1;
 
     function initializeReentrancyGuard() internal {
@@ -50,7 +52,7 @@ contract ReentrancyGuard {
         }
 
         // On the first call to nonReentrant, _notEntered will be true
-        require(notEntered, "ReentrancyGuard: reentrant call");
+        require(notEntered, "1b");
 
         // Any calls to nonReentrant after this point will fail
         assembly {

@@ -165,6 +165,16 @@ pub const SIGNED_CHANGE_PUBKEY_BIT_WIDTH: usize = TX_TYPE_BIT_WIDTH
     + FEE_MANTISSA_BIT_WIDTH
     + NONCE_BIT_WIDTH;
 
+pub const TIMESTAMP_BIT_WIDTH: usize = 8 * 8;
+
+/// Number of inputs in the basic circuit that is aggregated by recursive circuit
+pub const RECURSIVE_CIRCUIT_NUM_INPUTS: usize = 1;
+/// Depth of the tree which contains different verification keys for basic circuit
+pub const RECURSIVE_CIRCUIT_VK_TREE_DEPTH: usize = 3;
+
+/// Major version of the ZkSync
+pub const ZKSYNC_VERSION: &str = "contracts-4";
+
 lazy_static! {
     pub static ref JUBJUB_PARAMS: AltJubjubBn256 = AltJubjubBn256::new();
     pub static ref RESCUE_PARAMS: Bn256RescueParams = Bn256RescueParams::new_checked_2_into_1();

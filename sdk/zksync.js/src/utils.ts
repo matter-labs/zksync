@@ -1,5 +1,18 @@
 import { utils, constants, ethers, BigNumber, BigNumberish } from 'ethers';
-import { PubKeyHash, TokenAddress, TokenLike, Tokens, TokenSymbol, EthSignerType, Address, Transfer } from './types';
+import {
+    PubKeyHash,
+    TokenAddress,
+    TokenLike,
+    Tokens,
+    TokenSymbol,
+    EthSignerType,
+    Address,
+    Transfer,
+    ForcedExit,
+    ChangePubKey,
+    Withdraw,
+    CloseAccount
+} from './types';
 
 // Max number of tokens for the current version, it is determined by the zkSync circuit implementation.
 const MAX_NUMBER_OF_TOKENS = 128;
@@ -279,17 +292,17 @@ export class TokenSet {
     }
 }
 
-export function getChangePubkeyMessage(pubKeyHash: PubKeyHash, nonce: number, accountId: number): string {
-    const msgNonce = utils.hexlify(serializeNonce(nonce));
-    const msgAccId = utils.hexlify(serializeAccountId(accountId));
-    const pubKeyHashHex = pubKeyHash.replace('sync:', '').toLowerCase();
-    const message =
-        `Register zkSync pubkey:\n\n` +
-        `${pubKeyHashHex}\n` +
-        `nonce: ${msgNonce}\n` +
-        `account id: ${msgAccId}\n\n` +
-        `Only sign this message for a trusted client!`;
-    return message;
+export function getChangePubkeyMessage(
+    pubKeyHash: PubKeyHash,
+    nonce: number,
+    accountId: number,
+    batchHash?: string
+): Uint8Array {
+    const msgBatchHash = batchHash == undefined ? new Uint8Array(32).fill(0) : ethers.utils.arrayify(batchHash);
+    const msgNonce = serializeNonce(nonce);
+    const msgAccId = serializeAccountId(accountId);
+    const msgPubKeyHash = serializeAddress(pubKeyHash);
+    return ethers.utils.concat([msgPubKeyHash, msgNonce, msgAccId, msgBatchHash]);
 }
 
 export function getSignedBytesFromMessage(message: utils.BytesLike | string, addPrefix: boolean): Uint8Array {
@@ -430,6 +443,27 @@ export function serializeNonce(nonce: number): Uint8Array {
     return numberToBytesBE(nonce, 4);
 }
 
+export function serializeWithdraw(withdraw: Withdraw): Uint8Array {
+    const type = new Uint8Array([3]);
+    const accountId = serializeAccountId(withdraw.accountId);
+    const accountBytes = serializeAddress(withdraw.from);
+    const ethAddressBytes = serializeAddress(withdraw.to);
+    const tokenIdBytes = serializeTokenId(withdraw.token);
+    const amountBytes = serializeAmountFull(withdraw.amount);
+    const feeBytes = serializeFeePacked(withdraw.fee);
+    const nonceBytes = serializeNonce(withdraw.nonce);
+    return ethers.utils.concat([
+        type,
+        accountId,
+        accountBytes,
+        ethAddressBytes,
+        tokenIdBytes,
+        amountBytes,
+        feeBytes,
+        nonceBytes
+    ]);
+}
+
 export function serializeTransfer(transfer: Transfer): Uint8Array {
     const type = new Uint8Array([5]); // tx type
     const accountId = serializeAccountId(transfer.accountId);
@@ -440,6 +474,54 @@ export function serializeTransfer(transfer: Transfer): Uint8Array {
     const fee = serializeFeePacked(transfer.fee);
     const nonce = serializeNonce(transfer.nonce);
     return ethers.utils.concat([type, accountId, from, to, token, amount, fee, nonce]);
+}
+
+export function serializeChangePubKey(changePubKey: ChangePubKey): Uint8Array {
+    const type = new Uint8Array([7]);
+    const accountIdBytes = serializeAccountId(changePubKey.accountId);
+    const accountBytes = serializeAddress(changePubKey.account);
+    const pubKeyHashBytes = serializeAddress(changePubKey.newPkHash);
+    const tokenIdBytes = serializeTokenId(changePubKey.feeToken);
+    const feeBytes = serializeFeePacked(changePubKey.fee);
+    const nonceBytes = serializeNonce(changePubKey.nonce);
+    return ethers.utils.concat([
+        type,
+        accountIdBytes,
+        accountBytes,
+        pubKeyHashBytes,
+        tokenIdBytes,
+        feeBytes,
+        nonceBytes
+    ]);
+}
+
+export function serializeForcedExit(forcedExit: ForcedExit): Uint8Array {
+    const type = new Uint8Array([8]);
+    const initiatorAccountIdBytes = serializeAccountId(forcedExit.initiatorAccountId);
+    const targetBytes = serializeAddress(forcedExit.target);
+    const tokenIdBytes = serializeTokenId(forcedExit.token);
+    const feeBytes = serializeFeePacked(forcedExit.fee);
+    const nonceBytes = serializeNonce(forcedExit.nonce);
+    return ethers.utils.concat([type, initiatorAccountIdBytes, targetBytes, tokenIdBytes, feeBytes, nonceBytes]);
+}
+
+/**
+ * Encodes the transaction data as the byte sequence according to the zkSync protocol.
+ * @param tx A transaction to serialize.
+ */
+export function serializeTx(tx: Transfer | Withdraw | ChangePubKey | CloseAccount | ForcedExit): Uint8Array {
+    switch (tx.type) {
+        case 'Transfer':
+            return serializeTransfer(tx);
+        case 'Withdraw':
+            return serializeWithdraw(tx);
+        case 'ChangePubKey':
+            return serializeChangePubKey(tx);
+        case 'ForcedExit':
+            return serializeForcedExit(tx);
+        default:
+            return new Uint8Array();
+    }
 }
 
 function numberToBytesBE(number: number, bytes: number): Uint8Array {
@@ -453,4 +535,41 @@ function numberToBytesBE(number: number, bytes: number): Uint8Array {
 
 export function parseHexWithPrefix(str) {
     return Uint8Array.from(Buffer.from(str.slice(2), 'hex'));
+}
+
+export function getCREATE2AddressAndSalt(
+    syncPubkeyHash: string,
+    create2Data: {
+        creatorAddress: string;
+        saltArg: string;
+        codeHash: string;
+    }
+): { salt: string; address: string } {
+    const pubkeyHashHex = syncPubkeyHash.replace('sync:', '0x');
+
+    const additionalSaltArgument = ethers.utils.arrayify(create2Data.saltArg);
+    if (additionalSaltArgument.length !== 32) {
+        throw new Error('create2Data.saltArg should be exactly 32 bytes long');
+    }
+
+    // CREATE2 salt
+    const salt = ethers.utils.keccak256(
+        ethers.utils.concat([additionalSaltArgument, ethers.utils.arrayify(pubkeyHashHex)])
+    );
+
+    // Address according to CREATE2 specification
+    const address =
+        '0x' +
+        ethers.utils
+            .keccak256(
+                ethers.utils.concat([
+                    ethers.utils.arrayify(0xff),
+                    ethers.utils.arrayify(create2Data.creatorAddress),
+                    salt,
+                    ethers.utils.arrayify(create2Data.codeHash)
+                ])
+            )
+            .slice(2 + 12 * 2);
+
+    return { address: address, salt: ethers.utils.hexlify(salt) };
 }

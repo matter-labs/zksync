@@ -12,10 +12,11 @@ async fn migration_test() {
     let fee_account = ZkSyncAccount::rand();
     let (sk_thread_handle, stop_state_keeper_sender, sk_channels) =
         spawn_state_keeper(&fee_account.address);
+    let genesis_root = genesis_state(&fee_account.address).tree.root_hash();
 
     let deploy_timer = Instant::now();
     println!("deploying contracts");
-    let contracts = deploy_contracts(false, Default::default());
+    let contracts = deploy_contracts(false, genesis_root);
     println!(
         "contracts deployed {:#?}, {} secs",
         contracts,
@@ -67,7 +68,13 @@ async fn migration_test() {
         fee_account_id: ZKSyncAccountId(0),
     };
 
-    let mut test_setup = TestSetup::new(sk_channels, accounts, &contracts, commit_account);
+    let mut test_setup = TestSetup::new(
+        sk_channels,
+        accounts,
+        &contracts,
+        commit_account,
+        genesis_root,
+    );
 
     let deposit_amount = parse_ether("1.0").unwrap();
 

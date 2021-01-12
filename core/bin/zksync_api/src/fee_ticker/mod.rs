@@ -23,8 +23,7 @@ use tokio::time::Instant;
 use zksync_config::{FeeTickerOptions, TokenPriceSource};
 use zksync_storage::ConnectionPool;
 use zksync_types::{
-    Address, ChangePubKeyOp, Token, TokenId, TokenLike, TransferToNewOp, TxFeeTypes,
-    WithdrawOp,
+    Address, ChangePubKeyOp, Token, TokenId, TokenLike, TransferToNewOp, TxFeeTypes, WithdrawOp,
 };
 
 use zksync_utils::ratio_to_big_decimal;
@@ -211,12 +210,7 @@ pub fn run_ticker_task(
             let token_price_api = CoinMarketCapAPI::new(client, base_url);
 
             let ticker_api = TickerApi::new(db_pool.clone(), token_price_api);
-            let fee_ticker = FeeTicker::new(
-                ticker_api,
-                tricker_requests,
-                ticker_config,
-                validator,
-            );
+            let fee_ticker = FeeTicker::new(ticker_api, tricker_requests, ticker_config, validator);
 
             tokio::spawn(fee_ticker.run())
         }
@@ -263,9 +257,7 @@ impl<API: FeeTickerAPI, WATCHER: TokenWatcher> FeeTicker<API, WATCHER> {
                     token,
                     response,
                 } => {
-                    let fee = self
-                        .get_fee_from_ticker_in_wei(tx_type, token)
-                        .await;
+                    let fee = self.get_fee_from_ticker_in_wei(tx_type, token).await;
                     metrics::histogram!("ticker.get_tx_fee", start.elapsed());
                     response.send(fee).unwrap_or_default()
                 }

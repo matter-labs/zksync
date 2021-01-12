@@ -88,6 +88,8 @@ fn create_block(block_number: u32, transactions: Vec<ExecutedOperations>) -> Blo
         100,
         1_000_000.into(),
         1_500_000.into(),
+        H256::default(),
+        0,
     )
 }
 

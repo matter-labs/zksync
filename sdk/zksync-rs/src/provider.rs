@@ -183,6 +183,32 @@ impl RpcProvider {
         }
     }
 
+    /// Submits a batch transaction to the zkSync network.
+    /// Returns the hashes of the created transactions.
+    pub async fn send_txs_batch(
+        &self,
+        txs_signed: Vec<(ZkSyncTx, Option<PackedEthSignature>)>,
+        eth_signature: Option<PackedEthSignature>,
+    ) -> Result<Vec<TxHash>, ClientError> {
+        let msg = JsonRpcRequest::submit_tx_batch(txs_signed, eth_signature);
+        self.send_and_deserialize(&msg).await
+    }
+
+    /// Requests and returns information about an Ethereum operation given its `serial_id`.
+    pub async fn ethop_info(&self, serial_id: u32) -> Result<EthOpInfo, ClientError> {
+        let msg = JsonRpcRequest::ethop_info(serial_id);
+        self.send_and_deserialize(&msg).await
+    }
+
+    /// Requests and returns eth withdrawal transaction hash for some offchain withdrawal.
+    pub async fn get_eth_tx_for_withdrawal(
+        &self,
+        withdrawal_hash: TxHash,
+    ) -> Result<Option<String>, ClientError> {
+        let msg = JsonRpcRequest::eth_tx_for_withdrawal(withdrawal_hash);
+        self.send_and_deserialize(&msg).await
+    }
+
     /// Performs a POST query to the JSON RPC endpoint,
     /// and decodes the response, returning the decoded `serde_json::Value`.
     /// `Ok` is returned only for successful calls, for any kind of error

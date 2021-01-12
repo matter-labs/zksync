@@ -137,9 +137,16 @@ pub fn generic_test_scenario<W, F>(
     W: Witness,
     F: FnOnce(&mut ZkSyncState, &W::OperationType) -> Vec<CollectedFee>,
 {
+    let block_timestamp = 0xffbbccddeeff1122u64;
+
     // Initialize Plasma and WitnessBuilder.
     let (mut plasma_state, mut circuit_account_tree) = ZkSyncStateGenerator::generate(&accounts);
-    let mut witness_accum = WitnessBuilder::new(&mut circuit_account_tree, FEE_ACCOUNT_ID, 1);
+    let mut witness_accum = WitnessBuilder::new(
+        &mut circuit_account_tree,
+        FEE_ACCOUNT_ID,
+        1,
+        block_timestamp,
+    );
 
     // Apply op on plasma
     let fees = apply_op_on_plasma(&mut plasma_state, &op);
@@ -149,9 +156,14 @@ pub fn generic_test_scenario<W, F>(
     let witness = W::apply_tx(&mut witness_accum.account_tree, &op);
     let circuit_operations = witness.calculate_operations(input);
     let pub_data_from_witness = witness.get_pubdata();
+    let offset_commitment = witness.get_offset_commitment_data();
 
     // Prepare circuit
-    witness_accum.add_operation_with_pubdata(circuit_operations, pub_data_from_witness);
+    witness_accum.add_operation_with_pubdata(
+        circuit_operations,
+        pub_data_from_witness,
+        offset_commitment,
+    );
     witness_accum.collect_fees(&fees);
     witness_accum.calculate_pubdata_commitment();
 
@@ -182,9 +194,15 @@ pub fn corrupted_input_test_scenario<W, F>(
     W::CalculateOpsInput: Clone + std::fmt::Debug,
     F: FnOnce(&mut ZkSyncState, &W::OperationType) -> Vec<CollectedFee>,
 {
+    let block_timestamp = 0xffbbccddeeff1122u64;
     // Initialize Plasma and WitnessBuilder.
     let (mut plasma_state, mut circuit_account_tree) = ZkSyncStateGenerator::generate(&accounts);
-    let mut witness_accum = WitnessBuilder::new(&mut circuit_account_tree, FEE_ACCOUNT_ID, 1);
+    let mut witness_accum = WitnessBuilder::new(
+        &mut circuit_account_tree,
+        FEE_ACCOUNT_ID,
+        1,
+        block_timestamp,
+    );
 
     // Apply op on plasma
     let fees = apply_op_on_plasma(&mut plasma_state, &op);
@@ -194,9 +212,14 @@ pub fn corrupted_input_test_scenario<W, F>(
     let witness = W::apply_tx(&mut witness_accum.account_tree, &op);
     let circuit_operations = witness.calculate_operations(input.clone());
     let pub_data_from_witness = witness.get_pubdata();
+    let offset_commitment = witness.get_offset_commitment_data();
 
     // Prepare circuit
-    witness_accum.add_operation_with_pubdata(circuit_operations, pub_data_from_witness);
+    witness_accum.add_operation_with_pubdata(
+        circuit_operations,
+        pub_data_from_witness,
+        offset_commitment,
+    );
     witness_accum.collect_fees(&fees);
     witness_accum.calculate_pubdata_commitment();
 
@@ -236,9 +259,15 @@ pub fn incorrect_op_test_scenario<W, F>(
     W::CalculateOpsInput: Clone + std::fmt::Debug,
     F: FnOnce() -> Vec<CollectedFee>,
 {
+    let block_timestamp = 0xffbbccddeeff1122u64;
     // Initialize WitnessBuilder.
     let (_, mut circuit_account_tree) = ZkSyncStateGenerator::generate(&accounts);
-    let mut witness_accum = WitnessBuilder::new(&mut circuit_account_tree, FEE_ACCOUNT_ID, 1);
+    let mut witness_accum = WitnessBuilder::new(
+        &mut circuit_account_tree,
+        FEE_ACCOUNT_ID,
+        1,
+        block_timestamp,
+    );
 
     // Collect fees without actually applying the tx on plasma
     let fees = collect_fees();
@@ -247,9 +276,14 @@ pub fn incorrect_op_test_scenario<W, F>(
     let witness = W::apply_tx(&mut witness_accum.account_tree, &op);
     let circuit_operations = witness.calculate_operations(input.clone());
     let pub_data_from_witness = witness.get_pubdata();
+    let offset_commitment = witness.get_offset_commitment_data();
 
     // Prepare circuit
-    witness_accum.add_operation_with_pubdata(circuit_operations, pub_data_from_witness);
+    witness_accum.add_operation_with_pubdata(
+        circuit_operations,
+        pub_data_from_witness,
+        offset_commitment,
+    );
     witness_accum.collect_fees(&fees);
     witness_accum.calculate_pubdata_commitment();
 

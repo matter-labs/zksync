@@ -10,6 +10,7 @@ use itertools::Itertools;
 use tokio::task::JoinHandle;
 // Workspace uses
 use zksync_crypto::ff;
+use zksync_crypto::ff::{PrimeField, PrimeFieldRepr};
 use zksync_state::state::{CollectedFee, OpSuccess, ZkSyncState};
 use zksync_storage::ConnectionPool;
 use zksync_types::{
@@ -21,13 +22,14 @@ use zksync_types::{
     mempool::SignedTxVariant,
     tx::{TxHash, ZkSyncTx},
     Account, AccountId, AccountTree, AccountUpdate, AccountUpdates, ActionType, Address,
-    BlockNumber, PriorityOp, SignedZkSyncTx,
+    BlockNumber, PriorityOp, SignedZkSyncTx, H256,
 };
 // Local uses
 use crate::{
     committer::{AppliedUpdatesRequest, BlockCommitRequest, CommitRequest},
     mempool::ProposedBlock,
 };
+use std::time::{SystemTime, UNIX_EPOCH};
 
 #[cfg(test)]
 mod tests;
@@ -61,10 +63,17 @@ struct PendingBlock {
     collected_fees: Vec<CollectedFee>,
     /// Number of stored account updates in the db (from `account_updates` field)
     stored_account_updates: usize,
+    previous_block_root_hash: H256,
+    timestamp: u64,
 }
 
 impl PendingBlock {
-    fn new(unprocessed_priority_op_before: u64, chunks_left: usize) -> Self {
+    fn new(
+        unprocessed_priority_op_before: u64,
+        chunks_left: usize,
+        previous_block_root_hash: H256,
+        timestamp: u64,
+    ) -> Self {
         Self {
             success_operations: Vec::new(),
             failed_txs: Vec::new(),
@@ -78,6 +87,8 @@ impl PendingBlock {
             fast_processing_required: false,
             collected_fees: Vec::new(),
             stored_account_updates: 0,
+            previous_block_root_hash,
+            timestamp,
         }
     }
 }
@@ -366,13 +377,28 @@ impl ZkSyncStateKeeper {
             .expect("Fee account should be present in the account tree");
         // Keeper starts with the NEXT block
         let max_block_size = *available_block_chunk_sizes.iter().max().unwrap();
+        let mut be_bytes = [0u8; 32];
+        state
+            .root_hash()
+            .into_repr()
+            .write_be(be_bytes.as_mut())
+            .expect("Write commit bytes");
+        let previous_root_hash = H256::from(be_bytes);
         let keeper = ZkSyncStateKeeper {
             state,
             fee_account_id,
             current_unprocessed_priority_op: initial_state.unprocessed_priority_op,
             rx_for_blocks,
             tx_for_commitments,
-            pending_block: PendingBlock::new(initial_state.unprocessed_priority_op, max_block_size),
+            pending_block: PendingBlock::new(
+                initial_state.unprocessed_priority_op,
+                max_block_size,
+                previous_root_hash,
+                SystemTime::now()
+                    .duration_since(UNIX_EPOCH)
+                    .expect("failed to get system time")
+                    .as_secs(),
+            ),
             available_block_chunk_sizes,
             max_miniblock_iterations,
             fast_miniblock_iterations,
@@ -453,8 +479,7 @@ impl ZkSyncStateKeeper {
             last_committed == 0 && accounts.is_empty(),
             "db should be empty"
         );
-        let mut fee_account = Account::default();
-        fee_account.address = *fee_account_address;
+        let fee_account = Account::default_with_address(fee_account_address);
         let db_account_update = AccountUpdate::Create {
             address: *fee_account_address,
             nonce: fee_account.nonce,
@@ -473,12 +498,19 @@ impl ZkSyncStateKeeper {
             .await
             .expect("db fail");
 
+        let state = ZkSyncState::from_acc_map(accounts, last_committed + 1);
+        let root_hash = state.root_hash();
+        transaction
+            .chain()
+            .block_schema()
+            .save_genesis_block(root_hash)
+            .await
+            .expect("db fail");
+
         transaction
             .commit()
             .await
             .expect("Unable to commit transaction in statekeeper");
-        let state = ZkSyncState::from_acc_map(accounts, last_committed + 1);
-        let root_hash = state.root_hash();
         log::info!("Genesis block created, state: {}", state.root_hash());
         println!("GENESIS_ROOT=0x{}", ff::to_hex(&root_hash));
         metrics::histogram!("state_keeper.create_genesis_block", start.elapsed());
@@ -856,6 +888,11 @@ impl ZkSyncStateKeeper {
                     .available_block_chunk_sizes
                     .last()
                     .expect("failed to get max block size"),
+                H256::default(),
+                SystemTime::now()
+                    .duration_since(UNIX_EPOCH)
+                    .expect("failed to get system time")
+                    .as_secs(),
             ),
         );
 
@@ -882,20 +919,26 @@ impl ZkSyncStateKeeper {
         let commit_gas_limit = pending_block.gas_counter.commit_gas_limit();
         let verify_gas_limit = pending_block.gas_counter.verify_gas_limit();
 
-        let block_commit_request = BlockCommitRequest {
-            block: Block::new_from_available_block_sizes(
-                self.state.block_number,
-                self.state.root_hash(),
-                self.fee_account_id,
-                block_transactions,
-                (
-                    pending_block.unprocessed_priority_op_before,
-                    self.current_unprocessed_priority_op,
-                ),
-                &self.available_block_chunk_sizes,
-                commit_gas_limit,
-                verify_gas_limit,
+        let block = Block::new_from_available_block_sizes(
+            self.state.block_number,
+            self.state.root_hash(),
+            self.fee_account_id,
+            block_transactions,
+            (
+                pending_block.unprocessed_priority_op_before,
+                self.current_unprocessed_priority_op,
             ),
+            &self.available_block_chunk_sizes,
+            commit_gas_limit,
+            verify_gas_limit,
+            pending_block.previous_block_root_hash,
+            pending_block.timestamp,
+        );
+
+        self.pending_block.previous_block_root_hash = block.get_eth_encoded_root();
+
+        let block_commit_request = BlockCommitRequest {
+            block,
             accounts_updated: pending_block.account_updates.clone(),
         };
         let first_update_order_id = pending_block.stored_account_updates;
@@ -952,6 +995,8 @@ impl ZkSyncStateKeeper {
             pending_block_iteration: self.pending_block.pending_block_iteration,
             success_operations: new_success_operations,
             failed_txs: new_failed_operations,
+            previous_block_root_hash: self.pending_block.previous_block_root_hash,
+            timestamp: self.pending_block.timestamp,
         };
         let first_update_order_id = self.pending_block.stored_account_updates;
         let account_updates = self.pending_block.account_updates[first_update_order_id..].to_vec();

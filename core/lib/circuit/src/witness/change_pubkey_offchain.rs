@@ -108,6 +108,12 @@ impl Witness for ChangePubkeyOffChainWitness<Bn256> {
         pubdata_bits
     }
 
+    fn get_offset_commitment_data(&self) -> Vec<bool> {
+        let mut commitment = vec![false; ChangePubKeyOp::CHUNKS * 8];
+        commitment[7] = true;
+        commitment
+    }
+
     fn calculate_operations(&self, input: SigDataInput) -> Vec<Operation<Bn256>> {
         self.get_pubdata()
             .chunks(CHUNK_BIT_WIDTH)

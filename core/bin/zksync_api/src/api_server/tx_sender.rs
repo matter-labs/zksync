@@ -10,6 +10,7 @@ use futures::{
     channel::{mpsc, oneshot},
     prelude::*,
 };
+use itertools::izip;
 use num::bigint::ToBigInt;
 use thiserror::Error;
 
@@ -17,12 +18,12 @@ use thiserror::Error;
 use zksync_config::ApiServerOptions;
 use zksync_storage::ConnectionPool;
 use zksync_types::{
-    tx::EthSignData,
-    tx::{SignedZkSyncTx, TxEthSignature, TxHash},
-    Token, TokenId, TokenLike, TxFeeTypes, ZkSyncTx,
+    tx::{BatchSignData, EthSignData, SignedZkSyncTx, TxEthSignature, TxHash},
+    Address, Token, TokenId, TokenLike, TxFeeTypes, ZkSyncTx,
 };
 
 // Local uses
+use crate::api_server::rpc_server::types::TxWithSignature;
 use crate::{
     core_api_client::CoreApiClient,
     fee_ticker::{Fee, TickerRequest, TokenPriceRequestType},
@@ -42,6 +43,9 @@ pub struct TxSender {
     /// Mimimum age of the account for `ForcedExit` operations to be allowed.
     pub forced_exit_minimum_account_age: chrono::Duration,
     pub enforce_pubkey_change_fee: bool,
+    // Limit the number of both transactions and Ethereum signatures per batch.
+    pub max_number_of_transactions_per_batch: usize,
+    pub max_number_of_authors_per_batch: usize,
 }
 
 #[derive(Debug, Error)]
@@ -126,6 +130,10 @@ impl TxSender {
             chrono::Duration::from_std(api_server_options.forced_exit_minimum_account_age)
                 .expect("Unable to convert std::Duration to chrono::Duration");
 
+        let max_number_of_transactions_per_batch =
+            api_server_options.max_number_of_transactions_per_batch;
+        let max_number_of_authors_per_batch = api_server_options.max_number_of_authors_per_batch;
+
         Self {
             core_api_client,
             pool: connection_pool,
@@ -135,6 +143,26 @@ impl TxSender {
 
             enforce_pubkey_change_fee,
             forced_exit_minimum_account_age,
+            max_number_of_transactions_per_batch,
+            max_number_of_authors_per_batch,
+        }
+    }
+
+    /// If `ForcedExit` has Ethereum siganture (e.g. it's a part of a batch), an actual signer
+    /// is initiator, not the target, thus, this function will perform a database query to acquire
+    /// the corresponding address.
+    async fn get_tx_sender(&self, tx: &ZkSyncTx) -> Result<Address, anyhow::Error> {
+        match tx {
+            ZkSyncTx::ForcedExit(tx) => self
+                .pool
+                .access_storage()
+                .await?
+                .chain()
+                .account_schema()
+                .account_address_by_id(tx.initiator_account_id)
+                .await?
+                .ok_or_else(|| anyhow::anyhow!("Forced Exit account is not found in db")),
+            _ => Ok(tx.account()),
         }
     }
 
@@ -190,8 +218,7 @@ impl TxSender {
             }
 
             let required_fee =
-                Self::ticker_request(ticker_request_sender, tx_type, token.clone())
-                    .await?;
+                Self::ticker_request(ticker_request_sender, tx_type, token.clone()).await?;
             // Converting `BitUint` to `BigInt` is safe.
             let required_fee: BigDecimal = required_fee.total_fee.to_bigint().unwrap().into();
             let provided_fee: BigDecimal = provided_fee.to_bigint().unwrap().into();
@@ -211,8 +238,14 @@ impl TxSender {
             }
         }
 
+        let tx_sender = self
+            .get_tx_sender(&tx)
+            .await
+            .or(Err(SubmitError::TxAdd(TxAddError::DbError)))?;
+
         let verified_tx = verify_tx_info_message_signature(
             &tx,
+            tx_sender,
             signature.clone(),
             msg_to_sign,
             sign_verify_channel,
@@ -232,12 +265,24 @@ impl TxSender {
 
     pub async fn submit_txs_batch(
         &self,
-        txs: Vec<(ZkSyncTx, Option<TxEthSignature>)>,
-        eth_signature: Option<TxEthSignature>,
+        txs: Vec<TxWithSignature>,
+        eth_signatures: Vec<TxEthSignature>,
     ) -> Result<Vec<TxHash>, SubmitError> {
-        debug_assert!(txs.is_empty(), "Transaction batch cannot be empty");
+        if txs.is_empty() {
+            return Err(SubmitError::TxAdd(TxAddError::EmptyBatch));
+        }
+        // Even though this is going to be checked on the Mempool part,
+        // we don't want to verify huge batches as long as this operation
+        // is expensive.
+        if txs.len() > self.max_number_of_transactions_per_batch {
+            return Err(SubmitError::TxAdd(TxAddError::BatchTooBig));
+        }
+        // Same check but in terms of signatures.
+        if eth_signatures.len() > self.max_number_of_authors_per_batch {
+            return Err(SubmitError::TxAdd(TxAddError::EthSignaturesLimitExceeded));
+        }
 
-        if txs.iter().any(|tx| tx.0.is_close()) {
+        if txs.iter().any(|tx| tx.tx.is_close()) {
             return Err(SubmitError::AccountCloseDisabled);
         }
 
@@ -245,7 +290,7 @@ impl TxSender {
         let mut required_total_usd_fee = BigDecimal::from(0);
         let mut provided_total_usd_fee = BigDecimal::from(0);
         for tx in &txs {
-            let tx_fee_info = tx.0.get_fee_info();
+            let tx_fee_info = tx.tx.get_fee_info();
 
             if let Some((tx_type, token, provided_fee)) = tx_fee_info {
                 let fee_allowed =
@@ -301,33 +346,48 @@ impl TxSender {
             return Err(SubmitError::TxAdd(TxAddError::TxBatchFeeTooLow));
         }
 
-        let mut verified_txs = Vec::new();
-        let mut verified_signature = None;
+        let mut verified_txs = Vec::with_capacity(txs.len());
+        let mut verified_signatures = Vec::new();
 
-        let mut messages_to_sign = vec![];
+        let mut messages_to_sign = Vec::with_capacity(txs.len());
+        let mut tx_senders = Vec::with_capacity(txs.len());
         for tx in &txs {
-            messages_to_sign.push(self.tx_message_to_sign(&tx.0).await?);
+            messages_to_sign.push(self.tx_message_to_sign(&tx.tx).await?);
+            tx_senders.push(
+                self.get_tx_sender(&tx.tx)
+                    .await
+                    .or(Err(SubmitError::TxAdd(TxAddError::DbError)))?,
+            );
         }
 
-        if let Some(signature) = eth_signature {
-            // User provided the signature for the whole batch.
+        if !eth_signatures.is_empty() {
+            // User provided at least one signature for the whole batch.
+            let _txs = txs
+                .iter()
+                .map(|tx| tx.tx.clone())
+                .collect::<Vec<ZkSyncTx>>();
+            // Create batch signature data.
+            let batch_sign_data =
+                BatchSignData::new(&_txs, eth_signatures).map_err(SubmitError::other)?;
             let (verified_batch, sign_data) = verify_txs_batch_signature(
                 txs,
-                signature,
+                tx_senders,
+                batch_sign_data,
                 messages_to_sign,
                 self.sign_verify_requests.clone(),
             )
             .await?
             .unwrap_batch();
 
-            verified_signature = Some(sign_data.signature);
+            verified_signatures.extend(sign_data.signatures.into_iter());
             verified_txs.extend(verified_batch.into_iter());
         } else {
             // Otherwise, we process every transaction in turn.
-            for (tx, msg_to_sign) in txs.into_iter().zip(messages_to_sign.into_iter()) {
+            for (tx, sender, msg_to_sign) in izip!(txs, tx_senders, messages_to_sign) {
                 let verified_tx = verify_tx_info_message_signature(
-                    &tx.0,
-                    tx.1.clone(),
+                    &tx.tx,
+                    sender,
+                    tx.signature.clone(),
                     msg_to_sign,
                     self.sign_verify_requests.clone(),
                 )
@@ -337,11 +397,10 @@ impl TxSender {
                 verified_txs.push(verified_tx);
             }
         }
-
         let tx_hashes: Vec<TxHash> = verified_txs.iter().map(|tx| tx.tx.hash()).collect();
         // Send verified transactions to the mempool.
         self.core_api_client
-            .send_txs_batch(verified_txs, verified_signature)
+            .send_txs_batch(verified_txs, verified_signatures)
             .await
             .map_err(SubmitError::communication_core_server)?
             .map_err(SubmitError::TxAdd)?;
@@ -505,6 +564,7 @@ async fn send_verify_request_and_recv(
 /// If `msg_to_sign` is not `None`, then the signature must be present.
 async fn verify_tx_info_message_signature(
     tx: &ZkSyncTx,
+    tx_sender: Address,
     signature: Option<TxEthSignature>,
     msg_to_sign: Option<Vec<u8>>,
     req_channel: mpsc::Sender<VerifyTxSignatureRequest>,
@@ -528,19 +588,11 @@ async fn verify_tx_info_message_signature(
             tx: tx.clone(),
             eth_sign_data,
         }),
+        senders: vec![tx_sender],
         response: sender,
     };
 
     send_verify_request_and_recv(request, req_channel, receiever).await
-}
-
-pub(crate) fn get_batch_sign_message<'a, I: Iterator<Item = &'a ZkSyncTx>>(txs: I) -> Vec<u8> {
-    tiny_keccak::keccak256(
-        txs.flat_map(|tx| tx.get_bytes())
-            .collect::<Vec<u8>>()
-            .as_slice(),
-    )
-    .to_vec()
 }
 
 /// Send a request for Ethereum signature verification and wait for the response.
@@ -548,8 +600,9 @@ pub(crate) fn get_batch_sign_message<'a, I: Iterator<Item = &'a ZkSyncTx>>(txs: 
 /// every transaction from the batch to be signed. The signature must be obtained
 /// through signing hash of concatenated transactions bytes.
 async fn verify_txs_batch_signature(
-    batch: Vec<(ZkSyncTx, Option<TxEthSignature>)>,
-    signature: TxEthSignature,
+    batch: Vec<TxWithSignature>,
+    senders: Vec<Address>,
+    batch_sign_data: BatchSignData,
     msgs_to_sign: Vec<Option<Vec<u8>>>,
     req_channel: mpsc::Sender<VerifyTxSignatureRequest>,
 ) -> Result<VerifiedTx, SubmitError> {
@@ -557,24 +610,22 @@ async fn verify_txs_batch_signature(
     for (tx, message) in batch.into_iter().zip(msgs_to_sign.into_iter()) {
         // If we have more signatures provided than required,
         // we will verify those too.
-        let eth_sign_data = if let (Some(signature), Some(message)) = (tx.1, message) {
+        let eth_sign_data = if let (Some(signature), Some(message)) = (tx.signature, message) {
             Some(EthSignData { signature, message })
         } else {
             None
         };
         txs.push(SignedZkSyncTx {
-            tx: tx.0,
+            tx: tx.tx,
             eth_sign_data,
         });
     }
-    // User is expected to sign hash of the data of all transactions in the batch.
-    let message = get_batch_sign_message(txs.iter().map(|tx| &tx.tx));
-    let eth_sign_data = EthSignData { signature, message };
 
     let (sender, receiver) = oneshot::channel();
 
     let request = VerifyTxSignatureRequest {
-        tx: TxVariant::Batch(txs, eth_sign_data),
+        tx: TxVariant::Batch(txs, batch_sign_data),
+        senders,
         response: sender,
     };
 

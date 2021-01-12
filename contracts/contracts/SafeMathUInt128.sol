@@ -1,4 +1,6 @@
-pragma solidity ^0.5.8;
+// SPDX-License-Identifier: MIT OR Apache-2.0
+
+pragma solidity ^0.7.0;
 
 /**
  * @dev Wrappers over Solidity's arithmetic operations with added overflow
@@ -25,7 +27,7 @@ library SafeMathUInt128 {
      */
     function add(uint128 a, uint128 b) internal pure returns (uint128) {
         uint128 c = a + b;
-        require(c >= a, "SafeMath: addition overflow");
+        require(c >= a, "12");
 
         return c;
     }
@@ -40,7 +42,7 @@ library SafeMathUInt128 {
      * - Subtraction cannot overflow.
      */
     function sub(uint128 a, uint128 b) internal pure returns (uint128) {
-        return sub(a, b, "SafeMath: subtraction overflow");
+        return sub(a, b, "aa");
     }
 
     /**
@@ -83,7 +85,7 @@ library SafeMathUInt128 {
         }
 
         uint128 c = a * b;
-        require(c / a == b, "SafeMath: multiplication overflow");
+        require(c / a == b, "13");
 
         return c;
     }
@@ -100,7 +102,7 @@ library SafeMathUInt128 {
      * - The divisor cannot be zero.
      */
     function div(uint128 a, uint128 b) internal pure returns (uint128) {
-        return div(a, b, "SafeMath: division by zero");
+        return div(a, b, "ac");
     }
 
     /**
@@ -141,7 +143,7 @@ library SafeMathUInt128 {
      * - The divisor cannot be zero.
      */
     function mod(uint128 a, uint128 b) internal pure returns (uint128) {
-        return mod(a, b, "SafeMath: modulo by zero");
+        return mod(a, b, "ad");
     }
 
     /**

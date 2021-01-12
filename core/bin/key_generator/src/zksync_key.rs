@@ -130,6 +130,7 @@ fn zksync_circuit(block_chunks: usize) -> impl Circuit<Engine> + Clone {
         initial_used_subtree_root: None,
         validator_address: None,
         block_number: None,
+        block_timestamp: None,
         pub_data_commitment: None,
         validator_balances: vec![None; params::total_tokens()],
         validator_audit_path: vec![None; params::account_tree_depth()],

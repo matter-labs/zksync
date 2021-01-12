@@ -9,19 +9,21 @@ use zksync_core::committer::{BlockCommitRequest, CommitRequest};
 use zksync_core::mempool::ProposedBlock;
 use zksync_core::state_keeper::StateKeeperRequest;
 use zksync_types::{
-    mempool::SignedTxVariant, tx::SignedZkSyncTx, Account, AccountId, AccountMap, Address,
-    PriorityOp, TokenId, ZkSyncTx,
+    mempool::SignedTxVariant, tx::SignedZkSyncTx, Account, AccountId, AccountMap, Address, Fr,
+    PriorityOp, TokenId, ZkSyncTx, H256, U256,
 };
 
 use web3::types::TransactionReceipt;
-use zksync_crypto::proof::EncodedProofPlonk;
+use zksync_crypto::proof::EncodedAggregatedProof;
 use zksync_crypto::rand::Rng;
-use zksync_crypto::Fr;
 use zksync_types::block::Block;
 
 use crate::account_set::AccountSet;
 use crate::state_keeper_utils::*;
 use crate::types::*;
+use zksync_types::aggregated_operations::{
+    BlocksCommitOperation, BlocksExecuteOperation, BlocksProofOperation,
+};
 
 /// Used to create transactions between accounts and check for their validity.
 /// Every new block should start with `.start_block()`
@@ -41,7 +43,7 @@ pub struct TestSetup {
     pub expected_changes_for_current_block: ExpectedAccountState,
 
     pub commit_account: EthereumAccount<Http>,
-    pub current_state_root: Option<Fr>,
+    pub last_committed_block: Block,
 }
 
 impl TestSetup {
@@ -50,6 +52,7 @@ impl TestSetup {
         accounts: AccountSet<Http>,
         deployed_contracts: &Contracts,
         commit_account: EthereumAccount<Http>,
+        initial_root: Fr,
     ) -> Self {
         let mut tokens = HashMap::new();
         tokens.insert(1, deployed_contracts.test_erc20_address);
@@ -61,7 +64,18 @@ impl TestSetup {
             tokens,
             expected_changes_for_current_block: ExpectedAccountState::default(),
             commit_account,
-            current_state_root: None,
+            last_committed_block: Block::new(
+                0,
+                initial_root,
+                0,
+                vec![],
+                (0, 0),
+                0,
+                U256::from(0),
+                U256::from(0),
+                H256::default(),
+                0,
+            ),
         }
     }
 
@@ -250,10 +264,11 @@ impl TestSetup {
         account_id: AccountId,
         token_id: Token,
         amount: &BigUint,
-        proof: EncodedProofPlonk,
+        proof: EncodedAggregatedProof,
     ) -> ETHExecResult {
+        let last_block = &self.last_committed_block;
         self.accounts.eth_accounts[sending_account.0]
-            .exit(account_id, token_id.0, amount, proof)
+            .exit(last_block, account_id, token_id.0, amount, proof)
             .await
             .expect("Exit failed")
     }
@@ -619,32 +634,35 @@ impl TestSetup {
     }
 
     /// Should not be used execept special cases(when we want to commit but don't want to verify block)
-    pub async fn execute_commit_block(&mut self) -> (ETHExecResult, Block) {
+    pub async fn execute_commit_block(&mut self) -> Block {
         self.state_keeper_request_sender
             .clone()
             .send(StateKeeperRequest::SealBlock)
             .await
             .expect("sk receiver dropped");
 
-        let new_block = self.await_for_block_commit_request().await;
-        self.current_state_root = Some(new_block.block.new_root_hash);
+        let new_block = self.await_for_block_commit_request().await.block;
 
-        (
-            self.commit_account
-                .commit_block(&new_block.block)
-                .await
-                .expect("block commit fail"),
-            new_block.block,
-        )
+        let block_commit_op = BlocksCommitOperation {
+            last_committed_block: self.last_committed_block.clone(),
+            blocks: vec![new_block.clone()],
+        };
+        self.commit_account
+            .commit_block(&block_commit_op)
+            .await
+            .expect("block commit send tx")
+            .expect_success();
+        self.last_committed_block = new_block.clone();
+
+        new_block
     }
 
-    pub async fn execute_verify_block(
+    pub async fn execute_verify_commitments(
         &mut self,
-        block: &Block,
-        proof: EncodedProofPlonk,
+        proof: BlocksProofOperation,
     ) -> ETHExecResult {
         self.commit_account
-            .verify_block(block, Some(proof))
+            .verify_block(&proof)
             .await
             .expect("block verify fail")
     }
@@ -658,29 +676,46 @@ impl TestSetup {
             .await
             .expect("sk receiver dropped");
 
-        let new_block = self.await_for_block_commit_request().await;
+        let new_block = self.await_for_block_commit_request().await.block;
 
-        self.current_state_root = Some(new_block.block.new_root_hash);
-
+        let block_commit_op = BlocksCommitOperation {
+            last_committed_block: self.last_committed_block.clone(),
+            blocks: vec![new_block.clone()],
+        };
         let commit_result = self
             .commit_account
-            .commit_block(&new_block.block)
+            .commit_block(&block_commit_op)
             .await
             .expect("block commit send tx")
             .expect_success();
+
+        let mut proof = EncodedAggregatedProof::default();
+        proof.individual_vk_inputs[0] =
+            U256::from_big_endian(new_block.block_commitment.as_bytes());
+        let block_proof_op = BlocksProofOperation {
+            blocks: vec![new_block.clone()],
+            proof,
+        };
         let verify_result = self
             .commit_account
-            .verify_block(&new_block.block, None)
+            .verify_block(&block_proof_op)
             .await
             .expect("block verify send tx")
             .expect_success();
+
+        let block_execute_op = BlocksExecuteOperation {
+            blocks: vec![new_block.clone()],
+        };
         let withdrawals_result = self
             .commit_account
-            .complete_withdrawals()
+            .execute_block(&block_execute_op)
             .await
-            .expect("complete withdrawal send tx")
+            .expect("execute block tx")
             .expect_success();
-        let block_chunks = new_block.block.block_chunks_size;
+
+        self.last_committed_block = new_block.clone();
+
+        let block_chunks = new_block.block_chunks_size;
 
         let mut block_checks_failed = false;
         for ((eth_account, token), expeted_balance) in
@@ -714,7 +749,7 @@ impl TestSetup {
         if block_checks_failed {
             println!(
                 "Failed block exec_operations: {:#?}",
-                new_block.block.block_transactions
+                new_block.block_transactions
             );
             bail!("Block checks failed")
         }
@@ -725,6 +760,7 @@ impl TestSetup {
         }
 
         Ok(BlockExecutionResult::new(
+            new_block,
             commit_result,
             verify_result,
             withdrawals_result,
@@ -768,17 +804,17 @@ impl TestSetup {
         };
         result
             + self
-                .get_balance_to_withdraw(eth_account_id, Token(token))
+                .get_balance_to_withdraw(eth_account_id, self.tokens[&token])
                 .await
     }
 
     pub async fn get_balance_to_withdraw(
         &self,
         eth_account_id: ETHAccountId,
-        token: Token,
+        token: Address,
     ) -> BigUint {
         self.accounts.eth_accounts[eth_account_id.0]
-            .balances_to_withdraw(token.0)
+            .balances_to_withdraw(token)
             .await
             .expect("failed to query balance to withdraws")
     }
@@ -795,8 +831,8 @@ impl TestSetup {
         self.accounts.eth_accounts[0].total_blocks_verified().await
     }
 
-    pub async fn revert_blocks(&self, blocks_to_revert: u64) -> Result<(), anyhow::Error> {
-        self.commit_account.revert_blocks(blocks_to_revert).await?;
+    pub async fn revert_blocks(&self, blocks: &[Block]) -> Result<(), anyhow::Error> {
+        self.commit_account.revert_blocks(blocks).await?;
         Ok(())
     }
 
@@ -844,7 +880,7 @@ impl TestSetup {
         accounts: AccountMap,
         fund_owner: ZKSyncAccountId,
         token: Token,
-    ) -> (EncodedProofPlonk, BigUint) {
+    ) -> (EncodedAggregatedProof, BigUint) {
         let owner = &self.accounts.zksync_accounts[fund_owner.0];
         let owner_id = owner
             .get_account_id()
