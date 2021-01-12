@@ -19,9 +19,9 @@ jobs:
       - name: start-services
         run: |
           docker-compose -f docker-compose-runner.yml down
-          docker-compose -f docker-compose-runner.yml up -d geth postgres zk
-      - name: find_cache
-        run: docker-compose -f docker-compose-runner.yml exec -T zk sh infrastructure/ci-scripts/find_cache.sh
+          docker-compose -f docker-compose-runner.yml up -d geth postgres zk --build
+      - name: start_sscache
+        run: docker-compose -f docker-compose-runner.yml exec -T sccache --start-server
       - name: init
         run: |
           docker-compose -f docker-compose-runner.yml exec -T zk ln -s /usr/src/keys/setup keys/setup
@@ -42,8 +42,6 @@ jobs:
           docker-compose -f docker-compose-runner.yml exec -T zk zk run deploy-eip1271
       - name: run-services
         run: docker-compose -f docker-compose-runner.yml exec -T zk sh infrastructure/ci-scripts/run_services.sh
-      - name: cache
-        run: docker-compose -f docker-compose-runner.yml exec -T zk sh infrastructure/ci-scripts/cache.sh
       - name: integration-tests
         run: docker-compose -f docker-compose-runner.yml exec -T zk zk test integration all
 
