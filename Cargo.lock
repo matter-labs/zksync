@@ -5606,7 +5606,6 @@ dependencies = [
  "ethabi 12.0.0",
  "hex",
  "jsonrpc-core",
- "lazy_static",
  "num",
  "reqwest",
  "serde",
