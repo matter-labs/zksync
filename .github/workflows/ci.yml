@@ -20,7 +20,7 @@ jobs:
         run: |
           docker-compose -f docker-compose-runner.yml down
           docker-compose -f docker-compose-runner.yml up --build -d geth postgres zk
-      - name: start_sscache
+      - name: start_sccache
         run: docker-compose -f docker-compose-runner.yml exec -T zk sccache --start-server
       - name: init
         run: |
