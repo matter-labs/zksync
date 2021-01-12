@@ -272,7 +272,6 @@ pub struct ConfigurationOptions {
     pub operator_fee_eth_addr: Address,
     pub confirmations_for_eth_event: u64,
     pub available_block_chunk_sizes: Vec<usize>,
-    pub max_number_of_withdrawals_per_block: usize,
     pub eth_watch_poll_interval: Duration,
     pub eth_network: String,
     pub miniblock_timings: MiniblockTimings,
@@ -299,7 +298,6 @@ impl ConfigurationOptions {
             operator_fee_eth_addr: parse_env_with("OPERATOR_FEE_ETH_ADDRESS", |s| &s[2..]),
             confirmations_for_eth_event: parse_env("CONFIRMATIONS_FOR_ETH_EVENT"),
             available_block_chunk_sizes,
-            max_number_of_withdrawals_per_block: parse_env("MAX_NUMBER_OF_WITHDRAWALS_PER_BLOCK"),
             eth_watch_poll_interval: Duration::from_millis(parse_env::<u64>(
                 "ETH_WATCH_POLL_INTERVAL",
             )),
