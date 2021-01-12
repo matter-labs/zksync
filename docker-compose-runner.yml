@@ -43,7 +43,6 @@ services:
       - .:/usr/src/zksync
       - /usr/src/cache:/usr/src/cache
       - /usr/src/keys:/usr/src/keys
-      - /usr/local/cargo/bin/sccache:/usr/local/cargo/bin/sccache1
 
     environment:
       - IN_DOCKER=true

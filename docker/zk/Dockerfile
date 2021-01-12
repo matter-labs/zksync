@@ -29,8 +29,8 @@ ENV ZKSYNC_HOME=/usr/src/zksync
 ENV PATH="${ZKSYNC_HOME}/bin:${PATH}"
 ENV CI=1
 RUN cargo install sccache
-ENV RUSTC_WRAPPER=/usr/local/cargo/bin/sccache1
-
+ENV RUSTC_WRAPPER=/usr/local/cargo/bin/sccache
+ENV SCCACHE_DIR=/usr/src/cache/sccache
 COPY docker/zk/entrypoint.sh /usr/local/bin/entrypoint.sh
 
 
