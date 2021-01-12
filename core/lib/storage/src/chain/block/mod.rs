@@ -1,5 +1,6 @@
 // Built-in deps
 use std::time::Instant;
+use std::time::{SystemTime, UNIX_EPOCH};
 // External imports
 use zksync_basic_types::{H256, U256};
 // Workspace imports
@@ -563,7 +564,12 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
             success_operations,
             failed_txs,
             previous_block_root_hash,
-            timestamp: block.timestamp.unwrap_or_default() as u64,
+            timestamp: block.timestamp.unwrap_or_else(|| {
+                SystemTime::now()
+                    .duration_since(UNIX_EPOCH)
+                    .expect("failed to get system time")
+                    .as_secs() as i64
+            }) as u64,
         };
 
         transaction.commit().await?;

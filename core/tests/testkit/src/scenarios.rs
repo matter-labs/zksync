@@ -213,6 +213,8 @@ pub async fn perform_basic_operations(
             Token(token),
             &deposit_amount / BigUint::from(8u32),
             &deposit_amount / BigUint::from(8u32),
+            0,
+            u64::MAX,
         )
         .await;
 
@@ -224,6 +226,8 @@ pub async fn perform_basic_operations(
             Token(token),
             &deposit_amount / BigUint::from(8u32),
             &deposit_amount / BigUint::from(8u32),
+            0,
+            u64::MAX,
         )
         .await;
 
@@ -235,6 +239,8 @@ pub async fn perform_basic_operations(
         deposit_amount.clone(),
         BigUint::from(0u32),
         Some(nonce + 1),
+        0,
+        u64::MAX,
         false,
     );
     test_setup
@@ -249,6 +255,8 @@ pub async fn perform_basic_operations(
             Token(token),
             &deposit_amount / BigUint::from(4u32),
             &deposit_amount / BigUint::from(4u32),
+            0,
+            u64::MAX,
         )
         .await;
 

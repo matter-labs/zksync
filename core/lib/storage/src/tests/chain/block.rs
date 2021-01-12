@@ -629,6 +629,8 @@ async fn pending_block_workflow(mut storage: StorageProcessor<'_>) -> QueryResul
                 0u32.into(),
                 &to_zksync_account.address,
                 None,
+                0,
+                u64::MAX,
                 true,
             )
             .0;

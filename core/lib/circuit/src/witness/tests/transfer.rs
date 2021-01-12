@@ -48,6 +48,8 @@ fn test_transfer_success() {
                     BigUint::from(fee_amount),
                     &account_to.account.address,
                     None,
+                    0,
+                    u64::MAX,
                     true,
                 )
                 .0,
@@ -93,6 +95,8 @@ fn test_transfer_to_self() {
                 BigUint::from(3u32),
                 &account.account.address,
                 None,
+                0,
+                u64::MAX,
                 true,
             )
             .0,
@@ -139,6 +143,8 @@ fn corrupted_ops_input() {
                 BigUint::from(3u32),
                 &account.account.address,
                 None,
+                0,
+                u64::MAX,
                 true,
             )
             .0,
@@ -202,6 +208,8 @@ fn test_incorrect_transfer_account_from() {
                 BigUint::from(FEE_AMOUNT),
                 &account_to.account.address,
                 None,
+                0,
+                u64::MAX,
                 true,
             )
             .0,
@@ -256,6 +264,8 @@ fn test_incorrect_transfer_account_to() {
                 BigUint::from(FEE_AMOUNT),
                 &incorrect_account_to.account.address,
                 None,
+                0,
+                u64::MAX,
                 true,
             )
             .0,
@@ -314,6 +324,8 @@ fn test_incorrect_transfer_amount() {
                     BigUint::from(fee_amount),
                     &account_to.account.address,
                     None,
+                    0,
+                    u64::MAX,
                     true,
                 )
                 .0,
@@ -376,6 +388,8 @@ fn test_transfer_replay() {
                 BigUint::from(FEE_AMOUNT),
                 &account_to.account.address,
                 None,
+                0,
+                u64::MAX,
                 true,
             )
             .0,

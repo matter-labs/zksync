@@ -91,6 +91,8 @@ fn apply_many_ops() -> ZkSyncCircuit<'static, Bn256> {
                 BigUint::from(3u32),
                 &account_to.account.address,
                 None,
+                0,
+                u64::MAX,
                 true,
             )
             .0,
@@ -112,6 +114,8 @@ fn apply_many_ops() -> ZkSyncCircuit<'static, Bn256> {
                 BigUint::from(90u32),
                 &account_to.account.address,
                 None,
+                0,
+                u64::MAX,
                 true,
             )
             .0,

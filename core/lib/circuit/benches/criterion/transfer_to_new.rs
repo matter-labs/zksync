@@ -26,6 +26,8 @@ fn transfer_to_new_apply_tx(b: &mut Bencher<'_>, number_of_accounts: &usize) {
                 BigUint::from(1u64),
                 &account_to.account.address,
                 None,
+                0,
+                u64::MAX,
                 true,
             )
             .0,
@@ -55,6 +57,8 @@ fn transfer_to_new_get_pubdata(b: &mut Bencher<'_>) {
                 BigUint::from(1u64),
                 &account_to.account.address,
                 None,
+                0,
+                u64::MAX,
                 true,
             )
             .0,
@@ -84,6 +88,8 @@ fn transfer_to_new_calculate_operations(b: &mut Bencher<'_>) {
                 BigUint::from(1u64),
                 &account_to.account.address,
                 None,
+                0,
+                u64::MAX,
                 true,
             )
             .0,

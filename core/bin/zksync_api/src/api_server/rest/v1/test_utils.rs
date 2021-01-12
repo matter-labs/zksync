@@ -131,6 +131,8 @@ impl TestServerConfig {
                     closest_packable_fee_amount(&fee.into()),
                     &to.address,
                     None,
+                    0,
+                    u64::MAX,
                     false,
                 )
                 .0;
@@ -159,7 +161,17 @@ impl TestServerConfig {
         // Failed transfer tx pair
         {
             let tx = from
-                .sign_transfer(0, "GLM", 1_u64.into(), fee.into(), &to.address, None, false)
+                .sign_transfer(
+                    0,
+                    "GLM",
+                    1_u64.into(),
+                    fee.into(),
+                    &to.address,
+                    None,
+                    0,
+                    u64::MAX,
+                    false,
+                )
                 .0;
 
             let zksync_op = ZkSyncOp::TransferToNew(Box::new(TransferToNewOp {
@@ -193,6 +205,8 @@ impl TestServerConfig {
                 2_u64.into(),
                 fee.into(),
                 0,
+                0,
+                u64::MAX,
                 None,
             );
 

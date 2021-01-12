@@ -203,6 +203,8 @@ mod signatures_with_vectors {
                         transfer_tx.fee.clone(),
                         sign_data.to,
                         sign_data.nonce,
+                        0,
+                        u64::MAX,
                     )
                     .await
                     .expect("Transfer signing error");
