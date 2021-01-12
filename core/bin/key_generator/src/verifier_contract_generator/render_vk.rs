@@ -20,7 +20,7 @@ pub(crate) fn rendered_key(
     verification_key: impl AsRef<Path>,
 ) -> serde_json::Value {
     let vk = VerificationKey::<NodeEngine, RecursiveAggregationCircuitBn256<'static>>::read(
-        File::open(verification_key).expect("Failed to open verfifcation key file"),
+        File::open(verification_key).expect("Failed to open verification key file"),
     )
     .expect("Failed to read verification key");
     let mut map = HashMap::new();

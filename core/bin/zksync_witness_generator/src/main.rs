@@ -2,6 +2,7 @@ use futures::{channel::mpsc, executor::block_on, SinkExt, StreamExt};
 use std::cell::RefCell;
 use zksync_config::ProverOptions;
 use zksync_storage::ConnectionPool;
+use zksync_witness_generator::database::Database;
 use zksync_witness_generator::run_prover_server;
 
 #[tokio::main]
@@ -23,9 +24,10 @@ async fn main() -> anyhow::Result<()> {
     }
 
     let connection_pool = ConnectionPool::new(Some(WITNESS_GENERATOR_CONNECTION_POOL_SIZE));
+    let database = Database::new(connection_pool);
     let prover_options = ProverOptions::from_env();
 
-    run_prover_server(connection_pool, stop_signal_sender, prover_options);
+    run_prover_server(database, stop_signal_sender, prover_options);
 
     stop_signal_receiver.next().await;
 

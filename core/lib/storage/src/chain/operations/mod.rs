@@ -371,8 +371,6 @@ impl<'a, 'c> OperationsSchema<'a, 'c> {
         Ok(block_number)
     }
 
-    /// Given hash of the withdrawal, attempts to retrieve hash of the
-    /// corresponding ethereum transaction.
     pub async fn get_aggregated_op_that_affects_block(
         &mut self,
         aggregated_action: AggregatedActionType,
