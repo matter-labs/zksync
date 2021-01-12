@@ -20,6 +20,7 @@
 //!    Also, if there will be many tests running at once, and the server will die, it will be
 //!    hard to distinguish which test exactly caused this problem.
 
+use std::env;
 use std::time::{Duration, Instant};
 use zksync::operations::SyncTransactionHandle;
 use zksync::{
@@ -36,10 +37,23 @@ use zksync::{
     EthereumProvider, Network, RpcProvider, Wallet, WalletCredentials,
 };
 use zksync_eth_signer::{EthereumSigner, PrivateKeySigner};
+use zksync_utils::parse_env;
 
 const ETH_ADDR: &str = "36615Cf349d7F6344891B1e7CA7C72883F5dc049";
 const ETH_PRIVATE_KEY: &str = "7726827caac94a7f9e1b160f7ea819f172f7b6f9d2a97f992c38edeab82d4110";
-const LOCALHOST_WEB3_ADDR: &str = "http://127.0.0.1:8545";
+const LOCALHOST_WEB3_ADDR: &str = "http://localhost:8545";
+const DOCKER_WEB3_ADDR: &str = "http://geth:8545";
+
+lazy_static! {
+    static ref WEB3_ADDR: &str = {
+        let ci: u8 = env::var(name).unwrap_or_default(0);
+        if ci == 1 {
+            LOCALHOST_WEB3_ADDR
+        } else {
+            DOCKER_WEB3_ADDR
+        }
+    };
+}
 
 fn eth_main_account_credentials() -> (H160, H256) {
     let addr = ETH_ADDR.parse().unwrap();
@@ -124,7 +138,7 @@ async fn transfer_to(
             .unwrap();
 
     let wallet = Wallet::new(provider, credentials).await?;
-    let ethereum = wallet.ethereum(LOCALHOST_WEB3_ADDR).await?;
+    let ethereum = wallet.ethereum(WEB3_ADDR).await?;
     let hash = ethereum
         .transfer(token_like.into(), amount.into(), to)
         .await
@@ -177,7 +191,7 @@ where
     S: EthereumSigner + Clone,
     P: Provider + Clone,
 {
-    let ethereum = deposit_wallet.ethereum(LOCALHOST_WEB3_ADDR).await?;
+    let ethereum = deposit_wallet.ethereum(WEB3_ADDR).await?;
 
     if !deposit_wallet.tokens.is_eth(token.address.into()) {
         if !ethereum.is_erc20_deposit_approved(token.address).await? {
@@ -516,7 +530,7 @@ async fn init_account_with_one_ether(
             .unwrap();
 
     let mut wallet = Wallet::new(provider, credentials).await?;
-    let ethereum = wallet.ethereum(LOCALHOST_WEB3_ADDR).await?;
+    let ethereum = wallet.ethereum(WEB3_ADDR).await?;
 
     let deposit_tx_hash = ethereum
         .deposit("ETH", one_ether() / 2, wallet.address())
@@ -602,7 +616,7 @@ async fn comprehensive_test() -> Result<(), anyhow::Error> {
         Wallet::new(provider.clone(), random_credentials).await?
     };
 
-    let ethereum = main_wallet.ethereum(LOCALHOST_WEB3_ADDR).await?;
+    let ethereum = main_wallet.ethereum(WEB3_ADDR).await?;
 
     let main_contract = {
         let address_response = provider.contract_address().await?;

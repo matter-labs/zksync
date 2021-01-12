@@ -24,6 +24,7 @@ num = { version = "0.3.1", features = ["serde"] }
 reqwest = { version = "0.10", features = ["json", "blocking"] }
 thiserror = "1.0"
 async-trait = "0.1"
+lazy_static = "1.4.0"
 
 [dev-dependencies]
 tokio = { version = "0.2", features = ["full"] }
