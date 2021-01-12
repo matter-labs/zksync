@@ -156,7 +156,7 @@ class TxSubmitter {
         network: Network = 'localhost'
     ) {
         const ethProvider =
-            network == 'localhost' ? new ethers.providers.JsonRpcProvider() : ethers.getDefaultProvider(network);
+            network == 'localhost' ? new ethers.providers.JsonRpcProvider("http://geth:8545") : ethers.getDefaultProvider(network);
         const syncProvider = await zksync.getDefaultProvider(network, 'HTTP');
         const ethWallet = new ethers.Wallet(txDetails.privkey).connect(ethProvider);
         const syncWallet = await zksync.Wallet.fromEthSigner(ethWallet, syncProvider);
