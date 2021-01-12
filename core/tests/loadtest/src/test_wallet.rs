@@ -5,10 +5,14 @@ use num::BigUint;
 // Workspace uses
 use zksync::{
     error::ClientError,
+    ethereum::ierc20_contract,
     provider::Provider,
     types::BlockStatus,
-    utils::{biguint_to_u256, closest_packable_fee_amount},
-    web3::types::H256,
+    utils::{biguint_to_u256, closest_packable_fee_amount, u256_to_biguint},
+    web3::{
+        contract::{Contract, Options},
+        types::H256,
+    },
     EthereumProvider, Network, RpcProvider, Wallet, WalletCredentials,
 };
 use zksync_config::ConfigurationOptions;
@@ -156,6 +160,30 @@ impl TestWallet {
         self.eth_provider.balance().await
     }
 
+    /// Returns erc20 token balance in Ethereum network.
+    pub async fn erc20_balance(&self) -> Result<BigUint, ClientError> {
+        let token = self
+            .inner
+            .tokens
+            .resolve(self.token_name.clone())
+            .ok_or(ClientError::UnknownToken)
+            .expect("Unknown token");
+
+        let contract = Contract::new(
+            self.eth_provider.web3().eth(),
+            token.address,
+            ierc20_contract(),
+        );
+
+        let balance = contract
+            .query("balanceOf", self.address(), None, Options::default(), None)
+            .await
+            .map(u256_to_biguint)
+            .map_err(|err| ClientError::NetworkError(err.to_string()))?;
+
+        Ok(balance)
+    }
+
     /// Returns the token name of this wallet.
     pub fn token_name(&self) -> &TokenLike {
         &self.token_name
@@ -266,23 +294,13 @@ impl TestWallet {
         self.inner
     }
 
-    // TODO
-    pub async fn approve(&self) -> anyhow::Result<()> {
-        if self.token_name.is_eth() {
-            return Ok(());
-        }
-
-        if !self
+    /// Sends a transaction to ERC20 token contract to approve the ERC20 deposit.
+    pub async fn approve_erc20_deposits(&self) -> anyhow::Result<()> {
+        let tx_hash = self
             .eth_provider
-            .is_erc20_deposit_approved(self.token_name.clone())
-            .await?
-        {
-            let tx_hash = self
-                .eth_provider
-                .approve_erc20_token_deposits(self.token_name.clone())
-                .await?;
-            self.eth_provider.wait_for_tx(tx_hash).await?;
-        }
+            .approve_erc20_token_deposits(self.token_name.clone())
+            .await?;
+        self.eth_provider.wait_for_tx(tx_hash).await?;
 
         Ok(())
     }

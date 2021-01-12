@@ -114,15 +114,17 @@ impl FullExitScenario {
         fees: &Fees,
         wallet: &TestWallet,
     ) -> anyhow::Result<()> {
-        // TODO To make this scenario accuracy we should implement also additional method to get
-        // token balance in the l1 network instead ETH balance of this wallet.
-        let eth_balance = &wallet.eth_balance().await?;
-
         monitor
             .wait_for_priority_op(BlockStatus::Verified, &wallet.full_exit().await?)
             .await?;
 
-        let amount = closest_packable_token_amount(&(eth_balance - &fees.eth));
+        let balance = if wallet.token_name().is_eth() {
+            wallet.eth_balance().await?
+        } else {
+            wallet.erc20_balance().await?
+        };
+
+        let amount = closest_packable_token_amount(&(balance - &fees.eth));
         monitor
             .wait_for_priority_op(BlockStatus::Committed, &wallet.deposit(amount).await?)
             .await?;

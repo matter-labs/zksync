@@ -85,11 +85,15 @@ impl LoadtestExecutor {
         // Create main account to deposit money from and to return money back later.
         let main_wallet =
             TestWallet::from_info(monitor.clone(), &config.main_wallet, &env_options).await;
-        main_wallet.approve().await?;
+        // Special case for erc20 tokens.
+        if !main_wallet.token_name().is_eth() {
+            main_wallet.approve_erc20_deposits().await?;
+        }
 
         let default_fee = main_wallet.sufficient_fee().await?;
         let fees = Fees::from_config(&config.network, default_fee);
 
+        log::info!("Token is {}", main_wallet.token_name());
         log::info!("Eth fee is {}", format_ether(&fees.eth));
         log::info!("zkSync fee is {}", format_ether(&fees.zksync));
 
@@ -160,14 +164,16 @@ impl LoadtestExecutor {
             )
             .await;
 
+            // Special case for erc20 tokens.
             if !self.main_wallet.token_name().is_eth() {
                 for wallet in &scenario_wallets {
+                    // Give some gas to make it possible to create Ethereum transactions.
                     let eth_balance =
                         closest_packable_fee_amount(&(&self.fees.eth * BigUint::from(4_u64)));
                     self.main_wallet
                         .transfer_to("ETH", eth_balance, wallet.address())
                         .await?;
-                    wallet.approve().await?;
+                    wallet.approve_erc20_deposits().await?;
                 }
             }
 
@@ -395,6 +401,31 @@ impl LoadtestExecutor {
                     .map(|tx_hash| monitor.wait_for_tx(BlockStatus::Committed, tx_hash)),
             )
             .await?;
+
+            for wallet in scenario_wallets {
+                // Refund remaining erc20 tokens to the main wallet
+                if !wallet.token_name().is_eth() {
+                    let balance = wallet.erc20_balance().await?;
+                    if balance > self.fees.eth {
+                        let amount = balance - &self.fees.eth;
+                        wallet
+                            .transfer_to(
+                                wallet.token_name().clone(),
+                                closest_packable_token_amount(&amount),
+                                main_address,
+                            )
+                            .await?;
+                    }
+                }
+                // Move remaining gas to the main wallet.
+                let balance = wallet.eth_balance().await?;
+                if balance > self.fees.eth {
+                    let amount = balance - &self.fees.eth;
+                    wallet
+                        .transfer_to("ETH", closest_packable_token_amount(&amount), main_address)
+                        .await?;
+                }
+            }
         }
 
         // Withdraw remaining balance from the zkSync network back to the Ethereum one.

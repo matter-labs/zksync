@@ -249,7 +249,14 @@ impl<S: EthereumSigner> EthereumProvider<S> {
                 .expect("failed to encode parameters");
 
             self.eth_client
-                .sign_prepared_tx_for_addr(data, token_info.address, Default::default())
+                .sign_prepared_tx_for_addr(
+                    data,
+                    token_info.address,
+                    Options {
+                        gas: Some(300_000.into()),
+                        ..Default::default()
+                    },
+                )
                 .await
                 .map_err(|_| ClientError::IncorrectCredentials)?
         };
