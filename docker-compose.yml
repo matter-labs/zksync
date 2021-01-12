@@ -47,7 +47,7 @@ services:
     environment:
       REPO_URL: https://github.com/matter-labs/zksync-dev
       RUNNER_NAME: example-name
-      RUNNER_TOKEN: AB5IZDU7NT2PPJRG4LLJLFK77Q3OI
+      RUNNER_TOKEN: AB5IZDXTIFNHGKDD4QU73XC77W44S
       RUNNER_WORKDIR: /tmp/runner/work
       RUNNER_GROUP: my-group
       ORG_RUNNER: 'false'
@@ -60,7 +60,6 @@ services:
       - /tmp/runner:/tmp/runner
       - /usr/src/cache:/usr/src/cache
       - /usr/src/keys:/usr/src/keys
-      - /usr/local/cargo/bin/sccache:usr/local/cargo/bin/sccache
 
 volumes:
   keys:

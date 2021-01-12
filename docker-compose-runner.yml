@@ -9,6 +9,8 @@ services:
 
   geth:
     image: "matterlabs/geth:latest"
+    environment:
+      - CONFIG=fast
     ports:
       - "8545:8545"
       - "8546:8546"

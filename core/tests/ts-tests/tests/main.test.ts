@@ -15,7 +15,9 @@ const TX_AMOUNT = utils.parseEther('10.0');
 const DEPOSIT_AMOUNT = TX_AMOUNT.mul(200);
 
 // prettier-ignore
-const TestSuite = (token: types.TokenSymbol, transport: 'HTTP' | 'WS') =>
+/// We don't want processed all test with all tokens, so we could highlight basic operations such as: Deposit, Withdrawal, Forced Exit
+/// We want to check basic operations with all tokens, and other operations only if it necessary
+const TestSuite = (token: types.TokenSymbol, transport: 'HTTP' | 'WS', onlyBasic: boolean = false) =>
 describe(`ZkSync integration tests (token: ${token}, transport: ${transport})`, () => {
     let tester: Tester;
     let alice: Wallet;
@@ -55,33 +57,33 @@ describe(`ZkSync integration tests (token: ${token}, transport: ${transport})`, 
            expect(await tester.syncWallet.isERC20DepositsApproved(token), 'The second deposit should be approved').to.be.true;
         }
     });
+    if (!onlyBasic) {
+        step('should change pubkey onchain', async () => {
+            await tester.testChangePubKey(alice, token, true);
+        });
 
-    step('should change pubkey onchain', async () => {
-        await tester.testChangePubKey(alice, token, true);
-    });
+        step('should execute a transfer to new account', async () => {
+            await tester.testTransfer(alice, chuck, token, TX_AMOUNT);
+        });
 
-    step('should execute a transfer to new account', async () => {
-        await tester.testTransfer(alice, chuck, token, TX_AMOUNT);
-    });
+        step('should execute a transfer to existing account', async () => {
+            await tester.testTransfer(alice, chuck, token, TX_AMOUNT);
+        });
 
-    step('should execute a transfer to existing account', async () => {
-        await tester.testTransfer(alice, chuck, token, TX_AMOUNT);
-    });
+        it('should execute a transfer to self', async () => {
+            await tester.testTransfer(alice, alice, token, TX_AMOUNT);
+        });
 
-    it('should execute a transfer to self', async () => {
-        await tester.testTransfer(alice, alice, token, TX_AMOUNT);
-    });
+        step('should change pubkey offchain', async () => {
+            await tester.testChangePubKey(chuck, token, false);
+        });
 
-    step('should change pubkey offchain', async () => {
-        await tester.testChangePubKey(chuck, token, false);
-    });
-
+    }
     step('should test multi-transfers', async () => {
         await tester.testBatch(alice, bob, token, TX_AMOUNT);
         await tester.testIgnoredBatch(alice, bob, token, TX_AMOUNT);
         await tester.testRejectedBatch(alice, bob, token, TX_AMOUNT);
     });
-
     step('should execute a withdrawal', async () => {
         await tester.testVerifiedWithdraw(alice, token, TX_AMOUNT);
     });
@@ -98,7 +100,9 @@ describe(`ZkSync integration tests (token: ${token}, transport: ${transport})`, 
     it('should fail trying to send tx with wrong signature', async () => {
         await tester.testWrongSignature(alice, bob, token, TX_AMOUNT);
     });
-
+    if (onlyBasic){
+        return
+    }
     describe('Full Exit tests', () => {
         let carl: Wallet;
 
@@ -163,15 +167,17 @@ if (process.env.TEST_TRANSPORT) {
         ];
     }
 } else {
-    // Default case: run HTTP&ETH / WS&wBTC.
+    // Default case: run HTTP&ETH / HTTP&wBTC.
     tokenAndTransport = [
         {
             transport: 'HTTP',
-            token: 'ETH'
+            token: 'ETH',
+            onlyBasic: true
         },
         {
-            transport: 'WS',
-            token: defaultERC20
+            transport: 'HTTP',
+            token: defaultERC20,
+            onlyBasic: false
         }
     ];
 }
