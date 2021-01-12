@@ -112,7 +112,7 @@ export async function deploy() {
         'GOVERNANCE_ADDR',
         'CONTRACT_ADDR',
         'VERIFIER_ADDR',
-        'GATEKEEPER_ADDR',
+        'UPGRADE_GATEKEEPER_ADDR',
         'DEPLOY_FACTORY_ADDR',
         'GENESIS_TX_HASH'
     ];
