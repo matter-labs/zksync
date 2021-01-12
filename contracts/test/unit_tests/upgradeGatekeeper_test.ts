@@ -54,19 +54,19 @@ describe('UpgradeGatekeeper unit tests', function () {
                     UpgradeGatekeeperContract_with_wallet2_signer.addUpgradeable(constants.AddressZero)
                 )
             ).revertReason
-        ).equal('oro11');
+        ).equal('1c');
         expect(
             (await getCallRevertReason(() => UpgradeGatekeeperContract_with_wallet2_signer.startUpgrade([])))
                 .revertReason
-        ).equal('oro11');
+        ).equal('1c');
         expect(
             (await getCallRevertReason(() => UpgradeGatekeeperContract_with_wallet2_signer.cancelUpgrade()))
                 .revertReason
-        ).equal('oro11');
+        ).equal('1c');
         expect(
             (await getCallRevertReason(() => UpgradeGatekeeperContract_with_wallet2_signer.finishUpgrade([])))
                 .revertReason
-        ).equal('oro11');
+        ).equal('1c');
     });
 
     it('checking UpgradeGatekeeper reverts; activation and cancelation upgrade', async () => {

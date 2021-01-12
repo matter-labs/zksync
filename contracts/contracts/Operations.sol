@@ -190,23 +190,4 @@ library Operations {
         (offset, parsed.owner) = Bytes.readAddress(_data, offset); // owner
         (offset, parsed.nonce) = Bytes.readUInt32(_data, offset); // nonce
     }
-
-    // Withdrawal data process
-
-    function readWithdrawalData(bytes memory _data, uint256 _offset)
-        internal
-        pure
-        returns (
-            bool _addToPendingWithdrawalsQueue,
-            address _to,
-            uint16 _tokenId,
-            uint128 _amount
-        )
-    {
-        uint256 offset = _offset;
-        (offset, _addToPendingWithdrawalsQueue) = Bytes.readBool(_data, offset);
-        (offset, _to) = Bytes.readAddress(_data, offset);
-        (offset, _tokenId) = Bytes.readUInt16(_data, offset);
-        (offset, _amount) = Bytes.readUInt128(_data, offset);
-    }
 }
