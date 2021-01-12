@@ -1,7 +1,10 @@
 // Built-in deps
-use std::{convert::TryFrom, time::{self, Instant}};
+use std::{
+    convert::TryFrom,
+    time::{self, Instant},
+};
 // External imports
-use sqlx::{Done, postgres::types::PgInterval};
+use sqlx::{postgres::types::PgInterval, Done};
 // Workspace imports
 use zksync_crypto::proof::EncodedProofPlonk;
 use zksync_types::BlockNumber;
@@ -120,7 +123,7 @@ impl<'a, 'c> ProverSchema<'a, 'c> {
         sqlx::query!("LOCK TABLE prover_runs IN EXCLUSIVE MODE")
             .execute(transaction.conn())
             .await?;
-        
+
         // Find the block that satisfies the following criteria:
         // - Block number is greater than the index of last verified block.
         // - There is no proof for block.
