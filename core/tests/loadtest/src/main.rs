@@ -33,12 +33,12 @@ use loadtest::{Config, FiveSummaryStats, LoadtestExecutor};
 #[structopt(rename_all = "kebab-case")]
 struct LoadtestOpts {
     /// Path to a load test configuration file.
-    #[structopt(short = "p", long)]
-    config_path: Option<PathBuf>,
+    #[structopt(short = "p", long, default_value = Config::SAMPLE_CFG_PATH)]
+    config_path: PathBuf,
     /// Print the results as json file.
     #[structopt(long)]
     json_output: bool,
-    /// The path to the load test results
+    /// The path to the load test results.
     #[structopt(short = "o", long)]
     out_dir: Option<PathBuf>,
 }
@@ -94,11 +94,7 @@ async fn main() -> Result<(), anyhow::Error> {
 
     let opts = LoadtestOpts::from_args();
 
-    let config = opts
-        .config_path
-        .map(Config::from_toml)
-        .transpose()?
-        .unwrap_or_default();
+    let config = Config::from_toml(opts.config_path)?;
     let out_dir = opts.out_dir.unwrap_or_else(|| {
         std::env::current_dir()
             .unwrap()

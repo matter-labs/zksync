@@ -28,7 +28,9 @@ pub struct BatchTransferScenarioConfig {
     /// Due to scenario implementation details, amount of intermediate wallets
     /// should be greater than the expected block size.
     pub wallets_amount: u64,
-    /// TODO
+    /// Maximum transactions batch size.
+    ///
+    /// The test uses the following batch sizes: `[2, max_batch_size / 2, max_batch_size]`
     pub max_batch_size: u64,
 }
 
