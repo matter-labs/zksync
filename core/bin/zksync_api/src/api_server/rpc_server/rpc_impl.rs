@@ -17,7 +17,7 @@ use crate::{
 };
 use bigdecimal::BigDecimal;
 
-use super::{error::*, types::*, RpcApp};
+use super::{types::*, RpcApp};
 
 impl RpcApp {
     pub async fn _impl_account_info(self, address: Address) -> Result<AccountInfoResp> {
@@ -204,12 +204,7 @@ impl RpcApp {
         Ok(result)
     }
 
-    pub async fn _impl_get_tx_fee(
-        self,
-        tx_type: TxFeeTypes,
-        address: Address,
-        token: TokenLike,
-    ) -> Result<Fee> {
+    pub async fn _impl_get_tx_fee(self, tx_type: TxFeeTypes, token: TokenLike) -> Result<Fee> {
         let start = Instant::now();
         let ticker = self.tx_sender.ticker_requests.clone();
         let token_allowed = Self::token_allowed_for_fees(ticker.clone(), token.clone()).await?;
@@ -217,7 +212,7 @@ impl RpcApp {
             return Err(SubmitError::InappropriateFeeToken.into());
         }
 
-        let result = Self::ticker_request(ticker.clone(), tx_type, address, token).await;
+        let result = Self::ticker_request(ticker.clone(), tx_type, token).await;
         metrics::histogram!("api.rpc.get_tx_fee", start.elapsed());
         result
     }
@@ -225,17 +220,9 @@ impl RpcApp {
     pub async fn _impl_get_txs_batch_fee_in_wei(
         self,
         tx_types: Vec<TxFeeTypes>,
-        addresses: Vec<Address>,
         token: TokenLike,
     ) -> Result<BatchFee> {
         let start = Instant::now();
-        if tx_types.len() != addresses.len() {
-            return Err(Error {
-                code: RpcErrorCodes::IncorrectTx.into(),
-                message: "Number of tx_types must be equal to the number of addresses".to_string(),
-                data: None,
-            });
-        }
 
         let ticker = self.tx_sender.ticker_requests.clone();
         let token_allowed = Self::token_allowed_for_fees(ticker.clone(), token.clone()).await?;
@@ -245,9 +232,9 @@ impl RpcApp {
 
         let mut total_fee = BigUint::from(0u32);
 
-        for (tx_type, address) in tx_types.iter().zip(addresses.iter()) {
+        for tx_type in tx_types {
             let ticker = ticker.clone();
-            let fee = Self::ticker_request(ticker, *tx_type, *address, token.clone()).await?;
+            let fee = Self::ticker_request(ticker, tx_type, token.clone()).await?;
             total_fee += fee.total_fee;
         }
         // Sum of transactions can be unpackable

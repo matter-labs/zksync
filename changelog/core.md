@@ -2,6 +2,12 @@
 
 All notable changes to the core components will be documented in this file.
 
+## Unreleased
+
+### Changed
+
+- The fee for normal transfers is set as expensive as the fee for transfer_to_new.
+
 ## Prior to 2020-12-23
 
 ### Added
