@@ -127,7 +127,7 @@ mod tests {
                 .unwrap();
         let signature = EIP1271Signature(manual_signature.serialize_packed().to_vec());
 
-        let transport = web3::transports::Http::new(&config.eth.web3_url).unwrap();
+        let transport = web3::transports::Http::new(&web3_url).unwrap();
         let web3 = web3::Web3::new(transport);
 
         let eth_checker = EthereumChecker::new(web3, Default::default());
