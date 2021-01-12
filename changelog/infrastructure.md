@@ -9,12 +9,26 @@ components, the logs will have the following format:
 
 ## Unreleased
 
+### Changed
+
 ### Added
 
-- Link to status page was added to explorer.
-- (`explorer`): account and token ids, verified and committed nonces.
-- (zk): `lint` command.
+### Fixed
+
+## Release 2021-01-12
+
+### Added
+
+- (`fee-seller`): reserve fee accumulator address.
 
 ### Changed
 
-- (explorer): optimized by caching.
+- (`explorer`) was refactored and optimized.
+- (`explorer`): optimized by caching.
+
+### Fixed
+
+- (`fee-seller`): the logic of amount to withdraw/transfer through ZkSync network.
+- Link to status page was added to explorer.
+- (`explorer`): account and token ids, verified and committed nonces.
+- (`zk`): `lint` command.
