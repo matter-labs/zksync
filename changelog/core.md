@@ -7,6 +7,7 @@ All notable changes to the core components will be documented in this file.
 ### Changed
 
 - `gen_token_add_contract` crate is rewritten in ts.
+- `prover_run_for_next_commit` function uses its timeout interval instead of hard-coded interval.
 
 ### Added
 
