@@ -62,7 +62,7 @@ jobs:
           docker-compose -f docker-compose-runner.yml exec -T zk zk test rust
 
       - name: zksync-crypto-tests
-        run: docker-compose -f docker-compose-runner.yml exec -T zk pushd sdk/zksync-crypto && zk f cargo test --release
+        run: docker-compose -f docker-compose-runner.yml exec -T zk cd sdk/zksync-crypto && zk f cargo test --release
 
       - name: cache
         run: docker-compose -f docker-compose-runner.yml exec -T zk sh infrastructure/ci-scripts/cache.sh
