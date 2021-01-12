@@ -166,7 +166,7 @@ export async function testkit(command: string, timeout: number) {
         // await utils.spawn('cargo run --bin gas_price_test --release');
         await utils.spawn('cargo run --bin migration_test --release');
         await utils.spawn('cargo run --bin revert_blocks_test --release');
-        await utils.spawn('cargo run --bin exodus_test --release');
+        // await utils.spawn('cargo run --bin exodus_test --release');
     }
 }
 
