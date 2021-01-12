@@ -20,7 +20,7 @@ describe("Ownable unit tests", function () {
 
     it("checking correctness of transferring mastership to zero address", async () => {
         let {revertReason} = await getCallRevertReason( () => testContract.transferMastership("0x0000000000000000000000000000000000000000", {gasLimit: "300000"}) );
-        expect(revertReason).equal("otp11")
+        expect(revertReason).equal("1d")
     });
 
     it("checking correctness of transferring mastership", async () => {
@@ -30,7 +30,7 @@ describe("Ownable unit tests", function () {
 
         /// try to transfer mastership to wallet1 by wallet1 call
         let {revertReason} = await getCallRevertReason( () => testContract.transferMastership(wallet1.address, {gasLimit: "300000"}) );
-        expect(revertReason).equal("oro11")
+        expect(revertReason).equal("1c")
 
         /// transfer mastership back to wallet1
         let testContract_with_wallet2_signer = await testContract.connect(wallet2);

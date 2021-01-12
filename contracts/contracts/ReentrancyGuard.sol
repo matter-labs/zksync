@@ -52,7 +52,7 @@ contract ReentrancyGuard {
         }
 
         // On the first call to nonReentrant, _notEntered will be true
-        require(notEntered, "o");
+        require(notEntered, "1b");
 
         // Any calls to nonReentrant after this point will fail
         assembly {

@@ -11,7 +11,7 @@ contract ZkSyncWithdrawalUnitTest is ZkSync {
         uint16 _token,
         uint128 _amount
     ) external {
-        balancesToWithdraw[packAddressAndTokenId(_owner, _token)].balanceToWithdraw = _amount;
+        pendingBalances[packAddressAndTokenId(_owner, _token)].balanceToWithdraw = _amount;
     }
 
     function receiveETH() external payable {}

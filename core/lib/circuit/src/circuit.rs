@@ -2362,16 +2362,6 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
 
         rhs_valid_flags.push(is_pubdata_chunk_correct.clone());
 
-        let empty_pubkey_hash = Expression::constant::<CS>(E::Fr::zero());
-        let allocated_pubkey_hash = rhs.account.pub_key_hash.clone().into_number();
-
-        let is_rhs_signing_key_unset = Expression::equals(
-            cs.namespace(|| "rhs_signing_key_unset"),
-            &allocated_pubkey_hash,
-            empty_pubkey_hash,
-        )?;
-        rhs_valid_flags.push(Boolean::from(is_rhs_signing_key_unset));
-
         // Check that the withdraw amount is equal to the rhs account balance.
         let is_rhs_balance_eq_amount = CircuitElement::equals(
             cs.namespace(|| "is_rhs_balance_eq_amount_correct"),

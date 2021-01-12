@@ -31,7 +31,7 @@ library SafeCast {
      * - input must fit into 128 bits
      */
     function toUint128(uint256 value) internal pure returns (uint128) {
-        require(value < 2**128, "p");
+        require(value < 2**128, "16");
         return uint128(value);
     }
 
@@ -46,7 +46,7 @@ library SafeCast {
      * - input must fit into 64 bits
      */
     function toUint64(uint256 value) internal pure returns (uint64) {
-        require(value < 2**64, "q");
+        require(value < 2**64, "17");
         return uint64(value);
     }
 
@@ -61,7 +61,7 @@ library SafeCast {
      * - input must fit into 32 bits
      */
     function toUint32(uint256 value) internal pure returns (uint32) {
-        require(value < 2**32, "r");
+        require(value < 2**32, "18");
         return uint32(value);
     }
 
@@ -76,7 +76,7 @@ library SafeCast {
      * - input must fit into 16 bits
      */
     function toUint16(uint256 value) internal pure returns (uint16) {
-        require(value < 2**16, "s");
+        require(value < 2**16, "19");
         return uint16(value);
     }
 
@@ -91,7 +91,7 @@ library SafeCast {
      * - input must fit into 8 bits.
      */
     function toUint8(uint256 value) internal pure returns (uint8) {
-        require(value < 2**8, "t");
+        require(value < 2**8, "1a");
         return uint8(value);
     }
 }

@@ -824,17 +824,17 @@ impl TestSetup {
         };
         result
             + self
-                .get_balance_to_withdraw(eth_account_id, Token(token))
+                .get_balance_to_withdraw(eth_account_id, self.tokens[&token])
                 .await
     }
 
     pub async fn get_balance_to_withdraw(
         &self,
         eth_account_id: ETHAccountId,
-        token: Token,
+        token: Address,
     ) -> BigUint {
         self.accounts.eth_accounts[eth_account_id.0]
-            .balances_to_withdraw(token.0)
+            .balances_to_withdraw(token)
             .await
             .expect("failed to query balance to withdraws")
     }

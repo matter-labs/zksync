@@ -27,7 +27,7 @@ library SafeMathUInt128 {
      */
     function add(uint128 a, uint128 b) internal pure returns (uint128) {
         uint128 c = a + b;
-        require(c >= a, "z");
+        require(c >= a, "12");
 
         return c;
     }
@@ -42,7 +42,7 @@ library SafeMathUInt128 {
      * - Subtraction cannot overflow.
      */
     function sub(uint128 a, uint128 b) internal pure returns (uint128) {
-        return sub(a, b, "SafeMath: subtraction overflow");
+        return sub(a, b, "aa");
     }
 
     /**
@@ -61,7 +61,7 @@ library SafeMathUInt128 {
         uint128 b,
         string memory errorMessage
     ) internal pure returns (uint128) {
-        require(b <= a, "aa");
+        require(b <= a, errorMessage);
         uint128 c = a - b;
 
         return c;
@@ -85,7 +85,7 @@ library SafeMathUInt128 {
         }
 
         uint128 c = a * b;
-        require(c / a == b, "ab");
+        require(c / a == b, "13");
 
         return c;
     }
@@ -102,7 +102,7 @@ library SafeMathUInt128 {
      * - The divisor cannot be zero.
      */
     function div(uint128 a, uint128 b) internal pure returns (uint128) {
-        return div(a, b, "SafeMath: division by zero");
+        return div(a, b, "ac");
     }
 
     /**
@@ -124,7 +124,7 @@ library SafeMathUInt128 {
         string memory errorMessage
     ) internal pure returns (uint128) {
         // Solidity only automatically asserts when dividing by 0
-        require(b > 0, "ac");
+        require(b > 0, errorMessage);
         uint128 c = a / b;
         // assert(a == b * c + a % b); // There is no case in which this doesn't hold
 
@@ -143,7 +143,7 @@ library SafeMathUInt128 {
      * - The divisor cannot be zero.
      */
     function mod(uint128 a, uint128 b) internal pure returns (uint128) {
-        return mod(a, b, "SafeMath: modulo by zero");
+        return mod(a, b, "ad");
     }
 
     /**
@@ -164,7 +164,7 @@ library SafeMathUInt128 {
         uint128 b,
         string memory errorMessage
     ) internal pure returns (uint128) {
-        require(b != 0, "ad");
+        require(b != 0, errorMessage);
         return a % b;
     }
 }

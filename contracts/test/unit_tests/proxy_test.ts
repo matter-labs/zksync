@@ -36,21 +36,21 @@ describe('Proxy unit tests', function () {
                     testContract_with_wallet2_signer.upgradeTarget(constants.AddressZero, [], TX_OPTS)
                 )
             ).revertReason
-        ).equal('oro11');
+        ).equal('1c');
         expect(
             (await getCallRevertReason(() => testContract_with_wallet2_signer.upgradeNoticePeriodStarted(TX_OPTS)))
                 .revertReason
-        ).equal('oro11');
+        ).equal('1c');
         expect(
             (await getCallRevertReason(() => testContract_with_wallet2_signer.upgradePreparationStarted(TX_OPTS)))
                 .revertReason
-        ).equal('oro11');
+        ).equal('1c');
         expect(
             (await getCallRevertReason(() => testContract_with_wallet2_signer.upgradeCanceled(TX_OPTS))).revertReason
-        ).equal('oro11');
+        ).equal('1c');
         expect(
             (await getCallRevertReason(() => testContract_with_wallet2_signer.upgradeFinishes(TX_OPTS))).revertReason
-        ).equal('oro11');
+        ).equal('1c');
     });
 
     it('checking Proxy reverts', async () => {

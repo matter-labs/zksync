@@ -139,7 +139,7 @@ impl<T: Transport> EthereumAccount<T> {
         let signed_tx = self
             .main_contract_eth_client
             .sign_call_tx(
-                "fullExit",
+                "requestFullExit",
                 (u64::from(account_id), token_address),
                 default_tx_options(),
             )
@@ -288,7 +288,7 @@ impl<T: Transport> EthereumAccount<T> {
             .map_err(|e| format_err!("Contract query fail: {}", e))
     }
 
-    pub async fn balances_to_withdraw(&self, token: TokenId) -> Result<BigUint, anyhow::Error> {
+    pub async fn balances_to_withdraw(&self, token: Address) -> Result<BigUint, anyhow::Error> {
         let contract = Contract::new(
             self.main_contract_eth_client.web3.eth(),
             self.main_contract_eth_client.contract_addr,
@@ -297,8 +297,8 @@ impl<T: Transport> EthereumAccount<T> {
 
         Ok(contract
             .query(
-                "getBalanceToWithdraw",
-                (self.address, u64::from(token)),
+                "getPendingBalance",
+                (self.address, token),
                 None,
                 default_tx_options(),
                 None,
@@ -398,7 +398,7 @@ impl<T: Transport> EthereumAccount<T> {
         let signed_tx = self
             .main_contract_eth_client
             .sign_call_tx(
-                "proofBlocks",
+                "proveBlocks",
                 proof_operation.get_eth_tx_args().as_slice(),
                 Options::with(|f| f.gas = Some(U256::from(10 * 10u64.pow(6)))),
             )

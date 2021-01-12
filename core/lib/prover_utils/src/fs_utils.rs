@@ -5,7 +5,7 @@ use std::io::BufReader;
 use std::path::PathBuf;
 use zksync_crypto::bellman::kate_commitment::{Crs, CrsForLagrangeForm, CrsForMonomialForm};
 use zksync_crypto::params::{account_tree_depth, balance_tree_depth};
-use zksync_crypto::proof::{AggregatedProof, PrecomputedSampleProofs, SingleProof};
+use zksync_crypto::proof::PrecomputedSampleProofs;
 use zksync_crypto::Engine;
 
 pub fn get_keys_root_dir() -> PathBuf {

@@ -7,23 +7,23 @@ pragma experimental ABIEncoderV2;
 import "../ZkSync.sol";
 
 contract ZKSyncSignatureUnitTest is ZkSync {
-    function changePubkeySignatureCheck(
-        bytes calldata _signature,
-        bytes20 _newPkHash,
-        uint32 _nonce,
-        address _ethAddress,
-        uint24 _accountId
-    ) external pure returns (bool) {
-        Operations.ChangePubKey memory changePk;
-        changePk.owner = _ethAddress;
-        changePk.nonce = _nonce;
-        changePk.pubKeyHash = _newPkHash;
-        changePk.accountId = _accountId;
-        bytes memory witness = abi.encodePacked(bytes1(0x01), _signature, bytes32(0));
-        return verifyChangePubkeyECRECOVER(witness, changePk);
+    function changePubkeySignatureCheckECRECOVER(Operations.ChangePubKey memory _changePk, bytes memory _witness)
+        external
+        pure
+        returns (bool)
+    {
+        return verifyChangePubkeyECRECOVER(_witness, _changePk);
     }
 
-    function testRecoverAddressFromEthSignature(bytes calldata _signature, bytes32 _messageHash)
+    function changePubkeySignatureCheckCREATE2(Operations.ChangePubKey memory _changePk, bytes memory _witness)
+        external
+        pure
+        returns (bool)
+    {
+        return verifyChangePubkeyCREATE2(_witness, _changePk);
+    }
+
+    function testRecoverAddressFromEthSignature(bytes memory _signature, bytes32 _messageHash)
         external
         pure
         returns (address)

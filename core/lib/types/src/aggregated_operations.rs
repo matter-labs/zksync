@@ -40,18 +40,18 @@ impl BlocksCommitOperation {
                     .into_iter()
                     .map(|op| {
                         Token::Tuple(vec![
-                            Token::Uint(U256::from(op.public_data_offset)),
                             Token::Bytes(op.eth_witness),
+                            Token::Uint(U256::from(op.public_data_offset)),
                         ])
                     })
                     .collect::<Vec<_>>();
                 Token::Tuple(vec![
-                    Token::Uint(U256::from(block.block_number)),
-                    Token::Uint(U256::from(block.fee_account)),
                     Token::FixedBytes(block.get_eth_encoded_root().as_bytes().to_vec()),
                     Token::Bytes(block.get_eth_public_data()),
                     Token::Uint(U256::from(block.timestamp)),
                     Token::Array(onchain_ops),
+                    Token::Uint(U256::from(block.block_number)),
+                    Token::Uint(U256::from(block.fee_account)),
                 ])
             })
             .collect();
@@ -111,7 +111,7 @@ impl BlocksExecuteOperation {
             block
                 .processable_ops_pubdata()
                 .into_iter()
-                .map(|pubdata| Token::Bytes(pubdata))
+                .map(Token::Bytes)
                 .collect(),
         );
 

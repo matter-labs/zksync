@@ -14,8 +14,8 @@ interface Events {
     /// @notice Event emitted when a block is verified
     event BlockVerification(uint32 indexed blockNumber);
 
-    /// @notice Event emitted when user funds are withdrawn from the account
-    event OnchainWithdrawal(address indexed owner, uint16 indexed tokenId, uint128 amount);
+    /// @notice Event emitted when user funds are withdrawn from the zkSync contract
+    event OnchainWithdrawal(address indexed owner, uint16 indexed tokenId, uint128 amount, bool success);
 
     /// @notice Event emitted when user funds are withdrawn from the rollup
     event RollupWithdrawal(address indexed owner, uint16 indexed tokenId, uint128 amount);
@@ -58,14 +58,6 @@ interface Events {
         uint16 indexed tokenId,
         uint128 amount
     );
-
-    /// @notice Pending withdrawals index range that were added in the verifyBlock operation.
-    /// NOTE: processed indexes in the queue map are [queueStartIndex, queueEndIndex)
-    event PendingWithdrawalsAdd(uint32 queueStartIndex, uint32 queueEndIndex);
-
-    /// @notice Pending withdrawals index range that were executed in the completeWithdrawals operation.
-    /// NOTE: processed indexes in the queue map are [queueStartIndex, queueEndIndex)
-    event PendingWithdrawalsComplete(uint32 queueStartIndex, uint32 queueEndIndex);
 }
 
 /// @title Upgrade events

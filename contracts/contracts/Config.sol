@@ -5,11 +5,8 @@ pragma solidity ^0.7.0;
 /// @title zkSync configuration constants
 /// @author Matter Labs
 contract Config {
-    /// @dev ERC20 token withdrawal gas limit, used only for complete withdrawals
-    uint256 constant ERC20_WITHDRAWAL_GAS_LIMIT = 50000;
-
-    /// @dev ETH token withdrawal gas limit, used only for complete withdrawals
-    uint256 constant ETH_WITHDRAWAL_GAS_LIMIT = 10000;
+    /// @dev ERC20 tokens and ETH withdrawals gas limit, used only for complete withdrawals
+    uint256 constant WITHDRAWAL_GAS_LIMIT = 100000;
 
     /// @dev Bytes in one chunk
     uint8 constant CHUNK_BYTES = 9;
@@ -70,7 +67,7 @@ contract Config {
     uint64 constant MAX_PRIORITY_REQUESTS_TO_DELETE_IN_VERIFY = 6;
 
     /// @dev Reserved time for users to send full exit priority operation in case of an upgrade (in seconds)
-    uint256 constant MASS_FULL_EXIT_PERIOD = 3 days;
+    uint256 constant MASS_FULL_EXIT_PERIOD = 9 days;
 
     /// @dev Reserved time for users to withdraw funds from full exit priority operation in case of an upgrade (in seconds)
     uint256 constant TIME_TO_WITHDRAW_FUNDS_FROM_FULL_EXIT = 2 days;
@@ -93,4 +90,7 @@ contract Config {
 
     /// @dev Bit mask to apply for verifier public input before verifying.
     uint256 constant INPUT_MASK = $$(~uint256(0) >> 3);
+
+    /// @dev Auth fact reset timelock
+    uint256 constant AUTH_FACT_RESET_TIMELOCK = 1 days;
 }
