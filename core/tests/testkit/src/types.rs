@@ -6,7 +6,7 @@ use zksync_config::{ConfigurationOptions, EthClientOptions};
 use zksync_types::block::Block;
 use zksync_types::TokenId;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct TestkitConfig {
     pub chain_id: u8,
     pub gas_price_factor: f64,

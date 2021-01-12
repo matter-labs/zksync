@@ -106,7 +106,6 @@ async fn cancel_outstanding_deposits(
     let balance_to_withdraw_after = test_setup
         .get_balance_to_withdraw(deposit_receiver_account, token_address)
         .await;
-
     assert_eq!(
         balance_to_withdraw_before + deposit_amount,
         balance_to_withdraw_after,
@@ -354,7 +353,7 @@ async fn exit_test() {
 
     let fee_account = ZkSyncAccount::rand();
     let (sk_thread_handle, stop_state_keeper_sender, sk_channels) =
-        spawn_state_keeper(&fee_account.address);
+        spawn_state_keeper(&fee_account.address, genesis_state(&fee_account.address));
 
     let initial_root_hash = genesis_state(&fee_account.address).tree.root_hash();
 
@@ -425,6 +424,7 @@ async fn exit_test() {
         &contracts,
         commit_account,
         initial_root_hash,
+        None,
     );
 
     let deposit_amount = parse_ether("0.1").unwrap();
@@ -450,14 +450,15 @@ async fn exit_test() {
     )
     .await;
     trigger_exodus(&test_setup, ETHAccountId(1), expire_count_start_block).await;
-    cancel_outstanding_deposits(
-        &test_setup,
-        ETHAccountId(1),
-        Token(0),
-        &expired_deposit_amount,
-        ETHAccountId(1),
-    )
-    .await;
+    // TODO implement new cancelOutstandingDepositsForExodusMode contract method
+    // cancel_outstanding_deposits(
+    //     &test_setup,
+    //     ETHAccountId(1),
+    //     Token(0),
+    //     &expired_deposit_amount,
+    //     ETHAccountId(1),
+    // )
+    // .await;
 
     check_exit_correct_proof_other_token(
         &mut test_setup,

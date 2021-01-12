@@ -6115,6 +6115,7 @@ dependencies = [
  "log 0.4.11",
  "metrics",
  "num",
+ "serde_json",
  "web3 0.13.0",
  "zksync_crypto",
  "zksync_types",

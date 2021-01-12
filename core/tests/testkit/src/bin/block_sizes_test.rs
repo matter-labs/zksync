@@ -27,7 +27,7 @@ async fn main() {
 
     let fee_account = ZkSyncAccount::rand();
     let (sk_thread_handle, stop_state_keeper_sender, sk_channels) =
-        spawn_state_keeper(&fee_account.address);
+        spawn_state_keeper(&fee_account.address, genesis_state(&fee_account.address));
 
     let genesis_root = genesis_state(&fee_account.address).tree.root_hash();
 
@@ -84,6 +84,7 @@ async fn main() {
         &contracts,
         commit_account,
         genesis_root,
+        None,
     );
 
     let account_state = test_setup.get_accounts_state().await;
@@ -105,9 +106,10 @@ async fn main() {
 
         test_setup.start_block();
         for _ in 1..=(block_size / DepositOp::CHUNKS) {
-            test_setup
+            let (receipts, op) = test_setup
                 .deposit(ETHAccountId(1), ZKSyncAccountId(2), Token(0), 1u32.into())
-                .await
+                .await;
+            receipts
                 .last()
                 .cloned()
                 .expect("At least one receipt is expected for deposit");
@@ -175,9 +177,10 @@ async fn main() {
         for idx in 0..recursive_size {
             test_setup.start_block();
             for _ in 1..=(block_size / DepositOp::CHUNKS) {
-                test_setup
+                let (receipts, _) = test_setup
                     .deposit(ETHAccountId(1), ZKSyncAccountId(2), Token(0), 1u32.into())
-                    .await
+                    .await;
+                receipts
                     .last()
                     .cloned()
                     .expect("At least one receipt is expected for deposit");

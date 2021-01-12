@@ -207,8 +207,8 @@ impl TxSender {
         let ticker_request_sender = self.ticker_requests.clone();
 
         if let Some((tx_type, token, provided_fee)) = tx_fee_info {
-            let should_enforce_fee =
-                !matches!(tx_type, TxFeeTypes::ChangePubKey{..}) || self.enforce_pubkey_change_fee;
+            let should_enforce_fee = !matches!(tx_type, TxFeeTypes::ChangePubKey { .. })
+                || self.enforce_pubkey_change_fee;
 
             let fee_allowed =
                 Self::token_allowed_for_fees(ticker_request_sender.clone(), token.clone()).await?;
