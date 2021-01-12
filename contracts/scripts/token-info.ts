@@ -21,12 +21,12 @@ async function tokenInfo(address: string): Promise<Token> {
 
     return {
         address: address,
-        name: await contract.name().catch((err) => null),
-        symbol: await contract.symbol().catch((err) => null),
+        name: await contract.name().catch(() => null),
+        symbol: await contract.symbol().catch(() => null),
         decimals: await contract
             .decimals()
             .then((decimals) => Number(decimals))
-            .catch((err) => null)
+            .catch(() => null)
     };
 }
 
