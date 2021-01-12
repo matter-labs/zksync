@@ -58,8 +58,9 @@ services:
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - /tmp/runner:/tmp/runner
-      - /Users/danillugovskoy/cache:/Users/danillugovskoy/cache
-      - /Users/danillugovskoy/keys:/Users/danillugovskoy/keys
+      - /usr/src/cache:/usr/src/cache
+      - /usr/src/keys:/usr/src/keys
+      - /usr/local/cargo/bin/sccache:usr/local/cargo/bin/sccache
 
 volumes:
   keys:
