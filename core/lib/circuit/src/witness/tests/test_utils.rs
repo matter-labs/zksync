@@ -137,7 +137,7 @@ pub fn generic_test_scenario<W, F>(
     W: Witness,
     F: FnOnce(&mut ZkSyncState, &W::OperationType) -> Vec<CollectedFee>,
 {
-    let block_timestamp = 0xffbbccddeeff1122u64;
+    let block_timestamp = 0x12345678u64;
 
     // Initialize Plasma and WitnessBuilder.
     let (mut plasma_state, mut circuit_account_tree) = ZkSyncStateGenerator::generate(&accounts);
@@ -194,7 +194,7 @@ pub fn corrupted_input_test_scenario<W, F>(
     W::CalculateOpsInput: Clone + std::fmt::Debug,
     F: FnOnce(&mut ZkSyncState, &W::OperationType) -> Vec<CollectedFee>,
 {
-    let block_timestamp = 0xffbbccddeeff1122u64;
+    let block_timestamp = 0x12345678u64;
     // Initialize Plasma and WitnessBuilder.
     let (mut plasma_state, mut circuit_account_tree) = ZkSyncStateGenerator::generate(&accounts);
     let mut witness_accum = WitnessBuilder::new(
@@ -259,7 +259,7 @@ pub fn incorrect_op_test_scenario<W, F>(
     W::CalculateOpsInput: Clone + std::fmt::Debug,
     F: FnOnce() -> Vec<CollectedFee>,
 {
-    let block_timestamp = 0xffbbccddeeff1122u64;
+    let block_timestamp = 0x12345678u64;
     // Initialize WitnessBuilder.
     let (_, mut circuit_account_tree) = ZkSyncStateGenerator::generate(&accounts);
     let mut witness_accum = WitnessBuilder::new(
