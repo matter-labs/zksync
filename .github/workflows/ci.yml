@@ -69,9 +69,6 @@ jobs:
       - name: js-unit-tests
         run: ci_run zk test js
 
-      - name: zksync-crypto-tests
-        run: ci_run sh -c "cd sdk/zksync-crypto && zk f cargo test --release"
-
       - name: rust-unit-tests
         run: ci_run zk test rust
 
