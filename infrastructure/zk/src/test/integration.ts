@@ -227,10 +227,18 @@ command
 command
     .command('testkit [mode]')
     .description('run testkit tests')
-    .action(async (mode?: string) => {
+    .option('--offline')
+    .action(async (mode?: string, offline: boolean = false) => {
+        if (offline) {
+            process.env.SQLX_OFFLINE = 'true';
+        }
         mode = mode || 'fast';
         if (mode != 'fast' && mode != 'block-sizes') {
             throw new Error('modes are either "fast" or "block-sizes"');
         }
         await testkit(mode, 600);
+
+        if (offline) {
+            delete process.env.SQLX_OFFLINE;
+        }
     });
