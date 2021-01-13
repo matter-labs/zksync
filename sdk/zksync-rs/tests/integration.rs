@@ -210,7 +210,6 @@ where
         );
     };
 
-    // let balance_before = sync_wallet.get_balance(BlockStatus::Committed, &token.symbol as &str).await?;
     let deposit_tx_hash = ethereum
         .deposit(
             &token.symbol as &str,
@@ -221,8 +220,6 @@ where
 
     ethereum.wait_for_tx(deposit_tx_hash).await?;
     wait_for_deposit_and_update_account_id(sync_wallet).await;
-
-    // let balance_after = sync_wallet.get_balance(BlockStatus::Committed, &token.symbol as &str).await?;
 
     if !sync_wallet.tokens.is_eth(token.address.into()) {
         // It should not be approved because we have approved only DEPOSIT_AMOUNT, not the maximum possible amount of deposit
@@ -613,6 +610,10 @@ async fn comprehensive_test() -> Result<(), anyhow::Error> {
         Contract::new(ethereum.web3().eth(), contract_address, zksync_contract())
     };
 
+    let token_eth = sync_depositor_wallet
+        .tokens
+        .resolve("ETH".into())
+        .ok_or_else(|| anyhow::anyhow!("Error resolve token"))?;
     let token_dai = sync_depositor_wallet
         .tokens
         .resolve("DAI".into())
@@ -620,8 +621,18 @@ async fn comprehensive_test() -> Result<(), anyhow::Error> {
 
     let dai_deposit_amount = U256::from(10).pow(18.into()) * 10000; // 10000 DAI
 
+    // Move ETH to wallets so they will have some funds for L1 transactions.
+    let eth_deposit_amount = U256::from(10).pow(17.into()); // 0.1 ETH
+    transfer_to("ETH", eth_deposit_amount, sync_depositor_wallet.address()).await?;
+    transfer_to("ETH", eth_deposit_amount, alice_wallet1.address()).await?;
+    transfer_to("ETH", eth_deposit_amount, bob_wallet1.address()).await?;
+
     transfer_to("DAI", dai_deposit_amount, sync_depositor_wallet.address()).await?;
 
+    assert_eq!(
+        get_ethereum_balance(&ethereum, sync_depositor_wallet.address(), &token_eth).await?,
+        eth_deposit_amount
+    );
     assert_eq!(
         get_ethereum_balance(&ethereum, sync_depositor_wallet.address(), &token_dai).await?,
         dai_deposit_amount
