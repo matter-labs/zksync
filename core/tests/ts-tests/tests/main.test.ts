@@ -67,28 +67,28 @@ describe(`ZkSync integration tests (token: ${token}, transport: ${transport})`, 
     });
 
     step('should execute a transfer to existing account', async () => {
-        if (!onlyBasic) {
+        if (onlyBasic) {
             return;
         }
         await tester.testTransfer(alice, chuck, token, TX_AMOUNT);
     });
 
     it('should execute a transfer to self', async () => {
-        if (!onlyBasic) {
+        if (onlyBasic) {
             return;
         }
         await tester.testTransfer(alice, alice, token, TX_AMOUNT);
     });
 
     step('should change pubkey offchain', async () => {
-        if (!onlyBasic) {
+        if (onlyBasic) {
             return;
         }
         await tester.testChangePubKey(chuck, token, false);
     });
 
     step('should test multi-transfers', async () => {
-        if (!onlyBasic) {
+        if (onlyBasic) {
             return;
         }
         await tester.testBatch(alice, bob, token, TX_AMOUNT);
@@ -101,7 +101,7 @@ describe(`ZkSync integration tests (token: ${token}, transport: ${transport})`, 
     });
 
     step('should execute a ForcedExit', async () => {
-        if (!onlyBasic) {
+        if (onlyBasic) {
             return;
         }
         await tester.testVerifiedForcedExit(alice, bob, token);
@@ -113,7 +113,7 @@ describe(`ZkSync integration tests (token: ${token}, transport: ${transport})`, 
     });
 
     it('should fail trying to send tx with wrong signature', async () => {
-        if (!onlyBasic) {
+        if (onlyBasic) {
             return;
         }
         await tester.testWrongSignature(alice, bob, token, TX_AMOUNT);
@@ -127,14 +127,14 @@ describe(`ZkSync integration tests (token: ${token}, transport: ${transport})`, 
         });
 
         step('should execute full-exit on random wallet', async () => {
-            if (!onlyBasic) {
+            if (onlyBasic) {
                 return;
             }
             await tester.testFullExit(carl, token, 145);
         });
 
         step('should fail full-exit with wrong eth-signer', async () => {
-            if (!onlyBasic) {
+            if (onlyBasic) {
                 return;
             }
             // make a deposit so that wallet is assigned an accountId
@@ -149,7 +149,7 @@ describe(`ZkSync integration tests (token: ${token}, transport: ${transport})`, 
         });
 
         step('should execute a normal full-exit', async () => {
-            if (!onlyBasic) {
+            if (onlyBasic) {
                 return;
             }
             const [before, after] = await tester.testFullExit(carl, token);
@@ -158,7 +158,7 @@ describe(`ZkSync integration tests (token: ${token}, transport: ${transport})`, 
         });
 
         step('should execute full-exit on an empty wallet', async () => {
-            if (!onlyBasic) {
+            if (onlyBasic) {
                 return;
             }
             const [before, after] = await tester.testFullExit(carl, token);
@@ -181,8 +181,8 @@ if (process.env.TEST_TRANSPORT) {
         tokenAndTransport = [
             {
                 transport: envTransport,
-                token: envToken
-            }
+                token: envToken,
+            },
         ];
     } else {
         // Only transport is set, use wBTC as default token for this transport.
@@ -190,8 +190,8 @@ if (process.env.TEST_TRANSPORT) {
         tokenAndTransport = [
             {
                 transport: envTransport,
-                token: defaultERC20
-            }
+                token: defaultERC20,
+            },
         ];
     }
 } else {
@@ -200,17 +200,17 @@ if (process.env.TEST_TRANSPORT) {
         {
             transport: 'HTTP',
             token: 'ETH',
-            onlyBasic: true
+            onlyBasic: true,
         },
         {
             transport: 'HTTP',
             token: defaultERC20,
-            onlyBasic: false
-        }
+            onlyBasic: false,
+        },
     ];
 }
 
 for (const input of tokenAndTransport) {
     // @ts-ignore
-    TestSuite(input.token, input.transport);
+    TestSuite(input.token, input.transport, input.onlyBasic);
 }
