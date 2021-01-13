@@ -30,6 +30,10 @@ jobs:
       - name: start_sccache
         run: ci_run sccache --start-server
 
+      # Compile everything at once so it won't have to be recompiled later
+      - name: compile
+        run: ci_run zk f cargo build --all --bins --examples --tests --release
+
       - name: init
         run: |
           ci_run ln -s /usr/src/keys/setup keys/setup
