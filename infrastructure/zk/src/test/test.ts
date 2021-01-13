@@ -34,7 +34,7 @@ export async function rustApi(reset: boolean, ...args: string[]) {
     await runOnTestDb(
         reset,
         'core/bin/zksync_api',
-        `cargo test --release -p zksync_api -- --ignored --nocapture
+        `cargo test --release -p zksync_api -- --ignored --nocapture api_server
         ${args.join(' ')}`
     );
 }
