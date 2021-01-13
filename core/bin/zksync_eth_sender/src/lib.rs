@@ -25,7 +25,7 @@ use self::{
     transactions::*,
     tx_queue::{TxData, TxQueue, TxQueueBuilder},
 };
-use zksync_types::aggregated_operations::AggregatedOperation;
+use zksync_types::{aggregated_operations::AggregatedOperation, gas_counter::GasCounter};
 
 mod database;
 mod ethereum_interface;
@@ -40,11 +40,6 @@ mod tests;
 const RATE_LIMIT_BACKOFF_PERIOD: Duration = Duration::from_secs(30);
 /// Rate limit error will contain this response code
 const RATE_LIMIT_HTTP_CODE: &str = "429";
-
-/// constants for gas limit calculation
-const BASE_COMMIT_BLOCKS_TX_COST: usize = 36_000;
-const BASE_EXECUTE_BLOCKS_TX_COST: usize = 55_000;
-const BASE_PROOF_BLOCKS_TX_COST: usize = 500_000;
 
 /// `TxCheckMode` enum determines the policy on the obtaining the tx status.
 /// The latest sent transaction can be pending (we're still waiting for it),
@@ -637,21 +632,13 @@ impl<ETH: EthereumInterface, DB: DatabaseInterface> ETHSender<ETH, DB> {
             .expect("Operation not found - can't compute gas limit");
         match op {
             AggregatedOperation::CommitBlocks(commit) => {
-                U256::from(BASE_COMMIT_BLOCKS_TX_COST)
-                    + commit
-                        .blocks
-                        .iter()
-                        .fold(U256::zero(), |acc, block| acc + block.commit_gas_limit)
+                GasCounter::commit_gas_limit_aggregated(&commit.blocks)
             }
             AggregatedOperation::ExecuteBlocks(execute) => {
-                U256::from(BASE_EXECUTE_BLOCKS_TX_COST)
-                    + execute
-                        .blocks
-                        .iter()
-                        .fold(U256::zero(), |acc, block| acc + block.verify_gas_limit)
+                GasCounter::execute_gas_limit_aggregated(&execute.blocks)
             }
             AggregatedOperation::PublishProofBlocksOnchain(_) => {
-                U256::from(BASE_PROOF_BLOCKS_TX_COST)
+                U256::from(GasCounter::BASE_PROOF_BLOCKS_TX_COST)
             }
             AggregatedOperation::CreateProofBlocks(_) => {
                 panic!("Can't compute gas limit for CreateProofBlocks")
