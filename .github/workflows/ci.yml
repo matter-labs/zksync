@@ -71,6 +71,3 @@ jobs:
 
       - name: rust-unit-tests
         run: ci_run zk test rust
-
-      - name: cache
-        run: ci_run sh infrastructure/ci-scripts/cache.sh

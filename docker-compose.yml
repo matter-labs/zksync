@@ -40,26 +40,3 @@ services:
     - type: bind
       source: ./volumes/tesseracts
       target: /var/lib/tesseracts/data
-
-
-  runner:
-    image: myoung34/github-runner:latest
-    environment:
-      REPO_URL: https://github.com/matter-labs/zksync-dev
-      RUNNER_NAME: example-name
-      RUNNER_TOKEN: AB5IZDXTIFNHGKDD4QU73XC77W44S
-      RUNNER_WORKDIR: /tmp/runner/work
-      RUNNER_GROUP: my-group
-      ORG_RUNNER: 'false'
-      LABELS: linux,x64,TEST
-    security_opt:
-      # needed on SELinux systems to allow docker container to manage other docker containers
-      - label:disable
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock
-      - /tmp/runner:/tmp/runner
-      - /usr/src/cache:/usr/src/cache
-      - /usr/src/keys:/usr/src/keys
-
-volumes:
-  keys:

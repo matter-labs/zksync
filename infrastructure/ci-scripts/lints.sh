@@ -1,6 +1,6 @@
+#!/bin/sh
+
 zk fmt --check
-yarn lint:md
-yarn lint:sol
 ulimit -S -c unlimited
 cargo fmt --all -- --check
 zk f cargo clippy --tests --benches -- -D warnings

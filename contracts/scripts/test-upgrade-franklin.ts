@@ -17,7 +17,7 @@ async function main() {
         const parser = new ArgumentParser({
             version: '0.0.1',
             addHelp: true,
-            description: 'Contract upgrade'
+            description: 'Contract upgrade',
         });
         parser.addArgument('contractAddress');
         parser.addArgument('upgradeGatekeeperAddress');
@@ -40,7 +40,7 @@ async function main() {
         );
 
         const newTargetFranklin = await deployContract(wallet, FranklinTestUpgradeTargetContractCode, [], {
-            gasLimit: 6500000
+            gasLimit: 6500000,
         });
 
         console.log('Starting upgrade');
@@ -48,7 +48,7 @@ async function main() {
             await upgradeGatekeeper.startUpgrade([
                 constants.AddressZero,
                 constants.AddressZero,
-                newTargetFranklin.address
+                newTargetFranklin.address,
             ])
         ).wait();
 
@@ -64,6 +64,7 @@ async function main() {
         await (await upgradeGatekeeper.finishUpgrade([[], [], []], { gasLimit: 300000 })).wait();
 
         await expect(await proxyContract.getTarget()).to.equal(newTargetFranklin.address, 'upgrade was unsuccessful');
+        process.exit(0);
     } catch (e) {
         console.error(JSON.stringify(e));
         process.exit(1);
