@@ -401,6 +401,7 @@ impl<API: FeeTickerAPI, INFO: FeeTickerInfo, WATCHER: TokenWatcher> FeeTicker<AP
             }
         };
         let gas_price_wei = self.api.get_gas_price_wei().await?;
+        let scale_gas_price = gas_price_wei.clone() * BigUint::from(130u32) / BigUint::from(100u32);
         let wei_price_usd = self.api.get_last_quote(TokenLike::Id(0)).await?.usd_price
             / BigUint::from(10u32).pow(18u32);
 
@@ -413,7 +414,7 @@ impl<API: FeeTickerAPI, INFO: FeeTickerInfo, WATCHER: TokenWatcher> FeeTicker<AP
 
         let zkp_fee =
             (zkp_cost_chunk * op_chunks) * token_risk_factor.clone() / token_price_usd.clone();
-        let gas_fee = (wei_price_usd * gas_tx_amount.clone() * gas_price_wei.clone())
+        let gas_fee = (wei_price_usd * gas_tx_amount.clone() * scale_gas_price.clone())
             * token_risk_factor
             / token_price_usd;
 
