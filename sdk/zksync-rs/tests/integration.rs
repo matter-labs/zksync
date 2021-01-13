@@ -306,8 +306,8 @@ where
         .await?;
 
     transfer_handle
-        .verify_timeout(Duration::from_secs(180))
-        .wait_for_verify()
+        .commit_timeout(Duration::from_secs(180))
+        .wait_for_commit()
         .await?;
 
     let alice_balance_after = alice
@@ -355,8 +355,8 @@ where
         .await?;
 
     transfer_handle
-        .verify_timeout(Duration::from_secs(180))
-        .wait_for_verify()
+        .commit_timeout(Duration::from_secs(180))
+        .wait_for_commit()
         .await?;
 
     let balance_after = sync_wallet
@@ -590,25 +590,7 @@ async fn comprehensive_test() -> Result<(), anyhow::Error> {
         Wallet::new(provider.clone(), random_credentials).await?
     };
 
-    let mut alice_wallet2 = {
-        let (random_eth_address, random_eth_private_key) = eth_random_account_credentials();
-        let eth_signer = PrivateKeySigner::new(random_eth_private_key);
-        let random_credentials =
-            WalletCredentials::from_eth_signer(random_eth_address, eth_signer, Network::Localhost)
-                .await?;
-        Wallet::new(provider.clone(), random_credentials).await?
-    };
-
     let bob_wallet1 = {
-        let (random_eth_address, random_eth_private_key) = eth_random_account_credentials();
-        let eth_signer = PrivateKeySigner::new(random_eth_private_key);
-        let random_credentials =
-            WalletCredentials::from_eth_signer(random_eth_address, eth_signer, Network::Localhost)
-                .await?;
-        Wallet::new(provider.clone(), random_credentials).await?
-    };
-
-    let bob_wallet2 = {
         let (random_eth_address, random_eth_private_key) = eth_random_account_credentials();
         let eth_signer = PrivateKeySigner::new(random_eth_private_key);
         let random_credentials =
@@ -631,26 +613,14 @@ async fn comprehensive_test() -> Result<(), anyhow::Error> {
         Contract::new(ethereum.web3().eth(), contract_address, zksync_contract())
     };
 
-    let token_eth = sync_depositor_wallet
-        .tokens
-        .resolve("ETH".into())
-        .ok_or_else(|| anyhow::anyhow!("Error resolve token"))?;
-
     let token_dai = sync_depositor_wallet
         .tokens
         .resolve("DAI".into())
         .ok_or_else(|| anyhow::anyhow!("Error resolve token"))?;
 
-    let eth_deposit_amount = U256::from(10).pow(18.into()) * 6; // 6 Ethers
     let dai_deposit_amount = U256::from(10).pow(18.into()) * 10000; // 10000 DAI
 
-    transfer_to("ETH", eth_deposit_amount, sync_depositor_wallet.address()).await?;
     transfer_to("DAI", dai_deposit_amount, sync_depositor_wallet.address()).await?;
-
-    assert_eq!(
-        get_ethereum_balance(&ethereum, sync_depositor_wallet.address(), &token_eth).await?,
-        eth_deposit_amount
-    );
 
     assert_eq!(
         get_ethereum_balance(&ethereum, sync_depositor_wallet.address(), &token_dai).await?,
@@ -668,18 +638,6 @@ async fn comprehensive_test() -> Result<(), anyhow::Error> {
         "DAI",
         // 200 DAI
         200_000_000_000_000_000_000u128,
-    )
-    .await?;
-
-    move_funds(
-        &main_contract,
-        &ethereum,
-        &sync_depositor_wallet,
-        &mut alice_wallet2,
-        &bob_wallet2,
-        "ETH",
-        // 1 Ether (10^18 WEI)
-        1_000_000_000_000_000_000u128,
     )
     .await?;
 
@@ -701,8 +659,8 @@ async fn simple_transfer() -> Result<(), anyhow::Error> {
         .await?;
 
     handle
-        .verify_timeout(Duration::from_secs(180))
-        .wait_for_verify()
+        .commit_timeout(Duration::from_secs(180))
+        .wait_for_commit()
         .await?;
 
     Ok(())
@@ -755,8 +713,8 @@ async fn batch_transfer() -> Result<(), anyhow::Error> {
 
     for handle in handles {
         handle
-            .verify_timeout(Duration::from_secs(180))
-            .wait_for_verify()
+            .commit_timeout(Duration::from_secs(180))
+            .wait_for_commit()
             .await?;
     }
 
