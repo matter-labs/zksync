@@ -8,11 +8,10 @@ on:
     - trying
 
 jobs:
-  ci-lint:
+  lint:
     runs-on: [self-hosted, CI-worker]
 
     steps:
-
       - uses: actions/checkout@v2
 
       - name: setup-env
@@ -26,7 +25,7 @@ jobs:
           ci_run zk fmt --check
           ci_run zk lint --check
 
-  ci-all:
+  unit-tests:
     runs-on: [self-hosted, CI-worker]
 
     steps:
@@ -47,8 +46,8 @@ jobs:
         run: |
           ci_run ln -s /usr/src/keys/setup keys/setup
           ci_run zk
-          ci_run zk dummy-prover enable --no-redeploy
-          ci_run zk init
+          ci_run zk run deploy-eip1271
+          ci_run zk run verify-keys unpack
 
       - name: liquidity-token
         run: docker-compose -f docker-compose-runner.yml restart dev-liquidity-token-watcher
@@ -62,7 +61,7 @@ jobs:
       - name: rust-unit-tests
         run: ci_run zk test rust
 
-  ci-integration:
+  integration:
     runs-on: [self-hosted, CI-worker]
 
     steps:
@@ -105,7 +104,7 @@ jobs:
         run: ci_run zk test i rust-sdk
 
 
-  ci-testkit:
+  testkit:
     runs-on: [self-hosted, CI-worker]
 
     steps:
@@ -118,7 +117,6 @@ jobs:
         run: |
           ci_run ln -s /usr/src/keys/setup keys/setup
           ci_run zk
-          ci_run zk dummy-prover enable --no-redeploy
           ci_run zk run verify-keys unpack
 
       - name: integration-testkit
