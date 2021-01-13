@@ -1,6 +1,6 @@
 use futures::{channel::mpsc, executor::block_on, SinkExt, StreamExt};
 use std::cell::RefCell;
-use zksync_config::ProverOptions;
+use zksync_config::ZkSyncConfig;
 use zksync_storage::ConnectionPool;
 use zksync_witness_generator::run_prover_server;
 
@@ -23,9 +23,9 @@ async fn main() -> anyhow::Result<()> {
     }
 
     let connection_pool = ConnectionPool::new(Some(WITNESS_GENERATOR_CONNECTION_POOL_SIZE));
-    let prover_options = ProverOptions::from_env();
+    let config = ZkSyncConfig::from_env();
 
-    run_prover_server(connection_pool, stop_signal_sender, prover_options);
+    run_prover_server(connection_pool, stop_signal_sender, config);
 
     stop_signal_receiver.next().await;
 

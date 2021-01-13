@@ -13,7 +13,7 @@ pub struct DummyProverConfig {
 impl ProverConfig for DummyProverConfig {
     fn from_env() -> Self {
         Self {
-            block_sizes: get_env("SUPPORTED_BLOCK_CHUNKS_SIZES")
+            block_sizes: get_env("CHAIN_CIRCUIT_SUPPORTED_BLOCK_CHUNKS_SIZES")
                 .split(',')
                 .map(|p| p.parse().unwrap())
                 .collect(),

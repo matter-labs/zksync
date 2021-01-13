@@ -24,7 +24,7 @@ use chrono::{SecondsFormat, Utc};
 use colored::*;
 use structopt::StructOpt;
 // Workspace uses
-use zksync_config::ConfigurationOptions;
+use zksync_config::configs::ETHClientConfig;
 // Local uses
 use loadtest::{Config, FiveSummaryStats, LoadtestExecutor};
 
@@ -88,7 +88,8 @@ fn print_counters(failed: usize, total: usize) {
 #[tokio::main]
 async fn main() -> Result<(), anyhow::Error> {
     env_logger::init();
-    let env_config = ConfigurationOptions::from_env();
+    let env_config = ETHClientConfig::from_env();
+    let web3_url = env_config.web3_url;
 
     let opts = LoadtestOpts::from_args();
 
@@ -108,7 +109,7 @@ async fn main() -> Result<(), anyhow::Error> {
 
     loadtest::init_session(out_dir).await?;
 
-    let executor = LoadtestExecutor::new(config, env_config).await?;
+    let executor = LoadtestExecutor::new(config, web3_url).await?;
     let report = executor.run().await?;
 
     loadtest::finish_session(&report).await?;
