@@ -22,41 +22,41 @@ jobs:
           docker-compose -f docker-compose-runner.yml up --build -d geth postgres zk
 
       - name: start_sccache
-        run: docker-compose -f docker-compose-runner.yml exec -T zk sccache --start-server
+        run: ci_run sccache --start-server
 
       - name: init
         run: |
-          docker-compose -f docker-compose-runner.yml exec -T zk ln -s /usr/src/keys/setup keys/setup
-          docker-compose -f docker-compose-runner.yml exec -T zk zk
-          docker-compose -f docker-compose-runner.yml exec -T zk zk dummy-prover enable --no-redeploy
-          docker-compose -f docker-compose-runner.yml exec -T zk zk init
+          ci_run ln -s /usr/src/keys/setup keys/setup
+          ci_run zk
+          ci_run zk dummy-prover enable --no-redeploy
+          ci_run zk init
 
       - name: liquidity-token
         run: docker-compose -f docker-compose-runner.yml restart dev-liquidity-token-watcher
 
       - name: lints
-        run: docker-compose -f docker-compose-runner.yml exec -T zk sh infrastructure/ci-scripts/lints.sh
+        run: ci_run sh infrastructure/ci-scripts/lints.sh
 
       - name: run-services
-        run: docker-compose -f docker-compose-runner.yml exec -T zk sh infrastructure/ci-scripts/run_services.sh
+        run: ci_run sh infrastructure/ci-scripts/run_services.sh
 
       - name: integration-tests
-        run: docker-compose -f docker-compose-runner.yml exec -T zk zk test integration all
+        run: ci_run zk test integration all
 
       - name: integration-testkit
-        run: docker-compose -f docker-compose-runner.yml exec -T zk zk test integration testkit
+        run: ci_run zk test integration testkit
 
       - name: contracts-unit-tests
-        run: docker-compose -f docker-compose-runner.yml exec -T zk zk test contracts
+        run: ci_run zk test contracts
 
       - name: js-unit-tests
-        run: docker-compose -f docker-compose-runner.yml exec -T zk zk test js
+        run: ci_run zk test js
 
       - name: rust-unit-tests
-        run: docker-compose -f docker-compose-runner.yml exec -T zk zk test rust
+        run: ci_run zk test rust
 
       - name: zksync-crypto-tests
-        run: docker-compose -f docker-compose-runner.yml exec -T zk cd /usr/src/zksync/sdk/zksync-crypto && zk f cargo test --release
+        run: ci_run cd /usr/src/zksync/sdk/zksync-crypto && zk f cargo test --release
 
       - name: cache
-        run: docker-compose -f docker-compose-runner.yml exec -T zk sh infrastructure/ci-scripts/cache.sh
+        run: ci_run sh infrastructure/ci-scripts/cache.sh
