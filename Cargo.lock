@@ -557,9 +557,9 @@ checksum = "e91831deabf0d6d7ec49552e489aed63b7456a7a3c46cff62adad428110b0af0"
 
 [[package]]
 name = "async-trait"
-version = "0.1.41"
+version = "0.1.42"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b246867b8b3b6ae56035f1eb1ed557c1d8eae97f0d53696138a50fa0e3a3b8c0"
+checksum = "8d3a45e77e34375a7923b1e8febb049bb011f064714a8e17a1a616fef01da13d"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -6115,6 +6115,7 @@ dependencies = [
  "log 0.4.11",
  "metrics",
  "num",
+ "serde_json",
  "web3 0.13.0",
  "zksync_crypto",
  "zksync_types",
@@ -6232,6 +6233,7 @@ dependencies = [
  "actix-web",
  "actix-web-httpauth",
  "anyhow",
+ "async-trait",
  "chrono",
  "ctrlc",
  "env_logger 0.6.2",

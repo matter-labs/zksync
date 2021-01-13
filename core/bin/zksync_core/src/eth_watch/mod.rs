@@ -224,6 +224,10 @@ impl<W: EthClient, S: Storage> EthWatch<W, S> {
         nonce: Nonce,
         pub_key_hash: &PubKeyHash,
     ) -> anyhow::Result<bool> {
+        let auth_fact_reset_time = self.client.get_auth_fact_reset_time(address, nonce).await?;
+        if auth_fact_reset_time != 0 {
+            return Ok(false);
+        }
         let auth_fact = self.client.get_auth_fact(address, nonce).await?;
         Ok(auth_fact.as_slice() == tiny_keccak::keccak256(&pub_key_hash.data[..]))
     }

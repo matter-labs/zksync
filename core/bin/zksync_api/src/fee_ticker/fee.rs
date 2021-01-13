@@ -11,11 +11,8 @@ use zksync_utils::{round_precision, BigUintSerdeAsRadix10Str};
 /// Unlike the `TxFeeTypes`, this enum represents the fee
 /// from the point of zkSync view, rather than from the users
 /// point of view.
-/// Users do not divide transfers into `Transfer` and
-/// `TransferToNew`, while in zkSync it's two different operations.
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum OutputFeeType {
-    Transfer,
     TransferToNew,
     Withdraw,
     FastWithdraw,

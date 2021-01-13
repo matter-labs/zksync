@@ -72,6 +72,8 @@ impl ChangePubKeyOp {
                 fee_token,
                 fee,
                 nonce,
+                0,
+                u32::MAX,
                 None,
                 None,
             ),

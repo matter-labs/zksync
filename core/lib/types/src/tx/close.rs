@@ -14,6 +14,8 @@ pub struct Close {
     pub account: Address,
     pub nonce: Nonce,
     pub signature: TxSignature,
+    pub valid_from: Option<u32>,
+    pub valid_until: Option<u32>,
 }
 
 impl Close {
@@ -24,6 +26,8 @@ impl Close {
         out.extend_from_slice(&[Self::TX_TYPE]);
         out.extend_from_slice(&self.account.as_bytes());
         out.extend_from_slice(&self.nonce.to_be_bytes());
+        out.extend_from_slice(&self.valid_from.unwrap_or(0).to_be_bytes());
+        out.extend_from_slice(&self.valid_until.unwrap_or(u32::MAX).to_be_bytes());
         out
     }
 

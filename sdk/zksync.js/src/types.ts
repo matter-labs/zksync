@@ -78,6 +78,8 @@ export interface Transfer {
     fee: BigNumberish;
     nonce: number;
     signature: Signature;
+    validFrom: number;
+    validUntil: number;
 }
 
 export interface Withdraw {
@@ -90,6 +92,8 @@ export interface Withdraw {
     fee: BigNumberish;
     nonce: number;
     signature: Signature;
+    validFrom: number;
+    validUntil: number;
 }
 
 export interface ForcedExit {
@@ -100,6 +104,8 @@ export interface ForcedExit {
     fee: BigNumberish;
     nonce: number;
     signature: Signature;
+    validFrom: number;
+    validUntil: number;
 }
 
 export type ChangePubkeyTypes = 'Onchain' | 'ECDSA' | 'CREATE2';
@@ -131,6 +137,8 @@ export interface ChangePubKey {
     nonce: number;
     signature: Signature;
     ethAuthData: ChangePubKeyOnchain | ChangePubKeyECDSA | ChangePubKeyCREATE2;
+    validFrom: number;
+    validUntil: number;
 }
 
 export interface CloseAccount {

@@ -115,6 +115,14 @@ impl EthClient for FakeEthClient {
     ) -> Result<Vec<u8>, anyhow::Error> {
         unreachable!()
     }
+
+    async fn get_auth_fact_reset_time(
+        &self,
+        _address: Address,
+        _nonce: u32,
+    ) -> Result<u64, anyhow::Error> {
+        unreachable!()
+    }
 }
 
 fn create_watcher<T: EthClient>(client: T) -> EthWatch<T, FakeStorage> {

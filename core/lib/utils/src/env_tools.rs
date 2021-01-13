@@ -48,7 +48,7 @@ where
         .ok()
 }
 
-/// Obtains the environment variable value TODO!!
+/// Obtains the environment comma separated variables into collection.
 pub fn parse_env_to_collection<F, I>(name: &str) -> F
 where
     I: FromStr,

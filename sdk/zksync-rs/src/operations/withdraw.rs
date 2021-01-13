@@ -21,6 +21,8 @@ pub struct WithdrawBuilder<'a, S: EthereumSigner, P: Provider> {
     fee: Option<BigUint>,
     to: Option<Address>,
     nonce: Option<Nonce>,
+    valid_from: Option<u32>,
+    valid_until: Option<u32>,
 }
 
 impl<'a, S, P> WithdrawBuilder<'a, S, P>
@@ -37,6 +39,8 @@ where
             fee: None,
             to: None,
             nonce: None,
+            valid_from: None,
+            valid_until: None,
         }
     }
 
@@ -76,9 +80,12 @@ where
             }
         };
 
+        let valid_from = self.valid_from.unwrap_or(0);
+        let valid_until = self.valid_until.unwrap_or(u32::MAX);
+
         self.wallet
             .signer
-            .sign_withdraw(token, amount, fee, to, nonce)
+            .sign_withdraw(token, amount, fee, to, nonce, valid_from, valid_until)
             .await
             .map(|(tx, sign)| (ZkSyncTx::Withdraw(Box::new(tx)), sign))
             .map_err(ClientError::SigningError)
@@ -181,6 +188,18 @@ where
     /// Sets the transaction nonce.
     pub fn nonce(mut self, nonce: Nonce) -> Self {
         self.nonce = Some(nonce);
+        self
+    }
+
+    /// Sets the unix format timestamp of the first moment when transaction execution is valid.
+    pub fn valid_from(mut self, valid_from: u32) -> Self {
+        self.valid_from = Some(valid_from);
+        self
+    }
+
+    /// Sets the unix format timestamp of the last moment when transaction execution is valid.
+    pub fn valid_until(mut self, valid_until: u32) -> Self {
+        self.valid_until = Some(valid_until);
         self
     }
 }

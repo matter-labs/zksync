@@ -164,9 +164,11 @@ export async function testkit(command: string, timeout: number) {
     } else if (command == 'fast') {
         await utils.spawn('cargo run --bin testkit_tests --release');
         await utils.spawn('cargo run --bin gas_price_test --release');
-        // await utils.spawn('cargo run --bin migration_test --release');
         await utils.spawn('cargo run --bin revert_blocks_test --release');
-        // await utils.spawn('cargo run --bin exodus_test --release');
+        await utils.spawn('cargo run --bin migration_test --release');
+        await utils.spawn('cargo run --bin exodus_test --release');
+    } else {
+        await utils.spawn(`cargo run --bin ${command} --release`);
     }
 }
 
@@ -229,8 +231,5 @@ command
     .description('run testkit tests')
     .action(async (mode?: string) => {
         mode = mode || 'fast';
-        if (mode != 'fast' && mode != 'block-sizes') {
-            throw new Error('modes are either "fast" or "block-sizes"');
-        }
         await testkit(mode, 600);
     });

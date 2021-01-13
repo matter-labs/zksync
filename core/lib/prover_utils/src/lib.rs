@@ -8,7 +8,10 @@ use zksync_crypto::bellman::plonk::better_cs::{
     adaptor::TranspilationVariant, cs::PlonkCsWidth4WithNextStepParams, keys::SetupPolynomials,
     keys::VerificationKey, verifier::verify,
 };
-use zksync_crypto::bellman::plonk::{prove_by_steps, setup, transpile};
+use zksync_crypto::bellman::plonk::{
+    commitments::transcript::keccak_transcript::RollingKeccakTranscript, prove_by_steps, setup,
+    transpile,
+};
 use zksync_crypto::franklin_crypto::bellman::Circuit;
 use zksync_crypto::franklin_crypto::plonk::circuit::bigint::field::RnsParameters;
 use zksync_crypto::franklin_crypto::rescue::bn256::Bn256RescueParams;
@@ -55,17 +58,6 @@ impl PlonkVerificationKey {
             })
             .collect::<Vec<_>>();
         let (_, (vk_tree, _)) = create_vks_tree(&block_vks, RECURSIVE_CIRCUIT_VK_TREE_DEPTH)
-            .expect("Failed to create vk tree");
-        vk_tree.get_commitment()
-    }
-
-    pub fn get_vk_tree_root_hash_exit_proof() -> Fr {
-        let vks = vec![
-            PlonkVerificationKey::read_verification_key_for_exit_circuit()
-                .expect("Failed to get block vk")
-                .0,
-        ];
-        let (_, (vk_tree, _)) = create_vks_tree(&vks, RECURSIVE_CIRCUIT_VK_TREE_DEPTH)
             .expect("Failed to create vk tree");
         vk_tree.get_commitment()
     }
@@ -152,22 +144,16 @@ pub fn gen_verified_proof_for_exit_circuit<C: Circuit<Engine> + Clone>(
     let size_log2 = std::cmp::max(size_log2, SETUP_MIN_POW2); // for exit circuit
     let key_monomial_form = get_universal_setup_monomial_form(size_log2, false)?;
 
-    let rns_params =
-        RnsParameters::<Engine, <Engine as EngineTrait>::Fq>::new_for_field(68, 110, 4);
-    let rescue_params = Bn256RescueParams::new_checked_2_into_1();
-
-    let transcript_params = (&rescue_params, &rns_params);
-    let proof = prove_by_steps::<_, _, RescueTranscriptForRNS<Engine>>(
+    let proof = prove_by_steps::<_, _, RollingKeccakTranscript<Fr>>(
         circuit,
         &hints,
         &setup,
         None,
         &key_monomial_form,
-        Some(transcript_params),
+        None,
     )?;
 
-    let valid =
-        verify::<_, _, RescueTranscriptForRNS<Engine>>(&proof, &vk, Some(transcript_params))?;
+    let valid = verify::<_, _, RollingKeccakTranscript<Fr>>(&proof, &vk, None)?;
     anyhow::ensure!(valid, "proof for exit is invalid");
 
     log::info!("Proof for circuit successful");

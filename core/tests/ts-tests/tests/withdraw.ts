@@ -19,10 +19,10 @@ Tester.prototype.testVerifiedWithdraw = async function (
     amount: BigNumber,
     fastProcessing?: boolean
 ) {
-    const tokenId = wallet.provider.tokenSet.resolveTokenId(token);
+    const tokenAddress = wallet.provider.tokenSet.resolveTokenAddress(token);
 
     const onchainBalanceBefore = await wallet.getEthereumBalance(token);
-    const pendingBalanceBefore = await this.contract.getBalanceToWithdraw(wallet.address(), tokenId);
+    const pendingBalanceBefore = await this.contract.getPendingBalance(wallet.address(), tokenAddress);
     const handle = await this.testWithdraw(wallet, token, amount, fastProcessing);
 
     // Await for verification with a timeout set (through mocha's --timeout)
@@ -46,7 +46,7 @@ Tester.prototype.testVerifiedWithdraw = async function (
     await this.ethProvider.waitForTransaction(withdrawalTxHash as string);
 
     const onchainBalanceAfter = await wallet.getEthereumBalance(token);
-    const pendingBalanceAfter = await this.contract.getBalanceToWithdraw(wallet.address(), tokenId);
+    const pendingBalanceAfter = await this.contract.getPendingBalance(wallet.address(), tokenAddress);
     expect(
         onchainBalanceAfter.sub(onchainBalanceBefore).add(pendingBalanceAfter).sub(pendingBalanceBefore).eq(amount),
         'Wrong amount onchain after withdraw'

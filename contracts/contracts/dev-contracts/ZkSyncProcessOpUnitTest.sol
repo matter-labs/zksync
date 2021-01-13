@@ -12,7 +12,7 @@ contract ZkSyncProcessOpUnitTest is ZkSync {
         bytes32 processableOperationsHash,
         uint64 priorityOperationsProcessed,
         bytes memory offsetsCommitment
-    ) external {
+    ) external view {
         (bytes32 resOpHash, uint64 resPriorOps, bytes memory resOffsetsCommitment) = collectOnchainOps(_newBlockData);
         require(resOpHash == processableOperationsHash, "h");
         require(resPriorOps == priorityOperationsProcessed, "p");

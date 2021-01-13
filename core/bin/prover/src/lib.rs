@@ -1,6 +1,7 @@
 pub mod auth_utils;
 pub mod cli_utils;
 pub mod client;
+pub mod dummy_prover;
 pub mod plonk_step_by_step_prover;
 
 // Built-in deps
@@ -20,7 +21,7 @@ use zksync_crypto::rand::{
 // Workspace deps
 use zksync_config::ProverOptions;
 use zksync_prover_utils::api::{
-    JobRequestData, JobResultData, ProverId, ProverInputRequest, ProverInputRequestAuxData,
+    JobRequestData, JobResultData, ProverInputRequest, ProverInputRequestAuxData,
     ProverInputResponse, ProverOutputRequest,
 };
 
@@ -80,6 +81,7 @@ pub trait ProverImpl {
     fn create_from_config(config: Self::Config) -> Self;
     fn get_request_aux_data(&self) -> ProverInputRequestAuxData {
         Default::default()
+        // TODO: Add the ability to define different config (ZKS-283).
     }
     /// Resource heavy operation
     fn create_proof(&self, data: JobRequestData) -> anyhow::Result<JobResultData>;
@@ -89,7 +91,7 @@ pub trait ApiClient: Debug {
     async fn get_job(&self, req: ProverInputRequest) -> anyhow::Result<ProverInputResponse>;
     async fn working_on(&self, job_id: i32, prover_name: &str) -> anyhow::Result<()>;
     async fn publish(&self, data: ProverOutputRequest) -> anyhow::Result<()>;
-    async fn prover_stopped(&self, prover_id: ProverId) -> anyhow::Result<()>;
+    async fn prover_stopped(&self, prover_name: String) -> anyhow::Result<()>;
 }
 
 async fn compute_proof_no_blocking<PROVER>(
@@ -136,7 +138,7 @@ async fn heartbeat_future_handle<CLIENT>(
     }
 }
 
-async fn prover_work_cycle<PROVER, CLIENT>(
+pub async fn prover_work_cycle<PROVER, CLIENT>(
     mut prover: PROVER,
     client: CLIENT,
     shutdown: ShutdownRequest,

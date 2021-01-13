@@ -27,7 +27,7 @@ library SafeMathUInt128 {
      */
     function add(uint128 a, uint128 b) internal pure returns (uint128) {
         uint128 c = a + b;
-        require(c >= a, "z");
+        require(c >= a, "12");
 
         return c;
     }
@@ -85,7 +85,7 @@ library SafeMathUInt128 {
         }
 
         uint128 c = a * b;
-        require(c / a == b, "ab");
+        require(c / a == b, "13");
 
         return c;
     }

@@ -11,7 +11,7 @@ use web3::{
 };
 
 use zksync_contracts::zksync_contract;
-use zksync_types::{ethereum::CompleteWithdrawalsTx, Address, Nonce, PriorityOp, H160};
+use zksync_types::{ethereum::CompleteWithdrawalsTx, Address, Nonce, PriorityOp, H160, U256};
 
 struct ContractTopics {
     new_priority_request: Hash,
@@ -37,6 +37,8 @@ pub trait EthClient {
     ) -> anyhow::Result<Vec<PriorityOp>>;
     async fn block_number(&self) -> anyhow::Result<u64>;
     async fn get_auth_fact(&self, address: Address, nonce: Nonce) -> anyhow::Result<Vec<u8>>;
+    async fn get_auth_fact_reset_time(&self, address: Address, nonce: Nonce)
+        -> anyhow::Result<u64>;
 }
 
 pub struct EthHttpClient {
@@ -118,5 +120,19 @@ impl EthClient for EthHttpClient {
             )
             .await
             .map_err(|e| format_err!("Failed to query contract authFacts: {}", e))
+    }
+
+    async fn get_auth_fact_reset_time(&self, address: Address, nonce: u32) -> anyhow::Result<u64> {
+        self.zksync_contract
+            .query(
+                "authFactsResetTimer",
+                (address, u64::from(nonce)),
+                None,
+                Options::default(),
+                None,
+            )
+            .await
+            .map_err(|e| format_err!("Failed to query contract authFacts: {}", e))
+            .map(|res: U256| res.as_u64())
     }
 }

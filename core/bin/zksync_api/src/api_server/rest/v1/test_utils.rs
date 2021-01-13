@@ -99,7 +99,7 @@ impl TestServerConfig {
 
         // Sign change pubkey tx pair
         {
-            let tx = from.sign_change_pubkey_tx(None, false, 0, fee.into(), false);
+            let tx = from.sign_change_pubkey_tx(None, false, 0, fee.into(), false, 0, u32::MAX);
 
             let zksync_op = ZkSyncOp::ChangePubKeyOffchain(Box::new(ChangePubKeyOp {
                 tx: tx.clone(),
@@ -132,6 +132,8 @@ impl TestServerConfig {
                     &to.address,
                     None,
                     false,
+                    0,
+                    u32::MAX,
                 )
                 .0;
 
@@ -159,7 +161,17 @@ impl TestServerConfig {
         // Failed transfer tx pair
         {
             let tx = from
-                .sign_transfer(0, "GLM", 1_u64.into(), fee.into(), &to.address, None, false)
+                .sign_transfer(
+                    0,
+                    "GLM",
+                    1_u64.into(),
+                    fee.into(),
+                    &to.address,
+                    None,
+                    false,
+                    0,
+                    u32::MAX,
+                )
                 .0;
 
             let zksync_op = ZkSyncOp::TransferToNew(Box::new(TransferToNewOp {
@@ -193,6 +205,8 @@ impl TestServerConfig {
                 2_u64.into(),
                 fee.into(),
                 0,
+                0,
+                u32::MAX,
                 None,
             );
 

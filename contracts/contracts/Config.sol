@@ -6,7 +6,7 @@ pragma solidity ^0.7.0;
 /// @author Matter Labs
 contract Config {
     /// @dev ERC20 tokens and ETH withdrawals gas limit, used only for complete withdrawals
-    uint256 constant WITHDRAWAL_GAS_LIMIT = 50000;
+    uint256 constant WITHDRAWAL_GAS_LIMIT = 100000;
 
     /// @dev Bytes in one chunk
     uint8 constant CHUNK_BYTES = 9;
@@ -49,9 +49,6 @@ contract Config {
     /// @dev Full exit operation length
     uint256 constant FULL_EXIT_BYTES = 6 * CHUNK_BYTES;
 
-    /// @dev OnchainWithdrawal data length
-    uint256 constant ONCHAIN_WITHDRAWAL_BYTES = 1 + 20 + 2 + 16; // (uint8 addToPendingWithdrawalsQueue, address _to, uint16 _tokenId, uint128 _amount)
-
     /// @dev ChangePubKey operation length
     uint256 constant CHANGE_PUBKEY_BYTES = 6 * CHUNK_BYTES;
 
@@ -93,4 +90,7 @@ contract Config {
 
     /// @dev Bit mask to apply for verifier public input before verifying.
     uint256 constant INPUT_MASK = $$(~uint256(0) >> 3);
+
+    /// @dev Auth fact reset timelock
+    uint256 constant AUTH_FACT_RESET_TIMELOCK = 1 days;
 }

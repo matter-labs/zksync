@@ -3,15 +3,13 @@ use std::time::Duration;
 // External deps
 use anyhow::format_err;
 use backoff::future::FutureOperation;
-use backoff::Error::Transient;
+use backoff::Error::{Permanent, Transient};
 use futures::Future;
-use log::*;
 use reqwest::Url;
 // Workspace deps
 use crate::auth_utils::AuthTokenGenerator;
 use zksync_prover_utils::api::{
-    ProverId, ProverInputRequest, ProverInputResponse, ProverOutputRequest, ProverStopped,
-    WorkingOn,
+    ProverInputRequest, ProverInputResponse, ProverOutputRequest, ProverStopped, WorkingOn,
 };
 
 #[derive(Debug, Clone)]
@@ -30,10 +28,7 @@ impl ApiClient {
     // The time for which the authorization token will be valid.
     const AUTH_TOKEN_LIFETIME: Duration = Duration::from_secs(10);
 
-    pub fn new(base_url: &Url, worker: &str, req_server_timeout: Duration, secret: &str) -> Self {
-        if worker == "" {
-            panic!("worker name cannot be empty")
-        }
+    pub fn new(base_url: &Url, req_server_timeout: Duration, secret: &str) -> Self {
         let http_client = reqwest::ClientBuilder::new()
             .timeout(req_server_timeout)
             .build()
@@ -60,9 +55,10 @@ impl ApiClient {
         let notify = |err, next_after: Duration| {
             let duration_secs = next_after.as_millis() as f32 / 1000.0f32;
 
-            warn!(
+            log::warn!(
                 "Failed to reach server err: <{}>, retrying after: {:.1}s",
-                err, duration_secs,
+                err,
+                duration_secs,
             )
         };
 
@@ -100,7 +96,7 @@ impl ApiClient {
 impl crate::ApiClient for ApiClient {
     async fn get_job(&self, req: ProverInputRequest) -> anyhow::Result<ProverInputResponse> {
         let operation = (|| async {
-            trace!("get prover job");
+            log::trace!("get prover job");
 
             let response = self
                 .http_client
@@ -109,7 +105,11 @@ impl crate::ApiClient for ApiClient {
                 .json(&req)
                 .send()
                 .await
-                .map_err(|e| format_err!("failed to send working on request: {}", e))?;
+                .map_err(|e| format_err!("failed to send get job request: {}", e))?;
+
+            if response.status() == reqwest::StatusCode::UNAUTHORIZED {
+                return Err(Permanent(format_err!("authorization error")));
+            }
 
             response
                 .json()
@@ -121,50 +121,80 @@ impl crate::ApiClient for ApiClient {
     }
 
     async fn working_on(&self, job_id: i32, prover_name: &str) -> anyhow::Result<()> {
-        trace!(
-            "sending working_on job_id: {}, prover_name: {}",
-            job_id,
-            prover_name
-        );
-
-        self.http_client
-            .post(self.working_on_url.clone())
-            .bearer_auth(&self.get_encoded_token()?)
-            .json(&WorkingOn {
-                job_id,
-                prover_name: prover_name.to_string(),
-            })
-            .send()
-            .await
-            .map_err(|e| format_err!("failed to send working_on request: {}", e))?;
-        Ok(())
-    }
-
-    async fn publish(&self, data: ProverOutputRequest) -> anyhow::Result<()> {
         let operation = (|| async {
-            trace!("Trying publish proof: {:?}", data);
+            log::trace!(
+                "sending working_on job_id: {}, prover_name: {}",
+                job_id,
+                prover_name
+            );
 
-            self.http_client
-                .post(self.publish_url.clone())
+            let response = self
+                .http_client
+                .post(self.working_on_url.clone())
                 .bearer_auth(&self.get_encoded_token()?)
-                .json(&data)
+                .json(&WorkingOn {
+                    job_id,
+                    prover_name: prover_name.to_string(),
+                })
                 .send()
                 .await
-                .map_err(|e| format_err!("failed to send publish request: {}", e))?;
+                .map_err(|e| Transient(format_err!("failed to send working_on request: {}", e)))?;
+
+            if response.status() == reqwest::StatusCode::UNAUTHORIZED {
+                return Err(Permanent(format_err!("authorization error")));
+            }
+
             Ok(())
         });
 
         self.with_retries(operation).await
     }
 
-    async fn prover_stopped(&self, prover_id: ProverId) -> anyhow::Result<()> {
-        self.http_client
-            .post(self.stopped_url.clone())
-            .bearer_auth(&self.get_encoded_token()?)
-            .json(&ProverStopped { prover_id })
-            .send()
-            .await
-            .map_err(|e| format_err!("failed to send prover_stopped request: {}", e))?;
-        Ok(())
+    async fn publish(&self, data: ProverOutputRequest) -> anyhow::Result<()> {
+        let operation = (|| async {
+            log::trace!("Trying publish proof: {:?}", data);
+
+            let response = self
+                .http_client
+                .post(self.publish_url.clone())
+                .bearer_auth(&self.get_encoded_token()?)
+                .json(&data)
+                .send()
+                .await
+                .map_err(|e| Transient(format_err!("failed to send publish request: {}", e)))?;
+
+            if response.status() == reqwest::StatusCode::UNAUTHORIZED {
+                return Err(Permanent(format_err!("authorization error")));
+            }
+
+            Ok(())
+        });
+
+        self.with_retries(operation).await
+    }
+
+    async fn prover_stopped(&self, prover_name: String) -> anyhow::Result<()> {
+        let operation = (|| async {
+            let response = self
+                .http_client
+                .post(self.stopped_url.clone())
+                .bearer_auth(&self.get_encoded_token()?)
+                .json(&ProverStopped {
+                    prover_name: prover_name.clone(),
+                })
+                .send()
+                .await
+                .map_err(|e| {
+                    Transient(format_err!("failed to send prover_stopped request: {}", e))
+                })?;
+
+            if response.status() == reqwest::StatusCode::UNAUTHORIZED {
+                return Err(Permanent(format_err!("authorization error")));
+            }
+
+            Ok(())
+        });
+
+        self.with_retries(operation).await
     }
 }

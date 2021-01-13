@@ -110,11 +110,6 @@ contract Storage {
         return bytes22((uint176(_address) | (uint176(_tokenId) << 160)));
     }
 
-    /// @notice Gets value from balancesToWithdraw
-    function getPendingBalances(address _address, uint16 _tokenId) public view returns (uint128) {
-        return pendingBalances[packAddressAndTokenId(_address, _tokenId)].balanceToWithdraw;
-    }
-
     /// @Rollup block stored data
     /// @member blockNumber Rollup block number
     /// @member priorityOperations Number of priority operations processed
@@ -156,4 +151,8 @@ contract Storage {
     /// @dev Contains op type, pubdata and expiration block of unsatisfied requests.
     /// @dev Numbers are in order of requests receiving
     mapping(uint64 => PriorityOperation) internal priorityRequests;
+
+    /// @dev Timer for authFacts entry reset (address, nonce -> timer).
+    /// @dev Used when user wants to reset `authFacts` for some nonce.
+    mapping(address => mapping(uint32 => uint256)) internal authFactsResetTimer;
 }

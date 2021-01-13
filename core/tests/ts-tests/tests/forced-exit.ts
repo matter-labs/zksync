@@ -22,6 +22,7 @@ Tester.prototype.testVerifiedForcedExit = async function (
     // therefore, when making requests to `syncProvider`, we will use the type `Withdraw`.
 
     const tokenId = initiatorWallet.provider.tokenSet.resolveTokenId(token);
+    const tokenAddress = initiatorWallet.provider.tokenSet.resolveTokenAddress(token);
 
     const onchainBalanceBefore = await targetWallet.getEthereumBalance(token);
     const balanceToWithdraw = await targetWallet.getBalance(token);
@@ -49,7 +50,7 @@ Tester.prototype.testVerifiedForcedExit = async function (
     await this.ethProvider.waitForTransaction(withdrawalTxHash as string);
 
     const onchainBalanceAfter = await targetWallet.getEthereumBalance(token);
-    const pendingToBeOnchain = await this.contract.getBalanceToWithdraw(targetWallet.address(), tokenId);
+    const pendingToBeOnchain = await this.contract.getPendingBalance(targetWallet.address(), tokenAddress);
 
     expect(
         onchainBalanceAfter.add(pendingToBeOnchain).sub(onchainBalanceBefore).eq(balanceToWithdraw),

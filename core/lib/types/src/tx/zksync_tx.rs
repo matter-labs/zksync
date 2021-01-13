@@ -182,11 +182,10 @@ impl ZkSyncTx {
     ///
     /// - Fee type.
     /// - Token to pay fees in.
-    /// - Address of account affected by the transaction.
     /// - Fee provided in the transaction.
     ///
     /// Returns `None` if transaction doesn't require fee.
-    pub fn get_fee_info(&self) -> Option<(TxFeeTypes, TokenLike, Address, BigUint)> {
+    pub fn get_fee_info(&self) -> Option<(TxFeeTypes, TokenLike, BigUint)> {
         match self {
             ZkSyncTx::Withdraw(withdraw) => {
                 let fee_type = if withdraw.fast {
@@ -198,20 +197,17 @@ impl ZkSyncTx {
                 Some((
                     fee_type,
                     TokenLike::Id(withdraw.token),
-                    withdraw.to,
                     withdraw.fee.clone(),
                 ))
             }
             ZkSyncTx::ForcedExit(forced_exit) => Some((
                 TxFeeTypes::Withdraw,
                 TokenLike::Id(forced_exit.token),
-                forced_exit.target,
                 forced_exit.fee.clone(),
             )),
             ZkSyncTx::Transfer(transfer) => Some((
                 TxFeeTypes::Transfer,
                 TokenLike::Id(transfer.token),
-                transfer.to,
                 transfer.fee.clone(),
             )),
             ZkSyncTx::ChangePubKey(change_pubkey) => Some((
@@ -219,10 +215,20 @@ impl ZkSyncTx {
                     onchain_pubkey_auth: !change_pubkey.eth_auth_data.is_ecdsa(),
                 },
                 TokenLike::Id(change_pubkey.fee_token),
-                change_pubkey.account,
                 change_pubkey.fee.clone(),
             )),
             _ => None,
+        }
+    }
+
+    /// Returns the unix format timestamp of the first moment when transaction execution is valid.
+    pub fn valid_from(&self) -> u32 {
+        match self {
+            ZkSyncTx::Transfer(tx) => tx.valid_from.unwrap_or(0),
+            ZkSyncTx::Withdraw(tx) => tx.valid_from.unwrap_or(0),
+            ZkSyncTx::ChangePubKey(tx) => tx.valid_from.unwrap_or(0),
+            ZkSyncTx::ForcedExit(tx) => tx.valid_from.unwrap_or(0),
+            ZkSyncTx::Close(tx) => tx.valid_from.unwrap_or(0),
         }
     }
 }

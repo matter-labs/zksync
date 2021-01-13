@@ -19,6 +19,8 @@ const MAX_NUMBER_OF_TOKENS = 128;
 // Max number of accounts for the current version, it is determined by the zkSync circuit implementation.
 const MAX_NUMBER_OF_ACCOUNTS = Math.pow(2, 24);
 
+export const MAX_TIMESTAMP = 4294967295;
+
 export const IERC20_INTERFACE = new utils.Interface(require('../abi/IERC20.json').abi);
 export const SYNC_MAIN_CONTRACT_INTERFACE = new utils.Interface(require('../abi/SyncMain.json').abi);
 
@@ -441,6 +443,13 @@ export function serializeNonce(nonce: number): Uint8Array {
         throw new Error('Negative nonce');
     }
     return numberToBytesBE(nonce, 4);
+}
+
+export function serializeTimestamp(time: number): Uint8Array {
+    if (time < 0) {
+        throw new Error('Negative timestamp');
+    }
+    return numberToBytesBE(time, 4);
 }
 
 export function serializeWithdraw(withdraw: Withdraw): Uint8Array {
