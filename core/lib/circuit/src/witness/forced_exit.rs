@@ -407,7 +407,7 @@ impl ForcedExitWitness<Bn256> {
                 b: Some(b),
                 new_pub_key_hash: Some(Fr::zero()),
                 valid_from: Some(Fr::zero()),
-                valid_until: Some(Fr::from_str(&u64::MAX.to_string()).unwrap()),
+                valid_until: Some(Fr::from_str(&u32::MAX.to_string()).unwrap()),
             },
             before_root: Some(before_root),
             intermediate_root: Some(intermediate_root),
