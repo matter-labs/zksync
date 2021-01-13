@@ -166,6 +166,11 @@ impl LoadtestExecutor {
 
             // Special case for erc20 tokens.
             if !self.main_wallet.token_name().is_eth() {
+                log::info!(
+                    "Approving {} ERC20 wallets for deposits.",
+                    scenario_wallets.len(),
+                );
+
                 for wallet in &scenario_wallets {
                     // Give some gas to make it possible to create Ethereum transactions.
                     let eth_balance =
@@ -175,6 +180,11 @@ impl LoadtestExecutor {
                         .await?;
                     wallet.approve_erc20_deposits().await?;
                 }
+
+                log::info!(
+                    "All of {} ERC20 wallets have been approved for deposits.",
+                    scenario_wallets.len(),
+                );
             }
 
             wallets.push((scenario_wallets, wallet_balance));

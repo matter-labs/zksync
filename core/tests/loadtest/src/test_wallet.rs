@@ -197,11 +197,13 @@ impl TestWallet {
     // Updates ZKSync account id.
     pub async fn update_account_id(&mut self) -> Result<(), ClientError> {
         self.inner.update_account_id().await?;
-        self.monitor
-            .api_data_pool
-            .write()
-            .await
-            .set_account_id(self.address(), self.account_id().unwrap());
+        if let Some(account_id) = self.account_id() {
+            self.monitor
+                .api_data_pool
+                .write()
+                .await
+                .set_account_id(self.address(), account_id);
+        }
         Ok(())
     }
 
@@ -305,7 +307,7 @@ impl TestWallet {
         Ok(())
     }
 
-    // TODO
+    /// Sends a some amount tokens to the given address in the Ethereum network.
     pub async fn transfer_to(
         &self,
         token: impl Into<TokenLike>,
