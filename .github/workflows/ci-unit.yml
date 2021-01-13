@@ -32,10 +32,6 @@ jobs:
           ci_run zk dummy-prover enable --no-redeploy
           ci_run zk init
 
-      # Compile everything at once so it won't have to be recompiled later
-      - name: compile
-        run: ci_run zk f cargo build --all --bins --examples --tests --release
-
       - name: liquidity-token
         run: docker-compose -f docker-compose-runner.yml restart dev-liquidity-token-watcher
 
