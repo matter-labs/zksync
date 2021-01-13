@@ -136,7 +136,8 @@ pub const SIGNED_WITHDRAW_BIT_WIDTH: usize = TX_TYPE_BIT_WIDTH
     + BALANCE_BIT_WIDTH
     + FEE_EXPONENT_BIT_WIDTH
     + FEE_MANTISSA_BIT_WIDTH
-    + NONCE_BIT_WIDTH;
+    + NONCE_BIT_WIDTH
+    + 2 * TIMESTAMP_BIT_WIDTH;
 
 /// Size of the data that is signed for transfer tx
 pub const SIGNED_TRANSFER_BIT_WIDTH: usize = TX_TYPE_BIT_WIDTH
@@ -157,7 +158,8 @@ pub const SIGNED_FORCED_EXIT_BIT_WIDTH: usize = TX_TYPE_BIT_WIDTH
     + TOKEN_BIT_WIDTH
     + FEE_EXPONENT_BIT_WIDTH
     + FEE_MANTISSA_BIT_WIDTH
-    + NONCE_BIT_WIDTH;
+    + NONCE_BIT_WIDTH
+    + 2 * TIMESTAMP_BIT_WIDTH;
 
 /// Size of the data that is signed for change pubkey tx
 pub const SIGNED_CHANGE_PUBKEY_BIT_WIDTH: usize = TX_TYPE_BIT_WIDTH
@@ -167,7 +169,8 @@ pub const SIGNED_CHANGE_PUBKEY_BIT_WIDTH: usize = TX_TYPE_BIT_WIDTH
     + TOKEN_BIT_WIDTH
     + FEE_EXPONENT_BIT_WIDTH
     + FEE_MANTISSA_BIT_WIDTH
-    + NONCE_BIT_WIDTH;
+    + NONCE_BIT_WIDTH
+    + 2 * TIMESTAMP_BIT_WIDTH;
 
 /// Number of inputs in the basic circuit that is aggregated by recursive circuit
 pub const RECURSIVE_CIRCUIT_NUM_INPUTS: usize = 1;

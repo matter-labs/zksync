@@ -908,6 +908,7 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
             &op_data,
             &signer_key,
             &ext_pubdata_chunk,
+            &is_valid_timestamp,
             &signature_data.is_verified,
             &mut previous_pubdatas[WithdrawOp::OP_CODE as usize],
         )?);
@@ -920,6 +921,7 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
         //      &op_data,
         //      &signer_key,
         //      &subtree_root,
+        //      &is_valid_timestamp,
         //      &signature_data.is_verified,
         //  )?);
         op_flags.push(self.full_exit(
@@ -937,6 +939,7 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
             global_variables,
             &op_data,
             &ext_pubdata_chunk,
+            &is_valid_timestamp,
             &mut previous_pubdatas[ChangePubKeyOp::OP_CODE as usize],
             &is_a_geq_b,
             &signature_data.is_verified,
@@ -960,6 +963,7 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
             &op_data,
             &signer_key,
             &ext_pubdata_chunk,
+            &is_valid_timestamp,
             &signature_data.is_verified,
             &mut previous_pubdatas[ForcedExitOp::OP_CODE as usize],
         )?);
@@ -1033,6 +1037,7 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
         op_data: &AllocatedOperationData<E>,
         signer_key: &AllocatedSignerPubkey<E>,
         ext_pubdata_chunk: &AllocatedNum<E>,
+        is_valid_timestamp: &Boolean,
         is_sig_verified: &Boolean,
         pubdata_holder: &mut Vec<AllocatedNum<E>>,
     ) -> Result<Boolean, SynthesisError> {
@@ -1074,6 +1079,8 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
         serialized_tx_bits.extend(op_data.full_amount.get_bits_be());
         serialized_tx_bits.extend(op_data.fee_packed.get_bits_be());
         serialized_tx_bits.extend(cur.account.nonce.get_bits_be());
+        serialized_tx_bits.extend(op_data.valid_from.get_bits_be());
+        serialized_tx_bits.extend(op_data.valid_until.get_bits_be());
         assert_eq!(serialized_tx_bits.len(), params::SIGNED_WITHDRAW_BIT_WIDTH);
 
         let pubdata_chunk = select_pubdata_chunk(
@@ -1111,6 +1118,7 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
             Expression::u64::<CS>(u64::from(WithdrawOp::OP_CODE)),
         )?);
         base_valid_flags.push(is_withdraw);
+        base_valid_flags.push(is_valid_timestamp.clone());
 
         let is_serialized_tx_correct = verify_signature_message_construction(
             cs.namespace(|| "is_serialized_tx_correct"),
@@ -1511,6 +1519,7 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
         global_variables: &CircuitGlobalVariables<E>,
         op_data: &AllocatedOperationData<E>,
         ext_pubdata_chunk: &AllocatedNum<E>,
+        is_valid_timestamp: &Boolean,
         pubdata_holder: &mut Vec<AllocatedNum<E>>,
         is_a_geq_b: &Boolean,
         is_sig_verified: &Boolean,
@@ -1548,6 +1557,8 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
         serialized_tx_bits.extend(cur.token.get_bits_be());
         serialized_tx_bits.extend(op_data.fee_packed.get_bits_be());
         serialized_tx_bits.extend(cur.account.nonce.get_bits_be());
+        serialized_tx_bits.extend(op_data.valid_from.get_bits_be());
+        serialized_tx_bits.extend(op_data.valid_until.get_bits_be());
 
         assert_eq!(
             serialized_tx_bits.len(),
@@ -1621,6 +1632,8 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
             Expression::u64::<CS>(u64::from(ChangePubKeyOp::OP_CODE)),
         )?);
         is_valid_flags.push(is_change_pubkey_offchain);
+
+        is_valid_flags.push(is_valid_timestamp.clone());
 
         // verify if address is to previous one (if existed)
         let is_address_correct = CircuitElement::equals(
@@ -2230,6 +2243,7 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
         op_data: &AllocatedOperationData<E>,
         signer_key: &AllocatedSignerPubkey<E>,
         ext_pubdata_chunk: &AllocatedNum<E>,
+        is_valid_timestamp: &Boolean,
         is_sig_verified: &Boolean,
         pubdata_holder: &mut Vec<AllocatedNum<E>>,
     ) -> Result<Boolean, SynthesisError> {
@@ -2272,6 +2286,8 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
         serialized_tx_bits.extend(cur.token.get_bits_be());
         serialized_tx_bits.extend(op_data.fee_packed.get_bits_be());
         serialized_tx_bits.extend(lhs.account.nonce.get_bits_be());
+        serialized_tx_bits.extend(op_data.valid_from.get_bits_be());
+        serialized_tx_bits.extend(op_data.valid_until.get_bits_be());
         assert_eq!(serialized_tx_bits.len(), SIGNED_FORCED_EXIT_BIT_WIDTH);
 
         let pubdata_chunk = select_pubdata_chunk(
@@ -2298,6 +2314,7 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
 
         lhs_valid_flags.push(is_pubdata_chunk_correct.clone());
         lhs_valid_flags.push(is_forced_exit.clone());
+        lhs_valid_flags.push(is_valid_timestamp.clone());
 
         let is_first_chunk = Boolean::from(Expression::equals(
             cs.namespace(|| "is_first_chunk"),
@@ -2379,6 +2396,7 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
         let mut rhs_valid_flags = vec![];
         rhs_valid_flags.push(pubdata_properly_copied.clone());
         rhs_valid_flags.push(is_forced_exit.clone());
+        rhs_valid_flags.push(is_valid_timestamp.clone());
 
         let is_second_chunk = Boolean::from(Expression::equals(
             cs.namespace(|| "is_chunk_second"),
@@ -2426,6 +2444,7 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
         ohs_valid_flags.push(is_first_chunk.not());
         ohs_valid_flags.push(is_second_chunk.not());
         ohs_valid_flags.push(is_forced_exit);
+        ohs_valid_flags.push(is_valid_timestamp.clone());
         ohs_valid_flags.push(pubdata_properly_copied);
 
         let is_ohs_valid = multi_and(cs.namespace(|| "is_ohs_valid"), &ohs_valid_flags)?;
