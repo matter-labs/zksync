@@ -37,14 +37,6 @@ jobs:
       - name: lints
         run: docker-compose -f docker-compose-runner.yml exec -T zk sh infrastructure/ci-scripts/lints.sh
 
-      - name: generic-init
-        run: |
-          # Unpack keys to build dev contracts
-          docker-compose -f docker-compose-runner.yml exec -T zk zk run verify-keys unpack
-          # EIP1271 contract is used in Rust & JS unit tests.
-          docker-compose -f docker-compose-runner.yml exec -T zk zk contract build-dev
-          docker-compose -f docker-compose-runner.yml exec -T zk zk run deploy-eip1271
-
       - name: run-services
         run: docker-compose -f docker-compose-runner.yml exec -T zk sh infrastructure/ci-scripts/run_services.sh
 
