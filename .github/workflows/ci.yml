@@ -46,7 +46,6 @@ jobs:
         run: |
           ci_run zk fmt --check
           ci_run zk lint --check
-          ci_run zk dummy-prover ensure-disabled
           ci_run cargo fmt --all -- --check
           ci_run zk f cargo clippy --tests --benches -- -D warnings
           ci_run pushd sdk/zksync-crypto && cargo fmt -- --check
