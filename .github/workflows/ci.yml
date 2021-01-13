@@ -43,6 +43,15 @@ jobs:
       - name: lints
         run: ci_run sh infrastructure/ci-scripts/lints.sh
 
+      - name: run-services
+        run: ci_run sh infrastructure/ci-scripts/run_services.sh
+
+      - name: integration-tests
+        run: ci_run zk test integration all
+
+      - name: integration-testkit
+        run: ci_run zk test integration testkit
+
       - name: contracts-unit-tests
         run: ci_run zk test contracts
 
@@ -54,15 +63,6 @@ jobs:
 
       - name: rust-unit-tests
         run: ci_run zk test rust
-
-      - name: run-services
-        run: ci_run sh infrastructure/ci-scripts/run_services.sh
-
-      - name: integration-tests
-        run: ci_run zk test integration all
-
-      - name: integration-testkit
-        run: ci_run zk test integration testkit
 
       - name: cache
         run: ci_run sh infrastructure/ci-scripts/cache.sh
