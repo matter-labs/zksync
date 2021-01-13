@@ -14,6 +14,11 @@ jobs:
     steps:
       - uses: actions/checkout@v2
 
+      - name: setup-env
+        run: |
+          echo ZKSYNC_HOME=$(pwd) >> $GITHUB_ENV
+          echo $(pwd)/bin >> $GITHUB_PATH
+
       - name: start-services
         run: |
           docker-compose -f docker-compose-runner.yml down
@@ -114,6 +119,8 @@ jobs:
     runs-on: [self-hosted, CI-worker]
 
     steps:
+      - uses: actions/checkout@v2
+
       - name: prepare
         run: |
           echo ZKSYNC_HOME=$(pwd) >> $GITHUB_ENV
