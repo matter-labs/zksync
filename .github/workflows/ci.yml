@@ -34,6 +34,8 @@ jobs:
       # Compile everything at once so it won't have to be recompiled later
       - name: compile
         run: ci_run zk f cargo build --all --bins --examples --tests --release
+        env:
+          SQLX_OFFLINE: "true"
 
       - name: init
         run: |
