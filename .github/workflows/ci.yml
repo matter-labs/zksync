@@ -136,6 +136,7 @@ jobs:
         run: |
           ci_run ln -s /usr/src/keys/setup keys/setup
           ci_run zk
+          ci_run zk contract build-dev
 
       - name: integration-testkit
         run: ci_run zk test integration testkit --offline

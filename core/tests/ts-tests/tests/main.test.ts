@@ -181,8 +181,8 @@ if (process.env.TEST_TRANSPORT) {
         tokenAndTransport = [
             {
                 transport: envTransport,
-                token: envToken,
-            },
+                token: envToken
+            }
         ];
     } else {
         // Only transport is set, use wBTC as default token for this transport.
@@ -190,8 +190,8 @@ if (process.env.TEST_TRANSPORT) {
         tokenAndTransport = [
             {
                 transport: envTransport,
-                token: defaultERC20,
-            },
+                token: defaultERC20
+            }
         ];
     }
 } else {
@@ -200,13 +200,13 @@ if (process.env.TEST_TRANSPORT) {
         {
             transport: 'HTTP',
             token: 'ETH',
-            onlyBasic: true,
+            onlyBasic: true
         },
         {
             transport: 'HTTP',
             token: defaultERC20,
-            onlyBasic: false,
-        },
+            onlyBasic: false
+        }
     ];
 }
 
