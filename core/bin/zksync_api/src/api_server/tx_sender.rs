@@ -199,6 +199,16 @@ impl TxSender {
             withdraw.fast = fast_processing;
         }
 
+        if let ZkSyncTx::Transfer(transfer) = &mut tx {
+            let valid_from = transfer.valid_from.unwrap_or(0);
+            let valid_until = transfer.valid_until.unwrap_or(u32::MAX);
+            if valid_from > valid_until {
+                return Err(SubmitError::IncorrectTx(
+                    "Incorrect time segment when transfer execution is valid".to_string(),
+                ));
+            }
+        }
+
         let msg_to_sign = self.tx_message_to_sign(&tx).await?;
 
         let tx_fee_info = tx.get_fee_info();

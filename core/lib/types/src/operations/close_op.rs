@@ -44,6 +44,8 @@ impl CloseOp {
                 account: account_address,
                 nonce,
                 signature,
+                valid_from: None,
+                valid_until: None,
             },
             account_id,
         })

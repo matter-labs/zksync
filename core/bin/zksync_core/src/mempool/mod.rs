@@ -44,11 +44,14 @@ use zksync_types::{
 };
 
 // Local uses
+use crate::mempool::mempool_transactions_queue::MempoolTransactionsQueue;
 use crate::{
     balancer::{Balancer, BuildBalancedItem},
     eth_watch::EthWatchRequest,
     wait_for_tasks,
 };
+
+mod mempool_transactions_queue;
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, Error)]
 pub enum TxAddError {
@@ -107,6 +110,7 @@ impl ProposedBlock {
 #[derive(Debug)]
 pub struct GetBlockRequest {
     pub last_priority_op_number: u64,
+    pub block_timestamp: u64,
     pub response_sender: oneshot::Sender<ProposedBlock>,
 }
 
@@ -139,7 +143,7 @@ struct MempoolState {
     // account and last committed nonce
     account_nonces: HashMap<Address, Nonce>,
     account_ids: HashMap<AccountId, Address>,
-    ready_txs: VecDeque<SignedTxVariant>,
+    transactions_queue: MempoolTransactionsQueue,
 }
 
 impl MempoolState {
@@ -200,12 +204,19 @@ impl MempoolState {
 
         // Load transactions that were not yet processed and are awaiting in the
         // mempool.
-        let ready_txs: VecDeque<_> = transaction
+        let all_mempool_txs = transaction
             .chain()
             .mempool_schema()
             .load_txs()
             .await
             .expect("Attempt to restore mempool txs from DB failed");
+
+        // Transactions can become ready when knowing the block timestamp
+        let mut transactions_queue = MempoolTransactionsQueue::new();
+
+        for tx in all_mempool_txs.clone() {
+            transactions_queue.add_tx_variant(tx);
+        }
 
         transaction
             .commit()
@@ -214,13 +225,13 @@ impl MempoolState {
 
         log::info!(
             "{} transactions were restored from the persistent mempool storage",
-            ready_txs.len()
+            all_mempool_txs.len()
         );
 
         Self {
             account_nonces,
             account_ids,
-            ready_txs,
+            transactions_queue,
         }
     }
 
@@ -233,7 +244,7 @@ impl MempoolState {
         // `tx.check_correctness()` is not invoked here.
 
         if tx.nonce() >= self.nonce(&tx.account()) {
-            self.ready_txs.push_back(tx.into());
+            self.transactions_queue.add_tx_variant(tx.into());
             Ok(())
         } else {
             Err(TxAddError::NonceMismatch)
@@ -249,7 +260,8 @@ impl MempoolState {
             }
         }
 
-        self.ready_txs.push_back(SignedTxVariant::Batch(batch));
+        self.transactions_queue
+            .add_tx_variant(SignedTxVariant::Batch(batch));
 
         Ok(())
     }
@@ -263,12 +275,18 @@ struct MempoolBlocksHandler {
 }
 
 impl MempoolBlocksHandler {
-    async fn propose_new_block(&mut self, current_unprocessed_priority_op: u64) -> ProposedBlock {
+    async fn propose_new_block(
+        &mut self,
+        current_unprocessed_priority_op: u64,
+        block_timestamp: u64,
+    ) -> ProposedBlock {
         let start = std::time::Instant::now();
         let (chunks_left, priority_ops) = self
             .select_priority_ops(current_unprocessed_priority_op)
             .await;
-        let (_chunks_left, txs) = self.prepare_tx_for_block(chunks_left).await;
+        let (_chunks_left, txs) = self
+            .prepare_tx_for_block(chunks_left, block_timestamp)
+            .await;
 
         log::trace!("Proposed priority ops for block: {:#?}", priority_ops);
         log::trace!("Proposed txs for block: {:#?}", txs);
@@ -307,18 +325,24 @@ impl MempoolBlocksHandler {
     async fn prepare_tx_for_block(
         &mut self,
         mut chunks_left: usize,
+        block_timestamp: u64,
     ) -> (usize, Vec<SignedTxVariant>) {
+        let mut mempool_state = self.mempool_state.write().await;
+
+        mempool_state
+            .transactions_queue
+            .prepare_new_ready_transactions(block_timestamp);
+
         let mut txs_for_commit = Vec::new();
 
-        let mut mempool = self.mempool_state.write().await;
-        while let Some(tx) = mempool.ready_txs.pop_front() {
-            let chunks_for_tx = mempool.required_chunks(&tx);
+        while let Some(tx) = mempool_state.transactions_queue.pop_front() {
+            let chunks_for_tx = mempool_state.required_chunks(&tx);
             if chunks_left >= chunks_for_tx {
                 txs_for_commit.push(tx);
                 chunks_left -= chunks_for_tx;
             } else {
                 // Push the taken tx back, it does not fit.
-                mempool.ready_txs.push_front(tx);
+                mempool_state.transactions_queue.push_front(tx);
                 break;
             }
         }
@@ -332,8 +356,9 @@ impl MempoolBlocksHandler {
             match request {
                 MempoolBlocksRequest::GetBlock(block) => {
                     // Generate proposed block.
-                    let proposed_block =
-                        self.propose_new_block(block.last_priority_op_number).await;
+                    let proposed_block = self
+                        .propose_new_block(block.last_priority_op_number, block.block_timestamp)
+                        .await;
 
                     // Send the proposed block to the request initiator.
                     block

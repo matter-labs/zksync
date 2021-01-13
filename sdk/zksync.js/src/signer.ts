@@ -11,7 +11,8 @@ import {
     serializeFeePacked,
     serializeNonce,
     serializeAmountFull,
-    getCREATE2AddressAndSalt
+    getCREATE2AddressAndSalt,
+    serializeTimestamp
 } from './utils';
 import {
     Address,
@@ -26,6 +27,7 @@ import {
     ChangePubKeyCREATE2,
     ZkSyncVersion
 } from './types';
+import validate = WebAssembly.validate;
 
 export class Signer {
     readonly #privateKey: Uint8Array;
@@ -46,6 +48,8 @@ export class Signer {
         amount: BigNumberish;
         fee: BigNumberish;
         nonce: number;
+        validFrom: number;
+        validUntil: number;
     }): Uint8Array {
         const type = new Uint8Array([5]); // tx type
         const accountId = serializeAccountId(transfer.accountId);
@@ -55,7 +59,20 @@ export class Signer {
         const amount = serializeAmountPacked(transfer.amount);
         const fee = serializeFeePacked(transfer.fee);
         const nonce = serializeNonce(transfer.nonce);
-        const msgBytes = ethers.utils.concat([type, accountId, from, to, token, amount, fee, nonce]);
+        const validFrom = serializeTimestamp(transfer.validFrom);
+        const validUntil = serializeTimestamp(transfer.validUntil);
+        const msgBytes = ethers.utils.concat([
+            type,
+            accountId,
+            from,
+            to,
+            token,
+            amount,
+            fee,
+            nonce,
+            validFrom,
+            validUntil
+        ]);
 
         return msgBytes;
     }
@@ -69,6 +86,8 @@ export class Signer {
             amount: BigNumberish;
             fee: BigNumberish;
             nonce: number;
+            validFrom: number;
+            validUntil: number;
         },
         zkSyncVersion: ZkSyncVersion
     ): Promise<Transfer> {
@@ -87,6 +106,8 @@ export class Signer {
             amount: BigNumber.from(transfer.amount).toString(),
             fee: BigNumber.from(transfer.fee).toString(),
             nonce: transfer.nonce,
+            validFrom: transfer.validFrom,
+            validUntil: transfer.validUntil,
             signature
         };
     }
@@ -99,6 +120,8 @@ export class Signer {
         amount: BigNumberish;
         fee: BigNumberish;
         nonce: number;
+        validFrom: number;
+        validUntil: number;
     }): Uint8Array {
         const typeBytes = new Uint8Array([3]);
         const accountId = serializeAccountId(withdraw.accountId);
@@ -108,6 +131,8 @@ export class Signer {
         const amountBytes = serializeAmountFull(withdraw.amount);
         const feeBytes = serializeFeePacked(withdraw.fee);
         const nonceBytes = serializeNonce(withdraw.nonce);
+        const validFrom = serializeTimestamp(withdraw.validFrom);
+        const validUntil = serializeTimestamp(withdraw.validUntil);
         const msgBytes = ethers.utils.concat([
             typeBytes,
             accountId,
@@ -116,7 +141,9 @@ export class Signer {
             tokenIdBytes,
             amountBytes,
             feeBytes,
-            nonceBytes
+            nonceBytes,
+            validFrom,
+            validUntil
         ]);
 
         return msgBytes;
@@ -131,6 +158,8 @@ export class Signer {
             amount: BigNumberish;
             fee: BigNumberish;
             nonce: number;
+            validFrom: number;
+            validUntil: number;
         },
         zkSyncVersion: ZkSyncVersion
     ): Promise<Withdraw> {
@@ -149,6 +178,8 @@ export class Signer {
             amount: BigNumber.from(withdraw.amount).toString(),
             fee: BigNumber.from(withdraw.fee).toString(),
             nonce: withdraw.nonce,
+            validFrom: withdraw.validFrom,
+            validUntil: withdraw.validUntil,
             signature
         };
     }
@@ -159,6 +190,8 @@ export class Signer {
         tokenId: number;
         fee: BigNumberish;
         nonce: number;
+        validFrom: number;
+        validUntil: number;
     }): Uint8Array {
         const typeBytes = new Uint8Array([8]);
         const initiatorAccountIdBytes = serializeAccountId(forcedExit.initiatorAccountId);
@@ -166,13 +199,17 @@ export class Signer {
         const tokenIdBytes = serializeTokenId(forcedExit.tokenId);
         const feeBytes = serializeFeePacked(forcedExit.fee);
         const nonceBytes = serializeNonce(forcedExit.nonce);
+        const validFrom = serializeTimestamp(forcedExit.validFrom);
+        const validUntil = serializeTimestamp(forcedExit.validUntil);
         const msgBytes = ethers.utils.concat([
             typeBytes,
             initiatorAccountIdBytes,
             targetBytes,
             tokenIdBytes,
             feeBytes,
-            nonceBytes
+            nonceBytes,
+            validFrom,
+            validUntil
         ]);
 
         return msgBytes;
@@ -185,6 +222,8 @@ export class Signer {
             tokenId: number;
             fee: BigNumberish;
             nonce: number;
+            validFrom: number;
+            validUntil: number;
         },
         zkSyncVersion: ZkSyncVersion
     ): Promise<ForcedExit> {
@@ -200,6 +239,8 @@ export class Signer {
             token: forcedExit.tokenId,
             fee: BigNumber.from(forcedExit.fee).toString(),
             nonce: forcedExit.nonce,
+            validFrom: forcedExit.validFrom,
+            validUntil: forcedExit.validUntil,
             signature
         };
     }
@@ -211,6 +252,8 @@ export class Signer {
         feeTokenId: number;
         fee: BigNumberish;
         nonce: number;
+        validFrom: number;
+        validUntil: number;
     }): Uint8Array {
         const typeBytes = new Uint8Array([7]); // Tx type (1 byte)
         const accountIdBytes = serializeAccountId(changePubKey.accountId);
@@ -219,6 +262,8 @@ export class Signer {
         const tokenIdBytes = serializeTokenId(changePubKey.feeTokenId);
         const feeBytes = serializeFeePacked(changePubKey.fee);
         const nonceBytes = serializeNonce(changePubKey.nonce);
+        const validFrom = serializeTimestamp(changePubKey.validFrom);
+        const validUntil = serializeTimestamp(changePubKey.validUntil);
         const msgBytes = ethers.utils.concat([
             typeBytes,
             accountIdBytes,
@@ -226,7 +271,9 @@ export class Signer {
             pubKeyHashBytes,
             tokenIdBytes,
             feeBytes,
-            nonceBytes
+            nonceBytes,
+            validFrom,
+            validUntil
         ]);
 
         return msgBytes;
@@ -241,6 +288,8 @@ export class Signer {
             fee: BigNumberish;
             nonce: number;
             ethAuthData: ChangePubKeyOnchain | ChangePubKeyECDSA | ChangePubKeyCREATE2;
+            validFrom: number;
+            validUntil: number;
         },
         zkSyncVersion: ZkSyncVersion
     ): Promise<ChangePubKey> {
@@ -258,7 +307,9 @@ export class Signer {
             fee: BigNumber.from(changePubKey.fee).toString(),
             nonce: changePubKey.nonce,
             signature,
-            ethAuthData: changePubKey.ethAuthData
+            ethAuthData: changePubKey.ethAuthData,
+            validFrom: changePubKey.validFrom,
+            validUntil: changePubKey.validUntil
         };
     }
 

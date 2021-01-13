@@ -35,8 +35,10 @@ import {
     signMessagePersonalAPI,
     ERC20_DEPOSIT_GAS_LIMIT,
     getEthSignatureType,
-    serializeTransfer
+    serializeTransfer,
+    MAX_TIMESTAMP
 } from './utils';
+import validate = WebAssembly.validate;
 
 const EthersErrorCode = ErrorCode;
 
@@ -136,6 +138,8 @@ export class Wallet {
         amount: BigNumberish;
         fee: BigNumberish;
         nonce: number;
+        validFrom: number;
+        validUntil: number;
     }): Promise<Transfer> {
         if (!this.signer) {
             throw new Error('ZKSync signer is required for sending zksync transactions.');
@@ -152,7 +156,9 @@ export class Wallet {
             tokenId,
             amount: transfer.amount,
             fee: transfer.fee,
-            nonce: transfer.nonce
+            nonce: transfer.nonce,
+            validFrom: transfer.validFrom,
+            validUntil: transfer.validUntil
         };
 
         return this.signer.signSyncTransfer(transactionData, this.provider.zkSyncVersion);
@@ -164,8 +170,12 @@ export class Wallet {
         amount: BigNumberish;
         fee: BigNumberish;
         nonce: number;
+        validFrom?: number;
+        validUntil?: number;
     }): Promise<SignedTransaction> {
-        const signedTransferTransaction = await this.getTransfer(transfer);
+        transfer.validFrom = transfer.validFrom || 0;
+        transfer.validUntil = transfer.validUntil || MAX_TIMESTAMP;
+        const signedTransferTransaction = await this.getTransfer(transfer as any);
 
         const stringAmount = this.provider.tokenSet.formatToken(transfer.token, transfer.amount);
         const stringFee = this.provider.tokenSet.formatToken(transfer.token, transfer.fee);
@@ -176,7 +186,9 @@ export class Wallet {
             stringToken,
             to: transfer.to,
             nonce: transfer.nonce,
-            accountId: this.accountId
+            accountId: this.accountId,
+            validFrom: transfer.validFrom,
+            validUntil: transfer.validUntil
         });
         return {
             tx: signedTransferTransaction,
@@ -189,6 +201,8 @@ export class Wallet {
         token: TokenLike;
         fee: BigNumberish;
         nonce: number;
+        validFrom?: number;
+        validUntil?: number;
     }): Promise<ForcedExit> {
         if (!this.signer) {
             throw new Error('ZKSync signer is required for sending zksync transactions.');
@@ -202,7 +216,9 @@ export class Wallet {
             target: forcedExit.target,
             tokenId,
             fee: forcedExit.fee,
-            nonce: forcedExit.nonce
+            nonce: forcedExit.nonce,
+            validFrom: forcedExit.validFrom || 0,
+            validUntil: forcedExit.validUntil || MAX_TIMESTAMP
         };
 
         return await this.signer.signSyncForcedExit(transactionData, this.provider.zkSyncVersion);
@@ -213,6 +229,8 @@ export class Wallet {
         token: TokenLike;
         fee: BigNumberish;
         nonce: number;
+        validFrom?: number;
+        validUntil?: number;
     }): Promise<SignedTransaction> {
         const signedForcedExitTransaction = await this.getForcedExit(forcedExit);
 
@@ -226,6 +244,8 @@ export class Wallet {
         token: TokenLike;
         fee?: BigNumberish;
         nonce?: Nonce;
+        validFrom?: number;
+        validUntil?: number;
     }): Promise<Transaction> {
         forcedExit.nonce = forcedExit.nonce != null ? await this.getNonce(forcedExit.nonce) : await this.getNonce();
         if (forcedExit.fee == null) {
@@ -258,6 +278,8 @@ export class Wallet {
             amount: BigNumberish;
             fee: BigNumberish;
             nonce?: Nonce;
+            validFrom?: number;
+            validUntil?: number;
         }[]
     ): Promise<Transaction[]> {
         if (!this.signer) {
@@ -283,7 +305,9 @@ export class Wallet {
                 token: transfer.token,
                 amount: transfer.amount,
                 fee: transfer.fee,
-                nonce
+                nonce,
+                validFrom: transfer.validFrom || 0,
+                validUntil: transfer.validUntil || MAX_TIMESTAMP
             });
 
             bytes = ethers.utils.concat([bytes, serializeTransfer(tx)]);
@@ -303,6 +327,8 @@ export class Wallet {
         amount: BigNumberish;
         fee?: BigNumberish;
         nonce?: Nonce;
+        validFrom?: number;
+        validUntil?: number;
     }): Promise<Transaction> {
         transfer.nonce = transfer.nonce != null ? await this.getNonce(transfer.nonce) : await this.getNonce();
 
@@ -320,6 +346,8 @@ export class Wallet {
         amount: BigNumberish;
         fee: BigNumberish;
         nonce: number;
+        validFrom: number;
+        validUntil: number;
     }): Promise<Withdraw> {
         if (!this.signer) {
             throw new Error('ZKSync signer is required for sending zksync transactions.');
@@ -334,7 +362,9 @@ export class Wallet {
             tokenId,
             amount: withdraw.amount,
             fee: withdraw.fee,
-            nonce: withdraw.nonce
+            nonce: withdraw.nonce,
+            validFrom: withdraw.validFrom,
+            validUntil: withdraw.validUntil
         };
 
         return await this.signer.signSyncWithdraw(transactionData, this.provider.zkSyncVersion);
@@ -346,8 +376,12 @@ export class Wallet {
         amount: BigNumberish;
         fee: BigNumberish;
         nonce: number;
+        validFrom?: number;
+        validUntil?: number;
     }): Promise<SignedTransaction> {
-        const signedWithdrawTransaction = await this.getWithdrawFromSyncToEthereum(withdraw);
+        withdraw.validFrom = withdraw.validFrom || 0;
+        withdraw.validUntil = withdraw.validUntil || MAX_TIMESTAMP;
+        const signedWithdrawTransaction = await this.getWithdrawFromSyncToEthereum(withdraw as any);
 
         const stringAmount = this.provider.tokenSet.formatToken(withdraw.token, withdraw.amount);
         const stringFee = this.provider.tokenSet.formatToken(withdraw.token, withdraw.fee);
@@ -358,7 +392,9 @@ export class Wallet {
             stringToken,
             ethAddress: withdraw.ethAddress,
             nonce: withdraw.nonce,
-            accountId: this.accountId
+            accountId: this.accountId,
+            validFrom: withdraw.validFrom,
+            validUntil: withdraw.validUntil
         });
 
         return {
@@ -374,6 +410,8 @@ export class Wallet {
         fee?: BigNumberish;
         nonce?: Nonce;
         fastProcessing?: boolean;
+        validFrom?: number;
+        validUntil?: number;
     }): Promise<Transaction> {
         withdraw.nonce = withdraw.nonce != null ? await this.getNonce(withdraw.nonce) : await this.getNonce();
 
@@ -403,6 +441,8 @@ export class Wallet {
         fee: BigNumberish;
         nonce: number;
         ethAuthData: ChangePubKeyOnchain | ChangePubKeyECDSA | ChangePubKeyCREATE2;
+        validFrom: number;
+        validUntil: number;
     }): Promise<ChangePubKey> {
         if (!this.signer) {
             throw new Error('ZKSync signer is required for current pubkey calculation.');
@@ -419,7 +459,9 @@ export class Wallet {
                 nonce: changePubKey.nonce,
                 feeTokenId,
                 fee: BigNumber.from(changePubKey.fee).toString(),
-                ethAuthData: changePubKey.ethAuthData
+                ethAuthData: changePubKey.ethAuthData,
+                validFrom: changePubKey.validFrom,
+                validUntil: changePubKey.validUntil
             },
             this.provider.zkSyncVersion
         );
@@ -433,6 +475,8 @@ export class Wallet {
         nonce: number;
         ethAuthType: ChangePubkeyTypes;
         batchHash?: string;
+        validFrom?: number;
+        validUntil?: number;
     }): Promise<SignedTransaction> {
         const newPubKeyHash = await this.signer.pubKeyHash();
 
@@ -472,7 +516,9 @@ export class Wallet {
         }
 
         const changePubkeyTxUnsigned = Object.assign(changePubKey, { ethAuthData });
-        const changePubKeyTx = await this.getChangePubKey(changePubkeyTxUnsigned);
+        changePubkeyTxUnsigned.validFrom = changePubKey.validFrom || 0;
+        changePubkeyTxUnsigned.validUntil = changePubKey.validUntil || MAX_TIMESTAMP;
+        const changePubKeyTx = await this.getChangePubKey(changePubkeyTxUnsigned as any);
 
         return {
             tx: changePubKeyTx
@@ -484,6 +530,8 @@ export class Wallet {
         ethAuthType: ChangePubkeyTypes;
         fee?: BigNumberish;
         nonce?: Nonce;
+        validFrom?: number;
+        validUntil?: number;
     }): Promise<Transaction> {
         changePubKey.nonce =
             changePubKey.nonce != null ? await this.getNonce(changePubKey.nonce) : await this.getNonce();

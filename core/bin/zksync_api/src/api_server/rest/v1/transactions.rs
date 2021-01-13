@@ -716,6 +716,8 @@ mod tests {
             &to.address,
             None,
             false,
+            0,
+            u32::MAX,
         );
         client
             .submit_tx(
@@ -751,6 +753,8 @@ mod tests {
             &to.address,
             None,
             false,
+            0,
+            u32::MAX,
         );
         client
             .submit_tx(

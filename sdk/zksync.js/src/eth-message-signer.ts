@@ -30,13 +30,17 @@ export class EthMessageSigner {
         to: string;
         nonce: number;
         accountId: number;
+        validFrom: number;
+        validUntil: number;
     }): string {
         const humanReadableTxInfo =
             `Transfer ${transfer.stringAmount} ${transfer.stringToken}\n` +
             `To: ${transfer.to.toLowerCase()}\n` +
             `Nonce: ${transfer.nonce}\n` +
             `Fee: ${transfer.stringFee} ${transfer.stringToken}\n` +
-            `Account Id: ${transfer.accountId}`;
+            `Account Id: ${transfer.accountId}\n` +
+            `Valid from: ${transfer.validFrom}\n` +
+            `Valid until: ${transfer.validUntil}`;
 
         return humanReadableTxInfo;
     }
@@ -48,6 +52,8 @@ export class EthMessageSigner {
         to: string;
         nonce: number;
         accountId: number;
+        validFrom: number;
+        validUntil: number;
     }): Promise<TxEthSignature> {
         const message = this.getTransferEthSignMessage(transfer);
         return await this.getEthMessageSignature(message);
@@ -60,13 +66,17 @@ export class EthMessageSigner {
         ethAddress: string;
         nonce: number;
         accountId: number;
+        validFrom: number;
+        validUntil: number;
     }): string {
         const humanReadableTxInfo =
             `Withdraw ${withdraw.stringAmount} ${withdraw.stringToken}\n` +
             `To: ${withdraw.ethAddress.toLowerCase()}\n` +
             `Nonce: ${withdraw.nonce}\n` +
             `Fee: ${withdraw.stringFee} ${withdraw.stringToken}\n` +
-            `Account Id: ${withdraw.accountId}`;
+            `Account Id: ${withdraw.accountId}` +
+            `Valid from: ${withdraw.validFrom}\n` +
+            `Valid until: ${withdraw.validUntil}`;
 
         return humanReadableTxInfo;
     }
@@ -78,6 +88,8 @@ export class EthMessageSigner {
         ethAddress: string;
         nonce: number;
         accountId: number;
+        validFrom: number;
+        validUntil: number;
     }): Promise<TxEthSignature> {
         const message = this.getWithdrawEthSignMessage(withdraw);
         return await this.getEthMessageSignature(message);

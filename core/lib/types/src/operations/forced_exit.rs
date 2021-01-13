@@ -93,7 +93,16 @@ impl ForcedExitOp {
         let nonce = 0; // From pubdata it is unknown
 
         Ok(Self {
-            tx: ForcedExit::new(initiator_account_id, target, token, fee, nonce, None),
+            tx: ForcedExit::new(
+                initiator_account_id,
+                target,
+                token,
+                fee,
+                nonce,
+                0,
+                u32::MAX,
+                None,
+            ),
             target_account_id,
             withdraw_amount: Some(amount.into()),
         })

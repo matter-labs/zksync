@@ -27,6 +27,8 @@ fn get_batch() -> Vec<ZkSyncTx> {
         500u32.into(),
         20u32.into(),
         11,
+        0,
+        u32::MAX,
         None,
     );
 
@@ -38,6 +40,8 @@ fn get_batch() -> Vec<ZkSyncTx> {
         100u32.into(),
         10u32.into(),
         12,
+        0,
+        u32::MAX,
         None,
     );
 
@@ -48,6 +52,8 @@ fn get_batch() -> Vec<ZkSyncTx> {
         0,
         Default::default(),
         13,
+        0,
+        u32::MAX,
         None,
         Some(get_packed_signature()),
     );

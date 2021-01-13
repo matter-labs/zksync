@@ -721,7 +721,15 @@ async fn batch_transfer() -> Result<(), anyhow::Error> {
 
         let (transfer, signature) = wallet
             .signer
-            .sign_transfer(token.clone(), 1_000_000u64.into(), fee, recipient, nonce)
+            .sign_transfer(
+                token.clone(),
+                1_000_000u64.into(),
+                fee,
+                recipient,
+                nonce,
+                0,
+                u32::MAX,
+            )
             .await
             .expect("Transfer signing error");
 

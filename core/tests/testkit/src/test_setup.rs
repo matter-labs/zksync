@@ -348,9 +348,9 @@ impl TestSetup {
         self.accounts.zksync_accounts[account.0].set_account_id(Some(account_id));
 
         // Execute transaction
-        let tx = self
-            .accounts
-            .change_pubkey_with_tx(account, fee_token.0, fee, None, true);
+        let tx =
+            self.accounts
+                .change_pubkey_with_tx(account, fee_token.0, fee, None, true, 0, u32::MAX);
 
         self.execute_tx(tx).await;
     }
@@ -390,7 +390,16 @@ impl TestSetup {
 
         let tx = self
             .accounts
-            .change_pubkey_with_onchain_auth(eth_account, account, fee_token.0, fee, None, true)
+            .change_pubkey_with_onchain_auth(
+                eth_account,
+                account,
+                fee_token.0,
+                fee,
+                None,
+                true,
+                0,
+                u32::MAX,
+            )
             .await;
 
         self.execute_tx(tx).await;
@@ -403,6 +412,8 @@ impl TestSetup {
         token: Token,
         amount: BigUint,
         fee: BigUint,
+        valid_from: u32,
+        valid_until: u32,
     ) {
         let mut zksync0_old = self
             .get_expected_zksync_account_balance(from, token.0)
@@ -427,9 +438,17 @@ impl TestSetup {
             .sync_accounts_state
             .insert((self.accounts.fee_account_id, token.0), zksync0_old);
 
-        let transfer = self
-            .accounts
-            .transfer(from, to, token, amount, fee, None, true);
+        let transfer = self.accounts.transfer(
+            from,
+            to,
+            token,
+            amount,
+            fee,
+            None,
+            valid_from,
+            valid_until,
+            true,
+        );
 
         self.execute_tx(transfer).await;
     }
@@ -440,6 +459,8 @@ impl TestSetup {
         token: Token,
         amount: BigUint,
         fee: BigUint,
+        valid_from: u32,
+        valid_until: u32,
         rng: &mut impl Rng,
     ) {
         let mut zksync0_old = self
@@ -459,9 +480,17 @@ impl TestSetup {
             .sync_accounts_state
             .insert((self.accounts.fee_account_id, token.0), zksync0_old);
 
-        let transfer = self
-            .accounts
-            .transfer_to_new_random(from, token, amount, fee, None, true, rng);
+        let transfer = self.accounts.transfer_to_new_random(
+            from,
+            token,
+            amount,
+            fee,
+            None,
+            true,
+            valid_from,
+            valid_until,
+            rng,
+        );
 
         self.execute_tx(transfer).await;
     }
@@ -514,9 +543,9 @@ impl TestSetup {
             .sync_accounts_state
             .insert((self.accounts.fee_account_id, token.0), zksync0_old);
 
-        let withdraw = self
-            .accounts
-            .withdraw(from, to, token, amount, fee, None, true);
+        let withdraw =
+            self.accounts
+                .withdraw(from, to, token, amount, fee, None, true, 0, u32::MAX);
 
         self.execute_tx(withdraw).await;
     }
@@ -548,9 +577,17 @@ impl TestSetup {
             .sync_accounts_state
             .insert((self.accounts.fee_account_id, token.0), zksync0_old);
 
-        let withdraw = self
-            .accounts
-            .withdraw_to_random(from, token, amount, fee, None, true, rng);
+        let withdraw = self.accounts.withdraw_to_random(
+            from,
+            token,
+            amount,
+            fee,
+            None,
+            true,
+            0,
+            u32::MAX,
+            rng,
+        );
 
         self.execute_tx(withdraw).await;
     }
@@ -596,9 +633,9 @@ impl TestSetup {
                 fee_account_balance,
             );
 
-        let forced_exit = self
-            .accounts
-            .forced_exit(initiator, target, token_id, fee, None, true);
+        let forced_exit =
+            self.accounts
+                .forced_exit(initiator, target, token_id, fee, None, true, 0, u32::MAX);
 
         self.execute_tx(forced_exit).await;
     }

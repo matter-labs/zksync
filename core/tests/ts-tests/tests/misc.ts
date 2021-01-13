@@ -78,7 +78,15 @@ Tester.prototype.testMultipleBatchSigners = async function (wallets: Wallet[], t
         // Fee is zero for all wallets except the one sending this batch.
         const fee = BigNumber.from(i == 0 ? totalFee : 0);
         const nonce = await sender.getNonce();
-        const transfer = await sender.getTransfer({ to: receiver.address(), token, amount, fee, nonce });
+        const transfer = await sender.getTransfer({
+            to: receiver.address(),
+            token,
+            amount,
+            fee,
+            nonce,
+            validFrom: 0,
+            validUntil: Number.MAX_SAFE_INTEGER
+        });
         batch.push({ tx: transfer });
     }
     // The message is keccak256(batchBytes)
@@ -117,9 +125,19 @@ Tester.prototype.testMultipleWalletsWrongSignature = async function (
         token,
         amount,
         fee: 0,
-        nonce: await from.getNonce()
+        nonce: await from.getNonce(),
+        validFrom: 0,
+        validUntil: Number.MAX_SAFE_INTEGER
     });
-    const transfer2 = await to.getTransfer({ to: from.address(), token, amount, fee, nonce: await to.getNonce() });
+    const transfer2 = await to.getTransfer({
+        to: from.address(),
+        token,
+        amount,
+        fee,
+        nonce: await to.getNonce(),
+        validFrom: 0,
+        validUntil: Number.MAX_SAFE_INTEGER
+    });
     // transfer1 and transfer2 are from different wallets.
     const batch: SignedTransaction[] = [{ tx: transfer1 }, { tx: transfer2 }];
 

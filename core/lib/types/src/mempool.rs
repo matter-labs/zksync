@@ -46,4 +46,11 @@ impl SignedTxVariant {
             Self::Batch(batch) => batch.txs.iter().map(|tx| tx.hash()).collect(),
         }
     }
+
+    pub fn get_transactions(&self) -> Vec<SignedZkSyncTx> {
+        match self {
+            Self::Tx(tx) => vec![tx.clone()],
+            Self::Batch(batch) => batch.txs.clone(),
+        }
+    }
 }

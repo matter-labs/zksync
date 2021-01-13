@@ -39,7 +39,18 @@ fn create_withdraw_operations(
     amount: u32,
 ) -> ExecutedOperations {
     let withdraw_op = ZkSyncOp::Withdraw(Box::new(WithdrawOp {
-        tx: Withdraw::new(account_id, from, to, 0, amount.into(), 0u32.into(), 0, None),
+        tx: Withdraw::new(
+            account_id,
+            from,
+            to,
+            0,
+            amount.into(),
+            0u32.into(),
+            0,
+            0,
+            u32::MAX,
+            None,
+        ),
         account_id,
     }));
     let executed_tx = ExecutedTx {
