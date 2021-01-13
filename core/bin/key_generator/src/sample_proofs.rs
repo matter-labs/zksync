@@ -1,6 +1,5 @@
 //!
 
-use std::fs::File;
 use zksync_circuit::witness::WitnessBuilder;
 use zksync_config::AvailableBlockSizesConfig;
 use zksync_crypto::circuit::CircuitAccountTree;
@@ -9,7 +8,6 @@ use zksync_crypto::proof::{PrecomputedSampleProofs, SingleProof};
 use zksync_prover_utils::aggregated_proofs::{gen_aggregate_proof, prepare_proof_data};
 use zksync_prover_utils::fs_utils::get_precomputed_proofs_path;
 use zksync_prover_utils::{PlonkVerificationKey, SetupForStepByStepProver};
-use zksync_types::tokens::TokenLike::Address;
 use zksync_types::{Account, BlockNumber};
 
 fn generate_zksync_circuit_proofs(

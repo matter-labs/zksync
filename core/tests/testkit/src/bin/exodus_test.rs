@@ -15,7 +15,7 @@ use log::*;
 use num::BigUint;
 use std::time::Instant;
 use web3::transports::Http;
-use zksync_crypto::proof::EncodedAggregatedProof;
+use zksync_crypto::proof::{EncodedAggregatedProof, EncodedSingleProof};
 use zksync_testkit::*;
 use zksync_types::{AccountId, AccountMap};
 
@@ -125,7 +125,7 @@ async fn check_exit_garbage_proof(
         "Checking exit with garbage proof token: {}, amount: {}",
         token.0, amount
     );
-    let proof = EncodedAggregatedProof::default();
+    let proof = EncodedSingleProof::default();
     test_setup
         .exit(
             send_account,
@@ -135,7 +135,7 @@ async fn check_exit_garbage_proof(
             proof,
         )
         .await
-        .expect_revert("fet13");
+        .expect_revert("x");
     info!("Done cheching exit with garbage proof");
 }
 
@@ -212,7 +212,7 @@ async fn check_exit_correct_proof_second_time(
     test_setup
         .exit(send_account, account_id, token, &exit_amount, proof)
         .await
-        .expect_revert("fet12");
+        .expect_revert("t");
 
     let balance_to_withdraw_after = test_setup
         .get_balance_to_withdraw(send_account, token_address)
@@ -253,7 +253,7 @@ async fn check_exit_correct_proof_other_token(
     test_setup
         .exit(send_account, account_id, false_token, &exit_amount, proof)
         .await
-        .expect_revert("fet13");
+        .expect_revert("x");
 
     let balance_to_withdraw_after = test_setup
         .get_balance_to_withdraw(send_account, token_address)
@@ -294,7 +294,7 @@ async fn check_exit_correct_proof_other_amount(
     test_setup
         .exit(send_account, account_id, token, false_amount, proof)
         .await
-        .expect_revert("fet13");
+        .expect_revert("x");
 
     let balance_to_withdraw_after = test_setup
         .get_balance_to_withdraw(send_account, token_address)
@@ -334,7 +334,7 @@ async fn check_exit_correct_proof_incorrect_sender(
     test_setup
         .exit(send_account, account_id, token, &exit_amount, proof)
         .await
-        .expect_revert("fet13");
+        .expect_revert("x");
 
     let balance_to_withdraw_after = test_setup
         .get_balance_to_withdraw(send_account, token_address)

@@ -20,7 +20,7 @@ use zksync_types::{
 };
 
 use web3::types::TransactionReceipt;
-use zksync_crypto::proof::EncodedAggregatedProof;
+use zksync_crypto::proof::{EncodedAggregatedProof, EncodedSingleProof};
 use zksync_crypto::rand::Rng;
 
 use crate::account_set::AccountSet;
@@ -271,7 +271,7 @@ impl TestSetup {
         account_id: AccountId,
         token_id: Token,
         amount: &BigUint,
-        proof: EncodedAggregatedProof,
+        proof: EncodedSingleProof,
     ) -> ETHExecResult {
         let last_block = &self.last_committed_block;
         self.accounts.eth_accounts[sending_account.0]
@@ -898,7 +898,7 @@ impl TestSetup {
         accounts: AccountMap,
         fund_owner: ZKSyncAccountId,
         token: Token,
-    ) -> (EncodedAggregatedProof, BigUint) {
+    ) -> (EncodedSingleProof, BigUint) {
         let owner = &self.accounts.zksync_accounts[fund_owner.0];
         let owner_id = owner
             .get_account_id()
