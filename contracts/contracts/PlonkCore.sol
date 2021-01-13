@@ -1637,6 +1637,7 @@ contract Plonk4VerifierWithAccessToDNextOld {
 
         transcript.update_with_fr(proof.quotient_polynomial_at_z);
         transcript.update_with_fr(proof.linearization_polynomial_at_z);
+        transcript.update_with_fr(proof.grand_product_at_z_omega);
 
         state.v = transcript.get_challenge();
         transcript.update_with_g1(proof.opening_at_z_proof);
