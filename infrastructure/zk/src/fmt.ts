@@ -17,10 +17,12 @@ export async function prettier(extension: string, check: boolean = false) {
 
 export async function rustfmt(check: boolean = false) {
     process.chdir(process.env.ZKSYNC_HOME as string);
-    await utils.spawn('cargo fmt -- --check');
+    const command = check ? 'cargo fmt -- --check' : 'cargo fmt';
+
+    await utils.spawn(command);
 
     process.chdir('sdk/zksync-crypto');
-    await utils.spawn('cargo fmt -- --check');
+    await utils.spawn(command);
     process.chdir(process.env.ZKSYNC_HOME as string);
 }
 
