@@ -26,9 +26,10 @@ jobs:
         run: |
           docker-compose -f docker-compose-runner.yml down
           docker-compose -f docker-compose-runner.yml up --build -d geth postgres zk
+          ci_run sccache --start-server
 
-      - name: start_sccache
-        run: ci_run sccache --start-server
+      - name: install-zk
+        run: ci_run zk
 
       # Compile everything at once so it won't have to be recompiled later
       - name: compile
