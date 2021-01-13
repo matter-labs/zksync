@@ -588,7 +588,7 @@ impl TestSetup {
             CommitRequest::Block((new_block, _)) => {
                 panic!(
                     "Expected pending block, got full block proposed. Block: {:?}",
-                    new_block.block.block_transactions.len()
+                    new_block
                 );
             }
             CommitRequest::PendingBlock(_) => {
