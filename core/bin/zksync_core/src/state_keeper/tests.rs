@@ -338,16 +338,6 @@ mod apply_tx {
         assert!(result.is_err());
     }
 
-    /// Checks if processing withdrawal fails because of
-    /// small number of withdrawals_per_block
-    #[test]
-    fn withdrawals_limit_reached() {
-        let mut tester = StateKeeperTester::new(6, 1, 1);
-        let withdraw = create_account_and_withdrawal(&mut tester, 0, 1, 200u32, 145u32);
-        let result = tester.state_keeper.apply_tx(&withdraw);
-        assert!(result.is_err());
-    }
-
     /// Checks if processing withdrawal fails because the gas limit is reached.
     /// This sends 46 withdrawals (very ineficcient, but all constants in
     /// GasCounter are hardcoded, so I see no way out)
@@ -612,36 +602,6 @@ mod execute_proposed_block {
     #[tokio::test]
     async fn few_chunks() {
         let mut tester = StateKeeperTester::new(12, 3, 3);
-        let good_withdraw = create_account_and_withdrawal(&mut tester, 0, 1, 200u32, 145u32);
-        let bad_withdraw = create_account_and_withdrawal(&mut tester, 2, 2, 100u32, 145u32);
-        let deposit = create_deposit(0, 12u32);
-        let proposed_block = ProposedBlock {
-            txs: vec![
-                SignedTxVariant::Tx(good_withdraw),
-                SignedTxVariant::Tx(bad_withdraw),
-            ],
-            priority_ops: vec![deposit],
-        };
-        tester
-            .state_keeper
-            .execute_proposed_block(proposed_block)
-            .await;
-        assert!(matches!(
-            tester.response_rx.next().await,
-            Some(CommitRequest::Block(_))
-        ));
-        assert!(matches!(
-            tester.response_rx.next().await,
-            Some(CommitRequest::PendingBlock(_))
-        ));
-    }
-
-    /// Checks if executing a proposed_block is done correctly
-    /// There are more withdrawals than one can fit in 1 block,
-    /// so 1 block should get sealed in the process
-    #[tokio::test]
-    async fn few_withdrawals() {
-        let mut tester = StateKeeperTester::new(20, 3, 3);
         let good_withdraw = create_account_and_withdrawal(&mut tester, 0, 1, 200u32, 145u32);
         let bad_withdraw = create_account_and_withdrawal(&mut tester, 2, 2, 100u32, 145u32);
         let deposit = create_deposit(0, 12u32);
