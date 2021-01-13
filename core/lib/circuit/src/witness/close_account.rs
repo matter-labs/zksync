@@ -182,6 +182,8 @@ impl CloseAccountWitness<Bn256> {
                 a: Some(a),
                 b: Some(b),
                 new_pub_key_hash: Some(Fr::zero()),
+                valid_from: Some(Fr::zero()),
+                valid_until: Some(Fr::from_str(&u64::MAX.to_string()).unwrap()),
             },
             before_root: Some(before_root),
             after_root: Some(after_root),

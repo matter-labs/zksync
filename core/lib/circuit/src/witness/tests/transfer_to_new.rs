@@ -370,3 +370,62 @@ fn test_transfer_replay() {
         },
     );
 }
+
+/// Basic check for execution of `TransferToNew` operation in circuit with incorrect timestamps.
+#[test]
+#[ignore]
+fn test_incorrect_transfer_to_new_timestamps() {
+    // Test vector of (initial_balance, transfer_amount, fee_amount, valid_from, valid_until).
+    let test_vector = vec![
+        (10u64, 7u64, 3u64, 0, 0),                     // Basic transfer
+        (0, 0, 0, 0, 0),                               // Zero transfer
+        (std::u64::MAX, 1, 1, 0, 0),                   // Small transfer from rich account,
+        (std::u64::MAX, 10000, 1, u64::MAX, u64::MAX), // Big transfer from rich account (too big values can't be used, since they're not packable),
+        (std::u64::MAX, 1, 10000, u64::MAX, u64::MAX), // Very big fee
+    ];
+
+    for (initial_balance, transfer_amount, fee_amount, valid_from, valid_until) in test_vector {
+        // Input data.
+        let accounts = vec![WitnessTestAccount::new(1, initial_balance)];
+        let account_from = &accounts[0];
+        let account_to = WitnessTestAccount::new_empty(2); // Will not be included into state.
+        let transfer_op = TransferToNewOp {
+            tx: account_from
+                .zksync_account
+                .sign_transfer(
+                    0,
+                    "",
+                    BigUint::from(transfer_amount),
+                    BigUint::from(fee_amount),
+                    &account_to.account.address,
+                    None,
+                    valid_from,
+                    valid_until,
+                    true,
+                )
+                .0,
+            from: account_from.id,
+            to: account_to.id,
+        };
+
+        // Additional data required for performing the operation.
+        let input = SigDataInput::from_transfer_to_new_op(&transfer_op)
+            .expect("SigDataInput creation failed");
+
+        // Operation is not valid, since transaction timestamp is invalid.
+        const ERR_MSG: &str = "op_valid is true/enforce equal to one";
+
+        incorrect_op_test_scenario::<TransferToNewWitness<Bn256>, _>(
+            &accounts,
+            transfer_op,
+            input,
+            ERR_MSG,
+            || {
+                vec![CollectedFee {
+                    token: 0,
+                    amount: fee_amount.into(),
+                }]
+            },
+        );
+    }
+}

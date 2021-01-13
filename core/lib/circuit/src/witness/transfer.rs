@@ -38,6 +38,8 @@ pub struct TransferData {
     pub token: u32,
     pub from_account_address: u32,
     pub to_account_address: u32,
+    pub valid_from: u64,
+    pub valid_until: u64,
 }
 
 pub struct TransferWitness<E: RescueEngine> {
@@ -65,6 +67,8 @@ impl Witness for TransferWitness<Bn256> {
             token: u32::from(transfer.tx.token),
             from_account_address: transfer.from,
             to_account_address: transfer.to,
+            valid_from: transfer.tx.valid_from.unwrap_or(0),
+            valid_until: transfer.tx.valid_until.unwrap_or(u64::MAX),
         };
         // le_bit_vector_into_field_element()
         Self::apply_data(tree, &transfer_data)
@@ -242,6 +246,9 @@ impl TransferWitness<Bn256> {
 
         let fee_encoded: Fr = le_bit_vector_into_field_element(&fee_bits);
 
+        let valid_from = transfer.valid_from;
+        let valid_until = transfer.valid_until;
+
         //applying first transfer part
         let (
             account_witness_from_before,
@@ -364,6 +371,8 @@ impl TransferWitness<Bn256> {
                 a: Some(a),
                 b: Some(b),
                 new_pub_key_hash: Some(Fr::zero()),
+                valid_from: Some(Fr::from_str(&valid_from.to_string()).unwrap()),
+                valid_until: Some(Fr::from_str(&valid_until.to_string()).unwrap()),
             },
             before_root: Some(before_root),
             intermediate_root: Some(intermediate_root),

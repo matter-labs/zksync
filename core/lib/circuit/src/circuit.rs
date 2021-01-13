@@ -791,6 +791,16 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
                 &op_data.full_amount,
                 &prev.op_data.full_amount,
             )?);
+            is_op_data_correct_flags.push(CircuitElement::equals(
+                cs.namespace(|| "is valid_from equal to previous"),
+                &op_data.valid_from,
+                &prev.op_data.valid_from,
+            )?);
+            is_op_data_correct_flags.push(CircuitElement::equals(
+                cs.namespace(|| "is valid_until equal to previous"),
+                &op_data.valid_until,
+                &prev.op_data.valid_until,
+            )?);
 
             let is_op_data_equal_to_previous = multi_and(
                 cs.namespace(|| "is_op_data_equal_to_previous"),
@@ -844,6 +854,12 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
             diff_a_b_bits_repacked,
         )?);
 
+        let is_valid_timestamp = self.verify_operation_timestamp(
+            cs.namespace(|| "verify operation timestamp"),
+            &op_data,
+            &global_variables,
+        )?;
+
         let mut op_flags = vec![];
         op_flags.push(self.deposit(
             cs.namespace(|| "deposit"),
@@ -865,6 +881,7 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
             &op_data,
             &signer_key,
             &ext_pubdata_chunk,
+            &is_valid_timestamp,
             &signature_data.is_verified,
             &mut previous_pubdatas[TransferOp::OP_CODE as usize],
         )?);
@@ -879,6 +896,7 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
             &op_data,
             &signer_key,
             &ext_pubdata_chunk,
+            &is_valid_timestamp,
             &signature_data.is_verified,
             &mut previous_pubdatas[TransferToNewOp::OP_CODE as usize],
         )?);
@@ -1762,6 +1780,7 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
         op_data: &AllocatedOperationData<E>,
         signer_key: &AllocatedSignerPubkey<E>,
         ext_pubdata_chunk: &AllocatedNum<E>,
+        is_valid_timestamp: &Boolean,
         is_sig_verified: &Boolean,
         pubdata_holder: &mut Vec<AllocatedNum<E>>,
     ) -> Result<Boolean, SynthesisError> {
@@ -1812,6 +1831,8 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
         serialized_tx_bits.extend(op_data.amount_packed.get_bits_be());
         serialized_tx_bits.extend(op_data.fee_packed.get_bits_be());
         serialized_tx_bits.extend(cur.account.nonce.get_bits_be());
+        serialized_tx_bits.extend(op_data.valid_from.get_bits_be());
+        serialized_tx_bits.extend(op_data.valid_until.get_bits_be());
         assert_eq!(serialized_tx_bits.len(), SIGNED_TRANSFER_BIT_WIDTH);
 
         let pubdata_chunk = select_pubdata_chunk(
@@ -1835,6 +1856,7 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
             Expression::u64::<CS>(u64::from(TransferToNewOp::OP_CODE)),
         )?);
         lhs_valid_flags.push(is_transfer.clone());
+        lhs_valid_flags.push(is_valid_timestamp.clone());
 
         let is_first_chunk = Boolean::from(Expression::equals(
             cs.namespace(|| "is_first_chunk"),
@@ -1952,6 +1974,7 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
         rhs_valid_flags.push(is_pubdata_chunk_correct.clone());
         rhs_valid_flags.push(is_second_chunk.clone());
         rhs_valid_flags.push(is_transfer.clone());
+        rhs_valid_flags.push(is_valid_timestamp.clone());
         rhs_valid_flags.push(is_account_empty.clone());
         rhs_valid_flags.push(pubdata_properly_copied.clone());
 
@@ -2002,6 +2025,7 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
         op_data: &AllocatedOperationData<E>,
         signer_key: &AllocatedSignerPubkey<E>,
         ext_pubdata_chunk: &AllocatedNum<E>,
+        is_valid_timestamp: &Boolean,
         is_sig_verified: &Boolean,
         pubdata_holder: &mut Vec<AllocatedNum<E>>,
     ) -> Result<Boolean, SynthesisError> {
@@ -2045,6 +2069,8 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
         serialized_tx_bits.extend(op_data.amount_packed.get_bits_be());
         serialized_tx_bits.extend(op_data.fee_packed.get_bits_be());
         serialized_tx_bits.extend(cur.account.nonce.get_bits_be());
+        serialized_tx_bits.extend(op_data.valid_from.get_bits_be());
+        serialized_tx_bits.extend(op_data.valid_until.get_bits_be());
         assert_eq!(serialized_tx_bits.len(), SIGNED_TRANSFER_BIT_WIDTH);
 
         let pubdata_chunk = select_pubdata_chunk(
@@ -2071,6 +2097,7 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
 
         lhs_valid_flags.push(is_pubdata_chunk_correct.clone());
         lhs_valid_flags.push(is_transfer.clone());
+        lhs_valid_flags.push(is_valid_timestamp.clone());
 
         let is_first_chunk = Boolean::from(Expression::equals(
             cs.namespace(|| "is_first_chunk"),
@@ -2155,6 +2182,7 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
         let mut rhs_valid_flags = vec![];
         rhs_valid_flags.push(pubdata_properly_copied);
         rhs_valid_flags.push(is_transfer);
+        rhs_valid_flags.push(is_valid_timestamp.clone());
 
         let is_chunk_second = Boolean::from(Expression::equals(
             cs.namespace(|| "is_chunk_second"),
@@ -2407,6 +2435,35 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
             &[is_ohs_valid, lhs_valid, rhs_valid],
         )?;
         Ok(is_op_valid)
+    }
+
+    fn verify_operation_timestamp<CS: ConstraintSystem<E>>(
+        &self,
+        mut cs: CS,
+        op_data: &AllocatedOperationData<E>,
+        global_variables: &CircuitGlobalVariables<E>,
+    ) -> Result<Boolean, SynthesisError> {
+        let is_valid_from_ok = CircuitElement::less_than_fixed(
+            cs.namespace(|| "valid_from leq block_timestamp"),
+            &global_variables.block_timestamp,
+            &op_data.valid_from,
+        )?
+        .not();
+
+        let is_valid_until_ok = CircuitElement::less_than_fixed(
+            cs.namespace(|| "block_timestamp leq valid_until"),
+            &op_data.valid_until,
+            &global_variables.block_timestamp,
+        )?
+        .not();
+
+        let is_valid_timestamp = Boolean::and(
+            cs.namespace(|| "is_valid_from_ok AND is_valid_until_ok"),
+            &is_valid_from_ok,
+            &is_valid_until_ok,
+        )?;
+
+        Ok(is_valid_timestamp)
     }
 }
 
