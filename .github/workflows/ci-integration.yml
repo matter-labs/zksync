@@ -1,4 +1,4 @@
-name: CI
+name: CI integration tests
 
 on:
   pull_request:
@@ -8,13 +8,10 @@ on:
     - trying
 
 jobs:
-  ci-all:
-    # We currently have two self-hosted runners, one of which is marked "DEV-CI" and other one is marder "MAIN".
-    # "MAIN" is the current CI runner, "DEV-CI" is currently used to experiment with CI optimizing.
-    runs-on: [self-hosted, TEST]
+  ci-integration:
+    runs-on: [self-hosted, CI-worker]
 
     steps:
-
       - uses: actions/checkout@v2
 
       - name: setup-env
@@ -64,12 +61,3 @@ jobs:
       
       - name: integration-testkit
         run: ci_run zk test integration testkit
-
-      - name: contracts-unit-tests
-        run: ci_run zk test contracts
-
-      - name: js-unit-tests
-        run: ci_run zk test js
-
-      - name: rust-unit-tests
-        run: ci_run zk test rust

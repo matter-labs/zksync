@@ -33,8 +33,11 @@ export async function lint(extension: string, check: boolean = false) {
 }
 
 async function clippy() {
+    // We don't want clippy to require running database.
+    process.env.SQLX_OFFLINE = 'true';
     process.chdir(process.env.ZKSYNC_HOME as string);
     await utils.spawn('cargo clippy --all --tests --benches -- -D warnings');
+    delete process.env.SQLX_OFFLINE;
 
     process.chdir('sdk/zksync-crypto');
     await utils.spawn('cargo clippy --all --tests --benches -- -D warnings');
