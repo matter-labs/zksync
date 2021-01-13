@@ -408,14 +408,12 @@ struct MempoolTransactionsHandler {
     mempool_state: Arc<RwLock<MempoolState>>,
     requests: mpsc::Receiver<MempoolTransactionRequest>,
     max_block_size_chunks: usize,
-    max_number_of_withdrawals_per_block: usize,
 }
 
 struct MempoolTransactionsHandlerBuilder {
     db_pool: ConnectionPool,
     mempool_state: Arc<RwLock<MempoolState>>,
     max_block_size_chunks: usize,
-    max_number_of_withdrawals_per_block: usize,
 }
 
 impl BuildBalancedItem<MempoolTransactionRequest, MempoolTransactionsHandler>
@@ -430,7 +428,6 @@ impl BuildBalancedItem<MempoolTransactionRequest, MempoolTransactionsHandler>
             mempool_state: self.mempool_state.clone(),
             requests: receiver,
             max_block_size_chunks: self.max_block_size_chunks,
-            max_number_of_withdrawals_per_block: self.max_number_of_withdrawals_per_block,
         }
     }
 }
@@ -482,16 +479,6 @@ impl MempoolTransactionsHandler {
 
         if self.mempool_state.read().await.chunks_for_batch(&batch) > self.max_block_size_chunks {
             return Err(TxAddError::BatchTooBig);
-        }
-
-        let mut number_of_withdrawals = 0;
-        for tx in txs {
-            if tx.tx.is_withdraw() {
-                number_of_withdrawals += 1;
-            }
-        }
-        if number_of_withdrawals > self.max_number_of_withdrawals_per_block {
-            return Err(TxAddError::BatchWithdrawalsOverload);
         }
 
         let mut transaction = storage.start_transaction().await.map_err(|err| {
@@ -559,7 +546,6 @@ pub fn run_mempool_tasks(
                 db_pool: db_pool.clone(),
                 mempool_state: mempool_state.clone(),
                 max_block_size_chunks,
-                max_number_of_withdrawals_per_block: config.max_number_of_withdrawals_per_block,
             },
             tx_requests,
             number_of_mempool_transaction_handlers,
