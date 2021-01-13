@@ -1,5 +1,14 @@
 import { BigNumber, BigNumberish, ethers } from 'ethers';
-import { Address, TokenLike, Nonce, ChangePubKey, ChangePubKeyFee, SignedTransaction, TxEthSignature } from './types';
+import {
+    Address,
+    TokenLike,
+    Nonce,
+    ChangePubKey,
+    ChangePubKeyFee,
+    SignedTransaction,
+    TxEthSignature,
+    ChangePubkeyTypes
+} from './types';
 import { getChangePubkeyMessage, serializeTx } from './utils';
 import { Wallet } from './wallet';
 
@@ -18,9 +27,6 @@ interface InternalTx {
  * Provides iterface for constructing batches of transactions.
  */
 export class BatchBuilder {
-    private changePubKeyTx: ChangePubKey = null;
-    private changePubKeyOnChain: boolean = null;
-
     private constructor(private wallet: Wallet, private nonce: Nonce, private txs: InternalTx[] = []) {}
 
     static fromWallet(wallet: Wallet, nonce?: Nonce): BatchBuilder {
@@ -31,7 +37,6 @@ export class BatchBuilder {
     /**
      * Construct the batch from the given transactions.
      * Returs it with the corresponding Ethereum signature and total fee.
-     * The message signed is keccak256(batchBytes) possibly prefixed with ChangePubKeyMessage if it's in the batch.
      * @param feeToken If provided, the fee for the whole batch will be obtained from the server in this token.
      * Possibly creates phantom transfer.
      */
@@ -47,38 +52,9 @@ export class BatchBuilder {
         const totalFee = this.txs
             .map((tx) => tx.tx.fee)
             .reduce((sum: BigNumber, current: BigNumber) => sum.add(current), BigNumber.from(0));
-        const { txs, bytes } = await this.processTransactions();
+        const { txs, message } = await this.processTransactions();
 
-        const batchHash = ethers.utils.keccak256(bytes);
-        let signature: TxEthSignature;
-        if (this.changePubKeyOnChain === false) {
-            // The message is ChangePubKeyMessage + keccak256(batchBytes).
-            // Used for both batch and ChangePubKey transaction.
-            signature = await this.wallet.getEthMessageSignature(
-                getChangePubkeyMessage(
-                    this.changePubKeyTx.newPkHash,
-                    this.changePubKeyTx.nonce,
-                    this.wallet.accountId,
-                    batchHash
-                )
-            );
-            // It is necessary to store the hash, so the signature can be verified on smart contract.
-            this.changePubKeyTx.ethAuthData = {
-                type: 'ECDSA',
-                ethSignature: signature.signature,
-                batchHash
-            };
-        } else {
-            // The message is just keccak256(batchBytes).
-            signature = await this.wallet.getEthMessageSignature(
-                Uint8Array.from(Buffer.from(batchHash.slice(2), 'hex'))
-            );
-            if (this.changePubKeyTx != null) {
-                this.changePubKeyTx.ethAuthData = {
-                    type: 'Onchain'
-                };
-            }
-        }
+        let signature = await this.wallet.getEthMessageSignature(message);
 
         return {
             txs,
@@ -153,22 +129,24 @@ export class BatchBuilder {
         return this;
     }
 
-    addChangePubKey(changePubKey: { feeToken: TokenLike; fee?: BigNumberish; onchainAuth?: boolean }): BatchBuilder {
-        if (this.changePubKeyOnChain != null) {
-            throw new Error('ChangePubKey operation must be unique within a batch');
-        }
+    addChangePubKey(changePubKey: {
+        feeToken: TokenLike;
+        fee: BigNumberish;
+        nonce: number;
+        ethAuthType: ChangePubkeyTypes;
+        batchHash?: string;
+    }): BatchBuilder {
         const fee = changePubKey.fee != undefined ? changePubKey.fee : 0;
-        const onchainAuth = changePubKey.onchainAuth != undefined ? changePubKey.onchainAuth : false;
-        this.changePubKeyOnChain = onchainAuth;
         const _changePubKey = {
             feeToken: changePubKey.feeToken,
             fee: fee,
             nonce: null,
-            onchainAuth: onchainAuth
+            ethAuthType: changePubKey.ethAuthType,
+            pubKeyHash: null
         };
         const feeType = {
             ChangePubKey: {
-                onchainPubkeyAuth: _changePubKey.onchainAuth
+                onchainPubkeyAuth: changePubKey.ethAuthType === 'Onchain'
             }
         };
         this.txs.push({
@@ -200,46 +178,40 @@ export class BatchBuilder {
     }
 
     /**
-     * Sets transactions nonces, assembles the batch and serializes them into single array.
+     * Sets transactions nonces, assembles the batch and constructs the message to be signed by user.
      */
-    private async processTransactions(): Promise<{ txs: SignedTransaction[]; bytes: Uint8Array }> {
+    private async processTransactions(): Promise<{ txs: SignedTransaction[]; message: string }> {
         const processedTxs: SignedTransaction[] = [];
-        const _bytes: Uint8Array[] = [];
+        let messages: string[] = [];
         let nonce: number = await this.wallet.getNonce(this.nonce);
         for (const tx of this.txs) {
             tx.tx.nonce = nonce++;
             switch (tx.type) {
                 case 'Withdraw':
+                    messages.push(this.wallet.getWithdrawEthMessagePart(tx.tx));
                     const withdraw = { tx: await this.wallet.getWithdrawFromSyncToEthereum(tx.tx) };
-                    _bytes.push(serializeTx(withdraw.tx));
                     processedTxs.push(withdraw);
                     break;
                 case 'Transfer':
+                    messages.push(this.wallet.getTransferEthMessagePart(tx.tx));
                     const transfer = { tx: await this.wallet.getTransfer(tx.tx) };
-                    _bytes.push(serializeTx(transfer.tx));
                     processedTxs.push(transfer);
                     break;
                 case 'ChangePubKey':
-                    const changePubKey = { tx: await this.wallet.getChangePubKey(tx.tx) };
-                    const currentPubKeyHash = await this.wallet.getCurrentPubKeyHash();
-                    if (currentPubKeyHash === changePubKey.tx.newPkHash) {
-                        throw new Error('Current signing key is already set');
-                    }
-                    // We will sign it if necessary and store the batch hash.
-                    this.changePubKeyTx = changePubKey.tx;
-                    _bytes.push(serializeTx(changePubKey.tx));
+                    const changePubKey = await this.wallet.signSetSigningKey(tx.tx);
+                    tx.tx.pubKeyHash = (changePubKey.tx as ChangePubKey).newPkHash;
+                    messages.push(this.wallet.getChangePubKeyEthMessagePart(tx.tx));
                     processedTxs.push(changePubKey);
                     break;
                 case 'ForcedExit':
                     const forcedExit = { tx: await this.wallet.getForcedExit(tx.tx) };
-                    _bytes.push(serializeTx(forcedExit.tx));
                     processedTxs.push(forcedExit);
                     break;
             }
         }
         return {
             txs: processedTxs,
-            bytes: ethers.utils.concat(_bytes)
+            message: messages.join('\n')
         };
     }
 }

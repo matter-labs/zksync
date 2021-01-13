@@ -273,7 +273,7 @@ export class Wallet {
         await this.setRequiredAccountIdFromServer('Transfer funds');
 
         let batch = [];
-        let bytes = new Uint8Array([]);
+        let messages: string[] = [];
 
         let nextNonce = transfers[0].nonce != null ? await this.getNonce(transfers[0].nonce) : await this.getNonce();
 
@@ -290,11 +290,11 @@ export class Wallet {
                 nonce
             });
 
-            bytes = ethers.utils.concat([bytes, serializeTransfer(tx)]);
+            messages.push(this.getTransferEthMessagePart(transfer));
             batch.push({ tx, signature: null });
         }
-        const hash = ethers.utils.keccak256(bytes).slice(2);
-        const message = Uint8Array.from(Buffer.from(hash, 'hex'));
+
+        const message = messages.join('\n');
         const ethSignature = await this.ethMessageSigner.getEthMessageSignature(message);
 
         const transactionHashes = await this.provider.submitTxsBatch(batch, [ethSignature]);
@@ -518,6 +518,69 @@ export class Wallet {
         }
 
         return submitSignedTransaction(txData, this.provider);
+    }
+
+    // The following three methods are needed in case user decided to build
+    // a message for the batch himself (e.g. in case of multi-authors batch).
+    // It seems that these methods belong to ethMessageSigner, however, we have
+    // to resolve the token and format amount/fee before constructing the
+    // transaction.
+    getTransferEthMessagePart(transfer: {
+        to: Address;
+        token: TokenLike;
+        amount: BigNumberish;
+        fee: BigNumberish;
+    }): string {
+        const stringAmount = BigNumber.from(transfer.amount).isZero()
+            ? null
+            : this.provider.tokenSet.formatToken(transfer.token, transfer.amount);
+        const stringFee = BigNumber.from(transfer.fee).isZero()
+            ? null
+            : this.provider.tokenSet.formatToken(transfer.token, transfer.fee);
+        const stringToken = this.provider.tokenSet.resolveTokenSymbol(transfer.token);
+        return this.ethMessageSigner.getTransferEthMessagePart({
+            stringAmount,
+            stringFee,
+            stringToken,
+            to: transfer.to
+        });
+    }
+
+    getWithdrawEthMessagePart(withdraw: {
+        ethAddress: string;
+        token: TokenLike;
+        amount: BigNumberish;
+        fee: BigNumberish;
+    }): string {
+        const stringAmount = BigNumber.from(withdraw.amount).isZero()
+            ? null
+            : this.provider.tokenSet.formatToken(withdraw.token, withdraw.amount);
+        const stringFee = BigNumber.from(withdraw.fee).isZero()
+            ? null
+            : this.provider.tokenSet.formatToken(withdraw.token, withdraw.fee);
+        const stringToken = this.provider.tokenSet.resolveTokenSymbol(withdraw.token);
+        return this.ethMessageSigner.getWithdrawEthMessagePart({
+            stringAmount,
+            stringFee,
+            stringToken,
+            to: withdraw.ethAddress
+        });
+    }
+
+    getChangePubKeyEthMessagePart(changePubKey: {
+        pubKeyHash: string;
+        feeToken: TokenLike;
+        fee: BigNumberish;
+    }): string {
+        const stringFee = BigNumber.from(changePubKey.fee).isZero()
+            ? null
+            : this.provider.tokenSet.formatToken(changePubKey.feeToken, changePubKey.fee);
+        const stringToken = this.provider.tokenSet.resolveTokenSymbol(changePubKey.feeToken);
+        return this.ethMessageSigner.getChangePubKeyEthMessagePart({
+            pubKeyHash: changePubKey.pubKeyHash,
+            stringToken,
+            stringFee
+        });
     }
 
     async isOnchainAuthSigningKeySet(nonce: Nonce = 'committed'): Promise<boolean> {
