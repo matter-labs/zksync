@@ -9,7 +9,7 @@ use crate::{
 };
 use actix_web::{web, HttpResponse, Result as ActixResult};
 use futures::channel::mpsc;
-use zksync_config::configs::ZkSyncConfig;
+use zksync_config::ZkSyncConfig;
 use zksync_storage::{
     chain::{
         block::records::BlockDetails,

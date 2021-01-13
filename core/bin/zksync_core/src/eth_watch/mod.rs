@@ -35,7 +35,7 @@ use self::{
 
 pub use client::EthHttpClient;
 pub use storage::DBStorage;
-use zksync_config::configs::ZkSyncConfig;
+use zksync_config::ZkSyncConfig;
 
 mod client;
 mod eth_state;

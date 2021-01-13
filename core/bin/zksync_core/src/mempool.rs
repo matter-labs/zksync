@@ -42,7 +42,7 @@ use zksync_types::{
     TransferOp, TransferToNewOp, ZkSyncTx,
 };
 
-use zksync_config::configs::ZkSyncConfig;
+use zksync_config::ZkSyncConfig;
 // Local uses
 use crate::{
     balancer::{Balancer, BuildBalancedItem},

@@ -7,7 +7,7 @@ use actix_web::{web, Scope};
 
 // Workspace uses
 use zksync_api_client::rest::v1::Contracts;
-use zksync_config::configs::ZkSyncConfig;
+use zksync_config::ZkSyncConfig;
 use zksync_types::{network::Network, Address};
 
 // Local uses

@@ -15,7 +15,7 @@ use futures::{
     future, SinkExt,
 };
 use tokio::task::JoinHandle;
-use zksync_config::configs::ZkSyncConfig;
+use zksync_config::ZkSyncConfig;
 use zksync_storage::ConnectionPool;
 
 const DEFAULT_CHANNEL_CAPACITY: usize = 32_768;

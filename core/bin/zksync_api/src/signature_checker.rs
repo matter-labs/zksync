@@ -17,7 +17,7 @@ use tokio::runtime::{Builder, Handle};
 use zksync_types::{tx::TxEthSignature, SignedZkSyncTx, ZkSyncTx};
 // Local uses
 use crate::{eth_checker::EthereumChecker, tx_error::TxAddError};
-use zksync_config::configs::ZkSyncConfig;
+use zksync_config::ZkSyncConfig;
 use zksync_types::tx::EthSignData;
 use zksync_utils::panic_notify::ThreadPanicNotify;
 

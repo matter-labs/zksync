@@ -10,7 +10,7 @@ use actix_web::{
 
 // Workspace uses
 pub use zksync_api_client::rest::v1::{BlockInfo, TransactionInfo};
-use zksync_config::configs::ZkSyncConfig;
+use zksync_config::ZkSyncConfig;
 use zksync_crypto::{convert::FeConvert, Fr};
 use zksync_storage::{chain::block::records, ConnectionPool, QueryResult};
 use zksync_types::{tx::TxHash, BlockNumber};

@@ -4,7 +4,7 @@ use log::info;
 use std::time::Instant;
 use web3::transports::Http;
 use zksync_circuit::witness::utils::build_block_witness;
-use zksync_config::configs::ZkSyncConfig;
+use zksync_config::ZkSyncConfig;
 use zksync_crypto::circuit::CircuitAccountTree;
 use zksync_crypto::params::account_tree_depth;
 use zksync_prover_utils::{PlonkVerificationKey, SetupForStepByStepProver};

@@ -47,7 +47,7 @@ use crate::fee_ticker::validator::MarketUpdater;
 use std::convert::TryFrom;
 use std::iter::FromIterator;
 use zksync_config::configs::ticker::TokenPriceSource;
-use zksync_config::configs::ZkSyncConfig;
+use zksync_config::ZkSyncConfig;
 
 mod constants;
 mod fee;

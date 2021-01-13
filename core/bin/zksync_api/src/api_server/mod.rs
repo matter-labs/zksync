@@ -10,7 +10,7 @@ pub use rest::v1;
 // External uses
 use futures::channel::mpsc;
 // Workspace uses
-use zksync_config::configs::ZkSyncConfig;
+use zksync_config::ZkSyncConfig;
 use zksync_storage::ConnectionPool;
 // Local uses
 use crate::fee_ticker::TickerRequest;

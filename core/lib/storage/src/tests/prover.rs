@@ -2,7 +2,7 @@
 use std::time::Duration;
 // External imports
 // Workspace imports
-use zksync_config::configs::ZkSyncConfig;
+use zksync_config::ZkSyncConfig;
 use zksync_crypto::proof::EncodedProofPlonk;
 use zksync_types::{block::PendingBlock, Action};
 // Local imports

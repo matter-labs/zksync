@@ -10,7 +10,7 @@ use zksync_eth_signer::PrivateKeySigner;
 // Workspace uses
 use super::ExecutedTxStatus;
 use std::time::Duration;
-use zksync_config::configs::ZkSyncConfig;
+use zksync_config::ZkSyncConfig;
 use zksync_contracts::zksync_contract;
 use zksync_eth_client::{ETHClient, SignedCallResult};
 

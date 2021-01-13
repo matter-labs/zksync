@@ -12,7 +12,7 @@ use futures::{
 };
 use tokio::{task::JoinHandle, time};
 // Workspace deps
-use zksync_config::configs::ZkSyncConfig;
+use zksync_config::ZkSyncConfig;
 // Local deps
 use crate::{
     mempool::{GetBlockRequest, MempoolBlocksRequest, ProposedBlock},

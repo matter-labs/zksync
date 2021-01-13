@@ -11,7 +11,7 @@ use Error as ApiError;
 pub use zksync_api_client::rest::v1::{
     Client, ClientError, Pagination, PaginationQuery, MAX_LIMIT,
 };
-use zksync_config::configs::ZkSyncConfig;
+use zksync_config::ZkSyncConfig;
 
 // Local uses
 use crate::api_server::tx_sender::TxSender;

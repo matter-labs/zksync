@@ -14,7 +14,7 @@ use num::bigint::ToBigInt;
 use thiserror::Error;
 
 // Workspace uses
-use zksync_config::configs::ZkSyncConfig;
+use zksync_config::ZkSyncConfig;
 use zksync_storage::ConnectionPool;
 use zksync_types::{
     tx::EthSignData,
