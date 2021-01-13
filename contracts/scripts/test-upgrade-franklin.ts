@@ -1,14 +1,12 @@
 import { ArgumentParser } from 'argparse';
 import { deployContract } from 'ethereum-waffle';
 import { constants, ethers } from 'ethers';
-import { readTestContracts } from '../src.ts/deploy';
 import * as fs from 'fs';
 import * as path from 'path';
-import { readProductionContracts, readTestContracts } from '../src.ts/deploy';
+import { readProductionContracts } from '../src.ts/deploy';
 
 const { expect } = require('chai');
 
-export const FranklinTestUpgradeTargetContractCode = require(`../build/ZkSyncTestUpgradeTarget`);
 const testConfigPath = path.join(process.env.ZKSYNC_HOME as string, `etc/test_config/constant`);
 const ethTestConfig = JSON.parse(fs.readFileSync(`${testConfigPath}/eth.json`, { encoding: 'utf-8' }));
 const testContracts = readProductionContracts();
@@ -39,7 +37,7 @@ async function main() {
         wallet
     );
 
-    const newTargetFranklin = await deployContract(wallet, FranklinTestUpgradeTargetContractCode, [], {
+    const newTargetFranklin = await deployContract(wallet, testContracts.zkSync, [], {
         gasLimit: 6500000
     });
 

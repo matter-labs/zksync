@@ -99,7 +99,7 @@ impl TestServerConfig {
 
         // Sign change pubkey tx pair
         {
-            let tx = from.sign_change_pubkey_tx(None, false, 0, fee.into(), false);
+            let tx = from.sign_change_pubkey_tx(None, false, 0, fee.into(), false, 0, u32::MAX);
 
             let zksync_op = ZkSyncOp::ChangePubKeyOffchain(Box::new(ChangePubKeyOp {
                 tx: tx.clone(),
@@ -131,9 +131,9 @@ impl TestServerConfig {
                     closest_packable_fee_amount(&fee.into()),
                     &to.address,
                     None,
-                    0,
-                    u64::MAX,
                     false,
+                    0,
+                    u32::MAX,
                 )
                 .0;
 
@@ -168,9 +168,9 @@ impl TestServerConfig {
                     fee.into(),
                     &to.address,
                     None,
-                    0,
-                    u64::MAX,
                     false,
+                    0,
+                    u32::MAX,
                 )
                 .0;
 
@@ -206,7 +206,7 @@ impl TestServerConfig {
                 fee.into(),
                 0,
                 0,
-                u64::MAX,
+                u32::MAX,
                 None,
             );
 

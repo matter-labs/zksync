@@ -43,6 +43,10 @@ pub struct ForcedExit {
     pub signature: TxSignature,
     #[serde(skip)]
     cached_signer: VerifiedSignatureCache,
+    /// Unix epoch format of the time when the transaction is valid
+    /// This fields must be Option<...> because of backward compatibility with first version of ZkSync
+    pub valid_from: Option<u32>,
+    pub valid_until: Option<u32>,
 }
 
 impl ForcedExit {
@@ -59,6 +63,8 @@ impl ForcedExit {
         token: TokenId,
         fee: BigUint,
         nonce: Nonce,
+        valid_from: u32,
+        valid_until: u32,
         signature: Option<TxSignature>,
     ) -> Self {
         let mut tx = Self {
@@ -67,6 +73,8 @@ impl ForcedExit {
             token,
             fee,
             nonce,
+            valid_from: Some(valid_from),
+            valid_until: Some(valid_until),
             signature: signature.clone().unwrap_or_default(),
             cached_signer: VerifiedSignatureCache::NotCached,
         };
@@ -84,9 +92,20 @@ impl ForcedExit {
         token: TokenId,
         fee: BigUint,
         nonce: Nonce,
+        valid_from: u32,
+        valid_until: u32,
         private_key: &PrivateKey<Engine>,
     ) -> Result<Self, anyhow::Error> {
-        let mut tx = Self::new(initiator_account_id, target, token, fee, nonce, None);
+        let mut tx = Self::new(
+            initiator_account_id,
+            target,
+            token,
+            fee,
+            nonce,
+            valid_from,
+            valid_until,
+            None,
+        );
         tx.signature = TxSignature::sign_musig(private_key, &tx.get_bytes());
         if !tx.check_correctness() {
             anyhow::bail!(crate::tx::TRANSACTION_SIGNATURE_ERROR);
@@ -103,6 +122,8 @@ impl ForcedExit {
         out.extend_from_slice(&self.token.to_be_bytes());
         out.extend_from_slice(&pack_fee_amount(&self.fee));
         out.extend_from_slice(&self.nonce.to_be_bytes());
+        out.extend_from_slice(&self.valid_from.unwrap_or(0).to_be_bytes());
+        out.extend_from_slice(&self.valid_until.unwrap_or(u32::MAX).to_be_bytes());
         out
     }
 

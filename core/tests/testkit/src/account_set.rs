@@ -10,6 +10,7 @@ use crate::types::*;
 
 /// Account set is used to create transactions using stored account
 /// in a convenient way
+#[derive(Clone)]
 pub struct AccountSet<T: Transport> {
     pub eth_accounts: Vec<EthereumAccount<T>>,
     pub zksync_accounts: Vec<ZkSyncAccount>,
@@ -71,8 +72,8 @@ impl<T: Transport> AccountSet<T> {
         amount: BigUint,
         fee: BigUint,
         nonce: Option<Nonce>,
-        valid_from: u64,
-        valid_until: u64,
+        valid_from: u32,
+        valid_until: u32,
         increment_nonce: bool,
     ) -> ZkSyncTx {
         let from = &self.zksync_accounts[from.0];
@@ -86,9 +87,9 @@ impl<T: Transport> AccountSet<T> {
                 fee,
                 &to.address,
                 nonce,
+                increment_nonce,
                 valid_from,
                 valid_until,
-                increment_nonce,
             )
             .0,
         ))
@@ -105,9 +106,9 @@ impl<T: Transport> AccountSet<T> {
         amount: BigUint,
         fee: BigUint,
         nonce: Option<Nonce>,
-        valid_from: u64,
-        valid_until: u64,
         increment_nonce: bool,
+        valid_from: u32,
+        valid_until: u32,
         rng: &mut impl Rng,
     ) -> ZkSyncTx {
         let from = &self.zksync_accounts[from.0];
@@ -122,9 +123,9 @@ impl<T: Transport> AccountSet<T> {
                 fee,
                 &to_address,
                 nonce,
+                increment_nonce,
                 valid_from,
                 valid_until,
-                increment_nonce,
             )
             .0,
         ))
@@ -143,6 +144,8 @@ impl<T: Transport> AccountSet<T> {
         fee: BigUint,
         nonce: Option<Nonce>,
         increment_nonce: bool,
+        valid_from: u32,
+        valid_until: u32,
     ) -> ZkSyncTx {
         let from = &self.zksync_accounts[from.0];
         let to = &self.eth_accounts[to.0];
@@ -156,6 +159,8 @@ impl<T: Transport> AccountSet<T> {
                 &to.address,
                 nonce,
                 increment_nonce,
+                valid_from,
+                valid_until,
             )
             .0,
         ))
@@ -173,6 +178,8 @@ impl<T: Transport> AccountSet<T> {
         fee: BigUint,
         nonce: Option<Nonce>,
         increment_nonce: bool,
+        valid_from: u32,
+        valid_until: u32,
     ) -> ZkSyncTx {
         let from = &self.zksync_accounts[initiator.0];
         let target = &self.zksync_accounts[target.0];
@@ -182,6 +189,8 @@ impl<T: Transport> AccountSet<T> {
             &target.address,
             nonce,
             increment_nonce,
+            valid_from,
+            valid_until,
         )))
     }
 
@@ -197,6 +206,8 @@ impl<T: Transport> AccountSet<T> {
         fee: BigUint,
         nonce: Option<Nonce>,
         increment_nonce: bool,
+        valid_from: u32,
+        valid_until: u32,
         rng: &mut impl Rng,
     ) -> ZkSyncTx {
         let from = &self.zksync_accounts[from.0];
@@ -211,6 +222,8 @@ impl<T: Transport> AccountSet<T> {
                 &to_address,
                 nonce,
                 increment_nonce,
+                valid_from,
+                valid_until,
             )
             .0,
         ))
@@ -240,6 +253,8 @@ impl<T: Transport> AccountSet<T> {
         fee: BigUint,
         nonce: Option<Nonce>,
         increment_nonce: bool,
+        valid_from: u32,
+        valid_until: u32,
     ) -> ZkSyncTx {
         let zksync_account = &self.zksync_accounts[zksync_signer.0];
         let auth_nonce = nonce.unwrap_or_else(|| zksync_account.nonce());
@@ -256,6 +271,8 @@ impl<T: Transport> AccountSet<T> {
             fee_token,
             fee,
             true,
+            valid_from,
+            valid_until,
         )))
     }
 
@@ -266,6 +283,8 @@ impl<T: Transport> AccountSet<T> {
         fee: BigUint,
         nonce: Option<Nonce>,
         increment_nonce: bool,
+        valid_from: u32,
+        valid_until: u32,
     ) -> ZkSyncTx {
         let zksync_account = &self.zksync_accounts[zksync_signer.0];
         ZkSyncTx::ChangePubKey(Box::new(zksync_account.sign_change_pubkey_tx(
@@ -274,6 +293,8 @@ impl<T: Transport> AccountSet<T> {
             fee_token,
             fee,
             false,
+            valid_from,
+            valid_until,
         )))
     }
 }

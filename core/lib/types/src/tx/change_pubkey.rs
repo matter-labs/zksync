@@ -124,6 +124,10 @@ pub struct ChangePubKey {
     pub eth_auth_data: ChangePubKeyEthAuthData,
     #[serde(skip)]
     cached_signer: VerifiedSignatureCache,
+    /// Unix epoch format of the time when the transaction is valid
+    /// This fields must be Option<...> because of backward compatibility with first version of ZkSync
+    pub valid_from: Option<u32>,
+    pub valid_until: Option<u32>,
 }
 
 impl ChangePubKey {
@@ -142,6 +146,8 @@ impl ChangePubKey {
         fee_token: TokenId,
         fee: BigUint,
         nonce: Nonce,
+        valid_from: u32,
+        valid_until: u32,
         signature: Option<TxSignature>,
         eth_signature: Option<PackedEthSignature>,
     ) -> Self {
@@ -165,6 +171,8 @@ impl ChangePubKey {
             signature: signature.clone().unwrap_or_default(),
             eth_auth_data,
             cached_signer: VerifiedSignatureCache::NotCached,
+            valid_from: Some(valid_from),
+            valid_until: Some(valid_until),
         };
         if signature.is_some() {
             tx.cached_signer = VerifiedSignatureCache::Cached(tx.verify_signature());
@@ -182,6 +190,8 @@ impl ChangePubKey {
         fee_token: TokenId,
         fee: BigUint,
         nonce: Nonce,
+        valid_from: u32,
+        valid_until: u32,
         eth_signature: Option<PackedEthSignature>,
         private_key: &PrivateKey,
     ) -> Result<Self, anyhow::Error> {
@@ -192,6 +202,8 @@ impl ChangePubKey {
             fee_token,
             fee,
             nonce,
+            valid_from,
+            valid_until,
             None,
             eth_signature,
         );
@@ -223,6 +235,8 @@ impl ChangePubKey {
         out.extend_from_slice(&self.fee_token.to_be_bytes());
         out.extend_from_slice(&pack_fee_amount(&self.fee));
         out.extend_from_slice(&self.nonce.to_be_bytes());
+        out.extend_from_slice(&self.valid_from.unwrap_or(0).to_be_bytes());
+        out.extend_from_slice(&self.valid_until.unwrap_or(u32::MAX).to_be_bytes());
         out
     }
 

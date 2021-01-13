@@ -79,6 +79,8 @@ impl<S: EthereumSigner> Signer<S> {
         auth_onchain: bool,
         fee_token: Token,
         fee: BigUint,
+        valid_from: u32,
+        valid_until: u32,
     ) -> Result<ChangePubKey, SignerError> {
         let account_id = self.account_id.ok_or(SignerError::NoSigningKey)?;
 
@@ -89,6 +91,8 @@ impl<S: EthereumSigner> Signer<S> {
             fee_token.id,
             fee,
             nonce,
+            valid_from,
+            valid_until,
             None,
             &self.private_key,
         )
@@ -139,8 +143,8 @@ impl<S: EthereumSigner> Signer<S> {
         fee: BigUint,
         to: Address,
         nonce: Nonce,
-        valid_from: u64,
-        valid_until: u64,
+        valid_from: u32,
+        valid_until: u32,
     ) -> Result<(Transfer, Option<PackedEthSignature>), SignerError> {
         let account_id = self.account_id.ok_or(SignerError::NoSigningKey)?;
 
@@ -182,6 +186,8 @@ impl<S: EthereumSigner> Signer<S> {
         fee: BigUint,
         eth_address: Address,
         nonce: Nonce,
+        valid_from: u32,
+        valid_until: u32,
     ) -> Result<(Withdraw, Option<PackedEthSignature>), SignerError> {
         let account_id = self.account_id.ok_or(SignerError::NoSigningKey)?;
 
@@ -193,6 +199,8 @@ impl<S: EthereumSigner> Signer<S> {
             amount,
             fee,
             nonce,
+            valid_from,
+            valid_until,
             &self.private_key,
         )
         .map_err(signing_failed_error)?;
@@ -220,10 +228,21 @@ impl<S: EthereumSigner> Signer<S> {
         token: Token,
         fee: BigUint,
         nonce: Nonce,
+        valid_from: u32,
+        valid_until: u32,
     ) -> Result<ForcedExit, SignerError> {
         let account_id = self.account_id.ok_or(SignerError::NoSigningKey)?;
 
-        ForcedExit::new_signed(account_id, target, token.id, fee, nonce, &self.private_key)
-            .map_err(signing_failed_error)
+        ForcedExit::new_signed(
+            account_id,
+            target,
+            token.id,
+            fee,
+            nonce,
+            valid_from,
+            valid_until,
+            &self.private_key,
+        )
+        .map_err(signing_failed_error)
     }
 }

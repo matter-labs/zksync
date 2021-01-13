@@ -8,6 +8,8 @@ use zksync_data_restore::{
 use zksync_types::AccountMap;
 
 use crate::external_commands::Contracts;
+use web3::types::BlockNumber;
+use zksync_data_restore::contract::ZkSyncDeployedContract;
 
 pub async fn verify_restore(
     web3_url: &str,
@@ -24,7 +26,6 @@ pub async fn verify_restore(
     let mut driver = DataRestoreDriver::new(
         transport,
         contracts.governance,
-        contracts.contract,
         ETH_BLOCKS_STEP,
         0,
         available_block_chunk_sizes,
@@ -32,6 +33,14 @@ pub async fn verify_restore(
         Default::default(),
     );
 
+    driver
+        .zksync_contracts
+        .push(ZkSyncDeployedContract::version4(
+            driver.web3.eth(),
+            contracts.contract,
+            BlockNumber::Earliest,
+            BlockNumber::Latest,
+        ));
     interactor.insert_new_account(0, &fee_account_address);
     driver.load_state_from_storage(&mut interactor).await;
     driver.run_state_update(&mut interactor).await;

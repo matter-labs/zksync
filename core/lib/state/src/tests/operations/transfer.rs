@@ -26,7 +26,7 @@ fn to_existing() {
         fee.clone(),
         from_account.nonce,
         0,
-        u64::MAX,
+        u32::MAX,
         &from_sk,
     )
     .unwrap();
@@ -77,7 +77,7 @@ fn insufficient_funds() {
         fee,
         from_account.nonce,
         0,
-        u64::MAX,
+        u32::MAX,
         &from_sk,
     )
     .unwrap();
@@ -109,7 +109,7 @@ fn to_new() {
         fee.clone(),
         account.nonce,
         0,
-        u64::MAX,
+        u32::MAX,
         &sk,
     )
     .unwrap();
@@ -165,7 +165,7 @@ fn to_self() {
         fee.clone(),
         account.nonce,
         0,
-        u64::MAX,
+        u32::MAX,
         &sk,
     )
     .unwrap();
@@ -204,7 +204,7 @@ fn nonce_mismatch() {
         fee,
         account.nonce + 1,
         0,
-        u64::MAX,
+        u32::MAX,
         &sk,
     )
     .unwrap();
@@ -235,7 +235,7 @@ fn invalid_account_id() {
         fee,
         account.nonce,
         0,
-        u64::MAX,
+        u32::MAX,
         &sk,
     )
     .unwrap();

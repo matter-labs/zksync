@@ -1,4 +1,4 @@
-pub mod contract_functions;
+pub mod contract;
 pub mod data_restore_driver;
 pub mod database_storage_interactor;
 pub mod eth_tx_helpers;

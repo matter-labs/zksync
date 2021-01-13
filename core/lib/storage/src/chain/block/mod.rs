@@ -40,6 +40,11 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
     /// 1. Stores the operation.
     /// 2. Stores the proof (if it isn't stored already) for the verify operation.
     pub async fn execute_operation(&mut self, op: Operation) -> QueryResult<Operation> {
+        let stored = self.store_operation(op).await?;
+        let result = stored.into_op(self.0).await;
+        result
+    }
+    pub async fn store_operation(&mut self, op: Operation) -> QueryResult<StoredOperation> {
         let start = Instant::now();
         let mut transaction = self.0.start_transaction().await?;
 
@@ -59,11 +64,9 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
         let stored: StoredOperation = OperationsSchema(&mut transaction)
             .store_operation(new_operation)
             .await?;
-        let result = stored.into_op(&mut transaction).await;
-
         transaction.commit().await?;
         metrics::histogram!("sql.chain.block.execute_operation", start.elapsed());
-        result
+        Ok(stored)
     }
 
     /// Given a block, stores its transactions in the database.

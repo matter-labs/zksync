@@ -123,9 +123,9 @@ impl ZkSyncAccount {
         fee: BigUint,
         to: &Address,
         nonce: Option<Nonce>,
-        valid_from: u64,
-        valid_until: u64,
         increment_nonce: bool,
+        valid_from: u32,
+        valid_until: u32,
     ) -> (Transfer, PackedEthSignature) {
         let mut stored_nonce = self.nonce.lock().unwrap();
         let transfer = Transfer::new_signed(
@@ -162,6 +162,8 @@ impl ZkSyncAccount {
         target: &Address,
         nonce: Option<Nonce>,
         increment_nonce: bool,
+        valid_from: u32,
+        valid_until: u32,
     ) -> ForcedExit {
         let mut stored_nonce = self.nonce.lock().unwrap();
         let forced_exit = ForcedExit::new_signed(
@@ -173,6 +175,8 @@ impl ZkSyncAccount {
             token_id,
             fee,
             nonce.unwrap_or_else(|| *stored_nonce),
+            valid_from,
+            valid_until,
             &self.private_key,
         )
         .expect("Failed to sign forced exit");
@@ -194,6 +198,8 @@ impl ZkSyncAccount {
         eth_address: &Address,
         nonce: Option<Nonce>,
         increment_nonce: bool,
+        valid_from: u32,
+        valid_until: u32,
     ) -> (Withdraw, PackedEthSignature) {
         let mut stored_nonce = self.nonce.lock().unwrap();
         let withdraw = Withdraw::new_signed(
@@ -207,6 +213,8 @@ impl ZkSyncAccount {
             amount,
             fee,
             nonce.unwrap_or_else(|| *stored_nonce),
+            valid_from,
+            valid_until,
             &self.private_key,
         )
         .expect("Failed to sign withdraw");
@@ -227,6 +235,8 @@ impl ZkSyncAccount {
             account: self.address,
             nonce: nonce.unwrap_or_else(|| *stored_nonce),
             signature: TxSignature::default(),
+            valid_from: None,
+            valid_until: None,
         };
         close.signature = TxSignature::sign_musig(&self.private_key, &close.get_bytes());
 
@@ -243,6 +253,8 @@ impl ZkSyncAccount {
         fee_token: TokenId,
         fee: BigUint,
         auth_onchain: bool,
+        valid_from: u32,
+        valid_until: u32,
     ) -> ChangePubKey {
         let account_id = self
             .account_id
@@ -259,6 +271,8 @@ impl ZkSyncAccount {
             fee_token,
             fee,
             nonce,
+            valid_from,
+            valid_until,
             None,
             &self.private_key,
         )

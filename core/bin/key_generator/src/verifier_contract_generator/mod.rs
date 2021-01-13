@@ -7,11 +7,12 @@ use handlebars::to_json;
 use handlebars::Handlebars;
 
 use crate::verifier_contract_generator::render_vk::{
-    get_exit_vk_tree_root_hash, get_vk_tree_root_hash, rendered_key,
+    get_vk_tree_root_hash, rendered_key, rendered_key_single_proof,
 };
 use zksync_config::AvailableBlockSizesConfig;
 use zksync_prover_utils::fs_utils::{
-    get_recursive_verification_key_path, get_verifier_contract_key_path,
+    get_exodus_verification_key_path, get_recursive_verification_key_path,
+    get_verifier_contract_key_path,
 };
 use zksync_utils::parse_env;
 
@@ -27,11 +28,6 @@ pub(crate) fn create_verifier_contract(config: AvailableBlockSizesConfig) {
     template_params.insert(
         "vk_tree_root".to_string(),
         to_json(get_vk_tree_root_hash(&config.blocks_chunks)),
-    );
-
-    template_params.insert(
-        "vk_tree_root_exit".to_string(),
-        to_json(get_exit_vk_tree_root_hash()),
     );
 
     template_params.insert(
@@ -55,6 +51,10 @@ pub(crate) fn create_verifier_contract(config: AvailableBlockSizesConfig) {
         })
         .collect::<Vec<_>>();
     template_params.insert("keys".to_string(), to_json(templates_for_key_getters));
+
+    let exodus_key_path = get_exodus_verification_key_path();
+    let exodus_key = rendered_key_single_proof("getVkExit", exodus_key_path);
+    template_params.insert("single_keys".to_string(), to_json(vec![exodus_key]));
 
     let res = Handlebars::new()
         .render_template(template, &template_params)

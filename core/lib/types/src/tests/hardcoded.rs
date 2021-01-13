@@ -80,7 +80,7 @@ pub mod operations_test {
                 BigUint::from(42u32),
                 42,
                 0,
-                u64::MAX,
+                u32::MAX,
                 None,
             );
             let (from, to) = (1u32, 2u32);
@@ -116,6 +116,8 @@ pub mod operations_test {
                 BigUint::from(42u32),
                 BigUint::from(42u32),
                 42,
+                0,
+                u32::MAX,
                 None,
             );
             let account_id = 42u32;
@@ -160,6 +162,8 @@ pub mod operations_test {
                 42,
                 BigUint::from(42u32),
                 42,
+                0,
+                u32::MAX,
                 None,
                 Some(PackedEthSignature::deserialize_packed(
                     &hex::decode("2a0a81e257a2f5d6ed4f07b81dbda09f107bd026dbda09f107bd026f5d6ed4f02a0a81e257a2f5d6ed4f07b81dbda09f107bd026dbda09f107bd026f5d6ed4f0d4").unwrap(),
@@ -185,6 +189,8 @@ pub mod operations_test {
                 42,
                 BigUint::from(42u32),
                 42,
+                0,
+                u32::MAX,
                 None,
             );
             let target_account_id = 42u32;
@@ -274,6 +280,8 @@ pub mod tx_conversion_test {
             TOKEN_ID,
             (*FEE).clone(),
             NONCE,
+            0,
+            u32::MAX,
             None,
             None,
         );
@@ -293,7 +301,7 @@ pub mod tx_conversion_test {
             (*FEE).clone(),
             NONCE,
             0,
-            u64::MAX,
+            u32::MAX,
             None,
         );
 
@@ -303,8 +311,16 @@ pub mod tx_conversion_test {
 
     #[test]
     fn test_convert_to_bytes_forced_exit() {
-        let forced_exit =
-            ForcedExit::new(ACCOUNT_ID, *ALICE, TOKEN_ID, (*FEE).clone(), NONCE, None);
+        let forced_exit = ForcedExit::new(
+            ACCOUNT_ID,
+            *ALICE,
+            TOKEN_ID,
+            (*FEE).clone(),
+            NONCE,
+            0,
+            u32::MAX,
+            None,
+        );
 
         let bytes = forced_exit.get_bytes();
         assert_eq!(
@@ -323,6 +339,8 @@ pub mod tx_conversion_test {
             (*AMOUNT).clone(),
             (*FEE).clone(),
             NONCE,
+            0,
+            u32::MAX,
             None,
         );
 

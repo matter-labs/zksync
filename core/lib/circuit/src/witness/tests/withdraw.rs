@@ -42,6 +42,8 @@ fn test_withdraw() {
                     &Address::zero(),
                     None,
                     true,
+                    0,
+                    u32::MAX,
                 )
                 .0,
             account_id: account.id,
@@ -88,6 +90,8 @@ fn corrupted_ops_input() {
                 &Address::zero(),
                 None,
                 true,
+                0,
+                u32::MAX,
             )
             .0,
         account_id: account.id,
@@ -146,6 +150,8 @@ fn test_incorrect_withdraw_account_from() {
                 &Address::zero(),
                 None,
                 true,
+                0,
+                u32::MAX,
             )
             .0,
         account_id: account_from.id,
@@ -200,6 +206,8 @@ fn test_incorrect_withdraw_amount() {
                     &Address::zero(),
                     None,
                     true,
+                    0,
+                    u32::MAX,
                 )
                 .0,
             account_id: account_from.id,
@@ -263,6 +271,8 @@ fn test_withdraw_replay() {
                 &account_to.account.address,
                 None,
                 true,
+                0,
+                u32::MAX,
             )
             .0,
         account_id: account_copy.id,

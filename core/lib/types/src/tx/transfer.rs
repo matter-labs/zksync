@@ -39,8 +39,8 @@ pub struct Transfer {
     pub nonce: Nonce,
     /// Unix epoch format of the time when the transaction is valid
     /// This fields must be Option<...> because of backward compatibility with first version of ZkSync
-    pub valid_from: Option<u64>,
-    pub valid_until: Option<u64>,
+    pub valid_from: Option<u32>,
+    pub valid_until: Option<u32>,
     /// Transaction zkSync signature.
     pub signature: TxSignature,
     #[serde(skip)]
@@ -64,8 +64,8 @@ impl Transfer {
         amount: BigUint,
         fee: BigUint,
         nonce: Nonce,
-        valid_from: u64,
-        valid_until: u64,
+        valid_from: u32,
+        valid_until: u32,
         signature: Option<TxSignature>,
     ) -> Self {
         let mut tx = Self {
@@ -98,8 +98,8 @@ impl Transfer {
         amount: BigUint,
         fee: BigUint,
         nonce: Nonce,
-        valid_from: u64,
-        valid_until: u64,
+        valid_from: u32,
+        valid_until: u32,
         private_key: &PrivateKey<Engine>,
     ) -> Result<Self, anyhow::Error> {
         let mut tx = Self::new(
@@ -133,7 +133,7 @@ impl Transfer {
         out.extend_from_slice(&pack_fee_amount(&self.fee));
         out.extend_from_slice(&self.nonce.to_be_bytes());
         out.extend_from_slice(&self.valid_from.unwrap_or(0).to_be_bytes());
-        out.extend_from_slice(&self.valid_until.unwrap_or(u64::MAX).to_be_bytes());
+        out.extend_from_slice(&self.valid_until.unwrap_or(u32::MAX).to_be_bytes());
         out
     }
 
@@ -190,7 +190,7 @@ impl Transfer {
             fee = format_units(&self.fee, decimals),
             account_id = self.account_id,
             valid_from = self.valid_from.unwrap_or(0),
-            valid_until = self.valid_until.unwrap_or(u64::MAX),
+            valid_until = self.valid_until.unwrap_or(u32::MAX),
         )
     }
 }

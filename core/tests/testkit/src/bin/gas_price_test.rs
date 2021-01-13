@@ -188,7 +188,7 @@ async fn gas_price_test() {
 
     let fee_account = ZkSyncAccount::rand();
     let (sk_thread_handle, stop_state_keeper_sender, sk_channels) =
-        spawn_state_keeper(&fee_account.address);
+        spawn_state_keeper(&fee_account.address, genesis_state(&fee_account.address));
 
     let genesis_root = genesis_state(&fee_account.address).tree.root_hash();
 
@@ -245,6 +245,7 @@ async fn gas_price_test() {
         &contracts,
         commit_account,
         genesis_root,
+        None,
     );
 
     let rng = &mut XorShiftRng::from_seed([0, 1, 2, 3]);
@@ -350,7 +351,7 @@ async fn commit_cost_of_transfers(
                 tranfers_amount[i].clone(),
                 tranfers_fee[i].clone(),
                 0,
-                u64::MAX,
+                u32::MAX,
             )
             .await;
     }
@@ -413,7 +414,7 @@ async fn commit_cost_of_transfers_to_new(
                 tranfers_amount[i].clone(),
                 tranfers_fee[i].clone(),
                 0,
-                u64::MAX,
+                u32::MAX,
                 rng,
             )
             .await;
@@ -551,7 +552,7 @@ async fn commit_cost_of_full_exits(
 
     test_setup.start_block();
     for _ in 0..n_full_exits {
-        let full_exit_tx_receipt = test_setup
+        let (full_exit_tx_receipt, _) = test_setup
             .full_exit(ETHAccountId(3), ZKSyncAccountId(4), token)
             .await;
         user_gas_cost += full_exit_tx_receipt.gas_used.expect("full exit gas used");

@@ -44,7 +44,7 @@ const RATE_LIMIT_HTTP_CODE: &str = "429";
 /// constants for gas limit calculation
 const BASE_COMMIT_BLOCKS_TX_COST: usize = 36_000;
 const BASE_EXECUTE_BLOCKS_TX_COST: usize = 55_000;
-const BASE_PROOF_BLOCKS_TX_COST: usize = 500_000;
+const BASE_PROOF_BLOCKS_TX_COST: usize = 1_000_000;
 
 /// `TxCheckMode` enum determines the policy on the obtaining the tx status.
 /// The latest sent transaction can be pending (we're still waiting for it),

@@ -379,8 +379,8 @@ where
         get_ethereum_balance(eth_provider, withdraw_to.address(), token).await?;
     let pending_to_be_onchain_balance_before: U256 = {
         let query = main_contract.query(
-            "getBalanceToWithdraw",
-            (withdraw_to.address(), token.id),
+            "getPendingBalance",
+            (withdraw_to.address(), token.address),
             None,
             Options::default(),
             None,
@@ -412,8 +412,8 @@ where
 
     let pending_to_be_onchain_balance_after: U256 = {
         let query = main_contract.query(
-            "getBalanceToWithdraw",
-            (withdraw_to.address(), token.id),
+            "getPendingBalance",
+            (withdraw_to.address(), token.address),
             None,
             Options::default(),
             None,
@@ -728,7 +728,7 @@ async fn batch_transfer() -> Result<(), anyhow::Error> {
                 recipient,
                 nonce,
                 0,
-                u64::MAX,
+                u32::MAX,
             )
             .await
             .expect("Transfer signing error");

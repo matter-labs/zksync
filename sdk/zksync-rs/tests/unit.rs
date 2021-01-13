@@ -204,7 +204,7 @@ mod signatures_with_vectors {
                         sign_data.to,
                         sign_data.nonce,
                         0,
-                        u64::MAX,
+                        u32::MAX,
                     )
                     .await
                     .expect("Transfer signing error");
@@ -258,6 +258,8 @@ mod signatures_with_vectors {
                         withdraw_tx.fee.clone(),
                         sign_data.eth_address,
                         sign_data.nonce,
+                        0,
+                        u32::MAX,
                     )
                     .await
                     .expect("Withdraw signing error");
@@ -311,6 +313,8 @@ mod signatures_with_vectors {
                         false,
                         token,
                         change_pubkey_tx.fee.clone(),
+                        0,
+                        u32::MAX,
                     )
                     .await
                     .expect("Change pub key signing error");
@@ -365,6 +369,8 @@ mod signatures_with_vectors {
                         token,
                         forced_exit.fee.clone(),
                         forced_exit.nonce,
+                        0,
+                        u32::MAX,
                     )
                     .await
                     .expect("Forced exit signing error");

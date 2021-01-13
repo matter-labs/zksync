@@ -68,7 +68,7 @@ impl TransferOp {
         let to_id = u32::from_bytes(&bytes[to_offset..to_offset + ACCOUNT_ID_BIT_WIDTH / 8])
             .ok_or_else(|| format_err!("Cant get to account id from transfer pubdata"))?;
         let valid_from = 0; // It is unknown from pubdata
-        let valid_until = u64::MAX; // It is unknown from pubdata
+        let valid_until = u32::MAX; // It is unknown from pubdata
 
         Ok(Self {
             tx: Transfer::new(
