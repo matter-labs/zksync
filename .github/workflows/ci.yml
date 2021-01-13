@@ -28,9 +28,6 @@ jobs:
           docker-compose -f docker-compose-runner.yml up --build -d geth postgres zk
           ci_run sccache --start-server
 
-      - name: install-zk
-        run: ci_run zk
-
       - name: init
         run: |
           ci_run ln -s /usr/src/keys/setup keys/setup
