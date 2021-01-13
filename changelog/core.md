@@ -4,6 +4,9 @@ All notable changes to the core components will be documented in this file.
 
 ## Unreleased
 
+- Removed the limitation on the number of withdrawals in the block.
+- (`FeeTicker`): Increased gas price estimate for transaction.
+
 ### Changed
 
 ### Added

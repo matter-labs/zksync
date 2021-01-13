@@ -178,7 +178,6 @@ pub async fn run_core(
         config.chain.state_keeper.block_chunk_sizes.clone(),
         config.chain.state_keeper.miniblock_iterations as usize,
         config.chain.state_keeper.fast_block_miniblock_iterations as usize,
-        config.chain.eth.max_number_of_withdrawals_per_block,
     );
     let state_keeper_task = start_state_keeper(state_keeper, pending_block);
 

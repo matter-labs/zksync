@@ -45,11 +45,6 @@ pub struct Circuit {
 
 #[derive(Debug, Deserialize, Clone, PartialEq)]
 pub struct Eth {
-    /// Since withdraw is an expensive operation, we have to limit amount of
-    /// withdrawals in one block to not exceed the gas limit in prover.
-    /// If this threshold is reached, block will be immediately sealed and
-    /// the remaining withdrawals will go to the next block.
-    pub max_number_of_withdrawals_per_block: usize,
     /// Name of the used Ethereum network, e.g. `localhost` or `rinkeby`.
     pub network: Network,
 }
@@ -91,7 +86,6 @@ mod tests {
                 balance_tree_depth: 11,
             },
             eth: Eth {
-                max_number_of_withdrawals_per_block: 10,
                 network: "localhost".parse().unwrap(),
             },
             state_keeper: StateKeeper {
