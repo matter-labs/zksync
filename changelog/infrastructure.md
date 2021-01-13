@@ -9,6 +9,14 @@ components, the logs will have the following format:
 
 ## Unreleased
 
+### Changed
+
+### Added
+
+### Fixed
+
+## Release 2021-01-12
+
 ### Added
 
 - (`fee-seller`): reserve fee accumulator address.
@@ -16,6 +24,8 @@ components, the logs will have the following format:
 ### Changed
 
 - (`explorer`) was refactored and optimized.
+- (`explorer`): optimized by caching.
+- (`tok_cli`): was removed and all commands from it have been moved to `zk`.
 
 ### Fixed
 
@@ -23,7 +33,3 @@ components, the logs will have the following format:
 - Link to status page was added to explorer.
 - (`explorer`): account and token ids, verified and committed nonces.
 - (`zk`): `lint` command.
-
-### Changed
-
-- (`explorer`): optimized by caching.
