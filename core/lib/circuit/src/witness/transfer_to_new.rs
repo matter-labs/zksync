@@ -38,8 +38,8 @@ pub struct TransferToNewData {
     pub from_account_address: u32,
     pub to_account_address: u32,
     pub new_address: Fr,
-    pub valid_from: u64,
-    pub valid_until: u64,
+    pub valid_from: u32,
+    pub valid_until: u32,
 }
 
 pub struct TransferToNewWitness<E: RescueEngine> {
@@ -69,7 +69,7 @@ impl Witness for TransferToNewWitness<Bn256> {
             to_account_address: transfer_to_new.to,
             new_address: eth_address_to_fr(&transfer_to_new.tx.to),
             valid_from: transfer_to_new.tx.valid_from.unwrap_or(0),
-            valid_until: transfer_to_new.tx.valid_until.unwrap_or(u64::MAX),
+            valid_until: transfer_to_new.tx.valid_until.unwrap_or(u32::MAX),
         };
         // le_bit_vector_into_field_element()
         Self::apply_data(tree, &transfer_data)

@@ -416,14 +416,14 @@ fn test_transfer_replay() {
 /// Basic check for execution of `Transfer` operation in circuit with incorrect timestamps.
 #[test]
 #[ignore]
-fn test_incorrect_transfer_timestamps() {
+fn test_incorrect_transfer_timestamp() {
     // Test vector of (initial_balance, transfer_amount, fee_amount, valid_from, valid_until).
     let test_vector = vec![
         (10u64, 7u64, 3u64, 0, 0),                     // Basic transfer
         (0, 0, 0, 0, 0),                               // Zero transfer
         (std::u64::MAX, 1, 1, 0, 0),                   // Small transfer from rich account,
-        (std::u64::MAX, 10000, 1, u64::MAX, u64::MAX), // Big transfer from rich account (too big values can't be used, since they're not packable),
-        (std::u64::MAX, 1, 10000, u64::MAX, u64::MAX), // Very big fee
+        (std::u64::MAX, 10000, 1, u32::MAX, u32::MAX), // Big transfer from rich account (too big values can't be used, since they're not packable),
+        (std::u64::MAX, 1, 10000, u32::MAX, u32::MAX), // Very big fee
     ];
 
     for (initial_balance, transfer_amount, fee_amount, valid_from, valid_until) in test_vector {
@@ -443,9 +443,9 @@ fn test_incorrect_transfer_timestamps() {
                     BigUint::from(fee_amount),
                     &account_to.account.address,
                     None,
+                    true,
                     valid_from,
                     valid_until,
-                    true,
                 )
                 .0,
             from: account_from.id,

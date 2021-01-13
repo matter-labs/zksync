@@ -38,8 +38,8 @@ pub struct TransferData {
     pub token: u32,
     pub from_account_address: u32,
     pub to_account_address: u32,
-    pub valid_from: u64,
-    pub valid_until: u64,
+    pub valid_from: u32,
+    pub valid_until: u32,
 }
 
 pub struct TransferWitness<E: RescueEngine> {
@@ -68,7 +68,7 @@ impl Witness for TransferWitness<Bn256> {
             from_account_address: transfer.from,
             to_account_address: transfer.to,
             valid_from: transfer.tx.valid_from.unwrap_or(0),
-            valid_until: transfer.tx.valid_until.unwrap_or(u64::MAX),
+            valid_until: transfer.tx.valid_until.unwrap_or(u32::MAX),
         };
         // le_bit_vector_into_field_element()
         Self::apply_data(tree, &transfer_data)

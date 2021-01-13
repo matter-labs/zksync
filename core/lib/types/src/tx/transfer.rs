@@ -153,7 +153,7 @@ impl Transfer {
             && self.account_id <= max_account_id()
             && self.token <= max_token_id()
             && self.to != Address::zero()
-            && self.valid_from.unwrap_or(0) <= self.valid_until.unwrap_or(u64::MAX);
+            && self.valid_from.unwrap_or(0) <= self.valid_until.unwrap_or(u32::MAX);
         if valid {
             let signer = self.verify_signature();
             valid = valid && signer.is_some();

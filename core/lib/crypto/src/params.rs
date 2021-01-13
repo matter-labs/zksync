@@ -49,7 +49,7 @@ pub fn used_account_subtree_depth() -> usize {
 /// Max token id, based on the depth of the used left subtree
 pub fn max_account_id() -> AccountId {
     let list_count = 2u32.saturating_pow(used_account_subtree_depth() as u32);
-    if list_count == u32::max_value() {
+    if list_count == u32::MAX {
         list_count
     } else {
         list_count - 1
