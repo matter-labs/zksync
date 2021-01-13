@@ -18,3 +18,7 @@ etherscan_api_key="unset"
 # Configuration for the fee seller script
 max_liquidation_fee_percent=5
 # fee_account_private_key is set in `private.toml`
+
+reserve_fee_accumulator_address="unset"
+
+established_assets_for_withdrawing_through_zksync="ETH,DAI,USDC"

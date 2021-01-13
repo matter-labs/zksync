@@ -1,6 +1,8 @@
+use serde::Deserialize;
+
 pub use crate::configs::{
     ApiConfig, ChainConfig, ContractsConfig, DBConfig, ETHClientConfig, ETHSenderConfig,
-    ETHWatchConfig, ProverConfig, TickerConfig,
+    ETHWatchConfig, MiscConfig, ProverConfig, TickerConfig,
 };
 
 pub mod configs;

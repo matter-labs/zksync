@@ -1,6 +1,3 @@
-// External deps
-use serde::Deserialize;
-
 // Public re-exports
 pub use self::{
     api::ApiConfig, chain::ChainConfig, contracts::ContractsConfig, db::DBConfig,

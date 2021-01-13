@@ -1,9 +1,7 @@
 import { makeEntry, formatDate, readyStateFromString } from './utils';
 
 function getBlockNumberEntry(block) {
-    return makeEntry('Block number')
-        .innerHTML(block.block_number)
-        .localLink(`/blocks/${block.block_number}`);
+    return makeEntry('Block number').innerHTML(block.block_number).localLink(`/blocks/${block.block_number}`);
 }
 
 function getStatusEntry(block) {

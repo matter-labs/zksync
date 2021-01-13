@@ -27,22 +27,22 @@ export function numberAsFractionInBIPs(number: BigNumberish, baseFraction: BigNu
 }
 
 export function isOperationFeeAcceptable(
-    balance: BigNumberish,
-    withdrawFee: BigNumberish,
+    amount: BigNumberish,
+    fee: BigNumberish,
     operationFeeThreshold: number
 ): boolean {
-    balance = BigNumber.from(balance);
-    withdrawFee = BigNumber.from(withdrawFee);
+    amount = BigNumber.from(amount);
+    fee = BigNumber.from(fee);
 
-    if (balance.eq(0)) {
+    if (amount.eq(0)) {
         return false;
     }
 
-    if (balance.lte(withdrawFee)) {
+    if (amount.lte(fee)) {
         return false;
     }
 
-    return numberAsFractionInBIPs(withdrawFee, balance).lte(operationFeeThreshold * 100);
+    return numberAsFractionInBIPs(fee, amount).lte(operationFeeThreshold * 100);
 }
 
 export async function approveTokenIfNotApproved(signer: ethers.Signer, tokenAddress: string, contractAddress: string) {
@@ -104,7 +104,7 @@ export async function approveTokenIfNotApproved(signer: ethers.Signer, tokenAddr
     const approved = BigNumber.from(currentAllowance).gte(ERC20_APPROVE_TRESHOLD);
     if (!approved) {
         console.log(`Approving token ${tokenAddress}`);
-        const tx = await erc20contract.approve(contractAddress, MAX_ERC20_APPROVE_AMOUNT);
+        await erc20contract.approve(contractAddress, MAX_ERC20_APPROVE_AMOUNT);
     }
 }
 
