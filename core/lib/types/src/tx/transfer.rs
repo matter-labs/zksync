@@ -132,8 +132,11 @@ impl Transfer {
         out.extend_from_slice(&pack_token_amount(&self.amount));
         out.extend_from_slice(&pack_fee_amount(&self.fee));
         out.extend_from_slice(&self.nonce.to_be_bytes());
-        out.extend_from_slice(&self.valid_from.unwrap_or(0).to_be_bytes());
-        out.extend_from_slice(&self.valid_until.unwrap_or(u32::MAX).to_be_bytes());
+
+        // We use 64 bytes for timestamps in the signed message
+        out.extend_from_slice(&u64::from(self.valid_from.unwrap_or(0)).to_be_bytes());
+        out.extend_from_slice(&u64::from(self.valid_until.unwrap_or(u32::MAX)).to_be_bytes());
+
         out
     }
 
