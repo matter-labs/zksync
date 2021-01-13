@@ -14,7 +14,6 @@ const CONFIG_FILES = [
     'eth_sender.toml',
     'eth_watch.toml',
     'fee_ticker.toml',
-    'fee_seller.toml',
     'misc.toml',
     'prover.toml',
     'rust.toml',
