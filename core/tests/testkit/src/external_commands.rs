@@ -112,7 +112,9 @@ pub fn deploy_contracts(use_prod_contracts: bool, genesis_root: Fr) -> Contracts
         upgrade_gatekeeper: contracts
             .remove("CONTRACTS_UPGRADE_GATEKEEPER_ADDR")
             .expect("UPGRADE_GATEKEEPER_ADDR missing"),
-        test_erc20_address: contracts.remove("TEST_ERC20").expect("TEST_ERC20 missing"),
+        test_erc20_address: contracts
+            .remove("CONTRACTS_TEST_ERC20")
+            .expect("TEST_ERC20 missing"),
     }
 }
 
