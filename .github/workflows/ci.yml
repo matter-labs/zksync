@@ -56,7 +56,7 @@ jobs:
         run: ci_run zk test rust
 
       - name: zksync-crypto-tests
-        run: ci_run cd /usr/src/zksync/sdk/zksync-crypto && zk f cargo test --release
+        run: ci_run zk f cd /usr/src/zksync/sdk/zksync-crypto && zk f cargo test --release
 
       - name: cache
         run: ci_run sh infrastructure/ci-scripts/cache.sh
