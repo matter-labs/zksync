@@ -20,16 +20,20 @@ jobs:
         run: |
           docker-compose -f docker-compose-runner.yml down
           docker-compose -f docker-compose-runner.yml up --build -d geth postgres zk
+
       - name: start_sccache
         run: docker-compose -f docker-compose-runner.yml exec -T zk sccache --start-server
+
       - name: init
         run: |
           docker-compose -f docker-compose-runner.yml exec -T zk ln -s /usr/src/keys/setup keys/setup
           docker-compose -f docker-compose-runner.yml exec -T zk zk
           docker-compose -f docker-compose-runner.yml exec -T zk zk dummy-prover enable --no-redeploy
           docker-compose -f docker-compose-runner.yml exec -T zk zk init
+
       - name: liquidity-token
         run: docker-compose -f docker-compose-runner.yml restart dev-liquidity-token-watcher
+
       - name: lints
         run: docker-compose -f docker-compose-runner.yml exec -T zk sh infrastructure/ci-scripts/lints.sh
 
@@ -40,15 +44,16 @@ jobs:
           # EIP1271 contract is used in Rust & JS unit tests.
           docker-compose -f docker-compose-runner.yml exec -T zk zk contract build-dev
           docker-compose -f docker-compose-runner.yml exec -T zk zk run deploy-eip1271
+
       - name: run-services
         run: docker-compose -f docker-compose-runner.yml exec -T zk sh infrastructure/ci-scripts/run_services.sh
+
       - name: integration-tests
         run: docker-compose -f docker-compose-runner.yml exec -T zk zk test integration all
 
       - name: integration-testkit
         run: docker-compose -f docker-compose-runner.yml exec -T zk zk test integration testkit
-        env:
-          SQLX_OFFLINE: "true"
+
       - name: contracts-unit-tests
         run: docker-compose -f docker-compose-runner.yml exec -T zk zk test contracts
 
@@ -56,10 +61,7 @@ jobs:
         run: docker-compose -f docker-compose-runner.yml exec -T zk zk test js
 
       - name: rust-unit-tests
-        run: |
-          # Api tests require database setup
-          docker-compose -f docker-compose-runner.yml exec -T zk zk db setup
-          docker-compose -f docker-compose-runner.yml exec -T zk zk test rust
+        run: docker-compose -f docker-compose-runner.yml exec -T zk zk test rust
 
       - name: zksync-crypto-tests
         run: docker-compose -f docker-compose-runner.yml exec -T zk cd sdk/zksync-crypto && zk f cargo test --release
