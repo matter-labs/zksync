@@ -1,9 +1,9 @@
-import {Command} from 'commander';
+import { Command } from 'commander';
 import * as toml from '@iarna/toml';
 import * as fs from 'fs';
 import * as path from 'path';
 import deepExtend from 'deep-extend';
-import {env} from 'process';
+import { env } from 'process';
 
 const CONFIG_FILES = [
     'api.toml',
