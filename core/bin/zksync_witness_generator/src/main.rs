@@ -1,12 +1,13 @@
 use futures::{channel::mpsc, executor::block_on, SinkExt, StreamExt};
 use std::cell::RefCell;
 use zksync_config::ZkSyncConfig;
+use zksync_prometheus_exporter::run_prometheus_exporter;
 use zksync_storage::ConnectionPool;
 use zksync_witness_generator::run_prover_server;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    // `eth_sender` doesn't require many connections to the database.
+    // `witness_generator` doesn't require many connections to the database.
     const WITNESS_GENERATOR_CONNECTION_POOL_SIZE: u32 = 2;
 
     env_logger::init();
@@ -25,9 +26,23 @@ async fn main() -> anyhow::Result<()> {
     let connection_pool = ConnectionPool::new(Some(WITNESS_GENERATOR_CONNECTION_POOL_SIZE));
     let config = ZkSyncConfig::from_env();
 
+    // Run prometheus data exporter.
+    let (prometheus_task_handle, counter_task_handle) =
+        run_prometheus_exporter(connection_pool.clone(), config.api.prometheus.port);
+
     run_prover_server(connection_pool, stop_signal_sender, config);
 
-    stop_signal_receiver.next().await;
+    tokio::select! {
+        _ = async { prometheus_task_handle.await } => {
+            panic!("Prometheus exporter actors aren't supposed to finish their execution")
+        },
+        _ = async { counter_task_handle.await } => {
+            panic!("Operation counting actor is not supposed to finish its execution")
+        },
+        _ = async { stop_signal_receiver.next().await } => {
+            log::warn!("Stop signal received, shutting down");
+        }
+    };
 
     Ok(())
 }
