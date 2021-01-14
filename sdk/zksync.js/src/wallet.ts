@@ -296,6 +296,7 @@ export class Wallet {
         let messages: string[] = [];
 
         let nextNonce = transfers[0].nonce != null ? await this.getNonce(transfers[0].nonce) : await this.getNonce();
+        const batchNonce = nextNonce;
 
         for (let i = 0; i < transfers.length; i++) {
             const transfer = transfers[i];
@@ -316,6 +317,7 @@ export class Wallet {
             batch.push({ tx, signature: null });
         }
 
+        messages.push(`Nonce: ${batchNonce}`);
         const message = messages.join('\n');
         const ethSignature = await this.ethMessageSigner.getEthMessageSignature(message);
 

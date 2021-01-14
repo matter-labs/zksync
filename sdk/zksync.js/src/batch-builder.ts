@@ -205,6 +205,7 @@ export class BatchBuilder {
         const processedTxs: SignedTransaction[] = [];
         let messages: string[] = [];
         let nonce: number = await this.wallet.getNonce(this.nonce);
+        const batchNonce = nonce;
         for (const tx of this.txs) {
             tx.tx.nonce = nonce++;
             switch (tx.type) {
@@ -230,6 +231,7 @@ export class BatchBuilder {
                     break;
             }
         }
+        messages.push(`Nonce: ${batchNonce}`);
         return {
             txs: processedTxs,
             message: messages.join('\n')
