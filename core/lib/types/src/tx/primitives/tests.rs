@@ -16,6 +16,8 @@ fn get_transfer() -> Transfer {
         500u32.into(),
         0u32.into(),
         0,
+        0,
+        u32::MAX,
         None,
     )
 }
@@ -29,6 +31,8 @@ fn get_withdraw() -> Withdraw {
         100u32.into(),
         10u32.into(),
         12,
+        0,
+        u32::MAX,
         None,
     )
 }
@@ -41,6 +45,8 @@ fn get_change_pub_key() -> ChangePubKey {
         0,
         Default::default(),
         13,
+        0,
+        u32::MAX,
         None,
         None,
     )

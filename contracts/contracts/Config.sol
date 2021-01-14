@@ -49,9 +49,6 @@ contract Config {
     /// @dev Full exit operation length
     uint256 constant FULL_EXIT_BYTES = 6 * CHUNK_BYTES;
 
-    /// @dev OnchainWithdrawal data length
-    uint256 constant ONCHAIN_WITHDRAWAL_BYTES = 1 + 20 + 2 + 16; // (uint8 addToPendingWithdrawalsQueue, address _to, uint16 _tokenId, uint128 _amount)
-
     /// @dev ChangePubKey operation length
     uint256 constant CHANGE_PUBKEY_BYTES = 6 * CHUNK_BYTES;
 

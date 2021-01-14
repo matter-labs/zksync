@@ -1,12 +1,13 @@
 use zksync_types::{tokens::get_genesis_token_list, Token, TokenId};
 
+use crate::state_keeper::ZkSyncStateInitParams;
 use crate::{
     block_proposer::run_block_proposer_task,
     committer::run_committer,
     eth_watch::start_eth_watch,
     mempool::run_mempool_tasks,
     private_api::start_private_core_api,
-    state_keeper::{start_state_keeper, ZkSyncStateInitParams, ZkSyncStateKeeper},
+    state_keeper::{start_state_keeper, ZkSyncStateKeeper},
 };
 use futures::{channel::mpsc, future};
 use tokio::task::JoinHandle;

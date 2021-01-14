@@ -12,7 +12,7 @@ use web3::types::{
 };
 use web3::{Transport, Web3};
 use zksync_contracts::{erc20_contract, zksync_contract};
-use zksync_crypto::proof::EncodedAggregatedProof;
+use zksync_crypto::proof::{EncodedAggregatedProof, EncodedSingleProof};
 use zksync_eth_client::ETHClient;
 use zksync_eth_signer::PrivateKeySigner;
 use zksync_types::aggregated_operations::{
@@ -163,7 +163,7 @@ impl<T: Transport> EthereumAccount<T> {
         account_id: AccountId,
         token_id: TokenId,
         amount: &BigUint,
-        proof: EncodedAggregatedProof,
+        proof: EncodedSingleProof,
     ) -> Result<ETHExecResult, anyhow::Error> {
         let options = Options {
             gas: Some(3_000_000.into()),
@@ -175,13 +175,14 @@ impl<T: Transport> EthereumAccount<T> {
         let signed_tx = self
             .main_contract_eth_client
             .sign_call_tx(
-                "exit",
+                "performExodus",
                 (
                     stored_block_info,
+                    self.address,
                     u64::from(account_id),
                     u64::from(token_id),
                     U128::from(amount.to_u128().unwrap()),
-                    proof.get_eth_tx_args(),
+                    proof.proof,
                 ),
                 options,
             )
@@ -450,7 +451,7 @@ impl<T: Transport> EthereumAccount<T> {
     pub async fn trigger_exodus_if_needed(&self) -> Result<ETHExecResult, anyhow::Error> {
         let signed_tx = self
             .main_contract_eth_client
-            .sign_call_tx("triggerExodusIfNeeded", (), default_tx_options())
+            .sign_call_tx("activateExodusMode", (), default_tx_options())
             .await
             .map_err(|e| format_err!("Trigger exodus if needed send err: {}", e))?;
         let eth = self.main_contract_eth_client.web3.eth();

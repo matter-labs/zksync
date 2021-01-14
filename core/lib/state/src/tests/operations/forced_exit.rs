@@ -23,6 +23,8 @@ fn success() {
         token_id,
         fee.clone(),
         initiator_account.nonce,
+        0,
+        u32::MAX,
         &initiator_sk,
     )
     .unwrap();
@@ -71,6 +73,8 @@ fn unlocked_target() {
         token_id,
         fee,
         initiator_account.nonce,
+        0,
+        u32::MAX,
         &initiator_sk,
     )
     .unwrap();
@@ -101,6 +105,8 @@ fn insufficient_funds() {
         token_id,
         fee,
         initiator_account.nonce,
+        0,
+        u32::MAX,
         &initiator_sk,
     )
     .unwrap();
@@ -132,6 +138,8 @@ fn nonce_mismatch() {
         token_id,
         fee,
         initiator_account.nonce + 42,
+        0,
+        u32::MAX,
         &initiator_sk,
     )
     .unwrap();
@@ -161,6 +169,8 @@ fn invalid_account_id() {
         token_id,
         fee,
         initiator_account.nonce,
+        0,
+        u32::MAX,
         &initiator_sk,
     )
     .unwrap();

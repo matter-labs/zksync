@@ -266,14 +266,12 @@ impl RpcApp {
     async fn ticker_request(
         mut ticker_request_sender: mpsc::Sender<TickerRequest>,
         tx_type: TxFeeTypes,
-        address: Address,
         token: TokenLike,
     ) -> Result<Fee> {
         let req = oneshot::channel();
         ticker_request_sender
             .send(TickerRequest::GetTxFee {
                 tx_type,
-                address,
                 token: token.clone(),
                 response: req.0,
             })

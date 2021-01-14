@@ -1,29 +1,31 @@
 use crate::eth_account::{get_executed_tx_fee, ETHExecResult, EthereumAccount};
 use crate::external_commands::Contracts;
 use anyhow::bail;
-use futures::{channel::mpsc, SinkExt, StreamExt};
+use futures::{
+    channel::{mpsc, oneshot},
+    SinkExt, StreamExt,
+};
 use num::BigUint;
 use std::collections::HashMap;
 use web3::transports::Http;
 use zksync_core::committer::{BlockCommitRequest, CommitRequest};
 use zksync_core::mempool::ProposedBlock;
-use zksync_core::state_keeper::StateKeeperRequest;
+use zksync_core::state_keeper::{StateKeeperRequest, ZkSyncStateInitParams};
 use zksync_types::{
-    mempool::SignedTxVariant, tx::SignedZkSyncTx, Account, AccountId, AccountMap, Address, Fr,
-    PriorityOp, TokenId, ZkSyncTx, H256, U256,
+    aggregated_operations::{BlocksCommitOperation, BlocksExecuteOperation, BlocksProofOperation},
+    block::Block,
+    mempool::SignedTxVariant,
+    tx::SignedZkSyncTx,
+    Account, AccountId, AccountMap, Address, Fr, PriorityOp, TokenId, ZkSyncTx, H256, U256,
 };
 
 use web3::types::TransactionReceipt;
-use zksync_crypto::proof::EncodedAggregatedProof;
+use zksync_crypto::proof::{EncodedAggregatedProof, EncodedSingleProof};
 use zksync_crypto::rand::Rng;
-use zksync_types::block::Block;
 
 use crate::account_set::AccountSet;
 use crate::state_keeper_utils::*;
 use crate::types::*;
-use zksync_types::aggregated_operations::{
-    BlocksCommitOperation, BlocksExecuteOperation, BlocksProofOperation,
-};
 
 /// Used to create transactions between accounts and check for their validity.
 /// Every new block should start with `.start_block()`
@@ -43,6 +45,8 @@ pub struct TestSetup {
     pub expected_changes_for_current_block: ExpectedAccountState,
 
     pub commit_account: EthereumAccount<Http>,
+    pub current_state_root: Option<Fr>,
+
     pub last_committed_block: Block,
 }
 
@@ -53,6 +57,7 @@ impl TestSetup {
         deployed_contracts: &Contracts,
         commit_account: EthereumAccount<Http>,
         initial_root: Fr,
+        last_block: Option<Block>,
     ) -> Self {
         let mut tokens = HashMap::new();
         tokens.insert(1, deployed_contracts.test_erc20_address);
@@ -64,7 +69,8 @@ impl TestSetup {
             tokens,
             expected_changes_for_current_block: ExpectedAccountState::default(),
             commit_account,
-            last_committed_block: Block::new(
+            current_state_root: None,
+            last_committed_block: last_block.unwrap_or(Block::new(
                 0,
                 initial_root,
                 0,
@@ -75,7 +81,7 @@ impl TestSetup {
                 U256::from(0),
                 H256::default(),
                 0,
-            ),
+            )),
         }
     }
 
@@ -125,7 +131,7 @@ impl TestSetup {
         to: ZKSyncAccountId,
         token: Token,
         amount: BigUint,
-    ) -> Vec<TransactionReceipt> {
+    ) -> (Vec<TransactionReceipt>, PriorityOp) {
         let mut from_eth_balance = self.get_expected_eth_account_balance(from, token.0).await;
         from_eth_balance -= &amount;
 
@@ -169,8 +175,8 @@ impl TestSetup {
             .eth_accounts_state
             .insert((from, 0), eth_balance);
 
-        self.execute_priority_op(deposit_op).await;
-        receipts
+        self.execute_priority_op(deposit_op.clone()).await;
+        (receipts, deposit_op)
     }
 
     async fn execute_tx(&mut self, tx: ZkSyncTx) {
@@ -241,7 +247,8 @@ impl TestSetup {
         receipts
     }
 
-    async fn execute_priority_op(&mut self, op: PriorityOp) {
+    pub async fn execute_priority_op(&mut self, op: PriorityOp) {
+        println!("Execute priority op {:?}", op.serial_id);
         let block = ProposedBlock {
             priority_ops: vec![op],
             txs: Vec::new(),
@@ -264,7 +271,7 @@ impl TestSetup {
         account_id: AccountId,
         token_id: Token,
         amount: &BigUint,
-        proof: EncodedAggregatedProof,
+        proof: EncodedSingleProof,
     ) -> ETHExecResult {
         let last_block = &self.last_committed_block;
         self.accounts.eth_accounts[sending_account.0]
@@ -278,7 +285,7 @@ impl TestSetup {
         post_by: ETHAccountId,
         from: ZKSyncAccountId,
         token: Token,
-    ) -> TransactionReceipt {
+    ) -> (TransactionReceipt, PriorityOp) {
         let account_id = self
             .get_zksync_account_committed_state(from)
             .await
@@ -323,8 +330,8 @@ impl TestSetup {
             .eth_accounts_state
             .insert((post_by, 0), eth_balance);
 
-        self.execute_priority_op(full_exit_op).await;
-        receipt
+        self.execute_priority_op(full_exit_op.clone()).await;
+        (receipt, full_exit_op)
     }
 
     pub async fn change_pubkey_with_tx(
@@ -341,9 +348,9 @@ impl TestSetup {
         self.accounts.zksync_accounts[account.0].set_account_id(Some(account_id));
 
         // Execute transaction
-        let tx = self
-            .accounts
-            .change_pubkey_with_tx(account, fee_token.0, fee, None, true);
+        let tx =
+            self.accounts
+                .change_pubkey_with_tx(account, fee_token.0, fee, None, true, 0, u32::MAX);
 
         self.execute_tx(tx).await;
     }
@@ -383,7 +390,16 @@ impl TestSetup {
 
         let tx = self
             .accounts
-            .change_pubkey_with_onchain_auth(eth_account, account, fee_token.0, fee, None, true)
+            .change_pubkey_with_onchain_auth(
+                eth_account,
+                account,
+                fee_token.0,
+                fee,
+                None,
+                true,
+                0,
+                u32::MAX,
+            )
             .await;
 
         self.execute_tx(tx).await;
@@ -396,6 +412,8 @@ impl TestSetup {
         token: Token,
         amount: BigUint,
         fee: BigUint,
+        valid_from: u32,
+        valid_until: u32,
     ) {
         let mut zksync0_old = self
             .get_expected_zksync_account_balance(from, token.0)
@@ -420,9 +438,17 @@ impl TestSetup {
             .sync_accounts_state
             .insert((self.accounts.fee_account_id, token.0), zksync0_old);
 
-        let transfer = self
-            .accounts
-            .transfer(from, to, token, amount, fee, None, true);
+        let transfer = self.accounts.transfer(
+            from,
+            to,
+            token,
+            amount,
+            fee,
+            None,
+            valid_from,
+            valid_until,
+            true,
+        );
 
         self.execute_tx(transfer).await;
     }
@@ -433,6 +459,8 @@ impl TestSetup {
         token: Token,
         amount: BigUint,
         fee: BigUint,
+        valid_from: u32,
+        valid_until: u32,
         rng: &mut impl Rng,
     ) {
         let mut zksync0_old = self
@@ -452,9 +480,17 @@ impl TestSetup {
             .sync_accounts_state
             .insert((self.accounts.fee_account_id, token.0), zksync0_old);
 
-        let transfer = self
-            .accounts
-            .transfer_to_new_random(from, token, amount, fee, None, true, rng);
+        let transfer = self.accounts.transfer_to_new_random(
+            from,
+            token,
+            amount,
+            fee,
+            None,
+            true,
+            valid_from,
+            valid_until,
+            rng,
+        );
 
         self.execute_tx(transfer).await;
     }
@@ -507,9 +543,9 @@ impl TestSetup {
             .sync_accounts_state
             .insert((self.accounts.fee_account_id, token.0), zksync0_old);
 
-        let withdraw = self
-            .accounts
-            .withdraw(from, to, token, amount, fee, None, true);
+        let withdraw =
+            self.accounts
+                .withdraw(from, to, token, amount, fee, None, true, 0, u32::MAX);
 
         self.execute_tx(withdraw).await;
     }
@@ -541,9 +577,17 @@ impl TestSetup {
             .sync_accounts_state
             .insert((self.accounts.fee_account_id, token.0), zksync0_old);
 
-        let withdraw = self
-            .accounts
-            .withdraw_to_random(from, token, amount, fee, None, true, rng);
+        let withdraw = self.accounts.withdraw_to_random(
+            from,
+            token,
+            amount,
+            fee,
+            None,
+            true,
+            0,
+            u32::MAX,
+            rng,
+        );
 
         self.execute_tx(withdraw).await;
     }
@@ -589,9 +633,9 @@ impl TestSetup {
                 fee_account_balance,
             );
 
-        let forced_exit = self
-            .accounts
-            .forced_exit(initiator, target, token_id, fee, None, true);
+        let forced_exit =
+            self.accounts
+                .forced_exit(initiator, target, token_id, fee, None, true, 0, u32::MAX);
 
         self.execute_tx(forced_exit).await;
     }
@@ -642,6 +686,7 @@ impl TestSetup {
             .expect("sk receiver dropped");
 
         let new_block = self.await_for_block_commit_request().await.block;
+        // self.current_state_root = Some(new_block.new_root_hash);
 
         let block_commit_op = BlocksCommitOperation {
             last_committed_block: self.last_committed_block.clone(),
@@ -677,6 +722,7 @@ impl TestSetup {
             .expect("sk receiver dropped");
 
         let new_block = self.await_for_block_commit_request().await.block;
+        self.current_state_root = Some(new_block.new_root_hash);
 
         let block_commit_op = BlocksCommitOperation {
             last_committed_block: self.last_committed_block.clone(),
@@ -718,13 +764,13 @@ impl TestSetup {
         let block_chunks = new_block.block_chunks_size;
 
         let mut block_checks_failed = false;
-        for ((eth_account, token), expeted_balance) in
+        for ((eth_account, token), expected_balance) in
             &self.expected_changes_for_current_block.eth_accounts_state
         {
             let real_balance = self.get_eth_balance(*eth_account, *token).await;
-            if expeted_balance != &real_balance {
+            if expected_balance != &real_balance {
                 println!("eth acc: {}, token: {}", eth_account.0, token);
-                println!("expected: {}", expeted_balance);
+                println!("expected: {}", expected_balance);
                 println!("real:     {}", real_balance);
                 block_checks_failed = true;
             }
@@ -780,6 +826,15 @@ impl TestSetup {
         self.get_zksync_account_committed_state(zksync_id)
             .await
             .map(|a| a.0)
+    }
+
+    pub async fn get_current_state(&mut self) -> ZkSyncStateInitParams {
+        let (sender, receiver) = oneshot::channel();
+        self.state_keeper_request_sender
+            .send(StateKeeperRequest::GetCurrentState(sender))
+            .await
+            .expect("sk request send");
+        receiver.await.unwrap()
     }
 
     async fn get_zksync_balance(&self, zksync_id: ZKSyncAccountId, token: TokenId) -> BigUint {
@@ -880,7 +935,7 @@ impl TestSetup {
         accounts: AccountMap,
         fund_owner: ZKSyncAccountId,
         token: Token,
-    ) -> (EncodedAggregatedProof, BigUint) {
+    ) -> (EncodedSingleProof, BigUint) {
         let owner = &self.accounts.zksync_accounts[fund_owner.0];
         let owner_id = owner
             .get_account_id()

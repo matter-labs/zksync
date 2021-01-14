@@ -391,6 +391,14 @@ impl ZkSyncState {
             }
         }
     }
+
+    pub fn get_balance_tree(&self) -> AccountTree {
+        self.balance_tree.clone()
+    }
+
+    pub fn get_account_addresses(&self) -> HashMap<Address, AccountId> {
+        self.account_id_by_address.clone()
+    }
 }
 
 #[cfg(test)]
@@ -416,6 +424,8 @@ mod tests {
             BigUint::from(48u32),
             BigUint::from(2u32),
             account.nonce,
+            0,
+            u32::MAX,
             &sk,
         )
         .unwrap();
@@ -427,6 +437,8 @@ mod tests {
             BigUint::from(47u32),
             BigUint::from(3u32),
             account.nonce + 1,
+            0,
+            u32::MAX,
             &sk,
         )
         .unwrap();
@@ -461,6 +473,8 @@ mod tests {
             BigUint::from(48u32),
             BigUint::from(2u32),
             account.nonce,
+            0,
+            u32::MAX,
             &sk,
         )
         .unwrap();
@@ -472,6 +486,8 @@ mod tests {
             BigUint::from(47u32),
             BigUint::from(3u32),
             account.nonce + 1,
+            0,
+            u32::MAX,
             &sk,
         )
         .unwrap();

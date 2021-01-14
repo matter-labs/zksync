@@ -199,6 +199,16 @@ impl TxSender {
             withdraw.fast = fast_processing;
         }
 
+        if let ZkSyncTx::Transfer(transfer) = &mut tx {
+            let valid_from = transfer.valid_from.unwrap_or(0);
+            let valid_until = transfer.valid_until.unwrap_or(u32::MAX);
+            if valid_from > valid_until {
+                return Err(SubmitError::IncorrectTx(
+                    "Incorrect time segment when transfer execution is valid".to_string(),
+                ));
+            }
+        }
+
         // Resolve the token.
         let token = self.token_info(&tx).await?;
         let msg_to_sign = tx.get_ethereum_sign_message(token).map(String::into_bytes);
@@ -208,7 +218,7 @@ impl TxSender {
         let sign_verify_channel = self.sign_verify_requests.clone();
         let ticker_request_sender = self.ticker_requests.clone();
 
-        if let Some((tx_type, token, address, provided_fee)) = tx_fee_info {
+        if let Some((tx_type, token, provided_fee)) = tx_fee_info {
             let should_enforce_fee = !matches!(tx_type, TxFeeTypes::ChangePubKey { .. })
                 || self.enforce_pubkey_change_fee;
 
@@ -220,8 +230,7 @@ impl TxSender {
             }
 
             let required_fee =
-                Self::ticker_request(ticker_request_sender, tx_type, address, token.clone())
-                    .await?;
+                Self::ticker_request(ticker_request_sender, tx_type, token.clone()).await?;
             // Converting `BitUint` to `BigInt` is safe.
             let required_fee: BigDecimal = required_fee.total_fee.to_bigint().unwrap().into();
             let provided_fee: BigDecimal = provided_fee.to_bigint().unwrap().into();
@@ -295,7 +304,7 @@ impl TxSender {
         for tx in &txs {
             let tx_fee_info = tx.tx.get_fee_info();
 
-            if let Some((tx_type, token, address, provided_fee)) = tx_fee_info {
+            if let Some((tx_type, token, provided_fee)) = tx_fee_info {
                 let fee_allowed =
                     Self::token_allowed_for_fees(self.ticker_requests.clone(), token.clone())
                         .await?;
@@ -318,7 +327,6 @@ impl TxSender {
                 let required_fee = Self::ticker_request(
                     self.ticker_requests.clone(),
                     tx_type,
-                    address,
                     check_token.clone(),
                 )
                 .await?;
@@ -488,14 +496,12 @@ impl TxSender {
     async fn ticker_request(
         mut ticker_request_sender: mpsc::Sender<TickerRequest>,
         tx_type: TxFeeTypes,
-        address: Address,
         token: TokenLike,
     ) -> Result<Fee, SubmitError> {
         let req = oneshot::channel();
         ticker_request_sender
             .send(TickerRequest::GetTxFee {
                 tx_type,
-                address,
                 token: token.clone(),
                 response: req.0,
             })

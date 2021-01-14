@@ -27,6 +27,8 @@ fn transfer_to_new_apply_tx(b: &mut Bencher<'_>, number_of_accounts: &usize) {
                 &account_to.account.address,
                 None,
                 true,
+                0,
+                u32::MAX,
             )
             .0,
         from: account_from.id,
@@ -56,6 +58,8 @@ fn transfer_to_new_get_pubdata(b: &mut Bencher<'_>) {
                 &account_to.account.address,
                 None,
                 true,
+                0,
+                u32::MAX,
             )
             .0,
         from: account_from.id,
@@ -85,6 +89,8 @@ fn transfer_to_new_calculate_operations(b: &mut Bencher<'_>) {
                 &account_to.account.address,
                 None,
                 true,
+                0,
+                u32::MAX,
             )
             .0,
         from: account_from.id,

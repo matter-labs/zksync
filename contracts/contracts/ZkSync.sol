@@ -125,6 +125,7 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
     /// @notice zkSync contract upgrade. Can be external because Proxy contract intercepts illegal calls of this function.
     /// @param upgradeParameters Encoded representation of upgrade parameters
     function upgrade(bytes calldata upgradeParameters) external nonReentrant {
+        // #if UPGRADE_FROM_V3
         // NOTE: this line does not have any effect in contracts-4 upgrade since we require priority queue to be empty,
         // but this should be enabled in future upgrades.
         activateExodusMode();
@@ -150,6 +151,7 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
             );
         storedBlockHashes[totalBlocksExecuted] = hashStoredBlockInfo(rehashedLastBlock);
         totalBlocksProven = totalBlocksExecuted;
+        // #endif
     }
 
     /// @notice Sends tokens
@@ -466,13 +468,12 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
         }
 
         bool success =
-            verifier.verifyAggregatedProof(
+            verifier.verifyAggregatedBlockProof(
                 _proof.recursiveInput,
                 _proof.proof,
                 _proof.vkIndexes,
                 _proof.commitments,
-                _proof.subproofsLimbs,
-                true
+                _proof.subproofsLimbs
             );
         require(success, "p"); // Aggregated proof verification fail
 
@@ -539,28 +540,15 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
         uint32 _accountId,
         uint16 _tokenId,
         uint128 _amount,
-        ProofInput memory _proof
+        uint256[] memory _proof
     ) external nonReentrant {
         bytes22 packedBalanceKey = packAddressAndTokenId(_owner, _tokenId);
         require(exodusMode, "s"); // must be in exodus mode
         require(!performedExodus[_accountId][_tokenId], "t"); // already exited
         require(storedBlockHashes[totalBlocksExecuted] == hashStoredBlockInfo(_storedBlockInfo), "u"); // incorrect sotred block info
 
-        uint256 commitment =
-            uint256(sha256(abi.encodePacked(_storedBlockInfo.stateHash, _accountId, _owner, _tokenId, _amount)));
-        require(_proof.commitments.length == 1, "v");
-        commitment = commitment & INPUT_MASK;
-        require(_proof.commitments[0] == commitment, "w");
-
         bool proofCorrect =
-            verifier.verifyAggregatedProof(
-                _proof.recursiveInput,
-                _proof.proof,
-                _proof.vkIndexes,
-                _proof.commitments,
-                _proof.subproofsLimbs,
-                false
-            );
+            verifier.verifyExitProof(_storedBlockInfo.stateHash, _accountId, _owner, _tokenId, _amount, _proof);
         require(proofCorrect, "x");
 
         increaseBalanceToWithdraw(packedBalanceKey, _amount);

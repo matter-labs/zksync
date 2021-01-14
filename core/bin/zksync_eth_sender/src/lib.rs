@@ -16,12 +16,7 @@ use web3::{
 use zksync_config::{EthClientOptions, EthSenderOptions};
 use zksync_eth_client::SignedCallResult;
 use zksync_storage::ConnectionPool;
-use zksync_types::{
-    config,
-    ethereum::{ETHOperation, OperationType},
-    gas_counter::GasCounter,
-    Action, Operation,
-};
+use zksync_types::ethereum::ETHOperation;
 // Local uses
 use self::{
     database::{Database, DatabaseInterface},
@@ -45,6 +40,11 @@ mod tests;
 const RATE_LIMIT_BACKOFF_PERIOD: Duration = Duration::from_secs(30);
 /// Rate limit error will contain this response code
 const RATE_LIMIT_HTTP_CODE: &str = "429";
+
+/// constants for gas limit calculation
+const BASE_COMMIT_BLOCKS_TX_COST: usize = 36_000;
+const BASE_EXECUTE_BLOCKS_TX_COST: usize = 55_000;
+const BASE_PROOF_BLOCKS_TX_COST: usize = 1_000_000;
 
 /// `TxCheckMode` enum determines the policy on the obtaining the tx status.
 /// The latest sent transaction can be pending (we're still waiting for it),
@@ -631,25 +631,32 @@ impl<ETH: EthereumInterface, DB: DatabaseInterface> ETHSender<ETH, DB> {
 
     /// Calculates the gas limit for transaction to be send, depending on the type of operation.
     fn gas_limit_for_op(op: &ETHOperation) -> U256 {
-        // TODO:
-        U256::from(5_000_000)
-        // match op.op_type {
-        //     OperationType::Commit => {
-        //         op.op
-        //             .as_ref()
-        //             .expect("No zkSync operation for Commit")
-        //             .block
-        //             .commit_gas_limit
-        //     }
-        //     OperationType::Verify => {
-        //         op.op
-        //             .as_ref()
-        //             .expect("No zkSync operation for Verify")
-        //             .block
-        //             .verify_gas_limit
-        //     }
-        //     OperationType::Withdraw => GasCounter::complete_withdrawals_gas_limit(),
-        // }
+        let (_, op) = op
+            .op
+            .as_ref()
+            .expect("Operation not found - can't compute gas limit");
+        match op {
+            AggregatedOperation::CommitBlocks(commit) => {
+                U256::from(BASE_COMMIT_BLOCKS_TX_COST)
+                    + commit
+                        .blocks
+                        .iter()
+                        .fold(U256::zero(), |acc, block| acc + block.commit_gas_limit)
+            }
+            AggregatedOperation::ExecuteBlocks(execute) => {
+                U256::from(BASE_EXECUTE_BLOCKS_TX_COST)
+                    + execute
+                        .blocks
+                        .iter()
+                        .fold(U256::zero(), |acc, block| acc + block.verify_gas_limit)
+            }
+            AggregatedOperation::PublishProofBlocksOnchain(_) => {
+                U256::from(BASE_PROOF_BLOCKS_TX_COST)
+            }
+            AggregatedOperation::CreateProofBlocks(_) => {
+                panic!("Can't compute gas limit for CreateProofBlocks")
+            }
+        }
     }
 
     /// Creates a new transaction for the existing Ethereum operation.

@@ -90,6 +90,8 @@ fn create_account_and_transfer<B: Into<BigUint>>(
     account_id: AccountId,
     balance: B,
     transfer_amount: B,
+    valid_from: u32,
+    valid_until: u32,
 ) -> SignedZkSyncTx {
     let (account, sk) = tester.add_account(account_id);
     tester.set_balance(account_id, token_id, balance);
@@ -102,6 +104,8 @@ fn create_account_and_transfer<B: Into<BigUint>>(
         transfer_amount.into(),
         BigUint::from(1u32),
         account.nonce,
+        valid_from,
+        valid_until,
         &sk,
     )
     .unwrap();
@@ -117,6 +121,8 @@ fn create_account_and_withdrawal<B: Into<BigUint>>(
     account_id: AccountId,
     balance: B,
     withdraw_amount: B,
+    valid_from: u32,
+    valid_until: u32,
 ) -> SignedZkSyncTx {
     create_account_and_withdrawal_impl(
         tester,
@@ -125,6 +131,8 @@ fn create_account_and_withdrawal<B: Into<BigUint>>(
         balance,
         withdraw_amount,
         false,
+        valid_from,
+        valid_until,
     )
 }
 
@@ -134,8 +142,19 @@ fn create_account_and_fast_withdrawal<B: Into<BigUint>>(
     account_id: AccountId,
     balance: B,
     withdraw_amount: B,
+    valid_from: u32,
+    valid_until: u32,
 ) -> SignedZkSyncTx {
-    create_account_and_withdrawal_impl(tester, token_id, account_id, balance, withdraw_amount, true)
+    create_account_and_withdrawal_impl(
+        tester,
+        token_id,
+        account_id,
+        balance,
+        withdraw_amount,
+        true,
+        valid_from,
+        valid_until,
+    )
 }
 
 fn create_account_and_withdrawal_impl<B: Into<BigUint>>(
@@ -145,6 +164,8 @@ fn create_account_and_withdrawal_impl<B: Into<BigUint>>(
     balance: B,
     withdraw_amount: B,
     fast: bool,
+    valid_from: u32,
+    valid_until: u32,
 ) -> SignedZkSyncTx {
     let (account, sk) = tester.add_account(account_id);
     tester.set_balance(account_id, token_id, balance);
@@ -157,6 +178,8 @@ fn create_account_and_withdrawal_impl<B: Into<BigUint>>(
         withdraw_amount.into(),
         BigUint::from(1u32),
         account.nonce,
+        valid_from,
+        valid_until,
         &sk,
     )
     .unwrap();
@@ -187,7 +210,7 @@ pub fn create_deposit(token: TokenId, amount: impl Into<BigUint>) -> PriorityOp 
 }
 
 async fn apply_single_transfer(tester: &mut StateKeeperTester) {
-    let transfer = create_account_and_transfer(tester, 0, 1, 200u32, 100u32);
+    let transfer = create_account_and_transfer(tester, 0, 1, 200u32, 100u32, 0, u32::MAX);
     let proposed_block = ProposedBlock {
         txs: vec![SignedTxVariant::Tx(transfer)],
         priority_ops: Vec::new(),
@@ -199,8 +222,8 @@ async fn apply_single_transfer(tester: &mut StateKeeperTester) {
 }
 
 async fn apply_batch_with_two_transfers(tester: &mut StateKeeperTester) {
-    let first_transfer = create_account_and_transfer(tester, 0, 1, 200u32, 100u32);
-    let second_transfer = create_account_and_transfer(tester, 0, 2, 200u32, 100u32);
+    let first_transfer = create_account_and_transfer(tester, 0, 1, 200u32, 100u32, 0, u32::MAX);
+    let second_transfer = create_account_and_transfer(tester, 0, 2, 200u32, 100u32, 0, u32::MAX);
     let proposed_block = ProposedBlock {
         txs: vec![SignedTxVariant::Batch(SignedTxsBatch {
             txs: vec![first_transfer, second_transfer],
@@ -287,7 +310,8 @@ mod apply_tx {
     fn success() {
         let mut tester = StateKeeperTester::new(6, 1, 1, 1);
         let old_pending_block = tester.state_keeper.pending_block.clone();
-        let withdraw = create_account_and_withdrawal(&mut tester, 0, 1, 200u32, 145u32);
+        let withdraw =
+            create_account_and_withdrawal(&mut tester, 0, 1, 200u32, 145u32, 0, u32::MAX);
         let result = tester.state_keeper.apply_tx(&withdraw);
         let pending_block = tester.state_keeper.pending_block;
 
@@ -308,7 +332,8 @@ mod apply_tx {
     fn fast_withdrawal() {
         let mut tester = StateKeeperTester::new(6, 1, 1, 1);
         let old_pending_block = tester.state_keeper.pending_block.clone();
-        let withdraw = create_account_and_fast_withdrawal(&mut tester, 0, 1, 200u32, 145u32);
+        let withdraw =
+            create_account_and_fast_withdrawal(&mut tester, 0, 1, 200u32, 145u32, 0, u32::MAX);
         let result = tester.state_keeper.apply_tx(&withdraw);
         let pending_block = tester.state_keeper.pending_block;
 
@@ -322,7 +347,8 @@ mod apply_tx {
     fn failure() {
         let mut tester = StateKeeperTester::new(6, 1, 1, 1);
         let old_pending_block = tester.state_keeper.pending_block.clone();
-        let withdraw = create_account_and_withdrawal(&mut tester, 0, 1, 100u32, 145u32);
+        let withdraw =
+            create_account_and_withdrawal(&mut tester, 0, 1, 100u32, 145u32, 0, u32::MAX);
         let result = tester.state_keeper.apply_tx(&withdraw);
         let pending_block = tester.state_keeper.pending_block;
 
@@ -343,7 +369,8 @@ mod apply_tx {
     #[test]
     fn not_enough_chunks() {
         let mut tester = StateKeeperTester::new(1, 1, 1, 1);
-        let withdraw = create_account_and_withdrawal(&mut tester, 0, 1, 200u32, 145u32);
+        let withdraw =
+            create_account_and_withdrawal(&mut tester, 0, 1, 200u32, 145u32, 0, u32::MAX);
         let result = tester.state_keeper.apply_tx(&withdraw);
         assert!(result.is_err());
     }
@@ -353,7 +380,8 @@ mod apply_tx {
     #[test]
     fn withdrawals_limit_reached() {
         let mut tester = StateKeeperTester::new(6, 1, 1, 0);
-        let withdraw = create_account_and_withdrawal(&mut tester, 0, 1, 200u32, 145u32);
+        let withdraw =
+            create_account_and_withdrawal(&mut tester, 0, 1, 200u32, 145u32, 0, u32::MAX);
         let result = tester.state_keeper.apply_tx(&withdraw);
         assert!(result.is_err());
     }
@@ -366,8 +394,15 @@ mod apply_tx {
         let withdrawals_number = 46;
         let mut tester = StateKeeperTester::new(6 * withdrawals_number, 1, 1, withdrawals_number);
         for i in 1..=withdrawals_number {
-            let withdrawal =
-                create_account_and_withdrawal(&mut tester, 0, i as u32, 200u32, 145u32);
+            let withdrawal = create_account_and_withdrawal(
+                &mut tester,
+                0,
+                i as u32,
+                200u32,
+                145u32,
+                0,
+                u32::MAX,
+            );
             let result = tester.state_keeper.apply_tx(&withdrawal);
             if i < withdrawals_number {
                 assert!(result.is_ok())
@@ -383,8 +418,10 @@ mod apply_tx {
 #[tokio::test]
 async fn seal_pending_block() {
     let mut tester = StateKeeperTester::new(20, 3, 3, 2);
-    let good_withdraw = create_account_and_withdrawal(&mut tester, 0, 1, 200u32, 145u32);
-    let bad_withdraw = create_account_and_withdrawal(&mut tester, 2, 2, 100u32, 145u32);
+    let good_withdraw =
+        create_account_and_withdrawal(&mut tester, 0, 1, 200u32, 145u32, 0, u32::MAX);
+    let bad_withdraw =
+        create_account_and_withdrawal(&mut tester, 2, 2, 100u32, 145u32, 0, u32::MAX);
     let deposit = create_deposit(0, 12u32);
 
     assert!(tester.state_keeper.apply_tx(&good_withdraw).is_ok());
@@ -433,8 +470,10 @@ async fn seal_pending_block() {
 #[tokio::test]
 async fn store_pending_block() {
     let mut tester = StateKeeperTester::new(20, 3, 3, 2);
-    let good_withdraw = create_account_and_withdrawal(&mut tester, 0, 1, 200u32, 145u32);
-    let bad_withdraw = create_account_and_withdrawal(&mut tester, 2, 2, 100u32, 145u32);
+    let good_withdraw =
+        create_account_and_withdrawal(&mut tester, 0, 1, 200u32, 145u32, 0, u32::MAX);
+    let bad_withdraw =
+        create_account_and_withdrawal(&mut tester, 2, 2, 100u32, 145u32, 0, u32::MAX);
     let deposit = create_deposit(0, 12u32);
 
     assert!(tester.state_keeper.apply_tx(&good_withdraw).is_ok());
@@ -591,8 +630,10 @@ mod execute_proposed_block {
     #[tokio::test]
     async fn small() {
         let mut tester = StateKeeperTester::new(20, 3, 3, 2);
-        let good_withdraw = create_account_and_withdrawal(&mut tester, 0, 1, 200u32, 145u32);
-        let bad_withdraw = create_account_and_withdrawal(&mut tester, 2, 2, 100u32, 145u32);
+        let good_withdraw =
+            create_account_and_withdrawal(&mut tester, 0, 1, 200u32, 145u32, 0, u32::MAX);
+        let bad_withdraw =
+            create_account_and_withdrawal(&mut tester, 2, 2, 100u32, 145u32, 0, u32::MAX);
         let deposit = create_deposit(0, 12u32);
         let proposed_block = ProposedBlock {
             txs: vec![
@@ -622,8 +663,10 @@ mod execute_proposed_block {
     #[tokio::test]
     async fn few_chunks() {
         let mut tester = StateKeeperTester::new(12, 3, 3, 2);
-        let good_withdraw = create_account_and_withdrawal(&mut tester, 0, 1, 200u32, 145u32);
-        let bad_withdraw = create_account_and_withdrawal(&mut tester, 2, 2, 100u32, 145u32);
+        let good_withdraw =
+            create_account_and_withdrawal(&mut tester, 0, 1, 200u32, 145u32, 0, u32::MAX);
+        let bad_withdraw =
+            create_account_and_withdrawal(&mut tester, 2, 2, 100u32, 145u32, 0, u32::MAX);
         let deposit = create_deposit(0, 12u32);
         let proposed_block = ProposedBlock {
             txs: vec![
@@ -652,8 +695,10 @@ mod execute_proposed_block {
     #[tokio::test]
     async fn few_withdrawals() {
         let mut tester = StateKeeperTester::new(20, 3, 3, 1);
-        let good_withdraw = create_account_and_withdrawal(&mut tester, 0, 1, 200u32, 145u32);
-        let bad_withdraw = create_account_and_withdrawal(&mut tester, 2, 2, 100u32, 145u32);
+        let good_withdraw =
+            create_account_and_withdrawal(&mut tester, 0, 1, 200u32, 145u32, 0, u32::MAX);
+        let bad_withdraw =
+            create_account_and_withdrawal(&mut tester, 2, 2, 100u32, 145u32, 0, u32::MAX);
         let deposit = create_deposit(0, 12u32);
         let proposed_block = ProposedBlock {
             txs: vec![
@@ -681,8 +726,10 @@ mod execute_proposed_block {
     #[tokio::test]
     async fn few_iterations() {
         let mut tester = StateKeeperTester::new(20, 0, 0, 2);
-        let good_withdraw = create_account_and_withdrawal(&mut tester, 0, 1, 200u32, 145u32);
-        let bad_withdraw = create_account_and_withdrawal(&mut tester, 2, 2, 100u32, 145u32);
+        let good_withdraw =
+            create_account_and_withdrawal(&mut tester, 0, 1, 200u32, 145u32, 0, u32::MAX);
+        let bad_withdraw =
+            create_account_and_withdrawal(&mut tester, 2, 2, 100u32, 145u32, 0, u32::MAX);
         let deposit = create_deposit(0, 12u32);
         let proposed_block = ProposedBlock {
             txs: vec![
@@ -708,7 +755,8 @@ mod execute_proposed_block {
         const FAST_ITERATIONS: usize = 0; // Seal block right after fast withdrawal.
 
         let mut tester = StateKeeperTester::new(6, MAX_ITERATIONS, FAST_ITERATIONS, 2);
-        let withdraw = create_account_and_fast_withdrawal(&mut tester, 0, 1, 200u32, 145u32);
+        let withdraw =
+            create_account_and_fast_withdrawal(&mut tester, 0, 1, 200u32, 145u32, 0, u32::MAX);
 
         let proposed_block = ProposedBlock {
             priority_ops: Vec::new(),
@@ -759,7 +807,8 @@ mod execute_proposed_block {
         // --- Phase 2: Empty pending block, only failed tx in update. ---
 
         // Then send the block with the bad transaction only
-        let bad_withdraw = create_account_and_withdrawal(&mut tester, 2, 2, 100u32, 145u32);
+        let bad_withdraw =
+            create_account_and_withdrawal(&mut tester, 2, 2, 100u32, 145u32, 0, u32::MAX);
         let proposed_block = ProposedBlock {
             txs: vec![SignedTxVariant::Tx(bad_withdraw)],
             priority_ops: vec![],
@@ -781,7 +830,8 @@ mod execute_proposed_block {
         // --- Phase 3: Empty pending block, successful tx in update. ---
 
         // First, create some block with successfull operation.
-        let good_withdraw = create_account_and_withdrawal(&mut tester, 2, 2, 200u32, 145u32);
+        let good_withdraw =
+            create_account_and_withdrawal(&mut tester, 2, 2, 200u32, 145u32, 0, u32::MAX);
         let proposed_block = ProposedBlock {
             txs: vec![SignedTxVariant::Tx(good_withdraw)],
             priority_ops: vec![],
@@ -804,7 +854,8 @@ mod execute_proposed_block {
         // --- Phase 4: Successful tx in pending block, failed tx in update. ---
 
         // Then send the block with the bad transaction only
-        let bad_withdraw = create_account_and_withdrawal(&mut tester, 2, 2, 100u32, 145u32);
+        let bad_withdraw =
+            create_account_and_withdrawal(&mut tester, 2, 2, 100u32, 145u32, 0, u32::MAX);
         let proposed_block = ProposedBlock {
             txs: vec![SignedTxVariant::Tx(bad_withdraw)],
             priority_ops: vec![],
@@ -853,8 +904,10 @@ mod execute_proposed_block {
     async fn pending_block_diff() {
         let mut tester = StateKeeperTester::new(20, 5, 5, 4);
 
-        let good_withdraw_1 = create_account_and_withdrawal(&mut tester, 0, 1, 200u32, 145u32);
-        let bad_withdraw_1 = create_account_and_withdrawal(&mut tester, 2, 2, 100u32, 145u32);
+        let good_withdraw_1 =
+            create_account_and_withdrawal(&mut tester, 0, 1, 200u32, 145u32, 0, u32::MAX);
+        let bad_withdraw_1 =
+            create_account_and_withdrawal(&mut tester, 2, 2, 100u32, 145u32, 0, u32::MAX);
         let proposed_block_1 = ProposedBlock {
             txs: vec![
                 SignedTxVariant::Tx(good_withdraw_1.clone()),
@@ -863,8 +916,10 @@ mod execute_proposed_block {
             priority_ops: vec![],
         };
 
-        let good_withdraw_2 = create_account_and_withdrawal(&mut tester, 0, 3, 200u32, 145u32);
-        let bad_withdraw_2 = create_account_and_withdrawal(&mut tester, 2, 4, 100u32, 145u32);
+        let good_withdraw_2 =
+            create_account_and_withdrawal(&mut tester, 0, 3, 200u32, 145u32, 0, u32::MAX);
+        let bad_withdraw_2 =
+            create_account_and_withdrawal(&mut tester, 2, 4, 100u32, 145u32, 0, u32::MAX);
         let proposed_block_2 = ProposedBlock {
             txs: vec![
                 SignedTxVariant::Tx(good_withdraw_2.clone()),
@@ -917,6 +972,93 @@ mod execute_proposed_block {
             assert_eq!(block.failed_txs[0].signed_tx.hash(), bad_withdraw_2.hash());
         } else {
             panic!("Block #2 not stored");
+        }
+    }
+
+    /// Checks that a transaction with a valid timestamp accepted by the statekeeper
+    /// and transaction with an invalid timestamp failed.
+    #[tokio::test]
+    async fn transfers_with_different_timestamps() {
+        let mut tester = StateKeeperTester::new(20, 5, 5, 4);
+
+        let token_id: TokenId = 0;
+        let account_from_id: AccountId = 1;
+        let account_to_id: AccountId = 2;
+        let balance = 999u32;
+        let fee = 0u32;
+        let (account_from, sk_from) = tester.add_account(account_from_id);
+        let (account_to, _sk_to) = tester.add_account(account_to_id);
+        tester.set_balance(account_from_id, token_id, balance);
+
+        let correct_transfer = Transfer::new_signed(
+            account_from_id,
+            account_from.address,
+            account_to.address,
+            token_id,
+            balance.into(),
+            fee.into(),
+            0,
+            0,
+            u32::MAX,
+            &sk_from,
+        )
+        .unwrap();
+
+        let mut premature_transfer = correct_transfer.clone();
+        premature_transfer.valid_from = Some(u32::MAX);
+
+        let mut belated_transfer = correct_transfer.clone();
+        belated_transfer.valid_until = Some(0);
+
+        let correct_transfer = SignedZkSyncTx {
+            tx: ZkSyncTx::Transfer(Box::new(correct_transfer)),
+            eth_sign_data: None,
+        };
+        let premature_transfer = SignedZkSyncTx {
+            tx: ZkSyncTx::Transfer(Box::new(premature_transfer)),
+            eth_sign_data: None,
+        };
+        let belated_transfer = SignedZkSyncTx {
+            tx: ZkSyncTx::Transfer(Box::new(belated_transfer)),
+            eth_sign_data: None,
+        };
+        let proposed_block = ProposedBlock {
+            txs: vec![
+                SignedTxVariant::Tx(premature_transfer.clone()),
+                SignedTxVariant::Tx(belated_transfer.clone()),
+                SignedTxVariant::Tx(correct_transfer.clone()),
+            ],
+            priority_ops: vec![],
+        };
+
+        tester
+            .state_keeper
+            .execute_proposed_block(proposed_block)
+            .await;
+        if let Some(CommitRequest::PendingBlock((block, _))) = tester.response_rx.next().await {
+            assert_eq!(block.number, 1); // It's the first block.
+
+            assert_eq!(block.success_operations.len(), 1);
+            assert_eq!(
+                block.success_operations[0]
+                    .get_executed_tx()
+                    .unwrap()
+                    .signed_tx
+                    .hash(),
+                correct_transfer.hash()
+            );
+
+            assert_eq!(block.failed_txs.len(), 2);
+            assert_eq!(
+                block.failed_txs[0].signed_tx.hash(),
+                premature_transfer.hash()
+            );
+            assert_eq!(
+                block.failed_txs[1].signed_tx.hash(),
+                belated_transfer.hash()
+            );
+        } else {
+            panic!("Block not stored");
         }
     }
 }

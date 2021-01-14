@@ -80,7 +80,7 @@ pub fn gen_aggregate_proof(
                     None
                 }
             })
-            .ok_or(anyhow::anyhow!("Recursive proof size not found"))?;
+            .ok_or_else(|| anyhow::anyhow!("Recursive proof size not found"))?;
         get_universal_setup_monomial_form(setup_power, download_setup_network)?
     };
     let mut g2_bases = [<<Engine as EngineTrait>::G2Affine as CurveAffine>::zero(); 2];
@@ -101,7 +101,7 @@ pub fn gen_aggregate_proof(
         &vk_indexes,
         &g2_bases,
     )?;
-    let aggr_limbs = aggregate.limbed_aggregated_g1_elements.clone();
+    let aggr_limbs = aggregate.limbed_aggregated_g1_elements;
 
     let setup = create_recursive_circuit_setup(
         proofs.len(),

@@ -15,7 +15,7 @@ use log::*;
 use num::BigUint;
 use std::time::Instant;
 use web3::transports::Http;
-use zksync_crypto::proof::EncodedAggregatedProof;
+use zksync_crypto::proof::{EncodedAggregatedProof, EncodedSingleProof};
 use zksync_testkit::*;
 use zksync_types::{AccountId, AccountMap};
 
@@ -106,7 +106,6 @@ async fn cancel_outstanding_deposits(
     let balance_to_withdraw_after = test_setup
         .get_balance_to_withdraw(deposit_receiver_account, token_address)
         .await;
-
     assert_eq!(
         balance_to_withdraw_before + deposit_amount,
         balance_to_withdraw_after,
@@ -126,7 +125,7 @@ async fn check_exit_garbage_proof(
         "Checking exit with garbage proof token: {}, amount: {}",
         token.0, amount
     );
-    let proof = EncodedAggregatedProof::default();
+    let proof = EncodedSingleProof::default();
     test_setup
         .exit(
             send_account,
@@ -136,7 +135,7 @@ async fn check_exit_garbage_proof(
             proof,
         )
         .await
-        .expect_revert("fet13");
+        .expect_revert("x");
     info!("Done cheching exit with garbage proof");
 }
 
@@ -213,7 +212,7 @@ async fn check_exit_correct_proof_second_time(
     test_setup
         .exit(send_account, account_id, token, &exit_amount, proof)
         .await
-        .expect_revert("fet12");
+        .expect_revert("t");
 
     let balance_to_withdraw_after = test_setup
         .get_balance_to_withdraw(send_account, token_address)
@@ -254,7 +253,7 @@ async fn check_exit_correct_proof_other_token(
     test_setup
         .exit(send_account, account_id, false_token, &exit_amount, proof)
         .await
-        .expect_revert("fet13");
+        .expect_revert("x");
 
     let balance_to_withdraw_after = test_setup
         .get_balance_to_withdraw(send_account, token_address)
@@ -295,7 +294,7 @@ async fn check_exit_correct_proof_other_amount(
     test_setup
         .exit(send_account, account_id, token, false_amount, proof)
         .await
-        .expect_revert("fet13");
+        .expect_revert("x");
 
     let balance_to_withdraw_after = test_setup
         .get_balance_to_withdraw(send_account, token_address)
@@ -335,7 +334,7 @@ async fn check_exit_correct_proof_incorrect_sender(
     test_setup
         .exit(send_account, account_id, token, &exit_amount, proof)
         .await
-        .expect_revert("fet13");
+        .expect_revert("x");
 
     let balance_to_withdraw_after = test_setup
         .get_balance_to_withdraw(send_account, token_address)
@@ -354,7 +353,7 @@ async fn exit_test() {
 
     let fee_account = ZkSyncAccount::rand();
     let (sk_thread_handle, stop_state_keeper_sender, sk_channels) =
-        spawn_state_keeper(&fee_account.address);
+        spawn_state_keeper(&fee_account.address, genesis_state(&fee_account.address));
 
     let initial_root_hash = genesis_state(&fee_account.address).tree.root_hash();
 
@@ -425,6 +424,7 @@ async fn exit_test() {
         &contracts,
         commit_account,
         initial_root_hash,
+        None,
     );
 
     let deposit_amount = parse_ether("0.1").unwrap();
@@ -450,14 +450,15 @@ async fn exit_test() {
     )
     .await;
     trigger_exodus(&test_setup, ETHAccountId(1), expire_count_start_block).await;
-    cancel_outstanding_deposits(
-        &test_setup,
-        ETHAccountId(1),
-        Token(0),
-        &expired_deposit_amount,
-        ETHAccountId(1),
-    )
-    .await;
+    // TODO implement new cancelOutstandingDepositsForExodusMode contract method
+    // cancel_outstanding_deposits(
+    //     &test_setup,
+    //     ETHAccountId(1),
+    //     Token(0),
+    //     &expired_deposit_amount,
+    //     ETHAccountId(1),
+    // )
+    // .await;
 
     check_exit_correct_proof_other_token(
         &mut test_setup,

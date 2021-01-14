@@ -8,13 +8,15 @@ const prodConfig = {
     // UPGRADE_NOTICE_PERIOD: 0,
     MAX_AMOUNT_OF_REGISTERED_TOKENS: 127,
     // PRIORITY_EXPIRATION: 101,
-    DUMMY_VERIFIER: false
+    DUMMY_VERIFIER: false,
+    UPGRADE_FROM_V3: true
 };
 const testnetConfig = {
     UPGRADE_NOTICE_PERIOD: 0,
     MAX_AMOUNT_OF_REGISTERED_TOKENS: 127,
     // PRIORITY_EXPIRATION: 101,
-    DUMMY_VERIFIER: false
+    DUMMY_VERIFIER: false,
+    UPGRADE_FROM_V3: true
 };
 const testConfig = {
     UPGRADE_NOTICE_PERIOD: 0,

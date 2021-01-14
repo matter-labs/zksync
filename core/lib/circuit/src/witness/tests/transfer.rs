@@ -49,6 +49,8 @@ fn test_transfer_success() {
                     &account_to.account.address,
                     None,
                     true,
+                    0,
+                    u32::MAX,
                 )
                 .0,
             from: account_from.id,
@@ -94,6 +96,8 @@ fn test_transfer_to_self() {
                 &account.account.address,
                 None,
                 true,
+                0,
+                u32::MAX,
             )
             .0,
         from: account.id,
@@ -140,6 +144,8 @@ fn corrupted_ops_input() {
                 &account.account.address,
                 None,
                 true,
+                0,
+                u32::MAX,
             )
             .0,
         from: account.id,
@@ -203,6 +209,8 @@ fn test_incorrect_transfer_account_from() {
                 &account_to.account.address,
                 None,
                 true,
+                0,
+                u32::MAX,
             )
             .0,
         from: account_from.id,
@@ -257,6 +265,8 @@ fn test_incorrect_transfer_account_to() {
                 &incorrect_account_to.account.address,
                 None,
                 true,
+                0,
+                u32::MAX,
             )
             .0,
         from: account_from.id,
@@ -315,6 +325,8 @@ fn test_incorrect_transfer_amount() {
                     &account_to.account.address,
                     None,
                     true,
+                    0,
+                    u32::MAX,
                 )
                 .0,
             from: account_from.id,
@@ -377,6 +389,8 @@ fn test_transfer_replay() {
                 &account_to.account.address,
                 None,
                 true,
+                0,
+                u32::MAX,
             )
             .0,
         from: account_copy.id,

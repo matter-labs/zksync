@@ -5,20 +5,21 @@ use web3::{
     Transport, Web3,
 };
 // Workspace deps
-use zksync_contracts::{governance_contract, zksync_contract};
+use zksync_contracts::{governance_contract, upgrade_gatekeeper};
 use zksync_crypto::Fr;
 
 use zksync_types::{AccountMap, AccountUpdate};
 // Local deps
+use crate::contract::{ZkSyncContractVersion, ZkSyncDeployedContract};
 use crate::storage_interactor::StorageInteractor;
 use crate::{
-    contract_functions::{get_genesis_account, get_total_verified_blocks},
-    eth_tx_helpers::get_ethereum_transaction,
-    events_state::EventsState,
-    rollup_ops::RollupOpsBlock,
-    tree_state::TreeState,
+    contract::get_genesis_account, eth_tx_helpers::get_ethereum_transaction,
+    events_state::EventsState, rollup_ops::RollupOpsBlock, tree_state::TreeState,
 };
+use ethabi::Address;
 use serde::export::PhantomData;
+use std::convert::TryFrom;
+use web3::types::{BlockNumber, FilterBuilder, Log, U256};
 
 /// Storage state update:
 /// - None - The state is updated completely last time - start from fetching the new events
@@ -51,7 +52,7 @@ pub struct DataRestoreDriver<T: Transport, I> {
     /// Provides Ethereum Governance contract unterface
     pub governance_contract: (ethabi::Contract, Contract<T>),
     /// Provides Ethereum Rollup contract unterface
-    pub zksync_contract: (ethabi::Contract, Contract<T>),
+    pub zksync_contracts: Vec<ZkSyncDeployedContract<T>>,
     /// Rollup contract events state
     pub events_state: EventsState,
     /// Rollup accounts state
@@ -91,7 +92,6 @@ where
     pub fn new(
         web3_transport: T,
         governance_contract_eth_addr: H160,
-        zksync_contract_eth_addr: H160,
         eth_blocks_step: u64,
         end_eth_blocks_offset: u64,
         available_block_chunk_sizes: Vec<usize>,
@@ -108,22 +108,13 @@ where
             )
         };
 
-        let zksync_contract = {
-            let abi = zksync_contract();
-            (
-                abi.clone(),
-                Contract::new(web3.eth(), zksync_contract_eth_addr, abi),
-            )
-        };
-
         let events_state = EventsState::default();
 
         let tree_state = TreeState::new(available_block_chunk_sizes.clone());
-
         Self {
             web3,
             governance_contract,
-            zksync_contract,
+            zksync_contracts: vec![],
             events_state,
             tree_state,
             eth_blocks_step,
@@ -133,6 +124,108 @@ where
             final_hash,
             phantom_data: Default::default(),
         }
+    }
+
+    pub async fn get_gatekeeper_logs(
+        &self,
+        upgrade_gatekeeper_contract_address: Address,
+    ) -> anyhow::Result<Vec<Log>> {
+        let gatekeeper_abi = upgrade_gatekeeper();
+        let upgrade_contract_event = gatekeeper_abi
+            .event("UpgradeComplete")
+            .expect("Upgrade Gatekeeper contract abi error")
+            .signature();
+
+        let filter = FilterBuilder::default()
+            .address(vec![upgrade_gatekeeper_contract_address])
+            .from_block(BlockNumber::Earliest)
+            .to_block(BlockNumber::Latest)
+            .topics(Some(vec![upgrade_contract_event]), None, None, None)
+            .build();
+
+        let result = self
+            .web3
+            .eth()
+            .logs(filter)
+            .await
+            .map_err(|e| anyhow::format_err!("No new logs: {}", e))?;
+        Ok(result)
+    }
+    pub async fn init_contracts(
+        &mut self,
+        upgrade_gatekeeper_contract_addr: Address,
+        zksync_contract_addr: Address,
+    ) -> anyhow::Result<()> {
+        let logs = self
+            .get_gatekeeper_logs(upgrade_gatekeeper_contract_addr)
+            .await?;
+
+        let mut last_updated_block = BlockNumber::Earliest;
+        let mut contract_version = vec![];
+        let mut previous_version: Option<ZkSyncContractVersion> = None;
+        // Find starts and ends for contracts
+        for log in logs {
+            let block_number = log.block_number.expect("Block number should exist");
+            let version = U256::from(log.topics[1].as_bytes()).as_u32();
+            let version = ZkSyncContractVersion::try_from(version)?;
+            let current_block = BlockNumber::Number(block_number);
+            if let Some(previous_version) = previous_version {
+                contract_version.push((last_updated_block, current_block, previous_version));
+            }
+            previous_version = Some(version);
+            last_updated_block = current_block;
+        }
+        contract_version.push((
+            last_updated_block,
+            BlockNumber::Latest,
+            previous_version.expect("At least one contract should exist"),
+        ));
+
+        for (from, to, version) in contract_version {
+            match version {
+                ZkSyncContractVersion::V0 => {
+                    self.zksync_contracts.push(ZkSyncDeployedContract::version0(
+                        self.web3.eth(),
+                        zksync_contract_addr,
+                        from,
+                        to,
+                    ))
+                }
+                ZkSyncContractVersion::V1 => {
+                    self.zksync_contracts.push(ZkSyncDeployedContract::version1(
+                        self.web3.eth(),
+                        zksync_contract_addr,
+                        from,
+                        to,
+                    ))
+                }
+                ZkSyncContractVersion::V2 => {
+                    self.zksync_contracts.push(ZkSyncDeployedContract::version2(
+                        self.web3.eth(),
+                        zksync_contract_addr,
+                        from,
+                        to,
+                    ))
+                }
+                ZkSyncContractVersion::V3 => {
+                    self.zksync_contracts.push(ZkSyncDeployedContract::version3(
+                        self.web3.eth(),
+                        zksync_contract_addr,
+                        from,
+                        to,
+                    ))
+                }
+                ZkSyncContractVersion::V4 => {
+                    self.zksync_contracts.push(ZkSyncDeployedContract::version4(
+                        self.web3.eth(),
+                        zksync_contract_addr,
+                        from,
+                        to,
+                    ))
+                }
+            }
+        }
+        Ok(())
     }
 
     /// Sets the 'genesis' state.
@@ -197,6 +290,11 @@ where
         self.tree_state = tree_state;
     }
 
+    fn actual_zksync_contract(&self) -> &ZkSyncDeployedContract<T> {
+        self.zksync_contracts
+            .last()
+            .expect("At least one should exist")
+    }
     /// Stops states from storage
     pub async fn load_state_from_storage(&mut self, interactor: &mut I) -> bool {
         log::info!("Loading state from storage");
@@ -225,12 +323,15 @@ where
             }
             StorageUpdateState::None => {}
         }
-        let total_verified_blocks = get_total_verified_blocks(&self.zksync_contract).await;
+        let total_verified_blocks = self
+            .actual_zksync_contract()
+            .get_total_verified_blocks()
+            .await;
+
         let last_verified_block = self.tree_state.state.block_number;
         log::info!(
-            "State has been loaded\nProcessed {:?} blocks of total {:?} verified on contract\nRoot hash: {:?}\n",
+            "State has been loaded\nProcessed {:?} blocks on contract\nRoot hash: {:?}\n",
             last_verified_block,
-            total_verified_blocks,
             self.tree_state.root_hash()
         );
 
@@ -242,7 +343,7 @@ where
         let mut last_watched_block: u64 = self.events_state.last_watched_eth_block_number;
         let mut final_hash_was_found = false;
         loop {
-            log::debug!("Last watched ethereum block: {:?}", last_watched_block);
+            log::info!("Last watched ethereum block: {:?}", last_watched_block);
 
             // Update events
             if self.update_events_state(interactor).await {
@@ -253,8 +354,11 @@ where
                     // Update tree
                     self.update_tree_state(interactor, new_ops_blocks).await;
 
-                    let total_verified_blocks =
-                        get_total_verified_blocks(&self.zksync_contract).await;
+                    let total_verified_blocks = self
+                        .actual_zksync_contract()
+                        .get_total_verified_blocks()
+                        .await;
+
                     let last_verified_block = self.tree_state.state.block_number;
 
                     // We must update the Ethereum stats table to match the actual stored state
@@ -297,6 +401,7 @@ where
             }
 
             if last_watched_block == self.events_state.last_watched_eth_block_number {
+                log::info!("sleep block");
                 std::thread::sleep(std::time::Duration::from_secs(5));
             } else {
                 last_watched_block = self.events_state.last_watched_eth_block_number;
@@ -311,14 +416,13 @@ where
             .events_state
             .update_events_state(
                 &self.web3,
-                &self.zksync_contract,
+                &self.zksync_contracts,
                 &self.governance_contract,
                 self.eth_blocks_step,
                 self.end_eth_blocks_offset,
             )
             .await
             .expect("Updating events state: cant update events state");
-
         interactor
             .save_events_state(
                 &block_events,
@@ -326,8 +430,6 @@ where
                 last_watched_eth_block_number,
             )
             .await;
-
-        log::debug!("Updated events storage");
 
         !block_events.is_empty()
     }
@@ -381,10 +483,10 @@ where
             .get_only_verified_committed_events()
             .iter()
         {
-            let block = RollupOpsBlock::get_rollup_ops_block(&self.web3, &event)
+            let block = RollupOpsBlock::get_rollup_ops_blocks(&self.web3, &event)
                 .await
                 .expect("Cant get new operation blocks from events");
-            blocks.push(block);
+            blocks.extend(block);
         }
 
         blocks

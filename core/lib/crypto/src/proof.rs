@@ -3,9 +3,9 @@ use crate::bellman::plonk::better_cs::{
     cs::PlonkCsWidth4WithNextStepParams,
     keys::{Proof as OldProof, VerificationKey as SingleVk},
 };
+use crate::primitives::EthereumSerializer;
 use crate::serialization::{
-    serialize_fe_for_ethereum, serialize_new_proof, AggregatedProofSerde, SingleProofSerde,
-    VecFrSerde,
+    serialize_new_proof, serialize_single_proof, AggregatedProofSerde, SingleProofSerde, VecFrSerde,
 };
 use crate::{Engine, Fr};
 use ethabi::Token;
@@ -28,6 +28,12 @@ impl From<OldProofType> for SingleProof {
 impl Default for SingleProof {
     fn default() -> Self {
         SingleProof(OldProofType::empty())
+    }
+}
+
+impl SingleProof {
+    pub fn serialize_single_proof(&self) -> EncodedSingleProof {
+        serialize_single_proof(&self.0)
     }
 }
 
@@ -84,12 +90,12 @@ impl AggregatedProof {
         let subproof_limbs = self
             .aggr_limbs
             .iter()
-            .map(serialize_fe_for_ethereum)
+            .map(EthereumSerializer::serialize_fe)
             .collect();
         let individual_vk_inputs = self
             .individual_vk_inputs
             .iter()
-            .map(serialize_fe_for_ethereum)
+            .map(EthereumSerializer::serialize_fe)
             .collect();
         let individual_vk_idxs = self
             .individual_vk_idxs
@@ -171,4 +177,20 @@ impl Default for EncodedAggregatedProof {
 pub struct PrecomputedSampleProofs {
     pub single_proofs: Vec<(SingleProof, usize)>,
     pub aggregated_proof: AggregatedProof,
+}
+
+/// Encoded representation of the block proof.
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+pub struct EncodedSingleProof {
+    pub inputs: Vec<U256>,
+    pub proof: Vec<U256>,
+}
+
+impl Default for EncodedSingleProof {
+    fn default() -> Self {
+        Self {
+            inputs: vec![U256::default(); 1],
+            proof: vec![U256::default(); 33],
+        }
+    }
 }

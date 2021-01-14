@@ -219,7 +219,7 @@ impl ZkSyncState {
 
         assert!(
             self.get_account(op.to).is_none(),
-            "Transfer to new account exists"
+            format!("Transfer to new account exists {:?}", op.to)
         );
         let mut to_account = {
             let (acc, upd) = Account::create_account(op.to, op.tx.to);
