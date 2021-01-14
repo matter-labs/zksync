@@ -2015,6 +2015,7 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
         ohs_valid_flags.push(is_second_chunk.not());
         ohs_valid_flags.push(is_transfer);
         ohs_valid_flags.push(pubdata_properly_copied);
+        ohs_valid_flags.push(is_valid_timestamp.clone());
 
         let is_ohs_valid = multi_and(cs.namespace(|| "is_ohs_valid"), &ohs_valid_flags)?;
 

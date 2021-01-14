@@ -12,7 +12,7 @@ use zksync_crypto::params::account_tree_depth;
 use zksync_prover_utils::aggregated_proofs::{gen_aggregate_proof, prepare_proof_data};
 use zksync_prover_utils::{PlonkVerificationKey, SetupForStepByStepProver};
 use zksync_testkit::eth_account::EthereumAccount;
-use zksync_testkit::external_commands::{deploy_contracts, get_test_accounts};
+use zksync_testkit::external_commands::{deploy_contracts, get_test_accounts, js_revert_reason};
 use zksync_testkit::zksync_account::ZkSyncAccount;
 use zksync_testkit::{
     genesis_state, spawn_state_keeper, AccountSet, ETHAccountId, TestSetup, TestkitConfig, Token,
@@ -212,11 +212,9 @@ async fn main() {
             .expect_success();
     }
 
-    {
+    for aggregated_proof_size in aggregated_proof_sizes {
         let block_size = *available_block_chunk_sizes.first().unwrap();
         info!("Checking recursive keys for block size: {}", block_size);
-
-        let aggregated_proof_size = 1;
 
         let mut blocks = Vec::new();
         let mut proofs = Vec::new();
@@ -236,7 +234,6 @@ async fn main() {
             assert!(block.block_chunks_size <= block_size);
             // complete block to the correct size with noops
             block.block_chunks_size = block_size;
-            blocks.push(block.clone());
 
             let timer = Instant::now();
             let witness = build_block_witness(&mut circuit_account_tree, &block)
@@ -279,10 +276,15 @@ async fn main() {
             blocks,
             proof: aggregated_proof.serialize_aggregated_proof(),
         };
-        test_setup
+        let tx_receipt = test_setup
             .execute_verify_commitments(proof_op)
             .await
             .expect_success();
+        info!(
+            "Aggregated proof, size: {}, gas cost: {}",
+            aggregated_proof_size,
+            tx_receipt.gas_used.expect("Gas used empty")
+        );
     }
 
     stop_state_keeper_sender.send(()).expect("sk stop send");
