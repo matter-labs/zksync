@@ -137,8 +137,11 @@ impl Withdraw {
         out.extend_from_slice(&self.amount.to_u128().unwrap().to_be_bytes());
         out.extend_from_slice(&pack_fee_amount(&self.fee));
         out.extend_from_slice(&self.nonce.to_be_bytes());
-        out.extend_from_slice(&self.valid_from.unwrap_or(0).to_be_bytes());
-        out.extend_from_slice(&self.valid_until.unwrap_or(u32::MAX).to_be_bytes());
+
+        // We use 64 bytes for timestamps in the signed message
+        out.extend_from_slice(&u64::from(self.valid_from.unwrap_or(0)).to_be_bytes());
+        out.extend_from_slice(&u64::from(self.valid_until.unwrap_or(u32::MAX)).to_be_bytes());
+
         out
     }
 
@@ -153,7 +156,8 @@ impl Withdraw {
         let mut valid = self.amount <= BigUint::from(u128::max_value())
             && is_fee_amount_packable(&self.fee)
             && self.account_id <= max_account_id()
-            && self.token <= max_token_id();
+            && self.token <= max_token_id()
+            && self.valid_from.unwrap_or(0) <= self.valid_until.unwrap_or(u32::MAX);
 
         if valid {
             let signer = self.verify_signature();
@@ -181,13 +185,17 @@ impl Withdraw {
             To: {to:?}\n\
             Nonce: {nonce}\n\
             Fee: {fee} {token}\n\
-            Account Id: {account_id}",
+            Account Id: {account_id}\n\
+            Valid from: {valid_from}\n\
+            Valid until: {valid_until}",
             amount = format_units(&self.amount, decimals),
             token = token_symbol,
             to = self.to,
             nonce = self.nonce,
             fee = format_units(&self.fee, decimals),
             account_id = self.account_id,
+            valid_from = self.valid_from.unwrap_or(0),
+            valid_until = self.valid_until.unwrap_or(u32::MAX),
         )
     }
 }

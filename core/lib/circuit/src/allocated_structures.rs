@@ -108,6 +108,8 @@ pub struct AllocatedOperationData<E: Engine> {
     pub pub_nonce: CircuitElement<E>,
     pub a: CircuitElement<E>,
     pub b: CircuitElement<E>,
+    pub valid_from: CircuitElement<E>,
+    pub valid_until: CircuitElement<E>,
 }
 
 impl<E: RescueEngine> AllocatedOperationData<E> {
@@ -174,8 +176,18 @@ impl<E: RescueEngine> AllocatedOperationData<E> {
         );
 
         let b = CircuitElement::unsafe_empty_of_some_length(
-            zero_element,
+            zero_element.clone(),
             franklin_constants::BALANCE_BIT_WIDTH,
+        );
+
+        let valid_from = CircuitElement::unsafe_empty_of_some_length(
+            zero_element.clone(),
+            franklin_constants::TIMESTAMP_BIT_WIDTH,
+        );
+
+        let valid_until = CircuitElement::unsafe_empty_of_some_length(
+            zero_element,
+            franklin_constants::TIMESTAMP_BIT_WIDTH,
         );
 
         Ok(AllocatedOperationData {
@@ -192,6 +204,8 @@ impl<E: RescueEngine> AllocatedOperationData<E> {
             new_pubkey_hash,
             a,
             b,
+            valid_from,
+            valid_until,
         })
     }
 
@@ -287,6 +301,16 @@ impl<E: RescueEngine> AllocatedOperationData<E> {
             || op.args.b.grab(),
             franklin_constants::BALANCE_BIT_WIDTH,
         )?;
+        let valid_from = CircuitElement::from_fe_with_known_length(
+            cs.namespace(|| "valid_from"),
+            || op.args.valid_from.grab(),
+            franklin_constants::TIMESTAMP_BIT_WIDTH,
+        )?;
+        let valid_until = CircuitElement::from_fe_with_known_length(
+            cs.namespace(|| "valid_until"),
+            || op.args.valid_until.grab(),
+            franklin_constants::TIMESTAMP_BIT_WIDTH,
+        )?;
 
         Ok(AllocatedOperationData {
             eth_address,
@@ -302,6 +326,8 @@ impl<E: RescueEngine> AllocatedOperationData<E> {
             new_pubkey_hash,
             a,
             b,
+            valid_from,
+            valid_until,
         })
     }
 }

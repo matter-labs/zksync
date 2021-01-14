@@ -9,6 +9,7 @@ use zksync_crypto::franklin_crypto::{
     rescue::RescueEngine,
 };
 // Workspace deps
+use zksync_crypto::ff::Field;
 use zksync_crypto::params as franklin_constants;
 // Local deps
 use crate::utils::{allocate_bits_vector, pack_bits_to_element, reverse_bytes};
@@ -279,6 +280,31 @@ impl<E: Engine> CircuitElement<E> {
         let is_equal =
             AllocatedNum::equals(cs.namespace(|| "equals"), &x.get_number(), &y.get_number())?;
         Ok(Boolean::from(is_equal))
+    }
+
+    pub fn less_than_fixed<CS: ConstraintSystem<E>>(
+        mut cs: CS,
+        x: &Self,
+        y: &Self,
+    ) -> Result<Boolean, SynthesisError> {
+        let length = std::cmp::max(x.length, y.length);
+        assert!(
+            length < E::Fr::CAPACITY as usize,
+            "comparison is only supported for fixed-length elements"
+        );
+
+        let two = E::Fr::from_str("2").unwrap();
+        let power = E::Fr::from_str(&length.to_string()).unwrap();
+        let mut base = two.pow(&power.into_repr());
+        base.sub_assign(&E::Fr::one());
+
+        let expr = Expression::constant::<CS>(base) - &x.get_number() + &y.get_number();
+        let bits = expr.into_bits_le_fixed(cs.namespace(|| "diff bits"), length + 1)?;
+
+        Ok(bits
+            .last()
+            .expect("expr bit representation should always contain at least one bit")
+            .clone())
     }
 
     pub fn get_number(&self) -> AllocatedNum<E> {

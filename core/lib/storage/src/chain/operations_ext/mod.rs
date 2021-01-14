@@ -513,11 +513,11 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
         let (block_id, block_tx_id) = tx_id;
         let (block_number_start_idx, block_number_end_idx) = match direction {
             SearchDirection::Older => (0i64, block_id as i64 - 1), // Older blocks have lesser block ID.
-            SearchDirection::Newer => (block_id as i64 + 1, i64::max_value()), // Newer blocks have greater block ID.
+            SearchDirection::Newer => (block_id as i64 + 1, i64::MAX), // Newer blocks have greater block ID.
         };
         let (tx_number_start_idx, tx_number_end_idx) = match direction {
             SearchDirection::Older => (0i32, block_tx_id as i32 - 1),
-            SearchDirection::Newer => (block_tx_id as i32 + 1, i32::max_value()),
+            SearchDirection::Newer => (block_tx_id as i32 + 1, i32::MAX),
         };
 
         // This query does the following:
