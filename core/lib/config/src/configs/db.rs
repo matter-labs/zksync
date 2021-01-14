@@ -13,8 +13,11 @@ pub struct DBConfig {
 impl DBConfig {
     pub fn from_env() -> Self {
         Self {
-            pool_size: env!("DB_POOL_SIZE").parse().unwrap(),
-            url: env!("DATABASE_URL").to_string(),
+            pool_size: std::env::var("DB_POOL_SIZE")
+                .expect("DB_POOL_SIZE is set")
+                .parse()
+                .unwrap(),
+            url: std::env::var("DATABASE_URL").expect("DATABASE_URL is set"),
         }
     }
 }
