@@ -9,10 +9,11 @@ All notable changes to the core components will be documented in this file.
 
 ### Changed
 
-- `prometheus_exporter` was made a library to be used by several crates. `prometheus_exporter` is launched by every
-  microservice.
+- `prometheus_exporter` was made a library to be used by several crates.
 
 ### Added
+
+- `prometheus_exporter` is launched by every microservice.
 
 ### Fixed
 
