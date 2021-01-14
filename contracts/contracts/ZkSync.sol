@@ -388,7 +388,9 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
                 sent = false;
             }
         }
-        if (!sent) {
+        if (sent) {
+            emit Withdrawal(_tokenId, _amount);
+        } else {
             increaseBalanceToWithdraw(packedBalanceKey, _amount);
         }
     }
@@ -594,6 +596,7 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
             });
         bytes memory pubData = Operations.writeDepositPubdataForPriorityQueue(op);
         addPriorityRequest(Operations.OpType.Deposit, pubData);
+        emit Deposit(_tokenId, _amount);
     }
 
     /// @notice Register withdrawal - update user balance and emit OnchainWithdrawal event
@@ -608,6 +611,7 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
         bytes22 packedBalanceKey = packAddressAndTokenId(_to, _token);
         uint128 balance = pendingBalances[packedBalanceKey].balanceToWithdraw;
         pendingBalances[packedBalanceKey].balanceToWithdraw = balance.sub(_amount);
+        emit Withdrawal(_token, _amount);
     }
 
     /// @dev Gets operations packed in bytes array. Unpacks it and stores onchain operations.
