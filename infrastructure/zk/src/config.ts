@@ -21,11 +21,11 @@ const CONFIG_FILES = [
 ];
 
 async function getEnvironment(): Promise<string> {
-    const environmentFilePath = path.join(env['ZKSYNC_HOME'] as string, 'etc', 'env', 'current');
+    const environmentFilePath = path.join(envDirPath(), 'current');
     // Try to read environment from file.
     if (fs.existsSync(environmentFilePath)) {
         const environment = (await fs.promises.readFile(environmentFilePath)).toString().trim();
-        if (environment === '') {
+        if (environment !== '') {
             return environment;
         }
     }
@@ -149,6 +149,7 @@ export async function compileConfig(environment?: string) {
 
     const outputFileName = path.join(envDirPath(), `${environment}.env`);
     await fs.promises.writeFile(outputFileName, outputFileContents);
+    console.log('Configs compiled');
 }
 
 export const command = new Command('config').description('config management');

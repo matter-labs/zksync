@@ -44,7 +44,7 @@ const ethTestConfig = JSON.parse(fs.readFileSync(`${testConfigPath}/eth.json`, {
         ['Matter Labs Trial Token', 'MLTT', 18],
         { gasLimit: 5000000 }
     );
-    console.log(`TEST_ERC20=${erc20.address}`);
+    console.log(`CONTRACTS_TEST_ERC20=${erc20.address}`);
     await (await governance.addToken(erc20.address)).wait();
     if ((await governance.tokenIds(erc20.address)) !== 1) {
         console.error('Problem with testkit deployment, TEST_ERC20 token should have id 1');

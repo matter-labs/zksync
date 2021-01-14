@@ -1,4 +1,4 @@
-{
+module.exports = {
   "tabWidth": 2,
   "printWidth": 120,
   "parser": "markdown",
@@ -6,4 +6,4 @@
   "trailingComma": "none",
   "bracketSpacing": true,
   "proseWrap": "always"
-}
+};

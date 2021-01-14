@@ -1,12 +1,15 @@
 const { expect } = require('chai');
 const { wallet, deployProxyContract, getCallRevertReason } = require('./common');
 
-describe('Governance unit tests', function() {
+describe('Governance unit tests', function () {
     this.timeout(50000);
 
     let testContract;
     before(async () => {
         let governanceAddressDeployed;
+        // The `governanceAddressDeployed` is indeed never used
+        // but it is worth assigning it for clarity.
+        // eslint-disable-next-line no-unused-vars
         [testContract, governanceAddressDeployed] = await deployProxyContract(
             wallet,
             require('../../build/Proxy'),

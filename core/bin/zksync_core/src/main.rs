@@ -1,6 +1,6 @@
 use futures::{channel::mpsc, executor::block_on, SinkExt, StreamExt};
 use std::cell::RefCell;
-use zksync_config::configs::ZkSyncConfig;
+use zksync_config::ZkSyncConfig;
 use zksync_core::{run_core, wait_for_tasks};
 use zksync_storage::ConnectionPool;
 

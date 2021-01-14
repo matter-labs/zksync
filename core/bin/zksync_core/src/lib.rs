@@ -6,7 +6,7 @@ use crate::{
     block_proposer::run_block_proposer_task,
     committer::run_committer,
     eth_watch::start_eth_watch,
-    mempool::run_mempool_task,
+    mempool::run_mempool_tasks,
     private_api::start_private_core_api,
     state_keeper::{start_state_keeper, ZkSyncStateInitParams, ZkSyncStateKeeper},
 };
@@ -15,11 +15,12 @@ use futures::{
     future, SinkExt,
 };
 use tokio::task::JoinHandle;
-use zksync_config::configs::ZkSyncConfig;
+use zksync_config::ZkSyncConfig;
 use zksync_storage::ConnectionPool;
 
 const DEFAULT_CHANNEL_CAPACITY: usize = 32_768;
 
+pub mod balancer;
 pub mod block_proposer;
 pub mod committer;
 pub mod eth_watch;
@@ -101,8 +102,8 @@ pub async fn genesis_init(config: &ZkSyncConfig) {
     )
     .await;
     log::info!("Adding initial tokens to db");
-    let genesis_tokens =
-        get_genesis_token_list(&config.chain.eth.network).expect("Initial token list not found");
+    let genesis_tokens = get_genesis_token_list(&config.chain.eth.network.to_string())
+        .expect("Initial token list not found");
     for (id, token) in (1..).zip(genesis_tokens) {
         log::info!(
             "Adding token: {}, id:{}, address: {}, decimals: {}",
@@ -146,7 +147,9 @@ pub async fn run_core(
     let (state_keeper_req_sender, state_keeper_req_receiver) =
         mpsc::channel(DEFAULT_CHANNEL_CAPACITY);
     let (eth_watch_req_sender, eth_watch_req_receiver) = mpsc::channel(DEFAULT_CHANNEL_CAPACITY);
-    let (mempool_request_sender, mempool_request_receiver) =
+    let (mempool_tx_request_sender, mempool_tx_request_receiver) =
+        mpsc::channel(DEFAULT_CHANNEL_CAPACITY);
+    let (mempool_block_request_sender, mempool_block_request_receiver) =
         mpsc::channel(DEFAULT_CHANNEL_CAPACITY);
 
     // Start Ethereum Watcher.
@@ -175,36 +178,38 @@ pub async fn run_core(
         config.chain.state_keeper.block_chunk_sizes.clone(),
         config.chain.state_keeper.miniblock_iterations as usize,
         config.chain.state_keeper.fast_block_miniblock_iterations as usize,
-        config.chain.eth.max_number_of_withdrawals_per_block,
     );
     let state_keeper_task = start_state_keeper(state_keeper, pending_block);
 
     // Start committer.
     let committer_task = run_committer(
         proposed_blocks_receiver,
-        mempool_request_sender.clone(),
+        mempool_block_request_sender.clone(),
         connection_pool.clone(),
     );
 
     // Start mempool.
-    let mempool_task = run_mempool_task(
+    let mempool_task = run_mempool_tasks(
         connection_pool.clone(),
-        mempool_request_receiver,
+        mempool_tx_request_receiver,
+        mempool_block_request_receiver,
         eth_watch_req_sender.clone(),
         &config,
+        4,
+        DEFAULT_CHANNEL_CAPACITY,
     );
 
     // Start block proposer.
     let proposer_task = run_block_proposer_task(
         &config,
-        mempool_request_sender.clone(),
+        mempool_block_request_sender.clone(),
         state_keeper_req_sender.clone(),
     );
 
     // Start private API.
     start_private_core_api(
         panic_notify.clone(),
-        mempool_request_sender,
+        mempool_tx_request_sender,
         eth_watch_req_sender,
         config.api.private.clone(),
     );

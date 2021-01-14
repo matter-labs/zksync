@@ -2,7 +2,7 @@
 use num::BigUint;
 use std::collections::HashMap;
 use web3::types::TransactionReceipt;
-use zksync_config::configs::ZkSyncConfig;
+use zksync_config::ZkSyncConfig;
 use zksync_types::TokenId;
 
 #[derive(Debug)]

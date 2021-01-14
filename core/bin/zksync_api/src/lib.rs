@@ -2,7 +2,7 @@
 
 use crate::{api_server::start_api_server, fee_ticker::run_ticker_task};
 use futures::channel::mpsc;
-use zksync_config::configs::ZkSyncConfig;
+use zksync_config::ZkSyncConfig;
 use zksync_storage::ConnectionPool;
 
 pub mod api_server;

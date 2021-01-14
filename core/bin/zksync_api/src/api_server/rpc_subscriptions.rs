@@ -18,7 +18,7 @@ use crate::{
     api_server::rpc_server::types::{ETHOpInfoResp, ResponseAccountState, TransactionInfoResp},
     signature_checker::VerifyTxSignatureRequest,
 };
-use zksync_config::configs::ZkSyncConfig;
+use zksync_config::ZkSyncConfig;
 use zksync_utils::panic_notify::ThreadPanicNotify;
 
 #[rpc]

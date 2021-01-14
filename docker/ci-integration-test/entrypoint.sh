@@ -10,7 +10,6 @@ service postgresql restart
 zk dummy-prover enable --no-redeploy
 
 # Initialize the stack
-zk config compile
 zk run verify-keys unpack
 zk run yarn || true # It can fail
 zk db setup

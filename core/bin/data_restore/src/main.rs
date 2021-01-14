@@ -10,6 +10,7 @@ use zksync_data_restore::{
     add_tokens_to_storage, data_restore_driver::DataRestoreDriver,
     database_storage_interactor::DatabaseStorageInteractor, END_ETH_BLOCKS_OFFSET, ETH_BLOCKS_STEP,
 };
+use zksync_types::network::Network;
 
 #[derive(StructOpt)]
 #[structopt(
@@ -45,7 +46,7 @@ struct Opt {
 
 #[derive(Debug, Deserialize)]
 pub struct ContractsConfig {
-    eth_network: String,
+    eth_network: Network,
     governance_addr: Address,
     genesis_tx_hash: H256,
     contract_addr: Address,
@@ -116,7 +117,7 @@ async fn main() {
     if opt.genesis {
         // We have to load pre-defined tokens into the database before restoring state,
         // since these tokens do not have a corresponding Ethereum events.
-        add_tokens_to_storage(&mut interactor, &config.eth_network).await;
+        add_tokens_to_storage(&mut interactor, &config.eth_network.to_string()).await;
 
         driver
             .set_genesis_state(&mut interactor, config.genesis_tx_hash)

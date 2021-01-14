@@ -14,7 +14,7 @@ use futures::{
 };
 use tokio::runtime::{Builder, Handle};
 // Workspace uses
-use zksync_config::configs::ZkSyncConfig;
+use zksync_config::ZkSyncConfig;
 use zksync_eth_client::ethereum_gateway::EthereumGateway;
 use zksync_types::tx::EthSignData;
 use zksync_types::{tx::TxEthSignature, SignedZkSyncTx, ZkSyncTx};

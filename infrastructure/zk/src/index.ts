@@ -15,6 +15,7 @@ import { command as run } from './run/run';
 import { command as test } from './test/test';
 import { command as docker } from './docker';
 import { command as fmt } from './fmt';
+import { command as lint } from './lint';
 import { command as completion } from './completion';
 import { command as config } from './config';
 import * as env from './env';
@@ -32,6 +33,7 @@ const COMMANDS = [
     run,
     test,
     fmt,
+    lint,
     docker,
     config,
     env.command,

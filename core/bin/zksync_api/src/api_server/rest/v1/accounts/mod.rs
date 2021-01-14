@@ -16,7 +16,7 @@ use zksync_types::{AccountId, Address, BlockNumber, TokenId};
 use crate::{core_api_client::CoreApiClient, utils::token_db_cache::TokenDBCache};
 
 use super::{ApiError, JsonResult};
-use zksync_config::configs::ZkSyncConfig;
+use zksync_config::ZkSyncConfig;
 
 use self::types::{
     convert::{

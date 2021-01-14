@@ -7,7 +7,7 @@ use actix_web::{web, Scope};
 
 // Workspace uses
 use zksync_api_client::rest::v1::Contracts;
-use zksync_config::configs::ZkSyncConfig;
+use zksync_config::ZkSyncConfig;
 use zksync_types::{network::Network, Address};
 
 // Local uses
@@ -26,7 +26,7 @@ impl ApiConfigData {
         Self {
             contract_address: config.contracts.contract_addr,
             deposit_confirmations: config.eth_watch.confirmations_for_eth_event,
-            network: config.chain.eth.network.parse().unwrap(),
+            network: config.chain.eth.network,
         }
     }
 }
@@ -78,7 +78,10 @@ mod tests {
             cfg.config.eth_watch.confirmations_for_eth_event
         );
 
-        assert_eq!(client.network().await?, cfg.config.chain.eth.network);
+        assert_eq!(
+            client.network().await?,
+            cfg.config.chain.eth.network.to_string()
+        );
         assert_eq!(
             client.contracts().await?,
             Contracts {

@@ -10,7 +10,7 @@ use once_cell::sync::Lazy;
 use tokio::sync::Mutex;
 
 // Workspace uses
-use zksync_config::configs::ZkSyncConfig;
+use zksync_config::ZkSyncConfig;
 use zksync_crypto::rand::{SeedableRng, XorShiftRng};
 use zksync_storage::{
     chain::operations::records::NewExecutedPriorityOperation,

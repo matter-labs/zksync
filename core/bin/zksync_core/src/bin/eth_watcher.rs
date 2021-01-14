@@ -1,7 +1,9 @@
-use futures::{channel::mpsc, SinkExt};
 use std::time::Duration;
+
+use futures::{channel::mpsc, SinkExt};
 use tokio::{runtime::Runtime, time};
-use zksync_config::configs::ZkSyncConfig;
+
+use zksync_config::ZkSyncConfig;
 use zksync_core::eth_watch::{DBStorage, EthHttpClient, EthWatch, EthWatchRequest};
 use zksync_eth_client::EthereumGateway;
 use zksync_storage::ConnectionPool;

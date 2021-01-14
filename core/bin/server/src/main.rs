@@ -7,7 +7,7 @@ use zksync_eth_sender::run_eth_sender;
 use zksync_prometheus_exporter::run_prometheus_exporter;
 use zksync_witness_generator::run_prover_server;
 
-use zksync_config::configs::ZkSyncConfig;
+use zksync_config::ZkSyncConfig;
 use zksync_storage::ConnectionPool;
 
 #[derive(Debug, Clone, Copy)]

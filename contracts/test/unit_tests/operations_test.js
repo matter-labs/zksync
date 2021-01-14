@@ -1,7 +1,7 @@
 const { expect } = require('chai');
-const { provider, wallet, deployTestContract, getCallRevertReason } = require('./common');
+const { deployTestContract } = require('./common');
 
-describe('Operations unit tests', function() {
+describe('Operations unit tests', function () {
     this.timeout(50000);
 
     let testContract;

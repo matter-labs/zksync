@@ -10,15 +10,14 @@ use actix_web::{
 
 // Workspace uses
 pub use zksync_api_client::rest::v1::{BlockInfo, TransactionInfo};
+use zksync_config::ZkSyncConfig;
 use zksync_crypto::{convert::FeConvert, Fr};
 use zksync_storage::{chain::block::records, ConnectionPool, QueryResult};
 use zksync_types::{tx::TxHash, BlockNumber};
 
-use crate::{api_server::helpers::try_parse_tx_hash, utils::shared_lru_cache::AsyncLruCache};
-use zksync_config::configs::ZkSyncConfig;
-
 // Local uses
 use super::{Error as ApiError, JsonResult, Pagination, PaginationQuery};
+use crate::{api_server::helpers::try_parse_tx_hash, utils::shared_lru_cache::AsyncLruCache};
 
 /// Shared data between `api/v1/blocks` endpoints.
 #[derive(Debug, Clone)]

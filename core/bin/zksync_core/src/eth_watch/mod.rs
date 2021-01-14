@@ -35,7 +35,7 @@ use self::{
 
 pub use client::EthHttpClient;
 pub use storage::DBStorage;
-use zksync_config::configs::ZkSyncConfig;
+use zksync_config::ZkSyncConfig;
 
 use zksync_eth_client::ethereum_gateway::EthereumGateway;
 
@@ -326,6 +326,9 @@ impl<W: EthClient, S: Storage> EthWatch<W, S> {
     fn enter_backoff_mode(&mut self) {
         let backoff_until = Instant::now() + RATE_LIMIT_DELAY;
         self.mode = WatcherMode::Backoff(backoff_until);
+        // This is needed to track how much time is spent in backoff mode
+        // and trigger grafana alerts
+        metrics::histogram!("eth_watcher.enter_backoff_mode", RATE_LIMIT_DELAY);
     }
 
     fn polling_allowed(&mut self) -> bool {

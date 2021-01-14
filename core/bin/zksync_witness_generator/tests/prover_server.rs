@@ -6,7 +6,7 @@ use zksync_crypto::pairing::ff::{Field, PrimeField};
 // Workspace deps
 use num::BigUint;
 use zksync_circuit::witness::{deposit::DepositWitness, Witness};
-use zksync_config::configs::ZkSyncConfig;
+use zksync_config::ZkSyncConfig;
 use zksync_crypto::{params::total_tokens, proof::EncodedProofPlonk};
 use zksync_prover::{client, ApiClient};
 use zksync_types::{block::Block, Address, H256};

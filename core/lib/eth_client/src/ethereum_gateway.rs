@@ -3,15 +3,14 @@ use web3::contract::Options;
 use web3::types::{Address, BlockId, Filter, Log, U64};
 
 use std::fmt::Debug;
-use zksync_config::configs::ZkSyncConfig;
+use zksync_config::ZkSyncConfig;
+use zksync_contracts::zksync_contract;
 use zksync_eth_signer::PrivateKeySigner;
 use zksync_types::{TransactionReceipt, H160, H256, U256};
 
 use crate::clients::mock::MockEthereum;
 use crate::clients::multiplexer::MultiplexerEthereumClient;
 use crate::ETHDirectClient;
-use zksync_contracts::zksync_contract;
-// pub struct anyhow::Error;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct SignedCallResult {

@@ -256,9 +256,11 @@ impl<S: EthereumSigner + Send + Sync> EthereumProvider<S> {
             .ok_or(ClientError::UnknownToken)?;
 
         let signed_tx = if self.tokens_cache.is_eth(token) {
-            let mut options = Options::default();
-            options.value = Some(amount);
-            options.gas = Some(200_000.into());
+            let options = Options {
+                value: Some(amount),
+                gas: Some(200_000.into()),
+                ..Default::default()
+            };
             let data = self.eth_client.encode_tx_data("depositETH", sync_address);
 
             self.eth_client
@@ -266,8 +268,10 @@ impl<S: EthereumSigner + Send + Sync> EthereumProvider<S> {
                 .await
                 .map_err(|_| ClientError::IncorrectCredentials)?
         } else {
-            let mut options = Options::default();
-            options.gas = Some(300_000.into());
+            let options = Options {
+                gas: Some(300_000.into()),
+                ..Default::default()
+            };
             let params = (token_info.address, amount, sync_address);
             let data = self.eth_client.encode_tx_data("depositERC20", params);
 
@@ -299,12 +303,14 @@ impl<S: EthereumSigner + Send + Sync> EthereumProvider<S> {
             .ok_or(ClientError::UnknownToken)?;
         let account_id = U256::from(account_id);
 
-        let mut options = Options::default();
-        options.gas = Some(500_000.into());
+        let options = Options {
+            gas: Some(500_000.into()),
+            ..Default::default()
+        };
+
         let data = self
             .eth_client
             .encode_tx_data("fullExit", (account_id, token.address));
-
         let signed_tx = self
             .eth_client
             .sign_prepared_tx(data, options)
