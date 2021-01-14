@@ -1,16 +1,14 @@
 //! Generate exit proof for exodus mode given account and token
 
-use crate::aggregated_proofs::{gen_aggregate_proof, SingleProofData};
-use crate::{gen_verified_proof_for_exit_circuit, PlonkVerificationKey};
+use crate::gen_verified_proof_for_exit_circuit;
 use anyhow::format_err;
 use log::info;
 use num::BigUint;
 use std::time::Instant;
 use zksync_circuit::exit_circuit::create_exit_circuit_with_public_input;
-use zksync_config::AvailableBlockSizesConfig;
 use zksync_crypto::circuit::account::CircuitAccount;
 use zksync_crypto::circuit::CircuitAccountTree;
-use zksync_crypto::proof::{EncodedAggregatedProof, EncodedSingleProof, SingleProof};
+use zksync_crypto::proof::EncodedSingleProof;
 use zksync_types::{AccountId, AccountMap, Address, TokenId};
 
 pub fn create_exit_proof(

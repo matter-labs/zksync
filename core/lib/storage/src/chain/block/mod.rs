@@ -277,7 +277,7 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
                         idx
                     } else {
                         // failed operations are at the end.
-                        u32::max_value()
+                        u32::MAX
                     }
                 }
                 ExecutedOperations::PriorityOp(op) => op.block_index,
