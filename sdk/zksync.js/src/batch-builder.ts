@@ -234,7 +234,7 @@ export class BatchBuilder {
         messages.push(`Nonce: ${batchNonce}`);
         return {
             txs: processedTxs,
-            message: messages.join('\n')
+            message: messages.filter((part) => part.length != 0).join('\n')
         };
     }
 }

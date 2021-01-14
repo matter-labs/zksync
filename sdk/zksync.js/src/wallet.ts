@@ -318,7 +318,7 @@ export class Wallet {
         }
 
         messages.push(`Nonce: ${batchNonce}`);
-        const message = messages.join('\n');
+        const message = messages.filter((part) => part.length != 0).join('\n');
         const ethSignature = await this.ethMessageSigner.getEthMessageSignature(message);
 
         const transactionHashes = await this.provider.submitTxsBatch(batch, [ethSignature]);

@@ -69,7 +69,8 @@ impl BatchSignData {
         // The group is not empty.
         let nonce = iter.peek().unwrap().0.nonce();
         let message = itertools::join(
-            iter.filter_map(|(tx, token)| tx.get_ethereum_sign_message_part(token)),
+            iter.filter_map(|(tx, token)| tx.get_ethereum_sign_message_part(token))
+                .filter(|part| !part.is_empty()),
             "\n",
         );
         let body = format!(
