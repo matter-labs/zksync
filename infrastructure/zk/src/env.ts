@@ -66,10 +66,8 @@ export async function load() {
     if (zksyncEnv == 'dev') {
         /// If there no folder with toml files we should delete the old dev.env and regenerate toml files and
         if (!fs.existsSync('etc/env/dev')) {
-            try {
+            if (fs.existsSync('etc/env/dev.env')) {
                 fs.rmSync('etc/env/dev.env');
-            } catch {
-
             }
         }
 
