@@ -2,7 +2,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as Handlebars from 'handlebars';
 
-const network = process.env.ETH_NETWORK as string;
+const network = process.env.CHAIN_ETH_NETWORK as string;
 const ZKSYNC_HOME = process.env.ZKSYNC_HOME as string;
 if (!network) {
     throw new Error('ETH_NETWORK is not set');

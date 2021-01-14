@@ -1,10 +1,27 @@
+use std::time::Duration;
 // Workspace imports
-use zksync_config::{ConfigurationOptions, ProverOptions};
+use zksync_config::ZkSyncConfig;
 use zksync_crypto::proof::EncodedProofPlonk;
 use zksync_types::{block::PendingBlock, Action};
 // Local imports
 use crate::{chain::block::BlockSchema, prover::ProverSchema, QueryResult, StorageProcessor};
 use crate::{test_data::gen_operation, tests::db_test};
+
+/// Returns the smallest supported block size.
+fn supported_block_sizes() -> Vec<usize> {
+    ZkSyncConfig::from_env()
+        .chain
+        .circuit
+        .supported_block_chunks_sizes
+}
+
+fn smallest_block_size() -> usize {
+    supported_block_sizes()[0]
+}
+
+fn prover_gone_timeout() -> Duration {
+    ZkSyncConfig::from_env().prover.core.gone_timeout()
+}
 
 /// Checks that the proof can be stored and loaded.
 #[db_test]
@@ -131,8 +148,8 @@ async fn prover_run(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
     // Add the prover.
     let prover_name = "prover_10";
     // Smallest block size.
-    let block_size = ConfigurationOptions::from_env().available_block_chunk_sizes[0];
-    let timeout = ProverOptions::from_env().gone_timeout;
+    let block_size = smallest_block_size();
+    let timeout = prover_gone_timeout();
     let _prover_id = ProverSchema(&mut storage)
         .register_prover(prover_name, block_size)
         .await?;
@@ -203,8 +220,8 @@ async fn unstarted_prover_jobs_count(mut storage: StorageProcessor<'_>) -> Query
     // Add the prover.
     let prover_name = "prover_10";
     // Smallest block size.
-    let block_size = ConfigurationOptions::from_env().available_block_chunk_sizes[0];
-    let timeout = ProverOptions::from_env().gone_timeout;
+    let block_size = smallest_block_size();
+    let timeout = prover_gone_timeout();
     let _prover_id = ProverSchema(&mut storage)
         .register_prover(prover_name, block_size)
         .await?;

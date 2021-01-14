@@ -53,7 +53,6 @@ struct PendingBlock {
     pending_op_block_index: u32,
     unprocessed_priority_op_before: u64,
     pending_block_iteration: usize,
-    withdrawals_amount: u32,
     gas_counter: GasCounter,
     /// Option denoting if this block should be generated faster than usual.
     fast_processing_required: bool,
@@ -73,7 +72,6 @@ impl PendingBlock {
             pending_op_block_index: 0,
             unprocessed_priority_op_before,
             pending_block_iteration: 0,
-            withdrawals_amount: 0,
             gas_counter: GasCounter::new(),
             fast_processing_required: false,
             collected_fees: Vec::new(),
@@ -98,7 +96,6 @@ pub struct ZkSyncStateKeeper {
     available_block_chunk_sizes: Vec<usize>,
     max_miniblock_iterations: usize,
     fast_miniblock_iterations: usize,
-    max_number_of_withdrawals_per_block: usize,
 
     // Two fields below are for optimization: we don't want to overwrite all the block contents over and over.
     // With these fields we'll be able save the diff between two pending block states only.
@@ -345,7 +342,6 @@ impl ZkSyncStateKeeper {
         available_block_chunk_sizes: Vec<usize>,
         max_miniblock_iterations: usize,
         fast_miniblock_iterations: usize,
-        max_number_of_withdrawals_per_block: usize,
     ) -> Self {
         assert!(!available_block_chunk_sizes.is_empty());
 
@@ -376,7 +372,6 @@ impl ZkSyncStateKeeper {
             available_block_chunk_sizes,
             max_miniblock_iterations,
             fast_miniblock_iterations,
-            max_number_of_withdrawals_per_block,
 
             success_txs_pending_len: 0,
             failed_txs_pending_len: 0,
@@ -479,7 +474,7 @@ impl ZkSyncStateKeeper {
         let state = ZkSyncState::from_acc_map(accounts, last_committed + 1);
         let root_hash = state.root_hash();
         log::info!("Genesis block created, state: {}", state.root_hash());
-        println!("GENESIS_ROOT=0x{}", ff::to_hex(&root_hash));
+        println!("CONTRACTS_GENESIS_ROOT=0x{}", ff::to_hex(&root_hash));
         metrics::histogram!("state_keeper.create_genesis_block", start.elapsed());
     }
 
@@ -681,19 +676,6 @@ impl ZkSyncStateKeeper {
                     return Err(());
                 }
             }
-
-            if matches!(&tx.tx, &ZkSyncTx::Withdraw(_)) {
-                // Increase amount of the withdraw operations in this block.
-                self.pending_block.withdrawals_amount += 1;
-            }
-
-            // Check if we've reached the withdraw operations amount limit.
-            // If so, this block will be sealed and this tx will go to the next block.
-            if self.pending_block.withdrawals_amount
-                > self.max_number_of_withdrawals_per_block as u32
-            {
-                return Err(());
-            }
         }
 
         let all_updates = self.state.execute_txs_batch(txs);
@@ -779,19 +761,10 @@ impl ZkSyncStateKeeper {
         }
 
         if let ZkSyncTx::Withdraw(tx) = &tx.tx {
-            // Increase amount of the withdraw operations in this block.
-            self.pending_block.withdrawals_amount += 1;
-
             // Check if we should mark this block as requiring fast processing.
             if tx.fast {
                 self.pending_block.fast_processing_required = true;
             }
-        }
-
-        // Check if we've reached the withdraw operations amount limit.
-        // If so, this block will be sealed and this tx will go to the next block.
-        if self.pending_block.withdrawals_amount > self.max_number_of_withdrawals_per_block as u32 {
-            return Err(());
         }
 
         let tx_updates = self.state.execute_tx(tx.tx.clone());

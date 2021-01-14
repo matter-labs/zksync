@@ -4,7 +4,7 @@
 !docker/exit-tool/configs
 !docker/keybase-secrets/entrypoint.sh
 !docker/ci-integration-test/entrypoint.sh
-!etc/env/dev.env.example
+!etc/env/base
 !etc/tokens
 !keys/packed
 !docker/nginx/nginx.conf
@@ -18,6 +18,5 @@
 !infrastructure/explorer/index.html
 !infrastructure/explorer/dist
 !infrastructure/fee-seller
-!infrastructure/tok_cli
 !infrastructure/zk
 !sdk/zksync-rs

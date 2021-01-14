@@ -10,7 +10,7 @@ pub use rest::v1;
 // External uses
 use futures::channel::mpsc;
 // Workspace uses
-use zksync_config::{AdminServerOptions, ApiServerOptions, ConfigurationOptions};
+use zksync_config::ZkSyncConfig;
 use zksync_storage::ConnectionPool;
 // Local uses
 use crate::fee_ticker::TickerRequest;
@@ -33,27 +33,24 @@ pub fn start_api_server(
     connection_pool: ConnectionPool,
     panic_notify: mpsc::Sender<bool>,
     ticker_request_sender: mpsc::Sender<TickerRequest>,
-    config_options: ConfigurationOptions,
-    api_server_opts: ApiServerOptions,
-    admin_server_opts: AdminServerOptions,
+    config: &ZkSyncConfig,
 ) {
-    let (sign_check_sender, sign_check_receiver) = mpsc::channel(8192);
+    let (sign_check_sender, sign_check_receiver) = mpsc::channel(32768);
 
     signature_checker::start_sign_checker_detached(
-        config_options.clone(),
+        config.clone(),
         sign_check_receiver,
         panic_notify.clone(),
     );
 
     rest::start_server_thread_detached(
         connection_pool.clone(),
-        api_server_opts.rest_api_server_address,
-        config_options.contract_eth_addr,
+        config.api.rest.bind_addr(),
+        config.contracts.contract_addr,
         panic_notify.clone(),
         ticker_request_sender.clone(),
         sign_check_sender.clone(),
-        config_options.clone(),
-        api_server_opts.clone(),
+        config.clone(),
     );
 
     rpc_subscriptions::start_ws_server(
@@ -61,13 +58,12 @@ pub fn start_api_server(
         sign_check_sender.clone(),
         ticker_request_sender.clone(),
         panic_notify.clone(),
-        config_options.clone(),
-        api_server_opts.clone(),
+        config,
     );
 
     admin_server::start_admin_server(
-        admin_server_opts.admin_http_server_address,
-        admin_server_opts.secret_auth,
+        config.api.admin.bind_addr(),
+        config.api.admin.secret_auth.clone(),
         connection_pool.clone(),
         panic_notify.clone(),
     );
@@ -77,7 +73,6 @@ pub fn start_api_server(
         sign_check_sender,
         ticker_request_sender,
         panic_notify,
-        config_options,
-        api_server_opts,
+        config,
     );
 }

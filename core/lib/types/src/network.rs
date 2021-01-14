@@ -26,6 +26,8 @@ pub enum Network {
     Localhost,
     /// Unknown network type.
     Unknown,
+    /// Test network for testkit purposes
+    Test,
 }
 
 impl FromStr for Network {
@@ -37,6 +39,7 @@ impl FromStr for Network {
             "rinkeby" => Self::Rinkeby,
             "ropsten" => Self::Ropsten,
             "localhost" => Self::Localhost,
+            "test" => Self::Test,
             another => return Err(another.to_owned()),
         })
     }
@@ -50,6 +53,7 @@ impl fmt::Display for Network {
             Self::Ropsten => write!(f, "ropsten"),
             Self::Localhost => write!(f, "localhost"),
             Self::Unknown => write!(f, "unknown"),
+            Self::Test => write!(f, "test"),
         }
     }
 }
@@ -63,6 +67,7 @@ impl Network {
             Network::Rinkeby => 4,
             Network::Localhost => 9,
             Network::Unknown => panic!("Unknown chain ID"),
+            Network::Test => panic!("Test chain ID"),
         }
     }
 }

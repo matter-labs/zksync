@@ -1,7 +1,7 @@
 use serde::Deserialize;
 use structopt::StructOpt;
 use web3::transports::Http;
-use zksync_config::ConfigurationOptions;
+use zksync_config::configs::{ChainConfig, ContractsConfig as EnvContractsConfig, ETHClientConfig};
 use zksync_crypto::convert::FeConvert;
 use zksync_storage::ConnectionPool;
 use zksync_types::{Address, H256};
@@ -10,6 +10,7 @@ use zksync_data_restore::{
     add_tokens_to_storage, data_restore_driver::DataRestoreDriver,
     database_storage_interactor::DatabaseStorageInteractor, END_ETH_BLOCKS_OFFSET, ETH_BLOCKS_STEP,
 };
+use zksync_types::network::Network;
 
 #[derive(StructOpt)]
 #[structopt(
@@ -45,7 +46,7 @@ struct Opt {
 
 #[derive(Debug, Deserialize)]
 pub struct ContractsConfig {
-    eth_network: String,
+    eth_network: Network,
     governance_addr: Address,
     genesis_tx_hash: H256,
     contract_addr: Address,
@@ -60,14 +61,15 @@ impl ContractsConfig {
     }
 
     pub fn from_env() -> Self {
-        let config_opts = ConfigurationOptions::from_env();
+        let contracts_opts = EnvContractsConfig::from_env();
+        let chain_opts = ChainConfig::from_env();
 
         Self {
-            eth_network: config_opts.eth_network,
-            governance_addr: config_opts.governance_eth_addr,
-            genesis_tx_hash: config_opts.genesis_tx_hash,
-            contract_addr: config_opts.contract_eth_addr,
-            available_block_chunk_sizes: config_opts.available_block_chunk_sizes,
+            eth_network: chain_opts.eth.network,
+            governance_addr: contracts_opts.governance_addr,
+            genesis_tx_hash: contracts_opts.genesis_tx_hash,
+            contract_addr: contracts_opts.contract_addr,
+            available_block_chunk_sizes: chain_opts.state_keeper.block_chunk_sizes,
         }
     }
 }
@@ -77,7 +79,7 @@ async fn main() {
     log::info!("Restoring zkSync state from the contract");
     env_logger::init();
     let connection_pool = ConnectionPool::new(Some(1));
-    let config_opts = ConfigurationOptions::from_env();
+    let config_opts = ETHClientConfig::from_env();
 
     let opt = Opt::from_args();
 
@@ -105,7 +107,7 @@ async fn main() {
         config.contract_addr,
         ETH_BLOCKS_STEP,
         END_ETH_BLOCKS_OFFSET,
-        config.available_block_chunk_sizes,
+        config.available_block_chunk_sizes.clone(),
         finite_mode,
         final_hash,
     );
@@ -115,7 +117,7 @@ async fn main() {
     if opt.genesis {
         // We have to load pre-defined tokens into the database before restoring state,
         // since these tokens do not have a corresponding Ethereum events.
-        add_tokens_to_storage(&mut interactor, &config.eth_network).await;
+        add_tokens_to_storage(&mut interactor, &config.eth_network.to_string()).await;
 
         driver
             .set_genesis_state(&mut interactor, config.genesis_tx_hash)

@@ -13,7 +13,7 @@ use web3::{
     types::{TransactionReceipt, H256, U256},
 };
 // Workspace uses
-use zksync_config::{EthClientOptions, EthSenderOptions};
+use zksync_config::{ETHSenderConfig, ZkSyncConfig};
 use zksync_eth_client::SignedCallResult;
 use zksync_storage::ConnectionPool;
 use zksync_types::{
@@ -122,11 +122,11 @@ struct ETHSender<ETH: EthereumInterface, DB: DatabaseInterface> {
     /// Utility for managing the gas price for transactions.
     gas_adjuster: GasAdjuster<ETH, DB>,
     /// Settings for the `ETHSender`.
-    options: EthSenderOptions,
+    options: ETHSenderConfig,
 }
 
 impl<ETH: EthereumInterface, DB: DatabaseInterface> ETHSender<ETH, DB> {
-    pub async fn new(options: EthSenderOptions, db: DB, ethereum: ETH) -> Self {
+    pub async fn new(options: ETHSenderConfig, db: DB, ethereum: ETH) -> Self {
         let mut connection = db
             .acquire_connection()
             .await
@@ -142,7 +142,7 @@ impl<ETH: EthereumInterface, DB: DatabaseInterface> ETHSender<ETH, DB> {
             .await
             .expect("Failed loading ETH operations stats");
 
-        let tx_queue = TxQueueBuilder::new(options.max_txs_in_flight as usize)
+        let tx_queue = TxQueueBuilder::new(options.sender.max_txs_in_flight as usize)
             .with_sent_pending_txs(ongoing_ops.len())
             .with_commit_operations_count(stats.commit_ops)
             .with_verify_operations_count(stats.verify_ops)
@@ -178,11 +178,14 @@ impl<ETH: EthereumInterface, DB: DatabaseInterface> ETHSender<ETH, DB> {
     /// Main routine of `ETHSender`.
     pub async fn run(mut self) {
         loop {
-            time::timeout(self.options.tx_poll_period, self.load_new_operations())
-                .await
-                .unwrap_or_default();
+            time::timeout(
+                self.options.sender.tx_poll_period(),
+                self.load_new_operations(),
+            )
+            .await
+            .unwrap_or_default();
 
-            if self.options.is_enabled {
+            if self.options.sender.is_enabled {
                 // ...and proceed them.
                 self.proceed_next_operations().await;
                 // Update the gas adjuster to maintain the up-to-date max gas price limit.
@@ -546,7 +549,7 @@ impl<ETH: EthereumInterface, DB: DatabaseInterface> ETHSender<ETH, DB> {
 
     /// Helper method encapsulating the logic of determining the next deadline block.
     fn get_deadline_block(&self, current_block: u64) -> u64 {
-        current_block + self.options.expected_wait_time_block
+        current_block + self.options.sender.expected_wait_time_block
     }
 
     /// Looks up for a transaction state on the Ethereum chain
@@ -564,7 +567,7 @@ impl<ETH: EthereumInterface, DB: DatabaseInterface> ETHSender<ETH, DB> {
             // Successful execution.
             Some(status) if status.success => {
                 // Check if transaction has enough confirmations.
-                if status.confirmations >= self.options.wait_confirmations {
+                if status.confirmations >= self.options.sender.wait_confirmations {
                     TxCheckOutcome::Committed
                 } else {
                     TxCheckOutcome::Pending
@@ -573,7 +576,7 @@ impl<ETH: EthereumInterface, DB: DatabaseInterface> ETHSender<ETH, DB> {
             // Non-successful execution, report the failure with details.
             Some(status) => {
                 // Check if transaction has enough confirmations.
-                if status.confirmations >= self.options.wait_confirmations {
+                if status.confirmations >= self.options.sender.wait_confirmations {
                     assert!(
                         status.receipt.is_some(),
                         "Receipt should exist for a failed transaction"
@@ -811,18 +814,13 @@ impl<ETH: EthereumInterface, DB: DatabaseInterface> ETHSender<ETH, DB> {
 }
 
 #[must_use]
-pub fn run_eth_sender(
-    pool: ConnectionPool,
-    eth_client_options: EthClientOptions,
-    eth_sender_options: EthSenderOptions,
-) -> JoinHandle<()> {
-    let ethereum =
-        EthereumHttpClient::new(&eth_client_options).expect("Ethereum client creation failed");
+pub fn run_eth_sender(pool: ConnectionPool, options: ZkSyncConfig) -> JoinHandle<()> {
+    let ethereum = EthereumHttpClient::new(&options).expect("Ethereum client creation failed");
 
     let db = Database::new(pool);
 
     tokio::spawn(async move {
-        let eth_sender = ETHSender::new(eth_sender_options, db, ethereum).await;
+        let eth_sender = ETHSender::new(options.eth_sender, db, ethereum).await;
 
         eth_sender.run().await
     })

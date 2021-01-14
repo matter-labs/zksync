@@ -20,29 +20,31 @@ pub struct Contracts {
 }
 
 fn get_contract_address(deploy_script_out: &str) -> Option<(String, Address)> {
-    if let Some(output) = deploy_script_out.strip_prefix("GOVERNANCE_ADDR=0x") {
+    if let Some(output) = deploy_script_out.strip_prefix("CONTRACTS_GOVERNANCE_ADDR=0x") {
         Some((
-            String::from("GOVERNANCE_ADDR"),
+            String::from("CONTRACTS_GOVERNANCE_ADDR"),
             Address::from_str(output).expect("can't parse contract address"),
         ))
-    } else if let Some(output) = deploy_script_out.strip_prefix("VERIFIER_ADDR=0x") {
+    } else if let Some(output) = deploy_script_out.strip_prefix("CONTRACTS_VERIFIER_ADDR=0x") {
         Some((
-            String::from("VERIFIER_ADDR"),
+            String::from("CONTRACTS_VERIFIER_ADDR"),
             Address::from_str(output).expect("can't parse contract address"),
         ))
-    } else if let Some(output) = deploy_script_out.strip_prefix("CONTRACT_ADDR=0x") {
+    } else if let Some(output) = deploy_script_out.strip_prefix("CONTRACTS_CONTRACT_ADDR=0x") {
         Some((
-            String::from("CONTRACT_ADDR"),
+            String::from("CONTRACTS_CONTRACT_ADDR"),
             Address::from_str(output).expect("can't parse contract address"),
         ))
-    } else if let Some(output) = deploy_script_out.strip_prefix("UPGRADE_GATEKEEPER_ADDR=0x") {
+    } else if let Some(output) =
+        deploy_script_out.strip_prefix("CONTRACTS_UPGRADE_GATEKEEPER_ADDR=0x")
+    {
         Some((
-            String::from("UPGRADE_GATEKEEPER_ADDR"),
+            String::from("CONTRACTS_UPGRADE_GATEKEEPER_ADDR"),
             Address::from_str(output).expect("can't parse contract address"),
         ))
-    } else if let Some(output) = deploy_script_out.strip_prefix("TEST_ERC20=0x") {
+    } else if let Some(output) = deploy_script_out.strip_prefix("CONTRACTS_TEST_ERC20=0x") {
         Some((
-            String::from("TEST_ERC20"),
+            String::from("CONTRACTS_TEST_ERC20"),
             Address::from_str(output).expect("can't parse contract address"),
         ))
     } else {
@@ -99,18 +101,20 @@ pub fn deploy_contracts(use_prod_contracts: bool, genesis_root: Fr) -> Contracts
 
     Contracts {
         governance: contracts
-            .remove("GOVERNANCE_ADDR")
+            .remove("CONTRACTS_GOVERNANCE_ADDR")
             .expect("GOVERNANCE_ADDR missing"),
         verifier: contracts
-            .remove("VERIFIER_ADDR")
+            .remove("CONTRACTS_VERIFIER_ADDR")
             .expect("VERIFIER_ADDR missing"),
         contract: contracts
-            .remove("CONTRACT_ADDR")
+            .remove("CONTRACTS_CONTRACT_ADDR")
             .expect("CONTRACT_ADDR missing"),
         upgrade_gatekeeper: contracts
-            .remove("UPGRADE_GATEKEEPER_ADDR")
+            .remove("CONTRACTS_UPGRADE_GATEKEEPER_ADDR")
             .expect("UPGRADE_GATEKEEPER_ADDR missing"),
-        test_erc20_address: contracts.remove("TEST_ERC20").expect("TEST_ERC20 missing"),
+        test_erc20_address: contracts
+            .remove("CONTRACTS_TEST_ERC20")
+            .expect("TEST_ERC20 missing"),
     }
 }
 

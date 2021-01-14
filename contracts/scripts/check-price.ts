@@ -1,5 +1,5 @@
 const ethers = require('ethers');
-const provider = new ethers.providers.JsonRpcProvider(process.env.WEB3_URL);
+const provider = new ethers.providers.JsonRpcProvider(process.env.ETH_CLIENT_WEB3_URL);
 
 const rinkeby = ethers.getDefaultProvider('rinkeby');
 const mainnet = new ethers.providers.InfuraProvider();
@@ -20,7 +20,7 @@ async function main() {
     console.log('gas price mainnet', (await mainnet.getGasPrice()).toNumber());
     console.log('gas price mainnet2', (await mainnet2.getGasPrice()).toNumber());
 
-    calc('0x' + process.env.SENDER_ACCOUNT);
+    calc('0x' + process.env.ETH_SENDER_SENDER_OPERATOR_COMMIT_ETH_ADDR);
     calc('0xB0587796F36E39c4b0d79790D2Efa874386dcD6d');
 }
 

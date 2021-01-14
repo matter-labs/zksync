@@ -26,23 +26,21 @@ import {
 } from './utils';
 
 /** Env parameters. */
-const FEE_ACCOUNT_PRIVATE_KEY = process.env.FEE_ACCOUNT_PRIVATE_KEY;
-const MAX_LIQUIDATION_FEE_PERCENT = parseInt(process.env.MAX_LIQUIDATION_FEE_PERCENT);
-const OPERATOR_FEE_ETH_ADDRESS = process.env.OPERATOR_FEE_ETH_ADDRESS;
-
+const FEE_ACCOUNT_PRIVATE_KEY = process.env.MISC_FEE_ACCOUNT_PRIVATE_KEY;
+const MAX_LIQUIDATION_FEE_PERCENT = parseInt(process.env.MISC_MAX_LIQUIDATION_FEE_PERCENT);
+const OPERATOR_FEE_ETH_ADDRESS = process.env.CHAIN_STATE_KEEPER_FEE_ACCOUNT_ADDR;
+const ETH_NETWORK = process.env.CHAIN_ETH_NETWORK as any;
+const WEB3_URL = process.env.ETH_CLIENT_WEB3_URL;
+const MAX_LIQUIDATION_FEE_SLIPPAGE = parseInt(process.env.MAX_LIQUIDATION_FEE_SLIPPAGE) || 5;
 /** The threshold amount of the operator address to use reserve fee accumulator due to security reasons */
 const THRESHOLD_AMOUNT_TO_USE_RESERVE_ADDRESS = process.env.THRESHOLD_AMOUNT_TO_USE_RESERVE_ADDRESS
     ? ethers.utils.parseEther(process.env.THRESHOLD_AMOUNT_TO_USE_RESERVE_ADDRESS)
     : ethers.utils.parseEther('25.0');
-const RESERVE_FEE_ACCUMULATOR_ADDRESS = process.env.RESERVE_FEE_ACCUMULATOR_ADDRESS;
+const RESERVE_FEE_ACCUMULATOR_ADDRESS = process.env.MISC_RESERVE_FEE_ACCUMULATOR_ADDRESS;
 /** These assets will be transferred to the reserve fee accumulator address through the ZkSync network */
-const ESTABLISHED_ASSETS_FOR_WITHDRAWING_THROUGH_ZKSYNC = process.env.ESTABLISHED_ASSETS_FOR_WITHDRAWING_THROUGH_ZKSYNC.split(
+const ESTABLISHED_ASSETS_FOR_WITHDRAWING_THROUGH_ZKSYNC = process.env.MISC_ESTABLISHED_ASSETS_FOR_WITHDRAWING_THROUGH_ZKSYNC.split(
     ','
 );
-
-const ETH_NETWORK = process.env.ETH_NETWORK as any;
-const WEB3_URL = process.env.WEB3_URL;
-const MAX_LIQUIDATION_FEE_SLIPPAGE = parseInt(process.env.MAX_LIQUIDATION_FEE_SLIPPAGE) || 5;
 /** Amount of ETH that should be left on the fee account after third step. */
 const ETH_TRANSFER_THRESHOLD = process.env.ETH_TRANSFER_THRESHOLD
     ? ethers.utils.parseEther(process.env.ETH_TRANSFER_THRESHOLD)

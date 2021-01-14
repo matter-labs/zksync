@@ -25,6 +25,7 @@ components, the logs will have the following format:
 
 - (`explorer`) was refactored and optimized.
 - (`explorer`): optimized by caching.
+- (`tok_cli`): was removed and all commands from it have been moved to `zk`.
 
 ### Fixed
 

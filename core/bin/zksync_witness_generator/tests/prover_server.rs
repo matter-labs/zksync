@@ -1,12 +1,12 @@
 // Built-in deps
-use std::{net, str::FromStr, thread, time, time::Duration};
+use std::{thread, time, time::Duration};
 // External deps
 use futures::channel::mpsc;
 use zksync_crypto::pairing::ff::{Field, PrimeField};
 // Workspace deps
 use num::BigUint;
 use zksync_circuit::witness::{deposit::DepositWitness, Witness};
-use zksync_config::{ConfigurationOptions, ProverOptions};
+use zksync_config::ZkSyncConfig;
 use zksync_crypto::{params::total_tokens, proof::EncodedProofPlonk};
 use zksync_prover::{client, ApiClient};
 use zksync_types::{block::Block, Address, H256};
@@ -25,19 +25,30 @@ async fn spawn_server(prover_timeout: time::Duration, rounds_interval: time::Dur
     // TODO: make single server spawn for all tests (ZKS-99).
     let bind_to = "127.0.0.1:8088";
 
-    let mut prover_options = ProverOptions::from_env();
-    prover_options.prepare_data_interval = rounds_interval;
-    prover_options.gone_timeout = prover_timeout;
-    prover_options.prover_server_address = net::SocketAddr::from_str(bind_to).unwrap();
-    prover_options.secret_auth = CORRECT_PROVER_SECRET_AUTH.to_string();
+    let mut config = ZkSyncConfig::from_env();
+    config.prover.witness_generator.prepare_data_interval = rounds_interval.as_millis() as u64;
+    config.prover.core.gone_timeout = prover_timeout.as_millis() as u64;
+    config.api.prover.url = bind_to.into();
+    config.api.prover.secret_auth = CORRECT_PROVER_SECRET_AUTH.to_string();
 
     let conn_pool = connect_to_db().await;
     let (tx, _rx) = mpsc::channel(1);
 
     thread::spawn(move || {
-        run_prover_server(conn_pool, tx, prover_options);
+        run_prover_server(conn_pool, tx, config);
     });
     bind_to.to_string()
+}
+
+fn supported_block_sizes() -> Vec<usize> {
+    ZkSyncConfig::from_env()
+        .chain
+        .circuit
+        .supported_block_chunks_sizes
+}
+
+fn smallest_block_size() -> usize {
+    supported_block_sizes()[0]
 }
 
 #[test]
@@ -54,7 +65,7 @@ fn client_with_empty_worker_name_panics() {
 #[tokio::test]
 #[cfg_attr(not(feature = "db_test"), ignore)]
 async fn client_with_incorrect_secret_auth() {
-    let block_size_chunks = ConfigurationOptions::from_env().available_block_chunk_sizes[0];
+    let block_size_chunks = smallest_block_size();
     let addr = spawn_server(Duration::from_secs(1), Duration::from_secs(1)).await;
     let client = client::ApiClient::new(
         &format!("http://{}", &addr).parse().unwrap(),
@@ -76,7 +87,7 @@ async fn client_with_incorrect_secret_auth() {
 #[tokio::test]
 #[cfg_attr(not(feature = "db_test"), ignore)]
 async fn api_client_register_start_and_stop_of_prover() {
-    let block_size_chunks = ConfigurationOptions::from_env().available_block_chunk_sizes[0];
+    let block_size_chunks = smallest_block_size();
     let addr = spawn_server(time::Duration::from_secs(1), time::Duration::from_secs(1)).await;
     let client = client::ApiClient::new(
         &format!("http://{}", &addr).parse().unwrap(),
@@ -116,7 +127,7 @@ async fn api_client_simple_simulation() {
 
     let addr = spawn_server(prover_timeout, rounds_interval).await;
 
-    let block_size_chunks = ConfigurationOptions::from_env().available_block_chunk_sizes[0];
+    let block_size_chunks = smallest_block_size();
     let client = client::ApiClient::new(
         &format!("http://{}", &addr).parse().unwrap(),
         "foo",
@@ -290,7 +301,7 @@ pub async fn test_operation_and_wanted_prover_data(
         validator_account_id,
         ops,
         (0, 1),
-        &ConfigurationOptions::from_env().available_block_chunk_sizes,
+        &supported_block_sizes(),
         1_000_000.into(),
         1_500_000.into(),
     );
