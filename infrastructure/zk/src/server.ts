@@ -26,6 +26,7 @@ export async function genesis() {
     fs.mkdirSync(`logs/${label}`, { recursive: true });
     fs.copyFileSync('genesis.log', `logs/${label}/genesis.log`);
     env.modify('CONTRACTS_GENESIS_ROOT', genesisRoot);
+    env.modify_contracts_toml("CONTRACTS_GENESIS_ROOT", genesisRoot);
 }
 
 export const command = new Command('server')

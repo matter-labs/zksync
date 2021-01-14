@@ -1,9 +1,9 @@
-import { Command } from 'commander';
-import * as toml from 'toml';
+import {Command} from 'commander';
+import * as toml from '@iarna/toml';
 import * as fs from 'fs';
 import * as path from 'path';
 import deepExtend from 'deep-extend';
-import { env } from 'process';
+import {env} from 'process';
 
 const CONFIG_FILES = [
     'api.toml',
@@ -46,8 +46,7 @@ async function loadConfig(environment: string, configName: string) {
     const configPath = getConfigPath(environment, configName);
     const fileContents = await fs.promises.readFile(configPath);
     try {
-        const tomlData = toml.parse(fileContents.toString());
-        return tomlData;
+        return toml.parse(fileContents.toString());
     } catch (e) {
         console.error(
             `<${environment}/${configName}> load failed: Parsing error on line ${e.line} column ${e.column}: ${e.message}`

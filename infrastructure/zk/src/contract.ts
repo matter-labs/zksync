@@ -121,6 +121,7 @@ export async function deploy() {
         const matches = deployLog.match(pattern);
         if (matches !== null) {
             env.modify(envVar, matches[0]);
+            env.modify_contracts_toml( envVar, matches[0]);
         }
     }
 }
