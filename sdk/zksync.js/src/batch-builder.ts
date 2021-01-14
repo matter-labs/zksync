@@ -9,7 +9,7 @@ import {
     TxEthSignature,
     ChangePubkeyTypes
 } from './types';
-import { getChangePubkeyMessage, serializeTx } from './utils';
+import { MAX_TIMESTAMP } from './utils';
 import { Wallet } from './wallet';
 
 /**
@@ -90,14 +90,17 @@ export class BatchBuilder {
         amount: BigNumberish;
         fee?: BigNumberish;
         fastProcessing?: boolean;
+        validFrom?: number;
+        validUntil?: number;
     }): BatchBuilder {
-        const fee = withdraw.fee != undefined ? withdraw.fee : 0;
         const _withdraw = {
             ethAddress: withdraw.ethAddress,
             token: withdraw.token,
             amount: withdraw.amount,
-            fee: fee,
-            nonce: null
+            fee: withdraw.fee || 0,
+            nonce: null,
+            validFrom: withdraw.validFrom || 0,
+            validUntil: withdraw.validUntil || MAX_TIMESTAMP
         };
         const feeType = withdraw.fastProcessing === true ? 'FastWithdraw' : 'Withdraw';
         this.txs.push({
@@ -110,14 +113,22 @@ export class BatchBuilder {
         return this;
     }
 
-    addTransfer(transfer: { to: Address; token: TokenLike; amount: BigNumberish; fee?: BigNumberish }): BatchBuilder {
-        const fee = transfer.fee != undefined ? transfer.fee : 0;
+    addTransfer(transfer: {
+        to: Address;
+        token: TokenLike;
+        amount: BigNumberish;
+        fee?: BigNumberish;
+        validFrom?: number;
+        validUntil?: number;
+    }): BatchBuilder {
         const _transfer = {
             to: transfer.to,
             token: transfer.token,
             amount: transfer.amount,
-            fee: fee,
-            nonce: null
+            fee: transfer.fee || 0,
+            nonce: null,
+            validFrom: transfer.validFrom || 0,
+            validUntil: transfer.validUntil || MAX_TIMESTAMP
         };
         this.txs.push({
             type: 'Transfer',
@@ -131,10 +142,10 @@ export class BatchBuilder {
 
     addChangePubKey(changePubKey: {
         feeToken: TokenLike;
-        fee: BigNumberish;
-        nonce: number;
         ethAuthType: ChangePubkeyTypes;
-        batchHash?: string;
+        fee?: BigNumberish;
+        validFrom?: number;
+        validUntil?: number;
     }): BatchBuilder {
         const fee = changePubKey.fee != undefined ? changePubKey.fee : 0;
         const _changePubKey = {
@@ -142,6 +153,8 @@ export class BatchBuilder {
             fee: fee,
             nonce: null,
             ethAuthType: changePubKey.ethAuthType,
+            validFrom: changePubKey.validFrom || 0,
+            validUntil: changePubKey.validUntil || MAX_TIMESTAMP,
             pubKeyHash: null
         };
         const feeType = {
@@ -159,13 +172,21 @@ export class BatchBuilder {
         return this;
     }
 
-    addForcedExit(forcedExit: { target: Address; token: TokenLike; fee?: BigNumberish }): BatchBuilder {
+    addForcedExit(forcedExit: {
+        target: Address;
+        token: TokenLike;
+        fee?: BigNumberish;
+        validFrom?: number;
+        validUntil?: number;
+    }): BatchBuilder {
         const fee = forcedExit.fee != undefined ? forcedExit.fee : 0;
         const _forcedExit = {
             target: forcedExit.target,
             token: forcedExit.token,
             fee: fee,
-            nonce: null
+            nonce: null,
+            validFrom: forcedExit.validFrom || 0,
+            validUntil: forcedExit.validUntil || MAX_TIMESTAMP
         };
         this.txs.push({
             type: 'ForcedExit',

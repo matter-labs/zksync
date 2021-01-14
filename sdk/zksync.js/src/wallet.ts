@@ -398,7 +398,7 @@ export class Wallet {
             stringToken,
             ethAddress: withdraw.ethAddress,
             nonce: withdraw.nonce,
-            accountId: this.accountId,
+            accountId: this.accountId
         });
 
         return {
