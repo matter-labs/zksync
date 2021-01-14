@@ -159,8 +159,8 @@ export async function testkit(command: string, timeout: number) {
     await run.verifyKeys.unpack();
     await contract.build();
 
-    if (command == 'block-sizes') {
-        await utils.spawn('cargo run --bin block_sizes_test --release');
+    if (command.includes('block_sizes_test ')) {
+        await utils.spawn(`cargo run --release --bin ${command}`);
     } else if (command == 'fast') {
         await utils.spawn('cargo run --bin testkit_tests --release');
         await utils.spawn('cargo run --bin gas_price_test --release');

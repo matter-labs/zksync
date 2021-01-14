@@ -15,7 +15,7 @@ use log::*;
 use num::BigUint;
 use std::time::Instant;
 use web3::transports::Http;
-use zksync_crypto::proof::{EncodedAggregatedProof, EncodedSingleProof};
+use zksync_crypto::proof::EncodedSingleProof;
 use zksync_testkit::*;
 use zksync_types::{AccountId, AccountMap};
 
