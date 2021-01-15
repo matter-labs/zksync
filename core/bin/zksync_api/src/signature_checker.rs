@@ -17,7 +17,7 @@ use tokio::runtime::{Builder, Handle};
 use zksync_types::{tx::TxEthSignature, SignedZkSyncTx, ZkSyncTx};
 // Local uses
 use crate::{eth_checker::EthereumChecker, tx_error::TxAddError};
-use zksync_config::ConfigurationOptions;
+use zksync_config::ZkSyncConfig;
 use zksync_types::tx::EthSignData;
 use zksync_utils::panic_notify::ThreadPanicNotify;
 
@@ -226,14 +226,14 @@ pub struct VerifyTxSignatureRequest {
 /// Main routine of the concurrent signature checker.
 /// See the module documentation for details.
 pub fn start_sign_checker_detached(
-    config_options: ConfigurationOptions,
+    config: ZkSyncConfig,
     input: mpsc::Receiver<VerifyTxSignatureRequest>,
     panic_notify: mpsc::Sender<bool>,
 ) {
-    let transport = web3::transports::Http::new(&config_options.web3_url).unwrap();
+    let transport = web3::transports::Http::new(&config.eth_client.web3_url).unwrap();
     let web3 = web3::Web3::new(transport);
 
-    let eth_checker = EthereumChecker::new(web3, config_options.contract_eth_addr);
+    let eth_checker = EthereumChecker::new(web3, config.contracts.contract_addr);
 
     /// Main signature check requests handler.
     /// Basically it receives the requests through the channel and verifies signatures,

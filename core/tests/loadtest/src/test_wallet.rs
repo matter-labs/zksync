@@ -15,7 +15,6 @@ use zksync::{
     },
     EthereumProvider, Network, RpcProvider, Wallet, WalletCredentials,
 };
-use zksync_config::ConfigurationOptions;
 use zksync_eth_signer::PrivateKeySigner;
 use zksync_types::{
     tx::PackedEthSignature, AccountId, Address, PriorityOp, TokenLike, TxFeeTypes, ZkSyncTx,
@@ -38,11 +37,7 @@ impl TestWallet {
     const FEE_FACTOR: u64 = 3;
 
     /// Creates a new wallet from the given account information and Ethereum configuration options.
-    pub async fn from_info(
-        monitor: Monitor,
-        info: &AccountInfo,
-        options: &ConfigurationOptions,
-    ) -> Self {
+    pub async fn from_info(monitor: Monitor, info: &AccountInfo, web3_url: &str) -> Self {
         let credentials = WalletCredentials::from_eth_signer(
             info.address,
             PrivateKeySigner::new(info.private_key),
@@ -55,18 +50,13 @@ impl TestWallet {
             .await
             .unwrap();
 
-        let wallet =
-            Self::from_wallet(info.token_name.clone(), monitor, inner, &options.web3_url).await;
+        let wallet = Self::from_wallet(info.token_name.clone(), monitor, inner, web3_url).await;
         save_wallet(info.clone());
         wallet
     }
 
     /// Creates a random wallet.
-    pub async fn new_random(
-        token_name: TokenLike,
-        monitor: Monitor,
-        options: &ConfigurationOptions,
-    ) -> Self {
+    pub async fn new_random(token_name: TokenLike, monitor: Monitor, web3_url: &str) -> Self {
         let eth_private_key = gen_random_eth_private_key();
         let address_from_pk =
             PackedEthSignature::address_from_private_key(&eth_private_key).unwrap();
@@ -77,7 +67,7 @@ impl TestWallet {
             token_name,
         };
 
-        Self::from_info(monitor, &info, options).await
+        Self::from_info(monitor, &info, web3_url).await
     }
 
     async fn from_wallet(

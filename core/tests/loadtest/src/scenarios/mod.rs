@@ -3,6 +3,7 @@
 //! A simplest scenario will be: "get a bunch of accounts and just spawn a lot of transfer
 //! operations between them".
 
+// Public uses
 pub use self::{
     full_exit::FullExitScenarioConfig, transfers::TransferScenarioConfig,
     withdraw::WithdrawScenarioConfig,
@@ -13,15 +14,19 @@ use std::{
     collections::BTreeMap,
     fmt::{Debug, Display},
 };
+
 // External uses
 use async_trait::async_trait;
+use batch_transfers::{BatchTransferScenario, BatchTransferScenarioConfig};
 use num::BigUint;
 use serde::{Deserialize, Serialize};
 // Workspace uses
+
 // Local uses
 use self::{full_exit::FullExitScenario, transfers::TransferScenario, withdraw::WithdrawScenario};
 use crate::{monitor::Monitor, test_wallet::TestWallet, FiveSummaryStats};
 
+mod batch_transfers;
 mod full_exit;
 mod transfers;
 mod withdraw;
@@ -89,6 +94,8 @@ pub enum ScenarioConfig {
     Withdraw(WithdrawScenarioConfig),
     /// Full exit / deposit scenario.
     FullExit(FullExitScenarioConfig),
+    /// Batched transfers scenario.
+    BatchTransfers(BatchTransferScenarioConfig),
 }
 
 impl ScenarioConfig {
@@ -98,15 +105,23 @@ impl ScenarioConfig {
             Self::Transfer(cfg) => Box::new(TransferScenario::from(cfg)),
             Self::Withdraw(cfg) => Box::new(WithdrawScenario::from(cfg)),
             Self::FullExit(cfg) => Box::new(FullExitScenario::from(cfg)),
+            Self::BatchTransfers(cfg) => Box::new(BatchTransferScenario::new(cfg)),
         }
     }
+}
+
+/// Load test report for the each transaction variant.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct TxVariantTestsReport {
+    /// A five numbers summary statistic for each transaction lifecycle step.
+    pub stats: BTreeMap<String, Option<FiveSummaryStats>>,
 }
 
 /// Load test report for the transactions scenarios.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ScenariosTestsReport {
-    /// A five numbers summary statistic for each transaction lifecycle step.
-    pub summary: BTreeMap<String, FiveSummaryStats>,
+    /// A five numbers summary statistic for each transaction variant.
+    pub summary: BTreeMap<String, TxVariantTestsReport>,
     /// Total amount of sent requests.
     pub total_txs_count: usize,
     /// Amount of failed requests regardless of the cause of the failure.

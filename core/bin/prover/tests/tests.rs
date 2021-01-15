@@ -10,7 +10,7 @@ use zksync_circuit::{
     circuit::ZkSyncCircuit,
     witness::{deposit::DepositWitness, utils::WitnessBuilder, Witness},
 };
-use zksync_config::ConfigurationOptions;
+use zksync_config::configs::ChainConfig;
 use zksync_crypto::{
     circuit::{account::CircuitAccount, CircuitAccountTree},
     proof::EncodedProofPlonk,
@@ -33,7 +33,7 @@ fn prover_sends_heartbeat_requests_and_exits_on_stop_signal() {
     // - BabyProver sends `working_on` requests (heartbeat) over api client
     // - BabyProver stops running upon receiving data over stop channel
 
-    let block_size_chunks = ConfigurationOptions::from_env().available_block_chunk_sizes[0];
+    let block_size_chunks = ChainConfig::from_env().circuit.supported_block_chunks_sizes[0];
 
     // Create a channel to notify on provers exit.
     let (done_tx, _done_rx) = mpsc::channel();
@@ -148,7 +148,7 @@ fn new_test_data_for_prover() -> ProverData {
     witness_accum.add_operation_with_pubdata(deposit_operations, pub_data_from_witness);
     witness_accum.extend_pubdata_with_noops(smallest_block_size_for_chunks(
         DepositOp::CHUNKS,
-        &ConfigurationOptions::from_env().available_block_chunk_sizes,
+        &ChainConfig::from_env().circuit.supported_block_chunks_sizes,
     ));
     witness_accum.collect_fees(&Vec::new());
     witness_accum.calculate_pubdata_commitment();

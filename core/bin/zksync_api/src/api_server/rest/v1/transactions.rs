@@ -403,7 +403,7 @@ mod tests {
                     cfg.pool.clone(),
                     sign_verifier.clone(),
                     fee_ticker.clone(),
-                    &cfg.api_server_options,
+                    &cfg.config,
                 ))
             });
 

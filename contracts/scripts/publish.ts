@@ -5,7 +5,7 @@ import { Deployer } from '../src.ts/deploy';
     try {
         // Wallet is not needed for publishing
         const deployer = new Deployer({ deployWallet: Wallet.createRandom() });
-        if (process.env.ETH_NETWORK === 'localhost') {
+        if (process.env.CHAIN_ETH_NETWORK === 'localhost') {
             await deployer.publishSourcesToTesseracts();
         } else {
             await deployer.publishSourcesToEtherscan();

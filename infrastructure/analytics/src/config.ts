@@ -4,10 +4,10 @@ import { Network, Config } from './types';
 const CONFIG_FILE = '.analytics-config.json';
 
 function configPath() {
-    const env_directory = process.env.ANALYTICS_HOME;
+    const env_directory = process.env.ZKSYNC_HOME;
 
     const cur_path = './' + CONFIG_FILE;
-    const env_path = `${env_directory}/${CONFIG_FILE}`;
+    const env_path = `${env_directory}/infrastructure/analytics/${CONFIG_FILE}`;
 
     if (fs.existsSync(cur_path)) {
         return cur_path;
@@ -40,7 +40,7 @@ export function loadConfig(network?: Network) {
             network: network,
             rest_api_address: network_config['REST_API_ADDR'],
             operator_fee_address: network_config['OPERATOR_FEE_ETH_ADDRESS'],
-            etherscan_api_key: process.env['ETHERSCAN_API_KEY']
+            etherscan_api_key: process.env['MISC_ETHERSCAN_API_KEY']
         };
 
         return config;

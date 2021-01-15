@@ -1,16 +1,18 @@
 // Built-in uses
 use std::{collections::BTreeMap, fmt::Debug};
+
 // External uses
 use num::BigUint;
 use serde::{Deserialize, Serialize};
+
 // Workspace uses
 use zksync::{
     types::BlockStatus,
     utils::{closest_packable_fee_amount, closest_packable_token_amount},
     RpcProvider,
 };
-use zksync_config::ConfigurationOptions;
 use zksync_utils::format_ether;
+
 // Local uses
 use crate::{
     api::{self, ApiTestsFuture, ApiTestsReport, CancellationToken},
@@ -46,7 +48,7 @@ pub struct LoadtestExecutor {
     /// Main account to deposit ETH from / return ETH back to.
     main_wallet: TestWallet,
     monitor: Monitor,
-    env_options: ConfigurationOptions,
+    web3_url: String,
     /// Estimated fee amount for any zkSync operation.
     fees: Fees,
     scenarios: Vec<(Box<dyn Scenario>, Vec<TestWallet>)>,
@@ -74,7 +76,7 @@ impl LoadtestExecutor {
     const OPERATIONS_PER_WALLET: u64 = 5;
 
     /// Creates a new executor instance.
-    pub async fn new(config: Config, env_options: ConfigurationOptions) -> anyhow::Result<Self> {
+    pub async fn new(config: Config, web3_url: String) -> anyhow::Result<Self> {
         let monitor = Monitor::new(RpcProvider::new(config.network.name)).await;
 
         log::info!("Creating scenarios...");
@@ -87,7 +89,7 @@ impl LoadtestExecutor {
 
         // Create main account to deposit money from and to return money back later.
         let main_wallet =
-            TestWallet::from_info(monitor.clone(), &config.main_wallet, &env_options).await;
+            TestWallet::from_info(monitor.clone(), &config.main_wallet, &web3_url).await;
         // Special case for erc20 tokens.
         if !main_wallet.token_name().is_eth() {
             main_wallet.approve_erc20_deposits().await?;
@@ -104,7 +106,7 @@ impl LoadtestExecutor {
 
         Ok(Self {
             monitor,
-            env_options,
+            web3_url,
             main_wallet,
             scenarios,
             fees,
@@ -158,7 +160,7 @@ impl LoadtestExecutor {
                     TestWallet::new_random(
                         self.main_wallet.token_name().clone(),
                         self.monitor.clone(),
-                        &self.env_options,
+                        &self.web3_url,
                     )
                 }),
             )
