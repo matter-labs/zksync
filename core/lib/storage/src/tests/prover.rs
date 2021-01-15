@@ -1,29 +1,14 @@
 // External imports
 use anyhow::format_err;
-use lazy_static::lazy_static;
 // Workspace imports
-use zksync_crypto::proof::{AggregatedProof, PrecomputedSampleProofs, SingleProof};
-use zksync_prover_utils::fs_utils::load_precomputed_proofs;
 use zksync_types::{
     prover::{ProverJob, ProverJobType},
     Action,
 };
 // Local imports
-use crate::test_data::gen_operation;
+use crate::test_data::{gen_operation, get_sample_aggregated_proof, get_sample_single_proof};
 use crate::tests::db_test;
 use crate::{prover::ProverSchema, QueryResult, StorageProcessor};
-
-lazy_static! {
-    static ref SAMPLE_PROOF: PrecomputedSampleProofs = load_precomputed_proofs().unwrap();
-}
-
-fn get_sample_single_proof() -> SingleProof {
-    SAMPLE_PROOF.single_proofs[0].0.clone()
-}
-
-fn get_sample_aggregated_proof() -> AggregatedProof {
-    SAMPLE_PROOF.aggregated_proof.clone()
-}
 
 async fn get_idle_job_from_queue(mut storage: &mut StorageProcessor<'_>) -> QueryResult<ProverJob> {
     let job = ProverSchema(&mut storage)

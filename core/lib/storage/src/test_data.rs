@@ -4,8 +4,8 @@
 use std::ops::Deref;
 
 // External imports
+use lazy_static::lazy_static;
 use num::BigUint;
-
 use parity_crypto::publickey::{Generator, Random};
 // Workspace imports
 use zksync_crypto::{ff::PrimeField, rand::Rng, Fr};
@@ -18,7 +18,22 @@ use zksync_types::{
         AccountUpdate, BlockNumber, PubKeyHash,
     },
 };
+
+use zksync_crypto::proof::{AggregatedProof, PrecomputedSampleProofs, SingleProof};
+use zksync_prover_utils::fs_utils::load_precomputed_proofs;
 // Local imports
+
+lazy_static! {
+    static ref SAMPLE_PROOF: PrecomputedSampleProofs = load_precomputed_proofs().unwrap();
+}
+
+pub fn get_sample_single_proof() -> SingleProof {
+    SAMPLE_PROOF.single_proofs[0].0.clone()
+}
+
+pub fn get_sample_aggregated_proof() -> AggregatedProof {
+    SAMPLE_PROOF.aggregated_proof.clone()
+}
 
 /// Block size used for tests
 pub const BLOCK_SIZE_CHUNKS: usize = 100;

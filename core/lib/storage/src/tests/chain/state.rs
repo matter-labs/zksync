@@ -1,6 +1,6 @@
 // External imports
 // Workspace imports
-use zksync_types::{helpers::apply_updates, AccountMap, Action, ActionType};
+use zksync_types::{helpers::apply_updates, prover::ProverJobType, AccountMap, Action, ActionType};
 // Local imports
 use super::block::apply_random_updates;
 use crate::{
@@ -10,7 +10,7 @@ use crate::{
         state::StateSchema,
     },
     prover::ProverSchema,
-    test_data::gen_operation,
+    test_data::{gen_operation, get_sample_single_proof},
     tests::{create_rng, db_test},
     QueryResult, StorageProcessor,
 };
@@ -127,75 +127,87 @@ async fn low_level_commit_verify_state(mut storage: StorageProcessor<'_>) -> Que
 
 #[db_test]
 async fn state_diff(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
-    // async fn check_diff_applying(
-    //     storage: &mut StorageProcessor<'_>,
-    //     start_block: u32,
-    //     end_block: Option<u32>,
-    // ) -> QueryResult<()> {
-    //     let (block, updates) = StateSchema(storage)
-    //         .load_state_diff(start_block, end_block)
-    //         .await?
-    //         .expect("Can't load the diff");
-    //     if let Some(end_block) = end_block {
-    //         assert_eq!(end_block, block);
-    //     }
-    //     let (_, expected_state) = StateSchema(storage).load_committed_state(end_block).await?;
-    //     let (_, mut obtained_state) = StateSchema(storage)
-    //         .load_committed_state(Some(start_block))
-    //         .await?;
-    //     apply_updates(&mut obtained_state, updates);
-    //     assert_eq!(
-    //         obtained_state, expected_state,
-    //         "Applying diff {} -> {:?} failed",
-    //         start_block, end_block
-    //     );
-    //     Ok(())
-    // }
-    //
-    // let mut rng = create_rng();
-    //
-    // let block_size = 100;
-    // let mut accounts_map = AccountMap::default();
-    // let blocks_amount = 5;
-    //
-    // // Create and apply several blocks to work with.
-    // for block_number in 1..=blocks_amount {
-    //     let (new_accounts_map, updates) = apply_random_updates(accounts_map.clone(), &mut rng);
-    //     accounts_map = new_accounts_map;
-    //
-    //     BlockSchema(&mut storage)
-    //         .execute_operation(gen_operation(block_number, Action::Commit, block_size))
-    //         .await?;
-    //     StateSchema(&mut storage)
-    //         .commit_state_update(block_number, &updates, 0)
-    //         .await?;
-    //
-    //     ProverSchema(&mut storage)
-    //         .store_proof(block_number, &Default::default())
-    //         .await?;
-    //     BlockSchema(&mut storage)
-    //         .execute_operation(gen_operation(
-    //             block_number,
-    //             Action::Verify {
-    //                 proof: Default::default(),
-    //             },
-    //             block_size,
-    //         ))
-    //         .await?;
-    // }
-    //
-    // // Now let's load some diffs and apply them.
-    // check_diff_applying(&mut storage, 1, Some(2)).await?;
-    // check_diff_applying(&mut storage, 2, Some(3)).await?;
-    // check_diff_applying(&mut storage, 1, Some(3)).await?;
-    //
-    // // Go in the reverse order.
-    // check_diff_applying(&mut storage, 2, Some(1)).await?;
-    // check_diff_applying(&mut storage, 3, Some(1)).await?;
-    //
-    // // Apply diff with uncertain end target.
-    // check_diff_applying(&mut storage, 1, None).await?;
-    //
-    // Ok(())
-    todo!()
+    async fn check_diff_applying(
+        storage: &mut StorageProcessor<'_>,
+        start_block: u32,
+        end_block: Option<u32>,
+    ) -> QueryResult<()> {
+        let (block, updates) = StateSchema(storage)
+            .load_state_diff(start_block, end_block)
+            .await?
+            .expect("Can't load the diff");
+        if let Some(end_block) = end_block {
+            assert_eq!(end_block, block);
+        }
+        let (_, expected_state) = StateSchema(storage).load_committed_state(end_block).await?;
+        let (_, mut obtained_state) = StateSchema(storage)
+            .load_committed_state(Some(start_block))
+            .await?;
+        apply_updates(&mut obtained_state, updates);
+        assert_eq!(
+            obtained_state, expected_state,
+            "Applying diff {} -> {:?} failed",
+            start_block, end_block
+        );
+        Ok(())
+    }
+
+    let mut rng = create_rng();
+
+    let block_size = 100;
+    let mut accounts_map = AccountMap::default();
+    let blocks_amount = 5;
+
+    // Create and apply several blocks to work with.
+    for block_number in 1..=blocks_amount {
+        let (new_accounts_map, updates) = apply_random_updates(accounts_map.clone(), &mut rng);
+        accounts_map = new_accounts_map;
+
+        BlockSchema(&mut storage)
+            .execute_operation(gen_operation(block_number, Action::Commit, block_size))
+            .await?;
+        StateSchema(&mut storage)
+            .commit_state_update(block_number, &updates, 0)
+            .await?;
+
+        ProverSchema(&mut storage)
+            .add_prover_job_to_job_queue(
+                block_number,
+                block_number,
+                Default::default(),
+                1,
+                ProverJobType::SingleProof,
+            )
+            .await?;
+        let job = ProverSchema(&mut storage)
+            .get_idle_prover_job_from_job_queue()
+            .await?
+            .unwrap();
+        ProverSchema(&mut storage)
+            .store_proof(job.job_id, block_number, &get_sample_single_proof())
+            .await?;
+        BlockSchema(&mut storage)
+            .execute_operation(gen_operation(
+                block_number,
+                Action::Verify {
+                    proof: Default::default(),
+                },
+                block_size,
+            ))
+            .await?;
+    }
+
+    // Now let's load some diffs and apply them.
+    check_diff_applying(&mut storage, 1, Some(2)).await?;
+    check_diff_applying(&mut storage, 2, Some(3)).await?;
+    check_diff_applying(&mut storage, 1, Some(3)).await?;
+
+    // Go in the reverse order.
+    check_diff_applying(&mut storage, 2, Some(1)).await?;
+    check_diff_applying(&mut storage, 3, Some(1)).await?;
+
+    // Apply diff with uncertain end target.
+    check_diff_applying(&mut storage, 1, None).await?;
+
+    Ok(())
 }

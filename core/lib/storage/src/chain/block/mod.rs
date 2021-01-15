@@ -44,6 +44,7 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
         let result = stored.into_op(self.0).await;
         result
     }
+
     pub async fn store_operation(&mut self, op: Operation) -> QueryResult<StoredOperation> {
         let start = Instant::now();
         let mut transaction = self.0.start_transaction().await?;

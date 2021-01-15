@@ -17,6 +17,7 @@ db_test = []
 zksync_types = { path = "../types", version = "1.0" }
 zksync_crypto = { path = "../crypto", version = "1.0" }
 zksync_utils = { path = "../utils", version = "1.0" }
+zksync_prover_utils = { path = "../prover_utils" }
 zksync_basic_types = { path = "../basic_types", version = "1.0" }
 
 serde = "1.0.90"
@@ -25,6 +26,7 @@ num = { version = "0.3.1", features = ["serde"] }
 chrono = { version = "0.4", features = ["serde", "rustc-serialize"] }
 log = "0.4"
 anyhow = "1.0"
+lazy_static = "1.4.0"
 itertools = "0.8"
 hex = "0.4"
 metrics = "0.13.0-alpha.8"
@@ -44,10 +46,8 @@ sqlx = { version = "0.4.2", default-features = false, features = [
 
 [dev-dependencies]
 zksync_test_account = { path = "../../tests/test_account" }
-zksync_prover_utils = { path = "../prover_utils" }
 zksync_config = { path = "../config", version = "1.0" }
 db_test_macro = { path = "./db_test_macro" }
 
 env_logger = "0.6"
 tokio = { version = "0.2", features = ["full"] }
-lazy_static = "1.4.0"
