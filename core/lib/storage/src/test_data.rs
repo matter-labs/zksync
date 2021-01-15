@@ -8,9 +8,15 @@ use lazy_static::lazy_static;
 use num::BigUint;
 use parity_crypto::publickey::{Generator, Random};
 // Workspace imports
+use zksync_crypto::proof::{AggregatedProof, PrecomputedSampleProofs, SingleProof};
 use zksync_crypto::{ff::PrimeField, rand::Rng, Fr};
+use zksync_prover_utils::fs_utils::load_precomputed_proofs;
 use zksync_types::{
     account::Account,
+    aggregated_operations::{
+        AggregatedActionType, AggregatedOperation, BlocksCommitOperation,
+        BlocksCreateProofOperation,
+    },
     tx::{EthSignData, PackedEthSignature, TxEthSignature},
     Action, Address, Operation, H256,
     {
@@ -18,9 +24,6 @@ use zksync_types::{
         AccountUpdate, BlockNumber, PubKeyHash,
     },
 };
-
-use zksync_crypto::proof::{AggregatedProof, PrecomputedSampleProofs, SingleProof};
-use zksync_prover_utils::fs_utils::load_precomputed_proofs;
 // Local imports
 
 lazy_static! {
@@ -149,6 +152,34 @@ pub fn gen_unique_operation(
     gen_unique_operation_with_txs(block_number, action, block_chunks_size, vec![])
 }
 
+/// Generates dummy aggregated operation with the unique `new_root_hash` in the block.
+pub fn gen_unique_aggregated_operation(
+    block_number: BlockNumber,
+    action: AggregatedActionType,
+    block_chunks_size: usize,
+) -> AggregatedOperation {
+    gen_unique_aggregated_operation_with_txs(block_number, action, block_chunks_size, vec![])
+}
+
+fn get_sample_block(
+    block_number: BlockNumber,
+    block_chunks_size: usize,
+    txs: Vec<ExecutedOperations>,
+) -> Block {
+    Block {
+        block_number,
+        new_root_hash: dummy_root_hash_for_block(block_number),
+        fee_account: 0,
+        block_transactions: txs,
+        processed_priority_ops: (0, 0),
+        block_chunks_size,
+        commit_gas_limit: 1_000_000.into(),
+        verify_gas_limit: 1_500_000.into(),
+        block_commitment: H256::zero(),
+        timestamp: 0,
+    }
+}
+
 /// Generates dummy operation with the unique `new_root_hash` in the block and
 /// given set of transactions..
 pub fn gen_unique_operation_with_txs(
@@ -160,17 +191,35 @@ pub fn gen_unique_operation_with_txs(
     Operation {
         id: None,
         action,
-        block: Block {
-            block_number,
-            new_root_hash: dummy_root_hash_for_block(block_number),
-            fee_account: 0,
-            block_transactions: txs,
-            processed_priority_ops: (0, 0),
-            block_chunks_size,
-            commit_gas_limit: 1_000_000.into(),
-            verify_gas_limit: 1_500_000.into(),
-            block_commitment: H256::zero(),
-            timestamp: 0,
-        },
+        block: get_sample_block(block_number, block_chunks_size, txs),
     }
+}
+
+/// Generates dummy operation with the unique `new_root_hash` in the block and
+/// given set of transactions..
+pub fn gen_unique_aggregated_operation_with_txs(
+    block_number: BlockNumber,
+    action: AggregatedActionType,
+    block_chunks_size: usize,
+    txs: Vec<ExecutedOperations>,
+) -> AggregatedOperation {
+    let block = get_sample_block(block_number, block_chunks_size, txs);
+
+    let result = match action {
+        AggregatedActionType::CommitBlocks => {
+            AggregatedOperation::CommitBlocks(BlocksCommitOperation {
+                last_committed_block: block.clone(),
+                blocks: vec![block],
+            })
+        }
+        AggregatedActionType::CreateProofBlocks => {
+            AggregatedOperation::CreateProofBlocks(BlocksCreateProofOperation {
+                blocks: vec![block],
+                proofs_to_pad: 0,
+            })
+        }
+        _ => panic!("Invalid AggregatedActionType"),
+    };
+
+    result
 }
