@@ -157,7 +157,7 @@ impl TestWallet {
             .tokens
             .resolve(self.token_name.clone())
             .ok_or(ClientError::UnknownToken)
-            .expect("Unknown token");
+            ?;
 
         let contract = Contract::new(
             self.eth_provider.web3().eth(),
