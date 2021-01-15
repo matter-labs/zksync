@@ -43,8 +43,6 @@ pub struct TransactionInfo {
     pub created_at: DateTime<Utc>,
 }
 
-// Client implementation
-
 /// Blocks API part.
 impl Client {
     /// Returns information about block with the specified number or null if block doesn't exist.

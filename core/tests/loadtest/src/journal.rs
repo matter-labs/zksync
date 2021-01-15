@@ -1,7 +1,8 @@
 // Built-in import
 use std::{
     cmp::{max, min},
-    collections::HashMap,
+    collections::{BTreeMap, HashMap},
+    fmt::Display,
     time::{Duration, Instant},
 };
 // External uses
@@ -9,7 +10,37 @@ use serde::{Deserialize, Serialize};
 // Workspace uses
 use zksync_types::tx::TxHash;
 // Local uses
-use crate::{scenarios::ScenariosTestsReport, session::save_error};
+use crate::{
+    scenarios::{ScenariosTestsReport, TxVariantTestsReport},
+    session::save_error,
+};
+
+/// Monitored transaction category.
+#[derive(Debug, Copy, Clone, Ord, PartialOrd, Eq, PartialEq)]
+pub enum TxVariant {
+    /// Regular single transaction.
+    Single,
+    /// This transaction is a part of batch with the specified size.
+    Batched {
+        /// Batch size.
+        size: usize,
+    },
+}
+
+impl Default for TxVariant {
+    fn default() -> Self {
+        Self::Single
+    }
+}
+
+impl Display for TxVariant {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            TxVariant::Single => f.write_str("single"),
+            TxVariant::Batched { size } => write!(f, "batch/{}", size),
+        }
+    }
+}
 
 #[derive(Debug, Copy, Clone, Ord, PartialOrd, Eq, PartialEq)]
 pub struct TxLifecycle {
@@ -17,6 +48,7 @@ pub struct TxLifecycle {
     pub sent_at: Instant,
     pub committed_at: Instant,
     pub verified_at: Instant,
+    pub variant: TxVariant,
 }
 
 impl TxLifecycle {
@@ -40,6 +72,28 @@ pub struct Journal {
     errored_count: usize,
 }
 
+#[derive(Debug, Default)]
+struct TxVariantReportData {
+    sending: Vec<u128>,
+    committing: Vec<u128>,
+    verifying: Vec<u128>,
+}
+
+impl TxVariantReportData {
+    fn into_report(self) -> TxVariantTestsReport {
+        let stats = [
+            ("sending", self.sending),
+            ("committing", self.committing),
+            ("verifying", self.verifying),
+        ]
+        .iter()
+        .map(|(category, data)| (category.to_string(), FiveSummaryStats::from_data(data)))
+        .collect();
+
+        TxVariantTestsReport { stats }
+    }
+}
+
 impl Journal {
     pub fn record_tx(&mut self, tx_hash: TxHash, tx_result: Result<TxLifecycle, anyhow::Error>) {
         self.total_count += 1;
@@ -60,33 +114,25 @@ impl Journal {
     }
 
     pub fn report(&self) -> ScenariosTestsReport {
-        let mut sending = Vec::new();
-        let mut committing = Vec::new();
-        let mut verifying = Vec::new();
+        let mut reports: BTreeMap<_, TxVariantReportData> = BTreeMap::new();
 
         for tx_lifecycle in self.txs.values() {
-            sending.push(tx_lifecycle.send_duration().as_micros());
-            committing.push(tx_lifecycle.commit_duration().as_micros());
-            verifying.push(tx_lifecycle.verify_duration().as_micros());
+            let entry = reports.entry(tx_lifecycle.variant).or_default();
+
+            entry.sending.push(tx_lifecycle.send_duration().as_micros());
+            entry
+                .committing
+                .push(tx_lifecycle.commit_duration().as_micros());
+            entry
+                .verifying
+                .push(tx_lifecycle.verify_duration().as_micros());
         }
 
-        let summary = [
-            ("sending", sending),
-            ("committing", committing),
-            ("verifying", verifying),
-        ]
-        .iter()
-        .map(|(category, data)| {
-            (
-                category.to_string(),
-                FiveSummaryStats::from_data(data)
-                    .expect("Not enough data to compute summary stats"),
-            )
-        })
-        .collect();
-
         ScenariosTestsReport {
-            summary,
+            summary: reports
+                .into_iter()
+                .map(|(variant, data)| (variant.to_string(), data.into_report()))
+                .collect(),
             total_txs_count: self.total_count,
             failed_txs_count: self.errored_count,
         }
