@@ -1,9 +1,11 @@
+import { web3Provider } from './utils';
+
 const ethers = require('ethers');
-const provider = new ethers.providers.JsonRpcProvider(process.env.ETH_CLIENT_WEB3_URLS.split(',')[0]);
 
 const rinkeby = ethers.getDefaultProvider('rinkeby');
 const mainnet = new ethers.providers.InfuraProvider();
 const mainnet2 = new ethers.providers.EtherscanProvider();
+const provider = web3Provider();
 
 async function calc(addr) {
     const balanceBefore = await provider.getBalance(addr, 4385572);

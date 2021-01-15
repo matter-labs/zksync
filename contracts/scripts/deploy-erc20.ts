@@ -1,15 +1,16 @@
 import { Command } from 'commander';
 import { deployContract } from 'ethereum-waffle';
-import { ethers, Wallet } from 'ethers';
+import { Wallet } from 'ethers';
 import { readContractCode } from '../src.ts/deploy';
 import { parseEther } from 'ethers/lib/utils';
+import { web3Provider } from './utils';
 import * as fs from 'fs';
 import * as path from 'path';
 
 const testConfigPath = path.join(process.env.ZKSYNC_HOME as string, `etc/test_config/constant`);
 const ethTestConfig = JSON.parse(fs.readFileSync(`${testConfigPath}/eth.json`, { encoding: 'utf-8' }));
 
-const provider = new ethers.providers.JsonRpcProvider(process.env.ETH_CLIENT_WEB3_URLS.split(',')[0]);
+const provider = web3Provider();
 const wallet = Wallet.fromMnemonic(ethTestConfig.mnemonic, "m/44'/60'/0'/0/1").connect(provider);
 
 type Token = {

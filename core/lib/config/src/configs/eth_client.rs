@@ -20,6 +20,7 @@ impl ETHClientConfig {
     pub fn from_env() -> Self {
         envy_load!("eth_client", "ETH_CLIENT_")
     }
+
     /// Get first web3 url, useful in direct web3 clients, which don't need any multiplexers
     pub fn web3_url(&self) -> String {
         self.web3_urls
@@ -56,5 +57,6 @@ ETH_CLIENT_WEB3_URLS="http://127.0.0.1:8545,http://127.0.0.1:8546"
 
         let actual = ETHClientConfig::from_env();
         assert_eq!(actual, expected_config());
+        assert_eq!(actual.web3_url(), "http://127.0.0.1:8545");
     }
 }

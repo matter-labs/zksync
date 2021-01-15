@@ -33,7 +33,7 @@ pub struct ETHDirectClient<S: EthereumSigner> {
     pub chain_id: u8,
     pub gas_price_factor: f64,
     // It's public only for testkit
-    // TODO avoid public
+    // TODO avoid public (ZKS-376)
     pub web3: Web3<Http>,
 }
 
