@@ -13,6 +13,7 @@ export abstract class AbstractJSONRPCTransport {
     subscriptionsSupported(): boolean {
         return false;
     }
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     async subscribe(subMethod: string, subParams, unsubMethod: string, cb: (data: any) => void): Promise<Subscription> {
         throw new Error('subscription are not supported for this transport');
     }
@@ -163,13 +164,8 @@ export class WSTransport extends AbstractJSONRPCTransport {
 }
 
 export class DummyTransport extends AbstractJSONRPCTransport {
-    public constructor(public network: string, public ethPrivateKey: Uint8Array, public tokensList: any) {
+    public constructor(public network: string, public ethPrivateKey: Uint8Array, public getTokens: Function) {
         super();
-    }
-
-    getTokensList() {
-        // Just copying it
-        return [...this.tokensList];
     }
 
     async getPubKeyHash(): Promise<PubKeyHash> {
@@ -189,13 +185,13 @@ export class DummyTransport extends AbstractJSONRPCTransport {
         }
 
         if (method == 'tokens') {
-            const tokensList = this.getTokensList();
+            const tokensList = this.getTokens();
             const tokens = {};
 
             let id = 1;
             for (const tokenItem of tokensList.slice(0, 3)) {
                 const token = {
-                    address: tokenItem.address.slice(2),
+                    address: tokenItem.address,
                     id: id,
                     symbol: tokenItem.symbol,
                     decimals: tokenItem.decimals

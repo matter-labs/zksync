@@ -19,8 +19,9 @@ use zksync_types::{tx::TxHash, AccountId, Address, BlockNumber, ExecutedOperatio
 // Local uses
 use crate::{
     api_server::v1::{
-        client::{Client, Receipt},
         test_utils::{dummy_deposit_op, TestServerConfig},
+        transactions::Receipt,
+        Client,
     },
     core_api_client::CoreApiClient,
     utils::token_db_cache::TokenDBCache,
@@ -28,7 +29,10 @@ use crate::{
 
 use super::{
     api_scope,
-    types::{AccountOpReceipt, AccountReceipts, AccountTxReceipt},
+    types::{
+        convert::{op_receipt_from_response, tx_receipt_from_response},
+        AccountOpReceipt, AccountReceipts, AccountTxReceipt,
+    },
 };
 
 type PendingOpsHandle = Arc<Mutex<serde_json::Value>>;
@@ -90,8 +94,9 @@ impl TestServer {
 
         let (api_client, api_server) = cfg.start_server(move |cfg| {
             api_scope(
-                &cfg.env_options,
-                TokenDBCache::new(cfg.pool.clone()),
+                cfg.pool.clone(),
+                &cfg.config,
+                TokenDBCache::new(),
                 core_client.clone(),
             )
         });
@@ -401,7 +406,7 @@ fn account_tx_response_to_receipt() {
     ];
 
     for (resp, expected_receipt) in cases {
-        let actual_receipt = AccountTxReceipt::from(resp);
+        let actual_receipt = tx_receipt_from_response(resp);
         assert_eq!(actual_receipt, expected_receipt);
     }
 }
@@ -458,7 +463,7 @@ fn account_op_response_to_receipt() {
     ];
 
     for (resp, expected_receipt) in cases {
-        let actual_receipt = AccountOpReceipt::from(resp);
+        let actual_receipt = op_receipt_from_response(resp);
         assert_eq!(actual_receipt, expected_receipt);
     }
 }

@@ -1,5 +1,5 @@
 // Built-in
-use std::sync::{Arc, RwLock};
+use std::sync::Arc;
 use std::thread;
 use std::time::Duration;
 // External
@@ -14,8 +14,9 @@ use futures::channel::mpsc;
 use jsonwebtoken::errors::Error as JwtError;
 use jsonwebtoken::{decode, DecodingKey, Validation};
 use serde::{Deserialize, Serialize};
+use tokio::sync::RwLock;
 // Workspace deps
-use zksync_config::ProverOptions;
+use zksync_config::ZkSyncConfig;
 use zksync_prover_utils::api::{BlockToProveRes, ProverReq, PublishReq, WorkingOnReq};
 use zksync_storage::ConnectionPool;
 use zksync_types::BlockNumber;
@@ -109,7 +110,7 @@ async fn status() -> actix_web::Result<String> {
 
 async fn register(data: web::Data<AppState>, r: web::Json<ProverReq>) -> actix_web::Result<String> {
     log::info!("register request for prover with name: {}", r.name);
-    if r.name == "" {
+    if r.name.is_empty() {
         return Err(actix_web::error::ErrorBadRequest("empty name"));
     }
     let mut storage = data.access_storage().await?;
@@ -129,7 +130,7 @@ async fn block_to_prove(
     r: web::Json<ProverReq>,
 ) -> actix_web::Result<HttpResponse> {
     log::trace!("request block to prove from worker: {}", r.name);
-    if r.name == "" {
+    if r.name.is_empty() {
         return Err(actix_web::error::ErrorBadRequest("empty name"));
     }
     let mut storage = data.access_storage().await?;
@@ -289,7 +290,7 @@ async fn required_replicas(
     data: web::Data<AppState>,
     _input: web::Json<RequiredReplicasInput>,
 ) -> actix_web::Result<HttpResponse> {
-    let mut oracle = data.scaler_oracle.write().expect("Expected write lock");
+    let mut oracle = data.scaler_oracle.write().await;
 
     let needed_count = oracle
         .provers_required()
@@ -304,8 +305,12 @@ async fn required_replicas(
 pub fn run_prover_server(
     connection_pool: zksync_storage::ConnectionPool,
     panic_notify: mpsc::Sender<bool>,
-    prover_options: ProverOptions,
+    config: ZkSyncConfig,
 ) {
+    let witness_generator_opts = config.prover.witness_generator;
+    let core_opts = config.prover.core;
+    let prover_api_opts = config.api.prover;
+
     thread::Builder::new()
         .name("prover_server".to_string())
         .spawn(move || {
@@ -329,9 +334,9 @@ pub fn run_prover_server(
                 };
 
                 // Start pool maintainer threads.
-                for offset in 0..prover_options.witness_generators {
+                for offset in 0..witness_generator_opts.witness_generators {
                     let start_block = (last_verified_block + offset + 1) as u32;
-                    let block_step = prover_options.witness_generators as u32;
+                    let block_step = witness_generator_opts.witness_generators as u32;
                     log::info!(
                         "Starting witness generator ({},{})",
                         start_block,
@@ -339,16 +344,16 @@ pub fn run_prover_server(
                     );
                     let pool_maintainer = witness_generator::WitnessGenerator::new(
                         connection_pool.clone(),
-                        prover_options.prepare_data_interval,
+                        witness_generator_opts.prepare_data_interval(),
                         start_block,
                         block_step,
                     );
                     pool_maintainer.start(panic_notify.clone());
                 }
                 // Start HTTP server.
-                let secret_auth = prover_options.secret_auth.clone();
-                let gone_timeout = prover_options.gone_timeout;
-                let idle_provers = prover_options.idle_provers;
+                let secret_auth = prover_api_opts.secret_auth.clone();
+                let gone_timeout = core_opts.gone_timeout();
+                let idle_provers = core_opts.idle_provers;
                 HttpServer::new(move || {
                     let app_state = AppState::new(
                         secret_auth.clone(),
@@ -385,7 +390,7 @@ pub fn run_prover_server(
                             web::post().to(required_replicas),
                         )
                 })
-                .bind(&prover_options.prover_server_address)
+                .bind(&prover_api_opts.bind_addr())
                 .expect("failed to bind")
                 .run()
                 .await

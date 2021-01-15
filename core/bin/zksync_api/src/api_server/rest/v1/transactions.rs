@@ -7,22 +7,20 @@ use actix_web::{
     web::{self, Json},
     Scope,
 };
-use serde::{Deserialize, Serialize};
 
 // Workspace uses
+pub use zksync_api_client::rest::v1::{
+    FastProcessingQuery, IncomingTx, IncomingTxBatch, Receipt, TxData,
+};
 use zksync_storage::{
     chain::operations_ext::records::TxReceiptResponse, QueryResult, StorageProcessor,
 };
-use zksync_types::{
-    tx::{EthSignData, TxEthSignature, TxHash},
-    BlockNumber, SignedZkSyncTx, ZkSyncTx,
-};
+use zksync_types::{tx::TxHash, BlockNumber, SignedZkSyncTx};
+
+use crate::api_server::tx_sender::{SubmitError, TxSender};
 
 // Local uses
-use super::{
-    client::Client, client::ClientError, Error as ApiError, JsonResult, Pagination, PaginationQuery,
-};
-use crate::api_server::tx_sender::{SubmitError, TxSender};
+use super::{ApiError, JsonResult, Pagination, PaginationQuery};
 
 #[derive(Debug, Clone, Copy)]
 pub enum SumbitErrorCode {
@@ -180,153 +178,6 @@ impl ApiTransactionsData {
     }
 }
 
-// Data transfer objects.
-
-#[derive(Debug, Serialize, Deserialize, PartialEq, Clone, Copy)]
-#[serde(rename_all = "camelCase")]
-struct FastProcessingQuery {
-    fast_processing: Option<bool>,
-}
-
-/// This structure has the same layout as [`SignedZkSyncTx`],
-/// the only difference is that it uses "camelCase" for serialization.
-///
-/// [`SignedZkSyncTx`]: zksync_types::SignedZkSyncTx
-#[derive(Debug, Serialize, Deserialize, Clone)]
-#[serde(rename_all = "camelCase")]
-pub struct TxData {
-    /// Underlying zkSync transaction.
-    pub tx: ZkSyncTx,
-    /// Tuple of the Ethereum signature and the message
-    /// which user should have signed with their private key.
-    /// Can be `None` if the Ethereum signature is not required.
-    pub eth_sign_data: Option<EthSignData>,
-}
-
-/// This struct has the same layout as `SignedZkSyncTx`, expect that it used
-/// `TxEthSignature` directly instead of `EthSignData`.
-#[derive(Debug, Serialize, Deserialize, Clone)]
-#[serde(rename_all = "camelCase")]
-struct IncomingTx {
-    tx: ZkSyncTx,
-    signature: Option<TxEthSignature>,
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone)]
-#[serde(rename_all = "camelCase")]
-struct IncomingTxBatch {
-    txs: Vec<ZkSyncTx>,
-    signature: Option<TxEthSignature>,
-}
-
-/// Transaction (or priority operation) receipt.
-#[derive(Debug, Deserialize, Serialize, Clone, PartialEq)]
-#[serde(tag = "status", rename_all = "camelCase")]
-pub enum Receipt {
-    /// The transaction is awaiting execution in the memorypool.
-    Pending,
-    /// The transaction has been executed, but the block containing this transaction has not
-    /// yet been committed.
-    Executed,
-    /// The block which contains this transaction has been committed.
-    Committed { block: BlockNumber },
-    /// The block which contains this transaction has been verified.
-    Verified { block: BlockNumber },
-    /// The transaction has been rejected for some reasons.
-    Rejected { reason: Option<String> },
-}
-
-impl From<TxData> for SignedZkSyncTx {
-    fn from(inner: TxData) -> Self {
-        Self {
-            tx: inner.tx,
-            eth_sign_data: inner.eth_sign_data,
-        }
-    }
-}
-
-impl From<SignedZkSyncTx> for TxData {
-    fn from(inner: SignedZkSyncTx) -> Self {
-        Self {
-            tx: inner.tx,
-            eth_sign_data: inner.eth_sign_data,
-        }
-    }
-}
-
-// Client implementation
-
-/// Transactions API part.
-impl Client {
-    /// Sends a new transaction to the memory pool.
-    pub async fn submit_tx(
-        &self,
-        tx: ZkSyncTx,
-        signature: Option<TxEthSignature>,
-        fast_processing: Option<bool>,
-    ) -> Result<TxHash, ClientError> {
-        self.post("transactions/submit")
-            .query(&FastProcessingQuery { fast_processing })
-            .body(&IncomingTx { tx, signature })
-            .send()
-            .await
-    }
-
-    /// Sends a new transactions batch to the memory pool.
-    pub async fn submit_tx_batch(
-        &self,
-        txs: Vec<ZkSyncTx>,
-        signature: Option<TxEthSignature>,
-    ) -> Result<Vec<TxHash>, ClientError> {
-        self.post("transactions/submit/batch")
-            .body(&IncomingTxBatch { txs, signature })
-            .send()
-            .await
-    }
-
-    /// Gets actual transaction receipt.
-    pub async fn tx_status(&self, tx_hash: TxHash) -> Result<Option<Receipt>, ClientError> {
-        self.get(&format!("transactions/{}", tx_hash.to_string()))
-            .send()
-            .await
-    }
-
-    /// Gets transaction content.
-    pub async fn tx_data(&self, tx_hash: TxHash) -> Result<Option<TxData>, ClientError> {
-        self.get(&format!("transactions/{}/data", tx_hash.to_string()))
-            .send()
-            .await
-    }
-
-    /// Gets transaction receipt by ID.
-    pub async fn tx_receipt_by_id(
-        &self,
-        tx_hash: TxHash,
-        receipt_id: u32,
-    ) -> Result<Option<Receipt>, ClientError> {
-        self.get(&format!(
-            "transactions/{}/receipts/{}",
-            tx_hash.to_string(),
-            receipt_id
-        ))
-        .send()
-        .await
-    }
-
-    /// Gets transaction receipts.
-    pub async fn tx_receipts(
-        &self,
-        tx_hash: TxHash,
-        from: Pagination,
-        limit: BlockNumber,
-    ) -> Result<Vec<Receipt>, ClientError> {
-        self.get(&format!("transactions/{}/receipts", tx_hash.to_string()))
-            .query(&from.into_query(limit))
-            .send()
-            .await
-    }
-}
-
 // Server implementation
 
 async fn tx_status(
@@ -431,24 +282,28 @@ pub fn api_scope(tx_sender: TxSender) -> Scope {
 #[cfg(test)]
 mod tests {
     use actix_web::App;
-
     use bigdecimal::BigDecimal;
-    use futures::{channel::mpsc, prelude::*};
+    use futures::{channel::mpsc, StreamExt};
     use num::BigUint;
+
+    use zksync_api_client::rest::v1::Client;
     use zksync_storage::ConnectionPool;
     use zksync_test_account::ZkSyncAccount;
-    use zksync_types::{tokens::TokenLike, tx::PackedEthSignature, SignedZkSyncTx};
-
-    use super::{
-        super::test_utils::{TestServerConfig, TestTransactions},
-        *,
+    use zksync_types::{
+        tokens::TokenLike,
+        tx::{PackedEthSignature, TxEthSignature},
+        ZkSyncTx,
     };
+
     use crate::{
         api_server::helpers::try_parse_tx_hash,
         core_api_client::CoreApiClient,
         fee_ticker::{Fee, OutputFeeType::Withdraw, TickerRequest},
         signature_checker::{VerifiedTx, VerifyTxSignatureRequest},
     };
+
+    use super::super::test_utils::{TestServerConfig, TestTransactions};
+    use super::*;
 
     fn submit_txs_loopback() -> (CoreApiClient, actix_web::test::TestServer) {
         async fn send_tx(_tx: Json<SignedZkSyncTx>) -> Json<Result<(), ()>> {
@@ -548,7 +403,7 @@ mod tests {
                     cfg.pool.clone(),
                     sign_verifier.clone(),
                     fee_ticker.clone(),
-                    &cfg.api_server_options,
+                    &cfg.config,
                 ))
             });
 

@@ -10,7 +10,7 @@ use once_cell::sync::Lazy;
 use tokio::sync::Mutex;
 
 // Workspace uses
-use zksync_config::{ApiServerOptions, ConfigurationOptions};
+use zksync_config::ZkSyncConfig;
 use zksync_crypto::rand::{SeedableRng, XorShiftRng};
 use zksync_storage::{
     chain::operations::records::NewExecutedPriorityOperation,
@@ -31,7 +31,7 @@ use zksync_types::{
 };
 
 // Local uses
-use super::client::Client;
+use super::Client;
 
 /// Serial ID of the verified priority operation.
 pub const VERIFIED_OP_SERIAL_ID: u64 = 10;
@@ -44,16 +44,14 @@ pub const VERIFIED_BLOCKS_COUNT: BlockNumber = 3;
 
 #[derive(Debug, Clone)]
 pub struct TestServerConfig {
-    pub env_options: ConfigurationOptions,
-    pub api_server_options: ApiServerOptions,
+    pub config: ZkSyncConfig,
     pub pool: ConnectionPool,
 }
 
 impl Default for TestServerConfig {
     fn default() -> Self {
         Self {
-            env_options: ConfigurationOptions::from_env(),
-            api_server_options: ApiServerOptions::from_env(),
+            config: ZkSyncConfig::from_env(),
             pool: ConnectionPool::new(Some(1)),
         }
     }
@@ -390,12 +388,9 @@ impl TestServerConfig {
             NewExecutedPriorityOperation {
                 block_number: 2,
                 block_index: 2,
-                operation: serde_json::to_value(dummy_deposit_op(
-                    Address::default(),
-                    1,
-                    VERIFIED_OP_SERIAL_ID,
-                    2,
-                ))
+                operation: serde_json::to_value(
+                    dummy_deposit_op(Address::default(), 1, VERIFIED_OP_SERIAL_ID, 2).op,
+                )
                 .unwrap(),
                 from_account: Default::default(),
                 to_account: Default::default(),
@@ -411,12 +406,9 @@ impl TestServerConfig {
             NewExecutedPriorityOperation {
                 block_number: VERIFIED_BLOCKS_COUNT as i64 + 1,
                 block_index: 1,
-                operation: serde_json::to_value(dummy_full_exit_op(
-                    1,
-                    Address::default(),
-                    COMMITTED_OP_SERIAL_ID,
-                    3,
-                ))
+                operation: serde_json::to_value(
+                    dummy_full_exit_op(1, Address::default(), COMMITTED_OP_SERIAL_ID, 3).op,
+                )
                 .unwrap(),
                 from_account: Default::default(),
                 to_account: Default::default(),

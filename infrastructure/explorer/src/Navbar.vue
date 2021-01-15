@@ -23,9 +23,7 @@
                         Contract
                         <span style="font-size: 0.9em"><i class="fas fa-external-link-alt"></i></span>
                     </b-nav-item>
-                    <b-nav-item class="nowrap" v-on:click.prevent="goToTokens">
-                        Tokens
-                    </b-nav-item>
+                    <b-nav-item class="nowrap" v-on:click.prevent="goToTokens"> Tokens </b-nav-item>
                     <b-nav-item
                         v-if="store.walletLink"
                         v-bind:href="store.walletLink"
@@ -34,6 +32,16 @@
                         class="nowrap"
                     >
                         Wallet
+                        <span style="font-size: 0.9em"><i class="fas fa-external-link-alt"></i></span>
+                    </b-nav-item>
+                    <b-nav-item
+                        v-if="store.statusLink"
+                        v-bind:href="store.statusLink"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        class="nowrap"
+                    >
+                        Status
                         <span style="font-size: 0.9em"><i class="fas fa-external-link-alt"></i></span>
                     </b-nav-item>
                 </b-navbar-nav>

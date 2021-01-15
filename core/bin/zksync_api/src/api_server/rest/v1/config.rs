@@ -4,17 +4,14 @@
 
 // External uses
 use actix_web::{web, Scope};
-use serde::{Deserialize, Serialize};
 
 // Workspace uses
-use zksync_config::ConfigurationOptions;
+use zksync_api_client::rest::v1::Contracts;
+use zksync_config::ZkSyncConfig;
 use zksync_types::{network::Network, Address};
 
 // Local uses
-use super::{
-    client::{self, Client},
-    Json,
-};
+use super::Json;
 
 /// Shared data between `api/v1/config` endpoints.
 #[derive(Debug, Clone)]
@@ -25,37 +22,12 @@ struct ApiConfigData {
 }
 
 impl ApiConfigData {
-    fn new(env_options: &ConfigurationOptions) -> Self {
+    fn new(config: &ZkSyncConfig) -> Self {
         Self {
-            contract_address: env_options.contract_eth_addr,
-            deposit_confirmations: env_options.confirmations_for_eth_event,
-            network: env_options.eth_network.parse().unwrap(),
+            contract_address: config.contracts.contract_addr,
+            deposit_confirmations: config.eth_watch.confirmations_for_eth_event,
+            network: config.chain.eth.network,
         }
-    }
-}
-
-// Data transfer objects.
-
-#[derive(Debug, Serialize, Deserialize, PartialEq, Clone)]
-#[serde(rename_all = "camelCase")]
-pub struct Contracts {
-    pub contract: Address,
-}
-
-// Client implementation
-
-/// Configuration API part.
-impl Client {
-    pub async fn contracts(&self) -> client::Result<Contracts> {
-        self.get("config/contracts").send().await
-    }
-
-    pub async fn deposit_confirmations(&self) -> client::Result<u64> {
-        self.get("config/deposit_confirmations").send().await
-    }
-
-    pub async fn network(&self) -> client::Result<String> {
-        self.get("config/network").send().await
     }
 }
 
@@ -75,8 +47,8 @@ async fn network(data: web::Data<ApiConfigData>) -> Json<Network> {
     Json(data.network)
 }
 
-pub fn api_scope(env_options: &ConfigurationOptions) -> Scope {
-    let data = ApiConfigData::new(env_options);
+pub fn api_scope(config: &ZkSyncConfig) -> Scope {
+    let data = ApiConfigData::new(config);
 
     web::scope("config")
         .data(data)
@@ -99,18 +71,21 @@ mod tests {
     )]
     async fn test_config_scope() -> anyhow::Result<()> {
         let cfg = TestServerConfig::default();
-        let (client, server) = cfg.start_server(|cfg| api_scope(&cfg.env_options));
+        let (client, server) = cfg.start_server(|cfg| api_scope(&cfg.config));
 
         assert_eq!(
             client.deposit_confirmations().await?,
-            cfg.env_options.confirmations_for_eth_event
+            cfg.config.eth_watch.confirmations_for_eth_event
         );
 
-        assert_eq!(client.network().await?, cfg.env_options.eth_network);
+        assert_eq!(
+            client.network().await?,
+            cfg.config.chain.eth.network.to_string()
+        );
         assert_eq!(
             client.contracts().await?,
             Contracts {
-                contract: cfg.env_options.contract_eth_addr
+                contract: cfg.config.contracts.contract_addr
             },
         );
 

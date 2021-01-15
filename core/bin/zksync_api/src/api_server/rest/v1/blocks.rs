@@ -7,21 +7,16 @@ use actix_web::{
     web::{self, Json},
     Scope,
 };
-use chrono::{DateTime, Utc};
-use serde::{Deserialize, Serialize};
-use serde_json::Value;
 
 // Workspace uses
-use zksync_config::ApiServerOptions;
-use zksync_crypto::{convert::FeConvert, serialization::FrSerde, Fr};
+pub use zksync_api_client::rest::v1::{BlockInfo, TransactionInfo};
+use zksync_config::ZkSyncConfig;
+use zksync_crypto::{convert::FeConvert, Fr};
 use zksync_storage::{chain::block::records, ConnectionPool, QueryResult};
 use zksync_types::{tx::TxHash, BlockNumber};
 
 // Local uses
-use super::{
-    client::{self, Client},
-    Error as ApiError, JsonResult, Pagination, PaginationQuery,
-};
+use super::{Error as ApiError, JsonResult, Pagination, PaginationQuery};
 use crate::{api_server::helpers::try_parse_tx_hash, utils::shared_lru_cache::AsyncLruCache};
 
 /// Shared data between `api/v1/blocks` endpoints.
@@ -102,68 +97,46 @@ impl ApiBlocksData {
     }
 }
 
-// Data transfer objects.
+pub(super) mod convert {
+    use zksync_api_client::rest::v1::PaginationQueryError;
 
-#[derive(Debug, Serialize, Deserialize, PartialEq, Clone)]
-#[serde(rename_all = "camelCase")]
-pub struct BlockInfo {
-    pub block_number: BlockNumber,
-    #[serde(with = "FrSerde")]
-    pub new_state_root: Fr,
-    pub block_size: u64,
-    pub commit_tx_hash: Option<TxHash>,
-    pub verify_tx_hash: Option<TxHash>,
-    pub committed_at: DateTime<Utc>,
-    pub verified_at: Option<DateTime<Utc>>,
-}
+    use super::*;
 
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
-#[serde(rename_all = "camelCase")]
-pub struct TransactionInfo {
-    pub tx_hash: TxHash,
-    pub block_number: BlockNumber,
-    pub op: Value,
-    pub success: Option<bool>,
-    pub fail_reason: Option<String>,
-    pub created_at: DateTime<Utc>,
-}
-
-impl From<records::BlockDetails> for BlockInfo {
-    fn from(inner: records::BlockDetails) -> Self {
-        Self {
-            block_number: inner.block_number as BlockNumber,
-            new_state_root: Fr::from_bytes(&inner.new_state_root).unwrap_or_else(|err| {
-                panic!(
-                    "Database provided an incorrect new_state_root field: {:?}, an error occurred {}",
-                    inner.new_state_root, err
-                )
-            }),
-            block_size: inner.block_size as u64,
-            commit_tx_hash: inner.commit_tx_hash.map(|bytes| {
-                TxHash::from_slice(&bytes).unwrap_or_else(|| {
+    pub fn block_info_from_details(inner: records::BlockDetails) -> BlockInfo {
+        BlockInfo {
+                block_number: inner.block_number as BlockNumber,
+                new_state_root: Fr::from_bytes(&inner.new_state_root).unwrap_or_else(|err| {
                     panic!(
-                        "Database provided an incorrect commit_tx_hash field: {:?}",
-                        hex::encode(bytes)
+                        "Database provided an incorrect new_state_root field: {:?}, an error occurred {}",
+                        inner.new_state_root, err
                     )
-                })
-            }),
-            verify_tx_hash: inner.verify_tx_hash.map(|bytes| {
-                TxHash::from_slice(&bytes).unwrap_or_else(|| {
-                    panic!(
-                        "Database provided an incorrect verify_tx_hash field: {:?}",
-                        hex::encode(bytes)
-                    )
-                })
-            }),
-            committed_at: inner.committed_at,
-            verified_at: inner.verified_at,
-        }
+                }),
+                block_size: inner.block_size as u64,
+                commit_tx_hash: inner.commit_tx_hash.map(|bytes| {
+                    TxHash::from_slice(&bytes).unwrap_or_else(|| {
+                        panic!(
+                            "Database provided an incorrect commit_tx_hash field: {:?}",
+                            hex::encode(bytes)
+                        )
+                    })
+                }),
+                verify_tx_hash: inner.verify_tx_hash.map(|bytes| {
+                    TxHash::from_slice(&bytes).unwrap_or_else(|| {
+                        panic!(
+                            "Database provided an incorrect verify_tx_hash field: {:?}",
+                            hex::encode(bytes)
+                        )
+                    })
+                }),
+                committed_at: inner.committed_at,
+                verified_at: inner.verified_at,
+            }
     }
-}
 
-impl From<records::BlockTransactionItem> for TransactionInfo {
-    fn from(inner: records::BlockTransactionItem) -> Self {
-        Self {
+    pub fn transaction_info_from_transaction_item(
+        inner: records::BlockTransactionItem,
+    ) -> TransactionInfo {
+        TransactionInfo {
             tx_hash: try_parse_tx_hash(&inner.tx_hash).unwrap_or_else(|err| {
                 panic!(
                     "Database provided an incorrect transaction hash: {:?}, an error occurred: {}",
@@ -177,40 +150,11 @@ impl From<records::BlockTransactionItem> for TransactionInfo {
             created_at: inner.created_at,
         }
     }
-}
 
-// Client implementation
-
-/// Blocks API part.
-impl Client {
-    /// Returns information about block with the specified number or null if block doesn't exist.
-    pub async fn block_by_id(
-        &self,
-        block_number: BlockNumber,
-    ) -> client::Result<Option<BlockInfo>> {
-        self.get(&format!("blocks/{}", block_number)).send().await
-    }
-
-    /// Returns information about transactions of the block with the specified number.
-    pub async fn block_transactions(
-        &self,
-        block_number: BlockNumber,
-    ) -> client::Result<Vec<TransactionInfo>> {
-        self.get(&format!("blocks/{}/transactions", block_number))
-            .send()
-            .await
-    }
-
-    /// Returns information about several blocks in a range.
-    pub async fn blocks_range(
-        &self,
-        from: Pagination,
-        limit: BlockNumber,
-    ) -> client::Result<Vec<BlockInfo>> {
-        self.get("blocks")
-            .query(&from.into_query(limit))
-            .send()
-            .await
+    impl From<PaginationQueryError> for ApiError {
+        fn from(err: PaginationQueryError) -> Self {
+            ApiError::bad_request("Incorrect pagination query").detail(err.detail)
+        }
     }
 }
 
@@ -224,7 +168,7 @@ async fn block_by_id(
         data.block_info(block_number)
             .await
             .map_err(ApiError::internal)?
-            .map(BlockInfo::from),
+            .map(convert::block_info_from_details),
     ))
 }
 
@@ -240,7 +184,7 @@ async fn block_transactions(
     Ok(Json(
         transactions
             .into_iter()
-            .map(TransactionInfo::from)
+            .map(convert::transaction_info_from_transaction_item)
             .collect(),
     ))
 }
@@ -262,17 +206,20 @@ async fn blocks_range(
         range
             .into_iter()
             .filter(|block| block.block_number > after as i64)
-            .map(BlockInfo::from)
+            .map(convert::block_info_from_details)
             .collect()
     } else {
-        range.into_iter().map(BlockInfo::from).collect()
+        range
+            .into_iter()
+            .map(convert::block_info_from_details)
+            .collect()
     };
 
     Ok(Json(range))
 }
 
-pub fn api_scope(api_server_options: &ApiServerOptions, pool: ConnectionPool) -> Scope {
-    let data = ApiBlocksData::new(pool, api_server_options.api_requests_caches_size);
+pub fn api_scope(config: &ZkSyncConfig, pool: ConnectionPool) -> Scope {
+    let data = ApiBlocksData::new(pool, config.api.common.caches_size);
 
     web::scope("blocks")
         .data(data)
@@ -294,8 +241,7 @@ mod tests {
         let cfg = TestServerConfig::default();
         cfg.fill_database().await?;
 
-        let (client, server) =
-            cfg.start_server(|cfg| api_scope(&cfg.api_server_options, cfg.pool.clone()));
+        let (client, server) = cfg.start_server(|cfg| api_scope(&cfg.config, cfg.pool.clone()));
 
         // Block requests part
         let blocks: Vec<BlockInfo> = {
@@ -307,7 +253,10 @@ mod tests {
                 .load_block_range(10, 10)
                 .await?;
 
-            blocks.into_iter().map(From::from).collect()
+            blocks
+                .into_iter()
+                .map(convert::block_info_from_details)
+                .collect()
         };
 
         assert_eq!(client.block_by_id(1).await?.unwrap(), blocks[7]);
@@ -331,7 +280,10 @@ mod tests {
                 .get_block_transactions(1)
                 .await?;
 
-            transactions.into_iter().map(From::from).collect()
+            transactions
+                .into_iter()
+                .map(convert::transaction_info_from_transaction_item)
+                .collect()
         };
         assert_eq!(client.block_transactions(1).await?, expected_txs);
         assert_eq!(client.block_transactions(6).await?, vec![]);

@@ -5,6 +5,10 @@ local metrics = [
   "sql.ethereum.get_eth_op_id",
   "sql.ethereum.get_next_nonce",
   "sql.ethereum.initialize_eth_data",
+  "sql.ethereum.load_average_gas_price",
+  "sql.ethereum.load_eth_params",
+  "sql.ethereum.load_gas_price_limit",
+  "sql.ethereum.load_stats",
   "sql.ethereum.load_unconfirmed_operations",
   "sql.ethereum.load_unprocessed_operations",
   "sql.ethereum.report_created_operation",
@@ -13,7 +17,4 @@ local metrics = [
   "sql.ethereum.update_gas_price",
 ];
 
-G.dashboard(
-  'Metrics / sql / ethereum',
-  [ G.panel(metric) for metric in metrics ]
-)
+G.dashboard('sql / ethereum', metrics)

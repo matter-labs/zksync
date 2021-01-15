@@ -54,7 +54,7 @@ impl FakeEthClientData {
             self.last_block_number = max(op.eth_block, self.last_block_number);
             self.priority_ops
                 .entry(op.eth_block)
-                .or_insert(vec![])
+                .or_insert_with(Vec::new)
                 .push(op.clone());
         }
     }

@@ -2,14 +2,16 @@ name: CI
 
 on:
   pull_request:
+  push:
     branches:
-     - '*'
+    - staging
+    - trying
 
 jobs:
   ci-all:
     # We currently have two self-hosted runners, one of which is marked "DEV-CI" and other one is marder "MAIN".
     # "MAIN" is the current CI runner, "DEV-CI" is currently used to experiment with CI optimizing.
-    runs-on: self-hosted
+    runs-on: [self-hosted, MAIN]
 
     steps:
     - uses: actions/checkout@v2
@@ -32,21 +34,13 @@ jobs:
           contracts/dev-contracts/generated
         key: ${{ runner.os }}-contracts-${{ hashFiles('contracts/contracts/*.sol') }}
 
-    - name: cache-rust
-      uses: actions/cache@v2
-      with:
-        path: |
-          ~/.cargo/registry
-          ~/.cargo/git
-          target
-        key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-
     - name: update-deps
       run: |
-        rustup update stable
+        rustup update 1.48.0
+        rustup default 1.48.0
         cargo install --version=0.2.0 sqlx-cli
         cargo install diesel_cli --no-default-features --features postgres
-        docker pull matterlabs/ci-integration-test:zk-latest
+        docker pull matterlabs/ci-integration-test:latest
 
     - name: zk
       run: zk
@@ -55,8 +49,7 @@ jobs:
       run: |
         # lint non-rust code
         zk fmt --check
-        yarn lint:md
-        yarn lint:sol
+        zk lint --check
         zk dummy-prover ensure-disabled
         cargo fmt --all -- --check
         zk f cargo clippy --tests --benches -- -D warnings

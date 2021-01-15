@@ -9,12 +9,13 @@ import * as env from './env';
 import { up } from './up';
 
 export async function init() {
+    await createVolumes();
     if (!process.env.CI) {
         await checkEnv();
         await env.gitHooks();
         await up();
     }
-    await utils.allowFail(run.yarn());
+    await run.yarn();
     await run.plonkSetup();
     await run.verifyKeys.unpack();
     await db.setup();
@@ -24,6 +25,12 @@ export async function init() {
     await contract.build();
     await server.genesis();
     await contract.redeploy();
+}
+
+async function createVolumes() {
+    await utils.exec('mkdir -p $ZKSYNC_HOME/volumes/geth');
+    await utils.exec('mkdir -p $ZKSYNC_HOME/volumes/postgres');
+    await utils.exec('mkdir -p $ZKSYNC_HOME/volumes/tesseracts');
 }
 
 async function checkEnv() {

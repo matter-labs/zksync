@@ -67,7 +67,7 @@ function feeEntry(txData) {
         const feeBN = BigNumber.from(fee);
         if (feeBN.eq('0')) {
             return makeEntry('Fee').innerHTML(
-                '<i>This transaction is a part of a batch. The fee was payed in another transaction.</i>'
+                '<i>This transaction is a part of a batch. The fee was paid in another transaction.</i>'
             );
         }
     } catch {

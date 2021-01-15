@@ -19,9 +19,27 @@ export async function deployERC20(command: 'dev' | 'new', name?: string, symbol?
             ]' > ./etc/tokens/localhost.json`);
     } else if (command == 'new') {
         await utils.spawn(
-            `yarn --cwd contracts deploy-erc20 add --name ${name} --symbol ${symbol} --decimals ${decimals}`
+            `yarn --cwd contracts deploy-erc20 add --token-name ${name} --symbol ${symbol} --decimals ${decimals}`
         );
     }
+}
+
+export async function governanceAddERC20(command: 'dev' | 'new', address?: string) {
+    if (command == 'dev') {
+        await utils.spawn(`yarn --silent --cwd contracts governance-add-erc20 add-multi-current-network localhost`);
+    } else if (command == 'new') {
+        await utils.spawn(`yarn --cwd contracts governance-add-erc20 add ${address}`);
+    }
+}
+
+export async function serverAddERC20(address: string, symbol: string, decimals: string) {
+    await utils.spawn(
+        `yarn --cwd contracts server-add-erc20 add --address ${address} --symbol ${symbol} --decimals ${decimals}`
+    );
+}
+
+export async function tokenInfo(address: string) {
+    await utils.spawn(`yarn --cwd contracts token-info info ${address}`);
 }
 
 // installs all dependencies and builds our js packages
@@ -124,6 +142,31 @@ command
     });
 
 command
+    .command('governance-add-erc20 <dev|new> [address]')
+    .description('add testnet erc20 token to the governance')
+    .action(async (command: string, address?: string) => {
+        if (command != 'dev' && command != 'new') {
+            throw new Error('only "dev" and "new" subcommands are allowed');
+        }
+        await governanceAddERC20(command, address);
+    });
+
+command
+    .command('server-add-erc20 <address> <symbol> <decimals>')
+    .description('add testnet erc20 token to the zkSynk server')
+    .action(async (address: string, symbol: string, decimals: string) => {
+        await utils.confirmAction();
+        await serverAddERC20(address, symbol, decimals);
+    });
+
+command
+    .command('token-info <address>')
+    .description('get symbol, name and decimals parameters from token')
+    .action(async (address: string) => {
+        await tokenInfo(address);
+    });
+
+command
     .command('plonk-setup [powers]')
     .description('download missing keys')
     .action(async (powers?: string) => {
@@ -146,7 +189,7 @@ command
 command
     .command('deploy-eip1271')
     .description('deploy test EIP-1271 "smart wallet"')
-    .action(async (cmd: Command) => {
+    .action(async () => {
         await deployEIP1271();
     });
 

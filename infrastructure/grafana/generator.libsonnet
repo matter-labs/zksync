@@ -3,11 +3,12 @@
   width:: 1337,
   height:: 10,
 
-  panel(metric, span = '1h')::
+  time(metric, span = '1h')::
     local formatted = std.strReplace(metric, '.', '_');
     $.grafana.graphPanel.new(
       title = metric,
       datasource = 'Prometheus',
+      format = 'ns',
     ).addTarget(
       $.grafana.prometheus.target(
         'rate(%s_sum[%s]) / rate(%s_count[%s])' 
@@ -16,7 +17,33 @@
       )
     ) + { gridPos: { h: $.height, w: $.width } },
 
-  dashboard(title = '', panels = [])::
+  samples(metric, span = '1h')::
+    local formatted = std.strReplace(metric, '.', '_');
+    $.grafana.graphPanel.new(
+      title = metric + '[count]',
+      datasource = 'Prometheus',
+    ).addTarget(
+      $.grafana.prometheus.target(
+        'rate(%s_count[%s])' % [formatted, span],
+        legendFormat = '{{namespace}}'
+      )
+    ) + { gridPos: { h: $.height, w: $.width } },
+
+  dashboard(title, metrics = [])::
+    $.grafana.dashboard.new(
+      title,
+      schemaVersion = 18,
+      editable = true,
+      refresh = '1m',
+      tags = ['prometheus']
+    ).addPanels(
+      std.flattenArrays([
+        [$.time(metric), $.samples(metric)]
+        for metric in metrics
+      ])
+    ),
+
+  dashboardRaw(title, panels = [])::
     $.grafana.dashboard.new(
       title,
       schemaVersion = 18,

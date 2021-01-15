@@ -9,7 +9,8 @@ const store = {
     config: network,
     network: network,
     capitalizedNetwork: capitalize(network),
-    walletLink: `https://${walletLinkPrefix}.zksync.io`
+    walletLink: `https://${walletLinkPrefix}.zksync.io`,
+    statusLink: 'https://uptime.com/s/zksync'
 };
 
 export default store;

@@ -10,15 +10,15 @@ use std::{
 // External deps
 use structopt::StructOpt;
 // Workspace deps
-use zksync_config::ProverOptions;
+use zksync_config::configs::ProverConfig as EnvProverConfig;
 use zksync_utils::{get_env, parse_env};
 // Local deps
 use crate::{client, start, ApiClient, ProverConfig, ProverImpl, ShutdownRequest};
 
 fn api_client_from_env(worker_name: &str) -> client::ApiClient {
-    let server_api_url = parse_env("PROVER_SERVER_URL");
-    let request_timout = Duration::from_secs(parse_env::<u64>("REQ_SERVER_TIMEOUT"));
-    let secret = get_env("PROVER_SECRET_AUTH");
+    let server_api_url = parse_env("API_PROVER_URL");
+    let request_timout = Duration::from_secs(parse_env::<u64>("PROVER_PROVER_REQUEST_TIMEOUT"));
+    let secret = get_env("API_PROVER_SECRET_AUTH");
     client::ApiClient::new(&server_api_url, worker_name, request_timout, &secret)
 }
 
@@ -39,7 +39,7 @@ pub fn main_for_prover_impl<P: ProverImpl<client::ApiClient> + 'static + Send + 
     let worker_name = opt.worker_name;
 
     // used env
-    let heartbeat_interval = ProverOptions::from_env().heartbeat_interval;
+    let heartbeat_interval = EnvProverConfig::from_env().prover.heartbeat_interval();
     let prover_config = <P as ProverImpl<client::ApiClient>>::Config::from_env();
     let api_client = api_client_from_env(&worker_name);
     let prover = P::create_from_config(prover_config, api_client.clone(), heartbeat_interval);

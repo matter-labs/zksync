@@ -198,6 +198,30 @@ where
 impl<T, Hash, H> SparseMerkleTree<T, Hash, H>
 where
     T: GetBits + Default + Sync,
+    Hash: Clone + Debug + Sync + Send + Eq,
+    H: Hasher<Hash> + Sync,
+{
+    /// Verifies the given proof for the given element and index.
+    pub fn verify_proof(&self, element_index: u32, element: T, proof: Vec<(Hash, bool)>) -> bool {
+        let mut proof_index = 0;
+        let mut aggregated_hash = self.hasher.hash_bits(element.get_bits_le());
+        for (level, (hash, dir)) in proof.into_iter().enumerate() {
+            let (lhs, rhs) = if dir {
+                proof_index |= 1 << level;
+                (hash, aggregated_hash)
+            } else {
+                (aggregated_hash, hash)
+            };
+
+            aggregated_hash = self.hasher.compress(&lhs, &rhs, level);
+        }
+        proof_index == element_index && aggregated_hash == self.root_hash()
+    }
+}
+
+impl<T, Hash, H> SparseMerkleTree<T, Hash, H>
+where
+    T: GetBits + Default + Sync,
     Hash: Clone + Debug + Sync + Send,
     H: Hasher<Hash> + Sync,
 {
