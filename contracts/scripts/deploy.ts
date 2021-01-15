@@ -1,5 +1,5 @@
 import { ArgumentParser } from 'argparse';
-import { ethers, Wallet } from 'ethers';
+import { Wallet } from 'ethers';
 import { Deployer } from '../src.ts/deploy';
 import { formatUnits, parseUnits } from 'ethers/lib/utils';
 import * as fs from 'fs';
