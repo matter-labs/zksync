@@ -3,7 +3,7 @@ FROM debian:buster-slim
 WORKDIR /usr/src/zksync
 
 # Install required dependencies
-RUN apt-get update; apt-get install -y make bash git  openssl libssl-dev gcc g++ curl libpq-dev pkg-config software-properties-common jq
+RUN apt-get update; apt-get install -y make bash git openssl libssl-dev gcc g++ curl libpq-dev pkg-config software-properties-common jq
 
 # Install node and yarn
 RUN curl -sL https://deb.nodesource.com/setup_14.x | bash -
