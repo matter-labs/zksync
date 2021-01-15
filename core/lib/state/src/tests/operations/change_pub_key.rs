@@ -1,12 +1,12 @@
 use crate::tests::{AccountState::*, PlasmaTestBuilder};
 use zksync_types::account::{AccountUpdate, PubKeyHash};
-use zksync_types::tx::ChangePubKey;
+use zksync_types::{tx::ChangePubKey, AccountId, TokenId};
 
 /// Check ChangePubKey operation on new account
 #[test]
 fn success() {
     let mut tb = PlasmaTestBuilder::new();
-    let token_id = 1;
+    let token_id = TokenId(1);
     let balance = 10u32;
     let (account_id, account, sk) = tb.add_account(Locked);
     tb.set_balance(account_id, token_id, balance);
@@ -60,7 +60,7 @@ fn nonce_mismatch() {
         account_id,
         account.address,
         new_pub_key_hash,
-        0,
+        TokenId(0),
         0u32.into(),
         account.nonce + 1,
         None,
@@ -80,10 +80,10 @@ fn invalid_account_id() {
     let new_pub_key_hash = PubKeyHash::from_privkey(&sk);
 
     let change_pub_key = ChangePubKey::new_signed(
-        account_id + 1,
+        AccountId(*account_id + 1),
         account.address,
         new_pub_key_hash,
-        0,
+        TokenId(0),
         0u32.into(),
         account.nonce + 1,
         None,

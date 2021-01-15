@@ -34,7 +34,7 @@ impl<'a, 'c> TokensSchema<'a, 'c> {
             DO
               UPDATE SET address = $2, symbol = $3, decimals = $4
             "#,
-            i32::from(token.id),
+            i32::from(*token.id),
             address_to_stored_string(&token.address),
             token.symbol,
             i16::from(token.decimals),
@@ -101,7 +101,7 @@ impl<'a, 'c> TokensSchema<'a, 'c> {
                     WHERE id = $1
                     LIMIT 1
                     "#,
-                    i32::from(token_id)
+                    i32::from(*token_id)
                 )
                 .fetch_optional(self.0.conn())
                 .await?
@@ -150,7 +150,7 @@ impl<'a, 'c> TokensSchema<'a, 'c> {
             WHERE token_id = $1
             LIMIT 1
             "#,
-            i32::from(token_id)
+            i32::from(*token_id)
         )
         .fetch_optional(self.0.conn())
         .await?;
@@ -175,7 +175,7 @@ impl<'a, 'c> TokensSchema<'a, 'c> {
             DO
               UPDATE SET market_volume = $2, last_updated = $3
             "#,
-            i32::from(token_id),
+            i32::from(*token_id),
             market_volume_rounded.clone(),
             market_volume.last_updated
         )
@@ -198,7 +198,7 @@ impl<'a, 'c> TokensSchema<'a, 'c> {
             WHERE token_id = $1
             LIMIT 1
             "#,
-            i32::from(token_id)
+            i32::from(*token_id)
         )
         .fetch_optional(self.0.conn())
         .await?;
@@ -226,7 +226,7 @@ impl<'a, 'c> TokensSchema<'a, 'c> {
             DO
               UPDATE SET usd_price = $2, last_updated = $3
             "#,
-            i32::from(token_id),
+            i32::from(*token_id),
             usd_price_rounded.clone(),
             price.last_updated
         )

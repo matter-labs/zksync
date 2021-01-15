@@ -99,7 +99,7 @@ pub use crate::connection::ConnectionPool;
 pub type QueryResult<T> = Result<T, anyhow::Error>;
 
 /// The maximum possible block number in the storage.
-pub const MAX_BLOCK_NUMBER: BlockNumber = BlockNumber::MAX;
+pub const MAX_BLOCK_NUMBER: BlockNumber = BlockNumber(u32::MAX);
 /// The maximum possible index value in block in the storage.
 pub const MAX_BLOCK_INDEX: u32 = i32::MAX as u32;
 

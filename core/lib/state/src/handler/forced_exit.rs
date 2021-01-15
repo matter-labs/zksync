@@ -109,7 +109,7 @@ impl TxHandler<ForcedExit> for ZkSyncState {
 
         // Take fees from the initiator account (and update initiator account nonce).
         initiator_account.sub_balance(op.tx.token, &op.tx.fee);
-        initiator_account.nonce += 1;
+        *initiator_account.nonce += 1;
 
         // Withdraw funds from the target account (note that target account nonce is not affected).
         target_account.sub_balance(op.tx.token, &amount);

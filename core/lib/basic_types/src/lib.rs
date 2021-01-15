@@ -2,12 +2,14 @@
 //! Most of them are just re-exported from the `web3` crate.
 
 use serde::{Deserialize, Serialize};
-use std::ops::{Deref, DerefMut};
+use std::ops::{Add, Deref, DerefMut};
 
 pub use web3::types::{Address, Log, TransactionReceipt, H160, H256, U128, U256};
 
 /// Unique identifier of the token in the zkSync network.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Hash)]
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Hash, PartialOrd, Ord, Default,
+)]
 pub struct TokenId(pub u16);
 
 impl Deref for TokenId {
@@ -24,8 +26,17 @@ impl DerefMut for TokenId {
     }
 }
 
+#[test]
+fn foo() {
+    let a = TokenId(0);
+    let ser = serde_json::to_string(&a).unwrap();
+    println!("{}", ser);
+}
+
 /// Unique identifier of the account in the zkSync network.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Hash)]
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Hash, PartialOrd, Ord, Default,
+)]
 pub struct AccountId(pub u32);
 
 impl Deref for AccountId {
@@ -43,7 +54,9 @@ impl DerefMut for AccountId {
 }
 
 /// zkSync network block sequential index.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Hash)]
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Hash, PartialOrd, Ord, Default,
+)]
 pub struct BlockNumber(pub u32);
 
 impl Deref for BlockNumber {
@@ -61,7 +74,9 @@ impl DerefMut for BlockNumber {
 }
 
 /// zkSync account nonce.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Hash)]
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Hash, PartialOrd, Ord, Default,
+)]
 pub struct Nonce(pub u32);
 
 impl Deref for Nonce {
@@ -78,8 +93,18 @@ impl DerefMut for Nonce {
     }
 }
 
+impl Add<u32> for Nonce {
+    type Output = Self;
+
+    fn add(self, other: u32) -> Self {
+        Self(self.0 + other)
+    }
+}
+
 /// Unique identifier of the priority operation in the zkSync network.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Hash)]
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Hash, PartialOrd, Ord, Default,
+)]
 pub struct PriorityOpId(pub u64);
 
 impl Deref for PriorityOpId {
@@ -97,7 +122,9 @@ impl DerefMut for PriorityOpId {
 }
 
 /// Block number in the Ethereum network.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Hash)]
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Hash, PartialOrd, Ord, Default,
+)]
 pub struct EthBlockId(pub u64);
 
 impl Deref for EthBlockId {

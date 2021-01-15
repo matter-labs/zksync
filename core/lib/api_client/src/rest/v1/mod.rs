@@ -98,13 +98,13 @@ impl PaginationQuery {
             )),
         }?;
 
-        if limit == 0 {
+        if *limit == 0 {
             return Err(PaginationQueryError::with_detail(
                 "Limit should be greater than zero".into(),
             ));
         }
 
-        if limit > MAX_LIMIT {
+        if *limit > MAX_LIMIT {
             return Err(PaginationQueryError::with_detail(format!(
                 "Limit should be lower than {}",
                 MAX_LIMIT
@@ -122,19 +122,19 @@ impl Pagination {
     ///
     /// - if limit is zero.
     pub fn into_max(self, limit: BlockNumber) -> Result<Option<BlockNumber>, PaginationQueryError> {
-        assert!(limit > 0, "Limit should be greater than zero");
+        assert!(*limit > 0, "Limit should be greater than zero");
 
         match self {
             Pagination::Before(before) => {
-                if before < 1 {
+                if *before < 1 {
                     return Err(PaginationQueryError::with_detail(
                         "Before should be greater than zero".into(),
                     ));
                 }
 
-                Ok(Some(before - 1))
+                Ok(Some(BlockNumber(*before - 1)))
             }
-            Pagination::After(after) => Ok(Some(after + limit + 1)),
+            Pagination::After(after) => Ok(Some(BlockNumber(*after + *limit + 1))),
             Pagination::Last => Ok(None),
         }
     }
@@ -162,16 +162,16 @@ impl Pagination {
 
 #[test]
 fn pagination_before_max_limit() {
-    let pagination = Pagination::Before(10);
+    let pagination = Pagination::Before(BlockNumber(10));
 
-    let max = pagination.into_max(10).unwrap();
-    assert_eq!(max, Some(9))
+    let max = pagination.into_max(BlockNumber(10)).unwrap();
+    assert_eq!(max, Some(BlockNumber(9)))
 }
 
 #[test]
 fn pagination_after_max_limit() {
-    let pagination = Pagination::After(10);
+    let pagination = Pagination::After(BlockNumber(10));
 
-    let max = pagination.into_max(10).unwrap();
-    assert_eq!(max, Some(21))
+    let max = pagination.into_max(BlockNumber(10)).unwrap();
+    assert_eq!(max, Some(BlockNumber(21)))
 }

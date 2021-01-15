@@ -6,7 +6,7 @@ use chrono::{DateTime, Utc};
 
 // Workspace imports
 use zksync_types::ActionType;
-use zksync_types::{Address, TokenId};
+use zksync_types::{Address, BlockNumber, TokenId};
 
 // Local imports
 use self::records::{
@@ -48,14 +48,14 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
         let result = if let Some(tx) = tx {
             // Check whether transaction was verified.
             let verified = OperationsSchema(self.0)
-                .get_operation(tx.block_number as u32, ActionType::VERIFY)
+                .get_operation(BlockNumber(tx.block_number as u32), ActionType::VERIFY)
                 .await
                 .map(|v| v.confirmed)
                 .unwrap_or(false);
 
             // Get the prover job details.
             let prover_run = ProverSchema(self.0)
-                .get_existing_prover_run(tx.block_number as u32)
+                .get_existing_prover_run(BlockNumber(tx.block_number as u32))
                 .await?;
 
             Ok(Some(TxReceiptResponse {
@@ -86,12 +86,14 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
         let result = match stored_executed_prior_op {
             Some(stored_executed_prior_op) => {
                 let prover_run: Option<ProverRun> = ProverSchema(self.0)
-                    .get_existing_prover_run(stored_executed_prior_op.block_number as u32)
+                    .get_existing_prover_run(BlockNumber(
+                        stored_executed_prior_op.block_number as u32,
+                    ))
                     .await?;
 
                 let confirm = OperationsSchema(self.0)
                     .get_operation(
-                        stored_executed_prior_op.block_number as u32,
+                        BlockNumber(stored_executed_prior_op.block_number as u32),
                         ActionType::VERIFY,
                     )
                     .await;
@@ -480,7 +482,7 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
 
                 if let Some(tok_val) = tx_info.get_mut("token") {
                     if let Some(token_id) = tok_val.as_u64() {
-                        let token_id = token_id as TokenId;
+                        let token_id = TokenId(token_id as u16);
                         let token_symbol = tokens
                             .get(&token_id)
                             .map(|t| t.symbol.clone())
@@ -651,7 +653,7 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
 
                 if let Some(tok_val) = tx_info.get_mut("token") {
                     if let Some(token_id) = tok_val.as_u64() {
-                        let token_id = token_id as TokenId;
+                        let token_id = TokenId(token_id as u16);
                         let token_symbol = tokens
                             .get(&token_id)
                             .map(|t| t.symbol.clone())

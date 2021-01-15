@@ -69,7 +69,9 @@ impl<'a, 'c> DataRestoreSchema<'a, 'c> {
         StateSchema(&mut transaction)
             .commit_state_update(0, &[(0, genesis_acc_update)], 0)
             .await?;
-        StateSchema(&mut transaction).apply_state_update(0).await?;
+        StateSchema(&mut transaction)
+            .apply_state_update(BlockNumber(0))
+            .await?;
         transaction.commit().await?;
         metrics::histogram!("sql.data_restore.save_genesis_state", start.elapsed());
         Ok(())
@@ -102,9 +104,9 @@ impl<'a, 'c> DataRestoreSchema<'a, 'c> {
                     })
                     .collect();
                 StoredRollupOpsBlock {
-                    block_num: block_num as u32,
+                    block_num: BlockNumber(block_num as u32),
                     ops,
-                    fee_account: fee_account as u32,
+                    fee_account: AccountId(fee_account as u32),
                 }
             })
             .collect();
@@ -180,7 +182,7 @@ impl<'a, 'c> DataRestoreSchema<'a, 'c> {
             // The only way to know decimals is to query ERC20 contract 'decimals' function
             // that may or may not (in most cases, may not) be there, so we just assume it to be 18
             let decimals = 18;
-            let token = Token::new(id, address, &format!("ERC20-{}", id), decimals);
+            let token = Token::new(id, address, &format!("ERC20-{}", *id), decimals);
             TokensSchema(&mut transaction).store_token(token).await?;
         }
 
@@ -240,9 +242,9 @@ impl<'a, 'c> DataRestoreSchema<'a, 'c> {
             "UPDATE eth_parameters
             SET commit_ops = $1, verify_ops = $2, withdraw_ops = $3
             WHERE id = true",
-            last_committed_block as i64,
-            last_verified_block as i64,
-            last_verified_block as i64
+            *last_committed_block as i64,
+            *last_verified_block as i64,
+            *last_verified_block as i64
         )
         .execute(self.0.conn())
         .await?;

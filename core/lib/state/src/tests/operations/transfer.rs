@@ -1,12 +1,12 @@
 use crate::tests::{AccountState::*, PlasmaTestBuilder};
 use num::{BigUint, Zero};
 use web3::types::H160;
-use zksync_types::{AccountUpdate, Transfer};
+use zksync_types::{AccountId, AccountUpdate, Nonce, TokenId, Transfer};
 
 /// Check Transfer operation to existing account
 #[test]
 fn to_existing() {
-    let token_id = 0;
+    let token_id = TokenId(0);
     let amount = BigUint::from(100u32);
     let fee = BigUint::from(10u32);
 
@@ -55,7 +55,7 @@ fn to_existing() {
 /// Check Transfer failure if not enough funds
 #[test]
 fn insufficient_funds() {
-    let token_id = 0;
+    let token_id = TokenId(0);
     let amount = BigUint::from(100u32);
     let fee = BigUint::from(10u32);
 
@@ -84,7 +84,7 @@ fn insufficient_funds() {
 /// Check Transfer operation to new account
 #[test]
 fn to_new() {
-    let token_id = 0;
+    let token_id = TokenId(0);
     let amount = BigUint::from(100u32);
     let fee = BigUint::from(10u32);
 
@@ -115,7 +115,7 @@ fn to_new() {
                 new_id,
                 AccountUpdate::Create {
                     address: new_address,
-                    nonce: 0,
+                    nonce: Nonce(0),
                 },
             ),
             (
@@ -129,8 +129,8 @@ fn to_new() {
             (
                 new_id,
                 AccountUpdate::UpdateBalance {
-                    old_nonce: 0,
-                    new_nonce: 0,
+                    old_nonce: Nonce(0),
+                    new_nonce: Nonce(0),
                     balance_update: (token_id, BigUint::zero(), amount),
                 },
             ),
@@ -141,7 +141,7 @@ fn to_new() {
 /// Check Transfer operation from account to itself
 #[test]
 fn to_self() {
-    let token_id = 0;
+    let token_id = TokenId(0);
     let amount = BigUint::from(100u32);
     let fee = BigUint::from(10u32);
 
@@ -178,7 +178,7 @@ fn to_self() {
 /// Check Transfer failure if nonce is incorrect
 #[test]
 fn nonce_mismatch() {
-    let token_id = 0;
+    let token_id = TokenId(0);
     let amount = BigUint::from(100u32);
     let fee = BigUint::from(10u32);
 
@@ -206,7 +206,7 @@ fn nonce_mismatch() {
 /// does not correspond to accound_id
 #[test]
 fn invalid_account_id() {
-    let token_id = 0;
+    let token_id = TokenId(0);
     let amount = BigUint::from(100u32);
     let fee = BigUint::from(10u32);
 
@@ -217,7 +217,7 @@ fn invalid_account_id() {
     tb.set_balance(account_id, token_id, &amount + &fee);
 
     let transfer = Transfer::new_signed(
-        account_id + 145,
+        AccountId(*account_id + 145),
         account.address,
         to_account.address,
         token_id,

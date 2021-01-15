@@ -6,7 +6,7 @@ use sqlx::types::BigDecimal;
 // Workspace imports
 use zksync_types::{
     helpers::{apply_updates, reverse_updates},
-    AccountId, AccountMap, AccountUpdate, AccountUpdates, PubKeyHash,
+    AccountId, AccountMap, AccountUpdate, AccountUpdates, BlockNumber, PubKeyHash,
 };
 // Local imports
 use crate::chain::{
@@ -73,7 +73,7 @@ impl<'a, 'c> StateSchema<'a, 'c> {
                     let is_create = true;
                     let block_number = i64::from(block_number);
                     let address = address.as_bytes().to_vec();
-                    let nonce = i64::from(nonce);
+                    let nonce = i64::from(*nonce);
                     let update_order_id = update_order_id as i32;
                     sqlx::query!(
                         r#"
@@ -90,7 +90,7 @@ impl<'a, 'c> StateSchema<'a, 'c> {
                     let is_create = false;
                     let block_number = i64::from(block_number);
                     let address = address.as_bytes().to_vec();
-                    let nonce = i64::from(nonce);
+                    let nonce = i64::from(*nonce);
                     let update_order_id = update_order_id as i32;
                     sqlx::query!(
                         r#"
@@ -109,11 +109,11 @@ impl<'a, 'c> StateSchema<'a, 'c> {
                 } => {
                     let account_id = i64::from(*id);
                     let block_number = i64::from(block_number);
-                    let coin_id = token as i32;
+                    let coin_id = *token as i32;
                     let old_balance = BigDecimal::from(BigInt::from(old_balance.clone()));
                     let new_balance = BigDecimal::from(BigInt::from(new_balance.clone()));
-                    let old_nonce = i64::from(old_nonce);
-                    let new_nonce = i64::from(new_nonce);
+                    let old_nonce = i64::from(*old_nonce);
+                    let new_nonce = i64::from(*new_nonce);
                     let update_order_id = update_order_id as i32;
 
                     sqlx::query!(
@@ -144,8 +144,8 @@ impl<'a, 'c> StateSchema<'a, 'c> {
                     let block_number = i64::from(block_number);
                     let old_pubkey_hash = old_pub_key_hash.data.to_vec();
                     let new_pubkey_hash = new_pub_key_hash.data.to_vec();
-                    let old_nonce = i64::from(old_nonce);
-                    let new_nonce = i64::from(new_nonce);
+                    let old_nonce = i64::from(*old_nonce);
+                    let new_nonce = i64::from(*new_nonce);
                     sqlx::query!(
                         r#"
                         INSERT INTO account_pubkey_updates ( update_order_id, account_id, block_number, old_pubkey_hash, new_pubkey_hash, old_nonce, new_nonce )
@@ -169,9 +169,9 @@ impl<'a, 'c> StateSchema<'a, 'c> {
     ///
     /// This method is invoked from the `zksync_eth_sender` after corresponding `Verify` transaction
     /// is confirmed on Ethereum blockchain.
-    pub async fn apply_state_update(&mut self, block_number: u32) -> QueryResult<()> {
+    pub async fn apply_state_update(&mut self, block_number: BlockNumber) -> QueryResult<()> {
         let start = Instant::now();
-        log::info!("Applying state update for block: {}", block_number);
+        log::info!("Applying state update for block: {}", *block_number);
 
         let mut transaction = self.0.start_transaction().await?;
 
@@ -182,7 +182,7 @@ impl<'a, 'c> StateSchema<'a, 'c> {
         let account_balance_diff = sqlx::query_as!(
             StorageAccountUpdate,
             "SELECT * FROM account_balance_updates WHERE block_number = $1",
-            i64::from(block_number)
+            i64::from(*block_number)
         )
         .fetch_all(transaction.conn())
         .await?;
@@ -193,7 +193,7 @@ impl<'a, 'c> StateSchema<'a, 'c> {
                 SELECT * FROM account_creates
                 WHERE block_number = $1
             ",
-            i64::from(block_number)
+            i64::from(*block_number)
         )
         .fetch_all(transaction.conn())
         .await?;
@@ -204,7 +204,7 @@ impl<'a, 'c> StateSchema<'a, 'c> {
                 SELECT * FROM account_pubkey_updates
                 WHERE block_number = $1
             ",
-            i64::from(block_number)
+            i64::from(*block_number)
         )
         .fetch_all(transaction.conn())
         .await?;
@@ -322,8 +322,8 @@ impl<'a, 'c> StateSchema<'a, 'c> {
     /// state will be loaded.
     pub async fn load_committed_state(
         &mut self,
-        block: Option<u32>,
-    ) -> QueryResult<(u32, AccountMap)> {
+        block: Option<BlockNumber>,
+    ) -> QueryResult<(BlockNumber, AccountMap)> {
         let start = Instant::now();
         let mut transaction = self.0.start_transaction().await?;
 
@@ -331,7 +331,7 @@ impl<'a, 'c> StateSchema<'a, 'c> {
             StateSchema(&mut transaction).load_verified_state().await?;
         log::debug!(
             "Verified state block: {}, accounts: {:#?}",
-            verif_block,
+            *verif_block,
             accounts
         );
 
@@ -358,7 +358,7 @@ impl<'a, 'c> StateSchema<'a, 'c> {
     /// to which this state applies.
     /// If the provided block number is `None`, then the latest committed
     /// state will be loaded.
-    pub async fn load_verified_state(&mut self) -> QueryResult<(u32, AccountMap)> {
+    pub async fn load_verified_state(&mut self) -> QueryResult<(BlockNumber, AccountMap)> {
         let start = Instant::now();
         let mut transaction = self.0.start_transaction().await?;
 
@@ -386,13 +386,13 @@ impl<'a, 'c> StateSchema<'a, 'c> {
 
             for balance in balances.into_iter() {
                 balances_for_id
-                    .entry(balance.account_id as AccountId)
+                    .entry(AccountId(balance.account_id as u32))
                     .and_modify(|balances| balances.push(balance.clone()))
                     .or_insert_with(|| vec![balance]);
             }
 
             for stored_account in stored_accounts {
-                let id = stored_account.id as AccountId;
+                let id = AccountId(stored_account.id as u32);
                 let balances = balances_for_id.remove(&id).unwrap_or_default();
                 let (id, account) = restore_account(stored_account, balances);
                 account_map.insert(id, account);
@@ -412,9 +412,9 @@ impl<'a, 'c> StateSchema<'a, 'c> {
     /// block.
     pub async fn load_state_diff(
         &mut self,
-        from_block: u32,
-        to_block: Option<u32>,
-    ) -> QueryResult<Option<(u32, AccountUpdates)>> {
+        from_block: BlockNumber,
+        to_block: Option<BlockNumber>,
+    ) -> QueryResult<Option<(BlockNumber, AccountUpdates)>> {
         let start = Instant::now();
         let mut transaction = self.0.start_transaction().await?;
 
@@ -429,8 +429,8 @@ impl<'a, 'c> StateSchema<'a, 'c> {
 
             last_block
                 .max
-                .map(|last_block| last_block as u32)
-                .unwrap_or(0)
+                .map(|last_block| BlockNumber(last_block as u32))
+                .unwrap_or(BlockNumber(0))
         };
 
         // Determine the order: are we going forward or backwards.
@@ -449,8 +449,8 @@ impl<'a, 'c> StateSchema<'a, 'c> {
         let account_balance_diff = sqlx::query_as!(
             StorageAccountUpdate,
             "SELECT * FROM account_balance_updates WHERE block_number > $1 AND block_number <= $2 ",
-            i64::from(start_block),
-            i64::from(end_block),
+            i64::from(*start_block),
+            i64::from(*end_block),
         )
         .fetch_all(transaction.conn())
         .await?;
@@ -458,8 +458,8 @@ impl<'a, 'c> StateSchema<'a, 'c> {
         let account_creation_diff = sqlx::query_as!(
             StorageAccountCreation,
             "SELECT * FROM account_creates WHERE block_number > $1 AND block_number <= $2 ",
-            i64::from(start_block),
-            i64::from(end_block),
+            i64::from(*start_block),
+            i64::from(*end_block),
         )
         .fetch_all(transaction.conn())
         .await?;
@@ -467,8 +467,8 @@ impl<'a, 'c> StateSchema<'a, 'c> {
         let account_pubkey_diff = sqlx::query_as!(
             StorageAccountPubkeyUpdate,
             "SELECT * FROM account_pubkey_updates WHERE block_number > $1 AND block_number <= $2 ",
-            i64::from(start_block),
-            i64::from(end_block),
+            i64::from(*start_block),
+            i64::from(*end_block),
         )
         .fetch_all(transaction.conn())
         .await?;
@@ -476,8 +476,8 @@ impl<'a, 'c> StateSchema<'a, 'c> {
         log::debug!(
             "Loading state diff: forward: {}, start_block: {}, end_block: {}, unbounded: {}",
             time_forward,
-            start_block,
-            end_block,
+            *start_block,
+            *end_block,
             to_block.is_none()
         );
         log::debug!("Loaded account balance diff: {:#?}", account_balance_diff);
@@ -513,7 +513,7 @@ impl<'a, 'c> StateSchema<'a, 'c> {
                     .into_iter()
                     .map(|d| d.into())
                     .collect::<AccountUpdates>(),
-                last_block as u32,
+                BlockNumber(last_block as u32),
             )
         };
 
@@ -545,11 +545,11 @@ impl<'a, 'c> StateSchema<'a, 'c> {
     /// Loads the state of accounts updated in a specific block.
     pub async fn load_state_diff_for_block(
         &mut self,
-        block_number: u32,
+        block_number: BlockNumber,
     ) -> QueryResult<AccountUpdates> {
         let start = Instant::now();
         let result = self
-            .load_state_diff(block_number - 1, Some(block_number))
+            .load_state_diff(BlockNumber(*block_number - 1), Some(block_number))
             .await
             .map(|diff| diff.unwrap_or_default().1);
 
