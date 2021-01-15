@@ -54,6 +54,18 @@ export function reload() {
     for (const envVar in env) {
         process.env[envVar] = env[envVar];
     }
+    load_docker();
+}
+
+export function load_docker() {
+    if (!process.env.IN_DOCKER) {
+        return;
+    }
+    const envFile = process.env.DOCKER_ENV_FILE as string;
+    const env = dotenv.parse(fs.readFileSync(envFile));
+    for (const envVar in env) {
+        process.env[envVar] = env[envVar];
+    }
 }
 
 // loads environment variables
@@ -63,6 +75,7 @@ export async function load() {
         process.env.ZKSYNC_ENV || (fs.existsSync(current) ? fs.readFileSync(current).toString().trim() : 'dev');
     const envFile = `etc/env/${zksyncEnv}.env`;
     const envDir = `etc/env/${zksyncEnv}`;
+    const dockerEnvFile = `etc/env/docker.env`;
     if (zksyncEnv == 'dev') {
         /// If there no folder with toml files we should delete the old dev.env and regenerate toml files and
         if (!fs.existsSync('etc/env/dev')) {
@@ -78,10 +91,14 @@ export async function load() {
     if (!fs.existsSync(envFile)) {
         throw new Error('ZkSync config file not found: ' + envFile);
     }
+    if (fs.existsSync(dockerEnvFile)) {
+        process.env.DOCKER_ENV_FILE = dockerEnvFile;
+    }
     process.env.ZKSYNC_ENV = zksyncEnv;
     process.env.ENV_FILE = envFile;
     process.env.ENV_DIR = envDir;
     dotenv.config({ path: envFile });
+    load_docker();
 }
 
 // replaces an env variable in current .env file

@@ -116,9 +116,7 @@ export async function server() {
 export async function testkit(command: string, timeout: number) {
     let containerID = '';
     const prevUrl = process.env.ETH_CLIENT_WEB3_URL;
-    if (process.env.ZKSYNC_ENV == 'ci') {
-        process.env.ETH_CLIENT_WEB3_URL = 'http://geth-fast:8545';
-    } else if (process.env.ZKSYNC_ENV == 'dev') {
+    if (process.env.ZKSYNC_ENV == 'dev' && process.env.CI != '1') {
         const { stdout } = await utils.exec('docker run --rm -d -p 7545:8545 matterlabs/geth:latest fast');
         containerID = stdout;
         process.env.ETH_CLIENT_WEB3_URL = 'http://localhost:7545';
@@ -141,7 +139,7 @@ export async function testkit(command: string, timeout: number) {
     // but be careful! this is not called upon explicit termination
     // e.g. on SIGINT or process.exit()
     process.on('beforeExit', async (code) => {
-        if (process.env.ZKSYNC_ENV == 'dev') {
+        if (process.env.ZKSYNC_ENV == 'dev' && process.env.CI != '1') {
             try {
                 // probably should be replaced with child_process.execSync in future
                 // to change the hook to program.on('exit', ...)
@@ -163,7 +161,6 @@ export async function testkit(command: string, timeout: number) {
         await utils.spawn('cargo run --bin block_sizes_test --release');
     } else if (command == 'fast') {
         await utils.spawn('cargo run --bin testkit_tests --release');
-        await utils.spawn('cargo run --bin gas_price_test --release');
         await utils.spawn('cargo run --bin migration_test --release');
         await utils.spawn('cargo run --bin revert_blocks_test --release');
         await utils.spawn('cargo run --bin exodus_test --release');
@@ -227,10 +224,18 @@ command
 command
     .command('testkit [mode]')
     .description('run testkit tests')
-    .action(async (mode?: string) => {
+    .option('--offline')
+    .action(async (mode?: string, offline: boolean = false) => {
+        if (offline) {
+            process.env.SQLX_OFFLINE = 'true';
+        }
         mode = mode || 'fast';
         if (mode != 'fast' && mode != 'block-sizes') {
             throw new Error('modes are either "fast" or "block-sizes"');
         }
-        await testkit(mode, 600);
+        await testkit(mode, 6000);
+
+        if (offline) {
+            delete process.env.SQLX_OFFLINE;
+        }
     });
