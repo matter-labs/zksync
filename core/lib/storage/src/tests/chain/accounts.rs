@@ -1,9 +1,9 @@
 // External imports
 // Workspace imports
-use zksync_types::AccountMap;
-use zksync_types::Action;
+use zksync_types::{prover::ProverJobType, AccountMap, Action};
 // Local imports
 use super::block::apply_random_updates;
+use crate::test_data::get_sample_single_proof;
 use crate::tests::{create_rng, db_test};
 use crate::{chain::state::StateSchema, test_data::gen_operation};
 use crate::{
@@ -15,117 +15,123 @@ use crate::{
 /// Checks that stored accounts can be obtained once they're committed.
 #[db_test]
 async fn stored_accounts(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
-    todo!()
-    // let _ = env_logger::try_init();
-    // let mut rng = create_rng();
-    //
-    // let block_size = 100;
-    //
-    // // Create several accounts.
-    // let (accounts_block, updates_block) = apply_random_updates(AccountMap::default(), &mut rng);
-    //
-    // // Execute and commit block with them.
-    // // Also store account updates.
-    // BlockSchema(&mut storage)
-    //     .execute_operation(gen_operation(1, Action::Commit, block_size))
-    //     .await?;
-    // StateSchema(&mut storage)
-    //     .commit_state_update(1, &updates_block, 0)
-    //     .await?;
-    //
-    // // Get the accounts by their addresses.
-    // for (account_id, account) in accounts_block.iter() {
-    //     let mut account = account.clone();
-    //     let account_state = AccountSchema(&mut storage)
-    //         .account_state_by_address(account.address)
-    //         .await?;
-    //
-    //     // Check that committed state is available, but verified is not.
-    //     assert!(
-    //         account_state.committed.is_some(),
-    //         "No committed state for account"
-    //     );
-    //     assert!(
-    //         account_state.verified.is_none(),
-    //         "Block is not verified, but account has a verified state"
-    //     );
-    //
-    //     // Compare the obtained stored account with expected one.
-    //     let (got_account_id, got_account) = account_state.committed.unwrap();
-    //
-    //     // We have to copy this field, since it is not initialized by default.
-    //     account.pub_key_hash = got_account.pub_key_hash;
-    //
-    //     assert_eq!(got_account_id, *account_id);
-    //     assert_eq!(got_account, account);
-    //
-    //     // Also check `last_committed_state_for_account` method.
-    //     assert_eq!(
-    //         AccountSchema(&mut storage)
-    //             .last_committed_state_for_account(*account_id)
-    //             .await?,
-    //         Some(got_account)
-    //     );
-    //
-    //     // Check account address and ID getters.
-    //     assert_eq!(
-    //         AccountSchema(&mut storage)
-    //             .account_address_by_id(*account_id)
-    //             .await?,
-    //         Some(account.address)
-    //     );
-    //     assert_eq!(
-    //         AccountSchema(&mut storage)
-    //             .account_id_by_address(account.address)
-    //             .await?,
-    //         Some(*account_id)
-    //     );
-    // }
-    //
-    // // Now add a proof, verify block and apply a state update.
-    // ProverSchema(&mut storage)
-    //     .store_proof(1, &Default::default())
-    //     .await?;
-    // BlockSchema(&mut storage)
-    //     .execute_operation(gen_operation(
-    //         1,
-    //         Action::Verify {
-    //             proof: Default::default(),
-    //         },
-    //         block_size,
-    //     ))
-    //     .await?;
-    // StateSchema(&mut storage).apply_state_update(1).await?;
-    //
-    // // After that all the accounts should have a verified state.
-    // for (account_id, account) in accounts_block {
-    //     let account_state = AccountSchema(&mut storage)
-    //         .account_state_by_id(account_id)
-    //         .await?;
-    //
-    //     assert!(
-    //         account_state.committed.is_some(),
-    //         "No committed state for account"
-    //     );
-    //     assert!(
-    //         account_state.verified.is_some(),
-    //         "No verified state for the account"
-    //     );
-    //
-    //     // Compare the obtained stored account with expected one.
-    //     let (got_account_id, got_account) = account_state.verified.unwrap();
-    //
-    //     assert_eq!(got_account_id, account_id);
-    //     assert_eq!(got_account, account);
-    //
-    //     // Also check `last_verified_state_for_account` method.
-    //     assert_eq!(
-    //         AccountSchema(&mut storage)
-    //             .last_verified_state_for_account(account_id)
-    //             .await?,
-    //         Some(got_account)
-    //     );
-    // }
-    //
-    // Ok(())
+    let _ = env_logger::try_init();
+    let mut rng = create_rng();
+
+    let block_size = 100;
+
+    // Create several accounts.
+    let (accounts_block, updates_block) = apply_random_updates(AccountMap::default(), &mut rng);
+
+    // Execute and commit block with them.
+    // Also store account updates.
+    BlockSchema(&mut storage)
+        .execute_operation(gen_operation(1, Action::Commit, block_size))
+        .await?;
+    StateSchema(&mut storage)
+        .commit_state_update(1, &updates_block, 0)
+        .await?;
+
+    // Get the accounts by their addresses.
+    for (account_id, account) in accounts_block.iter() {
+        let mut account = account.clone();
+        let account_state = AccountSchema(&mut storage)
+            .account_state_by_address(account.address)
+            .await?;
+
+        // Check that committed state is available, but verified is not.
+        assert!(
+            account_state.committed.is_some(),
+            "No committed state for account"
+        );
+        assert!(
+            account_state.verified.is_none(),
+            "Block is not verified, but account has a verified state"
+        );
+
+        // Compare the obtained stored account with expected one.
+        let (got_account_id, got_account) = account_state.committed.unwrap();
+
+        // We have to copy this field, since it is not initialized by default.
+        account.pub_key_hash = got_account.pub_key_hash;
+
+        assert_eq!(got_account_id, *account_id);
+        assert_eq!(got_account, account);
+
+        // Also check `last_committed_state_for_account` method.
+        assert_eq!(
+            AccountSchema(&mut storage)
+                .last_committed_state_for_account(*account_id)
+                .await?,
+            Some(got_account)
+        );
+
+        // Check account address and ID getters.
+        assert_eq!(
+            AccountSchema(&mut storage)
+                .account_address_by_id(*account_id)
+                .await?,
+            Some(account.address)
+        );
+        assert_eq!(
+            AccountSchema(&mut storage)
+                .account_id_by_address(account.address)
+                .await?,
+            Some(*account_id)
+        );
+    }
+
+    // Now add a proof, verify block and apply a state update.
+    ProverSchema(&mut storage)
+        .add_prover_job_to_job_queue(1, 1, Default::default(), 1, ProverJobType::SingleProof)
+        .await?;
+    let job = ProverSchema(&mut storage)
+        .get_idle_prover_job_from_job_queue()
+        .await?
+        .unwrap();
+    ProverSchema(&mut storage)
+        .store_proof(job.job_id, 1, &get_sample_single_proof())
+        .await?;
+    BlockSchema(&mut storage)
+        .execute_operation(gen_operation(
+            1,
+            Action::Verify {
+                proof: Default::default(),
+            },
+            block_size,
+        ))
+        .await?;
+    StateSchema(&mut storage).apply_state_update(1).await?;
+
+    // After that all the accounts should have a verified state.
+    for (account_id, account) in accounts_block {
+        let account_state = AccountSchema(&mut storage)
+            .account_state_by_id(account_id)
+            .await?;
+
+        assert!(
+            account_state.committed.is_some(),
+            "No committed state for account"
+        );
+        assert!(
+            account_state.verified.is_some(),
+            "No verified state for the account"
+        );
+
+        // Compare the obtained stored account with expected one.
+        let (got_account_id, got_account) = account_state.verified.unwrap();
+
+        assert_eq!(got_account_id, account_id);
+        assert_eq!(got_account, account);
+
+        // Also check `last_verified_state_for_account` method.
+        assert_eq!(
+            AccountSchema(&mut storage)
+                .last_verified_state_for_account(account_id)
+                .await?,
+            Some(got_account)
+        );
+    }
+
+    Ok(())
 }

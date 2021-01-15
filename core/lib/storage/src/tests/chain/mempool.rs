@@ -17,7 +17,7 @@ use crate::{
     QueryResult, StorageProcessor,
 };
 
-/// Generates several different `SignedFranlinTx` objects.
+/// Generates several different `SignedZkSyncTx` objects.
 fn franklin_txs() -> Vec<SignedZkSyncTx> {
     let transfer_1 = Transfer::new(
         42,
