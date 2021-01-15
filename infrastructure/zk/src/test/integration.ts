@@ -225,6 +225,7 @@ command
 command
     .command('testkit [mode]')
     .description('run testkit tests')
+    .option('--offline')
     .action(async (mode?: string, offline: boolean = false) => {
         if (offline) {
             process.env.SQLX_OFFLINE = 'true';
