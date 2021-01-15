@@ -19,8 +19,6 @@ pub struct Contracts {
     pub contract: Address,
 }
 
-// Client implementation
-
 /// Configuration API part.
 impl Client {
     pub async fn contracts(&self) -> client::Result<Contracts> {

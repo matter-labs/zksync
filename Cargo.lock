@@ -1458,6 +1458,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "envy"
+version = "0.4.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3f47e0157f2cb54f5ae1bd371b30a2ae4311e1c028f575cd4e81de7353215965"
+dependencies = [
+ "serde",
+]
+
+[[package]]
 name = "ethabi"
 version = "12.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5393,10 +5402,12 @@ dependencies = [
 name = "zksync_config"
 version = "1.0.0"
 dependencies = [
+ "envy",
  "log",
  "num",
  "serde",
  "serde_json",
+ "toml",
  "url 2.1.1",
  "zksync_types",
  "zksync_utils",
@@ -5531,7 +5542,6 @@ dependencies = [
  "zksync_eth_signer",
  "zksync_storage",
  "zksync_types",
- "zksync_utils",
 ]
 
 [[package]]

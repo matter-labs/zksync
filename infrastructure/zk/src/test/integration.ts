@@ -115,13 +115,13 @@ export async function server() {
 
 export async function testkit(command: string, timeout: number) {
     let containerID = '';
-    const prevUrl = process.env.WEB3_URL;
+    const prevUrl = process.env.ETH_CLIENT_WEB3_URL;
     if (process.env.CI == '1') {
-        process.env.WEB3_URL = 'http://geth:8545';
+        process.env.ETH_CLIENT_WEB3_URL = 'http://geth:8545';
     } else if (process.env.ZKSYNC_ENV == 'dev') {
         const { stdout } = await utils.exec('docker run --rm -d -p 7545:8545 matterlabs/geth:latest fast');
         containerID = stdout;
-        process.env.WEB3_URL = 'http://localhost:7545';
+        process.env.ETH_CLIENT_WEB3_URL = 'http://localhost:7545';
     }
     process.on('SIGINT', () => {
         console.log('interrupt received');
@@ -149,13 +149,13 @@ export async function testkit(command: string, timeout: number) {
             } catch {
                 console.error('Problem killing', containerID);
             }
-            process.env.WEB3_URL = prevUrl;
+            process.env.ETH_CLIENT_WEB3_URL = prevUrl;
             // this has to be here - or else we will call this hook again
             process.exit(code);
         }
     });
 
-    process.env.ETH_NETWORK = 'test';
+    process.env.CHAIN_ETH_NETWORK = 'test';
     await run.verifyKeys.unpack();
     await contract.build();
 
@@ -163,10 +163,10 @@ export async function testkit(command: string, timeout: number) {
         await utils.spawn('cargo run --bin block_sizes_test --release');
     } else if (command == 'fast') {
         await utils.spawn('cargo run --bin testkit_tests --release');
-        // await utils.spawn('cargo run --bin gas_price_test --release');
+        await utils.spawn('cargo run --bin gas_price_test --release');
         await utils.spawn('cargo run --bin migration_test --release');
         await utils.spawn('cargo run --bin revert_blocks_test --release');
-        // await utils.spawn('cargo run --bin exodus_test --release');
+        await utils.spawn('cargo run --bin exodus_test --release');
     }
 }
 

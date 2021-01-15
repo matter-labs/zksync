@@ -61,14 +61,14 @@ export function readTestContracts(): Contracts {
 
 export function deployedAddressesFromEnv(): DeployedAddresses {
     return {
-        DeployFactory: process.env.DEPLOY_FACTORY_ADDR,
-        Governance: process.env.GOVERNANCE_ADDR,
-        GovernanceTarget: process.env.GOVERNANCE_TARGET_ADDR,
-        UpgradeGatekeeper: process.env.UPGRADE_GATEKEEPER_ADDR,
-        Verifier: process.env.VERIFIER_ADDR,
-        VerifierTarget: process.env.VERIFIER_TARGET_ADDR,
-        ZkSync: process.env.CONTRACT_ADDR,
-        ZkSyncTarget: process.env.CONTRACT_TARGET_ADDR
+        DeployFactory: process.env.CONTRACTS_DEPLOY_FACTORY_ADDR,
+        Governance: process.env.CONTRACTS_GOVERNANCE_ADDR,
+        GovernanceTarget: process.env.CONTRACTS_GOVERNANCE_TARGET_ADDR,
+        UpgradeGatekeeper: process.env.CONTRACTS_UPGRADE_GATEKEEPER_ADDR,
+        Verifier: process.env.CONTRACTS_VERIFIER_ADDR,
+        VerifierTarget: process.env.CONTRACTS_VERIFIER_TARGET_ADDR,
+        ZkSync: process.env.CONTRACTS_CONTRACT_ADDR,
+        ZkSyncTarget: process.env.CONTRACTS_CONTRACT_TARGET_ADDR
     };
 }
 
@@ -93,6 +93,7 @@ export class Deployer {
         if (this.verbose) {
             console.log('Deploying governance target');
         }
+
         const govContract = await deployContract(this.deployWallet, this.contracts.governance, [], {
             gasLimit: 600000,
             ...ethTxOptions
@@ -101,7 +102,7 @@ export class Deployer {
         const govGasUsed = govRec.gasUsed;
         const gasPrice = govContract.deployTransaction.gasPrice;
         if (this.verbose) {
-            console.log(`GOVERNANCE_TARGET_ADDR=${govContract.address}`);
+            console.log(`CONTRACTS_GOVERNANCE_TARGET_ADDR=${govContract.address}`);
             console.log(
                 `Governance target deployed, gasUsed: ${govGasUsed.toString()}, eth spent: ${formatEther(
                     govGasUsed.mul(gasPrice)
@@ -123,7 +124,7 @@ export class Deployer {
         const verGasUsed = verRec.gasUsed;
         const gasPrice = verifierContract.deployTransaction.gasPrice;
         if (this.verbose) {
-            console.log(`VERIFIER_TARGET_ADDR=${verifierContract.address}`);
+            console.log(`CONTRACTS_VERIFIER_TARGET_ADDR=${verifierContract.address}`);
             console.log(
                 `Verifier target deployed, gasUsed: ${verGasUsed.toString()}, eth spent: ${formatEther(
                     verGasUsed.mul(gasPrice)
@@ -145,7 +146,7 @@ export class Deployer {
         const zksGasUsed = zksRec.gasUsed;
         const gasPrice = zksContract.deployTransaction.gasPrice;
         if (this.verbose) {
-            console.log(`CONTRACT_TARGET_ADDR=${zksContract.address}`);
+            console.log(`CONTRACTS_CONTRACT_TARGET_ADDR=${zksContract.address}`);
             console.log(
                 `zkSync target deployed, gasUsed: ${zksGasUsed.toString()}, eth spent: ${formatEther(
                     zksGasUsed.mul(gasPrice)
@@ -156,6 +157,7 @@ export class Deployer {
     }
 
     public async deployProxiesAndGatekeeper(ethTxOptions?: ethers.providers.TransactionRequest) {
+        let genesis_root = process.env.CONTRACTS_GENESIS_ROOT;
         const deployFactoryContract = await deployContract(
             this.deployWallet,
             this.deployFactoryCode,
@@ -163,10 +165,10 @@ export class Deployer {
                 this.addresses.GovernanceTarget,
                 this.addresses.VerifierTarget,
                 this.addresses.ZkSyncTarget,
-                process.env.GENESIS_ROOT,
-                process.env.OPERATOR_COMMIT_ETH_ADDRESS,
+                genesis_root,
+                process.env.ETH_SENDER_SENDER_OPERATOR_COMMIT_ETH_ADDR,
                 this.governorAddress,
-                process.env.OPERATOR_FEE_ETH_ADDRESS
+                process.env.CHAIN_STATE_KEEPER_FEE_ACCOUNT_ADDR
             ],
             { gasLimit: 5000000, ...ethTxOptions }
         );
@@ -188,12 +190,12 @@ export class Deployer {
         const gasUsed = deployFactoryTx.gasUsed;
         const gasPrice = deployFactoryContract.deployTransaction.gasPrice;
         if (this.verbose) {
-            console.log(`DEPLOY_FACTORY_ADDR=${deployFactoryContract.address}`);
-            console.log(`GOVERNANCE_ADDR=${this.addresses.Governance}`);
-            console.log(`CONTRACT_ADDR=${this.addresses.ZkSync}`);
-            console.log(`VERIFIER_ADDR=${this.addresses.Verifier}`);
-            console.log(`UPGRADE_GATEKEEPER_ADDR=${this.addresses.UpgradeGatekeeper}`);
-            console.log(`GENESIS_TX_HASH=${txHash}`);
+            console.log(`CONTRACTS_DEPLOY_FACTORY_ADDR=${deployFactoryContract.address}`);
+            console.log(`CONTRACTS_GOVERNANCE_ADDR=${this.addresses.Governance}`);
+            console.log(`CONTRACTS_CONTRACT_ADDR=${this.addresses.ZkSync}`);
+            console.log(`CONTRACTS_VERIFIER_ADDR=${this.addresses.Verifier}`);
+            console.log(`CONTRACTS_UPGRADE_GATEKEEPER_ADDR=${this.addresses.UpgradeGatekeeper}`);
+            console.log(`CONTRACTS_GENESIS_TX_HASH=${txHash}`);
             console.log(
                 `Deploy finished, gasUsed: ${gasUsed.toString()}, eth spent: ${formatEther(gasUsed.mul(gasPrice))}`
             );
@@ -233,7 +235,7 @@ export class Deployer {
             encodeProxyContstuctorArgs(
                 this.contracts.proxy,
                 this.addresses.ZkSyncTarget,
-                [this.addresses.Governance, this.addresses.Verifier, process.env.GENESIS_ROOT],
+                [this.addresses.Governance, this.addresses.Verifier, process.env.CONTRACTS_GENESIS_ROOT],
                 ['address', 'address', 'bytes32']
             )
         );

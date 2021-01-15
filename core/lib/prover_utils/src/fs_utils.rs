@@ -10,7 +10,7 @@ use zksync_crypto::Engine;
 pub fn get_keys_root_dir() -> PathBuf {
     let mut out_dir = PathBuf::new();
     out_dir.push(&std::env::var("ZKSYNC_HOME").unwrap_or_else(|_| "/".to_owned()));
-    out_dir.push(&std::env::var("KEY_DIR").expect("KEY_DIR not set"));
+    out_dir.push(&std::env::var("CHAIN_CIRCUIT_KEY_DIR").expect("KEY_DIR not set"));
     out_dir.push(&format!(
         "account-{}_balance-{}",
         account_tree_depth(),

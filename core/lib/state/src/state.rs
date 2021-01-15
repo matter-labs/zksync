@@ -1,6 +1,6 @@
 use anyhow::Error;
 use num::BigUint;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use zksync_crypto::{params, Fr};
 use zksync_types::{
     helpers::reverse_updates,
@@ -113,7 +113,27 @@ impl ZkSyncState {
     }
 
     pub fn chunks_for_batch(&self, txs: &[SignedZkSyncTx]) -> usize {
-        txs.iter().map(|tx| self.chunks_for_tx(tx)).sum()
+        let mut new_addresses = HashSet::new();
+        let mut total_chunks = 0;
+        for signed_tx in txs {
+            let tx = &signed_tx.tx;
+            let tx_chunks = match tx {
+                ZkSyncTx::Transfer(tx) => {
+                    if self.get_account_by_address(&tx.to).is_some()
+                        || new_addresses.contains(&tx.to)
+                    {
+                        TransferOp::CHUNKS
+                    } else {
+                        new_addresses.insert(&tx.to);
+
+                        TransferToNewOp::CHUNKS
+                    }
+                }
+                _ => tx.min_chunks(),
+            };
+            total_chunks += tx_chunks;
+        }
+        total_chunks
     }
 
     pub fn chunks_for_tx(&self, franklin_tx: &ZkSyncTx) -> usize {

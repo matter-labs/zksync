@@ -9,7 +9,6 @@ use zksync::{
     utils::{closest_packable_fee_amount, closest_packable_token_amount},
     RpcProvider,
 };
-use zksync_config::ConfigurationOptions;
 use zksync_utils::format_ether;
 // Local uses
 use crate::{
@@ -46,7 +45,7 @@ pub struct LoadtestExecutor {
     /// Main account to deposit ETH from / return ETH back to.
     main_wallet: TestWallet,
     monitor: Monitor,
-    env_options: ConfigurationOptions,
+    web3_url: String,
     /// Estimated fee amount for any zkSync operation.
     fees: Fees,
     scenarios: Vec<(Box<dyn Scenario>, Vec<TestWallet>)>,
@@ -71,7 +70,7 @@ impl Fees {
 
 impl LoadtestExecutor {
     /// Creates a new executor instance.
-    pub async fn new(config: Config, env_options: ConfigurationOptions) -> anyhow::Result<Self> {
+    pub async fn new(config: Config, web3_url: String) -> anyhow::Result<Self> {
         let monitor = Monitor::new(RpcProvider::new(config.network.name)).await;
 
         log::info!("Creating scenarios...");
@@ -84,7 +83,7 @@ impl LoadtestExecutor {
 
         // Create main account to deposit money from and to return money back later.
         let main_wallet =
-            TestWallet::from_info(monitor.clone(), &config.main_wallet, &env_options).await;
+            TestWallet::from_info(monitor.clone(), &config.main_wallet, &web3_url).await;
 
         let default_fee = main_wallet.sufficient_fee().await?;
         let fees = Fees::from_config(&config.network, default_fee);
@@ -96,7 +95,7 @@ impl LoadtestExecutor {
 
         Ok(Self {
             monitor,
-            env_options,
+            web3_url,
             main_wallet,
             scenarios,
             fees,
@@ -152,7 +151,7 @@ impl LoadtestExecutor {
                     TestWallet::new_random(
                         self.main_wallet.token_name().clone(),
                         self.monitor.clone(),
-                        &self.env_options,
+                        &self.web3_url,
                     )
                 }),
             )

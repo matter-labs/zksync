@@ -34,7 +34,7 @@ use tokio::sync::RwLock;
 use tokio::task::JoinHandle;
 
 // Workspace uses
-use zksync_config::ConfigurationOptions;
+use zksync_config::ZkSyncConfig;
 use zksync_storage::ConnectionPool;
 use zksync_types::{
     mempool::{SignedTxVariant, SignedTxsBatch},
@@ -408,14 +408,12 @@ struct MempoolTransactionsHandler {
     mempool_state: Arc<RwLock<MempoolState>>,
     requests: mpsc::Receiver<MempoolTransactionRequest>,
     max_block_size_chunks: usize,
-    max_number_of_withdrawals_per_block: usize,
 }
 
 struct MempoolTransactionsHandlerBuilder {
     db_pool: ConnectionPool,
     mempool_state: Arc<RwLock<MempoolState>>,
     max_block_size_chunks: usize,
-    max_number_of_withdrawals_per_block: usize,
 }
 
 impl BuildBalancedItem<MempoolTransactionRequest, MempoolTransactionsHandler>
@@ -430,7 +428,6 @@ impl BuildBalancedItem<MempoolTransactionRequest, MempoolTransactionsHandler>
             mempool_state: self.mempool_state.clone(),
             requests: receiver,
             max_block_size_chunks: self.max_block_size_chunks,
-            max_number_of_withdrawals_per_block: self.max_number_of_withdrawals_per_block,
         }
     }
 }
@@ -484,16 +481,6 @@ impl MempoolTransactionsHandler {
             return Err(TxAddError::BatchTooBig);
         }
 
-        let mut number_of_withdrawals = 0;
-        for tx in txs {
-            if tx.tx.is_withdraw() {
-                number_of_withdrawals += 1;
-            }
-        }
-        if number_of_withdrawals > self.max_number_of_withdrawals_per_block {
-            return Err(TxAddError::BatchWithdrawalsOverload);
-        }
-
         let mut transaction = storage.start_transaction().await.map_err(|err| {
             log::warn!("Mempool storage access error: {}", err);
             TxAddError::DbError
@@ -540,7 +527,7 @@ pub fn run_mempool_tasks(
     tx_requests: mpsc::Receiver<MempoolTransactionRequest>,
     block_requests: mpsc::Receiver<MempoolBlocksRequest>,
     eth_watch_req: mpsc::Sender<EthWatchRequest>,
-    config: &ConfigurationOptions,
+    config: &ZkSyncConfig,
     number_of_mempool_transaction_handlers: u8,
     channel_capacity: usize,
 ) -> JoinHandle<()> {
@@ -548,18 +535,18 @@ pub fn run_mempool_tasks(
     tokio::spawn(async move {
         let mempool_state = Arc::new(RwLock::new(MempoolState::restore_from_db(&db_pool).await));
         let max_block_size_chunks = *config
-            .available_block_chunk_sizes
+            .chain
+            .state_keeper
+            .block_chunk_sizes
             .iter()
             .max()
             .expect("failed to find max block chunks size");
-
         let mut tasks = vec![];
         let (balancer, handlers) = Balancer::new(
             MempoolTransactionsHandlerBuilder {
                 db_pool: db_pool.clone(),
                 mempool_state: mempool_state.clone(),
                 max_block_size_chunks,
-                max_number_of_withdrawals_per_block: config.max_number_of_withdrawals_per_block,
             },
             tx_requests,
             number_of_mempool_transaction_handlers,

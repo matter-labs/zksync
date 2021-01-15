@@ -1,6 +1,6 @@
 use futures::{channel::mpsc, executor::block_on, SinkExt, StreamExt};
 use std::cell::RefCell;
-use zksync_config::ConfigurationOptions;
+use zksync_config::configs::ApiConfig;
 use zksync_prometheus_exporter::run_prometheus_exporter;
 use zksync_storage::ConnectionPool;
 
@@ -23,10 +23,10 @@ async fn main() -> anyhow::Result<()> {
     }
 
     let connection_pool = ConnectionPool::new(Some(PROMETHEUS_EXPORTER_CONNECTION_POOL_SIZE));
-    let config_options = ConfigurationOptions::from_env();
+    let api_options = ApiConfig::from_env();
 
     let (prometheus_handle, counter_handle) =
-        run_prometheus_exporter(connection_pool, config_options.prometheus_export_port);
+        run_prometheus_exporter(connection_pool, api_options.prometheus.port);
 
     tokio::select! {
         _ = async { prometheus_handle.await } => {

@@ -20,7 +20,6 @@ use serde::{Deserialize, Serialize};
 use tokio::task::JoinHandle;
 use tokio::time::Instant;
 // Workspace deps
-use zksync_config::{FeeTickerOptions, TokenPriceSource};
 use zksync_storage::ConnectionPool;
 use zksync_types::{
     Address, ChangePubKeyOp, Token, TokenId, TokenLike, TransferOp, TransferToNewOp, TxFeeTypes,
@@ -46,6 +45,9 @@ pub use self::fee::*;
 use crate::fee_ticker::balancer::TickerBalancer;
 use crate::fee_ticker::validator::MarketUpdater;
 use std::convert::TryFrom;
+use std::iter::FromIterator;
+use zksync_config::configs::ticker::TokenPriceSource;
+use zksync_config::ZkSyncConfig;
 
 mod constants;
 mod fee;
@@ -191,36 +193,37 @@ struct FeeTicker<API, INFO, WATCHER> {
 pub fn run_ticker_task(
     db_pool: ConnectionPool,
     tricker_requests: Receiver<TickerRequest>,
+    config: &ZkSyncConfig,
 ) -> JoinHandle<()> {
-    let config = FeeTickerOptions::from_env();
-
     let ticker_config = TickerConfig {
         zkp_cost_chunk_usd: Ratio::from_integer(BigUint::from(10u32).pow(3u32)).inv(),
-        gas_cost_tx: GasOperationsCost::from_constants(config.fast_processing_coeff),
+        gas_cost_tx: GasOperationsCost::from_constants(config.ticker.fast_processing_coeff),
         tokens_risk_factors: HashMap::new(),
-        not_subsidized_tokens: config.not_subsidized_tokens,
+        not_subsidized_tokens: HashSet::from_iter(config.ticker.not_subsidized_tokens.clone()),
     };
 
     let cache = (db_pool.clone(), TokenDBCache::new());
-    let watcher = UniswapTokenWatcher::new(config.uniswap_url);
+    let watcher = UniswapTokenWatcher::new(config.ticker.uniswap_url.clone());
     let validator = FeeTokenValidator::new(
         cache.clone(),
-        chrono::Duration::seconds(config.available_liquidity_seconds as i64),
-        BigDecimal::try_from(config.liquidity_volume).expect("Valid f64 for decimal"),
-        config.unconditionally_valid_tokens,
+        chrono::Duration::seconds(config.ticker.available_liquidity_seconds as i64),
+        BigDecimal::try_from(config.ticker.liquidity_volume).expect("Valid f64 for decimal"),
+        HashSet::from_iter(config.ticker.unconditionally_valid_tokens.clone()),
         watcher.clone(),
     );
 
     let updater = MarketUpdater::new(cache, watcher);
-    tokio::spawn(updater.keep_updated(config.token_market_update_time));
+    tokio::spawn(updater.keep_updated(config.ticker.token_market_update_time));
     let client = reqwest::ClientBuilder::new()
         .timeout(CONNECTION_TIMEOUT)
         .connect_timeout(CONNECTION_TIMEOUT)
         .build()
         .expect("Failed to build reqwest::Client");
-    match config.token_price_source {
-        TokenPriceSource::CoinMarketCap { base_url } => {
-            let token_price_api = CoinMarketCapAPI::new(client, base_url);
+    let (price_source, base_url) = config.ticker.price_source();
+    match price_source {
+        TokenPriceSource::CoinMarketCap => {
+            let token_price_api =
+                CoinMarketCapAPI::new(client, base_url.parse().expect("Correct CoinMarketCap url"));
 
             let ticker_api = TickerApi::new(db_pool.clone(), token_price_api);
             let ticker_info = TickerInfo::new(db_pool);
@@ -235,9 +238,10 @@ pub fn run_ticker_task(
             tokio::spawn(fee_ticker.run())
         }
 
-        TokenPriceSource::CoinGecko { base_url } => {
+        TokenPriceSource::CoinGecko => {
             let token_price_api =
-                CoinGeckoAPI::new(client, base_url).expect("CoinGecko initializing error");
+                CoinGeckoAPI::new(client, base_url.parse().expect("Correct CoinGecko url"))
+                    .expect("failed to init CoinGecko client");
             let ticker_info = TickerInfo::new(db_pool.clone());
 
             let mut ticker_balancer = TickerBalancer::new(
@@ -247,7 +251,7 @@ pub fn run_ticker_task(
                 validator,
                 tricker_requests,
                 db_pool,
-                config.number_of_ticker_actors,
+                config.ticker.number_of_ticker_actors,
             );
             ticker_balancer.spawn_tickers();
             tokio::spawn(ticker_balancer.run())
@@ -270,6 +274,13 @@ impl<API: FeeTickerAPI, INFO: FeeTickerInfo, WATCHER: TokenWatcher> FeeTicker<AP
             config,
             validator,
         }
+    }
+
+    /// Increases the gas price by a constant coefficient.
+    /// Due to the high volatility of gas prices, we are include the risk
+    /// in the fee in order not to go into negative territory.
+    fn risk_gas_price_estimate(gas_price: BigUint) -> BigUint {
+        gas_price * BigUint::from(130u32) / BigUint::from(100u32)
     }
 
     async fn run(mut self) {
@@ -401,6 +412,7 @@ impl<API: FeeTickerAPI, INFO: FeeTickerInfo, WATCHER: TokenWatcher> FeeTicker<AP
             }
         };
         let gas_price_wei = self.api.get_gas_price_wei().await?;
+        let scale_gas_price = Self::risk_gas_price_estimate(gas_price_wei.clone());
         let wei_price_usd = self.api.get_last_quote(TokenLike::Id(0)).await?.usd_price
             / BigUint::from(10u32).pow(18u32);
 
@@ -413,7 +425,7 @@ impl<API: FeeTickerAPI, INFO: FeeTickerInfo, WATCHER: TokenWatcher> FeeTicker<AP
 
         let zkp_fee =
             (zkp_cost_chunk * op_chunks) * token_risk_factor.clone() / token_price_usd.clone();
-        let gas_fee = (wei_price_usd * gas_tx_amount.clone() * gas_price_wei.clone())
+        let gas_fee = (wei_price_usd * gas_tx_amount.clone() * scale_gas_price.clone())
             * token_risk_factor
             / token_price_usd;
 

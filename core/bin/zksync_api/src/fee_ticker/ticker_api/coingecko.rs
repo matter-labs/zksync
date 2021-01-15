@@ -137,7 +137,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_coingecko_api() {
-        let ticker_url = parse_env("COINGECKO_BASE_URL");
+        let ticker_url = parse_env("FEE_TICKER_COINGECKO_BASE_URL");
         let client = reqwest::Client::new();
         let api = CoinGeckoAPI::new(client, ticker_url).unwrap();
         api.get_price("ETH")
