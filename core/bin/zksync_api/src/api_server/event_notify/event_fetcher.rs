@@ -13,7 +13,7 @@ macro_rules! await_db {
         match $e.await {
             Ok(res) => res,
             Err(err) => {
-                log::warn!("Unable to connect to the database: {}", err);
+                tracing::warn!("Unable to connect to the database: {}", err);
                 $on_exit
             }
         };

@@ -12,7 +12,7 @@ const DEFAULT_THRESHOLD: f64 = 5.0f64;
 ///
 /// This structure is expected to be used for a quick-and-dirty real-life benches.
 ///
-/// Reports are output via `log::info` by invoking `output_stats` method. The interval
+/// Reports are output via `vlog::info` by invoking `output_stats` method. The interval
 /// between messages can be configured by a constructor parameters, so the consecutive
 /// calls to that method won't spam the stats, but rather will only display message if
 /// the required amount of time had passed.
@@ -114,7 +114,7 @@ impl MetricsCounter {
             if tps > self.noise_threshold {
                 self.stats.add_sample(tps);
 
-                log::info!(
+                vlog::info!(
                     "Throughput: {} el/s; min: {}, max: {}, avg: {}",
                     tps,
                     self.stats.min(),

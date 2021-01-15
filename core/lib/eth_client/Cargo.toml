@@ -18,6 +18,6 @@ ethabi = "12.0.0"
 web3 = "0.13.0"
 parity-crypto = {version = "0.6.2", features = ["publickey"] }
 
-log = "0.4"
+tracing = "0.1.22"
 anyhow = "1.0"
 metrics = "0.13.0-alpha.8"

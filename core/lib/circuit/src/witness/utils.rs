@@ -603,7 +603,7 @@ pub fn build_block_witness<'a>(
     let block_number = block.block_number;
     let block_size = block.block_chunks_size;
 
-    log::info!("building prover data for block {}", &block_number);
+    vlog::info!("building prover data for block {}", &block_number);
 
     let mut witness_accum = WitnessBuilder::new(account_tree, block.fee_account, block_number);
 

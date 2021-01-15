@@ -153,7 +153,7 @@ where
             .events_state
             .set_genesis_block_number(&genesis_transaction)
             .expect("Cant set genesis block number for events state");
-        log::info!("genesis_eth_block_number: {:?}", &genesis_eth_block_number);
+        vlog::info!("genesis_eth_block_number: {:?}", &genesis_eth_block_number);
 
         interactor
             .save_events_state(&[], &[], genesis_eth_block_number)
@@ -162,7 +162,7 @@ where
         let genesis_fee_account =
             get_genesis_account(&genesis_transaction).expect("Cant get genesis account address");
 
-        log::info!(
+        vlog::info!(
             "genesis fee account address: 0x{}",
             hex::encode(genesis_fee_account.address.as_ref())
         );
@@ -187,19 +187,19 @@ where
             self.available_block_chunk_sizes.clone(),
         );
 
-        log::info!("Genesis tree root hash: {:?}", tree_state.root_hash());
-        log::debug!("Genesis accounts: {:?}", tree_state.get_accounts());
+        vlog::info!("Genesis tree root hash: {:?}", tree_state.root_hash());
+        vlog::debug!("Genesis accounts: {:?}", tree_state.get_accounts());
 
         interactor.save_genesis_tree_state(account_update).await;
 
-        log::info!("Saved genesis tree state\n");
+        vlog::info!("Saved genesis tree state\n");
 
         self.tree_state = tree_state;
     }
 
     /// Stops states from storage
     pub async fn load_state_from_storage(&mut self, interactor: &mut I) -> bool {
-        log::info!("Loading state from storage");
+        vlog::info!("Loading state from storage");
         let state = interactor.get_storage_state().await;
         self.events_state = interactor.get_block_events_state_from_storage().await;
         let tree_state = interactor.get_tree_state().await;
@@ -227,7 +227,7 @@ where
         }
         let total_verified_blocks = get_total_verified_blocks(&self.zksync_contract).await;
         let last_verified_block = self.tree_state.state.block_number;
-        log::info!(
+        vlog::info!(
             "State has been loaded\nProcessed {:?} blocks of total {:?} verified on contract\nRoot hash: {:?}\n",
             last_verified_block,
             total_verified_blocks,
@@ -242,7 +242,7 @@ where
         let mut last_watched_block: u64 = self.events_state.last_watched_eth_block_number;
         let mut final_hash_was_found = false;
         loop {
-            log::debug!("Last watched ethereum block: {:?}", last_watched_block);
+            vlog::debug!("Last watched ethereum block: {:?}", last_watched_block);
 
             // Update events
             if self.update_events_state(interactor).await {
@@ -261,7 +261,7 @@ where
                     // to keep the `state_keeper` consistent with the `eth_sender`.
                     interactor.update_eth_state().await;
 
-                    log::info!(
+                    vlog::info!(
                         "State updated\nProcessed {:?} blocks of total {:?} verified on contract\nRoot hash: {:?}\n",
                         last_verified_block,
                         total_verified_blocks,
@@ -276,7 +276,7 @@ where
                         if root_hash == self.tree_state.root_hash() {
                             final_hash_was_found = true;
 
-                            log::info!(
+                            vlog::info!(
                                 "Correct expected root hash was met on the block {} out of {}",
                                 last_verified_block,
                                 total_verified_blocks
@@ -327,7 +327,7 @@ where
             )
             .await;
 
-        log::debug!("Updated events storage");
+        vlog::debug!("Updated events storage");
 
         !block_events.is_empty()
     }
@@ -357,7 +357,7 @@ where
                 .await;
         }
 
-        log::debug!("Updated state");
+        vlog::debug!("Updated state");
     }
 
     /// Gets new operations blocks from events, updates rollup operations stored state.
@@ -367,7 +367,7 @@ where
 
         interactor.save_rollup_ops(&new_blocks).await;
 
-        log::debug!("Updated operations storage");
+        vlog::debug!("Updated operations storage");
 
         new_blocks
     }

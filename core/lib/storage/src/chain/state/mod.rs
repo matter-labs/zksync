@@ -62,7 +62,7 @@ impl<'a, 'c> StateSchema<'a, 'c> {
             first_update_order_id..first_update_order_id + accounts_updated.len();
 
         for (update_order_id, (id, upd)) in update_order_ids.zip(accounts_updated.iter()) {
-            log::debug!(
+            vlog::debug!(
                 "Committing state update for account {} in block {}",
                 id,
                 block_number
@@ -171,7 +171,7 @@ impl<'a, 'c> StateSchema<'a, 'c> {
     /// is confirmed on Ethereum blockchain.
     pub async fn apply_state_update(&mut self, block_number: u32) -> QueryResult<()> {
         let start = Instant::now();
-        log::info!("Applying state update for block: {}", block_number);
+        vlog::info!("Applying state update for block: {}", block_number);
 
         let mut transaction = self.0.start_transaction().await?;
 
@@ -231,7 +231,7 @@ impl<'a, 'c> StateSchema<'a, 'c> {
             account_diff
         };
 
-        log::debug!("Sorted account update list: {:?}", account_updates);
+        vlog::debug!("Sorted account update list: {:?}", account_updates);
 
         // Then go through the collected list of changes and apply them by one.
         for acc_update in account_updates.into_iter() {
@@ -329,7 +329,7 @@ impl<'a, 'c> StateSchema<'a, 'c> {
 
         let (verif_block, mut accounts) =
             StateSchema(&mut transaction).load_verified_state().await?;
-        log::debug!(
+        vlog::debug!(
             "Verified state block: {}, accounts: {:#?}",
             verif_block,
             accounts
@@ -341,7 +341,7 @@ impl<'a, 'c> StateSchema<'a, 'c> {
 
         // Fetch updates from blocks: verif_block +/- 1, ... , block
         let result = if let Some((block, state_diff)) = state_diff {
-            log::debug!("Loaded state diff: {:#?}", state_diff);
+            vlog::debug!("Loaded state diff: {:#?}", state_diff);
             apply_updates(&mut accounts, state_diff);
             Ok((block, accounts))
         } else {
@@ -473,15 +473,15 @@ impl<'a, 'c> StateSchema<'a, 'c> {
         .fetch_all(transaction.conn())
         .await?;
 
-        log::debug!(
+        vlog::debug!(
             "Loading state diff: forward: {}, start_block: {}, end_block: {}, unbounded: {}",
             time_forward,
             start_block,
             end_block,
             to_block.is_none()
         );
-        log::debug!("Loaded account balance diff: {:#?}", account_balance_diff);
-        log::debug!("Loaded account creation diff: {:#?}", account_creation_diff);
+        vlog::debug!("Loaded account balance diff: {:#?}", account_balance_diff);
+        vlog::debug!("Loaded account creation diff: {:#?}", account_creation_diff);
 
         // Fold the updates into one list and determine the actual last block
         // (since user-provided one may not exist yet).

@@ -118,7 +118,7 @@ impl CloseAccountWitness<Bn256> {
     fn apply_data(tree: &mut CircuitAccountTree, close_account: &CloseAccountData) -> Self {
         //preparing data and base witness
         let before_root = tree.root_hash();
-        log::debug!("Initial root = {}", before_root);
+        vlog::debug!("Initial root = {}", before_root);
         let (audit_path_before, audit_balance_path_before) =
             get_audits(tree, close_account.account_address, 0);
 
@@ -144,7 +144,7 @@ impl CloseAccountWitness<Bn256> {
             );
 
         let after_root = tree.root_hash();
-        log::debug!("After root = {}", after_root);
+        vlog::debug!("After root = {}", after_root);
         let (audit_path_after, audit_balance_path_after) =
             get_audits(tree, close_account.account_address, 0);
 

@@ -66,7 +66,7 @@ pub mod http_rpc {
                 .map(|&h| format!("{}: \"{}\"", h, get_header(h)))
                 .join(", ");
 
-            log::trace!("{}", headers_formatted,);
+            vlog::debug!("{}", headers_formatted,);
         }
 
         request.into()
@@ -96,7 +96,7 @@ pub mod ws_rpc {
                 .map(|&h| format!("{}: \"{}\"", h, get_header(h)))
                 .join(", ");
 
-            log::trace!("{}", headers_formatted,);
+            vlog::debug!("{}", headers_formatted,);
         }
 
         None

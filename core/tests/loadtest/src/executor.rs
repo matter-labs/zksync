@@ -73,7 +73,7 @@ impl LoadtestExecutor {
     pub async fn new(config: Config, web3_url: String) -> anyhow::Result<Self> {
         let monitor = Monitor::new(RpcProvider::new(config.network.name)).await;
 
-        log::info!("Creating scenarios...");
+        vlog::info!("Creating scenarios...");
 
         let scenarios = config
             .scenarios
@@ -88,8 +88,8 @@ impl LoadtestExecutor {
         let default_fee = main_wallet.sufficient_fee().await?;
         let fees = Fees::from_config(&config.network, default_fee);
 
-        log::info!("Eth fee is {}", format_ether(&fees.eth));
-        log::info!("zkSync fee is {}", format_ether(&fees.zksync));
+        vlog::info!("Eth fee is {}", format_ether(&fees.eth));
+        vlog::info!("zkSync fee is {}", format_ether(&fees.zksync));
 
         let api_tests = api::run(monitor.clone());
 
@@ -170,7 +170,7 @@ impl LoadtestExecutor {
             format_ether(&amount_to_deposit),
         );
 
-        log::info!(
+        vlog::info!(
             "Deposit {} for main wallet",
             format_ether(&amount_to_deposit),
         );
@@ -199,13 +199,13 @@ impl LoadtestExecutor {
             .wait_for_tx(BlockStatus::Committed, tx_hash)
             .await?;
 
-        log::info!("Deposit phase completed");
+        vlog::info!("Deposit phase completed");
 
         // Split the money from the main account between the intermediate wallets.
         for (scenario_index, (mut scenario_wallets, scenario_amount)) in
             wallets.into_iter().enumerate()
         {
-            log::info!(
+            vlog::info!(
                 "Preparing transactions for the initial transfer for `{}` scenario: \
                 {} to will be send to each of {} new wallets",
                 self.scenarios[scenario_index].0,
@@ -244,7 +244,7 @@ impl LoadtestExecutor {
             )
             .await?;
 
-            log::info!(
+            vlog::info!(
                 "All the initial transfers for the `{}` scenario have been committed.",
                 self.scenarios[scenario_index].0,
             );
@@ -287,20 +287,20 @@ impl LoadtestExecutor {
                 .await?;
             scenario_handle.1 = scenario_wallets;
 
-            log::info!(
+            vlog::info!(
                 "All the preparation steps for the `{}` scenario have been finished.",
                 self.scenarios[scenario_index].0,
             );
         }
 
-        log::info!("Awaiting for pending tasks verification...",);
+        vlog::info!("Awaiting for pending tasks verification...",);
         self.monitor.wait_for_verify().await;
         Ok(())
     }
 
     /// Performs main step of the load tests.
     async fn process(&mut self) -> anyhow::Result<Journal> {
-        log::info!("Starting TPS measuring...");
+        vlog::info!("Starting TPS measuring...");
         let monitor = self.monitor.clone();
         monitor.start().await;
 
@@ -316,13 +316,13 @@ impl LoadtestExecutor {
         self.monitor.wait_for_verify().await;
 
         let logs = self.monitor.finish().await;
-        log::info!("TPS measuring finished...");
+        vlog::info!("TPS measuring finished...");
         Ok(logs)
     }
 
     /// Returns the remaining funds to the main wallet.
     async fn refund(&mut self) -> anyhow::Result<()> {
-        log::info!("Refunding the remaining tokens to the main wallet.");
+        vlog::info!("Refunding the remaining tokens to the main wallet.");
 
         self.main_wallet.refresh_nonce().await?;
         // Transfer the remaining balances of the intermediate wallets into the main one.
@@ -386,7 +386,7 @@ impl LoadtestExecutor {
         // Withdraw remaining balance from the zkSync network back to the Ethereum one.
         let main_wallet_balance = self.main_wallet.balance(BlockStatus::Committed).await?;
         if main_wallet_balance > self.fees.zksync {
-            log::info!(
+            vlog::info!(
                 "Main wallet has {} balance, making refund...",
                 format_ether(&main_wallet_balance)
             );

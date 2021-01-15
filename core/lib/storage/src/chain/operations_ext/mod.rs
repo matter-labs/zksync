@@ -464,7 +464,7 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
             for tx_item in &mut tx_history {
                 let tx_info = match tx_item.tx["type"].as_str().unwrap_or("NONE") {
                     "NONE" => {
-                        log::warn!("Tx history item type not found, tx: {:?}", tx_item);
+                        vlog::warn!("Tx history item type not found, tx: {:?}", tx_item);
                         continue;
                     }
                     "Deposit" | "FullExit" => tx_item.tx.get_mut("priority_op"),
@@ -474,7 +474,7 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
                 let tx_info = if let Some(tx_info) = tx_info {
                     tx_info
                 } else {
-                    log::warn!("tx_info not found for tx: {:?}", tx_item);
+                    vlog::warn!("tx_info not found for tx: {:?}", tx_item);
                     continue;
                 };
 
@@ -635,7 +635,7 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
             for tx_item in &mut tx_history {
                 let tx_info = match tx_item.tx["type"].as_str().unwrap_or("NONE") {
                     "NONE" => {
-                        log::warn!("Tx history item type not found, tx: {:?}", tx_item);
+                        vlog::warn!("Tx history item type not found, tx: {:?}", tx_item);
                         continue;
                     }
                     "Deposit" | "FullExit" => tx_item.tx.get_mut("priority_op"),
@@ -645,7 +645,7 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
                 let tx_info = if let Some(tx_info) = tx_info {
                     tx_info
                 } else {
-                    log::warn!("tx_info not found for tx: {:?}", tx_item);
+                    vlog::warn!("tx_info not found for tx: {:?}", tx_item);
                     continue;
                 };
 

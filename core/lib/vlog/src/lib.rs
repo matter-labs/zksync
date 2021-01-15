@@ -1,7 +1,7 @@
 //! A set of logging macros that print not only timestamp and log level,
 //! but also filename, line and column.
 //!
-//! They behave just like usual log::warn, log::info, etc.
+//! They behave just like usual log::warn, tracing::info, etc.
 //!
 //!
 //! In fact, printing file, line and column can be done with a custom formatter for env_logger, like so:
@@ -20,11 +20,12 @@
 //!
 //! But I couldn't easily replicate its default behavior in my custom logger.
 //!
+pub use tracing::{debug, info, trace};
 
 #[macro_export]
 macro_rules! warn {
     ($($arg:tt)*) => {
-        log::warn!(
+        tracing::warn!(
             "[{}:{}:{}] {}",
             file!(),
             line!(),
@@ -37,7 +38,7 @@ macro_rules! warn {
 #[macro_export]
 macro_rules! error {
     ($($arg:tt)*) => {
-        log::error!(
+        tracing::error!(
             "[{}:{}:{}] {}",
             file!(),
             line!(),

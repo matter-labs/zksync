@@ -78,7 +78,7 @@ impl Scenario for WithdrawScenario {
         wallets: &[TestWallet],
     ) -> anyhow::Result<()> {
         for i in 0..self.config.withdraw_rounds {
-            log::info!(
+            vlog::info!(
                 "Withdraw and deposit cycle [{}/{}] started",
                 i + 1,
                 self.config.withdraw_rounds
@@ -90,14 +90,14 @@ impl Scenario for WithdrawScenario {
                 .collect::<Vec<_>>();
             wait_all_failsafe(&format!("withdraw/run/cycle/{}", i), futures).await?;
 
-            log::info!(
+            vlog::info!(
                 "Withdraw and deposit cycle [{}/{}] finished",
                 i + 1,
                 self.config.withdraw_rounds
             );
         }
 
-        log::info!("Withdraw scenario has been finished");
+        vlog::info!("Withdraw scenario has been finished");
 
         Ok(())
     }

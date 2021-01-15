@@ -27,7 +27,7 @@ async fn main() -> anyhow::Result<()> {
             panic!("API server actors aren't supposed to finish their execution")
         },
         _ = async { stop_signal_receiver.next().await } => {
-            log::warn!("Stop signal received, shutting down");
+            vlog::warn!("Stop signal received, shutting down");
         }
     };
 

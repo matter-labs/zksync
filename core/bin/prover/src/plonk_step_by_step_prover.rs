@@ -83,7 +83,7 @@ impl<C: ApiClient> ProverImpl<C> for PlonkStepByStepProver<C> {
 
             let (current_request_block, current_request_job_id) =
                 block_to_prove.unwrap_or_else(|| {
-                    log::trace!(
+                    tracing::debug!(
                         "no block to prove from the server for size: {}",
                         current_block_size
                     );
@@ -112,7 +112,7 @@ impl<C: ApiClient> ProverImpl<C> for PlonkStepByStepProver<C> {
             ))
         })?;
 
-        log::info!(
+        tracing::info!(
             "starting to compute proof for block {}, size: {}",
             block,
             block_size
@@ -166,7 +166,7 @@ impl<C: ApiClient> ProverImpl<C> for PlonkStepByStepProver<C> {
             .publish(block, verified_proof)
             .map_err(|e| BabyProverError::Api(format!("failed to publish proof: {}", e)))?;
 
-        log::info!("finished and published proof for block {}", block);
+        tracing::info!("finished and published proof for block {}", block);
         Ok(())
     }
 

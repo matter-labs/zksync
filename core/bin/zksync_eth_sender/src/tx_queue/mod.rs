@@ -174,7 +174,7 @@ impl TxQueue {
     pub fn add_commit_operation(&mut self, commit_operation: TxData) {
         self.commit_operations.push_back(commit_operation);
 
-        log::info!(
+        vlog::info!(
             "Adding commit operation to the queue. \
             Sent pending txs count: {}, \
             max pending txs count: {}, \
@@ -189,7 +189,7 @@ impl TxQueue {
     pub fn add_verify_operation(&mut self, block_idx: usize, verify_operation: TxData) {
         self.verify_operations.insert(block_idx, verify_operation);
 
-        log::info!(
+        vlog::info!(
             "Adding verify operation to the queue. \
             Sent pending txs count: {}, \
             max pending txs count: {}, \
@@ -204,7 +204,7 @@ impl TxQueue {
     pub fn add_withdraw_operation(&mut self, withdraw_operation: TxData) {
         self.withdraw_operations.push_back(withdraw_operation);
 
-        log::info!(
+        tracing::info!(
             "Adding withdraw operation to the queue. \
             Sent pending txs count: {}, \
             max pending txs count: {}, \

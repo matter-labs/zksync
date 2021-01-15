@@ -18,7 +18,8 @@ zksync_types = { path = "../types", version = "1.0" }
 
 lazy_static = "1.2.0"
 anyhow = "1.0"
-log = "0.4"
+tracing = "0.1.22"
+vlog = { path = "../../lib/vlog", version = "1.0" }
 backoff = "0.1.6"
 reqwest = { version = "0.10.6", features = ["blocking"] }
 serde = "1.0"

@@ -347,7 +347,7 @@ impl<E: RescueEngine + JubjubEngine> CircuitPubkey<E> {
 
         let hash = sponge_output.pop().expect("must get an element");
 
-        log::debug!("hash when fromxy: {:?}", hash.get_value());
+        vlog::debug!("hash when fromxy: {:?}", hash.get_value());
         let mut hash_bits = hash.into_bits_le_strict(cs.namespace(|| "pubkey hash into bits"))?;
         hash_bits.truncate(franklin_constants::NEW_PUBKEY_HASH_WIDTH);
         let element = CircuitElement::from_le_bits(cs.namespace(|| "repack_hash"), hash_bits)?;

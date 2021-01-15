@@ -145,38 +145,38 @@ fn run_rounds<PROVER: ProverImpl<CLIENT>, CLIENT: ApiClient>(
     start_heartbeats_tx: mpsc::Sender<(i32, bool)>,
     shutdown_request: ShutdownRequest,
 ) -> BabyProverError {
-    log::info!("Running worker rounds");
+    tracing::info!("Running worker rounds");
     let cycle_wait_interval = EnvProverConfig::from_env().prover.cycle_wait();
 
     loop {
         if shutdown_request.get() {
-            log::info!("Shutdown requested, ignoring the next round and finishing the job");
+            tracing::info!("Shutdown requested, ignoring the next round and finishing the job");
 
             let prover_id = shutdown_request.prover_id();
             if prover_id != ABSENT_PROVER_ID {
                 let (api_client, _) = prover.get_heartbeat_options();
                 match api_client.prover_stopped(prover_id) {
                     Ok(_) => {}
-                    Err(e) => log::error!("failed to send prover stop request: {}", e),
+                    Err(e) => tracing::error!("failed to send prover stop request: {}", e),
                 }
             }
 
             std::process::exit(0);
         }
 
-        log::trace!("Starting a next round");
+        tracing::debug!("Starting a next round");
         let ret = prover.next_round(start_heartbeats_tx.clone());
         if let Err(err) = ret {
             match err {
                 BabyProverError::Api(text) => {
-                    log::error!("could not reach api server: {}", text);
+                    tracing::error!("could not reach api server: {}", text);
                 }
                 BabyProverError::Internal(_) => {
                     return err;
                 }
             };
         }
-        log::trace!("round completed.");
+        tracing::debug!("round completed.");
 
         // Randomly generated shift to desynchronize multiple provers started at the same time.
         let mut rng = zksync_crypto::rand::thread_rng();
@@ -213,7 +213,7 @@ fn keep_sending_work_heartbeats<C: ApiClient>(
                     // Update the current job ID.
                     if new_job_id != 0 {
                         // Message with non-zero job ID is sent once per job, so it won't be spammed all over the log.
-                        log::info!(
+                        tracing::info!(
                             "Starting sending heartbeats for job with ID: {}",
                             new_job_id
                         );
@@ -230,10 +230,10 @@ fn keep_sending_work_heartbeats<C: ApiClient>(
             };
         }
         if job_id != 0 {
-            log::trace!("sending working_on request for job_id: {}", job_id);
+            tracing::debug!("sending working_on request for job_id: {}", job_id);
             let ret = client.working_on(job_id);
             if let Err(e) = ret {
-                log::error!("working_on request erred: {}", e);
+                tracing::error!("working_on request erred: {}", e);
             }
         }
     }

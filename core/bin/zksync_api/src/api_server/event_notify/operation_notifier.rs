@@ -91,7 +91,7 @@ impl OperationNotifier {
                 let account_state = match self.state.get_account_state(id, action).await? {
                     Some(account_state) => account_state,
                     None => {
-                        log::warn!(
+                        tracing::warn!(
                             "Account is updated but not stored in DB, id: {}, block: {:#?}",
                             id,
                             op.block

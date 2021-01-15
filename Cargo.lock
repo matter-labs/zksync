@@ -391,6 +391,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "ansi_term"
+version = "0.12.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d52a9bb7ec0cf484c551830a7ce27bd20d67eac647e1befb56b0be4ee39a55d2"
+dependencies = [
+ "winapi 0.3.9",
+]
+
+[[package]]
 name = "anyhow"
 version = "1.0.33"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -523,7 +532,7 @@ dependencies = [
  "memchr",
  "num_cpus",
  "once_cell",
- "pin-project-lite",
+ "pin-project-lite 0.1.11",
  "pin-utils",
  "slab",
  "wasm-bindgen-futures",
@@ -965,7 +974,7 @@ version = "2.33.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "37e58ac78573c40708d45522f0d80fa2f01cc4f9b4e2bf749807255454312002"
 dependencies = [
- "ansi_term",
+ "ansi_term 0.11.0",
  "atty",
  "bitflags",
  "strsim",
@@ -1740,7 +1749,7 @@ dependencies = [
  "futures-io",
  "memchr",
  "parking",
- "pin-project-lite",
+ "pin-project-lite 0.1.11",
  "waker-fn",
 ]
 
@@ -2438,11 +2447,12 @@ dependencies = [
  "env_logger",
  "handlebars",
  "hex",
- "log",
  "rust-crypto",
  "serde_json",
  "structopt",
  "time 0.1.44",
+ "tracing",
+ "vlog",
  "zksync_circuit",
  "zksync_config",
  "zksync_crypto",
@@ -2514,7 +2524,6 @@ dependencies = [
  "env_logger",
  "futures 0.3.6",
  "hex",
- "log",
  "num",
  "once_cell",
  "rand 0.4.6",
@@ -2524,6 +2533,8 @@ dependencies = [
  "structopt",
  "tokio 0.2.22",
  "toml",
+ "tracing",
+ "vlog",
  "web3",
  "zksync",
  "zksync_api_client",
@@ -2580,6 +2591,15 @@ name = "match_cfg"
 version = "0.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ffbee8634e0d45d258acb448e7eaab3fce7a0a467395d4d9f228e3c1f01fb2e4"
+
+[[package]]
+name = "matchers"
+version = "0.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f099785f7595cc4b4553a174ce30dd7589ef93391ff414dbb67f62392b9e0ce1"
+dependencies = [
+ "regex-automata",
+]
 
 [[package]]
 name = "matches"
@@ -3273,6 +3293,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c917123afa01924fc84bb20c4c03f004d9c38e5127e3c039bbf7f4b9c76a2f6b"
 
 [[package]]
+name = "pin-project-lite"
+version = "0.2.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "439697af366c49a6d0a010c56a0d97685bc140ce0d377b13a2ea2aa42d64a827"
+
+[[package]]
 name = "pin-utils"
 version = "0.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3651,6 +3677,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ae1ded71d66a4a97f5e961fd0cb25a5f366a42a41570d16a763a69c092c26ae4"
 dependencies = [
  "byteorder",
+ "regex-syntax",
 ]
 
 [[package]]
@@ -3691,7 +3718,7 @@ dependencies = [
  "mime_guess",
  "native-tls",
  "percent-encoding 2.1.0",
- "pin-project-lite",
+ "pin-project-lite 0.1.11",
  "serde",
  "serde_json",
  "serde_urlencoded",
@@ -4024,6 +4051,15 @@ dependencies = [
  "cpuid-bool",
  "digest 0.9.0",
  "opaque-debug 0.3.0",
+]
+
+[[package]]
+name = "sharded-slab"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "79c719719ee05df97490f80a45acfc99e5a30ce98a1e4fb67aee422745ae14e3"
+dependencies = [
+ "lazy_static",
 ]
 
 [[package]]
@@ -4571,7 +4607,7 @@ dependencies = [
  "mio-named-pipes",
  "mio-uds",
  "num_cpus",
- "pin-project-lite",
+ "pin-project-lite 0.1.11",
  "signal-hook-registry",
  "slab",
  "tokio-macros",
@@ -4788,7 +4824,7 @@ dependencies = [
  "futures-core",
  "futures-sink",
  "log",
- "pin-project-lite",
+ "pin-project-lite 0.1.11",
  "tokio 0.2.22",
 ]
 
@@ -4809,14 +4845,26 @@ checksum = "e987b6bf443f4b5b3b6f38704195592cca41c5bb7aedd3c3693c7081f8289860"
 
 [[package]]
 name = "tracing"
-version = "0.1.21"
+version = "0.1.22"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b0987850db3733619253fe60e17cb59b82d37c7e6c0236bb81e4d6b87c879f27"
+checksum = "9f47026cdc4080c07e49b37087de021820269d996f581aac150ef9e5583eefe3"
 dependencies = [
- "cfg-if 0.1.10",
+ "cfg-if 1.0.0",
  "log",
- "pin-project-lite",
+ "pin-project-lite 0.2.4",
+ "tracing-attributes",
  "tracing-core",
+]
+
+[[package]]
+name = "tracing-attributes"
+version = "0.1.11"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "80e0ccfc3378da0cce270c946b676a376943f5cd16aeba64568e7939806f4ada"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn",
 ]
 
 [[package]]
@@ -4826,6 +4874,49 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f50de3927f93d202783f4513cda820ab47ef17f624b03c096e86ef00c67e6b5f"
 dependencies = [
  "lazy_static",
+]
+
+[[package]]
+name = "tracing-log"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5e0f8c7178e13481ff6765bd169b33e8d554c5d2bbede5e32c356194be02b9b9"
+dependencies = [
+ "lazy_static",
+ "log",
+ "tracing-core",
+]
+
+[[package]]
+name = "tracing-serde"
+version = "0.1.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "fb65ea441fbb84f9f6748fd496cf7f63ec9af5bca94dd86456978d055e8eb28b"
+dependencies = [
+ "serde",
+ "tracing-core",
+]
+
+[[package]]
+name = "tracing-subscriber"
+version = "0.2.15"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a1fa8f0c8f4c594e4fc9debc1990deab13238077271ba84dd853d54902ee3401"
+dependencies = [
+ "ansi_term 0.12.1",
+ "chrono",
+ "lazy_static",
+ "matchers",
+ "regex",
+ "serde",
+ "serde_json",
+ "sharded-slab",
+ "smallvec 1.4.2",
+ "thread_local",
+ "tracing",
+ "tracing-core",
+ "tracing-log",
+ "tracing-serde",
 ]
 
 [[package]]
@@ -4999,7 +5090,7 @@ checksum = "b5a972e5669d67ba988ce3dc826706fb0a8b01471c088cb0b6110b805cc36aed"
 name = "vlog"
 version = "1.0.0"
 dependencies = [
- "log",
+ "tracing",
 ]
 
 [[package]]
@@ -5345,6 +5436,7 @@ dependencies = [
  "tiny-keccak 1.5.0",
  "tokio 0.1.22",
  "tokio 0.2.22",
+ "tracing",
  "vlog",
  "web3",
  "zksync_api_client",
@@ -5387,11 +5479,12 @@ dependencies = [
  "anyhow",
  "bigdecimal",
  "criterion",
- "log",
  "num",
  "rayon",
  "rust-crypto",
  "serde",
+ "tracing",
+ "vlog",
  "zksync_crypto",
  "zksync_state",
  "zksync_test_account",
@@ -5403,11 +5496,11 @@ name = "zksync_config"
 version = "1.0.0"
 dependencies = [
  "envy",
- "log",
  "num",
  "serde",
  "serde_json",
  "toml",
+ "tracing",
  "url 2.1.1",
  "zksync_types",
  "zksync_utils",
@@ -5435,7 +5528,6 @@ dependencies = [
  "ethabi",
  "futures 0.3.6",
  "itertools 0.9.0",
- "log",
  "metrics",
  "num",
  "serde",
@@ -5443,6 +5535,8 @@ dependencies = [
  "thiserror",
  "tiny-keccak 1.5.0",
  "tokio 0.2.22",
+ "tracing",
+ "vlog",
  "web3",
  "zksync_config",
  "zksync_contracts",
@@ -5483,13 +5577,14 @@ dependencies = [
  "futures 0.3.6",
  "hex",
  "jsonrpc-core",
- "log",
  "num",
  "serde",
  "serde_json",
  "structopt",
  "tiny-keccak 1.5.0",
  "tokio 0.2.22",
+ "tracing",
+ "vlog",
  "web3",
  "zksync_config",
  "zksync_contracts",
@@ -5506,10 +5601,10 @@ version = "1.0.0"
 dependencies = [
  "anyhow",
  "ethabi",
- "log",
  "metrics",
  "parity-crypto",
  "serde",
+ "tracing",
  "web3",
  "zksync_eth_signer",
  "zksync_types",
@@ -5528,12 +5623,13 @@ dependencies = [
  "futures 0.3.6",
  "hex",
  "lazy_static",
- "log",
  "metrics",
  "num",
  "serde",
  "serde_json",
  "tokio 0.2.22",
+ "tracing",
+ "vlog",
  "web3",
  "zksync_basic_types",
  "zksync_config",
@@ -5573,10 +5669,10 @@ dependencies = [
  "ctrlc",
  "env_logger",
  "futures 0.3.6",
- "log",
  "metrics",
  "metrics-exporter-prometheus",
  "tokio 0.2.22",
+ "tracing",
  "zksync_config",
  "zksync_storage",
  "zksync_types",
@@ -5593,7 +5689,6 @@ dependencies = [
  "env_logger",
  "hex",
  "jsonwebtoken",
- "log",
  "num",
  "reqwest",
  "rust-crypto",
@@ -5601,6 +5696,8 @@ dependencies = [
  "serde_json",
  "structopt",
  "tokio 0.1.22",
+ "tracing",
+ "vlog",
  "web3",
  "zksync_circuit",
  "zksync_config",
@@ -5619,13 +5716,14 @@ dependencies = [
  "backoff",
  "env_logger",
  "lazy_static",
- "log",
  "num",
  "reqwest",
  "serde",
  "serde_json",
  "structopt",
  "tokio 0.2.22",
+ "tracing",
+ "vlog",
  "zksync_basic_types",
  "zksync_circuit",
  "zksync_crypto",
@@ -5642,12 +5740,14 @@ dependencies = [
  "ctrlc",
  "env_logger",
  "futures 0.3.6",
- "log",
  "num",
  "serde",
  "serde_json",
  "structopt",
  "tokio 0.2.22",
+ "tracing",
+ "tracing-subscriber",
+ "vlog",
  "zksync_api",
  "zksync_config",
  "zksync_core",
@@ -5667,9 +5767,10 @@ version = "1.0.0"
 dependencies = [
  "anyhow",
  "criterion",
- "log",
  "metrics",
  "num",
+ "tracing",
+ "vlog",
  "web3",
  "zksync_crypto",
  "zksync_types",
@@ -5688,7 +5789,6 @@ dependencies = [
  "env_logger",
  "hex",
  "itertools 0.8.2",
- "log",
  "metrics",
  "num",
  "parity-crypto",
@@ -5696,6 +5796,8 @@ dependencies = [
  "serde_json",
  "sqlx",
  "tokio 0.2.22",
+ "tracing",
+ "vlog",
  "zksync_basic_types",
  "zksync_config",
  "zksync_crypto",
@@ -5723,11 +5825,12 @@ dependencies = [
  "ethabi",
  "futures 0.3.6",
  "itertools 0.9.0",
- "log",
  "num",
  "serde",
  "serde_json",
  "tokio 0.2.22",
+ "tracing",
+ "vlog",
  "web3",
  "zksync_circuit",
  "zksync_config",
@@ -5753,12 +5856,13 @@ dependencies = [
  "ethabi",
  "hex",
  "lazy_static",
- "log",
  "num",
  "parity-crypto",
  "secp256k1",
  "serde",
  "serde_json",
+ "tracing",
+ "vlog",
  "web3",
  "zksync_basic_types",
  "zksync_crypto",
@@ -5791,13 +5895,13 @@ dependencies = [
  "env_logger",
  "futures 0.3.6",
  "jsonwebtoken",
- "log",
  "metrics",
  "num",
  "reqwest",
  "serde",
  "serde_json",
  "tokio 0.2.22",
+ "tracing",
  "vlog",
  "zksync_circuit",
  "zksync_config",

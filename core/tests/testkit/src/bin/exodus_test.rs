@@ -11,9 +11,9 @@
 use crate::eth_account::{parse_ether, EthereumAccount};
 use crate::external_commands::{deploy_contracts, get_test_accounts};
 use crate::zksync_account::ZkSyncAccount;
-use log::*;
 use num::BigUint;
 use std::time::Instant;
+use vlog::*;
 use web3::transports::Http;
 use zksync_crypto::proof::EncodedProofPlonk;
 use zksync_testkit::*;

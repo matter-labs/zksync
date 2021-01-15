@@ -168,7 +168,7 @@ impl Account {
                     Some(account)
                 }
                 _ => {
-                    log::error!(
+                    vlog::error!(
                         "Incorrect update received {:?} for account {:?}",
                         update,
                         account
@@ -183,7 +183,7 @@ impl Account {
                     ..Default::default()
                 }),
                 _ => {
-                    log::error!("Incorrect update received {:?} for empty account", update);
+                    vlog::error!("Incorrect update received {:?} for empty account", update);
                     None
                 }
             },

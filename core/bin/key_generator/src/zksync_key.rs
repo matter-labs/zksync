@@ -20,7 +20,7 @@ use zksync_prover_utils::fs_utils::{
 
 pub(crate) fn make_plonk_exodus_verify_key() {
     let key_path = get_exodus_verification_key_path();
-    log::info!(
+    vlog::info!(
         "Generating exodus verification key into: {}",
         key_path.display()
     );
@@ -36,7 +36,7 @@ pub(crate) fn make_plonk_blocks_verify_keys(config: ChainConfig) {
             .into_iter(),
     ) {
         let key_path = get_block_verification_key_path(block_chunks);
-        log::info!(
+        vlog::info!(
             "Generating block: {} verification key into: {}",
             block_chunks,
             key_path.display()
@@ -160,7 +160,7 @@ fn generate_verification_key<C: Circuit<Engine> + Clone, P: AsRef<Path>>(
         remove_file(path).unwrap_or_default()
     }
 
-    log::info!("Transpiling circuit");
+    vlog::info!("Transpiling circuit");
     let (gates_count, transpilation_hints) =
         transpile_with_gates_count(circuit.clone()).expect("failed to transpile");
     let size_log2 = gates_count.next_power_of_two().trailing_zeros();
@@ -172,7 +172,7 @@ fn generate_verification_key<C: Circuit<Engine> + Clone, P: AsRef<Path>>(
 
     // exodus circuit is to small for the smallest setup
     let size_log2 = std::cmp::max(20, size_log2);
-    log::info!(
+    vlog::info!(
         "Reading setup file, gates_count: {}, pow2: {}",
         gates_count,
         size_log2
@@ -181,14 +181,14 @@ fn generate_verification_key<C: Circuit<Engine> + Clone, P: AsRef<Path>>(
     let key_monomial_form =
         get_universal_setup_monomial_form(size_log2).expect("Failed to read setup file.");
 
-    log::info!("Generating setup");
+    vlog::info!("Generating setup");
     let setup = setup(circuit, &transpilation_hints).expect("failed to make setup");
-    log::info!("Generating verification key");
+    vlog::info!("Generating verification key");
     let verification_key = make_verification_key(&setup, &key_monomial_form)
         .expect("failed to create verification key");
     verification_key
         .write(File::create(path).unwrap())
         .expect("Failed to write verification file."); // unwrap - checked at the function entry
-    log::info!("Verification key successfully generated");
+    vlog::info!("Verification key successfully generated");
     size_log2
 }

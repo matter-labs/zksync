@@ -29,7 +29,7 @@ async fn main() -> anyhow::Result<()> {
             // We don't need to do anything here, since actors will panic upon future resolving.
         },
         _ = async { stop_signal_receiver.next().await } => {
-            log::warn!("Stop signal received, shutting down");
+            vlog::warn!("Stop signal received, shutting down");
         }
     };
 

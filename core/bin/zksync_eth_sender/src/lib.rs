@@ -163,7 +163,7 @@ impl<ETH: EthereumInterface, DB: DatabaseInterface> ETHSender<ETH, DB> {
 
         // Add all the unprocessed operations to the queue.
         for operation in unprocessed_ops {
-            log::info!(
+            vlog::info!(
                 "Adding unprocessed ZKSync operation <id {}; action: {}; block: {}> to queue",
                 operation.id.expect("ID must be set"),
                 operation.action.to_string(),
@@ -203,7 +203,7 @@ impl<ETH: EthereumInterface, DB: DatabaseInterface> ETHSender<ETH, DB> {
         let mut connection = match self.db.acquire_connection().await {
             Ok(connection) => connection,
             Err(err) => {
-                log::warn!("Unable to connect to the database: {}", err);
+                vlog::warn!("Unable to connect to the database: {}", err);
                 return;
             }
         };
@@ -213,7 +213,7 @@ impl<ETH: EthereumInterface, DB: DatabaseInterface> ETHSender<ETH, DB> {
             .load_new_operations(&mut connection)
             .await
             .unwrap_or_else(|err| {
-                log::warn!("Unable to load new operations from the database: {}", err);
+                vlog::warn!("Unable to load new operations from the database: {}", err);
                 Vec::new()
             });
         drop(connection);
@@ -291,9 +291,9 @@ impl<ETH: EthereumInterface, DB: DatabaseInterface> ETHSender<ETH, DB> {
     }
 
     async fn process_error(err: anyhow::Error) {
-        log::warn!("Error while trying to complete uncommitted op: {}", err);
+        vlog::warn!("Error while trying to complete uncommitted op: {}", err);
         if err.to_string().contains(RATE_LIMIT_HTTP_CODE) {
-            log::warn!(
+            vlog::warn!(
                 "Received rate limit response, waiting for {}s",
                 RATE_LIMIT_BACKOFF_PERIOD.as_secs()
             );
@@ -362,7 +362,7 @@ impl<ETH: EthereumInterface, DB: DatabaseInterface> ETHSender<ETH, DB> {
         self.ongoing_ops.push_back(new_op.clone());
 
         // After storing all the tx data in the database, we can finally send the tx.
-        log::info!(
+        vlog::info!(
             "Sending new tx: [ETH Operation <id: {}, type: {:?}>. ETH tx: {}. ZKSync operation: {}]",
             new_op.id, new_op.op_type, self.eth_tx_description(&signed_tx), self.zksync_operation_description(&new_op),
         );
@@ -371,7 +371,7 @@ impl<ETH: EthereumInterface, DB: DatabaseInterface> ETHSender<ETH, DB> {
             // and resent. We can't do anything about this failure either, since it's most probably is not
             // related to the node logic, so we just log this error and pretend to have this operation
             // processed.
-            log::warn!("Error while sending the operation: {}", e);
+            vlog::warn!("Error while sending the operation: {}", e);
         });
 
         transaction.commit().await?;
@@ -466,11 +466,11 @@ impl<ETH: EthereumInterface, DB: DatabaseInterface> ETHSender<ETH, DB> {
                         .is_previous_operation_confirmed(&mut transaction, &op)
                         .await?
                     {
-                        log::info!("ETH Operation <id: {}> is confirmed ahead of time, considering it pending for now", op.id);
+                        vlog::info!("ETH Operation <id: {}> is confirmed ahead of time, considering it pending for now", op.id);
                         return Ok(OperationCommitment::Pending);
                     }
 
-                    log::info!(
+                    vlog::info!(
                         "Confirmed: [ETH Operation <id: {}, type: {:?}>. Tx hash: <{:#x}>. ZKSync operation: {}]",
                         op.id, op.op_type, tx_hash, self.zksync_operation_description(op),
                     );
@@ -485,7 +485,7 @@ impl<ETH: EthereumInterface, DB: DatabaseInterface> ETHSender<ETH, DB> {
                     // the last entry of the list, a new tx will be sent.
                 }
                 TxCheckOutcome::Failed(receipt) => {
-                    log::warn!(
+                    vlog::warn!(
                         "ETH transaction failed: tx: {:#x}, op_type: {:?}, op: {:?}; tx_receipt: {:#?} ",
                         tx_hash,
                         op.op_type,
@@ -520,7 +520,7 @@ impl<ETH: EthereumInterface, DB: DatabaseInterface> ETHSender<ETH, DB> {
             .add_hash_entry(&mut transaction, op.id, &new_tx.hash)
             .await?;
 
-        log::info!(
+        vlog::info!(
             "Stuck tx processing: sending tx for op, eth_op_id: {}; ETH tx: {}",
             op.id,
             self.eth_tx_description(&new_tx),
@@ -535,14 +535,14 @@ impl<ETH: EthereumInterface, DB: DatabaseInterface> ETHSender<ETH, DB> {
     /// Handles a transaction execution failure by reporting the issue to the log
     /// and terminating the node.
     async fn failure_handler(&self, receipt: &TransactionReceipt) -> ! {
-        log::error!(
+        vlog::error!(
             "Ethereum transaction unexpectedly failed. Receipt: {:#?}",
             receipt
         );
         if let Some(reason) = self.ethereum.failure_reason(receipt.transaction_hash).await {
-            log::error!("Failure reason for Ethereum tx: {:#?}", reason);
+            vlog::error!("Failure reason for Ethereum tx: {:#?}", reason);
         } else {
-            log::error!("Unable to receive failure reason for Ethereum tx");
+            vlog::error!("Unable to receive failure reason for Ethereum tx");
         }
         panic!("Cannot operate after unexpected TX failure");
     }
@@ -613,7 +613,7 @@ impl<ETH: EthereumInterface, DB: DatabaseInterface> ETHSender<ETH, DB> {
                 op
             );
 
-            log::info!(
+            vlog::info!(
                 "Gas limit for <ETH Operation id: {}> is {}",
                 op.id,
                 gas_limit
@@ -695,7 +695,7 @@ impl<ETH: EthereumInterface, DB: DatabaseInterface> ETHSender<ETH, DB> {
             stuck_tx
         );
 
-        log::info!(
+        vlog::info!(
             "Replacing tx: hash: {:#x}, old_gas: {}, new_gas: {}, used nonce: {}, gas limit: {}",
             stuck_tx.used_tx_hashes.last().unwrap(),
             old_tx_gas_price,
@@ -718,14 +718,14 @@ impl<ETH: EthereumInterface, DB: DatabaseInterface> ETHSender<ETH, DB> {
                 let root = op.block.get_eth_encoded_root();
 
                 let public_data = op.block.get_eth_public_data();
-                log::debug!(
+                vlog::debug!(
                     "public_data for block_number {}: {}",
                     op.block.block_number,
                     hex::encode(&public_data)
                 );
 
                 let witness_data = op.block.get_eth_witness_data();
-                log::debug!(
+                vlog::debug!(
                     "witness_data for block {}: {}, {:?}",
                     op.block.block_number,
                     hex::encode(&witness_data.0),
@@ -790,7 +790,7 @@ impl<ETH: EthereumInterface, DB: DatabaseInterface> ETHSender<ETH, DB> {
             }
         }
 
-        log::info!(
+        vlog::info!(
             "Added ZKSync operation <id {}; action: {}; block: {}> to queue",
             op.id.expect("ID must be set"),
             op.action.to_string(),
@@ -806,7 +806,7 @@ impl<ETH: EthereumInterface, DB: DatabaseInterface> ETHSender<ETH, DB> {
             config::MAX_WITHDRAWALS_TO_COMPLETE_IN_A_CALL,
         );
 
-        log::info!("Adding withdraw operation to queue");
+        vlog::info!("Adding withdraw operation to queue");
 
         self.tx_queue
             .add_withdraw_operation(TxData::from_raw(OperationType::Withdraw, raw_tx));
