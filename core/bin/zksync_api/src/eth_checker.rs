@@ -121,7 +121,8 @@ mod tests {
         let config = TestConfig::load();
         let message = "hello-world";
 
-        let web3_url = std::env::var("WEB3_URL").expect("WEB3_URL env var not found");
+        let web3_url =
+            std::env::var("ETH_CLIENT_WEB3_URL").expect("ETH_CLIENT_WEB3_URL env var not found");
         let manual_signature =
             PackedEthSignature::sign(&config.eip1271.owner_private_key, message.as_bytes())
                 .unwrap();
