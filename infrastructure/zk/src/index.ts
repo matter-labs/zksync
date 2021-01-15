@@ -5,6 +5,7 @@ import { spawnSync } from 'child_process';
 import { command as server } from './server';
 import { command as up } from './up';
 import { command as down } from './down';
+import { command as pull } from './pull';
 import { command as db } from './db/db';
 import { command as contract } from './contract';
 import { command as dummyProver } from './dummy-prover';
@@ -24,6 +25,7 @@ const COMMANDS = [
     server,
     up,
     down,
+    pull,
     db,
     contract,
     dummyProver,

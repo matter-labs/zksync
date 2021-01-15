@@ -7,9 +7,12 @@ import * as contract from './contract';
 import * as run from './run/run';
 import * as env from './env';
 import { up } from './up';
+import { down } from './down';
+import { pull } from './pull';
 
 export async function init() {
     await createVolumes();
+    await pull();
     if (!process.env.CI) {
         await checkEnv();
         await env.gitHooks();
@@ -25,6 +28,10 @@ export async function init() {
     await contract.build();
     await server.genesis();
     await contract.redeploy();
+    if (!process.env.CI) {
+        await down();
+        await up();
+    }
 }
 
 async function createVolumes() {
