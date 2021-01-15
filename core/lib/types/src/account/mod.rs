@@ -58,7 +58,7 @@ impl From<Account> for CircuitAccount<super::Engine> {
             .collect();
 
         for (i, b) in balances.into_iter() {
-            circuit_account.subtree.insert(u32::from(i), b);
+            circuit_account.subtree.insert(u32::from(*i), b);
         }
 
         circuit_account.nonce = Fr::from_str(&acc.nonce.to_string()).unwrap();
@@ -72,7 +72,7 @@ impl Default for Account {
     fn default() -> Self {
         Self {
             balances: HashMap::new(),
-            nonce: 0,
+            nonce: Nonce(0),
             pub_key_hash: PubKeyHash::default(),
             address: Address::zero(),
         }
