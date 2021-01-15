@@ -343,7 +343,7 @@ async fn check_exit_correct_proof_incorrect_sender(
 }
 
 async fn exit_test() {
-    env_logger::init();
+    vlog::init();
     let testkit_config = TestkitConfig::from_env();
 
     let fee_account = ZkSyncAccount::rand();

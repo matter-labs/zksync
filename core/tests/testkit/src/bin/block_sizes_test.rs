@@ -19,7 +19,7 @@ use zksync_types::DepositOp;
 
 #[tokio::main]
 async fn main() {
-    env_logger::init();
+    vlog::init();
 
     let testkit_config = TestkitConfig::from_env();
 

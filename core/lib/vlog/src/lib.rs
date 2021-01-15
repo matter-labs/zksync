@@ -47,3 +47,17 @@ macro_rules! error {
         );
     };
 }
+
+pub fn init() {
+    let log_format = std::env::var("MISC_LOG_FORMAT").unwrap_or("plain".to_string());
+    match log_format.as_str() {
+        "plain" => tracing_subscriber::fmt::init(),
+        "json" => {
+            tracing_subscriber::fmt::Subscriber::builder()
+                .with_env_filter(tracing_subscriber::EnvFilter::from_default_env())
+                .json()
+                .init();
+        }
+        _ => panic!("MISC_LOG_FORMAT has unexpected state"),
+    };
+}

@@ -12,3 +12,4 @@ publish = false # This is an utility crate, not to be used by libraries.
 
 [dependencies]
 tracing = "0.1.22"
+tracing-subscriber = "0.2.15"

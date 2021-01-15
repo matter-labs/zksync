@@ -44,7 +44,7 @@ pub fn main_for_prover_impl<P: ProverImpl<client::ApiClient> + 'static + Send + 
     let api_client = api_client_from_env(&worker_name);
     let prover = P::create_from_config(prover_config, api_client.clone(), heartbeat_interval);
 
-    env_logger::init();
+    vlog::init();
     const ABSENT_PROVER_ID: i32 = -1;
 
     tracing::info!("creating prover, worker name: {}", worker_name);

@@ -5091,6 +5091,7 @@ name = "vlog"
 version = "1.0.0"
 dependencies = [
  "tracing",
+ "tracing-subscriber",
 ]
 
 [[package]]

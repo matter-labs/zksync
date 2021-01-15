@@ -7,7 +7,7 @@ use zksync_storage::ConnectionPool;
 fn main() {
     let mut main_runtime = Runtime::new().expect("main runtime start");
 
-    env_logger::init();
+    vlog::init();
     vlog::info!("ETH watcher started");
     let web3_url =
         std::env::var("ETH_CLIENT_WEB3_URL").expect("ETH_CLIENT_WEB3_URL env var not found");

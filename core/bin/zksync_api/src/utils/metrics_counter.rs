@@ -44,7 +44,7 @@ const DEFAULT_THRESHOLD: f64 = 5.0f64;
 ///     }
 /// }
 ///
-/// env_logger::init();
+/// vlog::init();
 /// let mut processor = SomeProcessor::new();
 /// for _ in 0..5 {
 ///     let elements = // ...

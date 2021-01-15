@@ -31,10 +31,7 @@ async fn main() -> anyhow::Result<()> {
     let server_mode = if opt.genesis {
         ServerCommand::Genesis
     } else {
-        tracing_subscriber::fmt::Subscriber::builder()
-            .with_env_filter(tracing_subscriber::EnvFilter::from_default_env())
-            .json()
-            .init();
+        vlog::init();
         ServerCommand::Launch
     };
 

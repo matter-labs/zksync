@@ -36,7 +36,7 @@ struct Opt {
 
 #[tokio::main]
 async fn main() {
-    env_logger::init();
+    vlog::init();
 
     let opt = Opt::from_args();
 

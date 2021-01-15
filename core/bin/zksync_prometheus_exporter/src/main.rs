@@ -9,7 +9,7 @@ async fn main() -> anyhow::Result<()> {
     // Prometheus doesn't require many connections to the database.
     const PROMETHEUS_EXPORTER_CONNECTION_POOL_SIZE: u32 = 1;
 
-    env_logger::init();
+    vlog::init();
 
     // handle ctrl+c
     let (stop_signal_sender, mut stop_signal_receiver) = mpsc::channel(256);

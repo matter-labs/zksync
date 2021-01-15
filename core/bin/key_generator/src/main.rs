@@ -35,7 +35,7 @@ struct Opt {
 }
 
 fn main() {
-    env_logger::init();
+    vlog::init();
 
     let opt = Opt::from_args();
     let config = ChainConfig::from_env();

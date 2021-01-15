@@ -83,7 +83,7 @@ async fn handle_coingecko_token_price_query(req: HttpRequest) -> Result<HttpResp
 }
 
 fn main() {
-    env_logger::init();
+    vlog::init();
 
     let mut runtime = actix_rt::System::new("dev-ticker");
 
