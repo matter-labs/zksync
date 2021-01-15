@@ -23,7 +23,7 @@ import {
     fmtTokenWithETHValue,
     getExpectedETHSwapResult,
     isOperationFeeAcceptable,
-    sendNotification,
+    sendNotification
 } from './utils';
 
 /** Env parameters. */
@@ -87,7 +87,7 @@ async function withdrawTokens(zksWallet: zksync.Wallet) {
                 ethAddress: zksWallet.address(),
                 token,
                 amount: amountAfterWithdraw,
-                fee: withdrawFee,
+                fee: withdrawFee
             });
             console.log(`Tx hash: ${transaction.txHash}`);
             await transaction.awaitReceipt();
@@ -129,7 +129,7 @@ async function transferEstablishedTokens(zksWallet: zksync.Wallet, establishedTo
                 to: feeAccumulatorAddress,
                 token,
                 amount: amountToTransfer,
-                fee: transferFee,
+                fee: transferFee
             });
             console.log(`Tx hash: ${transaction.txHash}`);
             await transaction.awaitReceipt();
@@ -223,7 +223,7 @@ async function sellTokens(zksWallet: zksync.Wallet) {
                     gasLimit: BigNumber.from(apiResponse.gas),
                     gasPrice: BigNumber.from(apiResponse.gasPrice),
                     value: BigNumber.from(apiResponse.value),
-                    data: apiResponse.data,
+                    data: apiResponse.data
                 });
                 console.log(`Tx hash: ${ethTransaction.hash}`);
 
@@ -260,7 +260,7 @@ async function sendETH(zksWallet: zksync.Wallet, feeAccumulatorAddress: string) 
                 to: feeAccumulatorAddress,
                 value: ethToSend,
                 gasPrice,
-                nonce,
+                nonce
             });
             console.log(`Tx hash: ${tx.hash}`);
 
