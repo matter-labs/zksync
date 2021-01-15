@@ -15,8 +15,8 @@ const TX_AMOUNT = utils.parseEther('10.0');
 const DEPOSIT_AMOUNT = TX_AMOUNT.mul(200);
 
 // prettier-ignore
-/// We don't want processed all test with all tokens, so we could highlight basic operations such as: Deposit, Withdrawal, Forced Exit
-/// We want to check basic operations with all tokens, and other operations only if it necessary
+/// We don't want to run tests with all tokens, so we highlight basic operations such as: Deposit, Withdrawal, Forced Exit
+/// We want to check basic operations with all tokens, and other operations only if it's necessary
 const TestSuite = (token: types.TokenSymbol, transport: 'HTTP' | 'WS', onlyBasic: boolean = false) =>
 describe(`ZkSync integration tests (token: ${token}, transport: ${transport})`, () => {
     let tester: Tester;
