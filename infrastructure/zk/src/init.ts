@@ -7,8 +7,8 @@ import * as contract from './contract';
 import * as run from './run/run';
 import * as env from './env';
 import { up } from './up';
-import { down } from './down';
 import { pull } from './pull';
+import { restartLiquidityWatcher } from './restart-liquidity-watcher';
 
 export async function init() {
     await createVolumes();
@@ -29,8 +29,7 @@ export async function init() {
     await server.genesis();
     await contract.redeploy();
     if (!process.env.CI) {
-        await down();
-        await up();
+        await restartLiquidityWatcher();
     }
 }
 
