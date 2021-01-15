@@ -45,10 +45,7 @@ const LOCALHOST_WEB3_ADDR: &str = "http://127.0.0.1:8545";
 const DOCKER_WEB3_ADDR: &str = "http://geth:8545";
 
 fn web3_addr() -> &'static str {
-    let ci: u8 = env::var("CI")
-        .unwrap_or_else(|_| "0".to_string())
-        .parse()
-        .unwrap();
+    let ci: u8 = env::var("CI").map_or(0, |s| s.parse().unwrap());
     if ci == 1 {
         DOCKER_WEB3_ADDR
     } else {
