@@ -80,7 +80,7 @@ pub fn js_revert_reason(tx_hash: &H256) -> String {
             "run",
             "revert-reason",
             &format!("0x{:x}", tx_hash),
-            web3_url,
+            &web3_url,
         ],
     )
 }
