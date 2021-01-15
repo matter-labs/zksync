@@ -8,7 +8,8 @@ token_name = 'DAI'
 [network]
 # Network kind used for testing.
 name = 'localhost'
-eth_fee = 1000000000000
+# Fee for the Ethereum transactions in gwei.
+eth_fee = 10000000000
 # Fee for the zkSync transactions in gwei.
 zksync_fee = 100000000000
 

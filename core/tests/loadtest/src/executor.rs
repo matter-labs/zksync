@@ -70,6 +70,9 @@ impl Fees {
 }
 
 impl LoadtestExecutor {
+    /// The approximate number of extra operations for each wallet.
+    const OPERATIONS_PER_WALLET: u64 = 5;
+
     /// Creates a new executor instance.
     pub async fn new(config: Config, env_options: ConfigurationOptions) -> anyhow::Result<Self> {
         let monitor = Monitor::new(RpcProvider::new(config.network.name)).await;
@@ -139,17 +142,14 @@ impl LoadtestExecutor {
 
         // Create intermediate wallets and compute total amount to deposit and needed
         // balances for wallets.
-        let mut amount_to_deposit =
-            &self.fees.eth * BigUint::from(4_u64) + &self.fees.zksync * BigUint::from(10_u64);
+        let total_fee = BigUint::from(Self::OPERATIONS_PER_WALLET) * &self.fees.zksync;
+
+        let mut amount_to_deposit = &self.fees.zksync * BigUint::from(10_u64);
         let mut wallets = Vec::new();
         for resource in resources {
-            let wallet_balance = closest_packable_token_amount(
-                &(&resource.balance_per_wallet + BigUint::from(5_u64) * &self.fees.zksync),
-            );
-
-            let scenario_amount = BigUint::from(resource.wallets_amount) * &wallet_balance
-                + BigUint::from(10_u64) * &self.fees.zksync
-                + &self.fees.eth;
+            let wallet_balance = resource.balance_per_wallet + &total_fee;
+            let scenario_amount =
+                (&wallet_balance + &total_fee) * BigUint::from(resource.wallets_amount);
             amount_to_deposit += scenario_amount;
 
             let scenario_wallets = wait_all_chunks(
@@ -165,16 +165,16 @@ impl LoadtestExecutor {
             .await;
 
             // Special case for erc20 tokens.
-            if !self.main_wallet.token_name().is_eth() {
+            if resource.has_deposits && !self.main_wallet.token_name().is_eth() {
                 log::info!(
-                    "Approving {} ERC20 wallets for deposits.",
+                    "Approving {} wallets for ERC20 deposits.",
                     scenario_wallets.len(),
                 );
 
                 for wallet in &scenario_wallets {
                     // Give some gas to make it possible to create Ethereum transactions.
                     let eth_balance =
-                        closest_packable_fee_amount(&(&self.fees.eth * BigUint::from(4_u64)));
+                        closest_packable_fee_amount(&(&self.fees.eth * BigUint::from(2_u64)));
                     self.main_wallet
                         .transfer_to("ETH", eth_balance, wallet.address())
                         .await?;
@@ -182,7 +182,7 @@ impl LoadtestExecutor {
                 }
 
                 log::info!(
-                    "All of {} ERC20 wallets have been approved for deposits.",
+                    "All of {} wallets have been approved for deposits.",
                     scenario_wallets.len(),
                 );
             }
@@ -192,11 +192,11 @@ impl LoadtestExecutor {
 
         // Make deposit from Ethereum network to the zkSync one.
         let amount_to_deposit = closest_packable_token_amount(&amount_to_deposit);
-        let eth_balance = self.main_wallet.eth_balance().await?;
+        let l1_balance = self.main_wallet.l1_balance().await?;
         anyhow::ensure!(
-            eth_balance > amount_to_deposit,
+            l1_balance > amount_to_deposit,
             "Not enough balance in the main wallet to perform this test, actual: {}, expected: {}",
-            format_ether(&eth_balance),
+            format_ether(&l1_balance),
             format_ether(&amount_to_deposit),
         );
 
@@ -247,9 +247,10 @@ impl LoadtestExecutor {
                 "executor/prepare/sign_transfer",
                 CHUNK_SIZES,
                 scenario_wallets.iter().map(|wallet| {
+                    let amount = closest_packable_token_amount(&scenario_amount);
                     self.main_wallet.sign_transfer(
                         wallet.address(),
-                        scenario_amount.clone(),
+                        amount,
                         self.fees.zksync.clone(),
                     )
                 }),

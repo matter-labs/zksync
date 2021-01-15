@@ -59,6 +59,7 @@ impl Scenario for WithdrawScenario {
         ScenarioResources {
             wallets_amount: self.config.wallets_amount,
             balance_per_wallet,
+            has_deposits: true,
         }
     }
 

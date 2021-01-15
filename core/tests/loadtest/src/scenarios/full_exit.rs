@@ -52,6 +52,7 @@ impl Scenario for FullExitScenario {
         ScenarioResources {
             wallets_amount: self.config.wallets_amount,
             balance_per_wallet,
+            has_deposits: true,
         }
     }
 
@@ -118,12 +119,7 @@ impl FullExitScenario {
             .wait_for_priority_op(BlockStatus::Verified, &wallet.full_exit().await?)
             .await?;
 
-        let balance = if wallet.token_name().is_eth() {
-            wallet.eth_balance().await?
-        } else {
-            wallet.erc20_balance().await?
-        };
-
+        let balance = wallet.l1_balance().await?;
         let amount = closest_packable_token_amount(&(balance - &fees.eth));
         monitor
             .wait_for_priority_op(BlockStatus::Committed, &wallet.deposit(amount).await?)

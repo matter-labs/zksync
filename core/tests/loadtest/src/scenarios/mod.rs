@@ -33,6 +33,8 @@ pub struct ScenarioResources {
     pub wallets_amount: u64,
     /// Wei balance in each wallet.
     pub balance_per_wallet: BigUint,
+    /// Scenario has deposit operations.
+    pub has_deposits: bool,
 }
 
 /// Sufficient fee for the related type of transaction.

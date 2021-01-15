@@ -184,6 +184,15 @@ impl TestWallet {
         Ok(balance)
     }
 
+    /// Returns eth balance if token name is ETH; otherwise returns erc20 balance.
+    pub async fn l1_balance(&self) -> Result<BigUint, ClientError> {
+        if self.token_name.is_eth() {
+            self.eth_balance().await
+        } else {
+            self.erc20_balance().await
+        }
+    }
+
     /// Returns the token name of this wallet.
     pub fn token_name(&self) -> &TokenLike {
         &self.token_name
