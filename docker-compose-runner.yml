@@ -7,8 +7,6 @@ services:
 
   geth:
     image: "matterlabs/geth:latest"
-    environment:
-      - PLUGIN_CONFIG=fast
 
   dev-ticker:
     image: "matterlabs/dev-ticker:latest"
