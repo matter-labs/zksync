@@ -51,7 +51,7 @@ if [ "$PROVER_DOWNLOAD_SETUP" == "false" ]; then
   echo Setup is downloaded
 fi
 
-VERIFY_KEYS_TARBAL="verify-keys-`basename $KEY_DIR`-account-"$CHAIN_CIRCUIT_ACCOUNT_TREE_DEPTH"_-balance-$BALANCE_TREE_DEPTH.tar.gz"
+VERIFY_KEYS_TARBAL="verify-keys-`basename $CHAIN_CIRCUIT_KEY_DIR`-account-"$CHAIN_CIRCUIT_ACCOUNT_TREE_DEPTH"_-balance-$CHAIN_CIRCUIT_BALANCE_TREE_DEPTH.tar.gz"
 
 # checks if keys are present and if so, unpacks them
 [ -f keys/packed/$VERIFY_KEYS_TARBAL ] || (echo Keys file $VERIFY_KEYS_TARBAL not found && exit 1)
