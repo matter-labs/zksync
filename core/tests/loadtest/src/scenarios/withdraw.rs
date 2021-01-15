@@ -132,13 +132,13 @@ impl WithdrawScenario {
 
         await_condition!(
             std::time::Duration::from_millis(1_00),
-            wallet.eth_balance().await? >= amount
+            wallet.l1_balance().await? >= amount
         );
 
-        let eth_balance = wallet.eth_balance().await?;
-        anyhow::ensure!(eth_balance > fees.eth, "Ethereum fee is too low");
+        let balance = wallet.l1_balance().await?;
+        anyhow::ensure!(balance > fees.eth, "Ethereum fee is too low");
 
-        let amount = closest_packable_token_amount(&(eth_balance - &fees.eth));
+        let amount = closest_packable_token_amount(&(balance - &fees.eth));
         monitor
             .wait_for_priority_op(BlockStatus::Verified, &wallet.deposit(amount).await?)
             .await?;
