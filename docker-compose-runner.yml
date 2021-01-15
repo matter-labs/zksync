@@ -2,8 +2,6 @@ version: '3.2'
 services:
   postgres:
     image: "postgres:12"
-    ports:
-      - "5432:5432"
     environment:
         - POSTGRES_HOST_AUTH_METHOD=trust
 
@@ -11,19 +9,12 @@ services:
     image: "matterlabs/geth:latest"
     environment:
       - CONFIG=fast
-    ports:
-      - "8545:8545"
-      - "8546:8546"
 
   dev-ticker:
     image: "matterlabs/dev-ticker:latest"
-    ports:
-      - "9876:9876"
 
   dev-liquidity-token-watcher:
     image: "matterlabs/dev-liquidity-token-watcher:latest"
-    ports:
-      - "9975:9975"
     volumes:
       - ./etc/tokens/:/etc/tokens
 
