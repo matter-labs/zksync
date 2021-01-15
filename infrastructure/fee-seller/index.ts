@@ -217,13 +217,15 @@ async function sellTokens(zksWallet: zksync.Wallet) {
                 }
 
                 console.log('Sending swap tx.');
+                const nonce = await zksWallet.ethSigner.getTransactionCount('latest');
                 const ethTransaction = await zksWallet.ethSigner.sendTransaction({
                     from: apiResponse.from,
                     to: apiResponse.to,
                     gasLimit: BigNumber.from(apiResponse.gas),
                     gasPrice: BigNumber.from(apiResponse.gasPrice),
                     value: BigNumber.from(apiResponse.value),
-                    data: apiResponse.data
+                    data: apiResponse.data,
+                    nonce
                 });
                 console.log(`Tx hash: ${ethTransaction.hash}`);
 
