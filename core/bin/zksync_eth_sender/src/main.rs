@@ -27,8 +27,8 @@ async fn main() -> anyhow::Result<()> {
     let config = ZkSyncConfig::from_env();
 
     // Run prometheus data exporter.
-    let (prometheus_task_handle, counter_task_handle) =
-        run_prometheus_exporter(pool.clone(), config.api.prometheus.port);
+    let (prometheus_task_handle, _) =
+        run_prometheus_exporter(pool.clone(), config.api.prometheus.port, false);
 
     let task_handle = run_eth_sender(pool, config);
 
@@ -38,9 +38,6 @@ async fn main() -> anyhow::Result<()> {
         },
         _ = async { prometheus_task_handle.await } => {
             panic!("Prometheus exporter actors aren't supposed to finish their execution")
-        },
-        _ = async { counter_task_handle.await } => {
-            panic!("Operation counting actor is not supposed to finish its execution")
         },
         _ = async { stop_signal_receiver.next().await } => {
             log::warn!("Stop signal received, shutting down");

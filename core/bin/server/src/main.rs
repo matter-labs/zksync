@@ -60,7 +60,7 @@ async fn main() -> anyhow::Result<()> {
 
     // Run prometheus data exporter.
     let (prometheus_task_handle, counter_task_handle) =
-        run_prometheus_exporter(connection_pool.clone(), config.api.prometheus.port);
+        run_prometheus_exporter(connection_pool.clone(), config.api.prometheus.port, true);
 
     // Run core actors.
     log::info!("Starting the Core actors");
@@ -93,7 +93,7 @@ async fn main() -> anyhow::Result<()> {
         _ = async { prometheus_task_handle.await } => {
             panic!("Prometheus exporter actors aren't supposed to finish their execution")
         },
-        _ = async { counter_task_handle.await } => {
+        _ = async { counter_task_handle.unwrap().await } => {
             panic!("Operation counting actor is not supposed to finish its execution")
         },
         _ = async { stop_signal_receiver.next().await } => {

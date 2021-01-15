@@ -27,17 +27,14 @@ async fn main() -> anyhow::Result<()> {
     let config = ZkSyncConfig::from_env();
 
     // Run prometheus data exporter.
-    let (prometheus_task_handle, counter_task_handle) =
-        run_prometheus_exporter(connection_pool.clone(), config.api.prometheus.port);
+    let (prometheus_task_handle, _) =
+        run_prometheus_exporter(connection_pool.clone(), config.api.prometheus.port, false);
 
     run_prover_server(connection_pool, stop_signal_sender, config);
 
     tokio::select! {
         _ = async { prometheus_task_handle.await } => {
             panic!("Prometheus exporter actors aren't supposed to finish their execution")
-        },
-        _ = async { counter_task_handle.await } => {
-            panic!("Operation counting actor is not supposed to finish its execution")
         },
         _ = async { stop_signal_receiver.next().await } => {
             log::warn!("Stop signal received, shutting down");
