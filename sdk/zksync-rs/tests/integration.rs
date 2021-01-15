@@ -50,9 +50,9 @@ fn web3_addr() -> &'static str {
         .parse()
         .unwrap();
     if ci == 1 {
-        LOCALHOST_WEB3_ADDR
-    } else {
         DOCKER_WEB3_ADDR
+    } else {
+        LOCALHOST_WEB3_ADDR
     }
 }
 
