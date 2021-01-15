@@ -28,8 +28,6 @@ pub struct TokenPriceQuery {
     pub kind: TokenPriceKind,
 }
 
-// Client implementation
-
 /// Tokens API part.
 impl Client {
     pub async fn tokens(&self) -> client::Result<Vec<Token>> {
