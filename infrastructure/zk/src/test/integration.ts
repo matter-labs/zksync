@@ -160,10 +160,10 @@ export async function testkit(command: string, timeout: number) {
     if (command == 'block-sizes') {
         await utils.spawn('cargo run --bin block_sizes_test --release');
     } else if (command == 'fast') {
-        // await utils.spawn('cargo run --bin testkit_tests --release');
+        await utils.spawn('cargo run --bin testkit_tests --release');
         await utils.spawn('cargo run --bin gas_price_test --release');
-        // await utils.spawn('cargo run --bin migration_test --release');
-        // await utils.spawn('cargo run --bin revert_blocks_test --release');
+        await utils.spawn('cargo run --bin migration_test --release');
+        await utils.spawn('cargo run --bin revert_blocks_test --release');
         await utils.spawn('cargo run --bin exodus_test --release');
     }
 }
@@ -234,7 +234,7 @@ command
         if (mode != 'fast' && mode != 'block-sizes') {
             throw new Error('modes are either "fast" or "block-sizes"');
         }
-        await testkit(mode, 600);
+        await testkit(mode, 6000);
 
         if (offline) {
             delete process.env.SQLX_OFFLINE;
