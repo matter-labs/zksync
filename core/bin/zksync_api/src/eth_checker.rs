@@ -108,6 +108,8 @@ mod tests {
         let config = TestConfig::load();
         let message = "hello-world";
 
+        let web3_url =
+            std::env::var("ETH_CLIENT_WEB3_URL").expect("ETH_CLIENT_WEB3_URL env var not found");
         let manual_signature =
             PackedEthSignature::sign(&config.eip1271.owner_private_key, message.as_bytes())
                 .unwrap();
@@ -125,6 +127,7 @@ mod tests {
         ));
 
         let eth_checker = EthereumChecker::new(client);
+
         let result = eth_checker
             .is_eip1271_signature_correct(
                 config.eip1271.contract_address,

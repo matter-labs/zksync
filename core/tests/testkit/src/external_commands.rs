@@ -72,13 +72,15 @@ fn run_external_command(command: &str, args: &[&str]) -> String {
 }
 
 pub fn js_revert_reason(tx_hash: &H256) -> String {
+    let web3_url =
+        std::env::var("ETH_CLIENT_WEB3_URL").expect("ETH_CLIENT_WEB3_URL should be installed");
     run_external_command(
         "zk",
         &[
             "run",
             "revert-reason",
             &format!("0x{:x}", tx_hash),
-            "http://localhost:7545",
+            &web3_url,
         ],
     )
 }

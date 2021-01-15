@@ -13,6 +13,10 @@ All notable changes to `zksync.js` will be documented in this file.
 - `closestGreaterOrEqPackableTransactionAmount` and `closestGreaterOrEqPackableTransactionFee` functions. Tests for
   them.
 
+### Changed
+
+- HTTP provider is now the default one.
+
 ### Fixed
 
 - Bug with `integerToFloat` function. Now, it really rounds to the closest less or equal float number.

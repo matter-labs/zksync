@@ -65,6 +65,7 @@ async function main() {
         await (await upgradeGatekeeper.finishUpgrade([[], [], []], { gasLimit: 300000 })).wait();
 
         await expect(await proxyContract.getTarget()).to.equal(newTargetFranklin.address, 'upgrade was unsuccessful');
+        process.exit(0);
     } catch (e) {
         console.error(JSON.stringify(e));
         process.exit(1);
