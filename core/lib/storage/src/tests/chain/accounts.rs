@@ -1,14 +1,12 @@
 // External imports
 // Workspace imports
-use zksync_types::{prover::ProverJobType, AccountMap, Action};
+use zksync_types::{AccountMap, Action};
 // Local imports
 use super::block::apply_random_updates;
-use crate::test_data::get_sample_single_proof;
 use crate::tests::{create_rng, db_test};
 use crate::{chain::state::StateSchema, test_data::gen_operation};
 use crate::{
     chain::{account::AccountSchema, block::BlockSchema},
-    prover::ProverSchema,
     QueryResult, StorageProcessor,
 };
 
@@ -82,18 +80,8 @@ async fn stored_accounts(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
     }
 
     // Now add a proof, verify block and apply a state update.
-    ProverSchema(&mut storage)
-        .add_prover_job_to_job_queue(1, 1, Default::default(), 1, ProverJobType::SingleProof)
-        .await?;
-    let job = ProverSchema(&mut storage)
-        .get_idle_prover_job_from_job_queue()
-        .await?
-        .unwrap();
-    ProverSchema(&mut storage)
-        .store_proof(job.job_id, 1, &get_sample_single_proof())
-        .await?;
     BlockSchema(&mut storage)
-        .execute_operation(gen_operation(
+        .store_operation(gen_operation(
             1,
             Action::Verify {
                 proof: Default::default(),

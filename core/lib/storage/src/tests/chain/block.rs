@@ -98,18 +98,8 @@ async fn test_commit_rewind(mut storage: StorageProcessor<'_>) -> QueryResult<()
     assert_eq!((block, &state), (3, &accounts_block_3));
 
     // Add proofs for the first two blocks.
-    ProverSchema(&mut storage)
-        .add_prover_job_to_job_queue(1, 1, Default::default(), 1, ProverJobType::SingleProof)
-        .await?;
-    let job = ProverSchema(&mut storage)
-        .get_idle_prover_job_from_job_queue()
-        .await?
-        .unwrap();
-    ProverSchema(&mut storage)
-        .store_proof(job.job_id, 1, &get_sample_single_proof())
-        .await?;
     BlockSchema(&mut storage)
-        .execute_operation(gen_operation(
+        .store_operation(gen_operation(
             1,
             Action::Verify {
                 proof: Default::default(),
@@ -117,18 +107,8 @@ async fn test_commit_rewind(mut storage: StorageProcessor<'_>) -> QueryResult<()
             BLOCK_SIZE_CHUNKS,
         ))
         .await?;
-    ProverSchema(&mut storage)
-        .add_prover_job_to_job_queue(2, 2, Default::default(), 1, ProverJobType::SingleProof)
-        .await?;
-    let job = ProverSchema(&mut storage)
-        .get_idle_prover_job_from_job_queue()
-        .await?
-        .unwrap();
-    ProverSchema(&mut storage)
-        .store_proof(job.job_id, 2, &get_sample_single_proof())
-        .await?;
     BlockSchema(&mut storage)
-        .execute_operation(gen_operation(
+        .store_operation(gen_operation(
             2,
             Action::Verify {
                 proof: Default::default(),
@@ -302,24 +282,8 @@ async fn find_block_by_height_or_hash(mut storage: StorageProcessor<'_>) -> Quer
 
     //     // Add verification for the block if required.
     //     if block_number <= n_verified {
-    //         ProverSchema(&mut storage)
-    //             .add_prover_job_to_job_queue(
-    //                 block_number,
-    //                 block_number,
-    //                 Default::default(),
-    //                 1,
-    //                 ProverJobType::SingleProof,
-    //             )
-    //             .await?;
-    //         let job = ProverSchema(&mut storage)
-    //             .get_idle_prover_job_from_job_queue()
-    //             .await?
-    //             .unwrap();
-    //         ProverSchema(&mut storage)
-    //             .store_proof(job.job_id, block_number, &get_sample_single_proof())
-    //             .await?;
     //         let verify_operation = BlockSchema(&mut storage)
-    //             .execute_operation(gen_unique_operation(
+    //             .store_operation(gen_unique_operation(
     //                 block_number,
     //                 Action::Verify {
     //                     proof: Default::default(),
@@ -483,24 +447,8 @@ async fn block_range(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
 
     //     // Add verification for the block if required.
     //     if block_number <= n_verified {
-    //         ProverSchema(&mut storage)
-    //             .add_prover_job_to_job_queue(
-    //                 block_number,
-    //                 block_number,
-    //                 Default::default(),
-    //                 1,
-    //                 ProverJobType::SingleProof,
-    //             )
-    //             .await?;
-    //         let job = ProverSchema(&mut storage)
-    //             .get_idle_prover_job_from_job_queue()
-    //             .await?
-    //             .unwrap();
-    //         ProverSchema(&mut storage)
-    //             .store_proof(job.job_id, block_number, &get_sample_single_proof())
-    //             .await?;
     //         let operation = BlockSchema(&mut storage)
-    //             .execute_operation(gen_unique_operation(
+    //             .store_operation(gen_unique_operation(
     //                 block_number,
     //                 Action::Verify {
     //                     proof: Default::default(),
@@ -582,8 +530,8 @@ async fn unconfirmed_transaction(mut storage: StorageProcessor<'_>) -> QueryResu
         accounts_map = new_accounts_map;
 
         // Store the operation in the block schema.
-        let operation = BlockSchema(&mut storage)
-            .execute_operation(gen_unique_operation(
+        BlockSchema(&mut storage)
+            .store_operation(gen_unique_operation(
                 block_number,
                 Action::Commit,
                 BLOCK_SIZE_CHUNKS,
@@ -631,25 +579,8 @@ async fn unconfirmed_transaction(mut storage: StorageProcessor<'_>) -> QueryResu
 
         // Add verification for the block if required.
         if block_number <= n_verified {
-            ProverSchema(&mut storage)
-                .add_prover_job_to_job_queue(
-                    block_number,
-                    block_number,
-                    Default::default(),
-                    1,
-                    ProverJobType::SingleProof,
-                )
-                .await?;
-            let job = ProverSchema(&mut storage)
-                .get_idle_prover_job_from_job_queue()
-                .await?
-                .unwrap();
-            ProverSchema(&mut storage)
-                .store_proof(job.job_id, block_number, &get_sample_single_proof())
-                .await?;
-
-            let operation = BlockSchema(&mut storage)
-                .execute_operation(gen_unique_operation(
+            BlockSchema(&mut storage)
+                .store_operation(gen_unique_operation(
                     block_number,
                     Action::Verify {
                         proof: Default::default(),

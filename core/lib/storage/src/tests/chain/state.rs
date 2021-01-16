@@ -1,6 +1,6 @@
 // External imports
 // Workspace imports
-use zksync_types::{helpers::apply_updates, prover::ProverJobType, AccountMap, Action, ActionType};
+use zksync_types::{helpers::apply_updates, AccountMap, Action, ActionType};
 // Local imports
 use super::block::apply_random_updates;
 use crate::{
@@ -9,8 +9,7 @@ use crate::{
         operations::{records::NewOperation, OperationsSchema},
         state::StateSchema,
     },
-    prover::ProverSchema,
-    test_data::{gen_operation, get_sample_single_proof},
+    test_data::gen_operation,
     tests::{create_rng, db_test},
     QueryResult, StorageProcessor,
 };
@@ -164,30 +163,14 @@ async fn state_diff(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
         accounts_map = new_accounts_map;
 
         BlockSchema(&mut storage)
-            .execute_operation(gen_operation(block_number, Action::Commit, block_size))
+            .store_operation(gen_operation(block_number, Action::Commit, block_size))
             .await?;
         StateSchema(&mut storage)
             .commit_state_update(block_number, &updates, 0)
             .await?;
 
-        ProverSchema(&mut storage)
-            .add_prover_job_to_job_queue(
-                block_number,
-                block_number,
-                Default::default(),
-                1,
-                ProverJobType::SingleProof,
-            )
-            .await?;
-        let job = ProverSchema(&mut storage)
-            .get_idle_prover_job_from_job_queue()
-            .await?
-            .unwrap();
-        ProverSchema(&mut storage)
-            .store_proof(job.job_id, block_number, &get_sample_single_proof())
-            .await?;
         BlockSchema(&mut storage)
-            .execute_operation(gen_operation(
+            .store_operation(gen_operation(
                 block_number,
                 Action::Verify {
                     proof: Default::default(),
