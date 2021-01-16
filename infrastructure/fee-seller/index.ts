@@ -14,7 +14,6 @@
  * See Env parameters for available configuration parameters
  */
 import Axios from 'axios';
-import { expect } from 'chai';
 import { BigNumber, ethers } from 'ethers';
 import * as zksync from 'zksync';
 import {
