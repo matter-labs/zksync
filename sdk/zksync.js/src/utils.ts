@@ -399,7 +399,6 @@ export async function verifyERC1271Signature(
 ): Promise<boolean> {
     const EIP1271_SUCCESS_VALUE = '0x1626ba7e';
 
-    // sign_message = keccak256("\x19Ethereum Signed Message:\n{message_len}" + message)
     const signMessage = getSignedBytesFromMessage(message, true);
     const signMessageHash = utils.keccak256(signMessage);
 
@@ -433,9 +432,17 @@ export async function getEthSignatureType(
         };
     }
 
+    let isSignedMsgPrefixed: boolean | null = null;
+    // Sometimes an error is thrown if the signature is wrong
+    try {
+        isSignedMsgPrefixed = await verifyERC1271Signature(address, messageNoPrefix, signature, _provider);
+    } catch {
+        isSignedMsgPrefixed = false;
+    }
+
     return {
         verificationMethod: 'ERC-1271',
-        isSignedMsgPrefixed: true
+        isSignedMsgPrefixed
     };
 }
 
