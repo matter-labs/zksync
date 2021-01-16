@@ -71,29 +71,27 @@ async fn migration_test() {
 
     let deposit_amount = parse_ether("1.0").unwrap();
 
-    for token in 0..=1 {
-        perform_basic_operations(
-            token,
-            &mut test_setup,
-            deposit_amount.clone(),
-            BlockProcessing::CommitAndVerify,
-        )
-        .await;
-    }
+    let token = 0;
+    perform_basic_operations(
+        token,
+        &mut test_setup,
+        deposit_amount.clone(),
+        BlockProcessing::CommitAndVerify,
+    )
+    .await;
 
     let start_upgrade = Instant::now();
     run_upgrade_franklin(contracts.contract, contracts.upgrade_gatekeeper);
     println!("Upgrade done in {:?}", start_upgrade.elapsed());
 
-    for token in 0..=1 {
-        perform_basic_operations(
-            token,
-            &mut test_setup,
-            deposit_amount.clone(),
-            BlockProcessing::CommitAndVerify,
-        )
-        .await;
-    }
+    let token = 1;
+    perform_basic_operations(
+        token,
+        &mut test_setup,
+        deposit_amount.clone(),
+        BlockProcessing::CommitAndVerify,
+    )
+    .await;
 
     stop_state_keeper_sender.send(()).expect("sk stop send");
     sk_thread_handle.join().expect("sk thread join");
