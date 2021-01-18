@@ -35,7 +35,7 @@
                             />
                             <Entry
                                 class="normalize-text"
-                                v-else-if="data.item['name'] == 'ETH Tx hash'"
+                                v-else-if="data.item['name'] == 'ETH tx hash'"
                                 :value="data.item.value"
                             />
                             <Entry v-else-if="data.item.name == 'Status'" :value="data.item.value" />
@@ -156,7 +156,7 @@ export default {
             return this.$route.params.id;
         },
         completeWithdrawalHashEntry() {
-            const entry = makeEntry('ETH Tx hash');
+            const entry = makeEntry('ETH tx hash');
 
             if (this.txData.withdrawalTxHash) {
                 entry.outterLink(`${blockchainExplorerTx}/${this.txData.withdrawalTxHash}`);
@@ -194,7 +194,7 @@ export default {
             }
 
             const entry = this.onChainTx
-                ? makeEntry('ETH Tx hash')
+                ? makeEntry('ETH tx hash')
                       .outterLink(`${blockchainExplorerTx}/${this.tx_hash}`)
                       .innerHTML(this.tx_hash)
                       .copyable()
