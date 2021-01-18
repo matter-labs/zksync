@@ -79,4 +79,4 @@ export const command = new Command('docker').description('docker management');
 command.command('build <image>').description('build docker image').action(build);
 command.command('push <image>').description('build and push docker image').action(push);
 command.command('pull').description('pull all containers').action(pull);
-command.command('restart <container>').description('restart liquidity watcher').action(restart);
+command.command('restart <container>').description('restart container in docker-compose.yml').action(restart);
