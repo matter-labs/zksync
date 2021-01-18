@@ -15,7 +15,6 @@ use crate::{
 /// Checks that stored accounts can be obtained once they're committed.
 #[db_test]
 async fn stored_accounts(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
-    vlog::init();
     let mut rng = create_rng();
 
     let block_size = 100;
