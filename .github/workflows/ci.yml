@@ -77,7 +77,7 @@ jobs:
         run: ci_run zk test rust
 
   integration:
-    runs-on: [self-hosted, CI-worker]
+    runs-on: [self-hosted, FAST]
 
     steps:
       - uses: actions/checkout@v2
