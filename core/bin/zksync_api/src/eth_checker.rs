@@ -108,17 +108,17 @@ mod tests {
         let config = TestConfig::load();
         let message = "hello-world";
 
-        let web3_urls: Vec<String> = std::env::var("ETH_CLIENT_WEB3_URLS")
-            .expect("ETH_CLIENT_WEB3_URL env var not found")
-            .split(",")
-            .collect();
+        let web3_urls = std::env::var("ETH_CLIENT_WEB3_URLS")
+            .expect("ETH_CLIENT_WEB3_URLS should be installed");
+        let web3_urls: Vec<&str> = web3_urls.split(",").collect();
+
         let manual_signature =
             PackedEthSignature::sign(&config.eip1271.owner_private_key, message.as_bytes())
                 .unwrap();
         let signature = EIP1271Signature(manual_signature.serialize_packed().to_vec());
 
         let transport =
-            web3::transports::Http::new(&web3_urls.first().expect("At least one should exist"))
+            web3::transports::Http::new(web3_urls.first().expect("At least one should exist"))
                 .unwrap();
         let client = EthereumGateway::Direct(ETHDirectClient::new(
             transport,
