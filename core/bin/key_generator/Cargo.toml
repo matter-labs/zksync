@@ -21,9 +21,10 @@ zksync_utils = { path = "../../lib/utils", version = "1.0" }
 time = "0.1"
 hex = "0.4"
 rust-crypto = "0.2"
+
 tracing = "0.1.22"
 vlog = { path = "../../lib/vlog", version = "1.0" }
-env_logger = "0.6"
+
 structopt = "0.3.20"
 handlebars = "3.0.1"
 serde_json = "1.0.0"

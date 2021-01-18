@@ -30,7 +30,6 @@ web3 = "0.13.0"
 anyhow = "1.0"
 chrono = "0.4"
 colored = "2.0.0"
-env_logger = "0.6"
 hex = "0.4"
 tracing = "0.1.22"
 vlog = { path = "../../lib/vlog", version = "1.0" }
