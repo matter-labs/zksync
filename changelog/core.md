@@ -9,6 +9,8 @@ All notable changes to the core components will be documented in this file.
 
 ### Changed
 
+- `prover_run_for_next_commit` function uses a parameterized timeout instead of a hard-coded one.
+
 ### Added
 
 ### Fixed
