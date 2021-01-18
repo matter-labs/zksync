@@ -47,7 +47,7 @@ pub fn main_for_prover_impl<P: ProverImpl<client::ApiClient> + 'static + Send + 
     vlog::init();
     const ABSENT_PROVER_ID: i32 = -1;
 
-    tracing::info!("creating prover, worker name: {}", worker_name);
+    vlog::info!("creating prover, worker name: {}", worker_name);
 
     // Create client
 
@@ -59,17 +59,17 @@ pub fn main_for_prover_impl<P: ProverImpl<client::ApiClient> + 'static + Send + 
     {
         let shutdown_request = shutdown_request.clone();
         ctrlc::set_handler(move || {
-            tracing::info!(
+            vlog::info!(
                 "Termination signal received. It will be handled after the currently working round"
             );
 
             if shutdown_request.prover_id() == ABSENT_PROVER_ID {
-                tracing::warn!("Prover is not registered, shutting down immediately");
+                vlog::warn!("Prover is not registered, shutting down immediately");
                 std::process::exit(0);
             }
 
             if shutdown_request.get() {
-                tracing::warn!("Second shutdown request received, shutting down without waiting for round to be completed");
+                vlog::warn!("Second shutdown request received, shutting down without waiting for round to be completed");
                 std::process::exit(0);
             }
 
@@ -93,13 +93,13 @@ pub fn main_for_prover_impl<P: ProverImpl<client::ApiClient> + 'static + Send + 
     // Handle prover exit errors.
     let err = exit_err_rx.recv();
     jh.join().expect("failed to join on worker thread");
-    tracing::error!("prover exited with error: {:?}", err);
+    vlog::error!("prover exited with error: {:?}", err);
     {
         let prover_id = prover_id_arc.load(Ordering::SeqCst);
         if prover_id != ABSENT_PROVER_ID {
             match api_client.prover_stopped(prover_id) {
                 Ok(_) => {}
-                Err(e) => tracing::error!("failed to send prover stop request: {}", e),
+                Err(e) => vlog::error!("failed to send prover stop request: {}", e),
             }
         }
     }

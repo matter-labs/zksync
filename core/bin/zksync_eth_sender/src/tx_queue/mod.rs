@@ -204,7 +204,7 @@ impl TxQueue {
     pub fn add_withdraw_operation(&mut self, withdraw_operation: TxData) {
         self.withdraw_operations.push_back(withdraw_operation);
 
-        tracing::info!(
+        vlog::info!(
             "Adding withdraw operation to the queue. \
             Sent pending txs count: {}, \
             max pending txs count: {}, \

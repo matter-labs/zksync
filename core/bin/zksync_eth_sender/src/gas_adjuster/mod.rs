@@ -86,7 +86,7 @@ impl<ETH: EthereumInterface, DB: DatabaseInterface> GasAdjuster<ETH, DB> {
         if price == self.get_current_max_price() {
             // We're suggesting the max price, so we must notify the log
             // entry about it.
-            tracing::warn!("Maximum possible gas price will be used: <{}>", price);
+            vlog::warn!("Maximum possible gas price will be used: <{}>", price);
         }
 
         // Report used price to be gathered by the statistics module.
@@ -108,7 +108,7 @@ impl<ETH: EthereumInterface, DB: DatabaseInterface> GasAdjuster<ETH, DB> {
                     self.last_sample_added = Instant::now();
                 }
                 Err(err) => {
-                    tracing::warn!("Cannot add the sample gas price: {}", err);
+                    vlog::warn!("Cannot add the sample gas price: {}", err);
                 }
             }
         }
@@ -123,7 +123,7 @@ impl<ETH: EthereumInterface, DB: DatabaseInterface> GasAdjuster<ETH, DB> {
             let mut connection = match db.acquire_connection().await {
                 Ok(connection) => connection,
                 Err(err) => {
-                    tracing::warn!("Cannot update the gas limit value in the database: {}", err);
+                    vlog::warn!("Cannot update the gas limit value in the database: {}", err);
                     return;
                 }
             };
@@ -138,7 +138,7 @@ impl<ETH: EthereumInterface, DB: DatabaseInterface> GasAdjuster<ETH, DB> {
             if let Err(err) = result {
                 // Inability of update the value in the DB is not critical as it's not
                 // an essential logic part, so just report the error to the log.
-                tracing::warn!("Cannot update the gas limit value in the database: {}", err);
+                vlog::warn!("Cannot update the gas limit value in the database: {}", err);
             }
         }
     }

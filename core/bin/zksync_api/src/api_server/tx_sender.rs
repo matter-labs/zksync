@@ -197,7 +197,7 @@ impl TxSender {
             // Scaling the fee required since the price may change between signing the transaction and sending it to the server.
             let scaled_provided_fee = scale_user_fee_up(provided_fee.clone());
             if required_fee >= scaled_provided_fee && should_enforce_fee {
-                tracing::error!(
+                vlog::error!(
                     "User provided fee is too low, required: {}, provided: {} (scaled: {}); difference {}, token: {:?}",
                     required_fee.to_string(),
                     provided_fee.to_string(),
@@ -291,7 +291,7 @@ impl TxSender {
         // Scaling the fee required since the price may change between signing the transaction and sending it to the server.
         let scaled_provided_fee_in_usd = scale_user_fee_up(provided_total_usd_fee.clone());
         if required_total_usd_fee >= scaled_provided_fee_in_usd {
-            tracing::error!(
+            vlog::error!(
                 "User provided batch fee is too low, required: {}, provided: {} (scaled: {}); difference {}",
                 required_total_usd_fee.to_string(),
                 provided_total_usd_fee.to_string(),

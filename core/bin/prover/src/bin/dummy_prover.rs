@@ -58,7 +58,7 @@ impl<C: ApiClient> ProverImpl<C> for DummyProver<C> {
 
             let (current_request_block, current_request_job_id) =
                 block_to_prove.unwrap_or_else(|| {
-                    tracing::trace!("no block to prove from the server for size: {}", block_size);
+                    vlog::trace!("no block to prove from the server for size: {}", block_size);
                     (0, 0)
                 });
 
@@ -77,7 +77,7 @@ impl<C: ApiClient> ProverImpl<C> for DummyProver<C> {
             return Ok(());
         }
 
-        tracing::info!("got job id: {}, block {}", job_id, block);
+        vlog::info!("got job id: {}, block {}", job_id, block);
         let _instance = self.api_client.prover_data(block).map_err(|err| {
             BabyProverError::Api(format!(
                 "could not get prover data for block {}: {}",
@@ -85,13 +85,13 @@ impl<C: ApiClient> ProverImpl<C> for DummyProver<C> {
             ))
         })?;
 
-        tracing::info!("starting to compute proof for block {}", block,);
+        vlog::info!("starting to compute proof for block {}", block,);
 
         self.api_client
             .publish(block, EncodedProofPlonk::default())
             .map_err(|e| BabyProverError::Api(format!("failed to publish proof: {}", e)))?;
 
-        tracing::info!("finished and published proof for block {}", block);
+        vlog::info!("finished and published proof for block {}", block);
         Ok(())
     }
 

@@ -186,7 +186,7 @@ async fn commit_block(
         block,
         id: None,
     };
-    tracing::info!("commit block #{}", op.block.block_number);
+    vlog::info!("commit block #{}", op.block.block_number);
     transaction
         .chain()
         .block_schema()
@@ -197,7 +197,7 @@ async fn commit_block(
     mempool_req_sender
         .send(MempoolBlocksRequest::UpdateNonces(accounts_updated))
         .await
-        .map_err(|e| tracing::warn!("Failed notify mempool about account updates: {}", e))
+        .map_err(|e| vlog::warn!("Failed notify mempool about account updates: {}", e))
         .unwrap_or_default();
 
     transaction
@@ -240,7 +240,7 @@ async fn poll_for_new_proofs_task(pool: ConnectionPool) {
                     .await
                     .expect("Unable to start DB transaction");
 
-                tracing::info!("New proof for block: {}", block_number);
+                vlog::info!("New proof for block: {}", block_number);
                 let block = transaction
                     .chain()
                     .block_schema()

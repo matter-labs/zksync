@@ -237,7 +237,7 @@ impl WitnessGenerator {
     /// Updates witness data in database in an infinite loop,
     /// awaiting `rounds_interval` time between updates.
     async fn maintain(self) {
-        tracing::info!(
+        vlog::info!(
             "preparing prover data routine started with start_block({}), block_step({})",
             self.start_block,
             self.block_step
@@ -248,7 +248,7 @@ impl WitnessGenerator {
             let should_work = match self.should_work_on_block(current_block).await {
                 Ok(should_work) => should_work,
                 Err(err) => {
-                    tracing::warn!("witness for block {} check failed: {}", current_block, err);
+                    vlog::warn!("witness for block {} check failed: {}", current_block, err);
                     continue;
                 }
             };
@@ -257,7 +257,7 @@ impl WitnessGenerator {
             if let BlockInfo::NoWitness(block) = should_work {
                 let block_number = block.block_number;
                 if let Err(err) = self.prepare_witness_and_save_it(block).await {
-                    tracing::warn!("Witness generator ({},{}) failed to prepare witness for block: {}, err: {}",
+                    vlog::warn!("Witness generator ({},{}) failed to prepare witness for block: {}, err: {}",
                         self.start_block, self.block_step, block_number, err);
                     continue; // Retry the same block on the next iteration.
                 }

@@ -145,19 +145,19 @@ fn run_rounds<PROVER: ProverImpl<CLIENT>, CLIENT: ApiClient>(
     start_heartbeats_tx: mpsc::Sender<(i32, bool)>,
     shutdown_request: ShutdownRequest,
 ) -> BabyProverError {
-    tracing::info!("Running worker rounds");
+    vlog::info!("Running worker rounds");
     let cycle_wait_interval = EnvProverConfig::from_env().prover.cycle_wait();
 
     loop {
         if shutdown_request.get() {
-            tracing::info!("Shutdown requested, ignoring the next round and finishing the job");
+            vlog::info!("Shutdown requested, ignoring the next round and finishing the job");
 
             let prover_id = shutdown_request.prover_id();
             if prover_id != ABSENT_PROVER_ID {
                 let (api_client, _) = prover.get_heartbeat_options();
                 match api_client.prover_stopped(prover_id) {
                     Ok(_) => {}
-                    Err(e) => tracing::error!("failed to send prover stop request: {}", e),
+                    Err(e) => vlog::error!("failed to send prover stop request: {}", e),
                 }
             }
 
@@ -169,7 +169,7 @@ fn run_rounds<PROVER: ProverImpl<CLIENT>, CLIENT: ApiClient>(
         if let Err(err) = ret {
             match err {
                 BabyProverError::Api(text) => {
-                    tracing::error!("could not reach api server: {}", text);
+                    vlog::error!("could not reach api server: {}", text);
                 }
                 BabyProverError::Internal(_) => {
                     return err;
@@ -213,7 +213,7 @@ fn keep_sending_work_heartbeats<C: ApiClient>(
                     // Update the current job ID.
                     if new_job_id != 0 {
                         // Message with non-zero job ID is sent once per job, so it won't be spammed all over the log.
-                        tracing::info!(
+                        vlog::info!(
                             "Starting sending heartbeats for job with ID: {}",
                             new_job_id
                         );
@@ -233,7 +233,7 @@ fn keep_sending_work_heartbeats<C: ApiClient>(
             vlog::trace!("sending working_on request for job_id: {}", job_id);
             let ret = client.working_on(job_id);
             if let Err(e) = ret {
-                tracing::error!("working_on request erred: {}", e);
+                vlog::error!("working_on request erred: {}", e);
             }
         }
     }

@@ -112,7 +112,7 @@ impl<C: ApiClient> ProverImpl<C> for PlonkStepByStepProver<C> {
             ))
         })?;
 
-        tracing::info!(
+        vlog::info!(
             "starting to compute proof for block {}, size: {}",
             block,
             block_size
@@ -166,7 +166,7 @@ impl<C: ApiClient> ProverImpl<C> for PlonkStepByStepProver<C> {
             .publish(block, verified_proof)
             .map_err(|e| BabyProverError::Api(format!("failed to publish proof: {}", e)))?;
 
-        tracing::info!("finished and published proof for block {}", block);
+        vlog::info!("finished and published proof for block {}", block);
         Ok(())
     }
 

@@ -36,7 +36,7 @@ async fn main() -> anyhow::Result<()> {
             panic!("Operation counting actor is not supposed to finish its execution")
         },
         _ = async { stop_signal_receiver.next().await } => {
-            tracing::warn!("Stop signal received, shutting down");
+            vlog::warn!("Stop signal received, shutting down");
         }
     };
 
