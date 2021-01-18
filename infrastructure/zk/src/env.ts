@@ -54,6 +54,18 @@ export function reload() {
     for (const envVar in env) {
         process.env[envVar] = env[envVar];
     }
+    load_docker();
+}
+
+export function load_docker() {
+    if (!process.env.IN_DOCKER) {
+        return;
+    }
+    const envFile = process.env.DOCKER_ENV_FILE as string;
+    const env = dotenv.parse(fs.readFileSync(envFile));
+    for (const envVar in env) {
+        process.env[envVar] = env[envVar];
+    }
 }
 
 // loads environment variables
@@ -63,6 +75,7 @@ export async function load() {
         process.env.ZKSYNC_ENV || (fs.existsSync(current) ? fs.readFileSync(current).toString().trim() : 'dev');
     const envFile = `etc/env/${zksyncEnv}.env`;
     const envDir = `etc/env/${zksyncEnv}`;
+    const dockerEnvFile = `etc/env/docker.env`;
     if (zksyncEnv == 'dev') {
         /// If there no folder with toml files we should delete the old dev.env and regenerate toml files and
         if (!fs.existsSync('etc/env/dev')) {
@@ -78,23 +91,43 @@ export async function load() {
     if (!fs.existsSync(envFile)) {
         throw new Error('ZkSync config file not found: ' + envFile);
     }
+    if (fs.existsSync(dockerEnvFile)) {
+        process.env.DOCKER_ENV_FILE = dockerEnvFile;
+    }
     process.env.ZKSYNC_ENV = zksyncEnv;
     process.env.ENV_FILE = envFile;
     process.env.ENV_DIR = envDir;
     dotenv.config({ path: envFile });
+    load_docker();
 }
 
 // replaces an env variable in current .env file
 // takes variable name, e.g. VARIABLE
 // and the new assignment, e.g. VARIABLE=foo
 export function modify(variable: string, assignedVariable: string) {
+    if (!process.env.ENV_FILE) {
+        // ENV_FILE variable is not set, do nothing.
+        return;
+    }
+
     const envFile = process.env.ENV_FILE as string;
+    if (!fs.existsSync(envFile)) {
+        console.log(`${process.env.ENV_FILE} env file was not found, skipping update...`);
+        return;
+    }
+
     utils.replaceInFile(envFile, `${variable}=.*`, assignedVariable.trim());
     reload();
 }
 
 export function modify_contracts_toml(variable: string, assignedVariable: string) {
     const toml_file = `${process.env.ENV_DIR}/contracts.toml`;
+
+    if (!fs.existsSync(toml_file)) {
+        console.log(`contracts.toml config file was not found, skipping update...`);
+        return;
+    }
+
     const source = fs.readFileSync(toml_file).toString();
     const toml_res = toml.parse(source);
     const trimmed_variable = variable.replace('CONTRACTS_', '');

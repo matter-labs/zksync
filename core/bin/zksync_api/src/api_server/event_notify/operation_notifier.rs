@@ -82,8 +82,7 @@ impl OperationNotifier {
             .block
             .block_transactions
             .iter()
-            .map(|exec_op| exec_op.get_updated_account_ids())
-            .flatten()
+            .flat_map(|exec_op| exec_op.get_updated_account_ids())
             .collect();
 
         for id in updated_accounts {

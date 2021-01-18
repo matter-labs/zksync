@@ -8,7 +8,7 @@ const DEFAULT_REVERT_REASON = 'VM did not revert';
 
 // For: geth
 
-// const provider = new ethers.providers.JsonRpcProvider(process.env.WEB3_URL);
+// const provider = new ethers.providers.JsonRpcProvider(process.env.ETH_CLIENT_WEB3_URL);
 // const wallet = ethers.Wallet.fromMnemonic(process.env.MNEMONIC, "m/44'/60'/0'/0/1").connect(provider);
 // const exitWallet = ethers.Wallet.fromMnemonic(process.env.MNEMONIC, "m/44'/60'/0'/0/2").connect(provider);
 

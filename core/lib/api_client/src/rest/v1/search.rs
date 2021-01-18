@@ -51,8 +51,6 @@ impl From<TxHash> for BlockSearchQuery {
     }
 }
 
-// Client implementation
-
 /// Search API part.
 impl Client {
     /// Performs a block search with an uncertain query, which can be either of:
