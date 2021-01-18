@@ -71,8 +71,9 @@ impl VolumeStorage {
                     name,
                     volume: self.default_volume.clone(),
                 },
-            )
+            );
         }
+        self.whitelist_tokens = whitelist_tokens;
         self
     }
 
@@ -164,7 +165,7 @@ mod tests {
         let volume = storage.get_volume(&token.0);
         assert_eq!(volume, 500.into());
         let volume = storage.get_volume("wrong_addr");
-        assert_eq!(volume, 500.into())
+        assert_eq!(volume, 0.into())
     }
     #[test]
     fn get_volume_for_blacklisted() {
@@ -172,7 +173,7 @@ mod tests {
         let mut tokens = HashSet::new();
         tokens.insert(token.clone());
         let storage =
-            VolumeStorage::new(Regime::Whitelist, 500.into()).with_blacklist_tokens(tokens);
+            VolumeStorage::new(Regime::Blacklist, 500.into()).with_blacklist_tokens(tokens);
         let volume = storage.get_volume(&token);
         assert_eq!(volume, 0.into());
         let volume = storage.get_volume("another_token");

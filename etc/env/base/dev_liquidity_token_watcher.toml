@@ -1,0 +1,4 @@
+[dev_liquidity_token_watcher]
+blacklisted_tokens="0x6b175474e89094c44da98b954eedeac495271d0f"
+default_volume=500
+regime="whitelist"
