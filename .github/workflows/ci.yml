@@ -104,7 +104,11 @@ jobs:
         run: docker-compose -f docker-compose-runner.yml restart dev-liquidity-token-watcher
 
       - name: run-services
-        run: ci_run sh infrastructure/ci-scripts/run_services.sh
+        run: |
+          ci_run zk server &>server.log &
+          ci_run sleep 1
+          cu_run zk dummy-prover run &>dummy_prover.log &
+          ci_run sleep 10
 
       - name: integration-server
         run: ci_run zk test i server
