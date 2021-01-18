@@ -19,12 +19,12 @@ use zksync::{
 use zksync_eth_signer::EthereumSigner;
 use zksync_types::{
     tx::{PackedEthSignature, TxHash},
-    BlockNumber, PriorityOp, ZkSyncTx, H256,
+    Address, BlockNumber, PriorityOp, ZkSyncTx, H256,
 };
 // Local uses
 use crate::{
     api::ApiDataPool,
-    journal::{Journal, TxLifecycle},
+    journal::{Journal, TxLifecycle, TxVariant},
     utils::{wait_all_chunks, CHUNK_SIZES},
 };
 
@@ -204,11 +204,54 @@ impl Monitor {
         let tx_hash = self.provider.send_tx(tx, eth_signature).await?;
         let sent_at = Instant::now();
 
+        self.spawn_tx_monitor(created_at, sent_at, address, tx_hash, TxVariant::Single)
+            .await;
+        Ok(tx_hash)
+    }
+
+    /// Sumbits a transactions batch to the zkSync network and monitors its progress.
+    /// Returns hashes of sent transactions.
+    pub async fn send_txs_batch(
+        &self,
+        txs_signed: Vec<(ZkSyncTx, Option<PackedEthSignature>)>,
+    ) -> anyhow::Result<Vec<TxHash>> {
+        assert!(
+            !txs_signed.is_empty(),
+            "Batch should contains at least a one transaction"
+        );
+        let address = txs_signed.last().unwrap().0.account();
+
+        let created_at = Instant::now();
+        let tx_hashes = self.provider.send_txs_batch(txs_signed, None).await?;
+        let sent_at = Instant::now();
+
+        self.spawn_tx_monitor(
+            created_at,
+            sent_at,
+            address,
+            *tx_hashes.last().unwrap(),
+            TxVariant::Batched {
+                size: tx_hashes.len(),
+            },
+        )
+        .await;
+        Ok(tx_hashes)
+    }
+
+    /// Spawns transaction monitor future.
+    async fn spawn_tx_monitor(
+        &self,
+        created_at: Instant,
+        sent_at: Instant,
+        address: Address,
+        tx_hash: TxHash,
+        tx_variant: TxVariant,
+    ) {
         let monitor = self.clone();
         let handle = tokio::spawn(async move {
             let tx_result = monitor
                 .clone()
-                .monitor_tx(created_at, sent_at, tx_hash)
+                .monitor_tx(created_at, sent_at, tx_hash, tx_variant)
                 .await;
 
             if tx_result.is_err() {
@@ -224,7 +267,6 @@ impl Monitor {
             monitor.record_tx(tx_hash, tx_result).await;
         });
         self.inner().await.pending_tasks.push(handle);
-        Ok(tx_hash)
     }
 
     /// Waits for the transaction to reach the desired status.
@@ -360,6 +402,7 @@ impl Monitor {
         created_at: Instant,
         sent_at: Instant,
         tx_hash: TxHash,
+        tx_variant: TxVariant,
     ) -> anyhow::Result<TxLifecycle> {
         self.log_event(Event::TxSent(tx_hash)).await;
 
@@ -387,6 +430,7 @@ impl Monitor {
             sent_at,
             committed_at,
             verified_at,
+            variant: tx_variant,
         })
     }
 

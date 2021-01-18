@@ -37,7 +37,7 @@ pub fn get_universal_setup_monomial_form(
 fn try_to_download_setup(
     power_of_two: u32,
 ) -> Result<Crs<Engine, CrsForMonomialForm>, backoff::Error<anyhow::Error>> {
-    let setup_network_dir = std::env::var("PROVER_SETUP_NETWORK_DIR")
+    let setup_network_dir = std::env::var("MISC_PROVER_SETUP_NETWORK_DIR")
         .map_err(|e| backoff::Error::Permanent(e.into()))?;
 
     let setup_dl_path = format!("{}/setup_2%5E{}.key", setup_network_dir, power_of_two);
