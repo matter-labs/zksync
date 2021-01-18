@@ -50,7 +50,7 @@ macro_rules! error {
 }
 
 pub fn init() {
-    let log_format = std::env::var("MISC_LOG_FORMAT").unwrap_or("plain".to_string());
+    let log_format = std::env::var("MISC_LOG_FORMAT").unwrap_or_else(|_| "plain".to_string());
     match log_format.as_str() {
         "plain" => tracing_subscriber::fmt::init(),
         "json" => {

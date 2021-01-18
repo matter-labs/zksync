@@ -110,7 +110,7 @@ impl Scenario for BatchTransferScenario {
     ) -> anyhow::Result<()> {
         let transfers_number = (self.wallets * self.transfer_rounds) as usize;
 
-        log::info!(
+        vlog::info!(
             "All the initial transfers have been verified, creating {} transactions \
             for the transfers step",
             transfers_number
@@ -132,7 +132,7 @@ impl Scenario for BatchTransferScenario {
         )
         .await?;
 
-        log::info!("Created {} transactions...", self.txs.len());
+        vlog::info!("Created {} transactions...", self.txs.len());
 
         Ok(())
     }
