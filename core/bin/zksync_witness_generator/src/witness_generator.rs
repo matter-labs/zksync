@@ -195,14 +195,14 @@ impl WitnessGenerator {
         let mut circuit_account_tree = self
             .load_account_tree(block.block_number - 1, &mut storage)
             .await?;
-        tracing::debug!(
+        vlog::trace!(
             "Witness generator loading circuit account tree {}s",
             timer.elapsed().as_secs()
         );
 
         let timer = time::Instant::now();
         let witness: ProverData = build_block_witness(&mut circuit_account_tree, &block)?.into();
-        tracing::debug!(
+        vlog::trace!(
             "Witness generator witness build {}s",
             timer.elapsed().as_secs()
         );

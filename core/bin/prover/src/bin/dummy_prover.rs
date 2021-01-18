@@ -58,7 +58,7 @@ impl<C: ApiClient> ProverImpl<C> for DummyProver<C> {
 
             let (current_request_block, current_request_job_id) =
                 block_to_prove.unwrap_or_else(|| {
-                    tracing::debug!("no block to prove from the server for size: {}", block_size);
+                    tracing::trace!("no block to prove from the server for size: {}", block_size);
                     (0, 0)
                 });
 

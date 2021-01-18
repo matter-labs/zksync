@@ -129,7 +129,7 @@ async fn block_to_prove(
     data: web::Data<AppState>,
     r: web::Json<ProverReq>,
 ) -> actix_web::Result<HttpResponse> {
-    tracing::debug!("request block to prove from worker: {}", r.name);
+    vlog::trace!("request block to prove from worker: {}", r.name);
     if r.name.is_empty() {
         return Err(actix_web::error::ErrorBadRequest("empty name"));
     }
@@ -164,7 +164,7 @@ async fn prover_data(
     data: web::Data<AppState>,
     block: web::Json<BlockNumber>,
 ) -> actix_web::Result<HttpResponse> {
-    tracing::debug!("Got request for prover_data for block {}", *block);
+    vlog::trace!("Got request for prover_data for block {}", *block);
     let mut storage = data
         .access_storage()
         .await
@@ -188,7 +188,7 @@ async fn working_on(
 ) -> actix_web::Result<HttpResponse> {
     // These heartbeats aren't really important, as they're sent
     // continuously while prover is performing computations.
-    tracing::debug!(
+    vlog::trace!(
         "Received heartbeat for prover_run with id: {}",
         r.prover_run_id
     );

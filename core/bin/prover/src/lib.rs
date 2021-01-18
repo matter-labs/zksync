@@ -164,7 +164,7 @@ fn run_rounds<PROVER: ProverImpl<CLIENT>, CLIENT: ApiClient>(
             std::process::exit(0);
         }
 
-        tracing::debug!("Starting a next round");
+        vlog::trace!("Starting a next round");
         let ret = prover.next_round(start_heartbeats_tx.clone());
         if let Err(err) = ret {
             match err {
@@ -176,7 +176,7 @@ fn run_rounds<PROVER: ProverImpl<CLIENT>, CLIENT: ApiClient>(
                 }
             };
         }
-        tracing::debug!("round completed.");
+        vlog::trace!("round completed.");
 
         // Randomly generated shift to desynchronize multiple provers started at the same time.
         let mut rng = zksync_crypto::rand::thread_rng();
@@ -230,7 +230,7 @@ fn keep_sending_work_heartbeats<C: ApiClient>(
             };
         }
         if job_id != 0 {
-            tracing::debug!("sending working_on request for job_id: {}", job_id);
+            vlog::trace!("sending working_on request for job_id: {}", job_id);
             let ret = client.working_on(job_id);
             if let Err(e) = ret {
                 tracing::error!("working_on request erred: {}", e);

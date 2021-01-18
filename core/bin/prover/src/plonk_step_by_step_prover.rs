@@ -83,7 +83,7 @@ impl<C: ApiClient> ProverImpl<C> for PlonkStepByStepProver<C> {
 
             let (current_request_block, current_request_job_id) =
                 block_to_prove.unwrap_or_else(|| {
-                    tracing::debug!(
+                    vlog::trace!(
                         "no block to prove from the server for size: {}",
                         current_block_size
                     );

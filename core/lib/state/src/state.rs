@@ -103,7 +103,7 @@ impl ZkSyncState {
 
         let account = self.balance_tree.get(account_id).cloned();
 
-        tracing::debug!(
+        vlog::trace!(
             "Get account (id {}) execution time: {}ms",
             account_id,
             start.elapsed().as_millis()

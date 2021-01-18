@@ -88,7 +88,7 @@ async fn save_pending_block(
 
     let block_number = pending_block.number;
 
-    tracing::debug!("persist pending block #{}", block_number);
+    vlog::trace!("persist pending block #{}", block_number);
 
     transaction
         .chain()
