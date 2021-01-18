@@ -59,6 +59,6 @@ pub fn init() {
                 .json()
                 .init();
         }
-        _ => panic!("MISC_LOG_FORMAT has an unexpected value"),
+        _ => panic!("MISC_LOG_FORMAT has an unexpected value {}", log_format),
     };
 }
