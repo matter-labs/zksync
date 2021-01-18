@@ -197,12 +197,13 @@ impl TxSender {
             // Scaling the fee required since the price may change between signing the transaction and sending it to the server.
             let scaled_provided_fee = scale_user_fee_up(provided_fee.clone());
             if required_fee >= scaled_provided_fee && should_enforce_fee {
+                let difference = (required_fee.clone() - scaled_provided_fee.clone()).to_string();
                 vlog::error!(
                     "User provided fee is too low, required: {}, provided: {} (scaled: {}); difference {}, token: {:?}",
                     required_fee.to_string(),
                     provided_fee.to_string(),
                     scaled_provided_fee.to_string(),
-                    (required_fee.clone() - scaled_provided_fee.clone()).to_string(),
+                    difference,
                     token
                 );
 
