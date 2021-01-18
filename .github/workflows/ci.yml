@@ -77,7 +77,7 @@ jobs:
         run: ci_run zk test rust
 
   integration:
-    runs-on: [self-hosted, CI-worker]
+    runs-on: [self-hosted, FAST]
 
     steps:
       - uses: actions/checkout@v2
@@ -104,7 +104,11 @@ jobs:
         run: docker-compose -f docker-compose-runner.yml restart dev-liquidity-token-watcher
 
       - name: run-services
-        run: ci_run sh infrastructure/ci-scripts/run_services.sh
+        run: |
+          ci_run zk server &>server.log &
+          ci_run sleep 1
+          ci_run zk dummy-prover run &>dummy_prover.log &
+          ci_run sleep 10
 
       - name: integration-server
         run: ci_run zk test i server

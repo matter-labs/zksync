@@ -116,14 +116,22 @@ export async function deploy() {
         'CONTRACTS_DEPLOY_FACTORY_ADDR',
         'CONTRACTS_GENESIS_TX_HASH'
     ];
+    let updatedContracts = '';
     for (const envVar of envVars) {
         const pattern = new RegExp(`${envVar}=.*`, 'g');
         const matches = deployLog.match(pattern);
         if (matches !== null) {
-            env.modify(envVar, matches[0]);
-            env.modify_contracts_toml(envVar, matches[0]);
+            const varContents = matches[0];
+            env.modify(envVar, varContents);
+            env.modify_contracts_toml(envVar, varContents);
+
+            updatedContracts += `${varContents}\n`;
         }
     }
+
+    // Write updated contract addresses and tx hashes to the separate file
+    // Currently it's used by loadtest github action to update deployment configmap.
+    fs.writeFileSync('deployed_contracts.log', updatedContracts);
 }
 
 export async function redeploy() {
