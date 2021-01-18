@@ -213,7 +213,7 @@ export default {
             return this.txData.tx_type == 'Deposit' || this.txData.tx_type == 'FullExit';
         },
         withdrawalTx() {
-            return this.txData.tx_type == 'Withdrawal';
+            return this.txData.tx_type == 'Withdrawal' || this.txData.tx_type == 'ForcedExit';
         }
     },
     components
