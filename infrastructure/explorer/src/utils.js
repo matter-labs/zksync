@@ -99,6 +99,7 @@ export function readyStateFromString(s) {
         Initiated: Readiness.Initiated,
         Pending: Readiness.Committed,
         Complete: Readiness.Verified,
+        Scheduled: Readiness.Scheduled,
         // 'Verified' is a block version of the word 'Complete'
         Verified: Readiness.Verified
     }[s];

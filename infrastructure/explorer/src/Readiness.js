@@ -8,5 +8,6 @@ export const Readiness = {
     Rejected: -1,
     Initiated: 0,
     Committed: 1,
+    Scheduled: 1,
     Verified: 2
 };
