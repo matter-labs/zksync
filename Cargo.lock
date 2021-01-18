@@ -5668,12 +5668,12 @@ version = "1.0.0"
 dependencies = [
  "anyhow",
  "ctrlc",
- "env_logger",
  "futures 0.3.6",
  "metrics",
  "metrics-exporter-prometheus",
  "tokio 0.2.22",
  "tracing",
+ "vlog",
  "zksync_config",
  "zksync_storage",
  "zksync_types",

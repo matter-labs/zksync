@@ -15,8 +15,8 @@ zksync_types = { path = "../../lib/types", version = "1.0" }
 zksync_storage = { path = "../../lib/storage", version = "1.0" }
 zksync_config = { path = "../../lib/config", version = "1.0" }
 
+vlog = { path = "../../lib/vlog", version = "1.0" }
 tracing = "0.1.22"
-env_logger = "0.6"
 
 tokio = { version = "0.2", features = ["full"] }
 futures = "0.3"
