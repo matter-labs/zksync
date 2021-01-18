@@ -5,11 +5,11 @@
 //! scope configuration. This is done by the `ApiV01::into_scope` method.
 
 use crate::api_server::{
+    helpers::try_parse_hash,
     rest::{
-        helpers::*,
+        helpers::{deposit_op_to_tx_by_hash, parse_tx_id, priority_op_to_tx_history},
         v01::{api_decl::ApiV01, types::*},
     },
-    rpc_server::get_ongoing_priority_ops,
 };
 use actix_web::{web, HttpResponse, Result as ActixResult};
 use std::time::Instant;
@@ -82,7 +82,9 @@ impl ApiV01 {
             })?;
 
         // Fetch ongoing deposits, since they must be reported within the transactions history.
-        let mut ongoing_ops = get_ongoing_priority_ops(&self_.api_client, address)
+        let mut ongoing_ops = self_
+            .api_client
+            .get_unconfirmed_deposits(address)
             .await
             .map_err(|err| {
                 vlog::warn!(
@@ -96,13 +98,13 @@ impl ApiV01 {
             })?;
 
         // Sort operations by block number from smaller (older) to greater (newer).
-        ongoing_ops.sort_by(|lhs, rhs| rhs.0.cmp(&lhs.0));
+        ongoing_ops.sort_by(|lhs, rhs| rhs.eth_block.cmp(&lhs.eth_block));
 
         // Collect the unconfirmed priority operations with respect to the
         // `offset` and `limit` parameters.
         let mut ongoing_transactions_history: Vec<_> = ongoing_ops
             .iter()
-            .map(|(block, op)| priority_op_to_tx_history(&tokens, *block, op))
+            .map(|op| priority_op_to_tx_history(&tokens, op.eth_block, op))
             .skip(offset as usize)
             .take(limit as usize)
             .collect();
@@ -231,7 +233,9 @@ impl ApiV01 {
             // fill the rest of the limit.
 
             // Fetch ongoing deposits, since they must be reported within the transactions history.
-            let mut ongoing_ops = get_ongoing_priority_ops(&self_.api_client, address)
+            let mut ongoing_ops = self_
+                .api_client
+                .get_unconfirmed_deposits(address)
                 .await
                 .map_err(|err| {
                     vlog::warn!(
@@ -245,7 +249,7 @@ impl ApiV01 {
                 })?;
 
             // Sort operations by block number from smaller (older) to greater (newer).
-            ongoing_ops.sort_by(|lhs, rhs| rhs.0.cmp(&lhs.0));
+            ongoing_ops.sort_by(|lhs, rhs| rhs.eth_block.cmp(&lhs.eth_block));
 
             let tokens = self_
                 .access_storage()
@@ -267,7 +271,7 @@ impl ApiV01 {
             // `limit` parameters.
             let mut txs: Vec<_> = ongoing_ops
                 .iter()
-                .map(|(block, op)| priority_op_to_tx_history(&tokens, *block, op))
+                .map(|op| priority_op_to_tx_history(&tokens, op.eth_block, op))
                 .take(limit as usize)
                 .collect();
 
@@ -304,7 +308,7 @@ impl ApiV01 {
     ) -> ActixResult<HttpResponse> {
         let start = Instant::now();
         let hash = try_parse_hash(&hash_hex_with_prefix)
-            .ok_or_else(|| HttpResponse::BadRequest().finish())?;
+            .map_err(|_| HttpResponse::BadRequest().finish())?;
 
         let mut res = self_
             .access_storage()
@@ -475,13 +479,13 @@ impl ApiV01 {
 
     pub async fn withdrawal_processing_time(self_: web::Data<Self>) -> ActixResult<HttpResponse> {
         let start = Instant::now();
-        let miniblock_timings = &self_.config_options.miniblock_timings;
+        let state_keeper_config = &self_.config.chain.state_keeper;
         let processing_time = WithdrawalProcessingTimeResponse {
-            normal: (miniblock_timings.miniblock_iteration_interval
-                * miniblock_timings.max_miniblock_iterations as u32)
+            normal: (state_keeper_config.miniblock_iteration_interval()
+                * state_keeper_config.miniblock_iterations as u32)
                 .as_secs(),
-            fast: (miniblock_timings.miniblock_iteration_interval
-                * miniblock_timings.fast_miniblock_iterations as u32)
+            fast: (state_keeper_config.miniblock_iteration_interval()
+                * state_keeper_config.fast_block_miniblock_iterations as u32)
                 .as_secs(),
         };
 

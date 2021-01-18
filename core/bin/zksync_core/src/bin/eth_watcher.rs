@@ -9,7 +9,8 @@ fn main() {
 
     env_logger::init();
     log::info!("ETH watcher started");
-    let web3_url = std::env::var("WEB3_URL").expect("WEB3_URL env var not found");
+    let web3_url =
+        std::env::var("ETH_CLIENT_WEB3_URL").expect("ETH_CLIENT_WEB3_URL env var not found");
     let contract_address = std::env::var("CONTRACT_ADDR").expect("CONTRACT_ADDR env var not found")
         [2..]
         .parse()

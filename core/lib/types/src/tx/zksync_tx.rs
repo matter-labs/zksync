@@ -1,16 +1,15 @@
-use crate::Nonce;
-
-use crate::{
-    tx::{ChangePubKey, Close, ForcedExit, Transfer, TxEthSignature, TxHash, Withdraw},
-    CloseOp, ForcedExitOp, TokenLike, TransferOp, TxFeeTypes, WithdrawOp,
-};
 use num::BigUint;
 use parity_crypto::digest::sha256;
-
-use super::utils::deserialize_eth_message;
-use crate::operations::ChangePubKeyOp;
 use serde::{Deserialize, Serialize};
+
 use zksync_basic_types::Address;
+
+use crate::{
+    operations::ChangePubKeyOp,
+    tx::{ChangePubKey, Close, ForcedExit, Transfer, TxEthSignature, TxHash, Withdraw},
+    utils::deserialize_eth_message,
+    CloseOp, ForcedExitOp, Nonce, TokenLike, TransferOp, TxFeeTypes, WithdrawOp,
+};
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct EthSignData {

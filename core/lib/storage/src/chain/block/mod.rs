@@ -108,6 +108,7 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
         Ok(())
     }
 
+    // Helper method for retrieving blocks from the database.
     async fn get_storage_block(&mut self, block: BlockNumber) -> QueryResult<Option<StorageBlock>> {
         let start = Instant::now();
         let block = sqlx::query_as!(
@@ -177,6 +178,7 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
         Ok(result)
     }
 
+    /// Retrieves both L1 and L2 operations stored in the block with the given number.
     pub async fn get_block_transactions(
         &mut self,
         block: BlockNumber,
@@ -474,7 +476,10 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
     }
 
     pub async fn load_committed_block(&mut self, block_number: BlockNumber) -> Option<Block> {
-        self.load_commit_op(block_number).await.map(|r| r.block)
+        let start = Instant::now();
+        let op = self.load_commit_op(block_number).await;
+        metrics::histogram!("sql.chain.block.load_committed_block", start.elapsed());
+        op.map(|op| op.block)
     }
 
     /// Returns the number of last block
@@ -515,6 +520,7 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
         result
     }
 
+    /// Helper method for retrieving pending blocks from the database.
     async fn load_storage_pending_block(&mut self) -> QueryResult<Option<StoragePendingBlock>> {
         let start = Instant::now();
         let maybe_block = sqlx::query_as!(
@@ -533,6 +539,7 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
         Ok(maybe_block)
     }
 
+    /// Retrieves the latest pending block from the database, if such is present.
     pub async fn load_pending_block(&mut self) -> QueryResult<Option<PendingBlock>> {
         let start = Instant::now();
         let mut transaction = self.0.start_transaction().await?;
@@ -545,7 +552,7 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
             Some(block) => block,
             None => return Ok(None),
         };
-
+        // Fill the block that's going to be returned with its operations.
         let executed_ops = BlockSchema(&mut transaction)
             .get_block_executed_ops(block.number as u32)
             .await?;
@@ -576,11 +583,14 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
 
     /// Returns `true` if there is a stored pending block in the database.
     pub async fn pending_block_exists(&mut self) -> QueryResult<bool> {
+        let start = Instant::now();
         let result = self.load_storage_pending_block().await?.is_some();
 
+        metrics::histogram!("sql.chain.block.pending_block_exists", start.elapsed());
         Ok(result)
     }
 
+    /// Stores given pending block into the database.
     pub async fn save_pending_block(&mut self, pending_block: PendingBlock) -> QueryResult<()> {
         let start = Instant::now();
         let mut transaction = self.0.start_transaction().await?;
@@ -625,11 +635,13 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
         Ok(())
     }
 
+    /// Returns the number of operations with the given `action_type` and `is_confirmed` status.
     pub async fn count_operations(
         &mut self,
         action_type: ActionType,
         is_confirmed: bool,
     ) -> QueryResult<i64> {
+        let start = Instant::now();
         let count = sqlx::query!(
             r#"SELECT count(*) as "count!" FROM operations WHERE action_type = $1 AND confirmed = $2"#,
             action_type.to_string(),
@@ -639,6 +651,7 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
         .await?
         .count;
 
+        metrics::histogram!("sql.chain.block.count_operations", start.elapsed());
         Ok(count)
     }
 
@@ -728,6 +741,7 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
     pub async fn get_account_tree_cache(
         &mut self,
     ) -> QueryResult<Option<(BlockNumber, serde_json::Value)>> {
+        let start = Instant::now();
         let account_tree_cache = sqlx::query_as!(
             AccountTreeCache,
             "
@@ -739,6 +753,7 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
         .fetch_optional(self.0.conn())
         .await?;
 
+        metrics::histogram!("sql.chain.block.get_account_tree_cache", start.elapsed());
         Ok(account_tree_cache.map(|w| {
             (
                 w.block as BlockNumber,
@@ -753,6 +768,7 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
         &mut self,
         block: BlockNumber,
     ) -> QueryResult<Option<serde_json::Value>> {
+        let start = Instant::now();
         let account_tree_cache = sqlx::query_as!(
             AccountTreeCache,
             "
@@ -764,6 +780,10 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
         .fetch_optional(self.0.conn())
         .await?;
 
+        metrics::histogram!(
+            "sql.chain.block.get_account_tree_cache_block",
+            start.elapsed()
+        );
         Ok(account_tree_cache.map(|w| {
             serde_json::from_str(&w.tree_cache).expect("Failed to deserialize Account Tree Cache")
         }))

@@ -5,7 +5,7 @@ use sqlx::{types::BigDecimal, FromRow};
 // Local imports
 use crate::tokens::utils::{address_to_stored_string, stored_str_address_to_address};
 use chrono::{DateTime, Utc};
-use zksync_types::tokens::TokenPrice;
+use zksync_types::tokens::{TokenMarketVolume, TokenPrice};
 use zksync_types::{Token, TokenId};
 use zksync_utils::big_decimal_to_ratio;
 
@@ -50,6 +50,23 @@ impl Into<TokenPrice> for DbTickerPrice {
     fn into(self) -> TokenPrice {
         TokenPrice {
             usd_price: big_decimal_to_ratio(&self.usd_price).expect("Price could not be negative"),
+            last_updated: self.last_updated,
+        }
+    }
+}
+
+#[derive(Debug, Clone, FromRow)]
+pub struct DBMarketVolume {
+    pub token_id: i32,
+    pub market_volume: BigDecimal,
+    pub last_updated: DateTime<Utc>,
+}
+
+impl Into<TokenMarketVolume> for DBMarketVolume {
+    fn into(self) -> TokenMarketVolume {
+        TokenMarketVolume {
+            market_volume: big_decimal_to_ratio(&self.market_volume)
+                .expect("Price could not be negative"),
             last_updated: self.last_updated,
         }
     }

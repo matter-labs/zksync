@@ -14,7 +14,7 @@ async function main() {
     const program = new Command();
 
     const handler = async (
-        operation: 'transfer' | 'deposit',
+        operation: 'transfer' | 'deposit' | 'withdraw',
         fast: boolean,
         json?: string,
         amount?: string,
@@ -27,7 +27,7 @@ async function main() {
         if (!config.defaultWallet && !json) {
             throw new Error('sender is not provided');
         }
-        if (operation == 'deposit') {
+        if (operation == 'deposit' || operation == 'withdraw') {
             recipient = recipient || config.defaultWallet || '';
         }
         // prettier-ignore
@@ -77,6 +77,15 @@ async function main() {
         .option('--fast', 'do not wait for transaction commitment')
         .action(async (amount, token, recipient, cmd) => {
             await handler('deposit', cmd.fast, cmd.json, amount, token, recipient);
+        });
+
+    program
+        .command('withdraw [amount] [token] [recipient]')
+        .description('make a withdraw')
+        .option('--json <string>', 'supply transfer info as json string')
+        .option('--fast', 'do not wait for transaction commitment')
+        .action(async (amount, token, recipient, cmd) => {
+            await handler('withdraw', cmd.fast, cmd.json, amount, token, recipient);
         });
 
     program

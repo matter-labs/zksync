@@ -444,21 +444,6 @@ impl TestSetup {
         self.execute_tx(transfer).await;
     }
 
-    fn increase_block_withdraws_amount(&mut self) {
-        self.expected_changes_for_current_block.withdraw_ops += 1;
-
-        if self.expected_changes_for_current_block.withdraw_ops
-            > crate::MAX_WITHDRAWALS_PER_BLOCK as usize
-        {
-            panic!(
-                "Attempt to perform too many withdraw operations in one block. \
-                Maximum amount of withdraw operations in one block: {}. \
-                You have to commit block if it has this amount of withdraws.",
-                crate::MAX_WITHDRAWALS_PER_BLOCK
-            )
-        }
-    }
-
     pub async fn withdraw(
         &mut self,
         from: ZKSyncAccountId,
@@ -467,8 +452,6 @@ impl TestSetup {
         amount: BigUint,
         fee: BigUint,
     ) {
-        self.increase_block_withdraws_amount();
-
         let mut zksync0_old = self
             .get_expected_zksync_account_balance(from, token.0)
             .await;
@@ -507,8 +490,6 @@ impl TestSetup {
         fee: BigUint,
         rng: &mut impl Rng,
     ) {
-        self.increase_block_withdraws_amount();
-
         let mut zksync0_old = self
             .get_expected_zksync_account_balance(from, token.0)
             .await;
@@ -541,8 +522,6 @@ impl TestSetup {
         token_id: Token,
         fee: BigUint,
     ) {
-        self.increase_block_withdraws_amount();
-
         let mut initiator_old = self
             .get_expected_zksync_account_balance(target, token_id.0)
             .await;
@@ -850,7 +829,12 @@ impl TestSetup {
             .get_account_id()
             .expect("Account should have id to exit");
         // restore account state
-        zksync_prover::exit_proof::create_exit_proof(accounts, owner_id, owner.address, token.0)
-            .expect("Failed to generate exit proof")
+        zksync_prover_utils::exit_proof::create_exit_proof(
+            accounts,
+            owner_id,
+            owner.address,
+            token.0,
+        )
+        .expect("Failed to generate exit proof")
     }
 }

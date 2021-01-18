@@ -2,8 +2,10 @@ name: CI
 
 on:
   pull_request:
+  push:
     branches:
-     - '*'
+    - staging
+    - trying
 
 jobs:
   ci-all:
@@ -23,11 +25,22 @@ jobs:
         echo CI=1 >> $GITHUB_ENV
         echo $(pwd)/bin >> $GITHUB_PATH
 
+    - name: cache-contracts
+      uses: actions/cache@v2
+      with:
+        path: |
+          contracts/build
+          contracts/node_modules
+          contracts/dev-contracts/generated
+        key: ${{ runner.os }}-contracts-${{ hashFiles('contracts/contracts/*.sol') }}
+
     - name: update-deps
       run: |
-        rustup update stable
-        cargo sqlx --version || cargo install --version=0.2.0 sqlx-cli
-        docker pull matterlabs/ci-integration-test:zk-latest
+        rustup update 1.48.0
+        rustup default 1.48.0
+        cargo install --version=0.2.0 sqlx-cli
+        cargo install diesel_cli --no-default-features --features postgres
+        docker pull matterlabs/ci-integration-test:latest
 
     - name: zk
       run: zk
@@ -36,8 +49,7 @@ jobs:
       run: |
         # lint non-rust code
         zk fmt --check
-        yarn lint:md
-        yarn lint:sol
+        zk lint --check
         zk dummy-prover ensure-disabled
         cargo fmt --all -- --check
         zk f cargo clippy --tests --benches -- -D warnings
@@ -46,7 +58,7 @@ jobs:
         cargo clippy --all --tests --benches -- -D warnings
       env:
         SQLX_OFFLINE: "true"
-    
+
     - name: generic-init
       run: |
         # Unpack keys to build dev contracts

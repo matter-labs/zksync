@@ -1,0 +1,9 @@
+#!/bin/bash
+
+if [ -z "$1" ]; then
+    cd $ZKSYNC_HOME
+    yarn && yarn zcli build
+else
+    # can't start this with yarn since it has quirks with `--` as an argument
+    node -- $ZKSYNC_HOME/infrastructure/zcli/build/index.js "$@"
+fi

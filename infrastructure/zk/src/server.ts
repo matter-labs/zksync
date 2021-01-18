@@ -25,7 +25,8 @@ export async function genesis() {
     const label = `${process.env.ZKSYNC_ENV}-Genesis_gen-${year}-${month}-${day}-${hour}${minute}${second}`;
     fs.mkdirSync(`logs/${label}`, { recursive: true });
     fs.copyFileSync('genesis.log', `logs/${label}/genesis.log`);
-    env.modify('GENESIS_ROOT', genesisRoot);
+    env.modify('CONTRACTS_GENESIS_ROOT', genesisRoot);
+    env.modify_contracts_toml('CONTRACTS_GENESIS_ROOT', genesisRoot);
 }
 
 export const command = new Command('server')

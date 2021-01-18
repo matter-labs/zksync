@@ -1,6 +1,6 @@
 use crate::rollup_ops::RollupOpsBlock;
 use anyhow::format_err;
-use web3::types::Address;
+use web3::types::{Address, H256};
 use zksync_crypto::Fr;
 use zksync_state::{
     handler::TxHandler,
@@ -350,7 +350,7 @@ impl TreeState {
                 serial_id: 0,
                 data: priority_op,
                 deadline_block: 0,
-                eth_hash: Vec::new(),
+                eth_hash: H256::zero(),
                 eth_block: 0,
             },
             block_index,
@@ -539,7 +539,7 @@ mod test {
         let tx5 = ChangePubKey::new(
             0,
             [7u8; 20].into(),
-            pub_key_hash_7.clone(),
+            pub_key_hash_7,
             1,
             BigUint::from(1u32),
             2,
@@ -732,7 +732,7 @@ mod test {
         let tx5 = ChangePubKey::new(
             0,
             [7u8; 20].into(),
-            pub_key_hash_7.clone(),
+            pub_key_hash_7,
             1,
             BigUint::from(1u32),
             2,

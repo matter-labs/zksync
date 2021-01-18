@@ -21,13 +21,11 @@ pub struct NotifierState {
 
 impl NotifierState {
     pub fn new(cache_capacity: usize, db_pool: ConnectionPool) -> Self {
-        let tokens_cache = TokenDBCache::new(db_pool.clone());
-
         Self {
             cache_of_executed_priority_operations: LruCache::new(cache_capacity),
             cache_of_transaction_receipts: LruCache::new(cache_capacity),
             cache_of_blocks_info: LruCache::new(cache_capacity),
-            tokens_cache,
+            tokens_cache: TokenDBCache::new(),
             db_pool,
         }
     }
@@ -158,11 +156,13 @@ impl NotifierState {
         action: ActionType,
     ) -> anyhow::Result<(AccountId, ResponseAccountState)> {
         let start = Instant::now();
+
         let mut storage = self.db_pool.access_storage().await?;
+
         let account_state = storage
             .chain()
             .account_schema()
-            .account_state_by_address(&address)
+            .account_state_by_address(address)
             .await?;
 
         let account_id = if let Some(id) = account_state.committed.as_ref().map(|(id, _)| id) {
@@ -177,7 +177,7 @@ impl NotifierState {
         }
         .map(|(_, a)| a)
         {
-            ResponseAccountState::try_restore(account, &self.tokens_cache).await?
+            ResponseAccountState::try_restore(&mut storage, &self.tokens_cache, account).await?
         } else {
             ResponseAccountState::default()
         };
@@ -212,7 +212,7 @@ impl NotifierState {
         };
 
         let account = if let Some(account) = stored_account {
-            ResponseAccountState::try_restore(account, &self.tokens_cache)
+            ResponseAccountState::try_restore(&mut storage, &self.tokens_cache, account)
                 .await
                 .ok()
         } else {

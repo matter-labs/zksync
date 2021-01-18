@@ -1,0 +1,4 @@
+status = ["ci-all"]
+delete_merged_branches = true
+update_base_for_deletes = true
+timeout_sec = 7200

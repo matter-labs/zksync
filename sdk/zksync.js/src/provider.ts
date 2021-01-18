@@ -1,4 +1,4 @@
-import { AbstractJSONRPCTransport, HTTPTransport, WSTransport } from './transport';
+import { AbstractJSONRPCTransport, HTTPTransport, WSTransport, DummyTransport } from './transport';
 import { ethers, Contract, BigNumber } from 'ethers';
 import {
     AccountState,
@@ -16,7 +16,7 @@ import {
 } from './types';
 import { isTokenETH, sleep, SYNC_GOV_CONTRACT_INTERFACE, TokenSet } from './utils';
 
-export async function getDefaultProvider(network: Network, transport: 'WS' | 'HTTP' = 'WS'): Promise<Provider> {
+export async function getDefaultProvider(network: Network, transport: 'WS' | 'HTTP' = 'HTTP'): Promise<Provider> {
     if (network === 'localhost') {
         if (transport === 'WS') {
             return await Provider.newWebsocketProvider('ws://127.0.0.1:3031');
@@ -77,6 +77,19 @@ export class Provider {
         return provider;
     }
 
+    /**
+     * Provides some hardcoded values the `Provider` responsible for
+     * without communicating with the network
+     */
+    static async newMockProvider(network: string, ethPrivateKey: Uint8Array, getTokens: Function): Promise<Provider> {
+        const transport = new DummyTransport(network, ethPrivateKey, getTokens);
+        const provider = new Provider(transport);
+
+        provider.contractAddress = await provider.getContractAddress();
+        provider.tokenSet = new TokenSet(await provider.getTokens());
+        return provider;
+    }
+
     // return transaction hash (e.g. sync-tx:dead..beef)
     async submitTx(tx: any, signature?: TxEthSignature, fastProcessing?: boolean): Promise<string> {
         return await this.transport.request('tx_submit', [tx, signature, fastProcessing]);
@@ -97,6 +110,11 @@ export class Provider {
 
     async getTokens(): Promise<Tokens> {
         return await this.transport.request('tokens', null);
+    }
+
+    async updateTokenSet(): Promise<void> {
+        const updatedTokenSet = new TokenSet(await this.getTokens());
+        this.tokenSet = updatedTokenSet;
     }
 
     async getState(address: Address): Promise<AccountState> {

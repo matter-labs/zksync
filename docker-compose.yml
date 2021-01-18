@@ -19,6 +19,13 @@ services:
     - type: bind
       source: ./volumes/geth
       target: /var/lib/geth/data
+  dev-liquidity-token-watcher:
+    image: "matterlabs/dev-liquidity-token-watcher:latest"
+    ports:
+      - "9975:9975"
+    volumes:
+      - ./etc/tokens/:/etc/tokens
+
   dev-ticker:
     image: "matterlabs/dev-ticker:latest"
     ports:

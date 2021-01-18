@@ -16,6 +16,7 @@ pub trait FeeTickerInfo {
     async fn is_account_new(&mut self, address: Address) -> bool;
 }
 
+#[derive(Clone)]
 pub struct TickerInfo {
     db: ConnectionPool,
 }
@@ -38,7 +39,7 @@ impl FeeTickerInfo for TickerInfo {
         let account_state = storage
             .chain()
             .account_schema()
-            .account_state_by_address(&address)
+            .account_state_by_address(address)
             .await
             .expect("Unable to query account state from the database");
 

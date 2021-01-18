@@ -2,12 +2,24 @@
 use std::time::Duration;
 // External imports
 // Workspace imports
-use zksync_config::ConfigurationOptions;
+use zksync_config::ZkSyncConfig;
 use zksync_crypto::proof::EncodedProofPlonk;
 use zksync_types::{block::PendingBlock, Action};
 // Local imports
-use crate::tests::{chain::utils::get_operation, db_test};
 use crate::{chain::block::BlockSchema, prover::ProverSchema, QueryResult, StorageProcessor};
+use crate::{test_data::gen_operation, tests::db_test};
+
+/// Returns the smallest supported block size.
+fn supported_block_sizes() -> Vec<usize> {
+    ZkSyncConfig::from_env()
+        .chain
+        .circuit
+        .supported_block_chunks_sizes
+}
+
+fn smallest_block_size() -> usize {
+    supported_block_sizes()[0]
+}
 
 /// Checks that the proof can be stored and loaded.
 #[db_test]
@@ -49,7 +61,7 @@ async fn test_store_witness(mut storage: StorageProcessor<'_>) -> QueryResult<()
     storage
         .chain()
         .block_schema()
-        .execute_operation(get_operation(BLOCK_NUMBER, Action::Commit, BLOCK_SIZE))
+        .execute_operation(gen_operation(BLOCK_NUMBER, Action::Commit, BLOCK_SIZE))
         .await?;
 
     // Store the witness.
@@ -134,14 +146,14 @@ async fn prover_run(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
     // Add the prover.
     let prover_name = "prover_10";
     // Smallest block size.
-    let block_size = ConfigurationOptions::from_env().available_block_chunk_sizes[0];
+    let block_size = smallest_block_size();
     let _prover_id = ProverSchema(&mut storage)
         .register_prover(prover_name, block_size)
         .await?;
 
     // Create a block.
     BlockSchema(&mut storage)
-        .execute_operation(get_operation(1, Action::Commit, block_size))
+        .execute_operation(gen_operation(1, Action::Commit, block_size))
         .await?;
 
     // Get a prover run.
@@ -182,7 +194,7 @@ async fn prover_run(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
 
     // Create one more block.
     BlockSchema(&mut storage)
-        .execute_operation(get_operation(2, Action::Commit, block_size))
+        .execute_operation(gen_operation(2, Action::Commit, block_size))
         .await?;
 
     // Now we should get a prover run for the second block.
@@ -205,7 +217,7 @@ async fn unstarted_prover_jobs_count(mut storage: StorageProcessor<'_>) -> Query
     // Add the prover.
     let prover_name = "prover_10";
     // Smallest block size.
-    let block_size = ConfigurationOptions::from_env().available_block_chunk_sizes[0];
+    let block_size = smallest_block_size();
     let _prover_id = ProverSchema(&mut storage)
         .register_prover(prover_name, block_size)
         .await?;
@@ -216,13 +228,13 @@ async fn unstarted_prover_jobs_count(mut storage: StorageProcessor<'_>) -> Query
 
     // Create a some blocks.
     BlockSchema(&mut storage)
-        .execute_operation(get_operation(1, Action::Commit, block_size))
+        .execute_operation(gen_operation(1, Action::Commit, block_size))
         .await?;
     BlockSchema(&mut storage)
-        .execute_operation(get_operation(2, Action::Commit, block_size))
+        .execute_operation(gen_operation(2, Action::Commit, block_size))
         .await?;
     BlockSchema(&mut storage)
-        .execute_operation(get_operation(3, Action::Commit, block_size))
+        .execute_operation(gen_operation(3, Action::Commit, block_size))
         .await?;
 
     // We've created 3 blocks and no jobs were assigned yet.
@@ -282,7 +294,7 @@ async fn unstarted_prover_jobs_count(mut storage: StorageProcessor<'_>) -> Query
     // Then, when all the blocks are verified, create on more commit and check
     // that amount is increased again.
     BlockSchema(&mut storage)
-        .execute_operation(get_operation(4, Action::Commit, block_size))
+        .execute_operation(gen_operation(4, Action::Commit, block_size))
         .await?;
     let blocks_count = ProverSchema(&mut storage).unstarted_jobs_count().await?;
     assert_eq!(blocks_count, 1);

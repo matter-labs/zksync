@@ -11,7 +11,7 @@ use zksync_types::operations::{ChangePubKeyOp, ZkSyncOp};
 use zksync_types::priority_ops::PriorityOp;
 use zksync_types::{
     Address, CloseOp, Deposit, DepositOp, FullExit, FullExitOp, Token, TransferOp, TransferToNewOp,
-    WithdrawOp,
+    WithdrawOp, H256,
 };
 // Local imports
 
@@ -93,6 +93,41 @@ impl TransactionsHistoryTestSetup {
         self.blocks.push(block);
     }
 
+    pub fn add_block_with_rejected_op(&mut self, block_id: u32) {
+        let prior_op_unique_serial_id = u64::from(block_id * 2);
+        let executed_deposit_op = self.create_deposit_op(prior_op_unique_serial_id, block_id, 0);
+        let executed_transfer_to_new_op = self.create_transfer_to_new_op(Some(1));
+        let rejected_transfer_op = self.create_transfer_tx(None);
+        let executed_close_op = self.create_close_tx(Some(2));
+        let executed_change_pubkey_op = self.create_change_pubkey_tx(Some(3));
+        let executed_withdraw_op = self.create_withdraw_tx(Some(4));
+        let executed_full_exit_op =
+            self.create_full_exit_op(prior_op_unique_serial_id + 1, block_id, 6);
+
+        let operations = vec![
+            executed_deposit_op,
+            executed_full_exit_op,
+            executed_transfer_to_new_op,
+            rejected_transfer_op,
+            executed_withdraw_op,
+            executed_close_op,
+            executed_change_pubkey_op,
+        ];
+
+        let block = Block::new(
+            block_id,
+            Fr::zero(),
+            0,
+            operations,
+            (0, 0), // Not important
+            100,
+            1_000_000.into(), // Not important
+            1_500_000.into(), // Not important
+        );
+
+        self.blocks.push(block);
+    }
+
     fn create_deposit_op(
         &mut self,
         serial_id: u64,
@@ -114,7 +149,9 @@ impl TransactionsHistoryTestSetup {
                 serial_id,
                 data: deposit_op.try_get_priority_op().unwrap(),
                 deadline_block: 0,
-                eth_hash: hex::decode(format!("000000{}{}", block, block_index)).unwrap(),
+                eth_hash: H256::from_slice(
+                    &hex::decode(format!("{:0>64}", format!("{}{}", block, block_index))).unwrap(),
+                ),
                 eth_block: 10,
             },
             op: deposit_op,
@@ -145,7 +182,9 @@ impl TransactionsHistoryTestSetup {
                 serial_id,
                 data: full_exit_op.try_get_priority_op().unwrap(),
                 deadline_block: 0,
-                eth_hash: hex::decode(format!("000000{}{}", block, block_index)).unwrap(),
+                eth_hash: H256::from_slice(
+                    &hex::decode(format!("{:0>64}", format!("{}{}", block, block_index))).unwrap(),
+                ),
                 eth_block: 11,
             },
             op: full_exit_op,
@@ -207,7 +246,7 @@ impl TransactionsHistoryTestSetup {
 
         let executed_transfer_op = ExecutedTx {
             signed_tx: transfer_op.try_get_tx().unwrap().into(),
-            success: true,
+            success: block_index.is_some(),
             op: Some(transfer_op),
             fail_reason: None,
             block_index,

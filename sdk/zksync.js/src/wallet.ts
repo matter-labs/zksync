@@ -11,7 +11,6 @@ import {
     PriorityOperationReceipt,
     TransactionReceipt,
     PubKeyHash,
-    TxEthSignature,
     ChangePubKey,
     EthSignerType,
     SignedTransaction,
@@ -22,12 +21,8 @@ import {
     IERC20_INTERFACE,
     isTokenETH,
     MAX_ERC20_APPROVE_AMOUNT,
-    getChangePubkeyMessage,
     SYNC_MAIN_CONTRACT_INTERFACE,
-    getSignedBytesFromMessage,
-    signMessagePersonalAPI,
     ERC20_DEPOSIT_GAS_LIMIT,
-    getEthSignatureType,
     serializeTransfer
 } from './utils';
 
@@ -632,7 +627,7 @@ export class Wallet {
                 try {
                     const gasEstimate = await mainZkSyncContract.estimateGas.depositERC20(...args).then(
                         (estimate) => estimate,
-                        (_err) => BigNumber.from('0')
+                        () => BigNumber.from('0')
                     );
                     txRequest.gasLimit = gasEstimate.gte(ERC20_DEPOSIT_GAS_LIMIT)
                         ? gasEstimate

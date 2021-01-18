@@ -15,7 +15,7 @@ use zksync_crypto::{public_key_from_private, Fr, PrivateKey, PublicKey};
 /// to perform an operation.
 ///
 /// `PubKeyHash` is calculated as the Rescue hash of the public key byte sequence.
-#[derive(Clone, PartialEq, Default, Eq, Hash, PartialOrd, Ord)]
+#[derive(Copy, Clone, PartialEq, Default, Eq, Hash, PartialOrd, Ord)]
 pub struct PubKeyHash {
     pub data: [u8; params::FR_ADDRESS_LEN],
 }

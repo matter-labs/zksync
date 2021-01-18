@@ -101,7 +101,7 @@ impl WitnessTestAccount {
         let account = {
             let mut account = Account::default_with_address(&zksync_account.address);
             account.add_balance(0, &BigUint::from(balance));
-            account.pub_key_hash = zksync_account.pubkey_hash.clone();
+            account.pub_key_hash = zksync_account.pubkey_hash;
             account
         };
 

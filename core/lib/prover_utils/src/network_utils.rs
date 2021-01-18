@@ -37,7 +37,7 @@ pub fn get_universal_setup_monomial_form(
 fn try_to_download_setup(
     power_of_two: u32,
 ) -> Result<Crs<Engine, CrsForMonomialForm>, backoff::Error<anyhow::Error>> {
-    let setup_network_dir = std::env::var("PROVER_SETUP_NETWORK_DIR")
+    let setup_network_dir = std::env::var("MISC_PROVER_SETUP_NETWORK_DIR")
         .map_err(|e| backoff::Error::Permanent(e.into()))?;
 
     let setup_dl_path = format!("{}/setup_2%5E{}.key", setup_network_dir, power_of_two);
@@ -53,11 +53,12 @@ fn try_to_download_setup(
 }
 
 fn get_backoff() -> backoff::ExponentialBackoff {
-    let mut backoff = backoff::ExponentialBackoff::default();
-    backoff.current_interval = Duration::from_secs(5);
-    backoff.initial_interval = Duration::from_secs(5);
-    backoff.multiplier = 1.2f64;
-    backoff.max_interval = Duration::from_secs(80);
-    backoff.max_elapsed_time = Some(Duration::from_secs(10 * 60));
-    backoff
+    backoff::ExponentialBackoff {
+        current_interval: Duration::from_secs(5),
+        initial_interval: Duration::from_secs(5),
+        multiplier: 1.2f64,
+        max_interval: Duration::from_secs(80),
+        max_elapsed_time: Some(Duration::from_secs(10 * 60)),
+        ..Default::default()
+    }
 }

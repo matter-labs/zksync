@@ -7,7 +7,7 @@ use zksync_types::{
     Action, ActionType, BlockNumber,
 };
 // Local imports
-use super::utils::{get_operation, get_operation_with_txs};
+use crate::test_data::{gen_operation, gen_operation_with_txs};
 use crate::{
     chain::{
         block::{records::BlockDetails, BlockSchema},
@@ -56,19 +56,19 @@ async fn test_commit_rewind(mut storage: StorageProcessor<'_>) -> QueryResult<()
     // Execute and commit these blocks.
     // Also store account updates.
     BlockSchema(&mut storage)
-        .execute_operation(get_operation(1, Action::Commit, BLOCK_SIZE_CHUNKS))
+        .execute_operation(gen_operation(1, Action::Commit, BLOCK_SIZE_CHUNKS))
         .await?;
     StateSchema(&mut storage)
         .commit_state_update(1, &updates_block_1, 0)
         .await?;
     BlockSchema(&mut storage)
-        .execute_operation(get_operation(2, Action::Commit, BLOCK_SIZE_CHUNKS))
+        .execute_operation(gen_operation(2, Action::Commit, BLOCK_SIZE_CHUNKS))
         .await?;
     StateSchema(&mut storage)
         .commit_state_update(2, &updates_block_2, 0)
         .await?;
     BlockSchema(&mut storage)
-        .execute_operation(get_operation(3, Action::Commit, BLOCK_SIZE_CHUNKS))
+        .execute_operation(gen_operation(3, Action::Commit, BLOCK_SIZE_CHUNKS))
         .await?;
     StateSchema(&mut storage)
         .commit_state_update(3, &updates_block_3, 0)
@@ -95,7 +95,7 @@ async fn test_commit_rewind(mut storage: StorageProcessor<'_>) -> QueryResult<()
         .store_proof(1, &Default::default())
         .await?;
     BlockSchema(&mut storage)
-        .execute_operation(get_operation(
+        .execute_operation(gen_operation(
             1,
             Action::Verify {
                 proof: Default::default(),
@@ -107,7 +107,7 @@ async fn test_commit_rewind(mut storage: StorageProcessor<'_>) -> QueryResult<()
         .store_proof(2, &Default::default())
         .await?;
     BlockSchema(&mut storage)
-        .execute_operation(get_operation(
+        .execute_operation(gen_operation(
             2,
             Action::Verify {
                 proof: Default::default(),
@@ -652,8 +652,8 @@ async fn pending_block_workflow(mut storage: StorageProcessor<'_>) -> QueryResul
     let txs_1 = vec![executed_tx_1];
     let txs_2 = vec![executed_tx_2];
 
-    let block_1 = get_operation_with_txs(1, Action::Commit, BLOCK_SIZE_CHUNKS, txs_1.clone());
-    let block_2 = get_operation_with_txs(2, Action::Commit, BLOCK_SIZE_CHUNKS, txs_2.clone());
+    let block_1 = gen_operation_with_txs(1, Action::Commit, BLOCK_SIZE_CHUNKS, txs_1.clone());
+    let block_2 = gen_operation_with_txs(2, Action::Commit, BLOCK_SIZE_CHUNKS, txs_2.clone());
 
     let pending_block_1 = PendingBlock {
         number: 1,
@@ -780,21 +780,21 @@ async fn test_unproven_block_query(mut storage: StorageProcessor<'_>) -> QueryRe
 
     // Execute and commit these blocks.
     BlockSchema(&mut storage)
-        .execute_operation(get_operation(1, Action::Commit, BLOCK_SIZE_CHUNKS))
+        .execute_operation(gen_operation(1, Action::Commit, BLOCK_SIZE_CHUNKS))
         .await?;
     ProverSchema(&mut storage)
         .store_witness(1, serde_json::json!(null))
         .await?;
     assert_eq!(ProverSchema(&mut storage).pending_jobs_count().await?, 1);
     BlockSchema(&mut storage)
-        .execute_operation(get_operation(2, Action::Commit, BLOCK_SIZE_CHUNKS))
+        .execute_operation(gen_operation(2, Action::Commit, BLOCK_SIZE_CHUNKS))
         .await?;
     ProverSchema(&mut storage)
         .store_witness(2, serde_json::json!(null))
         .await?;
     assert_eq!(ProverSchema(&mut storage).pending_jobs_count().await?, 2);
     BlockSchema(&mut storage)
-        .execute_operation(get_operation(3, Action::Commit, BLOCK_SIZE_CHUNKS))
+        .execute_operation(gen_operation(3, Action::Commit, BLOCK_SIZE_CHUNKS))
         .await?;
     ProverSchema(&mut storage)
         .store_witness(3, serde_json::json!(null))
@@ -811,7 +811,7 @@ async fn test_unproven_block_query(mut storage: StorageProcessor<'_>) -> QueryRe
         .await?;
     assert_eq!(ProverSchema(&mut storage).pending_jobs_count().await?, 1);
     BlockSchema(&mut storage)
-        .execute_operation(get_operation(
+        .execute_operation(gen_operation(
             1,
             Action::Verify {
                 proof: Default::default(),
@@ -825,7 +825,7 @@ async fn test_unproven_block_query(mut storage: StorageProcessor<'_>) -> QueryRe
         .await?;
     assert_eq!(ProverSchema(&mut storage).pending_jobs_count().await?, 0);
     BlockSchema(&mut storage)
-        .execute_operation(get_operation(
+        .execute_operation(gen_operation(
             2,
             Action::Verify {
                 proof: Default::default(),

@@ -21,7 +21,6 @@ use tokio::{task::JoinHandle, time};
 use web3::types::{Address, BlockNumber};
 
 // Workspace deps
-use zksync_config::ConfigurationOptions;
 use zksync_crypto::params::PRIORITY_EXPIRATION;
 use zksync_storage::ConnectionPool;
 use zksync_types::{Nonce, PriorityOp, PubKeyHash, ZkSyncPriorityOp};
@@ -36,6 +35,7 @@ use self::{
 
 pub use client::EthHttpClient;
 pub use storage::DBStorage;
+use zksync_config::ZkSyncConfig;
 
 mod client;
 mod eth_state;
@@ -79,6 +79,10 @@ pub enum EthWatchRequest {
         resp: oneshot::Sender<Vec<PriorityOp>>,
     },
     GetUnconfirmedDeposits {
+        address: Address,
+        resp: oneshot::Sender<Vec<PriorityOp>>,
+    },
+    GetUnconfirmedOps {
         address: Address,
         resp: oneshot::Sender<Vec<PriorityOp>>,
     },
@@ -158,8 +162,16 @@ impl<W: EthClient, S: Storage> EthWatch<W, S> {
     async fn process_new_blocks(&mut self, last_ethereum_block: u64) -> anyhow::Result<()> {
         debug_assert!(self.eth_state.last_ethereum_block() < last_ethereum_block);
 
+        // We have to process every block between the current and previous known values.
+        // This is crucial since `eth_watch` may enter the backoff mode in which it will skip many blocks.
+        // Note that we don't have to add `number_of_confirmations_for_event` here, because the check function takes
+        // care of it on its own. Here we calculate "how many blocks should we watch", and the offsets with respect
+        // to the `number_of_confirmations_for_event` are calculated by `update_eth_state`.
+        let block_difference =
+            last_ethereum_block.saturating_sub(self.eth_state.last_ethereum_block());
+
         let (unconfirmed_queue, received_priority_queue) = self
-            .update_eth_state(last_ethereum_block, self.number_of_confirmations_for_event)
+            .update_eth_state(last_ethereum_block, block_difference)
             .await?;
 
         // Extend the existing priority operations with the new ones.
@@ -188,12 +200,12 @@ impl<W: EthClient, S: Storage> EthWatch<W, S> {
     async fn update_eth_state(
         &mut self,
         current_ethereum_block: u64,
-        depth_of_last_approved_block: u64,
+        unprocessed_blocks_amount: u64,
     ) -> anyhow::Result<(Vec<PriorityOp>, HashMap<u64, ReceivedPriorityOp>)> {
         let new_block_with_accepted_events =
             current_ethereum_block.saturating_sub(self.number_of_confirmations_for_event);
         let previous_block_with_accepted_events =
-            new_block_with_accepted_events.saturating_sub(depth_of_last_approved_block);
+            new_block_with_accepted_events.saturating_sub(unprocessed_blocks_amount);
 
         self.update_withdrawals(
             previous_block_with_accepted_events,
@@ -258,7 +270,7 @@ impl<W: EthClient, S: Storage> EthWatch<W, S> {
         self.eth_state
             .unconfirmed_queue()
             .iter()
-            .find(|op| op.eth_hash.as_slice() == eth_hash)
+            .find(|op| op.eth_hash.as_bytes() == eth_hash)
             .cloned()
     }
 
@@ -272,6 +284,21 @@ impl<W: EthClient, S: Storage> EthWatch<W, S> {
                     deposit.from == address || deposit.to == address
                 }
                 _ => false,
+            })
+            .cloned()
+            .collect()
+    }
+
+    fn get_ongoing_ops_for(&self, address: Address) -> Vec<PriorityOp> {
+        self.eth_state
+            .unconfirmed_queue()
+            .iter()
+            .filter(|op| match &op.data {
+                ZkSyncPriorityOp::Deposit(deposit) => {
+                    // Address may be set to sender.
+                    deposit.from == address
+                }
+                ZkSyncPriorityOp::FullExit(full_exit) => full_exit.eth_address == address,
             })
             .cloned()
             .collect()
@@ -297,6 +324,9 @@ impl<W: EthClient, S: Storage> EthWatch<W, S> {
     fn enter_backoff_mode(&mut self) {
         let backoff_until = Instant::now() + RATE_LIMIT_DELAY;
         self.mode = WatcherMode::Backoff(backoff_until);
+        // This is needed to track how much time is spent in backoff mode
+        // and trigger grafana alerts
+        metrics::histogram!("eth_watcher.enter_backoff_mode", RATE_LIMIT_DELAY);
     }
 
     fn polling_allowed(&mut self) -> bool {
@@ -380,7 +410,11 @@ impl<W: EthClient, S: Storage> EthWatch<W, S> {
                 }
                 EthWatchRequest::GetUnconfirmedDeposits { address, resp } => {
                     let deposits_for_address = self.get_ongoing_deposits_for(address);
-                    resp.send(deposits_for_address).unwrap_or_default();
+                    resp.send(deposits_for_address).ok();
+                }
+                EthWatchRequest::GetUnconfirmedOps { address, resp } => {
+                    let deposits_for_address = self.get_ongoing_ops_for(address);
+                    resp.send(deposits_for_address).ok();
                 }
                 EthWatchRequest::GetUnconfirmedOpByHash { eth_hash, resp } => {
                     let unconfirmed_op = self.find_ongoing_op_by_hash(&eth_hash);
@@ -412,27 +446,28 @@ impl<W: EthClient, S: Storage> EthWatch<W, S> {
 
 #[must_use]
 pub fn start_eth_watch(
-    config_options: ConfigurationOptions,
+    config_options: &ZkSyncConfig,
     eth_req_sender: mpsc::Sender<EthWatchRequest>,
     eth_req_receiver: mpsc::Receiver<EthWatchRequest>,
     db_pool: ConnectionPool,
 ) -> JoinHandle<()> {
-    let transport = web3::transports::Http::new(&config_options.web3_url).unwrap();
+    let transport = web3::transports::Http::new(&config_options.eth_client.web3_url).unwrap();
     let web3 = web3::Web3::new(transport);
-    let eth_client = EthHttpClient::new(web3, config_options.contract_eth_addr);
+    let eth_client = EthHttpClient::new(web3, config_options.contracts.contract_addr);
 
     let storage = DBStorage::new(db_pool);
 
     let eth_watch = EthWatch::new(
         eth_client,
         storage,
-        config_options.confirmations_for_eth_event,
+        config_options.eth_watch.confirmations_for_eth_event,
     );
 
     tokio::spawn(eth_watch.run(eth_req_receiver));
 
+    let poll_interval = config_options.eth_watch.poll_interval();
     tokio::spawn(async move {
-        let mut timer = time::interval(config_options.eth_watch_poll_interval);
+        let mut timer = time::interval(poll_interval);
 
         loop {
             timer.tick().await;
