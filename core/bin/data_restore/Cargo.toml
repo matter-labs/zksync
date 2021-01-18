@@ -14,7 +14,6 @@ publish = false # We don't want to publish our binaries.
 db_test = []
 
 [dependencies]
-tracing = "0.1.22"
 vlog = { path = "../../lib/vlog", version = "1.0" }
 
 num = { version = "0.3.1", features = ["serde"] }

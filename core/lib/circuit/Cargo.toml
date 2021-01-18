@@ -21,7 +21,6 @@ rust-crypto = "0.2"
 num = { version = "0.3.1", features = ["serde"] }
 serde = "1.0.90"
 anyhow = "1.0"
-tracing = "0.1.22"
 vlog = { path = "../../lib/vlog", version = "1.0" }
 
 [dev-dependencies]

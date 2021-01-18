@@ -26,7 +26,6 @@ ctrlc = { version = "3.1", features = ["termination"] }
 futures = "0.3"
 tokio = { version = "0.2", features = ["full"] }
 
-tracing = "0.1.22"
 vlog = { path = "../../lib/vlog", version = "1.0" }
 tracing-subscriber = "0.2.15"
 

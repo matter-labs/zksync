@@ -22,7 +22,6 @@ time = "0.1"
 hex = "0.4"
 rust-crypto = "0.2"
 
-tracing = "0.1.22"
 vlog = { path = "../../lib/vlog", version = "1.0" }
 
 structopt = "0.3.20"

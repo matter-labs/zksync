@@ -23,7 +23,6 @@ reqwest = { version = "0.10.6", features = ["blocking"] }
 serde = "1.0"
 num = { version = "0.3.1", features = ["serde"] }
 
-tracing = "0.1.22"
 vlog = { path = "../../lib/vlog", version = "1.0" }
 
 [dev-dependencies]

@@ -20,12 +20,13 @@
 //!
 //! But I couldn't easily replicate its default behavior in my custom logger.
 //!
+pub use tracing as __tracing;
 pub use tracing::{debug, info, trace};
 
 #[macro_export]
 macro_rules! warn {
     ($($arg:tt)*) => {
-        vlog::warn!(
+        vlog::__tracing::warn!(
             "[{}:{}:{}] {}",
             file!(),
             line!(),
@@ -38,7 +39,7 @@ macro_rules! warn {
 #[macro_export]
 macro_rules! error {
     ($($arg:tt)*) => {
-        vlog::error!(
+        vlog::__tracing::error!(
             "[{}:{}:{}] {}",
             file!(),
             line!(),
