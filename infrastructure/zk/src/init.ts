@@ -11,8 +11,8 @@ import { up } from './up';
 
 export async function init() {
     await createVolumes();
-    await docker.pull();
     if (!process.env.CI) {
+        await docker.pull();
         await checkEnv();
         await env.gitHooks();
         await up();
