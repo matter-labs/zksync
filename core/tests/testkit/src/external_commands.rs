@@ -74,7 +74,7 @@ fn run_external_command(command: &str, args: &[&str]) -> String {
 pub fn js_revert_reason(tx_hash: &H256) -> String {
     let web3_urls =
         std::env::var("ETH_CLIENT_WEB3_URLS").expect("ETH_CLIENT_WEB3_URLS should be installed");
-    let web3_urls: Vec<&str> = web3_urls.split(",").collect();
+    let web3_urls: Vec<&str> = web3_urls.split(',').collect();
     run_external_command(
         "zk",
         &[

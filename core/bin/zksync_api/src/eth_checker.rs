@@ -110,7 +110,7 @@ mod tests {
 
         let web3_urls = std::env::var("ETH_CLIENT_WEB3_URLS")
             .expect("ETH_CLIENT_WEB3_URLS should be installed");
-        let web3_urls: Vec<&str> = web3_urls.split(",").collect();
+        let web3_urls: Vec<&str> = web3_urls.split(',').collect();
 
         let manual_signature =
             PackedEthSignature::sign(&config.eip1271.owner_private_key, message.as_bytes())
