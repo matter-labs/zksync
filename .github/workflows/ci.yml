@@ -107,7 +107,7 @@ jobs:
         run: |
           ci_run zk server &>server.log &
           ci_run sleep 1
-          cu_run zk dummy-prover run &>dummy_prover.log &
+          ci_run zk dummy-prover run &>dummy_prover.log &
           ci_run sleep 10
 
       - name: integration-server
