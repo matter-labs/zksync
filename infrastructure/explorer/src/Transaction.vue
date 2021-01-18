@@ -30,7 +30,12 @@
                             />
                             <Entry
                                 class="normalize-text"
-                                v-else-if="['zkSync tx hash', 'ETH Tx hash'].includes(data.item['name'])"
+                                v-else-if="data.item['name'] == 'zkSync tx hash'"
+                                :value="data.item.value"
+                            />
+                            <Entry
+                                class="normalize-text"
+                                v-else-if="data.item['name'] == 'ETH tx hash'"
                                 :value="data.item.value"
                             />
                             <Entry v-else-if="data.item.name == 'Status'" :value="data.item.value" />
@@ -108,6 +113,7 @@ export default {
 
             if (txData.tx_type == 'Withdraw') {
                 txData.tx_type = 'Withdrawal';
+                txData.withdrawalTxHash = await client.withdrawalTxHash(`sync-tx:${this.tx_hash.slice(2)}`);
             }
 
             let block = {
@@ -149,6 +155,19 @@ export default {
         tx_hash() {
             return this.$route.params.id;
         },
+        completeWithdrawalHashEntry() {
+            const entry = makeEntry('ETH tx hash');
+
+            if (this.txData.withdrawalTxHash) {
+                entry.outterLink(`${blockchainExplorerTx}/${this.txData.withdrawalTxHash}`);
+                entry.innerHTML(this.txData.withdrawalTxHash);
+                entry.copyable();
+            } else {
+                entry.innerHTML(`Not yet sent on the chain.`);
+            }
+
+            return entry;
+        },
         breadcrumbs() {
             return [
                 {
@@ -165,22 +184,36 @@ export default {
                 }
             ];
         },
-        hashEntry() {
-            const entry = this.onChainTx
-                ? makeEntry('ETH Tx hash').outterLink(`${blockchainExplorerTx}/${this.tx_hash}`).innerHTML(this.tx_hash)
-                : makeEntry('zkSync tx hash').innerHTML(this.tx_hash);
 
-            return entry.copyable();
+        hashEntry() {
+            if (this.withdrawalTx) {
+                return [
+                    makeEntry('zkSync tx hash').innerHTML(this.tx_hash).copyable(),
+                    this.completeWithdrawalHashEntry
+                ];
+            }
+
+            const entry = this.onChainTx
+                ? makeEntry('ETH tx hash')
+                      .outterLink(`${blockchainExplorerTx}/${this.tx_hash}`)
+                      .innerHTML(this.tx_hash)
+                      .copyable()
+                : makeEntry('zkSync tx hash').innerHTML(this.tx_hash).copyable();
+
+            return [entry];
         },
         props() {
             if (Object.keys(this.txData).length == 0) {
                 return [];
             }
 
-            return [this.hashEntry, ...getTxEntries(this.txData)];
+            return [...this.hashEntry, ...getTxEntries(this.txData)];
         },
         onChainTx() {
             return this.txData.tx_type == 'Deposit' || this.txData.tx_type == 'FullExit';
+        },
+        withdrawalTx() {
+            return this.txData.tx_type == 'Withdrawal' || this.txData.tx_type == 'ForcedExit';
         }
     },
     components
