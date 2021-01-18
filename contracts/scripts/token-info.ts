@@ -1,7 +1,8 @@
 import { Command } from 'commander';
 import { ethers } from 'ethers';
+import { web3Provider } from './utils';
 
-const provider = new ethers.providers.JsonRpcProvider(process.env.ETH_CLIENT_WEB3_URL);
+const provider = web3Provider();
 
 type Token = {
     address: string;
