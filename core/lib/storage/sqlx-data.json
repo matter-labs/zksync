@@ -1116,6 +1116,27 @@
       "nullable": []
     }
   },
+  "4534e42575c3d9d93740398a6247ee09048d4abf5426389c0d07f7b6f609c372": {
+    "query": "\n                WITH unsized_blocks AS (\n                    SELECT * FROM operations o\n                    WHERE action_type = 'COMMIT'\n                        AND block_number >\n                            (SELECT COALESCE(max(block_number),0) FROM operations WHERE action_type = 'VERIFY')\n                        AND NOT EXISTS\n                            (SELECT * FROM proofs WHERE block_number = o.block_number)\n                        AND NOT EXISTS\n                            (SELECT * FROM prover_runs\n                                WHERE block_number = o.block_number AND (now() - updated_at) < $1::interval)\n                )\n                SELECT min(block_number) FROM unsized_blocks\n                INNER JOIN blocks\n                    ON unsized_blocks.block_number = blocks.number AND blocks.block_size = $2\n            ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "min",
+          "type_info": "Int8"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Interval",
+          "Int8"
+        ]
+      },
+      "nullable": [
+        null
+      ]
+    }
+  },
   "457b4a87812ac9dcad6fbfc356952f05481a5729074ce305c3dedb33f99672f6": {
     "query": "\n            DELETE FROM pending_block WHERE number = $1\n            ",
     "describe": {
@@ -2792,26 +2813,6 @@
         ]
       },
       "nullable": []
-    }
-  },
-  "abcb1ba77db438ed57266435357e92992da4efd7a2b254f95b58a68a4ea30df0": {
-    "query": "\n                WITH unsized_blocks AS (\n                    SELECT * FROM operations o\n                    WHERE action_type = 'COMMIT'\n                        AND block_number >\n                            (SELECT COALESCE(max(block_number),0) FROM operations WHERE action_type = 'VERIFY')\n                        AND NOT EXISTS\n                            (SELECT * FROM proofs WHERE block_number = o.block_number)\n                        AND NOT EXISTS\n                            (SELECT * FROM prover_runs\n                                WHERE block_number = o.block_number AND (now() - updated_at) < interval '120 seconds')\n                )\n                SELECT min(block_number) FROM unsized_blocks\n                INNER JOIN blocks\n                    ON unsized_blocks.block_number = blocks.number AND blocks.block_size = $1\n            ",
-    "describe": {
-      "columns": [
-        {
-          "ordinal": 0,
-          "name": "min",
-          "type_info": "Int8"
-        }
-      ],
-      "parameters": {
-        "Left": [
-          "Int8"
-        ]
-      },
-      "nullable": [
-        null
-      ]
     }
   },
   "b1c528c67d3c2ecea86e3ba1b2407cb4ee72149d66be0498be1c1162917c065d": {

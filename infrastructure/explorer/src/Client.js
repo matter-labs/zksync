@@ -163,6 +163,10 @@ export class Client {
         return tx;
     }
 
+    async withdrawalTxHash(syncTxHash) {
+        return await window.syncProvider.getEthTxForWithdrawal(syncTxHash);
+    }
+
     getAccount(address) {
         return window.syncProvider.getState(address);
     }

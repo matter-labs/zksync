@@ -43,7 +43,13 @@ export async function basicSetup() {
     env.reload();
 
     process.chdir('core/lib/storage');
-    console.log(`DATABASE_URL = ${process.env.DATABASE_URL}`);
+    if (process.env.DATABASE_URL == 'postgres://postgres@localhost/plasma') {
+        console.log(`Using localhost database:`);
+        console.log(`DATABASE_URL = ${process.env.DATABASE_URL}`);
+    } else {
+        // Remote database, we can't show the contents.
+        console.log(`WARNING! Using prod db!`);
+    }
     await utils.exec('diesel database setup');
     await utils.exec('diesel migration run');
     fs.unlinkSync('src/schema.rs.generated');

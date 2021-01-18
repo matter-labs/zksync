@@ -105,13 +105,29 @@ export async function load() {
 // takes variable name, e.g. VARIABLE
 // and the new assignment, e.g. VARIABLE=foo
 export function modify(variable: string, assignedVariable: string) {
+    if (!process.env.ENV_FILE) {
+        // ENV_FILE variable is not set, do nothing.
+        return;
+    }
+
     const envFile = process.env.ENV_FILE as string;
+    if (!fs.existsSync(envFile)) {
+        console.log(`${process.env.ENV_FILE} env file was not found, skipping update...`);
+        return;
+    }
+
     utils.replaceInFile(envFile, `${variable}=.*`, assignedVariable.trim());
     reload();
 }
 
 export function modify_contracts_toml(variable: string, assignedVariable: string) {
     const toml_file = `${process.env.ENV_DIR}/contracts.toml`;
+
+    if (!fs.existsSync(toml_file)) {
+        console.log(`contracts.toml config file was not found, skipping update...`);
+        return;
+    }
+
     const source = fs.readFileSync(toml_file).toString();
     const toml_res = toml.parse(source);
     const trimmed_variable = variable.replace('CONTRACTS_', '');
