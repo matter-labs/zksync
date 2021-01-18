@@ -15,13 +15,10 @@ interface Events {
     event BlockVerification(uint32 indexed blockNumber);
 
     /// @notice Event emitted when user funds are withdrawn from the zkSync contract
-    event OnchainWithdrawal(address indexed owner, uint16 indexed tokenId, uint128 amount, bool success);
+    event Withdrawal(uint16 indexed tokenId, uint128 amount);
 
-    /// @notice Event emitted when user funds are withdrawn from the rollup
-    event RollupWithdrawal(address indexed owner, uint16 indexed tokenId, uint128 amount);
-
-    /// @notice Event emitted when user send a transaction to deposit her funds
-    event OnchainDeposit(address indexed sender, uint16 indexed tokenId, uint128 amount, address indexed owner);
+    /// @notice Event emitted when user funds are deposited to the zkSync contract
+    event Deposit(uint16 indexed tokenId, uint128 amount);
 
     /// @notice Event emitted when user sends a authentication fact (e.g. pub-key hash)
     event FactAuth(address indexed sender, uint32 nonce, bytes fact);

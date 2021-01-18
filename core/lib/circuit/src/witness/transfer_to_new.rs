@@ -38,6 +38,8 @@ pub struct TransferToNewData {
     pub from_account_address: u32,
     pub to_account_address: u32,
     pub new_address: Fr,
+    pub valid_from: u32,
+    pub valid_until: u32,
 }
 
 pub struct TransferToNewWitness<E: RescueEngine> {
@@ -66,6 +68,8 @@ impl Witness for TransferToNewWitness<Bn256> {
             from_account_address: transfer_to_new.from,
             to_account_address: transfer_to_new.to,
             new_address: eth_address_to_fr(&transfer_to_new.tx.to),
+            valid_from: transfer_to_new.tx.valid_from.unwrap_or(0),
+            valid_until: transfer_to_new.tx.valid_until.unwrap_or(u32::MAX),
         };
         // le_bit_vector_into_field_element()
         Self::apply_data(tree, &transfer_data)
@@ -278,6 +282,10 @@ impl TransferToNewWitness<Bn256> {
 
         let fee_encoded: Fr = le_bit_vector_into_field_element(&fee_bits);
         log::debug!("fee_encoded in test_transfer_to_new {}", fee_encoded);
+
+        let valid_from = transfer_to_new.valid_from;
+        let valid_until = transfer_to_new.valid_until;
+
         //applying first transfer part
         let (
             account_witness_from_before,
@@ -414,6 +422,8 @@ impl TransferToNewWitness<Bn256> {
                 b: Some(b),
                 pub_nonce: Some(Fr::zero()),
                 new_pub_key_hash: Some(Fr::zero()),
+                valid_from: Some(Fr::from_str(&valid_from.to_string()).unwrap()),
+                valid_until: Some(Fr::from_str(&valid_until.to_string()).unwrap()),
             },
             before_root: Some(before_root),
             intermediate_root: Some(intermediate_root),

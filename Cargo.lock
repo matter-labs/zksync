@@ -6175,6 +6175,7 @@ dependencies = [
  "num",
  "serde",
  "serde_json",
+ "structopt",
  "tokio 0.2.22",
  "web3 0.13.0",
  "zksync_circuit",

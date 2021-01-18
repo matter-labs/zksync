@@ -2,7 +2,9 @@
 
 use log::info;
 use std::time::Instant;
+use structopt::StructOpt;
 use web3::transports::Http;
+
 use zksync_circuit::witness::utils::build_block_witness;
 use zksync_config::AvailableBlockSizesConfig;
 use zksync_crypto::circuit::CircuitAccountTree;
@@ -10,18 +12,72 @@ use zksync_crypto::params::account_tree_depth;
 use zksync_prover_utils::aggregated_proofs::{gen_aggregate_proof, prepare_proof_data};
 use zksync_prover_utils::{PlonkVerificationKey, SetupForStepByStepProver};
 use zksync_testkit::eth_account::EthereumAccount;
-use zksync_testkit::external_commands::{deploy_contracts, get_test_accounts};
+use zksync_testkit::external_commands::{deploy_contracts, get_test_accounts, js_revert_reason};
 use zksync_testkit::zksync_account::ZkSyncAccount;
 use zksync_testkit::{
     genesis_state, spawn_state_keeper, AccountSet, ETHAccountId, TestSetup, TestkitConfig, Token,
     ZKSyncAccountId,
 };
 use zksync_types::aggregated_operations::BlocksProofOperation;
-use zksync_types::{DepositOp, U256};
+use zksync_types::DepositOp;
+
+#[derive(Debug, StructOpt)]
+#[structopt(name = "ZkSync block sizes test", author = "Matter Labs")]
+struct Opt {
+    #[structopt(long)]
+    block_chunks_sizes: Option<Vec<usize>>,
+
+    #[structopt(long)]
+    skip_single_block_checks: bool,
+
+    #[structopt(long)]
+    aggregated_proof_sizes: Option<Vec<usize>>,
+}
 
 #[tokio::main]
 async fn main() {
     env_logger::init();
+
+    let opt = Opt::from_args();
+
+    let block_chunks_sizes = if !opt.skip_single_block_checks {
+        if let Some(block_chunks_sizes) = opt.block_chunks_sizes {
+            let available_sizes = AvailableBlockSizesConfig::from_env().blocks_chunks;
+            for chunk in &block_chunks_sizes {
+                available_sizes
+                    .iter()
+                    .find(|available_chunk| *available_chunk == chunk)
+                    .expect("Block chunk size is not found in available sizes");
+            }
+            block_chunks_sizes
+        } else {
+            AvailableBlockSizesConfig::from_env().blocks_chunks
+        }
+    } else {
+        Vec::new()
+    };
+
+    let aggregated_proof_sizes = if let Some(aggregated_proof_sizes) = opt.aggregated_proof_sizes {
+        let available_sizes = AvailableBlockSizesConfig::from_env().aggregated_proof_sizes;
+        for aggregated_size in &aggregated_proof_sizes {
+            available_sizes
+                .iter()
+                .find(|available_size| *available_size == aggregated_size)
+                .expect("Aggregates size is not found in available sizes");
+        }
+        aggregated_proof_sizes
+    } else {
+        AvailableBlockSizesConfig::from_env().aggregated_proof_sizes
+    };
+
+    info!(
+        "Checking proofs for block sizes: {:?}, aggregated sizes: {:?}",
+        block_chunks_sizes, aggregated_proof_sizes
+    );
+
+    let available_block_chunk_sizes = AvailableBlockSizesConfig::from_env().blocks_chunks;
+    let available_aggregated_proof_sizes =
+        AvailableBlockSizesConfig::from_env().aggregated_proof_sizes_with_setup_pow();
 
     let testkit_config = TestkitConfig::from_env();
 
@@ -93,20 +149,12 @@ async fn main() {
         circuit_account_tree.insert(id, account.into());
     }
 
-    let block_chunk_sizes = AvailableBlockSizesConfig::from_env().blocks_chunks;
-    let aggregated_proof_sizes =
-        AvailableBlockSizesConfig::from_env().aggregated_proof_sizes_with_setup_pow();
-    info!(
-        "Checking keys and onchain verification for block sizes: {:?}",
-        block_chunk_sizes
-    );
-
-    for block_size in block_chunk_sizes.clone() {
+    for block_size in block_chunks_sizes.clone() {
         info!("Checking keys for block size: {}", block_size);
 
         test_setup.start_block();
         for _ in 1..=(block_size / DepositOp::CHUNKS) {
-            let (receipts, op) = test_setup
+            let (receipts, _) = test_setup
                 .deposit(ETHAccountId(1), ZKSyncAccountId(2), Token(0), 1u32.into())
                 .await;
             receipts
@@ -149,9 +197,9 @@ async fn main() {
         for _ in 0..1 {
             proofs.push((proof.clone(), block_size));
         }
-        let (vks, proof_data) = prepare_proof_data(&block_chunk_sizes, proofs);
+        let (vks, proof_data) = prepare_proof_data(&available_block_chunk_sizes, proofs);
         let aggreagated_proof =
-            gen_aggregate_proof(vks, proof_data, &aggregated_proof_sizes, false)
+            gen_aggregate_proof(vks, proof_data, &available_aggregated_proof_sizes, false)
                 .expect("Failed to generate aggreagated proof");
 
         let proof_op = BlocksProofOperation {
@@ -164,17 +212,14 @@ async fn main() {
             .expect_success();
     }
 
-    {
-        let block_size = *block_chunk_sizes.first().unwrap();
+    for aggregated_proof_size in aggregated_proof_sizes {
+        let block_size = *available_block_chunk_sizes.first().unwrap();
         info!("Checking recursive keys for block size: {}", block_size);
 
-        let recursive_size = 5;
-        let mut proofs = Vec::new();
-        let mut block_commitments = Vec::new();
         let mut blocks = Vec::new();
-        let mut block_idxs_in_proof = Vec::new();
+        let mut proofs = Vec::new();
 
-        for idx in 0..recursive_size {
+        for _ in 0..aggregated_proof_size {
             test_setup.start_block();
             for _ in 1..=(block_size / DepositOp::CHUNKS) {
                 let (receipts, _) = test_setup
@@ -189,8 +234,6 @@ async fn main() {
             assert!(block.block_chunks_size <= block_size);
             // complete block to the correct size with noops
             block.block_chunks_size = block_size;
-            blocks.push(block.clone());
-            block_idxs_in_proof.push(idx);
 
             let timer = Instant::now();
             let witness = build_block_witness(&mut circuit_account_tree, &block)
@@ -221,23 +264,27 @@ async fn main() {
             info!("Proof done in {} s", timer.elapsed().as_secs());
 
             proofs.push((proof.clone(), block_size));
-            block_commitments.push(U256::from_big_endian(block.block_commitment.as_bytes()));
+            blocks.push(block);
         }
 
-        let (vks, proof_data) = prepare_proof_data(&block_chunk_sizes, proofs);
-        let aggreagated_proof =
-            gen_aggregate_proof(vks, proof_data, &aggregated_proof_sizes, false)
-                .expect("Failed to generate aggreagated proof");
-        // aggreagated_proof.individual_vk_inputs = block_commitments;
+        let (vks, proof_data) = prepare_proof_data(&available_block_chunk_sizes, proofs);
+        let aggregated_proof =
+            gen_aggregate_proof(vks, proof_data, &available_aggregated_proof_sizes, false)
+                .expect("Failed to generate aggregated proof");
 
         let proof_op = BlocksProofOperation {
             blocks,
-            proof: aggreagated_proof.serialize_aggregated_proof(),
+            proof: aggregated_proof.serialize_aggregated_proof(),
         };
-        test_setup
+        let tx_receipt = test_setup
             .execute_verify_commitments(proof_op)
             .await
             .expect_success();
+        info!(
+            "Aggregated proof, size: {}, gas cost: {}",
+            aggregated_proof_size,
+            tx_receipt.gas_used.expect("Gas used empty")
+        );
     }
 
     stop_state_keeper_sender.send(()).expect("sk stop send");

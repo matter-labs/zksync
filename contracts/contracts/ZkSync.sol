@@ -388,7 +388,9 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
                 sent = false;
             }
         }
-        if (!sent) {
+        if (sent) {
+            emit Withdrawal(_tokenId, _amount);
+        } else {
             increaseBalanceToWithdraw(packedBalanceKey, _amount);
         }
     }
@@ -458,10 +460,7 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
     function proveBlocks(StoredBlockInfo[] memory _committedBlocks, ProofInput memory _proof) external nonReentrant {
         uint32 currentTotalBlocksProven = totalBlocksProven;
         for (uint256 i = 0; i < _committedBlocks.length; ++i) {
-            require(
-                hashStoredBlockInfo(_committedBlocks[i]) == storedBlockHashes[currentTotalBlocksProven + 1],
-                "pbl2"
-            );
+            require(hashStoredBlockInfo(_committedBlocks[i]) == storedBlockHashes[currentTotalBlocksProven + 1], "o1");
             ++currentTotalBlocksProven;
 
             require(_proof.commitments[i] & INPUT_MASK == uint256(_committedBlocks[i].commitment) & INPUT_MASK, "o"); // incorrect block commitment in proof
@@ -597,6 +596,7 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
             });
         bytes memory pubData = Operations.writeDepositPubdataForPriorityQueue(op);
         addPriorityRequest(Operations.OpType.Deposit, pubData);
+        emit Deposit(_tokenId, _amount);
     }
 
     /// @notice Register withdrawal - update user balance and emit OnchainWithdrawal event
@@ -611,6 +611,7 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
         bytes22 packedBalanceKey = packAddressAndTokenId(_to, _token);
         uint128 balance = pendingBalances[packedBalanceKey].balanceToWithdraw;
         pendingBalances[packedBalanceKey].balanceToWithdraw = balance.sub(_amount);
+        emit Withdrawal(_token, _amount);
     }
 
     /// @dev Gets operations packed in bytes array. Unpacks it and stores onchain operations.
