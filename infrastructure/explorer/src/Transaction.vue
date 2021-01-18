@@ -52,7 +52,7 @@
 <script>
 import { clientPromise } from './Client';
 import timeConstants from './timeConstants';
-import { makeEntry } from './utils';
+import { makeEntry, removeTxHashPrefix } from './utils';
 import SearchField from './SearchField.vue';
 import CopyableAddress from './CopyableAddress.vue';
 import Navbar from './Navbar.vue';
@@ -113,7 +113,7 @@ export default {
 
             if (txData.tx_type == 'Withdraw') {
                 txData.tx_type = 'Withdrawal';
-                txData.withdrawalTxHash = await client.withdrawalTxHash(`sync-tx:${this.tx_hash.slice(2)}`);
+                txData.withdrawalTxHash = await client.withdrawalTxHash(`sync-tx:${removeTxHashPrefix(this.tx_hash)}`);
             }
 
             let block = {

@@ -9,6 +9,16 @@ export function isReadablyPrintable(tokenName) {
     return readablyPrintableTokens.includes(tokenName);
 }
 
+export function removeTxHashPrefix(txHash) {
+    let nonPrefixHash = txHash;
+    for (const prefix of ['0x', 'sync-tx:', 'sync-bl:', 'sync:']) {
+        if (nonPrefixHash.startsWith(prefix)) {
+            nonPrefixHash = nonPrefixHash.slice(prefix.length);
+        }
+    }
+    return nonPrefixHash;
+}
+
 export function shortenHash(str, fallback) {
     try {
         return `${str.slice(0, 12)}...`;
