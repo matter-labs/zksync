@@ -2,6 +2,7 @@ use futures::{channel::mpsc, executor::block_on, SinkExt, StreamExt};
 use std::cell::RefCell;
 use zksync_config::ZkSyncConfig;
 use zksync_eth_sender::run_eth_sender;
+use zksync_prometheus_exporter::run_prometheus_exporter;
 use zksync_storage::ConnectionPool;
 
 #[tokio::main]
@@ -25,11 +26,18 @@ async fn main() -> anyhow::Result<()> {
     let pool = ConnectionPool::new(Some(ETH_SENDER_CONNECTION_POOL_SIZE));
     let config = ZkSyncConfig::from_env();
 
+    // Run prometheus data exporter.
+    let (prometheus_task_handle, _) =
+        run_prometheus_exporter(pool.clone(), config.api.prometheus.port, false);
+
     let task_handle = run_eth_sender(pool, config);
 
     tokio::select! {
         _ = async { task_handle.await } => {
             panic!("Ethereum sender actors aren't supposed to finish their execution")
+        },
+        _ = async { prometheus_task_handle.await } => {
+            panic!("Prometheus exporter actors aren't supposed to finish their execution")
         },
         _ = async { stop_signal_receiver.next().await } => {
             log::warn!("Stop signal received, shutting down");
