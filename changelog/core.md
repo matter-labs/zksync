@@ -9,9 +9,12 @@ All notable changes to the core components will be documented in this file.
 
 ### Changed
 
+- `prometheus_exporter` was made a library to be used by several crates.
 - `prover_run_for_next_commit` function uses a parameterized timeout instead of a hard-coded one.
 
 ### Added
+
+- `prometheus_exporter` is launched by every microservice.
 
 ### Fixed
 
