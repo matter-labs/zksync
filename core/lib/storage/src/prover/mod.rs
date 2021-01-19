@@ -1,6 +1,8 @@
 // Built-in deps
 use std::time::Instant;
 // External imports
+use anyhow::format_err;
+use sqlx::Done;
 // Workspace imports
 use zksync_types::BlockNumber;
 // Local imports
@@ -169,15 +171,22 @@ impl<'a, 'c> ProverSchema<'a, 'c> {
     ) -> QueryResult<()> {
         let start = Instant::now();
         let mut transaction = self.0.start_transaction().await?;
-        sqlx::query!(
+        let updated_rows = sqlx::query!(
             "UPDATE prover_job_queue
             SET (updated_at, job_status, updated_by) = (now(), $1, 'server_finish_job')
-            WHERE id = $2",
+            WHERE id = $2 AND job_type = $3",
             ProverJobStatus::Done.to_number(),
             job_id,
+            ProverJobType::SingleProof.to_string()
         )
         .execute(transaction.conn())
-        .await?;
+        .await?
+        .rows_affected();
+
+        if updated_rows != 1 {
+            return Err(format_err!("Missing job for stored proof"));
+        }
+
         sqlx::query!(
             "INSERT INTO proofs (block_number, proof)
             VALUES ($1, $2)",
@@ -202,15 +211,22 @@ impl<'a, 'c> ProverSchema<'a, 'c> {
     ) -> QueryResult<()> {
         let start = Instant::now();
         let mut transaction = self.0.start_transaction().await?;
-        sqlx::query!(
+        let updated_rows = sqlx::query!(
             "UPDATE prover_job_queue
             SET (updated_at, job_status, updated_by) = (now(), $1, 'server_finish_job')
-            WHERE id = $2",
+            WHERE id = $2 AND job_type = $3",
             ProverJobStatus::Done.to_number(),
-            job_id
+            job_id,
+            ProverJobType::AggregatedProof.to_string()
         )
         .execute(transaction.conn())
-        .await?;
+        .await?
+        .rows_affected() as usize;
+
+        if updated_rows != 1 {
+            return Err(format_err!("Missing job for stored aggregated proof"));
+        }
+
         sqlx::query!(
             "INSERT INTO aggregated_proofs (first_block, last_block, proof)
             VALUES ($1, $2, $3)",
