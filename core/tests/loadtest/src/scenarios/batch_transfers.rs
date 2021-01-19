@@ -99,6 +99,7 @@ impl Scenario for BatchTransferScenario {
         ScenarioResources {
             balance_per_wallet: closest_packable_token_amount(&balance_per_wallet),
             wallets_amount: self.wallets,
+            has_deposits: false,
         }
     }
 
