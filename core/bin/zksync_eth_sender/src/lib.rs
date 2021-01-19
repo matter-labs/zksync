@@ -167,7 +167,7 @@ impl<ETH: EthereumInterface, DB: DatabaseInterface> ETHSender<ETH, DB> {
                 "Adding unprocessed ZKSync operation <id {}; action: {}; block: {}> to queue",
                 operation.id.expect("ID must be set"),
                 operation.action.to_string(),
-                operation.block.block_number
+                *operation.block.block_number
             );
             sender.add_operation_to_queue(operation);
         }
@@ -398,7 +398,7 @@ impl<ETH: EthereumInterface, DB: DatabaseInterface> ETHSender<ETH, DB> {
                 "<id {}; action: {}; block: {}>",
                 op.id.expect("ID must be set"),
                 op.action.to_string(),
-                op.block.block_number
+                *op.block.block_number
             )
         } else {
             "<not applicable>".into()
@@ -720,14 +720,14 @@ impl<ETH: EthereumInterface, DB: DatabaseInterface> ETHSender<ETH, DB> {
                 let public_data = op.block.get_eth_public_data();
                 log::debug!(
                     "public_data for block_number {}: {}",
-                    op.block.block_number,
+                    *op.block.block_number,
                     hex::encode(&public_data)
                 );
 
                 let witness_data = op.block.get_eth_witness_data();
                 log::debug!(
                     "witness_data for block {}: {}, {:?}",
-                    op.block.block_number,
+                    *op.block.block_number,
                     hex::encode(&witness_data.0),
                     &witness_data.1
                 );
@@ -735,8 +735,8 @@ impl<ETH: EthereumInterface, DB: DatabaseInterface> ETHSender<ETH, DB> {
                 self.ethereum.encode_tx_data(
                     "commitBlock",
                     (
-                        u64::from(op.block.block_number),
-                        u64::from(op.block.fee_account),
+                        u64::from(*op.block.block_number),
+                        u64::from(*op.block.fee_account),
                         vec![root],
                         public_data,
                         witness_data.0,
@@ -750,7 +750,7 @@ impl<ETH: EthereumInterface, DB: DatabaseInterface> ETHSender<ETH, DB> {
                 self.ethereum.encode_tx_data(
                     "verifyBlock",
                     (
-                        u64::from(block_number),
+                        u64::from(*block_number),
                         proof.proof.clone(),
                         withdrawals_data,
                     ),
@@ -784,7 +784,7 @@ impl<ETH: EthereumInterface, DB: DatabaseInterface> ETHSender<ETH, DB> {
                 }
 
                 self.tx_queue.add_verify_operation(
-                    block_number as usize,
+                    *block_number as usize,
                     TxData::from_operation(OperationType::Verify, op.clone(), raw_tx),
                 );
             }
@@ -794,7 +794,7 @@ impl<ETH: EthereumInterface, DB: DatabaseInterface> ETHSender<ETH, DB> {
             "Added ZKSync operation <id {}; action: {}; block: {}> to queue",
             op.id.expect("ID must be set"),
             op.action.to_string(),
-            op.block.block_number
+            *op.block.block_number
         );
     }
 

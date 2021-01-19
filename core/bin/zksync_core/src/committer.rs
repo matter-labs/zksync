@@ -88,7 +88,7 @@ async fn save_pending_block(
 
     let block_number = pending_block.number;
 
-    log::trace!("persist pending block #{}", block_number);
+    log::trace!("persist pending block #{}", *block_number);
 
     transaction
         .chain()
@@ -186,7 +186,7 @@ async fn commit_block(
         block,
         id: None,
     };
-    log::info!("commit block #{}", op.block.block_number);
+    log::info!("commit block #{}", *op.block.block_number);
     transaction
         .chain()
         .block_schema()
@@ -240,13 +240,13 @@ async fn poll_for_new_proofs_task(pool: ConnectionPool) {
                     .await
                     .expect("Unable to start DB transaction");
 
-                log::info!("New proof for block: {}", block_number);
+                log::info!("New proof for block: {}", *block_number);
                 let block = transaction
                     .chain()
                     .block_schema()
                     .load_committed_block(block_number)
                     .await
-                    .unwrap_or_else(|| panic!("failed to load block #{}", block_number));
+                    .unwrap_or_else(|| panic!("failed to load block #{}", *block_number));
 
                 let op = Operation {
                     action: Action::Verify {
@@ -261,7 +261,7 @@ async fn poll_for_new_proofs_task(pool: ConnectionPool) {
                     .execute_operation(op.clone())
                     .await
                     .expect("committer must commit the op into db");
-                last_verified_block += 1;
+                *last_verified_block += 1;
 
                 transaction
                     .commit()

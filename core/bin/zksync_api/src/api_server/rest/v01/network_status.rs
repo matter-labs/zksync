@@ -63,14 +63,14 @@ impl SharedNetworkStatus {
                             .block_schema()
                             .get_last_verified_confirmed_block()
                             .await
-                            .unwrap_or(0);
+                            .unwrap_or(BlockNumber(0));
 
                         let last_committed = transaction
                             .chain()
                             .block_schema()
                             .get_last_committed_block()
                             .await
-                            .unwrap_or(0);
+                            .unwrap_or(BlockNumber(0));
 
                         let total_transactions = transaction
                             .chain()

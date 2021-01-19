@@ -6,19 +6,19 @@ use chrono::DateTime;
 use lazy_static::lazy_static;
 // Workspace uses
 use zksync_types::{
-    block::Block, Address, ExecutedOperations, ExecutedPriorityOp, Fr, FullExit, FullExitOp,
-    PriorityOp, ZkSyncOp, ZkSyncPriorityOp, H256,
+    block::Block, AccountId, Address, BlockNumber, ExecutedOperations, ExecutedPriorityOp, Fr,
+    FullExit, FullExitOp, PriorityOp, TokenId, ZkSyncOp, ZkSyncPriorityOp, H256,
 };
 use zksync_types::{Action, Operation};
 
 /// Creates a dummy operation as a test input for `ETHSender` tests.
-fn get_operation(id: i64, block_number: u32, action: Action) -> Operation {
+fn get_operation(id: i64, block_number: BlockNumber, action: Action) -> Operation {
     // Create full exit operation for non-zero return data.
     let executed_full_exit_op = {
         let priority_op = FullExit {
-            account_id: 0,
+            account_id: AccountId(0),
             eth_address: Address::zero(),
-            token: 0,
+            token: TokenId(0),
         };
         ExecutedOperations::PriorityOp(Box::new(ExecutedPriorityOp {
             priority_op: PriorityOp {
@@ -42,7 +42,7 @@ fn get_operation(id: i64, block_number: u32, action: Action) -> Operation {
         block: Block::new(
             block_number,
             Fr::default(),
-            0,
+            AccountId(0),
             vec![executed_full_exit_op],
             (0, 0),
             50,
@@ -54,12 +54,12 @@ fn get_operation(id: i64, block_number: u32, action: Action) -> Operation {
 
 lazy_static! {
     pub static ref COMMIT_OPERATIONS: Vec<Operation> = (1..10)
-        .map(|id| get_operation(id, id as u32, Action::Commit))
+        .map(|id| get_operation(id, BlockNumber(id as u32), Action::Commit))
         .collect();
     pub static ref VERIFY_OPERATIONS: Vec<Operation> = (11..20)
         .map(|id| get_operation(
             id,
-            (id - 10) as u32,
+            BlockNumber((id - 10) as u32),
             Action::Verify {
                 proof: Default::default()
             }

@@ -15,7 +15,7 @@ use zksync_testkit::{
     genesis_state, spawn_state_keeper, AccountSet, ETHAccountId, TestSetup, TestkitConfig, Token,
     ZKSyncAccountId,
 };
-use zksync_types::DepositOp;
+use zksync_types::{DepositOp, Nonce, TokenId};
 
 #[tokio::main]
 async fn main() {
@@ -62,7 +62,7 @@ async fn main() {
             let rng_zksync_key = ZkSyncAccount::rand().private_key;
             ZkSyncAccount::new(
                 rng_zksync_key,
-                0,
+                Nonce(0),
                 eth_account.address,
                 eth_account.private_key,
             )
@@ -81,7 +81,7 @@ async fn main() {
     let account_state = test_setup.get_accounts_state().await;
     let mut circuit_account_tree = CircuitAccountTree::new(account_tree_depth());
     for (id, account) in account_state {
-        circuit_account_tree.insert(id, account.into());
+        circuit_account_tree.insert(*id, account.into());
     }
 
     let block_chunk_sizes = ZkSyncConfig::from_env()
@@ -99,7 +99,12 @@ async fn main() {
         test_setup.start_block();
         for _ in 1..=(block_size / DepositOp::CHUNKS) {
             test_setup
-                .deposit(ETHAccountId(1), ZKSyncAccountId(2), Token(0), 1u32.into())
+                .deposit(
+                    ETHAccountId(1),
+                    ZKSyncAccountId(2),
+                    Token(TokenId(0)),
+                    1u32.into(),
+                )
                 .await
                 .last()
                 .cloned()

@@ -167,7 +167,7 @@ impl TxQueue {
     pub fn verify_operation_exists(&self, block_idx: BlockNumber) -> bool {
         self.verify_operations
             .elements
-            .contains_key(&(block_idx as usize))
+            .contains_key(&(*block_idx as usize))
     }
 
     /// Adds the `commit` operation to the queue.

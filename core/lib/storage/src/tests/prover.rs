@@ -4,7 +4,7 @@ use std::time::Duration;
 // Workspace imports
 use zksync_config::ZkSyncConfig;
 use zksync_crypto::proof::EncodedProofPlonk;
-use zksync_types::{block::PendingBlock, Action};
+use zksync_types::{block::PendingBlock, Action, BlockNumber};
 // Local imports
 use crate::{chain::block::BlockSchema, prover::ProverSchema, QueryResult, StorageProcessor};
 use crate::{test_data::gen_operation, tests::db_test};
@@ -26,7 +26,7 @@ fn smallest_block_size() -> usize {
 async fn test_store_proof(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
     // Attempt to load the proof that was not stored should result in an error.
     assert!(ProverSchema(&mut storage)
-        .load_proof(1)
+        .load_proof(BlockNumber(1))
         .await
         .expect("Error while obtaining proof")
         .is_none());
@@ -34,12 +34,14 @@ async fn test_store_proof(mut storage: StorageProcessor<'_>) -> QueryResult<()> 
     // Store the proof.
     let proof = EncodedProofPlonk::default();
     assert!(ProverSchema(&mut storage)
-        .store_proof(1, &proof)
+        .store_proof(BlockNumber(1), &proof)
         .await
         .is_ok());
 
     // Now load it.
-    let loaded = ProverSchema(&mut storage).load_proof(1).await?;
+    let loaded = ProverSchema(&mut storage)
+        .load_proof(BlockNumber(1))
+        .await?;
     assert_eq!(loaded, Some(proof));
 
     Ok(())
@@ -48,7 +50,7 @@ async fn test_store_proof(mut storage: StorageProcessor<'_>) -> QueryResult<()> 
 /// Checks that the witness can be stored and loaded.
 #[db_test]
 async fn test_store_witness(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
-    const BLOCK_NUMBER: u32 = 1;
+    const BLOCK_NUMBER: BlockNumber = BlockNumber(1);
     const BLOCK_SIZE: usize = 100;
     // No witness stored for the block.
     assert!(storage
@@ -153,7 +155,7 @@ async fn prover_run(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
 
     // Create a block.
     BlockSchema(&mut storage)
-        .execute_operation(gen_operation(1, Action::Commit, block_size))
+        .execute_operation(gen_operation(BlockNumber(1), Action::Commit, block_size))
         .await?;
 
     // Get a prover run.
@@ -179,7 +181,7 @@ async fn prover_run(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
     // Create & store proof for the first block.
     let proof = EncodedProofPlonk::default();
     assert!(ProverSchema(&mut storage)
-        .store_proof(1, &proof)
+        .store_proof(BlockNumber(1), &proof)
         .await
         .is_ok());
 
@@ -194,7 +196,7 @@ async fn prover_run(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
 
     // Create one more block.
     BlockSchema(&mut storage)
-        .execute_operation(gen_operation(2, Action::Commit, block_size))
+        .execute_operation(gen_operation(BlockNumber(2), Action::Commit, block_size))
         .await?;
 
     // Now we should get a prover run for the second block.
@@ -228,13 +230,13 @@ async fn unstarted_prover_jobs_count(mut storage: StorageProcessor<'_>) -> Query
 
     // Create a some blocks.
     BlockSchema(&mut storage)
-        .execute_operation(gen_operation(1, Action::Commit, block_size))
+        .execute_operation(gen_operation(BlockNumber(1), Action::Commit, block_size))
         .await?;
     BlockSchema(&mut storage)
-        .execute_operation(gen_operation(2, Action::Commit, block_size))
+        .execute_operation(gen_operation(BlockNumber(2), Action::Commit, block_size))
         .await?;
     BlockSchema(&mut storage)
-        .execute_operation(gen_operation(3, Action::Commit, block_size))
+        .execute_operation(gen_operation(BlockNumber(3), Action::Commit, block_size))
         .await?;
 
     // We've created 3 blocks and no jobs were assigned yet.
@@ -253,7 +255,7 @@ async fn unstarted_prover_jobs_count(mut storage: StorageProcessor<'_>) -> Query
     // Create & store proof for the first block.
     let proof = EncodedProofPlonk::default();
     assert!(ProverSchema(&mut storage)
-        .store_proof(1, &proof)
+        .store_proof(BlockNumber(1), &proof)
         .await
         .is_ok());
 
@@ -270,7 +272,7 @@ async fn unstarted_prover_jobs_count(mut storage: StorageProcessor<'_>) -> Query
     assert_eq!(blocks_count, 1);
     let proof = EncodedProofPlonk::default();
     assert!(ProverSchema(&mut storage)
-        .store_proof(2, &proof)
+        .store_proof(BlockNumber(2), &proof)
         .await
         .is_ok());
     let blocks_count = ProverSchema(&mut storage).unstarted_jobs_count().await?;
@@ -285,7 +287,7 @@ async fn unstarted_prover_jobs_count(mut storage: StorageProcessor<'_>) -> Query
     assert_eq!(blocks_count, 0);
     let proof = EncodedProofPlonk::default();
     assert!(ProverSchema(&mut storage)
-        .store_proof(3, &proof)
+        .store_proof(BlockNumber(3), &proof)
         .await
         .is_ok());
     let blocks_count = ProverSchema(&mut storage).unstarted_jobs_count().await?;
@@ -294,7 +296,7 @@ async fn unstarted_prover_jobs_count(mut storage: StorageProcessor<'_>) -> Query
     // Then, when all the blocks are verified, create on more commit and check
     // that amount is increased again.
     BlockSchema(&mut storage)
-        .execute_operation(gen_operation(4, Action::Commit, block_size))
+        .execute_operation(gen_operation(BlockNumber(4), Action::Commit, block_size))
         .await?;
     let blocks_count = ProverSchema(&mut storage).unstarted_jobs_count().await?;
     assert_eq!(blocks_count, 1);
@@ -303,7 +305,7 @@ async fn unstarted_prover_jobs_count(mut storage: StorageProcessor<'_>) -> Query
 
     BlockSchema(&mut storage)
         .save_pending_block(PendingBlock {
-            number: 5,
+            number: BlockNumber(5),
             chunks_left: 0,
             unprocessed_priority_op_before: 0,
             pending_block_iteration: 1,

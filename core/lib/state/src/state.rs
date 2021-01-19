@@ -101,7 +101,7 @@ impl ZkSyncState {
     pub fn get_account(&self, account_id: AccountId) -> Option<Account> {
         let start = std::time::Instant::now();
 
-        let account = self.balance_tree.get(account_id).cloned();
+        let account = self.balance_tree.get(*account_id).cloned();
 
         log::trace!(
             "Get account (id {}) execution time: {}ms",
@@ -318,14 +318,14 @@ impl ZkSyncState {
     #[doc(hidden)] // Public for benches.
     pub fn insert_account(&mut self, id: AccountId, account: Account) {
         self.account_id_by_address.insert(account.address, id);
-        self.balance_tree.insert(id, account);
+        self.balance_tree.insert(*id, account);
     }
 
     #[allow(dead_code)]
     pub(crate) fn remove_account(&mut self, id: AccountId) {
         if let Some(account) = self.get_account(id) {
             self.account_id_by_address.remove(&account.address);
-            self.balance_tree.remove(id);
+            self.balance_tree.remove(*id);
         }
     }
 

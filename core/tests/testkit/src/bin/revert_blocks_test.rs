@@ -5,6 +5,7 @@ use zksync_testkit::{
     data_restore::verify_restore,
     scenarios::{perform_basic_operations, BlockProcessing},
 };
+use zksync_types::{Nonce, TokenId};
 
 use crate::eth_account::{parse_ether, EthereumAccount};
 use crate::external_commands::{deploy_contracts, get_test_accounts, Contracts};
@@ -54,7 +55,7 @@ async fn execute_blocks_with_new_state_keeper(
             let rng_zksync_key = ZkSyncAccount::rand().private_key;
             ZkSyncAccount::new(
                 rng_zksync_key,
-                0,
+                Nonce(0),
                 eth_account.address,
                 eth_account.private_key,
             )
@@ -75,13 +76,13 @@ async fn execute_blocks_with_new_state_keeper(
     let mut tokens = vec![];
     for token in 0..=1 {
         perform_basic_operations(
-            token,
+            TokenId(token),
             &mut test_setup,
             deposit_amount.clone(),
             block_processing,
         )
         .await;
-        tokens.push(token);
+        tokens.push(TokenId(token));
     }
 
     if block_processing == BlockProcessing::NoVerify {

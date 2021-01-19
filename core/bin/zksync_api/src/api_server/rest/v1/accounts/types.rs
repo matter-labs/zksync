@@ -80,8 +80,7 @@ pub(super) mod convert {
                 .await?
                 .ok_or_else(|| unable_to_find_token(token_id))?;
 
-            let expected_accept_block =
-                received_on_block as BlockNumber + confirmations_for_eth_event;
+            let expected_accept_block = confirmations_for_eth_event + (received_on_block as u32);
 
             let balance = balances
                 .entry(token_symbol)
@@ -102,7 +101,7 @@ pub(super) mod convert {
     pub fn validate_receipts_query(
         query: AccountReceiptsQuery,
     ) -> Result<(TxLocation, SearchDirection, BlockNumber), ApiError> {
-        if query.limit == 0 && query.limit > MAX_LIMIT {
+        if *query.limit == 0 && *query.limit > MAX_LIMIT {
             return Err(ApiError::bad_request("Incorrect limit")
                 .detail(format!("Limit should be between {} and {}", 1, MAX_LIMIT)));
         }
@@ -111,7 +110,7 @@ pub(super) mod convert {
             // Just try to fetch latest transactions.
             (None, None, None) => (
                 TxLocation {
-                    block: BlockNumber::MAX,
+                    block: BlockNumber(u32::MAX),
                     index: None,
                 },
                 SearchDirection::Older,
@@ -128,7 +127,7 @@ pub(super) mod convert {
     }
 
     pub fn tx_receipt_from_response(inner: AccountTxReceiptResponse) -> AccountTxReceipt {
-        let block = inner.block_number as BlockNumber;
+        let block = BlockNumber(inner.block_number as u32);
         let index = inner.block_index.map(|x| x as u32);
         let hash = TxHash::from_slice(&inner.tx_hash).unwrap_or_else(|| {
             panic!(
@@ -168,7 +167,7 @@ pub(super) mod convert {
     }
 
     pub fn op_receipt_from_response(inner: AccountOpReceiptResponse) -> AccountOpReceipt {
-        let block = inner.block_number as BlockNumber;
+        let block = BlockNumber(inner.block_number as u32);
         let index = inner.block_index as u32;
         let hash = H256::from_slice(&inner.eth_hash);
 

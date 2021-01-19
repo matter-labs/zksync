@@ -132,7 +132,7 @@ impl Pagination {
                     ));
                 }
 
-                Ok(Some(BlockNumber(*before - 1)))
+                Ok(Some(before - 1))
             }
             Pagination::After(after) => Ok(Some(BlockNumber(*after + *limit + 1))),
             Pagination::Last => Ok(None),

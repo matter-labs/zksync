@@ -380,7 +380,7 @@ where
     let pending_to_be_onchain_balance_before: U256 = {
         let query = main_contract.query(
             "getBalanceToWithdraw",
-            (withdraw_to.address(), token.id),
+            (withdraw_to.address(), *token.id),
             None,
             Options::default(),
             None,
@@ -413,7 +413,7 @@ where
     let pending_to_be_onchain_balance_after: U256 = {
         let query = main_contract.query(
             "getBalanceToWithdraw",
-            (withdraw_to.address(), token.id),
+            (withdraw_to.address(), *token.id),
             None,
             Options::default(),
             None,
@@ -727,7 +727,7 @@ async fn batch_transfer() -> Result<(), anyhow::Error> {
 
         signed_transfers.push((ZkSyncTx::Transfer(Box::new(transfer)), signature));
 
-        nonce += 1;
+        *nonce += 1;
     }
 
     // Send the batch and store its transaction hashes

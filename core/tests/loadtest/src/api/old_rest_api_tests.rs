@@ -158,7 +158,7 @@ impl RestApiClient {
 
     pub async fn block_tx(&self) -> anyhow::Result<()> {
         let (block_id, tx_id) = self.pool.read().await.random_tx_location();
-        let url = format!("/blocks/{}/transactions/{}", block_id, tx_id);
+        let url = format!("/blocks/{}/transactions/{}", *block_id, tx_id);
         self.get(&url).await?;
         Ok(())
     }
@@ -166,14 +166,14 @@ impl RestApiClient {
     pub async fn block_transactions(&self) -> anyhow::Result<()> {
         let url = format!(
             "/blocks/{}/transactions",
-            self.pool.read().await.random_block()
+            *self.pool.read().await.random_block()
         );
         self.get(&url).await?;
         Ok(())
     }
 
     pub async fn block_by_id(&self) -> anyhow::Result<()> {
-        let url = format!("/blocks/{}", self.pool.read().await.random_block());
+        let url = format!("/blocks/{}", *self.pool.read().await.random_block());
         self.get(&url).await?;
         Ok(())
     }
@@ -181,7 +181,7 @@ impl RestApiClient {
     pub async fn blocks(&self) -> anyhow::Result<()> {
         let url = format!(
             "/blocks?max_block={}&limit={}",
-            self.pool.read().await.random_block(),
+            *self.pool.read().await.random_block(),
             ApiDataPool::MAX_REQUEST_LIMIT
         );
         self.get(&url).await?;
@@ -189,7 +189,7 @@ impl RestApiClient {
     }
 
     pub async fn explorer_search(&self) -> anyhow::Result<()> {
-        let url = format!("/search?query={}", self.pool.read().await.random_block());
+        let url = format!("/search?query={}", *self.pool.read().await.random_block());
         self.get(&url).await?;
         Ok(())
     }

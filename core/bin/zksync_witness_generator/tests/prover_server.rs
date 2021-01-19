@@ -9,7 +9,7 @@ use zksync_circuit::witness::{deposit::DepositWitness, Witness};
 use zksync_config::ZkSyncConfig;
 use zksync_crypto::{params::total_tokens, proof::EncodedProofPlonk};
 use zksync_prover::{client, ApiClient};
-use zksync_types::{block::Block, Address, H256};
+use zksync_types::{block::Block, AccountId, Address, BlockNumber, TokenId, H256};
 // Local deps
 use zksync_circuit::witness::utils::get_used_subtree_root_hash;
 use zksync_witness_generator::run_prover_server;
@@ -221,10 +221,10 @@ pub async fn test_operation_and_wanted_prover_data(
     // Fee account
     let mut accounts = zksync_types::AccountMap::default();
     let validator_account = zksync_types::Account::default_with_address(&Address::random());
-    let validator_account_id: u32 = 0;
+    let validator_account_id = AccountId(0);
     accounts.insert(validator_account_id, validator_account.clone());
 
-    let mut state = zksync_state::state::ZkSyncState::from_acc_map(accounts, 1);
+    let mut state = zksync_state::state::ZkSyncState::from_acc_map(accounts, BlockNumber(1));
     println!(
         "acc_number 0, acc {:?}",
         zksync_crypto::circuit::account::CircuitAccount::from(validator_account.clone())
@@ -239,7 +239,7 @@ pub async fn test_operation_and_wanted_prover_data(
     let initial_used_subtree_root = get_used_subtree_root_hash(&circuit_tree);
     let deposit_priority_op = zksync_types::ZkSyncPriorityOp::Deposit(zksync_types::Deposit {
         from: validator_account.address,
-        token: 0,
+        token: TokenId(0),
         amount: BigUint::from(10u32),
         to: validator_account.address,
     });
@@ -258,9 +258,9 @@ pub async fn test_operation_and_wanted_prover_data(
         .chain()
         .state_schema()
         .commit_state_update(
-            0,
+            BlockNumber(0),
             &[(
-                0,
+                AccountId(0),
                 zksync_types::AccountUpdate::Create {
                     address: validator_account.address,
                     nonce: validator_account.nonce,
@@ -273,7 +273,7 @@ pub async fn test_operation_and_wanted_prover_data(
     storage
         .chain()
         .state_schema()
-        .apply_state_update(0)
+        .apply_state_update(BlockNumber(0))
         .await
         .unwrap();
 
@@ -314,7 +314,7 @@ pub async fn test_operation_and_wanted_prover_data(
             &mut circuit_tree,
             &zksync_types::operations::DepositOp {
                 priority_op: deposit_op,
-                account_id: 0,
+                account_id: AccountId(0),
             },
         );
 
@@ -326,7 +326,7 @@ pub async fn test_operation_and_wanted_prover_data(
     for _ in 0..block_size_chunks - operations.len() {
         operations.push(zksync_circuit::witness::noop::noop_operation(
             &circuit_tree,
-            block.fee_account,
+            *block.fee_account,
         ));
         pub_data.extend(vec![false; 64]);
     }
@@ -334,7 +334,7 @@ pub async fn test_operation_and_wanted_prover_data(
     assert_eq!(operations.len(), block_size_chunks);
 
     let validator_acc = circuit_tree
-        .get(block.fee_account as u32)
+        .get(*block.fee_account)
         .expect("fee_account is not empty");
     let mut validator_balances = vec![];
     for i in 0..total_tokens() {
@@ -346,11 +346,11 @@ pub async fn test_operation_and_wanted_prover_data(
     }
     let _: zksync_crypto::Fr = circuit_tree.root_hash();
     let (root_after_fee, validator_account_witness) =
-        zksync_circuit::witness::utils::apply_fee(&mut circuit_tree, block.fee_account, 0, 0);
+        zksync_circuit::witness::utils::apply_fee(&mut circuit_tree, *block.fee_account, 0, 0);
 
     assert_eq!(root_after_fee, block.new_root_hash);
     let (validator_audit_path, _) =
-        zksync_circuit::witness::utils::get_audits(&circuit_tree, block.fee_account as u32, 0);
+        zksync_circuit::witness::utils::get_audits(&circuit_tree, *block.fee_account as u32, 0);
     let public_data_commitment =
         zksync_circuit::witness::utils::public_data_commitment::<zksync_crypto::Engine>(
             &pub_data,

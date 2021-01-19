@@ -24,8 +24,10 @@ use zksync_types::{
 pub const BLOCK_SIZE_CHUNKS: usize = 100;
 
 /// Generates a random account with a set of changes.
-pub fn gen_acc_random_updates<R: Rng>(rng: &mut R) -> impl Iterator<Item = (u32, AccountUpdate)> {
-    let id: u32 = rng.gen();
+pub fn gen_acc_random_updates<R: Rng>(
+    rng: &mut R,
+) -> impl Iterator<Item = (AccountId, AccountUpdate)> {
+    let id: AccountId = AccountId(rng.gen());
     let balance = u128::from(rng.gen::<u64>());
     let nonce = Nonce(rng.gen());
     let pub_key_hash = PubKeyHash { data: rng.gen() };

@@ -3,7 +3,7 @@ use web3::contract::{Contract, Options};
 use web3::types::{Address, BlockId, Transaction, U256};
 use web3::Transport;
 use zksync_crypto::params::{INPUT_DATA_ADDRESS_BYTES_WIDTH, INPUT_DATA_ROOT_HASH_BYTES_WIDTH};
-use zksync_types::account::Account;
+use zksync_types::{account::Account, BlockNumber};
 
 /// Returns Rollup genesis (fees) account from the input of the Rollup contract creation transaction
 ///
@@ -77,17 +77,19 @@ pub fn get_genesis_account(genesis_transaction: &Transaction) -> Result<Account,
 ///
 pub async fn get_total_verified_blocks<T: Transport>(
     zksync_contract: &(ethabi::Contract, Contract<T>),
-) -> u32 {
-    zksync_contract
-        .1
-        .query::<U256, Option<Address>, Option<BlockId>, ()>(
-            "totalBlocksVerified",
-            (),
-            None,
-            Options::default(),
-            None,
-        )
-        .await
-        .unwrap()
-        .as_u32()
+) -> BlockNumber {
+    BlockNumber(
+        zksync_contract
+            .1
+            .query::<U256, Option<Address>, Option<BlockId>, ()>(
+                "totalBlocksVerified",
+                (),
+                None,
+                Options::default(),
+                None,
+            )
+            .await
+            .unwrap()
+            .as_u32(),
+    )
 }

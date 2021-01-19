@@ -150,7 +150,7 @@ pub fn api_scope(
 mod tests {
     use std::collections::HashMap;
 
-    use zksync_types::Address;
+    use zksync_types::{Address, TokenId};
 
     use super::{super::test_utils::TestServerConfig, *};
 
@@ -199,8 +199,8 @@ mod tests {
         cfg.fill_database().await?;
 
         let prices = [
-            (TokenLike::Id(1), 10_u64.into()),
-            (TokenLike::Id(15), 10_500_u64.into()),
+            (TokenLike::Id(TokenId(1)), 10_u64.into()),
+            (TokenLike::Id(TokenId(15)), 10_500_u64.into()),
             ("ETH".into(), 0_u64.into()),
             (Address::default().into(), 1_u64.into()),
         ];
@@ -222,13 +222,13 @@ mod tests {
         }
         assert_eq!(
             client
-                .token_price(&TokenLike::Id(2), TokenPriceKind::Currency)
+                .token_price(&TokenLike::Id(TokenId(2)), TokenPriceKind::Currency)
                 .await?,
             None
         );
         // TODO Check error (ZKS-125)
         client
-            .token_price(&TokenLike::Id(2), TokenPriceKind::Token)
+            .token_price(&TokenLike::Id(TokenId(2)), TokenPriceKind::Token)
             .await
             .unwrap_err();
 
@@ -251,7 +251,10 @@ mod tests {
 
         let expected_token = &expected_tokens[0];
         assert_eq!(
-            &client.token_by_id(&TokenLike::Id(0)).await?.unwrap(),
+            &client
+                .token_by_id(&TokenLike::Id(TokenId(0)))
+                .await?
+                .unwrap(),
             expected_token
         );
         assert_eq!(
@@ -313,7 +316,7 @@ mod tests {
             .expect("Golem token should be exist");
         // Check that GNT is alias to GMT.
         assert_eq!(golem_gnt, golem_tglm);
-        assert_eq!(golem_gnt.id, 16);
+        assert_eq!(*golem_gnt.id, 16);
 
         server.stop().await;
         Ok(())

@@ -408,7 +408,7 @@ impl ApiV01 {
         let resp = storage
             .chain()
             .block_schema()
-            .load_block_range(max_block, limit)
+            .load_block_range(BlockNumber(max_block), limit)
             .await
             .map_err(|err| {
                 vlog::warn!(
@@ -452,7 +452,7 @@ impl ApiV01 {
             .get_block_transactions(block_id)
             .await
             .map_err(|err| {
-                vlog::warn!("Internal Server Error: '{}'; input: {}", err, block_id);
+                vlog::warn!("Internal Server Error: '{}'; input: {}", err, *block_id);
                 HttpResponse::InternalServerError().finish()
             })?;
 

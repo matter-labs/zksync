@@ -13,7 +13,7 @@ use zksync::{
 };
 use zksync_eth_signer::PrivateKeySigner;
 use zksync_types::{
-    tx::PackedEthSignature, AccountId, Address, PriorityOp, TokenLike, TxFeeTypes, ZkSyncTx,
+    tx::PackedEthSignature, AccountId, Address, Nonce, PriorityOp, TokenLike, TxFeeTypes, ZkSyncTx,
 };
 // Local uses
 use crate::{config::AccountInfo, monitor::Monitor, session::save_wallet};
@@ -91,7 +91,7 @@ impl TestWallet {
             monitor,
             inner,
             eth_provider,
-            nonce: AtomicU32::new(zk_nonce),
+            nonce: AtomicU32::new(*zk_nonce),
             token_name,
         }
     }
@@ -108,7 +108,7 @@ impl TestWallet {
             .committed
             .nonce;
 
-        self.nonce.store(zk_nonce, Ordering::SeqCst);
+        self.nonce.store(*zk_nonce, Ordering::SeqCst);
         Ok(())
     }
 
@@ -257,8 +257,8 @@ impl TestWallet {
     }
 
     /// Returns appropriate nonce for the new transaction and increments the nonce.
-    fn pending_nonce(&self) -> u32 {
-        self.nonce.fetch_add(1, Ordering::SeqCst)
+    fn pending_nonce(&self) -> Nonce {
+        Nonce(self.nonce.fetch_add(1, Ordering::SeqCst))
     }
 }
 

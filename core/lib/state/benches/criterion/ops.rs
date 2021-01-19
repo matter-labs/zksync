@@ -12,16 +12,16 @@ use zksync_types::{
     account::{Account, PubKeyHash},
     priority_ops::{Deposit, FullExit},
     tx::{ChangePubKey, PackedEthSignature, Transfer, Withdraw},
-    AccountId, AccountMap, Address, BlockNumber, TokenId, ZkSyncPriorityOp, ZkSyncTx,
+    AccountId, AccountMap, Address, BlockNumber, Nonce, TokenId, ZkSyncPriorityOp, ZkSyncTx,
 };
 // Local uses
 use zksync_state::state::ZkSyncState;
 
-const ETH_TOKEN_ID: TokenId = 0x00;
+const ETH_TOKEN_ID: TokenId = TokenId(0x00);
 // The amount is not important, since we always work with 1 account.
 // We use some small non-zero value, so the overhead for cloning will not be big.
-const ACCOUNTS_AMOUNT: AccountId = 10;
-const CURRENT_BLOCK: BlockNumber = 1_000;
+const ACCOUNTS_AMOUNT: AccountId = AccountId(10);
+const CURRENT_BLOCK: BlockNumber = BlockNumber(1_000);
 
 /// Creates a random ZKSync account.
 fn generate_account() -> (H256, PrivateKey, Account) {
@@ -46,11 +46,11 @@ fn generate_state() -> (HashMap<AccountId, (PrivateKey, H256)>, ZkSyncState) {
     let mut accounts = AccountMap::default();
     let mut keys = HashMap::new();
 
-    for account_id in 0..ACCOUNTS_AMOUNT {
+    for account_id in 0..*ACCOUNTS_AMOUNT {
         let (eth_sk, sk, new_account) = generate_account();
 
-        accounts.insert(account_id, new_account);
-        keys.insert(account_id, (sk, eth_sk));
+        accounts.insert(AccountId(account_id), new_account);
+        keys.insert(AccountId(account_id), (sk, eth_sk));
     }
 
     let state = ZkSyncState::from_acc_map(accounts, CURRENT_BLOCK);
@@ -61,18 +61,20 @@ fn generate_state() -> (HashMap<AccountId, (PrivateKey, H256)>, ZkSyncState) {
 /// Bench for `ZkSyncState::apply_transfer_to_new_op`.
 fn apply_transfer_to_new_op(b: &mut Bencher<'_>) {
     let (keys, state) = generate_state();
-    let (private_key, _) = keys.get(&0).expect("Can't key the private key");
+    let (private_key, _) = keys.get(&AccountId(0)).expect("Can't key the private key");
 
-    let from_account = state.get_account(0).expect("Can't get the account");
+    let from_account = state
+        .get_account(AccountId(0))
+        .expect("Can't get the account");
 
     let transfer = Transfer::new_signed(
-        0,
+        AccountId(0),
         from_account.address,
         Address::random(),
         ETH_TOKEN_ID,
         10u32.into(),
         1u32.into(),
-        0,
+        Nonce(0),
         private_key,
     )
     .expect("failed to sign transfer");
@@ -94,19 +96,23 @@ fn apply_transfer_to_new_op(b: &mut Bencher<'_>) {
 /// Bench for `ZkSyncState::apply_transfer_op`.
 fn apply_transfer_tx(b: &mut Bencher<'_>) {
     let (keys, state) = generate_state();
-    let (private_key, _) = keys.get(&0).expect("Can't key the private key");
+    let (private_key, _) = keys.get(&AccountId(0)).expect("Can't key the private key");
 
-    let from_account = state.get_account(0).expect("Can't get the account");
-    let to_account = state.get_account(1).expect("Can't get the account");
+    let from_account = state
+        .get_account(AccountId(0))
+        .expect("Can't get the account");
+    let to_account = state
+        .get_account(AccountId(1))
+        .expect("Can't get the account");
 
     let transfer = Transfer::new_signed(
-        0,
+        AccountId(0),
         from_account.address,
         to_account.address,
         ETH_TOKEN_ID,
         10u32.into(),
         1u32.into(),
-        0,
+        Nonce(0),
         private_key,
     )
     .expect("failed to sign transfer");
@@ -130,10 +136,12 @@ fn apply_transfer_tx(b: &mut Bencher<'_>) {
 fn apply_full_exit_tx(b: &mut Bencher<'_>) {
     let (_, state) = generate_state();
 
-    let from_account = state.get_account(0).expect("Can't get the account");
+    let from_account = state
+        .get_account(AccountId(0))
+        .expect("Can't get the account");
 
     let full_exit = FullExit {
-        account_id: 0,
+        account_id: AccountId(0),
         eth_address: from_account.address,
         token: ETH_TOKEN_ID,
     };
@@ -155,7 +163,9 @@ fn apply_full_exit_tx(b: &mut Bencher<'_>) {
 fn apply_deposit_tx(b: &mut Bencher<'_>) {
     let (_, state) = generate_state();
 
-    let to_account = state.get_account(0).expect("Can't get the account");
+    let to_account = state
+        .get_account(AccountId(0))
+        .expect("Can't get the account");
 
     let deposit = Deposit {
         from: Address::random(),
@@ -181,17 +191,19 @@ fn apply_deposit_tx(b: &mut Bencher<'_>) {
 fn apply_withdraw_tx(b: &mut Bencher<'_>) {
     let (keys, state) = generate_state();
 
-    let from_account = state.get_account(0).expect("Can't get the account");
-    let (private_key, _) = keys.get(&0).expect("Can't key the private key");
+    let from_account = state
+        .get_account(AccountId(0))
+        .expect("Can't get the account");
+    let (private_key, _) = keys.get(&AccountId(0)).expect("Can't key the private key");
 
     let withdraw = Withdraw::new_signed(
-        0,
+        AccountId(0),
         from_account.address,
         Address::random(),
         ETH_TOKEN_ID,
         10u32.into(),
         1u32.into(),
-        0,
+        Nonce(0),
         private_key,
     )
     .expect("failed to sign withdraw");
@@ -215,8 +227,10 @@ fn apply_withdraw_tx(b: &mut Bencher<'_>) {
 fn apply_change_pubkey_op(b: &mut Bencher<'_>) {
     let (keys, state) = generate_state();
 
-    let to_change = state.get_account(0).expect("Can't get the account");
-    let (_, eth_private_key) = keys.get(&0).expect("Can't key the private key");
+    let to_change = state
+        .get_account(AccountId(0))
+        .expect("Can't get the account");
+    let (_, eth_private_key) = keys.get(&AccountId(0)).expect("Can't key the private key");
 
     let rng = &mut thread_rng();
     let new_sk = priv_key_from_fs(rng.gen());
@@ -224,12 +238,12 @@ fn apply_change_pubkey_op(b: &mut Bencher<'_>) {
     let nonce = 0;
 
     let mut change_pubkey = ChangePubKey::new(
-        0,
+        AccountId(0),
         to_change.address,
         PubKeyHash::from_privkey(&new_sk),
-        0,
+        TokenId(0),
         Default::default(),
-        nonce,
+        Nonce(nonce),
         None,
         None,
     );

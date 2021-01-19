@@ -208,7 +208,7 @@ impl DatabaseInterface for Database {
             OperationType::Commit | OperationType::Verify => {
                 let op = op.op.as_ref().unwrap();
                 // We're checking previous block, so for the edge case of first block we can say that it was confirmed.
-                let block_to_check = if op.block.block_number > 1 {
+                let block_to_check = if *op.block.block_number > 1 {
                     op.block.block_number - 1
                 } else {
                     return Ok(true);

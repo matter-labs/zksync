@@ -48,8 +48,8 @@ impl<'a, 'c> StateSchema<'a, 'c> {
     /// At this step, the changes are not verified yet, and thus are not applied.
     pub async fn commit_state_update(
         &mut self,
-        block_number: u32,
-        accounts_updated: &[(u32, AccountUpdate)],
+        block_number: BlockNumber,
+        accounts_updated: &[(AccountId, AccountUpdate)],
         first_update_order_id: usize,
     ) -> QueryResult<()> {
         let start = Instant::now();
@@ -64,14 +64,14 @@ impl<'a, 'c> StateSchema<'a, 'c> {
         for (update_order_id, (id, upd)) in update_order_ids.zip(accounts_updated.iter()) {
             log::debug!(
                 "Committing state update for account {} in block {}",
-                id,
-                block_number
+                **id,
+                *block_number
             );
             match *upd {
                 AccountUpdate::Create { ref address, nonce } => {
-                    let account_id = i64::from(*id);
+                    let account_id = i64::from(**id);
                     let is_create = true;
-                    let block_number = i64::from(block_number);
+                    let block_number = i64::from(*block_number);
                     let address = address.as_bytes().to_vec();
                     let nonce = i64::from(*nonce);
                     let update_order_id = update_order_id as i32;
@@ -86,9 +86,9 @@ impl<'a, 'c> StateSchema<'a, 'c> {
                     .await?;
                 }
                 AccountUpdate::Delete { ref address, nonce } => {
-                    let account_id = i64::from(*id);
+                    let account_id = i64::from(**id);
                     let is_create = false;
-                    let block_number = i64::from(block_number);
+                    let block_number = i64::from(*block_number);
                     let address = address.as_bytes().to_vec();
                     let nonce = i64::from(*nonce);
                     let update_order_id = update_order_id as i32;
@@ -107,8 +107,8 @@ impl<'a, 'c> StateSchema<'a, 'c> {
                     old_nonce,
                     new_nonce,
                 } => {
-                    let account_id = i64::from(*id);
-                    let block_number = i64::from(block_number);
+                    let account_id = i64::from(**id);
+                    let block_number = i64::from(*block_number);
                     let coin_id = *token as i32;
                     let old_balance = BigDecimal::from(BigInt::from(old_balance.clone()));
                     let new_balance = BigDecimal::from(BigInt::from(new_balance.clone()));
@@ -140,8 +140,8 @@ impl<'a, 'c> StateSchema<'a, 'c> {
                     new_nonce,
                 } => {
                     let update_order_id = update_order_id as i32;
-                    let account_id = i64::from(*id);
-                    let block_number = i64::from(block_number);
+                    let account_id = i64::from(**id);
+                    let block_number = i64::from(*block_number);
                     let old_pubkey_hash = old_pub_key_hash.data.to_vec();
                     let new_pubkey_hash = new_pub_key_hash.data.to_vec();
                     let old_nonce = i64::from(*old_nonce);
@@ -549,7 +549,7 @@ impl<'a, 'c> StateSchema<'a, 'c> {
     ) -> QueryResult<AccountUpdates> {
         let start = Instant::now();
         let result = self
-            .load_state_diff(BlockNumber(*block_number - 1), Some(block_number))
+            .load_state_diff(block_number - 1, Some(block_number))
             .await
             .map(|diff| diff.unwrap_or_default().1);
 

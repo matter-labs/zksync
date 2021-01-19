@@ -12,6 +12,8 @@ use crate::{
     zksync_account::ZkSyncAccount,
 };
 
+use zksync_types::{Nonce, TokenId};
+
 use super::*;
 
 /// Performs a fixed set of operations which covers most of the main server's functionality.
@@ -68,7 +70,7 @@ pub async fn perform_basic_tests() {
             let rng_zksync_key = ZkSyncAccount::rand().private_key;
             ZkSyncAccount::new(
                 rng_zksync_key,
-                0,
+                Nonce(0),
                 eth_account.address,
                 eth_account.private_key,
             )
@@ -89,13 +91,13 @@ pub async fn perform_basic_tests() {
     let mut tokens = vec![];
     for token in 0..=1 {
         perform_basic_operations(
-            token,
+            TokenId(token),
             &mut test_setup,
             deposit_amount.clone(),
             BlockProcessing::CommitAndVerify,
         )
         .await;
-        tokens.push(token);
+        tokens.push(TokenId(token));
     }
 
     verify_restore(
@@ -120,7 +122,7 @@ pub enum BlockProcessing {
 }
 
 pub async fn perform_basic_operations(
-    token: u16,
+    token: TokenId,
     test_setup: &mut TestSetup,
     deposit_amount: BigUint,
     blocks_processing: BlockProcessing,
@@ -140,7 +142,10 @@ pub async fn perform_basic_operations(
             .execute_commit_and_verify_block()
             .await
             .expect("Block execution failed");
-        println!("Deposit to other account test success, token_id: {}", token);
+        println!(
+            "Deposit to other account test success, token_id: {}",
+            *token
+        );
     } else {
         test_setup.execute_commit_block().await.0.expect_success();
     }
@@ -168,7 +173,7 @@ pub async fn perform_basic_operations(
             .execute_commit_and_verify_block()
             .await
             .expect("Block execution failed");
-        println!("Deposit test success, token_id: {}", token);
+        println!("Deposit test success, token_id: {}", *token);
     } else {
         test_setup.execute_commit_block().await.0.expect_success();
     }
@@ -256,7 +261,7 @@ pub async fn perform_basic_operations(
             .execute_commit_and_verify_block()
             .await
             .expect("Block execution failed");
-        println!("Transfer test success, token_id: {}", token);
+        println!("Transfer test success, token_id: {}", *token);
     } else {
         test_setup.execute_commit_block().await.0.expect_success();
     }

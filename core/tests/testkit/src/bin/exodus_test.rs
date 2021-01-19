@@ -17,7 +17,7 @@ use std::time::Instant;
 use web3::transports::Http;
 use zksync_crypto::proof::EncodedProofPlonk;
 use zksync_testkit::*;
-use zksync_types::{AccountId, AccountMap};
+use zksync_types::{AccountId, AccountMap, Nonce, TokenId};
 
 const PRIORITY_EXPIRATION: u64 = 101;
 
@@ -123,13 +123,13 @@ async fn check_exit_garbage_proof(
 ) {
     info!(
         "Checking exit with garbage proof token: {}, amount: {}",
-        token.0, amount
+        *token.0, amount
     );
     let proof = EncodedProofPlonk::default();
     test_setup
         .exit(
             send_account,
-            fund_owner.0 as AccountId,
+            AccountId(fund_owner.0 as u32),
             token,
             amount,
             proof,
@@ -391,7 +391,7 @@ async fn exit_test() {
             let rng_zksync_key = ZkSyncAccount::rand().private_key;
             ZkSyncAccount::new(
                 rng_zksync_key,
-                0,
+                Nonce(0),
                 eth_account.address,
                 eth_account.private_key,
             )
@@ -431,7 +431,7 @@ async fn exit_test() {
         &mut test_setup,
         ETHAccountId(0),
         ZKSyncAccountId(1),
-        Token(0),
+        Token(TokenId(0)),
         &expired_deposit_amount,
     )
     .await;
@@ -439,7 +439,7 @@ async fn exit_test() {
     cancel_outstanding_deposits(
         &test_setup,
         ETHAccountId(1),
-        Token(0),
+        Token(TokenId(0)),
         &expired_deposit_amount,
         ETHAccountId(1),
     )
@@ -450,9 +450,9 @@ async fn exit_test() {
         verified_accounts_state.clone(),
         ETHAccountId(1),
         ZKSyncAccountId(1),
-        Token(0),
+        Token(TokenId(0)),
         &deposit_amount,
-        Token(1),
+        Token(TokenId(1)),
     )
     .await;
     let incorrect_amount = BigUint::from(2u32) * deposit_amount.clone();
@@ -461,7 +461,7 @@ async fn exit_test() {
         verified_accounts_state.clone(),
         ETHAccountId(1),
         ZKSyncAccountId(1),
-        Token(0),
+        Token(TokenId(0)),
         &deposit_amount,
         &incorrect_amount,
     )
@@ -471,7 +471,7 @@ async fn exit_test() {
         &mut test_setup,
         ETHAccountId(1),
         ZKSyncAccountId(1),
-        Token(0),
+        Token(TokenId(0)),
         &deposit_amount,
     )
     .await;
@@ -481,7 +481,7 @@ async fn exit_test() {
         verified_accounts_state.clone(),
         ETHAccountId(0),
         ZKSyncAccountId(1),
-        Token(0),
+        Token(TokenId(0)),
         &deposit_amount,
     )
     .await;
@@ -491,7 +491,7 @@ async fn exit_test() {
         verified_accounts_state.clone(),
         ETHAccountId(1),
         ZKSyncAccountId(1),
-        Token(0),
+        Token(TokenId(0)),
         &deposit_amount,
     )
     .await;
@@ -501,7 +501,7 @@ async fn exit_test() {
         verified_accounts_state,
         ETHAccountId(1),
         ZKSyncAccountId(1),
-        Token(0),
+        Token(TokenId(0)),
         &deposit_amount,
     )
     .await;

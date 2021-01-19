@@ -379,7 +379,7 @@ impl Monitor {
             self.api_data_pool
                 .write()
                 .await
-                .store_block(block.block_number as BlockNumber);
+                .store_block(BlockNumber(block.block_number as u32));
         }
 
         Ok(TxLifecycle {
