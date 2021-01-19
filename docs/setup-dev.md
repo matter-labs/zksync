@@ -150,7 +150,7 @@ sudo apt install libssl-dev
 ```
 
 - Install OpenSSL. Here is
-  [the instruction for Ubuntu](https://www.notion.so/matterlabs/Setup-checklist-056a2e5c3a104608a5a25788520ef0ff#5f34729bdffe496f9d38c46787c640d7),
+  [the instruction for Ubuntu](https://www.spinup.com/installing-openssl-on-ubuntu/),
   but the steps should be similar for the debian-based Linux distros.
 - Add `OPENSSL_DIR` variable to your environment. This would typically be `/usr/local/ssl`. You can do this by adding
   the following line to your shell profile file (e.g. `~/.bash_profile`):
