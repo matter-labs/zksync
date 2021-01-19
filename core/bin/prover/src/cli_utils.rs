@@ -12,7 +12,7 @@ fn api_client_from_env(worker_name: &str) -> client::ApiClient {
     let server_api_url = parse_env("API_PROVER_URL");
     let request_timout = Duration::from_secs(parse_env::<u64>("PROVER_PROVER_REQUEST_TIMEOUT"));
     let secret = get_env("API_PROVER_SECRET_AUTH");
-    client::ApiClient::new(&server_api_url, worker_name, request_timout, &secret)
+    client::ApiClient::new(&server_api_url, request_timout, &secret)
 }
 
 #[derive(StructOpt)]
@@ -35,10 +35,11 @@ where
     let worker_name = opt.worker_name;
 
     // used env
+    let prover_options = EnvProverConfig::from_env();
     let heartbeat_interval = EnvProverConfig::from_env().prover.heartbeat_interval();
-    let prover_config = <P as ProverImpl<client::ApiClient>>::Config::from_env();
+    let prover_config = <PROVER as ProverImpl>::Config::from_env();
     let api_client = api_client_from_env(&worker_name);
-    let prover = P::create_from_config(prover_config, api_client.clone(), heartbeat_interval);
+    let prover = PROVER::create_from_config(prover_config);
 
     env_logger::init();
 

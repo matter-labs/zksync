@@ -130,8 +130,9 @@ impl TxSender {
         );
 
         let max_number_of_transactions_per_batch =
-            api_server_options.max_number_of_transactions_per_batch;
-        let max_number_of_authors_per_batch = api_server_options.max_number_of_authors_per_batch;
+            config.api.common.max_number_of_transactions_per_batch as usize;
+        let max_number_of_authors_per_batch =
+            config.api.common.max_number_of_authors_per_batch as usize;
 
         Self {
             core_api_client,

@@ -37,10 +37,25 @@ pub struct Circuit {
     /// Setup power needed to proof block of certain size (goes in the same order as the previous field,
     /// so both arrays can be `zip`ped together).
     pub supported_block_chunks_sizes_setup_powers: Vec<usize>,
+    /// Sizes of blocks for aggregated proofs.
+    pub aggregated_proof_sizes: Vec<usize>,
+    /// Setup power needed to create an aggregated proof for blocks of certain size (goes in the same order as the
+    /// previous field, so both arrays can be `zip`ped together).
+    pub aggregated_proof_sizes_setup_power2: Vec<u32>,
     /// Depth of the Account Merkle tree.
     pub account_tree_depth: usize,
     /// Depth of the Balance Merkle tree.
     pub balance_tree_depth: usize,
+}
+
+impl Circuit {
+    pub fn aggregated_proof_sizes_with_setup_pow(&self) -> Vec<(usize, u32)> {
+        self.aggregated_proof_sizes
+            .iter()
+            .cloned()
+            .zip(self.aggregated_proof_sizes_setup_power2.iter().cloned())
+            .collect()
+    }
 }
 
 #[derive(Debug, Deserialize, Clone, PartialEq)]
@@ -82,6 +97,8 @@ mod tests {
                 key_dir: "keys/plonk-975ae851".into(),
                 supported_block_chunks_sizes: vec![6, 30, 74, 150, 320, 630],
                 supported_block_chunks_sizes_setup_powers: vec![21, 22, 23, 24, 25, 26],
+                aggregated_proof_sizes: vec![1, 5, 10, 20],
+                aggregated_proof_sizes_setup_power2: vec![22, 24, 25, 26],
                 account_tree_depth: 32,
                 balance_tree_depth: 11,
             },
@@ -104,6 +121,8 @@ mod tests {
 CHAIN_CIRCUIT_KEY_DIR="keys/plonk-975ae851"
 CHAIN_CIRCUIT_SUPPORTED_BLOCK_CHUNKS_SIZES="6,30,74,150,320,630"
 CHAIN_CIRCUIT_SUPPORTED_BLOCK_CHUNKS_SIZES_SETUP_POWERS="21,22,23,24,25,26"
+CHAIN_CIRCUIT_AGGREGATED_PROOF_SIZES="1,5,10,20"
+CHAIN_CIRCUIT_AGGREGATED_PROOF_SIZES_POWER2="22,24,25,26"
 CHAIN_CIRCUIT_ACCOUNT_TREE_DEPTH="32"
 CHAIN_CIRCUIT_BALANCE_TREE_DEPTH="11"
 CHAIN_ETH_MAX_NUMBER_OF_WITHDRAWALS_PER_BLOCK="10"

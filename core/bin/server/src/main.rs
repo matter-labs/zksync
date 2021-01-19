@@ -79,7 +79,7 @@ async fn main() -> anyhow::Result<()> {
     // Run prover server & witness generator.
     log::info!("Starting the Prover server actors");
     let database = zksync_witness_generator::database::Database::new(connection_pool);
-    run_prover_server(database, stop_signal_sender, prover_options);
+    run_prover_server(database, stop_signal_sender, ZkSyncConfig::from_env());
 
     tokio::select! {
         _ = async { wait_for_tasks(core_task_handles).await } => {

@@ -16,7 +16,7 @@ use jsonwebtoken::{decode, DecodingKey, Validation};
 use serde::{Deserialize, Serialize};
 use tokio::sync::RwLock;
 // Workspace deps
-use zksync_config::ProverOptions;
+use zksync_config::ZkSyncConfig;
 // Local deps
 use self::database_interface::DatabaseInterface;
 use self::scaler::ScalerOracle;
@@ -419,15 +419,15 @@ pub fn run_prover_server<DB: DatabaseInterface>(
                     );
                     let pool_maintainer = witness_generator::WitnessGenerator::new(
                         database.clone(),
-                        prover_options.prepare_data_interval,
+                        witness_generator_opts.prepare_data_interval(),
                         start_block,
                         block_step,
                     );
                     pool_maintainer.start(panic_notify.clone());
                 }
                 // Start HTTP server.
-                let secret_auth = prover_options.secret_auth.clone();
-                let idle_provers = prover_options.idle_provers;
+                let secret_auth = prover_api_opts.secret_auth.clone();
+                let idle_provers = core_opts.idle_provers;
                 HttpServer::new(move || {
                     let app_state =
                         AppState::new(secret_auth.clone(), database.clone(), idle_provers);

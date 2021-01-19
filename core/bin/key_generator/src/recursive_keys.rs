@@ -1,13 +1,13 @@
 use std::fs::File;
-use zksync_config::AvailableBlockSizesConfig;
+use zksync_config::ChainConfig;
 use zksync_crypto::params::{RECURSIVE_CIRCUIT_NUM_INPUTS, RECURSIVE_CIRCUIT_VK_TREE_DEPTH};
 use zksync_crypto::recursive_aggregation_circuit;
 use zksync_prover_utils::fs_utils::{
     get_recursive_verification_key_path, get_universal_setup_monomial_form,
 };
 
-pub fn make_recursive_verification_keys(config: AvailableBlockSizesConfig) {
-    for (proofs, setup_power) in config.aggregated_proof_sizes_with_setup_pow() {
+pub fn make_recursive_verification_keys(config: ChainConfig) {
+    for (proofs, setup_power) in config.circuit.aggregated_proof_sizes_with_setup_pow() {
         let path = get_recursive_verification_key_path(proofs);
         log::info!(
             "Generating recursive verification key for {} proofs into: {}",

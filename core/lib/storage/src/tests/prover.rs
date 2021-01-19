@@ -1,6 +1,6 @@
 use std::time::Duration;
 // Workspace imports
-use zksync_config::ConfigurationOptions;
+use zksync_config::ZkSyncConfig;
 use zksync_types::{block::PendingBlock, Action};
 // Local imports
 use crate::test_data::gen_operation;

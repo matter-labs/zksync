@@ -3,7 +3,6 @@ use num::BigUint;
 use std::collections::HashMap;
 use web3::types::TransactionReceipt;
 use zksync_config::ZkSyncConfig;
-use zksync_config::{ConfigurationOptions, EthClientOptions};
 use zksync_types::block::Block;
 use zksync_types::TokenId;
 

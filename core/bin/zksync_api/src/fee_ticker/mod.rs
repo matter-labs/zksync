@@ -222,7 +222,6 @@ pub fn run_ticker_task(
             let token_price_api =
                 CoinGeckoAPI::new(client, base_url.parse().expect("Correct CoinGecko url"))
                     .expect("failed to init CoinGecko client");
-            let ticker_info = TickerInfo::new(db_pool.clone());
 
             let mut ticker_balancer = TickerBalancer::new(
                 token_price_api,

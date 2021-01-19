@@ -27,21 +27,24 @@ pub(crate) fn create_verifier_contract(config: ChainConfig) {
 
     template_params.insert(
         "vk_tree_root".to_string(),
-        to_json(get_vk_tree_root_hash(&config.blocks_chunks)),
+        to_json(get_vk_tree_root_hash(
+            &config.circuit.supported_block_chunks_sizes,
+        )),
     );
 
     template_params.insert(
         "vk_max_index".to_string(),
-        to_json(config.blocks_chunks.len() - 1),
+        to_json(config.circuit.supported_block_chunks_sizes.len() - 1),
     );
 
-    let chunks = to_json(config.blocks_chunks);
+    let chunks = to_json(config.circuit.supported_block_chunks_sizes);
     template_params.insert("chunks".to_string(), chunks);
 
-    let sizes = to_json(config.aggregated_proof_sizes.clone());
+    let sizes = to_json(config.circuit.aggregated_proof_sizes.clone());
     template_params.insert("sizes".to_string(), sizes);
 
     let templates_for_key_getters = config
+        .circuit
         .aggregated_proof_sizes
         .into_iter()
         .map(|blocks| {

@@ -6,7 +6,7 @@ import {
     encodeConstructorArgs,
     encodeProxyContstuctorArgs,
     publishAbiToTesseracts,
-    publishSourceCodeToEtherscan
+    publishSourceCodeToEtherscan,
 } from './publish-utils';
 import {
     Governance,
@@ -16,7 +16,7 @@ import {
     Verifier,
     VerifierFactory,
     ZkSync,
-    ZkSyncFactory
+    ZkSyncFactory,
 } from '../typechain';
 
 export interface Contracts {
@@ -58,7 +58,7 @@ export function readProductionContracts(): Contracts {
         zkSync: readContractCode('ZkSync'),
         verifier: readContractCode('Verifier'),
         proxy: readContractCode('Proxy'),
-        upgradeGatekeeper: readContractCode('UpgradeGatekeeper')
+        upgradeGatekeeper: readContractCode('UpgradeGatekeeper'),
     };
 }
 
@@ -68,7 +68,7 @@ export function readTestContracts(): Contracts {
         zkSync: readContractCode('ZkSyncTest'),
         verifier: readContractCode('VerifierTest'),
         proxy: readContractCode('Proxy'),
-        upgradeGatekeeper: readContractCode('UpgradeGatekeeperTest')
+        upgradeGatekeeper: readContractCode('UpgradeGatekeeperTest'),
     };
 }
 
@@ -81,7 +81,7 @@ export function deployedAddressesFromEnv(): DeployedAddresses {
         Verifier: process.env.CONTRACTS_VERIFIER_ADDR,
         VerifierTarget: process.env.CONTRACTS_VERIFIER_TARGET_ADDR,
         ZkSync: process.env.CONTRACTS_CONTRACT_ADDR,
-        ZkSyncTarget: process.env.CONTRACTS_CONTRACT_TARGET_ADDR
+        ZkSyncTarget: process.env.CONTRACTS_CONTRACT_TARGET_ADDR,
     };
 }
 
@@ -109,7 +109,7 @@ export class Deployer {
 
         const govContract = await deployContract(this.deployWallet, this.contracts.governance, [], {
             gasLimit: 600000,
-            ...ethTxOptions
+            ...ethTxOptions,
         });
         const govRec = await govContract.deployTransaction.wait();
         const govGasUsed = govRec.gasUsed;
@@ -131,7 +131,7 @@ export class Deployer {
         }
         const verifierContract = await deployContract(this.deployWallet, this.contracts.verifier, [], {
             gasLimit: 8000000,
-            ...ethTxOptions
+            ...ethTxOptions,
         });
         const verRec = await verifierContract.deployTransaction.wait();
         const verGasUsed = verRec.gasUsed;
@@ -153,7 +153,7 @@ export class Deployer {
         }
         const zksContract = await deployContract(this.deployWallet, this.contracts.zkSync, [], {
             gasLimit: 6000000,
-            ...ethTxOptions
+            ...ethTxOptions,
         });
         const zksRec = await zksContract.deployTransaction.wait();
         const zksGasUsed = zksRec.gasUsed;
@@ -170,7 +170,7 @@ export class Deployer {
     }
 
     public async deployProxiesAndGatekeeper(ethTxOptions?: ethers.providers.TransactionRequest) {
-        let genesis_root = process.env.CONTRACTS_GENESIS_ROOT;
+        let genesis_root = process.env.CONTRACTS_GENESIS_TX_HASH;
         const deployFactoryContract = await deployContract(
             this.deployWallet,
             this.deployFactoryCode,
@@ -181,7 +181,7 @@ export class Deployer {
                 genesis_root,
                 process.env.ETH_SENDER_SENDER_OPERATOR_COMMIT_ETH_ADDR,
                 this.governorAddress,
-                process.env.CHAIN_STATE_KEEPER_FEE_ACCOUNT_ADDR
+                process.env.CHAIN_STATE_KEEPER_FEE_ACCOUNT_ADDR,
             ],
             { gasLimit: 5000000, ...ethTxOptions }
         );

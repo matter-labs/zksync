@@ -70,6 +70,7 @@ impl ContractsConfig {
             governance_addr: contracts_opts.governance_addr,
             genesis_tx_hash: contracts_opts.genesis_tx_hash,
             contract_addr: contracts_opts.contract_addr,
+            upgrade_gatekeeper_addr: contracts_opts.upgrade_gatekeeper_addr,
             available_block_chunk_sizes: chain_opts.state_keeper.block_chunk_sizes,
         }
     }

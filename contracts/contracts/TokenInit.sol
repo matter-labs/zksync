@@ -3,10 +3,10 @@ pragma solidity ^0.7.0;
 contract TokenDeployInit {
     function getTokens() internal pure returns (address[] memory) {
         address[] memory tokens = new address[](4);
-        tokens[0] = 0x472d533243475f40221F3fD22C5bA5F98c71D10B;
-        tokens[1] = 0x1412295a435aB93CC9082FeaB48532170189E0D2;
-        tokens[2] = 0x623CFDc6F8D2011A2607254D2Fa4582691b66A45;
-        tokens[3] = 0xAd4E5DE9646A905a57e26ba99d58538BcA48bf28;
+        tokens[0] = 0x948ba9Dc442B06e0ceD0DF437ff1bFE59433a74E;
+        tokens[1] = 0x97C50a65AD238eF9C119368d3C802435e0f2433b;
+        tokens[2] = 0xFcF74da8146bd16d43d3dA013440d986EcC8ED68;
+        tokens[3] = 0x8E5a90cFEefd3F736E8E0FBf5EDbD5610d6e14Ca;
         return tokens;
     }
 }
