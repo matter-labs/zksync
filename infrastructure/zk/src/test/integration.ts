@@ -234,4 +234,6 @@ command
         }
         mode = mode || 'fast';
         if (offline) {
+            delete process.env.SQLX_OFFLINE;
+        }
     });

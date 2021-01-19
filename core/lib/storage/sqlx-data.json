@@ -1044,27 +1044,6 @@
       "nullable": []
     }
   },
-  "4534e42575c3d9d93740398a6247ee09048d4abf5426389c0d07f7b6f609c372": {
-    "query": "\n                WITH unsized_blocks AS (\n                    SELECT * FROM operations o\n                    WHERE action_type = 'COMMIT'\n                        AND block_number >\n                            (SELECT COALESCE(max(block_number),0) FROM operations WHERE action_type = 'VERIFY')\n                        AND NOT EXISTS\n                            (SELECT * FROM proofs WHERE block_number = o.block_number)\n                        AND NOT EXISTS\n                            (SELECT * FROM prover_runs\n                                WHERE block_number = o.block_number AND (now() - updated_at) < $1::interval)\n                )\n                SELECT min(block_number) FROM unsized_blocks\n                INNER JOIN blocks\n                    ON unsized_blocks.block_number = blocks.number AND blocks.block_size = $2\n            ",
-    "describe": {
-      "columns": [
-        {
-          "ordinal": 0,
-          "name": "min",
-          "type_info": "Int8"
-        }
-      ],
-      "parameters": {
-        "Left": [
-          "Interval",
-          "Int8"
-        ]
-      },
-      "nullable": [
-        null
-      ]
-    }
-  },
   "457b4a87812ac9dcad6fbfc356952f05481a5729074ce305c3dedb33f99672f6": {
     "query": "\n            DELETE FROM pending_block WHERE number = $1\n            ",
     "describe": {
@@ -2779,6 +2758,54 @@
         ]
       },
       "nullable": []
+    }
+  },
+  "ab8774812664b1c1d4207e7fcd5e04a078293d295c469f043e5bc4933c0c2944": {
+    "query": "SELECT * FROM aggregate_operations\n            WHERE NOT EXISTS (SELECT * FROM eth_aggregated_ops_binding WHERE op_id = aggregate_operations.id)\n            ORDER BY id ASC",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "id",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 1,
+          "name": "action_type",
+          "type_info": "Text"
+        },
+        {
+          "ordinal": 2,
+          "name": "arguments",
+          "type_info": "Jsonb"
+        },
+        {
+          "ordinal": 3,
+          "name": "from_block",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 4,
+          "name": "to_block",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 5,
+          "name": "created_at",
+          "type_info": "Timestamptz"
+        }
+      ],
+      "parameters": {
+        "Left": []
+      },
+      "nullable": [
+        false,
+        false,
+        false,
+        false,
+        false,
+        false
+      ]
     }
   },
   "b1c528c67d3c2ecea86e3ba1b2407cb4ee72149d66be0498be1c1162917c065d": {

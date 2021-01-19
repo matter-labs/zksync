@@ -4,7 +4,7 @@ import { ethers } from 'ethers';
 const hre = require('hardhat');
 
 async function main() {
-    if (process.env.ETH_NETWORK == 'localhost') {
+    if (process.env.CHAIN_ETH_NETWORK == 'localhost') {
         console.log('Skip contract publish on localhost');
         return;
     }
@@ -13,7 +13,7 @@ async function main() {
         addresses.ZkSyncTarget,
         addresses.VerifierTarget,
         addresses.GovernanceTarget,
-        addresses.UpgradeGatekeeper
+        addresses.UpgradeGatekeeper,
     ]) {
         try {
             await hre.run('verify', { address });
@@ -26,7 +26,7 @@ async function main() {
         const address = addresses.ZkSync;
         const zkSyncEncodedArguments = ethers.utils.defaultAbiCoder.encode(
             ['address', 'address', 'bytes32'],
-            [addresses.Governance, addresses.Verifier, process.env.GENESIS_ROOT]
+            [addresses.Governance, addresses.Verifier, process.env.CONTRACTS_GENESIS_ROOT]
         );
 
         const constructorArguments = [addresses.ZkSyncTarget, zkSyncEncodedArguments];
