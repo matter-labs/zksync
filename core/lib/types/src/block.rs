@@ -249,8 +249,8 @@ impl Block {
         let mut withdrawals_count = 0;
 
         for block_tx in &self.block_transactions {
-            if let Some(franklin_op) = block_tx.get_executed_op() {
-                if franklin_op.withdrawal_data().is_some() {
+            if let Some(sync_op) = block_tx.get_executed_op() {
+                if sync_op.withdrawal_data().is_some() {
                     withdrawals_count += 1;
                 }
             }
