@@ -21,7 +21,7 @@
 //! But I couldn't easily replicate its default behavior in my custom logger.
 //!
 pub use tracing as __tracing;
-pub use tracing::{debug, info, trace};
+pub use tracing::{debug, info, log, trace};
 
 #[macro_export]
 macro_rules! warn {

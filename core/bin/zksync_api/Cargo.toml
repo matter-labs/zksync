@@ -24,7 +24,6 @@ zksync_utils = { path = "../../lib/utils", version = "1.0" }
 zksync_contracts = { path = "../../lib/contracts", version = "1.0" }
 zksync_api_client  = { path = "../../lib/api_client", version = "0.1" }
 
-log = "0.4"
 vlog = { path = "../../lib/vlog", version = "1.0" }
 
 hex = "0.4"
