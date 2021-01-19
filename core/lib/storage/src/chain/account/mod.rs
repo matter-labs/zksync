@@ -46,6 +46,27 @@ impl<'a, 'c> AccountSchema<'a, 'c> {
         })
     }
 
+    pub async fn account_type_by_id(
+        &mut self,
+        account_id: AccountId,
+    ) -> QueryResult<Option<EthAccountType>> {
+        let start = Instant::now();
+
+        let result = sqlx::query!(
+            r#"
+            SELECT account_type as "account_type!: EthAccountType" 
+            FROM eth_account_types WHERE account_id = $1
+            "#,
+            i64::from(account_id)
+        )
+        .fetch_optional(self.0.conn())
+        .await?;
+
+        let account_type = result.map(|record| record.account_type as EthAccountType);
+        metrics::histogram!("sql.chain.account.account_type_by_id", start.elapsed());
+        Ok(account_type)
+    }
+
     /// Obtains both committed and verified state for the account by its address.
     pub async fn account_state_by_address(
         &mut self,

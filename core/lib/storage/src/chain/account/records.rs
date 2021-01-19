@@ -51,3 +51,10 @@ pub struct StorageBalance {
     pub coin_id: i32,
     pub balance: BigDecimal,
 }
+
+#[derive(Debug, sqlx::Type)]
+#[sqlx(rename = "eth_account_type")]
+pub enum EthAccountType {
+    Owned,
+    CREATE2,
+}

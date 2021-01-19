@@ -1615,6 +1615,47 @@
       "nullable": []
     }
   },
+  "5e8adb9ac718c5b0f4e408f06ab9987deee2b50ed1f00a388d666bb744a0007d": {
+    "query": "\n            INSERT INTO eth_account_types ( account_id, account_type )\n            VALUES ( $1, $2 )\n            ON CONFLICT (account_id) DO UPDATE \n            SET account_type = $2\n            RETURNING account_type as \"t!: EthAccountType\"\n            ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "t!: EthAccountType",
+          "type_info": {
+            "Custom": {
+              "name": "eth_account_type",
+              "kind": {
+                "Enum": [
+                  "Owned",
+                  "CREATE2"
+                ]
+              }
+            }
+          }
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Int8",
+          {
+            "Custom": {
+              "name": "eth_account_type",
+              "kind": {
+                "Enum": [
+                  "Owned",
+                  "CREATE2"
+                ]
+              }
+            }
+          }
+        ]
+      },
+      "nullable": [
+        false
+      ]
+    }
+  },
   "60a2be4d7162d73b929f7ab712d01404d45bcc128e2b03ad3ff853a645e2fb5c": {
     "query": "\n            WITH eth_ops AS (\n                SELECT DISTINCT ON (block_number, action_type)\n                    operations.block_number,\n                    eth_tx_hashes.tx_hash,\n                    operations.action_type,\n                    operations.created_at,\n                    confirmed\n                FROM operations\n                    left join eth_ops_binding on eth_ops_binding.op_id = operations.id\n                    left join eth_tx_hashes on eth_tx_hashes.eth_op_id = eth_ops_binding.eth_op_id\n                ORDER BY block_number desc, action_type, confirmed\n            )\n            SELECT\n                blocks.number AS \"block_number!\",\n                blocks.root_hash AS \"new_state_root!\",\n                blocks.block_size AS \"block_size!\",\n                committed.tx_hash AS \"commit_tx_hash?\",\n                verified.tx_hash AS \"verify_tx_hash?\",\n                committed.created_at AS \"committed_at!\",\n                verified.created_at AS \"verified_at?\"\n            FROM blocks\n            INNER JOIN eth_ops committed ON\n                committed.block_number = blocks.number AND committed.action_type = 'COMMIT' AND committed.confirmed = true\n            LEFT JOIN eth_ops verified ON\n                verified.block_number = blocks.number AND verified.action_type = 'VERIFY' AND verified.confirmed = true\n            WHERE false\n                OR committed.tx_hash = $1\n                OR verified.tx_hash = $1\n                OR blocks.root_hash = $1\n                OR blocks.number = $2\n            ORDER BY blocks.number DESC\n            LIMIT 1;\n            ",
     "describe": {
@@ -2819,6 +2860,36 @@
         ]
       },
       "nullable": []
+    }
+  },
+  "b286d50fa048e49b4035bb62afc8dc25f5dc157e270baa666fb0ea0ceb21c227": {
+    "query": "\n            SELECT account_type as \"account_type!: EthAccountType\" \n            FROM eth_account_types WHERE account_id = $1\n            ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "account_type!: EthAccountType",
+          "type_info": {
+            "Custom": {
+              "name": "eth_account_type",
+              "kind": {
+                "Enum": [
+                  "Owned",
+                  "CREATE2"
+                ]
+              }
+            }
+          }
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Int8"
+        ]
+      },
+      "nullable": [
+        false
+      ]
     }
   },
   "b5e0f843d267576d57f41e2c4a63335749cb40e79bdb2b2cccbbaed5200abe96": {
