@@ -251,7 +251,10 @@ export class TokenSet {
         }
 
         for (const token of Object.values(this.tokensBySymbol)) {
-            if (token.address.toLocaleLowerCase() == tokenLike.toLocaleLowerCase()) {
+            if (
+                token.address.toLocaleLowerCase() === tokenLike.toLocaleLowerCase() ||
+                token.symbol.toLocaleLowerCase() === tokenLike.toLocaleLowerCase()
+            ) {
                 return token;
             }
         }

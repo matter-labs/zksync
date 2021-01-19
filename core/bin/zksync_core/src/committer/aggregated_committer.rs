@@ -10,8 +10,7 @@ use zksync_types::aggregated_operations::{
     AggregatedActionType, AggregatedOperation, BlocksCommitOperation, BlocksCreateProofOperation,
     BlocksExecuteOperation, BlocksProofOperation,
 };
-use zksync_types::block::Block;
-use zksync_types::U256;
+use zksync_types::{block::Block, gas_counter::GasCounter, U256};
 
 fn create_new_commit_operation(
     last_committed_block: &Block,
@@ -21,30 +20,27 @@ fn create_new_commit_operation(
     block_commit_deadline: Duration,
     max_gas_for_tx: U256,
 ) -> Option<BlocksCommitOperation> {
+    let new_blocks = new_blocks
+        .iter()
+        .cloned()
+        .take(max_blocks_to_commit)
+        .collect::<Vec<_>>();
     let any_block_commit_deadline_triggered = {
         let block_commit_deadline_seconds = block_commit_deadline.as_secs() as i64;
-        new_blocks
-            .iter()
-            .take(max_blocks_to_commit)
-            .find(|block| {
-                let seconds_since_block_created = max(
-                    current_time
-                        // todo: block timestamp?
-                        .signed_duration_since(block.timestamp_utc())
-                        .num_seconds(),
-                    0,
-                );
-                seconds_since_block_created > block_commit_deadline_seconds
-            })
-            .is_some()
+        new_blocks.iter().any(|block| {
+            let seconds_since_block_created = max(
+                current_time
+                    // todo: block timestamp?
+                    .signed_duration_since(block.timestamp_utc())
+                    .num_seconds(),
+                0,
+            );
+            seconds_since_block_created > block_commit_deadline_seconds
+        })
     };
 
-    let gas_limit_reached_for_blocks = new_blocks
-        .iter()
-        .take(max_blocks_to_commit)
-        .map(|block| block.commit_gas_limit.as_u64())
-        .sum::<u64>()
-        >= max_gas_for_tx.as_u64();
+    let gas_limit_reached_for_blocks =
+        GasCounter::commit_gas_limit_aggregated(&new_blocks) >= max_gas_for_tx;
 
     let should_commit_blocks = any_block_commit_deadline_triggered
         || gas_limit_reached_for_blocks
@@ -54,15 +50,15 @@ fn create_new_commit_operation(
     }
 
     let mut blocks_to_commit = Vec::new();
-    let mut commit_tx_gas = U256::from(0);
-    for new_block in new_blocks.iter().take(max_blocks_to_commit) {
+    let mut commit_tx_gas = U256::from(GasCounter::BASE_COMMIT_BLOCKS_TX_COST);
+    for new_block in &new_blocks {
         if commit_tx_gas + new_block.commit_gas_limit > max_gas_for_tx {
             break;
         }
         blocks_to_commit.push(new_block.clone());
         commit_tx_gas += new_block.commit_gas_limit;
     }
-    assert!(blocks_to_commit.len() > 0);
+    assert!(!blocks_to_commit.is_empty());
 
     Some(BlocksCommitOperation {
         last_committed_block: last_committed_block.clone(),
@@ -87,7 +83,7 @@ fn create_new_create_proof_operation(
         new_blocks_with_proofs
             .iter()
             .take(max_aggregate_size)
-            .find(|block| {
+            .any(|block| {
                 let seconds_since_block_created = max(
                     current_time
                         .signed_duration_since(block.timestamp_utc())
@@ -96,7 +92,6 @@ fn create_new_create_proof_operation(
                 );
                 seconds_since_block_created > block_verify_deadline
             })
-            .is_some()
     };
 
     let can_create_max_aggregate_proof = new_blocks_with_proofs.len() >= max_aggregate_size;
@@ -149,29 +144,26 @@ fn create_execute_blocks_operation(
     block_execute_deadline: Duration,
     max_gas_for_tx: U256,
 ) -> Option<BlocksExecuteOperation> {
+    let proven_non_executed_block = proven_non_executed_block
+        .iter()
+        .cloned()
+        .take(max_blocks_to_execute)
+        .collect::<Vec<_>>();
     let any_block_execute_deadline_triggered = {
         let block_execute_deadline_seconds = block_execute_deadline.as_secs() as i64;
-        proven_non_executed_block
-            .iter()
-            .take(max_blocks_to_execute)
-            .find(|block| {
-                let seconds_since_block_created = max(
-                    current_time
-                        .signed_duration_since(block.timestamp_utc())
-                        .num_seconds(),
-                    0,
-                );
-                seconds_since_block_created > block_execute_deadline_seconds
-            })
-            .is_some()
+        proven_non_executed_block.iter().any(|block| {
+            let seconds_since_block_created = max(
+                current_time
+                    .signed_duration_since(block.timestamp_utc())
+                    .num_seconds(),
+                0,
+            );
+            seconds_since_block_created > block_execute_deadline_seconds
+        })
     };
 
-    let gas_limit_reached_for_blocks = proven_non_executed_block
-        .iter()
-        .take(max_blocks_to_execute)
-        .map(|block| block.verify_gas_limit.as_u64())
-        .sum::<u64>()
-        >= max_gas_for_tx.as_u64();
+    let gas_limit_reached_for_blocks =
+        GasCounter::execute_gas_limit_aggregated(&proven_non_executed_block) >= max_gas_for_tx;
 
     let should_execute_blocks = any_block_execute_deadline_triggered
         || gas_limit_reached_for_blocks
@@ -181,15 +173,15 @@ fn create_execute_blocks_operation(
     }
 
     let mut blocks_to_execute = Vec::new();
-    let mut execute_tx_gas = U256::from(0);
-    for block in proven_non_executed_block.iter().take(max_blocks_to_execute) {
+    let mut execute_tx_gas = U256::from(GasCounter::BASE_EXECUTE_BLOCKS_TX_COST);
+    for block in &proven_non_executed_block {
         if execute_tx_gas + block.verify_gas_limit > max_gas_for_tx {
             break;
         }
         blocks_to_execute.push(block.clone());
         execute_tx_gas += block.verify_gas_limit;
     }
-    assert!(blocks_to_execute.len() > 0);
+    assert!(!blocks_to_execute.is_empty());
 
     Some(BlocksExecuteOperation {
         blocks: blocks_to_execute,
@@ -325,7 +317,7 @@ async fn create_aggregated_publish_proof_operation_storage(
 
     let aggregated_proof = {
         assert!(
-            last_unpublished_create_proof_operation.blocks.len() > 0,
+            !last_unpublished_create_proof_operation.blocks.is_empty(),
             "should have 1 block"
         );
         let first_block = last_unpublished_create_proof_operation

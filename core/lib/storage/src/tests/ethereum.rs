@@ -3,67 +3,25 @@ use std::str::FromStr;
 // External imports
 use zksync_basic_types::{H256, U256};
 // Workspace imports
-use zksync_crypto::Fr;
 use zksync_types::{
-    ethereum::{ETHOperation, OperationType},
-    Action, Operation,
-    {block::Block, BlockNumber},
+    aggregated_operations::{AggregatedActionType, AggregatedOperation},
+    ethereum::ETHOperation,
+    Action,
 };
 // Local imports
+use crate::test_data::{gen_unique_aggregated_operation, gen_unique_operation, BLOCK_SIZE_CHUNKS};
 use crate::tests::db_test;
-use crate::{chain::block::BlockSchema, ethereum::EthereumSchema, QueryResult, StorageProcessor};
+use crate::{
+    chain::block::BlockSchema, chain::operations::OperationsSchema, ethereum::EthereumSchema,
+    QueryResult, StorageProcessor,
+};
 use num::BigUint;
-
-/// Creates a sample operation to be stored in `operations` table.
-/// This function is required since `eth_operations` table is linked to
-/// the `operations` table by the operation id.
-pub fn get_commit_operation(block_number: BlockNumber) -> Operation {
-    Operation {
-        id: None,
-        action: Action::Commit,
-        block: Block::new(
-            block_number,
-            Fr::default(),
-            0,
-            Vec::new(),
-            (0, 0),
-            100,
-            1_000_000.into(),
-            1_500_000.into(),
-            H256::default(),
-            0,
-        ),
-    }
-}
-
-/// Same as `get_commit_operation`, but creates a verify operation instead.
-pub fn get_verify_operation(block_number: BlockNumber) -> Operation {
-    let action = Action::Verify {
-        proof: Default::default(),
-    };
-    Operation {
-        id: None,
-        action,
-        block: Block::new(
-            block_number,
-            Fr::default(),
-            0,
-            Vec::new(),
-            (0, 0),
-            100,
-            1_000_000.into(),
-            1_500_000.into(),
-            H256::default(),
-            0,
-        ),
-    }
-}
 
 /// Parameters for `EthereumSchema::save_operation_eth_tx` method.
 #[derive(Debug)]
 pub struct EthereumTxParams {
     op_type: String,
-    op: Operation,
+    op: Option<(i64, AggregatedOperation)>,
     hash: H256,
     deadline_block: u64,
     gas_price: BigUint,
@@ -71,12 +29,13 @@ pub struct EthereumTxParams {
 }
 
 impl EthereumTxParams {
-    pub fn new(op_type: String, op: Operation) -> Self {
-        let op_id = op.id.unwrap() as u64;
+    pub fn new(op_type: String, op: Option<(i64, AggregatedOperation)>) -> Self {
+        let op_id = op.clone().map(|(id, _)| id).unwrap_or_default();
+
         Self {
             op_type,
             op,
-            hash: H256::from_low_u64_ne(op_id),
+            hash: H256::from_low_u64_ne(op_id as u64),
             deadline_block: 100,
             gas_price: 1000u32.into(),
             raw_tx: Default::default(),
@@ -84,24 +43,23 @@ impl EthereumTxParams {
     }
 
     pub fn to_eth_op(&self, db_id: i64, nonce: u64) -> ETHOperation {
-        let op_type = OperationType::from_str(self.op_type.as_ref())
+        let op_type = AggregatedActionType::from_str(self.op_type.as_ref())
             .expect("Stored operation type must have a valid value");
         let last_used_gas_price = U256::from_str(&self.gas_price.to_string()).unwrap();
         let used_tx_hashes = vec![self.hash];
 
-        todo!()
-        // ETHOperation {
-        //     id: db_id,
-        //     op_type,
-        //     op: Some(self.op.clone()),
-        //     nonce: nonce.into(),
-        //     last_deadline_block: self.deadline_block,
-        //     last_used_gas_price,
-        //     used_tx_hashes,
-        //     encoded_tx_data: self.raw_tx.clone(),
-        //     confirmed: false,
-        //     final_hash: None,
-        // }
+        ETHOperation {
+            id: db_id,
+            op_type,
+            op: self.op.clone(),
+            nonce: nonce.into(),
+            last_deadline_block: self.deadline_block,
+            last_used_gas_price,
+            used_tx_hashes,
+            encoded_tx_data: self.raw_tx.clone(),
+            confirmed: false,
+            final_hash: None,
+        }
     }
 }
 
@@ -135,16 +93,30 @@ async fn ethereum_storage(mut storage: StorageProcessor<'_>) -> QueryResult<()> 
 
     // Store operation with ID 1.
     let block_number = 1;
-    let operation = BlockSchema(&mut storage)
-        .execute_operation(get_commit_operation(block_number))
+    BlockSchema(&mut storage)
+        .store_operation(gen_unique_operation(
+            block_number,
+            Action::Commit,
+            BLOCK_SIZE_CHUNKS,
+        ))
+        .await?;
+    OperationsSchema(&mut storage)
+        .store_aggregated_action(gen_unique_aggregated_operation(
+            block_number,
+            AggregatedActionType::CommitBlocks,
+            BLOCK_SIZE_CHUNKS,
+        ))
+        .await?;
+    let op = OperationsSchema(&mut storage)
+        .get_aggregated_op_that_affects_block(AggregatedActionType::CommitBlocks, block_number)
         .await?;
 
     // Store the Ethereum transaction.
-    let params = EthereumTxParams::new("commit".into(), operation.clone());
+    let params = EthereumTxParams::new("CommitBlocks".into(), op);
     let response = EthereumSchema(&mut storage)
         .save_new_eth_tx(
-            todo!(),
-            Some(params.op.id.unwrap()),
+            AggregatedActionType::CommitBlocks,
+            Some(params.op.clone().unwrap().0),
             params.deadline_block as i64,
             params.gas_price.clone(),
             params.raw_tx.clone(),
@@ -169,16 +141,32 @@ async fn ethereum_storage(mut storage: StorageProcessor<'_>) -> QueryResult<()> 
 
     // Store operation with ID 2.
     let block_number = 2;
-    let operation_2 = BlockSchema(&mut storage)
-        .execute_operation(get_commit_operation(block_number))
+    BlockSchema(&mut storage)
+        .store_operation(gen_unique_operation(
+            block_number,
+            Action::Verify {
+                proof: Default::default(),
+            },
+            BLOCK_SIZE_CHUNKS,
+        ))
+        .await?;
+    OperationsSchema(&mut storage)
+        .store_aggregated_action(gen_unique_aggregated_operation(
+            block_number,
+            AggregatedActionType::CreateProofBlocks,
+            BLOCK_SIZE_CHUNKS,
+        ))
+        .await?;
+    let op = OperationsSchema(&mut storage)
+        .get_aggregated_op_that_affects_block(AggregatedActionType::CreateProofBlocks, block_number)
         .await?;
 
     // Create one more Ethereum transaction.
-    let params_2 = EthereumTxParams::new("commit".into(), operation_2.clone());
+    let params_2 = EthereumTxParams::new("CommitBlocks".into(), op);
     let response_2 = EthereumSchema(&mut storage)
         .save_new_eth_tx(
-            todo!(),
-            Some(params_2.op.id.unwrap()),
+            AggregatedActionType::CreateProofBlocks,
+            Some(params_2.op.clone().unwrap().0),
             params_2.deadline_block as i64,
             params_2.gas_price.clone(),
             params_2.raw_tx.clone(),
@@ -258,18 +246,48 @@ async fn ethereum_unprocessed(mut storage: StorageProcessor<'_>) -> QueryResult<
 
     // Store operation with ID 1.
     let block_number = 1;
-    let operation = BlockSchema(&mut storage)
-        .execute_operation(get_commit_operation(block_number))
+    BlockSchema(&mut storage)
+        .store_operation(gen_unique_operation(
+            block_number,
+            Action::Commit,
+            BLOCK_SIZE_CHUNKS,
+        ))
         .await?;
-    let verify_operation = BlockSchema(&mut storage)
-        .execute_operation(get_verify_operation(block_number))
+    OperationsSchema(&mut storage)
+        .store_aggregated_action(gen_unique_aggregated_operation(
+            block_number,
+            AggregatedActionType::CommitBlocks,
+            BLOCK_SIZE_CHUNKS,
+        ))
+        .await?;
+    let operation = OperationsSchema(&mut storage)
+        .get_aggregated_op_that_affects_block(AggregatedActionType::CommitBlocks, block_number)
+        .await?;
+    BlockSchema(&mut storage)
+        .store_operation(gen_unique_operation(
+            block_number,
+            Action::Verify {
+                proof: Default::default(),
+            },
+            BLOCK_SIZE_CHUNKS,
+        ))
+        .await?;
+    OperationsSchema(&mut storage)
+        .store_aggregated_action(gen_unique_aggregated_operation(
+            block_number,
+            AggregatedActionType::CreateProofBlocks,
+            BLOCK_SIZE_CHUNKS,
+        ))
+        .await?;
+    let verify_operation = OperationsSchema(&mut storage)
+        .get_aggregated_op_that_affects_block(AggregatedActionType::CommitBlocks, block_number)
         .await?;
 
     // Now there must be one unprocessed operation.
     let unprocessed_operations = EthereumSchema(&mut storage)
         .load_unprocessed_operations()
         .await?;
-    assert_eq!(unprocessed_operations.len(), 2);
+    assert_eq!(unprocessed_operations.len(), 1);
     // assert_eq!(unprocessed_operations[0].id, operation.id);
     // assert_eq!(unprocessed_operations[1].id, verify_operation.id);
 
@@ -280,11 +298,11 @@ async fn ethereum_unprocessed(mut storage: StorageProcessor<'_>) -> QueryResult<
     assert!(unconfirmed_operations.is_empty());
 
     // Store the Ethereum transaction.
-    let params = EthereumTxParams::new("commit".into(), operation.clone());
+    let params = EthereumTxParams::new("CommitBlocks".into(), operation.clone());
     let response = EthereumSchema(&mut storage)
         .save_new_eth_tx(
-            todo!(),
-            Some(params.op.id.unwrap()),
+            AggregatedActionType::CommitBlocks,
+            Some(params.op.clone().unwrap().0),
             params.deadline_block as i64,
             params.gas_price.clone(),
             params.raw_tx.clone(),
@@ -312,14 +330,14 @@ async fn ethereum_unprocessed(mut storage: StorageProcessor<'_>) -> QueryResult<
     let unprocessed_operations = EthereumSchema(&mut storage)
         .load_unprocessed_operations()
         .await?;
-    assert_eq!(unprocessed_operations.len(), 1);
+    assert_eq!(unprocessed_operations.len(), 0);
     // assert_eq!(unprocessed_operations[0].id, verify_operation.id);
 
-    let verify_params = EthereumTxParams::new("verify".into(), verify_operation.clone());
+    let verify_params = EthereumTxParams::new("CreateProofBlocks".into(), verify_operation.clone());
     let response = EthereumSchema(&mut storage)
         .save_new_eth_tx(
-            todo!(),
-            Some(verify_params.op.id.unwrap()),
+            AggregatedActionType::CreateProofBlocks,
+            Some(verify_params.op.unwrap().0),
             verify_params.deadline_block as i64,
             verify_params.gas_price.clone(),
             verify_params.raw_tx.clone(),
