@@ -6,7 +6,7 @@ use structopt::StructOpt;
 use web3::transports::Http;
 
 use zksync_circuit::witness::utils::build_block_witness;
-use zksync_config::AvailableBlockSizesConfig;
+use zksync_config::ZkSyncConfig;
 use zksync_crypto::circuit::CircuitAccountTree;
 use zksync_crypto::params::account_tree_depth;
 use zksync_prover_utils::aggregated_proofs::{gen_aggregate_proof, prepare_proof_data};
@@ -149,7 +149,16 @@ async fn main() {
         circuit_account_tree.insert(id, account.into());
     }
 
-    for block_size in block_chunks_sizes.clone() {
+    let block_chunk_sizes = ZkSyncConfig::from_env()
+        .chain
+        .state_keeper
+        .block_chunk_sizes;
+    info!(
+        "Checking keys and onchain verification for block sizes: {:?}",
+        block_chunk_sizes
+    );
+
+    for block_size in block_chunk_sizes {
         info!("Checking keys for block size: {}", block_size);
 
         test_setup.start_block();

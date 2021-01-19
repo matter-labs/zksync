@@ -10,9 +10,16 @@ use once_cell::sync::Lazy;
 use tokio::sync::Mutex;
 
 // Workspace uses
-use zksync_config::{ApiServerOptions, ConfigurationOptions};
-// use zksync_crypto::rand::{SeedableRng, XorShiftRng};
-use zksync_storage::ConnectionPool;
+use zksync_config::ZkSyncConfig;
+use zksync_crypto::rand::{SeedableRng, XorShiftRng};
+use zksync_storage::{
+    chain::operations::records::NewExecutedPriorityOperation,
+    test_data::{
+        dummy_ethereum_tx_hash, gen_acc_random_updates, gen_unique_operation,
+        gen_unique_operation_with_txs, BLOCK_SIZE_CHUNKS,
+    },
+    ConnectionPool,
+};
 use zksync_test_account::ZkSyncAccount;
 use zksync_types::{
     ethereum::OperationType,
@@ -39,16 +46,14 @@ pub const VERIFIED_BLOCKS_COUNT: BlockNumber = 3;
 
 #[derive(Debug, Clone)]
 pub struct TestServerConfig {
-    pub env_options: ConfigurationOptions,
-    pub api_server_options: ApiServerOptions,
+    pub config: ZkSyncConfig,
     pub pool: ConnectionPool,
 }
 
 impl Default for TestServerConfig {
     fn default() -> Self {
         Self {
-            env_options: ConfigurationOptions::from_env(),
-            api_server_options: ApiServerOptions::from_env(),
+            config: ZkSyncConfig::from_env(),
             pool: ConnectionPool::new(Some(1)),
         }
     }

@@ -380,8 +380,12 @@ async fn update_prover_job_queue<DB: DatabaseInterface>(database: DB) -> anyhow:
 pub fn run_prover_server<DB: DatabaseInterface>(
     database: DB,
     panic_notify: mpsc::Sender<bool>,
-    prover_options: ProverOptions,
+    config: ZkSyncConfig,
 ) {
+    let witness_generator_opts = config.prover.witness_generator;
+    let core_opts = config.prover.core;
+    let prover_api_opts = config.api.prover;
+
     thread::Builder::new()
         .name("prover_server".to_string())
         .spawn(move || {
@@ -405,9 +409,9 @@ pub fn run_prover_server<DB: DatabaseInterface>(
                 };
 
                 // Start pool maintainer threads.
-                for offset in 0..prover_options.witness_generators {
+                for offset in 0..witness_generator_opts.witness_generators {
                     let start_block = (last_verified_block + offset + 1) as u32;
-                    let block_step = prover_options.witness_generators as u32;
+                    let block_step = witness_generator_opts.witness_generators as u32;
                     log::info!(
                         "Starting witness generator ({},{})",
                         start_block,
@@ -454,7 +458,7 @@ pub fn run_prover_server<DB: DatabaseInterface>(
                             web::post().to(required_replicas::<DB>),
                         )
                 })
-                .bind(&prover_options.prover_server_address)
+                .bind(&prover_api_opts.bind_addr())
                 .expect("failed to bind")
                 .run()
                 .await

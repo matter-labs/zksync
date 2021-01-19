@@ -108,7 +108,9 @@ describe('zkSync process tokens which have no return value in `transfer` and `tr
             );
         } catch (e) {}
         const balanceAfter = await tokenContract.balanceOf(wallet.address);
+
         expect(balanceBefore).eq(balanceAfter);
+        expect(revertReason).to.not.equal(DEFAULT_REVERT_REASON);
     });
 
     it('Withdraw ERC20 success', async () => {
@@ -148,7 +150,9 @@ describe('zkSync process tokens which have no return value in `transfer` and `tr
             async () => await performWithdraw(wallet, tokenContract.address, tokenId, withdrawAmount.add(1))
         );
         const onchainBalAfter = await onchainBalance(wallet, tokenContract.address);
+
         expect(onchainBalAfter).eq(onchainBalBefore);
+        expect(revertReason).to.not.eq(DEFAULT_REVERT_REASON);
     });
 
     it('Complete pending withdawals', async () => {

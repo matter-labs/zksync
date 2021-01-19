@@ -1,6 +1,4 @@
-/// Std imports
 use std::time::Duration;
-// External imports
 // Workspace imports
 use zksync_config::ConfigurationOptions;
 use zksync_types::{block::PendingBlock, Action};
@@ -9,6 +7,22 @@ use crate::test_data::gen_operation;
 use crate::tests::db_test;
 use crate::{chain::block::BlockSchema, prover::ProverSchema, QueryResult, StorageProcessor};
 use zksync_basic_types::H256;
+
+/// Returns the smallest supported block size.
+fn supported_block_sizes() -> Vec<usize> {
+    ZkSyncConfig::from_env()
+        .chain
+        .circuit
+        .supported_block_chunks_sizes
+}
+
+fn smallest_block_size() -> usize {
+    supported_block_sizes()[0]
+}
+
+fn prover_gone_timeout() -> Duration {
+    ZkSyncConfig::from_env().prover.core.gone_timeout()
+}
 
 /// Checks that the proof can be stored and loaded.
 #[db_test]

@@ -2,7 +2,7 @@ const hardhat = require("hardhat");
 const { expect } = require('chai');
 const { getCallRevertReason } = require('./common');
 
-describe('Governance unit tests', function() {
+describe('Governance unit tests', function () {
     this.timeout(50000);
 
     let testContract;

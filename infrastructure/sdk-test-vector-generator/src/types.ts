@@ -1,5 +1,3 @@
-import * as zksync from 'zksync';
-
 export interface TestVectorEntry {
     inputs: any;
     outputs: any;

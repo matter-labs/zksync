@@ -59,7 +59,7 @@ This section provides an overview on folders / sub-projects that exist in this r
     - `/server`: zkSync server application.
     - `/prover`: zkSync prover application.
     - `/data_restore`: Utility to restore a state of the zkSync network from a smart contract.
-    - `/key_generator`: Utility to generate verification keys for network. launch.
+    - `/key_generator`: Utility to generate verification keys for network.
     - `/parse_pub_data`: Utility to parse zkSync operation pubdata.
     - `/zksync_core`: zkSync server Core microservice.
     - `/zksync_api`: zkSync server API microservice.
@@ -95,7 +95,6 @@ This section provides an overview on folders / sub-projects that exist in this r
   - `/analytics`: Script that analyzes the costs of zkSync network maintaining.
   - `/explorer`: A blockchain explorer for zkSync network.
   - `/fee-seller`: Script to sell the collected fees.
-  - `/tok_cli`: A command-line utility for adding new supported tokens into zkSync
   - `/zcli`: A command-line interface and development wallet for zkSync network.
 - `/keys`: Verification keys for `circuit` module.
 - `/sdk`: Implementation of client libraries for zkSync network in different programming languages.

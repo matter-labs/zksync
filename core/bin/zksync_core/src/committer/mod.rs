@@ -139,6 +139,18 @@ async fn commit_block(
         .await
         .expect("Failed initializing a DB transaction");
 
+    // This is needed to keep track of how many priority ops are in each block
+    // and trigger grafana alerts if there are suspiciously few
+    let total_priority_ops = block
+        .block_transactions
+        .filter(|tx| matches!(tx, ExecutedOperations::PriorityOp(_)))
+        .iter()
+        .count();
+    metrics::histogram!(
+        "committer.priority_ops_per_block",
+        total_priority_ops as u64
+    );
+
     transaction
         .chain()
         .state_schema()

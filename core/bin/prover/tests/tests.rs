@@ -12,6 +12,7 @@ use zksync_circuit::{
     serialization::ProverData,
     witness::{deposit::DepositWitness, utils::WitnessBuilder, Witness},
 };
+use zksync_config::configs::ChainConfig;
 use zksync_config::{ConfigurationOptions, ProverOptions};
 use zksync_crypto::{
     circuit::{account::CircuitAccount, CircuitAccountTree},
@@ -108,7 +109,7 @@ fn test_data_for_prover() -> JobRequestData {
     );
     witness_accum.extend_pubdata_with_noops(smallest_block_size_for_chunks(
         DepositOp::CHUNKS,
-        &ConfigurationOptions::from_env().available_block_chunk_sizes,
+        &ChainConfig::from_env().circuit.supported_block_chunks_sizes,
     ));
     witness_accum.collect_fees(&Vec::new());
     witness_accum.calculate_pubdata_commitment();

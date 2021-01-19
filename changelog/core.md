@@ -8,6 +8,42 @@ All notable changes to the core components will be documented in this file.
 
 - The fee for normal transfers is set as expensive as the fee for transfer_to_new.
 
+## Unreleased
+
+- Removed the limitation on the number of withdrawals in the block.
+- (`FeeTicker`): Increased gas price estimate for transaction.
+
+### Changed
+
+- `prover_run_for_next_commit` function uses a parameterized timeout instead of a hard-coded one.
+
+### Added
+
+### Fixed
+
+## Release 2021-01-12
+
+### Changed
+
+- `gen_token_add_contract` crate is rewritten in ts.
+- Metrics were added to some functions from lib/storage.
+- `get_tx_by_hash` function was simplified.
+
+### Added
+
+- `closest_greater_or_eq_packable_fee_amount` and `closest_greater_or_eq_packable_token_amount` functions.
+  `test_float_conversions` test was expanded.
+- Loadtest scenario for stressing transaction batches
+
+### Removed
+
+- Sequential Sparse Merkle Tree implementation was removed because it has been replaced by the parallel implementation.
+
+### Fixed
+
+- Bug with `to_float` function. Now, it really rounds to the closest less or equal float number.
+- Wrong index type used in the database causing some queries to take too much time.
+
 ## Prior to 2020-12-23
 
 ### Added

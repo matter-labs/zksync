@@ -27,10 +27,6 @@ use zksync_types::{
 };
 use zksync_utils::UnsignedRatioSerializeAsDecimal;
 
-/// Constant for gas_price_test
-/// Real value is in `dev.env`
-pub const MAX_WITHDRAWALS_PER_BLOCK: u32 = 10;
-
 const MIN_BLOCK_SIZE_CHUNKS: usize = 0;
 
 /// Gas cost data from one test in one test we process `samples` number of operations in one block.
@@ -281,11 +277,10 @@ async fn gas_price_test() {
         .await
         .report(&base_cost, "full exit ERC20", true);
 
-    let withdrawals_amount = MAX_WITHDRAWALS_PER_BLOCK as usize;
-    commit_cost_of_withdrawals(&mut test_setup, withdrawals_amount, Token(0), rng)
+    commit_cost_of_withdrawals(&mut test_setup, 40, Token(0), rng)
         .await
         .report(&base_cost, "withdrawals ETH", false);
-    commit_cost_of_withdrawals(&mut test_setup, withdrawals_amount, Token(1), rng)
+    commit_cost_of_withdrawals(&mut test_setup, 40, Token(1), rng)
         .await
         .report(&base_cost, "withdrawals ERC20", false);
 
@@ -437,13 +432,6 @@ async fn commit_cost_of_withdrawals(
     token: Token,
     rng: &mut impl Rng,
 ) -> CostsSample {
-    assert!(
-        n_withdrawals <= MAX_WITHDRAWALS_PER_BLOCK as usize,
-        "{} withdrawals would not fit in one block, max amount is {}",
-        n_withdrawals,
-        MAX_WITHDRAWALS_PER_BLOCK
-    );
-
     let mut withdraws_fee = Vec::new();
     let mut withdrawals_fee = Vec::new();
     let mut deposit_amount = BigUint::from(0u32);

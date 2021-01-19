@@ -35,6 +35,11 @@ pub struct PlonkStepByStepProverConfig {
 impl ProverConfig for PlonkStepByStepProverConfig {
     fn from_env() -> Self {
         Self {
+            block_sizes: get_env("CHAIN_STATE_KEEPER_BLOCK_CHUNK_SIZES")
+                .split(',')
+                .map(|p| p.parse().unwrap())
+                .collect(),
+            download_setup_from_network: parse_env("MISC_PROVER_DOWNLOAD_SETUP"),
             all_block_sizes: parse_env_to_collection("SUPPORTED_BLOCK_CHUNKS_SIZES"),
             block_sizes: parse_env_to_collection("BLOCK_CHUNK_SIZES"),
             download_setup_from_network: parse_env("PROVER_DOWNLOAD_SETUP"),

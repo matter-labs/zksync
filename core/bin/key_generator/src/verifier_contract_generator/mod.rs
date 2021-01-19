@@ -9,7 +9,7 @@ use handlebars::Handlebars;
 use crate::verifier_contract_generator::render_vk::{
     get_vk_tree_root_hash, rendered_key, rendered_key_single_proof,
 };
-use zksync_config::AvailableBlockSizesConfig;
+use zksync_config::configs::ChainConfig;
 use zksync_prover_utils::fs_utils::{
     get_exodus_verification_key_path, get_recursive_verification_key_path,
     get_verifier_contract_key_path,
@@ -20,7 +20,7 @@ mod render_vk;
 
 /// Creates verifier contract compatible with our main contract using generated verification keys.
 /// Contract is created from the template using `handlebars` crate.
-pub(crate) fn create_verifier_contract(config: AvailableBlockSizesConfig) {
+pub(crate) fn create_verifier_contract(config: ChainConfig) {
     let template = &std::fs::read_to_string(get_verifier_template_file())
         .expect("failed to read Verifier template file");
     let mut template_params = HashMap::new();

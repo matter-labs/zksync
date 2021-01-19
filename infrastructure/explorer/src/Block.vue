@@ -6,9 +6,7 @@
             <div v-if="loadingStatus == 'loading'">
                 <img style="margin-right: 1.5em" src="./assets/loading.gif" width="100em" />
             </div>
-            <div v-else-if="loadingStatus == 'not committed'">
-                This block is not committed yet.
-            </div>
+            <div v-else-if="loadingStatus == 'not committed'">This block is not committed yet.</div>
             <div v-else>
                 <h5>Block data</h5>
                 <b-card no-body>
@@ -101,14 +99,10 @@ export default {
             return makeEntry('Block Size').innerHTML(this.block_size);
         },
         rootHashEntry() {
-            return makeEntry('New root hash')
-                .innerHTML(this.new_state_root)
-                .copyable();
+            return makeEntry('New root hash').innerHTML(this.new_state_root).copyable();
         },
         statusEntry() {
-            return makeEntry('Status')
-                .status(readyStateFromString(this.status))
-                .innerHTML(this.status);
+            return makeEntry('Status').status(readyStateFromString(this.status)).innerHTML(this.status);
         },
         commitHashEntry() {
             const entry = makeEntry('Commit tx hash').copyable();
@@ -181,7 +175,7 @@ export default {
             const tokens = await client.tokensPromise;
 
             const transactions = await Promise.all(
-                txs.map(async tx => {
+                txs.map(async (tx) => {
                     return {
                         ...(await getTxEntries(tx, tokens, client)),
                         success: tx.success
@@ -189,7 +183,7 @@ export default {
                 })
             );
 
-            this.transactions = transactions.filter(tx => tx.success);
+            this.transactions = transactions.filter((tx) => tx.success);
             this.loadingStatus = 'ready';
         }
     },

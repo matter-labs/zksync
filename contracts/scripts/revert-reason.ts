@@ -20,7 +20,7 @@ function hex_to_ascii(str1) {
 async function reason() {
     const args = process.argv.slice(2);
     const hash = args[0];
-    const web3 = args[1] == null ? process.env.WEB3_URL : args[1];
+    const web3 = args[1] == null ? process.env.ETH_CLIENT_WEB3_URL : args[1];
     console.log('tx hash:', hash);
     console.log('provider:', web3);
 

@@ -49,17 +49,11 @@ pub struct Config {
     pub scenarios: Vec<ScenarioConfig>,
 }
 
-impl Default for Config {
-    fn default() -> Self {
-        let config_str = include_str!(concat!(
-            env!("CARGO_MANIFEST_DIR"),
-            "/config/localhost.toml"
-        ));
-        toml::from_str(config_str).unwrap()
-    }
-}
-
 impl Config {
+    /// Path to file with the sample configuration.
+    pub const SAMPLE_CFG_PATH: &'static str =
+        concat!(env!("CARGO_MANIFEST_DIR"), "/config/localhost.toml");
+
     /// Reads config from the given TOML file.
     pub fn from_toml(path: impl AsRef<Path>) -> anyhow::Result<Self> {
         let content = fs::read_to_string(path)?;

@@ -13,7 +13,7 @@
     "@types/chai": "^4.2.14",
     "@types/mocha": "^8.0.3",
     "argparse": "^1.0.10",
-    "axios": "^0.21.0",
+    "axios": "^0.21.1",
     "chai": "^4.2.0",
     "chalk": "^4.1.0",
     "ethereum-waffle": "^3.0.0",
@@ -24,7 +24,8 @@
     "hardhat": "^2.0.2",
     "hardhat-contract-sizer": "^2.0.2",
     "hardhat-typechain": "^0.3.3",
-    "mocha": "^6.2.0",
+    "handlebars": "^4.7.6",
+    "mocha": "^8.2.0",
     "openzeppelin-solidity": "^2.3.0",
     "path": "^0.12.7",
     "prettier": "^1.18.2",
@@ -35,6 +36,7 @@
     "typechain": "^4.0.0",
     "typescript": "^4.0.5",
     "commander": "^6.0.0",
+    "jsonwebtoken": "^8.5.1",
     "zksync": "link:../sdk/zksync.js"
   },
   "scripts": {
@@ -44,9 +46,12 @@
     "upgrade-testnet-no-build": "ts-node scripts/upgrade-testnet.ts",
     "deploy-eip1271": "ts-node scripts/deploy-eip1271.ts",
     "deploy-erc20": "ts-node scripts/deploy-erc20.ts",
-    "governance-add-erc20": "ts-node scripts/add-erc20-token.ts",
+    "governance-add-erc20": "ts-node scripts/governance-add-erc20.ts",
+    "server-add-erc20": "ts-node scripts/server-add-erc20.ts",
+    "token-info": "ts-node scripts/token-info.ts",
     "deploy-testkit": "ts-node scripts/deploy-testkit.ts",
-    "publish-sources": "hardhat run --network env scripts/publish.ts",
-    "deploy-testnet-erc20": "ts-node scripts/deploy-testnet-token.ts"
+    "publish-sources": "ts-node scripts/publish.ts",
+    "deploy-testnet-erc20": "ts-node scripts/deploy-testnet-token.ts",
+    "gen-token-add-contract": "ts-node scripts/gen-token-add-contract.ts"
   }
 }
