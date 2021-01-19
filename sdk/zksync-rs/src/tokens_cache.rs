@@ -1,5 +1,5 @@
 use std::collections::HashMap;
-use zksync_types::{Address, Token, TokenLike};
+use zksync_types::{Token, TokenLike};
 
 #[derive(Debug, Clone)]
 pub struct TokensCache {
@@ -24,10 +24,6 @@ impl TokensCache {
     }
 
     pub fn is_eth(&self, token: TokenLike) -> bool {
-        match token {
-            TokenLike::Symbol(symbol) => symbol == "ETH",
-            TokenLike::Address(address) => address == Address::zero(),
-            TokenLike::Id(id) => id == 0,
-        }
+        token.is_eth()
     }
 }
