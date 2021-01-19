@@ -72,7 +72,7 @@ async fn migration_test() {
 
     let deposit_amount = parse_ether("1.0").unwrap();
 
-    let token = 0;
+    let token = TokenId(0);
     perform_basic_operations(
         token,
         &mut test_setup,
@@ -85,7 +85,7 @@ async fn migration_test() {
     run_upgrade_franklin(contracts.contract, contracts.upgrade_gatekeeper);
     println!("Upgrade done in {:?}", start_upgrade.elapsed());
 
-    let token = 1;
+    let token = TokenId(1);
     perform_basic_operations(
         token,
         &mut test_setup,

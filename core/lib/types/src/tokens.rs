@@ -71,7 +71,7 @@ impl TokenLike {
         match self {
             TokenLike::Symbol(symbol) => symbol == "ETH",
             TokenLike::Address(address) => *address == Address::zero(),
-            TokenLike::Id(id) => *id == 0,
+            TokenLike::Id(id) => **id == 0,
         }
     }
 }

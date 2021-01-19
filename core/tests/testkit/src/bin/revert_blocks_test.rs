@@ -74,7 +74,7 @@ async fn execute_blocks_with_new_state_keeper(
     let deposit_amount = parse_ether("1.0").unwrap();
 
     let mut tokens = vec![];
-    let token = 0;
+    let token = TokenId(0);
     perform_basic_operations(
         token,
         &mut test_setup,

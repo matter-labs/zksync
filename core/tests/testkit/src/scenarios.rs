@@ -88,7 +88,7 @@ pub async fn perform_basic_tests() {
 
     let deposit_amount = parse_ether("1.0").unwrap();
 
-    let token = 1;
+    let token = TokenId(1);
     perform_basic_operations(
         token,
         &mut test_setup,
