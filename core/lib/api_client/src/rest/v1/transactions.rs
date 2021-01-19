@@ -88,8 +88,6 @@ impl From<SignedZkSyncTx> for TxData {
     }
 }
 
-// Client implementation
-
 /// Transactions API part.
 impl Client {
     /// Sends a new transaction to the memory pool.

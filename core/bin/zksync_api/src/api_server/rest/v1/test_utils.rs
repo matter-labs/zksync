@@ -291,8 +291,7 @@ impl TestServerConfig {
         for block_number in 1..=*COMMITTED_BLOCKS_COUNT {
             let block_number = BlockNumber(block_number);
             let updates = (0..3)
-                .map(|_| gen_acc_random_updates(&mut rng))
-                .flatten()
+                .flat_map(|_| gen_acc_random_updates(&mut rng))
                 .collect::<Vec<_>>();
             apply_updates(&mut accounts, updates.clone());
 

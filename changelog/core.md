@@ -9,9 +9,13 @@ All notable changes to the core components will be documented in this file.
 
 ### Changed
 
-- Replace aliases (TokenId, AccountId, Nonce, BlockNumber, PriorityOpId, EthBlockId) with wrapper structures.
+- Aliases (TokenId, AccountId, Nonce, BlockNumber, PriorityOpId, EthBlockId) are replaced with wrapper structures.
+- `prometheus_exporter` was made a library to be used by several crates.
+- `prover_run_for_next_commit` function uses a parameterized timeout instead of a hard-coded one.
 
 ### Added
+
+- `prometheus_exporter` is launched by every microservice.
 
 ### Fixed
 
@@ -20,11 +24,14 @@ All notable changes to the core components will be documented in this file.
 ### Changed
 
 - `gen_token_add_contract` crate is rewritten in ts.
+- Metrics were added to some functions from lib/storage.
+- `get_tx_by_hash` function was simplified.
 
 ### Added
 
 - `closest_greater_or_eq_packable_fee_amount` and `closest_greater_or_eq_packable_token_amount` functions.
   `test_float_conversions` test was expanded.
+- Loadtest scenario for stressing transaction batches
 
 ### Removed
 
@@ -53,10 +60,3 @@ All notable changes to the core components will be documented in this file.
 ### Fixed
 
 - Bug with delay between receiving a job and starting sending heartbeats.
-
-## Unreleased
-
-### Changed
-
-- Metrics were added to some functions from lib/storage.
-- `get_tx_by_hash` function was simplified.

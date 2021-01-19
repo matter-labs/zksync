@@ -1,7 +1,10 @@
 // Built-in deps
-use std::time::{self, Instant};
+use std::{
+    convert::TryFrom,
+    time::{self, Instant},
+};
 // External imports
-use sqlx::Done;
+use sqlx::{postgres::types::PgInterval, Done};
 // Workspace imports
 use zksync_crypto::proof::EncodedProofPlonk;
 use zksync_types::BlockNumber;
@@ -110,7 +113,7 @@ impl<'a, 'c> ProverSchema<'a, 'c> {
     pub async fn prover_run_for_next_commit(
         &mut self,
         worker_: &str,
-        _prover_timeout: time::Duration,
+        prover_timeout: time::Duration,
         block_size: usize,
     ) -> QueryResult<Option<ProverRun>> {
         let start = Instant::now();
@@ -126,9 +129,6 @@ impl<'a, 'c> ProverSchema<'a, 'c> {
         // - There is no proof for block.
         // - Either there is no ongoing job for the block, or the job exceeded the timeout.
         // Return the index of such a block.
-
-        // TODO: Prover gone interval is hard-coded (ZKS-103).
-        // Is it critical?
         let job = sqlx::query!(
             r#"
                 WITH unsized_blocks AS (
@@ -140,13 +140,14 @@ impl<'a, 'c> ProverSchema<'a, 'c> {
                             (SELECT * FROM proofs WHERE block_number = o.block_number)
                         AND NOT EXISTS
                             (SELECT * FROM prover_runs
-                                WHERE block_number = o.block_number AND (now() - updated_at) < interval '120 seconds')
+                                WHERE block_number = o.block_number AND (now() - updated_at) < $1::interval)
                 )
                 SELECT min(block_number) FROM unsized_blocks
                 INNER JOIN blocks
-                    ON unsized_blocks.block_number = blocks.number AND blocks.block_size = $1
+                    ON unsized_blocks.block_number = blocks.number AND blocks.block_size = $2
             "#,
-            block_size as i64
+            PgInterval::try_from(prover_timeout).expect("Cannot convert Duration to PgInterval"),
+            block_size as i64,
             )
             .fetch_one(transaction.conn())
             .await?

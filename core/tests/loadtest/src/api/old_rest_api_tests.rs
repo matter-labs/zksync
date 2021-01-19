@@ -33,7 +33,6 @@ impl ToHexId for Address {
     }
 }
 
-// Client implementation.
 impl RestApiClient {
     pub fn new(url: String, pool: ApiDataPool) -> Self {
         Self {

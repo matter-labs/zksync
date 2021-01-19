@@ -164,7 +164,7 @@ impl<W: TokenWatcher> FeeTokenValidator<W> {
             None => self.get_remote_token_market(&token).await?,
         };
 
-        if Utc::now() - volume.last_updated < self.available_time {
+        if Utc::now() - volume.last_updated > self.available_time {
             vlog::warn!("Token market amount for {} is not relevant", &token.symbol)
         }
         let allowed = ratio_to_big_decimal(&volume.market_volume, 2) >= self.liquidity_volume;

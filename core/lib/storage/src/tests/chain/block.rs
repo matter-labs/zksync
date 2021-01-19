@@ -31,9 +31,7 @@ pub fn apply_random_updates(
     rng: &mut XorShiftRng,
 ) -> (AccountMap, Vec<(AccountId, AccountUpdate)>) {
     let updates = (0..3)
-        .map(|i| AccountId(i))
-        .map(|_| gen_acc_random_updates(rng))
-        .flatten()
+        .flat_map(|_| gen_acc_random_updates(rng))
         .collect::<AccountUpdates>();
     apply_updates(&mut accounts, updates.clone());
     (accounts, updates)

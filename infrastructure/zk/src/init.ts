@@ -6,11 +6,13 @@ import * as server from './server';
 import * as contract from './contract';
 import * as run from './run/run';
 import * as env from './env';
+import * as docker from './docker';
 import { up } from './up';
 
 export async function init() {
     await createVolumes();
     if (!process.env.CI) {
+        await docker.pull();
         await checkEnv();
         await env.gitHooks();
         await up();
@@ -25,6 +27,9 @@ export async function init() {
     await contract.build();
     await server.genesis();
     await contract.redeploy();
+    if (!process.env.CI) {
+        await docker.restart('dev-liquidity-token-watcher');
+    }
 }
 
 async function createVolumes() {

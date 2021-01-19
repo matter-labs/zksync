@@ -65,6 +65,15 @@ impl TokenLike {
         // Otherwise interpret a string as the token symbol.
         Self::Symbol(value.to_string())
     }
+
+    /// Checks if the token is Ethereum.
+    pub fn is_eth(&self) -> bool {
+        match self {
+            TokenLike::Symbol(symbol) => symbol == "ETH",
+            TokenLike::Address(address) => *address == Address::zero(),
+            TokenLike::Id(id) => *id == 0,
+        }
+    }
 }
 
 /// Token supported in zkSync protocol

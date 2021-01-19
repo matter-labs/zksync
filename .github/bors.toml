@@ -1,4 +1,4 @@
-status = ["ci-all"]
+status = ["lint", "unit-tests", "integration", "testkit"]
 delete_merged_branches = true
 update_base_for_deletes = true
 timeout_sec = 7200

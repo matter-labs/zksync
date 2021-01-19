@@ -155,7 +155,7 @@ async fn test_operation_queues() {
     let to_addr = [2u8; 20].into();
 
     client
-        .add_operations(&vec![
+        .add_operations(&[
             PriorityOp {
                 serial_id: 0,
                 data: ZkSyncPriorityOp::Deposit(Deposit {
@@ -233,7 +233,7 @@ async fn test_operation_queues_time_lag() {
     // Client's block number will be 110, thus both first and second operations should get to the priority queue
     // in eth watcher.
     client
-        .add_operations(&vec![
+        .add_operations(&[
             PriorityOp {
                 serial_id: 0,
                 data: ZkSyncPriorityOp::Deposit(Deposit {
@@ -299,7 +299,7 @@ async fn test_operation_queues_time_lag() {
 async fn test_restore_and_poll() {
     let mut client = FakeEthClient::new();
     client
-        .add_operations(&vec![
+        .add_operations(&[
             PriorityOp {
                 serial_id: 0,
                 data: ZkSyncPriorityOp::Deposit(Deposit {
@@ -330,7 +330,7 @@ async fn test_restore_and_poll() {
     let mut watcher = create_watcher(client.clone());
     watcher.restore_state_from_eth(4).await.unwrap();
     client
-        .add_operations(&vec![
+        .add_operations(&[
             PriorityOp {
                 serial_id: 3,
                 data: ZkSyncPriorityOp::Deposit(Deposit {
@@ -374,7 +374,7 @@ async fn test_restore_and_poll() {
 async fn test_restore_and_poll_time_lag() {
     let mut client = FakeEthClient::new();
     client
-        .add_operations(&vec![
+        .add_operations(&[
             PriorityOp {
                 serial_id: 0,
                 data: ZkSyncPriorityOp::Deposit(Deposit {

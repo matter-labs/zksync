@@ -74,16 +74,15 @@ async fn execute_blocks_with_new_state_keeper(
     let deposit_amount = parse_ether("1.0").unwrap();
 
     let mut tokens = vec![];
-    for token in 0..=1 {
-        perform_basic_operations(
-            TokenId(token),
-            &mut test_setup,
-            deposit_amount.clone(),
-            block_processing,
-        )
-        .await;
-        tokens.push(TokenId(token));
-    }
+    let token = 0;
+    perform_basic_operations(
+        token,
+        &mut test_setup,
+        deposit_amount.clone(),
+        block_processing,
+    )
+    .await;
+    tokens.push(token);
 
     if block_processing == BlockProcessing::NoVerify {
         let blocks_committed = test_setup

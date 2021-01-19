@@ -88,17 +88,15 @@ pub async fn perform_basic_tests() {
 
     let deposit_amount = parse_ether("1.0").unwrap();
 
-    let mut tokens = vec![];
-    for token in 0..=1 {
-        perform_basic_operations(
-            TokenId(token),
-            &mut test_setup,
-            deposit_amount.clone(),
-            BlockProcessing::CommitAndVerify,
-        )
-        .await;
-        tokens.push(TokenId(token));
-    }
+    let token = 1;
+    perform_basic_operations(
+        token,
+        &mut test_setup,
+        deposit_amount.clone(),
+        BlockProcessing::CommitAndVerify,
+    )
+    .await;
+    let tokens = vec![token];
 
     verify_restore(
         &testkit_config.web3_url,
