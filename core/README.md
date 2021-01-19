@@ -1,4 +1,4 @@
-# zkSync Core backend
+# zkSync Core Backend
 
 **zkSync** is a scaling and privacy engine for Ethereum. Its current functionality scope includes low gas transfers of
 ETH and ERC20 tokens in the Ethereum network.
