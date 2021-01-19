@@ -90,7 +90,9 @@ Tester.prototype.testMultipleBatchSigners = async function (wallets: Wallet[], t
         batch.push({ tx: transfer });
     }
     // The message is keccak256(batchBytes)
-    const batchBytes = ethers.utils.concat(batch.map((signedTx) => serializeTx(signedTx.tx)));
+    const batchBytes = ethers.utils.concat(
+        batch.map((signedTx) => serializeTx(signedTx.tx, batchSender.provider.zkSyncVersion))
+    );
     const batchHash = ethers.utils.keccak256(batchBytes).slice(2);
     const message = Uint8Array.from(Buffer.from(batchHash, 'hex'));
     // For every sender there's corresponding signature, otherwise, batch verification would fail.
@@ -141,7 +143,9 @@ Tester.prototype.testMultipleWalletsWrongSignature = async function (
     // transfer1 and transfer2 are from different wallets.
     const batch: SignedTransaction[] = [{ tx: transfer1 }, { tx: transfer2 }];
 
-    const batchBytes = ethers.utils.concat(batch.map((signedTx) => serializeTx(signedTx.tx)));
+    const batchBytes = ethers.utils.concat(
+        batch.map((signedTx) => serializeTx(signedTx.tx, from.provider.zkSyncVersion))
+    );
     const batchHash = ethers.utils.keccak256(batchBytes).slice(2);
     const message = Uint8Array.from(Buffer.from(batchHash, 'hex'));
     const ethSignature = await from.getEthMessageSignature(message);

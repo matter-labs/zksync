@@ -129,7 +129,7 @@ export class Wallet {
     }
 
     batchBuilder(nonce?: Nonce): BatchBuilder {
-        return BatchBuilder.fromWallet(this, nonce);
+        return BatchBuilder.fromWallet(this, nonce, this.provider.zkSyncVersion);
     }
 
     async getTransfer(transfer: {
@@ -310,7 +310,7 @@ export class Wallet {
                 validUntil: transfer.validUntil || MAX_TIMESTAMP
             });
 
-            bytes = ethers.utils.concat([bytes, serializeTransfer(tx)]);
+            bytes = ethers.utils.concat([bytes, serializeTransfer(tx, this.provider.zkSyncVersion)]);
             batch.push({ tx, signature: null });
         }
         const hash = ethers.utils.keccak256(bytes).slice(2);
