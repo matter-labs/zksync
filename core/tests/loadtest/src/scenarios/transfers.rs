@@ -89,8 +89,9 @@ impl Scenario for TransferScenario {
             &self.transfer_size + (&fees.zksync * BigUint::from(self.transfer_rounds));
 
         ScenarioResources {
-            balance_per_wallet: closest_packable_token_amount(&balance_per_wallet),
+            balance_per_wallet,
             wallets_amount: self.wallets,
+            has_deposits: false,
         }
     }
 

@@ -2,6 +2,7 @@ use futures::{channel::mpsc, executor::block_on, SinkExt, StreamExt};
 use std::cell::RefCell;
 use zksync_config::ZkSyncConfig;
 use zksync_core::{run_core, wait_for_tasks};
+use zksync_prometheus_exporter::run_prometheus_exporter;
 use zksync_storage::ConnectionPool;
 
 #[tokio::main]
@@ -20,6 +21,10 @@ async fn main() -> anyhow::Result<()> {
     }
     let connection_pool = ConnectionPool::new(None);
 
+    // Run prometheus data exporter.
+    let (prometheus_task_handle, counter_task_handle) =
+        run_prometheus_exporter(connection_pool.clone(), config.api.prometheus.port, true);
+
     let task_handles = run_core(connection_pool, stop_signal_sender, &config)
         .await
         .expect("Unable to start Core actors");
@@ -27,6 +32,12 @@ async fn main() -> anyhow::Result<()> {
     tokio::select! {
         _ = async { wait_for_tasks(task_handles).await } => {
             // We don't need to do anything here, since actors will panic upon future resolving.
+        },
+        _ = async { prometheus_task_handle.await } => {
+            panic!("Prometheus exporter actors aren't supposed to finish their execution")
+        },
+        _ = async { counter_task_handle.unwrap().await } => {
+            panic!("Operation counting actor is not supposed to finish its execution")
         },
         _ = async { stop_signal_receiver.next().await } => {
             vlog::warn!("Stop signal received, shutting down");

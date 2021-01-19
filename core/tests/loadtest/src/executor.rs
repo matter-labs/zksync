@@ -1,8 +1,10 @@
 // Built-in uses
 use std::{collections::BTreeMap, fmt::Debug};
+
 // External uses
 use num::BigUint;
 use serde::{Deserialize, Serialize};
+
 // Workspace uses
 use zksync::{
     types::BlockStatus,
@@ -10,6 +12,7 @@ use zksync::{
     RpcProvider,
 };
 use zksync_utils::format_ether;
+
 // Local uses
 use crate::{
     api::{self, ApiTestsFuture, ApiTestsReport, CancellationToken},
@@ -69,6 +72,9 @@ impl Fees {
 }
 
 impl LoadtestExecutor {
+    /// The approximate number of extra operations for each wallet.
+    const OPERATIONS_PER_WALLET: u64 = 5;
+
     /// Creates a new executor instance.
     pub async fn new(config: Config, web3_url: String) -> anyhow::Result<Self> {
         let monitor = Monitor::new(RpcProvider::new(config.network.name)).await;
@@ -84,10 +90,15 @@ impl LoadtestExecutor {
         // Create main account to deposit money from and to return money back later.
         let main_wallet =
             TestWallet::from_info(monitor.clone(), &config.main_wallet, &web3_url).await;
+        // Special case for erc20 tokens.
+        if !main_wallet.token_name().is_eth() {
+            main_wallet.approve_erc20_deposits().await?;
+        }
 
         let default_fee = main_wallet.sufficient_fee().await?;
         let fees = Fees::from_config(&config.network, default_fee);
 
+        vlog::info!("Token is {}", main_wallet.token_name());
         vlog::info!("Eth fee is {}", format_ether(&fees.eth));
         vlog::info!("zkSync fee is {}", format_ether(&fees.zksync));
 
@@ -133,16 +144,14 @@ impl LoadtestExecutor {
 
         // Create intermediate wallets and compute total amount to deposit and needed
         // balances for wallets.
-        let mut amount_to_deposit = &self.fees.eth + &self.fees.zksync * BigUint::from(10_u64);
+        let total_fee = BigUint::from(Self::OPERATIONS_PER_WALLET) * &self.fees.zksync;
+
+        let mut amount_to_deposit = &self.fees.zksync * BigUint::from(10_u64);
         let mut wallets = Vec::new();
         for resource in resources {
-            let wallet_balance = closest_packable_token_amount(
-                &(&resource.balance_per_wallet + BigUint::from(5_u64) * &self.fees.zksync),
-            );
-
-            let scenario_amount = BigUint::from(resource.wallets_amount) * &wallet_balance
-                + BigUint::from(10_u64) * &self.fees.zksync
-                + &self.fees.eth;
+            let wallet_balance = resource.balance_per_wallet + &total_fee;
+            let scenario_amount =
+                (&wallet_balance + &total_fee) * BigUint::from(resource.wallets_amount);
             amount_to_deposit += scenario_amount;
 
             let scenario_wallets = wait_all_chunks(
@@ -157,16 +166,39 @@ impl LoadtestExecutor {
             )
             .await;
 
+            // Special case for erc20 tokens.
+            if resource.has_deposits && !self.main_wallet.token_name().is_eth() {
+                vlog::info!(
+                    "Approving {} wallets for ERC20 deposits.",
+                    scenario_wallets.len(),
+                );
+
+                for wallet in &scenario_wallets {
+                    // Give some gas to make it possible to create Ethereum transactions.
+                    let eth_balance =
+                        closest_packable_fee_amount(&(&self.fees.eth * BigUint::from(2_u64)));
+                    self.main_wallet
+                        .transfer_to("ETH", eth_balance, wallet.address())
+                        .await?;
+                    wallet.approve_erc20_deposits().await?;
+                }
+
+                vlog::info!(
+                    "All of {} wallets have been approved for deposits.",
+                    scenario_wallets.len(),
+                );
+            }
+
             wallets.push((scenario_wallets, wallet_balance));
         }
 
         // Make deposit from Ethereum network to the zkSync one.
         let amount_to_deposit = closest_packable_token_amount(&amount_to_deposit);
-        let eth_balance = self.main_wallet.eth_balance().await?;
+        let l1_balance = self.main_wallet.l1_balance().await?;
         anyhow::ensure!(
-            eth_balance > amount_to_deposit,
+            l1_balance > amount_to_deposit,
             "Not enough balance in the main wallet to perform this test, actual: {}, expected: {}",
-            format_ether(&eth_balance),
+            format_ether(&l1_balance),
             format_ether(&amount_to_deposit),
         );
 
@@ -217,9 +249,10 @@ impl LoadtestExecutor {
                 "executor/prepare/sign_transfer",
                 CHUNK_SIZES,
                 scenario_wallets.iter().map(|wallet| {
+                    let amount = closest_packable_token_amount(&scenario_amount);
                     self.main_wallet.sign_transfer(
                         wallet.address(),
-                        scenario_amount.clone(),
+                        amount,
                         self.fees.zksync.clone(),
                     )
                 }),
@@ -381,6 +414,31 @@ impl LoadtestExecutor {
                     .map(|tx_hash| monitor.wait_for_tx(BlockStatus::Committed, tx_hash)),
             )
             .await?;
+
+            for wallet in scenario_wallets {
+                // Refund remaining erc20 tokens to the main wallet
+                if !wallet.token_name().is_eth() {
+                    let balance = wallet.erc20_balance().await?;
+                    if balance > self.fees.eth {
+                        let amount = balance - &self.fees.eth;
+                        wallet
+                            .transfer_to(
+                                wallet.token_name().clone(),
+                                closest_packable_token_amount(&amount),
+                                main_address,
+                            )
+                            .await?;
+                    }
+                }
+                // Move remaining gas to the main wallet.
+                let balance = wallet.eth_balance().await?;
+                if balance > self.fees.eth {
+                    let amount = balance - &self.fees.eth;
+                    wallet
+                        .transfer_to("ETH", closest_packable_token_amount(&amount), main_address)
+                        .await?;
+                }
+            }
         }
 
         // Withdraw remaining balance from the zkSync network back to the Ethereum one.

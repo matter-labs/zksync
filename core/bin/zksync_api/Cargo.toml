@@ -23,6 +23,7 @@ zksync_config = { path = "../../lib/config", version = "1.0" }
 zksync_utils = { path = "../../lib/utils", version = "1.0" }
 zksync_contracts = { path = "../../lib/contracts", version = "1.0" }
 zksync_api_client  = { path = "../../lib/api_client", version = "0.1" }
+zksync_prometheus_exporter = { path = "../../lib/prometheus_exporter", version = "1.0" }
 
 vlog = { path = "../../lib/vlog", version = "1.0" }
 
