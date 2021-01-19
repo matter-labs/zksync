@@ -5,7 +5,7 @@
 // Workspace deps
 use zksync_basic_types::U256;
 // Local deps
-use crate::{config::MAX_WITHDRAWALS_TO_COMPLETE_IN_A_CALL, ZkSyncOp};
+use crate::{config::MAX_WITHDRAWALS_TO_COMPLETE_IN_A_CALL, Block, ZkSyncOp};
 
 /// Amount of gas that we can afford to spend in one transaction.
 /// This value must be big enough to fit big blocks with expensive transactions,
@@ -144,6 +144,11 @@ impl GasCounter {
     /// Cost of processing one withdraw operation in `completeWithdrawals` contract call.
     pub const COMPLETE_WITHDRAWALS_COST: u64 = 41_641;
 
+    /// constants for gas limit calculation of aggregated operations
+    pub const BASE_COMMIT_BLOCKS_TX_COST: usize = 40_000;
+    pub const BASE_EXECUTE_BLOCKS_TX_COST: usize = 70_000;
+    pub const BASE_PROOF_BLOCKS_TX_COST: usize = 1_500_000;
+
     pub fn new() -> Self {
         Self::default()
     }
@@ -186,6 +191,20 @@ impl GasCounter {
 
         // We scale this value up nevertheless, just in case.
         Self::scale_up(approx_limit)
+    }
+
+    pub fn commit_gas_limit_aggregated(blocks: &[Block]) -> U256 {
+        U256::from(Self::BASE_COMMIT_BLOCKS_TX_COST)
+            + blocks
+                .iter()
+                .fold(U256::zero(), |acc, block| acc + block.commit_gas_limit)
+    }
+
+    pub fn execute_gas_limit_aggregated(blocks: &[Block]) -> U256 {
+        U256::from(Self::BASE_EXECUTE_BLOCKS_TX_COST)
+            + blocks
+                .iter()
+                .fold(U256::zero(), |acc, block| acc + block.verify_gas_limit)
     }
 
     /// Increases the value by 30%.
