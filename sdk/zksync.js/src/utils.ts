@@ -11,7 +11,8 @@ import {
     ForcedExit,
     ChangePubKey,
     Withdraw,
-    CloseAccount
+    CloseAccount,
+    ZkSyncVersion
 } from './types';
 
 // Max number of tokens for the current version, it is determined by the zkSync circuit implementation.
@@ -449,10 +450,10 @@ export function serializeTimestamp(time: number): Uint8Array {
     if (time < 0) {
         throw new Error('Negative timestamp');
     }
-    return numberToBytesBE(time, 4);
+    return ethers.utils.concat([new Uint8Array(4), numberToBytesBE(time, 4)]);
 }
 
-export function serializeWithdraw(withdraw: Withdraw): Uint8Array {
+export function serializeWithdraw(withdraw: Withdraw, zkSyncVersion: ZkSyncVersion): Uint8Array {
     const type = new Uint8Array([3]);
     const accountId = serializeAccountId(withdraw.accountId);
     const accountBytes = serializeAddress(withdraw.from);
@@ -461,7 +462,9 @@ export function serializeWithdraw(withdraw: Withdraw): Uint8Array {
     const amountBytes = serializeAmountFull(withdraw.amount);
     const feeBytes = serializeFeePacked(withdraw.fee);
     const nonceBytes = serializeNonce(withdraw.nonce);
-    return ethers.utils.concat([
+    const validFrom = serializeTimestamp(withdraw.validFrom);
+    const validUntil = serializeTimestamp(withdraw.validUntil);
+    let result = ethers.utils.concat([
         type,
         accountId,
         accountBytes,
@@ -471,9 +474,13 @@ export function serializeWithdraw(withdraw: Withdraw): Uint8Array {
         feeBytes,
         nonceBytes
     ]);
+    if (zkSyncVersion === 'contracts-4') {
+        result = ethers.utils.concat([result, validFrom, validUntil]);
+    }
+    return result;
 }
 
-export function serializeTransfer(transfer: Transfer): Uint8Array {
+export function serializeTransfer(transfer: Transfer, zkSyncVersion: ZkSyncVersion): Uint8Array {
     const type = new Uint8Array([5]); // tx type
     const accountId = serializeAccountId(transfer.accountId);
     const from = serializeAddress(transfer.from);
@@ -482,10 +489,16 @@ export function serializeTransfer(transfer: Transfer): Uint8Array {
     const amount = serializeAmountPacked(transfer.amount);
     const fee = serializeFeePacked(transfer.fee);
     const nonce = serializeNonce(transfer.nonce);
-    return ethers.utils.concat([type, accountId, from, to, token, amount, fee, nonce]);
+    const validFrom = serializeTimestamp(transfer.validFrom);
+    const validUntil = serializeTimestamp(transfer.validUntil);
+    let result = ethers.utils.concat([type, accountId, from, to, token, amount, fee, nonce]);
+    if (zkSyncVersion === 'contracts-4') {
+        result = ethers.utils.concat([result, validFrom, validUntil]);
+    }
+    return result;
 }
 
-export function serializeChangePubKey(changePubKey: ChangePubKey): Uint8Array {
+export function serializeChangePubKey(changePubKey: ChangePubKey, zkSyncVersion: ZkSyncVersion): Uint8Array {
     const type = new Uint8Array([7]);
     const accountIdBytes = serializeAccountId(changePubKey.accountId);
     const accountBytes = serializeAddress(changePubKey.account);
@@ -493,7 +506,9 @@ export function serializeChangePubKey(changePubKey: ChangePubKey): Uint8Array {
     const tokenIdBytes = serializeTokenId(changePubKey.feeToken);
     const feeBytes = serializeFeePacked(changePubKey.fee);
     const nonceBytes = serializeNonce(changePubKey.nonce);
-    return ethers.utils.concat([
+    const validFrom = serializeTimestamp(changePubKey.validFrom);
+    const validUntil = serializeTimestamp(changePubKey.validUntil);
+    let result = ethers.utils.concat([
         type,
         accountIdBytes,
         accountBytes,
@@ -502,32 +517,46 @@ export function serializeChangePubKey(changePubKey: ChangePubKey): Uint8Array {
         feeBytes,
         nonceBytes
     ]);
+    if (zkSyncVersion === 'contracts-4') {
+        result = ethers.utils.concat([result, validFrom, validUntil]);
+    }
+    return result;
 }
 
-export function serializeForcedExit(forcedExit: ForcedExit): Uint8Array {
+export function serializeForcedExit(forcedExit: ForcedExit, zkSyncVersion: ZkSyncVersion): Uint8Array {
     const type = new Uint8Array([8]);
     const initiatorAccountIdBytes = serializeAccountId(forcedExit.initiatorAccountId);
     const targetBytes = serializeAddress(forcedExit.target);
     const tokenIdBytes = serializeTokenId(forcedExit.token);
     const feeBytes = serializeFeePacked(forcedExit.fee);
     const nonceBytes = serializeNonce(forcedExit.nonce);
-    return ethers.utils.concat([type, initiatorAccountIdBytes, targetBytes, tokenIdBytes, feeBytes, nonceBytes]);
+    const validFrom = serializeTimestamp(forcedExit.validFrom);
+    const validUntil = serializeTimestamp(forcedExit.validUntil);
+    let result = ethers.utils.concat([type, initiatorAccountIdBytes, targetBytes, tokenIdBytes, feeBytes, nonceBytes]);
+    if (zkSyncVersion === 'contracts-4') {
+        result = ethers.utils.concat([result, validFrom, validUntil]);
+    }
+    return result;
 }
 
 /**
  * Encodes the transaction data as the byte sequence according to the zkSync protocol.
  * @param tx A transaction to serialize.
+ * @param zkSyncVersion Version of the zkSync.
  */
-export function serializeTx(tx: Transfer | Withdraw | ChangePubKey | CloseAccount | ForcedExit): Uint8Array {
+export function serializeTx(
+    tx: Transfer | Withdraw | ChangePubKey | CloseAccount | ForcedExit,
+    zkSyncVersion: ZkSyncVersion
+): Uint8Array {
     switch (tx.type) {
         case 'Transfer':
-            return serializeTransfer(tx);
+            return serializeTransfer(tx, zkSyncVersion);
         case 'Withdraw':
-            return serializeWithdraw(tx);
+            return serializeWithdraw(tx, zkSyncVersion);
         case 'ChangePubKey':
-            return serializeChangePubKey(tx);
+            return serializeChangePubKey(tx, zkSyncVersion);
         case 'ForcedExit':
-            return serializeForcedExit(tx);
+            return serializeForcedExit(tx, zkSyncVersion);
         default:
             return new Uint8Array();
     }

@@ -7,7 +7,7 @@ import {
     ChangePubKeyFee,
     SignedTransaction,
     TxEthSignature,
-    ChangePubkeyTypes
+    ChangePubkeyTypes,
 } from './types';
 import { MAX_TIMESTAMP } from './utils';
 import { Wallet } from './wallet';
@@ -30,7 +30,7 @@ export class BatchBuilder {
     private constructor(private wallet: Wallet, private nonce: Nonce, private txs: InternalTx[] = []) {}
 
     static fromWallet(wallet: Wallet, nonce?: Nonce): BatchBuilder {
-        const batchBuilder = new BatchBuilder(wallet, nonce);
+        const batchBuilder = new BatchBuilder(wallet, nonce, []);
         return batchBuilder;
     }
 
