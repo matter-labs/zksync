@@ -164,6 +164,10 @@ export default {
                 entry.copyable();
             } else {
                 entry.innerHTML(`Not yet sent on the chain.`);
+                // Also change status for withdrawal without complete L1.
+                if (this.txData.status == 'Complete') {
+                    this.txData.status = 'Scheduled';
+                }
             }
 
             return entry;
