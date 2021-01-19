@@ -11,5 +11,5 @@ categories = ["cryptography"]
 publish = false # This is an utility crate, not to be used by libraries.
 
 [dependencies]
-tracing = "0.1.22"
+tracing = {version= "0.1.22", features = ["log"]}
 tracing-subscriber = "0.2.15"
