@@ -29,13 +29,6 @@ impl DerefMut for TokenId {
     }
 }
 
-#[test]
-fn foo() {
-    let a = TokenId(0);
-    let ser = serde_json::to_string(&a).unwrap();
-    println!("{}", ser);
-}
-
 /// Unique identifier of the account in the zkSync network.
 #[derive(
     Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Hash, PartialOrd, Ord, Default,

@@ -9,6 +9,8 @@ All notable changes to the core components will be documented in this file.
 
 ### Changed
 
+- Replace aliases (TokenId, AccountId, Nonce, BlockNumber, PriorityOpId, EthBlockId) with wrapper structures.
+
 ### Added
 
 ### Fixed
