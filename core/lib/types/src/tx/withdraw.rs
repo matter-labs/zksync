@@ -185,17 +185,13 @@ impl Withdraw {
             To: {to:?}\n\
             Nonce: {nonce}\n\
             Fee: {fee} {token}\n\
-            Account Id: {account_id}\n\
-            Valid from: {valid_from}\n\
-            Valid until: {valid_until}",
+            Account Id: {account_id}",
             amount = format_units(&self.amount, decimals),
             token = token_symbol,
             to = self.to,
             nonce = self.nonce,
             fee = format_units(&self.fee, decimals),
             account_id = self.account_id,
-            valid_from = self.valid_from.unwrap_or(0),
-            valid_until = self.valid_until.unwrap_or(u32::MAX),
         )
     }
 }
