@@ -609,7 +609,7 @@ export class Wallet {
             stringAmount,
             stringFee,
             stringToken,
-            to: withdraw.ethAddress
+            ethAddress: withdraw.ethAddress
         });
     }
 

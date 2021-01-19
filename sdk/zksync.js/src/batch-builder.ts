@@ -7,7 +7,7 @@ import {
     ChangePubKeyFee,
     SignedTransaction,
     TxEthSignature,
-    ChangePubkeyTypes,
+    ChangePubkeyTypes
 } from './types';
 import { MAX_TIMESTAMP } from './utils';
 import { Wallet } from './wallet';
@@ -147,10 +147,9 @@ export class BatchBuilder {
         validFrom?: number;
         validUntil?: number;
     }): BatchBuilder {
-        const fee = changePubKey.fee != undefined ? changePubKey.fee : 0;
         const _changePubKey = {
             feeToken: changePubKey.feeToken,
-            fee: fee,
+            fee: changePubKey.fee || 0,
             nonce: null,
             ethAuthType: changePubKey.ethAuthType,
             validFrom: changePubKey.validFrom || 0,
@@ -179,11 +178,10 @@ export class BatchBuilder {
         validFrom?: number;
         validUntil?: number;
     }): BatchBuilder {
-        const fee = forcedExit.fee != undefined ? forcedExit.fee : 0;
         const _forcedExit = {
             target: forcedExit.target,
             token: forcedExit.token,
-            fee: fee,
+            fee: forcedExit.fee || 0,
             nonce: null,
             validFrom: forcedExit.validFrom || 0,
             validUntil: forcedExit.validUntil || MAX_TIMESTAMP
@@ -222,6 +220,10 @@ export class BatchBuilder {
                 case 'ChangePubKey':
                     const changePubKey = await this.wallet.signSetSigningKey(tx.tx);
                     tx.tx.pubKeyHash = (changePubKey.tx as ChangePubKey).newPkHash;
+                    const currentPubKeyHash = await this.wallet.getCurrentPubKeyHash();
+                    if (currentPubKeyHash === tx.tx.pubKeyHash) {
+                        throw new Error('Current signing key is already set');
+                    }
                     messages.push(this.wallet.getChangePubKeyEthMessagePart(tx.tx));
                     processedTxs.push(changePubKey);
                     break;

@@ -3,8 +3,8 @@ import { expect } from 'chai';
 import { Wallet, types } from 'zksync';
 import { BigNumber, ethers } from 'ethers';
 import { SignedTransaction, TxEthSignature } from 'zksync/build/types';
-import { serializeTx } from 'zksync/build/utils';
 import { submitSignedTransactionsBatch } from 'zksync/build/wallet';
+import { MAX_TIMESTAMP } from 'zksync/build/utils';
 
 type TokenLike = types.TokenLike;
 
@@ -86,13 +86,13 @@ Tester.prototype.testMultipleBatchSigners = async function (wallets: Wallet[], t
             fee,
             nonce,
             validFrom: 0,
-            validUntil: Number.MAX_SAFE_INTEGER
+            validUntil: MAX_TIMESTAMP
         };
         const transfer = await sender.getTransfer(transferArgs);
         batch.push({ tx: transfer });
 
         const messagePart = sender.getTransferEthMessagePart(transferArgs);
-        messages.push(`From: ${sender.address()}\n${messagePart}\nNonce: ${nonce}`);
+        messages.push(`From: ${sender.address().toLowerCase()}\n${messagePart}\nNonce: ${nonce}`);
     }
 
     const message = messages.join('\n\n');
@@ -130,7 +130,7 @@ Tester.prototype.testMultipleWalletsWrongSignature = async function (
         fee: 0,
         nonce: await from.getNonce(),
         validFrom: 0,
-        validUntil: Number.MAX_SAFE_INTEGER
+        validUntil: MAX_TIMESTAMP
     };
     const _transfer2 = {
         to: from.address(),
@@ -139,16 +139,16 @@ Tester.prototype.testMultipleWalletsWrongSignature = async function (
         fee,
         nonce: await to.getNonce(),
         validFrom: 0,
-        validUntil: Number.MAX_SAFE_INTEGER
+        validUntil: MAX_TIMESTAMP
     };
     const transfer1 = await from.getTransfer(_transfer1);
     const transfer2 = await to.getTransfer(_transfer2);
     // transfer1 and transfer2 are from different wallets.
     const batch: SignedTransaction[] = [{ tx: transfer1 }, { tx: transfer2 }];
 
-    const message = `From: ${from.address()}\n${from.getTransferEthMessagePart(_transfer1)}\nNonce: ${
+    const message = `From: ${from.address().toLowerCase()}\n${from.getTransferEthMessagePart(_transfer1)}\nNonce: ${
         _transfer1.nonce
-    }\n\nFrom: ${to.address()}\n${to.getTransferEthMessagePart(_transfer2)}\nNonce: ${_transfer1.nonce}`;
+    }\n\nFrom: ${to.address().toLowerCase()}\n${to.getTransferEthMessagePart(_transfer2)}\nNonce: ${_transfer1.nonce}`;
     const ethSignature = await from.getEthMessageSignature(message);
 
     let thrown = true;

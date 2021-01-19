@@ -37,7 +37,10 @@ impl BatchSignData {
 
     /// Construct the message user is expected to sign for the given batch.
     pub fn get_batch_sign_message(txs: Vec<(ZkSyncTx, Option<Token>)>) -> Vec<u8> {
-        let grouped = txs.into_iter().group_by(|(tx, _)| tx.account());
+        let grouped = txs
+            .into_iter()
+            .filter(|(_, token)| token.is_some())
+            .group_by(|tx| tx.0.account());
         let mut iter = grouped.into_iter().peekable();
         // The message is empty if there're no transactions.
         let first = match iter.next() {
