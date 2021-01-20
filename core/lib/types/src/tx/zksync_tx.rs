@@ -116,13 +116,13 @@ impl ZkSyncTx {
         }
     }
 
-    pub fn account_id(&self) -> AccountId {
+    pub fn account_id(&self) -> anyhow::Result<AccountId> {
         match self {
-            ZkSyncTx::Transfer(tx) => tx.account_id,
-            ZkSyncTx::Withdraw(tx) => tx.account_id,
-            ZkSyncTx::Close(_) => panic!("Close operation is disabled"),
-            ZkSyncTx::ChangePubKey(tx) => tx.account_id,
-            ZkSyncTx::ForcedExit(tx) => tx.initiator_account_id,
+            ZkSyncTx::Transfer(tx) => Ok(tx.account_id),
+            ZkSyncTx::Withdraw(tx) => Ok(tx.account_id),
+            ZkSyncTx::ChangePubKey(tx) => Ok(tx.account_id),
+            ZkSyncTx::ForcedExit(tx) => Ok(tx.initiator_account_id),
+            ZkSyncTx::Close(_) => Err(anyhow::anyhow!("Close operations are disabled")),
         }
     }
 

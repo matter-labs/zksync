@@ -472,7 +472,7 @@ async fn store_account_type(
     };
     storage
         .chain()
-        .state_schema()
+        .account_schema()
         .set_account_type(tx.account_id, account_type)
         .await
         .map_err(|_| TxAddError::DbError)

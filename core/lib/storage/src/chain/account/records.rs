@@ -58,3 +58,9 @@ pub enum EthAccountType {
     Owned,
     CREATE2,
 }
+
+#[derive(Debug, Clone, FromRow)]
+pub struct StorageAccountType {
+    pub account_id: i64,
+    pub account_type: EthAccountType,
+}

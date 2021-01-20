@@ -38,31 +38,6 @@ use crate::{QueryResult, StorageProcessor};
 pub struct StateSchema<'a, 'c>(pub &'a mut StorageProcessor<'c>);
 
 impl<'a, 'c> StateSchema<'a, 'c> {
-    pub async fn set_account_type(
-        &mut self,
-        account_id: AccountId,
-        account_type: EthAccountType,
-    ) -> QueryResult<()> {
-        let start = Instant::now();
-
-        sqlx::query!(
-            r#"
-            INSERT INTO eth_account_types ( account_id, account_type )
-            VALUES ( $1, $2 )
-            ON CONFLICT (account_id) DO UPDATE 
-            SET account_type = $2
-            RETURNING account_type as "t!: EthAccountType"
-            "#,
-            i64::from(account_id),
-            account_type as EthAccountType
-        )
-        .fetch_one(self.0.conn())
-        .await?;
-
-        metrics::histogram!("sql.chain.state.set_account_type", start.elapsed());
-        Ok(())
-    }
-
     /// Stores the list of updates to the account map in the database.
     /// At this step, the changes are not verified yet, and thus are not applied.
     pub async fn commit_state_update(

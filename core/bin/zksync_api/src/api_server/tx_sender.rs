@@ -166,6 +166,20 @@ impl TxSender {
         }
     }
 
+    async fn get_tx_sender_type(&self, tx: &ZkSyncTx) -> Result<EthAccountType, SubmitError> {
+        Ok(self
+            .pool
+            .access_storage()
+            .await
+            .map_err(|_| SubmitError::TxAdd(TxAddError::DbError))?
+            .chain()
+            .account_schema()
+            .account_type_by_id(tx.account_id().or(Err(SubmitError::AccountCloseDisabled))?)
+            .await
+            .map_err(|_| SubmitError::TxAdd(TxAddError::DbError))?
+            .unwrap_or(EthAccountType::Owned))
+    }
+
     pub async fn submit_tx(
         &self,
         mut tx: ZkSyncTx,
@@ -256,6 +270,7 @@ impl TxSender {
         let verified_tx = verify_tx_info_message_signature(
             &tx,
             tx_sender,
+            self.get_tx_sender_type(&tx).await?,
             signature.clone(),
             msg_to_sign,
             sign_verify_channel,
@@ -361,6 +376,7 @@ impl TxSender {
 
         let mut messages_to_sign = Vec::with_capacity(txs.len());
         let mut tx_senders = Vec::with_capacity(txs.len());
+        let mut tx_sender_types = Vec::with_capacity(txs.len());
         for tx in &txs {
             messages_to_sign.push(self.tx_message_to_sign(&tx.tx).await?);
             tx_senders.push(
@@ -368,6 +384,7 @@ impl TxSender {
                     .await
                     .or(Err(SubmitError::TxAdd(TxAddError::DbError)))?,
             );
+            tx_sender_types.push(self.get_tx_sender_type(&tx.tx).await?);
         }
 
         if !eth_signatures.is_empty() {
@@ -382,6 +399,7 @@ impl TxSender {
             let (verified_batch, sign_data) = verify_txs_batch_signature(
                 txs,
                 tx_senders,
+                tx_sender_types,
                 batch_sign_data,
                 messages_to_sign,
                 self.sign_verify_requests.clone(),
@@ -393,10 +411,13 @@ impl TxSender {
             verified_txs.extend(verified_batch.into_iter());
         } else {
             // Otherwise, we process every transaction in turn.
-            for (tx, sender, msg_to_sign) in izip!(txs, tx_senders, messages_to_sign) {
+            for (tx, sender, sender_type, msg_to_sign) in
+                izip!(txs, tx_senders, tx_sender_types, messages_to_sign)
+            {
                 let verified_tx = verify_tx_info_message_signature(
                     &tx.tx,
                     sender,
+                    sender_type,
                     tx.signature.clone(),
                     msg_to_sign,
                     self.sign_verify_requests.clone(),
@@ -575,45 +596,29 @@ async fn send_verify_request_and_recv(
 async fn verify_tx_info_message_signature(
     tx: &ZkSyncTx,
     tx_sender: Address,
+    account_type: EthAccountType,
     signature: Option<TxEthSignature>,
     msg_to_sign: Option<Vec<u8>>,
     req_channel: mpsc::Sender<VerifyTxSignatureRequest>,
 ) -> Result<VerifiedTx, SubmitError> {
     let eth_sign_data = match msg_to_sign {
-        Some(message_to_sign) => {
+        Some(message) => match account_type {
             // Check if account is a CREATE2 account
             // These accounts do not have to pass 2FA
-            let id = tx.account_id();
-            let connection_pool = zksync_storage::ConnectionPool::new(None);
-            let mut storage = connection_pool
-                .access_storage()
-                .await
-                .expect("could not access storage");
-
-            let account_type = storage
-                .chain()
-                .account_schema()
-                .account_type_by_id(id)
-                .await
-                .map_err(|_| SubmitError::TxAdd(TxAddError::DbError))?
-                .unwrap_or(EthAccountType::Owned);
-
-            if matches!(account_type, EthAccountType::CREATE2) {
+            EthAccountType::CREATE2 => {
                 if signature.is_some() {
                     return Err(SubmitError::IncorrectTx(
                         "Eth signature from CREATE2 account not expected".to_string(),
                     ));
                 }
                 None
-            } else {
+            }
+            EthAccountType::Owned => {
                 let signature =
                     signature.ok_or(SubmitError::TxAdd(TxAddError::MissingEthSignature))?;
-                Some(EthSignData {
-                    signature,
-                    message: message_to_sign,
-                })
+                Some(EthSignData { signature, message })
             }
-        }
+        },
         None => None,
     };
 
@@ -638,15 +643,21 @@ async fn verify_tx_info_message_signature(
 async fn verify_txs_batch_signature(
     batch: Vec<TxWithSignature>,
     senders: Vec<Address>,
+    sender_types: Vec<EthAccountType>,
     batch_sign_data: BatchSignData,
     msgs_to_sign: Vec<Option<Vec<u8>>>,
     req_channel: mpsc::Sender<VerifyTxSignatureRequest>,
 ) -> Result<VerifiedTx, SubmitError> {
     let mut txs = Vec::with_capacity(batch.len());
-    for (tx, message) in batch.into_iter().zip(msgs_to_sign.into_iter()) {
+    for (tx, message, sender_type) in izip!(batch, msgs_to_sign, sender_types) {
         // If we have more signatures provided than required,
         // we will verify those too.
         let eth_sign_data = if let (Some(signature), Some(message)) = (tx.signature, message) {
+            if let EthAccountType::CREATE2 = sender_type {
+                return Err(SubmitError::IncorrectTx(
+                    "Eth signature from CREATE2 account not expected".to_string(),
+                ));
+            }
             Some(EthSignData { signature, message })
         } else {
             None
