@@ -142,7 +142,7 @@ impl GasCounter {
     /// Cost of processing one withdraw operation in `completeWithdrawals` contract call.
     pub const COMPLETE_WITHDRAWALS_COST: u64 = 41_641;
     /// Some ERС20 tokens may require a lot of gas to withdrawals.
-    pub const COMPLETE_WITHDRAWALS_ERC20_COST: u64 = 120_000;
+    pub const COMPLETE_WITHDRAWALS_ERC20_COST: u64 = 200_000;
 
     pub fn new() -> Self {
         Self::default()
