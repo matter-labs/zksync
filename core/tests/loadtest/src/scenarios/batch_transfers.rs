@@ -140,10 +140,10 @@ impl Scenario for BatchTransferScenario {
 
     async fn run(
         &mut self,
-        monitor: &Monitor,
-        _fees: &Fees,
-        _wallets: &[TestWallet],
-    ) -> anyhow::Result<()> {
+        monitor: Monitor,
+        _fees: Fees,
+        wallets: Vec<TestWallet>,
+    ) -> anyhow::Result<Vec<TestWallet>> {
         let max_batch_size = self.max_batch_size;
         let batch_sizes = std::iter::repeat_with(move || match thread_rng().gen_range(0, 3) {
             0 => 2,
@@ -156,11 +156,14 @@ impl Scenario for BatchTransferScenario {
         wait_all_failsafe_chunks(
             "run/batch_transfers",
             &[1, 2, 3, 2, 1],
-            DynamicChunks::new(txs, batch_sizes).map(|txs| monitor.send_txs_batch(txs)),
+            DynamicChunks::new(txs, batch_sizes).map(|txs| {
+                eprintln!("Batch_transfers: sent_txs");
+                monitor.send_txs_batch(txs)
+            }),
         )
         .await?;
 
-        Ok(())
+        Ok(wallets)
     }
 
     async fn finalize(

@@ -132,20 +132,21 @@ impl Scenario for TransferScenario {
 
     async fn run(
         &mut self,
-        monitor: &Monitor,
-        _fees: &Fees,
-        _wallets: &[TestWallet],
-    ) -> anyhow::Result<()> {
+        monitor: Monitor,
+        _fees: Fees,
+        wallets: Vec<TestWallet>,
+    ) -> anyhow::Result<Vec<TestWallet>> {
         wait_all_failsafe_chunks(
             "run/transfers",
             CHUNK_SIZES,
-            self.txs
-                .drain(..)
-                .map(|(tx, sign)| monitor.send_tx(tx, sign)),
+            self.txs.drain(..).map(|(tx, sign)| {
+                eprintln!("Transfers: sent_tx");
+                monitor.send_tx(tx, sign)
+            }),
         )
         .await?;
 
-        Ok(())
+        Ok(wallets)
     }
 
     async fn finalize(

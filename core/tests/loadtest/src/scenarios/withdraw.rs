@@ -74,10 +74,10 @@ impl Scenario for WithdrawScenario {
 
     async fn run(
         &mut self,
-        monitor: &Monitor,
-        fees: &Fees,
-        wallets: &[TestWallet],
-    ) -> anyhow::Result<()> {
+        monitor: Monitor,
+        fees: Fees,
+        wallets: Vec<TestWallet>,
+    ) -> anyhow::Result<Vec<TestWallet>> {
         for i in 0..self.config.withdraw_rounds {
             log::info!(
                 "Withdraw and deposit cycle [{}/{}] started",
@@ -87,7 +87,7 @@ impl Scenario for WithdrawScenario {
 
             let futures = wallets
                 .iter()
-                .map(|wallet| Self::withdraw_and_deposit(monitor, fees, wallet))
+                .map(|wallet| Self::withdraw_and_deposit(&monitor, &fees, wallet))
                 .collect::<Vec<_>>();
             wait_all_failsafe(&format!("withdraw/run/cycle/{}", i), futures).await?;
 
@@ -100,7 +100,7 @@ impl Scenario for WithdrawScenario {
 
         log::info!("Withdraw scenario has been finished");
 
-        Ok(())
+        Ok(wallets)
     }
 
     async fn finalize(
@@ -119,6 +119,8 @@ impl WithdrawScenario {
         fees: &Fees,
         wallet: &TestWallet,
     ) -> anyhow::Result<()> {
+        eprintln!("withdraw_and_deposit");
+
         let amount = closest_packable_token_amount(
             &(wallet.balance(BlockStatus::Committed).await? - &fees.zksync),
         );
