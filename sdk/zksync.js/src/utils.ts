@@ -447,7 +447,7 @@ export function calculateCreate2WalletAddressAndSalt(
     syncPubkeyHash: string,
     create2Data: Create2WalletData
 ): { salt: string; address: string } {
-    const pubkeyHashHex = syncPubkeyHash.replace("sync:", "0x");
+    const pubkeyHashHex = syncPubkeyHash.replace("sync:", "0x000000000000000000000000");
 
     const additionalSaltArgument = ethers.utils.arrayify(create2Data.saltArg);
     if (additionalSaltArgument.length !== 32) {
