@@ -610,7 +610,7 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
         (offset, creatorAddress) = Bytes.readAddress(_args, offset);
         (offset, saltArg) = Bytes.readBytes32(_args, offset);
         (offset, codeHash) = Bytes.readBytes32(_args, offset);
-        bytes32 salt = keccak256(abi.encodePacked(saltArg, _newPkHash));
+        bytes32 salt = keccak256(abi.encodePacked(saltArg, uint256(uint160(_newPkHash))));
         address recoveredAddress = address(uint160(uint256(keccak256(abi.encodePacked(bytes1(0xff), creatorAddress, salt, codeHash)))));
         return recoveredAddress == _ethAddress && _nonce == 0;
     }
