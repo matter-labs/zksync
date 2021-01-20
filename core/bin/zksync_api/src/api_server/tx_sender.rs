@@ -16,7 +16,7 @@ use thiserror::Error;
 
 // Workspace uses
 use zksync_config::ApiServerOptions;
-use zksync_storage::ConnectionPool;
+use zksync_storage::{chain::account::records::EthAccountType, ConnectionPool};
 use zksync_types::{
     tx::{BatchSignData, EthSignData, SignedZkSyncTx, TxEthSignature, TxHash},
     Address, Token, TokenId, TokenLike, TxFeeTypes, ZkSyncTx,
@@ -581,12 +581,38 @@ async fn verify_tx_info_message_signature(
 ) -> Result<VerifiedTx, SubmitError> {
     let eth_sign_data = match msg_to_sign {
         Some(message_to_sign) => {
-            let signature = signature.ok_or(SubmitError::TxAdd(TxAddError::MissingEthSignature))?;
+            // Check if account is a CREATE2 account
+            // These accounts do not have to pass 2FA
+            let id = tx.account_id();
+            let connection_pool = zksync_storage::ConnectionPool::new(None);
+            let mut storage = connection_pool
+                .access_storage()
+                .await
+                .expect("could not access storage");
 
-            Some(EthSignData {
-                signature,
-                message: message_to_sign,
-            })
+            let account_type = storage
+                .chain()
+                .account_schema()
+                .account_type_by_id(id)
+                .await
+                .map_err(|_| SubmitError::TxAdd(TxAddError::DbError))?
+                .unwrap_or(EthAccountType::Owned);
+
+            if matches!(account_type, EthAccountType::CREATE2) {
+                if signature.is_some() {
+                    return Err(SubmitError::IncorrectTx(
+                        "Eth signature from CREATE2 account not expected".to_string(),
+                    ));
+                }
+                None
+            } else {
+                let signature =
+                    signature.ok_or(SubmitError::TxAdd(TxAddError::MissingEthSignature))?;
+                Some(EthSignData {
+                    signature,
+                    message: message_to_sign,
+                })
+            }
         }
         None => None,
     };

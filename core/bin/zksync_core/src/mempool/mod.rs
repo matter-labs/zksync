@@ -13,6 +13,7 @@
 //!
 //! Communication with db:
 //! on restart mempool restores nonces of the accounts that are stored in the account tree.
+//! on accepting ChangePubKey tx saves account type - Owned or CREATE2
 
 // Built-in deps
 use std::{
@@ -35,10 +36,10 @@ use tokio::task::JoinHandle;
 
 // Workspace uses
 use zksync_config::ConfigurationOptions;
-use zksync_storage::ConnectionPool;
+use zksync_storage::{chain::account::records::EthAccountType, ConnectionPool, StorageProcessor};
 use zksync_types::{
     mempool::{SignedTxVariant, SignedTxsBatch},
-    tx::TxEthSignature,
+    tx::{ChangePubKey, TxEthSignature},
     AccountId, AccountUpdate, AccountUpdates, Address, Nonce, PriorityOp, SignedZkSyncTx,
     TransferOp, TransferToNewOp, ZkSyncTx,
 };
@@ -460,6 +461,23 @@ impl BuildBalancedItem<MempoolTransactionRequest, MempoolTransactionsHandler>
     }
 }
 
+async fn store_account_type(
+    tx: &ChangePubKey,
+    storage: &mut StorageProcessor<'_>,
+) -> Result<(), TxAddError> {
+    let account_type = if tx.eth_auth_data.is_create2() {
+        EthAccountType::CREATE2
+    } else {
+        EthAccountType::Owned
+    };
+    storage
+        .chain()
+        .state_schema()
+        .set_account_type(tx.account_id, account_type)
+        .await
+        .map_err(|_| TxAddError::DbError)
+}
+
 impl MempoolTransactionsHandler {
     async fn add_tx(&mut self, tx: SignedZkSyncTx) -> Result<(), TxAddError> {
         let mut storage = self.db_pool.access_storage().await.map_err(|err| {
@@ -480,6 +498,12 @@ impl MempoolTransactionsHandler {
                 log::warn!("Mempool storage access error: {}", err);
                 TxAddError::DbError
             })?;
+
+        // WARNING: we are saving account type in mempool, this presents
+        // a possibility for users to spam our database using lots of invalid txs
+        if let ZkSyncTx::ChangePubKey(tx) = &tx.tx {
+            store_account_type(&tx, &mut transaction).await?;
+        }
 
         transaction.commit().await.map_err(|err| {
             log::warn!("Mempool storage access error: {}", err);
@@ -510,19 +534,24 @@ impl MempoolTransactionsHandler {
         }
 
         let mut number_of_withdrawals = 0;
-        for tx in txs {
-            if tx.tx.is_withdraw() {
-                number_of_withdrawals += 1;
-            }
-        }
-        if number_of_withdrawals > self.max_number_of_withdrawals_per_block {
-            return Err(TxAddError::BatchWithdrawalsOverload);
-        }
-
         let mut transaction = storage.start_transaction().await.map_err(|err| {
             log::warn!("Mempool storage access error: {}", err);
             TxAddError::DbError
         })?;
+
+        for tx in txs {
+            if tx.tx.is_withdraw() {
+                number_of_withdrawals += 1;
+            }
+            if let ZkSyncTx::ChangePubKey(tx) = &tx.tx {
+                store_account_type(&tx, &mut transaction).await?;
+            }
+        }
+
+        if number_of_withdrawals > self.max_number_of_withdrawals_per_block {
+            return Err(TxAddError::BatchWithdrawalsOverload);
+        }
+
         let batch_id = transaction
             .chain()
             .mempool_schema()

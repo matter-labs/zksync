@@ -68,6 +68,10 @@ impl ChangePubKeyEthAuthData {
         matches!(self, ChangePubKeyEthAuthData::Onchain)
     }
 
+    pub fn is_create2(&self) -> bool {
+        matches!(self, ChangePubKeyEthAuthData::CREATE2(..))
+    }
+
     pub fn get_eth_witness(&self) -> Vec<u8> {
         match self {
             ChangePubKeyEthAuthData::Onchain => Vec::new(),

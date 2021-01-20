@@ -52,7 +52,7 @@ pub struct StorageBalance {
     pub balance: BigDecimal,
 }
 
-#[derive(Debug, sqlx::Type)]
+#[derive(Debug, Clone, Copy, sqlx::Type)]
 #[sqlx(rename = "eth_account_type")]
 pub enum EthAccountType {
     Owned,
