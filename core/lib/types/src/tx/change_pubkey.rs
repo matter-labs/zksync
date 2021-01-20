@@ -204,6 +204,7 @@ impl ChangePubKey {
                 let salt = {
                     let mut bytes = Vec::new();
                     bytes.extend_from_slice(salt_arg.as_bytes());
+                    bytes.extend_from_slice(&[0u8; 12]);
                     bytes.extend_from_slice(&self.new_pk_hash.data);
                     bytes.keccak256()
                 };
