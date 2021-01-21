@@ -50,7 +50,7 @@ pub struct EthereumProvider<S: EthereumSigner> {
     confirmation_timeout: Duration,
 }
 
-impl<S: EthereumSigner + Send + Sync> EthereumProvider<S> {
+impl<S: EthereumSigner> EthereumProvider<S> {
     /// Creates a new Ethereum provider.
     pub async fn new<P: Provider>(
         provider: &P,

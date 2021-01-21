@@ -74,7 +74,7 @@ fn one_ether() -> U256 {
 }
 
 /// Auxiliary function that returns the balance of the account on Ethereum.
-async fn get_ethereum_balance<S: EthereumSigner + Send + Sync + Clone>(
+async fn get_ethereum_balance<S: EthereumSigner>(
     eth_provider: &EthereumProvider<S>,
     address: Address,
     token: &Token,
@@ -103,7 +103,7 @@ async fn get_ethereum_balance<S: EthereumSigner + Send + Sync + Clone>(
 
 async fn wait_for_deposit_and_update_account_id<S, P>(wallet: &mut Wallet<S, P>)
 where
-    S: EthereumSigner + Send + Sync + Clone,
+    S: EthereumSigner,
     P: Provider + Clone,
 {
     let timeout = Duration::from_secs(60);
@@ -156,7 +156,7 @@ async fn transfer_to(
 /// from a new wallet without SigningKey.
 async fn test_tx_fail<S, P>(zksync_depositor_wallet: &Wallet<S, P>) -> Result<(), anyhow::Error>
 where
-    S: EthereumSigner + Send + Sync + Clone,
+    S: EthereumSigner,
     P: Provider + Clone,
 {
     let provider = RpcProvider::new(Network::Localhost);
@@ -192,7 +192,7 @@ async fn test_deposit<S, P>(
     amount: u128,
 ) -> Result<(), anyhow::Error>
 where
-    S: EthereumSigner + Send + Sync + Clone,
+    S: EthereumSigner,
     P: Provider + Clone,
 {
     let ethereum = deposit_wallet.ethereum(web3_addr()).await?;
@@ -250,7 +250,7 @@ async fn test_change_pubkey<S, P>(
     token_symbol: &str,
 ) -> Result<(), anyhow::Error>
 where
-    S: EthereumSigner + Send + Sync + Clone,
+    S: EthereumSigner,
     P: Provider + Clone,
 {
     if !sync_wallet.is_signing_key_set().await? {
@@ -278,7 +278,7 @@ async fn test_transfer<S, P>(
     transfer_amount: u128,
 ) -> Result<(), anyhow::Error>
 where
-    S: EthereumSigner + Send + Sync + Clone,
+    S: EthereumSigner,
     P: Provider + Clone,
 {
     let transfer_amount = num::BigUint::from(transfer_amount);
@@ -333,7 +333,7 @@ async fn test_transfer_to_self<S, P>(
     transfer_amount: u128,
 ) -> Result<(), anyhow::Error>
 where
-    S: EthereumSigner + Send + Sync + Clone,
+    S: EthereumSigner,
     P: Provider + Clone,
 {
     let transfer_amount = num::BigUint::from(transfer_amount);
@@ -379,7 +379,7 @@ async fn test_withdraw<S, P>(
     amount: u128,
 ) -> Result<(), anyhow::Error>
 where
-    S: EthereumSigner + Send + Sync + Clone,
+    S: EthereumSigner,
     P: Provider + Clone,
 {
     let total_fee = sync_wallet
@@ -464,7 +464,7 @@ async fn move_funds<S, P>(
     deposit_amount: u128,
 ) -> Result<(), anyhow::Error>
 where
-    S: EthereumSigner + Send + Sync + Clone,
+    S: EthereumSigner,
     P: Provider + Clone,
 {
     let token_like = token_like.into();

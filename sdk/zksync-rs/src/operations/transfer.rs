@@ -25,7 +25,7 @@ pub struct TransferBuilder<'a, S: EthereumSigner, P: Provider> {
 
 impl<'a, S, P> TransferBuilder<'a, S, P>
 where
-    S: EthereumSigner + Clone + Send + Sync,
+    S: EthereumSigner,
     P: Provider + Clone,
 {
     /// Initializes a transfer transaction building process.
