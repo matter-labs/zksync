@@ -95,7 +95,8 @@ fn test_batch_message() -> Result<()> {
 
     let txs = txs
         .into_iter()
-        .zip(std::iter::repeat(Some(token.clone())))
+        .zip(std::iter::repeat(token.clone()))
+        .map(|(tx, token)| (tx.clone(), token, tx.account()))
         .collect::<Vec<_>>();
     // Shouldn't fail.
     let batch_sign_data = BatchSignData::new(txs, Vec::new()).unwrap();
@@ -126,7 +127,8 @@ fn test_batch_message() -> Result<()> {
     );
     let txs = txs
         .into_iter()
-        .zip(std::iter::repeat(Some(token)))
+        .zip(std::iter::repeat(token))
+        .map(|(tx, token)| (tx.clone(), token, tx.account()))
         .collect::<Vec<_>>();
 
     let message = BatchSignData::get_batch_sign_message(txs);

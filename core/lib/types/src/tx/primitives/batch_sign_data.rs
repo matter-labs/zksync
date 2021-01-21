@@ -22,7 +22,7 @@ impl BatchSignData {
     ///
     /// `From: {address}`
     pub fn new(
-        txs: Vec<(ZkSyncTx, Option<Token>)>,
+        txs: Vec<(ZkSyncTx, Token, Address)>,
         signatures: Vec<TxEthSignature>,
     ) -> anyhow::Result<BatchSignData> {
         ensure!(!txs.is_empty(), "Transaction batch cannot be empty");
@@ -36,11 +36,8 @@ impl BatchSignData {
     }
 
     /// Construct the message user is expected to sign for the given batch.
-    pub fn get_batch_sign_message(txs: Vec<(ZkSyncTx, Option<Token>)>) -> Vec<u8> {
-        let grouped = txs
-            .into_iter()
-            .filter(|(_, token)| token.is_some())
-            .group_by(|tx| tx.0.account());
+    pub fn get_batch_sign_message(txs: Vec<(ZkSyncTx, Token, Address)>) -> Vec<u8> {
+        let grouped = txs.into_iter().group_by(|tx| tx.2);
         let mut iter = grouped.into_iter().peekable();
         // The message is empty if there're no transactions.
         let first = match iter.next() {
@@ -66,13 +63,13 @@ impl BatchSignData {
 
     fn group_message<I>(iter: I, address: Option<Address>) -> String
     where
-        I: IntoIterator<Item = (ZkSyncTx, Option<Token>)>,
+        I: IntoIterator<Item = (ZkSyncTx, Token, Address)>,
     {
         let mut iter = iter.into_iter().peekable();
         // The group is not empty.
         let nonce = iter.peek().unwrap().0.nonce();
         let message = itertools::join(
-            iter.filter_map(|(tx, token)| tx.get_ethereum_sign_message_part(token))
+            iter.filter_map(|(tx, token, _)| tx.get_ethereum_sign_message_part(token))
                 .filter(|part| !part.is_empty()),
             "\n",
         );

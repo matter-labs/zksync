@@ -210,7 +210,7 @@ impl TxSender {
         }
 
         // Resolve the token.
-        let token = self.token_info(&tx).await?;
+        let token = self.token_info_from_id(tx.token_id()).await?;
         let msg_to_sign = tx.get_ethereum_sign_message(token).map(String::into_bytes);
 
         let tx_fee_info = tx.get_fee_info();
@@ -366,7 +366,7 @@ impl TxSender {
         let mut tokens = Vec::with_capacity(txs.len());
         for tx in txs.iter().map(|tx| &tx.tx) {
             // Resolve the token and save it for constructing the batch message.
-            let token = self.token_info(tx).await?;
+            let token = self.token_info_from_id(tx.token_id()).await?;
             tokens.push(token.clone());
 
             messages_to_sign.push(tx.get_ethereum_sign_message(token).map(String::into_bytes));
@@ -382,7 +382,8 @@ impl TxSender {
             let _txs = txs
                 .iter()
                 .zip(tokens.into_iter())
-                .map(|(tx, token)| (tx.tx.clone(), token))
+                .zip(tx_senders.iter())
+                .map(|((tx, token), sender)| (tx.tx.clone(), token, sender.clone()))
                 .collect::<Vec<_>>();
             // Create batch signature data.
             let batch_sign_data =
@@ -465,6 +466,7 @@ impl TxSender {
         }
     }
 
+    /// Resolves the token from the database.
     async fn token_info_from_id(&self, token_id: TokenId) -> Result<Token, SubmitError> {
         let mut storage = self
             .pool
@@ -478,19 +480,6 @@ impl TxSender {
             .map_err(SubmitError::internal)?
             // TODO Make error more clean
             .ok_or_else(|| SubmitError::other("Token not found in the DB"))
-    }
-
-    /// Resolves the token from the database.
-    ///
-    /// Returns `Some` only for transactions that might have an Ethereum signature.
-    /// This is needed to avoid unnecessary `storage` accesses.
-    async fn token_info(&self, tx: &ZkSyncTx) -> Result<Option<Token>, SubmitError> {
-        Ok(match tx {
-            ZkSyncTx::Transfer(tx) => Some(self.token_info_from_id(tx.token).await?),
-            ZkSyncTx::Withdraw(tx) => Some(self.token_info_from_id(tx.token).await?),
-            ZkSyncTx::ChangePubKey(tx) => Some(self.token_info_from_id(tx.fee_token).await?),
-            _ => None,
-        })
     }
 
     async fn ticker_request(
