@@ -36,7 +36,6 @@ where
 
     // used env
     let prover_options = EnvProverConfig::from_env();
-    let heartbeat_interval = EnvProverConfig::from_env().prover.heartbeat_interval();
     let prover_config = <PROVER as ProverImpl>::Config::from_env();
     let api_client = api_client_from_env(&worker_name);
     let prover = PROVER::create_from_config(prover_config);

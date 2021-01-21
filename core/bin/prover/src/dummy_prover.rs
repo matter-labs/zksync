@@ -1,9 +1,9 @@
 use crate::{ProverConfig, ProverImpl};
 use anyhow::Error;
+use zksync_config::ZkSyncConfig;
 use zksync_crypto::proof::PrecomputedSampleProofs;
 use zksync_prover_utils::api::{JobRequestData, JobResultData};
 use zksync_prover_utils::fs_utils::load_precomputed_proofs;
-use zksync_utils::parse_env_to_collection;
 
 #[derive(Debug)]
 pub struct DummyProverConfig {
@@ -12,8 +12,10 @@ pub struct DummyProverConfig {
 
 impl ProverConfig for DummyProverConfig {
     fn from_env() -> Self {
+        let env_config = ZkSyncConfig::from_env();
+
         Self {
-            block_sizes: parse_env_to_collection("SUPPORTED_BLOCK_CHUNKS_SIZES"),
+            block_sizes: env_config.chain.state_keeper.block_chunk_sizes,
         }
     }
 }

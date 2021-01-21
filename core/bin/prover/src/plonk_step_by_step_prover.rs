@@ -7,7 +7,7 @@ use zksync_crypto::Engine;
 use zksync_prover_utils::aggregated_proofs::{gen_aggregate_proof, prepare_proof_data};
 use zksync_prover_utils::api::{JobRequestData, JobResultData};
 use zksync_prover_utils::{PlonkVerificationKey, SetupForStepByStepProver};
-use zksync_utils::{parse_env, parse_env_to_collection};
+use zksync_utils::parse_env;
 // Local deps
 use crate::{ProverConfig, ProverImpl};
 use zksync_prover_utils::fs_utils::load_precomputed_proofs;
