@@ -52,7 +52,7 @@ export async function circuit(threads: number = 1, testName?: string, ...args: s
 }
 
 export async function prover() {
-    await utils.spawn('cargo test -p zksync_prover --release -- --ignored');
+    await utils.spawn('cargo test -p zksync_prover --release');
 }
 
 export async function witness_generator() {

@@ -23,7 +23,6 @@ export function prepareVerify() {
 export async function build() {
     await utils.confirmAction();
     prepareVerify();
-    await utils.spawn('yarn contracts gen-token-add-contract');
     await utils.spawn('yarn contracts build');
 }
 
