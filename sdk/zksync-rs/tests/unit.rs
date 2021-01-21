@@ -363,7 +363,7 @@ mod signatures_with_vectors {
                     symbol: String::new(),
                     decimals: 0,
                 };
-                let forced_exit = signer
+                let (forced_exit, _) = signer
                     .sign_forced_exit(
                         forced_exit.target,
                         token,
