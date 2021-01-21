@@ -1,5 +1,14 @@
 import { BigNumber, BigNumberish, ethers } from 'ethers';
-import { Address, TokenLike, Nonce, ChangePubKey, ChangePubKeyFee, SignedTransaction, TxEthSignature } from './types';
+import {
+    Address,
+    TokenLike,
+    Nonce,
+    ChangePubKey,
+    ChangePubKeyFee,
+    SignedTransaction,
+    TxEthSignature,
+    ZkSyncVersion
+} from './types';
 import { getChangePubkeyMessage, serializeTx } from './utils';
 import { Wallet } from './wallet';
 
@@ -21,10 +30,18 @@ export class BatchBuilder {
     private changePubKeyTx: ChangePubKey = null;
     private changePubKeyOnChain: boolean = null;
 
-    private constructor(private wallet: Wallet, private nonce: Nonce, private txs: InternalTx[] = []) {}
+    private constructor(
+        private wallet: Wallet,
+        private nonce: Nonce,
+        private txs: InternalTx[] = [],
+        public zkSyncVersion: ZkSyncVersion
+    ) {}
 
-    static fromWallet(wallet: Wallet, nonce?: Nonce): BatchBuilder {
-        const batchBuilder = new BatchBuilder(wallet, nonce);
+    static fromWallet(wallet: Wallet, nonce?: Nonce, version?: ZkSyncVersion): BatchBuilder {
+        if (version == null) {
+            version = 'contracts-3';
+        }
+        const batchBuilder = new BatchBuilder(wallet, nonce, [], version);
         return batchBuilder;
     }
 
@@ -211,12 +228,12 @@ export class BatchBuilder {
             switch (tx.type) {
                 case 'Withdraw':
                     const withdraw = { tx: await this.wallet.getWithdrawFromSyncToEthereum(tx.tx) };
-                    _bytes.push(serializeTx(withdraw.tx));
+                    _bytes.push(serializeTx(withdraw.tx, this.zkSyncVersion));
                     processedTxs.push(withdraw);
                     break;
                 case 'Transfer':
                     const transfer = { tx: await this.wallet.getTransfer(tx.tx) };
-                    _bytes.push(serializeTx(transfer.tx));
+                    _bytes.push(serializeTx(transfer.tx, this.zkSyncVersion));
                     processedTxs.push(transfer);
                     break;
                 case 'ChangePubKey':
@@ -227,12 +244,12 @@ export class BatchBuilder {
                     }
                     // We will sign it if necessary and store the batch hash.
                     this.changePubKeyTx = changePubKey.tx;
-                    _bytes.push(serializeTx(changePubKey.tx));
+                    _bytes.push(serializeTx(changePubKey.tx, this.zkSyncVersion));
                     processedTxs.push(changePubKey);
                     break;
                 case 'ForcedExit':
                     const forcedExit = { tx: await this.wallet.getForcedExit(tx.tx) };
-                    _bytes.push(serializeTx(forcedExit.tx));
+                    _bytes.push(serializeTx(forcedExit.tx, this.zkSyncVersion));
                     processedTxs.push(forcedExit);
                     break;
             }

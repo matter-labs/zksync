@@ -17,7 +17,7 @@ use crate::{
     QueryResult, StorageProcessor,
 };
 
-/// Generates several different `SignedFranlinTx` objects.
+/// Generates several different `SignedZkSyncTx` objects.
 fn franklin_txs() -> Vec<SignedZkSyncTx> {
     let transfer_1 = Transfer::new(
         42,
@@ -305,50 +305,50 @@ async fn collect_garbage(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
 /// Checks that memory pool contains previously inserted transaction.
 #[db_test]
 async fn contains_and_get_tx(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
-    todo!()
-    // let txs = gen_transfers(5);
-    //
-    // // Make sure that the mempool responds that these transactions are missing.
-    // for tx in &txs {
-    //     let tx_hash = tx.hash();
-    //
-    //     assert_eq!(
-    //         MempoolSchema(&mut storage).contains_tx(tx_hash).await?,
-    //         false
-    //     );
-    //     assert!(MempoolSchema(&mut storage).get_tx(tx_hash).await?.is_none());
-    // }
-    //
-    // // Submit transactions.
-    // {
-    //     let single_tx = &txs[0];
-    //
-    //     let batch = &txs[1..];
-    //     let batch_signature = Some(gen_eth_sign_data("test message".to_owned()).signature);
-    //
-    //     let mut mempool = MempoolSchema(&mut storage);
-    //     mempool.insert_tx(single_tx).await?;
-    //     mempool.insert_batch(batch, batch_signature).await?;
-    // }
-    //
-    // // Make sure that the memory pool now responds that these transactions exist.
-    // for tx in &txs {
-    //     let tx_hash = tx.hash();
-    //
-    //     assert_eq!(
-    //         MempoolSchema(&mut storage).contains_tx(tx_hash).await?,
-    //         true
-    //     );
-    //     assert_eq!(
-    //         MempoolSchema(&mut storage)
-    //             .get_tx(tx_hash)
-    //             .await?
-    //             .as_ref()
-    //             .unwrap()
-    //             .hash(),
-    //         tx_hash,
-    //     );
-    // }
-    //
-    // Ok(())
+    let txs = gen_transfers(5);
+
+    // Make sure that the mempool responds that these transactions are missing.
+    for tx in &txs {
+        let tx_hash = tx.hash();
+
+        assert_eq!(
+            MempoolSchema(&mut storage).contains_tx(tx_hash).await?,
+            false
+        );
+        assert!(MempoolSchema(&mut storage).get_tx(tx_hash).await?.is_none());
+    }
+
+    // Submit transactions.
+    {
+        let single_tx = &txs[0];
+
+        let batch = &txs[1..];
+        let batch_signature =
+            vec![gen_eth_sign_data("test message".to_owned()).signature; txs.len() - 1];
+
+        let mut mempool = MempoolSchema(&mut storage);
+        mempool.insert_tx(single_tx).await?;
+        mempool.insert_batch(batch, batch_signature).await?;
+    }
+
+    // Make sure that the memory pool now responds that these transactions exist.
+    for tx in &txs {
+        let tx_hash = tx.hash();
+
+        assert_eq!(
+            MempoolSchema(&mut storage).contains_tx(tx_hash).await?,
+            true
+        );
+        assert_eq!(
+            MempoolSchema(&mut storage)
+                .get_tx(tx_hash)
+                .await?
+                .as_ref()
+                .unwrap()
+                .hash(),
+            tx_hash,
+        );
+    }
+
+    Ok(())
 }

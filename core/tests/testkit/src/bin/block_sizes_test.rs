@@ -12,7 +12,7 @@ use zksync_crypto::params::account_tree_depth;
 use zksync_prover_utils::aggregated_proofs::{gen_aggregate_proof, prepare_proof_data};
 use zksync_prover_utils::{PlonkVerificationKey, SetupForStepByStepProver};
 use zksync_testkit::eth_account::EthereumAccount;
-use zksync_testkit::external_commands::{deploy_contracts, get_test_accounts, js_revert_reason};
+use zksync_testkit::external_commands::{deploy_contracts, get_test_accounts};
 use zksync_testkit::zksync_account::ZkSyncAccount;
 use zksync_testkit::{
     genesis_state, spawn_state_keeper, AccountSet, ETHAccountId, TestSetup, TestkitConfig, Token,

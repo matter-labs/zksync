@@ -44,6 +44,7 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
         let result = stored.into_op(self.0).await;
         result
     }
+
     pub async fn store_operation(&mut self, op: Operation) -> QueryResult<StoredOperation> {
         let start = Instant::now();
         let mut transaction = self.0.start_transaction().await?;
@@ -294,6 +295,9 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
         max_block: BlockNumber,
         limit: u32,
     ) -> QueryResult<Vec<BlockDetails>> {
+        // TODO: instead of operations, we need to use `aggregated_operations`
+        // BUT It is necessary somehow leave backward compatibility for the mainnet DB. (ZKS-375)
+
         let start = Instant::now();
         // This query does the following:
         // - joins the `operations` and `eth_tx_hashes` (using the intermediate `eth_ops_binding` table)
@@ -369,6 +373,8 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
     /// Will return `None` if the query is malformed or there is no block that matches
     /// the query.
     pub async fn find_block_by_height_or_hash(&mut self, query: String) -> Option<BlockDetails> {
+        // TODO: instead of operations, we need to use `aggregated_operations`
+        // BUT It is necessary somehow leave backward compatibility for the mainnet DB. (ZKS-375)
         let start = Instant::now();
         // If the input looks like hash, add the hash lookup part.
         let hash_bytes = if let Some(hex_query) = self.try_parse_hex(&query) {

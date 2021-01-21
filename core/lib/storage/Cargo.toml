@@ -17,6 +17,7 @@ db_test = []
 zksync_types = { path = "../types", version = "1.0" }
 zksync_crypto = { path = "../crypto", version = "1.0" }
 zksync_utils = { path = "../utils", version = "1.0" }
+zksync_prover_utils = { path = "../prover_utils" }
 zksync_basic_types = { path = "../basic_types", version = "1.0" }
 
 serde = "1.0.90"
@@ -25,6 +26,7 @@ num = { version = "0.3.1", features = ["serde"] }
 chrono = { version = "0.4", features = ["serde", "rustc-serialize"] }
 log = "0.4"
 anyhow = "1.0"
+lazy_static = "1.4.0"
 itertools = "0.8"
 hex = "0.4"
 metrics = "0.13.0-alpha.8"

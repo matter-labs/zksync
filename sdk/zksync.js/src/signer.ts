@@ -40,17 +40,20 @@ export class Signer {
         return await privateKeyToPubKeyHash(this.#privateKey);
     }
 
-    transferSignBytes(transfer: {
-        accountId: number;
-        from: Address;
-        to: Address;
-        tokenId: number;
-        amount: BigNumberish;
-        fee: BigNumberish;
-        nonce: number;
-        validFrom: number;
-        validUntil: number;
-    }): Uint8Array {
+    transferSignBytes(
+        transfer: {
+            accountId: number;
+            from: Address;
+            to: Address;
+            tokenId: number;
+            amount: BigNumberish;
+            fee: BigNumberish;
+            nonce: number;
+            validFrom: number;
+            validUntil: number;
+        },
+        zkSyncVersion: ZkSyncVersion
+    ): Uint8Array {
         const type = new Uint8Array([5]); // tx type
         const accountId = serializeAccountId(transfer.accountId);
         const from = serializeAddress(transfer.from);
@@ -61,18 +64,10 @@ export class Signer {
         const nonce = serializeNonce(transfer.nonce);
         const validFrom = serializeTimestamp(transfer.validFrom);
         const validUntil = serializeTimestamp(transfer.validUntil);
-        const msgBytes = ethers.utils.concat([
-            type,
-            accountId,
-            from,
-            to,
-            token,
-            amount,
-            fee,
-            nonce,
-            validFrom,
-            validUntil
-        ]);
+        let msgBytes = ethers.utils.concat([type, accountId, from, to, token, amount, fee, nonce]);
+        if (zkSyncVersion === 'contracts-4') {
+            msgBytes = ethers.utils.concat([msgBytes, validFrom, validUntil]);
+        }
 
         return msgBytes;
     }
@@ -91,10 +86,7 @@ export class Signer {
         },
         zkSyncVersion: ZkSyncVersion
     ): Promise<Transfer> {
-        if (zkSyncVersion === 'contracts-3') {
-            throw new Error('Contracts-3 version is not supported by this version of sdk');
-        }
-        const msgBytes = this.transferSignBytes(transfer);
+        const msgBytes = this.transferSignBytes(transfer, zkSyncVersion);
         const signature = await signTransactionBytes(this.#privateKey, msgBytes);
 
         return {
@@ -112,17 +104,20 @@ export class Signer {
         };
     }
 
-    withdrawSignBytes(withdraw: {
-        accountId: number;
-        from: Address;
-        ethAddress: string;
-        tokenId: number;
-        amount: BigNumberish;
-        fee: BigNumberish;
-        nonce: number;
-        validFrom: number;
-        validUntil: number;
-    }): Uint8Array {
+    withdrawSignBytes(
+        withdraw: {
+            accountId: number;
+            from: Address;
+            ethAddress: string;
+            tokenId: number;
+            amount: BigNumberish;
+            fee: BigNumberish;
+            nonce: number;
+            validFrom: number;
+            validUntil: number;
+        },
+        zkSyncVersion: ZkSyncVersion
+    ): Uint8Array {
         const typeBytes = new Uint8Array([3]);
         const accountId = serializeAccountId(withdraw.accountId);
         const accountBytes = serializeAddress(withdraw.from);
@@ -133,7 +128,7 @@ export class Signer {
         const nonceBytes = serializeNonce(withdraw.nonce);
         const validFrom = serializeTimestamp(withdraw.validFrom);
         const validUntil = serializeTimestamp(withdraw.validUntil);
-        const msgBytes = ethers.utils.concat([
+        let msgBytes = ethers.utils.concat([
             typeBytes,
             accountId,
             accountBytes,
@@ -141,10 +136,11 @@ export class Signer {
             tokenIdBytes,
             amountBytes,
             feeBytes,
-            nonceBytes,
-            validFrom,
-            validUntil
+            nonceBytes
         ]);
+        if (zkSyncVersion === 'contracts-4') {
+            msgBytes = ethers.utils.concat([msgBytes, validFrom, validUntil]);
+        }
 
         return msgBytes;
     }
@@ -163,10 +159,7 @@ export class Signer {
         },
         zkSyncVersion: ZkSyncVersion
     ): Promise<Withdraw> {
-        if (zkSyncVersion === 'contracts-3') {
-            throw new Error('Contracts-3 version is not supported by this version of sdk');
-        }
-        const msgBytes = this.withdrawSignBytes(withdraw);
+        const msgBytes = this.withdrawSignBytes(withdraw, zkSyncVersion);
         const signature = await signTransactionBytes(this.#privateKey, msgBytes);
 
         return {
@@ -184,15 +177,18 @@ export class Signer {
         };
     }
 
-    forcedExitSignBytes(forcedExit: {
-        initiatorAccountId: number;
-        target: Address;
-        tokenId: number;
-        fee: BigNumberish;
-        nonce: number;
-        validFrom: number;
-        validUntil: number;
-    }): Uint8Array {
+    forcedExitSignBytes(
+        forcedExit: {
+            initiatorAccountId: number;
+            target: Address;
+            tokenId: number;
+            fee: BigNumberish;
+            nonce: number;
+            validFrom: number;
+            validUntil: number;
+        },
+        zkSyncVersion: ZkSyncVersion
+    ): Uint8Array {
         const typeBytes = new Uint8Array([8]);
         const initiatorAccountIdBytes = serializeAccountId(forcedExit.initiatorAccountId);
         const targetBytes = serializeAddress(forcedExit.target);
@@ -201,16 +197,17 @@ export class Signer {
         const nonceBytes = serializeNonce(forcedExit.nonce);
         const validFrom = serializeTimestamp(forcedExit.validFrom);
         const validUntil = serializeTimestamp(forcedExit.validUntil);
-        const msgBytes = ethers.utils.concat([
+        let msgBytes = ethers.utils.concat([
             typeBytes,
             initiatorAccountIdBytes,
             targetBytes,
             tokenIdBytes,
             feeBytes,
-            nonceBytes,
-            validFrom,
-            validUntil
+            nonceBytes
         ]);
+        if (zkSyncVersion === 'contracts-4') {
+            msgBytes = ethers.utils.concat([msgBytes, validFrom, validUntil]);
+        }
 
         return msgBytes;
     }
@@ -230,7 +227,7 @@ export class Signer {
         if (zkSyncVersion === 'contracts-3') {
             throw new Error('Contracts-3 version is not supported by this version of sdk');
         }
-        const msgBytes = this.forcedExitSignBytes(forcedExit);
+        const msgBytes = this.forcedExitSignBytes(forcedExit, zkSyncVersion);
         const signature = await signTransactionBytes(this.#privateKey, msgBytes);
         return {
             type: 'ForcedExit',
@@ -245,16 +242,19 @@ export class Signer {
         };
     }
 
-    changePubKeySignBytes(changePubKey: {
-        accountId: number;
-        account: Address;
-        newPkHash: PubKeyHash;
-        feeTokenId: number;
-        fee: BigNumberish;
-        nonce: number;
-        validFrom: number;
-        validUntil: number;
-    }): Uint8Array {
+    changePubKeySignBytes(
+        changePubKey: {
+            accountId: number;
+            account: Address;
+            newPkHash: PubKeyHash;
+            feeTokenId: number;
+            fee: BigNumberish;
+            nonce: number;
+            validFrom: number;
+            validUntil: number;
+        },
+        zkSyncVersion: ZkSyncVersion
+    ): Uint8Array {
         const typeBytes = new Uint8Array([7]); // Tx type (1 byte)
         const accountIdBytes = serializeAccountId(changePubKey.accountId);
         const accountBytes = serializeAddress(changePubKey.account);
@@ -264,17 +264,18 @@ export class Signer {
         const nonceBytes = serializeNonce(changePubKey.nonce);
         const validFrom = serializeTimestamp(changePubKey.validFrom);
         const validUntil = serializeTimestamp(changePubKey.validUntil);
-        const msgBytes = ethers.utils.concat([
+        let msgBytes = ethers.utils.concat([
             typeBytes,
             accountIdBytes,
             accountBytes,
             pubKeyHashBytes,
             tokenIdBytes,
             feeBytes,
-            nonceBytes,
-            validFrom,
-            validUntil
+            nonceBytes
         ]);
+        if (zkSyncVersion === 'contracts-4') {
+            msgBytes = ethers.utils.concat([msgBytes, validFrom, validUntil]);
+        }
 
         return msgBytes;
     }
@@ -296,7 +297,7 @@ export class Signer {
         if (zkSyncVersion === 'contracts-3') {
             throw new Error('Contracts-3 version is not supported by this version of sdk');
         }
-        const msgBytes = this.changePubKeySignBytes(changePubKey);
+        const msgBytes = this.changePubKeySignBytes(changePubKey, zkSyncVersion);
         const signature = await signTransactionBytes(this.#privateKey, msgBytes);
         return {
             type: 'ChangePubKey',

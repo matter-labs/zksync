@@ -38,9 +38,7 @@ export class EthMessageSigner {
             `To: ${transfer.to.toLowerCase()}\n` +
             `Nonce: ${transfer.nonce}\n` +
             `Fee: ${transfer.stringFee} ${transfer.stringToken}\n` +
-            `Account Id: ${transfer.accountId}\n` +
-            `Valid from: ${transfer.validFrom}\n` +
-            `Valid until: ${transfer.validUntil}`;
+            `Account Id: ${transfer.accountId}`;
 
         return humanReadableTxInfo;
     }
@@ -74,9 +72,7 @@ export class EthMessageSigner {
             `To: ${withdraw.ethAddress.toLowerCase()}\n` +
             `Nonce: ${withdraw.nonce}\n` +
             `Fee: ${withdraw.stringFee} ${withdraw.stringToken}\n` +
-            `Account Id: ${withdraw.accountId}` +
-            `Valid from: ${withdraw.validFrom}\n` +
-            `Valid until: ${withdraw.validUntil}`;
+            `Account Id: ${withdraw.accountId}`;
 
         return humanReadableTxInfo;
     }
