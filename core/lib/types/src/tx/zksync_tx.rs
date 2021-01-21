@@ -135,7 +135,7 @@ impl ZkSyncTx {
         match self {
             ZkSyncTx::Transfer(tx) => tx.token,
             ZkSyncTx::Withdraw(tx) => tx.token,
-            ZkSyncTx::Close(tx) => 0,
+            ZkSyncTx::Close(_) => 0,
             ZkSyncTx::ChangePubKey(tx) => tx.fee_token,
             ZkSyncTx::ForcedExit(tx) => tx.token,
         }

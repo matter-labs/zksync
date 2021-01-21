@@ -191,7 +191,7 @@ impl ForcedExit {
     /// Gets message that should be signed by Ethereum keys of the account for 2-Factor authentication.
     pub fn get_ethereum_sign_message(&self, token_symbol: &str, decimals: u8) -> String {
         let mut message = self.get_ethereum_sign_message_part(token_symbol, decimals);
-        message.push_str(format!("Nonce: {}", self.nonce).as_str());
+        message.push_str(format!("\nNonce: {}", self.nonce).as_str());
         message
     }
 }

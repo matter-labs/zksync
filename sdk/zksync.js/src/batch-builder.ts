@@ -228,6 +228,7 @@ export class BatchBuilder {
                     processedTxs.push(changePubKey);
                     break;
                 case 'ForcedExit':
+                    messages.push(this.wallet.getForcedExitEthMessagePart(tx.tx));
                     const forcedExit = { tx: await this.wallet.getForcedExit(tx.tx) };
                     processedTxs.push(forcedExit);
                     break;

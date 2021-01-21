@@ -52,6 +52,16 @@ export class EthMessageSigner {
         return await this.getEthMessageSignature(message);
     }
 
+    async ethSignForcedExit(forcedExit: {
+        stringToken: string;
+        stringFee: string;
+        target: string;
+        nonce: number;
+    }): Promise<TxEthSignature> {
+        const message = this.getForcedExitEthSignMessage(forcedExit);
+        return await this.getEthMessageSignature(message);
+    }
+
     getWithdrawEthSignMessage(withdraw: {
         stringAmount: string;
         stringToken: string;
@@ -66,6 +76,17 @@ export class EthMessageSigner {
         }
         humanReadableTxInfo += `Nonce: ${withdraw.nonce}`;
 
+        return humanReadableTxInfo;
+    }
+
+    getForcedExitEthSignMessage(forcedExit: {
+        stringToken: string;
+        stringFee: string;
+        target: string;
+        nonce: number;
+    }): string {
+        let humanReadableTxInfo = this.getForcedExitEthMessagePart(forcedExit);
+        humanReadableTxInfo += `\nNonce: ${forcedExit.nonce}`;
         return humanReadableTxInfo;
     }
 
@@ -119,6 +140,14 @@ export class EthMessageSigner {
         message += `Set signing key: ${changePubKey.pubKeyHash.replace('sync:', '').toLowerCase()}`;
         if (changePubKey.stringFee != null) {
             message += `\nFee: ${changePubKey.stringFee} ${changePubKey.stringToken}`;
+        }
+        return message;
+    }
+
+    getForcedExitEthMessagePart(forcedExit: { stringToken: string; stringFee: string; target: string }): string {
+        let message = `ForcedExit ${forcedExit.stringToken} to: ${forcedExit.target.toLowerCase()}`;
+        if (forcedExit.stringFee != null) {
+            message += `\nFee: ${forcedExit.stringFee} ${forcedExit.stringToken}`;
         }
         return message;
     }

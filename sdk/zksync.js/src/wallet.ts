@@ -236,8 +236,20 @@ export class Wallet {
     }): Promise<SignedTransaction> {
         const signedForcedExitTransaction = await this.getForcedExit(forcedExit);
 
+        const stringFee = BigNumber.from(forcedExit.fee).isZero()
+            ? null
+            : this.provider.tokenSet.formatToken(forcedExit.token, forcedExit.fee);
+        const stringToken = this.provider.tokenSet.resolveTokenSymbol(forcedExit.token);
+        const txMessageEthSignature = await this.ethMessageSigner.ethSignForcedExit({
+            stringToken,
+            stringFee,
+            target: forcedExit.target,
+            nonce: forcedExit.nonce
+        });
+
         return {
-            tx: signedForcedExitTransaction
+            tx: signedForcedExitTransaction,
+            ethereumSignature: txMessageEthSignature
         };
     }
 
@@ -566,9 +578,9 @@ export class Wallet {
         return submitSignedTransaction(txData, this.provider);
     }
 
-    // The following three methods are needed in case user decided to build
+    // The following methods are needed in case user decided to build
     // a message for the batch himself (e.g. in case of multi-authors batch).
-    // It seems that these methods belong to ethMessageSigner, however, we have
+    // It might seem that these belong to ethMessageSigner, however, we have
     // to resolve the token and format amount/fee before constructing the
     // transaction.
     getTransferEthMessagePart(transfer: {
@@ -626,6 +638,23 @@ export class Wallet {
             pubKeyHash: changePubKey.pubKeyHash,
             stringToken,
             stringFee
+        });
+    }
+
+    getForcedExitEthMessagePart(forcedExit: {
+        target: Address;
+        token: TokenLike;
+        fee: BigNumberish;
+        nonce: number;
+    }): string {
+        const stringFee = BigNumber.from(forcedExit.fee).isZero()
+            ? null
+            : this.provider.tokenSet.formatToken(forcedExit.token, forcedExit.fee);
+        const stringToken = this.provider.tokenSet.resolveTokenSymbol(forcedExit.token);
+        return this.ethMessageSigner.getForcedExitEthMessagePart({
+            stringToken,
+            stringFee,
+            target: forcedExit.target
         });
     }
 
