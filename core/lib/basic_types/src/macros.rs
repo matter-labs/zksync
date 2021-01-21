@@ -1,54 +1,52 @@
-macro_rules! impl_deref_and_deref_mut {
-    ($type:ty, $base_type:ty) => {
-        impl Deref for $type {
-            type Target = $base_type;
+macro_rules! basic_type {
+    ($(#[$attr:meta])* $name:ident, $type:ty) => {
+        $(#[$attr])*
+        #[derive(
+            Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Hash, PartialOrd, Ord, Default,
+        )]
+        pub struct $name(pub $type);
+
+        impl Deref for $name {
+            type Target = $type;
 
             fn deref(&self) -> &Self::Target {
                 &self.0
             }
         }
 
-        impl DerefMut for $type {
+        impl DerefMut for $name {
             fn deref_mut(&mut self) -> &mut Self::Target {
                 &mut self.0
             }
         }
-    };
-}
 
-macro_rules! impl_from_str_and_display {
-    ($type:ty, $base_type:ty) => {
-        impl FromStr for $type {
+        impl FromStr for $name {
             type Err = ParseIntError;
 
             fn from_str(s: &str) -> Result<Self, Self::Err> {
-                let value = s.parse::<$base_type>()?;
+                let value = s.parse::<$type>()?;
                 Ok(Self(value))
             }
         }
 
-        impl fmt::Display for $type {
+        impl fmt::Display for $name {
             fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
                 write!(f, "{}", self.0)
             }
         }
-    };
-}
 
-macro_rules! impl_add_and_sub_with_base_type {
-    ($type:ty, $base_type:ty) => {
-        impl Add<$base_type> for $type {
+        impl Add<$type> for $name {
             type Output = Self;
 
-            fn add(self, other: $base_type) -> Self {
+            fn add(self, other: $type) -> Self {
                 Self(self.0 + other)
             }
         }
 
-        impl Sub<$base_type> for $type {
+        impl Sub<$type> for $name {
             type Output = Self;
 
-            fn sub(self, other: $base_type) -> Self {
+            fn sub(self, other: $type) -> Self {
                 Self(self.0 - other)
             }
         }
