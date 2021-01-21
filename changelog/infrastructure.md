@@ -11,6 +11,9 @@ components, the logs will have the following format:
 
 ### Changed
 
+- (`explorer`): Deposits from and withdrawals to an L1 account with the same address are not displayed on the account
+  history page.
+
 ### Added
 
 ### Fixed
