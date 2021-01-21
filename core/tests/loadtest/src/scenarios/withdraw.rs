@@ -119,8 +119,6 @@ impl WithdrawScenario {
         fees: &Fees,
         wallet: &TestWallet,
     ) -> anyhow::Result<()> {
-        eprintln!("withdraw_and_deposit");
-
         let amount = closest_packable_token_amount(
             &(wallet.balance(BlockStatus::Committed).await? - &fees.zksync),
         );

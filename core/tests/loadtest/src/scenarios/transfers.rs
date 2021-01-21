@@ -6,13 +6,13 @@ use num::BigUint;
 use serde::{Deserialize, Serialize};
 // Workspace uses
 use zksync::utils::closest_packable_token_amount;
-
+use zksync_types::{tx::PackedEthSignature, ZkSyncTx};
 // Local uses
 use super::{Fees, Scenario, ScenarioResources};
 use crate::{
     monitor::Monitor,
     test_wallet::TestWallet,
-    utils::{foreach_failsafe, gwei_to_wei},
+    utils::{foreach_failsafe, gwei_to_wei, wait_all_failsafe_chunks, CHUNK_SIZES},
 };
 
 /// Configuration options for the transfers scenario.
@@ -62,6 +62,7 @@ pub struct TransferScenario {
     transfer_size: BigUint,
     transfer_rounds: u64,
     wallets: u64,
+    txs: Vec<(ZkSyncTx, Option<PackedEthSignature>)>,
 }
 
 impl TransferScenario {
@@ -70,6 +71,7 @@ impl TransferScenario {
             transfer_size: gwei_to_wei(config.transfer_size),
             transfer_rounds: config.transfer_rounds,
             wallets: config.wallets_amount,
+            txs: Vec::new(),
         }
     }
 }
@@ -96,38 +98,49 @@ impl Scenario for TransferScenario {
     async fn prepare(
         &mut self,
         _monitor: &Monitor,
-        _fees: &Fees,
-        _wallets: &[TestWallet],
+        fees: &Fees,
+        wallets: &[TestWallet],
     ) -> anyhow::Result<()> {
+        let transfers_number = (self.wallets * self.transfer_rounds) as usize;
+
+        log::info!(
+            "All the initial transfers have been verified, creating {} transactions \
+            for the transfers step",
+            transfers_number
+        );
+
+        self.txs = wait_all_failsafe_chunks(
+            "prepare/transfers",
+            CHUNK_SIZES,
+            (0..transfers_number).map(|i| {
+                let from = i % wallets.len();
+                let to = (i + 1) % wallets.len();
+
+                wallets[from].sign_transfer(
+                    wallets[to].address(),
+                    closest_packable_token_amount(&self.transfer_size),
+                    fees.zksync.clone(),
+                )
+            }),
+        )
+        .await?;
+
+        log::info!("Created {} transactions...", self.txs.len());
+
         Ok(())
     }
 
     async fn run(
         &mut self,
         monitor: Monitor,
-        fees: Fees,
+        _fees: Fees,
         wallets: Vec<TestWallet>,
     ) -> anyhow::Result<Vec<TestWallet>> {
-        let transfers_number = (self.wallets * self.transfer_rounds) as usize;
         foreach_failsafe(
             "run/transfers",
-            (0..transfers_number).map(|i| {
-                let from = i % wallets.len();
-                let to = (i + 1) % wallets.len();
-
-                let sign_transfer_task = wallets[from].sign_transfer(
-                    wallets[to].address(),
-                    closest_packable_token_amount(&self.transfer_size),
-                    fees.zksync.clone(),
-                );
-
-                let monitor = monitor.clone();
-                async move {
-                    let (tx, sign) = sign_transfer_task.await?;
-                    eprintln!("transfers: sent_tx");
-                    monitor.send_tx(tx, sign).await
-                }
-            }),
+            self.txs
+                .drain(..)
+                .map(|(tx, sign)| monitor.send_tx(tx, sign)),
         )
         .await?;
 
