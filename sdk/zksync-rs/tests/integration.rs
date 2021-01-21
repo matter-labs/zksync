@@ -74,7 +74,7 @@ fn one_ether() -> U256 {
 }
 
 /// Auxiliary function that returns the balance of the account on Ethereum.
-async fn get_ethereum_balance<S: EthereumSigner + Send + Sync + Clone + Send + Sync>(
+async fn get_ethereum_balance<S: EthereumSigner + Send + Sync + Clone>(
     eth_provider: &EthereumProvider<S>,
     address: Address,
     token: &Token,

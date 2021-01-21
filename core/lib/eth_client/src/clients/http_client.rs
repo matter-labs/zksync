@@ -1,23 +1,24 @@
 // Built-in deps
-use std::fmt;
+use std::{fmt, time::Instant};
 
 // External uses
-
 use web3::{
-    contract::{Contract, Options},
+    contract::{
+        tokens::{Detokenize, Tokenize},
+        Contract, Options,
+    },
     transports::Http,
-    types::{Address, BlockId, BlockNumber, Bytes, TransactionReceipt, H160, H256, U256, U64},
+    types::{
+        Address, BlockId, BlockNumber, Bytes, Filter, Log, TransactionReceipt, H160, H256, U256,
+        U64,
+    },
     Web3,
 };
 
 // Workspace uses
-use crate::ethereum_gateway::{ExecutedTxStatus, FailureInfo, SignedCallResult};
-
-use std::time::Instant;
-use web3::contract::tokens::{Detokenize, Tokenize};
-use web3::types::{Filter, Log};
 use zksync_eth_signer::{raw_ethereum_tx::RawTransaction, EthereumSigner};
 
+use crate::ethereum_gateway::{ExecutedTxStatus, FailureInfo, SignedCallResult};
 /// Gas limit value to be used in transaction if for some reason
 /// gas limit was not set for it.
 ///
