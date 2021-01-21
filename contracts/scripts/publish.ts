@@ -13,7 +13,7 @@ async function main() {
         addresses.ZkSyncTarget,
         addresses.VerifierTarget,
         addresses.GovernanceTarget,
-        addresses.UpgradeGatekeeper,
+        addresses.UpgradeGatekeeper
     ]) {
         try {
             await hre.run('verify', { address });

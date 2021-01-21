@@ -29,11 +29,8 @@ async fn main() -> anyhow::Result<()> {
     let zksync_config = ZkSyncConfig::from_env();
 
     // Run prometheus data exporter.
-    let (prometheus_task_handle, _) = run_prometheus_exporter(
-        connection_pool,
-        zksync_config.api.prometheus.port,
-        false,
-    );
+    let (prometheus_task_handle, _) =
+        run_prometheus_exporter(connection_pool, zksync_config.api.prometheus.port, false);
 
     run_prover_server(database, stop_signal_sender, zksync_config);
 

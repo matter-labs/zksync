@@ -9,20 +9,20 @@ const prodConfig = {
     MAX_AMOUNT_OF_REGISTERED_TOKENS: 127,
     // PRIORITY_EXPIRATION: 101,
     DUMMY_VERIFIER: false,
-    UPGRADE_FROM_V3: true,
+    UPGRADE_FROM_V3: true
 };
 const testnetConfig = {
     UPGRADE_NOTICE_PERIOD: 0,
     MAX_AMOUNT_OF_REGISTERED_TOKENS: 127,
     // PRIORITY_EXPIRATION: 101,
     DUMMY_VERIFIER: false,
-    UPGRADE_FROM_V3: true,
+    UPGRADE_FROM_V3: true
 };
 const testConfig = {
     UPGRADE_NOTICE_PERIOD: 0,
     MAX_AMOUNT_OF_REGISTERED_TOKENS: 5,
     PRIORITY_EXPIRATION: 101,
-    DUMMY_VERIFIER: true,
+    DUMMY_VERIFIER: true
 };
 
 const localConfig = Object.assign({}, prodConfig);
@@ -33,7 +33,7 @@ const contractDefs = {
     ropsten: testnetConfig,
     mainnet: prodConfig,
     test: testConfig,
-    localhost: localConfig,
+    localhost: localConfig
 };
 
 export default {
@@ -42,15 +42,15 @@ export default {
         settings: {
             optimizer: {
                 enabled: true,
-                runs: 200,
-            },
-        },
+                runs: 200
+            }
+        }
     },
     contractSizer: {
-        runOnCompile: false,
+        runOnCompile: false
     },
     paths: {
-        sources: './contracts',
+        sources: './contracts'
     },
     solpp: {
         defs: (() => {
@@ -58,17 +58,17 @@ export default {
                 return contractDefs.test;
             }
             return contractDefs[process.env.CHAIN_ETH_NETWORK];
-        })(),
+        })()
     },
     networks: {
         env: {
-            url: process.env.ETH_CLIENT_WEB3_URL,
+            url: process.env.ETH_CLIENT_WEB3_URL
         },
         hardhat: {
-            allowUnlimitedContractSize: true,
-        },
+            allowUnlimitedContractSize: true
+        }
     },
     etherscan: {
-        apiKey: process.env.MISC_ETHERSCAN_API_KEY,
-    },
+        apiKey: process.env.MISC_ETHERSCAN_API_KEY
+    }
 };

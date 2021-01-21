@@ -48,7 +48,7 @@ export class HTTPTransport extends AbstractJSONRPCTransport {
             id: 1,
             jsonrpc: '2.0',
             method,
-            params,
+            params
         };
 
         const response = await Axios.post(this.address, request).then((resp) => {
@@ -81,7 +81,7 @@ export class WSTransport extends AbstractJSONRPCTransport {
             packMessage: (data) => JSON.stringify(data),
             unpackMessage: (data) => JSON.parse(data as string),
             attachRequestId: (data, requestId) => Object.assign({ id: requestId }, data), // attach requestId to message as `id` field
-            extractRequestId: (data) => data && data.id,
+            extractRequestId: (data) => data && data.id
         });
 
         this.subscriptionCallback = new Map();
@@ -122,7 +122,7 @@ export class WSTransport extends AbstractJSONRPCTransport {
             const unsubRep = await this.ws.sendRequest({
                 jsonrpc: '2.0',
                 method: unsubMethod,
-                params: [subId],
+                params: [subId]
             });
             if (unsubRep.error) {
                 throw new JRPCError(`Unsubscribe failed: ${subId}, ${JSON.stringify(unsubRep.error)}`, unsubRep.error);
@@ -141,7 +141,7 @@ export class WSTransport extends AbstractJSONRPCTransport {
         const request = {
             jsonrpc: '2.0',
             method,
-            params,
+            params
         };
 
         const response = await this.ws.sendRequest(request, { requestId: 1 });
@@ -180,7 +180,7 @@ export class DummyTransport extends AbstractJSONRPCTransport {
                 // The HEX-encoded sequence of bytes [0..20) provided as the `mainContract`.
                 mainContract: '0x000102030405060708090a0b0c0d0e0f10111213',
                 //  The `govContract` is not used in tests and it is simply an empty string.
-                govContract: '',
+                govContract: ''
             };
         }
 
@@ -194,7 +194,7 @@ export class DummyTransport extends AbstractJSONRPCTransport {
                     address: tokenItem.address,
                     id: id,
                     symbol: tokenItem.symbol,
-                    decimals: tokenItem.decimals,
+                    decimals: tokenItem.decimals
                 };
 
                 tokens[tokenItem.symbol] = token;
@@ -216,18 +216,18 @@ export class DummyTransport extends AbstractJSONRPCTransport {
                 depositing: {},
                 committed: {
                     balances: {
-                        DAI: BigNumber.from(12345),
+                        DAI: BigNumber.from(12345)
                     },
                     nonce: 0,
-                    pubKeyHash: await this.getPubKeyHash(),
+                    pubKeyHash: await this.getPubKeyHash()
                 },
                 verified: {
                     balances: {
-                        USDC: BigNumber.from(98765),
+                        USDC: BigNumber.from(98765)
                     },
                     nonce: 0,
-                    pubKeyHash: '',
-                },
+                    pubKeyHash: ''
+                }
             };
         }
 
@@ -237,7 +237,7 @@ export class DummyTransport extends AbstractJSONRPCTransport {
 
         return {
             method,
-            params,
+            params
         };
     }
 
