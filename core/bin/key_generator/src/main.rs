@@ -17,7 +17,9 @@ mod zksync_key;
 
 use structopt::StructOpt;
 
-use crate::recursive_keys::make_recursive_verification_keys;
+use crate::recursive_keys::{
+    count_gates_recursive_verification_keys, make_recursive_verification_keys,
+};
 use crate::sample_proofs::make_sample_proofs;
 use crate::verifier_contract_generator::create_verifier_contract;
 use crate::zksync_key::{make_plonk_blocks_verify_keys, make_plonk_exodus_verify_key};
