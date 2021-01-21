@@ -13,11 +13,18 @@ All notable changes to the core components will be documented in this file.
 - Removed the limitation on the number of withdrawals in the block.
 - (`FeeTicker`): Increased gas price estimate for transaction.
 
+### Removed
+
+- `MetricsCounter` structure was removed because it is not used.
+
 ### Changed
 
+- `prometheus_exporter` was made a library to be used by several crates.
 - `prover_run_for_next_commit` function uses a parameterized timeout instead of a hard-coded one.
 
 ### Added
+
+- `prometheus_exporter` is launched by every microservice.
 
 ### Fixed
 

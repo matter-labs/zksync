@@ -3,6 +3,7 @@
         <i v-if="status == Readiness.Rejected" class="fas fa-times brown"></i>
         <b-spinner v-else-if="status == Readiness.Initiated" small label="Small Spinner" />
         <img v-else-if="status == Readiness.Committed" small class="readiness-image" src="../assets/2.svg" />
+        <img v-else-if="status == Readiness.Scheduled" small class="readiness-image" src="../assets/3.svg" />
         <img v-else-if="status == Readiness.Verified" small class="readiness-image" src="../assets/1.svg" />
     </span>
 </template>

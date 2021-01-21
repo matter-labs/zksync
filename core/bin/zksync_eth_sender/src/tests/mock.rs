@@ -559,6 +559,7 @@ pub(in crate) async fn create_signed_tx(
 pub(in crate) async fn create_signed_withdraw_tx(
     id: i64,
     eth_sender: &ETHSender<MockEthereum, MockDatabase>,
+    operation: Option<Operation>,
     deadline_block: u64,
     nonce: i64,
 ) -> ETHOperation {

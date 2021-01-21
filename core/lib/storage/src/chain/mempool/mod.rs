@@ -44,10 +44,7 @@ impl<'a, 'c> MempoolSchema<'a, 'c> {
             }
         };
 
-        let mut prev_batch_id = txs
-            .first()
-            .map(|tx| batch_id_optional(tx.batch_id))
-            .flatten();
+        let mut prev_batch_id = txs.first().and_then(|tx| batch_id_optional(tx.batch_id));
 
         let grouped_txs = txs.into_iter().group_by(|tx| {
             prev_batch_id = batch_id_optional(tx.batch_id);

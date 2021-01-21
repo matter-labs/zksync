@@ -5,10 +5,14 @@ use num::BigUint;
 // Workspace uses
 use zksync::{
     error::ClientError,
+    ethereum::ierc20_contract,
     provider::Provider,
     types::BlockStatus,
-    utils::{biguint_to_u256, closest_packable_fee_amount},
-    web3::types::H256,
+    utils::{biguint_to_u256, closest_packable_fee_amount, u256_to_biguint},
+    web3::{
+        contract::{Contract, Options},
+        types::H256,
+    },
     EthereumProvider, Network, RpcProvider, Wallet, WalletCredentials,
 };
 use zksync_eth_signer::PrivateKeySigner;
@@ -146,6 +150,38 @@ impl TestWallet {
         self.eth_provider.balance().await
     }
 
+    /// Returns erc20 token balance in Ethereum network.
+    pub async fn erc20_balance(&self) -> Result<BigUint, ClientError> {
+        let token = self
+            .inner
+            .tokens
+            .resolve(self.token_name.clone())
+            .ok_or(ClientError::UnknownToken)?;
+
+        let contract = Contract::new(
+            self.eth_provider.web3().eth(),
+            token.address,
+            ierc20_contract(),
+        );
+
+        let balance = contract
+            .query("balanceOf", self.address(), None, Options::default(), None)
+            .await
+            .map(u256_to_biguint)
+            .map_err(|err| ClientError::NetworkError(err.to_string()))?;
+
+        Ok(balance)
+    }
+
+    /// Returns eth balance if token name is ETH; otherwise returns erc20 balance.
+    pub async fn l1_balance(&self) -> Result<BigUint, ClientError> {
+        if self.token_name.is_eth() {
+            self.eth_balance().await
+        } else {
+            self.erc20_balance().await
+        }
+    }
+
     /// Returns the token name of this wallet.
     pub fn token_name(&self) -> &TokenLike {
         &self.token_name
@@ -159,11 +195,13 @@ impl TestWallet {
     // Updates ZKSync account id.
     pub async fn update_account_id(&mut self) -> Result<(), ClientError> {
         self.inner.update_account_id().await?;
-        self.monitor
-            .api_data_pool
-            .write()
-            .await
-            .set_account_id(self.address(), self.account_id().unwrap());
+        if let Some(account_id) = self.account_id() {
+            self.monitor
+                .api_data_pool
+                .write()
+                .await
+                .set_account_id(self.address(), account_id);
+        }
         Ok(())
     }
 
@@ -255,6 +293,33 @@ impl TestWallet {
     /// Returns an underlying wallet.
     pub fn into_inner(self) -> Wallet<PrivateKeySigner, RpcProvider> {
         self.inner
+    }
+
+    /// Sends a transaction to ERC20 token contract to approve the ERC20 deposit.
+    pub async fn approve_erc20_deposits(&self) -> anyhow::Result<()> {
+        let tx_hash = self
+            .eth_provider
+            .approve_erc20_token_deposits(self.token_name.clone())
+            .await?;
+        self.eth_provider.wait_for_tx(tx_hash).await?;
+
+        Ok(())
+    }
+
+    /// Sends a some amount tokens to the given address in the Ethereum network.
+    pub async fn transfer_to(
+        &self,
+        token: impl Into<TokenLike>,
+        amount: impl Into<BigUint>,
+        to: Address,
+    ) -> anyhow::Result<()> {
+        let tx_hash = self
+            .eth_provider
+            .transfer(token, biguint_to_u256(amount.into()), to)
+            .await?;
+        self.eth_provider.wait_for_tx(tx_hash).await?;
+
+        Ok(())
     }
 
     /// Returns appropriate nonce for the new transaction and increments the nonce.
