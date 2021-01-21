@@ -1,6 +1,4 @@
-/// Std imports
 use std::time::Duration;
-// External imports
 // Workspace imports
 use zksync_config::ZkSyncConfig;
 use zksync_crypto::proof::EncodedProofPlonk;
@@ -19,6 +17,10 @@ fn supported_block_sizes() -> Vec<usize> {
 
 fn smallest_block_size() -> usize {
     supported_block_sizes()[0]
+}
+
+fn prover_gone_timeout() -> Duration {
+    ZkSyncConfig::from_env().prover.core.gone_timeout()
 }
 
 /// Checks that the proof can be stored and loaded.
@@ -147,6 +149,7 @@ async fn prover_run(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
     let prover_name = "prover_10";
     // Smallest block size.
     let block_size = smallest_block_size();
+    let timeout = prover_gone_timeout();
     let _prover_id = ProverSchema(&mut storage)
         .register_prover(prover_name, block_size)
         .await?;
@@ -158,7 +161,7 @@ async fn prover_run(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
 
     // Get a prover run.
     let maybe_run = ProverSchema(&mut storage)
-        .prover_run_for_next_commit(prover_name, Duration::from_secs(1), block_size)
+        .prover_run_for_next_commit(prover_name, timeout, block_size)
         .await?;
     let run = maybe_run.expect("Can't get a prover run with a block committed");
 
@@ -169,7 +172,7 @@ async fn prover_run(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
 
     // Try to get another run.
     let maybe_run = ProverSchema(&mut storage)
-        .prover_run_for_next_commit(prover_name, Duration::from_secs(1), block_size)
+        .prover_run_for_next_commit(prover_name, timeout, block_size)
         .await?;
     assert!(
         maybe_run.is_none(),
@@ -185,7 +188,7 @@ async fn prover_run(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
 
     // Try to get another run. There should be none, since there are no blocks to prover.
     let maybe_run = ProverSchema(&mut storage)
-        .prover_run_for_next_commit(prover_name, Duration::from_secs(1), block_size)
+        .prover_run_for_next_commit(prover_name, timeout, block_size)
         .await?;
     assert!(
         maybe_run.is_none(),
@@ -199,7 +202,7 @@ async fn prover_run(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
 
     // Now we should get a prover run for the second block.
     let maybe_run = ProverSchema(&mut storage)
-        .prover_run_for_next_commit(prover_name, Duration::from_secs(1), block_size)
+        .prover_run_for_next_commit(prover_name, timeout, block_size)
         .await?;
     let run = maybe_run.expect("Can't get a prover run with a block committed");
 
@@ -218,6 +221,7 @@ async fn unstarted_prover_jobs_count(mut storage: StorageProcessor<'_>) -> Query
     let prover_name = "prover_10";
     // Smallest block size.
     let block_size = smallest_block_size();
+    let timeout = prover_gone_timeout();
     let _prover_id = ProverSchema(&mut storage)
         .register_prover(prover_name, block_size)
         .await?;
@@ -243,7 +247,7 @@ async fn unstarted_prover_jobs_count(mut storage: StorageProcessor<'_>) -> Query
 
     // Create a prover run.
     ProverSchema(&mut storage)
-        .prover_run_for_next_commit(prover_name, Duration::from_secs(1), block_size)
+        .prover_run_for_next_commit(prover_name, timeout, block_size)
         .await?;
 
     // Now, as the job started, the number of not started jobs must be 2.
@@ -263,7 +267,7 @@ async fn unstarted_prover_jobs_count(mut storage: StorageProcessor<'_>) -> Query
 
     // Create next run & repeat checks.
     ProverSchema(&mut storage)
-        .prover_run_for_next_commit(prover_name, Duration::from_secs(2), block_size)
+        .prover_run_for_next_commit(prover_name, timeout, block_size)
         .await?;
 
     let blocks_count = ProverSchema(&mut storage).unstarted_jobs_count().await?;
@@ -278,7 +282,7 @@ async fn unstarted_prover_jobs_count(mut storage: StorageProcessor<'_>) -> Query
 
     // And finally store the proof for the third block.
     ProverSchema(&mut storage)
-        .prover_run_for_next_commit(prover_name, Duration::from_secs(3), block_size)
+        .prover_run_for_next_commit(prover_name, timeout, block_size)
         .await?;
 
     let blocks_count = ProverSchema(&mut storage).unstarted_jobs_count().await?;

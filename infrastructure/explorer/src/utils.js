@@ -9,6 +9,16 @@ export function isReadablyPrintable(tokenName) {
     return readablyPrintableTokens.includes(tokenName);
 }
 
+export function removeTxHashPrefix(txHash) {
+    let nonPrefixHash = txHash;
+    for (const prefix of ['0x', 'sync-tx:', 'sync-bl:', 'sync:']) {
+        if (nonPrefixHash.startsWith(prefix)) {
+            nonPrefixHash = nonPrefixHash.slice(prefix.length);
+        }
+    }
+    return nonPrefixHash;
+}
+
 export function shortenHash(str, fallback) {
     try {
         return `${str.slice(0, 12)}...`;
@@ -89,6 +99,7 @@ export function readyStateFromString(s) {
         Initiated: Readiness.Initiated,
         Pending: Readiness.Committed,
         Complete: Readiness.Verified,
+        Scheduled: Readiness.Scheduled,
         // 'Verified' is a block version of the word 'Complete'
         Verified: Readiness.Verified
     }[s];

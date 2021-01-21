@@ -183,7 +183,14 @@ impl<S: EthereumSigner + Send + Sync> EthereumProvider<S> {
 
         let signed_tx = self
             .eth_client
-            .sign_prepared_tx_for_addr(data, token.address, Default::default())
+            .sign_prepared_tx_for_addr(
+                data,
+                token.address,
+                Options {
+                    gas: Some(300_000.into()),
+                    ..Default::default()
+                },
+            )
             .await
             .map_err(|_| ClientError::IncorrectCredentials)?;
 
@@ -211,7 +218,11 @@ impl<S: EthereumSigner + Send + Sync> EthereumProvider<S> {
             .ok_or(ClientError::UnknownToken)?;
 
         let signed_tx = if self.tokens_cache.is_eth(token) {
-            let options = Options::with(|options| options.value = Some(amount));
+            let options = Options {
+                value: Some(amount),
+                gas: Some(300_000.into()),
+                ..Default::default()
+            };
             self.eth_client
                 .sign_prepared_tx_for_addr(Vec::new(), to, options)
                 .await
@@ -227,7 +238,14 @@ impl<S: EthereumSigner + Send + Sync> EthereumProvider<S> {
                 .expect("failed to encode parameters");
 
             self.eth_client
-                .sign_prepared_tx_for_addr(data, token_info.address, Default::default())
+                .sign_prepared_tx_for_addr(
+                    data,
+                    token_info.address,
+                    Options {
+                        gas: Some(300_000.into()),
+                        ..Default::default()
+                    },
+                )
                 .await
                 .map_err(|_| ClientError::IncorrectCredentials)?
         };
