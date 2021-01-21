@@ -37,8 +37,8 @@ impl ChangePubKeyCREATE2Data {
     pub fn get_address(&self, pubkey_hash: &PubKeyHash) -> Address {
         let salt = {
             let mut bytes = Vec::new();
-            bytes.extend_from_slice(&pubkey_hash.data);
             bytes.extend_from_slice(self.salt_arg.as_bytes());
+            bytes.extend_from_slice(&pubkey_hash.data);
             bytes.keccak256()
         };
 

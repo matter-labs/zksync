@@ -177,7 +177,7 @@ if (process.env.TEST_TRANSPORT) {
     if (process.env.TEST_TOKEN) {
         // Both transport and token are set, use config from env.
         const envTransport = process.env.TEST_TRANSPORT.toUpperCase();
-        const envToken = process.env.TEST_TOKEN.toUpperCase();
+        const envToken = process.env.TEST_TOKEN;
         tokenAndTransport = [
             {
                 transport: envTransport,
