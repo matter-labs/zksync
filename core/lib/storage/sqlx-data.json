@@ -1851,19 +1851,6 @@
       ]
     }
   },
-  "6bd51c16a66835305c8fa763966bbfef13199924cbe1c97b7d7b840edea4217a": {
-    "query": "UPDATE prover_job_queue\n            SET (updated_at, job_status, updated_by) = (now(), $1, 'server_finish_job')\n            WHERE id = $2",
-    "describe": {
-      "columns": [],
-      "parameters": {
-        "Left": [
-          "Int4",
-          "Int4"
-        ]
-      },
-      "nullable": []
-    }
-  },
   "6d676581f14d0935983aca496bc37b58206b90320058290809020a2604b11df3": {
     "query": "SELECT max(number) FROM blocks",
     "describe": {
@@ -2000,6 +1987,20 @@
       "nullable": [
         false
       ]
+    }
+  },
+  "76ac37f173ae27687dbb0eb261a5ab9920fd2185e50a476c00315a874dd6b75c": {
+    "query": "UPDATE prover_job_queue\n            SET (updated_at, job_status, updated_by) = (now(), $1, 'server_finish_job')\n            WHERE id = $2 AND job_type = $3",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "Int4",
+          "Int4",
+          "Text"
+        ]
+      },
+      "nullable": []
     }
   },
   "775393191c0f793a8431df81cdd8e5ec3121a22110d90974c903ae370366aa33": {

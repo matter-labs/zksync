@@ -3,14 +3,12 @@
 //! This module provides building blocks for serializing and deserializing
 //! common `zksync` types.
 
-use crate::bellman::pairing::{CurveAffine, Engine as EngineTrait};
 use crate::bellman::plonk::better_better_cs::cs::Circuit as NewCircuit;
 use crate::bellman::plonk::better_better_cs::proof::Proof as NewProof;
 use crate::bellman::plonk::better_cs::{
     cs::PlonkCsWidth4WithNextStepParams, keys::Proof as OldProof,
 };
 use crate::convert::FeConvert;
-use crate::ff::{PrimeField, PrimeFieldRepr, ScalarEngine};
 use crate::primitives::EthereumSerializer;
 use crate::proof::EncodedSingleProof;
 use crate::recursive_aggregation_circuit::circuit::RecursiveAggregationCircuitBn256;
