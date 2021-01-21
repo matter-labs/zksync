@@ -12,7 +12,6 @@ use zksync_circuit::{
     witness::{deposit::DepositWitness, utils::WitnessBuilder, Witness},
 };
 use zksync_config::configs::{ChainConfig, ProverConfig};
-// use zksync_config::{ConfigurationOptions, ProverOptions};
 use zksync_crypto::{
     circuit::{account::CircuitAccount, CircuitAccountTree},
     pairing::ff::PrimeField,

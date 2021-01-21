@@ -8,7 +8,7 @@ use zksync_utils::{get_env, parse_env};
 // Local deps
 use crate::{client, prover_work_cycle, ProverConfig, ProverImpl, ShutdownRequest};
 
-fn api_client_from_env(worker_name: &str) -> client::ApiClient {
+fn api_client_from_env() -> client::ApiClient {
     let server_api_url = parse_env("API_PROVER_URL");
     let request_timout = Duration::from_secs(parse_env::<u64>("PROVER_PROVER_REQUEST_TIMEOUT"));
     let secret = get_env("API_PROVER_SECRET_AUTH");
@@ -37,7 +37,7 @@ where
     // used env
     let prover_options = EnvProverConfig::from_env();
     let prover_config = <PROVER as ProverImpl>::Config::from_env();
-    let api_client = api_client_from_env(&worker_name);
+    let api_client = api_client_from_env();
     let prover = PROVER::create_from_config(prover_config);
 
     env_logger::init();

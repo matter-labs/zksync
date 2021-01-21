@@ -50,8 +50,7 @@
     "server-add-erc20": "ts-node scripts/server-add-erc20.ts",
     "token-info": "ts-node scripts/token-info.ts",
     "deploy-testkit": "ts-node scripts/deploy-testkit.ts",
-    "publish-sources": "ts-node scripts/publish.ts",
-    "deploy-testnet-erc20": "ts-node scripts/deploy-testnet-token.ts",
-    "gen-token-add-contract": "ts-node scripts/gen-token-add-contract.ts"
+    "publish-sources": "hardhat run --network env scripts/publish.ts",
+    "deploy-testnet-erc20": "ts-node scripts/deploy-testnet-token.ts"
   }
 }
