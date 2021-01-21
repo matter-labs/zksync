@@ -120,7 +120,7 @@ async fn get_job<DB: DatabaseInterface>(
     r: web::Json<ProverInputRequest>,
 ) -> actix_web::Result<HttpResponse> {
     log::trace!("request block to prove from worker: {}", r.prover_name);
-    if r.prover_name == "" {
+    if r.prover_name.is_empty() {
         return Err(actix_web::error::ErrorBadRequest("empty name"));
     }
     let mut storage = data.access_storage().await?;

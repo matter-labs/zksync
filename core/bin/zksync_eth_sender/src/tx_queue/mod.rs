@@ -6,7 +6,6 @@ use zksync_types::aggregated_operations::{AggregatedActionType, AggregatedOperat
 
 mod counter_queue;
 mod sparse_queue;
-mod withdrawals_counter_queue;
 
 pub type RawTxData = Vec<u8>;
 
@@ -190,37 +189,37 @@ mod tests {
     use super::*;
     use zksync_types::{block::Block, Action};
 
-    fn get_tx_data(
-        operation_type: OperationType,
-        block_number: BlockNumber,
-        raw: RawTxData,
-    ) -> TxData {
-        let block = Block::new_from_available_block_sizes(
-            block_number,
-            Default::default(),
-            0,
-            vec![],
-            (0, 0),
-            &[0],
-            1_000_000.into(),
-            1_500_000.into(),
-        );
+    // fn get_tx_data(
+    //     operation_type: OperationType,
+    //     block_number: BlockNumber,
+    //     raw: RawTxData,
+    // ) -> TxData {
+    //     let block = Block::new_from_available_block_sizes(
+    //         block_number,
+    //         Default::default(),
+    //         0,
+    //         vec![],
+    //         (0, 0),
+    //         &[0],
+    //         1_000_000.into(),
+    //         1_500_000.into(),
+    //     );
 
-        let action = match operation_type {
-            OperationType::Commit => Action::Commit,
-            _ => Action::Verify {
-                proof: Default::default(),
-            },
-        };
+    //     let action = match operation_type {
+    //         OperationType::Commit => Action::Commit,
+    //         _ => Action::Verify {
+    //             proof: Default::default(),
+    //         },
+    //     };
 
-        let operation = Operation {
-            id: None,
-            action,
-            block,
-        };
+    //     let operation = Operation {
+    //         id: None,
+    //         action,
+    //         block,
+    //     };
 
-        TxData::from_operation(operation_type, operation, raw)
-    }
+    //     TxData::from_operation(operation_type, operation, raw)
+    // }
 
     /// Checks the basic workflow of the queue including adding several operations
     /// and retrieving them later.

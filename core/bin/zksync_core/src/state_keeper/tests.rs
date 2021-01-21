@@ -151,6 +151,7 @@ fn create_account_and_fast_withdrawal<B: Into<BigUint>>(
     )
 }
 
+#[allow(clippy::clippy::too_many_arguments)]
 fn create_account_and_withdrawal_impl<B: Into<BigUint>>(
     tester: &mut StateKeeperTester,
     token_id: TokenId,
@@ -358,7 +359,7 @@ mod apply_tx {
     /// small number of chunks left in the block
     #[test]
     fn not_enough_chunks() {
-        let mut tester = StateKeeperTester::new(1, 1, 1, 1);
+        let mut tester = StateKeeperTester::new(1, 1, 1);
         let withdraw =
             create_account_and_withdrawal(&mut tester, 0, 1, 200u32, 145u32, 0, u32::MAX);
         let result = tester.state_keeper.apply_tx(&withdraw);
@@ -396,7 +397,7 @@ mod apply_tx {
 /// with 1 priority_op, 1 succeeded tx, 1 failed tx
 #[tokio::test]
 async fn seal_pending_block() {
-    let mut tester = StateKeeperTester::new(20, 3, 3, 2);
+    let mut tester = StateKeeperTester::new(20, 3, 3);
     let good_withdraw =
         create_account_and_withdrawal(&mut tester, 0, 1, 200u32, 145u32, 0, u32::MAX);
     let bad_withdraw =
@@ -448,7 +449,7 @@ async fn seal_pending_block() {
 /// with 1 priority_op, 1 succeeded tx, 1 failed tx
 #[tokio::test]
 async fn store_pending_block() {
-    let mut tester = StateKeeperTester::new(20, 3, 3, 2);
+    let mut tester = StateKeeperTester::new(20, 3, 3);
     let good_withdraw =
         create_account_and_withdrawal(&mut tester, 0, 1, 200u32, 145u32, 0, u32::MAX);
     let bad_withdraw =
@@ -608,7 +609,7 @@ mod execute_proposed_block {
     /// Checks if executing a small proposed_block is done correctly
     #[tokio::test]
     async fn small() {
-        let mut tester = StateKeeperTester::new(20, 3, 3, 2);
+        let mut tester = StateKeeperTester::new(20, 3, 3);
         let good_withdraw =
             create_account_and_withdrawal(&mut tester, 0, 1, 200u32, 145u32, 0, u32::MAX);
         let bad_withdraw =
@@ -641,7 +642,7 @@ mod execute_proposed_block {
     /// so 1 block should get sealed in the process
     #[tokio::test]
     async fn few_chunks() {
-        let mut tester = StateKeeperTester::new(12, 3, 3, 2);
+        let mut tester = StateKeeperTester::new(12, 3, 3);
         let good_withdraw =
             create_account_and_withdrawal(&mut tester, 0, 1, 200u32, 145u32, 0, u32::MAX);
         let bad_withdraw =
@@ -672,7 +673,7 @@ mod execute_proposed_block {
     /// max_iterations == 0, so the block should get sealed, not stored
     #[tokio::test]
     async fn few_iterations() {
-        let mut tester = StateKeeperTester::new(20, 0, 0, 2);
+        let mut tester = StateKeeperTester::new(20, 0, 0);
         let good_withdraw =
             create_account_and_withdrawal(&mut tester, 0, 1, 200u32, 145u32, 0, u32::MAX);
         let bad_withdraw =
@@ -701,7 +702,7 @@ mod execute_proposed_block {
         const MAX_ITERATIONS: usize = 100;
         const FAST_ITERATIONS: usize = 0; // Seal block right after fast withdrawal.
 
-        let mut tester = StateKeeperTester::new(6, MAX_ITERATIONS, FAST_ITERATIONS, 2);
+        let mut tester = StateKeeperTester::new(6, MAX_ITERATIONS, FAST_ITERATIONS);
         let withdraw =
             create_account_and_fast_withdrawal(&mut tester, 0, 1, 200u32, 145u32, 0, u32::MAX);
 
@@ -926,7 +927,7 @@ mod execute_proposed_block {
     /// and transaction with an invalid timestamp failed.
     #[tokio::test]
     async fn transfers_with_different_timestamps() {
-        let mut tester = StateKeeperTester::new(20, 5, 5, 4);
+        let mut tester = StateKeeperTester::new(20, 5, 5);
 
         let token_id: TokenId = 0;
         let account_from_id: AccountId = 1;
