@@ -7,6 +7,10 @@ All notable changes to the core components will be documented in this file.
 - Removed the limitation on the number of withdrawals in the block.
 - (`FeeTicker`): Increased gas price estimate for transaction.
 
+### Removed
+
+- `MetricsCounter` structure was removed because it is not used.
+
 ### Changed
 
 - Type aliases (`TokenId`, `AccountId`, `Nonce`, `BlockNumber`, `PriorityOpId`, `EthBlockId`) are replaced with wrapper

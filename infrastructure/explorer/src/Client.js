@@ -183,7 +183,15 @@ export class Client {
         if (!address) {
             return [];
         }
-        const transactions = await this.blockExplorerClient.getAccountTransactions(address, offset, limit);
+        const rawTransactions = await this.blockExplorerClient.getAccountTransactions(address, offset, limit);
+        const transactions = rawTransactions.filter((tx) => {
+            const type = tx.tx.type || '';
+            if (type == 'Deposit') {
+                return tx.tx.priority_op.to == address;
+            } else if (type == 'Withdraw') {
+                return tx.tx.from == address;
+            } else return true;
+        });
         const res = transactions.map(async (tx) => {
             const type = tx.tx.type || '';
             const hash = tx.hash;
