@@ -133,6 +133,51 @@ where
     Ok(oks)
 }
 
+/// Creates a future which represents either a collection of the results of the
+/// futures given or an error.
+///
+/// But unlike the `try_wait_all_failsafe` method, it performs futures one by one
+/// without concurrency.
+pub async fn foreach_failsafe<I>(
+    category: &str,
+    i: I,
+) -> Result<Vec<<I::Item as TryFuture>::Ok>, <I::Item as TryFuture>::Error>
+where
+    I: IntoIterator,
+    I::Item: TryFuture,
+    <I::Item as Future>::Output:
+        Into<Result<<I::Item as TryFuture>::Ok, <I::Item as TryFuture>::Error>>,
+    <I::Item as TryFuture>::Error: std::fmt::Display,
+{
+    let mut oks = Vec::new();
+    let mut errs = Vec::new();
+
+    for item in i.into_iter() {
+        match item.await.into() {
+            Ok(ok) => oks.push(ok),
+            Err(err) => {
+                save_error(category, &err);
+                errs.push(err)
+            }
+        }
+    }
+
+    if oks.is_empty() {
+        match errs.into_iter().next() {
+            Some(err) => return Err(err),
+            None => return Ok(Vec::new()),
+        }
+    } else if errs.len() > ERRORS_CUTOFF {
+        log::warn!(
+            "A {} errors occurred during the `{}` execution.",
+            errs.len(),
+            category,
+        );
+    }
+
+    Ok(oks)
+}
+
 type ChunksIter = dyn Iterator<Item = usize> + Send + 'static;
 
 /// An iterator similar to `.iter().chunks(..)`, but supporting multiple
