@@ -76,6 +76,7 @@ export class BatchBuilder {
                     this.changePubKeyTx.newPkHash,
                     this.changePubKeyTx.nonce,
                     this.wallet.accountId,
+                    this.zkSyncVersion,
                     batchHash
                 )
             );

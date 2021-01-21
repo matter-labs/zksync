@@ -22,7 +22,8 @@ import {
     ChangePubkeyTypes,
     ChangePubKeyOnchain,
     ChangePubKeyECDSA,
-    ChangePubKeyCREATE2
+    ChangePubKeyCREATE2,
+    ZkSyncVersion
 } from './types';
 import {
     ERC20_APPROVE_TRESHOLD,
@@ -491,6 +492,7 @@ export class Wallet {
                 newPubKeyHash,
                 changePubKey.nonce,
                 this.accountId,
+                this.provider.zkSyncVersion,
                 changePubKey.batchHash
             );
             const ethSignature = (await this.getEthMessageSignature(changePubKeyMessage)).signature;
@@ -500,6 +502,10 @@ export class Wallet {
                 batchHash: changePubKey.batchHash
             };
         } else if (changePubKey.ethAuthType === 'CREATE2') {
+            if (this.provider.zkSyncVersion === 'contracts-3') {
+                throw new Error('CREATE2 authentication is not supported for zkSync version contracts-3');
+            }
+
             if (this.ethSigner instanceof Create2WalletSigner) {
                 const create2data = this.ethSigner.create2WalletData;
                 ethAuthData = {

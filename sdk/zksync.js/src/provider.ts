@@ -246,7 +246,15 @@ export class Provider {
     }
 
     async getZkSyncVersion(): Promise<ZkSyncVersion> {
-        return await this.transport.request('get_zksync_version', []);
+        try {
+            return await this.transport.request('get_zksync_version', []);
+        } catch (err) {
+            if (err.message.includes('Method not found')) {
+                return 'contracts-3';
+            } else {
+                throw new Error(err);
+            }
+        }
     }
 
     async disconnect() {
