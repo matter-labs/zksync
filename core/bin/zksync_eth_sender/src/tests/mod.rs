@@ -299,7 +299,7 @@ async fn operation_commitment_workflow() {
     let deadline_block =
         eth_sender.get_deadline_block(eth_sender.ethereum.get_mock().unwrap().block_number);
     let mut withdraw_op_tx =
-        create_signed_withdraw_tx(eth_op_idx, &eth_sender, deadline_block, nonce).await;
+        create_signed_withdraw_tx(eth_op_idx, &eth_sender, None, deadline_block, nonce).await;
 
     eth_sender.db.assert_stored(&withdraw_op_tx).await;
     eth_sender
@@ -457,7 +457,7 @@ async fn operations_order() {
         let nonce = eth_op_idx;
 
         let withdraw_op_tx =
-            create_signed_withdraw_tx(eth_op_idx, &eth_sender, deadline_block, nonce).await;
+            create_signed_withdraw_tx(eth_op_idx, &eth_sender, None, deadline_block, nonce).await;
 
         expected_txs.push(withdraw_op_tx);
     }
@@ -728,8 +728,14 @@ async fn concurrent_operations_order() {
         let eth_op_idx = (idx * 3 + 2) as i64;
         let nonce = eth_op_idx;
 
-        let withdraw_op_tx =
-            create_signed_withdraw_tx(eth_op_idx, &eth_sender, deadline_block, nonce).await;
+        let withdraw_op_tx = create_signed_withdraw_tx(
+            eth_op_idx,
+            &eth_sender,
+            Some(verify_operation.clone()),
+            deadline_block,
+            nonce,
+        )
+        .await;
 
         expected_txs.push(withdraw_op_tx);
     }
