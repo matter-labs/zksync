@@ -18,6 +18,8 @@ components, the logs will have the following format:
 
 ### Fixed
 
+- (`explorer`): Bug with not displaying old blocks was fixed.
+
 ## Release 2021-01-12
 
 ### Added
