@@ -1,6 +1,5 @@
 import { formatDate, formatToken, makeEntry, blockchainExplorerToken, readyStateFromString } from './utils';
 import { blockchainExplorerAddress } from './constants';
-import { BigNumber } from 'ethers';
 
 function fromLinkEntry(txData) {
     const entry = makeEntry('From').copyable();
