@@ -249,10 +249,10 @@ fn apply_change_pubkey_op(b: &mut Bencher<'_>) {
             .expect("Failed to construct ChangePubKey signed message.");
         let eth_signature =
             PackedEthSignature::sign(eth_private_key, &sign_bytes).expect("Signing failed");
-        ChangePubKeyEthAuthData::ECDSA(ChangePubKeyECDSAData {
+        Some(ChangePubKeyEthAuthData::ECDSA(ChangePubKeyECDSAData {
             eth_signature,
             batch_hash: H256::zero(),
-        })
+        }))
     };
 
     let change_pubkey_tx = ZkSyncTx::ChangePubKey(Box::new(change_pubkey));

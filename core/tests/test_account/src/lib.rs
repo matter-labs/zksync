@@ -278,17 +278,17 @@ impl ZkSyncAccount {
         )
         .expect("Can't sign ChangePubKey operation");
         change_pubkey.eth_auth_data = if auth_onchain {
-            ChangePubKeyEthAuthData::Onchain
+            Some(ChangePubKeyEthAuthData::Onchain)
         } else {
             let sign_bytes = change_pubkey
                 .get_eth_signed_data()
                 .expect("Failed to construct change pubkey signed message.");
             let eth_signature = PackedEthSignature::sign(&self.eth_private_key, &sign_bytes)
                 .expect("Signature should succeed");
-            ChangePubKeyEthAuthData::ECDSA(ChangePubKeyECDSAData {
+            Some(ChangePubKeyEthAuthData::ECDSA(ChangePubKeyECDSAData {
                 eth_signature,
                 batch_hash: H256::zero(),
-            })
+            }))
         };
 
         assert!(

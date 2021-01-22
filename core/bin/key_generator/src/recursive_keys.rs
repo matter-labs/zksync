@@ -31,3 +31,32 @@ pub fn make_recursive_verification_keys(config: AvailableBlockSizesConfig) {
         vk.write(vk_file).expect("Failed to save verification key");
     }
 }
+
+pub fn count_gates_recursive_verification_keys() {
+    fn get_setup_size(proofs: usize) -> u32 {
+        let recursive_setup =
+            recursive_aggregation_circuit::circuit::create_recursive_circuit_setup(
+                proofs,
+                RECURSIVE_CIRCUIT_NUM_INPUTS,
+                RECURSIVE_CIRCUIT_VK_TREE_DEPTH,
+            )
+            .expect("Failed to generate recursive circuit setup");
+        recursive_setup.n.next_power_of_two().trailing_zeros()
+    }
+
+    let mut proofs = 1;
+    let mut setup_power = get_setup_size(proofs);
+    while setup_power <= 26 {
+        let new_proofs = proofs + 1;
+        let new_setup_power = get_setup_size(new_proofs);
+        if new_setup_power <= setup_power {
+            proofs = new_proofs;
+        } else {
+            log::info!("setup_size_log2: {}, proofs: {}", setup_power, proofs);
+            proofs = proofs * 2;
+            let new_setup_power = get_setup_size(proofs);
+            assert_eq!(setup_power + 1, new_setup_power);
+            setup_power = new_setup_power;
+        }
+    }
+}

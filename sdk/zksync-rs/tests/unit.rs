@@ -333,10 +333,10 @@ mod signatures_with_vectors {
 
                 if let Some(expected_eth_signature) = outputs.eth_signature {
                     let eth_signature = match &change_pub_key.eth_auth_data {
-                        ChangePubKeyEthAuthData::ECDSA(ChangePubKeyECDSAData {
+                        Some(ChangePubKeyEthAuthData::ECDSA(ChangePubKeyECDSAData {
                             eth_signature,
                             ..
-                        }) => eth_signature.serialize_packed(),
+                        })) => eth_signature.serialize_packed(),
                         _ => panic!("No ChangePubKey ethereum siganture"),
                     };
                     assert_eq!(&eth_signature[..], expected_eth_signature.as_slice());

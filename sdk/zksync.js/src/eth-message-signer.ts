@@ -1,6 +1,6 @@
 import * as ethers from 'ethers';
-import { TxEthSignature, EthSignerType, PubKeyHash } from './types';
-import { getSignedBytesFromMessage, signMessagePersonalAPI, getChangePubkeyMessage, serializeAddress } from './utils';
+import { TxEthSignature, EthSignerType, PubKeyHash, ZkSyncVersion } from './types';
+import { getSignedBytesFromMessage, signMessagePersonalAPI, getChangePubkeyMessage } from './utils';
 
 /**
  * Wrapper around `ethers.Signer` which provides convenient methods to get and sign messages required for zkSync.
@@ -168,14 +168,21 @@ export class EthMessageSigner {
         pubKeyHash: PubKeyHash;
         nonce: number;
         accountId: number;
+        zkSyncVersion: ZkSyncVersion;
     }): Uint8Array {
-        return getChangePubkeyMessage(changePubKey.pubKeyHash, changePubKey.nonce, changePubKey.accountId);
+        return getChangePubkeyMessage(
+            changePubKey.pubKeyHash,
+            changePubKey.nonce,
+            changePubKey.accountId,
+            changePubKey.zkSyncVersion
+        );
     }
 
     async ethSignChangePubKey(changePubKey: {
         pubKeyHash: PubKeyHash;
         nonce: number;
         accountId: number;
+        zkSyncVersion: ZkSyncVersion;
     }): Promise<TxEthSignature> {
         const message = this.getChangePubKeyEthSignMessage(changePubKey);
         return await this.getEthMessageSignature(message);

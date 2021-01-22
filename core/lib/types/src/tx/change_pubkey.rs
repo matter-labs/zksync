@@ -120,14 +120,18 @@ pub struct ChangePubKey {
     /// fields can't be changed by an attacker.
     #[serde(default)]
     pub signature: TxSignature,
+    /// Transaction Ethereum signature. It may be `None` if `ChangePubKey` operation is authorized
+    /// onchain, otherwise the message must be signed by the Ethereum private key corresponding
+    /// to the account address.
+    pub eth_signature: Option<PackedEthSignature>,
     /// Data needed to check if Ethereum address authorized ChangePubKey operation
-    pub eth_auth_data: ChangePubKeyEthAuthData,
-    #[serde(skip)]
-    cached_signer: VerifiedSignatureCache,
+    pub eth_auth_data: Option<ChangePubKeyEthAuthData>,
     /// Unix epoch format of the time when the transaction is valid
     /// This fields must be Option<...> because of backward compatibility with first version of ZkSync
     pub valid_from: Option<u32>,
     pub valid_until: Option<u32>,
+    #[serde(skip)]
+    cached_signer: VerifiedSignatureCache,
 }
 
 impl ChangePubKey {
@@ -152,14 +156,16 @@ impl ChangePubKey {
         eth_signature: Option<PackedEthSignature>,
     ) -> Self {
         // TODO: support CREATE2
-        let eth_auth_data = eth_signature
-            .map(|eth_signature| {
-                ChangePubKeyEthAuthData::ECDSA(ChangePubKeyECDSAData {
-                    eth_signature,
-                    batch_hash: H256::zero(),
+        let eth_auth_data = Some(
+            eth_signature
+                .map(|eth_signature| {
+                    ChangePubKeyEthAuthData::ECDSA(ChangePubKeyECDSAData {
+                        eth_signature,
+                        batch_hash: H256::zero(),
+                    })
                 })
-            })
-            .unwrap_or(ChangePubKeyEthAuthData::Onchain);
+                .unwrap_or(ChangePubKeyEthAuthData::Onchain),
+        );
 
         let mut tx = Self {
             account_id,
@@ -169,6 +175,7 @@ impl ChangePubKey {
             fee,
             nonce,
             signature: signature.clone().unwrap_or_default(),
+            eth_signature: None,
             eth_auth_data,
             cached_signer: VerifiedSignatureCache::NotCached,
             valid_from: Some(valid_from),
@@ -235,11 +242,12 @@ impl ChangePubKey {
         out.extend_from_slice(&self.fee_token.to_be_bytes());
         out.extend_from_slice(&pack_fee_amount(&self.fee));
         out.extend_from_slice(&self.nonce.to_be_bytes());
-
-        // We use 64 bytes for timestamps in the signed message
-        out.extend_from_slice(&u64::from(self.valid_from.unwrap_or(0)).to_be_bytes());
-        out.extend_from_slice(&u64::from(self.valid_until.unwrap_or(u32::MAX)).to_be_bytes());
-
+        if let Some(valid_from) = &self.valid_from {
+            out.extend_from_slice(&u64::from(*valid_from).to_be_bytes());
+        }
+        if let Some(valid_until) = &self.valid_until {
+            out.extend_from_slice(&u64::from(*valid_until).to_be_bytes());
+        }
         out
     }
 
@@ -259,7 +267,7 @@ impl ChangePubKey {
         eth_signed_msg.extend_from_slice(&self.nonce.to_be_bytes());
         eth_signed_msg.extend_from_slice(&self.account_id.to_be_bytes());
         // In case this transaction is not part of a batch, we simply append zeros.
-        if let ChangePubKeyEthAuthData::ECDSA(ChangePubKeyECDSAData { batch_hash, .. }) =
+        if let Some(ChangePubKeyEthAuthData::ECDSA(ChangePubKeyECDSAData { batch_hash, .. })) =
             self.eth_auth_data
         {
             eth_signed_msg.extend_from_slice(batch_hash.as_bytes());
@@ -275,20 +283,65 @@ impl ChangePubKey {
         Ok(eth_signed_msg)
     }
 
+    /// Provides an old message to be signed with the Ethereum private key.
+    pub fn get_old_eth_signed_data(&self) -> Result<Vec<u8>, anyhow::Error> {
+        // Fee data is not included into ETH signature input, since it would require
+        // to either have more chunks in pubdata (if fee amount is unpacked), unpack
+        // fee on contract (if fee amount is packed), or display non human-readable
+        // amount in message (if fee amount is packed and is not unpacked on contract).
+        // Either of these options is either non user-friendly or increase cost of
+        // operation. Instead, fee data is signed via zkSync signature, which is essentially
+        // free. This signature will be verified in the circuit.
+
+        const CHANGE_PUBKEY_SIGNATURE_LEN: usize = 152;
+        let mut eth_signed_msg = Vec::with_capacity(CHANGE_PUBKEY_SIGNATURE_LEN);
+        eth_signed_msg.extend_from_slice(b"Register zkSync pubkey:\n\n");
+        eth_signed_msg.extend_from_slice(
+            format!(
+                "{pubkey}\n\
+                 nonce: 0x{nonce}\n\
+                 account id: 0x{account_id}\
+                 \n\n",
+                pubkey = hex::encode(&self.new_pk_hash.data).to_ascii_lowercase(),
+                nonce = hex::encode(&self.nonce.to_be_bytes()).to_ascii_lowercase(),
+                account_id = hex::encode(&self.account_id.to_be_bytes()).to_ascii_lowercase()
+            )
+            .as_bytes(),
+        );
+        eth_signed_msg.extend_from_slice(b"Only sign this message for a trusted client!");
+        ensure!(
+            eth_signed_msg.len() == CHANGE_PUBKEY_SIGNATURE_LEN,
+            "Change pubkey signed message len is too big: {}, expected: {}",
+            eth_signed_msg.len(),
+            CHANGE_PUBKEY_SIGNATURE_LEN
+        );
+        Ok(eth_signed_msg)
+    }
+
     pub fn is_eth_auth_data_valid(&self) -> bool {
-        match &self.eth_auth_data {
-            ChangePubKeyEthAuthData::Onchain => true, // Should query Ethereum to check it
-            ChangePubKeyEthAuthData::ECDSA(ChangePubKeyECDSAData { eth_signature, .. }) => {
-                let recovered_address = self
-                    .get_eth_signed_data()
-                    .ok()
-                    .and_then(|msg| eth_signature.signature_recover_signer(&msg).ok());
-                recovered_address == Some(self.account)
+        if let Some(eth_auth_data) = &self.eth_auth_data {
+            match eth_auth_data {
+                ChangePubKeyEthAuthData::Onchain => true, // Should query Ethereum to check it
+                ChangePubKeyEthAuthData::ECDSA(ChangePubKeyECDSAData { eth_signature, .. }) => {
+                    let recovered_address = self
+                        .get_eth_signed_data()
+                        .ok()
+                        .and_then(|msg| eth_signature.signature_recover_signer(&msg).ok());
+                    recovered_address == Some(self.account)
+                }
+                ChangePubKeyEthAuthData::CREATE2(create2_data) => {
+                    let create2_address = create2_data.get_address(&self.new_pk_hash);
+                    create2_address == self.account
+                }
             }
-            ChangePubKeyEthAuthData::CREATE2(create2_data) => {
-                let create2_address = create2_data.get_address(&self.new_pk_hash);
-                create2_address == self.account
-            }
+        } else if let Some(old_eth_signature) = &self.eth_signature {
+            let recovered_address = self
+                .get_old_eth_signed_data()
+                .ok()
+                .and_then(|msg| old_eth_signature.signature_recover_signer(&msg).ok());
+            recovered_address == Some(self.account)
+        } else {
+            true
         }
     }
 
@@ -306,6 +359,22 @@ impl ChangePubKey {
             && self.fee_token <= max_token_id()
             && is_fee_amount_packable(&self.fee)
             && self.valid_from.unwrap_or(0) <= self.valid_until.unwrap_or(u32::MAX)
+    }
+
+    pub fn is_ecdsa(&self) -> bool {
+        if let Some(auth_data) = &self.eth_auth_data {
+            auth_data.is_ecdsa()
+        } else {
+            self.eth_signature.is_some()
+        }
+    }
+
+    pub fn is_onchain(&self) -> bool {
+        if let Some(auth_data) = &self.eth_auth_data {
+            auth_data.is_onchain()
+        } else {
+            self.eth_signature.is_none()
+        }
     }
 
     /// Get part of the message that should be signed with Ethereum account key for the batch of transactions.
