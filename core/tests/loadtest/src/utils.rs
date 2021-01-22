@@ -168,7 +168,7 @@ where
             None => return Ok(Vec::new()),
         }
     } else if errs.len() > ERRORS_CUTOFF {
-        log::warn!(
+        vlog::warn!(
             "During the `{}` execution {} out of total {} actions erred.",
             category,
             errs.len(),
