@@ -1,13 +1,15 @@
-use crate::ethereum_gateway::{ExecutedTxStatus, FailureInfo, SignedCallResult};
 use ethabi::Contract;
-use web3::contract::Options;
-use web3::types::{Address, BlockId, Filter, Log, U64};
+use web3::{
+    contract::tokens::{Detokenize, Tokenize},
+    contract::Options,
+    types::{Address, BlockId, Filter, Log, U64},
+};
 
-use crate::ETHDirectClient;
-
-use web3::contract::tokens::{Detokenize, Tokenize};
 use zksync_eth_signer::PrivateKeySigner;
 use zksync_types::{TransactionReceipt, H160, H256, U256};
+
+use crate::ethereum_gateway::{ExecutedTxStatus, FailureInfo, SignedCallResult};
+use crate::ETHDirectClient;
 
 #[derive(Debug, Clone)]
 pub struct MultiplexerEthereumClient {
@@ -18,6 +20,28 @@ impl Default for MultiplexerEthereumClient {
     fn default() -> Self {
         Self::new()
     }
+}
+
+macro_rules! multiple_call {
+    ($self:expr, $func:ident($($attr:expr),+)) => {
+        for (name, client) in $self.clients.iter() {
+            match client.$func($($attr.clone()),+).await {
+                Ok(res) => return Ok(res),
+                Err(err) => log::error!("Error in interface: {}, {} ", name, err),
+            }
+        }
+        anyhow::bail!("All interfaces was wrong please try again")
+    };
+
+    ($self:expr, $func:ident()) => {
+        for (name, client) in $self.clients.iter() {
+            match client.$func().await {
+                Ok(res) => return Ok(res),
+                Err(err) => log::error!("Error in interface: {}, {} ", name, err),
+            }
+        }
+        anyhow::bail!("All interfaces was wrong please try again")
+    };
 }
 
 impl MultiplexerEthereumClient {
@@ -31,53 +55,23 @@ impl MultiplexerEthereumClient {
     }
 
     pub async fn pending_nonce(&self) -> Result<U256, anyhow::Error> {
-        for (name, client) in self.clients.iter() {
-            match client.pending_nonce().await {
-                Ok(res) => return Ok(res),
-                Err(err) => log::error!("Error in interface: {}, {} ", name, err),
-            }
-        }
-        anyhow::bail!("All interfaces was wrong please try again")
+        multiple_call!(self, pending_nonce());
     }
 
     pub async fn current_nonce(&self) -> Result<U256, anyhow::Error> {
-        for (name, client) in self.clients.iter() {
-            match client.current_nonce().await {
-                Ok(res) => return Ok(res),
-                Err(err) => log::error!("Error in interface: {}, {} ", name, err),
-            }
-        }
-        anyhow::bail!("All interfaces was wrong please try again")
+        multiple_call!(self, current_nonce());
     }
 
     pub async fn block_number(&self) -> Result<U64, anyhow::Error> {
-        for (name, client) in self.clients.iter() {
-            match client.block_number().await {
-                Ok(res) => return Ok(res),
-                Err(err) => log::error!("Error in interface: {}, {} ", name, err),
-            }
-        }
-        anyhow::bail!("All interfaces was wrong please try again")
+        multiple_call!(self, block_number());
     }
 
     pub async fn get_gas_price(&self) -> Result<U256, anyhow::Error> {
-        for (name, client) in self.clients.iter() {
-            match client.get_gas_price().await {
-                Ok(res) => return Ok(res),
-                Err(err) => log::error!("Error in interface: {}, {} ", name, err),
-            }
-        }
-        anyhow::bail!("All interfaces was wrong please try again")
+        multiple_call!(self, get_gas_price());
     }
 
-    pub async fn balance(&self) -> Result<U256, anyhow::Error> {
-        for (name, client) in self.clients.iter() {
-            match client.balance().await {
-                Ok(res) => return Ok(res),
-                Err(err) => log::error!("Error in interface: {}, {} ", name, err),
-            }
-        }
-        anyhow::bail!("All interfaces was wrong please try again")
+    pub async fn sender_eth_balance(&self) -> Result<U256, anyhow::Error> {
+        multiple_call!(self, sender_eth_balance());
     }
 
     pub async fn sign_prepared_tx(
@@ -85,13 +79,7 @@ impl MultiplexerEthereumClient {
         data: Vec<u8>,
         options: Options,
     ) -> Result<SignedCallResult, anyhow::Error> {
-        for (name, client) in self.clients.iter() {
-            match client.sign_prepared_tx(data.clone(), options.clone()).await {
-                Ok(res) => return Ok(res),
-                Err(err) => log::error!("Error in interface: {}, {} ", name, err),
-            }
-        }
-        anyhow::bail!("All interfaces was wrong please try again")
+        multiple_call!(self, sign_prepared_tx(data, options));
     }
 
     pub async fn sign_prepared_tx_for_addr(
@@ -100,62 +88,32 @@ impl MultiplexerEthereumClient {
         contract_addr: H160,
         options: Options,
     ) -> Result<SignedCallResult, anyhow::Error> {
-        for (name, client) in self.clients.iter() {
-            match client
-                .sign_prepared_tx_for_addr(data.clone(), contract_addr, options.clone())
-                .await
-            {
-                Ok(res) => return Ok(res),
-                Err(err) => log::error!("Error in interface: {}, {} ", name, err),
-            }
-        }
-        anyhow::bail!("All interfaces was wrong please try again")
+        multiple_call!(
+            self,
+            sign_prepared_tx_for_addr(data, contract_addr, options)
+        );
     }
 
     pub async fn send_raw_tx(&self, tx: Vec<u8>) -> Result<H256, anyhow::Error> {
-        for (name, client) in self.clients.iter() {
-            match client.send_raw_tx(tx.clone()).await {
-                Ok(res) => return Ok(res),
-                Err(err) => log::error!("Error in interface: {}, {} ", name, err),
-            }
-        }
-        anyhow::bail!("All interfaces was wrong please try again")
+        multiple_call!(self, send_raw_tx(tx));
     }
 
     pub async fn tx_receipt(
         &self,
         tx_hash: H256,
     ) -> Result<Option<TransactionReceipt>, anyhow::Error> {
-        for (name, client) in self.clients.iter() {
-            match client.tx_receipt(tx_hash).await {
-                Ok(res) => return Ok(res),
-                Err(err) => log::error!("Error in interface: {}, {} ", name, err),
-            }
-        }
-        anyhow::bail!("All interfaces was wrong please try again")
+        multiple_call!(self, tx_receipt(tx_hash));
     }
 
     pub async fn failure_reason(
         &self,
         tx_hash: H256,
     ) -> Result<Option<FailureInfo>, anyhow::Error> {
-        for (name, client) in self.clients.iter() {
-            match client.failure_reason(tx_hash).await {
-                Ok(res) => return Ok(res),
-                Err(err) => log::error!("Error in interface: {}, {} ", name, err),
-            }
-        }
-        anyhow::bail!("All interfaces was wrong please try again")
+        multiple_call!(self, failure_reason(tx_hash));
     }
 
     pub async fn eth_balance(&self, address: Address) -> Result<U256, anyhow::Error> {
-        for (name, client) in self.clients.iter() {
-            match client.eth_balance(address).await {
-                Ok(res) => return Ok(res),
-                Err(err) => log::error!("Error in interface: {}, {} ", name, err),
-            }
-        }
-        anyhow::bail!("All interfaces was wrong please try again")
+        multiple_call!(self, eth_balance(address));
     }
 
     pub async fn allowance(
@@ -163,13 +121,7 @@ impl MultiplexerEthereumClient {
         token_address: Address,
         erc20_abi: Contract,
     ) -> Result<U256, anyhow::Error> {
-        for (name, client) in self.clients.iter() {
-            match client.allowance(token_address, erc20_abi.clone()).await {
-                Ok(res) => return Ok(res),
-                Err(err) => log::error!("Error in interface: {}, {} ", name, err),
-            }
-        }
-        anyhow::bail!("All interfaces was wrong please try again")
+        multiple_call!(self, allowance(token_address, erc20_abi));
     }
 
     #[allow(clippy::too_many_arguments)]
@@ -189,24 +141,10 @@ impl MultiplexerEthereumClient {
         B: Into<Option<BlockId>> + Clone,
         P: Tokenize + Clone,
     {
-        for (name, client) in self.clients.iter() {
-            match client
-                .call_contract_function(
-                    func,
-                    params.clone(),
-                    from.clone(),
-                    options.clone(),
-                    block.clone(),
-                    token_address,
-                    erc20_abi.clone(),
-                )
-                .await
-            {
-                Ok(res) => return Ok(res),
-                Err(err) => log::error!("Error in interface: {}, {} ", name, err),
-            }
-        }
-        anyhow::bail!("All interfaces was wrong please try again")
+        multiple_call!(
+            self,
+            call_contract_function(func, params, from, options, block, token_address, erc20_abi)
+        );
     }
 
     pub async fn call_main_contract_function<R, A, B, P>(
@@ -223,45 +161,21 @@ impl MultiplexerEthereumClient {
         B: Into<Option<BlockId>> + Clone,
         P: Tokenize + Clone,
     {
-        for (name, client) in self.clients.iter() {
-            match client
-                .call_main_contract_function(
-                    func,
-                    params.clone(),
-                    from.clone(),
-                    options.clone(),
-                    block.clone(),
-                )
-                .await
-            {
-                Ok(res) => return Ok(res),
-                Err(err) => log::error!("Error in interface: {}, {} ", name, err),
-            }
-        }
-        anyhow::bail!("All interfaces was wrong please try again")
+        multiple_call!(
+            self,
+            call_main_contract_function(func, params, from, options, block)
+        );
     }
 
     pub async fn get_tx_status(
         &self,
-        hash: &H256,
+        hash: H256,
     ) -> Result<Option<ExecutedTxStatus>, anyhow::Error> {
-        for (name, client) in self.clients.iter() {
-            match client.get_tx_status(hash).await {
-                Ok(res) => return Ok(res),
-                Err(err) => log::error!("Error in interface: {}, {} ", name, err),
-            }
-        }
-        anyhow::bail!("All interfaces was wrong please try again")
+        multiple_call!(self, get_tx_status(hash));
     }
 
     pub async fn logs(&self, filter: Filter) -> anyhow::Result<Vec<Log>> {
-        for (name, client) in self.clients.iter() {
-            match client.logs(filter.clone()).await {
-                Ok(res) => return Ok(res),
-                Err(err) => log::error!("Error in interface: {}, {} ", name, err),
-            }
-        }
-        anyhow::bail!("All interfaces was wrong please try again")
+        multiple_call!(self, logs(filter));
     }
 
     pub fn encode_tx_data<P: Tokenize + Clone>(&self, func: &str, params: P) -> Vec<u8> {

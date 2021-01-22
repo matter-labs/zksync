@@ -130,8 +130,8 @@ impl EthereumGateway {
         delegate_call!(self.get_gas_price())
     }
     /// Returns the account balance.
-    pub async fn balance(&self) -> Result<U256, anyhow::Error> {
-        delegate_call!(self.balance())
+    pub async fn sender_eth_balance(&self) -> Result<U256, anyhow::Error> {
+        delegate_call!(self.sender_eth_balance())
     }
 
     /// Signs the transaction given the previously encoded data.
@@ -188,7 +188,7 @@ impl EthereumGateway {
     ) -> Result<U256, anyhow::Error> {
         delegate_call!(self.allowance(token_address, erc20_abi))
     }
-    pub async fn get_tx_status(&self, hash: &H256) -> anyhow::Result<Option<ExecutedTxStatus>> {
+    pub async fn get_tx_status(&self, hash: H256) -> anyhow::Result<Option<ExecutedTxStatus>> {
         delegate_call!(self.get_tx_status(hash))
     }
     /// Encodes the transaction data (smart contract method and its input) to the bytes

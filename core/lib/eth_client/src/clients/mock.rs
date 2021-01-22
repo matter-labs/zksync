@@ -87,8 +87,8 @@ impl MockEthereum {
         };
         self.tx_statuses.write().await.insert(*hash, status);
     }
-    pub async fn get_tx_status(&self, hash: &H256) -> anyhow::Result<Option<ExecutedTxStatus>> {
-        Ok(self.tx_statuses.read().await.get(hash).cloned())
+    pub async fn get_tx_status(&self, hash: H256) -> anyhow::Result<Option<ExecutedTxStatus>> {
+        Ok(self.tx_statuses.read().await.get(&hash).cloned())
     }
 
     pub async fn block_number(&self) -> anyhow::Result<U64> {
@@ -147,7 +147,7 @@ impl MockEthereum {
         unreachable!()
     }
 
-    pub async fn balance(&self) -> Result<U256, Error> {
+    pub async fn sender_eth_balance(&self) -> Result<U256, Error> {
         unreachable!()
     }
 

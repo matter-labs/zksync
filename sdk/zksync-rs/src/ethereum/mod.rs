@@ -106,7 +106,7 @@ impl<S: EthereumSigner> EthereumProvider<S> {
     /// Returns the Ethereum account balance.
     pub async fn balance(&self) -> Result<BigUint, ClientError> {
         self.eth_client
-            .balance()
+            .sender_eth_balance()
             .await
             .map_err(|err| ClientError::NetworkError(err.to_string()))
             .map(u256_to_biguint)

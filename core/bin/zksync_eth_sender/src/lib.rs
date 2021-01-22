@@ -441,7 +441,7 @@ impl<DB: DatabaseInterface> ETHSender<DB> {
             };
 
             match self
-                .check_transaction_state(mode, op, tx_hash, current_block.as_u64())
+                .check_transaction_state(mode, op, *tx_hash, current_block.as_u64())
                 .await?
             {
                 TxCheckOutcome::Pending => {
@@ -570,7 +570,7 @@ impl<DB: DatabaseInterface> ETHSender<DB> {
         &self,
         mode: TxCheckMode,
         op: &ETHOperation,
-        tx_hash: &H256,
+        tx_hash: H256,
         current_block: u64,
     ) -> anyhow::Result<TxCheckOutcome> {
         let status = self.ethereum.get_tx_status(tx_hash).await?;

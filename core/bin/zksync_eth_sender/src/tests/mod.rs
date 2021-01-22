@@ -129,7 +129,7 @@ async fn transaction_state() {
             .check_transaction_state(
                 TxCheckMode::Latest,
                 &eth_operations[0],
-                &eth_operations[0].used_tx_hashes[0],
+                eth_operations[0].used_tx_hashes[0],
                 current_block + committed_response.confirmations,
             )
             .await
@@ -143,7 +143,7 @@ async fn transaction_state() {
             .check_transaction_state(
                 TxCheckMode::Latest,
                 &eth_operations[1],
-                &eth_operations[1].used_tx_hashes[0],
+                eth_operations[1].used_tx_hashes[0],
                 current_block + pending_response.confirmations,
             )
             .await
@@ -157,7 +157,7 @@ async fn transaction_state() {
             .check_transaction_state(
                 TxCheckMode::Latest,
                 &eth_operations[2],
-                &eth_operations[2].used_tx_hashes[0],
+                eth_operations[2].used_tx_hashes[0],
                 current_block + failed_response.confirmations,
             )
             .await
@@ -171,7 +171,7 @@ async fn transaction_state() {
             .check_transaction_state(
                 TxCheckMode::Latest,
                 &eth_operations[3],
-                &eth_operations[3].used_tx_hashes[0],
+                eth_operations[3].used_tx_hashes[0],
                 current_block + pending_failed_response.confirmations,
             )
             .await
@@ -185,7 +185,7 @@ async fn transaction_state() {
             .check_transaction_state(
                 TxCheckMode::Latest,
                 &eth_operations[4],
-                &eth_operations[4].used_tx_hashes[0],
+                eth_operations[4].used_tx_hashes[0],
                 current_block + EXPECTED_WAIT_TIME_BLOCKS,
             )
             .await
@@ -199,7 +199,7 @@ async fn transaction_state() {
             .check_transaction_state(
                 TxCheckMode::Latest,
                 &eth_operations[5],
-                &eth_operations[5].used_tx_hashes[0],
+                eth_operations[5].used_tx_hashes[0],
                 current_block + EXPECTED_WAIT_TIME_BLOCKS - 1,
             )
             .await
@@ -213,7 +213,7 @@ async fn transaction_state() {
             .check_transaction_state(
                 TxCheckMode::Old,
                 &eth_operations[5],
-                &eth_operations[5].used_tx_hashes[0],
+                eth_operations[5].used_tx_hashes[0],
                 current_block + EXPECTED_WAIT_TIME_BLOCKS - 1,
             )
             .await

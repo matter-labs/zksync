@@ -71,12 +71,15 @@ impl<S: EthereumSigner> ETHDirectClient<S> {
             web3: Web3::new(transport),
         }
     }
+
     pub fn main_contract_with_address(&self, address: Address) -> Contract<Http> {
         Contract::new(self.web3.eth(), address, self.contract.clone())
     }
+
     pub fn main_contract(&self) -> Contract<Http> {
         self.main_contract_with_address(self.contract_addr)
     }
+
     pub async fn pending_nonce(&self) -> Result<U256, anyhow::Error> {
         let start = Instant::now();
         let count = self
@@ -113,13 +116,6 @@ impl<S: EthereumSigner> ETHDirectClient<S> {
         network_gas_price = (network_gas_price * percent_gas_price_factor) / U256::from(100);
         metrics::histogram!("eth_client.direct.get_gas_price", start.elapsed());
         Ok(network_gas_price)
-    }
-
-    pub async fn balance(&self) -> Result<U256, anyhow::Error> {
-        let start = Instant::now();
-        let balance = self.web3.eth().balance(self.sender_account, None).await?;
-        metrics::histogram!("eth_client.direct.balance", start.elapsed());
-        Ok(balance)
     }
 
     pub async fn sign_prepared_tx(
@@ -258,11 +254,16 @@ impl<S: EthereumSigner> ETHDirectClient<S> {
             revert_reason,
         }))
     }
+
     pub async fn eth_balance(&self, address: Address) -> Result<U256, anyhow::Error> {
         let start = Instant::now();
         let balance = self.web3.eth().balance(address, None).await?;
         metrics::histogram!("eth_client.direct.eth_balance", start.elapsed());
         Ok(balance)
+    }
+
+    pub async fn sender_eth_balance(&self) -> Result<U256, anyhow::Error> {
+        self.eth_balance(self.sender_account).await
     }
 
     pub async fn allowance(
@@ -336,10 +337,10 @@ impl<S: EthereumSigner> ETHDirectClient<S> {
         Ok(res)
     }
 
-    pub async fn get_tx_status(&self, hash: &H256) -> anyhow::Result<Option<ExecutedTxStatus>> {
+    pub async fn get_tx_status(&self, hash: H256) -> anyhow::Result<Option<ExecutedTxStatus>> {
         let start = Instant::now();
 
-        let receipt = self.tx_receipt(*hash).await?;
+        let receipt = self.tx_receipt(hash).await?;
         let res: Result<Option<ExecutedTxStatus>, anyhow::Error> = match receipt {
             Some(TransactionReceipt {
                 block_number: Some(tx_block_number),
