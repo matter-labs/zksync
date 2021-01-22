@@ -42,7 +42,6 @@ pub fn apply_random_updates(
 /// Make sure that we can get state for all blocks.
 #[db_test]
 async fn test_commit_rewind(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
-    let _ = env_logger::try_init();
     let mut rng = create_rng();
 
     // Create the input data for three blocks.
@@ -596,8 +595,7 @@ async fn pending_block_workflow(mut storage: StorageProcessor<'_>) -> QueryResul
         operations::{ChangePubKeyOp, TransferToNewOp},
         ExecutedOperations, ExecutedTx, ZkSyncOp, ZkSyncTx,
     };
-
-    let _ = env_logger::try_init();
+    vlog::init();
 
     let from_account_id = AccountId(0xbabe);
     let from_zksync_account = ZkSyncAccount::rand();
@@ -812,8 +810,6 @@ async fn pending_block_workflow(mut storage: StorageProcessor<'_>) -> QueryResul
 /// Here we create blocks and publish proofs for them in different order
 #[db_test]
 async fn test_unproven_block_query(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
-    let _ = env_logger::try_init();
-
     assert_eq!(ProverSchema(&mut storage).pending_jobs_count().await?, 0);
 
     // Execute and commit these blocks.

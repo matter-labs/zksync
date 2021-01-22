@@ -56,9 +56,9 @@ where
     //     return None;
     // }
     let (sig_r_x, sig_r_y) = signature.r.into_xy();
-    log::debug!("signature.s: {}", signature.s);
-    log::debug!("signature.r.x: {}", sig_r_x);
-    log::debug!("signature.r.y: {}", sig_r_y);
+    vlog::debug!("signature.s: {}", signature.s);
+    vlog::debug!("signature.r.x: {}", sig_r_x);
+    vlog::debug!("signature.r.y: {}", sig_r_y);
 
     convert_signature_to_representation(signature)
 }
@@ -93,9 +93,9 @@ where
     //     return None;
     // }
     let (sig_r_x, sig_r_y) = signature.r.into_xy();
-    log::debug!("signature.s: {}", signature.s);
-    log::debug!("signature.r.x: {}", sig_r_x);
-    log::debug!("signature.r.y: {}", sig_r_y);
+    vlog::debug!("signature.s: {}", signature.s);
+    vlog::debug!("signature.r.x: {}", sig_r_x);
+    vlog::debug!("signature.r.y: {}", sig_r_y);
 
     convert_signature_to_representation(signature)
 }

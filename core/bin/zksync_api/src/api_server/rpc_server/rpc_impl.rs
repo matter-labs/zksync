@@ -33,7 +33,7 @@ impl RpcApp {
         )
         .await?;
 
-        log::trace!(
+        vlog::debug!(
             "account_info: address {}, total request processing {}ms",
             &address,
             start.elapsed().as_millis()
@@ -138,7 +138,7 @@ impl RpcApp {
         let start = Instant::now();
         let mut storage = self.access_storage().await?;
         let config = storage.config_schema().load_config().await.map_err(|err| {
-            log::warn!(
+            vlog::warn!(
                 "[{}:{}:{}] Internal Server Error: '{}'; input: N/A",
                 file!(),
                 line!(),
@@ -168,7 +168,7 @@ impl RpcApp {
         let start = Instant::now();
         let mut storage = self.access_storage().await?;
         let mut tokens = storage.tokens_schema().load_tokens().await.map_err(|err| {
-            log::warn!("Internal Server Error: '{}'; input: N/A", err);
+            vlog::warn!("Internal Server Error: '{}'; input: N/A", err);
             Error::internal_error()
         })?;
 

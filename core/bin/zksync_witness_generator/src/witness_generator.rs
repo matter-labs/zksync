@@ -195,14 +195,14 @@ impl WitnessGenerator {
         let mut circuit_account_tree = self
             .load_account_tree(block.block_number - 1, &mut storage)
             .await?;
-        log::trace!(
+        vlog::trace!(
             "Witness generator loading circuit account tree {}s",
             timer.elapsed().as_secs()
         );
 
         let timer = time::Instant::now();
         let witness: ProverData = build_block_witness(&mut circuit_account_tree, &block)?.into();
-        log::trace!(
+        vlog::trace!(
             "Witness generator witness build {}s",
             timer.elapsed().as_secs()
         );
@@ -239,7 +239,7 @@ impl WitnessGenerator {
     /// Updates witness data in database in an infinite loop,
     /// awaiting `rounds_interval` time between updates.
     async fn maintain(self) {
-        log::info!(
+        vlog::info!(
             "preparing prover data routine started with start_block({}), block_step({})",
             *self.start_block,
             *self.block_step
@@ -250,7 +250,7 @@ impl WitnessGenerator {
             let should_work = match self.should_work_on_block(current_block).await {
                 Ok(should_work) => should_work,
                 Err(err) => {
-                    log::warn!("witness for block {} check failed: {}", *current_block, err);
+                    vlog::warn!("witness for block {} check failed: {}", current_block, err);
                     continue;
                 }
             };
@@ -259,8 +259,8 @@ impl WitnessGenerator {
             if let BlockInfo::NoWitness(block) = should_work {
                 let block_number = block.block_number;
                 if let Err(err) = self.prepare_witness_and_save_it(block).await {
-                    log::warn!("Witness generator ({},{}) failed to prepare witness for block: {}, err: {}",
-                        *self.start_block, *self.block_step, *block_number, err);
+                    vlog::warn!("Witness generator ({},{}) failed to prepare witness for block: {}, err: {}",
+                        self.start_block, self.block_step, block_number, err);
                     continue; // Retry the same block on the next iteration.
                 }
             }

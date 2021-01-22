@@ -234,7 +234,7 @@ impl ForcedExitWitness<Bn256> {
     fn apply_data(tree: &mut CircuitAccountTree, forced_exit: &ForcedExitData) -> Self {
         //preparing data and base witness
         let before_root = tree.root_hash();
-        log::debug!("Initial root = {}", before_root);
+        vlog::debug!("Initial root = {}", before_root);
         let (audit_path_initiator_before, audit_balance_path_initiator_before) = get_audits(
             tree,
             forced_exit.initiator_account_address,
@@ -292,7 +292,7 @@ impl ForcedExitWitness<Bn256> {
         );
 
         let intermediate_root = tree.root_hash();
-        log::debug!("Intermediate root = {}", intermediate_root);
+        vlog::debug!("Intermediate root = {}", intermediate_root);
 
         let (audit_path_initiator_intermediate, audit_balance_path_initiator_intermediate) =
             get_audits(
