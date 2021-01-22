@@ -339,11 +339,21 @@ impl LoadtestExecutor {
 
         // Run scenarios concurrently.
         let fees = self.fees.clone();
-        wait_all_failsafe(
-            "executor/process",
+        self.scenarios = wait_all_failsafe(
+            "executor/process_par",
             self.scenarios
-                .iter_mut()
-                .map(|(scenario, wallets)| scenario.run(&monitor, &fees, wallets)),
+                .drain(..)
+                .map(move |(mut scenario, wallets)| {
+                    let monitor = monitor.clone();
+                    let fees = fees.clone();
+                    async move {
+                        tokio::spawn(async move {
+                            let wallets = scenario.run(monitor, fees, wallets).await?;
+                            Ok((scenario, wallets)) as anyhow::Result<_>
+                        })
+                        .await?
+                    }
+                }),
         )
         .await?;
         self.monitor.wait_for_verify().await;

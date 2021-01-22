@@ -12,7 +12,7 @@ use super::{Fees, Scenario, ScenarioResources};
 use crate::{
     monitor::Monitor,
     test_wallet::TestWallet,
-    utils::{gwei_to_wei, wait_all_failsafe_chunks, CHUNK_SIZES},
+    utils::{foreach_failsafe, gwei_to_wei, wait_all_failsafe_chunks, CHUNK_SIZES},
 };
 
 /// Configuration options for the transfers scenario.
@@ -132,20 +132,19 @@ impl Scenario for TransferScenario {
 
     async fn run(
         &mut self,
-        monitor: &Monitor,
-        _fees: &Fees,
-        _wallets: &[TestWallet],
-    ) -> anyhow::Result<()> {
-        wait_all_failsafe_chunks(
+        monitor: Monitor,
+        _fees: Fees,
+        wallets: Vec<TestWallet>,
+    ) -> anyhow::Result<Vec<TestWallet>> {
+        foreach_failsafe(
             "run/transfers",
-            CHUNK_SIZES,
             self.txs
                 .drain(..)
                 .map(|(tx, sign)| monitor.send_tx(tx, sign)),
         )
         .await?;
 
-        Ok(())
+        Ok(wallets)
     }
 
     async fn finalize(

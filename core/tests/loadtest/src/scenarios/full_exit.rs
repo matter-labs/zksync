@@ -82,21 +82,21 @@ impl Scenario for FullExitScenario {
 
     async fn run(
         &mut self,
-        monitor: &Monitor,
-        fees: &Fees,
-        wallets: &[TestWallet],
-    ) -> anyhow::Result<()> {
+        monitor: Monitor,
+        fees: Fees,
+        wallets: Vec<TestWallet>,
+    ) -> anyhow::Result<Vec<TestWallet>> {
         vlog::info!("Full exit and deposit cycle started");
 
-        let futures = wallets
+        let full_exit_task = wallets
             .iter()
-            .map(|wallet| Self::full_exit_and_deposit(monitor, fees, wallet))
+            .map(|wallet| Self::full_exit_and_deposit(&monitor, &fees, wallet))
             .collect::<Vec<_>>();
-        wait_all_failsafe("full_exit/run", futures).await?;
+        wait_all_failsafe("full_exit/run", full_exit_task).await?;
 
         vlog::info!("Full exit scenario has been finished");
 
-        Ok(())
+        Ok(wallets)
     }
 
     async fn finalize(
