@@ -185,6 +185,7 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
     function cancelOutstandingDepositsForExodusMode(uint64 _n, bytes[] memory _depositsPubdata) external nonReentrant {
         require(exodusMode, "8"); // exodus mode not active
         uint64 toProcess = Utils.minU64(totalOpenPriorityRequests, _n);
+        require(toProcess == _depositsPubdata.length, "A");
         require(toProcess > 0, "9"); // no deposits to process
         uint64 currentDepositIdx = 0;
         for (uint64 id = firstPriorityRequestId; id < firstPriorityRequestId + toProcess; id++) {
@@ -352,8 +353,8 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
         // Check timestamp of the new block
         {
             require(_newBlock.timestamp >= _previousBlock.timestamp, "g"); // Block should be after previous block
-            bool timestampNotTooSmall = block.timestamp - COMMIT_TIMESTAMP_NOT_OLDER <= _newBlock.timestamp;
-            bool timestampNotTooBig = _newBlock.timestamp <= block.timestamp + COMMIT_TIMESTAMP_APPROXIMATION_DELTA;
+            bool timestampNotTooSmall = block.timestamp.sub(COMMIT_TIMESTAMP_NOT_OLDER) <= _newBlock.timestamp;
+            bool timestampNotTooBig = _newBlock.timestamp <= block.timestamp.add(COMMIT_TIMESTAMP_APPROXIMATION_DELTA);
             require(timestampNotTooSmall && timestampNotTooBig, "h"); // New block timestamp is not valid
         }
 
@@ -678,6 +679,7 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
             OnchainOperationData memory onchainOpData = _newBlockData.onchainOperations[i];
 
             uint256 pubdataOffset = onchainOpData.publicDataOffset;
+            require(pubdataOffset < pubData.length, "A1");
             require(pubdataOffset % CHUNK_BYTES == 0, "B"); // offsets should be on chunks boundaries
             uint256 chunkId = pubdataOffset / CHUNK_BYTES;
             require(offsetsCommitment[chunkId] == 0x00, "C"); // offset commitment should be empty
