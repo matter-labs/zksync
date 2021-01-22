@@ -168,7 +168,7 @@ impl<T: TokenPriceAPI> TickerApi<T> {
             if !cached_entry.is_cache_entry_expired() {
                 price_cache.insert(token_id, cached_entry.clone());
                 if cached_entry.is_price_historical {
-                    log::warn!("Using historical price for token_id: {}", token_id);
+                    log::warn!("Using historical price for token_id: {}", *token_id);
                 }
                 return Some(cached_entry.price);
             }

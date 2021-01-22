@@ -3,7 +3,7 @@ use crate::utils::ZkSyncStateGenerator;
 use criterion::{black_box, criterion_group, Bencher, BenchmarkId, Criterion};
 use zksync_circuit::witness::{utils::SigDataInput, Witness};
 use zksync_crypto::franklin_crypto::bellman::pairing::bn256::Bn256;
-use zksync_types::ChangePubKeyOp;
+use zksync_types::{ChangePubKeyOp, TokenId};
 
 use zksync_circuit::witness::change_pubkey_offchain::ChangePubkeyOffChainWitness;
 
@@ -17,7 +17,7 @@ fn change_pubkey_offchain_apply_tx(b: &mut Bencher<'_>, number_of_accounts: &usi
         tx: account.zksync_account.sign_change_pubkey_tx(
             None,
             true,
-            0u16,
+            TokenId(0),
             Default::default(),
             false,
         ),
@@ -40,7 +40,7 @@ fn change_pubkey_offchain_get_pubdata(b: &mut Bencher<'_>) {
         tx: account.zksync_account.sign_change_pubkey_tx(
             None,
             true,
-            0u16,
+            TokenId(0),
             Default::default(),
             false,
         ),
@@ -63,7 +63,7 @@ fn change_pubkey_offchain_calculate_operations(b: &mut Bencher<'_>) {
         tx: account.zksync_account.sign_change_pubkey_tx(
             None,
             true,
-            0u16,
+            TokenId(0),
             Default::default(),
             false,
         ),

@@ -26,7 +26,7 @@ pub fn create_exit_proof(
         if id == account_id {
             target_account = Some(account.clone());
         }
-        circuit_account_tree.insert(id, CircuitAccount::from(account));
+        circuit_account_tree.insert(*id, CircuitAccount::from(account));
     }
 
     let balance = target_account
@@ -34,7 +34,7 @@ pub fn create_exit_proof(
         .ok_or_else(|| {
             format_err!(
                 "Fund account not found: id: {}, address: 0x{:x}",
-                account_id,
+                *account_id,
                 owner
             )
         })?;

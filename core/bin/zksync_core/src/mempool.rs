@@ -225,7 +225,7 @@ impl MempoolState {
     }
 
     fn nonce(&self, address: &Address) -> Nonce {
-        *self.account_nonces.get(address).unwrap_or(&0)
+        *self.account_nonces.get(address).unwrap_or(&Nonce(0))
     }
 
     fn add_tx(&mut self, tx: SignedZkSyncTx) -> Result<(), TxAddError> {

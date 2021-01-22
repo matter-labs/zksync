@@ -54,8 +54,8 @@ impl Witness for DepositWitness<Bn256> {
     fn apply_tx(tree: &mut CircuitAccountTree, deposit: &DepositOp) -> Self {
         let deposit_data = DepositData {
             amount: deposit.priority_op.amount.to_string().parse().unwrap(),
-            token: u32::from(deposit.priority_op.token),
-            account_address: deposit.account_id,
+            token: *deposit.priority_op.token as u32,
+            account_address: *deposit.account_id,
             address: eth_address_to_fr(&deposit.priority_op.to),
         };
         Self::apply_data(tree, &deposit_data)

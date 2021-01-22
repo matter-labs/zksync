@@ -58,7 +58,7 @@ impl From<Account> for CircuitAccount<super::Engine> {
             .collect();
 
         for (i, b) in balances.into_iter() {
-            circuit_account.subtree.insert(u32::from(i), b);
+            circuit_account.subtree.insert(u32::from(*i), b);
         }
 
         circuit_account.nonce = Fr::from_str(&acc.nonce.to_string()).unwrap();
@@ -72,7 +72,7 @@ impl Default for Account {
     fn default() -> Self {
         Self {
             balances: HashMap::new(),
-            nonce: 0,
+            nonce: Nonce(0),
             pub_key_hash: PubKeyHash::default(),
             address: Address::zero(),
         }
@@ -216,24 +216,24 @@ mod test {
     fn test_account_update() {
         let create = AccountUpdate::Create {
             address: Address::default(),
-            nonce: 1,
+            nonce: Nonce(1),
         };
 
         let bal_update = AccountUpdate::UpdateBalance {
-            old_nonce: 1,
-            new_nonce: 2,
-            balance_update: (0, 0u32.into(), 5u32.into()),
+            old_nonce: Nonce(1),
+            new_nonce: Nonce(2),
+            balance_update: (TokenId(0), 0u32.into(), 5u32.into()),
         };
 
         let delete = AccountUpdate::Delete {
             address: Address::default(),
-            nonce: 2,
+            nonce: Nonce(2),
         };
 
         {
             {
                 let created_account = Account {
-                    nonce: 1,
+                    nonce: Nonce(1),
                     ..Default::default()
                 };
                 assert_eq!(
@@ -256,10 +256,10 @@ mod test {
             );
             {
                 let mut updated_account = Account {
-                    nonce: 2,
+                    nonce: Nonce(2),
                     ..Default::default()
                 };
-                updated_account.set_balance(0, 5u32.into());
+                updated_account.set_balance(TokenId(0), 5u32.into());
                 assert_eq!(
                     Account::apply_update(Some(Account::default()), bal_update)
                         .unwrap()
@@ -280,56 +280,56 @@ mod test {
         let account_map_initial = {
             let mut map = AccountMap::default();
             let account_0 = Account {
-                nonce: 8,
+                nonce: Nonce(8),
                 ..Default::default()
             };
             let account_1 = Account {
-                nonce: 16,
+                nonce: Nonce(16),
                 ..Default::default()
             };
-            map.insert(0, account_0);
-            map.insert(1, account_1);
+            map.insert(AccountId(0), account_0);
+            map.insert(AccountId(1), account_1);
             map
         };
 
         let account_map_updated_expected = {
             let mut map = AccountMap::default();
             let mut account_1 = Account {
-                nonce: 17,
+                nonce: Nonce(17),
                 ..Default::default()
             };
-            account_1.set_balance(0, 256u32.into());
-            map.insert(1, account_1);
+            account_1.set_balance(TokenId(0), 256u32.into());
+            map.insert(AccountId(1), account_1);
             let account_2 = Account {
-                nonce: 36,
+                nonce: Nonce(36),
                 ..Default::default()
             };
-            map.insert(2, account_2);
+            map.insert(AccountId(2), account_2);
             map
         };
 
         let updates = {
             let mut updates = AccountUpdates::new();
             updates.push((
-                0,
+                AccountId(0),
                 AccountUpdate::Delete {
                     address: Address::default(),
-                    nonce: 8,
+                    nonce: Nonce(8),
                 },
             ));
             updates.push((
-                1,
+                AccountId(1),
                 AccountUpdate::UpdateBalance {
-                    old_nonce: 16,
-                    new_nonce: 17,
-                    balance_update: (0, 0u32.into(), 256u32.into()),
+                    old_nonce: Nonce(16),
+                    new_nonce: Nonce(17),
+                    balance_update: (TokenId(0), 0u32.into(), 256u32.into()),
                 },
             ));
             updates.push((
-                2,
+                AccountId(2),
                 AccountUpdate::Create {
                     address: Address::default(),
-                    nonce: 36,
+                    nonce: Nonce(36),
                 },
             ));
             updates

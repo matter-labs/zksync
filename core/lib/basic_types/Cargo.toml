@@ -11,3 +11,4 @@ categories = ["cryptography"]
 
 [dependencies]
 web3 = "0.13.0"
+serde = { version = "1.0", features = ["derive"] }

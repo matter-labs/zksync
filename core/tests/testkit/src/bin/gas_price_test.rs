@@ -23,7 +23,7 @@ use zksync_crypto::rand::{Rng, SeedableRng, XorShiftRng};
 use zksync_testkit::*;
 use zksync_types::{
     helpers::{pack_fee_amount, pack_token_amount, unpack_fee_amount, unpack_token_amount},
-    ChangePubKeyOp, DepositOp, FullExitOp, TransferOp, TransferToNewOp, WithdrawOp,
+    ChangePubKeyOp, DepositOp, FullExitOp, Nonce, TokenId, TransferOp, TransferToNewOp, WithdrawOp,
 };
 use zksync_utils::UnsignedRatioSerializeAsDecimal;
 
@@ -219,7 +219,7 @@ async fn gas_price_test() {
             let rng_zksync_key = ZkSyncAccount::rand().private_key;
             ZkSyncAccount::new(
                 rng_zksync_key,
-                0,
+                Nonce(0),
                 eth_account.address,
                 eth_account.private_key,
             )
@@ -244,10 +244,10 @@ async fn gas_price_test() {
         base_cost.base_commit_cost, base_cost.base_verify_cost, base_cost.base_withdraw_cost
     );
 
-    commit_cost_of_deposits(&mut test_setup, 100, Token(0), rng)
+    commit_cost_of_deposits(&mut test_setup, 100, Token(TokenId(0)), rng)
         .await
         .report(&base_cost, "deposit ETH", true);
-    commit_cost_of_deposits(&mut test_setup, 50, Token(1), rng)
+    commit_cost_of_deposits(&mut test_setup, 50, Token(TokenId(1)), rng)
         .await
         .report(&base_cost, "deposit ERC20", true);
 
@@ -261,17 +261,17 @@ async fn gas_price_test() {
     commit_cost_of_transfers_to_new(&mut test_setup, 500, rng)
         .await
         .report(&base_cost, "transfer to new", false);
-    commit_cost_of_full_exits(&mut test_setup, 100, Token(0))
+    commit_cost_of_full_exits(&mut test_setup, 100, Token(TokenId(0)))
         .await
         .report(&base_cost, "full exit ETH", true);
-    commit_cost_of_full_exits(&mut test_setup, 100, Token(1))
+    commit_cost_of_full_exits(&mut test_setup, 100, Token(TokenId(1)))
         .await
         .report(&base_cost, "full exit ERC20", true);
 
-    commit_cost_of_withdrawals(&mut test_setup, 40, Token(0), rng)
+    commit_cost_of_withdrawals(&mut test_setup, 40, Token(TokenId(0)), rng)
         .await
         .report(&base_cost, "withdrawals ETH", false);
-    commit_cost_of_withdrawals(&mut test_setup, 40, Token(1), rng)
+    commit_cost_of_withdrawals(&mut test_setup, 40, Token(TokenId(1)), rng)
         .await
         .report(&base_cost, "withdrawals ERC20", false);
 
@@ -305,7 +305,7 @@ async fn commit_cost_of_transfers(
         .deposit(
             ETHAccountId(1),
             ZKSyncAccountId(1),
-            Token(0),
+            Token(TokenId(0)),
             deposit_amount,
         )
         .await;
@@ -314,12 +314,12 @@ async fn commit_cost_of_transfers(
         .deposit(
             ETHAccountId(2),
             ZKSyncAccountId(2),
-            Token(0),
+            Token(TokenId(0)),
             BigUint::from(0u32),
         )
         .await;
     test_setup
-        .change_pubkey_with_tx(ZKSyncAccountId(1), Token(0), 0u32.into())
+        .change_pubkey_with_tx(ZKSyncAccountId(1), Token(TokenId(0)), 0u32.into())
         .await;
     test_setup
         .execute_commit_and_verify_block()
@@ -333,7 +333,7 @@ async fn commit_cost_of_transfers(
             .transfer(
                 ZKSyncAccountId(1),
                 ZKSyncAccountId(2),
-                Token(0),
+                Token(TokenId(0)),
                 tranfers_amount[i].clone(),
                 tranfers_fee[i].clone(),
             )
@@ -377,12 +377,12 @@ async fn commit_cost_of_transfers_to_new(
         .deposit(
             ETHAccountId(1),
             ZKSyncAccountId(1),
-            Token(0),
+            Token(TokenId(0)),
             deposit_amount,
         )
         .await;
     test_setup
-        .change_pubkey_with_tx(ZKSyncAccountId(1), Token(0), 0u32.into())
+        .change_pubkey_with_tx(ZKSyncAccountId(1), Token(TokenId(0)), 0u32.into())
         .await;
     test_setup
         .execute_commit_and_verify_block()
@@ -394,7 +394,7 @@ async fn commit_cost_of_transfers_to_new(
         test_setup
             .transfer_to_new_random(
                 ZKSyncAccountId(1),
-                Token(0),
+                Token(TokenId(0)),
                 tranfers_amount[i].clone(),
                 tranfers_fee[i].clone(),
                 rng,
@@ -577,7 +577,7 @@ async fn commit_cost_of_change_pubkey(
     test_setup: &mut TestSetup,
     n_change_pubkeys: usize,
 ) -> CostsSample {
-    let token = Token(0);
+    let token = Token(TokenId(0));
     let fee_amount = 100u32;
     let deposit_amount = (fee_amount * (n_change_pubkeys + 1) as u32).into();
 

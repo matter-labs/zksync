@@ -113,7 +113,7 @@ impl ApiTransactionsData {
             }
         };
 
-        let block_number = tx_receipt.block_number as BlockNumber;
+        let block_number = BlockNumber(tx_receipt.block_number as u32);
         // Check the cases where we don't need to get block details.
         if !tx_receipt.success {
             return Ok(Some(Receipt::Rejected {
@@ -220,7 +220,7 @@ async fn tx_receipts(
     let (pagination, _limit) = pagination.into_inner()?;
     // At the moment we store only last receipt, so this endpoint is just only a stub.
     let is_some = match pagination {
-        Pagination::Before(before) if before < 1 => false,
+        Pagination::Before(before) if *before < 1 => false,
         Pagination::After(_after) => false,
         _ => true,
     };
@@ -292,7 +292,7 @@ mod tests {
     use zksync_types::{
         tokens::TokenLike,
         tx::{PackedEthSignature, TxEthSignature},
-        ZkSyncTx,
+        AccountId, BlockNumber, Nonce, TokenId, ZkSyncTx,
     };
 
     use crate::{
@@ -352,7 +352,7 @@ mod tests {
                     TickerRequest::IsTokenAllowed { token, response } => {
                         // For test purposes, PHNX token is not allowed.
                         let is_phnx = match token {
-                            TokenLike::Id(id) => id == 1,
+                            TokenLike::Id(id) => *id == 1,
                             TokenLike::Symbol(sym) => sym == "PHNX",
                             TokenLike::Address(_) => unreachable!(),
                         };
@@ -457,7 +457,7 @@ mod tests {
             let transactions = storage
                 .chain()
                 .block_schema()
-                .get_block_transactions(1)
+                .get_block_transactions(BlockNumber(1))
                 .await?;
 
             try_parse_tx_hash(&transactions[0].tx_hash).unwrap()
@@ -478,23 +478,34 @@ mod tests {
         // Tx receipts.
         let queries = vec![
             (
-                (committed_tx_hash, Pagination::Before(1), 1),
-                vec![Receipt::Verified { block: 1 }],
+                (committed_tx_hash, Pagination::Before(BlockNumber(1)), 1),
+                vec![Receipt::Verified {
+                    block: BlockNumber(1),
+                }],
             ),
             (
                 (committed_tx_hash, Pagination::Last, 1),
-                vec![Receipt::Verified { block: 1 }],
+                vec![Receipt::Verified {
+                    block: BlockNumber(1),
+                }],
             ),
             (
-                (committed_tx_hash, Pagination::Before(2), 1),
-                vec![Receipt::Verified { block: 1 }],
+                (committed_tx_hash, Pagination::Before(BlockNumber(2)), 1),
+                vec![Receipt::Verified {
+                    block: BlockNumber(1),
+                }],
             ),
-            ((committed_tx_hash, Pagination::After(0), 1), vec![]),
+            (
+                (committed_tx_hash, Pagination::After(BlockNumber(0)), 1),
+                vec![],
+            ),
             ((unknown_tx_hash, Pagination::Last, 1), vec![]),
         ];
 
         for (query, expected_response) in queries {
-            let actual_response = client.tx_receipts(query.0, query.1, query.2).await?;
+            let actual_response = client
+                .tx_receipts(query.0, query.1, BlockNumber(query.2))
+                .await?;
 
             assert_eq!(
                 actual_response,
@@ -509,7 +520,9 @@ mod tests {
         // Tx status and data for committed transaction.
         assert_eq!(
             client.tx_status(committed_tx_hash).await?,
-            Some(Receipt::Verified { block: 1 })
+            Some(Receipt::Verified {
+                block: BlockNumber(1)
+            })
         );
         assert_eq!(
             SignedZkSyncTx::from(client.tx_data(committed_tx_hash).await?.unwrap()).hash(),
@@ -596,17 +609,17 @@ mod tests {
         let (client, server) = TestServer::new().await?;
 
         let from = ZkSyncAccount::rand();
-        from.set_account_id(Some(0xdead));
+        from.set_account_id(Some(AccountId(0xdead)));
         let to = ZkSyncAccount::rand();
 
         // Submit transaction with a fee token that is not allowed.
         let (tx, eth_sig) = from.sign_transfer(
-            1,
+            TokenId(1),
             "PHNX",
             100u64.into(),
             100u64.into(),
             &to.address,
-            0.into(),
+            Nonce(0).into(),
             false,
         );
         let transfer_bad_token = ZkSyncTx::Transfer(Box::new(tx));
@@ -634,23 +647,23 @@ mod tests {
 
         // Finally, prepare the batch in which fee is covered by the supported token.
         let (tx, _) = from.sign_transfer(
-            1,
+            TokenId(1),
             "PHNX",
             100u64.into(),
             0u64.into(), // Note that fee is zero, which is OK.
             &to.address,
-            0.into(),
+            Nonce(0).into(),
             false,
         );
         let phnx_transfer = ZkSyncTx::Transfer(Box::new(tx));
         let phnx_transfer_hash = phnx_transfer.hash();
         let (tx, _) = from.sign_transfer(
-            0,
+            TokenId(0),
             "ETH",
             0u64.into(),
             200u64.into(), // Here we pay fees for both transfers in ETH.
             &to.address,
-            0.into(),
+            Nonce(0).into(),
             false,
         );
         let fee_tx = ZkSyncTx::Transfer(Box::new(tx));
@@ -686,12 +699,12 @@ mod tests {
         let (client, server) = TestServer::new().await?;
 
         let from = ZkSyncAccount::rand();
-        from.set_account_id(Some(0xdead));
+        from.set_account_id(Some(AccountId(0xdead)));
         let to = ZkSyncAccount::rand();
 
         // Submit non-withdraw transaction with the enabled fast-processing.
         let (tx, eth_sig) = from.sign_transfer(
-            0,
+            TokenId(0),
             "ETH",
             10_u64.into(),
             10_u64.into(),
@@ -726,7 +739,7 @@ mod tests {
 
         // Submit withdraw transaction with the enabled fast-processing.
         let (tx, eth_sig) = from.sign_withdraw(
-            0,
+            TokenId(0),
             "ETH",
             100u64.into(),
             10u64.into(),

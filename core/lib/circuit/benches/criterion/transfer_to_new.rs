@@ -5,7 +5,7 @@ use criterion::{black_box, criterion_group, Bencher, BenchmarkId, Criterion};
 use num::BigUint;
 use zksync_circuit::witness::{utils::SigDataInput, Witness};
 use zksync_crypto::franklin_crypto::bellman::pairing::bn256::Bn256;
-use zksync_types::TransferToNewOp;
+use zksync_types::{AccountId, TokenId, TransferToNewOp};
 
 use zksync_circuit::witness::transfer_to_new::TransferToNewWitness;
 
@@ -15,12 +15,12 @@ type TransferToNewWitnessBn256 = TransferToNewWitness<Bn256>;
 fn transfer_to_new_apply_tx(b: &mut Bencher<'_>, number_of_accounts: &usize) {
     let accounts = generate_accounts(*number_of_accounts);
     let account_from = &accounts[0];
-    let account_to = WitnessTestAccount::new(1000u32, 200u64);
+    let account_to = WitnessTestAccount::new(AccountId(1000), 200u64);
     let transfer_op = TransferToNewOp {
         tx: account_from
             .zksync_account
             .sign_transfer(
-                0,
+                TokenId(0),
                 "",
                 BigUint::from(100u64),
                 BigUint::from(1u64),
@@ -44,12 +44,12 @@ fn transfer_to_new_apply_tx(b: &mut Bencher<'_>, number_of_accounts: &usize) {
 fn transfer_to_new_get_pubdata(b: &mut Bencher<'_>) {
     let accounts = generate_accounts(10);
     let account_from = &accounts[0];
-    let account_to = WitnessTestAccount::new(1000u32, 200u64);
+    let account_to = WitnessTestAccount::new(AccountId(1000), 200u64);
     let transfer_op = TransferToNewOp {
         tx: account_from
             .zksync_account
             .sign_transfer(
-                0,
+                TokenId(0),
                 "",
                 BigUint::from(100u64),
                 BigUint::from(1u64),
@@ -73,12 +73,12 @@ fn transfer_to_new_get_pubdata(b: &mut Bencher<'_>) {
 fn transfer_to_new_calculate_operations(b: &mut Bencher<'_>) {
     let accounts = generate_accounts(10);
     let account_from = &accounts[0];
-    let account_to = WitnessTestAccount::new(1000u32, 200u64);
+    let account_to = WitnessTestAccount::new(AccountId(1000), 200u64);
     let transfer_op = TransferToNewOp {
         tx: account_from
             .zksync_account
             .sign_transfer(
-                0,
+                TokenId(0),
                 "",
                 BigUint::from(100u64),
                 BigUint::from(1u64),

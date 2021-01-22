@@ -93,13 +93,13 @@ impl WithdrawalsCounterQueue {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use zksync_types::{block::Block, Action, BlockNumber, Operation};
+    use zksync_types::{block::Block, AccountId, Action, BlockNumber, Operation};
 
     fn get_withdraw_op(block_number: BlockNumber) -> TxData {
         let block = Block::new_from_available_block_sizes(
             block_number,
             Default::default(),
-            0,
+            AccountId(0),
             vec![],
             (0, 0),
             &[0],
@@ -124,19 +124,19 @@ mod tests {
         assert_eq!(queue.get_count(), 0);
 
         // Insert the next element and obtain it.
-        queue.push_back(1, get_withdraw_op(1));
+        queue.push_back(1, get_withdraw_op(BlockNumber(1)));
         // Inserting the element should NOT update the counter.
         assert_eq!(queue.get_count(), 0);
-        assert_eq!(queue.pop_front().unwrap(), get_withdraw_op(1));
+        assert_eq!(queue.pop_front().unwrap(), get_withdraw_op(BlockNumber(1)));
         // After taking the element, the counter should be updated.
         assert_eq!(queue.get_count(), 1);
 
         // Perform the same check again and check that overall counter will become 2.
-        queue.push_back(2, get_withdraw_op(2));
+        queue.push_back(2, get_withdraw_op(BlockNumber(2)));
         assert_eq!(queue.get_count(), 1);
-        assert_eq!(queue.pop_front().unwrap(), get_withdraw_op(2));
+        assert_eq!(queue.pop_front().unwrap(), get_withdraw_op(BlockNumber(2)));
         assert_eq!(queue.get_count(), 1);
-        assert_eq!(queue.pop_front().unwrap(), get_withdraw_op(2));
+        assert_eq!(queue.pop_front().unwrap(), get_withdraw_op(BlockNumber(2)));
         assert_eq!(queue.get_count(), 2);
 
         // Now attempt take no value, and check that counter is not increased.
@@ -144,32 +144,32 @@ mod tests {
         assert_eq!(queue.get_count(), 2);
 
         // Return the popped element back.
-        queue.return_popped(get_withdraw_op(2));
+        queue.return_popped(get_withdraw_op(BlockNumber(2)));
         assert_eq!(queue.get_count(), 1);
 
-        assert_eq!(queue.pop_front().unwrap(), get_withdraw_op(2));
+        assert_eq!(queue.pop_front().unwrap(), get_withdraw_op(BlockNumber(2)));
         assert_eq!(queue.get_count(), 2);
 
         // If popped element have the same block number as front element
         // then return the popped element should NOT change the counter.
-        queue.push_back(3, get_withdraw_op(3));
+        queue.push_back(3, get_withdraw_op(BlockNumber(3)));
         assert_eq!(queue.get_count(), 2);
 
-        assert_eq!(queue.pop_front().unwrap(), get_withdraw_op(3));
+        assert_eq!(queue.pop_front().unwrap(), get_withdraw_op(BlockNumber(3)));
         assert_eq!(queue.get_count(), 2);
 
-        assert_eq!(queue.pop_front().unwrap(), get_withdraw_op(3));
+        assert_eq!(queue.pop_front().unwrap(), get_withdraw_op(BlockNumber(3)));
         assert_eq!(queue.get_count(), 2);
 
-        assert_eq!(queue.pop_front().unwrap(), get_withdraw_op(3));
+        assert_eq!(queue.pop_front().unwrap(), get_withdraw_op(BlockNumber(3)));
         assert_eq!(queue.get_count(), 3);
 
-        queue.return_popped(get_withdraw_op(3));
-        queue.return_popped(get_withdraw_op(3));
+        queue.return_popped(get_withdraw_op(BlockNumber(3)));
+        queue.return_popped(get_withdraw_op(BlockNumber(3)));
         assert_eq!(queue.get_count(), 2);
 
-        assert_eq!(queue.pop_front().unwrap(), get_withdraw_op(3));
-        assert_eq!(queue.pop_front().unwrap(), get_withdraw_op(3));
+        assert_eq!(queue.pop_front().unwrap(), get_withdraw_op(BlockNumber(3)));
+        assert_eq!(queue.pop_front().unwrap(), get_withdraw_op(BlockNumber(3)));
         assert_eq!(queue.get_count(), 3);
     }
 }

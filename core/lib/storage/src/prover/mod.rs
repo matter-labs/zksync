@@ -23,43 +23,43 @@ pub struct ProverSchema<'a, 'c>(pub &'a mut StorageProcessor<'c>);
 impl<'a, 'c> ProverSchema<'a, 'c> {
     /// Returns the amount of blocks which await for proof, but have
     /// no assigned prover run.
-    pub async fn unstarted_jobs_count(&mut self) -> QueryResult<u64> {
+    pub async fn unstarted_jobs_count(&mut self) -> QueryResult<u32> {
         let start = Instant::now();
         let mut transaction = self.0.start_transaction().await?;
 
         let mut last_committed_block = BlockSchema(&mut transaction)
             .get_last_committed_block()
-            .await? as u64;
+            .await?;
 
         if BlockSchema(&mut transaction).pending_block_exists().await? {
             // Existence of the pending block means that soon there will be one more block.
-            last_committed_block += 1;
+            *last_committed_block += 1;
         }
 
         let last_verified_block = BlockSchema(&mut transaction)
             .get_last_verified_block()
-            .await? as u64;
+            .await?;
 
         let num_ongoing_jobs = sqlx::query!(
             "SELECT COUNT(*) FROM prover_runs WHERE block_number > $1",
-            last_verified_block as i64
+            *last_verified_block as i64
         )
         .fetch_one(transaction.conn())
         .await?
         .count
-        .unwrap_or(0) as u64;
+        .unwrap_or(0) as u32;
 
         assert!(
-            last_verified_block + num_ongoing_jobs <= last_committed_block,
+            *last_verified_block + num_ongoing_jobs <= *last_committed_block,
             "There are more ongoing prover jobs than blocks without proofs. \
                 Last verifier block: {}, last committed block: {}, amount of ongoing \
                 prover runs: {}",
-            last_verified_block,
-            last_committed_block,
+            *last_verified_block,
+            *last_committed_block,
             num_ongoing_jobs,
         );
 
-        let result = last_committed_block - (last_verified_block + num_ongoing_jobs);
+        let result = *last_committed_block - (*last_verified_block + num_ongoing_jobs);
 
         transaction.commit().await?;
         metrics::histogram!("sql.prover.unstarted_jobs_count", start.elapsed());
@@ -98,7 +98,7 @@ impl<'a, 'c> ProverSchema<'a, 'c> {
         let prover_run = sqlx::query_as!(
             ProverRun,
             "SELECT * FROM prover_runs WHERE block_number = $1",
-            i64::from(block_number),
+            i64::from(*block_number),
         )
         .fetch_optional(self.0.conn())
         .await?;
@@ -266,7 +266,7 @@ impl<'a, 'c> ProverSchema<'a, 'c> {
         let updated_rows = sqlx::query!(
             "INSERT INTO proofs (block_number, proof)
             VALUES ($1, $2)",
-            i64::from(block_number),
+            i64::from(*block_number),
             serde_json::to_value(proof).unwrap()
         )
         .execute(self.0.conn())
@@ -286,7 +286,7 @@ impl<'a, 'c> ProverSchema<'a, 'c> {
         let proof = sqlx::query_as!(
             StoredProof,
             "SELECT * FROM proofs WHERE block_number = $1",
-            i64::from(block_number),
+            i64::from(*block_number),
         )
         .fetch_optional(self.0.conn())
         .await?
@@ -309,7 +309,7 @@ impl<'a, 'c> ProverSchema<'a, 'c> {
             VALUES ($1, $2)
             ON CONFLICT (block)
             DO NOTHING",
-            i64::from(block),
+            i64::from(*block),
             witness_str
         )
         .execute(self.0.conn())
@@ -328,7 +328,7 @@ impl<'a, 'c> ProverSchema<'a, 'c> {
         let block_witness = sqlx::query_as!(
             StorageBlockWitness,
             "SELECT * FROM block_witness WHERE block = $1",
-            i64::from(block_number),
+            i64::from(*block_number),
         )
         .fetch_optional(self.0.conn())
         .await?;

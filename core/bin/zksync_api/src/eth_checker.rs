@@ -95,7 +95,7 @@ impl<T: Transport> EthereumChecker<T> {
             .1
             .query(
                 "authFacts",
-                (address, u64::from(nonce)),
+                (address, u64::from(*nonce)),
                 None,
                 Options::default(),
                 None,
