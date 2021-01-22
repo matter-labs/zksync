@@ -26,7 +26,7 @@ use std::time::{Duration, Instant};
 use zksync::operations::SyncTransactionHandle;
 use zksync::{
     error::ClientError,
-    ethereum::{ierc20_contract, zksync_contract},
+    ethereum::ierc20_contract,
     provider::Provider,
     types::BlockStatus,
     web3::{
@@ -74,30 +74,36 @@ fn one_ether() -> U256 {
 }
 
 /// Auxiliary function that returns the balance of the account on Ethereum.
-async fn get_ethereum_balance<S: EthereumSigner + Clone>(
+async fn get_ethereum_balance<S: EthereumSigner>(
     eth_provider: &EthereumProvider<S>,
     address: Address,
     token: &Token,
 ) -> Result<U256, anyhow::Error> {
     if token.symbol == "ETH" {
         return eth_provider
-            .web3()
-            .eth()
-            .balance(address, None)
+            .client()
+            .eth_balance(address)
             .await
             .map_err(|_e| anyhow::anyhow!("failed to request balance from Ethereum {}", _e));
     }
-
-    let contract = Contract::new(eth_provider.web3().eth(), token.address, ierc20_contract());
-    contract
-        .query("balanceOf", address, None, Options::default(), None)
+    eth_provider
+        .client()
+        .call_contract_function(
+            "balanceOf",
+            address,
+            None,
+            Options::default(),
+            None,
+            token.address,
+            ierc20_contract(),
+        )
         .await
         .map_err(|_e| anyhow::anyhow!("failed to request erc20 balance from Ethereum"))
 }
 
 async fn wait_for_deposit_and_update_account_id<S, P>(wallet: &mut Wallet<S, P>)
 where
-    S: EthereumSigner + Clone,
+    S: EthereumSigner,
     P: Provider + Clone,
 {
     let timeout = Duration::from_secs(60);
@@ -150,7 +156,7 @@ async fn transfer_to(
 /// from a new wallet without SigningKey.
 async fn test_tx_fail<S, P>(zksync_depositor_wallet: &Wallet<S, P>) -> Result<(), anyhow::Error>
 where
-    S: EthereumSigner + Clone,
+    S: EthereumSigner,
     P: Provider + Clone,
 {
     let provider = RpcProvider::new(Network::Localhost);
@@ -186,7 +192,7 @@ async fn test_deposit<S, P>(
     amount: u128,
 ) -> Result<(), anyhow::Error>
 where
-    S: EthereumSigner + Clone,
+    S: EthereumSigner,
     P: Provider + Clone,
 {
     let ethereum = deposit_wallet.ethereum(web3_addr()).await?;
@@ -244,7 +250,7 @@ async fn test_change_pubkey<S, P>(
     token_symbol: &str,
 ) -> Result<(), anyhow::Error>
 where
-    S: EthereumSigner + Clone,
+    S: EthereumSigner,
     P: Provider + Clone,
 {
     if !sync_wallet.is_signing_key_set().await? {
@@ -272,7 +278,7 @@ async fn test_transfer<S, P>(
     transfer_amount: u128,
 ) -> Result<(), anyhow::Error>
 where
-    S: EthereumSigner + Clone,
+    S: EthereumSigner,
     P: Provider + Clone,
 {
     let transfer_amount = num::BigUint::from(transfer_amount);
@@ -327,7 +333,7 @@ async fn test_transfer_to_self<S, P>(
     transfer_amount: u128,
 ) -> Result<(), anyhow::Error>
 where
-    S: EthereumSigner + Clone,
+    S: EthereumSigner,
     P: Provider + Clone,
 {
     let transfer_amount = num::BigUint::from(transfer_amount);
@@ -373,7 +379,7 @@ async fn test_withdraw<S, P>(
     amount: u128,
 ) -> Result<(), anyhow::Error>
 where
-    S: EthereumSigner + Clone,
+    S: EthereumSigner,
     P: Provider + Clone,
 {
     let total_fee = sync_wallet
@@ -458,7 +464,7 @@ async fn move_funds<S, P>(
     deposit_amount: u128,
 ) -> Result<(), anyhow::Error>
 where
-    S: EthereumSigner + Clone,
+    S: EthereumSigner,
     P: Provider + Clone,
 {
     let token_like = token_like.into();
@@ -603,8 +609,9 @@ async fn comprehensive_test() -> Result<(), anyhow::Error> {
             &address_response.main_contract
         }
         .parse()?;
-
-        Contract::new(ethereum.web3().eth(), contract_address, zksync_contract())
+        ethereum
+            .client()
+            .main_contract_with_address(contract_address)
     };
 
     let token_eth = sync_depositor_wallet

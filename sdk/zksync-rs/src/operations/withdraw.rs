@@ -25,7 +25,7 @@ pub struct WithdrawBuilder<'a, S: EthereumSigner, P: Provider> {
 
 impl<'a, S, P> WithdrawBuilder<'a, S, P>
 where
-    S: EthereumSigner + Clone,
+    S: EthereumSigner,
     P: Provider + Clone,
 {
     /// Initializes a withdraw transaction building process.

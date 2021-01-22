@@ -159,7 +159,7 @@ impl TestWallet {
             .ok_or(ClientError::UnknownToken)?;
 
         let contract = Contract::new(
-            self.eth_provider.web3().eth(),
+            self.eth_provider.client().web3.eth(),
             token.address,
             ierc20_contract(),
         );

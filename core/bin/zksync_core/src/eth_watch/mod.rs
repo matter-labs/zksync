@@ -37,6 +37,8 @@ pub use client::EthHttpClient;
 pub use storage::DBStorage;
 use zksync_config::ZkSyncConfig;
 
+use zksync_eth_client::ethereum_gateway::EthereumGateway;
+
 mod client;
 mod eth_state;
 mod received_ops;
@@ -451,9 +453,8 @@ pub fn start_eth_watch(
     eth_req_receiver: mpsc::Receiver<EthWatchRequest>,
     db_pool: ConnectionPool,
 ) -> JoinHandle<()> {
-    let transport = web3::transports::Http::new(&config_options.eth_client.web3_url).unwrap();
-    let web3 = web3::Web3::new(transport);
-    let eth_client = EthHttpClient::new(web3, config_options.contracts.contract_addr);
+    let client = EthereumGateway::from_config(&config_options);
+    let eth_client = EthHttpClient::new(client, config_options.contracts.contract_addr);
 
     let storage = DBStorage::new(db_pool);
 

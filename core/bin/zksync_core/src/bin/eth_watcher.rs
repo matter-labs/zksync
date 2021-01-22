@@ -1,7 +1,11 @@
-use futures::{channel::mpsc, SinkExt};
 use std::time::Duration;
+
+use futures::{channel::mpsc, SinkExt};
 use tokio::{runtime::Runtime, time};
+
+use zksync_config::ZkSyncConfig;
 use zksync_core::eth_watch::{DBStorage, EthHttpClient, EthWatch, EthWatchRequest};
+use zksync_eth_client::EthereumGateway;
 use zksync_storage::ConnectionPool;
 
 fn main() {
@@ -9,22 +13,16 @@ fn main() {
 
     vlog::init();
     vlog::info!("ETH watcher started");
-    let web3_url =
-        std::env::var("ETH_CLIENT_WEB3_URL").expect("ETH_CLIENT_WEB3_URL env var not found");
-    let contract_address = std::env::var("CONTRACT_ADDR").expect("CONTRACT_ADDR env var not found")
-        [2..]
-        .parse()
-        .expect("Failed to parse CONTRACT_ADDR");
-    let transport = web3::transports::Http::new(&web3_url).unwrap();
-    let web3 = web3::Web3::new(transport);
+
+    let config = ZkSyncConfig::from_env();
+    let client = EthereumGateway::from_config(&config);
 
     let (eth_req_sender, eth_req_receiver) = mpsc::channel(256);
 
-    let db_pool = ConnectionPool::new(None);
-    let eth_client = EthHttpClient::new(web3, contract_address);
+    let db_pool = ConnectionPool::new(Some(config.db.pool_size as u32));
 
     let storage = DBStorage::new(db_pool);
-
+    let eth_client = EthHttpClient::new(client, config.contracts.contract_addr);
     let watcher = EthWatch::new(eth_client, storage, 0);
 
     main_runtime.spawn(watcher.run(eth_req_receiver));

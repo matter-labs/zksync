@@ -83,7 +83,7 @@ async fn main() {
 
     let opt = Opt::from_args();
 
-    let web3_url = opt.web3_url.unwrap_or(config_opts.web3_url);
+    let web3_url = opt.web3_url.unwrap_or_else(|| config_opts.web3_url());
 
     let transport = Http::new(&web3_url).expect("failed to start web3 transport");
 

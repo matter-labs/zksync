@@ -61,7 +61,7 @@ pub async fn wait_for_account_id<S, P>(
     timeout_ms: u64,
 ) -> Option<AccountId>
 where
-    S: EthereumSigner + Clone,
+    S: EthereumSigner,
     P: Provider + Clone,
 {
     let timeout = Duration::from_millis(timeout_ms);

@@ -3,5 +3,5 @@ chain_id=9
 # Coefficient for increasing the network gas price. Normally it's 1, we use the network-provided price (and limit it
 # with the gas adjuster in eth sender). However, it can be increased to speed up the transaction mining time.
 gas_price_factor=1
-# Address of the Ethereum node API
+# Addresses of the Ethereum node API, separated by comma
 web3_url="http://127.0.0.1:8545"

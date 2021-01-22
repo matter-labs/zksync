@@ -348,7 +348,7 @@ impl Monitor {
 
     /// Returns the priority operation for the given transaction and monitors its progress in
     /// the zkSync network.
-    pub(crate) async fn get_priority_op<S: EthereumSigner + Clone>(
+    pub(crate) async fn get_priority_op<S: EthereumSigner>(
         &self,
         eth_provider: &EthereumProvider<S>,
         eth_tx_hash: H256,
