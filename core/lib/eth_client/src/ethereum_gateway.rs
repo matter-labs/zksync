@@ -49,7 +49,7 @@ pub enum EthereumGateway {
 
 impl EthereumGateway {
     pub fn from_config(config: &ZkSyncConfig) -> Self {
-        if config.eth_client.web3_urls.len() == 1 {
+        if config.eth_client.web3_url.len() == 1 {
             let transport = web3::transports::Http::new(&config.eth_client.web3_url()).unwrap();
 
             EthereumGateway::Direct(ETHDirectClient::new(
@@ -65,7 +65,7 @@ impl EthereumGateway {
             let mut client = MultiplexerEthereumClient::new();
 
             let contract = zksync_contract();
-            for web3_url in config.eth_client.web3_urls.iter() {
+            for web3_url in config.eth_client.web3_url.iter() {
                 let transport = web3::transports::Http::new(web3_url).unwrap();
                 client = client.add_client(
                     web3_url.clone(),

@@ -13,7 +13,7 @@ pub struct ETHClientConfig {
     /// However, it can be increased to speed up the transaction mining time.
     pub gas_price_factor: f64,
     /// Address of the Ethereum node API.
-    pub web3_urls: Vec<String>,
+    pub web3_url: Vec<String>,
 }
 
 impl ETHClientConfig {
@@ -23,7 +23,7 @@ impl ETHClientConfig {
 
     /// Get first web3 url, useful in direct web3 clients, which don't need any multiplexers
     pub fn web3_url(&self) -> String {
-        self.web3_urls
+        self.web3_url
             .first()
             .cloned()
             .expect("Should be at least one")
@@ -39,7 +39,7 @@ mod tests {
         ETHClientConfig {
             chain_id: 9,
             gas_price_factor: 1.0f64,
-            web3_urls: vec![
+            web3_url: vec![
                 "http://127.0.0.1:8545".into(),
                 "http://127.0.0.1:8546".into(),
             ],
