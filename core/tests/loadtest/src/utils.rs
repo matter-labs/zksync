@@ -25,13 +25,13 @@ pub fn gwei_to_wei(gwei: impl Into<BigUint>) -> BigUint {
 ///
 /// But unlike the `futures::future::join_all` method, it performs futures in chunks
 /// to reduce descriptors usage.
-pub async fn wait_all_chunks<I>(chunk_sizes: &[usize], i: I) -> Vec<<I::Item as Future>::Output>
+pub async fn wait_all_chunks<I>(chunk_sizes: &[usize], iter: I) -> Vec<<I::Item as Future>::Output>
 where
     I: IntoIterator,
     I::Item: Future,
 {
     let mut output = Vec::new();
-    for chunk in DynamicChunks::with_sizes(i, chunk_sizes) {
+    for chunk in DynamicChunks::with_sizes(iter, chunk_sizes) {
         let values = futures::future::join_all(chunk).await;
         output.extend(values);
     }
@@ -46,7 +46,7 @@ where
 /// futures.
 pub async fn wait_all_failsafe<I>(
     category: &str,
-    i: I,
+    iter: I,
 ) -> Result<Vec<<I::Item as TryFuture>::Ok>, <I::Item as TryFuture>::Error>
 where
     I: IntoIterator,
@@ -58,7 +58,7 @@ where
     let mut oks = Vec::new();
     let mut errs = Vec::new();
 
-    let output = futures::future::join_all(i).await;
+    let output = futures::future::join_all(iter).await;
     for item in output {
         match item.into() {
             Ok(ok) => oks.push(ok),
@@ -93,7 +93,7 @@ where
 pub async fn wait_all_failsafe_chunks<I>(
     category: &str,
     chunk_sizes: &[usize],
-    i: I,
+    iter: I,
 ) -> Result<Vec<<I::Item as TryFuture>::Ok>, <I::Item as TryFuture>::Error>
 where
     I: IntoIterator,
@@ -104,7 +104,7 @@ where
 {
     let mut oks = Vec::new();
     let mut errs = Vec::new();
-    for chunk in DynamicChunks::with_sizes(i, chunk_sizes) {
+    for chunk in DynamicChunks::with_sizes(iter, chunk_sizes) {
         let output = futures::future::join_all(chunk).await;
         for item in output {
             match item.into() {
@@ -140,7 +140,7 @@ where
 /// without concurrency.
 pub async fn foreach_failsafe<I>(
     category: &str,
-    i: I,
+    iter: I,
 ) -> Result<Vec<<I::Item as TryFuture>::Ok>, <I::Item as TryFuture>::Error>
 where
     I: IntoIterator,
@@ -152,7 +152,7 @@ where
     let mut oks = Vec::new();
     let mut errs = Vec::new();
 
-    for item in i.into_iter() {
+    for item in iter.into_iter() {
         match item.await.into() {
             Ok(ok) => oks.push(ok),
             Err(err) => {
