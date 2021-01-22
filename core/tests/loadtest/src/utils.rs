@@ -169,9 +169,10 @@ where
         }
     } else if errs.len() > ERRORS_CUTOFF {
         log::warn!(
-            "A {} errors occurred during the `{}` execution.",
-            errs.len(),
+            "During the `{}` execution {} out of total {} actions erred.",
             category,
+            errs.len(),
+            errs.len() + oks.len(),
         );
     }
 
