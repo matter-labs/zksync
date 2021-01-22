@@ -134,11 +134,11 @@ impl EthClient for EthHttpClient {
         Ok(self.client.block_number().await?.as_u64())
     }
 
-    async fn get_auth_fact(&self, address: Address, nonce: u32) -> anyhow::Result<Vec<u8>> {
+    async fn get_auth_fact(&self, address: Address, nonce: Nonce) -> anyhow::Result<Vec<u8>> {
         self.client
             .call_main_contract_function(
                 "authFacts",
-                (address, u64::from(nonce)),
+                (address, u64::from(*nonce)),
                 None,
                 Options::default(),
                 None,

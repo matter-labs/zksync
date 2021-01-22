@@ -186,7 +186,7 @@ pub fn run(monitor: Monitor) -> (ApiTestsFuture, CancellationToken) {
 
     let token = cancellation.clone();
     let future = async move {
-        log::info!("API tests starting...");
+        vlog::info!("API tests starting...");
 
         let mut builder = ApiTestsBuilder::new(token.clone());
         builder = sdk_tests::wire_tests(builder, &monitor);
@@ -194,7 +194,7 @@ pub fn run(monitor: Monitor) -> (ApiTestsFuture, CancellationToken) {
         builder = rest_api_v1_tests::wire_tests(builder, &monitor);
 
         let report = builder.run().await;
-        log::info!("API tests finished");
+        vlog::info!("API tests finished");
         report
     }
     .boxed();

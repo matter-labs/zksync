@@ -3,7 +3,7 @@ use std::collections::HashMap;
 // External imports
 // Workspace imports
 // Local imports
-use zksync_types::{ethereum::OperationType, Action};
+use zksync_types::{ethereum::OperationType, Action, BlockNumber};
 
 use self::setup::TransactionsHistoryTestSetup;
 use crate::{
@@ -74,12 +74,16 @@ async fn update_blocks_status(storage: &mut StorageProcessor<'_>) -> QueryResult
     let operation = storage
         .chain()
         .block_schema()
-        .execute_operation(gen_unique_operation(1, Action::Commit, BLOCK_SIZE_CHUNKS))
+        .execute_operation(gen_unique_operation(
+            BlockNumber(1),
+            Action::Commit,
+            BLOCK_SIZE_CHUNKS,
+        ))
         .await?;
     storage
         .chain()
         .state_schema()
-        .commit_state_update(1, &[], 0)
+        .commit_state_update(BlockNumber(1), &[], 0)
         .await?;
     confirm_eth_op(storage, operation.id.unwrap() as i64, OperationType::Commit).await?;
 
@@ -88,7 +92,7 @@ async fn update_blocks_status(storage: &mut StorageProcessor<'_>) -> QueryResult
         .chain()
         .block_schema()
         .execute_operation(gen_unique_operation(
-            1,
+            BlockNumber(1),
             Action::Verify {
                 proof: Default::default(),
             },

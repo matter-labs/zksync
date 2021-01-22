@@ -75,7 +75,7 @@ impl Scenario for FullExitScenario {
         }
         wait_all_failsafe("full_exit/prepare", txs_queue.into_iter()).await?;
 
-        log::info!("All withdrawal transactions have been verified");
+        vlog::info!("All withdrawal transactions have been verified");
 
         Ok(())
     }
@@ -86,7 +86,7 @@ impl Scenario for FullExitScenario {
         fees: &Fees,
         wallets: &[TestWallet],
     ) -> anyhow::Result<()> {
-        log::info!("Full exit and deposit cycle started");
+        vlog::info!("Full exit and deposit cycle started");
 
         let futures = wallets
             .iter()
@@ -94,7 +94,7 @@ impl Scenario for FullExitScenario {
             .collect::<Vec<_>>();
         wait_all_failsafe("full_exit/run", futures).await?;
 
-        log::info!("Full exit scenario has been finished");
+        vlog::info!("Full exit scenario has been finished");
 
         Ok(())
     }

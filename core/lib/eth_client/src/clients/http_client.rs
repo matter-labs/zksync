@@ -152,7 +152,7 @@ impl<S: EthereumSigner> ETHDirectClient<S> {
                 // Verbosity level is set to `error`, since we expect all the transactions to have
                 // a set limit, but don't want to crush the application if for some reason in some
                 // place limit was not set.
-                log::error!(
+                vlog::error!(
                     "No gas limit was set for transaction, using the default limit: {}",
                     FALLBACK_GAS_LIMIT
                 );

@@ -5,13 +5,15 @@ use ethabi::ParamType;
 use num::{BigUint, ToPrimitive};
 use std::convert::TryFrom;
 use std::str::FromStr;
-use web3::api::Eth;
-use web3::contract::Options;
-use web3::transports::Http;
-use web3::types::{
-    BlockId, CallRequest, Transaction, TransactionId, TransactionReceipt, H256, U128, U256, U64,
+use web3::{
+    api::Eth,
+    contract::Options,
+    transports::Http,
+    types::{
+        BlockId, CallRequest, Transaction, TransactionId, TransactionReceipt, H256, U128, U256, U64,
+    },
+    Transport, Web3,
 };
-use web3::{Transport, Web3};
 use zksync_contracts::{erc20_contract, zksync_contract};
 use zksync_crypto::proof::EncodedProofPlonk;
 use zksync_eth_client::ETHDirectClient;
@@ -123,7 +125,7 @@ impl EthereumAccount {
     ) -> Result<(TransactionReceipt, PriorityOp), anyhow::Error> {
         let data = self
             .main_contract_eth_client
-            .encode_tx_data("fullExit", (u64::from(account_id), token_address));
+            .encode_tx_data("fullExit", (u64::from(*account_id), token_address));
 
         let signed_tx = self
             .main_contract_eth_client
@@ -157,8 +159,8 @@ impl EthereumAccount {
         let data = self.main_contract_eth_client.encode_tx_data(
             "exit",
             (
-                u64::from(account_id),
-                u64::from(token_id),
+                u64::from(*account_id),
+                u64::from(*token_id),
                 U128::from(amount.to_u128().unwrap()),
                 proof.proof,
             ),
@@ -278,7 +280,7 @@ impl EthereumAccount {
         Ok(contract
             .query(
                 "getBalanceToWithdraw",
-                (self.address, u64::from(token)),
+                (self.address, u64::from(*token)),
                 None,
                 default_tx_options(),
                 None,
@@ -355,8 +357,8 @@ impl EthereumAccount {
         let data = self.main_contract_eth_client.encode_tx_data(
             "commitBlock",
             (
-                u64::from(block.block_number),
-                u64::from(block.fee_account),
+                u64::from(*block.block_number),
+                u64::from(*block.fee_account),
                 vec![block.get_eth_encoded_root()],
                 block.get_eth_public_data(),
                 witness_data.0,
@@ -387,7 +389,7 @@ impl EthereumAccount {
         let data = self.main_contract_eth_client.encode_tx_data(
             "verifyBlock",
             (
-                u64::from(block.block_number),
+                u64::from(*block.block_number),
                 proof.unwrap_or_default().proof,
                 block.get_withdrawals_data(),
             ),
@@ -472,7 +474,7 @@ impl EthereumAccount {
     ) -> Result<TransactionReceipt, anyhow::Error> {
         let data = self
             .main_contract_eth_client
-            .encode_tx_data("setAuthPubkeyHash", (fact.to_vec(), u64::from(nonce)));
+            .encode_tx_data("setAuthPubkeyHash", (fact.to_vec(), u64::from(*nonce)));
         let signed_tx = self
             .main_contract_eth_client
             .sign_prepared_tx(data, default_tx_options())

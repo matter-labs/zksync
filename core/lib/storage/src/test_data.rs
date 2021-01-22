@@ -15,7 +15,7 @@ use zksync_types::{
     Action, Address, Operation, H256,
     {
         block::{Block, ExecutedOperations},
-        AccountUpdate, BlockNumber, PubKeyHash,
+        AccountId, AccountUpdate, BlockNumber, Nonce, PubKeyHash, TokenId,
     },
 };
 // Local imports
@@ -24,10 +24,12 @@ use zksync_types::{
 pub const BLOCK_SIZE_CHUNKS: usize = 100;
 
 /// Generates a random account with a set of changes.
-pub fn gen_acc_random_updates<R: Rng>(rng: &mut R) -> impl Iterator<Item = (u32, AccountUpdate)> {
-    let id: u32 = rng.gen();
+pub fn gen_acc_random_updates<R: Rng>(
+    rng: &mut R,
+) -> impl Iterator<Item = (AccountId, AccountUpdate)> {
+    let id: AccountId = AccountId(rng.gen());
     let balance = u128::from(rng.gen::<u64>());
-    let nonce: u32 = rng.gen();
+    let nonce = Nonce(rng.gen());
     let pub_key_hash = PubKeyHash { data: rng.gen() };
     let address: Address = rng.gen::<[u8; 20]>().into();
 
@@ -36,9 +38,9 @@ pub fn gen_acc_random_updates<R: Rng>(rng: &mut R) -> impl Iterator<Item = (u32,
     a.nonce = old_nonce + 2;
     a.pub_key_hash = pub_key_hash;
 
-    let old_balance = a.get_balance(0);
-    a.set_balance(0, BigUint::from(balance));
-    let new_balance = a.get_balance(0);
+    let old_balance = a.get_balance(TokenId(0));
+    a.set_balance(TokenId(0), BigUint::from(balance));
+    let new_balance = a.get_balance(TokenId(0));
     vec![
         (
             id,
@@ -61,7 +63,7 @@ pub fn gen_acc_random_updates<R: Rng>(rng: &mut R) -> impl Iterator<Item = (u32,
             AccountUpdate::UpdateBalance {
                 old_nonce: old_nonce + 1,
                 new_nonce: old_nonce + 2,
-                balance_update: (0, old_balance, new_balance),
+                balance_update: (TokenId(0), old_balance, new_balance),
             },
         ),
     ]
@@ -90,7 +92,7 @@ pub fn gen_operation_with_txs(
         block: Block {
             block_number,
             new_root_hash: Fr::default(),
-            fee_account: 0,
+            fee_account: AccountId(0),
             block_transactions: txs,
             processed_priority_ops: (0, 0),
             block_chunks_size,
@@ -146,7 +148,7 @@ pub fn gen_unique_operation_with_txs(
         block: Block {
             block_number,
             new_root_hash: dummy_root_hash_for_block(block_number),
-            fee_account: 0,
+            fee_account: AccountId(0),
             block_transactions: txs,
             processed_priority_ops: (0, 0),
             block_chunks_size,

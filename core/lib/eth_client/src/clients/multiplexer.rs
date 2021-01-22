@@ -27,7 +27,7 @@ macro_rules! multiple_call {
         for (name, client) in $self.clients.iter() {
             match client.$func($($attr.clone()),+).await {
                 Ok(res) => return Ok(res),
-                Err(err) => log::error!("Error in interface: {}, {} ", name, err),
+                Err(err) => vlog::error!("Error in interface: {}, {} ", name, err),
             }
         }
         anyhow::bail!("All interfaces was wrong please try again")
@@ -37,7 +37,7 @@ macro_rules! multiple_call {
         for (name, client) in $self.clients.iter() {
             match client.$func().await {
                 Ok(res) => return Ok(res),
-                Err(err) => log::error!("Error in interface: {}, {} ", name, err),
+                Err(err) => vlog::error!("Error in interface: {}, {} ", name, err),
             }
         }
         anyhow::bail!("All interfaces was wrong please try again")

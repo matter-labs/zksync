@@ -6,7 +6,8 @@ use zksync_storage::data_restore::records::{
     NewBlockEvent, StoredBlockEvent, StoredRollupOpsBlock,
 };
 use zksync_types::{
-    block::Block, AccountMap, AccountUpdate, AccountUpdates, TokenGenesisListItem, TokenId,
+    block::Block, AccountId, AccountMap, AccountUpdate, AccountUpdates, BlockNumber,
+    TokenGenesisListItem, TokenId,
 };
 
 use crate::{
@@ -17,10 +18,10 @@ use crate::{
 };
 
 pub struct StoredTreeState {
-    pub last_block_number: u32,
+    pub last_block_number: BlockNumber,
     pub account_map: AccountMap,
     pub unprocessed_prior_ops: u64,
-    pub fee_acc_id: u32,
+    pub fee_acc_id: AccountId,
 }
 
 #[async_trait::async_trait]
@@ -98,8 +99,9 @@ pub trait StorageInteractor {
 ///
 pub fn stored_block_event_into_block_event(block: StoredBlockEvent) -> BlockEvent {
     BlockEvent {
-        block_num: u32::try_from(block.block_num)
-            .expect("Wrong block number - cant convert into u32"),
+        block_num: BlockNumber(
+            u32::try_from(block.block_num).expect("Wrong block number - cant convert into u32"),
+        ),
         transaction_hash: H256::from_slice(block.transaction_hash.as_slice()),
         block_type: match &block.block_type {
             c if c == "Committed" => EventType::Committed,
@@ -122,7 +124,7 @@ pub fn block_event_into_stored_block_event(event: &BlockEvent) -> NewBlockEvent 
             EventType::Verified => "Verified".to_string(),
         },
         transaction_hash: event.transaction_hash.as_bytes().to_vec(),
-        block_num: i64::from(event.block_num),
+        block_num: i64::from(*event.block_num),
     }
 }
 

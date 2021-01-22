@@ -156,7 +156,7 @@ impl<T: TokenPriceAPI> TickerApi<T> {
         if !is_price_historical {
             self._update_stored_value(token_id, price)
                 .await
-                .map_err(|e| log::warn!("Failed to update historical ticker price: {}", e))
+                .map_err(|e| vlog::warn!("Failed to update historical ticker price: {}", e))
                 .unwrap_or_default();
         }
     }
@@ -168,7 +168,7 @@ impl<T: TokenPriceAPI> TickerApi<T> {
             if !cached_entry.is_cache_entry_expired() {
                 price_cache.insert(token_id, cached_entry.clone());
                 if cached_entry.is_price_historical {
-                    log::warn!("Using historical price for token_id: {}", token_id);
+                    vlog::warn!("Using historical price for token_id: {}", token_id);
                 }
                 return Some(cached_entry.price);
             }
@@ -227,7 +227,7 @@ impl<T: TokenPriceAPI + Send + Sync> FeeTickerAPI for TickerApi<T> {
             .token_price_api
             .get_price(&token.symbol)
             .await
-            .map_err(|e| log::warn!("Failed to get price: {}", e));
+            .map_err(|e| vlog::warn!("Failed to get price: {}", e));
         if let Ok(api_price) = api_price {
             self.update_stored_value(token.id, api_price.clone(), false)
                 .await;
@@ -238,7 +238,7 @@ impl<T: TokenPriceAPI + Send + Sync> FeeTickerAPI for TickerApi<T> {
         let historical_price = self
             .get_historical_ticker_price(token.id)
             .await
-            .map_err(|e| log::warn!("Failed to get historical ticker price: {}", e));
+            .map_err(|e| vlog::warn!("Failed to get historical ticker price: {}", e));
 
         if let Ok(Some(historical_price)) = historical_price {
             self.update_stored_value(token.id, historical_price.clone(), true)

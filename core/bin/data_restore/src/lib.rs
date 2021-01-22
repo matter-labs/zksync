@@ -13,7 +13,7 @@ pub mod tree_state;
 mod tests;
 
 use crate::storage_interactor::StorageInteractor;
-use zksync_types::tokens::get_genesis_token_list;
+use zksync_types::{tokens::get_genesis_token_list, TokenId};
 
 // How many blocks we will process at once.
 pub const ETH_BLOCKS_STEP: u64 = 10_000;
@@ -27,7 +27,7 @@ pub async fn add_tokens_to_storage<I: StorageInteractor>(interactor: &mut I, eth
             "Adding token: {}, id:{}, address: {}, decimals: {}",
             &token.symbol, id, &token.address, &token.decimals
         );
-        interactor.store_token(token, id).await;
-        log::info!("{}", add_token_log);
+        interactor.store_token(token, TokenId(id)).await;
+        vlog::info!("{}", add_token_log);
     }
 }

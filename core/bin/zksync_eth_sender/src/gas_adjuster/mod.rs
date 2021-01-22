@@ -84,7 +84,7 @@ impl<DB: DatabaseInterface> GasAdjuster<DB> {
         if price == self.get_current_max_price() {
             // We're suggesting the max price, so we must notify the log
             // entry about it.
-            log::warn!("Maximum possible gas price will be used: <{}>", price);
+            vlog::warn!("Maximum possible gas price will be used: <{}>", price);
         }
 
         // Report used price to be gathered by the statistics module.
@@ -106,7 +106,7 @@ impl<DB: DatabaseInterface> GasAdjuster<DB> {
                     self.last_sample_added = Instant::now();
                 }
                 Err(err) => {
-                    log::warn!("Cannot add the sample gas price: {}", err);
+                    vlog::warn!("Cannot add the sample gas price: {}", err);
                 }
             }
         }
@@ -121,7 +121,7 @@ impl<DB: DatabaseInterface> GasAdjuster<DB> {
             let mut connection = match db.acquire_connection().await {
                 Ok(connection) => connection,
                 Err(err) => {
-                    log::warn!("Cannot update the gas limit value in the database: {}", err);
+                    vlog::warn!("Cannot update the gas limit value in the database: {}", err);
                     return;
                 }
             };
@@ -136,7 +136,7 @@ impl<DB: DatabaseInterface> GasAdjuster<DB> {
             if let Err(err) = result {
                 // Inability of update the value in the DB is not critical as it's not
                 // an essential logic part, so just report the error to the log.
-                log::warn!("Cannot update the gas limit value in the database: {}", err);
+                vlog::warn!("Cannot update the gas limit value in the database: {}", err);
             }
         }
     }

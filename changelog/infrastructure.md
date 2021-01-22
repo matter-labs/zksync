@@ -11,9 +11,14 @@ components, the logs will have the following format:
 
 ### Changed
 
+- (`explorer`): Deposits from and withdrawals to an L1 account with the same address are not displayed on the account
+  history page.
+
 ### Added
 
 ### Fixed
+
+- (`explorer`): bug with updating transaction data after searching another transaction was fixed.
 
 ## Release 2021-01-12
 

@@ -4,7 +4,7 @@ use criterion::{black_box, criterion_group, Bencher, BenchmarkId, Criterion};
 use num::BigUint;
 use zksync_circuit::witness::{utils::SigDataInput, Witness};
 use zksync_crypto::franklin_crypto::bellman::pairing::bn256::Bn256;
-use zksync_types::{Address, WithdrawOp};
+use zksync_types::{Address, TokenId, WithdrawOp};
 
 use zksync_circuit::witness::withdraw::WithdrawWitness;
 
@@ -18,7 +18,7 @@ fn withdraw_apply_tx(b: &mut Bencher<'_>, number_of_accounts: &usize) {
         tx: account
             .zksync_account
             .sign_withdraw(
-                0,
+                TokenId(0),
                 "",
                 BigUint::from(100u64),
                 BigUint::from(1u64),
@@ -45,7 +45,7 @@ fn withdraw_get_pubdata(b: &mut Bencher<'_>) {
         tx: account
             .zksync_account
             .sign_withdraw(
-                0,
+                TokenId(0),
                 "",
                 BigUint::from(100u64),
                 BigUint::from(1u64),
@@ -72,7 +72,7 @@ fn withdraw_calculate_operations(b: &mut Bencher<'_>) {
         tx: account
             .zksync_account
             .sign_withdraw(
-                0,
+                TokenId(0),
                 "",
                 BigUint::from(100u64),
                 BigUint::from(1u64),

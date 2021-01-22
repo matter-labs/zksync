@@ -6,8 +6,8 @@ use std::time::{self, Duration};
 use anyhow::bail;
 use anyhow::format_err;
 use backoff::Operation;
-use log::*;
 use reqwest::Url;
+use vlog::*;
 // Workspace deps
 use crate::client;
 use zksync_circuit::circuit::ZkSyncCircuit;

@@ -50,8 +50,8 @@ impl fmt::Display for TokenLike {
 impl TokenLike {
     pub fn parse(value: &str) -> Self {
         // Try to interpret an address as the token ID.
-        if let Ok(id) = TokenId::from_str(value) {
-            return Self::Id(id);
+        if let Ok(id) = u16::from_str(value) {
+            return Self::Id(TokenId(id));
         }
         // Try to interpret a token as the token address with or without a prefix.
         let maybe_address = if let Some(value) = value.strip_prefix("0x") {
@@ -71,7 +71,7 @@ impl TokenLike {
         match self {
             TokenLike::Symbol(symbol) => symbol == "ETH",
             TokenLike::Address(address) => *address == Address::zero(),
-            TokenLike::Id(id) => *id == 0,
+            TokenLike::Id(id) => **id == 0,
         }
     }
 }

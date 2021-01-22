@@ -77,6 +77,13 @@ export default {
         loading: true,
         transactionExists: true
     }),
+    watch: {
+        async tx_hash() {
+            this.loading = true;
+            await this.update();
+            this.loading = false;
+        }
+    },
     async created() {
         await this.update();
         this.loading = false;

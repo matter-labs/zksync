@@ -45,7 +45,7 @@ impl SharedNetworkStatus {
                         let mut storage = match connection_pool.access_storage().await {
                             Ok(storage) => storage,
                             Err(err) => {
-                                log::warn!("Unable to update the network status. Storage access failed: {}", err);
+                                vlog::warn!("Unable to update the network status. Storage access failed: {}", err);
                                 continue;
                             }
                         };
@@ -53,7 +53,7 @@ impl SharedNetworkStatus {
                         let mut transaction =  match storage.start_transaction().await {
                             Ok(transaction) => transaction,
                             Err(err) => {
-                                log::warn!("Unable to update the network status. Storage access failed: {}", err);
+                                vlog::warn!("Unable to update the network status. Storage access failed: {}", err);
                                 continue;
                             }
                         };
@@ -63,14 +63,14 @@ impl SharedNetworkStatus {
                             .block_schema()
                             .get_last_verified_confirmed_block()
                             .await
-                            .unwrap_or(0);
+                            .unwrap_or(BlockNumber(0));
 
                         let last_committed = transaction
                             .chain()
                             .block_schema()
                             .get_last_committed_block()
                             .await
-                            .unwrap_or(0);
+                            .unwrap_or(BlockNumber(0));
 
                         let total_transactions = transaction
                             .chain()

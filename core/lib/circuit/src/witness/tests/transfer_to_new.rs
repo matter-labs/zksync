@@ -7,7 +7,7 @@ use zksync_state::{
     handler::TxHandler,
     state::{TransferOutcome, ZkSyncState},
 };
-use zksync_types::{operations::TransferToNewOp, tx::Transfer};
+use zksync_types::{operations::TransferToNewOp, tx::Transfer, AccountId, TokenId};
 // Local deps
 use crate::witness::{
     tests::test_utils::{
@@ -34,14 +34,14 @@ fn test_transfer_to_new_success() {
 
     for (initial_balance, transfer_amount, fee_amount) in test_vector {
         // Input data.
-        let accounts = vec![WitnessTestAccount::new(1, initial_balance)];
+        let accounts = vec![WitnessTestAccount::new(AccountId(1), initial_balance)];
         let account_from = &accounts[0];
-        let account_to = WitnessTestAccount::new_empty(2); // Will not be included into state.
+        let account_to = WitnessTestAccount::new_empty(AccountId(2)); // Will not be included into state.
         let transfer_op = TransferToNewOp {
             tx: account_from
                 .zksync_account
                 .sign_transfer(
-                    0,
+                    TokenId(0),
                     "",
                     BigUint::from(transfer_amount),
                     BigUint::from(fee_amount),
@@ -83,14 +83,14 @@ fn corrupted_ops_input() {
     const EXPECTED_PANIC_MSG: &str = "op_valid is true";
 
     // Legit input data.
-    let accounts = vec![WitnessTestAccount::new(1, 10)];
+    let accounts = vec![WitnessTestAccount::new(AccountId(1), 10)];
     let account_from = &accounts[0];
-    let account_to = WitnessTestAccount::new_empty(2); // Will not be included into state.
+    let account_to = WitnessTestAccount::new_empty(AccountId(2)); // Will not be included into state.
     let transfer_op = TransferToNewOp {
         tx: account_from
             .zksync_account
             .sign_transfer(
-                0,
+                TokenId(0),
                 "",
                 BigUint::from(7u64),
                 BigUint::from(3u64),
@@ -133,7 +133,7 @@ fn corrupted_ops_input() {
 #[test]
 #[ignore]
 fn test_incorrect_transfer_account_from() {
-    const TOKEN_ID: u16 = 0;
+    const TOKEN_ID: TokenId = TokenId(0);
     const INITIAL_BALANCE: u64 = 10;
     const TOKEN_AMOUNT: u64 = 7;
     const FEE_AMOUNT: u64 = 3;
@@ -141,13 +141,13 @@ fn test_incorrect_transfer_account_from() {
     // Operation is not valid, since `from` ID is different from the tx body.
     const ERR_MSG: &str = "op_valid is true/enforce equal to one";
 
-    let incorrect_from_account = WitnessTestAccount::new(3, INITIAL_BALANCE);
+    let incorrect_from_account = WitnessTestAccount::new(AccountId(3), INITIAL_BALANCE);
 
     // Input data: transaction is signed by an incorrect account (address of account
     // and ID of the `from` accounts differ).
-    let accounts = vec![WitnessTestAccount::new(1, INITIAL_BALANCE)];
+    let accounts = vec![WitnessTestAccount::new(AccountId(1), INITIAL_BALANCE)];
     let account_from = &accounts[0];
-    let account_to = WitnessTestAccount::new_empty(2); // Will not be included into state.
+    let account_to = WitnessTestAccount::new_empty(AccountId(2)); // Will not be included into state.
     let transfer_op = TransferToNewOp {
         tx: incorrect_from_account
             .zksync_account
@@ -189,7 +189,7 @@ fn test_incorrect_transfer_account_from() {
 #[ignore]
 #[should_panic(expected = "assertion failed: (acc.address == Fr::zero())")]
 fn test_incorrect_transfer_account_to() {
-    const TOKEN_ID: u16 = 0;
+    const TOKEN_ID: TokenId = TokenId(0);
     const INITIAL_BALANCE: u64 = 10;
     const TOKEN_AMOUNT: u64 = 7;
     const FEE_AMOUNT: u64 = 3;
@@ -199,8 +199,8 @@ fn test_incorrect_transfer_account_to() {
 
     // Input data: account `to` exists.
     let accounts = vec![
-        WitnessTestAccount::new(1, INITIAL_BALANCE),
-        WitnessTestAccount::new_empty(2),
+        WitnessTestAccount::new(AccountId(1), INITIAL_BALANCE),
+        WitnessTestAccount::new_empty(AccountId(2)),
     ];
     let (account_from, account_to) = (&accounts[0], &accounts[1]);
     let transfer_op = TransferToNewOp {
@@ -242,7 +242,7 @@ fn test_incorrect_transfer_account_to() {
 #[test]
 #[ignore]
 fn test_incorrect_transfer_amount() {
-    const TOKEN_ID: u16 = 0;
+    const TOKEN_ID: TokenId = TokenId(0);
     // Balance check should fail.
     // "balance-fee bits" is message for subtraction check in circuit.
     // For details see `circuit.rs`.
@@ -257,9 +257,9 @@ fn test_incorrect_transfer_amount() {
 
     for (initial_balance, transfer_amount, fee_amount) in test_vector {
         // Input data: account does not have enough funds.
-        let accounts = vec![WitnessTestAccount::new(1, initial_balance)];
+        let accounts = vec![WitnessTestAccount::new(AccountId(1), initial_balance)];
         let account_from = &accounts[0];
-        let account_to = WitnessTestAccount::new_empty(2); // Will not be included into state.
+        let account_to = WitnessTestAccount::new_empty(AccountId(2)); // Will not be included into state.
 
         let transfer_op = TransferToNewOp {
             tx: account_from
@@ -301,7 +301,7 @@ fn test_incorrect_transfer_amount() {
 #[test]
 #[ignore]
 fn test_transfer_replay() {
-    const TOKEN_ID: u16 = 0;
+    const TOKEN_ID: TokenId = TokenId(0);
     const INITIAL_BALANCE: u64 = 10;
     const TOKEN_AMOUNT: u64 = 7;
     const FEE_AMOUNT: u64 = 3;
@@ -310,12 +310,12 @@ fn test_transfer_replay() {
     // with the same private key.
     const ERR_MSG: &str = "op_valid is true/enforce equal to one";
 
-    let account_base = WitnessTestAccount::new(1, INITIAL_BALANCE);
+    let account_base = WitnessTestAccount::new(AccountId(1), INITIAL_BALANCE);
     // Create a copy of the base account with the same keys.
-    let mut account_copy = WitnessTestAccount::new_empty(2);
+    let mut account_copy = WitnessTestAccount::new_empty(AccountId(2));
     account_copy.account = account_base.account.clone();
 
-    let account_to = WitnessTestAccount::new_empty(3); // Will not be included into state.
+    let account_to = WitnessTestAccount::new_empty(AccountId(3)); // Will not be included into state.
 
     // Input data
     let accounts = vec![account_base, account_copy];

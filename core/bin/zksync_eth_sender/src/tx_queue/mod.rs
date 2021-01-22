@@ -158,14 +158,14 @@ impl TxQueue {
     pub fn verify_operation_exists(&self, block_idx: BlockNumber) -> bool {
         self.verify_operations
             .elements
-            .contains_key(&(block_idx as usize))
+            .contains_key(&(*block_idx as usize))
     }
 
     /// Adds the `commit` operation to the queue.
     pub fn add_commit_operation(&mut self, commit_operation: TxData) {
         self.commit_operations.push_back(commit_operation);
 
-        log::info!(
+        vlog::info!(
             "Adding commit operation to the queue. \
             Sent pending txs count: {}, \
             max pending txs count: {}, \
@@ -180,7 +180,7 @@ impl TxQueue {
     pub fn add_verify_operation(&mut self, block_idx: usize, verify_operation: TxData) {
         self.verify_operations.insert(block_idx, verify_operation);
 
-        log::info!(
+        vlog::info!(
             "Adding verify operation to the queue. \
             Sent pending txs count: {}, \
             max pending txs count: {}, \
@@ -196,7 +196,7 @@ impl TxQueue {
         self.withdraw_operations
             .push_back(count, withdraw_operation);
 
-        log::info!(
+        vlog::info!(
             "Adding withdrawals to the queue. \
             Sent pending txs count: {}, \
             max pending txs count: {}, \
@@ -299,7 +299,7 @@ impl TxQueue {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use zksync_types::{block::Block, Action};
+    use zksync_types::{block::Block, AccountId, Action};
 
     fn get_tx_data(
         operation_type: OperationType,
@@ -309,7 +309,7 @@ mod tests {
         let block = Block::new_from_available_block_sizes(
             block_number,
             Default::default(),
-            0,
+            AccountId(0),
             vec![],
             (0, 0),
             &[0],
@@ -345,23 +345,39 @@ mod tests {
         let mut queue = TxQueueBuilder::new(MAX_IN_FLY).build();
 
         // Add 2 commit, 2 verify and 2 withdraw operations.
-        queue.add_commit_operation(get_tx_data(OperationType::Commit, 1, vec![COMMIT_MARK, 0]));
-        queue.add_commit_operation(get_tx_data(OperationType::Commit, 1, vec![COMMIT_MARK, 1]));
+        queue.add_commit_operation(get_tx_data(
+            OperationType::Commit,
+            BlockNumber(1),
+            vec![COMMIT_MARK, 0],
+        ));
+        queue.add_commit_operation(get_tx_data(
+            OperationType::Commit,
+            BlockNumber(1),
+            vec![COMMIT_MARK, 1],
+        ));
         queue.add_verify_operation(
             1,
-            get_tx_data(OperationType::Verify, 1, vec![VERIFY_MARK, 0]),
+            get_tx_data(OperationType::Verify, BlockNumber(1), vec![VERIFY_MARK, 0]),
         );
         queue.add_verify_operation(
             2,
-            get_tx_data(OperationType::Verify, 1, vec![VERIFY_MARK, 1]),
+            get_tx_data(OperationType::Verify, BlockNumber(1), vec![VERIFY_MARK, 1]),
         );
         queue.add_withdraw_operation(
             3,
-            get_tx_data(OperationType::Withdraw, 1, vec![WITHDRAW_MARK, 0]),
+            get_tx_data(
+                OperationType::Withdraw,
+                BlockNumber(1),
+                vec![WITHDRAW_MARK, 0],
+            ),
         );
         queue.add_withdraw_operation(
             3,
-            get_tx_data(OperationType::Withdraw, 1, vec![WITHDRAW_MARK, 1]),
+            get_tx_data(
+                OperationType::Withdraw,
+                BlockNumber(1),
+                vec![WITHDRAW_MARK, 1],
+            ),
         );
 
         // Retrieve the next {MAX_IN_FLY} operations.
@@ -453,6 +469,10 @@ mod tests {
 
         let mut queue = TxQueueBuilder::new(MAX_IN_FLY).build();
 
-        queue.return_popped(get_tx_data(OperationType::Commit, 1, vec![COMMIT_MARK, 0]));
+        queue.return_popped(get_tx_data(
+            OperationType::Commit,
+            BlockNumber(1),
+            vec![COMMIT_MARK, 0],
+        ));
     }
 }

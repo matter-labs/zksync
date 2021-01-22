@@ -11,11 +11,12 @@ use zksync_storage::ConnectionPool;
 fn main() {
     let mut main_runtime = Runtime::new().expect("main runtime start");
 
-    env_logger::init();
-    log::info!("ETH watcher started");
-    let config = ZkSyncConfig::from_env();
+    vlog::init();
+    vlog::info!("ETH watcher started");
 
+    let config = ZkSyncConfig::from_env();
     let client = EthereumGateway::from_config(&config);
+
     let (eth_req_sender, eth_req_receiver) = mpsc::channel(256);
 
     let db_pool = ConnectionPool::new(Some(config.db.pool_size as u32));

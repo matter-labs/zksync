@@ -9,14 +9,14 @@ use zksync_crypto::circuit::{account::CircuitAccount, CircuitAccountTree};
 use zksync_crypto::{Engine, Fr};
 use zksync_state::state::{CollectedFee, ZkSyncState};
 use zksync_test_account::ZkSyncAccount;
-use zksync_types::{Account, AccountId, AccountMap, Address};
+use zksync_types::{Account, AccountId, AccountMap, Address, BlockNumber, TokenId};
 // Local deps
 use crate::{circuit::ZkSyncCircuit, witness::Witness};
 
 // Public re-exports
 pub use crate::witness::utils::WitnessBuilder;
 
-pub const FEE_ACCOUNT_ID: u32 = 0;
+pub const FEE_ACCOUNT_ID: AccountId = AccountId(0);
 
 /// Verifies that circuit has no unsatisfied constraints, and returns an error otherwise.
 pub fn check_circuit_non_panicking(circuit: ZkSyncCircuit<Engine>) -> Result<(), String> {
@@ -48,7 +48,7 @@ pub struct ZkSyncStateGenerator;
 
 impl ZkSyncStateGenerator {
     fn create_state(accounts: AccountMap) -> (ZkSyncState, CircuitAccountTree) {
-        let plasma_state = ZkSyncState::from_acc_map(accounts, 1);
+        let plasma_state = ZkSyncState::from_acc_map(accounts, BlockNumber(1));
 
         let mut circuit_account_tree =
             CircuitAccountTree::new(zksync_crypto::params::account_tree_depth());
@@ -68,7 +68,7 @@ impl ZkSyncStateGenerator {
         let accounts = if accounts.iter().any(|(id, _)| *id == FEE_ACCOUNT_ID) {
             println!(
                 "Note: AccountId {} is an existing fee account",
-                FEE_ACCOUNT_ID
+                *FEE_ACCOUNT_ID
             );
             accounts.into_iter().collect()
         } else {
@@ -100,7 +100,7 @@ impl WitnessTestAccount {
 
         let account = {
             let mut account = Account::default_with_address(&zksync_account.address);
-            account.add_balance(0, &BigUint::from(balance));
+            account.add_balance(TokenId(0), &BigUint::from(balance));
             account.pub_key_hash = zksync_account.pubkey_hash;
             account
         };
@@ -139,7 +139,8 @@ pub fn generic_test_scenario<W, F>(
 {
     // Initialize Plasma and WitnessBuilder.
     let (mut plasma_state, mut circuit_account_tree) = ZkSyncStateGenerator::generate(&accounts);
-    let mut witness_accum = WitnessBuilder::new(&mut circuit_account_tree, FEE_ACCOUNT_ID, 1);
+    let mut witness_accum =
+        WitnessBuilder::new(&mut circuit_account_tree, FEE_ACCOUNT_ID, BlockNumber(1));
 
     // Apply op on plasma
     let fees = apply_op_on_plasma(&mut plasma_state, &op);
@@ -184,7 +185,8 @@ pub fn corrupted_input_test_scenario<W, F>(
 {
     // Initialize Plasma and WitnessBuilder.
     let (mut plasma_state, mut circuit_account_tree) = ZkSyncStateGenerator::generate(&accounts);
-    let mut witness_accum = WitnessBuilder::new(&mut circuit_account_tree, FEE_ACCOUNT_ID, 1);
+    let mut witness_accum =
+        WitnessBuilder::new(&mut circuit_account_tree, FEE_ACCOUNT_ID, BlockNumber(1));
 
     // Apply op on plasma
     let fees = apply_op_on_plasma(&mut plasma_state, &op);
@@ -238,7 +240,8 @@ pub fn incorrect_op_test_scenario<W, F>(
 {
     // Initialize WitnessBuilder.
     let (_, mut circuit_account_tree) = ZkSyncStateGenerator::generate(&accounts);
-    let mut witness_accum = WitnessBuilder::new(&mut circuit_account_tree, FEE_ACCOUNT_ID, 1);
+    let mut witness_accum =
+        WitnessBuilder::new(&mut circuit_account_tree, FEE_ACCOUNT_ID, BlockNumber(1));
 
     // Collect fees without actually applying the tx on plasma
     let fees = collect_fees();

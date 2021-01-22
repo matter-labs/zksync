@@ -4,7 +4,7 @@ use criterion::{black_box, criterion_group, Bencher, BenchmarkId, Criterion};
 use num::BigUint;
 use zksync_circuit::witness::Witness;
 use zksync_crypto::franklin_crypto::bellman::pairing::bn256::Bn256;
-use zksync_types::{Deposit, DepositOp};
+use zksync_types::{Deposit, DepositOp, TokenId};
 
 use zksync_circuit::witness::deposit::DepositWitness;
 
@@ -17,7 +17,7 @@ fn create_deposit_apply_tx(b: &mut Bencher<'_>, number_of_accounts: &usize) {
     let deposit_op = DepositOp {
         priority_op: Deposit {
             from: account.account.address,
-            token: 0,
+            token: TokenId(0),
             amount: BigUint::from(1u32),
             to: account.account.address,
         },
@@ -38,7 +38,7 @@ fn create_deposit_get_pubdata(b: &mut Bencher<'_>) {
     let deposit_op = DepositOp {
         priority_op: Deposit {
             from: account.account.address,
-            token: 0,
+            token: TokenId(0),
             amount: BigUint::from(1u32),
             to: account.account.address,
         },
@@ -59,7 +59,7 @@ fn create_deposit_calculate_operations(b: &mut Bencher<'_>) {
     let deposit_op = DepositOp {
         priority_op: Deposit {
             from: account.account.address,
-            token: 0,
+            token: TokenId(0),
             amount: BigUint::from(1u32),
             to: account.account.address,
         },

@@ -319,7 +319,7 @@ impl<S: EthereumSigner> EthereumProvider<S> {
             .tokens_cache
             .resolve(token.clone())
             .ok_or(ClientError::UnknownToken)?;
-        let account_id = U256::from(account_id);
+        let account_id = U256::from(*account_id);
 
         let options = Options {
             gas: Some(500_000.into()),
