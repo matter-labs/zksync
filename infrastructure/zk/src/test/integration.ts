@@ -115,11 +115,11 @@ export async function server() {
 
 export async function testkit(command: string, timeout: number) {
     let containerID = '';
-    const prevUrls = process.env.ETH_CLIENT_WEB3_URLS;
+    const prevUrls = process.env.ETH_CLIENT_WEB3_URL;
     if (process.env.ZKSYNC_ENV == 'dev' && process.env.CI != '1') {
         const { stdout } = await utils.exec('docker run --rm -d -p 7545:8545 matterlabs/geth:latest fast');
         containerID = stdout;
-        process.env.ETH_CLIENT_WEB3_URLS = 'http://localhost:7545';
+        process.env.ETH_CLIENT_WEB3_URL = 'http://localhost:7545';
     }
     process.on('SIGINT', () => {
         console.log('interrupt received');
@@ -147,7 +147,7 @@ export async function testkit(command: string, timeout: number) {
             } catch {
                 console.error('Problem killing', containerID);
             }
-            process.env.ETH_CLIENT_WEB3_URLS = prevUrls;
+            process.env.ETH_CLIENT_WEB3_URL = prevUrls;
             // this has to be here - or else we will call this hook again
             process.exit(code);
         }

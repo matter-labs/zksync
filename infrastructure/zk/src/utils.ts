@@ -127,5 +127,5 @@ export async function getUnignoredFiles(extension: string) {
 
 export function web3Url() {
     // @ts-ignore
-    return process.env.ETH_CLIENT_WEB3_URLS.split(',')[0] as string;
+    return process.env.ETH_CLIENT_WEB3_URL.split(',')[0] as string;
 }

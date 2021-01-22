@@ -51,7 +51,7 @@ mod tests {
         let config = r#"
 ETH_CLIENT_CHAIN_ID="9"
 ETH_CLIENT_GAS_PRICE_FACTOR="1"
-ETH_CLIENT_WEB3_URLS="http://127.0.0.1:8545,http://127.0.0.1:8546"
+ETH_CLIENT_WEB3_URL="http://127.0.0.1:8545,http://127.0.0.1:8546"
         "#;
         set_env(config);
 

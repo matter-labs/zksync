@@ -108,8 +108,8 @@ mod tests {
         let config = TestConfig::load();
         let message = "hello-world";
 
-        let web3_urls = std::env::var("ETH_CLIENT_WEB3_URLS")
-            .expect("ETH_CLIENT_WEB3_URLS should be installed");
+        let web3_urls =
+            std::env::var("ETH_CLIENT_WEB3_URL").expect("ETH_CLIENT_WEB3_URL should be installed");
         let web3_urls: Vec<&str> = web3_urls.split(',').collect();
 
         let manual_signature =

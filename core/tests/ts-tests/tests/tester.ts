@@ -26,7 +26,7 @@ export class Tester {
     // prettier-ignore
     static async init(network: Network, transport: 'WS' | 'HTTP') {
         // @ts-ignore
-        let web3Url = process.env.ETH_CLIENT_WEB3_URLS.split(",")[0];
+        let web3Url = process.env.ETH_CLIENT_WEB3_URL.split(",")[0];
         const ethProvider = network == 'localhost'
             ? new ethers.providers.JsonRpcProvider(web3Url)
             : ethers.getDefaultProvider(network);
