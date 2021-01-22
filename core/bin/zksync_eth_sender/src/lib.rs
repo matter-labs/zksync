@@ -264,12 +264,20 @@ impl<ETH: EthereumInterface, DB: DatabaseInterface> ETHSender<ETH, DB> {
                     self.tx_queue.report_commitment();
 
                     if current_op.is_verify() {
-                        let sync_op = current_op.op.expect("Should be verify operation");
-                        let contains_withdrawals = !sync_op.block.get_withdrawals_data().is_empty();
+                        let sync_op = current_op.clone().op.expect("Should be verify operation");
+                        // Number of times to call `completeWithdrawals` on the contract.
+                        // Value is equal to the number of withdrawals in the block divide by the maximum number of calls, rounded up.
+                        let number_complete_withdrawals_calls =
+                            (sync_op.block.get_withdrawals_count() - 1
+                                + config::MAX_WITHDRAWALS_TO_COMPLETE_IN_A_CALL as usize)
+                                / config::MAX_WITHDRAWALS_TO_COMPLETE_IN_A_CALL as usize;
 
-                        if contains_withdrawals {
+                        if number_complete_withdrawals_calls > 0 {
                             // Complete pending withdrawals after each verify.
-                            self.add_complete_withdrawals_to_queue();
+                            self.add_complete_withdrawals_to_queue(
+                                number_complete_withdrawals_calls,
+                                sync_op,
+                            );
                         }
                     }
                 }
@@ -325,7 +333,7 @@ impl<ETH: EthereumInterface, DB: DatabaseInterface> ETHSender<ETH, DB> {
                 .save_new_eth_tx(
                     &mut transaction,
                     tx.op_type,
-                    tx.operation.clone(),
+                    Some(tx.operation.clone()),
                     deadline_block as i64,
                     gas_price,
                     tx.raw.clone(),
@@ -335,7 +343,7 @@ impl<ETH: EthereumInterface, DB: DatabaseInterface> ETHSender<ETH, DB> {
             let mut new_op = ETHOperation {
                 id: assigned_data.id,
                 op_type: tx.op_type,
-                op: tx.operation,
+                op: Some(tx.operation),
                 nonce: assigned_data.nonce,
                 last_deadline_block: deadline_block,
                 last_used_gas_price: gas_price,
@@ -799,7 +807,11 @@ impl<ETH: EthereumInterface, DB: DatabaseInterface> ETHSender<ETH, DB> {
     }
 
     /// The same as `add_operation_to_queue`, but for the withdraw operation.
-    fn add_complete_withdrawals_to_queue(&mut self) {
+    fn add_complete_withdrawals_to_queue(&mut self, count: usize, operation: Operation) {
+        assert!(
+            count > 0,
+            "Cannot store a non-positive number of withdrawals"
+        );
         // function completeWithdrawals(uint32 _n) external {
         let raw_tx = self.ethereum.encode_tx_data(
             "completeWithdrawals",
@@ -808,8 +820,10 @@ impl<ETH: EthereumInterface, DB: DatabaseInterface> ETHSender<ETH, DB> {
 
         vlog::info!("Adding withdraw operation to queue");
 
-        self.tx_queue
-            .add_withdraw_operation(TxData::from_raw(OperationType::Withdraw, raw_tx));
+        self.tx_queue.add_withdraw_operation(
+            count,
+            TxData::from_operation(OperationType::Withdraw, operation, raw_tx),
+        );
     }
 }
 

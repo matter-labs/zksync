@@ -87,6 +87,7 @@ impl ETHOperation {
     pub fn is_verify(&self) -> bool {
         if let Some(op) = &self.op {
             matches!(op.action, Action::Verify { .. })
+                && matches!(self.op_type, OperationType::Verify)
         } else {
             false
         }
