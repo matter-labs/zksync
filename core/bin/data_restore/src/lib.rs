@@ -27,7 +27,7 @@ pub async fn add_tokens_to_storage<I: StorageInteractor>(interactor: &mut I, eth
             "Adding token: {}, id:{}, address: {}, decimals: {}",
             &token.symbol, id, &token.address, &token.decimals
         );
-        interactor.store_token(token, id).await;
+        interactor.store_token(token, TokenId(id)).await;
         vlog::info!("{}", add_token_log);
     }
 }

@@ -251,7 +251,6 @@ impl WitnessGenerator {
                 Ok(should_work) => should_work,
                 Err(err) => {
                     vlog::warn!("witness for block {} check failed: {}", current_block, err);
-                    log::warn!("witness for block {} check failed: {}", *current_block, err);
                     continue;
                 }
             };
