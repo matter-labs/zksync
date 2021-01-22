@@ -10,7 +10,7 @@ async fn main() -> anyhow::Result<()> {
     // `witness_generator` doesn't require many connections to the database.
     const WITNESS_GENERATOR_CONNECTION_POOL_SIZE: u32 = 2;
 
-    env_logger::init();
+    vlog::init();
 
     // handle ctrl+c
     let (stop_signal_sender, mut stop_signal_receiver) = mpsc::channel(256);
@@ -37,7 +37,7 @@ async fn main() -> anyhow::Result<()> {
             panic!("Prometheus exporter actors aren't supposed to finish their execution")
         },
         _ = async { stop_signal_receiver.next().await } => {
-            log::warn!("Stop signal received, shutting down");
+            vlog::warn!("Stop signal received, shutting down");
         }
     };
 

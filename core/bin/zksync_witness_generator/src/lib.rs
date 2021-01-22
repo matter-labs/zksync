@@ -109,7 +109,7 @@ async fn status() -> actix_web::Result<String> {
 }
 
 async fn register(data: web::Data<AppState>, r: web::Json<ProverReq>) -> actix_web::Result<String> {
-    log::info!("register request for prover with name: {}", r.name);
+    vlog::info!("register request for prover with name: {}", r.name);
     if r.name.is_empty() {
         return Err(actix_web::error::ErrorBadRequest("empty name"));
     }
@@ -129,7 +129,7 @@ async fn block_to_prove(
     data: web::Data<AppState>,
     r: web::Json<ProverReq>,
 ) -> actix_web::Result<HttpResponse> {
-    log::trace!("request block to prove from worker: {}", r.name);
+    vlog::trace!("request block to prove from worker: {}", r.name);
     if r.name.is_empty() {
         return Err(actix_web::error::ErrorBadRequest("empty name"));
     }
@@ -143,7 +143,7 @@ async fn block_to_prove(
             actix_web::error::ErrorInternalServerError("storage layer error")
         })?;
     if let Some(prover_run) = ret {
-        log::info!(
+        vlog::info!(
             "satisfied request block {} to prove from worker: {}",
             prover_run.block_number,
             r.name
@@ -164,7 +164,7 @@ async fn prover_data(
     data: web::Data<AppState>,
     block: web::Json<BlockNumber>,
 ) -> actix_web::Result<HttpResponse> {
-    log::trace!("Got request for prover_data for block {}", **block);
+    vlog::trace!("Got request for prover_data for block {}", *block);
     let mut storage = data
         .access_storage()
         .await
@@ -174,10 +174,10 @@ async fn prover_data(
         Err(_) => return Ok(HttpResponse::InternalServerError().finish()),
     };
     if witness.is_some() {
-        log::info!("Sent prover_data for block {}", **block);
+        vlog::info!("Sent prover_data for block {}", *block);
     } else {
         // No witness, we should just wait
-        log::warn!("No witness for block {}", **block);
+        vlog::warn!("No witness for block {}", *block);
     }
     Ok(HttpResponse::Ok().json(witness))
 }
@@ -188,7 +188,7 @@ async fn working_on(
 ) -> actix_web::Result<HttpResponse> {
     // These heartbeats aren't really important, as they're sent
     // continuously while prover is performing computations.
-    log::trace!(
+    vlog::trace!(
         "Received heartbeat for prover_run with id: {}",
         r.prover_run_id
     );
@@ -212,7 +212,7 @@ async fn publish(
     data: web::Data<AppState>,
     r: web::Json<PublishReq>,
 ) -> actix_web::Result<HttpResponse> {
-    log::info!("Received a proof for block: {}", r.block);
+    vlog::info!("Received a proof for block: {}", r.block);
     let mut storage = data
         .access_storage()
         .await
@@ -257,7 +257,7 @@ async fn stopped(
             actix_web::error::ErrorBadRequest("unknown prover ID")
         })?;
 
-    log::info!(
+    vlog::info!(
         "Prover instance '{}' with ID {} send a stopping notification",
         prover_description.worker,
         prover_id
@@ -341,7 +341,7 @@ pub fn run_prover_server(
                 for offset in 0..witness_generator_opts.witness_generators {
                     let start_block = (last_verified_block + offset + 1) as u32;
                     let block_step = witness_generator_opts.witness_generators as u32;
-                    log::info!(
+                    vlog::info!(
                         "Starting witness generator ({},{})",
                         start_block,
                         block_step

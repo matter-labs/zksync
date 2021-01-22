@@ -1,7 +1,7 @@
 //! Block sizes test is used to create blocks of all available sizes, make proofs of them and verify onchain
 
-use log::info;
 use std::time::Instant;
+use vlog::info;
 use web3::transports::Http;
 use zksync_circuit::witness::utils::build_block_witness;
 use zksync_config::ZkSyncConfig;
@@ -19,7 +19,7 @@ use zksync_types::{DepositOp, Nonce, TokenId};
 
 #[tokio::main]
 async fn main() {
-    env_logger::init();
+    vlog::init();
 
     let testkit_config = TestkitConfig::from_env();
 

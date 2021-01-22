@@ -262,7 +262,7 @@ impl ZkSyncStateInitParams {
         self.unprocessed_priority_op =
             Self::unprocessed_priority_op_id(storage, block_number).await?;
 
-        log::info!(
+        vlog::info!(
             "Loaded committed state: last block number: {}, unprocessed priority op: {}",
             *self.last_block_number,
             self.unprocessed_priority_op
@@ -378,7 +378,7 @@ impl ZkSyncStateKeeper {
         };
 
         let root = keeper.state.root_hash();
-        log::info!("created state keeper, root hash = {}", root);
+        vlog::info!("created state keeper, root hash = {}", root);
 
         keeper
     }
@@ -412,7 +412,7 @@ impl ZkSyncStateKeeper {
             }
             self.pending_block.stored_account_updates = self.pending_block.account_updates.len();
 
-            log::info!(
+            vlog::info!(
                 "Executed restored proposed block: {} transactions, {} priority operations, {} failed transactions",
                 txs_count,
                 priority_op_count,
@@ -420,7 +420,7 @@ impl ZkSyncStateKeeper {
             );
             self.pending_block.failed_txs = pending_block.failed_txs;
         } else {
-            log::info!("There is no pending block to restore");
+            vlog::info!("There is no pending block to restore");
         }
 
         metrics::histogram!("state_keeper.initialize", start.elapsed());
@@ -473,7 +473,7 @@ impl ZkSyncStateKeeper {
             .expect("Unable to commit transaction in statekeeper");
         let state = ZkSyncState::from_acc_map(accounts, last_committed + 1);
         let root_hash = state.root_hash();
-        log::info!("Genesis block created, state: {}", state.root_hash());
+        vlog::info!("Genesis block created, state: {}", state.root_hash());
         println!("CONTRACTS_GENESIS_ROOT=0x{}", ff::to_hex(&root_hash));
         metrics::histogram!("state_keeper.create_genesis_block", start.elapsed());
     }
@@ -711,7 +711,7 @@ impl ZkSyncStateKeeper {
                     executed_operations.push(exec_result);
                 }
                 Err(e) => {
-                    log::warn!("Failed to execute transaction: {:?}, {}", tx, e);
+                    vlog::warn!("Failed to execute transaction: {:?}, {}", tx, e);
                     let failed_tx = ExecutedTx {
                         signed_tx: tx.clone(),
                         success: false,
@@ -798,7 +798,7 @@ impl ZkSyncStateKeeper {
                 exec_result
             }
             Err(e) => {
-                log::warn!("Failed to execute transaction: {:?}, {}", tx, e);
+                vlog::warn!("Failed to execute transaction: {:?}, {}", tx, e);
                 let failed_tx = ExecutedTx {
                     signed_tx: tx.clone(),
                     success: false,
@@ -879,7 +879,7 @@ impl ZkSyncStateKeeper {
         pending_block.stored_account_updates = pending_block.account_updates.len();
         *self.state.block_number += 1;
 
-        log::info!(
+        vlog::info!(
             "Creating full block: {}, operations: {}, chunks_left: {}, miniblock iterations: {}",
             *block_commit_request.block.block_number,
             block_commit_request.block.block_transactions.len(),
@@ -933,7 +933,7 @@ impl ZkSyncStateKeeper {
         };
         self.pending_block.stored_account_updates = self.pending_block.account_updates.len();
 
-        log::trace!(
+        vlog::debug!(
             "Persisting mini block: {}, operations: {}, failed_txs: {}, chunks_left: {}, miniblock iterations: {}",
             *pending_block.number,
             pending_block.success_operations.len(),
