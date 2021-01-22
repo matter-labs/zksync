@@ -45,7 +45,7 @@ async fn handle_coinmarketcap_token_price_query(
             }
         }
     });
-    log::info!("1.0 {} = {} USD", query.symbol, price);
+    vlog::info!("1.0 {} = {} USD", query.symbol, price);
     Ok(HttpResponse::Ok().json(resp))
 }
 
@@ -78,12 +78,12 @@ async fn handle_coingecko_token_price_query(req: HttpRequest) -> Result<HttpResp
             [last_updated, price],
         ]
     });
-    log::info!("1.0 {:?} = {} USD", coin_id, price);
+    vlog::info!("1.0 {:?} = {} USD", coin_id, price);
     Ok(HttpResponse::Ok().json(resp))
 }
 
 fn main() {
-    env_logger::init();
+    vlog::init();
 
     let mut runtime = actix_rt::System::new("dev-ticker");
 

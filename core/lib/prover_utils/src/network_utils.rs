@@ -20,7 +20,7 @@ pub fn get_universal_setup_monomial_form(
         .retry_notify(&mut get_backoff(), |err, next_after: Duration| {
             let duration_secs = next_after.as_millis() as f32 / 1000.0f32;
 
-            log::warn!(
+            vlog::warn!(
                 "Failed to download setup err: <{}>, retrying after: {:.1}s",
                 err,
                 duration_secs,
@@ -42,7 +42,7 @@ fn try_to_download_setup(
 
     let setup_dl_path = format!("{}/setup_2%5E{}.key", setup_network_dir, power_of_two);
 
-    log::info!("Downloading universal setup from {}", &setup_dl_path);
+    vlog::info!("Downloading universal setup from {}", &setup_dl_path);
 
     let mut response_reader =
         reqwest::blocking::get(&setup_dl_path).map_err(|e| backoff::Error::Transient(e.into()))?;

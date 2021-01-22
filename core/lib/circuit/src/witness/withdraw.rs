@@ -57,8 +57,8 @@ impl Witness for WithdrawWitness<Bn256> {
         let withdraw_data = WithdrawData {
             amount: withdraw.tx.amount.to_u128().unwrap(),
             fee: withdraw.tx.fee.to_u128().unwrap(),
-            token: u32::from(withdraw.tx.token),
-            account_address: withdraw.account_id,
+            token: *withdraw.tx.token as u32,
+            account_address: *withdraw.account_id,
             eth_address: eth_address_to_fr(&withdraw.tx.to),
         };
         // le_bit_vector_into_field_element()
@@ -188,7 +188,7 @@ impl WithdrawWitness<Bn256> {
     fn apply_data(tree: &mut CircuitAccountTree, withdraw: &WithdrawData) -> Self {
         //preparing data and base witness
         let before_root = tree.root_hash();
-        log::debug!("Initial root = {}", before_root);
+        vlog::debug!("Initial root = {}", before_root);
         let (audit_path_before, audit_balance_path_before) =
             get_audits(tree, withdraw.account_address, withdraw.token);
 
@@ -239,7 +239,7 @@ impl WithdrawWitness<Bn256> {
             );
 
         let after_root = tree.root_hash();
-        log::debug!("After root = {}", after_root);
+        vlog::debug!("After root = {}", after_root);
         let (audit_path_after, audit_balance_path_after) =
             get_audits(tree, withdraw.account_address, withdraw.token);
 

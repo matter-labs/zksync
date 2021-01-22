@@ -5,7 +5,7 @@ use zksync_data_restore::{
     data_restore_driver::DataRestoreDriver, inmemory_storage_interactor::InMemoryStorageInteractor,
     ETH_BLOCKS_STEP,
 };
-use zksync_types::AccountMap;
+use zksync_types::{AccountId, AccountMap, TokenId};
 
 use crate::external_commands::Contracts;
 
@@ -15,7 +15,7 @@ pub async fn verify_restore(
     contracts: &Contracts,
     fee_account_address: Address,
     acc_state_from_test_setup: AccountMap,
-    tokens: Vec<u16>,
+    tokens: Vec<TokenId>,
     root_hash: Fr,
 ) {
     let transport = Http::new(web3_url).expect("http transport start");
@@ -32,7 +32,7 @@ pub async fn verify_restore(
         Default::default(),
     );
 
-    interactor.insert_new_account(0, &fee_account_address);
+    interactor.insert_new_account(AccountId(0), &fee_account_address);
     driver.load_state_from_storage(&mut interactor).await;
     driver.run_state_update(&mut interactor).await;
 

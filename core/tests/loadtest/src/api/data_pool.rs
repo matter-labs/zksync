@@ -143,7 +143,7 @@ impl ApiDataPoolInner {
         };
 
         let limit = rng.gen_range(1, MAX_REQUEST_LIMIT + 1);
-        (pagination, limit as BlockNumber)
+        (pagination, BlockNumber(limit as u32))
     }
 
     /// Generates a random transaction identifier (block number, position in block).
@@ -155,7 +155,7 @@ impl ApiDataPoolInner {
         // Sometimes we have gaps in the block list, so it is not always
         // possible to randomly generate an existing block number.
         for _ in 0..MAX_REQUEST_LIMIT {
-            let number = rng.gen_range(from, to + 1);
+            let number = BlockNumber(rng.gen_range(*from, *to + 1));
             if let Some(&block_txs) = self.blocks.get(&number) {
                 let tx_id = rng.gen_range(0, block_txs);
                 return (number, tx_id);

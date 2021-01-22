@@ -75,7 +75,7 @@ where
             None => return Ok(Vec::new()),
         }
     } else if errs.len() > ERRORS_CUTOFF {
-        log::warn!(
+        vlog::warn!(
             "A {} errors occurred during the `{}` execution.",
             errs.len(),
             category,
@@ -123,7 +123,7 @@ where
             None => return Ok(Vec::new()),
         }
     } else if errs.len() > ERRORS_CUTOFF {
-        log::warn!(
+        vlog::warn!(
             "A {} errors occurred during the `{}` execution.",
             errs.len(),
             category,

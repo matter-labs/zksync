@@ -8,7 +8,7 @@ use serde::{Deserialize, Serialize};
 // Workspace uses
 use zksync_storage::StorageProcessor;
 use zksync_types::{
-    tx::TxEthSignature, Account, AccountId, Address, Nonce, PriorityOp, PubKeyHash,
+    tx::TxEthSignature, Account, AccountId, Address, Nonce, PriorityOp, PubKeyHash, TokenId,
     ZkSyncPriorityOp, ZkSyncTx,
 };
 use zksync_utils::{BigUintSerdeAsRadix10Str, BigUintSerdeWrapper};
@@ -85,7 +85,7 @@ impl DepositingAccountBalances {
         let mut balances = HashMap::new();
 
         for op in pending_ops.deposits {
-            let token_symbol = if op.token_id == 0 {
+            let token_symbol = if *op.token_id == 0 {
                 "ETH".to_string()
             } else {
                 tokens
@@ -163,7 +163,7 @@ pub struct ContractAddressResp {
 #[serde(rename_all = "camelCase")]
 pub struct OngoingDeposit {
     pub received_on_block: u64,
-    pub token_id: u16,
+    pub token_id: TokenId,
     pub amount: u128,
     pub eth_tx_hash: String,
 }

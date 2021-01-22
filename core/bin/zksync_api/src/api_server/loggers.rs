@@ -47,10 +47,10 @@ pub mod http_rpc {
         hyper::{http::HeaderValue, Body, Request},
         RequestMiddlewareAction,
     };
-    use log::Level;
+    use vlog::log;
 
     pub fn request_middleware(request: Request<Body>) -> RequestMiddlewareAction {
-        if log::log_enabled!(Level::Info) {
+        if log::log_enabled!(log::Level::Info) {
             let get_header = |header| {
                 request
                     .headers()
@@ -66,7 +66,7 @@ pub mod http_rpc {
                 .map(|&h| format!("{}: \"{}\"", h, get_header(h)))
                 .join(", ");
 
-            log::trace!("{}", headers_formatted,);
+            vlog::debug!("{}", headers_formatted,);
         }
 
         request.into()
@@ -77,11 +77,11 @@ pub mod ws_rpc {
     use super::HEADERS;
     use itertools::Itertools;
     use jsonrpc_ws_server::ws::{Request, Response};
-    use log::Level;
     use std::{collections::HashMap, ops::Deref};
+    use vlog::log;
 
     pub fn request_middleware(request: &Request) -> Option<Response> {
-        if log::log_enabled!(Level::Info) {
+        if log::log_enabled!(log::Level::Info) {
             let mut headers = HashMap::with_capacity(request.headers().len());
 
             for (k, v) in request.headers() {
@@ -96,7 +96,7 @@ pub mod ws_rpc {
                 .map(|&h| format!("{}: \"{}\"", h, get_header(h)))
                 .join(", ");
 
-            log::trace!("{}", headers_formatted,);
+            vlog::debug!("{}", headers_formatted,);
         }
 
         None

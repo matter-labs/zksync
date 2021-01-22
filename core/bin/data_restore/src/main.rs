@@ -76,8 +76,8 @@ impl ContractsConfig {
 
 #[tokio::main]
 async fn main() {
-    log::info!("Restoring zkSync state from the contract");
-    env_logger::init();
+    vlog::info!("Restoring zkSync state from the contract");
+    vlog::init();
     let connection_pool = ConnectionPool::new(Some(1));
     let config_opts = ETHClientConfig::from_env();
 

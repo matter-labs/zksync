@@ -413,7 +413,11 @@ impl<API: FeeTickerAPI, INFO: FeeTickerInfo, WATCHER: TokenWatcher> FeeTicker<AP
         };
         let gas_price_wei = self.api.get_gas_price_wei().await?;
         let scale_gas_price = Self::risk_gas_price_estimate(gas_price_wei.clone());
-        let wei_price_usd = self.api.get_last_quote(TokenLike::Id(0)).await?.usd_price
+        let wei_price_usd = self
+            .api
+            .get_last_quote(TokenLike::Id(TokenId(0)))
+            .await?
+            .usd_price
             / BigUint::from(10u32).pow(18u32);
 
         let token_price_usd = self

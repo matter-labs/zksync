@@ -76,7 +76,7 @@ impl<T: Transport> EthereumChecker<T> {
             Err(error) => {
                 // One error of this kind will mean that user provided incorrect signature.
                 // Many errors will likely mean that something is wrong with our implementation.
-                log::warn!("EIP1271 signature check failed: {:#?}", error);
+                vlog::warn!("EIP1271 signature check failed: {:#?}", error);
                 return Ok(false);
             }
         };
@@ -95,7 +95,7 @@ impl<T: Transport> EthereumChecker<T> {
             .1
             .query(
                 "authFacts",
-                (address, u64::from(nonce)),
+                (address, u64::from(*nonce)),
                 None,
                 Options::default(),
                 None,

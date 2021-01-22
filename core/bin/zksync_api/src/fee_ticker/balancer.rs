@@ -106,7 +106,7 @@ mod tests {
         channel::{mpsc, oneshot},
         SinkExt, StreamExt,
     };
-    use zksync_types::TxFeeTypes;
+    use zksync_types::{TokenId, TxFeeTypes};
 
     #[tokio::test]
     async fn dispatch() {
@@ -131,7 +131,7 @@ mod tests {
                 .send(TickerRequest::GetTxFee {
                     tx_type: TxFeeTypes::Withdraw,
                     address: Default::default(),
-                    token: i.into(),
+                    token: TokenId(i).into(),
                     response: channel.0,
                 })
                 .await
@@ -143,7 +143,7 @@ mod tests {
                 response: _,
             }) = receivers[(i % 10) as usize].next().await
             {
-                assert_eq!(token, i.into());
+                assert_eq!(token, TokenId(i).into());
             } else {
                 panic!("Wrong type")
             }

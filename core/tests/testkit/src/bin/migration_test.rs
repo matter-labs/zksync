@@ -5,6 +5,7 @@ use std::time::Instant;
 use web3::transports::Http;
 use zksync_testkit::scenarios::{perform_basic_operations, BlockProcessing};
 use zksync_testkit::*;
+use zksync_types::{Nonce, TokenId};
 
 async fn migration_test() {
     let testkit_config = TestkitConfig::from_env();
@@ -53,7 +54,7 @@ async fn migration_test() {
             let rng_zksync_key = ZkSyncAccount::rand().private_key;
             ZkSyncAccount::new(
                 rng_zksync_key,
-                0,
+                Nonce(0),
                 eth_account.address,
                 eth_account.private_key,
             )
@@ -71,7 +72,7 @@ async fn migration_test() {
 
     let deposit_amount = parse_ether("1.0").unwrap();
 
-    let token = 0;
+    let token = TokenId(0);
     perform_basic_operations(
         token,
         &mut test_setup,
@@ -84,7 +85,7 @@ async fn migration_test() {
     run_upgrade_franklin(contracts.contract, contracts.upgrade_gatekeeper);
     println!("Upgrade done in {:?}", start_upgrade.elapsed());
 
-    let token = 1;
+    let token = TokenId(1);
     perform_basic_operations(
         token,
         &mut test_setup,

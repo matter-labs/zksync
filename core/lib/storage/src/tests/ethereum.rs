@@ -7,7 +7,7 @@ use zksync_crypto::Fr;
 use zksync_types::{
     ethereum::{ETHOperation, OperationType},
     Action, Operation,
-    {block::Block, BlockNumber},
+    {block::Block, AccountId, BlockNumber},
 };
 // Local imports
 use crate::tests::db_test;
@@ -24,7 +24,7 @@ pub fn get_commit_operation(block_number: BlockNumber) -> Operation {
         block: Block::new(
             block_number,
             Fr::default(),
-            0,
+            AccountId(0),
             Vec::new(),
             (0, 0),
             100,
@@ -45,7 +45,7 @@ pub fn get_verify_operation(block_number: BlockNumber) -> Operation {
         block: Block::new(
             block_number,
             Fr::default(),
-            0,
+            AccountId(0),
             Vec::new(),
             (0, 0),
             100,
@@ -129,7 +129,7 @@ async fn ethereum_storage(mut storage: StorageProcessor<'_>) -> QueryResult<()> 
     assert!(unconfirmed_operations.is_empty());
 
     // Store operation with ID 1.
-    let block_number = 1;
+    let block_number = BlockNumber(1);
     let operation = BlockSchema(&mut storage)
         .execute_operation(get_commit_operation(block_number))
         .await?;
@@ -163,7 +163,7 @@ async fn ethereum_storage(mut storage: StorageProcessor<'_>) -> QueryResult<()> 
     );
 
     // Store operation with ID 2.
-    let block_number = 2;
+    let block_number = BlockNumber(2);
     let operation_2 = BlockSchema(&mut storage)
         .execute_operation(get_commit_operation(block_number))
         .await?;
@@ -252,7 +252,7 @@ async fn ethereum_unprocessed(mut storage: StorageProcessor<'_>) -> QueryResult<
     assert!(unprocessed_operations.is_empty());
 
     // Store operation with ID 1.
-    let block_number = 1;
+    let block_number = BlockNumber(1);
     let operation = BlockSchema(&mut storage)
         .execute_operation(get_commit_operation(block_number))
         .await?;

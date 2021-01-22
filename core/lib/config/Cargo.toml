@@ -13,7 +13,7 @@ categories = ["cryptography"]
 zksync_types = { path = "../types", version = "1.0" }
 zksync_utils = { path = "../utils", version = "1.0" }
 url = "2.1"
-log = "0.4"
+tracing = "0.1.22"
 num = "0.3.1"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"

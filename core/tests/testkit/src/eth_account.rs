@@ -137,7 +137,7 @@ impl<T: Transport> EthereumAccount<T> {
             .main_contract_eth_client
             .sign_call_tx(
                 "fullExit",
-                (u64::from(account_id), token_address),
+                (u64::from(*account_id), token_address),
                 default_tx_options(),
             )
             .await
@@ -172,8 +172,8 @@ impl<T: Transport> EthereumAccount<T> {
             .sign_call_tx(
                 "exit",
                 (
-                    u64::from(account_id),
-                    u64::from(token_id),
+                    u64::from(*account_id),
+                    u64::from(*token_id),
                     U128::from(amount.to_u128().unwrap()),
                     proof.proof,
                 ),
@@ -292,7 +292,7 @@ impl<T: Transport> EthereumAccount<T> {
         Ok(contract
             .query(
                 "getBalanceToWithdraw",
-                (self.address, u64::from(token)),
+                (self.address, u64::from(*token)),
                 None,
                 default_tx_options(),
                 None,
@@ -371,8 +371,8 @@ impl<T: Transport> EthereumAccount<T> {
             .sign_call_tx(
                 "commitBlock",
                 (
-                    u64::from(block.block_number),
-                    u64::from(block.fee_account),
+                    u64::from(*block.block_number),
+                    u64::from(*block.fee_account),
                     vec![block.get_eth_encoded_root()],
                     block.get_eth_public_data(),
                     witness_data.0,
@@ -400,7 +400,7 @@ impl<T: Transport> EthereumAccount<T> {
             .sign_call_tx(
                 "verifyBlock",
                 (
-                    u64::from(block.block_number),
+                    u64::from(*block.block_number),
                     proof.unwrap_or_default().proof,
                     block.get_withdrawals_data(),
                 ),
@@ -475,7 +475,7 @@ impl<T: Transport> EthereumAccount<T> {
             .main_contract_eth_client
             .sign_call_tx(
                 "setAuthPubkeyHash",
-                (fact.to_vec(), u64::from(nonce)),
+                (fact.to_vec(), u64::from(*nonce)),
                 default_tx_options(),
             )
             .await

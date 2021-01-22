@@ -1,12 +1,11 @@
-use crate::AccountId;
 use crate::{
     helpers::{pack_fee_amount, unpack_fee_amount},
     Withdraw,
 };
+use crate::{AccountId, Address, Nonce, TokenId};
 use anyhow::{ensure, format_err};
 use num::{BigUint, FromPrimitive, ToPrimitive};
 use serde::{Deserialize, Serialize};
-use zksync_basic_types::Address;
 use zksync_crypto::params::{
     ACCOUNT_ID_BIT_WIDTH, BALANCE_BIT_WIDTH, CHUNK_BYTES, ETH_ADDRESS_BIT_WIDTH,
     FEE_EXPONENT_BIT_WIDTH, FEE_MANTISSA_BIT_WIDTH, TOKEN_BIT_WIDTH,
@@ -79,8 +78,17 @@ impl WithdrawOp {
         let nonce = 0; // From pubdata it is unknown
 
         Ok(Self {
-            tx: Withdraw::new(account_id, from, to, token, amount, fee, nonce, None),
-            account_id,
+            tx: Withdraw::new(
+                AccountId(account_id),
+                from,
+                to,
+                TokenId(token),
+                amount,
+                fee,
+                Nonce(nonce),
+                None,
+            ),
+            account_id: AccountId(account_id),
         })
     }
 

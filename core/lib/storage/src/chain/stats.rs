@@ -17,7 +17,7 @@ impl<'a, 'c> StatsSchema<'a, 'c> {
         let start = Instant::now();
         let count = sqlx::query!(
             "SELECT COUNT(*) FROM executed_transactions WHERE block_number > $1",
-            i64::from(after_block)
+            i64::from(*after_block)
         )
         .fetch_one(self.0.conn())
         .await?

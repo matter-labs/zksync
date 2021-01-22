@@ -108,7 +108,7 @@ pub fn gen_verified_proof_for_exit_circuit<C: Circuit<Engine> + Clone>(
 ) -> Result<EncodedProofPlonk, anyhow::Error> {
     let vk = VerificationKey::read(File::open(get_exodus_verification_key_path())?)?;
 
-    log::info!("Proof for circuit started");
+    vlog::info!("Proof for circuit started");
 
     let hints = transpile(circuit.clone())?;
     let setup = setup(circuit.clone(), &hints)?;
@@ -128,7 +128,7 @@ pub fn gen_verified_proof_for_exit_circuit<C: Circuit<Engine> + Clone>(
     let valid = verify::<_, RollingKeccakTranscript<Fr>>(&proof, &vk)?;
     anyhow::ensure!(valid, "proof for exit is invalid");
 
-    log::info!("Proof for circuit successful");
+    vlog::info!("Proof for circuit successful");
     Ok(serialize_proof(&proof))
 }
 

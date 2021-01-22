@@ -82,7 +82,7 @@ pub async fn wait_for_tasks(task_futures: Vec<JoinHandle<()>>) {
             panic!("One of the actors finished its run, while it wasn't expected to do it");
         }
         (Err(error), _, _) => {
-            log::warn!("One of the tokio actors unexpectedly finished, shutting down");
+            vlog::warn!("One of the tokio actors unexpectedly finished, shutting down");
             if error.is_panic() {
                 // Resume the panic on the main task
                 std::panic::resume_unwind(error.into_panic());
@@ -95,17 +95,17 @@ pub async fn wait_for_tasks(task_futures: Vec<JoinHandle<()>>) {
 pub async fn genesis_init(config: &ZkSyncConfig) {
     let pool = ConnectionPool::new(Some(1));
 
-    log::info!("Generating genesis block.");
+    vlog::info!("Generating genesis block.");
     ZkSyncStateKeeper::create_genesis_block(
         pool.clone(),
         &config.chain.state_keeper.fee_account_addr,
     )
     .await;
-    log::info!("Adding initial tokens to db");
+    vlog::info!("Adding initial tokens to db");
     let genesis_tokens = get_genesis_token_list(&config.chain.eth.network.to_string())
         .expect("Initial token list not found");
     for (id, token) in (1..).zip(genesis_tokens) {
-        log::info!(
+        vlog::info!(
             "Adding token: {}, id:{}, address: {}, decimals: {}",
             token.symbol,
             id,
@@ -117,7 +117,7 @@ pub async fn genesis_init(config: &ZkSyncConfig) {
             .expect("failed to access db")
             .tokens_schema()
             .store_token(Token {
-                id: id as TokenId,
+                id: TokenId(id as u16),
                 symbol: token.symbol,
                 address: token.address[2..]
                     .parse()
