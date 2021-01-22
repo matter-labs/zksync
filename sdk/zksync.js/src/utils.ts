@@ -594,9 +594,7 @@ export function getCREATE2AddressAndSalt(
     }
 
     // CREATE2 salt
-    const salt = ethers.utils.keccak256(
-        ethers.utils.concat([additionalSaltArgument, pubkeyHashHex])
-    );
+    const salt = ethers.utils.keccak256(ethers.utils.concat([additionalSaltArgument, pubkeyHashHex]));
 
     // Address according to CREATE2 specification
     const address =
