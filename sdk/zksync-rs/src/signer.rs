@@ -126,7 +126,7 @@ impl<S: EthereumSigner> Signer<S> {
                 batch_hash: H256::zero(),
             })
         };
-        change_pubkey.eth_auth_data = eth_auth_data;
+        change_pubkey.eth_auth_data = Some(eth_auth_data);
 
         assert!(
             change_pubkey.is_eth_auth_data_valid(),

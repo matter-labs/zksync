@@ -43,7 +43,7 @@ impl CommitCost {
             ZkSyncOp::Deposit(_) => Self::DEPOSIT_COST,
             ZkSyncOp::ChangePubKeyOffchain(change_pubkey) => {
                 // TODO: determine correct cost of this tx
-                if change_pubkey.tx.eth_auth_data.is_ecdsa() {
+                if change_pubkey.tx.is_ecdsa() {
                     Self::CHANGE_PUBKEY_COST_OFFCHAIN
                 } else {
                     Self::CHANGE_PUBKEY_COST_ONCHAIN

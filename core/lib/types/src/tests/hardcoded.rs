@@ -238,12 +238,12 @@ pub mod operations_test {
             ChangePubKeyOp::from_public_data(&hex::decode(CHANGE_PUBKEY_PUBLIC_DATA).unwrap())
                 .unwrap();
 
-        change_pubkey.tx.eth_auth_data = ChangePubKeyEthAuthData::ECDSA(ChangePubKeyECDSAData {
+        change_pubkey.tx.eth_auth_data = Some(ChangePubKeyEthAuthData::ECDSA(ChangePubKeyECDSAData {
             eth_signature: PackedEthSignature::deserialize_packed(
             &hex::decode("2a0a81e257a2f5d6ed4f07b81dbda09f107bd026dbda09f107bd026f5d6ed4f02a0a81e257a2f5d6ed4f07b81dbda09f107bd026dbda09f107bd026f5d6ed4f0d4").unwrap(),
             ).expect("Hex signature deserialization"),
             batch_hash: H256::from([0xCEu8; 32])
-        });
+        }));
 
         assert_eq!(
             hex::encode(change_pubkey.get_eth_witness()),

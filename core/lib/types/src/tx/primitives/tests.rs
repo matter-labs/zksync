@@ -103,11 +103,12 @@ fn test_batch_message() -> Result<()> {
         ZkSyncTx::ChangePubKey(tx) => tx,
         _ => panic!("ChangePubKey is supposed to be the last element in Vec of test transactions"),
     };
-    change_pub_key.as_mut().eth_auth_data = ChangePubKeyEthAuthData::ECDSA(ChangePubKeyECDSAData {
-        batch_hash: H256::from_slice(batch_hash.as_slice()),
-        eth_signature: PackedEthSignature::deserialize_packed(&vec![0u8; 65])
-            .expect("Creation of fake eth signature fail"),
-    });
+    change_pub_key.as_mut().eth_auth_data =
+        Some(ChangePubKeyEthAuthData::ECDSA(ChangePubKeyECDSAData {
+            batch_hash: H256::from_slice(batch_hash.as_slice()),
+            eth_signature: PackedEthSignature::deserialize_packed(&vec![0u8; 65])
+                .expect("Creation of fake eth signature fail"),
+        }));
     let change_pub_key_message = change_pub_key.as_ref().get_eth_signed_data()?;
     assert!(change_pub_key_message.ends_with(batch_hash.as_slice()));
     // Shouldn't fail.
