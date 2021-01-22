@@ -69,9 +69,9 @@ impl Witness for ForcedExitWitness<Bn256> {
                 .to_u128()
                 .unwrap(),
             fee: forced_exit.tx.fee.to_u128().unwrap(),
-            token: u32::from(forced_exit.tx.token),
-            initiator_account_address: forced_exit.tx.initiator_account_id,
-            target_account_address: forced_exit.target_account_id,
+            token: *forced_exit.tx.token as u32,
+            initiator_account_address: *forced_exit.tx.initiator_account_id,
+            target_account_address: *forced_exit.target_account_id,
             target_account_eth_address: eth_address_to_fr(&forced_exit.tx.target),
         };
         Self::apply_data(tree, &forced_exit_data)

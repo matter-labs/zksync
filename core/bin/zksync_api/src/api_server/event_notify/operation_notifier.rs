@@ -6,7 +6,9 @@ use std::time::Instant;
 use zksync_storage::ConnectionPool;
 use zksync_types::tx::TxHash;
 use zksync_types::BlockNumber;
-use zksync_types::{block::ExecutedOperations, AccountId, ActionType, Address, Operation};
+use zksync_types::{
+    block::ExecutedOperations, AccountId, ActionType, Address, Operation, PriorityOpId,
+};
 
 use super::{
     state::NotifierState, sub_store::SubStorage, EventNotifierRequest, EventSubscribeRequest,
@@ -17,7 +19,7 @@ pub struct OperationNotifier {
     state: NotifierState,
 
     tx_subs: SubStorage<TxHash, TransactionInfoResp>,
-    prior_op_subs: SubStorage<u64, ETHOpInfoResp>,
+    prior_op_subs: SubStorage<PriorityOpId, ETHOpInfoResp>,
     account_subs: SubStorage<AccountId, ResponseAccountState>,
 }
 
@@ -92,7 +94,7 @@ impl OperationNotifier {
                     None => {
                         vlog::warn!(
                             "Account is updated but not stored in DB, id: {}, block: {:#?}",
-                            id,
+                            *id,
                             op.block
                         );
                         continue;
@@ -124,7 +126,7 @@ impl OperationNotifier {
                         success: Some(tx.success),
                         fail_reason: tx.fail_reason,
                         block: Some(BlockInfo {
-                            block_number: i64::from(block_number),
+                            block_number: i64::from(*block_number),
                             committed: true,
                             verified: action == ActionType::VERIFY,
                         }),
@@ -136,12 +138,12 @@ impl OperationNotifier {
                     let resp = ETHOpInfoResp {
                         executed: true,
                         block: Some(BlockInfo {
-                            block_number: i64::from(block_number),
+                            block_number: i64::from(*block_number),
                             committed: true,
                             verified: action == ActionType::VERIFY,
                         }),
                     };
-                    self.prior_op_subs.notify(id, action, resp);
+                    self.prior_op_subs.notify(PriorityOpId(id), action, resp);
                 }
             }
         }
@@ -177,7 +179,9 @@ impl OperationNotifier {
         sub: Subscriber<ETHOpInfoResp>,
     ) -> Result<(), anyhow::Error> {
         let start = Instant::now();
-        let sub_id = self.prior_op_subs.generate_sub_id(serial_id, action);
+        let sub_id = self
+            .prior_op_subs
+            .generate_sub_id(PriorityOpId(serial_id), action);
 
         let executed_op = self
             .state
@@ -187,7 +191,7 @@ impl OperationNotifier {
             // There may be no block, if transaction was executed in the pending block only.
             if let Some(block_info) = self
                 .state
-                .get_block_info(executed_op.block_number as u32)
+                .get_block_info(BlockNumber(executed_op.block_number as u32))
                 .await?
             {
                 match action {
@@ -214,7 +218,7 @@ impl OperationNotifier {
         }
 
         self.prior_op_subs
-            .insert_new(sub_id, sub, serial_id, action)?;
+            .insert_new(sub_id, sub, PriorityOpId(serial_id), action)?;
         metrics::histogram!("api.notifier.add_priority_op_sub", start.elapsed());
         Ok(())
     }

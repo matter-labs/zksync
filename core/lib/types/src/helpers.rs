@@ -136,6 +136,7 @@ mod test {
     use super::*;
     use crate::TokenLike;
     use serde::{Deserialize, Serialize};
+    use zksync_basic_types::TokenId;
 
     #[test]
     fn test_roundtrip() {
@@ -245,7 +246,7 @@ mod test {
             ),
             (
                 Query {
-                    token: TokenLike::Id(14),
+                    token: TokenLike::Id(TokenId(14)),
                 },
                 r#"{"token":14}"#,
             ),

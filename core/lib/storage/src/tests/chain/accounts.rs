@@ -1,7 +1,6 @@
 // External imports
 // Workspace imports
-use zksync_types::AccountMap;
-use zksync_types::Action;
+use zksync_types::{AccountMap, Action, BlockNumber};
 // Local imports
 use super::block::apply_random_updates;
 use crate::tests::{create_rng, db_test};
@@ -25,10 +24,10 @@ async fn stored_accounts(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
     // Execute and commit block with them.
     // Also store account updates.
     BlockSchema(&mut storage)
-        .execute_operation(gen_operation(1, Action::Commit, block_size))
+        .execute_operation(gen_operation(BlockNumber(1), Action::Commit, block_size))
         .await?;
     StateSchema(&mut storage)
-        .commit_state_update(1, &updates_block, 0)
+        .commit_state_update(BlockNumber(1), &updates_block, 0)
         .await?;
 
     // Get the accounts by their addresses.
@@ -82,18 +81,20 @@ async fn stored_accounts(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
 
     // Now add a proof, verify block and apply a state update.
     ProverSchema(&mut storage)
-        .store_proof(1, &Default::default())
+        .store_proof(BlockNumber(1), &Default::default())
         .await?;
     BlockSchema(&mut storage)
         .execute_operation(gen_operation(
-            1,
+            BlockNumber(1),
             Action::Verify {
                 proof: Default::default(),
             },
             block_size,
         ))
         .await?;
-    StateSchema(&mut storage).apply_state_update(1).await?;
+    StateSchema(&mut storage)
+        .apply_state_update(BlockNumber(1))
+        .await?;
 
     // After that all the accounts should have a verified state.
     for (account_id, account) in accounts_block {

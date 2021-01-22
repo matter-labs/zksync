@@ -18,7 +18,8 @@ use zksync_crypto::{
 };
 use zksync_prover_utils::prover_data::ProverData;
 use zksync_types::{
-    block::smallest_block_size_for_chunks, operations::DepositOp, Account, Address, Deposit,
+    block::smallest_block_size_for_chunks, operations::DepositOp, Account, AccountId, Address,
+    BlockNumber, Deposit, TokenId,
 };
 // Local deps
 use zksync_prover::{
@@ -121,20 +122,21 @@ fn prover_proves_a_block_and_publishes_result() {
 fn new_test_data_for_prover() -> ProverData {
     let mut circuit_account_tree =
         CircuitAccountTree::new(zksync_crypto::params::account_tree_depth());
-    let fee_account_id = 0;
+    let fee_account_id = AccountId(0);
 
     // Init the fee account.
     let fee_account = Account::default_with_address(&Address::default());
-    circuit_account_tree.insert(fee_account_id, CircuitAccount::from(fee_account));
+    circuit_account_tree.insert(*fee_account_id, CircuitAccount::from(fee_account));
 
-    let mut witness_accum = WitnessBuilder::new(&mut circuit_account_tree, fee_account_id, 1);
+    let mut witness_accum =
+        WitnessBuilder::new(&mut circuit_account_tree, fee_account_id, BlockNumber(1));
 
-    let empty_account_id = 1;
+    let empty_account_id = AccountId(1);
     let empty_account_address = [7u8; 20].into();
     let deposit_op = DepositOp {
         priority_op: Deposit {
             from: empty_account_address,
-            token: 0,
+            token: TokenId(0),
             amount: BigUint::from(1u32),
             to: empty_account_address,
         },

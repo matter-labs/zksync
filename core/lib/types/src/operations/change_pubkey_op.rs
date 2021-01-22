@@ -1,10 +1,9 @@
 use crate::helpers::{pack_fee_amount, unpack_fee_amount};
 use crate::tx::ChangePubKey;
-use crate::AccountId;
 use crate::PubKeyHash;
+use crate::{AccountId, Address, Nonce, TokenId};
 use anyhow::{ensure, format_err};
 use serde::{Deserialize, Serialize};
-use zksync_basic_types::Address;
 use zksync_crypto::params::{
     ACCOUNT_ID_BIT_WIDTH, ADDRESS_WIDTH, CHUNK_BYTES, FEE_EXPONENT_BIT_WIDTH,
     FEE_MANTISSA_BIT_WIDTH, NEW_PUBKEY_HASH_WIDTH, NONCE_BIT_WIDTH, TOKEN_BIT_WIDTH,
@@ -70,16 +69,16 @@ impl ChangePubKeyOp {
 
         Ok(ChangePubKeyOp {
             tx: ChangePubKey::new(
-                account_id,
+                AccountId(account_id),
                 account,
                 new_pk_hash,
-                fee_token,
+                TokenId(fee_token),
                 fee,
-                nonce,
+                Nonce(nonce),
                 None,
                 None,
             ),
-            account_id,
+            account_id: AccountId(account_id),
         })
     }
 

@@ -117,7 +117,7 @@ impl WitnessGenerator {
                 .load_committed_state(Some(block))
                 .await?;
             for (id, account) in accounts {
-                circuit_account_tree.insert(id, account.into());
+                circuit_account_tree.insert(*id, account.into());
             }
             circuit_account_tree.set_internals(serde_json::from_value(account_tree_cache)?);
             if block != cached_block {
@@ -140,7 +140,7 @@ impl WitnessGenerator {
                     updated_accounts.dedup();
                     for idx in updated_accounts {
                         circuit_account_tree
-                            .insert(idx, accounts.get(&idx).cloned().unwrap_or_default().into());
+                            .insert(*idx, accounts.get(&idx).cloned().unwrap_or_default().into());
                     }
                 }
                 circuit_account_tree.root_hash();
@@ -158,7 +158,7 @@ impl WitnessGenerator {
                 .load_committed_state(Some(block))
                 .await?;
             for (id, account) in accounts {
-                circuit_account_tree.insert(id, account.into());
+                circuit_account_tree.insert(*id, account.into());
             }
             circuit_account_tree.root_hash();
             let account_tree_cache = circuit_account_tree.get_internals();
@@ -169,7 +169,7 @@ impl WitnessGenerator {
                 .await?;
         }
 
-        if block != 0 {
+        if *block != 0 {
             let storage_block = storage
                 .chain()
                 .block_schema()
@@ -230,7 +230,9 @@ impl WitnessGenerator {
     ) -> BlockNumber {
         match block_info {
             BlockInfo::NotReadyBlock => current_block, // Keep waiting
-            BlockInfo::WithWitness | BlockInfo::NoWitness(_) => current_block + block_step, // Go to the next block
+            BlockInfo::WithWitness | BlockInfo::NoWitness(_) => {
+                BlockNumber(*current_block + *block_step)
+            } // Go to the next block
         }
     }
 
@@ -239,8 +241,8 @@ impl WitnessGenerator {
     async fn maintain(self) {
         vlog::info!(
             "preparing prover data routine started with start_block({}), block_step({})",
-            self.start_block,
-            self.block_step
+            *self.start_block,
+            *self.block_step
         );
         let mut current_block = self.start_block;
         loop {
@@ -249,6 +251,7 @@ impl WitnessGenerator {
                 Ok(should_work) => should_work,
                 Err(err) => {
                     vlog::warn!("witness for block {} check failed: {}", current_block, err);
+                    log::warn!("witness for block {} check failed: {}", *current_block, err);
                     continue;
                 }
             };
@@ -273,22 +276,30 @@ impl WitnessGenerator {
 mod tests {
     use super::*;
     use zksync_crypto::Fr;
-    use zksync_types::U256;
+    use zksync_types::{AccountId, U256};
 
     #[test]
     fn test_next_witness_block() {
         assert_eq!(
-            WitnessGenerator::next_witness_block(3, 4, &BlockInfo::NotReadyBlock),
-            3
+            WitnessGenerator::next_witness_block(
+                BlockNumber(3),
+                BlockNumber(4),
+                &BlockInfo::NotReadyBlock
+            ),
+            BlockNumber(3)
         );
         assert_eq!(
-            WitnessGenerator::next_witness_block(3, 4, &BlockInfo::WithWitness),
-            7
+            WitnessGenerator::next_witness_block(
+                BlockNumber(3),
+                BlockNumber(4),
+                &BlockInfo::WithWitness
+            ),
+            BlockNumber(7)
         );
         let empty_block = Block::new(
-            0,
+            BlockNumber(0),
             Fr::default(),
-            0,
+            AccountId(0),
             vec![],
             (0, 0),
             0,
@@ -296,8 +307,12 @@ mod tests {
             U256::default(),
         );
         assert_eq!(
-            WitnessGenerator::next_witness_block(3, 4, &BlockInfo::NoWitness(empty_block)),
-            7
+            WitnessGenerator::next_witness_block(
+                BlockNumber(3),
+                BlockNumber(4),
+                &BlockInfo::NoWitness(empty_block)
+            ),
+            BlockNumber(7)
         );
     }
 }

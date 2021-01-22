@@ -246,7 +246,7 @@ async fn poll_for_new_proofs_task(pool: ConnectionPool) {
                     .block_schema()
                     .load_committed_block(block_number)
                     .await
-                    .unwrap_or_else(|| panic!("failed to load block #{}", block_number));
+                    .unwrap_or_else(|| panic!("failed to load block #{}", *block_number));
 
                 let op = Operation {
                     action: Action::Verify {
@@ -261,7 +261,7 @@ async fn poll_for_new_proofs_task(pool: ConnectionPool) {
                     .execute_operation(op.clone())
                     .await
                     .expect("committer must commit the op into db");
-                last_verified_block += 1;
+                *last_verified_block += 1;
 
                 transaction
                     .commit()

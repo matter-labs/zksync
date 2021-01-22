@@ -186,7 +186,7 @@ impl RpcApp {
                     has_gnt = Some(token.clone());
                 }
 
-                if id == 0 {
+                if *id == 0 {
                     ("ETH".to_string(), token)
                 } else {
                     (token.symbol.clone(), token)

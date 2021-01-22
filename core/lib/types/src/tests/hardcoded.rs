@@ -21,7 +21,7 @@ use crate::{
     Log, PriorityOp,
 };
 use lazy_static::lazy_static;
-use zksync_basic_types::{Address, H256};
+use zksync_basic_types::{AccountId, Address, Nonce, TokenId, H256};
 
 #[cfg(test)]
 pub mod operations_test {
@@ -49,14 +49,14 @@ pub mod operations_test {
             let priority_op = Deposit {
                 from: Address::from_str("2a0a81e257a2f5d6ed4f07b81dbda09f107bd026").unwrap(),
                 to: Address::from_str("21abaed8712072e918632259780e587698ef58da").unwrap(),
-                token: 42,
+                token: TokenId(42),
                 amount: BigUint::from(42u32),
             };
             let account_id = 42u32;
 
             DepositOp {
                 priority_op,
-                account_id,
+                account_id: AccountId(account_id),
             }
         };
 
@@ -70,16 +70,16 @@ pub mod operations_test {
     fn test_public_data_conversions_transfer() {
         let (expected_transfer, expected_transfer_to_new) = {
             let tx = Transfer::new(
-                42,
+                AccountId(42),
                 Address::from_str("2a0a81e257a2f5d6ed4f07b81dbda09f107bd026").unwrap(),
                 Address::from_str("21abaed8712072e918632259780e587698ef58da").unwrap(),
-                42,
+                TokenId(42),
                 BigUint::from(42u32),
                 BigUint::from(42u32),
-                42,
+                Nonce(42),
                 None,
             );
-            let (from, to) = (1u32, 2u32);
+            let (from, to) = (AccountId(1u32), AccountId(2u32));
 
             (
                 TransferOp {
@@ -105,16 +105,16 @@ pub mod operations_test {
     fn test_public_data_conversions_withdraw() {
         let expected_op = {
             let tx = Withdraw::new(
-                42,
+                AccountId(42),
                 Address::from_str("2a0a81e257a2f5d6ed4f07b81dbda09f107bd026").unwrap(),
                 Address::from_str("21abaed8712072e918632259780e587698ef58da").unwrap(),
-                42,
+                TokenId(42),
                 BigUint::from(42u32),
                 BigUint::from(42u32),
-                42,
+                Nonce(42),
                 None,
             );
-            let account_id = 42u32;
+            let account_id = AccountId(42u32);
 
             WithdrawOp { tx, account_id }
         };
@@ -130,8 +130,8 @@ pub mod operations_test {
         let expected_op = {
             let priority_op = FullExit {
                 eth_address: Address::from_str("2a0a81e257a2f5d6ed4f07b81dbda09f107bd026").unwrap(),
-                account_id: 42,
-                token: 42,
+                account_id: AccountId(42),
+                token: TokenId(42),
             };
 
             FullExitOp {
@@ -150,18 +150,18 @@ pub mod operations_test {
     fn test_public_data_conversions_change_pubkey() {
         let expected_op = {
             let tx = ChangePubKey::new(
-                42,
+                AccountId(42),
                 Address::from_str("2a0a81e257a2f5d6ed4f07b81dbda09f107bd026").unwrap(),
                 PubKeyHash::from_hex("sync:3cfb9a39096d9e02b24187355f628f9a6331511b").unwrap(),
-                42,
+                TokenId(42),
                 BigUint::from(42u32),
-                42,
+                Nonce(42),
                 None,
                 Some(PackedEthSignature::deserialize_packed(
                     &hex::decode("2a0a81e257a2f5d6ed4f07b81dbda09f107bd026dbda09f107bd026f5d6ed4f02a0a81e257a2f5d6ed4f07b81dbda09f107bd026dbda09f107bd026f5d6ed4f0d4").unwrap(),
                 ).unwrap()),
             );
-            let account_id = 42u32;
+            let account_id = AccountId(42u32);
 
             ChangePubKeyOp { tx, account_id }
         };
@@ -176,14 +176,14 @@ pub mod operations_test {
     fn test_public_data_conversions_forced_exit() {
         let expected_op = {
             let tx = ForcedExit::new(
-                42,
+                AccountId(42),
                 Address::from_str("2a0a81e257a2f5d6ed4f07b81dbda09f107bd026").unwrap(),
-                42,
+                TokenId(42),
                 BigUint::from(42u32),
-                42,
+                Nonce(42),
                 None,
             );
-            let target_account_id = 42u32;
+            let target_account_id = AccountId(42u32);
 
             ForcedExitOp {
                 tx,
@@ -244,9 +244,9 @@ pub mod tx_conversion_test {
     use super::*;
 
     // General configuration parameters for all types of operations
-    const ACCOUNT_ID: u32 = 100;
-    const TOKEN_ID: u16 = 5;
-    const NONCE: u32 = 20;
+    const ACCOUNT_ID: AccountId = AccountId(100);
+    const TOKEN_ID: TokenId = TokenId(5);
+    const NONCE: Nonce = Nonce(20);
     lazy_static! {
         static ref ALICE: Address =
             Address::from_str("2a0a81e257a2f5d6ed4f07b81dbda09f107bd026").unwrap();

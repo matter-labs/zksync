@@ -264,7 +264,7 @@ impl TxSender {
                 } else {
                     // For non-popular tokens we've already checked that the provided fee is 0,
                     // and the USD price will be checked in ETH.
-                    TokenLike::Id(0)
+                    TokenLike::Id(TokenId(0))
                 };
 
                 let required_fee = Self::ticker_request(

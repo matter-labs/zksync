@@ -46,7 +46,7 @@ impl Witness for CloseAccountWitness<Bn256> {
 
     fn apply_tx(tree: &mut CircuitAccountTree, close_account: &CloseOp) -> Self {
         let close_acoount_data = CloseAccountData {
-            account_address: close_account.account_id as u32,
+            account_address: *close_account.account_id,
         };
         Self::apply_data(tree, &close_acoount_data)
     }

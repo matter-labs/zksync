@@ -62,9 +62,9 @@ impl Witness for TransferToNewWitness<Bn256> {
         let transfer_data = TransferToNewData {
             amount: transfer_to_new.tx.amount.to_string().parse().unwrap(),
             fee: transfer_to_new.tx.fee.to_string().parse().unwrap(),
-            token: u32::from(transfer_to_new.tx.token),
-            from_account_address: transfer_to_new.from,
-            to_account_address: transfer_to_new.to,
+            token: *transfer_to_new.tx.token as u32,
+            from_account_address: *transfer_to_new.from,
+            to_account_address: *transfer_to_new.to,
             new_address: eth_address_to_fr(&transfer_to_new.tx.to),
         };
         // le_bit_vector_into_field_element()

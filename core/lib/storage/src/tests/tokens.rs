@@ -21,22 +21,22 @@ async fn tokens_storage(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
         .expect("Load tokens query failed");
     assert_eq!(tokens.len(), 1);
     let eth_token = Token {
-        id: 0,
+        id: TokenId(0),
         address: "0000000000000000000000000000000000000000".parse().unwrap(),
         symbol: "ETH".into(),
         decimals: 18,
     };
-    assert_eq!(tokens[&0], eth_token);
+    assert_eq!(tokens[&TokenId(0)], eth_token);
 
     // Add two tokens.
     let token_a = Token {
-        id: 1,
+        id: TokenId(1),
         address: "0000000000000000000000000000000000000001".parse().unwrap(),
         symbol: "ABC".into(),
         decimals: 9,
     };
     let token_b = Token {
-        id: 2,
+        id: TokenId(2),
         address: "0000000000000000000000000000000000000002".parse().unwrap(),
         symbol: "DEF".into(),
         decimals: 6,
@@ -87,7 +87,7 @@ async fn tokens_storage(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
 
     // Now check that storing the token that already exists is the same as updating it.
     let token_c = Token {
-        id: 2,
+        id: TokenId(2),
         address: "0000000000000000000000000000000000000008".parse().unwrap(),
         symbol: "BAT".into(),
         decimals: 6,
@@ -110,7 +110,7 @@ async fn tokens_storage(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
 /// Checks the store/load routine for `ticker_price` table.
 #[db_test]
 async fn test_ticker_price(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
-    const TOKEN_ID: TokenId = 0;
+    const TOKEN_ID: TokenId = TokenId(0);
     // No entry exists yet.
     let loaded = storage
         .tokens_schema()

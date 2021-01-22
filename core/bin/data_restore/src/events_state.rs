@@ -25,7 +25,9 @@ impl TryFrom<Log> for NewTokenEvent {
         }
         Ok(NewTokenEvent {
             address: Address::from_slice(&event.topics[1].as_fixed_bytes()[12..]),
-            id: U256::from_big_endian(&event.topics[2].as_fixed_bytes()[..]).as_u32() as u16,
+            id: TokenId(
+                U256::from_big_endian(&event.topics[2].as_fixed_bytes()[..]).as_u32() as u16,
+            ),
         })
     }
 }
@@ -314,8 +316,12 @@ impl EventsState {
                 const U256_SIZE: usize = 32;
                 // Fields in `BlocksRevert` are not `indexed`, thus they're located in `data`.
                 assert_eq!(log.data.0.len(), U256_SIZE * 2);
-                let total_verified = U256::from_big_endian(&log.data.0[..U256_SIZE]).as_u32();
-                let total_committed = U256::from_big_endian(&log.data.0[U256_SIZE..]).as_u32();
+                let total_verified = zksync_types::BlockNumber(
+                    U256::from_big_endian(&log.data.0[..U256_SIZE]).as_u32(),
+                );
+                let total_committed = zksync_types::BlockNumber(
+                    U256::from_big_endian(&log.data.0[U256_SIZE..]).as_u32(),
+                );
 
                 self.committed_events
                     .retain(|bl| bl.block_num <= total_committed);
@@ -327,7 +333,7 @@ impl EventsState {
 
             // Go into new blocks
             let mut block: BlockEvent = BlockEvent {
-                block_num: 0,
+                block_num: zksync_types::BlockNumber(0),
                 transaction_hash: H256::zero(),
                 block_type: EventType::Committed,
             };
@@ -337,7 +343,7 @@ impl EventsState {
                 .expect("There are no tx hash in block event");
             let block_num = log.topics[1];
 
-            block.block_num = U256::from(block_num.as_bytes()).as_u32();
+            block.block_num = zksync_types::BlockNumber(U256::from(block_num.as_bytes()).as_u32());
             block.transaction_hash = tx_hash;
 
             if topic == block_verified_topic {

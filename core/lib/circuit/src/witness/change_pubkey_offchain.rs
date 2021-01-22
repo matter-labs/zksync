@@ -55,10 +55,10 @@ impl Witness for ChangePubkeyOffChainWitness<Bn256> {
 
     fn apply_tx(tree: &mut CircuitAccountTree, change_pubkey_offchain: &ChangePubKeyOp) -> Self {
         let change_pubkey_data = ChangePubkeyOffChainData {
-            account_id: change_pubkey_offchain.account_id,
+            account_id: *change_pubkey_offchain.account_id,
             address: eth_address_to_fr(&change_pubkey_offchain.tx.account),
             new_pubkey_hash: change_pubkey_offchain.tx.new_pk_hash.to_fr(),
-            fee_token: u32::from(change_pubkey_offchain.tx.fee_token),
+            fee_token: *change_pubkey_offchain.tx.fee_token as u32,
             fee: change_pubkey_offchain.tx.fee.to_u128().unwrap(),
             nonce: Fr::from_str(&change_pubkey_offchain.tx.nonce.to_string()).unwrap(),
         };

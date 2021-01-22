@@ -8,7 +8,7 @@ use web3::{
 use zksync_contracts::{governance_contract, zksync_contract};
 use zksync_crypto::Fr;
 
-use zksync_types::{AccountMap, AccountUpdate};
+use zksync_types::{AccountId, AccountMap, AccountUpdate, BlockNumber};
 // Local deps
 use crate::storage_interactor::StorageInteractor;
 use crate::{
@@ -173,9 +173,9 @@ where
         };
 
         let mut account_map = AccountMap::default();
-        account_map.insert(0, genesis_fee_account);
+        account_map.insert(AccountId(0), genesis_fee_account);
 
-        let current_block = 0;
+        let current_block = BlockNumber(0);
         let current_unprocessed_priority_op = 0;
         let fee_acc_num = 0;
 
@@ -183,7 +183,7 @@ where
             current_block,
             account_map,
             current_unprocessed_priority_op,
-            fee_acc_num,
+            AccountId(fee_acc_num),
             self.available_block_chunk_sizes.clone(),
         );
 
@@ -278,8 +278,8 @@ where
 
                             vlog::info!(
                                 "Correct expected root hash was met on the block {} out of {}",
-                                last_verified_block,
-                                total_verified_blocks
+                                *last_verified_block,
+                                *total_verified_blocks
                             );
                         }
                     }

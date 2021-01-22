@@ -62,9 +62,9 @@ impl Witness for TransferWitness<Bn256> {
         let transfer_data = TransferData {
             amount: transfer.tx.amount.to_u128().unwrap(),
             fee: transfer.tx.fee.to_u128().unwrap(),
-            token: u32::from(transfer.tx.token),
-            from_account_address: transfer.from,
-            to_account_address: transfer.to,
+            token: *transfer.tx.token as u32,
+            from_account_address: *transfer.from,
+            to_account_address: *transfer.to,
         };
         // le_bit_vector_into_field_element()
         Self::apply_data(tree, &transfer_data)

@@ -57,8 +57,8 @@ impl Witness for WithdrawWitness<Bn256> {
         let withdraw_data = WithdrawData {
             amount: withdraw.tx.amount.to_u128().unwrap(),
             fee: withdraw.tx.fee.to_u128().unwrap(),
-            token: u32::from(withdraw.tx.token),
-            account_address: withdraw.account_id,
+            token: *withdraw.tx.token as u32,
+            account_address: *withdraw.account_id,
             eth_address: eth_address_to_fr(&withdraw.tx.to),
         };
         // le_bit_vector_into_field_element()

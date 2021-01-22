@@ -123,7 +123,7 @@ impl ZkSyncStateInitParams {
         Self {
             tree: AccountTree::new(zksync_crypto::params::account_tree_depth()),
             acc_id_by_addr: HashMap::new(),
-            last_block_number: 0,
+            last_block_number: BlockNumber(0),
             unprocessed_priority_op: 0,
         }
     }
@@ -150,7 +150,7 @@ impl ZkSyncStateInitParams {
 
         // We've checked that pending block is greater than the last committed block,
         // but it must be greater exactly by 1.
-        assert_eq!(pending_block.number, self.last_block_number + 1);
+        assert_eq!(*pending_block.number, *self.last_block_number + 1);
 
         Some(pending_block)
     }
@@ -237,7 +237,7 @@ impl ZkSyncStateInitParams {
                 }
             }
         }
-        if block_number != 0 {
+        if *block_number != 0 {
             let storage_root_hash = storage
                 .chain()
                 .block_schema()
@@ -264,7 +264,7 @@ impl ZkSyncStateInitParams {
 
         vlog::info!(
             "Loaded committed state: last block number: {}, unprocessed priority op: {}",
-            self.last_block_number,
+            *self.last_block_number,
             self.unprocessed_priority_op
         );
         Ok(())
@@ -295,13 +295,13 @@ impl ZkSyncStateInitParams {
         Ok(())
     }
 
-    pub fn insert_account(&mut self, id: u32, acc: Account) {
+    pub fn insert_account(&mut self, id: AccountId, acc: Account) {
         self.acc_id_by_addr.insert(acc.address, id);
-        self.tree.insert(id, acc);
+        self.tree.insert(*id, acc);
     }
 
-    pub fn remove_account(&mut self, id: u32) -> Option<Account> {
-        if let Some(acc) = self.tree.remove(id) {
+    pub fn remove_account(&mut self, id: AccountId) -> Option<Account> {
+        if let Some(acc) = self.tree.remove(*id) {
             self.acc_id_by_addr.remove(&acc.address);
             Some(acc)
         } else {
@@ -445,7 +445,7 @@ impl ZkSyncStateKeeper {
             .expect("db failed");
 
         assert!(
-            last_committed == 0 && accounts.is_empty(),
+            *last_committed == 0 && accounts.is_empty(),
             "db should be empty"
         );
         let fee_account = Account::default_with_address(fee_account_address);
@@ -453,17 +453,17 @@ impl ZkSyncStateKeeper {
             address: *fee_account_address,
             nonce: fee_account.nonce,
         };
-        accounts.insert(0, fee_account);
+        accounts.insert(AccountId(0), fee_account);
         transaction
             .chain()
             .state_schema()
-            .commit_state_update(0, &[(0, db_account_update)], 0)
+            .commit_state_update(BlockNumber(0), &[(AccountId(0), db_account_update)], 0)
             .await
             .expect("db fail");
         transaction
             .chain()
             .state_schema()
-            .apply_state_update(0)
+            .apply_state_update(BlockNumber(0))
             .await
             .expect("db fail");
 
@@ -877,11 +877,11 @@ impl ZkSyncStateKeeper {
             first_update_order_id,
         };
         pending_block.stored_account_updates = pending_block.account_updates.len();
-        self.state.block_number += 1;
+        *self.state.block_number += 1;
 
         vlog::info!(
             "Creating full block: {}, operations: {}, chunks_left: {}, miniblock iterations: {}",
-            block_commit_request.block.block_number,
+            *block_commit_request.block.block_number,
             block_commit_request.block.block_transactions.len(),
             pending_block.chunks_left,
             pending_block.pending_block_iteration
@@ -935,7 +935,7 @@ impl ZkSyncStateKeeper {
 
         vlog::debug!(
             "Persisting mini block: {}, operations: {}, failed_txs: {}, chunks_left: {}, miniblock iterations: {}",
-            pending_block.number,
+            *pending_block.number,
             pending_block.success_operations.len(),
             pending_block.failed_txs.len(),
             pending_block.chunks_left,

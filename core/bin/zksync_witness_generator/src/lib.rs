@@ -217,7 +217,11 @@ async fn publish(
         .access_storage()
         .await
         .map_err(actix_web::error::ErrorInternalServerError)?;
-    if let Err(e) = storage.prover_schema().store_proof(r.block, &r.proof).await {
+    if let Err(e) = storage
+        .prover_schema()
+        .store_proof(BlockNumber(r.block), &r.proof)
+        .await
+    {
         vlog::error!("failed to store received proof: {}", e);
         let message = if e.to_string().contains("duplicate key") {
             "duplicate key"
@@ -324,7 +328,7 @@ pub fn run_prover_server(
                         .await
                         .expect("Failed to access storage");
 
-                    storage
+                    *storage
                         .chain()
                         .block_schema()
                         .get_last_verified_block()
@@ -345,8 +349,8 @@ pub fn run_prover_server(
                     let pool_maintainer = witness_generator::WitnessGenerator::new(
                         connection_pool.clone(),
                         witness_generator_opts.prepare_data_interval(),
-                        start_block,
-                        block_step,
+                        BlockNumber(start_block),
+                        BlockNumber(block_step),
                     );
                     pool_maintainer.start(panic_notify.clone());
                 }

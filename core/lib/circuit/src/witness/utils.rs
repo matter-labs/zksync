@@ -103,7 +103,7 @@ impl<'a> WitnessBuilder<'a> {
         for _ in 0..chunks_remaining {
             self.operations.push(crate::witness::noop::noop_operation(
                 &self.account_tree,
-                self.fee_account_id,
+                *self.fee_account_id,
             ));
             self.pubdata.extend(vec![false; CHUNK_BIT_WIDTH]);
         }
@@ -115,7 +115,7 @@ impl<'a> WitnessBuilder<'a> {
 
         let fee_circuit_account = self
             .account_tree
-            .get(self.fee_account_id)
+            .get(*self.fee_account_id)
             .expect("fee account is not in the tree");
         let mut fee_circuit_account_balances = Vec::with_capacity(total_tokens());
         for i in 0u32..(total_tokens() as u32) {
@@ -129,12 +129,12 @@ impl<'a> WitnessBuilder<'a> {
         self.fee_account_balances = Some(fee_circuit_account_balances);
 
         let (mut root_after_fee, mut fee_account_witness) =
-            crate::witness::utils::apply_fee(&mut self.account_tree, self.fee_account_id, 0, 0);
+            crate::witness::utils::apply_fee(&mut self.account_tree, *self.fee_account_id, 0, 0);
         for CollectedFee { token, amount } in fees {
             let (root, acc_witness) = crate::witness::utils::apply_fee(
                 &mut self.account_tree,
-                self.fee_account_id,
-                u32::from(*token),
+                *self.fee_account_id,
+                **token as u32,
                 amount.to_u128().unwrap(),
             );
             root_after_fee = root;
@@ -148,7 +148,7 @@ impl<'a> WitnessBuilder<'a> {
     /// After fees collected creates public data commitment
     pub fn calculate_pubdata_commitment(&mut self) {
         let (fee_account_audit_path, _) =
-            crate::witness::utils::get_audits(&self.account_tree, self.fee_account_id, 0);
+            crate::witness::utils::get_audits(&self.account_tree, *self.fee_account_id, 0);
         self.fee_account_audit_path = Some(fee_account_audit_path);
 
         let public_data_commitment = crate::witness::utils::public_data_commitment::<Engine>(

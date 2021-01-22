@@ -107,7 +107,7 @@ impl ZkSyncState {
         );
 
         from_account.sub_balance(op.tx.token, &(&op.tx.amount + &op.tx.fee));
-        from_account.nonce += 1;
+        *from_account.nonce += 1;
 
         let from_new_balance = from_account.get_balance(op.tx.token);
         let from_new_nonce = from_account.nonce;
@@ -176,7 +176,7 @@ impl ZkSyncState {
         );
 
         account.sub_balance(op.tx.token, &op.tx.fee);
-        account.nonce += 1;
+        *account.nonce += 1;
 
         let new_balance = account.get_balance(op.tx.token);
         let new_nonce = account.nonce;
@@ -236,7 +236,7 @@ impl ZkSyncState {
             "Not enough balance"
         );
         from_account.sub_balance(op.tx.token, &(&op.tx.amount + &op.tx.fee));
-        from_account.nonce += 1;
+        *from_account.nonce += 1;
         let from_new_balance = from_account.get_balance(op.tx.token);
         let from_new_nonce = from_account.nonce;
 

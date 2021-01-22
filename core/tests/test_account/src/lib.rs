@@ -56,7 +56,7 @@ impl ZkSyncAccount {
             }
             (eth_pk, eth_address)
         };
-        Self::new(pk, 0, eth_address, eth_pk)
+        Self::new(pk, Nonce(0), eth_address, eth_pk)
     }
 
     pub fn new(
@@ -127,7 +127,7 @@ impl ZkSyncAccount {
         .expect("Failed to sign transfer");
 
         if increment_nonce {
-            *stored_nonce += 1;
+            **stored_nonce += 1;
         }
 
         let message = transfer.get_ethereum_sign_message(token_symbol, 18);
@@ -159,7 +159,7 @@ impl ZkSyncAccount {
         .expect("Failed to sign forced exit");
 
         if increment_nonce {
-            *stored_nonce += 1;
+            **stored_nonce += 1;
         }
 
         forced_exit
@@ -193,7 +193,7 @@ impl ZkSyncAccount {
         .expect("Failed to sign withdraw");
 
         if increment_nonce {
-            *stored_nonce += 1;
+            **stored_nonce += 1;
         }
 
         let message = withdraw.get_ethereum_sign_message(token_symbol, 18);
@@ -212,7 +212,7 @@ impl ZkSyncAccount {
         close.signature = TxSignature::sign_musig(&self.private_key, &close.get_bytes());
 
         if increment_nonce {
-            *stored_nonce += 1;
+            **stored_nonce += 1;
         }
         close
     }
@@ -263,7 +263,7 @@ impl ZkSyncAccount {
         }
 
         if increment_nonce {
-            *stored_nonce += 1;
+            **stored_nonce += 1;
         }
 
         change_pubkey
