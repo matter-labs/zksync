@@ -40,3 +40,11 @@ services:
     - type: bind
       source: ./volumes/tesseracts
       target: /var/lib/tesseracts/data
+
+  elastic:
+    image: elasticsearch:7.10.1
+    ports:
+      - "9200:9200"
+      - "9300:9300"
+    environment:
+      - discovery.type=single-node

@@ -138,7 +138,7 @@ impl ChangePubkeyOffChainWitness<Bn256> {
     ) -> Self {
         //preparing data and base witness
         let before_root = tree.root_hash();
-        log::debug!("Initial root = {}", before_root);
+        vlog::debug!("Initial root = {}", before_root);
         let (audit_path_before, audit_balance_path_before) = get_audits(
             tree,
             change_pubkey_offcahin.account_id,
@@ -185,7 +185,7 @@ impl ChangePubkeyOffChainWitness<Bn256> {
         let b = fee_as_field_element;
 
         let after_root = tree.root_hash();
-        log::debug!("After root = {}", after_root);
+        vlog::debug!("After root = {}", after_root);
         let (audit_path_after, audit_balance_path_after) = get_audits(
             tree,
             change_pubkey_offcahin.account_id,

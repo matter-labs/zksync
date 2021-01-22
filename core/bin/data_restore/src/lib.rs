@@ -28,6 +28,6 @@ pub async fn add_tokens_to_storage<I: StorageInteractor>(interactor: &mut I, eth
             &token.symbol, id, &token.address, &token.decimals
         );
         interactor.store_token(token, TokenId(id)).await;
-        log::info!("{}", add_token_log);
+        vlog::info!("{}", add_token_log);
     }
 }
