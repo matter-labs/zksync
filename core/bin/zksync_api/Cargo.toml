@@ -17,21 +17,21 @@ api_test = []
 [dependencies]
 zksync_types = { path = "../../lib/types", version = "1.0" }
 zksync_storage = { path = "../../lib/storage", version = "1.0" }
-vlog = { path = "../../lib/vlog", version = "1.0" }
 
 zksync_crypto = { path = "../../lib/crypto", version = "1.0" }
 zksync_config = { path = "../../lib/config", version = "1.0" }
 zksync_utils = { path = "../../lib/utils", version = "1.0" }
 zksync_contracts = { path = "../../lib/contracts", version = "1.0" }
 zksync_api_client  = { path = "../../lib/api_client", version = "0.1" }
+zksync_prometheus_exporter = { path = "../../lib/prometheus_exporter", version = "1.0" }
+
+vlog = { path = "../../lib/vlog", version = "1.0" }
 
 hex = "0.4"
 ethabi = "12.0.0"
 web3 = "0.13.0"
 serde = "1.0.90"
 serde_json = "1.0.0"
-log = "0.4"
-env_logger = "0.6"
 itertools = "0.8"
 jsonrpc-core = "14.0.3"
 jsonrpc-core-client = "14.0.3"

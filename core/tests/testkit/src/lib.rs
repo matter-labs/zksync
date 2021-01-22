@@ -1,5 +1,5 @@
 use zksync_core::state_keeper::ZkSyncStateInitParams;
-use zksync_types::{Account, Address};
+use zksync_types::{Account, AccountId, Address};
 
 pub use self::{
     account_set::AccountSet, state_keeper_utils::spawn_state_keeper, test_setup::TestSetup,
@@ -21,6 +21,6 @@ pub mod types;
 pub fn genesis_state(fee_account_address: &Address) -> ZkSyncStateInitParams {
     let operator_account = Account::default_with_address(fee_account_address);
     let mut params = ZkSyncStateInitParams::new();
-    params.insert_account(0, operator_account);
+    params.insert_account(AccountId(0), operator_account);
     params
 }

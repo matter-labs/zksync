@@ -2,7 +2,6 @@
 
 use crate::gen_verified_proof_for_exit_circuit;
 use anyhow::format_err;
-use log::info;
 use num::BigUint;
 use std::time::Instant;
 use zksync_circuit::exit_circuit::create_exit_circuit_with_public_input;
@@ -26,7 +25,7 @@ pub fn create_exit_proof(
         if id == account_id {
             target_account = Some(account.clone());
         }
-        circuit_account_tree.insert(id, CircuitAccount::from(account));
+        circuit_account_tree.insert(*id, CircuitAccount::from(account));
     }
 
     let balance = target_account
@@ -34,7 +33,7 @@ pub fn create_exit_proof(
         .ok_or_else(|| {
             format_err!(
                 "Fund account not found: id: {}, address: 0x{:x}",
-                account_id,
+                *account_id,
                 owner
             )
         })?;
@@ -45,6 +44,6 @@ pub fn create_exit_proof(
     let proof = gen_verified_proof_for_exit_circuit(zksync_exit_circuit)
         .map_err(|e| format_err!("Failed to generate proof: {}", e))?;
 
-    info!("Exit proof created: {} s", timer.elapsed().as_secs());
+    vlog::info!("Exit proof created: {} s", timer.elapsed().as_secs());
     Ok((proof, balance))
 }

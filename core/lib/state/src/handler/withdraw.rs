@@ -70,7 +70,7 @@ impl TxHandler<Withdraw> for ZkSyncState {
         );
 
         from_account.sub_balance(op.tx.token, &(&op.tx.amount + &op.tx.fee));
-        from_account.nonce += 1;
+        *from_account.nonce += 1;
 
         let from_new_balance = from_account.get_balance(op.tx.token);
         let from_new_nonce = from_account.nonce;

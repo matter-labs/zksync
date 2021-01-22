@@ -194,7 +194,14 @@ impl<S: EthereumSigner> EthereumProvider<S> {
 
         let signed_tx = self
             .eth_client
-            .sign_prepared_tx_for_addr(data, token.address, Default::default())
+            .sign_prepared_tx_for_addr(
+                data,
+                token.address,
+                Options {
+                    gas: Some(300_000.into()),
+                    ..Default::default()
+                },
+            )
             .await
             .map_err(|_| ClientError::IncorrectCredentials)?;
 
@@ -222,7 +229,11 @@ impl<S: EthereumSigner> EthereumProvider<S> {
             .ok_or(ClientError::UnknownToken)?;
 
         let signed_tx = if self.tokens_cache.is_eth(token) {
-            let options = Options::with(|options| options.value = Some(amount));
+            let options = Options {
+                value: Some(amount),
+                gas: Some(300_000.into()),
+                ..Default::default()
+            };
             self.eth_client
                 .sign_prepared_tx_for_addr(Vec::new(), to, options)
                 .await
@@ -238,7 +249,14 @@ impl<S: EthereumSigner> EthereumProvider<S> {
                 .expect("failed to encode parameters");
 
             self.eth_client
-                .sign_prepared_tx_for_addr(data, token_info.address, Default::default())
+                .sign_prepared_tx_for_addr(
+                    data,
+                    token_info.address,
+                    Options {
+                        gas: Some(300_000.into()),
+                        ..Default::default()
+                    },
+                )
                 .await
                 .map_err(|_| ClientError::IncorrectCredentials)?
         };
@@ -308,7 +326,7 @@ impl<S: EthereumSigner> EthereumProvider<S> {
             .tokens_cache
             .resolve(token.clone())
             .ok_or(ClientError::UnknownToken)?;
-        let account_id = U256::from(account_id);
+        let account_id = U256::from(*account_id);
 
         let options = Options {
             gas: Some(500_000.into()),

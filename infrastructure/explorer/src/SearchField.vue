@@ -34,6 +34,7 @@
 
 <script>
 import { clientPromise } from './Client';
+import { removeTxHashPrefix } from './utils';
 
 export default {
     name: 'SearchField',
@@ -55,12 +56,7 @@ export default {
             this.notFound = false;
             this.searching = true;
 
-            let query = this.query.trim();
-            for (const prefix of ['0x', 'sync-tx:', 'sync-bl:', 'sync:']) {
-                if (query.startsWith(prefix)) {
-                    query = query.slice(prefix.length);
-                }
-            }
+            let query = removeTxHashPrefix(this.query.trim());
 
             let block = await client.searchBlock(query).catch(() => null);
             if (block && block.block_number) {

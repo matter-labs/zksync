@@ -43,7 +43,7 @@ impl<'a, 'c> OperationsSchema<'a, 'c> {
             "sql.chain.operations.get_last_block_by_action",
             start.elapsed()
         );
-        Ok(max_block as BlockNumber)
+        Ok(BlockNumber(max_block as u32))
     }
 
     /// Given block number and action type, retrieves the corresponding operation
@@ -57,7 +57,7 @@ impl<'a, 'c> OperationsSchema<'a, 'c> {
         let result = sqlx::query_as!(
             StoredOperation,
             "SELECT * FROM operations WHERE block_number = $1 AND action_type = $2",
-            i64::from(block_number),
+            i64::from(*block_number),
             action_type.to_string()
         )
         .fetch_optional(self.0.conn())
@@ -161,7 +161,7 @@ impl<'a, 'c> OperationsSchema<'a, 'c> {
                 SET confirmed = $1
                 WHERE block_number = $2 AND action_type = $3",
             true,
-            i64::from(block_number),
+            i64::from(*block_number),
             action_type.to_string()
         )
         .execute(self.0.conn())

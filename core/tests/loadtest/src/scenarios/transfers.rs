@@ -89,8 +89,9 @@ impl Scenario for TransferScenario {
             &self.transfer_size + (&fees.zksync * BigUint::from(self.transfer_rounds));
 
         ScenarioResources {
-            balance_per_wallet: closest_packable_token_amount(&balance_per_wallet),
+            balance_per_wallet,
             wallets_amount: self.wallets,
+            has_deposits: false,
         }
     }
 
@@ -102,7 +103,7 @@ impl Scenario for TransferScenario {
     ) -> anyhow::Result<()> {
         let transfers_number = (self.wallets * self.transfer_rounds) as usize;
 
-        log::info!(
+        vlog::info!(
             "All the initial transfers have been verified, creating {} transactions \
             for the transfers step",
             transfers_number
@@ -124,7 +125,7 @@ impl Scenario for TransferScenario {
         )
         .await?;
 
-        log::info!("Created {} transactions...", self.txs.len());
+        vlog::info!("Created {} transactions...", self.txs.len());
 
         Ok(())
     }

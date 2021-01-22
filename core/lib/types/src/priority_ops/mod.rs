@@ -108,7 +108,7 @@ impl ZkSyncPriorityOp {
 
                 Ok(Self::Deposit(Deposit {
                     from: sender,
-                    token,
+                    token: TokenId(token),
                     amount,
                     to: account,
                 }))
@@ -140,9 +140,9 @@ impl ZkSyncPriorityOp {
                 );
 
                 Ok(Self::FullExit(FullExit {
-                    account_id,
+                    account_id: AccountId(account_id),
                     eth_address,
-                    token,
+                    token: TokenId(token),
                 }))
             }
             _ => {

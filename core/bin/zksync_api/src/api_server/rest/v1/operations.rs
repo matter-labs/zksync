@@ -58,7 +58,7 @@ impl ApiOperationsData {
         let blocks = storage
             .chain()
             .block_schema()
-            .load_block_range(executed_op.block_number as BlockNumber, 1)
+            .load_block_range(BlockNumber(executed_op.block_number as u32), 1)
             .await?;
 
         let block_info = blocks
@@ -66,7 +66,7 @@ impl ApiOperationsData {
             .next()
             .expect("Database provided an incorrect priority op receipt");
 
-        let block = block_info.block_number as BlockNumber;
+        let block = BlockNumber(block_info.block_number as u32);
         let index = executed_op.block_index as u32;
 
         let receipt = if block_info.verify_tx_hash.is_some() {
@@ -170,7 +170,7 @@ pub fn api_scope(pool: ConnectionPool) -> Scope {
 #[cfg(test)]
 mod tests {
     use zksync_storage::test_data::dummy_ethereum_tx_hash;
-    use zksync_types::Address;
+    use zksync_types::{AccountId, Address};
 
     use crate::api_server::v1::test_utils::{dummy_deposit_op, dummy_full_exit_op};
 
@@ -196,7 +196,9 @@ mod tests {
 
         let expected_receipt = PriorityOpReceipt {
             index: Some(2),
-            status: Receipt::Verified { block: 2 },
+            status: Receipt::Verified {
+                block: BlockNumber(2),
+            },
         };
         assert_eq!(
             client.priority_op(VERIFIED_OP_SERIAL_ID).await?.as_ref(),
@@ -208,7 +210,7 @@ mod tests {
         );
 
         let expected_data = PriorityOpData {
-            data: dummy_deposit_op(Address::default(), 1, 15, 2).op,
+            data: dummy_deposit_op(Address::default(), AccountId(1), 15, 2).op,
             serial_id: VERIFIED_OP_SERIAL_ID,
             eth_hash: verified_op_hash,
         };
@@ -236,7 +238,9 @@ mod tests {
 
         let expected_receipt = PriorityOpReceipt {
             index: Some(1),
-            status: Receipt::Committed { block: 4 },
+            status: Receipt::Committed {
+                block: BlockNumber(4),
+            },
         };
         assert_eq!(
             client.priority_op(COMMITTED_OP_SERIAL_ID).await?.as_ref(),
@@ -248,7 +252,7 @@ mod tests {
         );
 
         let expected_data = PriorityOpData {
-            data: dummy_full_exit_op(1, Address::default(), 16, 3).op,
+            data: dummy_full_exit_op(AccountId(1), Address::default(), 16, 3).op,
             serial_id: COMMITTED_OP_SERIAL_ID,
             eth_hash: committed_eth_hash,
         };

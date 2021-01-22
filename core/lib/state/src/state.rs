@@ -57,7 +57,7 @@ impl ZkSyncState {
         let balance_tree = AccountTree::new(tree_depth);
         Self {
             balance_tree,
-            block_number: 0,
+            block_number: BlockNumber(0),
             account_id_by_address: HashMap::new(),
         }
     }
@@ -101,11 +101,11 @@ impl ZkSyncState {
     pub fn get_account(&self, account_id: AccountId) -> Option<Account> {
         let start = std::time::Instant::now();
 
-        let account = self.balance_tree.get(account_id).cloned();
+        let account = self.balance_tree.get(*account_id).cloned();
 
-        log::trace!(
+        vlog::trace!(
             "Get account (id {}) execution time: {}ms",
-            account_id,
+            *account_id,
             start.elapsed().as_millis()
         );
 
@@ -268,7 +268,7 @@ impl ZkSyncState {
     }
 
     pub(crate) fn get_free_account_id(&self) -> AccountId {
-        self.balance_tree.items.len() as u32
+        AccountId(self.balance_tree.items.len() as u32)
     }
 
     pub fn collect_fee(&mut self, fees: &[CollectedFee], fee_account: AccountId) -> AccountUpdates {
@@ -277,7 +277,7 @@ impl ZkSyncState {
         let mut account = self.get_account(fee_account).unwrap_or_else(|| {
             panic!(
                 "Fee account should be present in the account tree: {}",
-                fee_account
+                *fee_account
             )
         });
 
@@ -318,14 +318,14 @@ impl ZkSyncState {
     #[doc(hidden)] // Public for benches.
     pub fn insert_account(&mut self, id: AccountId, account: Account) {
         self.account_id_by_address.insert(account.address, id);
-        self.balance_tree.insert(id, account);
+        self.balance_tree.insert(*id, account);
     }
 
     #[allow(dead_code)]
     pub(crate) fn remove_account(&mut self, id: AccountId) {
         if let Some(account) = self.get_account(id) {
             self.account_id_by_address.remove(&account.address);
-            self.balance_tree.remove(id);
+            self.balance_tree.remove(*id);
         }
     }
 
@@ -349,7 +349,7 @@ impl ZkSyncState {
     }
 
     #[cfg(test)]
-    pub(crate) fn apply_updates(&mut self, updates: &[(u32, AccountUpdate)]) {
+    pub(crate) fn apply_updates(&mut self, updates: &[(AccountId, AccountUpdate)]) {
         for (account_id, update) in updates {
             match update {
                 AccountUpdate::Create { address, nonce } => {
@@ -418,7 +418,7 @@ mod tests {
     use super::*;
     use crate::tests::{AccountState::*, PlasmaTestBuilder};
     use zksync_crypto::rand::{Rng, SeedableRng, XorShiftRng};
-    use zksync_types::tx::Withdraw;
+    use zksync_types::{tx::Withdraw, Nonce};
 
     /// Checks if execute_txs_batch fails if it doesn't have enough balance.
     #[test]
@@ -426,13 +426,13 @@ mod tests {
         let mut tb = PlasmaTestBuilder::new();
 
         let (account_id, account, sk) = tb.add_account(Unlocked);
-        tb.set_balance(account_id, 0, BigUint::from(99u32));
+        tb.set_balance(account_id, TokenId(0), BigUint::from(99u32));
 
         let withdraw1 = Withdraw::new_signed(
             account_id,
             account.address,
             account.address,
-            0,
+            TokenId(0),
             BigUint::from(48u32),
             BigUint::from(2u32),
             account.nonce,
@@ -443,7 +443,7 @@ mod tests {
             account_id,
             account.address,
             account.address,
-            0,
+            TokenId(0),
             BigUint::from(47u32),
             BigUint::from(3u32),
             account.nonce + 1,
@@ -471,13 +471,13 @@ mod tests {
         let mut tb = PlasmaTestBuilder::new();
 
         let (account_id, account, sk) = tb.add_account(Unlocked);
-        tb.set_balance(account_id, 0, BigUint::from(100u32));
+        tb.set_balance(account_id, TokenId(0), BigUint::from(100u32));
 
         let withdraw1 = Withdraw::new_signed(
             account_id,
             account.address,
             account.address,
-            0,
+            TokenId(0),
             BigUint::from(48u32),
             BigUint::from(2u32),
             account.nonce,
@@ -488,7 +488,7 @@ mod tests {
             account_id,
             account.address,
             account.address,
-            0,
+            TokenId(0),
             BigUint::from(47u32),
             BigUint::from(3u32),
             account.nonce + 1,
@@ -506,19 +506,19 @@ mod tests {
         };
         let expected_updates = vec![
             (
-                0,
+                AccountId(0),
                 AccountUpdate::UpdateBalance {
-                    old_nonce: 0,
-                    new_nonce: 1,
-                    balance_update: (0, 100u32.into(), 50u32.into()),
+                    old_nonce: Nonce(0),
+                    new_nonce: Nonce(1),
+                    balance_update: (TokenId(0), 100u32.into(), 50u32.into()),
                 },
             ),
             (
-                0,
+                AccountId(0),
                 AccountUpdate::UpdateBalance {
-                    old_nonce: 1,
-                    new_nonce: 2,
-                    balance_update: (0, 50u32.into(), 0u32.into()),
+                    old_nonce: Nonce(1),
+                    new_nonce: Nonce(2),
+                    balance_update: (TokenId(0), 50u32.into(), 0u32.into()),
                 },
             ),
         ];
@@ -532,10 +532,10 @@ mod tests {
         let mut rng = XorShiftRng::from_seed([1, 2, 3, 4]);
         let mut state = ZkSyncState::empty();
         let updates = vec![(
-            0,
+            AccountId(0),
             AccountUpdate::Delete {
                 address: Address::from(rng.gen::<[u8; 20]>()),
-                nonce: 0,
+                nonce: Nonce(0),
             },
         )];
         state.apply_account_updates(updates);
@@ -549,21 +549,27 @@ mod tests {
         let mut state = ZkSyncState::empty();
         let address = Address::from(rng.gen::<[u8; 20]>());
         let updates = vec![
-            (0, AccountUpdate::Create { address, nonce: 0 }),
             (
-                0,
-                AccountUpdate::UpdateBalance {
-                    old_nonce: 0,
-                    new_nonce: 1,
-                    balance_update: (0, 0u32.into(), 100u32.into()),
+                AccountId(0),
+                AccountUpdate::Create {
+                    address,
+                    nonce: Nonce(0),
                 },
             ),
             (
-                0,
+                AccountId(0),
                 AccountUpdate::UpdateBalance {
-                    old_nonce: 0,
-                    new_nonce: 1,
-                    balance_update: (0, 100u32.into(), 200u32.into()),
+                    old_nonce: Nonce(0),
+                    new_nonce: Nonce(1),
+                    balance_update: (TokenId(0), 0u32.into(), 100u32.into()),
+                },
+            ),
+            (
+                AccountId(0),
+                AccountUpdate::UpdateBalance {
+                    old_nonce: Nonce(0),
+                    new_nonce: Nonce(1),
+                    balance_update: (TokenId(0), 100u32.into(), 200u32.into()),
                 },
             ),
         ];
@@ -578,21 +584,27 @@ mod tests {
         let mut state = ZkSyncState::empty();
         let address = Address::from(rng.gen::<[u8; 20]>());
         let updates = vec![
-            (0, AccountUpdate::Create { address, nonce: 0 }),
             (
-                0,
-                AccountUpdate::UpdateBalance {
-                    old_nonce: 0,
-                    new_nonce: 1,
-                    balance_update: (0, 0u32.into(), 100u32.into()),
+                AccountId(0),
+                AccountUpdate::Create {
+                    address,
+                    nonce: Nonce(0),
                 },
             ),
             (
-                0,
+                AccountId(0),
                 AccountUpdate::UpdateBalance {
-                    old_nonce: 1,
-                    new_nonce: 2,
-                    balance_update: (0, 0u32.into(), 200u32.into()),
+                    old_nonce: Nonce(0),
+                    new_nonce: Nonce(1),
+                    balance_update: (TokenId(0), 0u32.into(), 100u32.into()),
+                },
+            ),
+            (
+                AccountId(0),
+                AccountUpdate::UpdateBalance {
+                    old_nonce: Nonce(1),
+                    new_nonce: Nonce(2),
+                    balance_update: (TokenId(0), 0u32.into(), 200u32.into()),
                 },
             ),
         ];
@@ -611,17 +623,17 @@ mod tests {
         let mut state = ZkSyncState::empty();
         let updates = vec![
             (
-                0,
+                AccountId(0),
                 AccountUpdate::Create {
                     address: random_addresses[0],
-                    nonce: 0,
+                    nonce: Nonce(0),
                 },
             ),
             (
-                1,
+                AccountId(1),
                 AccountUpdate::Create {
                     address: random_addresses[0],
-                    nonce: 0,
+                    nonce: Nonce(0),
                 },
             ),
         ];
@@ -633,7 +645,7 @@ mod tests {
     fn apply_account_updates_success() {
         let mut rng = XorShiftRng::from_seed([1, 2, 3, 4]);
         let mut random_addresses = Vec::new();
-        let token_id = 0;
+        let token_id = TokenId(0);
         random_addresses.push(Address::from(rng.gen::<[u8; 20]>()));
         random_addresses.push(Address::from(rng.gen::<[u8; 20]>()));
 
@@ -641,68 +653,80 @@ mod tests {
 
         let updates = vec![
             (
-                0,
+                AccountId(0),
                 AccountUpdate::Create {
                     address: random_addresses[0],
-                    nonce: 0,
+                    nonce: Nonce(0),
                 },
             ),
             (
-                1,
+                AccountId(1),
                 AccountUpdate::Create {
                     address: random_addresses[1],
-                    nonce: 0,
+                    nonce: Nonce(0),
                 },
             ),
         ];
         state.apply_account_updates(updates);
         assert_eq!(
-            state.get_account(0).unwrap().get_balance(token_id),
+            state
+                .get_account(AccountId(0))
+                .unwrap()
+                .get_balance(token_id),
             0u32.into()
         );
         assert_eq!(
-            state.get_account(1).unwrap().get_balance(token_id),
+            state
+                .get_account(AccountId(1))
+                .unwrap()
+                .get_balance(token_id),
             0u32.into()
         );
 
         let updates = vec![(
-            0,
+            AccountId(0),
             AccountUpdate::UpdateBalance {
-                old_nonce: 0,
-                new_nonce: 1,
+                old_nonce: Nonce(0),
+                new_nonce: Nonce(1),
                 balance_update: (token_id, 0u32.into(), 100u32.into()),
             },
         )];
         state.apply_account_updates(updates);
         assert_eq!(
-            state.get_account(0).unwrap().get_balance(token_id),
+            state
+                .get_account(AccountId(0))
+                .unwrap()
+                .get_balance(token_id),
             100u32.into()
         );
         assert_eq!(
-            state.get_account(1).unwrap().get_balance(token_id),
+            state
+                .get_account(AccountId(1))
+                .unwrap()
+                .get_balance(token_id),
             0u32.into()
         );
 
         let updates = vec![(
-            0,
+            AccountId(0),
             AccountUpdate::ChangePubKeyHash {
-                old_pub_key_hash: state.get_account(0).unwrap().pub_key_hash,
-                new_pub_key_hash: state.get_account(1).unwrap().pub_key_hash,
-                old_nonce: 1,
-                new_nonce: 2,
+                old_pub_key_hash: state.get_account(AccountId(0)).unwrap().pub_key_hash,
+                new_pub_key_hash: state.get_account(AccountId(1)).unwrap().pub_key_hash,
+                old_nonce: Nonce(1),
+                new_nonce: Nonce(2),
             },
         )];
         state.apply_account_updates(updates);
         assert_eq!(
-            state.get_account(0).unwrap().pub_key_hash,
-            state.get_account(1).unwrap().pub_key_hash
+            state.get_account(AccountId(0)).unwrap().pub_key_hash,
+            state.get_account(AccountId(1)).unwrap().pub_key_hash
         );
 
         let updates = vec![(
-            0,
+            AccountId(0),
             AccountUpdate::Delete {
                 address: random_addresses[0],
-                nonce: 2,
+                nonce: Nonce(2),
             },
         )];
         state.apply_account_updates(updates);
@@ -713,7 +737,7 @@ mod tests {
     fn plasma_state_reversing_updates() {
         let mut rng = XorShiftRng::from_seed([1, 2, 3, 4]);
 
-        let token_id = 10;
+        let token_id = TokenId(10);
 
         let mut random_addresses = Vec::new();
         for _ in 0..20 {
@@ -724,44 +748,44 @@ mod tests {
         // Delete 0, update balance of 1, create account 2
         // Reverse updates
 
-        let initial_plasma_state = ZkSyncState::from_acc_map(AccountMap::default(), 0);
+        let initial_plasma_state = ZkSyncState::from_acc_map(AccountMap::default(), BlockNumber(0));
 
         let updates = {
             let mut updates = AccountUpdates::new();
             updates.push((
-                0,
+                AccountId(0),
                 AccountUpdate::Create {
                     address: random_addresses[0],
-                    nonce: 0,
+                    nonce: Nonce(0),
                 },
             ));
             updates.push((
-                1,
+                AccountId(1),
                 AccountUpdate::Create {
                     address: random_addresses[1],
-                    nonce: 0,
+                    nonce: Nonce(0),
                 },
             ));
             updates.push((
-                0,
+                AccountId(0),
                 AccountUpdate::Delete {
                     address: random_addresses[0],
-                    nonce: 0,
+                    nonce: Nonce(0),
                 },
             ));
             updates.push((
-                1,
+                AccountId(1),
                 AccountUpdate::UpdateBalance {
-                    old_nonce: 0,
-                    new_nonce: 1,
+                    old_nonce: Nonce(0),
+                    new_nonce: Nonce(1),
                     balance_update: (token_id, 0u32.into(), 256u32.into()),
                 },
             ));
             updates.push((
-                2,
+                AccountId(2),
                 AccountUpdate::Create {
                     address: random_addresses[2],
-                    nonce: 0,
+                    nonce: Nonce(0),
                 },
             ));
             updates
@@ -774,7 +798,7 @@ mod tests {
         };
         assert_eq!(
             plasma_state_updated
-                .get_account(1)
+                .get_account(AccountId(1))
                 .unwrap()
                 .get_balance(token_id),
             256u32.into()

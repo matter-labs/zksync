@@ -119,7 +119,7 @@ async fn handle_graphql(
 }
 
 fn main() {
-    env_logger::init();
+    vlog::init();
 
     let mut runtime = actix_rt::System::new("dev-liquidity-token-watcher");
     let config = DevLiquidityTokenWatcherConfig::from_env();

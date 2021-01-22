@@ -1,9 +1,8 @@
-use crate::AccountId;
 use crate::Deposit;
+use crate::{AccountId, Address, TokenId};
 use anyhow::{ensure, format_err};
 use num::{BigUint, ToPrimitive};
 use serde::{Deserialize, Serialize};
-use zksync_basic_types::Address;
 use zksync_crypto::params::{
     ACCOUNT_ID_BIT_WIDTH, BALANCE_BIT_WIDTH, CHUNK_BYTES, FR_ADDRESS_LEN, TOKEN_BIT_WIDTH,
 };
@@ -61,11 +60,11 @@ impl DepositOp {
         Ok(Self {
             priority_op: Deposit {
                 from,
-                token,
+                token: TokenId(token),
                 amount,
                 to,
             },
-            account_id,
+            account_id: AccountId(account_id),
         })
     }
 
