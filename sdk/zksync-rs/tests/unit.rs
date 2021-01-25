@@ -477,6 +477,15 @@ mod wallet_tests {
             unreachable!()
         }
 
+        async fn get_txs_batch_fee(
+            &self,
+            _tx_types: Vec<TxFeeTypes>,
+            _addresses: Vec<Address>,
+            _token: impl Into<TokenLike> + Send + 'async_trait,
+        ) -> Result<BigUint, ClientError> {
+            unreachable!()
+        }
+
         async fn ethop_info(&self, _serial_id: u32) -> Result<EthOpInfo, ClientError> {
             unreachable!()
         }

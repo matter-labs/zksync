@@ -700,16 +700,29 @@ async fn batch_transfer() -> Result<(), anyhow::Error> {
     // Sign a transfer for each recipient created above
     let mut signed_transfers = Vec::with_capacity(recipients.len());
 
-    for recipient in recipients {
-        let fee = wallet
+    // Obtain total fee for this batch
+    let mut total_fee = Some(
+        wallet
             .provider
-            .get_tx_fee(TxFeeTypes::Transfer, recipient, token_like.clone())
-            .await?
-            .total_fee;
+            .get_txs_batch_fee(
+                vec![TxFeeTypes::Transfer; recipients.len()],
+                recipients.clone(),
+                token_like.clone(),
+            )
+            .await?,
+    );
 
+    for recipient in recipients {
         let (transfer, signature) = wallet
             .signer
-            .sign_transfer(token.clone(), 1_000_000u64.into(), fee, recipient, nonce)
+            .sign_transfer(
+                token.clone(),
+                1_000_000u64.into(),
+                // Set a total batch fee in the first transaction.
+                total_fee.take().unwrap_or_default(),
+                recipient,
+                nonce,
+            )
             .await
             .expect("Transfer signing error");
 
