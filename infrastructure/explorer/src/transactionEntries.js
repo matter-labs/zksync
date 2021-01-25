@@ -62,19 +62,19 @@ function statusEntry(txData) {
 
 function feeEntry(txData) {
     const fee = txData.fee || 0;
-    if(!txData.feeTokenName) {
+    if (!txData.feeTokenName) {
         return makeEntry('Fee').innerHTML(`${'ETH'} ${formatToken(fee, 'ETH')}`);
     }
 
     try {
         const feeBN = BigNumber.from(fee);
-        if (feeBN.eq('0')) {	
-            return makeEntry('Fee').innerHTML(	
-                '<i>This transaction is a part of a batch. The fee was paid in another transaction.</i>'	
-            );	
-        }	
-    } catch {	
-        return makeEntry('Fee');	
+        if (feeBN.eq('0')) {
+            return makeEntry('Fee').innerHTML(
+                '<i>This transaction is a part of a batch. The fee was paid in another transaction.</i>'
+            );
+        }
+    } catch {
+        return makeEntry('Fee');
     }
     return makeEntry('Fee').innerHTML(`${txData.feeTokenName} ${formatToken(fee, txData.feeTokenName)}`);
 }
