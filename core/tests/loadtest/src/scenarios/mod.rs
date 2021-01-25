@@ -18,6 +18,7 @@ use std::{
 // External uses
 use async_trait::async_trait;
 use batch_transfers::{BatchTransferScenario, BatchTransferScenarioConfig};
+use fee_ticker::{FeeTickerScenario, FeeTickerScenarioConfig};
 use num::BigUint;
 use serde::{Deserialize, Serialize};
 // Workspace uses
@@ -27,6 +28,7 @@ use self::{full_exit::FullExitScenario, transfers::TransferScenario, withdraw::W
 use crate::{monitor::Monitor, test_wallet::TestWallet, FiveSummaryStats};
 
 mod batch_transfers;
+mod fee_ticker;
 mod full_exit;
 mod transfers;
 mod withdraw;
@@ -96,6 +98,8 @@ pub enum ScenarioConfig {
     FullExit(FullExitScenarioConfig),
     /// Batched transfers scenario.
     BatchTransfers(BatchTransferScenarioConfig),
+    /// Stressing fee ticker scenario.
+    FeeTicker(FeeTickerScenarioConfig),
 }
 
 impl ScenarioConfig {
@@ -105,7 +109,8 @@ impl ScenarioConfig {
             Self::Transfer(cfg) => Box::new(TransferScenario::from(cfg)),
             Self::Withdraw(cfg) => Box::new(WithdrawScenario::from(cfg)),
             Self::FullExit(cfg) => Box::new(FullExitScenario::from(cfg)),
-            Self::BatchTransfers(cfg) => Box::new(BatchTransferScenario::new(cfg)),
+            Self::BatchTransfers(cfg) => Box::new(BatchTransferScenario::from(cfg)),
+            Self::FeeTicker(cfg) => Box::new(FeeTickerScenario::from(cfg)),
         }
     }
 }
