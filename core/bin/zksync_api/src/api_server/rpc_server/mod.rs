@@ -283,6 +283,7 @@ impl RpcApp {
             Error::internal_error()
         })
     }
+
     async fn ticker_request(
         mut ticker_request_sender: mpsc::Sender<TickerRequest>,
         tx_type: TxFeeTypes,
