@@ -4,12 +4,13 @@ use serde_json::value::Value;
 use sqlx::FromRow;
 // Workspace imports
 // Local imports
+use crate::ActionTypeSqlx;
 
 #[derive(Debug, Clone, FromRow)]
 pub struct StoredOperation {
     pub id: i64,
     pub block_number: i64,
-    pub action_type: String,
+    pub action_type: ActionTypeSqlx,
     pub created_at: DateTime<Utc>,
     pub confirmed: bool,
 }
@@ -49,7 +50,7 @@ pub struct StoredExecutedTransaction {
 #[derive(Debug, Clone)]
 pub struct NewOperation {
     pub block_number: i64,
-    pub action_type: String,
+    pub action_type: ActionTypeSqlx,
 }
 
 #[derive(Debug, Clone)]

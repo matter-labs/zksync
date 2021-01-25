@@ -74,10 +74,12 @@
 
 // Built-in deps
 // use std::env;
+use std::str::FromStr;
 // External imports
 use sqlx::{postgres::Postgres, Connection, PgConnection, Transaction};
 // Workspace imports
 use zksync_basic_types::BlockNumber;
+use zksync_types::ActionType;
 // Local imports
 use crate::connection::{holder::ConnectionHolder, PooledConnection};
 
@@ -110,6 +112,33 @@ pub const MAX_BLOCK_INDEX: u32 = i32::MAX as u32;
 pub struct StorageProcessor<'a> {
     conn: ConnectionHolder<'a>,
     in_transaction: bool,
+}
+
+#[derive(sqlx::Type, Debug, Clone, PartialEq, Eq)]
+#[sqlx(rename = "action_type_enum")]
+pub enum ActionTypeSqlx {
+    COMMIT,
+    VERIFY,
+}
+
+impl From<ActionType> for ActionTypeSqlx {
+    fn from(action_type: ActionType) -> Self {
+        match action_type {
+            ActionType::COMMIT => ActionTypeSqlx::COMMIT,
+            ActionType::VERIFY => ActionTypeSqlx::VERIFY,
+        }
+    }
+}
+
+impl FromStr for ActionTypeSqlx {
+    type Err = ();
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "COMMIT" => Ok(ActionTypeSqlx::COMMIT),
+            "VERIFY" => Ok(ActionTypeSqlx::VERIFY),
+            _ => Err(()),
+        }
+    }
 }
 
 impl<'a> StorageProcessor<'a> {
