@@ -26,6 +26,7 @@ use zksync_crypto::rand::Rng;
 use crate::account_set::AccountSet;
 use crate::state_keeper_utils::*;
 use crate::types::*;
+use zksync_types::tx::TimeRange;
 
 /// Used to create transactions between accounts and check for their validity.
 /// Every new block should start with `.start_block()`
@@ -412,8 +413,7 @@ impl TestSetup {
         token: Token,
         amount: BigUint,
         fee: BigUint,
-        valid_from: u32,
-        valid_until: u32,
+        time_range: TimeRange,
     ) {
         let mut zksync0_old = self
             .get_expected_zksync_account_balance(from, token.0)
@@ -438,17 +438,9 @@ impl TestSetup {
             .sync_accounts_state
             .insert((self.accounts.fee_account_id, token.0), zksync0_old);
 
-        let transfer = self.accounts.transfer(
-            from,
-            to,
-            token,
-            amount,
-            fee,
-            None,
-            valid_from,
-            valid_until,
-            true,
-        );
+        let transfer = self
+            .accounts
+            .transfer(from, to, token, amount, fee, None, time_range, true);
 
         self.execute_tx(transfer).await;
     }
@@ -480,17 +472,9 @@ impl TestSetup {
             .sync_accounts_state
             .insert((self.accounts.fee_account_id, token.0), zksync0_old);
 
-        let transfer = self.accounts.transfer_to_new_random(
-            from,
-            token,
-            amount,
-            fee,
-            None,
-            true,
-            valid_from,
-            valid_until,
-            rng,
-        );
+        let transfer = self
+            .accounts
+            .transfer_to_new_random(from, token, amount, fee, None, true, rng);
 
         self.execute_tx(transfer).await;
     }

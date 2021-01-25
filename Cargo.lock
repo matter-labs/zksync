@@ -1756,7 +1756,7 @@ checksum = "00b0228411908ca8685dba7fc2cdd70ec9990a6e753e89b6ac91a84c40fbaf4b"
 [[package]]
 name = "franklin-crypto"
 version = "0.0.5"
-source = "git+https://github.com/matter-labs/franklin-crypto.git?branch=beta#b39a82a4539f389cf056b3f7cc916f1b7df3447d"
+source = "git+https://github.com/matter-labs/franklin-crypto.git?branch=beta#4a706d93628980e036249e3b182b91af8797ce8c"
 dependencies = [
  "bellman_ce",
  "bit-vec",

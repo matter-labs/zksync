@@ -350,8 +350,7 @@ async fn commit_cost_of_transfers(
                 Token(0),
                 tranfers_amount[i].clone(),
                 tranfers_fee[i].clone(),
-                0,
-                u32::MAX,
+                Default::default(),
             )
             .await;
     }

@@ -727,8 +727,7 @@ async fn batch_transfer() -> Result<(), anyhow::Error> {
                 fee,
                 recipient,
                 nonce,
-                0,
-                u32::MAX,
+                Default::default(),
             )
             .await
             .expect("Transfer signing error");

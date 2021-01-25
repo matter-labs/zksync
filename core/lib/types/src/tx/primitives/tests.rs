@@ -27,8 +27,7 @@ fn get_batch() -> Vec<ZkSyncTx> {
         500u32.into(),
         20u32.into(),
         11,
-        0,
-        u32::MAX,
+        Default::default(),
         None,
     );
 

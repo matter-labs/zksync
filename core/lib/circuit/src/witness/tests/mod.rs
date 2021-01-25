@@ -92,8 +92,7 @@ fn apply_many_ops() -> ZkSyncCircuit<'static, Bn256> {
                 &account_to.account.address,
                 None,
                 true,
-                0,
-                u32::MAX,
+                Default::default(),
             )
             .0,
         from: account.id,
@@ -115,8 +114,7 @@ fn apply_many_ops() -> ZkSyncCircuit<'static, Bn256> {
                 &account_to.account.address,
                 None,
                 true,
-                0,
-                u32::MAX,
+                Default::default(),
             )
             .0,
         from: account.id,

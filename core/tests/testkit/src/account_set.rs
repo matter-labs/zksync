@@ -7,6 +7,7 @@ use zksync_crypto::rand::Rng;
 use zksync_types::{AccountId, Address, Nonce, PriorityOp, TokenId, ZkSyncTx};
 
 use crate::types::*;
+use zksync_types::tx::TimeRange;
 
 /// Account set is used to create transactions using stored account
 /// in a convenient way
@@ -72,8 +73,7 @@ impl<T: Transport> AccountSet<T> {
         amount: BigUint,
         fee: BigUint,
         nonce: Option<Nonce>,
-        valid_from: u32,
-        valid_until: u32,
+        time_range: TimeRange,
         increment_nonce: bool,
     ) -> ZkSyncTx {
         let from = &self.zksync_accounts[from.0];
@@ -88,8 +88,7 @@ impl<T: Transport> AccountSet<T> {
                 &to.address,
                 nonce,
                 increment_nonce,
-                valid_from,
-                valid_until,
+                time_range,
             )
             .0,
         ))
@@ -107,8 +106,6 @@ impl<T: Transport> AccountSet<T> {
         fee: BigUint,
         nonce: Option<Nonce>,
         increment_nonce: bool,
-        valid_from: u32,
-        valid_until: u32,
         rng: &mut impl Rng,
     ) -> ZkSyncTx {
         let from = &self.zksync_accounts[from.0];
@@ -124,8 +121,7 @@ impl<T: Transport> AccountSet<T> {
                 &to_address,
                 nonce,
                 increment_nonce,
-                valid_from,
-                valid_until,
+                Default::default(),
             )
             .0,
         ))

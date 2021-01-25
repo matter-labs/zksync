@@ -79,8 +79,7 @@ pub mod operations_test {
                 BigUint::from(42u32),
                 BigUint::from(42u32),
                 42,
-                0,
-                u32::MAX,
+                Default::default(),
                 None,
             );
             let (from, to) = (1u32, 2u32);
@@ -300,8 +299,7 @@ pub mod tx_conversion_test {
             (*AMOUNT).clone(),
             (*FEE).clone(),
             NONCE,
-            0,
-            u32::MAX,
+            Default::default(),
             None,
         );
 

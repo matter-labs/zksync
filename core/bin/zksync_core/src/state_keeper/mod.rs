@@ -703,12 +703,14 @@ impl ZkSyncStateKeeper {
     ) -> Result<(), anyhow::Error> {
         match tx {
             ZkSyncTx::Transfer(tx) => {
-                let valid_from = u64::from(tx.valid_from.unwrap_or(0));
-                let valid_until = u64::from(tx.valid_until.unwrap_or(u32::MAX));
+                let time_range = tx.time_range.unwrap_or_default();
                 ensure!(
-                    valid_from <= block_timestamp && block_timestamp <= valid_until,
+                    time_range.is_valid(block_timestamp),
                     "The transaction can't be executed in the block because of an invalid timestamp"
                 );
+            }
+            ZkSyncTx::Withdraw(tx) => {
+                // todo!("should check withdraw tx here too")
             }
             _ => {
                 // There are no timestamps in other transactions

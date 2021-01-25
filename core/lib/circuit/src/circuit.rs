@@ -1147,10 +1147,9 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
             &op_data,
         )?;
 
-        let is_serialized_tx_correct = Boolean::xor(
+        let is_serialized_tx_correct = multi_or(
             cs.namespace(|| "is_serialized_tx_correct"),
-            &is_new_serialized_tx_correct,
-            &is_old_serialized_tx_correct,
+            &[is_new_serialized_tx_correct, is_old_serialized_tx_correct],
         )?;
         let is_signed_correctly = multi_and(
             cs.namespace(|| "is_signed_correctly"),
@@ -1619,10 +1618,9 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
             &op_data,
         )?;
 
-        let is_serialized_tx_correct = Boolean::xor(
+        let is_serialized_tx_correct = multi_or(
             cs.namespace(|| "is_serialized_tx_correct"),
-            &is_new_serialized_tx_correct,
-            &is_old_serialized_tx_correct,
+            &[is_new_serialized_tx_correct, is_old_serialized_tx_correct],
         )?;
 
         let (is_equal_pubdata, packed_pubdata) = vectorized_compare(
@@ -1982,10 +1980,9 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
             &op_data,
         )?;
 
-        let is_serialized_tx_correct = Boolean::xor(
+        let is_serialized_tx_correct = multi_or(
             cs.namespace(|| "old_or_new_signature_correct"),
-            &is_new_serialized_tx_correct,
-            &is_old_serialized_tx_correct,
+            &[is_new_serialized_tx_correct, is_old_serialized_tx_correct],
         )?;
 
         log::debug!(
@@ -2252,10 +2249,9 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
             &op_data,
         )?;
 
-        let is_serialized_tx_correct = Boolean::xor(
+        let is_serialized_tx_correct = multi_or(
             cs.namespace(|| "is_serialized_tx_correct"),
-            &is_new_serialized_tx_correct,
-            &is_old_serialized_tx_correct,
+            &[is_new_serialized_tx_correct, is_old_serialized_tx_correct],
         )?;
         lhs_valid_flags.push(is_serialized_tx_correct);
 

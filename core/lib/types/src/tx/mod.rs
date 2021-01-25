@@ -29,7 +29,7 @@ pub use self::primitives::{
     batch_sign_data::BatchSignData, eip1271_signature::EIP1271Signature,
     eth_signature::TxEthSignature, packed_eth_signature::PackedEthSignature,
     packed_public_key::PackedPublicKey, packed_signature::PackedSignature, signature::TxSignature,
-    tx_hash::TxHash,
+    time_range::TimeRange, tx_hash::TxHash,
 };
 
 pub(crate) use self::primitives::signature_cache::VerifiedSignatureCache;

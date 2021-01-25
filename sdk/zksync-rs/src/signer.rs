@@ -2,7 +2,7 @@
 use std::fmt;
 use zksync_eth_signer::error::SignerError;
 use zksync_eth_signer::EthereumSigner;
-use zksync_types::tx::{ChangePubKeyECDSAData, ChangePubKeyEthAuthData, TxEthSignature};
+use zksync_types::tx::{ChangePubKeyECDSAData, ChangePubKeyEthAuthData, TimeRange, TxEthSignature};
 // External uses
 use num::BigUint;
 // Workspace uses
@@ -143,8 +143,7 @@ impl<S: EthereumSigner> Signer<S> {
         fee: BigUint,
         to: Address,
         nonce: Nonce,
-        valid_from: u32,
-        valid_until: u32,
+        time_range: TimeRange,
     ) -> Result<(Transfer, Option<PackedEthSignature>), SignerError> {
         let account_id = self.account_id.ok_or(SignerError::NoSigningKey)?;
 
@@ -156,8 +155,7 @@ impl<S: EthereumSigner> Signer<S> {
             amount,
             fee,
             nonce,
-            valid_from,
-            valid_until,
+            time_range,
             &self.private_key,
         )
         .map_err(signing_failed_error)?;

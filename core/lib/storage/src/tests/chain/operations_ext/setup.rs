@@ -212,8 +212,7 @@ impl TransactionsHistoryTestSetup {
                     &self.to_zksync_account.address,
                     None,
                     true,
-                    0,
-                    u32::MAX,
+                    Default::default(),
                 )
                 .0,
             from: self.from_zksync_account.get_account_id().unwrap(),
@@ -245,8 +244,7 @@ impl TransactionsHistoryTestSetup {
                     &self.to_zksync_account.address,
                     None,
                     true,
-                    0,
-                    u32::MAX,
+                    Default::default(),
                 )
                 .0,
             from: self.from_zksync_account.get_account_id().unwrap(),

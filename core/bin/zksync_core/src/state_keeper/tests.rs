@@ -90,8 +90,6 @@ fn create_account_and_transfer<B: Into<BigUint>>(
     account_id: AccountId,
     balance: B,
     transfer_amount: B,
-    valid_from: u32,
-    valid_until: u32,
 ) -> SignedZkSyncTx {
     let (account, sk) = tester.add_account(account_id);
     tester.set_balance(account_id, token_id, balance);
@@ -104,8 +102,7 @@ fn create_account_and_transfer<B: Into<BigUint>>(
         transfer_amount.into(),
         BigUint::from(1u32),
         account.nonce,
-        valid_from,
-        valid_until,
+        Default::default(),
         &sk,
     )
     .unwrap();
@@ -210,7 +207,7 @@ pub fn create_deposit(token: TokenId, amount: impl Into<BigUint>) -> PriorityOp 
 }
 
 async fn apply_single_transfer(tester: &mut StateKeeperTester) {
-    let transfer = create_account_and_transfer(tester, 0, 1, 200u32, 100u32, 0, u32::MAX);
+    let transfer = create_account_and_transfer(tester, 0, 1, 200u32, 100u32);
     let proposed_block = ProposedBlock {
         txs: vec![SignedTxVariant::Tx(transfer)],
         priority_ops: Vec::new(),
@@ -222,8 +219,8 @@ async fn apply_single_transfer(tester: &mut StateKeeperTester) {
 }
 
 async fn apply_batch_with_two_transfers(tester: &mut StateKeeperTester) {
-    let first_transfer = create_account_and_transfer(tester, 0, 1, 200u32, 100u32, 0, u32::MAX);
-    let second_transfer = create_account_and_transfer(tester, 0, 2, 200u32, 100u32, 0, u32::MAX);
+    let first_transfer = create_account_and_transfer(tester, 0, 1, 200u32, 100u32);
+    let second_transfer = create_account_and_transfer(tester, 0, 2, 200u32, 100u32);
     let proposed_block = ProposedBlock {
         txs: vec![SignedTxVariant::Batch(SignedTxsBatch {
             txs: vec![first_transfer, second_transfer],
@@ -998,17 +995,22 @@ mod execute_proposed_block {
             balance.into(),
             fee.into(),
             0,
-            0,
-            u32::MAX,
+            Default::default(),
             &sk_from,
         )
         .unwrap();
 
         let mut premature_transfer = correct_transfer.clone();
-        premature_transfer.valid_from = Some(u32::MAX);
+        premature_transfer
+            .time_range
+            .as_mut()
+            .map(|t| t.valid_from = u64::max_value());
 
         let mut belated_transfer = correct_transfer.clone();
-        belated_transfer.valid_until = Some(0);
+        belated_transfer
+            .time_range
+            .as_mut()
+            .map(|t| t.valid_until = 0);
 
         let correct_transfer = SignedZkSyncTx {
             tx: ZkSyncTx::Transfer(Box::new(correct_transfer)),

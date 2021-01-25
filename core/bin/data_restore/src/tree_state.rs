@@ -495,8 +495,7 @@ mod test {
             BigUint::from(40u32),
             BigUint::from(1u32),
             3,
-            0,
-            u32::MAX,
+            Default::default(),
             None,
         );
         let op3 = ZkSyncOp::TransferToNew(Box::new(TransferToNewOp {
@@ -521,8 +520,7 @@ mod test {
             BigUint::from(19u32),
             BigUint::from(1u32),
             1,
-            0,
-            u32::MAX,
+            Default::default(),
             None,
         );
         let op4 = ZkSyncOp::Transfer(Box::new(TransferOp {
@@ -715,8 +713,7 @@ mod test {
             BigUint::from(40u32),
             BigUint::from(1u32),
             3,
-            0,
-            u32::MAX,
+            Default::default(),
             None,
         );
         let op3 = ZkSyncOp::TransferToNew(Box::new(TransferToNewOp {
@@ -734,8 +731,7 @@ mod test {
             BigUint::from(19u32),
             BigUint::from(1u32),
             1,
-            0,
-            u32::MAX,
+            Default::default(),
             None,
         );
         let op4 = ZkSyncOp::Transfer(Box::new(TransferOp {
