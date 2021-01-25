@@ -22,7 +22,7 @@ use crate::{
         OperationsSchema,
     },
     prover::ProverSchema,
-    ActionTypeSqlx, QueryResult, StorageProcessor,
+    DbActionType, QueryResult, StorageProcessor,
 };
 
 mod conversion;
@@ -66,7 +66,7 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
 
         let new_operation = NewOperation {
             block_number: i64::from(*block_number),
-            action_type: ActionTypeSqlx::from(op.action.get_type()),
+            action_type: DbActionType::from(op.action.get_type()),
         };
         let stored: StoredOperation = OperationsSchema(&mut transaction)
             .store_operation(new_operation)
@@ -644,7 +644,7 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
         let start = Instant::now();
         let count = sqlx::query!(
             r#"SELECT count(*) as "count!" FROM operations WHERE action_type = $1 AND confirmed = $2"#,
-            ActionTypeSqlx::from(action_type) as ActionTypeSqlx,
+            DbActionType::from(action_type) as DbActionType,
             is_confirmed
         )
         .fetch_one(self.0.conn())

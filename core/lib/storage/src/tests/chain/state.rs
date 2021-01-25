@@ -12,7 +12,7 @@ use crate::{
     prover::ProverSchema,
     test_data::gen_operation,
     tests::{create_rng, db_test},
-    QueryResult, StorageProcessor,
+    DbActionType, QueryResult, StorageProcessor,
 };
 
 /// Performs low-level checks for the state workflow.
@@ -49,7 +49,7 @@ async fn low_level_commit_verify_state(mut storage: StorageProcessor<'_>) -> Que
         OperationsSchema(&mut storage)
             .store_operation(NewOperation {
                 block_number,
-                action_type: ActionType::COMMIT.to_string(),
+                action_type: DbActionType::from(ActionType::COMMIT),
             })
             .await?;
     }
@@ -77,7 +77,7 @@ async fn low_level_commit_verify_state(mut storage: StorageProcessor<'_>) -> Que
     OperationsSchema(&mut storage)
         .store_operation(NewOperation {
             block_number: 1,
-            action_type: ActionType::VERIFY.to_string(),
+            action_type: DbActionType::from(ActionType::VERIFY),
         })
         .await?;
     OperationsSchema(&mut storage)
@@ -98,7 +98,7 @@ async fn low_level_commit_verify_state(mut storage: StorageProcessor<'_>) -> Que
     OperationsSchema(&mut storage)
         .store_operation(NewOperation {
             block_number: 2,
-            action_type: ActionType::VERIFY.to_string(),
+            action_type: DbActionType::from(ActionType::VERIFY),
         })
         .await?;
     OperationsSchema(&mut storage)
@@ -116,7 +116,7 @@ async fn low_level_commit_verify_state(mut storage: StorageProcessor<'_>) -> Que
     OperationsSchema(&mut storage)
         .store_operation(NewOperation {
             block_number: 3,
-            action_type: ActionType::VERIFY.to_string(),
+            action_type: DbActionType::from(ActionType::VERIFY),
         })
         .await?;
     OperationsSchema(&mut storage)

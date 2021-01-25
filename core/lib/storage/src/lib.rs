@@ -74,7 +74,6 @@
 
 // Built-in deps
 // use std::env;
-use std::str::FromStr;
 // External imports
 use sqlx::{postgres::Postgres, Connection, PgConnection, Transaction};
 // Workspace imports
@@ -116,27 +115,16 @@ pub struct StorageProcessor<'a> {
 
 #[derive(sqlx::Type, Debug, Clone, PartialEq, Eq)]
 #[sqlx(rename = "action_type_enum")]
-pub enum ActionTypeSqlx {
+pub enum DbActionType {
     COMMIT,
     VERIFY,
 }
 
-impl From<ActionType> for ActionTypeSqlx {
+impl From<ActionType> for DbActionType {
     fn from(action_type: ActionType) -> Self {
         match action_type {
-            ActionType::COMMIT => ActionTypeSqlx::COMMIT,
-            ActionType::VERIFY => ActionTypeSqlx::VERIFY,
-        }
-    }
-}
-
-impl FromStr for ActionTypeSqlx {
-    type Err = ();
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s {
-            "COMMIT" => Ok(ActionTypeSqlx::COMMIT),
-            "VERIFY" => Ok(ActionTypeSqlx::VERIFY),
-            _ => Err(()),
+            ActionType::COMMIT => DbActionType::COMMIT,
+            ActionType::VERIFY => DbActionType::VERIFY,
         }
     }
 }

@@ -20,7 +20,7 @@ use crate::{
         dummy_ethereum_tx_hash, gen_acc_random_updates, gen_unique_operation, BLOCK_SIZE_CHUNKS,
     },
     tests::{create_rng, db_test},
-    QueryResult, StorageProcessor,
+    DbActionType, QueryResult, StorageProcessor,
 };
 
 /// Creates several random updates for the provided account map,
@@ -934,7 +934,7 @@ async fn test_operations_counter(mut storage: StorageProcessor<'_>) -> QueryResu
             .operations_schema()
             .store_operation(NewOperation {
                 block_number: *block_number,
-                action_type: action.to_string(),
+                action_type: DbActionType::from(*action),
             })
             .await?;
     }
