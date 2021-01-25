@@ -295,10 +295,13 @@ impl TestWallet {
     }
 
     /// Sends a transaction to ERC20 token contract to approve the ERC20 deposit.
-    pub async fn approve_erc20_deposits(&self) -> anyhow::Result<()> {
+    pub async fn approve_erc20_deposits(
+        &self,
+        token_name: impl Into<TokenLike>,
+    ) -> anyhow::Result<()> {
         let tx_hash = self
             .eth_provider
-            .approve_erc20_token_deposits(self.token_name.clone())
+            .approve_erc20_token_deposits(token_name)
             .await?;
         self.eth_provider.wait_for_tx(tx_hash).await?;
 

@@ -92,7 +92,9 @@ impl LoadtestExecutor {
             TestWallet::from_info(monitor.clone(), &config.main_wallet, &web3_url).await;
         // Special case for erc20 tokens.
         if !main_wallet.token_name().is_eth() {
-            main_wallet.approve_erc20_deposits().await?;
+            main_wallet
+                .approve_erc20_deposits(main_wallet.token_name().clone())
+                .await?;
         }
 
         let default_fee = main_wallet.sufficient_fee().await?;
@@ -180,7 +182,9 @@ impl LoadtestExecutor {
                     self.main_wallet
                         .transfer_to("ETH", eth_balance, wallet.address())
                         .await?;
-                    wallet.approve_erc20_deposits().await?;
+                    wallet
+                        .approve_erc20_deposits(wallet.token_name().clone())
+                        .await?;
                 }
 
                 vlog::info!(
