@@ -2,6 +2,8 @@
 use std::collections::HashMap;
 use std::time::Instant;
 // External imports
+use num::rational::Ratio;
+use num::BigUint;
 // Workspace imports
 use zksync_types::{Token, TokenId, TokenLike, TokenPrice};
 use zksync_utils::ratio_to_big_decimal;
@@ -57,6 +59,37 @@ impl<'a, 'c> TokensSchema<'a, 'c> {
             SELECT * FROM tokens
             ORDER BY id ASC
             "#,
+        )
+        .fetch_all(self.0.conn())
+        .await?;
+
+        let result = Ok(tokens
+            .into_iter()
+            .map(|t| {
+                let token: Token = t.into();
+                (token.id, token)
+            })
+            .collect());
+
+        metrics::histogram!("sql.token.load_tokens", start.elapsed());
+        result
+    }
+
+    pub async fn load_tokens_where_volume_greater_than(
+        &mut self,
+        volume: Ratio<BigUint>,
+    ) -> QueryResult<HashMap<TokenId, Token>> {
+        let start = Instant::now();
+        let tokens = sqlx::query_as!(
+            DbToken,
+            r#"
+            SELECT id, address, symbol, decimals FROM tokens
+            INNER JOIN ticker_market_volume
+            ON tokens.id = ticker_market_volume.token_id
+            WHERE ticker_market_volume.market_volume >= $1
+            ORDER BY id ASC
+            "#,
+            ratio_to_big_decimal(&volume, STORED_USD_PRICE_PRECISION)
         )
         .fetch_all(self.0.conn())
         .await?;
