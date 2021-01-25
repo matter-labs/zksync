@@ -12,7 +12,7 @@ use zksync_types::{
 // Local imports
 use self::records::{ETHParams, ETHStats, ETHTxHash, StorageETHOperation};
 use crate::chain::operations::records::StoredOperation;
-use crate::{DbActionType, QueryResult, StorageProcessor};
+use crate::{QueryResult, StorageActionType, StorageProcessor};
 
 pub mod records;
 
@@ -58,7 +58,7 @@ impl<'a, 'c> EthereumSchema<'a, 'c> {
                 StoredOperation,
                 r#"
                 SELECT operations.id, operations.block_number,
-                    operations.action_type as "action_type!: DbActionType",
+                    operations.action_type as "action_type!: StorageActionType",
                     operations.created_at, operations.confirmed
                 FROM eth_ops_binding
                 LEFT JOIN operations ON operations.id = op_id
@@ -137,7 +137,7 @@ impl<'a, 'c> EthereumSchema<'a, 'c> {
             StoredOperation,
             r#"
             SELECT id, block_number,
-                action_type as "action_type!: DbActionType",
+                action_type as "action_type!: StorageActionType",
                 created_at, confirmed
             FROM operations
             WHERE confirmed = false AND NOT EXISTS (SELECT * FROM eth_ops_binding WHERE op_id = operations.id)

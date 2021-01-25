@@ -114,17 +114,17 @@ pub struct StorageProcessor<'a> {
 }
 
 #[derive(sqlx::Type, Debug, Clone, PartialEq, Eq)]
-#[sqlx(rename = "action_type_enum")]
-pub enum DbActionType {
+#[sqlx(rename = "action_type")]
+pub enum StorageActionType {
     COMMIT,
     VERIFY,
 }
 
-impl From<ActionType> for DbActionType {
+impl From<ActionType> for StorageActionType {
     fn from(action_type: ActionType) -> Self {
         match action_type {
-            ActionType::COMMIT => DbActionType::COMMIT,
-            ActionType::VERIFY => DbActionType::VERIFY,
+            ActionType::COMMIT => StorageActionType::COMMIT,
+            ActionType::VERIFY => StorageActionType::VERIFY,
         }
     }
 }
