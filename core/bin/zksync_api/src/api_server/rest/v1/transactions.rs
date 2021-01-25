@@ -358,6 +358,15 @@ mod tests {
                         };
                         response.send(Ok(!is_phnx)).unwrap_or_default();
                     }
+                    TickerRequest::GetBatchTxFee {
+                        response,
+                        transactions,
+                        ..
+                    } => {
+                        let price = Ok(BigUint::from(transactions.len()));
+
+                        response.send(price).expect("Unable to send response");
+                    }
                 }
             }
         });

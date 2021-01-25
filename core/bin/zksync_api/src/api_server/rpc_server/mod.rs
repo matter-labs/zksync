@@ -37,6 +37,7 @@ pub mod types;
 pub use self::rpc_trait::Rpc;
 use self::types::*;
 use super::tx_sender::TxSender;
+use num::BigUint;
 
 #[derive(Clone)]
 pub struct RpcApp {
@@ -262,6 +263,26 @@ impl RpcApp {
             })
     }
 
+    async fn ticker_batch_fee_request(
+        mut ticker_request_sender: mpsc::Sender<TickerRequest>,
+        transactions: Vec<(TxFeeTypes, Address)>,
+        token: TokenLike,
+    ) -> Result<BigUint> {
+        let req = oneshot::channel();
+        ticker_request_sender
+            .send(TickerRequest::GetBatchTxFee {
+                transactions,
+                token: token.clone(),
+                response: req.0,
+            })
+            .await
+            .expect("ticker receiver dropped");
+        let resp = req.1.await.expect("ticker answer sender dropped");
+        resp.map_err(|err| {
+            vlog::warn!("Internal Server Error: '{}'; input: {:?}", err, token,);
+            Error::internal_error()
+        })
+    }
     async fn ticker_request(
         mut ticker_request_sender: mpsc::Sender<TickerRequest>,
         tx_type: TxFeeTypes,

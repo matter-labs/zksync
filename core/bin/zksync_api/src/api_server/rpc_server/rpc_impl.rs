@@ -1,8 +1,8 @@
 use std::collections::HashMap;
 use std::time::Instant;
 // External uses
+use bigdecimal::BigDecimal;
 use jsonrpc_core::{Error, Result};
-use num::BigUint;
 // Workspace uses
 use zksync_types::{
     helpers::closest_packable_fee_amount,
@@ -15,7 +15,6 @@ use crate::{
     api_server::tx_sender::SubmitError,
     fee_ticker::{BatchFee, Fee, TokenPriceRequestType},
 };
-use bigdecimal::BigDecimal;
 
 use super::{error::*, types::*, RpcApp};
 
@@ -244,13 +243,11 @@ impl RpcApp {
             return Err(SubmitError::InappropriateFeeToken.into());
         }
 
-        let mut total_fee = BigUint::from(0u32);
+        let transactions: Vec<(TxFeeTypes, Address)> =
+            (tx_types.iter().cloned().zip(addresses.iter().cloned())).collect();
+        let mut total_fee =
+            Self::ticker_batch_fee_request(ticker, transactions, token.clone()).await?;
 
-        for (tx_type, address) in tx_types.iter().zip(addresses.iter()) {
-            let ticker = ticker.clone();
-            let fee = Self::ticker_request(ticker, *tx_type, *address, token.clone()).await?;
-            total_fee += fee.total_fee;
-        }
         // Sum of transactions can be unpackable
         total_fee = closest_packable_fee_amount(&total_fee);
 
