@@ -30,6 +30,7 @@ use crate::{
     tx_error::TxAddError,
     utils::token_db_cache::TokenDBCache,
 };
+use num::BigUint;
 
 #[derive(Clone)]
 pub struct TxSender {
@@ -242,8 +243,11 @@ impl TxSender {
         }
 
         // Checking fees data
-        let mut required_total_usd_fee = BigDecimal::from(0);
         let mut provided_total_usd_fee = BigDecimal::from(0);
+        let mut transaction_types = vec![];
+
+        let eth_token = TokenLike::Id(TokenId(0));
+
         for tx in &txs {
             let tx_fee_info = tx.0.get_fee_info();
 
@@ -251,6 +255,8 @@ impl TxSender {
                 let fee_allowed =
                     Self::token_allowed_for_fees(self.ticker_requests.clone(), token.clone())
                         .await?;
+
+                transaction_types.push((tx_type, address));
 
                 // In batches, transactions with non-popular token are allowed to be included, but should not
                 // used to pay fees. Fees must be covered by some more common token.
@@ -264,16 +270,9 @@ impl TxSender {
                 } else {
                     // For non-popular tokens we've already checked that the provided fee is 0,
                     // and the USD price will be checked in ETH.
-                    TokenLike::Id(TokenId(0))
+                    eth_token.clone()
                 };
 
-                let required_fee = Self::ticker_request(
-                    self.ticker_requests.clone(),
-                    tx_type,
-                    address,
-                    check_token.clone(),
-                )
-                .await?;
                 let token_price_in_usd = Self::ticker_price_request(
                     self.ticker_requests.clone(),
                     check_token.clone(),
@@ -281,14 +280,30 @@ impl TxSender {
                 )
                 .await?;
 
-                required_total_usd_fee +=
-                    BigDecimal::from(required_fee.total_fee.to_bigint().unwrap())
-                        * &token_price_in_usd;
                 provided_total_usd_fee +=
                     BigDecimal::from(provided_fee.clone().to_bigint().unwrap())
                         * &token_price_in_usd;
             }
         }
+
+        // Calculate required fee for ethereum token
+        let required_eth_fee = Self::ticker_batch_fee_request(
+            self.ticker_requests.clone(),
+            transaction_types,
+            eth_token.clone(),
+        )
+        .await?;
+
+        let eth_price_in_usd = Self::ticker_price_request(
+            self.ticker_requests.clone(),
+            eth_token,
+            TokenPriceRequestType::USDForOneWei,
+        )
+        .await?;
+
+        let required_total_usd_fee =
+            BigDecimal::from(required_eth_fee.to_bigint().unwrap()) * &eth_price_in_usd;
+
         // Scaling the fee required since the price may change between signing the transaction and sending it to the server.
         let scaled_provided_fee_in_usd = scale_user_fee_up(provided_total_usd_fee.clone());
         if required_total_usd_fee >= scaled_provided_fee_in_usd {
@@ -427,6 +442,24 @@ impl TxSender {
             .map_err(SubmitError::internal)?
             // TODO Make error more clean
             .ok_or_else(|| SubmitError::other("Token not found in the DB"))
+    }
+
+    async fn ticker_batch_fee_request(
+        mut ticker_request_sender: mpsc::Sender<TickerRequest>,
+        transactions: Vec<(TxFeeTypes, Address)>,
+        token: TokenLike,
+    ) -> Result<BigUint, SubmitError> {
+        let req = oneshot::channel();
+        ticker_request_sender
+            .send(TickerRequest::GetBatchTxFee {
+                transactions,
+                token: token.clone(),
+                response: req.0,
+            })
+            .await
+            .map_err(SubmitError::internal)?;
+        let resp = req.1.await.map_err(SubmitError::internal)?;
+        resp.map_err(|err| internal_error!(err))
     }
 
     async fn ticker_request(
