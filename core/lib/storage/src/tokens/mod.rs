@@ -74,6 +74,8 @@ impl<'a, 'c> TokensSchema<'a, 'c> {
         result
     }
 
+    /// Loads all the stored tokens, which have market_volume (ticker_market_volume table)
+    /// not less than parameter (min_market_volume)
     pub async fn load_tokens_by_market_volume(
         &mut self,
         min_market_volume: Ratio<BigUint>,
