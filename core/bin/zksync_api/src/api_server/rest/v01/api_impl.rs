@@ -12,9 +12,7 @@ use crate::api_server::{
     },
 };
 use actix_web::{web, HttpResponse, Result as ActixResult};
-use num::rational::Ratio;
-use num::BigUint;
-use num::FromPrimitive;
+use num::{rational::Ratio, BigUint, FromPrimitive};
 use std::time::Instant;
 use zksync_storage::chain::operations_ext::SearchDirection;
 use zksync_types::{Address, BlockNumber};
@@ -68,15 +66,15 @@ impl ApiV01 {
         let mut storage = self_.access_storage().await?;
         let tokens = storage
             .tokens_schema()
-            .load_tokens_where_market_volume_not_less_than(liquidity_volume)
+            .load_tokens_by_market_volume(liquidity_volume)
             .await
             .map_err(Self::db_error)?;
 
-        let mut vec_tokens = tokens.values().cloned().collect::<Vec<_>>();
-        vec_tokens.sort_by_key(|t| t.id);
+        let mut tokens = tokens.values().cloned().collect::<Vec<_>>();
+        tokens.sort_by_key(|t| t.id);
 
         metrics::histogram!("api.v01.tokens_acceptable_for_fees", start.elapsed());
-        ok_json!(vec_tokens)
+        ok_json!(tokens)
     }
 
     pub async fn tx_history(

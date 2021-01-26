@@ -151,7 +151,7 @@ async fn test_ticker_price(mut storage: StorageProcessor<'_>) -> QueryResult<()>
     Ok(())
 }
 
-/// Checks the store/load routine for `ticker_market_volume` table.
+/// Checks the store/load routine for `ticker_market_volume` table and load tokens by market volume.
 #[db_test]
 async fn test_market_volume(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
     const TOKEN_ID: TokenId = TokenId(0);
@@ -180,21 +180,15 @@ async fn test_market_volume(mut storage: StorageProcessor<'_>) -> QueryResult<()
     );
 
     let tokens = TokensSchema(&mut storage)
-        .load_tokens_where_market_volume_not_less_than(Ratio::new(
-            BigUint::from(3u32),
-            BigUint::from(5u32),
-        ))
+        .load_tokens_by_market_volume(Ratio::new(BigUint::from(3u32), BigUint::from(5u32)))
         .await
-        .expect("Load tokens where volume greater than query failed");
+        .expect("Load tokens by market volume query failed");
     assert_eq!(tokens.len(), 0);
 
     let tokens = TokensSchema(&mut storage)
-        .load_tokens_where_market_volume_not_less_than(Ratio::new(
-            BigUint::from(2u32),
-            BigUint::from(5u32),
-        ))
+        .load_tokens_by_market_volume(Ratio::new(BigUint::from(2u32), BigUint::from(5u32)))
         .await
-        .expect("Load tokens where volume greater than query failed");
+        .expect("Load tokens by market volume query failed");
     assert_eq!(tokens.len(), 1);
 
     Ok(())

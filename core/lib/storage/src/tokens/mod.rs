@@ -2,8 +2,7 @@
 use std::collections::HashMap;
 use std::time::Instant;
 // External imports
-use num::rational::Ratio;
-use num::BigUint;
+use num::{rational::Ratio, BigUint};
 // Workspace imports
 use zksync_types::{Token, TokenId, TokenLike, TokenPrice};
 use zksync_utils::ratio_to_big_decimal;
@@ -75,21 +74,22 @@ impl<'a, 'c> TokensSchema<'a, 'c> {
         result
     }
 
-    pub async fn load_tokens_where_market_volume_not_less_than(
+    pub async fn load_tokens_by_market_volume(
         &mut self,
-        market_volume: Ratio<BigUint>,
+        min_market_volume: Ratio<BigUint>,
     ) -> QueryResult<HashMap<TokenId, Token>> {
         let start = Instant::now();
         let tokens = sqlx::query_as!(
             DbToken,
             r#"
-            SELECT id, address, symbol, decimals FROM tokens
+            SELECT id, address, symbol, decimals
+            FROM tokens
             INNER JOIN ticker_market_volume
             ON tokens.id = ticker_market_volume.token_id
             WHERE ticker_market_volume.market_volume >= $1
             ORDER BY id ASC
             "#,
-            ratio_to_big_decimal(&market_volume, STORED_USD_PRICE_PRECISION)
+            ratio_to_big_decimal(&min_market_volume, STORED_USD_PRICE_PRECISION)
         )
         .fetch_all(self.0.conn())
         .await?;
@@ -102,10 +102,7 @@ impl<'a, 'c> TokensSchema<'a, 'c> {
             })
             .collect());
 
-        metrics::histogram!(
-            "sql.token.load_tokens_where_market_volume_not_less_than",
-            start.elapsed()
-        );
+        metrics::histogram!("sql.token.load_tokens_by_market_volume", start.elapsed());
         result
     }
 
