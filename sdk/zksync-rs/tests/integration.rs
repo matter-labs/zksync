@@ -558,46 +558,26 @@ async fn init_account_with_one_ether(
     Ok(wallet)
 }
 
+async fn make_wallet(
+    provider: RpcProvider,
+    (eth_address, eth_private_key): (H160, H256),
+) -> Result<Wallet<PrivateKeySigner, RpcProvider>, ClientError> {
+    let eth_signer = PrivateKeySigner::new(eth_private_key);
+    let credentials =
+        WalletCredentials::from_eth_signer(eth_address, eth_signer, Network::Localhost).await?;
+    Wallet::new(provider, credentials).await
+}
+
 #[tokio::test]
 #[cfg_attr(not(feature = "integration-tests"), ignore)]
 async fn comprehensive_test() -> Result<(), anyhow::Error> {
     let provider = RpcProvider::new(Network::Localhost);
 
-    let main_wallet = {
-        let (main_eth_address, main_eth_private_key) = eth_main_account_credentials();
-        let eth_signer = PrivateKeySigner::new(main_eth_private_key);
-        let main_credentials =
-            WalletCredentials::from_eth_signer(main_eth_address, eth_signer, Network::Localhost)
-                .await?;
-        Wallet::new(provider.clone(), main_credentials).await?
-    };
-
-    let sync_depositor_wallet = {
-        let (random_eth_address, random_eth_private_key) = eth_random_account_credentials();
-        let eth_signer = PrivateKeySigner::new(random_eth_private_key);
-        let random_credentials =
-            WalletCredentials::from_eth_signer(random_eth_address, eth_signer, Network::Localhost)
-                .await?;
-        Wallet::new(provider.clone(), random_credentials).await?
-    };
-
-    let mut alice_wallet1 = {
-        let (random_eth_address, random_eth_private_key) = eth_random_account_credentials();
-        let eth_signer = PrivateKeySigner::new(random_eth_private_key);
-        let random_credentials =
-            WalletCredentials::from_eth_signer(random_eth_address, eth_signer, Network::Localhost)
-                .await?;
-        Wallet::new(provider.clone(), random_credentials).await?
-    };
-
-    let bob_wallet1 = {
-        let (random_eth_address, random_eth_private_key) = eth_random_account_credentials();
-        let eth_signer = PrivateKeySigner::new(random_eth_private_key);
-        let random_credentials =
-            WalletCredentials::from_eth_signer(random_eth_address, eth_signer, Network::Localhost)
-                .await?;
-        Wallet::new(provider.clone(), random_credentials).await?
-    };
+    let main_wallet = make_wallet(provider.clone(), eth_main_account_credentials()).await?;
+    let sync_depositor_wallet =
+        make_wallet(provider.clone(), eth_random_account_credentials()).await?;
+    let mut alice_wallet1 = make_wallet(provider.clone(), eth_random_account_credentials()).await?;
+    let bob_wallet1 = make_wallet(provider.clone(), eth_random_account_credentials()).await?;
 
     let ethereum = main_wallet.ethereum(web3_addr()).await?;
 
@@ -653,6 +633,56 @@ async fn comprehensive_test() -> Result<(), anyhow::Error> {
         "DAI",
         // 200 DAI
         200_000_000_000_000_000_000u128,
+    )
+    .await?;
+
+    // Test for tGLM token in ETH signatures workaround
+    // TODO: Remove this case after Golem update [ZKS-173]
+    let token_gnt = sync_depositor_wallet
+        .tokens
+        .resolve("GNT".into())
+        .ok_or_else(|| anyhow::anyhow!("Error resolve token"))?;
+    let token_tglm = sync_depositor_wallet
+        .tokens
+        .resolve("tGLM".into())
+        .ok_or_else(|| anyhow::anyhow!("Error resolve token"))?;
+
+    let tglm_deposit_amount = U256::from(10).pow(18.into()) * 10000; // 10000 tGLM
+    transfer_to("tGLM", tglm_deposit_amount, sync_depositor_wallet.address()).await?;
+
+    assert_eq!(
+        get_ethereum_balance(&ethereum, sync_depositor_wallet.address(), &token_gnt).await?,
+        tglm_deposit_amount
+    );
+
+    assert_eq!(
+        get_ethereum_balance(&ethereum, sync_depositor_wallet.address(), &token_tglm).await?,
+        tglm_deposit_amount
+    );
+
+    let mut alice_wallet2 = make_wallet(provider.clone(), eth_random_account_credentials()).await?;
+
+    test_deposit(
+        &sync_depositor_wallet,
+        &mut alice_wallet2,
+        &token_gnt,
+        200_000_000_000_000_000_000u128,
+    )
+    .await?;
+    test_change_pubkey(&alice_wallet2, "GNT").await?;
+    test_transfer(
+        &alice_wallet2,
+        &bob_wallet1,
+        "GNT",
+        100_000_000_000_000_000_000u128,
+    )
+    .await?;
+    // Check that sending transaction using tGLM token name works and transaction gets processed by server.
+    test_transfer(
+        &alice_wallet2,
+        &bob_wallet1,
+        "tGLM",
+        100_000_000_000_000_000_000u128,
     )
     .await?;
 
