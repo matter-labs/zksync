@@ -686,6 +686,42 @@ async fn comprehensive_test() -> Result<(), anyhow::Error> {
     )
     .await?;
 
+    // Test batch with single transaction
+    let total_fee = alice_wallet2
+        .provider
+        .get_tx_fee(TxFeeTypes::Transfer, bob_wallet1.address(), "tGLM")
+        .await?
+        .total_fee;
+
+    let mut nonce = alice_wallet2.account_info().await?.committed.nonce;
+    let (transfer, signature) = alice_wallet2
+        .signer
+        .sign_transfer(
+            token_tglm.clone(),
+            20_000_000_000_000_000_000u128.into(),
+            total_fee,
+            bob_wallet1.address(),
+            nonce,
+        )
+        .await?;
+    *nonce += 1;
+
+    let signed_transfers = vec![(
+        ZkSyncTx::Transfer(Box::new(transfer.clone())),
+        signature.clone(),
+    )];
+
+    let tx_hashes = alice_wallet2
+        .provider
+        .send_txs_batch(signed_transfers, None)
+        .await?;
+    let batch_handle = SyncTransactionHandle::new(tx_hashes[0], alice_wallet2.provider.clone());
+
+    batch_handle
+        .commit_timeout(Duration::from_secs(180))
+        .wait_for_commit()
+        .await?;
+
     Ok(())
 }
 

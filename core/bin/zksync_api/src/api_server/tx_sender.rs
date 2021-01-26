@@ -295,36 +295,17 @@ impl TxSender {
         let mut verified_txs = Vec::new();
         let mut verified_signature = None;
 
-        let mut messages_to_sign = vec![];
-        for tx in &txs {
-            messages_to_sign.push(self.tx_message_to_sign(&tx.0).await?);
-        }
-
         if let Some(signature) = eth_signature {
             // User provided the signature for the whole batch.
-            let (verified_batch, sign_data) = verify_txs_batch_signature(
-                txs,
-                signature,
-                messages_to_sign,
-                self.sign_verify_requests.clone(),
-            )
-            .await?
-            .unwrap_batch();
+            let (verified_batch, sign_data) =
+                self.glm_verify_txs_batch_info(txs, signature).await?;
 
             verified_signature = Some(sign_data.signature);
             verified_txs.extend(verified_batch.into_iter());
         } else {
             // Otherwise, we process every transaction in turn.
-            for (tx, msg_to_sign) in txs.into_iter().zip(messages_to_sign.into_iter()) {
-                let verified_tx = verify_tx_info_message_signature(
-                    &tx.0,
-                    tx.1.clone(),
-                    msg_to_sign,
-                    self.sign_verify_requests.clone(),
-                )
-                .await?
-                .unwrap_tx();
-
+            for (tx, signature) in txs {
+                let verified_tx = self.glm_verify_tx_info(&tx, signature).await?;
                 verified_txs.push(verified_tx);
             }
         }
@@ -382,6 +363,7 @@ impl TxSender {
     /// Returns a message that user has to sign to send the transaction.
     /// If the transaction doesn't need a message signature, returns `None`.
     /// If any error is encountered during the message generation, returns `jsonrpc_core::Error`.
+    #[allow(dead_code)]
     async fn tx_message_to_sign(&self, tx: &ZkSyncTx) -> Result<Option<Vec<u8>>, SubmitError> {
         Ok(match tx {
             ZkSyncTx::Transfer(tx) => {
@@ -504,6 +486,55 @@ impl TxSender {
         })
     }
 
+    fn glm_force_tx_message_to_sign(&self, tx: &ZkSyncTx, decimals: u8) -> Option<Vec<u8>> {
+        match tx {
+            ZkSyncTx::Transfer(tx) => {
+                let msg = tx.get_ethereum_sign_message("tGLM", decimals).into_bytes();
+                Some(msg)
+            }
+
+            ZkSyncTx::Withdraw(tx) => {
+                let msg = tx.get_ethereum_sign_message("tGLM", decimals).into_bytes();
+                Some(msg)
+            }
+
+            _ => None,
+        }
+    }
+
+    fn glm_force_txs_batch_message_to_sign(
+        &self,
+        txs: &[(ZkSyncTx, Option<TxEthSignature>)],
+        decimals: u8,
+    ) -> Vec<Option<Vec<u8>>> {
+        txs.iter()
+            .map(|(tx, _)| self.glm_force_tx_message_to_sign(tx, decimals))
+            .collect()
+    }
+
+    async fn glm_txs_batch_message_to_sign(
+        &self,
+        txs: &[(ZkSyncTx, Option<TxEthSignature>)],
+    ) -> Result<(Option<Token>, Vec<Option<Vec<u8>>>), SubmitError> {
+        let mut messages_to_sign = vec![];
+        let mut batch_token = None;
+
+        for tx in txs {
+            let msg = match self.glm_tx_message_to_sign(&tx.0).await? {
+                Some((token, msg)) => {
+                    if batch_token.is_none() {
+                        batch_token = Some(token.clone());
+                    }
+                    Some(msg)
+                }
+                None => None,
+            };
+            messages_to_sign.push(msg);
+        }
+
+        Ok((batch_token, messages_to_sign))
+    }
+
     async fn glm_verify_tx_info(
         &self,
         tx: &ZkSyncTx,
@@ -522,23 +553,7 @@ impl TxSender {
                 Ok(tx) => Ok(tx.unwrap_tx()),
                 Err(err) => {
                     if token.symbol == "GNT" {
-                        let msg_to_sign = match tx {
-                            ZkSyncTx::Transfer(tx) => {
-                                let msg = tx
-                                    .get_ethereum_sign_message("tGLM", token.decimals)
-                                    .into_bytes();
-                                Some(msg)
-                            }
-
-                            ZkSyncTx::Withdraw(tx) => {
-                                let msg = tx
-                                    .get_ethereum_sign_message("tGLM", token.decimals)
-                                    .into_bytes();
-                                Some(msg)
-                            }
-
-                            _ => unreachable!(),
-                        };
+                        let msg_to_sign = self.glm_force_tx_message_to_sign(tx, token.decimals);
 
                         let verified_tx = verify_tx_info_message_signature(
                             &tx,
@@ -566,6 +581,39 @@ impl TxSender {
             .unwrap_tx();
 
             Ok(verified_tx)
+        }
+    }
+
+    async fn glm_verify_txs_batch_info(
+        &self,
+        batch: Vec<(ZkSyncTx, Option<TxEthSignature>)>,
+        signature: TxEthSignature,
+    ) -> Result<(Vec<SignedZkSyncTx>, EthSignData), SubmitError> {
+        let (batch_token, messages_to_sign) = self.glm_txs_batch_message_to_sign(&batch).await?;
+
+        let verify_result = verify_txs_batch_signature(
+            batch.clone(),
+            signature.clone(),
+            messages_to_sign,
+            self.sign_verify_requests.clone(),
+        )
+        .await;
+
+        match (verify_result, batch_token) {
+            (Ok(tx), _) => Ok(tx.unwrap_batch()),
+            (Err(_), Some(token)) if token.symbol == "GNT" => {
+                let messages_to_sign =
+                    self.glm_force_txs_batch_message_to_sign(&batch, token.decimals);
+                Ok(verify_txs_batch_signature(
+                    batch,
+                    signature,
+                    messages_to_sign,
+                    self.sign_verify_requests.clone(),
+                )
+                .await?
+                .unwrap_batch())
+            }
+            (Err(e), _) => Err(e),
         }
     }
 }
