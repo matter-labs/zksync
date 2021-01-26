@@ -199,7 +199,9 @@ impl TxSender {
             withdraw.fast = fast_processing;
         }
 
-        let msg_to_sign = self.tx_message_to_sign(&tx).await?;
+        // Resolve the token.
+        let token = self.token_info_from_id(tx.token_id()).await?;
+        let msg_to_sign = tx.get_ethereum_sign_message(token).map(String::into_bytes);
 
         let tx_fee_info = tx.get_fee_info();
 
@@ -351,10 +353,15 @@ impl TxSender {
 
         let mut messages_to_sign = Vec::with_capacity(txs.len());
         let mut tx_senders = Vec::with_capacity(txs.len());
-        for tx in &txs {
-            messages_to_sign.push(self.tx_message_to_sign(&tx.tx).await?);
+        let mut tokens = Vec::with_capacity(txs.len());
+        for tx in txs.iter().map(|tx| &tx.tx) {
+            // Resolve the token and save it for constructing the batch message.
+            let token = self.token_info_from_id(tx.token_id()).await?;
+            tokens.push(token.clone());
+
+            messages_to_sign.push(tx.get_ethereum_sign_message(token).map(String::into_bytes));
             tx_senders.push(
-                self.get_tx_sender(&tx.tx)
+                self.get_tx_sender(tx)
                     .await
                     .or(Err(SubmitError::TxAdd(TxAddError::DbError)))?,
             );
@@ -364,11 +371,13 @@ impl TxSender {
             // User provided at least one signature for the whole batch.
             let _txs = txs
                 .iter()
-                .map(|tx| tx.tx.clone())
-                .collect::<Vec<ZkSyncTx>>();
+                .zip(tokens.into_iter())
+                .zip(tx_senders.iter())
+                .map(|((tx, token), sender)| (tx.tx.clone(), token, sender.clone()))
+                .collect::<Vec<_>>();
             // Create batch signature data.
             let batch_sign_data =
-                BatchSignData::new(&_txs, eth_signatures).map_err(SubmitError::other)?;
+                BatchSignData::new(_txs, eth_signatures).map_err(SubmitError::other)?;
             let (verified_batch, sign_data) = verify_txs_batch_signature(
                 txs,
                 tx_senders,
@@ -447,31 +456,7 @@ impl TxSender {
         }
     }
 
-    /// Returns a message that user has to sign to send the transaction.
-    /// If the transaction doesn't need a message signature, returns `None`.
-    /// If any error is encountered during the message generation, returns `jsonrpc_core::Error`.
-    async fn tx_message_to_sign(&self, tx: &ZkSyncTx) -> Result<Option<Vec<u8>>, SubmitError> {
-        Ok(match tx {
-            ZkSyncTx::Transfer(tx) => {
-                let token = self.token_info_from_id(tx.token).await?;
-
-                let msg = tx
-                    .get_ethereum_sign_message(&token.symbol, token.decimals)
-                    .into_bytes();
-                Some(msg)
-            }
-            ZkSyncTx::Withdraw(tx) => {
-                let token = self.token_info_from_id(tx.token).await?;
-
-                let msg = tx
-                    .get_ethereum_sign_message(&token.symbol, token.decimals)
-                    .into_bytes();
-                Some(msg)
-            }
-            _ => None,
-        })
-    }
-
+    /// Resolves the token from the database.
     async fn token_info_from_id(&self, token_id: TokenId) -> Result<Token, SubmitError> {
         let mut storage = self
             .pool

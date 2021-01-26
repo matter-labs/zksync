@@ -19,7 +19,7 @@ export async function run() {
 }
 
 export async function status() {
-    if (process.env.DUMMY_VERIFIER == 'true') {
+    if (process.env.CONTRACTS_TEST_DUMMY_VERIFIER == 'true') {
         console.log('Dummy Prover status: enabled');
         return true;
     }

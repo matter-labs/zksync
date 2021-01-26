@@ -26,9 +26,6 @@ export async function init() {
     await run.deployEIP1271();
     await server.genesis();
     await contract.redeploy();
-    if (!process.env.CI) {
-        await docker.restart('dev-liquidity-token-watcher');
-    }
 }
 
 async function createVolumes() {

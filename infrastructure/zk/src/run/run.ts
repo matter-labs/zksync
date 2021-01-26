@@ -5,6 +5,7 @@ import fs from 'fs';
 import * as path from 'path';
 import * as verifyKeys from './verify-keys';
 import * as dataRestore from './data-restore';
+import * as docker from '../docker';
 
 export { verifyKeys, dataRestore };
 
@@ -17,6 +18,9 @@ export async function deployERC20(command: 'dev' | 'new', name?: string, symbol?
                 { "name": "BAT",  "symbol": "BAT",  "decimals": 18 },
                 { "name": "MLTT", "symbol": "MLTT", "decimals": 18 }
             ]' > ./etc/tokens/localhost.json`);
+        if (!process.env.CI) {
+            await docker.restart('dev-liquidity-token-watcher');
+        }
     } else if (command == 'new') {
         await utils.spawn(
             `yarn --cwd contracts deploy-erc20 add --token-name ${name} --symbol ${symbol} --decimals ${decimals}`

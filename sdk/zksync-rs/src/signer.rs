@@ -223,10 +223,10 @@ impl<S: EthereumSigner> Signer<S> {
         fee: BigUint,
         nonce: Nonce,
         time_range: TimeRange,
-    ) -> Result<ForcedExit, SignerError> {
+    ) -> Result<(ForcedExit, Option<PackedEthSignature>), SignerError> {
         let account_id = self.account_id.ok_or(SignerError::NoSigningKey)?;
 
-        ForcedExit::new_signed(
+        let forced_exit = ForcedExit::new_signed(
             account_id,
             target,
             token.id,
@@ -235,6 +235,22 @@ impl<S: EthereumSigner> Signer<S> {
             time_range,
             &self.private_key,
         )
-        .map_err(signing_failed_error)
+        .map_err(signing_failed_error)?;
+
+        let eth_signature = match &self.eth_signer {
+            Some(signer) => {
+                let message = forced_exit.get_ethereum_sign_message(&token.symbol, token.decimals);
+                let signature = signer.sign_message(&message.as_bytes()).await?;
+
+                if let TxEthSignature::EthereumSignature(packed_signature) = signature {
+                    Some(packed_signature)
+                } else {
+                    return Err(SignerError::MissingEthSigner);
+                }
+            }
+            _ => None,
+        };
+
+        Ok((forced_exit, eth_signature))
     }
 }
