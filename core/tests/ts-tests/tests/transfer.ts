@@ -69,6 +69,7 @@ Tester.prototype.testBatch = async function (sender: Wallet, receiver: Wallet, t
     await Promise.all(handles.map((handle) => handle.awaitReceipt()));
     const senderAfter = await sender.getBalance(token);
     const receiverAfter = await receiver.getBalance(token);
+    console.log(`Fee: ${fee}`);
     console.log(`Sender before : ${senderBefore}, receiverBefore ${receiverBefore}`);
     console.log(`Sender after : ${senderAfter}, receiverAfter ${receiverAfter}`);
 
