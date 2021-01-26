@@ -1,16 +1,13 @@
 // Built-in deps
-use std::time::Instant;
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::time::{Instant, SystemTime, UNIX_EPOCH};
 // External imports
-use zksync_basic_types::{H256, U256};
 // Workspace imports
+use zksync_basic_types::{H256, U256};
 use zksync_crypto::convert::FeConvert;
 use zksync_types::{
-    aggregated_operations::AggregatedActionType, block::PendingBlock, ActionType, Fr, Operation,
-};
-use zksync_types::{
-    block::{Block, ExecutedOperations},
-    AccountId, BlockNumber, ZkSyncOp,
+    aggregated_operations::AggregatedActionType,
+    block::{Block, ExecutedOperations, PendingBlock},
+    AccountId, BlockNumber, Fr, ZkSyncOp,
 };
 // Local imports
 use self::records::{

@@ -2104,6 +2104,19 @@
       "nullable": []
     }
   },
+  "93bd5b76565dfbadecfd66a394127fd5b701d09dc3d61adb30b337fd12d86f6a": {
+    "query": "\n            UPDATE aggregate_operations\n                SET confirmed = $1\n                WHERE id = (SELECT op_id FROM eth_aggregated_ops_binding WHERE eth_op_id = $2)",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "Bool",
+          "Int8"
+        ]
+      },
+      "nullable": []
+    }
+  },
   "93fe4dceacf4e052ad807068272dc768eab33513e6c1e1ac62d2f989b1a26eee": {
     "query": "\n                INSERT INTO eth_operations (op_type, nonce, last_deadline_block, last_used_gas_price, raw_tx)\n                VALUES ($1, $2, $3, $4, $5)\n                RETURNING id\n            ",
     "describe": {
