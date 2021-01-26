@@ -75,9 +75,9 @@ impl<'a, 'c> TokensSchema<'a, 'c> {
         result
     }
 
-    pub async fn load_tokens_where_volume_greater_than(
+    pub async fn load_tokens_where_market_volume_not_less_than(
         &mut self,
-        volume: Ratio<BigUint>,
+        market_volume: Ratio<BigUint>,
     ) -> QueryResult<HashMap<TokenId, Token>> {
         let start = Instant::now();
         let tokens = sqlx::query_as!(
@@ -89,7 +89,7 @@ impl<'a, 'c> TokensSchema<'a, 'c> {
             WHERE ticker_market_volume.market_volume >= $1
             ORDER BY id ASC
             "#,
-            ratio_to_big_decimal(&volume, STORED_USD_PRICE_PRECISION)
+            ratio_to_big_decimal(&market_volume, STORED_USD_PRICE_PRECISION)
         )
         .fetch_all(self.0.conn())
         .await?;

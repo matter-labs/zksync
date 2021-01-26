@@ -68,7 +68,7 @@ impl ApiV01 {
         let mut storage = self_.access_storage().await?;
         let tokens = storage
             .tokens_schema()
-            .load_tokens_where_volume_greater_than(liquidity_volume)
+            .load_tokens_where_market_volume_not_less_than(liquidity_volume)
             .await
             .map_err(Self::db_error)?;
 
