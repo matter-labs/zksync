@@ -237,7 +237,6 @@ impl TxSender {
         eth_signature: Option<TxEthSignature>,
     ) -> Result<Vec<TxHash>, SubmitError> {
         debug_assert!(txs.is_empty(), "Transaction batch cannot be empty");
-        vlog::warn!("Start batch success");
 
         if txs.iter().any(|tx| tx.0.is_close()) {
             return Err(SubmitError::AccountCloseDisabled);
@@ -366,7 +365,6 @@ impl TxSender {
             .map_err(SubmitError::communication_core_server)?
             .map_err(SubmitError::TxAdd)?;
 
-        vlog::warn!("Execute batch success");
         Ok(tx_hashes)
     }
 
