@@ -102,7 +102,10 @@ impl<'a, 'c> TokensSchema<'a, 'c> {
             })
             .collect());
 
-        metrics::histogram!("sql.token.load_tokens", start.elapsed());
+        metrics::histogram!(
+            "sql.token.load_tokens_where_market_volume_not_less_than",
+            start.elapsed()
+        );
         result
     }
 

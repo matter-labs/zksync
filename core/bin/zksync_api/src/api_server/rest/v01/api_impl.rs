@@ -75,7 +75,7 @@ impl ApiV01 {
         let mut vec_tokens = tokens.values().cloned().collect::<Vec<_>>();
         vec_tokens.sort_by_key(|t| t.id);
 
-        metrics::histogram!("api.v01.tokens", start.elapsed());
+        metrics::histogram!("api.v01.tokens_acceptable_for_fees", start.elapsed());
         ok_json!(vec_tokens)
     }
 
