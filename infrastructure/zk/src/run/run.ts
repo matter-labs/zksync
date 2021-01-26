@@ -47,6 +47,10 @@ export async function deployEIP1271() {
     await utils.spawn(`yarn contracts deploy-eip1271`);
 }
 
+export async function deployMulticall() {
+    await utils.spawn(`yarn contracts deploy-multicall`);
+}
+
 export async function testUpgrade(contract: string, gatekeeper: string) {
     await utils.spawn(`yarn contracts ts-node scripts/test-upgrade-franklin.ts ${contract} ${gatekeeper}`);
 }

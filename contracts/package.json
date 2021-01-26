@@ -44,6 +44,7 @@
     "upgrade-testnet-no-build": "ts-node scripts/upgrade-testnet.ts",
     "deploy-eip1271": "ts-node scripts/deploy-eip1271.ts",
     "deploy-erc20": "ts-node scripts/deploy-erc20.ts",
+    "deploy-multicall": "ts-node scripts/deploy-multicall.ts",
     "governance-add-erc20": "ts-node scripts/add-erc20-token.ts",
     "deploy-testkit": "ts-node scripts/deploy-testkit.ts",
     "publish-sources": "hardhat run --network env scripts/publish.ts",

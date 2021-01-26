@@ -22,6 +22,7 @@ export async function init() {
     await contract.build();
     await run.deployERC20('dev');
     await run.deployEIP1271();
+    await run.deployMulticall();
     await server.genesis();
     await contract.redeploy();
 }
