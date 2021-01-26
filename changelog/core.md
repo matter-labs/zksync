@@ -21,6 +21,7 @@ All notable changes to the core components will be documented in this file.
 ### Added
 
 - `prometheus_exporter` is launched by every microservice.
+- `tokens_acceptable_for_fees` endpoint was added to REST API v0.1.
 
 ### Fixed
 
