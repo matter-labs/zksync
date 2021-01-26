@@ -37,8 +37,8 @@ impl ChangePubKeyCREATE2Data {
     pub fn get_address(&self, pubkey_hash: &PubKeyHash) -> Address {
         let salt = {
             let mut bytes = Vec::new();
-            bytes.extend_from_slice(&pubkey_hash.data);
             bytes.extend_from_slice(self.salt_arg.as_bytes());
+            bytes.extend_from_slice(&pubkey_hash.data);
             bytes.keccak256()
         };
 
@@ -66,6 +66,10 @@ impl ChangePubKeyEthAuthData {
 
     pub fn is_onchain(&self) -> bool {
         matches!(self, ChangePubKeyEthAuthData::Onchain)
+    }
+
+    pub fn is_create2(&self) -> bool {
+        matches!(self, ChangePubKeyEthAuthData::CREATE2(..))
     }
 
     pub fn get_eth_witness(&self) -> Vec<u8> {

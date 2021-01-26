@@ -2,7 +2,7 @@ use num::BigUint;
 use parity_crypto::digest::sha256;
 use serde::{Deserialize, Serialize};
 
-use zksync_basic_types::Address;
+use zksync_basic_types::{AccountId, Address};
 
 use crate::{
     operations::ChangePubKeyOp,
@@ -113,6 +113,16 @@ impl ZkSyncTx {
             ZkSyncTx::Close(tx) => tx.account,
             ZkSyncTx::ChangePubKey(tx) => tx.account,
             ZkSyncTx::ForcedExit(tx) => tx.target,
+        }
+    }
+
+    pub fn account_id(&self) -> anyhow::Result<AccountId> {
+        match self {
+            ZkSyncTx::Transfer(tx) => Ok(tx.account_id),
+            ZkSyncTx::Withdraw(tx) => Ok(tx.account_id),
+            ZkSyncTx::ChangePubKey(tx) => Ok(tx.account_id),
+            ZkSyncTx::ForcedExit(tx) => Ok(tx.initiator_account_id),
+            ZkSyncTx::Close(_) => Err(anyhow::anyhow!("Close operations are disabled")),
         }
     }
 

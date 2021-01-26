@@ -664,7 +664,7 @@ function numberToBytesBE(number: number, bytes: number): Uint8Array {
     return result;
 }
 
-export function parseHexWithPrefix(str) {
+export function parseHexWithPrefix(str: string) {
     return Uint8Array.from(Buffer.from(str.slice(2), 'hex'));
 }
 
@@ -684,9 +684,7 @@ export function getCREATE2AddressAndSalt(
     }
 
     // CREATE2 salt
-    const salt = ethers.utils.keccak256(
-        ethers.utils.concat([additionalSaltArgument, ethers.utils.arrayify(pubkeyHashHex)])
-    );
+    const salt = ethers.utils.keccak256(ethers.utils.concat([additionalSaltArgument, pubkeyHashHex]));
 
     // Address according to CREATE2 specification
     const address =
