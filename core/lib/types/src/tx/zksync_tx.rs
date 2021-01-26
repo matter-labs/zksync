@@ -278,7 +278,7 @@ impl ZkSyncTx {
     /// Returns the unix format timestamp of the first moment when transaction execution is valid.
     pub fn valid_from(&self) -> u32 {
         match self {
-            ZkSyncTx::Transfer(tx) => tx.valid_from.unwrap_or(0),
+            ZkSyncTx::Transfer(tx) => tx.time_range.map(|t| t.valid_from).unwrap_or(0) as u32,
             ZkSyncTx::Withdraw(tx) => tx.valid_from.unwrap_or(0),
             ZkSyncTx::ChangePubKey(tx) => tx.valid_from.unwrap_or(0),
             ZkSyncTx::ForcedExit(tx) => tx.valid_from.unwrap_or(0),

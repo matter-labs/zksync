@@ -16,8 +16,7 @@ fn get_transfer() -> Transfer {
         500u32.into(),
         0u32.into(),
         0,
-        0,
-        u32::MAX,
+        Default::default(),
         None,
     )
 }

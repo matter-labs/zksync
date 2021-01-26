@@ -181,8 +181,7 @@ mod test {
             20u32.into(),
             20u32.into(),
             3,
-            0,
-            u32::MAX,
+            Default::default(),
             None,
         );
         let op1 = ZkSyncOp::TransferToNew(Box::new(TransferToNewOp {
@@ -209,8 +208,7 @@ mod test {
             20u32.into(),
             10u32.into(),
             3,
-            0,
-            u32::MAX,
+            Default::default(),
             None,
         );
         let op1 = ZkSyncOp::Transfer(Box::new(TransferOp {

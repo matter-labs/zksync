@@ -74,8 +74,7 @@ fn apply_transfer_to_new_op(b: &mut Bencher<'_>) {
         10u32.into(),
         1u32.into(),
         0,
-        0,
-        u32::MAX,
+        Default::default(),
         private_key,
     )
     .expect("failed to sign transfer");
@@ -110,8 +109,7 @@ fn apply_transfer_tx(b: &mut Bencher<'_>) {
         10u32.into(),
         1u32.into(),
         0,
-        0,
-        u32::MAX,
+        Default::default(),
         private_key,
     )
     .expect("failed to sign transfer");

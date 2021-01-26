@@ -7,7 +7,8 @@ use zksync_basic_types::H256;
 use zksync_crypto::rand::{thread_rng, Rng};
 use zksync_crypto::{priv_key_from_fs, PrivateKey};
 use zksync_types::tx::{
-    ChangePubKey, ChangePubKeyECDSAData, ChangePubKeyEthAuthData, PackedEthSignature, TxSignature,
+    ChangePubKey, ChangePubKeyECDSAData, ChangePubKeyEthAuthData, PackedEthSignature, TimeRange,
+    TxSignature,
 };
 use zksync_types::{
     AccountId, Address, Close, ForcedExit, Nonce, PubKeyHash, TokenId, Transfer, Withdraw,
@@ -124,8 +125,7 @@ impl ZkSyncAccount {
         to: &Address,
         nonce: Option<Nonce>,
         increment_nonce: bool,
-        valid_from: u32,
-        valid_until: u32,
+        time_range: TimeRange,
     ) -> (Transfer, PackedEthSignature) {
         let mut stored_nonce = self.nonce.lock().unwrap();
         let transfer = Transfer::new_signed(
@@ -139,8 +139,7 @@ impl ZkSyncAccount {
             amount,
             fee,
             nonce.unwrap_or_else(|| *stored_nonce),
-            valid_from,
-            valid_until,
+            time_range,
             &self.private_key,
         )
         .expect("Failed to sign transfer");

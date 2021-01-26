@@ -132,8 +132,7 @@ impl TestServerConfig {
                     &to.address,
                     None,
                     false,
-                    0,
-                    u32::MAX,
+                    Default::default(),
                 )
                 .0;
 
@@ -169,8 +168,7 @@ impl TestServerConfig {
                     &to.address,
                     None,
                     false,
-                    0,
-                    u32::MAX,
+                    Default::default(),
                 )
                 .0;
 
@@ -205,8 +203,7 @@ impl TestServerConfig {
                 2_u64.into(),
                 fee.into(),
                 0,
-                0,
-                u32::MAX,
+                Default::default(),
                 None,
             );
 
