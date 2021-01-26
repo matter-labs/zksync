@@ -1,7 +1,7 @@
 // External imports
 use num::{rational::Ratio, BigUint};
 // Workspace imports
-use zksync_types::{Token, TokenId, TokenLike, TokenPrice};
+use zksync_types::{tokens::TokenMarketVolume, Token, TokenId, TokenLike, TokenPrice};
 use zksync_utils::{big_decimal_to_ratio, ratio_to_big_decimal};
 // Local imports
 use crate::tests::db_test;
@@ -147,6 +147,49 @@ async fn test_ticker_price(mut storage: StorageProcessor<'_>) -> QueryResult<()>
         loaded.last_updated.timestamp(),
         price.last_updated.timestamp()
     );
+
+    Ok(())
+}
+
+/// Checks the store/load routine for `ticker_market_volume` table.
+#[db_test]
+async fn test_market_volume(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
+    const TOKEN_ID: TokenId = TokenId(0);
+
+    let market_volume = TokenMarketVolume {
+        market_volume: Ratio::new(BigUint::from(2u32), BigUint::from(5u32)),
+        last_updated: chrono::Utc::now(),
+    };
+
+    storage
+        .tokens_schema()
+        .update_token_market_volume(TOKEN_ID, market_volume.clone())
+        .await?;
+
+    let loaded = storage
+        .tokens_schema()
+        .get_token_market_volume(TOKEN_ID)
+        .await?
+        .expect("couldn't load market volume");
+
+    assert_eq!(loaded.market_volume, market_volume.market_volume);
+
+    assert_eq!(
+        loaded.last_updated.timestamp(),
+        market_volume.last_updated.timestamp()
+    );
+
+    let tokens = TokensSchema(&mut storage)
+        .load_tokens_where_volume_greater_than(Ratio::new(BigUint::from(3u32), BigUint::from(5u32)))
+        .await
+        .expect("Load tokens where volume greater than query failed");
+    assert_eq!(tokens.len(), 0);
+
+    let tokens = TokensSchema(&mut storage)
+        .load_tokens_where_volume_greater_than(Ratio::new(BigUint::from(2u32), BigUint::from(5u32)))
+        .await
+        .expect("Load tokens where volume greater than query failed");
+    assert_eq!(tokens.len(), 1);
 
     Ok(())
 }
