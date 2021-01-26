@@ -637,7 +637,7 @@ async fn comprehensive_test() -> Result<(), anyhow::Error> {
     .await?;
 
     // Test for tGLM token in ETH signatures workaround
-    // TODO: Remove this case after Golem update [ZKS-173]
+    // TODO: Remove this code after Golem update [ZKS-173]
     let token_gnt = sync_depositor_wallet
         .tokens
         .resolve("GNT".into())
@@ -674,7 +674,7 @@ async fn comprehensive_test() -> Result<(), anyhow::Error> {
         &alice_wallet2,
         &bob_wallet1,
         "GNT",
-        100_000_000_000_000_000_000u128,
+        20_000_000_000_000_000_000u128,
     )
     .await?;
     // Check that sending transaction using tGLM token name works and transaction gets processed by server.
@@ -682,7 +682,7 @@ async fn comprehensive_test() -> Result<(), anyhow::Error> {
         &alice_wallet2,
         &bob_wallet1,
         "tGLM",
-        100_000_000_000_000_000_000u128,
+        20_000_000_000_000_000_000u128,
     )
     .await?;
 

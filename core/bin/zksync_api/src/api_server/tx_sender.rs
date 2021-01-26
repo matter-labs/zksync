@@ -170,11 +170,8 @@ impl TxSender {
             withdraw.fast = fast_processing;
         }
 
-        let msg_to_sign = self.tx_message_to_sign(&tx).await?;
-
         let tx_fee_info = tx.get_fee_info();
 
-        let sign_verify_channel = self.sign_verify_requests.clone();
         let ticker_request_sender = self.ticker_requests.clone();
 
         if let Some((tx_type, token, address, provided_fee)) = tx_fee_info {
@@ -211,14 +208,7 @@ impl TxSender {
             }
         }
 
-        let verified_tx = verify_tx_info_message_signature(
-            &tx,
-            signature.clone(),
-            msg_to_sign,
-            sign_verify_channel,
-        )
-        .await?
-        .unwrap_tx();
+        let verified_tx = self.glm_verify_tx_info(&tx, signature.clone()).await?;
 
         // Send verified transactions to the mempool.
         self.core_api_client
@@ -484,6 +474,99 @@ impl TxSender {
             .map_err(SubmitError::internal)?;
         let resp = req.1.await.map_err(SubmitError::internal)?;
         resp.map_err(|err| internal_error!(err))
+    }
+
+    // Methods for Golem workaround:
+    // TODO: Remove this code after Golem update [ZKS-173]
+
+    async fn glm_tx_message_to_sign(
+        &self,
+        tx: &ZkSyncTx,
+    ) -> Result<Option<(Token, Vec<u8>)>, SubmitError> {
+        Ok(match tx {
+            ZkSyncTx::Transfer(tx) => {
+                let token = self.token_info_from_id(tx.token).await?;
+
+                let msg = tx
+                    .get_ethereum_sign_message(&token.symbol, token.decimals)
+                    .into_bytes();
+                Some((token, msg))
+            }
+            ZkSyncTx::Withdraw(tx) => {
+                let token = self.token_info_from_id(tx.token).await?;
+
+                let msg = tx
+                    .get_ethereum_sign_message(&token.symbol, token.decimals)
+                    .into_bytes();
+                Some((token, msg))
+            }
+            _ => None,
+        })
+    }
+
+    async fn glm_verify_tx_info(
+        &self,
+        tx: &ZkSyncTx,
+        signature: Option<TxEthSignature>,
+    ) -> Result<SignedZkSyncTx, SubmitError> {
+        if let Some((token, msg_to_sign)) = self.glm_tx_message_to_sign(&tx).await? {
+            let verify_result = verify_tx_info_message_signature(
+                &tx,
+                signature.clone(),
+                Some(msg_to_sign.clone()),
+                self.sign_verify_requests.clone(),
+            )
+            .await;
+
+            match verify_result {
+                Ok(tx) => Ok(tx.unwrap_tx()),
+                Err(err) => {
+                    if token.symbol == "GNT" {
+                        let msg_to_sign = match tx {
+                            ZkSyncTx::Transfer(tx) => {
+                                let msg = tx
+                                    .get_ethereum_sign_message("tGLM", token.decimals)
+                                    .into_bytes();
+                                Some(msg)
+                            }
+
+                            ZkSyncTx::Withdraw(tx) => {
+                                let msg = tx
+                                    .get_ethereum_sign_message("tGLM", token.decimals)
+                                    .into_bytes();
+                                Some(msg)
+                            }
+
+                            _ => unreachable!(),
+                        };
+
+                        let verified_tx = verify_tx_info_message_signature(
+                            &tx,
+                            signature.clone(),
+                            msg_to_sign,
+                            self.sign_verify_requests.clone(),
+                        )
+                        .await?
+                        .unwrap_tx();
+
+                        Ok(verified_tx)
+                    } else {
+                        Err(err)
+                    }
+                }
+            }
+        } else {
+            let verified_tx = verify_tx_info_message_signature(
+                &tx,
+                signature.clone(),
+                None,
+                self.sign_verify_requests.clone(),
+            )
+            .await?
+            .unwrap_tx();
+
+            Ok(verified_tx)
+        }
     }
 }
 
