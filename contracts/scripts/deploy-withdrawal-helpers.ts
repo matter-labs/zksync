@@ -1,10 +1,12 @@
-// This script deploys the multicall contract
+// This script deploys the contracts required both for production and 
+// for testing of the contracts required for the `withdrawal-helpers` library
 
 import { ethers } from 'ethers';
 import { readContractCode } from '../src.ts/deploy';
 import { deployContract } from 'ethereum-waffle';
 import * as fs from 'fs';
 import * as path from 'path';
+import { recoverAddress } from 'ethers/lib/utils';
 
 const testConfigPath = path.join(process.env.ZKSYNC_HOME as string, `etc/test_config/constant`);
 const ethTestConfig = JSON.parse(fs.readFileSync(`${testConfigPath}/eth.json`, { encoding: 'utf-8' }));
@@ -30,11 +32,20 @@ async function main() {
                 gasLimit: 5000000
             }
         );
+        const revertReceiveAccount = await deployContract(
+            deployWallet,
+            readContractCode('dev-contracts/RevertReceiveAccount'),
+            [],
+            {
+                gasLimit: 5000000
+            }
+        );
 
         const outConfig = {
-            contract_address: multicallContract.address
+            multicall_address: multicallContract.address,
+            revert_receive_address: revertReceiveAccount.address,
         };
-        const outConfigPath = path.join(process.env.ZKSYNC_HOME, 'etc/test_config/volatile/multicall.json');
+        const outConfigPath = path.join(process.env.ZKSYNC_HOME, 'etc/test_config/volatile/withdrawal-helpers-dev.json');
         fs.writeFileSync(outConfigPath, JSON.stringify(outConfig), { encoding: 'utf-8' });
         process.exit(0);
     } catch (err) {
