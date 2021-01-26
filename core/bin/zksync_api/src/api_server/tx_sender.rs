@@ -30,7 +30,7 @@ use crate::{
     tx_error::TxAddError,
     utils::token_db_cache::TokenDBCache,
 };
-use num::BigUint;
+use num::{BigUint, Zero};
 
 #[derive(Clone)]
 pub struct TxSender {
@@ -237,6 +237,7 @@ impl TxSender {
         eth_signature: Option<TxEthSignature>,
     ) -> Result<Vec<TxHash>, SubmitError> {
         debug_assert!(txs.is_empty(), "Transaction batch cannot be empty");
+        vlog::warn!("Start batch success");
 
         if txs.iter().any(|tx| tx.0.is_close()) {
             return Err(SubmitError::AccountCloseDisabled);
@@ -252,6 +253,9 @@ impl TxSender {
             let tx_fee_info = tx.0.get_fee_info();
 
             if let Some((tx_type, token, address, provided_fee)) = tx_fee_info {
+                if provided_fee == BigUint::zero() {
+                    continue;
+                }
                 let fee_allowed =
                     Self::token_allowed_for_fees(self.ticker_requests.clone(), token.clone())
                         .await?;
@@ -362,6 +366,7 @@ impl TxSender {
             .map_err(SubmitError::communication_core_server)?
             .map_err(SubmitError::TxAdd)?;
 
+        vlog::warn!("Execute batch success");
         Ok(tx_hashes)
     }
 

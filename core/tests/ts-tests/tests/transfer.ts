@@ -69,6 +69,9 @@ Tester.prototype.testBatch = async function (sender: Wallet, receiver: Wallet, t
     await Promise.all(handles.map((handle) => handle.awaitReceipt()));
     const senderAfter = await sender.getBalance(token);
     const receiverAfter = await receiver.getBalance(token);
+    console.log(`Sender before : ${senderBefore}, receiverBefore ${receiverBefore}`);
+    console.log(`Sender after : ${senderAfter}, receiverAfter ${receiverAfter}`);
+
     expect(senderBefore.sub(senderAfter).eq(amount.mul(2).add(fee)), 'Batched transfer failed').to.be.true;
     expect(receiverAfter.sub(receiverBefore).eq(amount.mul(2)), 'Batched transfer failed').to.be.true;
     this.runningFee = this.runningFee.add(fee);
