@@ -5,7 +5,10 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use zksync_basic_types::{H256, U256};
 // Workspace imports
 use zksync_crypto::convert::FeConvert;
-use zksync_types::{block::PendingBlock, Action, ActionType, Fr, Operation};
+use zksync_types::{
+    aggregated_operations::AggregatedActionType, block::PendingBlock, Action, ActionType, Fr,
+    Operation,
+};
 use zksync_types::{
     block::{Block, ExecutedOperations},
     AccountId, BlockNumber, ZkSyncOp,
@@ -295,9 +298,6 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
         max_block: BlockNumber,
         limit: u32,
     ) -> QueryResult<Vec<BlockDetails>> {
-        // TODO: instead of operations, we need to use `aggregated_operations`
-        // BUT It is necessary somehow leave backward compatibility for the mainnet DB. (ZKS-375)
-
         let start = Instant::now();
         // This query does the following:
         // - joins the `operations` and `eth_tx_hashes` (using the intermediate `eth_ops_binding` table)
@@ -310,16 +310,17 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
             BlockDetails,
             r#"
             WITH eth_ops AS (
-                SELECT DISTINCT ON (block_number, action_type)
-                    operations.block_number,
+                SELECT DISTINCT ON (to_block, action_type)
+                    aggregate_operations.from_block,
+                    aggregate_operations.to_block,
                     eth_tx_hashes.tx_hash,
-                    operations.action_type,
-                    operations.created_at,
-                    confirmed
-                FROM operations
-                    left join eth_ops_binding on eth_ops_binding.op_id = operations.id
-                    left join eth_tx_hashes on eth_tx_hashes.eth_op_id = eth_ops_binding.eth_op_id
-                ORDER BY block_number DESC, action_type, confirmed
+                    aggregate_operations.action_type,
+                    aggregate_operations.created_at,
+                    aggregate_operations.confirmed
+                FROM aggregate_operations
+                    left join eth_aggregated_ops_binding on eth_aggregated_ops_binding.op_id = aggregate_operations.id
+                    left join eth_tx_hashes on eth_tx_hashes.eth_op_id = eth_aggregated_ops_binding.eth_op_id
+                ORDER BY to_block DESC, action_type, confirmed
             )
             SELECT
                 blocks.number AS "block_number!",
@@ -331,9 +332,9 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
                 verified.created_at AS "verified_at?"
             FROM blocks
             INNER JOIN eth_ops committed ON
-                committed.block_number = blocks.number AND committed.action_type = 'COMMIT' AND committed.confirmed = true
+                committed.from_block <= blocks.number AND committed.to_block >= blocks.number AND committed.action_type = 'CommitBlocks' AND committed.confirmed = true
             LEFT JOIN eth_ops verified ON
-                verified.block_number = blocks.number AND verified.action_type = 'VERIFY' AND verified.confirmed = true
+                verified.from_block <= blocks.number AND verified.to_block >= blocks.number AND verified.action_type = 'ExecuteBlocks' AND verified.confirmed = true
             WHERE
                 blocks.number <= $1
             ORDER BY blocks.number DESC
@@ -373,8 +374,6 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
     /// Will return `None` if the query is malformed or there is no block that matches
     /// the query.
     pub async fn find_block_by_height_or_hash(&mut self, query: String) -> Option<BlockDetails> {
-        // TODO: instead of operations, we need to use `aggregated_operations`
-        // BUT It is necessary somehow leave backward compatibility for the mainnet DB. (ZKS-375)
         let start = Instant::now();
         // If the input looks like hash, add the hash lookup part.
         let hash_bytes = if let Some(hex_query) = self.try_parse_hex(&query) {
@@ -415,16 +414,17 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
             BlockDetails,
             r#"
             WITH eth_ops AS (
-                SELECT DISTINCT ON (block_number, action_type)
-                    operations.block_number,
+                SELECT DISTINCT ON (to_block, action_type)
+                    aggregate_operations.from_block,
+                    aggregate_operations.to_block,
                     eth_tx_hashes.tx_hash,
-                    operations.action_type,
-                    operations.created_at,
-                    confirmed
-                FROM operations
-                    left join eth_ops_binding on eth_ops_binding.op_id = operations.id
-                    left join eth_tx_hashes on eth_tx_hashes.eth_op_id = eth_ops_binding.eth_op_id
-                ORDER BY block_number desc, action_type, confirmed
+                    aggregate_operations.action_type,
+                    aggregate_operations.created_at,
+                    aggregate_operations.confirmed
+                FROM aggregate_operations
+                    left join eth_aggregated_ops_binding on eth_aggregated_ops_binding.op_id = aggregate_operations.id
+                    left join eth_tx_hashes on eth_tx_hashes.eth_op_id = eth_aggregated_ops_binding.eth_op_id
+                ORDER BY to_block desc, action_type, confirmed
             )
             SELECT
                 blocks.number AS "block_number!",
@@ -436,9 +436,9 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
                 verified.created_at AS "verified_at?"
             FROM blocks
             INNER JOIN eth_ops committed ON
-                committed.block_number = blocks.number AND committed.action_type = 'COMMIT' AND committed.confirmed = true
+                committed.from_block <= blocks.number AND committed.to_block >= blocks.number AND committed.action_type = 'CommitBlocks' AND committed.confirmed = true
             LEFT JOIN eth_ops verified ON
-                verified.block_number = blocks.number AND verified.action_type = 'VERIFY' AND verified.confirmed = true
+                verified.from_block <= blocks.number AND verified.to_block >= blocks.number AND verified.action_type = 'ExecuteBlocks' AND verified.confirmed = true
             WHERE false
                 OR committed.tx_hash = $1
                 OR verified.tx_hash = $1
@@ -642,14 +642,14 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
         Ok(())
     }
 
-    /// Returns the number of operations with the given `action_type` and `is_confirmed` status.
-    pub async fn count_operations(
+    /// Returns the number of aggregated operations with the given `action_type` and `is_confirmed` status.
+    pub async fn count_aggregated_operations(
         &mut self,
-        action_type: ActionType,
+        action_type: AggregatedActionType,
         is_confirmed: bool,
     ) -> QueryResult<i64> {
         let count = sqlx::query!(
-            r#"SELECT count(*) as "count!" FROM operations WHERE action_type = $1 AND confirmed = $2"#,
+            r#"SELECT count(*) as "count!" FROM aggregate_operations WHERE action_type = $1 AND confirmed = $2"#,
             action_type.to_string(),
             is_confirmed
         )

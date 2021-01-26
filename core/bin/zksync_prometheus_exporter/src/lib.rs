@@ -5,7 +5,7 @@ use std::time::Duration;
 use tokio::task::JoinHandle;
 use tokio::time::delay_for;
 use zksync_storage::ConnectionPool;
-use zksync_types::ActionType::*;
+use zksync_types::aggregated_operations::AggregatedActionType::*;
 
 const QUERY_INTERVAL: Duration = Duration::from_secs(60);
 
@@ -42,10 +42,10 @@ pub fn run_prometheus_exporter(
                 .expect("unable to start db transaction");
             let mut block_schema = transaction.chain().block_schema();
 
-            for &action in &[COMMIT, VERIFY] {
+            for &action in &[CommitBlocks, ExecuteBlocks] {
                 for &is_confirmed in &[false, true] {
                     let result = block_schema
-                        .count_operations(action, is_confirmed)
+                        .count_aggregated_operations(action, is_confirmed)
                         .await
                         .expect("");
                     metrics::gauge!(
