@@ -1,0 +1,22 @@
+{
+  "name": "zksync-withdrawal-helpers",
+  "version": "0.0.1",
+  "description": "A collection of helper functions for those who encounter problems while withdrawing funds from zkSync",
+  "main": "build/index.js",
+  "bin": "build/index.js",
+  "repository": "https://github.com/matter-labs/zksync-dev.git",
+  "author": "The Matter Labs Team",
+  "license": "MIT",
+  "scripts": {
+    "build": "tsc",
+    "watch": "tsc --watch",
+    "start": "node build/index.js"
+  },
+  "devDependencies": {
+    "typescript": "^4.0.2"
+  },
+  "dependencies": {
+    "ethers": "^5.0.18",
+    "zksync": "^0.8.4"
+  }
+}
