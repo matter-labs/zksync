@@ -15,7 +15,9 @@ pub use self::{
     operations::{PriorityOpData, PriorityOpQuery, PriorityOpQueryError, PriorityOpReceipt},
     search::BlockSearchQuery,
     tokens::{TokenPriceKind, TokenPriceQuery},
-    transactions::{FastProcessingQuery, IncomingTx, IncomingTxBatch, Receipt, TxData},
+    transactions::{
+        FastProcessingQuery, IncomingTx, IncomingTxBatch, IncomingTxBatchForFee, Receipt, TxData,
+    },
 };
 
 // Local uses

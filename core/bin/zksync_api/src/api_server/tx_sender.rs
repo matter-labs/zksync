@@ -368,6 +368,17 @@ impl TxSender {
         Ok(tx_hashes)
     }
 
+    pub async fn get_txs_batch_fee_in_wei(
+        &self,
+        transactions: Vec<(TxFeeTypes, Address)>,
+        token: TokenLike,
+    ) -> Result<BigUint, SubmitError> {
+        Ok(
+            Self::ticker_batch_fee_request(self.ticker_requests.clone(), transactions, token)
+                .await?,
+        )
+    }
+
     /// For forced exits, we must check that target account exists for more
     /// than 24 hours in order to give new account owners give an opportunity
     /// to set the signing key. While `ForcedExit` operation doesn't do anything

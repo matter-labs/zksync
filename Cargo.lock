@@ -4703,6 +4703,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8efab2086f17abcddb8f756117665c958feee6b2e39974c2f1600592ab3a4195"
 dependencies = [
  "autocfg 1.0.1",
+ "num_cpus",
  "pin-project-lite 0.2.4",
 ]
 
@@ -5633,6 +5634,7 @@ dependencies = [
  "tiny-keccak 1.5.0",
  "tokio 0.1.22",
  "tokio 0.2.22",
+ "tokio 1.1.0",
  "vlog",
  "web3",
  "zksync_api_client",
@@ -5655,6 +5657,7 @@ dependencies = [
  "bigdecimal",
  "chrono",
  "hex",
+ "num",
  "reqwest",
  "serde",
  "serde_json",

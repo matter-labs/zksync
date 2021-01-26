@@ -3,13 +3,15 @@
 // Built-in uses
 
 // External uses
+use num::BigUint;
 use serde::{Deserialize, Serialize};
 
 // Workspace uses
 use zksync_types::{
     tx::{EthSignData, TxEthSignature, TxHash},
-    BlockNumber, SignedZkSyncTx, ZkSyncTx,
+    Address, BlockNumber, SignedZkSyncTx, TokenLike, TxFeeTypes, ZkSyncTx,
 };
+use zksync_utils::BigUintSerdeAsRadix10Str;
 
 // Local uses
 use super::{client::Client, client::ClientError, Pagination};
@@ -44,6 +46,14 @@ pub struct TxData {
 pub struct IncomingTx {
     pub tx: ZkSyncTx,
     pub signature: Option<TxEthSignature>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct IncomingTxBatchForFee {
+    pub tx_types: Vec<TxFeeTypes>,
+    pub addresses: Vec<Address>,
+    pub token_like: TokenLike,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -88,6 +98,13 @@ impl From<SignedZkSyncTx> for TxData {
     }
 }
 
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct BatchFee {
+    #[serde(with = "BigUintSerdeAsRadix10Str")]
+    pub total_fee: BigUint,
+}
+
 /// Transactions API part.
 impl Client {
     /// Sends a new transaction to the memory pool.
@@ -100,6 +117,23 @@ impl Client {
         self.post("transactions/submit")
             .query(&FastProcessingQuery { fast_processing })
             .body(&IncomingTx { tx, signature })
+            .send()
+            .await
+    }
+
+    /// Sends a new transactions batch to the memory pool.
+    pub async fn get_batched_txs_fee(
+        &self,
+        tx_types: Vec<TxFeeTypes>,
+        addresses: Vec<Address>,
+        token_like: TokenLike,
+    ) -> Result<BatchFee, ClientError> {
+        self.post("transactions/batch_fee")
+            .body(&IncomingTxBatchForFee {
+                tx_types,
+                addresses,
+                token_like,
+            })
             .send()
             .await
     }

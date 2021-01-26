@@ -10,7 +10,7 @@ use actix_web::{
 
 // Workspace uses
 pub use zksync_api_client::rest::v1::{
-    FastProcessingQuery, IncomingTx, IncomingTxBatch, Receipt, TxData,
+    FastProcessingQuery, IncomingTx, IncomingTxBatch, IncomingTxBatchForFee, Receipt, TxData,
 };
 use zksync_storage::{
     chain::operations_ext::records::TxReceiptResponse, QueryResult, StorageProcessor,
@@ -18,6 +18,7 @@ use zksync_storage::{
 use zksync_types::{tx::TxHash, BlockNumber, SignedZkSyncTx};
 
 use crate::api_server::tx_sender::{SubmitError, TxSender};
+use crate::fee_ticker::BatchFee;
 
 // Local uses
 use super::{ApiError, JsonResult, Pagination, PaginationQuery};
@@ -263,6 +264,24 @@ async fn submit_tx_batch(
     Ok(Json(tx_hashes))
 }
 
+async fn get_txs_batch_fee_in_wei(
+    data: web::Data<ApiTransactionsData>,
+    Json(body): Json<IncomingTxBatchForFee>,
+) -> JsonResult<BatchFee> {
+    let txs = body
+        .tx_types
+        .into_iter()
+        .zip(body.addresses.into_iter())
+        .collect();
+    let fee = data
+        .tx_sender
+        .get_txs_batch_fee_in_wei(txs, body.token_like)
+        .await
+        .map_err(ApiError::from)?;
+
+    Ok(Json(BatchFee { total_fee: fee }))
+}
+
 pub fn api_scope(tx_sender: TxSender) -> Scope {
     let data = ApiTransactionsData::new(tx_sender);
 
@@ -277,6 +296,7 @@ pub fn api_scope(tx_sender: TxSender) -> Scope {
         .route("{tx_hash}/receipts", web::get().to(tx_receipts))
         .route("submit", web::post().to(submit_tx))
         .route("submit/batch", web::post().to(submit_tx_batch))
+        .route("batch_fee", web::post().to(get_txs_batch_fee_in_wei))
 }
 
 #[cfg(test)]
@@ -284,7 +304,7 @@ mod tests {
     use actix_web::App;
     use bigdecimal::BigDecimal;
     use futures::{channel::mpsc, StreamExt};
-    use num::BigUint;
+    use num::{BigUint, Zero};
 
     use zksync_api_client::rest::v1::Client;
     use zksync_storage::ConnectionPool;
@@ -292,7 +312,7 @@ mod tests {
     use zksync_types::{
         tokens::TokenLike,
         tx::{PackedEthSignature, TxEthSignature},
-        AccountId, BlockNumber, Nonce, TokenId, ZkSyncTx,
+        AccountId, BlockNumber, Nonce, TokenId, TxFeeTypes, ZkSyncTx,
     };
 
     use crate::{
@@ -304,6 +324,7 @@ mod tests {
 
     use super::super::test_utils::{TestServerConfig, TestTransactions};
     use super::*;
+    use ethabi::Address;
 
     fn submit_txs_loopback() -> (CoreApiClient, actix_web::test::TestServer) {
         async fn send_tx(_tx: Json<SignedZkSyncTx>) -> Json<Result<(), ()>> {
@@ -472,6 +493,14 @@ mod tests {
             try_parse_tx_hash(&transactions[0].tx_hash).unwrap()
         };
 
+        let fee = client
+            .get_batched_txs_fee(
+                vec![TxFeeTypes::Withdraw, TxFeeTypes::Transfer],
+                vec![Address::random(), Address::random()],
+                TokenLike::Id(TokenId(0)),
+            )
+            .await?;
+        assert_ne!(fee.total_fee, BigUint::zero());
         // Tx receipt by ID.
         let unknown_tx_hash = TxHash::default();
         assert!(client
