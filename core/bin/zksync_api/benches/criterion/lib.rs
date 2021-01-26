@@ -2,31 +2,30 @@ use async_jsonrpc_client::{Params, SubscriptionId, Transport, WebSocketTransport
 use criterion::async_executor::{AsyncExecutor, FuturesExecutor};
 use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion};
 use ethabi::Address;
+use reqwest::StatusCode;
 use serde_json::{json, Map, Value};
+use zksync_api_client::rest::v1::IncomingTxBatchForFee;
+use zksync_types::{Token, TokenLike, TxFeeTypes};
 
-async fn websocket_client() {
-    let ws_path = std::env::var("API_JSON_RPC_WS_URL").unwrap();
-    let ws = WebSocketTransport::new(ws_path);
-    let address = Address::random();
-    // Filecoin.Version need read permission
-    let params = json!({"tx_types": vec!["Withdraw", "Withdraw"], "addresses": vec![address, address], "token": "WBTC"});
-    if let Value::Object(obj) = params {
-        let version: Value = ws
-            .send("get_txs_batch_fee_in_wei", Params::Map(obj))
-            .await
-            .unwrap();
-        println!("Version: {:?}", version);
-    }
+fn get_txs_batch_fee() {
+    let url = std::env::var("API_REST_URL").unwrap();
+    let client = reqwest::blocking::Client::new();
+
+    let res = client
+        .post(format!("{}/api/v1/transactions/batch_fee", url).as_str())
+        .json(&IncomingTxBatchForFee {
+            tx_types: vec![TxFeeTypes::Withdraw],
+            addresses: vec![Address::random()],
+            token_like: TokenLike::Symbol("wBTC".to_string()),
+        })
+        .send()
+        .unwrap();
+    assert_eq!(res.status(), StatusCode::OK)
 }
 
-fn from_elem(c: &mut Criterion) {
-    let size: usize = 1024;
-    c.bench_with_input(BenchmarkId::new("input_example", size), &size, |b, &s| {
-        // Insert a call to `to_async` to convert the bencher to async mode.
-        // The timing loops are the same as with the normal bencher.
-        b.to_async(FuturesExecutor).iter(|| websocket_client());
-    });
+fn bench_fee(c: &mut Criterion) {
+    c.bench_function("get_txs_batch_fee", get_txs_batch_fee());
 }
 
-criterion_group!(benches, from_elem);
+criterion_group!(benches, bench_fee);
 criterion_main!(benches);
