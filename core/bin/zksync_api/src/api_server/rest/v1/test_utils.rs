@@ -99,7 +99,8 @@ impl TestServerConfig {
 
         // Sign change pubkey tx pair
         {
-            let tx = from.sign_change_pubkey_tx(None, false, 0, fee.into(), false, 0, u32::MAX);
+            let tx =
+                from.sign_change_pubkey_tx(None, false, 0, fee.into(), false, Default::default());
 
             let zksync_op = ZkSyncOp::ChangePubKeyOffchain(Box::new(ChangePubKeyOp {
                 tx: tx.clone(),

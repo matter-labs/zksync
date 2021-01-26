@@ -13,7 +13,7 @@ use zksync_crypto::params::{max_account_id, max_token_id};
 use zksync_utils::format_units;
 use zksync_utils::BigUintSerdeAsRadix10Str;
 
-use super::{TxSignature, VerifiedSignatureCache};
+use super::{TimeRange, TxSignature, VerifiedSignatureCache};
 
 /// `Withdraw` transaction performs a withdrawal of funds from zkSync account to L1 account.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -45,10 +45,10 @@ pub struct Withdraw {
     /// rejected.
     #[serde(default)]
     pub fast: bool,
-    /// Unix epoch format of the time when the transaction is valid
+    /// Time range when the transaction is valid
     /// This fields must be Option<...> because of backward compatibility with first version of ZkSync
-    pub valid_from: Option<u32>,
-    pub valid_until: Option<u32>,
+    #[serde(flatten)]
+    pub time_range: Option<TimeRange>,
 }
 
 impl Withdraw {
@@ -68,8 +68,7 @@ impl Withdraw {
         amount: BigUint,
         fee: BigUint,
         nonce: Nonce,
-        valid_from: u32,
-        valid_until: u32,
+        time_range: TimeRange,
         signature: Option<TxSignature>,
     ) -> Self {
         let mut tx = Self {
@@ -83,8 +82,7 @@ impl Withdraw {
             signature: signature.clone().unwrap_or_default(),
             cached_signer: VerifiedSignatureCache::NotCached,
             fast: false,
-            valid_from: Some(valid_from),
-            valid_until: Some(valid_until),
+            time_range: Some(time_range),
         };
         if signature.is_some() {
             tx.cached_signer = VerifiedSignatureCache::Cached(tx.verify_signature());
@@ -103,21 +101,11 @@ impl Withdraw {
         amount: BigUint,
         fee: BigUint,
         nonce: Nonce,
-        valid_from: u32,
-        valid_until: u32,
+        time_range: TimeRange,
         private_key: &PrivateKey<Engine>,
     ) -> Result<Self, anyhow::Error> {
         let mut tx = Self::new(
-            account_id,
-            from,
-            to,
-            token,
-            amount,
-            fee,
-            nonce,
-            valid_from,
-            valid_until,
-            None,
+            account_id, from, to, token, amount, fee, nonce, time_range, None,
         );
         tx.signature = TxSignature::sign_musig(private_key, &tx.get_bytes());
         if !tx.check_correctness() {
@@ -137,11 +125,8 @@ impl Withdraw {
         out.extend_from_slice(&self.amount.to_u128().unwrap().to_be_bytes());
         out.extend_from_slice(&pack_fee_amount(&self.fee));
         out.extend_from_slice(&self.nonce.to_be_bytes());
-        if let Some(valid_from) = &self.valid_from {
-            out.extend_from_slice(&u64::from(*valid_from).to_be_bytes());
-        }
-        if let Some(valid_until) = &self.valid_from {
-            out.extend_from_slice(&u64::from(*valid_until).to_be_bytes());
+        if let Some(time_range) = &self.time_range {
+            out.extend_from_slice(&time_range.to_be_bytes());
         }
         out
     }
@@ -158,7 +143,10 @@ impl Withdraw {
             && is_fee_amount_packable(&self.fee)
             && self.account_id <= max_account_id()
             && self.token <= max_token_id()
-            && self.valid_from.unwrap_or(0) <= self.valid_until.unwrap_or(u32::MAX);
+            && self
+                .time_range
+                .map(|t| t.check_correctness())
+                .unwrap_or(true);
 
         if valid {
             let signer = self.verify_signature();

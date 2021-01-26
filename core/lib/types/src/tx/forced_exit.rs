@@ -13,6 +13,7 @@ use zksync_crypto::params::{max_account_id, max_token_id};
 use zksync_utils::BigUintSerdeAsRadix10Str;
 
 use super::{TxSignature, VerifiedSignatureCache};
+use crate::tx::TimeRange;
 
 /// `ForcedExit` transaction is used to withdraw funds from an unowned
 /// account to its corresponding L1 address.
@@ -43,10 +44,9 @@ pub struct ForcedExit {
     pub signature: TxSignature,
     #[serde(skip)]
     cached_signer: VerifiedSignatureCache,
-    /// Unix epoch format of the time when the transaction is valid
-    /// This fields must be Option<...> because of backward compatibility with first version of ZkSync
-    pub valid_from: Option<u32>,
-    pub valid_until: Option<u32>,
+    /// Time range when the transaction is valid
+    #[serde(flatten)]
+    pub time_range: TimeRange,
 }
 
 impl ForcedExit {
@@ -63,8 +63,7 @@ impl ForcedExit {
         token: TokenId,
         fee: BigUint,
         nonce: Nonce,
-        valid_from: u32,
-        valid_until: u32,
+        time_range: TimeRange,
         signature: Option<TxSignature>,
     ) -> Self {
         let mut tx = Self {
@@ -73,8 +72,7 @@ impl ForcedExit {
             token,
             fee,
             nonce,
-            valid_from: Some(valid_from),
-            valid_until: Some(valid_until),
+            time_range,
             signature: signature.clone().unwrap_or_default(),
             cached_signer: VerifiedSignatureCache::NotCached,
         };
@@ -92,8 +90,7 @@ impl ForcedExit {
         token: TokenId,
         fee: BigUint,
         nonce: Nonce,
-        valid_from: u32,
-        valid_until: u32,
+        time_range: TimeRange,
         private_key: &PrivateKey<Engine>,
     ) -> Result<Self, anyhow::Error> {
         let mut tx = Self::new(
@@ -102,8 +99,7 @@ impl ForcedExit {
             token,
             fee,
             nonce,
-            valid_from,
-            valid_until,
+            time_range,
             None,
         );
         tx.signature = TxSignature::sign_musig(private_key, &tx.get_bytes());
@@ -122,11 +118,7 @@ impl ForcedExit {
         out.extend_from_slice(&self.token.to_be_bytes());
         out.extend_from_slice(&pack_fee_amount(&self.fee));
         out.extend_from_slice(&self.nonce.to_be_bytes());
-
-        // We use 64 bytes for timestamps in the signed message
-        out.extend_from_slice(&u64::from(self.valid_from.unwrap_or(0)).to_be_bytes());
-        out.extend_from_slice(&u64::from(self.valid_until.unwrap_or(u32::MAX)).to_be_bytes());
-
+        out.extend_from_slice(&self.time_range.to_be_bytes());
         out
     }
 
@@ -140,7 +132,7 @@ impl ForcedExit {
         let mut valid = is_fee_amount_packable(&self.fee)
             && self.initiator_account_id <= max_account_id()
             && self.token <= max_token_id()
-            && self.valid_from.unwrap_or(0) <= self.valid_until.unwrap_or(u32::MAX);
+            && self.time_range.check_correctness();
 
         if valid {
             let signer = self.verify_signature();

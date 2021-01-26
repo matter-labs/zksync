@@ -75,20 +75,12 @@ where
             }
         };
 
-        let valid_from = self.valid_from.unwrap_or(0);
-        let valid_until = self.valid_until.unwrap_or(u32::MAX);
+        let time_range = Default::default();
 
         Ok(ZkSyncTx::from(
             self.wallet
                 .signer
-                .sign_change_pubkey_tx(
-                    nonce,
-                    self.onchain_auth,
-                    fee_token,
-                    fee,
-                    valid_from,
-                    valid_until,
-                )
+                .sign_change_pubkey_tx(nonce, self.onchain_auth, fee_token, fee, time_range)
                 .await
                 .map_err(ClientError::SigningError)?,
         ))

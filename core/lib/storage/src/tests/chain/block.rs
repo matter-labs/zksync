@@ -674,8 +674,7 @@ async fn pending_block_workflow(mut storage: StorageProcessor<'_>) -> QueryResul
             0,
             Default::default(),
             false,
-            0,
-            u32::MAX,
+            Default::default(),
         );
 
         let change_pubkey_op = ZkSyncOp::ChangePubKeyOffchain(Box::new(ChangePubKeyOp {

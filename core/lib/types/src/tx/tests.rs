@@ -99,8 +99,7 @@ fn test_print_withdraw_for_protocol() {
         BigUint::from(12_340_000_000_000u64),
         BigUint::from(56_700_000_000u64),
         rng.gen(),
-        0,
-        u32::MAX,
+        Default::default(),
         &key,
     )
     .expect("failed to sign withdraw");

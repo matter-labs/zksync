@@ -117,8 +117,7 @@ mod test {
             20u32.into(),
             10u32.into(),
             2,
-            0,
-            u32::MAX,
+            Default::default(),
             None,
         );
         let op1 = ZkSyncOp::Withdraw(Box::new(WithdrawOp { tx, account_id: 3 }));
@@ -231,8 +230,7 @@ mod test {
             account: "7777777777777777777777777777777777777777".parse().unwrap(),
             nonce: 3,
             signature: TxSignature::default(),
-            valid_from: None,
-            valid_until: None,
+            time_range: Default::default(),
         };
         let op1 = ZkSyncOp::Close(Box::new(CloseOp { tx, account_id: 11 }));
         let pub_data1 = op1.public_data();
@@ -253,8 +251,7 @@ mod test {
             0,
             Default::default(),
             3,
-            0,
-            u32::MAX,
+            Default::default(),
             None,
             None,
         );

@@ -424,8 +424,7 @@ mod tests {
             BigUint::from(48u32),
             BigUint::from(2u32),
             account.nonce,
-            0,
-            u32::MAX,
+            Default::default(),
             &sk,
         )
         .unwrap();
@@ -437,8 +436,7 @@ mod tests {
             BigUint::from(47u32),
             BigUint::from(3u32),
             account.nonce + 1,
-            0,
-            u32::MAX,
+            Default::default(),
             &sk,
         )
         .unwrap();
@@ -473,8 +471,7 @@ mod tests {
             BigUint::from(48u32),
             BigUint::from(2u32),
             account.nonce,
-            0,
-            u32::MAX,
+            Default::default(),
             &sk,
         )
         .unwrap();
@@ -486,8 +483,7 @@ mod tests {
             BigUint::from(47u32),
             BigUint::from(3u32),
             account.nonce + 1,
-            0,
-            u32::MAX,
+            Default::default(),
             &sk,
         )
         .unwrap();

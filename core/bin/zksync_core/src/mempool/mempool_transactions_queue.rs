@@ -4,7 +4,7 @@ use zksync_types::{mempool::SignedTxVariant, SignedZkSyncTx, ZkSyncTx};
 
 #[derive(Debug, Clone)]
 struct MempoolPendingTransaction {
-    valid_from: u32,
+    valid_from: u64,
     tx: SignedTxVariant,
 }
 
@@ -135,8 +135,7 @@ mod tests {
             20u32.into(),
             10u32.into(),
             2,
-            0,
-            u32::MAX,
+            Default::default(),
             None,
         );
 

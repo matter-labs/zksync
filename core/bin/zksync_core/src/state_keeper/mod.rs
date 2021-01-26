@@ -701,21 +701,17 @@ impl ZkSyncStateKeeper {
         tx: ZkSyncTx,
         block_timestamp: u64,
     ) -> Result<(), anyhow::Error> {
-        match tx {
-            ZkSyncTx::Transfer(tx) => {
-                let time_range = tx.time_range.unwrap_or_default();
-                ensure!(
-                    time_range.is_valid(block_timestamp),
-                    "The transaction can't be executed in the block because of an invalid timestamp"
-                );
-            }
-            ZkSyncTx::Withdraw(tx) => {
-                // todo!("should check withdraw tx here too")
-            }
-            _ => {
-                // There are no timestamps in other transactions
-            }
-        }
+        let time_range = match tx {
+            ZkSyncTx::Transfer(tx) => tx.time_range.unwrap_or_default(),
+            ZkSyncTx::Withdraw(tx) => tx.time_range.unwrap_or_default(),
+            ZkSyncTx::ForcedExit(tx) => tx.time_range,
+            ZkSyncTx::ChangePubKey(tx) => tx.time_range.unwrap_or_default(),
+            ZkSyncTx::Close(tx) => tx.time_range,
+        };
+        ensure!(
+            time_range.is_valid(block_timestamp),
+            "The transaction can't be executed in the block because of an invalid timestamp"
+        );
         Ok(())
     }
 
