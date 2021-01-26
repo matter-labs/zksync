@@ -8,7 +8,7 @@ use crate::{
 use num::BigUint;
 
 use crate::account::PubKeyHash;
-use crate::ethereum_sign_message_part;
+use crate::utils::ethereum_sign_message_part;
 use crate::Engine;
 use serde::{Deserialize, Serialize};
 use zksync_basic_types::Address;
@@ -170,7 +170,14 @@ impl Transfer {
     /// The only difference is the missing `nonce` since it's added at the end of the transactions
     /// batch message.
     pub fn get_ethereum_sign_message_part(&self, token_symbol: &str, decimals: u8) -> String {
-        ethereum_sign_message_part!(&self, Transfer, token_symbol, decimals)
+        ethereum_sign_message_part(
+            "Transfer",
+            token_symbol,
+            decimals,
+            &self.amount,
+            &self.fee,
+            &self.to,
+        )
     }
 
     /// Gets message that should be signed by Ethereum keys of the account for 2-Factor authentication.
