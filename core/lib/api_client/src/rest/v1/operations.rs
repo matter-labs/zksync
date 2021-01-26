@@ -99,8 +99,6 @@ impl PriorityOpQuery {
     }
 }
 
-// Client implementation
-
 /// Operations API part.
 impl Client {
     /// Gets priority operation receipt.

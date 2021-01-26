@@ -24,7 +24,7 @@ use chrono::{SecondsFormat, Utc};
 use colored::*;
 use structopt::StructOpt;
 // Workspace uses
-use zksync_config::ConfigurationOptions;
+use zksync_config::configs::ETHClientConfig;
 // Local uses
 use loadtest::{Config, FiveSummaryStats, LoadtestExecutor};
 
@@ -33,12 +33,12 @@ use loadtest::{Config, FiveSummaryStats, LoadtestExecutor};
 #[structopt(rename_all = "kebab-case")]
 struct LoadtestOpts {
     /// Path to a load test configuration file.
-    #[structopt(short = "p", long)]
-    config_path: Option<PathBuf>,
+    #[structopt(short = "p", long, default_value = Config::SAMPLE_CFG_PATH)]
+    config_path: PathBuf,
     /// Print the results as json file.
     #[structopt(long)]
     json_output: bool,
-    /// The path to the load test results
+    /// The path to the load test results.
     #[structopt(short = "o", long)]
     out_dir: Option<PathBuf>,
 }
@@ -65,6 +65,8 @@ fn print_stats_summary(name: impl AsRef<str>, summary: Option<&FiveSummaryStats>
             pretty_fmt!(summary.max).dimmed(),
             pretty_fmt!(summary.std_dev).yellow()
         );
+    } else {
+        println!("        not enough data to collect statisics");
     }
 }
 
@@ -88,15 +90,12 @@ fn print_counters(failed: usize, total: usize) {
 #[tokio::main]
 async fn main() -> Result<(), anyhow::Error> {
     env_logger::init();
-    let env_config = ConfigurationOptions::from_env();
+    let env_config = ETHClientConfig::from_env();
+    let web3_url = env_config.web3_url;
 
     let opts = LoadtestOpts::from_args();
 
-    let config = opts
-        .config_path
-        .map(Config::from_toml)
-        .transpose()?
-        .unwrap_or_default();
+    let config = Config::from_toml(opts.config_path)?;
     let out_dir = opts.out_dir.unwrap_or_else(|| {
         std::env::current_dir()
             .unwrap()
@@ -108,7 +107,7 @@ async fn main() -> Result<(), anyhow::Error> {
 
     loadtest::init_session(out_dir).await?;
 
-    let executor = LoadtestExecutor::new(config, env_config).await?;
+    let executor = LoadtestExecutor::new(config, web3_url).await?;
     let report = executor.run().await?;
 
     loadtest::finish_session(&report).await?;
@@ -117,10 +116,26 @@ async fn main() -> Result<(), anyhow::Error> {
         println!("{}", serde_json::to_string_pretty(&report)?);
     } else {
         println!("Loadtest finished.");
+        println!();
+        println!("Statistics for transactions:");
 
-        println!("Statistics for scenarios:");
-        for (category, stats) in &report.scenarios.summary {
-            print_stats_summary(category, Some(stats));
+        for (variant, report) in &report.scenarios.summary {
+            let has_enough_data = report
+                .stats
+                .iter()
+                .next()
+                .filter(|(_k, v)| v.is_some())
+                .is_some();
+
+            if has_enough_data {
+                println!(
+                    "Sending {} transaction:",
+                    variant.to_string().bright_green()
+                );
+                for (category, stats) in &report.stats {
+                    print_stats_summary(category, stats.as_ref());
+                }
+            }
         }
         print_counters(
             report.scenarios.failed_txs_count,

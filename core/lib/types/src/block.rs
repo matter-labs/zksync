@@ -271,6 +271,21 @@ impl Block {
         smallest_block_size_for_chunks(chunks_used, available_block_sizes)
     }
 
+    /// Returns the number of Withdrawal and ForcedExit in a block.
+    pub fn get_withdrawals_count(&self) -> usize {
+        let mut withdrawals_count = 0;
+
+        for block_tx in &self.block_transactions {
+            if let Some(sync_op) = block_tx.get_executed_op() {
+                if sync_op.withdrawal_data().is_some() {
+                    withdrawals_count += 1;
+                }
+            }
+        }
+
+        withdrawals_count
+    }
+
     /// Returns the data about withdrawals required for the Ethereum smart contract.
     pub fn get_withdrawals_data(&self) -> Vec<u8> {
         let mut withdrawals_data = Vec::new();

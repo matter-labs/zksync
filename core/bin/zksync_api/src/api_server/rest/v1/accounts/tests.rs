@@ -94,8 +94,8 @@ impl TestServer {
 
         let (api_client, api_server) = cfg.start_server(move |cfg| {
             api_scope(
-                &cfg.env_options,
                 cfg.pool.clone(),
+                &cfg.config,
                 TokenDBCache::new(),
                 core_client.clone(),
             )

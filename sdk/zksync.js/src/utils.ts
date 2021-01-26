@@ -125,32 +125,83 @@ function numberToBits(integer: number, bits: number): number[] {
     return result;
 }
 
-export function integerToFloat(
-    integer: BigNumber,
-    exp_bits: number,
-    mantissa_bits: number,
-    exp_base: number
-): Uint8Array {
-    const max_exponent = BigNumber.from(10).pow(Math.pow(2, exp_bits) - 1);
-    const max_mantissa = BigNumber.from(2).pow(mantissa_bits).sub(1);
+export function integerToFloat(integer: BigNumber, expBits: number, mantissaBits: number, expBase: number): Uint8Array {
+    const maxExponentPower = BigNumber.from(2).pow(expBits).sub(1);
+    const maxExponent = BigNumber.from(expBase).pow(maxExponentPower);
+    const maxMantissa = BigNumber.from(2).pow(mantissaBits).sub(1);
 
-    if (integer.gt(max_mantissa.mul(max_exponent))) {
+    if (integer.gt(maxMantissa.mul(maxExponent))) {
         throw new Error('Integer is too big');
     }
 
+    // The algortihm is as follows: calculate minimal exponent
+    // such that integer <= max_mantissa * exponent_base ^ exponent,
+    // then if this minimal exponent is 0 we can choose mantissa equals integer and exponent equals 0
+    // else we need to check two variants:
+    // 1) with that minimal exponent
+    // 2) with that minimal exponent minus 1
     let exponent = 0;
-    let mantissa = integer;
-    while (mantissa.gt(max_mantissa)) {
-        mantissa = mantissa.div(exp_base);
+    let exponentTemp = BigNumber.from(1);
+    while (integer.gt(maxMantissa.mul(exponentTemp))) {
+        exponentTemp = exponentTemp.mul(expBase);
         exponent += 1;
+    }
+    let mantissa = integer.div(exponentTemp);
+    if (exponent !== 0) {
+        const variant1 = exponentTemp.mul(mantissa);
+        const variant2 = exponentTemp.div(expBase).mul(maxMantissa);
+        const diff1 = integer.sub(variant1);
+        const diff2 = integer.sub(variant2);
+        if (diff2.lt(diff1)) {
+            mantissa = maxMantissa;
+            exponent -= 1;
+        }
     }
 
     // encode into bits. First bits of mantissa in LE order
     const encoding = [];
 
-    encoding.push(...numberToBits(exponent, exp_bits));
+    encoding.push(...numberToBits(exponent, expBits));
     const mantissaNumber = mantissa.toNumber();
-    encoding.push(...numberToBits(mantissaNumber, mantissa_bits));
+    encoding.push(...numberToBits(mantissaNumber, mantissaBits));
+
+    return bitsIntoBytesInBEOrder(encoding.reverse()).reverse();
+}
+
+export function integerToFloatUp(
+    integer: BigNumber,
+    expBits: number,
+    mantissaBits: number,
+    expBase: number
+): Uint8Array {
+    const maxExponentPower = BigNumber.from(2).pow(expBits).sub(1);
+    const maxExponent = BigNumber.from(expBase).pow(maxExponentPower);
+    const maxMantissa = BigNumber.from(2).pow(mantissaBits).sub(1);
+
+    if (integer.gt(maxMantissa.mul(maxExponent))) {
+        throw new Error('Integer is too big');
+    }
+
+    // The algortihm is as follows: calculate minimal exponent
+    // such that integer <= max_mantissa * exponent_base ^ exponent,
+    // then mantissa is calculated as integer divided by exponent_base ^ exponent and rounded up
+    let exponent = 0;
+    let exponentTemp = BigNumber.from(1);
+    while (integer.gt(maxMantissa.mul(exponentTemp))) {
+        exponentTemp = exponentTemp.mul(expBase);
+        exponent += 1;
+    }
+    let mantissa = integer.div(exponentTemp);
+    if (!integer.mod(exponentTemp).eq(BigNumber.from(0))) {
+        mantissa = mantissa.add(1);
+    }
+
+    // encode into bits. First bits of mantissa in LE order
+    const encoding = [];
+
+    encoding.push(...numberToBits(exponent, expBits));
+    const mantissaNumber = mantissa.toNumber();
+    encoding.push(...numberToBits(mantissaNumber, mantissaBits));
 
     return bitsIntoBytesInBEOrder(encoding.reverse()).reverse();
 }
@@ -171,8 +222,16 @@ function packAmount(amount: BigNumber): Uint8Array {
     return reverseBits(integerToFloat(amount, AMOUNT_EXPONENT_BIT_WIDTH, AMOUNT_MANTISSA_BIT_WIDTH, 10));
 }
 
+function packAmountUp(amount: BigNumber): Uint8Array {
+    return reverseBits(integerToFloatUp(amount, AMOUNT_EXPONENT_BIT_WIDTH, AMOUNT_MANTISSA_BIT_WIDTH, 10));
+}
+
 function packFee(amount: BigNumber): Uint8Array {
     return reverseBits(integerToFloat(amount, FEE_EXPONENT_BIT_WIDTH, FEE_MANTISSA_BIT_WIDTH, 10));
+}
+
+function packFeeUp(amount: BigNumber): Uint8Array {
+    return reverseBits(integerToFloatUp(amount, FEE_EXPONENT_BIT_WIDTH, FEE_MANTISSA_BIT_WIDTH, 10));
 }
 
 export function packAmountChecked(amount: BigNumber): Uint8Array {
@@ -199,6 +258,11 @@ export function closestPackableTransactionAmount(amount: BigNumberish): BigNumbe
     return floatToInteger(packedAmount, AMOUNT_EXPONENT_BIT_WIDTH, AMOUNT_MANTISSA_BIT_WIDTH, 10);
 }
 
+export function closestGreaterOrEqPackableTransactionAmount(amount: BigNumberish): BigNumber {
+    const packedAmount = packAmountUp(BigNumber.from(amount));
+    return floatToInteger(packedAmount, AMOUNT_EXPONENT_BIT_WIDTH, AMOUNT_MANTISSA_BIT_WIDTH, 10);
+}
+
 export function isTransactionAmountPackable(amount: BigNumberish): boolean {
     return closestPackableTransactionAmount(amount).eq(amount);
 }
@@ -210,6 +274,11 @@ export function isTransactionAmountPackable(amount: BigNumberish): boolean {
  */
 export function closestPackableTransactionFee(fee: BigNumberish): BigNumber {
     const packedFee = packFee(BigNumber.from(fee));
+    return floatToInteger(packedFee, FEE_EXPONENT_BIT_WIDTH, FEE_MANTISSA_BIT_WIDTH, 10);
+}
+
+export function closestGreaterOrEqPackableTransactionFee(fee: BigNumberish): BigNumber {
+    const packedFee = packFeeUp(BigNumber.from(fee));
     return floatToInteger(packedFee, FEE_EXPONENT_BIT_WIDTH, FEE_MANTISSA_BIT_WIDTH, 10);
 }
 
@@ -363,7 +432,6 @@ export async function verifyERC1271Signature(
 ): Promise<boolean> {
     const EIP1271_SUCCESS_VALUE = '0x1626ba7e';
 
-    // sign_message = keccak256("\x19Ethereum Signed Message:\n{message_len}" + message)
     const signMessage = getSignedBytesFromMessage(message, true);
     const signMessageHash = utils.keccak256(signMessage);
 
@@ -397,9 +465,17 @@ export async function getEthSignatureType(
         };
     }
 
+    let isSignedMsgPrefixed: boolean | null = null;
+    // Sometimes an error is thrown if the signature is wrong
+    try {
+        isSignedMsgPrefixed = await verifyERC1271Signature(address, messageNoPrefix, signature, _provider);
+    } catch {
+        isSignedMsgPrefixed = false;
+    }
+
     return {
         verificationMethod: 'ERC-1271',
-        isSignedMsgPrefixed: true
+        isSignedMsgPrefixed
     };
 }
 

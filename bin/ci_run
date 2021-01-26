@@ -1,0 +1,5 @@
+#!/bin/bash
+
+# Runs the command from within CI docker-compose environment.
+cd $ZKSYNC_HOME
+docker-compose -f docker-compose-runner.yml exec -T zk $@

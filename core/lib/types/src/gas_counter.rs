@@ -143,6 +143,8 @@ impl GasCounter {
     pub const COMPLETE_WITHDRAWALS_BASE_COST: u64 = 30_307;
     /// Cost of processing one withdraw operation in `completeWithdrawals` contract call.
     pub const COMPLETE_WITHDRAWALS_COST: u64 = 41_641;
+    /// Some ERС20 tokens may require a lot of gas to withdrawals.
+    pub const COMPLETE_WITHDRAWALS_ERC20_COST: u64 = 200_000;
 
     /// constants for gas limit calculation of aggregated operations
     pub const BASE_COMMIT_BLOCKS_TX_COST: usize = 40_000;
@@ -187,7 +189,7 @@ impl GasCounter {
         // is predictable.
         let approx_limit = U256::from(Self::COMPLETE_WITHDRAWALS_BASE_COST)
             + U256::from(MAX_WITHDRAWALS_TO_COMPLETE_IN_A_CALL)
-                * U256::from(Self::COMPLETE_WITHDRAWALS_COST);
+                * U256::from(Self::COMPLETE_WITHDRAWALS_ERC20_COST);
 
         // We scale this value up nevertheless, just in case.
         Self::scale_up(approx_limit)

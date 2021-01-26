@@ -28,7 +28,8 @@ export async function status() {
 }
 
 async function setStatus(value: boolean, redeploy: boolean) {
-    env.modify('DUMMY_VERIFIER', `DUMMY_VERIFIER=${value}`);
+    env.modify('CONTRACTS_TEST_DUMMY_VERIFIER', `CONTRACTS_TEST_DUMMY_VERIFIER="${value}"`);
+    env.modify_contracts_toml('CONTRACTS_TEST_DUMMY_VERIFIER', `CONTRACTS_TEST_DUMMY_VERIFIER="${value}"`);
     await status();
     if (redeploy) {
         console.log('Redeploying the contract...');

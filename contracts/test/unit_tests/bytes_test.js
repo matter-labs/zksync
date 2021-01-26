@@ -1,14 +1,14 @@
-const hardhat = require("hardhat");
+const hardhat = require('hardhat');
 const { BigNumber } = require('ethers');
 const { expect } = require('chai');
 const { getCallRevertReason } = require('./common');
 
-describe('Bytes unit tests', function() {
+describe('Bytes unit tests', function () {
     this.timeout(50000);
 
     let bytesTestContract;
     before(async () => {
-        const contractFactory = await hardhat.ethers.getContractFactory("BytesTest");
+        const contractFactory = await hardhat.ethers.getContractFactory('BytesTest');
         bytesTestContract = await contractFactory.deploy();
     });
 

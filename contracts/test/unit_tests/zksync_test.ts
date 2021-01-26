@@ -415,7 +415,9 @@ describe('zkSync withdraw unit tests', function () {
             );
         } catch (err) {}
         const onchainBalAfter = await onchainBalance(wallet, tokenContract.address);
+
         expect(onchainBalAfter).eq(onchainBalBefore);
+        expect(revertReason).to.not.eq(DEFAULT_REVERT_REASON);
     });
 
     it('Withdraw ERC20 unsupported token', async () => {
@@ -434,7 +436,6 @@ describe('zkSync auth pubkey onchain unit tests', function () {
 
     let zksyncContract;
     let tokenContract;
-    let ethProxy;
     before(async () => {
         [wallet, exitWallet] = await hardhat.ethers.getSigners();
 
@@ -448,11 +449,6 @@ describe('zkSync auth pubkey onchain unit tests', function () {
 
         const govContract = deployer.governanceContract(wallet);
         await govContract.addToken(tokenContract.address);
-
-        ethProxy = new ETHProxy(wallet.provider, {
-            mainContract: zksyncContract.address,
-            govContract: govContract.address
-        });
     });
 
     it('Auth pubkey success', async () => {
@@ -518,7 +514,6 @@ describe('zkSync test process next operation', function () {
 
     let zksyncContract: ZkSyncProcessOpUnitTest;
     let tokenContract;
-    let incorrectTokenContract;
     let ethProxy;
 
     const EMPTY_KECCAK = ethers.utils.keccak256('0x');

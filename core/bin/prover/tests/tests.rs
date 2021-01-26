@@ -1,6 +1,5 @@
 // Built-in deps
 use std::collections::HashMap;
-use std::net::SocketAddr;
 use std::sync::Arc;
 use std::time::Duration;
 // External deps
@@ -12,7 +11,7 @@ use zksync_circuit::{
     serialization::ProverData,
     witness::{deposit::DepositWitness, utils::WitnessBuilder, Witness},
 };
-use zksync_config::{ConfigurationOptions, ProverOptions};
+use zksync_config::configs::{ChainConfig, ProverConfig};
 use zksync_crypto::{
     circuit::{account::CircuitAccount, CircuitAccountTree},
     pairing::ff::PrimeField,
@@ -35,7 +34,7 @@ use zksync_types::{
 struct MockProverConfigs {
     plonk_config: PlonkStepByStepProverConfig,
     dummy_config: DummyProverConfig,
-    prover_options: ProverOptions,
+    prover_options: ProverConfig,
     shutdown_request: ShutdownRequest,
     prover_name: String,
 }
@@ -51,16 +50,20 @@ impl Default for MockProverConfigs {
         let dummy_config = DummyProverConfig {
             block_sizes: vec![6, 30],
         };
-        let prover_options = ProverOptions {
-            secret_auth: "".to_string(),
-            prepare_data_interval: Duration::from_secs(5),
-            heartbeat_interval: Duration::from_secs(0),
-            cycle_wait: Duration::from_millis(500),
-            prover_server_address: "0.0.0.0:8088"
-                .parse::<SocketAddr>()
-                .expect("Can't get address from port"),
-            witness_generators: 2,
-            idle_provers: 1,
+        let prover_options = ProverConfig {
+            prover: zksync_config::configs::prover::Prover {
+                heartbeat_interval: 1000,
+                cycle_wait: 500,
+                request_timeout: 1,
+            },
+            core: zksync_config::configs::prover::Core {
+                gone_timeout: 2,
+                idle_provers: 1,
+            },
+            witness_generator: zksync_config::configs::prover::WitnessGenerator {
+                prepare_data_interval: 5000,
+                witness_generators: 2,
+            },
         };
 
         Self {
@@ -108,7 +111,7 @@ fn test_data_for_prover() -> JobRequestData {
     );
     witness_accum.extend_pubdata_with_noops(smallest_block_size_for_chunks(
         DepositOp::CHUNKS,
-        &ConfigurationOptions::from_env().available_block_chunk_sizes,
+        &ChainConfig::from_env().circuit.supported_block_chunks_sizes,
     ));
     witness_accum.collect_fees(&Vec::new());
     witness_accum.calculate_pubdata_commitment();
@@ -154,7 +157,7 @@ async fn test_shutdown_request() {
         &prover_name,
     )
     .fuse();
-    let timeout = tokio::time::delay_for(prover_options.cycle_wait).fuse();
+    let timeout = tokio::time::delay_for(prover_options.prover.cycle_wait()).fuse();
 
     pin_mut!(prover_work_cycle, timeout);
 

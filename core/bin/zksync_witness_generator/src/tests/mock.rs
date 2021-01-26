@@ -62,7 +62,7 @@ impl MockDatabase {
         let validator_account_id: u32 = 0;
         accounts.insert(validator_account_id, validator_account.clone());
 
-        tree.insert(0, validator_account.clone());
+        tree.insert(0, validator_account);
         tree.root_hash();
         (tree, accounts)
     }

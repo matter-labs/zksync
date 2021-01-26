@@ -19,12 +19,7 @@ struct StateKeeperTester {
 }
 
 impl StateKeeperTester {
-    fn new(
-        available_chunk_size: usize,
-        max_iterations: usize,
-        fast_iterations: usize,
-        number_of_withdrawals: usize,
-    ) -> Self {
+    fn new(available_chunk_size: usize, max_iterations: usize, fast_iterations: usize) -> Self {
         const CHANNEL_SIZE: usize = 32768;
         let (_request_tx, request_rx) = mpsc::channel(CHANNEL_SIZE);
         let (response_tx, response_rx) = mpsc::channel(CHANNEL_SIZE);
@@ -42,7 +37,6 @@ impl StateKeeperTester {
             vec![available_chunk_size],
             max_iterations,
             fast_iterations,
-            number_of_withdrawals,
         );
 
         Self {
@@ -151,6 +145,7 @@ fn create_account_and_fast_withdrawal<B: Into<BigUint>>(
     )
 }
 
+#[allow(clippy::clippy::too_many_arguments)]
 fn create_account_and_withdrawal_impl<B: Into<BigUint>>(
     tester: &mut StateKeeperTester,
     token_id: TokenId,
@@ -237,7 +232,6 @@ fn test_create_incorrect_state_keeper() {
     const CHANNEL_SIZE: usize = 32768;
     const MAX_ITERATIONS: usize = 100;
     const FAST_ITERATIONS: usize = 100;
-    const NUMBER_OF_WITHDRAWALS: usize = 100;
 
     let (_request_tx, request_rx) = mpsc::channel(CHANNEL_SIZE);
     let (response_tx, _response_rx) = mpsc::channel(CHANNEL_SIZE);
@@ -256,7 +250,6 @@ fn test_create_incorrect_state_keeper() {
         vec![1, 2, 2], // `available_block_chunk_sizes` must be strictly increasing.
         MAX_ITERATIONS,
         FAST_ITERATIONS,
-        NUMBER_OF_WITHDRAWALS,
     );
 }
 
@@ -266,7 +259,7 @@ mod apply_priority_op {
     /// Checks if deposit is processed correctly by the state_keeper
     #[test]
     fn success() {
-        let mut tester = StateKeeperTester::new(6, 1, 1, 0);
+        let mut tester = StateKeeperTester::new(6, 1, 1);
         let old_pending_block = tester.state_keeper.pending_block.clone();
         let deposit = create_deposit(0, 145u32);
         let result = tester.state_keeper.apply_priority_op(deposit);
@@ -287,7 +280,7 @@ mod apply_priority_op {
     /// small number of chunks left in the block
     #[test]
     fn not_enough_chunks() {
-        let mut tester = StateKeeperTester::new(1, 1, 1, 0);
+        let mut tester = StateKeeperTester::new(1, 1, 1);
         let deposit = create_deposit(0, 1u32);
         let result = tester.state_keeper.apply_priority_op(deposit);
         assert!(result.is_err());
@@ -300,7 +293,7 @@ mod apply_tx {
     /// Checks if withdrawal is processed correctly by the state_keeper
     #[test]
     fn success() {
-        let mut tester = StateKeeperTester::new(6, 1, 1, 1);
+        let mut tester = StateKeeperTester::new(6, 1, 1);
         let old_pending_block = tester.state_keeper.pending_block.clone();
         let withdraw =
             create_account_and_withdrawal(&mut tester, 0, 1, 200u32, 145u32, Default::default());
@@ -316,13 +309,12 @@ mod apply_tx {
         assert!(!pending_block.account_updates.is_empty());
         assert!(!pending_block.success_operations.is_empty());
         assert!(!pending_block.collected_fees.is_empty());
-        assert_eq!(pending_block.withdrawals_amount, 1);
     }
 
     /// Checks if fast withdrawal makes fast processing required
     #[test]
     fn fast_withdrawal() {
-        let mut tester = StateKeeperTester::new(6, 1, 1, 1);
+        let mut tester = StateKeeperTester::new(6, 1, 1);
         let old_pending_block = tester.state_keeper.pending_block.clone();
         let withdraw = create_account_and_fast_withdrawal(
             &mut tester,
@@ -343,7 +335,7 @@ mod apply_tx {
     /// Checks if withdrawal that will fail is processed correctly
     #[test]
     fn failure() {
-        let mut tester = StateKeeperTester::new(6, 1, 1, 1);
+        let mut tester = StateKeeperTester::new(6, 1, 1);
         let old_pending_block = tester.state_keeper.pending_block.clone();
         let withdraw =
             create_account_and_withdrawal(&mut tester, 0, 1, 100u32, 145u32, Default::default());
@@ -359,25 +351,13 @@ mod apply_tx {
         assert!(pending_block.account_updates.is_empty());
         assert!(!pending_block.failed_txs.is_empty());
         assert!(pending_block.collected_fees.is_empty());
-        assert_eq!(pending_block.withdrawals_amount, 1);
     }
 
     /// Checks if processing withdrawal fails because of
     /// small number of chunks left in the block
     #[test]
     fn not_enough_chunks() {
-        let mut tester = StateKeeperTester::new(1, 1, 1, 1);
-        let withdraw =
-            create_account_and_withdrawal(&mut tester, 0, 1, 200u32, 145u32, Default::default());
-        let result = tester.state_keeper.apply_tx(&withdraw);
-        assert!(result.is_err());
-    }
-
-    /// Checks if processing withdrawal fails because of
-    /// small number of withdrawals_per_block
-    #[test]
-    fn withdrawals_limit_reached() {
-        let mut tester = StateKeeperTester::new(6, 1, 1, 0);
+        let mut tester = StateKeeperTester::new(1, 1, 1);
         let withdraw =
             create_account_and_withdrawal(&mut tester, 0, 1, 200u32, 145u32, Default::default());
         let result = tester.state_keeper.apply_tx(&withdraw);
@@ -390,7 +370,7 @@ mod apply_tx {
     #[test]
     fn gas_limit_reached() {
         let withdrawals_number = 46;
-        let mut tester = StateKeeperTester::new(6 * withdrawals_number, 1, 1, withdrawals_number);
+        let mut tester = StateKeeperTester::new(6 * withdrawals_number, 1, 1);
         for i in 1..=withdrawals_number {
             let withdrawal = create_account_and_withdrawal(
                 &mut tester,
@@ -414,7 +394,7 @@ mod apply_tx {
 /// with 1 priority_op, 1 succeeded tx, 1 failed tx
 #[tokio::test]
 async fn seal_pending_block() {
-    let mut tester = StateKeeperTester::new(20, 3, 3, 2);
+    let mut tester = StateKeeperTester::new(20, 3, 3);
     let good_withdraw =
         create_account_and_withdrawal(&mut tester, 0, 1, 200u32, 145u32, Default::default());
     let bad_withdraw =
@@ -466,7 +446,7 @@ async fn seal_pending_block() {
 /// with 1 priority_op, 1 succeeded tx, 1 failed tx
 #[tokio::test]
 async fn store_pending_block() {
-    let mut tester = StateKeeperTester::new(20, 3, 3, 2);
+    let mut tester = StateKeeperTester::new(20, 3, 3);
     let good_withdraw =
         create_account_and_withdrawal(&mut tester, 0, 1, 200u32, 145u32, Default::default());
     let bad_withdraw =
@@ -516,7 +496,7 @@ mod execute_proposed_block {
     /// and checks if number of chunks left is correct after each operation
     #[tokio::test]
     async fn just_enough_chunks() {
-        let mut tester = StateKeeperTester::new(8, 3, 3, 0);
+        let mut tester = StateKeeperTester::new(8, 3, 3);
 
         // First batch
         apply_batch_with_two_transfers(&mut tester).await;
@@ -542,7 +522,7 @@ mod execute_proposed_block {
     /// Also, checks if number of chunks left is correct after each operation
     #[tokio::test]
     async fn chunks_to_fit_three_transfers_2_2_1() {
-        let mut tester = StateKeeperTester::new(6, 3, 3, 0);
+        let mut tester = StateKeeperTester::new(6, 3, 3);
 
         // First batch
         apply_batch_with_two_transfers(&mut tester).await;
@@ -581,7 +561,7 @@ mod execute_proposed_block {
     /// Also, checks if number of chunks left is correct after each operation
     #[tokio::test]
     async fn chunks_to_fit_three_transfers_1_1_2_1() {
-        let mut tester = StateKeeperTester::new(6, 3, 3, 0);
+        let mut tester = StateKeeperTester::new(6, 3, 3);
 
         // First single tx
         apply_single_transfer(&mut tester).await;
@@ -626,7 +606,7 @@ mod execute_proposed_block {
     /// Checks if executing a small proposed_block is done correctly
     #[tokio::test]
     async fn small() {
-        let mut tester = StateKeeperTester::new(20, 3, 3, 2);
+        let mut tester = StateKeeperTester::new(20, 3, 3);
         let good_withdraw =
             create_account_and_withdrawal(&mut tester, 0, 1, 200u32, 145u32, Default::default());
         let bad_withdraw =
@@ -659,39 +639,7 @@ mod execute_proposed_block {
     /// so 1 block should get sealed in the process
     #[tokio::test]
     async fn few_chunks() {
-        let mut tester = StateKeeperTester::new(12, 3, 3, 2);
-        let good_withdraw =
-            create_account_and_withdrawal(&mut tester, 0, 1, 200u32, 145u32, Default::default());
-        let bad_withdraw =
-            create_account_and_withdrawal(&mut tester, 2, 2, 100u32, 145u32, Default::default());
-        let deposit = create_deposit(0, 12u32);
-        let proposed_block = ProposedBlock {
-            txs: vec![
-                SignedTxVariant::Tx(good_withdraw),
-                SignedTxVariant::Tx(bad_withdraw),
-            ],
-            priority_ops: vec![deposit],
-        };
-        tester
-            .state_keeper
-            .execute_proposed_block(proposed_block)
-            .await;
-        assert!(matches!(
-            tester.response_rx.next().await,
-            Some(CommitRequest::Block(_))
-        ));
-        assert!(matches!(
-            tester.response_rx.next().await,
-            Some(CommitRequest::PendingBlock(_))
-        ));
-    }
-
-    /// Checks if executing a proposed_block is done correctly
-    /// There are more withdrawals than one can fit in 1 block,
-    /// so 1 block should get sealed in the process
-    #[tokio::test]
-    async fn few_withdrawals() {
-        let mut tester = StateKeeperTester::new(20, 3, 3, 1);
+        let mut tester = StateKeeperTester::new(12, 3, 3);
         let good_withdraw =
             create_account_and_withdrawal(&mut tester, 0, 1, 200u32, 145u32, Default::default());
         let bad_withdraw =
@@ -722,7 +670,7 @@ mod execute_proposed_block {
     /// max_iterations == 0, so the block should get sealed, not stored
     #[tokio::test]
     async fn few_iterations() {
-        let mut tester = StateKeeperTester::new(20, 0, 0, 2);
+        let mut tester = StateKeeperTester::new(20, 0, 0);
         let good_withdraw =
             create_account_and_withdrawal(&mut tester, 0, 1, 200u32, 145u32, Default::default());
         let bad_withdraw =
@@ -751,7 +699,7 @@ mod execute_proposed_block {
         const MAX_ITERATIONS: usize = 100;
         const FAST_ITERATIONS: usize = 0; // Seal block right after fast withdrawal.
 
-        let mut tester = StateKeeperTester::new(6, MAX_ITERATIONS, FAST_ITERATIONS, 2);
+        let mut tester = StateKeeperTester::new(6, MAX_ITERATIONS, FAST_ITERATIONS);
         let withdraw = create_account_and_fast_withdrawal(
             &mut tester,
             0,
@@ -784,7 +732,7 @@ mod execute_proposed_block {
     /// 3. if there were successful operations in the block, pending block iteration is incremented after each `execute_proposed_block` call.
     #[tokio::test]
     async fn pending_block_updates() {
-        let mut tester = StateKeeperTester::new(20, 5, 5, 4);
+        let mut tester = StateKeeperTester::new(20, 5, 5);
 
         // --- Phase 1: Empty pending block, empty update. ---
 
@@ -905,7 +853,7 @@ mod execute_proposed_block {
     /// to the committer.
     #[tokio::test]
     async fn pending_block_diff() {
-        let mut tester = StateKeeperTester::new(20, 5, 5, 4);
+        let mut tester = StateKeeperTester::new(20, 5, 5);
 
         let good_withdraw_1 =
             create_account_and_withdrawal(&mut tester, 0, 1, 200u32, 145u32, Default::default());
@@ -982,7 +930,7 @@ mod execute_proposed_block {
     /// and transaction with an invalid timestamp failed.
     #[tokio::test]
     async fn transfers_with_different_timestamps() {
-        let mut tester = StateKeeperTester::new(20, 5, 5, 4);
+        let mut tester = StateKeeperTester::new(20, 5, 5);
 
         let token_id: TokenId = 0;
         let account_from_id: AccountId = 1;

@@ -1,16 +1,18 @@
-const hardhat = require("hardhat");
+const hardhat = require('hardhat');
 const { expect } = require('chai');
 const { getCallRevertReason } = require('./common');
 
-describe('Governance unit tests', function() {
+describe('Governance unit tests', function () {
     this.timeout(50000);
 
     let testContract;
     before(async () => {
         let governanceAddressDeployed;
-        const contractFactory = await hardhat.ethers.getContractFactory("Governance");
+        const contractFactory = await hardhat.ethers.getContractFactory('Governance');
         testContract = await contractFactory.deploy();
-        await testContract.initialize(ethers.utils.defaultAbiCoder.encode(["address"], [await testContract.signer.getAddress()]));
+        await testContract.initialize(
+            ethers.utils.defaultAbiCoder.encode(['address'], [await testContract.signer.getAddress()])
+        );
     });
 
     it('checking correctness of using MAX_AMOUNT_OF_REGISTERED_TOKENS constant', async () => {
@@ -21,7 +23,7 @@ describe('Governance unit tests', function() {
             );
             if (step !== MAX_AMOUNT_OF_REGISTERED_TOKENS + 1) {
                 expect(revertReason).equal('VM did not revert');
-            } else{
+            } else {
                 expect(revertReason).not.equal('VM did not revert');
             }
         }

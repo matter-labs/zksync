@@ -1,0 +1,5 @@
+[db]
+# Datbase URL is defined in the `private.toml`
+
+# Amount of open connections to the database.
+pool_size=10

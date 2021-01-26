@@ -10,9 +10,16 @@ use once_cell::sync::Lazy;
 use tokio::sync::Mutex;
 
 // Workspace uses
-use zksync_config::{ApiServerOptions, ConfigurationOptions};
-// use zksync_crypto::rand::{SeedableRng, XorShiftRng};
-use zksync_storage::ConnectionPool;
+use zksync_config::ZkSyncConfig;
+use zksync_crypto::rand::{SeedableRng, XorShiftRng};
+use zksync_storage::{
+    chain::operations::records::NewExecutedPriorityOperation,
+    test_data::{
+        dummy_ethereum_tx_hash, gen_acc_random_updates, gen_unique_operation,
+        gen_unique_operation_with_txs, BLOCK_SIZE_CHUNKS,
+    },
+    ConnectionPool,
+};
 use zksync_test_account::ZkSyncAccount;
 use zksync_types::{
     ethereum::OperationType,
@@ -39,16 +46,14 @@ pub const VERIFIED_BLOCKS_COUNT: BlockNumber = 3;
 
 #[derive(Debug, Clone)]
 pub struct TestServerConfig {
-    pub env_options: ConfigurationOptions,
-    pub api_server_options: ApiServerOptions,
+    pub config: ZkSyncConfig,
     pub pool: ConnectionPool,
 }
 
 impl Default for TestServerConfig {
     fn default() -> Self {
         Self {
-            env_options: ConfigurationOptions::from_env(),
-            api_server_options: ApiServerOptions::from_env(),
+            config: ZkSyncConfig::from_env(),
             pool: ConnectionPool::new(Some(1)),
         }
     }
@@ -234,108 +239,147 @@ impl TestServerConfig {
     }
 
     pub async fn fill_database(&self) -> anyhow::Result<()> {
-        todo!()
-        //     static INITED: Lazy<Mutex<bool>> = Lazy::new(|| Mutex::new(false));
-        //
-        //     // Hold this guard until transaction will be committed to avoid double init.
-        //     let mut inited_guard = INITED.lock().await;
-        //     if *inited_guard {
-        //         return Ok(());
-        //     }
-        //     *inited_guard = true;
-        //
-        //     let mut storage = self.pool.access_storage().await?;
-        //
-        //     // Check if database is been already inited.
-        //     if storage.chain().block_schema().get_block(1).await?.is_some() {
-        //         return Ok(());
-        //     }
-        //
-        //     // Make changes atomic.
-        //     let mut storage = storage.start_transaction().await?;
-        //
-        //     // Below lies the initialization of the data for the test.
-        //     let mut rng = XorShiftRng::from_seed([0, 1, 2, 3]);
-        //
-        //     // Required since we use `EthereumSchema` in this test.
-        //     storage.ethereum_schema().initialize_eth_data().await?;
-        //
-        //     // Insert PHNX token
+        todo!();
+
+        // static INITED: Lazy<Mutex<bool>> = Lazy::new(|| Mutex::new(false));
+
+        // // Hold this guard until transaction will be committed to avoid double init.
+        // let mut inited_guard = INITED.lock().await;
+        // if *inited_guard {
+        //     return Ok(());
+        // }
+        // *inited_guard = true;
+
+        // let mut storage = self.pool.access_storage().await?;
+
+        // // Check if database is been already inited.
+        // if storage.chain().block_schema().get_block(1).await?.is_some() {
+        //     return Ok(());
+        // }
+
+        // // Make changes atomic.
+        // let mut storage = storage.start_transaction().await?;
+
+        // // Below lies the initialization of the data for the test.
+        // let mut rng = XorShiftRng::from_seed([0, 1, 2, 3]);
+
+        // // Required since we use `EthereumSchema` in this test.
+        // storage.ethereum_schema().initialize_eth_data().await?;
+
+        // // Insert PHNX token
+        // storage
+        //     .tokens_schema()
+        //     .store_token(Token::new(
+        //         1,
+        //         Address::from_str("38A2fDc11f526Ddd5a607C1F251C065f40fBF2f7").unwrap(),
+        //         "PHNX",
+        //         18,
+        //     ))
+        //     .await?;
+        // // Insert Golem token with old symbol (from rinkeby).
+        // storage
+        //     .tokens_schema()
+        //     .store_token(Token::new(
+        //         16,
+        //         Address::from_str("d94e3dc39d4cad1dad634e7eb585a57a19dc7efe").unwrap(),
+        //         "GNT",
+        //         18,
+        //     ))
+        //     .await?;
+
+        // let mut accounts = AccountMap::default();
+
+        // // Create and apply several blocks to work with.
+        // for block_number in 1..=COMMITTED_BLOCKS_COUNT {
+        //     let updates = (0..3)
+        //         .flat_map(|_| gen_acc_random_updates(&mut rng))
+        //         .collect::<Vec<_>>();
+        //     apply_updates(&mut accounts, updates.clone());
+
+        //     // Add transactions to every odd block.
+        //     let txs = if block_number % 2 == 1 {
+        //         let (&id, account) = accounts.iter().next().unwrap();
+
+        //         Self::gen_zk_txs_for_account(id, account.address, 1_000)
+        //             .txs
+        //             .into_iter()
+        //             .map(|(_tx, op)| op)
+        //             .collect()
+        //     } else {
+        //         vec![]
+        //     };
+
+        //     // Storage transactions in the block schema.
         //     storage
-        //         .tokens_schema()
-        //         .store_token(Token::new(
-        //             1,
-        //             Address::from_str("38A2fDc11f526Ddd5a607C1F251C065f40fBF2f7").unwrap(),
-        //             "PHNX",
-        //             18,
+        //         .chain()
+        //         .block_schema()
+        //         .save_block_transactions(block_number, txs.clone())
+        //         .await?;
+
+        //     // Store the commit operation in the block schema.
+        //     let operation = storage
+        //         .chain()
+        //         .block_schema()
+        //         .execute_operation(gen_unique_operation_with_txs(
+        //             block_number,
+        //             Action::Commit,
+        //             BLOCK_SIZE_CHUNKS,
+        //             txs,
         //         ))
         //         .await?;
-        //     // Insert Golem token with old symbol (from rinkeby).
         //     storage
-        //         .tokens_schema()
-        //         .store_token(Token::new(
-        //             16,
-        //             Address::from_str("d94e3dc39d4cad1dad634e7eb585a57a19dc7efe").unwrap(),
-        //             "GNT",
-        //             18,
-        //         ))
+        //         .chain()
+        //         .state_schema()
+        //         .commit_state_update(block_number, &updates, 0)
         //         .await?;
-        //
-        //     let mut accounts = AccountMap::default();
-        //
-        //     // Create and apply several blocks to work with.
-        //     for block_number in 1..=COMMITTED_BLOCKS_COUNT {
-        //         let updates = (0..3)
-        //             .map(|_| gen_acc_random_updates(&mut rng))
-        //             .flatten()
-        //             .collect::<Vec<_>>();
-        //         apply_updates(&mut accounts, updates.clone());
-        //
-        //         // Add transactions to every odd block.
-        //         let txs = if block_number % 2 == 1 {
-        //             let (&id, account) = accounts.iter().next().unwrap();
-        //
-        //             Self::gen_zk_txs_for_account(id, account.address, 1_000)
-        //                 .txs
-        //                 .into_iter()
-        //                 .map(|(_tx, op)| op)
-        //                 .collect()
-        //         } else {
-        //             vec![]
-        //         };
-        //
-        //         // Storage transactions in the block schema.
+
+        //     // Store & confirm the operation in the ethereum schema, as it's used for obtaining
+        //     // commit/verify hashes.
+        //     let ethereum_op_id = operation.id.unwrap() as i64;
+        //     let eth_tx_hash = dummy_ethereum_tx_hash(ethereum_op_id);
+        //     let response = storage
+        //         .ethereum_schema()
+        //         .save_new_eth_tx(
+        //             OperationType::Commit,
+        //             Some(ethereum_op_id),
+        //             100,
+        //             100u32.into(),
+        //             Default::default(),
+        //         )
+        //         .await?;
+        //     storage
+        //         .ethereum_schema()
+        //         .add_hash_entry(response.id, &eth_tx_hash)
+        //         .await?;
+        //     storage
+        //         .ethereum_schema()
+        //         .confirm_eth_tx(&eth_tx_hash)
+        //         .await?;
+
+        //     // Add verification for the block if required.
+        //     if block_number <= VERIFIED_BLOCKS_COUNT {
         //         storage
-        //             .chain()
-        //             .block_schema()
-        //             .save_block_transactions(block_number, txs.clone())
+        //             .prover_schema()
+        //             .store_proof(block_number, &Default::default())
         //             .await?;
-        //
-        //         // Store the commit operation in the block schema.
         //         let operation = storage
         //             .chain()
         //             .block_schema()
-        //             .execute_operation(gen_unique_operation_with_txs(
+        //             .execute_operation(gen_unique_operation(
         //                 block_number,
-        //                 Action::Commit,
+        //                 Action::Verify {
+        //                     proof: Default::default(),
+        //                 },
         //                 BLOCK_SIZE_CHUNKS,
-        //                 txs,
         //             ))
         //             .await?;
-        //         storage
-        //             .chain()
-        //             .state_schema()
-        //             .commit_state_update(block_number, &updates, 0)
-        //             .await?;
-        //
-        //         // Store & confirm the operation in the ethereum schema, as it's used for obtaining
-        //         // commit/verify hashes.
+
         //         let ethereum_op_id = operation.id.unwrap() as i64;
         //         let eth_tx_hash = dummy_ethereum_tx_hash(ethereum_op_id);
         //         let response = storage
         //             .ethereum_schema()
         //             .save_new_eth_tx(
-        //                 OperationType::Commit,
+        //                 OperationType::Verify,
         //                 Some(ethereum_op_id),
         //                 100,
         //                 100u32.into(),
@@ -350,116 +394,77 @@ impl TestServerConfig {
         //             .ethereum_schema()
         //             .confirm_eth_tx(&eth_tx_hash)
         //             .await?;
-        //
-        //         // Add verification for the block if required.
-        //         if block_number <= VERIFIED_BLOCKS_COUNT {
-        //             storage
-        //                 .prover_schema()
-        //                 .store_proof(block_number, &Default::default())
-        //                 .await?;
-        //             let operation = storage
-        //                 .chain()
-        //                 .block_schema()
-        //                 .execute_operation(gen_unique_operation(
-        //                     block_number,
-        //                     Action::Verify {
-        //                         proof: Default::default(),
-        //                     },
-        //                     BLOCK_SIZE_CHUNKS,
-        //                 ))
-        //                 .await?;
-        //
-        //             let ethereum_op_id = operation.id.unwrap() as i64;
-        //             let eth_tx_hash = dummy_ethereum_tx_hash(ethereum_op_id);
-        //             let response = storage
-        //                 .ethereum_schema()
-        //                 .save_new_eth_tx(
-        //                     OperationType::Verify,
-        //                     Some(ethereum_op_id),
-        //                     100,
-        //                     100u32.into(),
-        //                     Default::default(),
-        //                 )
-        //                 .await?;
-        //             storage
-        //                 .ethereum_schema()
-        //                 .add_hash_entry(response.id, &eth_tx_hash)
-        //                 .await?;
-        //             storage
-        //                 .ethereum_schema()
-        //                 .confirm_eth_tx(&eth_tx_hash)
-        //                 .await?;
-        //         }
         //     }
-        //
-        //     // Store priority operations for some tests.
-        //     let ops = vec![
-        //         // Verified priority operation.
-        //         NewExecutedPriorityOperation {
-        //             block_number: 2,
-        //             block_index: 2,
-        //             operation: serde_json::to_value(
-        //                 dummy_deposit_op(Address::default(), 1, VERIFIED_OP_SERIAL_ID, 2).op,
-        //             )
-        //             .unwrap(),
-        //             from_account: Default::default(),
-        //             to_account: Default::default(),
-        //             priority_op_serialid: VERIFIED_OP_SERIAL_ID as i64,
-        //             deadline_block: 100,
-        //             eth_hash: dummy_ethereum_tx_hash(VERIFIED_OP_SERIAL_ID as i64)
-        //                 .as_bytes()
-        //                 .to_vec(),
-        //             eth_block: 10,
-        //             created_at: chrono::Utc::now(),
-        //         },
-        //         // Committed priority operation.
-        //         NewExecutedPriorityOperation {
-        //             block_number: VERIFIED_BLOCKS_COUNT as i64 + 1,
-        //             block_index: 1,
-        //             operation: serde_json::to_value(
-        //                 dummy_full_exit_op(1, Address::default(), COMMITTED_OP_SERIAL_ID, 3).op,
-        //             )
-        //             .unwrap(),
-        //             from_account: Default::default(),
-        //             to_account: Default::default(),
-        //             priority_op_serialid: COMMITTED_OP_SERIAL_ID as i64,
-        //             deadline_block: 200,
-        //             eth_hash: dummy_ethereum_tx_hash(COMMITTED_OP_SERIAL_ID as i64)
-        //                 .as_bytes()
-        //                 .to_vec(),
-        //             eth_block: 14,
-        //             created_at: chrono::Utc::now(),
-        //         },
-        //     ];
-        //
-        //     for op in ops {
-        //         storage
-        //             .chain()
-        //             .operations_schema()
-        //             .store_executed_priority_op(op)
-        //             .await?;
-        //     }
-        //
-        //     // Get the accounts by their IDs.
-        //     for (account_id, _account) in accounts {
-        //         let account_state = storage
-        //             .chain()
-        //             .account_schema()
-        //             .account_state_by_id(account_id)
-        //             .await?;
-        //
-        //         // Check that committed state is available.
-        //         assert!(
-        //             account_state.committed.is_some(),
-        //             "No committed state for account"
-        //         );
-        //     }
-        //
-        //     storage.commit().await?;
-        //     // Storage has been inited, so we can safely drop this guard.
-        //     drop(inited_guard);
-        //
-        //     Ok(())
+        // }
+
+        // // Store priority operations for some tests.
+        // let ops = vec![
+        //     // Verified priority operation.
+        //     NewExecutedPriorityOperation {
+        //         block_number: 2,
+        //         block_index: 2,
+        //         operation: serde_json::to_value(
+        //             dummy_deposit_op(Address::default(), 1, VERIFIED_OP_SERIAL_ID, 2).op,
+        //         )
+        //         .unwrap(),
+        //         from_account: Default::default(),
+        //         to_account: Default::default(),
+        //         priority_op_serialid: VERIFIED_OP_SERIAL_ID as i64,
+        //         deadline_block: 100,
+        //         eth_hash: dummy_ethereum_tx_hash(VERIFIED_OP_SERIAL_ID as i64)
+        //             .as_bytes()
+        //             .to_vec(),
+        //         eth_block: 10,
+        //         created_at: chrono::Utc::now(),
+        //     },
+        //     // Committed priority operation.
+        //     NewExecutedPriorityOperation {
+        //         block_number: VERIFIED_BLOCKS_COUNT as i64 + 1,
+        //         block_index: 1,
+        //         operation: serde_json::to_value(
+        //             dummy_full_exit_op(1, Address::default(), COMMITTED_OP_SERIAL_ID, 3).op,
+        //         )
+        //         .unwrap(),
+        //         from_account: Default::default(),
+        //         to_account: Default::default(),
+        //         priority_op_serialid: COMMITTED_OP_SERIAL_ID as i64,
+        //         deadline_block: 200,
+        //         eth_hash: dummy_ethereum_tx_hash(COMMITTED_OP_SERIAL_ID as i64)
+        //             .as_bytes()
+        //             .to_vec(),
+        //         eth_block: 14,
+        //         created_at: chrono::Utc::now(),
+        //     },
+        // ];
+
+        // for op in ops {
+        //     storage
+        //         .chain()
+        //         .operations_schema()
+        //         .store_executed_priority_op(op)
+        //         .await?;
+        // }
+
+        // // Get the accounts by their IDs.
+        // for (account_id, _account) in accounts {
+        //     let account_state = storage
+        //         .chain()
+        //         .account_schema()
+        //         .account_state_by_id(account_id)
+        //         .await?;
+
+        //     // Check that committed state is available.
+        //     assert!(
+        //         account_state.committed.is_some(),
+        //         "No committed state for account"
+        //     );
+        // }
+
+        // storage.commit().await?;
+        // // Storage has been inited, so we can safely drop this guard.
+        // drop(inited_guard);
+
+        Ok(())
     }
 }
 

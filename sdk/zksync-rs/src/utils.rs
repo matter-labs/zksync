@@ -14,6 +14,7 @@ use crate::{error::ClientError, provider::Provider, wallet::Wallet};
 
 // Public re-exports.
 pub use zksync_types::helpers::{
+    closest_greater_or_eq_packable_fee_amount, closest_greater_or_eq_packable_token_amount,
     closest_packable_fee_amount, closest_packable_token_amount, is_fee_amount_packable,
     is_token_amount_packable, pack_fee_amount, pack_token_amount,
 };
