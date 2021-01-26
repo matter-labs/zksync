@@ -12,7 +12,7 @@ use zksync_types::{
 // Local imports
 use self::records::{ETHParams, ETHStats, ETHTxHash, StorageETHOperation};
 use crate::chain::operations::records::StoredOperation;
-use crate::{QueryResult, StorageProcessor};
+use crate::{QueryResult, StorageActionType, StorageProcessor};
 
 pub mod records;
 
@@ -56,9 +56,14 @@ impl<'a, 'c> EthereumSchema<'a, 'c> {
         for eth_op in eth_ops {
             let raw_op = sqlx::query_as!(
                 StoredOperation,
-                "SELECT operations.* FROM eth_ops_binding
+                r#"
+                SELECT operations.id, operations.block_number,
+                    operations.action_type as "action_type!: StorageActionType",
+                    operations.created_at, operations.confirmed
+                FROM eth_ops_binding
                 LEFT JOIN operations ON operations.id = op_id
-                WHERE eth_op_id = $1",
+                WHERE eth_op_id = $1
+                "#,
                 eth_op.id
             )
             .fetch_optional(transaction.conn())
@@ -130,9 +135,14 @@ impl<'a, 'c> EthereumSchema<'a, 'c> {
 
         let raw_ops = sqlx::query_as!(
             StoredOperation,
-            "SELECT * FROM operations
+            r#"
+            SELECT id, block_number,
+                action_type as "action_type!: StorageActionType",
+                created_at, confirmed
+            FROM operations
             WHERE confirmed = false AND NOT EXISTS (SELECT * FROM eth_ops_binding WHERE op_id = operations.id)
-            ORDER BY id ASC",
+            ORDER BY id ASC
+            "#,
         )
         .fetch_all(transaction.conn())
         .await?;

@@ -11,7 +11,7 @@ use crate::{
             OperationsSchema,
         },
     },
-    QueryResult, StorageProcessor,
+    QueryResult, StorageActionType, StorageProcessor,
 };
 
 /// Checks the save&load routine for unconfirmed operations.
@@ -22,7 +22,7 @@ async fn operations(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
     OperationsSchema(&mut storage)
         .store_operation(NewOperation {
             block_number,
-            action_type: action_type.to_string(),
+            action_type: StorageActionType::from(action_type),
         })
         .await?;
 
@@ -32,7 +32,10 @@ async fn operations(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
         .unwrap();
 
     assert_eq!(stored_operation.block_number, 1);
-    assert_eq!(stored_operation.action_type, action_type.to_string());
+    assert_eq!(
+        stored_operation.action_type,
+        StorageActionType::from(action_type)
+    );
     assert_eq!(stored_operation.confirmed, false);
 
     Ok(())
