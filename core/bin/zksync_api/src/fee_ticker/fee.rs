@@ -56,13 +56,7 @@ impl Fee {
         gas_tx_amount: BigUint,
         gas_price_wei: BigUint,
     ) -> Self {
-        let zkp_fee = round_precision(&zkp_fee, 18).ceil().to_integer();
-        let gas_fee = round_precision(&gas_fee, 18).ceil().to_integer();
-
-        let total_fee = zkp_fee.clone() + gas_fee.clone();
-        let total_fee = unpack_fee_amount(&pack_fee_amount(&total_fee))
-            .expect("Failed to round gas fee amount.");
-
+        let (zkp_fee, gas_fee, total_fee) = total_fee(&zkp_fee, &gas_fee);
         Self {
             fee_type,
             gas_tx_amount,
@@ -72,4 +66,19 @@ impl Fee {
             total_fee,
         }
     }
+}
+
+pub(crate) fn total_fee(
+    zkp_fee: &Ratio<BigUint>,
+    gas_fee: &Ratio<BigUint>,
+) -> (BigUint, BigUint, BigUint) {
+    let zkp_fee = round_precision(zkp_fee, 18).ceil().to_integer();
+    let gas_fee = round_precision(gas_fee, 18).ceil().to_integer();
+
+    let total_fee = zkp_fee.clone() + gas_fee.clone();
+    (
+        zkp_fee,
+        gas_fee,
+        unpack_fee_amount(&pack_fee_amount(&total_fee)).expect("Failed to round gas fee amount."),
+    )
 }

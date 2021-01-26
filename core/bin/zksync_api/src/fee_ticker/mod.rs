@@ -5,6 +5,8 @@
 
 // Built-in deps
 use std::collections::{HashMap, HashSet};
+use std::convert::TryFrom;
+use std::iter::FromIterator;
 // External deps
 use bigdecimal::BigDecimal;
 use futures::{
@@ -14,20 +16,24 @@ use futures::{
 use num::{
     rational::Ratio,
     traits::{Inv, Pow},
-    BigUint,
+    BigUint, Zero,
 };
 use serde::{Deserialize, Serialize};
 use tokio::task::JoinHandle;
 use tokio::time::Instant;
+
 // Workspace deps
+use zksync_config::{configs::ticker::TokenPriceSource, ZkSyncConfig};
 use zksync_storage::ConnectionPool;
 use zksync_types::{
     Address, ChangePubKeyOp, Token, TokenId, TokenLike, TransferOp, TransferToNewOp, TxFeeTypes,
     WithdrawOp,
 };
-
 use zksync_utils::ratio_to_big_decimal;
+
 // Local deps
+use crate::fee_ticker::balancer::TickerBalancer;
+use crate::fee_ticker::validator::MarketUpdater;
 use crate::fee_ticker::{
     ticker_api::{
         coingecko::CoinGeckoAPI, coinmarkercap::CoinMarketCapAPI, FeeTickerAPI, TickerApi,
@@ -42,12 +48,6 @@ use crate::fee_ticker::{
 use crate::utils::token_db_cache::TokenDBCache;
 
 pub use self::fee::*;
-use crate::fee_ticker::balancer::TickerBalancer;
-use crate::fee_ticker::validator::MarketUpdater;
-use std::convert::TryFrom;
-use std::iter::FromIterator;
-use zksync_config::configs::ticker::TokenPriceSource;
-use zksync_config::ZkSyncConfig;
 
 mod constants;
 mod fee;
@@ -169,6 +169,11 @@ pub enum TickerRequest {
         address: Address,
         token: TokenLike,
         response: oneshot::Sender<Result<Fee, anyhow::Error>>,
+    },
+    GetBatchTxFee {
+        transactions: Vec<(TxFeeTypes, Address)>,
+        token: TokenLike,
+        response: oneshot::Sender<Result<BigUint, anyhow::Error>>,
     },
     GetTokenPrice {
         token: TokenLike,
@@ -313,6 +318,15 @@ impl<API: FeeTickerAPI, INFO: FeeTickerInfo, WATCHER: TokenWatcher> FeeTicker<AP
                     metrics::histogram!("ticker.is_token_allowed", start.elapsed());
                     response.send(allowed).unwrap_or_default();
                 }
+                TickerRequest::GetBatchTxFee {
+                    transactions,
+                    token,
+                    response,
+                } => {
+                    let fee = self.get_batch_from_ticker_in_wei(token, transactions).await;
+                    metrics::histogram!("ticker.get_tx_fee", start.elapsed());
+                    response.send(fee).unwrap_or_default()
+                }
             }
         }
     }
@@ -342,7 +356,7 @@ impl<API: FeeTickerAPI, INFO: FeeTickerInfo, WATCHER: TokenWatcher> FeeTicker<AP
     }
 
     /// Returns `true` if the token is subsidized.
-    fn is_token_subsidized(&self, token: Token) -> bool {
+    fn is_token_subsidized(&self, token: &Token) -> bool {
         // We have disabled the subsidies up until the contract upgrade (when the prices will indeed become that
         // low), but however we want to leave ourselves the possibility to easily enable them if required.
         // Thus:
@@ -365,6 +379,73 @@ impl<API: FeeTickerAPI, INFO: FeeTickerInfo, WATCHER: TokenWatcher> FeeTicker<AP
     ) -> Result<Fee, anyhow::Error> {
         let zkp_cost_chunk = self.config.zkp_cost_chunk_usd.clone();
         let token = self.api.get_token(token).await?;
+
+        let gas_price_wei = self.api.get_gas_price_wei().await?;
+        let scale_gas_price = Self::risk_gas_price_estimate(gas_price_wei.clone());
+        let is_token_subsidized = self.is_token_subsidized(&token);
+        let wei_price_usd = self.wei_price_usd().await?;
+        let token_usd_risk = self.token_usd_risk(&token).await?;
+
+        let (fee_type, gas_tx_amount, op_chunks) = self
+            .gas_tx_amount(is_token_subsidized, tx_type, recipient)
+            .await;
+
+        let zkp_fee = (zkp_cost_chunk * op_chunks) * token_usd_risk.clone();
+        let gas_fee =
+            (wei_price_usd * gas_tx_amount.clone() * scale_gas_price.clone()) * token_usd_risk;
+
+        Ok(Fee::new(
+            fee_type,
+            zkp_fee,
+            gas_fee,
+            gas_tx_amount,
+            gas_price_wei,
+        ))
+    }
+
+    async fn get_batch_from_ticker_in_wei(
+        &mut self,
+        token: TokenLike,
+        txs: Vec<(TxFeeTypes, Address)>,
+    ) -> anyhow::Result<BigUint> {
+        let zkp_cost_chunk = self.config.zkp_cost_chunk_usd.clone();
+        let token = self.api.get_token(token).await?;
+
+        let gas_price_wei = self.api.get_gas_price_wei().await?;
+        let scale_gas_price = Self::risk_gas_price_estimate(gas_price_wei.clone());
+        let is_token_subsidized = self.is_token_subsidized(&token);
+        let wei_price_usd = self.wei_price_usd().await?;
+        let token_usd_risk = self.token_usd_risk(&token).await?;
+
+        let mut total_gas_tx_amount = BigUint::zero();
+        let mut total_op_chunks = BigUint::zero();
+
+        for (tx_type, recipient) in txs {
+            let (_, gas_tx_amount, op_chunks) = self
+                .gas_tx_amount(is_token_subsidized, tx_type, recipient)
+                .await;
+            total_gas_tx_amount += gas_tx_amount;
+            total_op_chunks += op_chunks;
+        }
+
+        let total_zkp_fee = (zkp_cost_chunk * total_op_chunks) * token_usd_risk.clone();
+        let total_gas_fee =
+            (wei_price_usd * total_gas_tx_amount * scale_gas_price) * token_usd_risk;
+        let (_, _, total_fee) = total_fee(&total_zkp_fee, &total_gas_fee);
+
+        Ok(total_fee)
+    }
+
+    async fn wei_price_usd(&mut self) -> anyhow::Result<Ratio<BigUint>> {
+        Ok(self
+            .api
+            .get_last_quote(TokenLike::Id(TokenId(0)))
+            .await?
+            .usd_price
+            / BigUint::from(10u32).pow(18u32))
+    }
+
+    async fn token_usd_risk(&mut self, token: &Token) -> anyhow::Result<Ratio<BigUint>> {
         let token_risk_factor = self
             .config
             .tokens_risk_factors
@@ -372,6 +453,21 @@ impl<API: FeeTickerAPI, INFO: FeeTickerInfo, WATCHER: TokenWatcher> FeeTicker<AP
             .cloned()
             .unwrap_or_else(|| Ratio::from_integer(1u32.into()));
 
+        let token_price_usd = self
+            .api
+            .get_last_quote(TokenLike::Id(token.id))
+            .await?
+            .usd_price
+            / BigUint::from(10u32).pow(u32::from(token.decimals));
+        Ok(token_risk_factor / token_price_usd)
+    }
+
+    async fn gas_tx_amount(
+        &mut self,
+        is_token_subsidized: bool,
+        tx_type: TxFeeTypes,
+        recipient: Address,
+    ) -> (OutputFeeType, BigUint, BigUint) {
         let (fee_type, op_chunks) = match tx_type {
             TxFeeTypes::Withdraw => (OutputFeeType::Withdraw, WithdrawOp::CHUNKS),
             TxFeeTypes::FastWithdraw => (OutputFeeType::FastWithdraw, WithdrawOp::CHUNKS),
@@ -393,8 +489,8 @@ impl<API: FeeTickerAPI, INFO: FeeTickerInfo, WATCHER: TokenWatcher> FeeTicker<AP
         };
         // Convert chunks amount to `BigUint`.
         let op_chunks = BigUint::from(op_chunks);
+
         let gas_tx_amount = {
-            let is_token_subsidized = self.is_token_subsidized(token.clone());
             if is_token_subsidized {
                 self.config
                     .gas_cost_tx
@@ -411,34 +507,6 @@ impl<API: FeeTickerAPI, INFO: FeeTickerInfo, WATCHER: TokenWatcher> FeeTicker<AP
                     .unwrap()
             }
         };
-        let gas_price_wei = self.api.get_gas_price_wei().await?;
-        let scale_gas_price = Self::risk_gas_price_estimate(gas_price_wei.clone());
-        let wei_price_usd = self
-            .api
-            .get_last_quote(TokenLike::Id(TokenId(0)))
-            .await?
-            .usd_price
-            / BigUint::from(10u32).pow(18u32);
-
-        let token_price_usd = self
-            .api
-            .get_last_quote(TokenLike::Id(token.id))
-            .await?
-            .usd_price
-            / BigUint::from(10u32).pow(u32::from(token.decimals));
-
-        let zkp_fee =
-            (zkp_cost_chunk * op_chunks) * token_risk_factor.clone() / token_price_usd.clone();
-        let gas_fee = (wei_price_usd * gas_tx_amount.clone() * scale_gas_price.clone())
-            * token_risk_factor
-            / token_price_usd;
-
-        Ok(Fee::new(
-            fee_type,
-            zkp_fee,
-            gas_fee,
-            gas_tx_amount,
-            gas_price_wei,
-        ))
+        (fee_type, gas_tx_amount, op_chunks)
     }
 }
