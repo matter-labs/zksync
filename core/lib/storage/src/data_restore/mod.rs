@@ -33,27 +33,29 @@ impl<'a, 'c> DataRestoreSchema<'a, 'c> {
         let new_state = self.new_storage_state("None");
         let mut transaction = self.0.start_transaction().await?;
 
-        let commit_op = BlockSchema(&mut transaction)
-            .store_operation(commit_op)
-            .await?;
-        let verify_op = BlockSchema(&mut transaction)
-            .store_operation(verify_op)
-            .await?;
-        // The state is expected to be updated, so it's necessary
-        // to do it here.
-        StateSchema(&mut transaction)
-            .apply_state_update(commit_op.block_number as u32)
-            .await?;
-        OperationsSchema(&mut transaction)
-            .confirm_operation(commit_op.block_number as u32, ActionType::COMMIT)
-            .await?;
-        OperationsSchema(&mut transaction)
-            .confirm_operation(verify_op.block_number as u32, ActionType::VERIFY)
-            .await?;
+        // TODO: Restore code (ZKS-427)
 
-        DataRestoreSchema(&mut transaction)
-            .update_storage_state(new_state)
-            .await?;
+        // let commit_op = BlockSchema(&mut transaction)
+        //     .store_operation(commit_op)
+        //     .await?;
+        // let verify_op = BlockSchema(&mut transaction)
+        //     .store_operation(verify_op)
+        //     .await?;
+        // // The state is expected to be updated, so it's necessary
+        // // to do it here.
+        // StateSchema(&mut transaction)
+        //     .apply_state_update(commit_op.block_number as u32)
+        //     .await?;
+        // OperationsSchema(&mut transaction)
+        //     .confirm_operation(commit_op.block_number as u32, ActionType::COMMIT)
+        //     .await?;
+        // OperationsSchema(&mut transaction)
+        //     .confirm_operation(verify_op.block_number as u32, ActionType::VERIFY)
+        //     .await?;
+
+        // DataRestoreSchema(&mut transaction)
+        //     .update_storage_state(new_state)
+        //     .await?;
         transaction.commit().await?;
         Ok(())
     }

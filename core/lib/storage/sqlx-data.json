@@ -21,48 +21,24 @@
       ]
     }
   },
-  "03d9e5cb04328e5a5e238727311406d19ffb924f06f34c04f67fbd9354442996": {
-    "query": "SELECT * FROM operations WHERE block_number = $1 AND action_type = $2",
+  "013bb5d51eb4f646172b6ca9dbf0704db0150147957923144e394810b574248b": {
+    "query": "SELECT max(to_block) FROM aggregate_operations WHERE action_type = $1 AND confirmed IS DISTINCT FROM $2",
     "describe": {
       "columns": [
         {
           "ordinal": 0,
-          "name": "id",
+          "name": "max",
           "type_info": "Int8"
-        },
-        {
-          "ordinal": 1,
-          "name": "block_number",
-          "type_info": "Int8"
-        },
-        {
-          "ordinal": 2,
-          "name": "action_type",
-          "type_info": "Text"
-        },
-        {
-          "ordinal": 3,
-          "name": "created_at",
-          "type_info": "Timestamptz"
-        },
-        {
-          "ordinal": 4,
-          "name": "confirmed",
-          "type_info": "Bool"
         }
       ],
       "parameters": {
         "Left": [
-          "Int8",
-          "Text"
+          "Text",
+          "Bool"
         ]
       },
       "nullable": [
-        false,
-        false,
-        false,
-        false,
-        false
+        null
       ]
     }
   },
@@ -97,51 +73,6 @@
         ]
       },
       "nullable": [
-        false,
-        false,
-        false,
-        false
-      ]
-    }
-  },
-  "05a15d67581b3f06b8e3994526d5e4394e82fe5bd6550a80bc54038637c31eac": {
-    "query": "INSERT INTO operations (block_number, action_type) VALUES ($1, $2)\n            RETURNING *",
-    "describe": {
-      "columns": [
-        {
-          "ordinal": 0,
-          "name": "id",
-          "type_info": "Int8"
-        },
-        {
-          "ordinal": 1,
-          "name": "block_number",
-          "type_info": "Int8"
-        },
-        {
-          "ordinal": 2,
-          "name": "action_type",
-          "type_info": "Text"
-        },
-        {
-          "ordinal": 3,
-          "name": "created_at",
-          "type_info": "Timestamptz"
-        },
-        {
-          "ordinal": 4,
-          "name": "confirmed",
-          "type_info": "Bool"
-        }
-      ],
-      "parameters": {
-        "Left": [
-          "Int8",
-          "Text"
-        ]
-      },
-      "nullable": [
-        false,
         false,
         false,
         false,
@@ -2046,27 +1977,6 @@
       ]
     }
   },
-  "85f509373fbcfdd2e477fe2458f1035be06e1a51f20979fa9dc0e5144e1de084": {
-    "query": "SELECT max(block_number) FROM operations WHERE action_type = $1 AND confirmed IS DISTINCT FROM $2",
-    "describe": {
-      "columns": [
-        {
-          "ordinal": 0,
-          "name": "max",
-          "type_info": "Int8"
-        }
-      ],
-      "parameters": {
-        "Left": [
-          "Text",
-          "Bool"
-        ]
-      },
-      "nullable": [
-        null
-      ]
-    }
-  },
   "8a039b0bae78afb5d106d84f7d136be17670909814f92a8e8070ba99a9aea21c": {
     "query": "SELECT * FROM data_restore_last_watched_eth_block LIMIT 1",
     "describe": {
@@ -2189,21 +2099,6 @@
           "Int8",
           "Jsonb",
           "Int8"
-        ]
-      },
-      "nullable": []
-    }
-  },
-  "92ea6ba2573073b4ccb3823d09743295761c242d47bd96227a4379b014154e63": {
-    "query": "UPDATE operations\n                SET confirmed = $1\n                WHERE block_number >= $2 AND block_number <= $3 AND action_type = $4",
-    "describe": {
-      "columns": [],
-      "parameters": {
-        "Left": [
-          "Bool",
-          "Int8",
-          "Int8",
-          "Text"
         ]
       },
       "nullable": []
@@ -2459,20 +2354,6 @@
           "Int4",
           "Numeric",
           "Timestamptz"
-        ]
-      },
-      "nullable": []
-    }
-  },
-  "a36e324b9f22ff0e3e9ac59c73807480fc4774ea43c06f1505d10d68ae06c567": {
-    "query": "UPDATE operations\n                SET confirmed = $1\n                WHERE block_number = $2 AND action_type = $3",
-    "describe": {
-      "columns": [],
-      "parameters": {
-        "Left": [
-          "Bool",
-          "Int8",
-          "Text"
         ]
       },
       "nullable": []
@@ -3362,6 +3243,63 @@
         ]
       },
       "nullable": []
+    }
+  },
+  "d9e266ce374cc7d12511a61ca81cd167b59493ee74e44b26c4baf92f4a4152e4": {
+    "query": "SELECT * FROM aggregate_operations WHERE from_block >= $1 AND to_block <= $1 AND action_type = $2",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "id",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 1,
+          "name": "action_type",
+          "type_info": "Text"
+        },
+        {
+          "ordinal": 2,
+          "name": "arguments",
+          "type_info": "Jsonb"
+        },
+        {
+          "ordinal": 3,
+          "name": "from_block",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 4,
+          "name": "to_block",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 5,
+          "name": "created_at",
+          "type_info": "Timestamptz"
+        },
+        {
+          "ordinal": 6,
+          "name": "confirmed",
+          "type_info": "Bool"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Int8",
+          "Text"
+        ]
+      },
+      "nullable": [
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false
+      ]
     }
   },
   "db91278dbc648e1c7ebf4775d7927104e887c0bb338ed51c9aff21cfdecb2f27": {

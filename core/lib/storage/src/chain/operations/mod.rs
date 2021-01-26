@@ -2,11 +2,11 @@
 use std::time::Instant;
 // External imports
 // Workspace imports
-use zksync_types::{tx::TxHash, ActionType, BlockNumber};
+use zksync_types::{tx::TxHash, BlockNumber};
 // Local imports
 use self::records::{
-    NewExecutedPriorityOperation, NewExecutedTransaction, NewOperation, StoredAggregatedOperation,
-    StoredExecutedPriorityOperation, StoredOperation,
+    NewExecutedPriorityOperation, NewExecutedTransaction, StoredAggregatedOperation,
+    StoredExecutedPriorityOperation,
 };
 use crate::chain::operations::records::StoredExecutedTransaction;
 use crate::chain::operations_ext::OperationsExtSchema;
@@ -25,15 +25,15 @@ pub struct OperationsSchema<'a, 'c>(pub &'a mut StorageProcessor<'c>);
 
 impl<'a, 'c> OperationsSchema<'a, 'c> {
     /// Return the greatest block number with the given `action_type` and `confirmed` status.
-    pub async fn get_last_block_by_action(
+    pub async fn get_last_block_by_aggregated_action(
         &mut self,
-        action_type: ActionType,
+        aggregated_action_type: AggregatedActionType,
         confirmed: Option<bool>,
     ) -> QueryResult<BlockNumber> {
         let start = Instant::now();
         let max_block = sqlx::query!(
-            r#"SELECT max(block_number) FROM operations WHERE action_type = $1 AND confirmed IS DISTINCT FROM $2"#,
-            action_type.to_string(),
+            r#"SELECT max(to_block) FROM aggregate_operations WHERE action_type = $1 AND confirmed IS DISTINCT FROM $2"#,
+            aggregated_action_type.to_string(),
             confirmed.map(|value| !value)
         )
         .fetch_one(self.0.conn())
@@ -42,32 +42,33 @@ impl<'a, 'c> OperationsSchema<'a, 'c> {
         .unwrap_or(0);
 
         metrics::histogram!(
-            "sql.chain.operations.get_last_block_by_action",
+            "sql.chain.operations.get_last_block_by_aggregated_action",
             start.elapsed()
         );
         Ok(max_block as BlockNumber)
     }
 
-    /// Given block number and action type, retrieves the corresponding operation
-    /// from the database.
-    pub async fn get_operation(
+    pub async fn get_stored_aggregated_operation(
         &mut self,
         block_number: BlockNumber,
-        action_type: ActionType,
-    ) -> Option<StoredOperation> {
+        aggregated_action_type: AggregatedActionType,
+    ) -> Option<StoredAggregatedOperation> {
         let start = Instant::now();
         let result = sqlx::query_as!(
-            StoredOperation,
-            "SELECT * FROM operations WHERE block_number = $1 AND action_type = $2",
+            StoredAggregatedOperation,
+            "SELECT * FROM aggregate_operations WHERE from_block >= $1 AND to_block <= $1 AND action_type = $2",
             i64::from(block_number),
-            action_type.to_string()
+            aggregated_action_type.to_string()
         )
         .fetch_optional(self.0.conn())
         .await
         .ok()
         .flatten();
 
-        metrics::histogram!("sql.chain.operations.get_operation", start.elapsed());
+        metrics::histogram!(
+            "sql.chain.operations.get_stored_aggregated_operations",
+            start.elapsed()
+        );
         result
     }
 
@@ -134,55 +135,17 @@ impl<'a, 'c> OperationsSchema<'a, 'c> {
         Ok(op)
     }
 
-    pub(crate) async fn store_operation(
-        &mut self,
-        operation: NewOperation,
-    ) -> QueryResult<StoredOperation> {
-        let start = Instant::now();
-        let op = sqlx::query_as!(
-            StoredOperation,
-            "INSERT INTO operations (block_number, action_type) VALUES ($1, $2)
-            RETURNING *",
-            operation.block_number,
-            operation.action_type
-        )
-        .fetch_one(self.0.conn())
-        .await?;
-        metrics::histogram!("sql.chain.operations.store_operation", start.elapsed());
-        Ok(op)
-    }
-
-    pub(crate) async fn confirm_operation(
-        &mut self,
-        block_number: BlockNumber,
-        action_type: ActionType,
-    ) -> QueryResult<()> {
-        let start = Instant::now();
-        sqlx::query!(
-            "UPDATE operations
-                SET confirmed = $1
-                WHERE block_number = $2 AND action_type = $3",
-            true,
-            i64::from(block_number),
-            action_type.to_string()
-        )
-        .execute(self.0.conn())
-        .await?;
-        metrics::histogram!("sql.chain.operations.confirm_operation", start.elapsed());
-        Ok(())
-    }
-
-    pub async fn confirm_operations(
+    pub async fn confirm_aggregated_operations(
         &mut self,
         first_block: BlockNumber,
         last_block: BlockNumber,
-        action_type: ActionType,
+        action_type: AggregatedActionType,
     ) -> QueryResult<()> {
         let start = Instant::now();
         sqlx::query!(
-            "UPDATE operations
+            "UPDATE aggregate_operations
                 SET confirmed = $1
-                WHERE block_number >= $2 AND block_number <= $3 AND action_type = $4",
+                WHERE from_block >= $2 AND to_block <= $3 AND action_type = $4",
             true,
             i64::from(first_block),
             i64::from(last_block),
@@ -190,7 +153,10 @@ impl<'a, 'c> OperationsSchema<'a, 'c> {
         )
         .execute(self.0.conn())
         .await?;
-        metrics::histogram!("sql.chain.operations.confirm_operations", start.elapsed());
+        metrics::histogram!(
+            "sql.chain.operations.confirm_aggregated_operations",
+            start.elapsed()
+        );
         Ok(())
     }
 

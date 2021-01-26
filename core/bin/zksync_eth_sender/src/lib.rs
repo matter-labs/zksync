@@ -383,12 +383,13 @@ impl<ETH: EthereumInterface, DB: DatabaseInterface> ETHSender<ETH, DB> {
     /// Intended to be used for log entries.
     fn zksync_operation_description(&self, operation: &ETHOperation) -> String {
         if let Some((id, op)) = &operation.op {
+            let (first_block, last_block) = op.get_block_range();
             format!(
                 "<id {}; action: {}; blocks: {}-{}>",
                 id,
                 op.get_action_type().to_string(),
-                op.get_block_range().0,
-                op.get_block_range().1
+                first_block,
+                last_block
             )
         } else {
             "<not applicable>".into()

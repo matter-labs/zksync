@@ -150,16 +150,12 @@ async fn commit_block(
         .await
         .expect("committer must commit the pending block into db");
 
-    let op = Operation {
-        action: Action::Commit,
-        block,
-        id: None,
-    };
-    log::info!("commit block #{}", op.block.block_number);
+    log::info!("commit block #{}", block.block_number);
+
     transaction
         .chain()
         .block_schema()
-        .execute_operation(op.clone())
+        .save_block(block)
         .await
         .expect("committer must commit the op into db");
 

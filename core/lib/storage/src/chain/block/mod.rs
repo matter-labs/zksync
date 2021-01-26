@@ -6,8 +6,7 @@ use zksync_basic_types::{H256, U256};
 // Workspace imports
 use zksync_crypto::convert::FeConvert;
 use zksync_types::{
-    aggregated_operations::AggregatedActionType, block::PendingBlock, Action, ActionType, Fr,
-    Operation,
+    aggregated_operations::AggregatedActionType, block::PendingBlock, ActionType, Fr, Operation,
 };
 use zksync_types::{
     block::{Block, ExecutedOperations},
@@ -20,8 +19,8 @@ use self::records::{
 use crate::{
     chain::operations::{
         records::{
-            NewExecutedPriorityOperation, NewExecutedTransaction, NewOperation,
-            StoredExecutedPriorityOperation, StoredExecutedTransaction, StoredOperation,
+            NewExecutedPriorityOperation, NewExecutedTransaction, StoredExecutedPriorityOperation,
+            StoredExecutedTransaction,
         },
         OperationsSchema,
     },
@@ -39,40 +38,6 @@ pub mod records;
 pub struct BlockSchema<'a, 'c>(pub &'a mut StorageProcessor<'c>);
 
 impl<'a, 'c> BlockSchema<'a, 'c> {
-    /// Executes an operation:
-    /// 1. Stores the operation.
-    /// 2. Stores the proof (if it isn't stored already) for the verify operation.
-    pub async fn execute_operation(&mut self, op: Operation) -> QueryResult<Operation> {
-        let stored = self.store_operation(op).await?;
-        let result = stored.into_op(self.0).await;
-        result
-    }
-
-    pub async fn store_operation(&mut self, op: Operation) -> QueryResult<StoredOperation> {
-        let start = Instant::now();
-        let mut transaction = self.0.start_transaction().await?;
-
-        let block_number = op.block.block_number;
-
-        match &op.action {
-            Action::Commit => {
-                BlockSchema(&mut transaction).save_block(op.block).await?;
-            }
-            Action::Verify { .. } => {}
-        };
-
-        let new_operation = NewOperation {
-            block_number: i64::from(block_number),
-            action_type: op.action.to_string(),
-        };
-        let stored: StoredOperation = OperationsSchema(&mut transaction)
-            .store_operation(new_operation)
-            .await?;
-        transaction.commit().await?;
-        metrics::histogram!("sql.chain.block.execute_operation", start.elapsed());
-        Ok(stored)
-    }
-
     /// Given a block, stores its transactions in the database.
     pub async fn save_block_transactions(
         &mut self,
@@ -461,29 +426,11 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
         result
     }
 
-    pub async fn load_commit_op(&mut self, block_number: BlockNumber) -> Option<Operation> {
-        let start = Instant::now();
-        let op = OperationsSchema(self.0)
-            .get_operation(block_number, ActionType::COMMIT)
-            .await;
-        let result = if let Some(stored_op) = op {
-            stored_op.into_op(self.0).await.ok()
-        } else {
-            None
-        };
-        metrics::histogram!("sql.chain.block.load_commit_op", start.elapsed());
-        result
-    }
-
-    pub async fn load_committed_block(&mut self, block_number: BlockNumber) -> Option<Block> {
-        self.load_commit_op(block_number).await.map(|r| r.block)
-    }
-
     /// Returns the number of last block
     pub async fn get_last_committed_block(&mut self) -> QueryResult<BlockNumber> {
         let start = Instant::now();
         let result = OperationsSchema(self.0)
-            .get_last_block_by_action(ActionType::COMMIT, None)
+            .get_last_block_by_aggregated_action(AggregatedActionType::CommitBlocks, None)
             .await;
         metrics::histogram!("sql.chain.block.get_last_committed_block", start.elapsed());
         result
@@ -497,7 +444,7 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
     pub async fn get_last_verified_block(&mut self) -> QueryResult<BlockNumber> {
         let start = Instant::now();
         let result = OperationsSchema(self.0)
-            .get_last_block_by_action(ActionType::VERIFY, None)
+            .get_last_block_by_aggregated_action(AggregatedActionType::ExecuteBlocks, None)
             .await;
         metrics::histogram!("sql.chain.block.get_last_verified_block", start.elapsed());
         result
@@ -508,7 +455,7 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
     pub async fn get_last_verified_confirmed_block(&mut self) -> QueryResult<BlockNumber> {
         let start = Instant::now();
         let result = OperationsSchema(self.0)
-            .get_last_block_by_action(ActionType::VERIFY, Some(true))
+            .get_last_block_by_aggregated_action(AggregatedActionType::ExecuteBlocks, Some(true))
             .await;
         metrics::histogram!(
             "sql.chain.block.get_last_verified_confirmed_block",
@@ -645,12 +592,12 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
     /// Returns the number of aggregated operations with the given `action_type` and `is_confirmed` status.
     pub async fn count_aggregated_operations(
         &mut self,
-        action_type: AggregatedActionType,
+        aggregated_action_type: AggregatedActionType,
         is_confirmed: bool,
     ) -> QueryResult<i64> {
         let count = sqlx::query!(
             r#"SELECT count(*) as "count!" FROM aggregate_operations WHERE action_type = $1 AND confirmed = $2"#,
-            action_type.to_string(),
+            aggregated_action_type.to_string(),
             is_confirmed
         )
         .fetch_one(self.0.conn())
@@ -660,7 +607,7 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
         Ok(count)
     }
 
-    pub(crate) async fn save_block(&mut self, block: Block) -> QueryResult<()> {
+    pub async fn save_block(&mut self, block: Block) -> QueryResult<()> {
         let start = Instant::now();
         let mut transaction = self.0.start_transaction().await?;
 

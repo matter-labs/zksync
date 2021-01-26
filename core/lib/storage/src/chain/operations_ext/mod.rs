@@ -5,7 +5,7 @@ use std::time::Instant;
 use chrono::{DateTime, Utc};
 
 // Workspace imports
-use zksync_types::ActionType;
+use zksync_types::aggregated_operations::AggregatedActionType;
 use zksync_types::{Address, TokenId};
 
 // Local imports
@@ -47,10 +47,13 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
         let result = if let Some(tx) = tx {
             // Check whether transaction was verified.
             let verified = OperationsSchema(self.0)
-                .get_operation(tx.block_number as u32, ActionType::VERIFY)
+                .get_stored_aggregated_operation(
+                    tx.block_number as u32,
+                    AggregatedActionType::ExecuteBlocks,
+                )
                 .await
-                .map(|v| v.confirmed)
-                .unwrap_or(false);
+                .map(|operation| operation.confirmed)
+                .unwrap_or_default();
 
             Ok(Some(TxReceiptResponse {
                 tx_hash: hex::encode(hash),
@@ -79,16 +82,18 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
 
         let result = match stored_executed_prior_op {
             Some(stored_executed_prior_op) => {
-                let confirm = OperationsSchema(self.0)
-                    .get_operation(
+                let verified = OperationsSchema(self.0)
+                    .get_stored_aggregated_operation(
                         stored_executed_prior_op.block_number as u32,
-                        ActionType::VERIFY,
+                        AggregatedActionType::ExecuteBlocks,
                     )
-                    .await;
+                    .await
+                    .map(|operation| operation.confirmed)
+                    .unwrap_or_default();
 
                 Ok(PriorityOpReceiptResponse {
                     committed: true,
-                    verified: confirm.is_some(),
+                    verified,
                     prover_run: None,
                 })
             }
