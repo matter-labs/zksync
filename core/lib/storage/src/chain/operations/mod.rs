@@ -10,7 +10,7 @@ use self::records::{
     StoredCompleteWithdrawalsTransaction, StoredExecutedPriorityOperation,
     StoredExecutedTransaction, StoredOperation, StoredPendingWithdrawal,
 };
-use crate::{chain::mempool::MempoolSchema, QueryResult, StorageProcessor};
+use crate::{chain::mempool::MempoolSchema, QueryResult, StorageActionType, StorageProcessor};
 use zksync_basic_types::H256;
 
 pub mod records;
@@ -31,7 +31,7 @@ impl<'a, 'c> OperationsSchema<'a, 'c> {
         let start = Instant::now();
         let max_block = sqlx::query!(
             r#"SELECT max(block_number) FROM operations WHERE action_type = $1 AND confirmed IS DISTINCT FROM $2"#,
-            action_type.to_string(),
+            StorageActionType::from(action_type) as StorageActionType,
             confirmed.map(|value| !value)
         )
         .fetch_one(self.0.conn())
@@ -56,9 +56,14 @@ impl<'a, 'c> OperationsSchema<'a, 'c> {
         let start = Instant::now();
         let result = sqlx::query_as!(
             StoredOperation,
-            "SELECT * FROM operations WHERE block_number = $1 AND action_type = $2",
+            r#"
+            SELECT id, block_number,
+                action_type as "action_type!: StorageActionType",
+                created_at, confirmed
+            FROM operations WHERE block_number = $1 AND action_type = $2
+            "#,
             i64::from(*block_number),
-            action_type.to_string()
+            StorageActionType::from(action_type) as StorageActionType
         )
         .fetch_optional(self.0.conn())
         .await
@@ -139,10 +144,14 @@ impl<'a, 'c> OperationsSchema<'a, 'c> {
         let start = Instant::now();
         let op = sqlx::query_as!(
             StoredOperation,
-            "INSERT INTO operations (block_number, action_type) VALUES ($1, $2)
-            RETURNING *",
+            r#"
+            INSERT INTO operations (block_number, action_type) VALUES ($1, $2)
+            RETURNING id, block_number,
+            action_type as "action_type!: StorageActionType",
+            created_at, confirmed
+            "#,
             operation.block_number,
-            operation.action_type
+            operation.action_type as StorageActionType
         )
         .fetch_one(self.0.conn())
         .await?;
@@ -162,7 +171,7 @@ impl<'a, 'c> OperationsSchema<'a, 'c> {
                 WHERE block_number = $2 AND action_type = $3",
             true,
             i64::from(*block_number),
-            action_type.to_string()
+            StorageActionType::from(action_type) as StorageActionType
         )
         .execute(self.0.conn())
         .await?;
