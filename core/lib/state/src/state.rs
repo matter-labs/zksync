@@ -268,7 +268,18 @@ impl ZkSyncState {
     }
 
     pub(crate) fn get_free_account_id(&self) -> AccountId {
-        AccountId(self.balance_tree.items.len() as u32)
+        let mut account_id = AccountId(self.balance_tree.items.len() as u32);
+
+        // In the production database it somehow appeared that one account ID in the database got missing,
+        // meaning that it was never assigned, but the next one was inserted.
+        // This led to the fact that length of the tree is not equal to the most recent ID anymore.
+        // In order to prevent similar error-proneness in the future, we scan until we find the next free ID.
+        // Amount of steps here is not expected to be high.
+        while self.get_account(account_id).is_some() {
+            *account_id += 1;
+        }
+
+        account_id
     }
 
     pub fn collect_fee(&mut self, fees: &[CollectedFee], fee_account: AccountId) -> AccountUpdates {
