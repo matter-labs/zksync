@@ -1,5 +1,5 @@
 import { expect } from 'chai';
-import { BigNumber, utils } from 'ethers';
+import { BigNumber, utils, ethers } from 'ethers';
 import { Wallet, types } from 'zksync';
 
 import { Tester } from './tester';
@@ -10,6 +10,11 @@ import './withdraw';
 import './forced-exit';
 import './misc';
 import './batch-builder';
+
+import { loadTestConfig } from './helpers';
+
+
+const TEST_CONFIG = loadTestConfig();
 
 const TX_AMOUNT = utils.parseEther('10.0');
 // should be enough for ~200 test transactions (excluding fees), increase if needed
@@ -166,6 +171,15 @@ describe(`ZkSync integration tests (token: ${token}, transport: ${transport})`, 
             expect(after.eq(0), "Balance after Full Exit must be zero").to.be.true;
         });
     });
+
+    it('should recover failed ETH withdraw', async () => {
+        await tester.testRecoverETHWithdrawal(
+            alice,
+            TEST_CONFIG.withdrawalHelpers.revert_receive_address,
+            tester.syncWallet,
+            TX_AMOUNT
+        );
+    });
 });
 
 // wBTC is chosen because it has decimals different from ETH (8 instead of 18).
@@ -201,10 +215,10 @@ if (process.env.TEST_TRANSPORT) {
             transport: 'HTTP',
             token: 'ETH'
         },
-        {
-            transport: 'WS',
-            token: defaultERC20
-        }
+        // {
+        //     transport: 'WS',
+        //     token: defaultERC20
+        // }
     ];
 }
 

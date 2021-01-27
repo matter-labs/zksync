@@ -1,10 +1,15 @@
 import { Tester } from './tester';
 import { expect } from 'chai';
 import { Wallet, types } from 'zksync';
-import { BigNumber, ethers } from 'ethers';
-import { SignedTransaction, TxEthSignature } from 'zksync/build/types';
-import { serializeTx } from 'zksync/build/utils';
+import { BigNumber, ethers, Signer } from 'ethers';
+import { SignedTransaction, TxEthSignature, Address } from 'zksync/build/types';
+import { serializeTx, sleep } from 'zksync/build/utils';
 import { submitSignedTransactionsBatch } from 'zksync/build/wallet';
+
+import { RevertReceiveAccountFactory } from '../../../../contracts/typechain';
+import { waitForOnchainWithdrawal }  from './helpers';
+
+import { withdrawalHelpers } from 'zksync';
 
 type TokenLike = types.TokenLike;
 
@@ -13,6 +18,7 @@ declare module './tester' {
         testWrongSignature(from: Wallet, to: Wallet, token: TokenLike, amount: BigNumber): Promise<void>;
         testMultipleBatchSigners(wallets: Wallet[], token: TokenLike, amount: BigNumber): Promise<void>;
         testMultipleWalletsWrongSignature(from: Wallet, to: Wallet, token: TokenLike, amount: BigNumber): Promise<void>;
+        testRecoverETHWithdrawal(from: Wallet, to: Address, toOwner: Wallet, amount: BigNumber): Promise<void>;
     }
 }
 
@@ -159,3 +165,55 @@ Tester.prototype.testMultipleWalletsWrongSignature = async function (
     }
     expect(thrown, 'Sending batch with incorrect ETH signature must throw').to.be.true;
 };
+
+Tester.prototype.testRecoverETHWithdrawal = async function (
+    from: Wallet,
+    to: Address,
+    toOwner: Wallet,
+    amount: BigNumber
+) {
+    const revertReceiveContract = RevertReceiveAccountFactory.connect(
+        to,
+        toOwner.ethSigner
+    );
+
+    const balanceBefore = await this.ethProvider.getBalance(to);
+
+    // Making sure that the withdrawal will be reverted 
+    await revertReceiveContract.setRevertReceive(true);
+
+    const withdrawTx = await from.withdrawFromSyncToEthereum({
+        ethAddress: to,
+        token: 'ETH',
+        amount
+    });
+
+    await withdrawTx.awaitVerifyReceipt();
+    
+    // Waiting for the withdrawl to be sent
+    const withdrawalTxHash = await waitForOnchainWithdrawal(
+        this.syncProvider,
+        withdrawTx.txHash
+    );
+    
+    expect(withdrawalTxHash, 'Withdrawal was not processed onchain').to.exist;
+
+    const balanceAfter = await this.ethProvider.getBalance(to);
+
+    // double-check that the withdrawal has indeed failed
+    expect(balanceBefore.eq(balanceAfter), "The withdrawal did not fail the first time").to.be.true;
+
+    await revertReceiveContract.setRevertReceive(false);
+
+    await withdrawalHelpers.withdrawPendingBalance(
+        this.syncProvider as any,
+        from.ethSigner,
+        to,
+        'ETH'
+    );
+
+    const expectedToBalance = balanceBefore.add(amount);
+    const toBalance = await this.ethProvider.getBalance(to);
+    
+    expect(toBalance.eq(expectedToBalance), "The withdrawal was not recovered").to.be.true;
+}

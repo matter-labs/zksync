@@ -1,17 +1,20 @@
-import { types, Provider, utils } from 'zksync'; 
+
 import { BigNumberish, ethers, Contract } from 'ethers';
+import { Address, TokenLike } from '../types'; 
+import { SYNC_MAIN_CONTRACT_INTERFACE } from '../utils';
+import { Provider } from '../';
 
 interface WithdrawPendingBalanceParams {
-    owner: types.Address,
-    token: types.Address,
+    owner: Address,
+    token: Address,
     amount: BigNumberish
 }
 
 async function getWithdrawPendingBalanceParams(
     syncProvider: Provider,
     syncContract: Contract,
-    from: types.Address,
-    token: types.TokenLike,
+    from: Address,
+    token: TokenLike,
     amount?: BigNumberish
 ): Promise<WithdrawPendingBalanceParams> {
 
@@ -36,15 +39,15 @@ async function getWithdrawPendingBalanceParams(
 export async function withdrawPendingBalance(
     syncProvider: Provider,
     ethersWallet: ethers.Signer,
-    from: types.Address,
-    token: types.TokenLike,
+    from: Address,
+    token: TokenLike,
     amount?: BigNumberish
-) {
+): Promise<any> {
     const contractAddress = syncProvider.contractAddress.mainContract;
 
     const zksyncContract = new Contract(
         contractAddress,
-        utils.SYNC_MAIN_CONTRACT_INTERFACE,
+        SYNC_MAIN_CONTRACT_INTERFACE,
         ethersWallet
     );
 
@@ -57,7 +60,7 @@ export async function withdrawPendingBalance(
         amount
     );
 
-    return zksyncContract.withdrawPendingBalance(
+    return await zksyncContract.withdrawPendingBalance(
         callParams.owner,
         callParams.token,
         callParams.amount

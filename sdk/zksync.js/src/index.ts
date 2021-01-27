@@ -8,6 +8,7 @@ import * as wallet from './wallet';
 import * as types from './types';
 import * as utils from './utils';
 import * as crypto from './crypto';
+import * as withdrawalHelpers from './withdrawal-helpers';
 
 export {
     Wallet,
@@ -21,5 +22,6 @@ export {
     types,
     utils,
     crypto,
-    wallet
+    wallet,
+    withdrawalHelpers
 };
