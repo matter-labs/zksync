@@ -69,7 +69,7 @@ async function prepareTestContracts() {
     };
 
     utils.modifyFile(`${outDir}/ConfigTest.sol`, (config) => {
-        config = setConstant(config, 'MAX_AMOUNT_OF_REGISTERED_TOKENS', '5');
+        config = setConstant(config, 'MAX_AMOUNT_OF_REGISTERED_TOKENS', '6');
         config = setConstant(config, 'EXPECT_VERIFICATION_IN', '8');
         config = setConstant(config, 'MAX_UNVERIFIED_BLOCKS', '4');
         config = setConstant(config, 'PRIORITY_EXPIRATION', '101');

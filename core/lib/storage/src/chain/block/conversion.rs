@@ -23,7 +23,7 @@ use crate::{
         },
     },
     prover::ProverSchema,
-    QueryResult, StorageProcessor,
+    QueryResult, StorageActionType, StorageProcessor,
 };
 
 impl StoredOperation {
@@ -31,9 +31,9 @@ impl StoredOperation {
         let block_number = BlockNumber(self.block_number as u32);
         let id = Some(self.id);
 
-        let action = if self.action_type == ActionType::COMMIT.to_string() {
+        let action = if self.action_type == StorageActionType::from(ActionType::COMMIT) {
             Action::Commit
-        } else if self.action_type == ActionType::VERIFY.to_string() {
+        } else if self.action_type == StorageActionType::from(ActionType::VERIFY) {
             let proof = Box::new(ProverSchema(conn).load_proof(block_number).await?);
             Action::Verify {
                 proof: proof.expect("No proof for verify action").into(),

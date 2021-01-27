@@ -30,6 +30,7 @@ use crate::{
     tx_error::TxAddError,
     utils::token_db_cache::TokenDBCache,
 };
+use num::{BigUint, Zero};
 
 #[derive(Clone)]
 pub struct TxSender {
@@ -170,11 +171,8 @@ impl TxSender {
             withdraw.fast = fast_processing;
         }
 
-        let msg_to_sign = self.tx_message_to_sign(&tx).await?;
-
         let tx_fee_info = tx.get_fee_info();
 
-        let sign_verify_channel = self.sign_verify_requests.clone();
         let ticker_request_sender = self.ticker_requests.clone();
 
         if let Some((tx_type, token, address, provided_fee)) = tx_fee_info {
@@ -211,14 +209,7 @@ impl TxSender {
             }
         }
 
-        let verified_tx = verify_tx_info_message_signature(
-            &tx,
-            signature.clone(),
-            msg_to_sign,
-            sign_verify_channel,
-        )
-        .await?
-        .unwrap_tx();
+        let verified_tx = self.glm_verify_tx_info(&tx, signature.clone()).await?;
 
         // Send verified transactions to the mempool.
         self.core_api_client
@@ -242,15 +233,23 @@ impl TxSender {
         }
 
         // Checking fees data
-        let mut required_total_usd_fee = BigDecimal::from(0);
         let mut provided_total_usd_fee = BigDecimal::from(0);
+        let mut transaction_types = vec![];
+
+        let eth_token = TokenLike::Id(TokenId(0));
+
         for tx in &txs {
             let tx_fee_info = tx.0.get_fee_info();
 
             if let Some((tx_type, token, address, provided_fee)) = tx_fee_info {
+                if provided_fee == BigUint::zero() {
+                    continue;
+                }
                 let fee_allowed =
                     Self::token_allowed_for_fees(self.ticker_requests.clone(), token.clone())
                         .await?;
+
+                transaction_types.push((tx_type, address));
 
                 // In batches, transactions with non-popular token are allowed to be included, but should not
                 // used to pay fees. Fees must be covered by some more common token.
@@ -264,16 +263,9 @@ impl TxSender {
                 } else {
                     // For non-popular tokens we've already checked that the provided fee is 0,
                     // and the USD price will be checked in ETH.
-                    TokenLike::Id(TokenId(0))
+                    eth_token.clone()
                 };
 
-                let required_fee = Self::ticker_request(
-                    self.ticker_requests.clone(),
-                    tx_type,
-                    address,
-                    check_token.clone(),
-                )
-                .await?;
                 let token_price_in_usd = Self::ticker_price_request(
                     self.ticker_requests.clone(),
                     check_token.clone(),
@@ -281,14 +273,30 @@ impl TxSender {
                 )
                 .await?;
 
-                required_total_usd_fee +=
-                    BigDecimal::from(required_fee.total_fee.to_bigint().unwrap())
-                        * &token_price_in_usd;
                 provided_total_usd_fee +=
                     BigDecimal::from(provided_fee.clone().to_bigint().unwrap())
                         * &token_price_in_usd;
             }
         }
+
+        // Calculate required fee for ethereum token
+        let required_eth_fee = Self::ticker_batch_fee_request(
+            self.ticker_requests.clone(),
+            transaction_types,
+            eth_token.clone(),
+        )
+        .await?;
+
+        let eth_price_in_usd = Self::ticker_price_request(
+            self.ticker_requests.clone(),
+            eth_token,
+            TokenPriceRequestType::USDForOneWei,
+        )
+        .await?;
+
+        let required_total_usd_fee =
+            BigDecimal::from(required_eth_fee.to_bigint().unwrap()) * &eth_price_in_usd;
+
         // Scaling the fee required since the price may change between signing the transaction and sending it to the server.
         let scaled_provided_fee_in_usd = scale_user_fee_up(provided_total_usd_fee.clone());
         if required_total_usd_fee >= scaled_provided_fee_in_usd {
@@ -305,36 +313,17 @@ impl TxSender {
         let mut verified_txs = Vec::new();
         let mut verified_signature = None;
 
-        let mut messages_to_sign = vec![];
-        for tx in &txs {
-            messages_to_sign.push(self.tx_message_to_sign(&tx.0).await?);
-        }
-
         if let Some(signature) = eth_signature {
             // User provided the signature for the whole batch.
-            let (verified_batch, sign_data) = verify_txs_batch_signature(
-                txs,
-                signature,
-                messages_to_sign,
-                self.sign_verify_requests.clone(),
-            )
-            .await?
-            .unwrap_batch();
+            let (verified_batch, sign_data) =
+                self.glm_verify_txs_batch_info(txs, signature).await?;
 
             verified_signature = Some(sign_data.signature);
             verified_txs.extend(verified_batch.into_iter());
         } else {
             // Otherwise, we process every transaction in turn.
-            for (tx, msg_to_sign) in txs.into_iter().zip(messages_to_sign.into_iter()) {
-                let verified_tx = verify_tx_info_message_signature(
-                    &tx.0,
-                    tx.1.clone(),
-                    msg_to_sign,
-                    self.sign_verify_requests.clone(),
-                )
-                .await?
-                .unwrap_tx();
-
+            for (tx, signature) in txs {
+                let verified_tx = self.glm_verify_tx_info(&tx, signature).await?;
                 verified_txs.push(verified_tx);
             }
         }
@@ -392,6 +381,7 @@ impl TxSender {
     /// Returns a message that user has to sign to send the transaction.
     /// If the transaction doesn't need a message signature, returns `None`.
     /// If any error is encountered during the message generation, returns `jsonrpc_core::Error`.
+    #[allow(dead_code)]
     async fn tx_message_to_sign(&self, tx: &ZkSyncTx) -> Result<Option<Vec<u8>>, SubmitError> {
         Ok(match tx {
             ZkSyncTx::Transfer(tx) => {
@@ -427,6 +417,24 @@ impl TxSender {
             .map_err(SubmitError::internal)?
             // TODO Make error more clean
             .ok_or_else(|| SubmitError::other("Token not found in the DB"))
+    }
+
+    async fn ticker_batch_fee_request(
+        mut ticker_request_sender: mpsc::Sender<TickerRequest>,
+        transactions: Vec<(TxFeeTypes, Address)>,
+        token: TokenLike,
+    ) -> Result<BigUint, SubmitError> {
+        let req = oneshot::channel();
+        ticker_request_sender
+            .send(TickerRequest::GetBatchTxFee {
+                transactions,
+                token: token.clone(),
+                response: req.0,
+            })
+            .await
+            .map_err(SubmitError::internal)?;
+        let resp = req.1.await.map_err(SubmitError::internal)?;
+        resp.map_err(|err| internal_error!(err))
     }
 
     async fn ticker_request(
@@ -484,6 +492,165 @@ impl TxSender {
             .map_err(SubmitError::internal)?;
         let resp = req.1.await.map_err(SubmitError::internal)?;
         resp.map_err(|err| internal_error!(err))
+    }
+
+    // Methods for Golem workaround:
+    // TODO: Remove this code after Golem update [ZKS-173]
+
+    async fn glm_tx_message_to_sign(
+        &self,
+        tx: &ZkSyncTx,
+    ) -> Result<Option<(Token, Vec<u8>)>, SubmitError> {
+        Ok(match tx {
+            ZkSyncTx::Transfer(tx) => {
+                let token = self.token_info_from_id(tx.token).await?;
+
+                let msg = tx
+                    .get_ethereum_sign_message(&token.symbol, token.decimals)
+                    .into_bytes();
+                Some((token, msg))
+            }
+            ZkSyncTx::Withdraw(tx) => {
+                let token = self.token_info_from_id(tx.token).await?;
+
+                let msg = tx
+                    .get_ethereum_sign_message(&token.symbol, token.decimals)
+                    .into_bytes();
+                Some((token, msg))
+            }
+            _ => None,
+        })
+    }
+
+    fn glm_force_tx_message_to_sign(&self, tx: &ZkSyncTx, decimals: u8) -> Option<Vec<u8>> {
+        match tx {
+            ZkSyncTx::Transfer(tx) => {
+                let msg = tx.get_ethereum_sign_message("tGLM", decimals).into_bytes();
+                Some(msg)
+            }
+
+            ZkSyncTx::Withdraw(tx) => {
+                let msg = tx.get_ethereum_sign_message("tGLM", decimals).into_bytes();
+                Some(msg)
+            }
+
+            _ => None,
+        }
+    }
+
+    fn glm_force_txs_batch_message_to_sign(
+        &self,
+        txs: &[(ZkSyncTx, Option<TxEthSignature>)],
+        decimals: u8,
+    ) -> Vec<Option<Vec<u8>>> {
+        txs.iter()
+            .map(|(tx, _)| self.glm_force_tx_message_to_sign(tx, decimals))
+            .collect()
+    }
+
+    async fn glm_txs_batch_message_to_sign(
+        &self,
+        txs: &[(ZkSyncTx, Option<TxEthSignature>)],
+    ) -> Result<(Option<Token>, Vec<Option<Vec<u8>>>), SubmitError> {
+        let mut messages_to_sign = vec![];
+        let mut batch_token = None;
+
+        for tx in txs {
+            let msg = match self.glm_tx_message_to_sign(&tx.0).await? {
+                Some((token, msg)) => {
+                    if batch_token.is_none() {
+                        batch_token = Some(token.clone());
+                    }
+                    Some(msg)
+                }
+                None => None,
+            };
+            messages_to_sign.push(msg);
+        }
+
+        Ok((batch_token, messages_to_sign))
+    }
+
+    async fn glm_verify_tx_info(
+        &self,
+        tx: &ZkSyncTx,
+        signature: Option<TxEthSignature>,
+    ) -> Result<SignedZkSyncTx, SubmitError> {
+        if let Some((token, msg_to_sign)) = self.glm_tx_message_to_sign(&tx).await? {
+            let verify_result = verify_tx_info_message_signature(
+                &tx,
+                signature.clone(),
+                Some(msg_to_sign.clone()),
+                self.sign_verify_requests.clone(),
+            )
+            .await;
+
+            match verify_result {
+                Ok(tx) => Ok(tx.unwrap_tx()),
+                Err(err) => {
+                    if token.symbol == "GNT" {
+                        let msg_to_sign = self.glm_force_tx_message_to_sign(tx, token.decimals);
+
+                        let verified_tx = verify_tx_info_message_signature(
+                            &tx,
+                            signature.clone(),
+                            msg_to_sign,
+                            self.sign_verify_requests.clone(),
+                        )
+                        .await?
+                        .unwrap_tx();
+
+                        Ok(verified_tx)
+                    } else {
+                        Err(err)
+                    }
+                }
+            }
+        } else {
+            let verified_tx = verify_tx_info_message_signature(
+                &tx,
+                signature.clone(),
+                None,
+                self.sign_verify_requests.clone(),
+            )
+            .await?
+            .unwrap_tx();
+
+            Ok(verified_tx)
+        }
+    }
+
+    async fn glm_verify_txs_batch_info(
+        &self,
+        batch: Vec<(ZkSyncTx, Option<TxEthSignature>)>,
+        signature: TxEthSignature,
+    ) -> Result<(Vec<SignedZkSyncTx>, EthSignData), SubmitError> {
+        let (batch_token, messages_to_sign) = self.glm_txs_batch_message_to_sign(&batch).await?;
+
+        let verify_result = verify_txs_batch_signature(
+            batch.clone(),
+            signature.clone(),
+            messages_to_sign,
+            self.sign_verify_requests.clone(),
+        )
+        .await;
+
+        match (verify_result, batch_token) {
+            (Ok(tx), _) => Ok(tx.unwrap_batch()),
+            (Err(_), Some(token)) if token.symbol == "GNT" => {
+                let messages_to_sign =
+                    self.glm_force_txs_batch_message_to_sign(&batch, token.decimals);
+                Ok(verify_txs_batch_signature(
+                    batch,
+                    signature,
+                    messages_to_sign,
+                    self.sign_verify_requests.clone(),
+                )
+                .await?
+                .unwrap_batch())
+            }
+            (Err(e), _) => Err(e),
+        }
     }
 }
 
