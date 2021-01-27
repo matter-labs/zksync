@@ -20,8 +20,7 @@ fn success() {
         token_id,
         balance.into(),
         account.nonce,
-        0,
-        u32::MAX,
+        Default::default(),
         None,
         &sk,
     )
@@ -65,8 +64,7 @@ fn nonce_mismatch() {
         0,
         0u32.into(),
         account.nonce + 1,
-        0,
-        u32::MAX,
+        Default::default(),
         None,
         &sk,
     )
@@ -90,8 +88,7 @@ fn invalid_account_id() {
         0,
         0u32.into(),
         account.nonce + 1,
-        0,
-        u32::MAX,
+        Default::default(),
         None,
         &sk,
     )

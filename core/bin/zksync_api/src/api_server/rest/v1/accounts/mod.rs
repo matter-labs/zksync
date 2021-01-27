@@ -9,7 +9,6 @@ use actix_web::{
 };
 
 // Workspace uses
-use zksync_config::ConfigurationOptions;
 use zksync_storage::{ConnectionPool, QueryResult, StorageProcessor};
 use zksync_types::{AccountId, Address, BlockNumber, TokenId};
 
@@ -17,6 +16,7 @@ use zksync_types::{AccountId, Address, BlockNumber, TokenId};
 use crate::{core_api_client::CoreApiClient, utils::token_db_cache::TokenDBCache};
 
 use super::{ApiError, JsonResult};
+use zksync_config::ZkSyncConfig;
 
 use self::types::{
     convert::{
@@ -297,8 +297,8 @@ async fn account_pending_receipts(
 }
 
 pub fn api_scope(
-    env_options: &ConfigurationOptions,
     pool: ConnectionPool,
+    config: &ZkSyncConfig,
     tokens: TokenDBCache,
     core_api_client: CoreApiClient,
 ) -> Scope {
@@ -306,7 +306,7 @@ pub fn api_scope(
         pool,
         tokens,
         core_api_client,
-        env_options.confirmations_for_eth_event as BlockNumber,
+        config.eth_watch.confirmations_for_eth_event as BlockNumber,
     );
 
     web::scope("accounts")

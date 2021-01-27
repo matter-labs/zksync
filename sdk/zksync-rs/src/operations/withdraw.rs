@@ -80,12 +80,11 @@ where
             }
         };
 
-        let valid_from = self.valid_from.unwrap_or(0);
-        let valid_until = self.valid_until.unwrap_or(u32::MAX);
+        let time_range = Default::default();
 
         self.wallet
             .signer
-            .sign_withdraw(token, amount, fee, to, nonce, valid_from, valid_until)
+            .sign_withdraw(token, amount, fee, to, nonce, time_range)
             .await
             .map(|(tx, sign)| (ZkSyncTx::Withdraw(Box::new(tx)), sign))
             .map_err(ClientError::SigningError)

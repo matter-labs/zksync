@@ -171,7 +171,7 @@ library Operations {
 
     // ChangePubKey
 
-    enum ChangePubkeyType {ECRECOVER, CREATE2}
+    enum ChangePubkeyType {ECRECOVER, CREATE2, OldECRECOVER}
 
     struct ChangePubKey {
         // uint8 opType; -- present in pubdata, ignored at serialization

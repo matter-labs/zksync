@@ -9,6 +9,7 @@ use zksync_state::{
 };
 use zksync_types::{operations::TransferToNewOp, tx::Transfer};
 // Local deps
+use crate::witness::tests::test_utils::BLOCK_TIMESTAMP;
 use crate::witness::{
     tests::test_utils::{
         corrupted_input_test_scenario, generic_test_scenario, incorrect_op_test_scenario,
@@ -17,6 +18,7 @@ use crate::witness::{
     transfer_to_new::TransferToNewWitness,
     utils::SigDataInput,
 };
+use zksync_types::tx::TimeRange;
 
 /// Basic check for execution of `TransferToNew` operation in circuit.
 /// Here we create one account and perform a transfer to a new account.
@@ -48,8 +50,7 @@ fn test_transfer_to_new_success() {
                     &account_to.account.address,
                     None,
                     true,
-                    0,
-                    u32::MAX,
+                    Default::default(),
                 )
                 .0,
             from: account_from.id,
@@ -99,8 +100,7 @@ fn corrupted_ops_input() {
                 &account_to.account.address,
                 None,
                 true,
-                0,
-                u32::MAX,
+                Default::default(),
             )
             .0,
         from: account_from.id,
@@ -163,8 +163,7 @@ fn test_incorrect_transfer_account_from() {
                 &account_to.account.address,
                 None,
                 true,
-                0,
-                u32::MAX,
+                Default::default(),
             )
             .0,
         from: account_from.id,
@@ -220,8 +219,7 @@ fn test_incorrect_transfer_account_to() {
                 &account_to.account.address,
                 None,
                 true,
-                0,
-                u32::MAX,
+                Default::default(),
             )
             .0,
         from: account_from.id,
@@ -280,8 +278,7 @@ fn test_incorrect_transfer_amount() {
                     &account_to.account.address,
                     None,
                     true,
-                    0,
-                    u32::MAX,
+                    Default::default(),
                 )
                 .0,
             from: account_from.id,
@@ -346,8 +343,7 @@ fn test_transfer_replay() {
                 &account_to.account.address,
                 None,
                 true,
-                0,
-                u32::MAX,
+                Default::default(),
             )
             .0,
         from: account_copy.id,
@@ -375,16 +371,19 @@ fn test_transfer_replay() {
 #[test]
 #[ignore]
 fn test_incorrect_transfer_to_new_timestamp() {
-    // Test vector of (initial_balance, transfer_amount, fee_amount, valid_from, valid_until).
+    // Test vector of (initial_balance, transfer_amount, fee_amount, time_range).
     let test_vector = vec![
-        (10u64, 7u64, 3u64, 0, 0),                     // Basic transfer
-        (0, 0, 0, 0, 0),                               // Zero transfer
-        (std::u64::MAX, 1, 1, 0, 0),                   // Small transfer from rich account,
-        (std::u64::MAX, 10000, 1, u32::MAX, u32::MAX), // Big transfer from rich account (too big values can't be used, since they're not packable),
-        (std::u64::MAX, 1, 10000, u32::MAX, u32::MAX), // Very big fee
+        (10u64, 7u64, 3u64, TimeRange::new(0, 0)),
+        (10u64, 7u64, 3u64, TimeRange::new(0, BLOCK_TIMESTAMP - 1)),
+        (
+            10u64,
+            7u64,
+            3u64,
+            TimeRange::new(BLOCK_TIMESTAMP + 1, u64::max_value()),
+        ),
     ];
 
-    for (initial_balance, transfer_amount, fee_amount, valid_from, valid_until) in test_vector {
+    for (initial_balance, transfer_amount, fee_amount, time_range) in test_vector {
         // Input data.
         let accounts = vec![WitnessTestAccount::new(1, initial_balance)];
         let account_from = &accounts[0];
@@ -400,8 +399,7 @@ fn test_incorrect_transfer_to_new_timestamp() {
                     &account_to.account.address,
                     None,
                     true,
-                    valid_from,
-                    valid_until,
+                    time_range,
                 )
                 .0,
             from: account_from.id,

@@ -20,7 +20,9 @@
 //!    Also, if there will be many tests running at once, and the server will die, it will be
 //!    hard to distinguish which test exactly caused this problem.
 
+use std::env;
 use std::time::{Duration, Instant};
+
 use zksync::operations::SyncTransactionHandle;
 use zksync::{
     error::ClientError,
@@ -40,6 +42,16 @@ use zksync_eth_signer::{EthereumSigner, PrivateKeySigner};
 const ETH_ADDR: &str = "36615Cf349d7F6344891B1e7CA7C72883F5dc049";
 const ETH_PRIVATE_KEY: &str = "7726827caac94a7f9e1b160f7ea819f172f7b6f9d2a97f992c38edeab82d4110";
 const LOCALHOST_WEB3_ADDR: &str = "http://127.0.0.1:8545";
+const DOCKER_WEB3_ADDR: &str = "http://geth:8545";
+
+fn web3_addr() -> &'static str {
+    let ci: u8 = env::var("CI").map_or(0, |s| s.parse().unwrap());
+    if ci == 1 {
+        DOCKER_WEB3_ADDR
+    } else {
+        LOCALHOST_WEB3_ADDR
+    }
+}
 
 fn eth_main_account_credentials() -> (H160, H256) {
     let addr = ETH_ADDR.parse().unwrap();
@@ -124,7 +136,7 @@ async fn transfer_to(
             .unwrap();
 
     let wallet = Wallet::new(provider, credentials).await?;
-    let ethereum = wallet.ethereum(LOCALHOST_WEB3_ADDR).await?;
+    let ethereum = wallet.ethereum(web3_addr()).await?;
     let hash = ethereum
         .transfer(token_like.into(), amount.into(), to)
         .await
@@ -177,7 +189,7 @@ where
     S: EthereumSigner + Clone,
     P: Provider + Clone,
 {
-    let ethereum = deposit_wallet.ethereum(LOCALHOST_WEB3_ADDR).await?;
+    let ethereum = deposit_wallet.ethereum(web3_addr()).await?;
 
     if !deposit_wallet.tokens.is_eth(token.address.into()) {
         if !ethereum.is_erc20_deposit_approved(token.address).await? {
@@ -195,7 +207,6 @@ where
         );
     };
 
-    // let balance_before = sync_wallet.get_balance(BlockStatus::Committed, &token.symbol as &str).await?;
     let deposit_tx_hash = ethereum
         .deposit(
             &token.symbol as &str,
@@ -206,8 +217,6 @@ where
 
     ethereum.wait_for_tx(deposit_tx_hash).await?;
     wait_for_deposit_and_update_account_id(sync_wallet).await;
-
-    // let balance_after = sync_wallet.get_balance(BlockStatus::Committed, &token.symbol as &str).await?;
 
     if !sync_wallet.tokens.is_eth(token.address.into()) {
         // It should not be approved because we have approved only DEPOSIT_AMOUNT, not the maximum possible amount of deposit
@@ -291,8 +300,8 @@ where
         .await?;
 
     transfer_handle
-        .verify_timeout(Duration::from_secs(180))
-        .wait_for_verify()
+        .commit_timeout(Duration::from_secs(180))
+        .wait_for_commit()
         .await?;
 
     let alice_balance_after = alice
@@ -340,8 +349,8 @@ where
         .await?;
 
     transfer_handle
-        .verify_timeout(Duration::from_secs(180))
-        .wait_for_verify()
+        .commit_timeout(Duration::from_secs(180))
+        .wait_for_commit()
         .await?;
 
     let balance_after = sync_wallet
@@ -516,7 +525,7 @@ async fn init_account_with_one_ether(
             .unwrap();
 
     let mut wallet = Wallet::new(provider, credentials).await?;
-    let ethereum = wallet.ethereum(LOCALHOST_WEB3_ADDR).await?;
+    let ethereum = wallet.ethereum(web3_addr()).await?;
 
     let deposit_tx_hash = ethereum
         .deposit("ETH", one_ether() / 2, wallet.address())
@@ -575,15 +584,6 @@ async fn comprehensive_test() -> Result<(), anyhow::Error> {
         Wallet::new(provider.clone(), random_credentials).await?
     };
 
-    let mut alice_wallet2 = {
-        let (random_eth_address, random_eth_private_key) = eth_random_account_credentials();
-        let eth_signer = PrivateKeySigner::new(random_eth_private_key);
-        let random_credentials =
-            WalletCredentials::from_eth_signer(random_eth_address, eth_signer, Network::Localhost)
-                .await?;
-        Wallet::new(provider.clone(), random_credentials).await?
-    };
-
     let bob_wallet1 = {
         let (random_eth_address, random_eth_private_key) = eth_random_account_credentials();
         let eth_signer = PrivateKeySigner::new(random_eth_private_key);
@@ -593,16 +593,7 @@ async fn comprehensive_test() -> Result<(), anyhow::Error> {
         Wallet::new(provider.clone(), random_credentials).await?
     };
 
-    let bob_wallet2 = {
-        let (random_eth_address, random_eth_private_key) = eth_random_account_credentials();
-        let eth_signer = PrivateKeySigner::new(random_eth_private_key);
-        let random_credentials =
-            WalletCredentials::from_eth_signer(random_eth_address, eth_signer, Network::Localhost)
-                .await?;
-        Wallet::new(provider.clone(), random_credentials).await?
-    };
-
-    let ethereum = main_wallet.ethereum(LOCALHOST_WEB3_ADDR).await?;
+    let ethereum = main_wallet.ethereum(web3_addr()).await?;
 
     let main_contract = {
         let address_response = provider.contract_address().await?;
@@ -620,23 +611,25 @@ async fn comprehensive_test() -> Result<(), anyhow::Error> {
         .tokens
         .resolve("ETH".into())
         .ok_or_else(|| anyhow::anyhow!("Error resolve token"))?;
-
     let token_dai = sync_depositor_wallet
         .tokens
         .resolve("DAI".into())
         .ok_or_else(|| anyhow::anyhow!("Error resolve token"))?;
 
-    let eth_deposit_amount = U256::from(10).pow(18.into()) * 6; // 6 Ethers
     let dai_deposit_amount = U256::from(10).pow(18.into()) * 10000; // 10000 DAI
 
+    // Move ETH to wallets so they will have some funds for L1 transactions.
+    let eth_deposit_amount = U256::from(10).pow(17.into()); // 0.1 ETH
     transfer_to("ETH", eth_deposit_amount, sync_depositor_wallet.address()).await?;
+    transfer_to("ETH", eth_deposit_amount, alice_wallet1.address()).await?;
+    transfer_to("ETH", eth_deposit_amount, bob_wallet1.address()).await?;
+
     transfer_to("DAI", dai_deposit_amount, sync_depositor_wallet.address()).await?;
 
     assert_eq!(
         get_ethereum_balance(&ethereum, sync_depositor_wallet.address(), &token_eth).await?,
         eth_deposit_amount
     );
-
     assert_eq!(
         get_ethereum_balance(&ethereum, sync_depositor_wallet.address(), &token_dai).await?,
         dai_deposit_amount
@@ -653,18 +646,6 @@ async fn comprehensive_test() -> Result<(), anyhow::Error> {
         "DAI",
         // 200 DAI
         200_000_000_000_000_000_000u128,
-    )
-    .await?;
-
-    move_funds(
-        &main_contract,
-        &ethereum,
-        &sync_depositor_wallet,
-        &mut alice_wallet2,
-        &bob_wallet2,
-        "ETH",
-        // 1 Ether (10^18 WEI)
-        1_000_000_000_000_000_000u128,
     )
     .await?;
 
@@ -686,8 +667,8 @@ async fn simple_transfer() -> Result<(), anyhow::Error> {
         .await?;
 
     handle
-        .verify_timeout(Duration::from_secs(180))
-        .wait_for_verify()
+        .commit_timeout(Duration::from_secs(180))
+        .wait_for_commit()
         .await?;
 
     Ok(())
@@ -727,8 +708,7 @@ async fn batch_transfer() -> Result<(), anyhow::Error> {
                 fee,
                 recipient,
                 nonce,
-                0,
-                u32::MAX,
+                Default::default(),
             )
             .await
             .expect("Transfer signing error");
@@ -748,8 +728,8 @@ async fn batch_transfer() -> Result<(), anyhow::Error> {
 
     for handle in handles {
         handle
-            .verify_timeout(Duration::from_secs(180))
-            .wait_for_verify()
+            .commit_timeout(Duration::from_secs(180))
+            .wait_for_commit()
             .await?;
     }
 

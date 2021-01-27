@@ -36,7 +36,16 @@ impl ChangePubKeyOp {
     }
 
     pub fn get_eth_witness(&self) -> Vec<u8> {
-        self.tx.eth_auth_data.get_eth_witness()
+        if let Some(eth_auth_data) = &self.tx.eth_auth_data {
+            eth_auth_data.get_eth_witness()
+        } else if let Some(eth_signature) = &self.tx.eth_signature {
+            let mut bytes = Vec::new();
+            bytes.push(0x02);
+            bytes.extend_from_slice(&eth_signature.serialize_packed());
+            bytes
+        } else {
+            Vec::new()
+        }
     }
 
     pub fn from_public_data(bytes: &[u8]) -> Result<Self, anyhow::Error> {
@@ -72,8 +81,7 @@ impl ChangePubKeyOp {
                 fee_token,
                 fee,
                 nonce,
-                0,
-                u32::MAX,
+                Default::default(),
                 None,
                 None,
             ),

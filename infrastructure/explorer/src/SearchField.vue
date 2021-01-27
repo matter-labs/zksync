@@ -10,9 +10,7 @@
                     <b-button
                         @click="search"
                         :variant="searchFieldInMenu ? 'info' : 'info'"
-                        style="
-                            box-shadow: inset 0 0 2px rgba(255, 255, 255, 0.4);
-                        "
+                        style="box-shadow: inset 0 0 2px rgba(255, 255, 255, 0.4)"
                         :disabled="searching"
                     >
                         <b-spinner v-if="searching" small></b-spinner>
@@ -36,6 +34,7 @@
 
 <script>
 import { clientPromise } from './Client';
+import { removeTxHashPrefix } from './utils';
 
 export default {
     name: 'SearchField',
@@ -57,12 +56,7 @@ export default {
             this.notFound = false;
             this.searching = true;
 
-            let query = this.query.trim();
-            for (const prefix of ['0x', 'sync-tx:', 'sync-bl:', 'sync:']) {
-                if (query.startsWith(prefix)) {
-                    query = query.slice(prefix.length);
-                }
-            }
+            let query = removeTxHashPrefix(this.query.trim());
 
             let block = await client.searchBlock(query).catch(() => null);
             if (block && block.block_number) {
@@ -88,7 +82,7 @@ export default {
 
             this.searching = false;
             this.notFound = true;
-            await new Promise(resolve => setTimeout(resolve, 3600));
+            await new Promise((resolve) => setTimeout(resolve, 3600));
             this.notFound = false;
         }
     }

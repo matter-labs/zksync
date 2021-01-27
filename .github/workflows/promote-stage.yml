@@ -26,7 +26,7 @@ jobs:
         zk run yarn
         cp etc/tokens/{test,localhost}.json
         zk run verify-keys unpack
-        zk db setup
+        zk db basic-setup
 
     - name: update-images
       run: |

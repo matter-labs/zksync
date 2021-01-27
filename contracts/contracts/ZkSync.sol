@@ -185,6 +185,7 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
     function cancelOutstandingDepositsForExodusMode(uint64 _n, bytes[] memory _depositsPubdata) external nonReentrant {
         require(exodusMode, "8"); // exodus mode not active
         uint64 toProcess = Utils.minU64(totalOpenPriorityRequests, _n);
+        require(toProcess == _depositsPubdata.length, "A");
         require(toProcess > 0, "9"); // no deposits to process
         uint64 currentDepositIdx = 0;
         for (uint64 id = firstPriorityRequestId; id < firstPriorityRequestId + toProcess; id++) {
@@ -244,6 +245,14 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
         return pendingBalances[packAddressAndTokenId(_address, tokenId)].balanceToWithdraw;
     }
 
+    /// @notice Returns amount of tokens that can be withdrawn by `address` from zkSync contract
+    /// @notice DEPRECATED: to be removed in future,  use getPendingBalance instead
+    /// @param _address Address of the tokens owner
+    /// @param _tokenId token id, 0 is used for ETH
+    function getBalanceToWithdraw(address _address, uint16 _tokenId) public view returns (uint128) {
+        return pendingBalances[packAddressAndTokenId(_address, _tokenId)].balanceToWithdraw;
+    }
+
     /// @notice  Withdraws tokens from zkSync contract to the owner
     /// @param _owner Address of the tokens owner
     /// @param _token Address of tokens, zero address is used for ETH
@@ -271,10 +280,31 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
         }
     }
 
+    /// @notice Withdraw ERC20 token to Layer 1 - register withdrawal and transfer ERC20 to sender
+    /// @notice DEPRECATED: use withdrawPendingBalance instead
+    /// @param _token Token address
+    /// @param _amount amount to withdraw
+    function withdrawERC20(IERC20 _token, uint128 _amount) external nonReentrant {
+        uint16 tokenId = governance.validateTokenAddress(address(_token));
+        bytes22 packedBalanceKey = packAddressAndTokenId(msg.sender, tokenId);
+        uint128 balance = pendingBalances[packedBalanceKey].balanceToWithdraw;
+        uint128 withdrawnAmount = this._transferERC20(_token, msg.sender, _amount, balance);
+        registerWithdrawal(tokenId, withdrawnAmount, msg.sender);
+    }
+
+    /// @notice Withdraw ETH to Layer 1 - register withdrawal and transfer ether to sender
+    /// @notice DEPRECATED: use withdrawPendingBalance instead
+    /// @param _amount Ether amount to withdraw
+    function withdrawETH(uint128 _amount) external nonReentrant {
+        registerWithdrawal(0, _amount, msg.sender);
+        (bool success, ) = msg.sender.call{value: _amount}("");
+        require(success, "D"); // ETH withdraw failed
+    }
+
     /// @notice Register full exit request - pack pubdata, add priority request
     /// @param _accountId Numerical id of the account
     /// @param _token Token address, 0 address for ether
-    function requestFullExit(uint32 _accountId, address _token) external nonReentrant {
+    function requestFullExit(uint32 _accountId, address _token) public nonReentrant {
         requireActive();
         require(_accountId <= MAX_ACCOUNT_ID, "e");
 
@@ -302,6 +332,14 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
         pendingBalances[packedBalanceKey].gasReserveValue = FILLED_GAS_RESERVE_VALUE;
     }
 
+    /// @notice Register full exit request - pack pubdata, add priority request
+    /// @notice DEPRECATED: use requestFullExit instead.
+    /// @param _accountId Numerical id of the account
+    /// @param _token Token address, 0 address for ether
+    function fullExit(uint32 _accountId, address _token) external {
+        requestFullExit(_accountId, _token);
+    }
+
     /// @dev Process one block commit using previous block StoredBlockInfo,
     /// @dev returns new block StoredBlockInfo
     /// @dev NOTE: Does not change storage (except events, so we can't mark it view)
@@ -315,8 +353,8 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
         // Check timestamp of the new block
         {
             require(_newBlock.timestamp >= _previousBlock.timestamp, "g"); // Block should be after previous block
-            bool timestampNotTooSmall = block.timestamp - COMMIT_TIMESTAMP_NOT_OLDER <= _newBlock.timestamp;
-            bool timestampNotTooBig = _newBlock.timestamp <= block.timestamp + COMMIT_TIMESTAMP_APPROXIMATION_DELTA;
+            bool timestampNotTooSmall = block.timestamp.sub(COMMIT_TIMESTAMP_NOT_OLDER) <= _newBlock.timestamp;
+            bool timestampNotTooBig = _newBlock.timestamp <= block.timestamp.add(COMMIT_TIMESTAMP_APPROXIMATION_DELTA);
             require(timestampNotTooSmall && timestampNotTooBig, "h"); // New block timestamp is not valid
         }
 
@@ -641,6 +679,7 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
             OnchainOperationData memory onchainOpData = _newBlockData.onchainOperations[i];
 
             uint256 pubdataOffset = onchainOpData.publicDataOffset;
+            require(pubdataOffset < pubData.length, "A1");
             require(pubdataOffset % CHUNK_BYTES == 0, "B"); // offsets should be on chunks boundaries
             uint256 chunkId = pubdataOffset / CHUNK_BYTES;
             require(offsetsCommitment[chunkId] == 0x00, "C"); // offset commitment should be empty
@@ -704,6 +743,8 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
             return verifyChangePubkeyECRECOVER(_ethWitness, _changePk);
         } else if (changePkType == Operations.ChangePubkeyType.CREATE2) {
             return verifyChangePubkeyCREATE2(_ethWitness, _changePk);
+        } else if (changePkType == Operations.ChangePubkeyType.OldECRECOVER) {
+            return verifyChangePubkeyOldECRECOVER(_ethWitness, _changePk);
         } else {
             revert("G"); // Incorrect ChangePubKey type
         }
@@ -727,6 +768,35 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
                     _changePk.nonce,
                     _changePk.accountId,
                     bytes32(0)
+                )
+            );
+        address recoveredAddress = Utils.recoverAddressFromEthSignature(signature, messageHash);
+        return recoveredAddress == _changePk.owner && recoveredAddress != address(0);
+    }
+
+    /// @notice Checks that signature is valid for pubkey change message, old version differs by form of the signed message.
+    /// @param _ethWitness Signature (65 bytes)
+    /// @param _changePk Parsed change pubkey operation
+    function verifyChangePubkeyOldECRECOVER(bytes memory _ethWitness, Operations.ChangePubKey memory _changePk)
+        internal
+        pure
+        returns (bool)
+    {
+        (, bytes memory signature) = Bytes.read(_ethWitness, 1, 65); // offset is 1 because we skip type of ChangePubkey
+        bytes32 messageHash =
+            keccak256(
+                abi.encodePacked(
+                    "\x19Ethereum Signed Message:\n152",
+                    "Register zkSync pubkey:\n\n",
+                    Bytes.bytesToHexASCIIBytes(abi.encodePacked(_changePk.pubKeyHash)),
+                    "\n",
+                    "nonce: 0x",
+                    Bytes.bytesToHexASCIIBytes(Bytes.toBytesFromUInt32(_changePk.nonce)),
+                    "\n",
+                    "account id: 0x",
+                    Bytes.bytesToHexASCIIBytes(Bytes.toBytesFromUInt32(_changePk.accountId)),
+                    "\n\n",
+                    "Only sign this message for a trusted client!"
                 )
             );
         address recoveredAddress = Utils.recoverAddressFromEthSignature(signature, messageHash);

@@ -12,12 +12,12 @@ members = [
     "core/bin/zksync_core",
     "core/bin/zksync_eth_sender",
     "core/bin/zksync_witness_generator",
-    "core/bin/zksync_prometheus_exporter",
 
     # Libraries
     "core/lib/circuit",
     "core/lib/eth_client",
     "core/lib/eth_signer",
+    "core/lib/prometheus_exporter",
     "core/lib/types",
     "core/lib/state",
     "core/lib/storage",
@@ -34,9 +34,6 @@ members = [
     "core/tests/test_account",
     "core/tests/testkit",
     "core/tests/loadtest",
-
-    # Infrastructure applications
-    "infrastructure/tok_cli",
 
     # SDK section
     "sdk/zksync-rs",

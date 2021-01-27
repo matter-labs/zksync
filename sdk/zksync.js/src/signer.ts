@@ -294,24 +294,39 @@ export class Signer {
         },
         zkSyncVersion: ZkSyncVersion
     ): Promise<ChangePubKey> {
-        if (zkSyncVersion === 'contracts-3') {
-            throw new Error('Contracts-3 version is not supported by this version of sdk');
-        }
         const msgBytes = this.changePubKeySignBytes(changePubKey, zkSyncVersion);
         const signature = await signTransactionBytes(this.#privateKey, msgBytes);
-        return {
-            type: 'ChangePubKey',
-            accountId: changePubKey.accountId,
-            account: changePubKey.account,
-            newPkHash: changePubKey.newPkHash,
-            feeToken: changePubKey.feeTokenId,
-            fee: BigNumber.from(changePubKey.fee).toString(),
-            nonce: changePubKey.nonce,
-            signature,
-            ethAuthData: changePubKey.ethAuthData,
-            validFrom: changePubKey.validFrom,
-            validUntil: changePubKey.validUntil
-        };
+        if (zkSyncVersion === 'contracts-3') {
+            let ethSignature = null;
+            if ((changePubKey.ethAuthData as ChangePubKeyECDSA).ethSignature) {
+                ethSignature = (changePubKey.ethAuthData as ChangePubKeyECDSA).ethSignature;
+            }
+            return {
+                type: 'ChangePubKey',
+                accountId: changePubKey.accountId,
+                account: changePubKey.account,
+                newPkHash: changePubKey.newPkHash,
+                feeToken: changePubKey.feeTokenId,
+                fee: BigNumber.from(changePubKey.fee).toString(),
+                nonce: changePubKey.nonce,
+                signature,
+                ethSignature
+            } as any;
+        } else {
+            return {
+                type: 'ChangePubKey',
+                accountId: changePubKey.accountId,
+                account: changePubKey.account,
+                newPkHash: changePubKey.newPkHash,
+                feeToken: changePubKey.feeTokenId,
+                fee: BigNumber.from(changePubKey.fee).toString(),
+                nonce: changePubKey.nonce,
+                signature,
+                ethAuthData: changePubKey.ethAuthData,
+                validFrom: changePubKey.validFrom,
+                validUntil: changePubKey.validUntil
+            };
+        }
     }
 
     static fromPrivateKey(pk: Uint8Array): Signer {

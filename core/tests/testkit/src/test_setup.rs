@@ -5,7 +5,7 @@ use futures::{
     channel::{mpsc, oneshot},
     SinkExt, StreamExt,
 };
-use num::{BigInt, BigUint};
+use num::{bigint::Sign, BigInt, BigUint};
 use std::collections::HashMap;
 use web3::transports::Http;
 use zksync_core::committer::{BlockCommitRequest, CommitRequest};
@@ -26,8 +26,8 @@ use zksync_crypto::rand::Rng;
 use crate::account_set::AccountSet;
 use crate::state_keeper_utils::*;
 use crate::types::*;
-use num::bigint::Sign;
 
+use zksync_types::tx::TimeRange;
 /// Used to create transactions between accounts and check for their validity.
 /// Every new block should start with `.start_block()`
 /// and end with `execute_commit_and_verify_block()`
@@ -490,9 +490,14 @@ impl TestSetup {
         self.accounts.zksync_accounts[account.0].set_account_id(Some(account_id));
 
         // Execute transaction
-        let tx =
-            self.accounts
-                .change_pubkey_with_tx(account, fee_token.0, fee, None, true, 0, u32::MAX);
+        let tx = self.accounts.change_pubkey_with_tx(
+            account,
+            fee_token.0,
+            fee,
+            None,
+            true,
+            Default::default(),
+        );
 
         self.execute_tx(tx).await;
     }
@@ -539,8 +544,7 @@ impl TestSetup {
                 fee,
                 None,
                 true,
-                0,
-                u32::MAX,
+                Default::default(),
             )
             .await;
 
@@ -554,8 +558,7 @@ impl TestSetup {
         token: Token,
         amount: BigUint,
         fee: BigUint,
-        valid_from: u32,
-        valid_until: u32,
+        time_range: TimeRange,
     ) {
         let mut zksync0_old = self
             .get_expected_zksync_account_balance(from, token.0)
@@ -579,17 +582,10 @@ impl TestSetup {
         self.expected_changes_for_current_block
             .sync_accounts_state
             .insert((self.accounts.fee_account_id, token.0), zksync0_old);
-        let transfer = self.accounts.transfer(
-            from,
-            to,
-            token,
-            amount,
-            fee,
-            None,
-            valid_from,
-            valid_until,
-            true,
-        );
+
+        let transfer = self
+            .accounts
+            .transfer(from, to, token, amount, fee, None, time_range, true);
 
         self.execute_tx(transfer).await;
     }
@@ -600,8 +596,6 @@ impl TestSetup {
         token: Token,
         amount: BigUint,
         fee: BigUint,
-        valid_from: u32,
-        valid_until: u32,
         rng: &mut impl Rng,
     ) {
         let mut zksync0_old = self
@@ -621,34 +615,11 @@ impl TestSetup {
             .sync_accounts_state
             .insert((self.accounts.fee_account_id, token.0), zksync0_old);
 
-        let transfer = self.accounts.transfer_to_new_random(
-            from,
-            token,
-            amount,
-            fee,
-            None,
-            true,
-            valid_from,
-            valid_until,
-            rng,
-        );
+        let transfer = self
+            .accounts
+            .transfer_to_new_random(from, token, amount, fee, None, true, rng);
 
         self.execute_tx(transfer).await;
-    }
-
-    fn increase_block_withdraws_amount(&mut self) {
-        self.expected_changes_for_current_block.withdraw_ops += 1;
-
-        if self.expected_changes_for_current_block.withdraw_ops
-            > crate::MAX_WITHDRAWALS_PER_BLOCK as usize
-        {
-            panic!(
-                "Attempt to perform too many withdraw operations in one block. \
-                Maximum amount of withdraw operations in one block: {}. \
-                You have to commit block if it has this amount of withdraws.",
-                crate::MAX_WITHDRAWALS_PER_BLOCK
-            )
-        }
     }
 
     pub async fn withdraw(
@@ -659,8 +630,6 @@ impl TestSetup {
         amount: BigUint,
         fee: BigUint,
     ) {
-        self.increase_block_withdraws_amount();
-
         let mut zksync0_old = self
             .get_expected_zksync_account_balance(from, token.0)
             .await;
@@ -686,7 +655,7 @@ impl TestSetup {
 
         let withdraw =
             self.accounts
-                .withdraw(from, to, token, amount, fee, None, true, 0, u32::MAX);
+                .withdraw(from, to, token, amount, fee, None, true, Default::default());
 
         self.execute_tx(withdraw).await;
     }
@@ -699,8 +668,6 @@ impl TestSetup {
         fee: BigUint,
         rng: &mut impl Rng,
     ) {
-        self.increase_block_withdraws_amount();
-
         let mut zksync0_old = self
             .get_expected_zksync_account_balance(from, token.0)
             .await;
@@ -718,17 +685,9 @@ impl TestSetup {
             .sync_accounts_state
             .insert((self.accounts.fee_account_id, token.0), zksync0_old);
 
-        let withdraw = self.accounts.withdraw_to_random(
-            from,
-            token,
-            amount,
-            fee,
-            None,
-            true,
-            0,
-            u32::MAX,
-            rng,
-        );
+        let withdraw = self
+            .accounts
+            .withdraw_to_random(from, token, amount, fee, None, true, rng);
 
         self.execute_tx(withdraw).await;
     }
@@ -741,8 +700,6 @@ impl TestSetup {
         token_id: Token,
         fee: BigUint,
     ) {
-        self.increase_block_withdraws_amount();
-
         let mut initiator_old = self
             .get_expected_zksync_account_balance(target, token_id.0)
             .await;
@@ -774,9 +731,15 @@ impl TestSetup {
                 fee_account_balance,
             );
 
-        let forced_exit =
-            self.accounts
-                .forced_exit(initiator, target, token_id, fee, None, true, 0, u32::MAX);
+        let forced_exit = self.accounts.forced_exit(
+            initiator,
+            target,
+            token_id,
+            fee,
+            None,
+            true,
+            Default::default(),
+        );
 
         self.execute_tx(forced_exit).await;
     }

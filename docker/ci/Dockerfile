@@ -10,10 +10,6 @@ USER ci_user
 RUN cargo install diesel_cli --no-default-features --features postgres
 RUN cargo install wasm-pack
 
-# sccache support
-RUN cargo install sccache
-ENV RUSTC_WRAPPER=/root/.cargo/bin/sccache
-ENV SCCACHE_DIR=/drone/src/target/rust-ci-cache/sccache
 ENV CARGO_HOME=/drone/src/target/rust-ci-cache/cargo
 
 RUN curl -LO https://storage.googleapis.com/kubernetes-release/release/`curl -s https://storage.googleapis.com/kubernetes-release/release/stable.txt`/bin/linux/amd64/kubectl

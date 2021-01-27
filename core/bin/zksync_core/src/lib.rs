@@ -11,7 +11,7 @@ use crate::{
 };
 use futures::{channel::mpsc, future};
 use tokio::task::JoinHandle;
-use zksync_config::{ApiServerOptions, ConfigurationOptions};
+use zksync_config::ZkSyncConfig;
 use zksync_storage::ConnectionPool;
 
 const DEFAULT_CHANNEL_CAPACITY: usize = 32_768;
@@ -44,16 +44,18 @@ pub async fn wait_for_tasks(task_futures: Vec<JoinHandle<()>>) {
 }
 
 /// Inserts the initial information about zkSync tokens into the database.
-pub async fn genesis_init() {
+pub async fn genesis_init(config: &ZkSyncConfig) {
     let pool = ConnectionPool::new(Some(1));
-    let config_options = ConfigurationOptions::from_env();
 
     log::info!("Generating genesis block.");
-    ZkSyncStateKeeper::create_genesis_block(pool.clone(), &config_options.operator_fee_eth_addr)
-        .await;
+    ZkSyncStateKeeper::create_genesis_block(
+        pool.clone(),
+        &config.chain.state_keeper.fee_account_addr,
+    )
+    .await;
     log::info!("Adding initial tokens to db");
-    let genesis_tokens =
-        get_genesis_token_list(&config_options.eth_network).expect("Initial token list not found");
+    let genesis_tokens = get_genesis_token_list(&config.chain.eth.network.to_string())
+        .expect("Initial token list not found");
     for (id, token) in (1..).zip(genesis_tokens) {
         log::info!(
             "Adding token: {}, id:{}, address: {}, decimals: {}",
@@ -90,10 +92,8 @@ pub async fn genesis_init() {
 pub async fn run_core(
     connection_pool: ConnectionPool,
     panic_notify: mpsc::Sender<bool>,
+    config: &ZkSyncConfig,
 ) -> anyhow::Result<Vec<JoinHandle<()>>> {
-    let config_opts = ConfigurationOptions::from_env();
-    let api_server_options = ApiServerOptions::from_env();
-
     let (proposed_blocks_sender, proposed_blocks_receiver) =
         mpsc::channel(DEFAULT_CHANNEL_CAPACITY);
     let (state_keeper_req_sender, state_keeper_req_receiver) =
@@ -106,7 +106,7 @@ pub async fn run_core(
 
     // Start Ethereum Watcher.
     let eth_watch_task = start_eth_watch(
-        config_opts.clone(),
+        &config,
         eth_watch_req_sender.clone(),
         eth_watch_req_receiver,
         connection_pool.clone(),
@@ -123,13 +123,12 @@ pub async fn run_core(
 
     let state_keeper = ZkSyncStateKeeper::new(
         state_keeper_init,
-        config_opts.operator_fee_eth_addr,
+        config.chain.state_keeper.fee_account_addr,
         state_keeper_req_receiver,
         proposed_blocks_sender,
-        config_opts.available_block_chunk_sizes.clone(),
-        config_opts.miniblock_timings.max_miniblock_iterations,
-        config_opts.miniblock_timings.fast_miniblock_iterations,
-        config_opts.max_number_of_withdrawals_per_block,
+        config.chain.state_keeper.block_chunk_sizes.clone(),
+        config.chain.state_keeper.miniblock_iterations as usize,
+        config.chain.state_keeper.fast_block_miniblock_iterations as usize,
     );
     let state_keeper_task = start_state_keeper(state_keeper, pending_block);
 
@@ -146,14 +145,14 @@ pub async fn run_core(
         mempool_tx_request_receiver,
         mempool_block_request_receiver,
         eth_watch_req_sender.clone(),
-        &config_opts,
+        &config,
         4,
         DEFAULT_CHANNEL_CAPACITY,
     );
 
     // Start block proposer.
     let proposer_task = run_block_proposer_task(
-        &config_opts,
+        &config,
         mempool_block_request_sender.clone(),
         state_keeper_req_sender.clone(),
     );
@@ -163,7 +162,7 @@ pub async fn run_core(
         panic_notify.clone(),
         mempool_tx_request_sender,
         eth_watch_req_sender,
-        api_server_options,
+        config.api.private.clone(),
     );
 
     let task_futures = vec![

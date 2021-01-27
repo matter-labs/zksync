@@ -12,30 +12,31 @@ import {
     PriorityOperationReceipt,
     TransactionReceipt,
     PubKeyHash,
-    TxEthSignature,
     ChangePubKey,
     EthSignerType,
     SignedTransaction,
     Transfer,
+    TxEthSignature,
     ForcedExit,
     Withdraw,
     ChangePubkeyTypes,
     ChangePubKeyOnchain,
     ChangePubKeyECDSA,
-    ChangePubKeyCREATE2
+    ChangePubKeyCREATE2,
+    ZkSyncVersion
 } from './types';
 import {
     ERC20_APPROVE_TRESHOLD,
     IERC20_INTERFACE,
     isTokenETH,
     MAX_ERC20_APPROVE_AMOUNT,
-    getChangePubkeyMessage,
     SYNC_MAIN_CONTRACT_INTERFACE,
-    getSignedBytesFromMessage,
-    signMessagePersonalAPI,
     ERC20_DEPOSIT_GAS_LIMIT,
     getEthSignatureType,
+    signMessagePersonalAPI,
+    getSignedBytesFromMessage,
     serializeTransfer,
+    getChangePubkeyMessage,
     MAX_TIMESTAMP
 } from './utils';
 import validate = WebAssembly.validate;
@@ -129,7 +130,7 @@ export class Wallet {
     }
 
     batchBuilder(nonce?: Nonce): BatchBuilder {
-        return BatchBuilder.fromWallet(this, nonce, this.provider.zkSyncVersion);
+        return BatchBuilder.fromWallet(this, nonce);
     }
 
     async getTransfer(transfer: {
@@ -177,8 +178,12 @@ export class Wallet {
         transfer.validUntil = transfer.validUntil || MAX_TIMESTAMP;
         const signedTransferTransaction = await this.getTransfer(transfer as any);
 
-        const stringAmount = this.provider.tokenSet.formatToken(transfer.token, transfer.amount);
-        const stringFee = this.provider.tokenSet.formatToken(transfer.token, transfer.fee);
+        const stringAmount = BigNumber.from(transfer.amount).isZero()
+            ? null
+            : this.provider.tokenSet.formatToken(transfer.token, transfer.amount);
+        const stringFee = BigNumber.from(transfer.fee).isZero()
+            ? null
+            : this.provider.tokenSet.formatToken(transfer.token, transfer.fee);
         const stringToken = this.provider.tokenSet.resolveTokenSymbol(transfer.token);
         const txMessageEthSignature = await this.ethMessageSigner.ethSignTransfer({
             stringAmount,
@@ -186,9 +191,7 @@ export class Wallet {
             stringToken,
             to: transfer.to,
             nonce: transfer.nonce,
-            accountId: this.accountId,
-            validFrom: transfer.validFrom,
-            validUntil: transfer.validUntil
+            accountId: this.accountId
         });
         return {
             tx: signedTransferTransaction,
@@ -234,8 +237,20 @@ export class Wallet {
     }): Promise<SignedTransaction> {
         const signedForcedExitTransaction = await this.getForcedExit(forcedExit);
 
+        const stringFee = BigNumber.from(forcedExit.fee).isZero()
+            ? null
+            : this.provider.tokenSet.formatToken(forcedExit.token, forcedExit.fee);
+        const stringToken = this.provider.tokenSet.resolveTokenSymbol(forcedExit.token);
+        const txMessageEthSignature = await this.ethMessageSigner.ethSignForcedExit({
+            stringToken,
+            stringFee,
+            target: forcedExit.target,
+            nonce: forcedExit.nonce
+        });
+
         return {
-            tx: signedForcedExitTransaction
+            tx: signedForcedExitTransaction,
+            ethereumSignature: txMessageEthSignature
         };
     }
 
@@ -291,9 +306,10 @@ export class Wallet {
         await this.setRequiredAccountIdFromServer('Transfer funds');
 
         let batch = [];
-        let bytes = new Uint8Array([]);
+        let messages: string[] = [];
 
         let nextNonce = transfers[0].nonce != null ? await this.getNonce(transfers[0].nonce) : await this.getNonce();
+        const batchNonce = nextNonce;
 
         for (let i = 0; i < transfers.length; i++) {
             const transfer = transfers[i];
@@ -310,11 +326,12 @@ export class Wallet {
                 validUntil: transfer.validUntil || MAX_TIMESTAMP
             });
 
-            bytes = ethers.utils.concat([bytes, serializeTransfer(tx, this.provider.zkSyncVersion)]);
+            messages.push(this.getTransferEthMessagePart(transfer));
             batch.push({ tx, signature: null });
         }
-        const hash = ethers.utils.keccak256(bytes).slice(2);
-        const message = Uint8Array.from(Buffer.from(hash, 'hex'));
+
+        messages.push(`Nonce: ${batchNonce}`);
+        const message = messages.filter((part) => part.length != 0).join('\n');
         const ethSignature = await this.ethMessageSigner.getEthMessageSignature(message);
 
         const transactionHashes = await this.provider.submitTxsBatch(batch, [ethSignature]);
@@ -383,8 +400,12 @@ export class Wallet {
         withdraw.validUntil = withdraw.validUntil || MAX_TIMESTAMP;
         const signedWithdrawTransaction = await this.getWithdrawFromSyncToEthereum(withdraw as any);
 
-        const stringAmount = this.provider.tokenSet.formatToken(withdraw.token, withdraw.amount);
-        const stringFee = this.provider.tokenSet.formatToken(withdraw.token, withdraw.fee);
+        const stringAmount = BigNumber.from(withdraw.amount).isZero()
+            ? null
+            : this.provider.tokenSet.formatToken(withdraw.token, withdraw.amount);
+        const stringFee = BigNumber.from(withdraw.fee).isZero()
+            ? null
+            : this.provider.tokenSet.formatToken(withdraw.token, withdraw.fee);
         const stringToken = this.provider.tokenSet.resolveTokenSymbol(withdraw.token);
         const txMessageEthSignature = await this.ethMessageSigner.ethSignWithdraw({
             stringAmount,
@@ -392,9 +413,7 @@ export class Wallet {
             stringToken,
             ethAddress: withdraw.ethAddress,
             nonce: withdraw.nonce,
-            accountId: this.accountId,
-            validFrom: withdraw.validFrom,
-            validUntil: withdraw.validUntil
+            accountId: this.accountId
         });
 
         return {
@@ -449,6 +468,8 @@ export class Wallet {
         }
 
         const feeTokenId = this.provider.tokenSet.resolveTokenId(changePubKey.feeToken);
+        const newPubKeyHash = await this.signer.pubKeyHash();
+
         await this.setRequiredAccountIdFromServer('Set Signing Key');
 
         const changePubKeyTx: ChangePubKey = await this.signer.signSyncChangePubKey(
@@ -491,6 +512,7 @@ export class Wallet {
                 newPubKeyHash,
                 changePubKey.nonce,
                 this.accountId,
+                this.provider.zkSyncVersion,
                 changePubKey.batchHash
             );
             const ethSignature = (await this.getEthMessageSignature(changePubKeyMessage)).signature;
@@ -500,6 +522,10 @@ export class Wallet {
                 batchHash: changePubKey.batchHash
             };
         } else if (changePubKey.ethAuthType === 'CREATE2') {
+            if (this.provider.zkSyncVersion === 'contracts-3') {
+                throw new Error('CREATE2 authentication is not supported for zkSync version contracts-3');
+            }
+
             if (this.ethSigner instanceof Create2WalletSigner) {
                 const create2data = this.ethSigner.create2WalletData;
                 ethAuthData = {
@@ -556,6 +582,86 @@ export class Wallet {
         }
 
         return submitSignedTransaction(txData, this.provider);
+    }
+
+    // The following methods are needed in case user decided to build
+    // a message for the batch himself (e.g. in case of multi-authors batch).
+    // It might seem that these belong to ethMessageSigner, however, we have
+    // to resolve the token and format amount/fee before constructing the
+    // transaction.
+    getTransferEthMessagePart(transfer: {
+        to: Address;
+        token: TokenLike;
+        amount: BigNumberish;
+        fee: BigNumberish;
+    }): string {
+        const stringAmount = BigNumber.from(transfer.amount).isZero()
+            ? null
+            : this.provider.tokenSet.formatToken(transfer.token, transfer.amount);
+        const stringFee = BigNumber.from(transfer.fee).isZero()
+            ? null
+            : this.provider.tokenSet.formatToken(transfer.token, transfer.fee);
+        const stringToken = this.provider.tokenSet.resolveTokenSymbol(transfer.token);
+        return this.ethMessageSigner.getTransferEthMessagePart({
+            stringAmount,
+            stringFee,
+            stringToken,
+            to: transfer.to
+        });
+    }
+
+    getWithdrawEthMessagePart(withdraw: {
+        ethAddress: string;
+        token: TokenLike;
+        amount: BigNumberish;
+        fee: BigNumberish;
+    }): string {
+        const stringAmount = BigNumber.from(withdraw.amount).isZero()
+            ? null
+            : this.provider.tokenSet.formatToken(withdraw.token, withdraw.amount);
+        const stringFee = BigNumber.from(withdraw.fee).isZero()
+            ? null
+            : this.provider.tokenSet.formatToken(withdraw.token, withdraw.fee);
+        const stringToken = this.provider.tokenSet.resolveTokenSymbol(withdraw.token);
+        return this.ethMessageSigner.getWithdrawEthMessagePart({
+            stringAmount,
+            stringFee,
+            stringToken,
+            ethAddress: withdraw.ethAddress
+        });
+    }
+
+    getChangePubKeyEthMessagePart(changePubKey: {
+        pubKeyHash: string;
+        feeToken: TokenLike;
+        fee: BigNumberish;
+    }): string {
+        const stringFee = BigNumber.from(changePubKey.fee).isZero()
+            ? null
+            : this.provider.tokenSet.formatToken(changePubKey.feeToken, changePubKey.fee);
+        const stringToken = this.provider.tokenSet.resolveTokenSymbol(changePubKey.feeToken);
+        return this.ethMessageSigner.getChangePubKeyEthMessagePart({
+            pubKeyHash: changePubKey.pubKeyHash,
+            stringToken,
+            stringFee
+        });
+    }
+
+    getForcedExitEthMessagePart(forcedExit: {
+        target: Address;
+        token: TokenLike;
+        fee: BigNumberish;
+        nonce: number;
+    }): string {
+        const stringFee = BigNumber.from(forcedExit.fee).isZero()
+            ? null
+            : this.provider.tokenSet.formatToken(forcedExit.token, forcedExit.fee);
+        const stringToken = this.provider.tokenSet.resolveTokenSymbol(forcedExit.token);
+        return this.ethMessageSigner.getForcedExitEthMessagePart({
+            stringToken,
+            stringFee,
+            target: forcedExit.target
+        });
     }
 
     async isOnchainAuthSigningKeySet(nonce: Nonce = 'committed'): Promise<boolean> {
@@ -760,7 +866,7 @@ export class Wallet {
                 try {
                     const gasEstimate = await mainZkSyncContract.estimateGas.depositERC20(...args).then(
                         (estimate) => estimate,
-                        (_err) => BigNumber.from('0')
+                        () => BigNumber.from('0')
                     );
                     txRequest.gasLimit = gasEstimate.gte(ERC20_DEPOSIT_GAS_LIMIT)
                         ? gasEstimate
@@ -810,7 +916,7 @@ export class Wallet {
 
         const tokenAddress = this.provider.tokenSet.resolveTokenAddress(withdraw.token);
         try {
-            const ethTransaction = await mainZkSyncContract.fullExit(accountId, tokenAddress, {
+            const ethTransaction = await mainZkSyncContract.requestFullExit(accountId, tokenAddress, {
                 gasLimit: BigNumber.from('500000'),
                 gasPrice,
                 ...withdraw.ethTxOptions

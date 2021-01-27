@@ -97,17 +97,15 @@ pub async fn perform_basic_tests() {
 
     let deposit_amount = parse_ether("1.0").unwrap();
 
-    let mut tokens = vec![];
-    for token in 0..=1 {
-        perform_basic_operations(
-            token,
-            &mut test_setup,
-            deposit_amount.clone(),
-            BlockProcessing::CommitAndVerify,
-        )
-        .await;
-        tokens.push(token);
-    }
+    let token = 1;
+    perform_basic_operations(
+        token,
+        &mut test_setup,
+        deposit_amount.clone(),
+        BlockProcessing::CommitAndVerify,
+    )
+    .await;
+    let tokens = vec![token];
 
     verify_restore(
         &testkit_config.web3_url,
@@ -219,8 +217,7 @@ pub async fn perform_basic_operations(
             Token(token),
             &deposit_amount / BigUint::from(8u32),
             &deposit_amount / BigUint::from(8u32),
-            0,
-            u32::MAX,
+            Default::default(),
         )
         .await;
     //
@@ -232,8 +229,7 @@ pub async fn perform_basic_operations(
             Token(token),
             &deposit_amount / BigUint::from(8u32),
             &deposit_amount / BigUint::from(8u32),
-            0,
-            u32::MAX,
+            Default::default(),
         )
         .await;
 
@@ -245,8 +241,7 @@ pub async fn perform_basic_operations(
         deposit_amount.clone(),
         BigUint::from(0u32),
         Some(nonce + 1),
-        0,
-        u32::MAX,
+        Default::default(),
         false,
     );
     test_setup
@@ -261,8 +256,7 @@ pub async fn perform_basic_operations(
             Token(token),
             &deposit_amount / BigUint::from(4u32),
             &deposit_amount / BigUint::from(4u32),
-            0,
-            u32::MAX,
+            Default::default(),
         )
         .await;
 

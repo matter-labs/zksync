@@ -6,7 +6,7 @@ use structopt::StructOpt;
 use web3::transports::Http;
 
 use zksync_circuit::witness::utils::build_block_witness;
-use zksync_config::AvailableBlockSizesConfig;
+use zksync_config::ZkSyncConfig;
 use zksync_crypto::circuit::CircuitAccountTree;
 use zksync_crypto::params::account_tree_depth;
 use zksync_prover_utils::aggregated_proofs::{gen_aggregate_proof, prepare_proof_data};
@@ -42,7 +42,10 @@ async fn main() {
 
     let block_chunks_sizes = if !opt.skip_single_block_checks {
         if let Some(block_chunks_sizes) = opt.block_chunks_sizes {
-            let available_sizes = AvailableBlockSizesConfig::from_env().blocks_chunks;
+            let available_sizes = ZkSyncConfig::from_env()
+                .chain
+                .circuit
+                .supported_block_chunks_sizes;
             for chunk in &block_chunks_sizes {
                 available_sizes
                     .iter()
@@ -51,14 +54,20 @@ async fn main() {
             }
             block_chunks_sizes
         } else {
-            AvailableBlockSizesConfig::from_env().blocks_chunks
+            ZkSyncConfig::from_env()
+                .chain
+                .circuit
+                .supported_block_chunks_sizes
         }
     } else {
         Vec::new()
     };
 
     let aggregated_proof_sizes = if let Some(aggregated_proof_sizes) = opt.aggregated_proof_sizes {
-        let available_sizes = AvailableBlockSizesConfig::from_env().aggregated_proof_sizes;
+        let available_sizes = ZkSyncConfig::from_env()
+            .chain
+            .circuit
+            .aggregated_proof_sizes;
         for aggregated_size in &aggregated_proof_sizes {
             available_sizes
                 .iter()
@@ -67,7 +76,10 @@ async fn main() {
         }
         aggregated_proof_sizes
     } else {
-        AvailableBlockSizesConfig::from_env().aggregated_proof_sizes
+        ZkSyncConfig::from_env()
+            .chain
+            .circuit
+            .aggregated_proof_sizes
     };
 
     info!(
@@ -75,9 +87,14 @@ async fn main() {
         block_chunks_sizes, aggregated_proof_sizes
     );
 
-    let available_block_chunk_sizes = AvailableBlockSizesConfig::from_env().blocks_chunks;
-    let available_aggregated_proof_sizes =
-        AvailableBlockSizesConfig::from_env().aggregated_proof_sizes_with_setup_pow();
+    let available_block_chunk_sizes = ZkSyncConfig::from_env()
+        .chain
+        .circuit
+        .supported_block_chunks_sizes;
+    let available_aggregated_proof_sizes = ZkSyncConfig::from_env()
+        .chain
+        .circuit
+        .aggregated_proof_sizes_with_setup_pow();
 
     let testkit_config = TestkitConfig::from_env();
 
@@ -149,7 +166,16 @@ async fn main() {
         circuit_account_tree.insert(id, account.into());
     }
 
-    for block_size in block_chunks_sizes.clone() {
+    let block_chunk_sizes = ZkSyncConfig::from_env()
+        .chain
+        .state_keeper
+        .block_chunk_sizes;
+    info!(
+        "Checking keys and onchain verification for block sizes: {:?}",
+        block_chunk_sizes
+    );
+
+    for block_size in block_chunk_sizes {
         info!("Checking keys for block size: {}", block_size);
 
         test_setup.start_block();

@@ -74,8 +74,7 @@ fn apply_transfer_to_new_op(b: &mut Bencher<'_>) {
         10u32.into(),
         1u32.into(),
         0,
-        0,
-        u32::MAX,
+        Default::default(),
         private_key,
     )
     .expect("failed to sign transfer");
@@ -110,8 +109,7 @@ fn apply_transfer_tx(b: &mut Bencher<'_>) {
         10u32.into(),
         1u32.into(),
         0,
-        0,
-        u32::MAX,
+        Default::default(),
         private_key,
     )
     .expect("failed to sign transfer");
@@ -197,8 +195,7 @@ fn apply_withdraw_tx(b: &mut Bencher<'_>) {
         10u32.into(),
         1u32.into(),
         0,
-        0,
-        u32::MAX,
+        Default::default(),
         private_key,
     )
     .expect("failed to sign withdraw");
@@ -237,8 +234,7 @@ fn apply_change_pubkey_op(b: &mut Bencher<'_>) {
         0,
         Default::default(),
         nonce,
-        0,
-        u32::MAX,
+        Default::default(),
         None,
         None,
     );
@@ -249,10 +245,10 @@ fn apply_change_pubkey_op(b: &mut Bencher<'_>) {
             .expect("Failed to construct ChangePubKey signed message.");
         let eth_signature =
             PackedEthSignature::sign(eth_private_key, &sign_bytes).expect("Signing failed");
-        ChangePubKeyEthAuthData::ECDSA(ChangePubKeyECDSAData {
+        Some(ChangePubKeyEthAuthData::ECDSA(ChangePubKeyECDSAData {
             eth_signature,
             batch_hash: H256::zero(),
-        })
+        }))
     };
 
     let change_pubkey_tx = ZkSyncTx::ChangePubKey(Box::new(change_pubkey));

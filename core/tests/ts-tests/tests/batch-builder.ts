@@ -51,14 +51,10 @@ Tester.prototype.testBatchBuilderInvalidUsage = async function (wallet: Wallet, 
     await expectThrow(
         wallet
             .batchBuilder()
-            .addChangePubKey({ feeToken })
+            .addChangePubKey({ feeToken, ethAuthType: 'ECDSA' })
             .addTransfer({ to: wallet.address(), token: feeToken, amount: 0, fee: 999 })
             .build(feeToken),
         'Fees are expected to be zero'
-    );
-    // Multiple `ChangePubKey` in a single batch.
-    expect(() => wallet.batchBuilder().addChangePubKey({ feeToken }).addChangePubKey({ feeToken })).to.throw(
-        'ChangePubKey operation must be unique within a batch'
     );
 };
 
@@ -77,7 +73,7 @@ Tester.prototype.testBatchBuilderChangePubKey = async function (
 
     const batch = await wallet
         .batchBuilder()
-        .addChangePubKey({ feeToken: token, onchainAuth: onchain })
+        .addChangePubKey({ feeToken: token, ethAuthType: onchain ? 'Onchain' : 'ECDSA' })
         .addWithdraw({ ethAddress: wallet.address(), token, amount })
         .build(token);
 

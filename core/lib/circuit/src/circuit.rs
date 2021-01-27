@@ -18,7 +18,8 @@ use zksync_crypto::franklin_crypto::{
 };
 // Workspace deps
 use zksync_crypto::params::{
-    self, FR_BIT_WIDTH_PADDED, SIGNED_FORCED_EXIT_BIT_WIDTH, SIGNED_TRANSFER_BIT_WIDTH,
+    self, FR_BIT_WIDTH_PADDED, OLD_SIGNED_TRANSFER_BIT_WIDTH, SIGNED_FORCED_EXIT_BIT_WIDTH,
+    SIGNED_TRANSFER_BIT_WIDTH,
 };
 use zksync_types::{
     operations::{ChangePubKeyOp, NoopOp},
@@ -1083,6 +1084,21 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
         serialized_tx_bits.extend(op_data.valid_until.get_bits_be());
         assert_eq!(serialized_tx_bits.len(), params::SIGNED_WITHDRAW_BIT_WIDTH);
 
+        let mut serialized_tx_bits_old = vec![];
+
+        serialized_tx_bits_old.extend(global_variables.chunk_data.tx_type.get_bits_be());
+        serialized_tx_bits_old.extend(cur.account_id.get_bits_be());
+        serialized_tx_bits_old.extend(cur.account.address.get_bits_be());
+        serialized_tx_bits_old.extend(op_data.eth_address.get_bits_be());
+        serialized_tx_bits_old.extend(cur.token.get_bits_be());
+        serialized_tx_bits_old.extend(op_data.full_amount.get_bits_be());
+        serialized_tx_bits_old.extend(op_data.fee_packed.get_bits_be());
+        serialized_tx_bits_old.extend(cur.account.nonce.get_bits_be());
+        assert_eq!(
+            serialized_tx_bits_old.len(),
+            params::OLD_SIGNED_WITHDRAW_BIT_WIDTH
+        );
+
         let pubdata_chunk = select_pubdata_chunk(
             cs.namespace(|| "select_pubdata_chunk"),
             &pubdata_bits,
@@ -1120,10 +1136,20 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
         base_valid_flags.push(is_withdraw);
         base_valid_flags.push(is_valid_timestamp.clone());
 
-        let is_serialized_tx_correct = verify_signature_message_construction(
-            cs.namespace(|| "is_serialized_tx_correct"),
+        let is_new_serialized_tx_correct = verify_signature_message_construction(
+            cs.namespace(|| "is_new_serialized_tx_correct"),
             serialized_tx_bits,
             &op_data,
+        )?;
+        let is_old_serialized_tx_correct = verify_signature_message_construction(
+            cs.namespace(|| "is_old_serialized_tx_correct"),
+            serialized_tx_bits_old,
+            &op_data,
+        )?;
+
+        let is_serialized_tx_correct = multi_or(
+            cs.namespace(|| "is_serialized_tx_correct"),
+            &[is_new_serialized_tx_correct, is_old_serialized_tx_correct],
         )?;
         let is_signed_correctly = multi_and(
             cs.namespace(|| "is_signed_correctly"),
@@ -1565,10 +1591,36 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
             params::SIGNED_CHANGE_PUBKEY_BIT_WIDTH
         );
 
-        let is_serialized_tx_correct = verify_signature_message_construction(
-            cs.namespace(|| "is_serialized_tx_correct"),
+        // Construct serialized tx
+        let mut serialized_tx_bits_old = vec![];
+
+        serialized_tx_bits_old.extend(global_variables.chunk_data.tx_type.get_bits_be());
+        serialized_tx_bits_old.extend(cur.account_id.get_bits_be());
+        serialized_tx_bits_old.extend(op_data.eth_address.get_bits_be());
+        serialized_tx_bits_old.extend(op_data.new_pubkey_hash.get_bits_be());
+        serialized_tx_bits_old.extend(cur.token.get_bits_be());
+        serialized_tx_bits_old.extend(op_data.fee_packed.get_bits_be());
+        serialized_tx_bits_old.extend(cur.account.nonce.get_bits_be());
+
+        assert_eq!(
+            serialized_tx_bits_old.len(),
+            params::OLD_SIGNED_CHANGE_PUBKEY_BIT_WIDTH
+        );
+
+        let is_new_serialized_tx_correct = verify_signature_message_construction(
+            cs.namespace(|| "is_new_serialized_tx_correct"),
             serialized_tx_bits,
             &op_data,
+        )?;
+        let is_old_serialized_tx_correct = verify_signature_message_construction(
+            cs.namespace(|| "is_old_serialized_tx_correct"),
+            serialized_tx_bits_old,
+            &op_data,
+        )?;
+
+        let is_serialized_tx_correct = multi_or(
+            cs.namespace(|| "is_serialized_tx_correct"),
+            &[is_new_serialized_tx_correct, is_old_serialized_tx_correct],
         )?;
 
         let (is_equal_pubdata, packed_pubdata) = vectorized_compare(
@@ -1848,6 +1900,17 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
         serialized_tx_bits.extend(op_data.valid_until.get_bits_be());
         assert_eq!(serialized_tx_bits.len(), SIGNED_TRANSFER_BIT_WIDTH);
 
+        let mut serialized_tx_bits_old = vec![];
+        serialized_tx_bits_old.extend(tx_code.get_bits_be());
+        serialized_tx_bits_old.extend(lhs.account_id.get_bits_be());
+        serialized_tx_bits_old.extend(lhs.account.address.get_bits_be());
+        serialized_tx_bits_old.extend(op_data.eth_address.get_bits_be());
+        serialized_tx_bits_old.extend(cur.token.get_bits_be());
+        serialized_tx_bits_old.extend(op_data.amount_packed.get_bits_be());
+        serialized_tx_bits_old.extend(op_data.fee_packed.get_bits_be());
+        serialized_tx_bits_old.extend(cur.account.nonce.get_bits_be());
+        assert_eq!(serialized_tx_bits_old.len(), OLD_SIGNED_TRANSFER_BIT_WIDTH);
+
         let pubdata_chunk = select_pubdata_chunk(
             cs.namespace(|| "select_pubdata_chunk"),
             &pubdata_bits,
@@ -1906,11 +1969,22 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
             &cur.account.nonce.get_number(),
         )?);
 
-        let is_serialized_tx_correct = verify_signature_message_construction(
-            cs.namespace(|| "is_serialized_tx_correct"),
+        let is_new_serialized_tx_correct = verify_signature_message_construction(
+            cs.namespace(|| "is_new_serialized_tx_correct"),
             serialized_tx_bits,
             &op_data,
         )?;
+        let is_old_serialized_tx_correct = verify_signature_message_construction(
+            cs.namespace(|| "is_old_serialized_tx_correct"),
+            serialized_tx_bits_old,
+            &op_data,
+        )?;
+
+        let is_serialized_tx_correct = multi_or(
+            cs.namespace(|| "old_or_new_signature_correct"),
+            &[is_new_serialized_tx_correct, is_old_serialized_tx_correct],
+        )?;
+
         log::debug!(
             "is_serialized_tx_correct: {:?}",
             is_serialized_tx_correct.get_value()
@@ -2087,6 +2161,18 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
         serialized_tx_bits.extend(op_data.valid_until.get_bits_be());
         assert_eq!(serialized_tx_bits.len(), SIGNED_TRANSFER_BIT_WIDTH);
 
+        let mut serialized_tx_bits_old = vec![];
+
+        serialized_tx_bits_old.extend(global_variables.chunk_data.tx_type.get_bits_be());
+        serialized_tx_bits_old.extend(lhs.account_id.get_bits_be());
+        serialized_tx_bits_old.extend(lhs.account.address.get_bits_be());
+        serialized_tx_bits_old.extend(rhs.account.address.get_bits_be());
+        serialized_tx_bits_old.extend(cur.token.get_bits_be());
+        serialized_tx_bits_old.extend(op_data.amount_packed.get_bits_be());
+        serialized_tx_bits_old.extend(op_data.fee_packed.get_bits_be());
+        serialized_tx_bits_old.extend(cur.account.nonce.get_bits_be());
+        assert_eq!(serialized_tx_bits_old.len(), OLD_SIGNED_TRANSFER_BIT_WIDTH);
+
         let pubdata_chunk = select_pubdata_chunk(
             cs.namespace(|| "select_pubdata_chunk"),
             &pubdata_bits,
@@ -2152,10 +2238,20 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
             &cur.account.nonce.get_number(),
         )?);
 
-        let is_serialized_tx_correct = verify_signature_message_construction(
-            cs.namespace(|| "is_serialized_tx_correct"),
+        let is_new_serialized_tx_correct = verify_signature_message_construction(
+            cs.namespace(|| "is_new_serialized_tx_correct"),
             serialized_tx_bits,
             &op_data,
+        )?;
+        let is_old_serialized_tx_correct = verify_signature_message_construction(
+            cs.namespace(|| "is_old_serialized_tx_correct"),
+            serialized_tx_bits_old,
+            &op_data,
+        )?;
+
+        let is_serialized_tx_correct = multi_or(
+            cs.namespace(|| "is_serialized_tx_correct"),
+            &[is_new_serialized_tx_correct, is_old_serialized_tx_correct],
         )?;
         lhs_valid_flags.push(is_serialized_tx_correct);
 

@@ -13,7 +13,7 @@ use web3::{
     types::{TransactionReceipt, H256, U256},
 };
 // Workspace uses
-use zksync_config::{EthClientOptions, EthSenderOptions};
+use zksync_config::{ETHSenderConfig, ZkSyncConfig};
 use zksync_eth_client::SignedCallResult;
 use zksync_storage::ConnectionPool;
 use zksync_types::ethereum::ETHOperation;
@@ -118,11 +118,11 @@ struct ETHSender<ETH: EthereumInterface, DB: DatabaseInterface> {
     /// Utility for managing the gas price for transactions.
     gas_adjuster: GasAdjuster<ETH, DB>,
     /// Settings for the `ETHSender`.
-    options: EthSenderOptions,
+    options: ETHSenderConfig,
 }
 
 impl<ETH: EthereumInterface, DB: DatabaseInterface> ETHSender<ETH, DB> {
-    pub async fn new(options: EthSenderOptions, db: DB, ethereum: ETH) -> Self {
+    pub async fn new(options: ETHSenderConfig, db: DB, ethereum: ETH) -> Self {
         let mut connection = db
             .acquire_connection()
             .await
@@ -138,7 +138,7 @@ impl<ETH: EthereumInterface, DB: DatabaseInterface> ETHSender<ETH, DB> {
             .await
             .expect("Failed loading ETH operations stats");
 
-        let tx_queue = TxQueueBuilder::new(options.max_txs_in_flight as usize)
+        let tx_queue = TxQueueBuilder::new(options.sender.max_txs_in_flight as usize)
             .with_sent_pending_txs(ongoing_ops.len())
             .with_aggregated_ops_count(stats.commit_ops)
             .build();
@@ -173,11 +173,14 @@ impl<ETH: EthereumInterface, DB: DatabaseInterface> ETHSender<ETH, DB> {
     /// Main routine of `ETHSender`.
     pub async fn run(mut self) {
         loop {
-            time::timeout(self.options.tx_poll_period, self.load_new_operations())
-                .await
-                .unwrap_or_default();
+            time::timeout(
+                self.options.sender.tx_poll_period(),
+                self.load_new_operations(),
+            )
+            .await
+            .unwrap_or_default();
 
-            if self.options.is_enabled {
+            if self.options.sender.is_enabled {
                 // ...and proceed them.
                 self.proceed_next_operations().await;
                 // Update the gas adjuster to maintain the up-to-date max gas price limit.
@@ -229,21 +232,7 @@ impl<ETH: EthereumInterface, DB: DatabaseInterface> ETHSender<ETH, DB> {
 
         while let Some(tx) = self.tx_queue.pop_front() {
             if let Err(e) = self.initialize_operation(tx.clone()).await {
-                log::warn!(
-                    "[{}:{}:{}] Error while trying to complete uncommitted op: {}",
-                    file!(),
-                    line!(),
-                    column!(),
-                    e
-                );
-                if e.to_string().contains(RATE_LIMIT_HTTP_CODE) {
-                    log::warn!(
-                        "Received rate limit response, waiting for {}s",
-                        RATE_LIMIT_BACKOFF_PERIOD.as_secs()
-                    );
-                    time::delay_for(RATE_LIMIT_BACKOFF_PERIOD).await;
-                }
-
+                Self::process_error(e).await;
                 // Return the unperformed operation to the queue, since failing the
                 // operation initialization means that it was not stored in the database.
                 self.tx_queue.return_popped(tx);
@@ -259,14 +248,7 @@ impl<ETH: EthereumInterface, DB: DatabaseInterface> ETHSender<ETH, DB> {
             let commitment = match self.perform_commitment_step(&mut current_op).await {
                 Ok(commitment) => commitment,
                 Err(e) => {
-                    log::warn!("Error while trying to complete uncommitted op: {}", e);
-                    if e.to_string().contains(RATE_LIMIT_HTTP_CODE) {
-                        log::warn!(
-                            "Received rate limit response, waiting for {}s",
-                            RATE_LIMIT_BACKOFF_PERIOD.as_secs()
-                        );
-                        time::delay_for(RATE_LIMIT_BACKOFF_PERIOD).await;
-                    }
+                    Self::process_error(e).await;
                     OperationCommitment::Pending
                 }
             };
@@ -291,6 +273,20 @@ impl<ETH: EthereumInterface, DB: DatabaseInterface> ETHSender<ETH, DB> {
         // Store the ongoing operations for the next round.
         self.ongoing_ops = new_ongoing_ops;
         metrics::histogram!("eth_sender.proceed_next_operations", start.elapsed());
+    }
+
+    async fn process_error(err: anyhow::Error) {
+        log::warn!("Error while trying to complete uncommitted op: {}", err);
+        if err.to_string().contains(RATE_LIMIT_HTTP_CODE) {
+            log::warn!(
+                "Received rate limit response, waiting for {}s",
+                RATE_LIMIT_BACKOFF_PERIOD.as_secs()
+            );
+            // This metric is needed to track how much time is spent in backoff mode
+            // and trigger grafana alerts
+            metrics::histogram!("eth_sender.backoff_mode", RATE_LIMIT_BACKOFF_PERIOD);
+            time::delay_for(RATE_LIMIT_BACKOFF_PERIOD).await;
+        }
     }
 
     /// Stores the new operation in the database and sends the corresponding transaction.
@@ -539,7 +535,7 @@ impl<ETH: EthereumInterface, DB: DatabaseInterface> ETHSender<ETH, DB> {
 
     /// Helper method encapsulating the logic of determining the next deadline block.
     fn get_deadline_block(&self, current_block: u64) -> u64 {
-        current_block + self.options.expected_wait_time_block
+        current_block + self.options.sender.expected_wait_time_block
     }
 
     /// Looks up for a transaction state on the Ethereum chain
@@ -557,7 +553,7 @@ impl<ETH: EthereumInterface, DB: DatabaseInterface> ETHSender<ETH, DB> {
             // Successful execution.
             Some(status) if status.success => {
                 // Check if transaction has enough confirmations.
-                if status.confirmations >= self.options.wait_confirmations {
+                if status.confirmations >= self.options.sender.wait_confirmations {
                     TxCheckOutcome::Committed
                 } else {
                     TxCheckOutcome::Pending
@@ -566,7 +562,7 @@ impl<ETH: EthereumInterface, DB: DatabaseInterface> ETHSender<ETH, DB> {
             // Non-successful execution, report the failure with details.
             Some(status) => {
                 // Check if transaction has enough confirmations.
-                if status.confirmations >= self.options.wait_confirmations {
+                if status.confirmations >= self.options.sender.wait_confirmations {
                     assert!(
                         status.receipt.is_some(),
                         "Receipt should exist for a failed transaction"
@@ -735,18 +731,13 @@ impl<ETH: EthereumInterface, DB: DatabaseInterface> ETHSender<ETH, DB> {
 }
 
 #[must_use]
-pub fn run_eth_sender(
-    pool: ConnectionPool,
-    eth_client_options: EthClientOptions,
-    eth_sender_options: EthSenderOptions,
-) -> JoinHandle<()> {
-    let ethereum =
-        EthereumHttpClient::new(&eth_client_options).expect("Ethereum client creation failed");
+pub fn run_eth_sender(pool: ConnectionPool, options: ZkSyncConfig) -> JoinHandle<()> {
+    let ethereum = EthereumHttpClient::new(&options).expect("Ethereum client creation failed");
 
     let db = Database::new(pool);
 
     tokio::spawn(async move {
-        let eth_sender = ETHSender::new(eth_sender_options, db, ethereum).await;
+        let eth_sender = ETHSender::new(options.eth_sender, db, ethereum).await;
 
         eth_sender.run().await
     })

@@ -203,8 +203,7 @@ mod signatures_with_vectors {
                         transfer_tx.fee.clone(),
                         sign_data.to,
                         sign_data.nonce,
-                        0,
-                        u32::MAX,
+                        Default::default(),
                     )
                     .await
                     .expect("Transfer signing error");
@@ -258,8 +257,7 @@ mod signatures_with_vectors {
                         withdraw_tx.fee.clone(),
                         sign_data.eth_address,
                         sign_data.nonce,
-                        0,
-                        u32::MAX,
+                        Default::default(),
                     )
                     .await
                     .expect("Withdraw signing error");
@@ -313,8 +311,7 @@ mod signatures_with_vectors {
                         false,
                         token,
                         change_pubkey_tx.fee.clone(),
-                        0,
-                        u32::MAX,
+                        Default::default(),
                     )
                     .await
                     .expect("Change pub key signing error");
@@ -333,10 +330,10 @@ mod signatures_with_vectors {
 
                 if let Some(expected_eth_signature) = outputs.eth_signature {
                     let eth_signature = match &change_pub_key.eth_auth_data {
-                        ChangePubKeyEthAuthData::ECDSA(ChangePubKeyECDSAData {
+                        Some(ChangePubKeyEthAuthData::ECDSA(ChangePubKeyECDSAData {
                             eth_signature,
                             ..
-                        }) => eth_signature.serialize_packed(),
+                        })) => eth_signature.serialize_packed(),
                         _ => panic!("No ChangePubKey ethereum siganture"),
                     };
                     assert_eq!(&eth_signature[..], expected_eth_signature.as_slice());
@@ -363,14 +360,13 @@ mod signatures_with_vectors {
                     symbol: String::new(),
                     decimals: 0,
                 };
-                let forced_exit = signer
+                let (forced_exit, _) = signer
                     .sign_forced_exit(
                         forced_exit.target,
                         token,
                         forced_exit.fee.clone(),
                         forced_exit.nonce,
-                        0,
-                        u32::MAX,
+                        Default::default(),
                     )
                     .await
                     .expect("Forced exit signing error");

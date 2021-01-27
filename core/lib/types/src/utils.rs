@@ -1,10 +1,17 @@
 //! Utilities used in tx module.
 
 // External uses.
+use num::{BigUint, Zero};
 use serde::{
     de::{value::SeqAccessDeserializer, Error, SeqAccess, Visitor},
     Deserialize, Deserializer,
 };
+
+// Workspace uses.
+use zksync_utils::format_units;
+
+// Local uses.
+use crate::Address;
 
 /// Deserializes either a `String` or `Vec<u8>` into `Vec<u8>`.
 /// The reason we cannot expect just a vector is backward compatibility: messages
@@ -73,4 +80,46 @@ pub mod h256_as_vec {
 
         Ok(H256::from_slice(&val))
     }
+}
+
+/// Construct the first part of the message that should be signed by Ethereum key.
+/// The pattern is as follows:
+///
+/// [{Transfer/Withdraw} {amount} {token} to: {to_address}]
+/// [Fee: {fee} {token}]
+///
+/// Note that both lines are optional.
+pub fn ethereum_sign_message_part(
+    transaction: &str,
+    token_symbol: &str,
+    decimals: u8,
+    amount: &BigUint,
+    fee: &BigUint,
+    to: &Address,
+) -> String {
+    let mut message = if !amount.is_zero() {
+        format!(
+            "{transaction} {amount} {token} to: {to:?}",
+            transaction = transaction,
+            amount = format_units(amount, decimals),
+            token = token_symbol,
+            to = to
+        )
+    } else {
+        String::new()
+    };
+    if !fee.is_zero() {
+        if !message.is_empty() {
+            message.push('\n');
+        }
+        message.push_str(
+            format!(
+                "Fee: {fee} {token}",
+                fee = format_units(fee, decimals),
+                token = token_symbol
+            )
+            .as_str(),
+        );
+    }
+    message
 }

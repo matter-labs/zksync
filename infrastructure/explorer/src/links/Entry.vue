@@ -1,6 +1,6 @@
 <template>
     <span v-if="value">
-        <readiness-status v-if="value.status" :status="value.status" />
+        <readiness-status v-if="value.status != null" :status="value.status" />
         <layer-icon :layer="value.layer" />
 
         <span

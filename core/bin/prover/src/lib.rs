@@ -19,7 +19,7 @@ use zksync_crypto::rand::{
     thread_rng,
 };
 // Workspace deps
-use zksync_config::ProverOptions;
+use zksync_config::ProverConfig as EnvProverConfig;
 use zksync_prover_utils::api::{
     JobRequestData, JobResultData, ProverInputRequest, ProverInputRequestAuxData,
     ProverInputResponse, ProverOutputRequest,
@@ -142,14 +142,14 @@ pub async fn prover_work_cycle<PROVER, CLIENT>(
     mut prover: PROVER,
     client: CLIENT,
     shutdown: ShutdownRequest,
-    prover_options: ProverOptions,
+    prover_options: EnvProverConfig,
     prover_name: &str,
 ) where
     CLIENT: 'static + Sync + Send + ApiClient + Clone,
     PROVER: ProverImpl + Send + Sync + 'static,
 {
     log::info!("Running worker cycle");
-    let mut new_job_poll_timer = tokio::time::interval(prover_options.cycle_wait);
+    let mut new_job_poll_timer = tokio::time::interval(prover_options.prover.cycle_wait());
     loop {
         new_job_poll_timer.tick().await;
 
@@ -195,7 +195,7 @@ pub async fn prover_work_cycle<PROVER, CLIENT>(
             client.clone(),
             prover_name,
             job_id,
-            prover_options.heartbeat_interval,
+            prover_options.prover.heartbeat_interval(),
         )
         .fuse();
         let compute_proof_future = compute_proof_no_blocking(prover, job_data).fuse();
