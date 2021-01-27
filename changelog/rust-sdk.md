@@ -2,13 +2,14 @@
 
 All notable changes to `zksync_rs` will be documented in this file.
 
-## Unrealesed
+## Unreleased
 
 **Version 0.2.2** is being developed.
 
 ### Added
 
 - Additional unit tests.
+- Exporting `closest_greater_or_eq_packable_fee_amount` and `closest_greater_or_eq_packable_token_amount` functions.
 
 ### Changed
 

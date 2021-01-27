@@ -195,8 +195,7 @@ fn apply_withdraw_tx(b: &mut Bencher<'_>) {
         10u32.into(),
         1u32.into(),
         0,
-        0,
-        u32::MAX,
+        Default::default(),
         private_key,
     )
     .expect("failed to sign withdraw");
@@ -235,8 +234,7 @@ fn apply_change_pubkey_op(b: &mut Bencher<'_>) {
         0,
         Default::default(),
         nonce,
-        0,
-        u32::MAX,
+        Default::default(),
         None,
         None,
     );

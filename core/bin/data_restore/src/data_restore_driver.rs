@@ -17,8 +17,8 @@ use crate::{
     events_state::EventsState, rollup_ops::RollupOpsBlock, tree_state::TreeState,
 };
 use ethabi::Address;
-use serde::export::PhantomData;
 use std::convert::TryFrom;
+use std::marker::PhantomData;
 use web3::types::{BlockNumber, FilterBuilder, Log, U256};
 
 /// Storage state update:

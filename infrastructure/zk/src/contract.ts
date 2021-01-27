@@ -7,9 +7,9 @@ import * as db from './db/db';
 import * as run from './run/run';
 
 export function prepareVerify() {
-    const keyDir = process.env.KEY_DIR;
-    const accountTreeDepth = process.env.ACCOUNT_TREE_DEPTH;
-    const balanceTreeDepth = process.env.BALANCE_TREE_DEPTH;
+    const keyDir = process.env.CHAIN_CIRCUIT_KEY_DIR;
+    const accountTreeDepth = process.env.CHAIN_CIRCUIT_ACCOUNT_TREE_DEPTH;
+    const balanceTreeDepth = process.env.CHAIN_CIRCUIT_BALANCE_TREE_DEPTH;
     const source = `${keyDir}/account-${accountTreeDepth}_balance-${balanceTreeDepth}/KeysWithPlonkVerifier.sol`;
     const dest = 'contracts/contracts/KeysWithPlonkVerifier.sol';
     try {
@@ -36,23 +36,32 @@ export async function deploy() {
     await utils.spawn('yarn contracts deploy-no-build | tee deploy.log');
     const deployLog = fs.readFileSync('deploy.log').toString();
     const envVars = [
-        'GOVERNANCE_TARGET_ADDR',
-        'VERIFIER_TARGET_ADDR',
-        'CONTRACT_TARGET_ADDR',
-        'GOVERNANCE_ADDR',
-        'CONTRACT_ADDR',
-        'VERIFIER_ADDR',
-        'GATEKEEPER_ADDR',
-        'DEPLOY_FACTORY_ADDR',
-        'GENESIS_TX_HASH'
+        'CONTRACTS_GOVERNANCE_TARGET_ADDR',
+        'CONTRACTS_VERIFIER_TARGET_ADDR',
+        'CONTRACTS_CONTRACT_TARGET_ADDR',
+        'CONTRACTS_GOVERNANCE_ADDR',
+        'CONTRACTS_CONTRACT_ADDR',
+        'CONTRACTS_VERIFIER_ADDR',
+        'CONTRACTS_UPGRADE_GATEKEEPER_ADDR',
+        'CONTRACTS_DEPLOY_FACTORY_ADDR',
+        'CONTRACTS_GENESIS_TX_HASH'
     ];
+    let updatedContracts = '';
     for (const envVar of envVars) {
         const pattern = new RegExp(`${envVar}=.*`, 'g');
         const matches = deployLog.match(pattern);
         if (matches !== null) {
-            env.modify(envVar, matches[0]);
+            const varContents = matches[0];
+            env.modify(envVar, varContents);
+            env.modify_contracts_toml(envVar, varContents);
+
+            updatedContracts += `${varContents}\n`;
         }
     }
+
+    // Write updated contract addresses and tx hashes to the separate file
+    // Currently it's used by loadtest github action to update deployment configmap.
+    fs.writeFileSync('deployed_contracts.log', updatedContracts);
 }
 
 export async function redeploy() {

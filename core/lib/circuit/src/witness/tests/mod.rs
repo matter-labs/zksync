@@ -136,8 +136,7 @@ fn apply_many_ops() -> ZkSyncCircuit<'static, Bn256> {
                 &Address::zero(),
                 None,
                 true,
-                0,
-                u32::MAX,
+                Default::default(),
             )
             .0,
         account_id: account.id,

@@ -16,7 +16,7 @@ use jsonwebtoken::{decode, DecodingKey, Validation};
 use serde::{Deserialize, Serialize};
 use tokio::sync::RwLock;
 // Workspace deps
-use zksync_config::ProverOptions;
+use zksync_config::ZkSyncConfig;
 // Local deps
 use self::database_interface::DatabaseInterface;
 use self::scaler::ScalerOracle;
@@ -120,7 +120,7 @@ async fn get_job<DB: DatabaseInterface>(
     r: web::Json<ProverInputRequest>,
 ) -> actix_web::Result<HttpResponse> {
     log::trace!("request block to prove from worker: {}", r.prover_name);
-    if r.prover_name == "" {
+    if r.prover_name.is_empty() {
         return Err(actix_web::error::ErrorBadRequest("empty name"));
     }
     let mut storage = data.access_storage().await?;
@@ -380,8 +380,12 @@ async fn update_prover_job_queue<DB: DatabaseInterface>(database: DB) -> anyhow:
 pub fn run_prover_server<DB: DatabaseInterface>(
     database: DB,
     panic_notify: mpsc::Sender<bool>,
-    prover_options: ProverOptions,
+    config: ZkSyncConfig,
 ) {
+    let witness_generator_opts = config.prover.witness_generator;
+    let core_opts = config.prover.core;
+    let prover_api_opts = config.api.prover;
+
     thread::Builder::new()
         .name("prover_server".to_string())
         .spawn(move || {
@@ -405,9 +409,9 @@ pub fn run_prover_server<DB: DatabaseInterface>(
                 };
 
                 // Start pool maintainer threads.
-                for offset in 0..prover_options.witness_generators {
+                for offset in 0..witness_generator_opts.witness_generators {
                     let start_block = (last_verified_block + offset + 1) as u32;
-                    let block_step = prover_options.witness_generators as u32;
+                    let block_step = witness_generator_opts.witness_generators as u32;
                     log::info!(
                         "Starting witness generator ({},{})",
                         start_block,
@@ -415,15 +419,15 @@ pub fn run_prover_server<DB: DatabaseInterface>(
                     );
                     let pool_maintainer = witness_generator::WitnessGenerator::new(
                         database.clone(),
-                        prover_options.prepare_data_interval,
+                        witness_generator_opts.prepare_data_interval(),
                         start_block,
                         block_step,
                     );
                     pool_maintainer.start(panic_notify.clone());
                 }
                 // Start HTTP server.
-                let secret_auth = prover_options.secret_auth.clone();
-                let idle_provers = prover_options.idle_provers;
+                let secret_auth = prover_api_opts.secret_auth.clone();
+                let idle_provers = core_opts.idle_provers;
                 HttpServer::new(move || {
                     let app_state =
                         AppState::new(secret_auth.clone(), database.clone(), idle_provers);
@@ -454,7 +458,7 @@ pub fn run_prover_server<DB: DatabaseInterface>(
                             web::post().to(required_replicas::<DB>),
                         )
                 })
-                .bind(&prover_options.prover_server_address)
+                .bind(&prover_api_opts.bind_addr())
                 .expect("failed to bind")
                 .run()
                 .await

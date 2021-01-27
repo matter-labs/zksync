@@ -5,6 +5,7 @@ import { BigNumber, ethers, Signer } from 'ethers';
 import { SignedTransaction, TxEthSignature, Address } from 'zksync/build/types';
 import { serializeTx, sleep } from 'zksync/build/utils';
 import { submitSignedTransactionsBatch } from 'zksync/build/wallet';
+import { MAX_TIMESTAMP } from 'zksync/build/utils';
 
 import { RevertReceiveAccountFactory } from '../../../../contracts/typechain';
 import { waitForOnchainWithdrawal }  from './helpers';
@@ -71,6 +72,7 @@ Tester.prototype.testWrongSignature = async function (from: Wallet, to: Wallet, 
 Tester.prototype.testMultipleBatchSigners = async function (wallets: Wallet[], token: TokenLike, amount: BigNumber) {
     expect(wallets.length >= 2, 'At least 2 wallets are expected').to.be.true;
     const batch: SignedTransaction[] = [];
+    const messages: string[] = [];
     // The first account will send the batch and pay all the fees.
     const batchSender = wallets[0];
     const types = Array(wallets.length).fill('Transfer');
@@ -84,23 +86,23 @@ Tester.prototype.testMultipleBatchSigners = async function (wallets: Wallet[], t
         // Fee is zero for all wallets except the one sending this batch.
         const fee = BigNumber.from(i == 0 ? totalFee : 0);
         const nonce = await sender.getNonce();
-        const transfer = await sender.getTransfer({
+        const transferArgs = {
             to: receiver.address(),
             token,
             amount,
             fee,
             nonce,
             validFrom: 0,
-            validUntil: Number.MAX_SAFE_INTEGER
-        });
+            validUntil: MAX_TIMESTAMP
+        };
+        const transfer = await sender.getTransfer(transferArgs);
         batch.push({ tx: transfer });
+
+        const messagePart = sender.getTransferEthMessagePart(transferArgs);
+        messages.push(`From: ${sender.address().toLowerCase()}\n${messagePart}\nNonce: ${nonce}`);
     }
-    // The message is keccak256(batchBytes)
-    const batchBytes = ethers.utils.concat(
-        batch.map((signedTx) => serializeTx(signedTx.tx, batchSender.provider.zkSyncVersion))
-    );
-    const batchHash = ethers.utils.keccak256(batchBytes).slice(2);
-    const message = Uint8Array.from(Buffer.from(batchHash, 'hex'));
+
+    const message = messages.join('\n\n');
     // For every sender there's corresponding signature, otherwise, batch verification would fail.
     const ethSignatures: TxEthSignature[] = [];
     for (let i = 0; i < wallets.length - 1; ++i) {
@@ -128,32 +130,32 @@ Tester.prototype.testMultipleWalletsWrongSignature = async function (
         [from.address(), to.address()],
         token
     );
-    const transfer1 = await from.getTransfer({
+    const _transfer1 = {
         to: to.address(),
         token,
         amount,
         fee: 0,
         nonce: await from.getNonce(),
         validFrom: 0,
-        validUntil: Number.MAX_SAFE_INTEGER
-    });
-    const transfer2 = await to.getTransfer({
+        validUntil: MAX_TIMESTAMP
+    };
+    const _transfer2 = {
         to: from.address(),
         token,
         amount,
         fee,
         nonce: await to.getNonce(),
         validFrom: 0,
-        validUntil: Number.MAX_SAFE_INTEGER
-    });
+        validUntil: MAX_TIMESTAMP
+    };
+    const transfer1 = await from.getTransfer(_transfer1);
+    const transfer2 = await to.getTransfer(_transfer2);
     // transfer1 and transfer2 are from different wallets.
     const batch: SignedTransaction[] = [{ tx: transfer1 }, { tx: transfer2 }];
 
-    const batchBytes = ethers.utils.concat(
-        batch.map((signedTx) => serializeTx(signedTx.tx, from.provider.zkSyncVersion))
-    );
-    const batchHash = ethers.utils.keccak256(batchBytes).slice(2);
-    const message = Uint8Array.from(Buffer.from(batchHash, 'hex'));
+    const message = `From: ${from.address().toLowerCase()}\n${from.getTransferEthMessagePart(_transfer1)}\nNonce: ${
+        _transfer1.nonce
+    }\n\nFrom: ${to.address().toLowerCase()}\n${to.getTransferEthMessagePart(_transfer2)}\nNonce: ${_transfer1.nonce}`;
     const ethSignature = await from.getEthMessageSignature(message);
 
     let thrown = true;

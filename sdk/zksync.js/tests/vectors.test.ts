@@ -190,10 +190,10 @@ describe(txVectors['description'], function () {
 
     it('ForcedExit signature', async function () {
         for (const item of txVectors.items) {
-            const { type: txType, ethPrivateKey, data: forcedExit, ethSignData } = item.inputs;
+            const { type: txType, ethPrivateKey, data: forcedExit } = item.inputs;
             const expected = item.outputs;
             const privateKey = parseHexWithPrefix(ethPrivateKey);
-            const { signer, ethMessageSigner } = await getSigner(privateKey);
+            const { signer } = await getSigner(privateKey);
 
             if (txType === 'ForcedExit') {
                 const signBytes = signer.forcedExitSignBytes(forcedExit);

@@ -140,8 +140,7 @@ impl<T: Transport> AccountSet<T> {
         fee: BigUint,
         nonce: Option<Nonce>,
         increment_nonce: bool,
-        valid_from: u32,
-        valid_until: u32,
+        time_range: TimeRange,
     ) -> ZkSyncTx {
         let from = &self.zksync_accounts[from.0];
         let to = &self.eth_accounts[to.0];
@@ -155,8 +154,7 @@ impl<T: Transport> AccountSet<T> {
                 &to.address,
                 nonce,
                 increment_nonce,
-                valid_from,
-                valid_until,
+                time_range,
             )
             .0,
         ))
@@ -174,8 +172,7 @@ impl<T: Transport> AccountSet<T> {
         fee: BigUint,
         nonce: Option<Nonce>,
         increment_nonce: bool,
-        valid_from: u32,
-        valid_until: u32,
+        time_range: TimeRange,
     ) -> ZkSyncTx {
         let from = &self.zksync_accounts[initiator.0];
         let target = &self.zksync_accounts[target.0];
@@ -185,8 +182,7 @@ impl<T: Transport> AccountSet<T> {
             &target.address,
             nonce,
             increment_nonce,
-            valid_from,
-            valid_until,
+            time_range,
         )))
     }
 
@@ -202,8 +198,6 @@ impl<T: Transport> AccountSet<T> {
         fee: BigUint,
         nonce: Option<Nonce>,
         increment_nonce: bool,
-        valid_from: u32,
-        valid_until: u32,
         rng: &mut impl Rng,
     ) -> ZkSyncTx {
         let from = &self.zksync_accounts[from.0];
@@ -218,8 +212,7 @@ impl<T: Transport> AccountSet<T> {
                 &to_address,
                 nonce,
                 increment_nonce,
-                valid_from,
-                valid_until,
+                Default::default(),
             )
             .0,
         ))
@@ -249,8 +242,7 @@ impl<T: Transport> AccountSet<T> {
         fee: BigUint,
         nonce: Option<Nonce>,
         increment_nonce: bool,
-        valid_from: u32,
-        valid_until: u32,
+        time_range: TimeRange,
     ) -> ZkSyncTx {
         let zksync_account = &self.zksync_accounts[zksync_signer.0];
         let auth_nonce = nonce.unwrap_or_else(|| zksync_account.nonce());
@@ -267,8 +259,7 @@ impl<T: Transport> AccountSet<T> {
             fee_token,
             fee,
             true,
-            valid_from,
-            valid_until,
+            time_range,
         )))
     }
 
@@ -279,8 +270,7 @@ impl<T: Transport> AccountSet<T> {
         fee: BigUint,
         nonce: Option<Nonce>,
         increment_nonce: bool,
-        valid_from: u32,
-        valid_until: u32,
+        time_range: TimeRange,
     ) -> ZkSyncTx {
         let zksync_account = &self.zksync_accounts[zksync_signer.0];
         ZkSyncTx::ChangePubKey(Box::new(zksync_account.sign_change_pubkey_tx(
@@ -289,8 +279,7 @@ impl<T: Transport> AccountSet<T> {
             fee_token,
             fee,
             false,
-            valid_from,
-            valid_until,
+            time_range,
         )))
     }
 }

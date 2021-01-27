@@ -31,7 +31,7 @@ where
     I::Item: Future,
 {
     let mut output = Vec::new();
-    for chunk in DynamicChunks::new(i, chunk_sizes) {
+    for chunk in DynamicChunks::with_sizes(i, chunk_sizes) {
         let values = futures::future::join_all(chunk).await;
         output.extend(values);
     }
@@ -104,7 +104,7 @@ where
 {
     let mut oks = Vec::new();
     let mut errs = Vec::new();
-    for chunk in DynamicChunks::new(i, chunk_sizes) {
+    for chunk in DynamicChunks::with_sizes(i, chunk_sizes) {
         let output = futures::future::join_all(chunk).await;
         for item in output {
             match item.into() {
@@ -133,6 +133,8 @@ where
     Ok(oks)
 }
 
+type ChunksIter = dyn Iterator<Item = usize> + Send + 'static;
+
 /// An iterator similar to `.iter().chunks(..)`, but supporting multiple
 /// different chunk sizes. Size of yielded batches is chosen one-by-one
 /// from the provided list of sizes (preserving their order).
@@ -140,30 +142,35 @@ where
 /// For example, if chunk sizes array is `[10, 20]` and the iterator is
 /// created over an array of 43 elements, sizes of batches will be 10,
 /// 20, 10 again and then 3 (remaining elements).
-#[derive(Debug)]
 pub struct DynamicChunks<T, I>
 where
     I: Iterator<Item = T>,
 {
     iterable: I,
-    chunk_sizes: Vec<usize>,
-    chunk_size_id: usize,
+    chunk_sizes: Box<ChunksIter>,
 }
 
 impl<T, I> DynamicChunks<T, I>
 where
     I: Iterator<Item = T>,
 {
-    pub fn new<J>(iterable: J, chunk_sizes: &[usize]) -> Self
+    pub fn with_sizes<J>(iterable: J, chunk_sizes: &[usize]) -> Self
     where
         J: IntoIterator<Item = T, IntoIter = I>,
     {
         assert!(!chunk_sizes.is_empty());
+        let chunk_sizes = chunk_sizes.to_vec();
+        Self::new(iterable, chunk_sizes.into_iter().cycle())
+    }
 
+    pub fn new<J, C>(iterable: J, chunk_sizes: C) -> Self
+    where
+        J: IntoIterator<Item = T, IntoIter = I>,
+        C: Iterator<Item = usize> + Send + 'static,
+    {
         Self {
             iterable: iterable.into_iter(),
-            chunk_sizes: chunk_sizes.to_vec(),
-            chunk_size_id: 0,
+            chunk_sizes: Box::new(chunk_sizes),
         }
     }
 }
@@ -175,8 +182,10 @@ where
     type Item = Vec<T>;
 
     fn next(&mut self) -> Option<Vec<T>> {
-        let chunk_size = self.chunk_sizes[self.chunk_size_id];
-        self.chunk_size_id = (self.chunk_size_id + 1) % self.chunk_sizes.len();
+        let chunk_size = self
+            .chunk_sizes
+            .next()
+            .expect("The chunk sizes iterator must be infinite");
 
         let mut items = Vec::new();
         for _ in 0..chunk_size {

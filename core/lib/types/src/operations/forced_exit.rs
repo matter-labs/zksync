@@ -91,6 +91,7 @@ impl ForcedExitOp {
         let target = Address::from_slice(&bytes[eth_address_offset..eth_address_end]);
 
         let nonce = 0; // From pubdata it is unknown
+        let time_range = Default::default();
 
         Ok(Self {
             tx: ForcedExit::new(
@@ -99,8 +100,7 @@ impl ForcedExitOp {
                 token,
                 fee,
                 nonce,
-                0,
-                u32::MAX,
+                time_range,
                 None,
             ),
             target_account_id,

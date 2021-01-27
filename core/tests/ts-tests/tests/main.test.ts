@@ -21,7 +21,9 @@ const TX_AMOUNT = utils.parseEther('10.0');
 const DEPOSIT_AMOUNT = TX_AMOUNT.mul(200);
 
 // prettier-ignore
-const TestSuite = (token: types.TokenSymbol, transport: 'HTTP' | 'WS') =>
+/// We don't want to run tests with all tokens, so we highlight basic operations such as: Deposit, Withdrawal, Forced Exit
+/// We want to check basic operations with all tokens, and other operations only if it's necessary
+const TestSuite = (token: types.TokenSymbol, transport: 'HTTP' | 'WS', onlyBasic: boolean = false) =>
 describe(`ZkSync integration tests (token: ${token}, transport: ${transport})`, () => {
     let tester: Tester;
     let alice: Wallet;
@@ -77,18 +79,30 @@ describe(`ZkSync integration tests (token: ${token}, transport: ${transport})`, 
     });
 
     step('should execute a transfer to existing account', async () => {
+        if (onlyBasic) {
+            return;
+        }
         await tester.testTransfer(alice, chuck, token, TX_AMOUNT);
     });
 
     it('should execute a transfer to self', async () => {
+        if (onlyBasic) {
+            return;
+        }
         await tester.testTransfer(alice, alice, token, TX_AMOUNT);
     });
 
     step('should change pubkey offchain', async () => {
+        if (onlyBasic) {
+            return;
+        }
         await tester.testChangePubKey(chuck, token, false);
     });
 
     step('should test multi-transfers', async () => {
+        if (onlyBasic) {
+            return;
+        }
         await tester.testBatch(alice, bob, token, TX_AMOUNT);
         await tester.testIgnoredBatch(alice, bob, token, TX_AMOUNT);
         await tester.testRejectedBatch(alice, bob, token, TX_AMOUNT);
@@ -99,6 +113,9 @@ describe(`ZkSync integration tests (token: ${token}, transport: ${transport})`, 
     });
 
     step('should execute a ForcedExit', async () => {
+        if (onlyBasic) {
+            return;
+        }
         await tester.testVerifiedForcedExit(alice, bob, token);
     });
 
@@ -133,6 +150,9 @@ describe(`ZkSync integration tests (token: ${token}, transport: ${transport})`, 
     });
 
     it('should fail trying to send tx with wrong signature', async () => {
+        if (onlyBasic) {
+            return;
+        }
         await tester.testWrongSignature(alice, bob, token, TX_AMOUNT);
     });
 
@@ -144,10 +164,16 @@ describe(`ZkSync integration tests (token: ${token}, transport: ${transport})`, 
         });
 
         step('should execute full-exit on random wallet', async () => {
+            if (onlyBasic) {
+                return;
+            }
             await tester.testFullExit(carl, token, 145);
         });
 
         step('should fail full-exit with wrong eth-signer', async () => {
+            if (onlyBasic) {
+                return;
+            }
             // make a deposit so that wallet is assigned an accountId
             await tester.testDeposit(carl, token, DEPOSIT_AMOUNT, true);
 
@@ -160,12 +186,18 @@ describe(`ZkSync integration tests (token: ${token}, transport: ${transport})`, 
         });
 
         step('should execute a normal full-exit', async () => {
+            if (onlyBasic) {
+                return;
+            }
             const [before, after] = await tester.testFullExit(carl, token);
             expect(before.eq(0), "Balance before Full Exit must be non-zero").to.be.false;
             expect(after.eq(0), "Balance after Full Exit must be zero").to.be.true;
         });
 
         step('should execute full-exit on an empty wallet', async () => {
+            if (onlyBasic) {
+                return;
+            }
             const [before, after] = await tester.testFullExit(carl, token);
             expect(before.eq(0), "Balance before Full Exit must be zero (we've already withdrawn all the funds)").to.be.true;
             expect(after.eq(0), "Balance after Full Exit must be zero").to.be.true;
@@ -191,7 +223,7 @@ if (process.env.TEST_TRANSPORT) {
     if (process.env.TEST_TOKEN) {
         // Both transport and token are set, use config from env.
         const envTransport = process.env.TEST_TRANSPORT.toUpperCase();
-        const envToken = process.env.TEST_TOKEN.toUpperCase();
+        const envToken = process.env.TEST_TOKEN;
         tokenAndTransport = [
             {
                 transport: envTransport,
@@ -209,20 +241,22 @@ if (process.env.TEST_TRANSPORT) {
         ];
     }
 } else {
-    // Default case: run HTTP&ETH / WS&wBTC.
+    // Default case: run HTTP&ETH / HTTP&wBTC.
     tokenAndTransport = [
         {
             transport: 'HTTP',
-            token: 'ETH'
+            token: 'ETH',
+            onlyBasic: true
         },
-        // {
-        //     transport: 'WS',
-        //     token: defaultERC20
-        // }
+        {
+            transport: 'HTTP',
+            token: defaultERC20,
+            onlyBasic: false
+        }
     ];
 }
 
 for (const input of tokenAndTransport) {
     // @ts-ignore
-    TestSuite(input.token, input.transport);
+    TestSuite(input.token, input.transport, input.onlyBasic);
 }

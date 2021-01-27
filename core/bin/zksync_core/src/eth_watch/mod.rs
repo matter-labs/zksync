@@ -21,7 +21,6 @@ use tokio::{task::JoinHandle, time};
 use web3::types::{Address, BlockNumber};
 
 // Workspace deps
-use zksync_config::ConfigurationOptions;
 use zksync_crypto::params::PRIORITY_EXPIRATION;
 use zksync_storage::ConnectionPool;
 use zksync_types::{Nonce, PriorityOp, PubKeyHash, ZkSyncPriorityOp};
@@ -36,6 +35,7 @@ use self::{
 
 pub use client::EthHttpClient;
 pub use storage::DBStorage;
+use zksync_config::ZkSyncConfig;
 
 mod client;
 mod eth_state;
@@ -290,6 +290,9 @@ impl<W: EthClient, S: Storage> EthWatch<W, S> {
     fn enter_backoff_mode(&mut self) {
         let backoff_until = Instant::now() + RATE_LIMIT_DELAY;
         self.mode = WatcherMode::Backoff(backoff_until);
+        // This is needed to track how much time is spent in backoff mode
+        // and trigger grafana alerts
+        metrics::histogram!("eth_watcher.enter_backoff_mode", RATE_LIMIT_DELAY);
     }
 
     fn polling_allowed(&mut self) -> bool {
@@ -402,27 +405,28 @@ impl<W: EthClient, S: Storage> EthWatch<W, S> {
 
 #[must_use]
 pub fn start_eth_watch(
-    config_options: ConfigurationOptions,
+    config_options: &ZkSyncConfig,
     eth_req_sender: mpsc::Sender<EthWatchRequest>,
     eth_req_receiver: mpsc::Receiver<EthWatchRequest>,
     db_pool: ConnectionPool,
 ) -> JoinHandle<()> {
-    let transport = web3::transports::Http::new(&config_options.web3_url).unwrap();
+    let transport = web3::transports::Http::new(&config_options.eth_client.web3_url).unwrap();
     let web3 = web3::Web3::new(transport);
-    let eth_client = EthHttpClient::new(web3, config_options.contract_eth_addr);
+    let eth_client = EthHttpClient::new(web3, config_options.contracts.contract_addr);
 
     let storage = DBStorage::new(db_pool);
 
     let eth_watch = EthWatch::new(
         eth_client,
         storage,
-        config_options.confirmations_for_eth_event,
+        config_options.eth_watch.confirmations_for_eth_event,
     );
 
     tokio::spawn(eth_watch.run(eth_req_receiver));
 
+    let poll_interval = config_options.eth_watch.poll_interval();
     tokio::spawn(async move {
-        let mut timer = time::interval(config_options.eth_watch_poll_interval);
+        let mut timer = time::interval(poll_interval);
 
         loop {
             timer.tick().await;

@@ -1,12 +1,22 @@
 import store from './store';
 import { Readiness } from './Readiness';
 
-export const sleep = async ms => await new Promise(resolve => setTimeout(resolve, ms));
+export const sleep = async (ms) => await new Promise((resolve) => setTimeout(resolve, ms));
 
 const readablyPrintableTokens = ['ETH', 'FAU'];
 
 export function isReadablyPrintable(tokenName) {
     return readablyPrintableTokens.includes(tokenName);
+}
+
+export function removeTxHashPrefix(txHash) {
+    let nonPrefixHash = txHash;
+    for (const prefix of ['0x', 'sync-tx:', 'sync-bl:', 'sync:']) {
+        if (nonPrefixHash.startsWith(prefix)) {
+            nonPrefixHash = nonPrefixHash.slice(prefix.length);
+        }
+    }
+    return nonPrefixHash;
 }
 
 export function shortenHash(str, fallback) {
@@ -22,15 +32,7 @@ export function formatDate(timeStr) {
         return '';
     }
 
-    return (
-        timeStr.toString().split('T')[0] +
-        ' ' +
-        timeStr
-            .toString()
-            .split('T')[1]
-            .slice(0, 8) +
-        ' UTC'
-    );
+    return timeStr.toString().split('T')[0] + ' ' + timeStr.toString().split('T')[1].slice(0, 8) + ' UTC';
 }
 
 export function formatToken(amount, token) {
@@ -97,9 +99,23 @@ export function readyStateFromString(s) {
         Initiated: Readiness.Initiated,
         Pending: Readiness.Committed,
         Complete: Readiness.Verified,
+        Scheduled: Readiness.Scheduled,
         // 'Verified' is a block version of the word 'Complete'
         Verified: Readiness.Verified
     }[s];
+}
+
+export function accountStateToBalances(account) {
+    let balances = Object.entries(account.committed.balances).map(([tokenSymbol, balance]) => {
+        return {
+            tokenSymbol,
+            balance: formatToken(balance, tokenSymbol)
+        };
+    });
+
+    balances.sort((a, b) => a.tokenSymbol.localeCompare(b.tokenSymbol));
+
+    return balances;
 }
 
 // Note that this class follows Builder pattern
@@ -184,7 +200,7 @@ class Entry {
     // Can be used to set readiness status of a transaction or block
     status(status) {
         const isValidStatus = Object.values(Readiness).includes(status);
-        if(!isValidStatus) {
+        if (!isValidStatus) {
             throw new Error('Invalid status');
         }
 
