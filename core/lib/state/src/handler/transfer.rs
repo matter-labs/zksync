@@ -217,10 +217,15 @@ impl ZkSyncState {
             "TransferToNew to account id is bigger than max supported"
         );
 
-        assert!(
-            self.get_account(op.to).is_none(),
-            "Transfer to new account exists"
-        );
+        if let Some(account) = self.get_account(op.to) {
+            vlog::error!(
+                "Attempt to execute transfer to new account for an existing account. Account: {:#?}; Transfer: {:#?}",
+                account,
+                op
+            );
+            panic!("Transfer to new account exists");
+        }
+
         let mut to_account = {
             let (acc, upd) = Account::create_account(op.to, op.tx.to);
             updates.extend(upd.into_iter());
