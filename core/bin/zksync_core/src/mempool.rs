@@ -270,8 +270,12 @@ impl MempoolBlocksHandler {
             .await;
         let (_chunks_left, txs) = self.prepare_tx_for_block(chunks_left).await;
 
-        vlog::debug!("Proposed priority ops for block: {:#?}", priority_ops);
-        vlog::debug!("Proposed txs for block: {:#?}", txs);
+        if !priority_ops.is_empty() {
+            vlog::debug!("Proposed priority ops for block: {:?}", priority_ops);
+        }
+        if !txs.is_empty() {
+            vlog::debug!("Proposed txs for block: {:?}", txs);
+        }
         metrics::histogram!("mempool.propose_new_block", start.elapsed());
         ProposedBlock { priority_ops, txs }
     }

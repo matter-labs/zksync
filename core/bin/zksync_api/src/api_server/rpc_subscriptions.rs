@@ -220,7 +220,6 @@ pub fn start_ws_server(
             io,
             |context: &RequestContext| Arc::new(Session::new(context.sender())),
         )
-        .request_middleware(super::loggers::ws_rpc::request_middleware)
         .max_connections(1000)
         .event_loop_executor(task_executor.executor())
         .start(&addr)
