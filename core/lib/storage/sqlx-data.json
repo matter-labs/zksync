@@ -19,51 +19,6 @@
       "nullable": []
     }
   },
-  "03d9e5cb04328e5a5e238727311406d19ffb924f06f34c04f67fbd9354442996": {
-    "query": "SELECT * FROM operations WHERE block_number = $1 AND action_type = $2",
-    "describe": {
-      "columns": [
-        {
-          "ordinal": 0,
-          "name": "id",
-          "type_info": "Int8"
-        },
-        {
-          "ordinal": 1,
-          "name": "block_number",
-          "type_info": "Int8"
-        },
-        {
-          "ordinal": 2,
-          "name": "action_type",
-          "type_info": "Text"
-        },
-        {
-          "ordinal": 3,
-          "name": "created_at",
-          "type_info": "Timestamptz"
-        },
-        {
-          "ordinal": 4,
-          "name": "confirmed",
-          "type_info": "Bool"
-        }
-      ],
-      "parameters": {
-        "Left": [
-          "Int8",
-          "Text"
-        ]
-      },
-      "nullable": [
-        false,
-        false,
-        false,
-        false,
-        false
-      ]
-    }
-  },
   "04069d09246f16a6d03be04decaa05456556dc05b964adea34742af0eaef91aa": {
     "query": "\n                    SELECT * FROM tokens\n                    WHERE symbol = $1\n                    LIMIT 1\n                    ",
     "describe": {
@@ -95,51 +50,6 @@
         ]
       },
       "nullable": [
-        false,
-        false,
-        false,
-        false
-      ]
-    }
-  },
-  "05a15d67581b3f06b8e3994526d5e4394e82fe5bd6550a80bc54038637c31eac": {
-    "query": "INSERT INTO operations (block_number, action_type) VALUES ($1, $2)\n            RETURNING *",
-    "describe": {
-      "columns": [
-        {
-          "ordinal": 0,
-          "name": "id",
-          "type_info": "Int8"
-        },
-        {
-          "ordinal": 1,
-          "name": "block_number",
-          "type_info": "Int8"
-        },
-        {
-          "ordinal": 2,
-          "name": "action_type",
-          "type_info": "Text"
-        },
-        {
-          "ordinal": 3,
-          "name": "created_at",
-          "type_info": "Timestamptz"
-        },
-        {
-          "ordinal": 4,
-          "name": "confirmed",
-          "type_info": "Bool"
-        }
-      ],
-      "parameters": {
-        "Left": [
-          "Int8",
-          "Text"
-        ]
-      },
-      "nullable": [
-        false,
         false,
         false,
         false,
@@ -350,6 +260,60 @@
         "Left": []
       },
       "nullable": [
+        false,
+        false,
+        false,
+        false
+      ]
+    }
+  },
+  "143213e36d47ecd3b49c053cff2725680e2962b5be47e86c38b57918c1124306": {
+    "query": "\n                SELECT operations.id, operations.block_number,\n                    operations.action_type as \"action_type!: StorageActionType\",\n                    operations.created_at, operations.confirmed\n                FROM eth_ops_binding\n                LEFT JOIN operations ON operations.id = op_id\n                WHERE eth_op_id = $1\n                ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "id",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 1,
+          "name": "block_number",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 2,
+          "name": "action_type!: StorageActionType",
+          "type_info": {
+            "Custom": {
+              "name": "action_type",
+              "kind": {
+                "Enum": [
+                  "COMMIT",
+                  "VERIFY"
+                ]
+              }
+            }
+          }
+        },
+        {
+          "ordinal": 3,
+          "name": "created_at",
+          "type_info": "Timestamptz"
+        },
+        {
+          "ordinal": 4,
+          "name": "confirmed",
+          "type_info": "Bool"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Int8"
+        ]
+      },
+      "nullable": [
+        false,
         false,
         false,
         false,
@@ -700,50 +664,6 @@
       "nullable": []
     }
   },
-  "2a64cf1b6a9b36c4dcb9ef0510c69792a0f3e67ce5f09d30497315368268afb8": {
-    "query": "SELECT operations.* FROM eth_ops_binding\n                LEFT JOIN operations ON operations.id = op_id\n                WHERE eth_op_id = $1",
-    "describe": {
-      "columns": [
-        {
-          "ordinal": 0,
-          "name": "id",
-          "type_info": "Int8"
-        },
-        {
-          "ordinal": 1,
-          "name": "block_number",
-          "type_info": "Int8"
-        },
-        {
-          "ordinal": 2,
-          "name": "action_type",
-          "type_info": "Text"
-        },
-        {
-          "ordinal": 3,
-          "name": "created_at",
-          "type_info": "Timestamptz"
-        },
-        {
-          "ordinal": 4,
-          "name": "confirmed",
-          "type_info": "Bool"
-        }
-      ],
-      "parameters": {
-        "Left": [
-          "Int8"
-        ]
-      },
-      "nullable": [
-        false,
-        false,
-        false,
-        false,
-        false
-      ]
-    }
-  },
   "2d70c5906b5c17523afd243c8be132f5b1724482e2f9d2795085455cafa0d6ce": {
     "query": "\n            SELECT id, address, symbol, decimals\n            FROM tokens\n            INNER JOIN ticker_market_volume\n            ON tokens.id = ticker_market_volume.token_id\n            WHERE ticker_market_volume.market_volume >= $1\n            ORDER BY id ASC\n            ",
     "describe": {
@@ -895,7 +815,17 @@
       ],
       "parameters": {
         "Left": [
-          "Text",
+          {
+            "Custom": {
+              "name": "action_type",
+              "kind": {
+                "Enum": [
+                  "COMMIT",
+                  "VERIFY"
+                ]
+              }
+            }
+          },
           "Bool"
         ]
       },
@@ -1081,6 +1011,71 @@
         ]
       },
       "nullable": []
+    }
+  },
+  "43842b8f3011a41c4af07dc5903e71b1caa9ad204b384a06810d993666151cf0": {
+    "query": "\n            INSERT INTO operations (block_number, action_type) VALUES ($1, $2)\n            RETURNING id, block_number,\n            action_type as \"action_type!: StorageActionType\",\n            created_at, confirmed\n            ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "id",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 1,
+          "name": "block_number",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 2,
+          "name": "action_type!: StorageActionType",
+          "type_info": {
+            "Custom": {
+              "name": "action_type",
+              "kind": {
+                "Enum": [
+                  "COMMIT",
+                  "VERIFY"
+                ]
+              }
+            }
+          }
+        },
+        {
+          "ordinal": 3,
+          "name": "created_at",
+          "type_info": "Timestamptz"
+        },
+        {
+          "ordinal": 4,
+          "name": "confirmed",
+          "type_info": "Bool"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Int8",
+          {
+            "Custom": {
+              "name": "action_type",
+              "kind": {
+                "Enum": [
+                  "COMMIT",
+                  "VERIFY"
+                ]
+              }
+            }
+          }
+        ]
+      },
+      "nullable": [
+        false,
+        false,
+        false,
+        false,
+        false
+      ]
     }
   },
   "439f184911734c059ed99d61eb344af056e7b4df75182fee3adeb625856bd68a": {
@@ -2288,7 +2283,17 @@
       ],
       "parameters": {
         "Left": [
-          "Text",
+          {
+            "Custom": {
+              "name": "action_type",
+              "kind": {
+                "Enum": [
+                  "COMMIT",
+                  "VERIFY"
+                ]
+              }
+            }
+          },
           "Bool"
         ]
       },
@@ -2752,7 +2757,17 @@
         "Left": [
           "Bool",
           "Int8",
-          "Text"
+          {
+            "Custom": {
+              "name": "action_type",
+              "kind": {
+                "Enum": [
+                  "COMMIT",
+                  "VERIFY"
+                ]
+              }
+            }
+          }
         ]
       },
       "nullable": []
@@ -3034,6 +3049,58 @@
         "Left": []
       },
       "nullable": [
+        false,
+        false
+      ]
+    }
+  },
+  "bdb559901eb5a6c1d638621e024dbc7eef563b3295cb78df73211213f766e372": {
+    "query": "\n            SELECT id, block_number,\n                action_type as \"action_type!: StorageActionType\",\n                created_at, confirmed\n            FROM operations\n            WHERE confirmed = false AND NOT EXISTS (SELECT * FROM eth_ops_binding WHERE op_id = operations.id)\n            ORDER BY id ASC\n            ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "id",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 1,
+          "name": "block_number",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 2,
+          "name": "action_type!: StorageActionType",
+          "type_info": {
+            "Custom": {
+              "name": "action_type",
+              "kind": {
+                "Enum": [
+                  "COMMIT",
+                  "VERIFY"
+                ]
+              }
+            }
+          }
+        },
+        {
+          "ordinal": 3,
+          "name": "created_at",
+          "type_info": "Timestamptz"
+        },
+        {
+          "ordinal": 4,
+          "name": "confirmed",
+          "type_info": "Bool"
+        }
+      ],
+      "parameters": {
+        "Left": []
+      },
+      "nullable": [
+        false,
+        false,
+        false,
         false,
         false
       ]
@@ -3388,6 +3455,71 @@
         ]
       },
       "nullable": [
+        false,
+        false
+      ]
+    }
+  },
+  "cb8d9222642f2eb96ddfb3cf78e9b46e22331a52f345f57af2a1079d90da8a4c": {
+    "query": "\n            SELECT id, block_number,\n                action_type as \"action_type!: StorageActionType\",\n                created_at, confirmed\n            FROM operations WHERE block_number = $1 AND action_type = $2\n            ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "id",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 1,
+          "name": "block_number",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 2,
+          "name": "action_type!: StorageActionType",
+          "type_info": {
+            "Custom": {
+              "name": "action_type",
+              "kind": {
+                "Enum": [
+                  "COMMIT",
+                  "VERIFY"
+                ]
+              }
+            }
+          }
+        },
+        {
+          "ordinal": 3,
+          "name": "created_at",
+          "type_info": "Timestamptz"
+        },
+        {
+          "ordinal": 4,
+          "name": "confirmed",
+          "type_info": "Bool"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Int8",
+          {
+            "Custom": {
+              "name": "action_type",
+              "kind": {
+                "Enum": [
+                  "COMMIT",
+                  "VERIFY"
+                ]
+              }
+            }
+          }
+        ]
+      },
+      "nullable": [
+        false,
+        false,
+        false,
         false,
         false
       ]
@@ -3929,48 +4061,6 @@
       },
       "nullable": [
         false,
-        false,
-        false,
-        false,
-        false,
-        false
-      ]
-    }
-  },
-  "f5be7cf851842a40bdb41b2ef914dd9120f868be7cdf995953eb5c365d2fea7f": {
-    "query": "SELECT * FROM operations\n            WHERE confirmed = false AND NOT EXISTS (SELECT * FROM eth_ops_binding WHERE op_id = operations.id)\n            ORDER BY id ASC",
-    "describe": {
-      "columns": [
-        {
-          "ordinal": 0,
-          "name": "id",
-          "type_info": "Int8"
-        },
-        {
-          "ordinal": 1,
-          "name": "block_number",
-          "type_info": "Int8"
-        },
-        {
-          "ordinal": 2,
-          "name": "action_type",
-          "type_info": "Text"
-        },
-        {
-          "ordinal": 3,
-          "name": "created_at",
-          "type_info": "Timestamptz"
-        },
-        {
-          "ordinal": 4,
-          "name": "confirmed",
-          "type_info": "Bool"
-        }
-      ],
-      "parameters": {
-        "Left": []
-      },
-      "nullable": [
         false,
         false,
         false,
