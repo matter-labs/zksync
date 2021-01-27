@@ -19,15 +19,6 @@ fn generate_transactions(number: usize) -> IncomingTxBatchForFee {
     }
 }
 
-fn get_old_txs_batch_fee(client: Client, url: String, transaction: IncomingTxBatchForFee) {
-    let res = client
-        .post(format!("{}/api/v1/transactions/old_get_txs_batch_fee_in_wei", url).as_str())
-        .json(&transaction)
-        .send()
-        .unwrap();
-    assert_eq!(res.status(), StatusCode::OK)
-}
-
 fn get_txs_batch_fee(client: Client, url: String, transaction: IncomingTxBatchForFee) {
     let res = client
         .post(format!("{}/api/v1/transactions/batch_fee", url).as_str())
@@ -58,9 +49,6 @@ fn bench_fee(c: &mut Criterion) {
     let transaction = generate_transactions(100);
     c.bench_function("get_txs_batch_fee_new_version", |b| {
         b.iter(|| get_txs_batch_fee(client.clone(), url.clone(), transaction.clone()))
-    });
-    c.bench_function("get_txs_batch_fee_old_version", |b| {
-        b.iter(|| get_old_txs_batch_fee(client.clone(), url.clone(), transaction.clone()))
     });
     c.bench_function("get_txs_fee", |b| {
         b.iter(|| get_txs_fee(client.clone(), url.clone()))
