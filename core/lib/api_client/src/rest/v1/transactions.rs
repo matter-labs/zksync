@@ -50,6 +50,14 @@ pub struct IncomingTx {
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
+pub struct IncomingTxForFee {
+    pub tx_type: TxFeeTypes,
+    pub address: Address,
+    pub token_like: TokenLike,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
 pub struct IncomingTxBatchForFee {
     pub tx_types: Vec<TxFeeTypes>,
     pub addresses: Vec<Address>,

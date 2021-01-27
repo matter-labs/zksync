@@ -368,15 +368,21 @@ impl TxSender {
         Ok(tx_hashes)
     }
 
+    pub async fn get_txs_fee_in_wei(
+        &self,
+        tx_type: TxFeeTypes,
+        address: Address,
+        token: TokenLike,
+    ) -> Result<Fee, SubmitError> {
+        Self::ticker_request(self.ticker_requests.clone(), tx_type, address, token).await
+    }
+
     pub async fn get_txs_batch_fee_in_wei(
         &self,
         transactions: Vec<(TxFeeTypes, Address)>,
         token: TokenLike,
     ) -> Result<BigUint, SubmitError> {
-        Ok(
-            Self::ticker_batch_fee_request(self.ticker_requests.clone(), transactions, token)
-                .await?,
-        )
+        Self::ticker_batch_fee_request(self.ticker_requests.clone(), transactions, token).await
     }
 
     /// For forced exits, we must check that target account exists for more

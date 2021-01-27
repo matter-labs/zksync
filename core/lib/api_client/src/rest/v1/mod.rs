@@ -16,7 +16,8 @@ pub use self::{
     search::BlockSearchQuery,
     tokens::{TokenPriceKind, TokenPriceQuery},
     transactions::{
-        FastProcessingQuery, IncomingTx, IncomingTxBatch, IncomingTxBatchForFee, Receipt, TxData,
+        FastProcessingQuery, IncomingTx, IncomingTxBatch, IncomingTxBatchForFee, IncomingTxForFee,
+        Receipt, TxData,
     },
 };
 

@@ -7,6 +7,7 @@ use actix_web::{
     web::{self, Json},
     Scope,
 };
+use num::BigUint;
 
 // Workspace uses
 pub use zksync_api_client::rest::v1::{
@@ -18,10 +19,12 @@ use zksync_storage::{
 use zksync_types::{tx::TxHash, BlockNumber, SignedZkSyncTx};
 
 use crate::api_server::tx_sender::{SubmitError, TxSender};
-use crate::fee_ticker::BatchFee;
+use crate::fee_ticker::{BatchFee, Fee};
 
 // Local uses
 use super::{ApiError, JsonResult, Pagination, PaginationQuery};
+use zksync_api_client::rest::v1::IncomingTxForFee;
+use zksync_types::helpers::closest_packable_fee_amount;
 
 #[derive(Debug, Clone, Copy)]
 pub enum SumbitErrorCode {
@@ -264,6 +267,34 @@ async fn submit_tx_batch(
     Ok(Json(tx_hashes))
 }
 
+async fn old_get_txs_batch_fee_in_wei(
+    data: web::Data<ApiTransactionsData>,
+    Json(body): Json<IncomingTxBatchForFee>,
+) -> JsonResult<BatchFee> {
+    let mut total_fee = BigUint::from(0u32);
+    for (i, tx_type) in body.tx_types.into_iter().enumerate() {
+        let fee = data
+            .tx_sender
+            .get_txs_fee_in_wei(tx_type, body.addresses[i], body.token_like.clone())
+            .await?;
+        total_fee += fee.total_fee;
+    }
+    // Sum of transactions can be unpackable
+    total_fee = closest_packable_fee_amount(&total_fee);
+    Ok(Json(BatchFee { total_fee }))
+}
+
+async fn get_txs_fee_in_wei(
+    data: web::Data<ApiTransactionsData>,
+    Json(body): Json<IncomingTxForFee>,
+) -> JsonResult<Fee> {
+    let fee = data
+        .tx_sender
+        .get_txs_fee_in_wei(body.tx_type, body.address, body.token_like)
+        .await?;
+    Ok(Json(fee))
+}
+
 async fn get_txs_batch_fee_in_wei(
     data: web::Data<ApiTransactionsData>,
     Json(body): Json<IncomingTxBatchForFee>,
@@ -297,6 +328,11 @@ pub fn api_scope(tx_sender: TxSender) -> Scope {
         .route("submit", web::post().to(submit_tx))
         .route("submit/batch", web::post().to(submit_tx_batch))
         .route("batch_fee", web::post().to(get_txs_batch_fee_in_wei))
+        .route("fee", web::post().to(get_txs_fee_in_wei))
+        .route(
+            "old_get_txs_batch_fee_in_wei",
+            web::post().to(old_get_txs_batch_fee_in_wei),
+        )
 }
 
 #[cfg(test)]
