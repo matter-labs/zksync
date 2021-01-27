@@ -491,24 +491,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "async-jsonrpc-client"
-version = "0.1.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "236cc6ad6d29c92571b4272cbe1b9dd047261822e914eba4da430ceac5f4fa46"
-dependencies = [
- "async-trait",
- "async-tungstenite",
- "futures 0.3.6",
- "log 0.4.11",
- "parking_lot 0.11.0",
- "reqwest",
- "serde",
- "serde_json",
- "thiserror",
- "tokio 0.2.22",
-]
-
-[[package]]
 name = "async-mutex"
 version = "1.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -571,20 +553,6 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn",
-]
-
-[[package]]
-name = "async-tungstenite"
-version = "0.7.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2760f968801f873112e651c5a9c3b60c11ae6d66e7ca3f2d51aafbfcef9495fa"
-dependencies = [
- "futures-io",
- "futures-util",
- "log 0.4.11",
- "pin-project 0.4.27",
- "tokio 0.2.22",
- "tungstenite",
 ]
 
 [[package]]
@@ -2277,15 +2245,6 @@ checksum = "55e2e4c765aa53a0424761bf9f41aa7a6ac1efa87238f59560640e27fca028f2"
 dependencies = [
  "autocfg 1.0.1",
  "hashbrown",
-]
-
-[[package]]
-name = "input_buffer"
-version = "0.3.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "19a8a95243d5a0398cae618ec29477c6e3cb631152be5c19481f80bc71559754"
-dependencies = [
- "bytes 0.5.6",
 ]
 
 [[package]]
@@ -4703,7 +4662,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8efab2086f17abcddb8f756117665c958feee6b2e39974c2f1600592ab3a4195"
 dependencies = [
  "autocfg 1.0.1",
- "num_cpus",
  "pin-project-lite 0.2.4",
 ]
 
@@ -5076,25 +5034,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "59547bce71d9c38b83d9c0e92b6066c4253371f15005def0c30d9657f50c7642"
 
 [[package]]
-name = "tungstenite"
-version = "0.11.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f0308d80d86700c5878b9ef6321f020f29b1bb9d5ff3cab25e75e23f3a492a23"
-dependencies = [
- "base64 0.12.3",
- "byteorder",
- "bytes 0.5.6",
- "http 0.2.1",
- "httparse",
- "input_buffer",
- "log 0.4.11",
- "rand 0.7.3",
- "sha-1 0.9.1",
- "url 2.1.1",
- "utf-8",
-]
-
-[[package]]
 name = "typeable"
 version = "0.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5205,12 +5144,6 @@ dependencies = [
  "matches",
  "percent-encoding 2.1.0",
 ]
-
-[[package]]
-name = "utf-8"
-version = "0.7.5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "05e42f7c18b8f902290b009cde6d651262f956c98bc51bca4cd1d511c9cd85c7"
 
 [[package]]
 name = "vcpkg"
@@ -5604,7 +5537,6 @@ dependencies = [
  "actix-web",
  "actix-web-httpauth",
  "anyhow",
- "async-jsonrpc-client",
  "async-trait",
  "bigdecimal",
  "chrono",
@@ -5634,7 +5566,6 @@ dependencies = [
  "tiny-keccak 1.5.0",
  "tokio 0.1.22",
  "tokio 0.2.22",
- "tokio 1.1.0",
  "vlog",
  "web3",
  "zksync_api_client",

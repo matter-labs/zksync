@@ -26,8 +26,8 @@ use tokio::time::Instant;
 use zksync_config::{configs::ticker::TokenPriceSource, ZkSyncConfig};
 use zksync_storage::ConnectionPool;
 use zksync_types::{
-    Address, ChangePubKeyOp, Token, TokenId, TokenLike, TransferOp, TransferToNewOp, TxFeeTypes,
-    WithdrawOp,
+    Address, BatchFee, ChangePubKeyOp, Fee, OutputFeeType, Token, TokenId, TokenLike, TransferOp,
+    TransferToNewOp, TxFeeTypes, WithdrawOp,
 };
 use zksync_utils::ratio_to_big_decimal;
 
@@ -47,10 +47,7 @@ use crate::fee_ticker::{
 };
 use crate::utils::token_db_cache::TokenDBCache;
 
-pub use self::fee::*;
-
 mod constants;
-mod fee;
 mod ticker_api;
 mod ticker_info;
 pub mod validator;
@@ -173,7 +170,7 @@ pub enum TickerRequest {
     GetBatchTxFee {
         transactions: Vec<(TxFeeTypes, Address)>,
         token: TokenLike,
-        response: oneshot::Sender<Result<BigUint, anyhow::Error>>,
+        response: oneshot::Sender<Result<BatchFee, anyhow::Error>>,
     },
     GetTokenPrice {
         token: TokenLike,
@@ -407,7 +404,7 @@ impl<API: FeeTickerAPI, INFO: FeeTickerInfo, WATCHER: TokenWatcher> FeeTicker<AP
         &mut self,
         token: TokenLike,
         txs: Vec<(TxFeeTypes, Address)>,
-    ) -> anyhow::Result<BigUint> {
+    ) -> anyhow::Result<BatchFee> {
         let zkp_cost_chunk = self.config.zkp_cost_chunk_usd.clone();
         let token = self.api.get_token(token).await?;
 
@@ -431,7 +428,7 @@ impl<API: FeeTickerAPI, INFO: FeeTickerInfo, WATCHER: TokenWatcher> FeeTicker<AP
         let total_zkp_fee = (zkp_cost_chunk * total_op_chunks) * token_usd_risk.clone();
         let total_gas_fee =
             (wei_price_usd * total_gas_tx_amount * scale_gas_price) * token_usd_risk;
-        let (_, _, total_fee) = total_fee(&total_zkp_fee, &total_gas_fee);
+        let total_fee = BatchFee::new(&total_zkp_fee, &total_gas_fee);
 
         Ok(total_fee)
     }

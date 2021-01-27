@@ -3,15 +3,13 @@
 // Built-in uses
 
 // External uses
-use num::BigUint;
 use serde::{Deserialize, Serialize};
 
 // Workspace uses
 use zksync_types::{
     tx::{EthSignData, TxEthSignature, TxHash},
-    Address, BlockNumber, SignedZkSyncTx, TokenLike, TxFeeTypes, ZkSyncTx,
+    Address, BatchFee, BlockNumber, Fee, SignedZkSyncTx, TokenLike, TxFeeTypes, ZkSyncTx,
 };
-use zksync_utils::BigUintSerdeAsRadix10Str;
 
 // Local uses
 use super::{client::Client, client::ClientError, Pagination};
@@ -106,13 +104,6 @@ impl From<SignedZkSyncTx> for TxData {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
-#[serde(rename_all = "camelCase")]
-pub struct BatchFee {
-    #[serde(with = "BigUintSerdeAsRadix10Str")]
-    pub total_fee: BigUint,
-}
-
 /// Transactions API part.
 impl Client {
     /// Sends a new transaction to the memory pool.
@@ -129,7 +120,24 @@ impl Client {
             .await
     }
 
-    /// Sends a new transactions batch to the memory pool.
+    /// Get fee for single transaction.
+    pub async fn get_txs_fee(
+        &self,
+        tx_type: TxFeeTypes,
+        address: Address,
+        token_like: TokenLike,
+    ) -> Result<Fee, ClientError> {
+        self.post("transactions/fee")
+            .body(&IncomingTxForFee {
+                tx_type,
+                address,
+                token_like,
+            })
+            .send()
+            .await
+    }
+
+    /// Get txs fee for batch.
     pub async fn get_batched_txs_fee(
         &self,
         tx_types: Vec<TxFeeTypes>,

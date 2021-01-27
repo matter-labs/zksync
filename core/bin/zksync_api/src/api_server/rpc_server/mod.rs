@@ -18,11 +18,11 @@ use zksync_storage::{
     },
     ConnectionPool, StorageProcessor,
 };
-use zksync_types::{tx::TxHash, Address, TokenLike, TxFeeTypes};
+use zksync_types::{tx::TxHash, Address, BatchFee, Fee, TokenLike, TxFeeTypes};
 
 // Local uses
 use crate::{
-    fee_ticker::{Fee, TickerRequest, TokenPriceRequestType},
+    fee_ticker::{TickerRequest, TokenPriceRequestType},
     signature_checker::VerifyTxSignatureRequest,
     utils::shared_lru_cache::SharedLruCache,
 };
@@ -37,7 +37,6 @@ pub mod types;
 pub use self::rpc_trait::Rpc;
 use self::types::*;
 use super::tx_sender::TxSender;
-use num::BigUint;
 
 #[derive(Clone)]
 pub struct RpcApp {
@@ -267,7 +266,7 @@ impl RpcApp {
         mut ticker_request_sender: mpsc::Sender<TickerRequest>,
         transactions: Vec<(TxFeeTypes, Address)>,
         token: TokenLike,
-    ) -> Result<BigUint> {
+    ) -> Result<BatchFee> {
         let req = oneshot::channel();
         ticker_request_sender
             .send(TickerRequest::GetBatchTxFee {
