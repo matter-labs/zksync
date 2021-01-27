@@ -397,9 +397,11 @@ mod tests {
                         transactions,
                         ..
                     } => {
-                        let price = Ok(BigUint::from(transactions.len()));
+                        let fee = BatchFee {
+                            total_fee: BigUint::from(transactions.len()),
+                        };
 
-                        response.send(price).expect("Unable to send response");
+                        response.send(Ok(fee)).expect("Unable to send response");
                     }
                 }
             }
