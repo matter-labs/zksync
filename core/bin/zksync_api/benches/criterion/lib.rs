@@ -1,7 +1,7 @@
-use async_jsonrpc_client::{Params, SubscriptionId, WebSocketTransport};
 use criterion::{criterion_group, criterion_main, Criterion};
 use ethabi::Address;
 use reqwest::{blocking::Client, StatusCode};
+
 use zksync_api_client::rest::v1::{IncomingTxBatchForFee, IncomingTxForFee};
 use zksync_types::{TokenLike, TxFeeTypes};
 
