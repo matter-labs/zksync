@@ -204,7 +204,12 @@ describe(`ZkSync integration tests (token: ${token}, transport: ${transport})`, 
         });
     });
 
-    it('should recover failed ETH withdraw', async () => {
+    it('should recover failed ETH withdraw', async function() {
+        if (token !== 'ETH') {
+            // This is better than skipping, because
+            // it shows the test as "passed"
+            return;
+        }
         await tester.testRecoverETHWithdrawal(
             alice,
             TEST_CONFIG.withdrawalHelpers.revert_receive_address,

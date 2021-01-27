@@ -6,9 +6,9 @@ pragma solidity ^0.7.0;
 /// @dev Used for testing failed withdrawlas from the zkSync smart contract
 contract RevertReceiveAccount {
     
-    address owner;
+    address public owner;
 
-    bool revertReceive;
+    bool public revertReceive;
 
     constructor() {
         owner = msg.sender;
@@ -22,6 +22,6 @@ contract RevertReceiveAccount {
     }
 
     fallback() external payable {
-        require(!revertReceive);
+        require(!revertReceive, "All the receiving transactions are reverted");
     }
 }

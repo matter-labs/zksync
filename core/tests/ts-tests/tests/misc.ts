@@ -179,43 +179,45 @@ Tester.prototype.testRecoverETHWithdrawal = async function (
         toOwner.ethSigner
     );
 
-    const balanceBefore = await this.ethProvider.getBalance(to);
-
     // Making sure that the withdrawal will be reverted 
     await revertReceiveContract.setRevertReceive(true);
 
+    const balanceBefore = await this.ethProvider.getBalance(to);
     const withdrawTx = await from.withdrawFromSyncToEthereum({
         ethAddress: to,
         token: 'ETH',
         amount
     });
-
     await withdrawTx.awaitVerifyReceipt();
     
-    // Waiting for the withdrawl to be sent
+    // Waiting for the withdrawl to be sent onchain
     const withdrawalTxHash = await waitForOnchainWithdrawal(
         this.syncProvider,
         withdrawTx.txHash
     );
     
+    // Double-check that zkSync tried to process withdrawal
     expect(withdrawalTxHash, 'Withdrawal was not processed onchain').to.exist;
 
-    const balanceAfter = await this.ethProvider.getBalance(to);
-
     // double-check that the withdrawal has indeed failed
+    const balanceAfter = await this.ethProvider.getBalance(to);
     expect(balanceBefore.eq(balanceAfter), "The withdrawal did not fail the first time").to.be.true;
 
-    await revertReceiveContract.setRevertReceive(false);
-
-    await withdrawalHelpers.withdrawPendingBalance(
-        this.syncProvider as any,
-        from.ethSigner,
+    // Make sure that the withdrawal will pass now
+    const tx = await revertReceiveContract.setRevertReceive(false);
+    await tx.wait();
+    
+    // Re-try
+    const withdrawPendingTx = await withdrawalHelpers.withdrawPendingBalance(
+        this.syncProvider,
+        from.ethSigner.connect(this.ethProvider),
         to,
         'ETH'
     );
+    await withdrawPendingTx.wait();
 
+    // The funds should have arrived
     const expectedToBalance = balanceBefore.add(amount);
-    const toBalance = await this.ethProvider.getBalance(to);
-    
+    const toBalance = await this.ethProvider.getBalance(to);    
     expect(toBalance.eq(expectedToBalance), "The withdrawal was not recovered").to.be.true;
 }

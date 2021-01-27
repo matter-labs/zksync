@@ -1848,11 +1848,6 @@
   resolved "https://registry.yarnpkg.com/@types/mocha/-/mocha-8.0.3.tgz#51b21b6acb6d1b923bbdc7725c38f9f455166402"
   integrity sha512-vyxR57nv8NfcU0GZu8EUXZLTbCMupIUwy95LJ6lllN+JRPG25CwMHoB1q5xKh8YKhQnHYRAn4yW2yuHbf/5xgg==
 
-"@types/mocha@^8.2.0":
-  version "8.2.0"
-  resolved "https://registry.yarnpkg.com/@types/mocha/-/mocha-8.2.0.tgz#3eb56d13a1de1d347ecb1957c6860c911704bc44"
-  integrity sha512-/Sge3BymXo4lKc31C8OINJgXLaw+7vL1/L1pGiBNpGrBiT8FQiaFpSYV0uhTaG4y78vcMBTMFsWaHDvuD+xGzQ==
-
 "@types/mock-fs@^4.10.0", "@types/mock-fs@^4.13.0":
   version "4.13.0"
   resolved "https://registry.yarnpkg.com/@types/mock-fs/-/mock-fs-4.13.0.tgz#b8b01cd2db588668b2532ecd21b1babd3fffb2c0"
@@ -1877,11 +1872,6 @@
   version "12.19.3"
   resolved "https://registry.yarnpkg.com/@types/node/-/node-12.19.3.tgz#a6e252973214079155f749e8bef99cc80af182fa"
   integrity sha512-8Jduo8wvvwDzEVJCOvS/G6sgilOLvvhn1eMmK3TW8/T217O7u1jdrK6ImKLv80tVryaPSVeKu6sjDEiFjd4/eg==
-
-"@types/node@^14.14.22":
-  version "14.14.22"
-  resolved "https://registry.yarnpkg.com/@types/node/-/node-14.14.22.tgz#0d29f382472c4ccf3bd96ff0ce47daf5b7b84b18"
-  integrity sha512-g+f/qj/cNcqKkc3tFqlXOYjrmZA+jNBiDzbP3kH+B+otKFqAdPgVTGP1IeKRdMml/aE69as5S4FqtxAbl+LaMw==
 
 "@types/normalize-package-data@^2.4.0":
   version "2.4.0"
@@ -3004,13 +2994,6 @@ axios@^0.18.0:
   dependencies:
     follow-redirects "1.5.10"
     is-buffer "^2.0.2"
-
-axios@^0.21.1:
-  version "0.21.1"
-  resolved "https://registry.yarnpkg.com/axios/-/axios-0.21.1.tgz#22563481962f4d6bde9a76d516ef0e5d3c09b2b8"
-  integrity sha512-dKQiRHxGD9PPRIUNIWvZhPTPpl1rf/OxTYKsqKUDjBwYylTvV7SjSHJb9ratfyzM6wCdLCOYLzs73qpg5c4iGA==
-  dependencies:
-    follow-redirects "^1.10.0"
 
 axios@^0.21.1:
   version "0.21.1"
@@ -4866,11 +4849,6 @@ create-hmac@^1.1.0, create-hmac@^1.1.4, create-hmac@^1.1.7:
     ripemd160 "^2.0.0"
     safe-buffer "^5.0.1"
     sha.js "^2.4.8"
-
-create-require@^1.1.0:
-  version "1.1.1"
-  resolved "https://registry.yarnpkg.com/create-require/-/create-require-1.1.1.tgz#c1d7e8f1e5f6cfc9ff65f9cd352d37348756c333"
-  integrity sha512-dcKFX3jn0MpIaXjisoRvexIJVEKzaq7z2rZKxf+MSr9TkdmHmsU4m2lcLojrj/FHl8mk5VxMmYA+ftRkP/3oKQ==
 
 cross-fetch@^2.1.0, cross-fetch@^2.1.1:
   version "2.2.3"
@@ -9868,37 +9846,6 @@ mocha@^8.1.3, mocha@^8.2.0:
     yargs-parser "13.1.2"
     yargs-unparser "2.0.0"
 
-mocha@^8.2.1:
-  version "8.2.1"
-  resolved "https://registry.yarnpkg.com/mocha/-/mocha-8.2.1.tgz#f2fa68817ed0e53343d989df65ccd358bc3a4b39"
-  integrity sha512-cuLBVfyFfFqbNR0uUKbDGXKGk+UDFe6aR4os78XIrMQpZl/nv7JYHcvP5MFIAb374b2zFXsdgEGwmzMtP0Xg8w==
-  dependencies:
-    "@ungap/promise-all-settled" "1.1.2"
-    ansi-colors "4.1.1"
-    browser-stdout "1.3.1"
-    chokidar "3.4.3"
-    debug "4.2.0"
-    diff "4.0.2"
-    escape-string-regexp "4.0.0"
-    find-up "5.0.0"
-    glob "7.1.6"
-    growl "1.10.5"
-    he "1.2.0"
-    js-yaml "3.14.0"
-    log-symbols "4.0.0"
-    minimatch "3.0.4"
-    ms "2.1.2"
-    nanoid "3.1.12"
-    serialize-javascript "5.0.1"
-    strip-json-comments "3.1.1"
-    supports-color "7.2.0"
-    which "2.0.2"
-    wide-align "1.1.3"
-    workerpool "6.0.2"
-    yargs "13.3.2"
-    yargs-parser "13.1.2"
-    yargs-unparser "2.0.0"
-
 mock-fs@^4.1.0, mock-fs@^4.13.0:
   version "4.13.0"
   resolved "https://registry.yarnpkg.com/mock-fs/-/mock-fs-4.13.0.tgz#31c02263673ec3789f90eb7b6963676aa407a598"
@@ -13474,18 +13421,6 @@ ts-node@^9.0.0:
     source-map-support "^0.5.17"
     yn "3.1.1"
 
-ts-node@^9.1.1:
-  version "9.1.1"
-  resolved "https://registry.yarnpkg.com/ts-node/-/ts-node-9.1.1.tgz#51a9a450a3e959401bda5f004a72d54b936d376d"
-  integrity sha512-hPlt7ZACERQGf03M253ytLY3dHbGNGrAq9qIHWUY9XHYl1z7wYngSr3OQ5xmui8o2AaxsONxIzjafLUiWBo1Fg==
-  dependencies:
-    arg "^4.1.0"
-    create-require "^1.1.0"
-    diff "^4.0.1"
-    make-error "^1.1.1"
-    source-map-support "^0.5.17"
-    yn "3.1.1"
-
 ts-pnp@^1.1.6:
   version "1.2.0"
   resolved "https://registry.yarnpkg.com/ts-pnp/-/ts-pnp-1.2.0.tgz#a500ad084b0798f1c3071af391e65912c86bca92"
@@ -14863,16 +14798,6 @@ zksync-crypto@^0.4.2:
   version "0.4.2"
   resolved "https://registry.yarnpkg.com/zksync-crypto/-/zksync-crypto-0.4.2.tgz#58dd8629ce222f14b3ad83f2c50a68fec6363974"
   integrity sha512-PQw0e7t80uP7c5LHonEh4dS4wGpK2TC4uYR/16jcDCaCS2wY/exF37hAOeQiskb0hnU2C6/jqtvBMbsMTzVh7Q==
-
-zksync@^0.8.4:
-  version "0.8.4"
-  resolved "https://registry.yarnpkg.com/zksync/-/zksync-0.8.4.tgz#1d02cca4ca17aa09ede73944177baee10cc2ace9"
-  integrity sha512-5jtyxYb4cTdB6cvA/9j40xJS0oKO1fmOx49BbXhNMo+03rvfJX0hSH9Wdu1Zh2HZT04OPIx6lZcUQlwT53YhZA==
-  dependencies:
-    axios "^0.21.1"
-    websocket "^1.0.30"
-    websocket-as-promised "^1.1.0"
-    zksync-crypto "^0.4.2"
 
 "zksync@link:sdk/zksync.js":
   version "0.8.4-beta"

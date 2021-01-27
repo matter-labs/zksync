@@ -1,5 +1,5 @@
 
-import { BigNumberish, ethers, Contract } from 'ethers';
+import { BigNumberish, ethers, Contract, BigNumber } from 'ethers';
 import { Address, TokenLike } from '../types'; 
 import { SYNC_MAIN_CONTRACT_INTERFACE } from '../utils';
 import { Provider } from '../';
@@ -43,6 +43,11 @@ export async function withdrawPendingBalance(
     token: TokenLike,
     amount?: BigNumberish
 ): Promise<any> {
+
+    if (!ethersWallet.provider) {
+        throw new Error('The Ethereum Wallet must be connected to a provider');
+    }
+
     const contractAddress = syncProvider.contractAddress.mainContract;
 
     const zksyncContract = new Contract(
@@ -51,6 +56,7 @@ export async function withdrawPendingBalance(
         ethersWallet
     );
 
+    const gasPrice = await ethersWallet.provider.getGasPrice();
         
     const callParams = await getWithdrawPendingBalanceParams(
         syncProvider,
@@ -63,6 +69,10 @@ export async function withdrawPendingBalance(
     return await zksyncContract.withdrawPendingBalance(
         callParams.owner,
         callParams.token,
-        callParams.amount
+        callParams.amount, 
+        {
+            gasLimit: BigNumber.from('200000'),
+            gasPrice,
+        }
     );
 }
