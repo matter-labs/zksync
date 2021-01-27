@@ -70,7 +70,7 @@ export default {
             }
 
             const hiddenFields = ['fromAddr', 'toAddr', 'success', 'from_explorer_link', 'to_explorer_link'];
-            return Object.keys(this.transactions[0]).filter(k => !hiddenFields.includes(k));
+            return Object.keys(this.transactions[0]).filter((k) => !hiddenFields.includes(k));
         }
     },
     components

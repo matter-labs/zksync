@@ -4,7 +4,7 @@ use zksync_types::{mempool::SignedTxVariant, SignedZkSyncTx, ZkSyncTx};
 
 #[derive(Debug, Clone)]
 struct MempoolPendingTransaction {
-    valid_from: u32,
+    valid_from: u64,
     tx: SignedTxVariant,
 }
 
@@ -105,9 +105,9 @@ impl MempoolTransactionsQueue {
 mod tests {
     use super::*;
     use crate::mempool::Address;
-    use zksync_types::tx::{Transfer, Withdraw};
+    use zksync_types::tx::{TimeRange, Transfer, Withdraw};
 
-    fn get_transfer_with_timestamps(valid_from: u32, valid_until: u32) -> SignedTxVariant {
+    fn get_transfer_with_timestamps(valid_from: u64, valid_until: u64) -> SignedTxVariant {
         let transfer = Transfer::new(
             4242,
             Address::random(),
@@ -116,8 +116,7 @@ mod tests {
             500u32.into(),
             20u32.into(),
             11,
-            valid_from,
-            valid_until,
+            TimeRange::new(valid_from, valid_until),
             None,
         );
 
@@ -136,8 +135,7 @@ mod tests {
             20u32.into(),
             10u32.into(),
             2,
-            0,
-            u32::MAX,
+            Default::default(),
             None,
         );
 

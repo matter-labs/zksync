@@ -77,21 +77,11 @@ impl WithdrawOp {
         )
         .ok_or_else(|| format_err!("Cant get fee from withdraw pubdata"))?;
         let nonce = 0; // From pubdata it is unknown
-        let valid_from = 0;
-        let valid_until = u32::MAX;
+        let time_range = Default::default();
 
         Ok(Self {
             tx: Withdraw::new(
-                account_id,
-                from,
-                to,
-                token,
-                amount,
-                fee,
-                nonce,
-                valid_from,
-                valid_until,
-                None,
+                account_id, from, to, token, amount, fee, nonce, time_range, None,
             ),
             account_id,
         })

@@ -23,7 +23,7 @@ use crate::recursive_keys::{
 use crate::sample_proofs::make_sample_proofs;
 use crate::verifier_contract_generator::create_verifier_contract;
 use crate::zksync_key::{make_plonk_blocks_verify_keys, make_plonk_exodus_verify_key};
-use zksync_config::AvailableBlockSizesConfig;
+use zksync_config::configs::ChainConfig;
 
 #[derive(StructOpt)]
 enum Command {
@@ -44,7 +44,7 @@ fn main() {
     env_logger::init();
 
     let opt = Opt::from_args();
-    let config = AvailableBlockSizesConfig::from_env();
+    let config = ChainConfig::from_env();
 
     match opt.command {
         Command::Keys => {

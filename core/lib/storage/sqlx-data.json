@@ -953,6 +953,42 @@
       "nullable": []
     }
   },
+  "3c734a6a585db3da17b515c061bf7b1b50e466c79e6a38814f95f4ada2639b00": {
+    "query": "\n            SELECT account_id, account_type as \"account_type!: EthAccountType\" \n            FROM eth_account_types WHERE account_id = $1\n            ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "account_id",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 1,
+          "name": "account_type!: EthAccountType",
+          "type_info": {
+            "Custom": {
+              "name": "eth_account_type",
+              "kind": {
+                "Enum": [
+                  "Owned",
+                  "CREATE2"
+                ]
+              }
+            }
+          }
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Int8"
+        ]
+      },
+      "nullable": [
+        false,
+        false
+      ]
+    }
+  },
   "3ed6f62aea4b0901e56abf35be76cf1f4f64d14dc0ef63de8b205fc472c4de97": {
     "query": "INSERT INTO data_restore_last_watched_eth_block (block_number) VALUES ($1)",
     "describe": {
@@ -3384,6 +3420,29 @@
         true,
         false
       ]
+    }
+  },
+  "e3ee3cb9cbe8d05a635e71daea301cf6b2310f89f3d9f8fdabc28e7ebf8d3521": {
+    "query": "\n            INSERT INTO eth_account_types VALUES ( $1, $2 )\n            ON CONFLICT (account_id) DO UPDATE SET account_type = $2\n            ",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "Int8",
+          {
+            "Custom": {
+              "name": "eth_account_type",
+              "kind": {
+                "Enum": [
+                  "Owned",
+                  "CREATE2"
+                ]
+              }
+            }
+          }
+        ]
+      },
+      "nullable": []
     }
   },
   "e42d1180b05adcce696d87de411553e385d36018fe60e0963a348adc00ad874b": {

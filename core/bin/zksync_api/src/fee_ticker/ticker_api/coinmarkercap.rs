@@ -90,7 +90,7 @@ mod test {
             .enable_all()
             .build()
             .expect("tokio runtime");
-        let ticker_url = parse_env("COINMARKETCAP_BASE_URL");
+        let ticker_url = parse_env("FEE_TICKER_COINMARKETCAP_BASE_URL");
         let client = reqwest::Client::new();
         let api = CoinMarketCapAPI::new(client, ticker_url);
         runtime

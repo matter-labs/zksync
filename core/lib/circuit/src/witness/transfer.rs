@@ -38,8 +38,8 @@ pub struct TransferData {
     pub token: u32,
     pub from_account_address: u32,
     pub to_account_address: u32,
-    pub valid_from: u32,
-    pub valid_until: u32,
+    pub valid_from: u64,
+    pub valid_until: u64,
 }
 
 pub struct TransferWitness<E: RescueEngine> {
@@ -61,14 +61,15 @@ impl Witness for TransferWitness<Bn256> {
     type CalculateOpsInput = SigDataInput;
 
     fn apply_tx(tree: &mut CircuitAccountTree, transfer: &TransferOp) -> Self {
+        let time_range = transfer.tx.time_range.unwrap_or_default();
         let transfer_data = TransferData {
             amount: transfer.tx.amount.to_u128().unwrap(),
             fee: transfer.tx.fee.to_u128().unwrap(),
             token: u32::from(transfer.tx.token),
             from_account_address: transfer.from,
             to_account_address: transfer.to,
-            valid_from: transfer.tx.valid_from.unwrap_or(0),
-            valid_until: transfer.tx.valid_until.unwrap_or(u32::MAX),
+            valid_from: time_range.valid_from,
+            valid_until: time_range.valid_until,
         };
         // le_bit_vector_into_field_element()
         Self::apply_data(tree, &transfer_data)

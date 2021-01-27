@@ -533,8 +533,10 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
 
     /// Returns `true` if there is a stored pending block in the database.
     pub async fn pending_block_exists(&mut self) -> QueryResult<bool> {
+        let start = Instant::now();
         let result = self.load_storage_pending_block().await?.is_some();
 
+        metrics::histogram!("sql.chain.block.pending_block_exists", start.elapsed());
         Ok(result)
     }
 
@@ -592,6 +594,7 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
         aggregated_action_type: AggregatedActionType,
         is_confirmed: bool,
     ) -> QueryResult<i64> {
+        let start = Instant::now();
         let count = sqlx::query!(
             r#"SELECT count(*) as "count!" FROM aggregate_operations WHERE action_type = $1 AND confirmed = $2"#,
             aggregated_action_type.to_string(),
@@ -601,6 +604,7 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
         .await?
         .count;
 
+        metrics::histogram!("sql.chain.block.count_operations", start.elapsed());
         Ok(count)
     }
 
@@ -695,6 +699,7 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
     pub async fn get_account_tree_cache(
         &mut self,
     ) -> QueryResult<Option<(BlockNumber, serde_json::Value)>> {
+        let start = Instant::now();
         let account_tree_cache = sqlx::query_as!(
             AccountTreeCache,
             "
@@ -706,6 +711,7 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
         .fetch_optional(self.0.conn())
         .await?;
 
+        metrics::histogram!("sql.chain.block.get_account_tree_cache", start.elapsed());
         Ok(account_tree_cache.map(|w| {
             (
                 w.block as BlockNumber,
@@ -720,6 +726,7 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
         &mut self,
         block: BlockNumber,
     ) -> QueryResult<Option<serde_json::Value>> {
+        let start = Instant::now();
         let account_tree_cache = sqlx::query_as!(
             AccountTreeCache,
             "
@@ -731,6 +738,10 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
         .fetch_optional(self.0.conn())
         .await?;
 
+        metrics::histogram!(
+            "sql.chain.block.get_account_tree_cache_block",
+            start.elapsed()
+        );
         Ok(account_tree_cache.map(|w| {
             serde_json::from_str(&w.tree_cache).expect("Failed to deserialize Account Tree Cache")
         }))

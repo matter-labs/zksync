@@ -417,7 +417,7 @@ mod tests {
                     cfg.pool.clone(),
                     sign_verifier.clone(),
                     fee_ticker.clone(),
-                    &cfg.api_server_options,
+                    &cfg.config,
                 ))
             });
 
@@ -716,8 +716,7 @@ mod tests {
             &to.address,
             None,
             false,
-            0,
-            u32::MAX,
+            Default::default(),
         );
         client
             .submit_tx(
@@ -753,8 +752,7 @@ mod tests {
             &to.address,
             None,
             false,
-            0,
-            u32::MAX,
+            Default::default(),
         );
         client
             .submit_tx(

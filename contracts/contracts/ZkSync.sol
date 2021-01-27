@@ -249,7 +249,7 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
     /// @notice DEPRECATED: to be removed in future,  use getPendingBalance instead
     /// @param _address Address of the tokens owner
     /// @param _tokenId token id, 0 is used for ETH
-    function getBalancesToWithdraw(address _address, uint16 _tokenId) public view returns (uint128) {
+    function getBalanceToWithdraw(address _address, uint16 _tokenId) public view returns (uint128) {
         return pendingBalances[packAddressAndTokenId(_address, _tokenId)].balanceToWithdraw;
     }
 

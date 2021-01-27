@@ -26,7 +26,7 @@ const testConfig = {
 };
 
 const localConfig = Object.assign({}, prodConfig);
-localConfig.DUMMY_VERIFIER = process.env.DUMMY_VERIFIER === 'true';
+localConfig.DUMMY_VERIFIER = process.env.CONTRACTS_TEST_DUMMY_VERIFIER === 'true';
 
 const contractDefs = {
     rinkeby: testnetConfig,
@@ -57,18 +57,18 @@ export default {
             if (process.env.CONTRACT_TESTS) {
                 return contractDefs.test;
             }
-            return contractDefs[process.env.ETH_NETWORK];
+            return contractDefs[process.env.CHAIN_ETH_NETWORK];
         })()
     },
     networks: {
         env: {
-            url: process.env.WEB3_URL
+            url: process.env.ETH_CLIENT_WEB3_URL
         },
         hardhat: {
             allowUnlimitedContractSize: true
         }
     },
     etherscan: {
-        apiKey: process.env.ETHERSCAN_API_KEY
+        apiKey: process.env.MISC_ETHERSCAN_API_KEY
     }
 };

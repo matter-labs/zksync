@@ -16,6 +16,7 @@ use jsonwebtoken::{decode, DecodingKey, Validation};
 use serde::{Deserialize, Serialize};
 
 // Local uses
+use zksync_storage::ConnectionPool;
 use zksync_types::{tokens, Address, TokenId};
 use zksync_utils::panic_notify::ThreadPanicNotify;
 
@@ -30,7 +31,7 @@ struct PayloadAuthToken {
 #[derive(Debug, Clone)]
 struct AppState {
     secret_auth: String,
-    connection_pool: zksync_storage::ConnectionPool,
+    connection_pool: ConnectionPool,
 }
 
 impl AppState {
@@ -129,7 +130,7 @@ async fn run_server(app_state: AppState, bind_to: SocketAddr) {
     HttpServer::new(move || {
         let auth = HttpAuthentication::bearer(move |req, credentials| async {
             let secret_auth = req
-                .app_data::<AppState>()
+                .app_data::<web::Data<AppState>>()
                 .expect("failed get AppState upon receipt of the authentication token")
                 .secret_auth
                 .clone();
@@ -140,7 +141,7 @@ async fn run_server(app_state: AppState, bind_to: SocketAddr) {
 
         App::new()
             .wrap(auth)
-            .data(app_state.clone())
+            .app_data(web::Data::new(app_state.clone()))
             .route("/tokens", web::post().to(add_token))
     })
     .workers(1)

@@ -5,6 +5,7 @@ import fs from 'fs';
 import * as path from 'path';
 import * as verifyKeys from './verify-keys';
 import * as dataRestore from './data-restore';
+import * as docker from '../docker';
 
 export { verifyKeys, dataRestore };
 
@@ -17,9 +18,12 @@ export async function deployERC20(command: 'dev' | 'new', name?: string, symbol?
                 { "name": "BAT",  "symbol": "BAT",  "decimals": 18 },
                 { "name": "MLTT", "symbol": "MLTT", "decimals": 18 }
             ]' > ./etc/tokens/localhost.json`);
+        if (!process.env.CI) {
+            await docker.restart('dev-liquidity-token-watcher');
+        }
     } else if (command == 'new') {
         await utils.spawn(
-            `yarn --cwd contracts deploy-erc20 add --name ${name} --symbol ${symbol} --decimals ${decimals}`
+            `yarn --cwd contracts deploy-erc20 add --token-name ${name} --symbol ${symbol} --decimals ${decimals}`
         );
     }
 }
@@ -28,8 +32,18 @@ export async function governanceAddERC20(command: 'dev' | 'new', address?: strin
     if (command == 'dev') {
         await utils.spawn(`yarn --silent --cwd contracts governance-add-erc20 add-multi-current-network localhost`);
     } else if (command == 'new') {
-        await utils.spawn(`yarn --cwd contracts governance-add-erc20 add --tokenAddress ${address}`);
+        await utils.spawn(`yarn --cwd contracts governance-add-erc20 add ${address}`);
     }
+}
+
+export async function serverAddERC20(address: string, symbol: string, decimals: string) {
+    await utils.spawn(
+        `yarn --cwd contracts server-add-erc20 add --address ${address} --symbol ${symbol} --decimals ${decimals}`
+    );
+}
+
+export async function tokenInfo(address: string) {
+    await utils.spawn(`yarn --cwd contracts token-info info ${address}`);
 }
 
 // installs all dependencies and builds our js packages
@@ -68,7 +82,7 @@ export async function plonkSetup(powers?: number[]) {
 }
 
 export async function revertReason(txHash: string, web3url?: string) {
-    await utils.spawn(`cd contracts && yarn run ts-node scripts/revert-reason.ts ${txHash} ${web3url || ''}`);
+    await utils.spawn(`yarn contracts ts-node scripts/revert-reason.ts ${txHash} ${web3url || ''}`);
 }
 
 export async function explorer() {
@@ -142,6 +156,21 @@ command
     });
 
 command
+    .command('server-add-erc20 <address> <symbol> <decimals>')
+    .description('add testnet erc20 token to the zkSynk server')
+    .action(async (address: string, symbol: string, decimals: string) => {
+        await utils.confirmAction();
+        await serverAddERC20(address, symbol, decimals);
+    });
+
+command
+    .command('token-info <address>')
+    .description('get symbol, name and decimals parameters from token')
+    .action(async (address: string) => {
+        await tokenInfo(address);
+    });
+
+command
     .command('plonk-setup [powers]')
     .description('download missing keys')
     .action(async (powers?: string) => {
@@ -164,7 +193,7 @@ command
 command
     .command('deploy-eip1271')
     .description('deploy test EIP-1271 "smart wallet"')
-    .action(async (cmd: Command) => {
+    .action(async () => {
         await deployEIP1271();
     });
 

@@ -115,13 +115,11 @@ export async function server() {
 
 export async function testkit(command: string, timeout: number) {
     let containerID = '';
-    const prevUrl = process.env.WEB3_URL;
-    if (process.env.ZKSYNC_ENV == 'ci') {
-        process.env.WEB3_URL = 'http://geth-fast:8545';
-    } else if (process.env.ZKSYNC_ENV == 'dev') {
+    const prevUrl = process.env.ETH_CLIENT_WEB3_URL;
+    if (process.env.ZKSYNC_ENV == 'dev' && process.env.CI != '1') {
         const { stdout } = await utils.exec('docker run --rm -d -p 7545:8545 matterlabs/geth:latest fast');
         containerID = stdout;
-        process.env.WEB3_URL = 'http://localhost:7545';
+        process.env.ETH_CLIENT_WEB3_URL = 'http://localhost:7545';
     }
     process.on('SIGINT', () => {
         console.log('interrupt received');
@@ -141,7 +139,7 @@ export async function testkit(command: string, timeout: number) {
     // but be careful! this is not called upon explicit termination
     // e.g. on SIGINT or process.exit()
     process.on('beforeExit', async (code) => {
-        if (process.env.ZKSYNC_ENV == 'dev') {
+        if (process.env.ZKSYNC_ENV == 'dev' && process.env.CI != '1') {
             try {
                 // probably should be replaced with child_process.execSync in future
                 // to change the hook to program.on('exit', ...)
@@ -149,13 +147,13 @@ export async function testkit(command: string, timeout: number) {
             } catch {
                 console.error('Problem killing', containerID);
             }
-            process.env.WEB3_URL = prevUrl;
+            process.env.ETH_CLIENT_WEB3_URL = prevUrl;
             // this has to be here - or else we will call this hook again
             process.exit(code);
         }
     });
 
-    process.env.ETH_NETWORK = 'test';
+    process.env.CHAIN_ETH_NETWORK = 'test';
     await run.verifyKeys.unpack();
     await contract.build();
 
@@ -229,7 +227,15 @@ command
 command
     .command('testkit [mode]')
     .description('run testkit tests')
-    .action(async (mode?: string) => {
+    .option('--offline')
+    .action(async (mode?: string, offline: boolean = false) => {
+        if (offline) {
+            process.env.SQLX_OFFLINE = 'true';
+        }
         mode = mode || 'fast';
-        await testkit(mode, 600);
+        await testkit(mode, 6000);
+
+        if (offline) {
+            delete process.env.SQLX_OFFLINE;
+        }
     });

@@ -1,10 +1,10 @@
 // Built-in deps
-use std::{net::SocketAddr, str::FromStr, thread, time::Duration};
+use std::{thread, time::Duration};
 // External deps
 use futures::channel::mpsc;
 use num::BigUint;
 // Workspace deps
-use zksync_config::ProverOptions;
+use zksync_config::ZkSyncConfig;
 use zksync_crypto::franklin_crypto::bellman::pairing::ff::{PrimeField, PrimeFieldRepr};
 use zksync_prover::{client, ApiClient};
 use zksync_prover_utils::api::ProverInputRequest;
@@ -15,22 +15,25 @@ use crate::{run_prover_server, DatabaseInterface};
 
 const CORRECT_PROVER_SECRET_AUTH: &str = "42";
 const INCORRECT_PROVER_SECRET_AUTH: &str = "123";
+const SERVER_BIND_PORT: u16 = 8088;
 const SERVER_BIND_TO: &str = "127.0.0.1:8088";
 
-struct MockProverOptions(ProverOptions);
+struct MockProverOptions(ZkSyncConfig);
 
 impl Default for MockProverOptions {
     fn default() -> Self {
-        let prover_options = ProverOptions {
-            secret_auth: CORRECT_PROVER_SECRET_AUTH.to_string(),
-            prepare_data_interval: Duration::from_secs(0),
-            heartbeat_interval: Duration::from_secs(20),
-            cycle_wait: Duration::from_millis(500),
-            prover_server_address: SocketAddr::from_str(SERVER_BIND_TO).unwrap(),
-            idle_provers: 1,
-            witness_generators: 1,
-        };
-        MockProverOptions(prover_options)
+        let mut zksync_config = ZkSyncConfig::from_env();
+
+        zksync_config.api.prover.port = SERVER_BIND_PORT;
+        zksync_config.api.prover.url = SERVER_BIND_TO.to_string();
+        zksync_config.api.prover.secret_auth = CORRECT_PROVER_SECRET_AUTH.to_string();
+        zksync_config.prover.prover.heartbeat_interval = 20000;
+        zksync_config.prover.prover.cycle_wait = 500;
+        zksync_config.prover.witness_generator.prepare_data_interval = 0;
+        zksync_config.prover.witness_generator.witness_generators = 1;
+        zksync_config.prover.core.idle_provers = 1;
+
+        MockProverOptions(zksync_config)
     }
 }
 
@@ -187,10 +190,10 @@ pub async fn get_test_block() -> Block {
         validator_account_id,
         ops,
         (0, 1),
-        &[6 as usize],
+        &[6],
         1_000_000.into(),
         1_500_000.into(),
         old_hash,
-        0 as u64,
+        0,
     )
 }

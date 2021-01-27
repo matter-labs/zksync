@@ -30,8 +30,7 @@ pub fn apply_random_updates(
     rng: &mut XorShiftRng,
 ) -> (AccountMap, Vec<(u32, AccountUpdate)>) {
     let updates = (0..3)
-        .map(|_| gen_acc_random_updates(rng))
-        .flatten()
+        .flat_map(|_| gen_acc_random_updates(rng))
         .collect::<AccountUpdates>();
     apply_updates(&mut accounts, updates.clone());
     (accounts, updates)
@@ -618,8 +617,7 @@ async fn pending_block_workflow(mut storage: StorageProcessor<'_>) -> QueryResul
             0,
             Default::default(),
             false,
-            0,
-            u32::MAX,
+            Default::default(),
         );
 
         let change_pubkey_op = ZkSyncOp::ChangePubKeyOffchain(Box::new(ChangePubKeyOp {
@@ -652,8 +650,7 @@ async fn pending_block_workflow(mut storage: StorageProcessor<'_>) -> QueryResul
                 &to_zksync_account.address,
                 None,
                 true,
-                0,
-                u32::MAX,
+                Default::default(),
             )
             .0;
 

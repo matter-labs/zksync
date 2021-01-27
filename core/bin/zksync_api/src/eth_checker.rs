@@ -121,12 +121,14 @@ mod tests {
         let config = TestConfig::load();
         let message = "hello-world";
 
+        let web3_url =
+            std::env::var("ETH_CLIENT_WEB3_URL").expect("ETH_CLIENT_WEB3_URL env var not found");
         let manual_signature =
             PackedEthSignature::sign(&config.eip1271.owner_private_key, message.as_bytes())
                 .unwrap();
         let signature = EIP1271Signature(manual_signature.serialize_packed().to_vec());
 
-        let transport = web3::transports::Http::new(&config.eth.web3_url).unwrap();
+        let transport = web3::transports::Http::new(&web3_url).unwrap();
         let web3 = web3::Web3::new(transport);
 
         let eth_checker = EthereumChecker::new(web3, Default::default());

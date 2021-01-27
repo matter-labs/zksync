@@ -2,7 +2,7 @@
 use std::fmt;
 use zksync_eth_signer::error::SignerError;
 use zksync_eth_signer::EthereumSigner;
-use zksync_types::tx::{ChangePubKeyECDSAData, ChangePubKeyEthAuthData, TxEthSignature};
+use zksync_types::tx::{ChangePubKeyECDSAData, ChangePubKeyEthAuthData, TimeRange, TxEthSignature};
 // External uses
 use num::BigUint;
 // Workspace uses
@@ -79,8 +79,7 @@ impl<S: EthereumSigner> Signer<S> {
         auth_onchain: bool,
         fee_token: Token,
         fee: BigUint,
-        valid_from: u32,
-        valid_until: u32,
+        time_range: TimeRange,
     ) -> Result<ChangePubKey, SignerError> {
         let account_id = self.account_id.ok_or(SignerError::NoSigningKey)?;
 
@@ -91,8 +90,7 @@ impl<S: EthereumSigner> Signer<S> {
             fee_token.id,
             fee,
             nonce,
-            valid_from,
-            valid_until,
+            time_range,
             None,
             &self.private_key,
         )
@@ -143,8 +141,7 @@ impl<S: EthereumSigner> Signer<S> {
         fee: BigUint,
         to: Address,
         nonce: Nonce,
-        valid_from: u32,
-        valid_until: u32,
+        time_range: TimeRange,
     ) -> Result<(Transfer, Option<PackedEthSignature>), SignerError> {
         let account_id = self.account_id.ok_or(SignerError::NoSigningKey)?;
 
@@ -156,8 +153,7 @@ impl<S: EthereumSigner> Signer<S> {
             amount,
             fee,
             nonce,
-            valid_from,
-            valid_until,
+            time_range,
             &self.private_key,
         )
         .map_err(signing_failed_error)?;
@@ -186,8 +182,7 @@ impl<S: EthereumSigner> Signer<S> {
         fee: BigUint,
         eth_address: Address,
         nonce: Nonce,
-        valid_from: u32,
-        valid_until: u32,
+        time_range: TimeRange,
     ) -> Result<(Withdraw, Option<PackedEthSignature>), SignerError> {
         let account_id = self.account_id.ok_or(SignerError::NoSigningKey)?;
 
@@ -199,8 +194,7 @@ impl<S: EthereumSigner> Signer<S> {
             amount,
             fee,
             nonce,
-            valid_from,
-            valid_until,
+            time_range,
             &self.private_key,
         )
         .map_err(signing_failed_error)?;
@@ -228,21 +222,35 @@ impl<S: EthereumSigner> Signer<S> {
         token: Token,
         fee: BigUint,
         nonce: Nonce,
-        valid_from: u32,
-        valid_until: u32,
-    ) -> Result<ForcedExit, SignerError> {
+        time_range: TimeRange,
+    ) -> Result<(ForcedExit, Option<PackedEthSignature>), SignerError> {
         let account_id = self.account_id.ok_or(SignerError::NoSigningKey)?;
 
-        ForcedExit::new_signed(
+        let forced_exit = ForcedExit::new_signed(
             account_id,
             target,
             token.id,
             fee,
             nonce,
-            valid_from,
-            valid_until,
+            time_range,
             &self.private_key,
         )
-        .map_err(signing_failed_error)
+        .map_err(signing_failed_error)?;
+
+        let eth_signature = match &self.eth_signer {
+            Some(signer) => {
+                let message = forced_exit.get_ethereum_sign_message(&token.symbol, token.decimals);
+                let signature = signer.sign_message(&message.as_bytes()).await?;
+
+                if let TxEthSignature::EthereumSignature(packed_signature) = signature {
+                    Some(packed_signature)
+                } else {
+                    return Err(SignerError::MissingEthSigner);
+                }
+            }
+            _ => None,
+        };
+
+        Ok((forced_exit, eth_signature))
     }
 }

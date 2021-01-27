@@ -4,16 +4,16 @@ import path from 'path';
 import fs from 'fs';
 
 function verfiyKeysTarball() {
-    const accountTreeDepth = process.env.ACCOUNT_TREE_DEPTH;
-    const balanceTreeDepth = process.env.BALANCE_TREE_DEPTH;
-    const keyDir = path.basename(process.env.KEY_DIR as string);
+    const accountTreeDepth = process.env.CHAIN_CIRCUIT_ACCOUNT_TREE_DEPTH;
+    const balanceTreeDepth = process.env.CHAIN_CIRCUIT_BALANCE_TREE_DEPTH;
+    const keyDir = path.basename(process.env.CHAIN_CIRCUIT_KEY_DIR as string);
     return `verify-keys-${keyDir}-account-${accountTreeDepth}_-balance-${balanceTreeDepth}.tar.gz`;
 }
 
 export async function gen(command: 'contract' | 'all') {
-    const accountTreeDepth = process.env.ACCOUNT_TREE_DEPTH;
-    const balanceTreeDepth = process.env.BALANCE_TREE_DEPTH;
-    const keyDir = process.env.KEY_DIR;
+    const accountTreeDepth = process.env.CHAIN_CIRCUIT_ACCOUNT_TREE_DEPTH;
+    const balanceTreeDepth = process.env.CHAIN_CIRCUIT_BALANCE_TREE_DEPTH;
+    const keyDir = process.env.CHAIN_CIRCUIT_KEY_DIR;
     const outputDir = `${keyDir}/account-${accountTreeDepth}_balance-${balanceTreeDepth}`;
 
     if (command == 'all') {

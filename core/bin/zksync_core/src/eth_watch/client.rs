@@ -2,7 +2,7 @@ use std::{convert::TryFrom, time::Instant};
 
 use anyhow::format_err;
 use ethabi::Hash;
-use serde::export::fmt::Debug;
+use std::fmt::Debug;
 use web3::{
     contract::{Contract, Options},
     transports::Http,

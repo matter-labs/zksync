@@ -31,8 +31,7 @@ fn test_change_pubkey_offchain_success() {
             FEE_TOKEN,
             Default::default(),
             false,
-            0,
-            u32::MAX,
+            Default::default(),
         ),
         account_id: account.id,
     };
@@ -70,8 +69,7 @@ fn test_change_pubkey_offchain_nonzero_fee() {
             FEE_TOKEN,
             fee,
             false,
-            0,
-            u32::MAX,
+            Default::default(),
         ),
         account_id: account.id,
     };
@@ -116,8 +114,7 @@ fn test_incorrect_change_pubkey_account() {
             FEE_TOKEN,
             Default::default(),
             false,
-            0,
-            u32::MAX,
+            Default::default(),
         ),
         account_id: account.id,
     };
@@ -168,8 +165,7 @@ fn test_incorrect_change_pubkey_signature() {
         FEE_TOKEN,
         Default::default(),
         false,
-        0,
-        u32::MAX,
+        Default::default(),
     );
 
     // Change fee.

@@ -25,7 +25,7 @@ export async function db(reset: boolean, ...args: string[]) {
     await runOnTestDb(
         reset,
         'core/lib/storage',
-        `cargo test --release -p zksync_storage --features db_test -- --nocapture
+        `cargo test --release -p zksync_storage -- --ignored --nocapture
         ${args.join(' ')}`
     );
 }
@@ -34,7 +34,7 @@ export async function rustApi(reset: boolean, ...args: string[]) {
     await runOnTestDb(
         reset,
         'core/bin/zksync_api',
-        `cargo test --release -p zksync_api --features api_test -- --nocapture
+        `cargo test --release -p zksync_api -- --ignored --nocapture api_server
         ${args.join(' ')}`
     );
 }
@@ -52,7 +52,7 @@ export async function circuit(threads: number = 1, testName?: string, ...args: s
 }
 
 export async function prover() {
-    await utils.spawn('cargo test -p zksync_prover --release -- --ignored');
+    await utils.spawn('cargo test -p zksync_prover --release');
 }
 
 export async function witness_generator() {
@@ -64,6 +64,12 @@ export async function js() {
     await utils.spawn('yarn fee-seller tests');
 }
 
+async function rustCryptoTests() {
+    process.chdir('sdk/zksync-crypto');
+    await utils.spawn('cargo test --release');
+    process.chdir(process.env.ZKSYNC_HOME as string);
+}
+
 export async function rust() {
     await utils.spawn('cargo test --release');
     await db(true);
@@ -71,6 +77,7 @@ export async function rust() {
     await prover();
     const { stdout: threads } = await utils.exec('nproc');
     await circuit(parseInt(threads));
+    await rustCryptoTests();
 }
 
 export const command = new Command('test').description('run test suites').addCommand(integration.command);

@@ -112,18 +112,18 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
     }
 
     pub async fn get_tx_by_hash(&mut self, hash: &[u8]) -> QueryResult<Option<TxByHashResponse>> {
-        // Attempt to find the transaction in the list of executed operations.
-        if let Some(response) = self.find_tx_by_hash(hash).await? {
-            return Ok(Some(response));
-        }
-        // The transaction was not found in the list of executed transactions.
-        // Check executed priority operations list.
-        if let Some(response) = self.find_priority_op_by_hash(hash).await? {
-            return Ok(Some(response));
-        }
+        let start = Instant::now();
 
-        // There is no executed transaction with the provided hash.
-        Ok(None)
+        // Attempt to find the transaction in the list of executed operations.
+        let result = if let Some(response) = self.find_tx_by_hash(hash).await? {
+            Some(response)
+        } else {
+            // If the transaction is not found in the list of executed operations check executed priority operations list.
+            self.find_priority_op_by_hash(hash).await?
+        };
+
+        metrics::histogram!("sql.chain.operations_ext.get_tx_by_hash", start.elapsed());
+        Ok(result)
     }
 
     /// Helper method for `get_tx_by_hash` which attempts to find a transaction

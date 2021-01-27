@@ -30,6 +30,7 @@ impl<'a, 'c> DataRestoreSchema<'a, 'c> {
         commit_op: Operation,
         verify_op: Operation,
     ) -> QueryResult<()> {
+        let start = Instant::now();
         let new_state = self.new_storage_state("None");
         let mut transaction = self.0.start_transaction().await?;
 
@@ -57,6 +58,7 @@ impl<'a, 'c> DataRestoreSchema<'a, 'c> {
         //     .update_storage_state(new_state)
         //     .await?;
         transaction.commit().await?;
+        metrics::histogram!("sql.data_restore.save_block_operations", start.elapsed());
         Ok(())
     }
 
@@ -64,12 +66,14 @@ impl<'a, 'c> DataRestoreSchema<'a, 'c> {
         &mut self,
         genesis_acc_update: AccountUpdate,
     ) -> QueryResult<()> {
+        let start = Instant::now();
         let mut transaction = self.0.start_transaction().await?;
         StateSchema(&mut transaction)
             .commit_state_update(0, &[(0, genesis_acc_update)], 0)
             .await?;
         StateSchema(&mut transaction).apply_state_update(0).await?;
         transaction.commit().await?;
+        metrics::histogram!("sql.data_restore.save_genesis_state", start.elapsed());
         Ok(())
     }
 
@@ -167,6 +171,7 @@ impl<'a, 'c> DataRestoreSchema<'a, 'c> {
         token_events: &[NewTokenEvent],
         last_watched_eth_number: &str,
     ) -> QueryResult<()> {
+        let start = Instant::now();
         let new_state = self.new_storage_state("Events");
         let mut transaction = self.0.start_transaction().await?;
         DataRestoreSchema(&mut transaction)
@@ -190,6 +195,7 @@ impl<'a, 'c> DataRestoreSchema<'a, 'c> {
 
         transaction.commit().await?;
 
+        metrics::histogram!("sql.data_restore.save_events_state", start.elapsed());
         Ok(())
     }
 

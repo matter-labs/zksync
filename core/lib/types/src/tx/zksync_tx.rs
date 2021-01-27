@@ -2,13 +2,13 @@ use num::BigUint;
 use parity_crypto::digest::sha256;
 use serde::{Deserialize, Serialize};
 
-use zksync_basic_types::Address;
+use zksync_basic_types::{AccountId, Address};
 
 use crate::{
     operations::ChangePubKeyOp,
     tx::{ChangePubKey, Close, ForcedExit, Transfer, TxEthSignature, TxHash, Withdraw},
     utils::deserialize_eth_message,
-    CloseOp, ForcedExitOp, Nonce, TokenLike, TransferOp, TxFeeTypes, WithdrawOp,
+    CloseOp, ForcedExitOp, Nonce, Token, TokenId, TokenLike, TransferOp, TxFeeTypes, WithdrawOp,
 };
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -116,6 +116,16 @@ impl ZkSyncTx {
         }
     }
 
+    pub fn account_id(&self) -> anyhow::Result<AccountId> {
+        match self {
+            ZkSyncTx::Transfer(tx) => Ok(tx.account_id),
+            ZkSyncTx::Withdraw(tx) => Ok(tx.account_id),
+            ZkSyncTx::ChangePubKey(tx) => Ok(tx.account_id),
+            ZkSyncTx::ForcedExit(tx) => Ok(tx.initiator_account_id),
+            ZkSyncTx::Close(_) => Err(anyhow::anyhow!("Close operations are disabled")),
+        }
+    }
+
     /// Returns the account nonce associated with transaction.
     pub fn nonce(&self) -> Nonce {
         match self {
@@ -124,6 +134,20 @@ impl ZkSyncTx {
             ZkSyncTx::Close(tx) => tx.nonce,
             ZkSyncTx::ChangePubKey(tx) => tx.nonce,
             ZkSyncTx::ForcedExit(tx) => tx.nonce,
+        }
+    }
+
+    /// Returns the token used to pay the transaction fee with.
+    ///
+    /// For `Close` we return 0 and expect the server to decline
+    /// the transaction before the call to this method.
+    pub fn token_id(&self) -> TokenId {
+        match self {
+            ZkSyncTx::Transfer(tx) => tx.token,
+            ZkSyncTx::Withdraw(tx) => tx.token,
+            ZkSyncTx::Close(_) => 0,
+            ZkSyncTx::ChangePubKey(tx) => tx.fee_token,
+            ZkSyncTx::ForcedExit(tx) => tx.token,
         }
     }
 
@@ -138,6 +162,46 @@ impl ZkSyncTx {
             ZkSyncTx::Close(tx) => tx.check_correctness(),
             ZkSyncTx::ChangePubKey(tx) => tx.check_correctness(),
             ZkSyncTx::ForcedExit(tx) => tx.check_correctness(),
+        }
+    }
+
+    /// Returns a message that user has to sign to send the transaction.
+    /// If the transaction doesn't need a message signature, returns `None`.
+    /// `ChangePubKey` message is handled separately since its Ethereum signature
+    /// is passed to the contract.
+    pub fn get_ethereum_sign_message(&self, token: Token) -> Option<String> {
+        match self {
+            ZkSyncTx::Transfer(tx) => {
+                Some(tx.get_ethereum_sign_message(&token.symbol, token.decimals))
+            }
+            ZkSyncTx::Withdraw(tx) => {
+                Some(tx.get_ethereum_sign_message(&token.symbol, token.decimals))
+            }
+            ZkSyncTx::ForcedExit(tx) => {
+                Some(tx.get_ethereum_sign_message(&token.symbol, token.decimals))
+            }
+            _ => None,
+        }
+    }
+
+    /// Returns the corresponding part of the batch message user has to sign in order
+    /// to send it. In this case we handle `ChangePubKey` on the server side and
+    /// expect a line in the message for it.
+    pub fn get_ethereum_sign_message_part(&self, token: Token) -> Option<String> {
+        match self {
+            ZkSyncTx::Transfer(tx) => {
+                Some(tx.get_ethereum_sign_message_part(&token.symbol, token.decimals))
+            }
+            ZkSyncTx::Withdraw(tx) => {
+                Some(tx.get_ethereum_sign_message_part(&token.symbol, token.decimals))
+            }
+            ZkSyncTx::ChangePubKey(tx) => {
+                Some(tx.get_ethereum_sign_message_part(&token.symbol, token.decimals))
+            }
+            ZkSyncTx::ForcedExit(tx) => {
+                Some(tx.get_ethereum_sign_message_part(&token.symbol, token.decimals))
+            }
+            _ => None,
         }
     }
 
@@ -222,13 +286,13 @@ impl ZkSyncTx {
     }
 
     /// Returns the unix format timestamp of the first moment when transaction execution is valid.
-    pub fn valid_from(&self) -> u32 {
+    pub fn valid_from(&self) -> u64 {
         match self {
-            ZkSyncTx::Transfer(tx) => tx.valid_from.unwrap_or(0),
-            ZkSyncTx::Withdraw(tx) => tx.valid_from.unwrap_or(0),
-            ZkSyncTx::ChangePubKey(tx) => tx.valid_from.unwrap_or(0),
-            ZkSyncTx::ForcedExit(tx) => tx.valid_from.unwrap_or(0),
-            ZkSyncTx::Close(tx) => tx.valid_from.unwrap_or(0),
+            ZkSyncTx::Transfer(tx) => tx.time_range.unwrap_or_default().valid_from,
+            ZkSyncTx::Withdraw(tx) => tx.time_range.unwrap_or_default().valid_from,
+            ZkSyncTx::ChangePubKey(tx) => tx.time_range.unwrap_or_default().valid_from,
+            ZkSyncTx::ForcedExit(tx) => tx.time_range.valid_from,
+            ZkSyncTx::Close(tx) => tx.time_range.valid_from,
         }
     }
 }

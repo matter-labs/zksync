@@ -13,6 +13,7 @@
 //!
 //! Communication with db:
 //! on restart mempool restores nonces of the accounts that are stored in the account tree.
+//! on accepting ChangePubKey tx saves account type - Owned or CREATE2
 
 // Built-in deps
 use std::{
@@ -34,11 +35,11 @@ use tokio::sync::RwLock;
 use tokio::task::JoinHandle;
 
 // Workspace uses
-use zksync_config::ConfigurationOptions;
-use zksync_storage::ConnectionPool;
+use zksync_config::ZkSyncConfig;
+use zksync_storage::{chain::account::records::EthAccountType, ConnectionPool, StorageProcessor};
 use zksync_types::{
     mempool::{SignedTxVariant, SignedTxsBatch},
-    tx::TxEthSignature,
+    tx::{ChangePubKey, TxEthSignature},
     AccountId, AccountUpdate, AccountUpdates, Address, Nonce, PriorityOp, SignedZkSyncTx,
     TransferOp, TransferToNewOp, ZkSyncTx,
 };
@@ -433,14 +434,12 @@ struct MempoolTransactionsHandler {
     mempool_state: Arc<RwLock<MempoolState>>,
     requests: mpsc::Receiver<MempoolTransactionRequest>,
     max_block_size_chunks: usize,
-    max_number_of_withdrawals_per_block: usize,
 }
 
 struct MempoolTransactionsHandlerBuilder {
     db_pool: ConnectionPool,
     mempool_state: Arc<RwLock<MempoolState>>,
     max_block_size_chunks: usize,
-    max_number_of_withdrawals_per_block: usize,
 }
 
 impl BuildBalancedItem<MempoolTransactionRequest, MempoolTransactionsHandler>
@@ -455,9 +454,30 @@ impl BuildBalancedItem<MempoolTransactionRequest, MempoolTransactionsHandler>
             mempool_state: self.mempool_state.clone(),
             requests: receiver,
             max_block_size_chunks: self.max_block_size_chunks,
-            max_number_of_withdrawals_per_block: self.max_number_of_withdrawals_per_block,
         }
     }
+}
+
+async fn store_account_type(
+    tx: &ChangePubKey,
+    storage: &mut StorageProcessor<'_>,
+) -> Result<(), TxAddError> {
+    let account_type = if tx
+        .eth_auth_data
+        .as_ref()
+        .map(|auth| auth.is_create2())
+        .unwrap_or(false)
+    {
+        EthAccountType::CREATE2
+    } else {
+        EthAccountType::Owned
+    };
+    storage
+        .chain()
+        .account_schema()
+        .set_account_type(tx.account_id, account_type)
+        .await
+        .map_err(|_| TxAddError::DbError)
 }
 
 impl MempoolTransactionsHandler {
@@ -480,6 +500,12 @@ impl MempoolTransactionsHandler {
                 log::warn!("Mempool storage access error: {}", err);
                 TxAddError::DbError
             })?;
+
+        // WARNING: we are saving account type in mempool, this presents
+        // a possibility for users to spam our database using lots of invalid txs
+        if let ZkSyncTx::ChangePubKey(tx) = &tx.tx {
+            store_account_type(&tx, &mut transaction).await?;
+        }
 
         transaction.commit().await.map_err(|err| {
             log::warn!("Mempool storage access error: {}", err);
@@ -509,20 +535,15 @@ impl MempoolTransactionsHandler {
             return Err(TxAddError::BatchTooBig);
         }
 
-        let mut number_of_withdrawals = 0;
-        for tx in txs {
-            if tx.tx.is_withdraw() {
-                number_of_withdrawals += 1;
-            }
-        }
-        if number_of_withdrawals > self.max_number_of_withdrawals_per_block {
-            return Err(TxAddError::BatchWithdrawalsOverload);
-        }
-
         let mut transaction = storage.start_transaction().await.map_err(|err| {
             log::warn!("Mempool storage access error: {}", err);
             TxAddError::DbError
         })?;
+        for tx in txs {
+            if let ZkSyncTx::ChangePubKey(tx) = &tx.tx {
+                store_account_type(&tx, &mut transaction).await?;
+            }
+        }
         let batch_id = transaction
             .chain()
             .mempool_schema()
@@ -565,7 +586,7 @@ pub fn run_mempool_tasks(
     tx_requests: mpsc::Receiver<MempoolTransactionRequest>,
     block_requests: mpsc::Receiver<MempoolBlocksRequest>,
     eth_watch_req: mpsc::Sender<EthWatchRequest>,
-    config: &ConfigurationOptions,
+    config: &ZkSyncConfig,
     number_of_mempool_transaction_handlers: u8,
     channel_capacity: usize,
 ) -> JoinHandle<()> {
@@ -573,18 +594,18 @@ pub fn run_mempool_tasks(
     tokio::spawn(async move {
         let mempool_state = Arc::new(RwLock::new(MempoolState::restore_from_db(&db_pool).await));
         let max_block_size_chunks = *config
-            .available_block_chunk_sizes
+            .chain
+            .state_keeper
+            .block_chunk_sizes
             .iter()
             .max()
             .expect("failed to find max block chunks size");
-
         let mut tasks = vec![];
         let (balancer, handlers) = Balancer::new(
             MempoolTransactionsHandlerBuilder {
                 db_pool: db_pool.clone(),
                 mempool_state: mempool_state.clone(),
                 max_block_size_chunks,
-                max_number_of_withdrawals_per_block: config.max_number_of_withdrawals_per_block,
             },
             tx_requests,
             number_of_mempool_transaction_handlers,

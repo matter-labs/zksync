@@ -42,8 +42,7 @@ fn test_forced_exit_success() {
                 &account_to.account.address,
                 None,
                 true,
-                0,
-                u32::MAX,
+                Default::default(),
             ),
             target_account_id: account_to.id,
             withdraw_amount: Some(BigUint::from(withdraw_amount).into()),
@@ -95,8 +94,7 @@ fn corrupted_ops_input() {
             &account_to.account.address,
             None,
             true,
-            0,
-            u32::MAX,
+            Default::default(),
         ),
         target_account_id: account_to.id,
         withdraw_amount: Some(BigUint::from(withdraw_amount).into()),
@@ -150,8 +148,7 @@ fn test_incorrect_target() {
             &account_to.account.address,
             None,
             true,
-            0,
-            u32::MAX,
+            Default::default(),
         ),
         target_account_id: account_to.id,
         withdraw_amount: Some(BigUint::from(WITHDRAW_AMOUNT).into()),
@@ -175,17 +172,13 @@ fn test_incorrect_target() {
     );
 }
 
-/// Checks that executing a transfer operation with incorrect
-/// data (target account has signing key set) results in an error.
+/// Checks that executing a forced exit operation for target account with pubkey set is correct
 #[test]
 #[ignore]
 fn test_target_has_key_set() {
     const TOKEN_ID: u16 = 0;
     const FEE_AMOUNT: u64 = 3;
     const WITHDRAW_AMOUNT: u64 = 100;
-
-    // Operation is not valid, since account has signing key set.
-    const ERR_MSG: &str = "op_valid is true/enforce equal to one";
 
     // Input data: we DO NOT reset the signing key for the second account.
     let accounts = vec![
@@ -201,8 +194,7 @@ fn test_target_has_key_set() {
             &account_to.account.address,
             None,
             true,
-            0,
-            u32::MAX,
+            Default::default(),
         ),
         target_account_id: account_to.id,
         withdraw_amount: Some(BigUint::from(WITHDRAW_AMOUNT).into()),
@@ -212,16 +204,17 @@ fn test_target_has_key_set() {
     let input =
         SigDataInput::from_forced_exit_op(&forced_exit_op).expect("SigDataInput creation failed");
 
-    incorrect_op_test_scenario::<ForcedExitWitness<Bn256>, _>(
+    generic_test_scenario::<ForcedExitWitness<Bn256>, _>(
         &accounts,
         forced_exit_op,
         input,
-        ERR_MSG,
-        || {
-            vec![CollectedFee {
-                token: TOKEN_ID,
-                amount: FEE_AMOUNT.into(),
-            }]
+        |plasma_state, op| {
+            let fee = <ZkSyncState as TxHandler<ForcedExit>>::apply_op(plasma_state, &op)
+                .expect("ForcedExit failed")
+                .0
+                .unwrap();
+
+            vec![fee]
         },
     );
 }
@@ -254,8 +247,7 @@ fn test_not_enough_fees() {
             &account_to.account.address,
             None,
             true,
-            0,
-            u32::MAX,
+            Default::default(),
         ),
         target_account_id: account_to.id,
         withdraw_amount: Some(BigUint::from(WITHDRAW_AMOUNT).into()),
@@ -306,8 +298,7 @@ fn test_not_enough_balance() {
             &account_to.account.address,
             None,
             true,
-            0,
-            u32::MAX,
+            Default::default(),
         ),
         target_account_id: account_to.id,
         withdraw_amount: Some(BigUint::from(WITHDRAW_AMOUNT).into()),
@@ -359,8 +350,7 @@ fn test_not_exact_withdrawal_amount() {
             &account_to.account.address,
             None,
             true,
-            0,
-            u32::MAX,
+            Default::default(),
         ),
         target_account_id: account_to.id,
         withdraw_amount: Some(BigUint::from(WITHDRAW_AMOUNT).into()),

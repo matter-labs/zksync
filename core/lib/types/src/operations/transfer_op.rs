@@ -67,8 +67,7 @@ impl TransferOp {
             .ok_or_else(|| format_err!("Cant get from account id from transfer pubdata"))?;
         let to_id = u32::from_bytes(&bytes[to_offset..to_offset + ACCOUNT_ID_BIT_WIDTH / 8])
             .ok_or_else(|| format_err!("Cant get to account id from transfer pubdata"))?;
-        let valid_from = 0; // It is unknown from pubdata
-        let valid_until = u32::MAX; // It is unknown from pubdata
+        let time_range = Default::default();
 
         Ok(Self {
             tx: Transfer::new(
@@ -79,8 +78,7 @@ impl TransferOp {
                 amount,
                 fee,
                 nonce,
-                valid_from,
-                valid_until,
+                time_range,
                 None,
             ),
             from: from_id,

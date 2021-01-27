@@ -69,21 +69,11 @@ impl TransferToNewOp {
         )
         .ok_or_else(|| format_err!("Cant get fee from transfer to new pubdata"))?;
         let nonce = 0; // It is unknown from pubdata
-        let valid_from = 0; // It is unknown from pubdata
-        let valid_until = u32::MAX; // It is unknown from pubdata
+        let time_range = Default::default();
 
         Ok(Self {
             tx: Transfer::new(
-                from_id,
-                from,
-                to,
-                token,
-                amount,
-                fee,
-                nonce,
-                valid_from,
-                valid_until,
-                None,
+                from_id, from, to, token, amount, fee, nonce, time_range, None,
             ),
             from: from_id,
             to: to_id,

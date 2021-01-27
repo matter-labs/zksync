@@ -1,13 +1,13 @@
 // Built-in deps
 use std::sync::Mutex;
 // Workspace deps
-use zksync_config::AvailableBlockSizesConfig;
+use zksync_config::ChainConfig;
 use zksync_crypto::proof::{AggregatedProof, PrecomputedSampleProofs, SingleProof};
 use zksync_crypto::Engine;
 use zksync_prover_utils::aggregated_proofs::{gen_aggregate_proof, prepare_proof_data};
 use zksync_prover_utils::api::{JobRequestData, JobResultData};
 use zksync_prover_utils::{PlonkVerificationKey, SetupForStepByStepProver};
-use zksync_utils::{parse_env, parse_env_to_collection};
+use zksync_utils::parse_env;
 // Local deps
 use crate::{ProverConfig, ProverImpl};
 use zksync_prover_utils::fs_utils::load_precomputed_proofs;
@@ -34,12 +34,16 @@ pub struct PlonkStepByStepProverConfig {
 
 impl ProverConfig for PlonkStepByStepProverConfig {
     fn from_env() -> Self {
+        let env_config = ChainConfig::from_env();
+
+        let aggregated_proof_sizes_with_setup_pow =
+            env_config.circuit.aggregated_proof_sizes_with_setup_pow();
+
         Self {
-            all_block_sizes: parse_env_to_collection("SUPPORTED_BLOCK_CHUNKS_SIZES"),
-            block_sizes: parse_env_to_collection("BLOCK_CHUNK_SIZES"),
-            download_setup_from_network: parse_env("PROVER_DOWNLOAD_SETUP"),
-            aggregated_proof_sizes_with_setup_pow: AvailableBlockSizesConfig::from_env()
-                .aggregated_proof_sizes_with_setup_pow(),
+            download_setup_from_network: parse_env("MISC_PROVER_DOWNLOAD_SETUP"),
+            all_block_sizes: env_config.circuit.supported_block_chunks_sizes,
+            block_sizes: env_config.state_keeper.block_chunk_sizes,
+            aggregated_proof_sizes_with_setup_pow,
         }
     }
 }
