@@ -226,6 +226,19 @@ describe(`ZkSync integration tests (token: ${token}, transport: ${transport})`, 
             TX_AMOUNT
         );
     });
+
+    it('should recover multiple withdrawals', async () => {
+        if (token === 'ETH') {
+            return;
+        }
+
+       await tester.testRecoverMultipleWithdrawals(
+           alice,
+           [TEST_CONFIG.withdrawalHelpers.revert_receive_address, TEST_CONFIG.withdrawalHelpers.revert_receive_address],
+           ['ETH', 'wBTC'],
+           [TX_AMOUNT, TX_AMOUNT]
+       );
+    })
 });
 
 // wBTC is chosen because it has decimals different from ETH (8 instead of 18).

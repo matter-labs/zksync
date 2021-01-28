@@ -25,7 +25,7 @@ export function loadTestConfig() {
     const ethConstantPath = configPath('constant/eth.json');
     const ethConfig = loadConfig(ethConstantPath);
 
-    const withdrawalHelpersConfigPoth = configPath('volatile/withdrawal-helpers-dev.json');
+    const withdrawalHelpersConfigPoth = configPath('volatile/withdrawal-helpers.json');
     const withdrawalHelpersConfig = loadConfig(withdrawalHelpersConfigPoth);
 
     return {

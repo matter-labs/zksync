@@ -8,7 +8,7 @@ contract RevertReceiveAccount {
     bool public revertReceive;
 
     constructor() {
-        revertReceive = true;
+        revertReceive = false;
     }
 
     function setRevertReceive(bool newValue) public {

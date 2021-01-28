@@ -1,14 +1,16 @@
 import { Tester } from './tester';
 import { expect } from 'chai';
-import { Wallet, types } from 'zksync';
-import { BigNumber, ethers, Signer } from 'ethers';
+import { Wallet, types, Provider, utils } from 'zksync';
+import { BigNumber, Contract, ethers, Signer } from 'ethers';
 import { SignedTransaction, TxEthSignature, Address } from 'zksync/build/types';
 import { serializeTx, sleep } from 'zksync/build/utils';
 import { submitSignedTransactionsBatch } from 'zksync/build/wallet';
 import { MAX_TIMESTAMP } from 'zksync/build/utils';
 
 import { RevertReceiveAccountFactory, RevertTransferERC20Factory } from '../../../../contracts/typechain';
-import { waitForOnchainWithdrawal }  from './helpers';
+import { waitForOnchainWithdrawal, loadTestConfig }  from './helpers';
+
+const TEST_CONFIG = loadTestConfig();
 
 import { withdrawalHelpers } from 'zksync';
 
@@ -21,6 +23,7 @@ declare module './tester' {
         testMultipleWalletsWrongSignature(from: Wallet, to: Wallet, token: TokenLike, amount: BigNumber): Promise<void>;
         testRecoverETHWithdrawal(from: Wallet, to: Address, amount: BigNumber): Promise<void>;
         testRecoverERC20Withdrawal(from: Wallet, to: Address, token: TokenLike, amount: BigNumber): Promise<void>;
+        testRecoverMultipleWithdrawals(from: Wallet, to: Address[], token: TokenLike[], amount: BigNumber[]): Promise<void>;
     }
 }
 
@@ -275,4 +278,150 @@ Tester.prototype.testRecoverERC20Withdrawal = async function (
     const expectedToBalance = balanceBefore.add(amount);
     const toBalance = await revertTransferERC20.balanceOf(to);    
     expect(toBalance.eq(expectedToBalance), "The withdrawal was not recovered").to.be.true;
+}
+
+async function setRevertReceive(
+    ethWallet: ethers.Signer,
+    to: Address,
+    value: boolean
+) {
+    const revertReceiveContract = RevertReceiveAccountFactory.connect(
+        to,
+        ethWallet
+    );
+
+    const tx = await revertReceiveContract.setRevertReceive(value);
+    tx.wait();
+}
+
+async function setRevertTransfer(
+    ethWallet: ethers.Signer,
+    tokenAddress: Address,
+    value: boolean
+) {
+    const revertTransferERC20 = RevertTransferERC20Factory.connect(
+        tokenAddress,
+        ethWallet
+    );
+
+    const tx = await revertTransferERC20.setRevertTransfer(value);
+    tx.wait();
+}
+
+async function setRevert(
+    ethWallet: ethers.Signer,
+    provider: Provider,
+    recipient: Address,
+    token: TokenLike,
+    value: boolean
+) {
+    const tokenSymbol = provider.tokenSet.resolveTokenSymbol(token);
+    const tokenAddress = provider.tokenSet.resolveTokenAddress(token);
+    
+    if (tokenSymbol === 'ETH') {
+        await setRevertReceive(ethWallet, recipient, value);
+    } else {
+        await setRevertTransfer(ethWallet, tokenAddress, value)
+    }
+}
+
+Tester.prototype.testRecoverMultipleWithdrawals = async function (
+    from: Wallet,
+    to: Address[],
+    token: TokenLike[],
+    amount: BigNumber[]
+) {
+
+    const balancesBefore = await Promise.all(to.map(async (recipient, i) => {
+        return utils.getEthereumBalance(
+            this.ethProvider,
+            this.syncProvider,
+            recipient,
+            token[i]
+        );
+    })); 
+
+    // Make sure that all the withdrawal will fall
+    await Promise.all(to.map(async (recipient, i) => {
+        await setRevert(
+            from.ethSigner, 
+            this.syncProvider, 
+            recipient, 
+            token[i],
+            true
+        );
+    }));
+
+    // Send the withdrawals and wait until they are sent onchain
+    await Promise.all(to.map(async (recipient, i) => {
+        const withdrawTx = await from.withdrawFromSyncToEthereum({
+            ethAddress: recipient,
+            token: token[i],
+            amount: amount[i]
+        });
+        await withdrawTx.awaitVerifyReceipt();
+
+        const withdrawalTxHash = await waitForOnchainWithdrawal(
+            this.syncProvider,
+            withdrawTx.txHash
+        );
+        expect(withdrawalTxHash, 'Withdrawal was not processed onchain').to.exist;
+    }));
+
+    const balancesAfter = await Promise.all(to.map(async (recipient, i) => {
+        return utils.getEthereumBalance(
+            this.ethProvider,
+            this.syncProvider,
+            recipient,
+            token[i]
+        );
+    })); 
+
+    // Check that all the withdrawals indeed failed 
+    balancesBefore.forEach((balance, i) => {
+        expect(
+            balance.eq(balancesAfter[i]), 
+            `The withdrawal ${i} did not fail the first time`
+        ).to.be.true;
+    });
+
+    // Make sure that all the withdrawal will pass
+    await Promise.all(to.map(async (recipient, i) => {
+        await setRevert(
+            from.ethSigner, 
+            this.syncProvider, 
+            recipient, 
+            token[i],
+            true
+        );
+    }));
+
+    const handle = await withdrawalHelpers.withdrawPendingBalances(
+        this.syncProvider,
+        from.ethSigner,
+        to,
+        token,
+        {
+            address: TEST_CONFIG.withdrawalHelpers.multicall_address
+        }
+    );
+    
+    await handle.wait();
+
+    const balancesAfterRecovery = await Promise.all(to.map(async (recipient, i) => {
+        return utils.getEthereumBalance(
+            this.ethProvider,
+            this.syncProvider,
+            recipient,
+            token[i]
+        );
+    })); 
+
+    // Check that all the withdrawals indeed failed 
+    balancesAfterRecovery.forEach((balance, i) => {
+        expect(
+            balance.eq(balancesBefore[i].add(amount[i])), 
+            `The withdrawal ${i} was not recovered`
+        ).to.be.true;
+    });
 }

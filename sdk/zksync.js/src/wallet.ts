@@ -37,7 +37,8 @@ import {
     getSignedBytesFromMessage,
     serializeTransfer,
     getChangePubkeyMessage,
-    MAX_TIMESTAMP
+    MAX_TIMESTAMP,
+    getEthereumBalance
 } from './utils';
 import validate = WebAssembly.validate;
 
@@ -750,22 +751,16 @@ export class Wallet {
     }
 
     async getEthereumBalance(token: TokenLike): Promise<BigNumber> {
-        let balance: BigNumber;
-        if (isTokenETH(token)) {
-            balance = await this.ethSigner.provider.getBalance(this.cachedAddress);
-        } else {
-            const erc20contract = new Contract(
-                this.provider.tokenSet.resolveTokenAddress(token),
-                IERC20_INTERFACE,
-                this.ethSigner
+        try {
+            return getEthereumBalance(
+                this.ethSigner.provider,
+                this.provider,
+                this.cachedAddress,
+                token
             );
-            try {
-                balance = await erc20contract.balanceOf(this.cachedAddress);
-            } catch (e) {
-                this.modifyEthersError(e);
-            }
+        } catch(e) {
+            this.modifyEthersError(e);
         }
-        return balance;
     }
 
     async isERC20DepositsApproved(
