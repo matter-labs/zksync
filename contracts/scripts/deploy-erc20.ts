@@ -22,8 +22,8 @@ type Token = {
 };
 
 type TokenDescription = Token & {
-    implementation?: string
-}
+    implementation?: string;
+};
 
 async function deployToken(token: TokenDescription): Promise<Token> {
     token.implementation = token.implementation || DEFAULT_ERC20;
@@ -44,7 +44,7 @@ async function deployToken(token: TokenDescription): Promise<Token> {
     token.address = erc20.address;
 
     // Remove the unneeded field
-    if(token.implementation) {
+    if (token.implementation) {
         delete token.implementation;
     }
 
@@ -64,10 +64,10 @@ async function main() {
         .option('-i --implementation <implementation>')
         .description('Adds a new token with a given fields')
         .action(async (cmd: Command) => {
-            const token: TokenDescription = { 
-                address: null, 
-                name: cmd.token_name, 
-                symbol: cmd.symbol, 
+            const token: TokenDescription = {
+                address: null,
+                name: cmd.token_name,
+                symbol: cmd.symbol,
                 decimals: cmd.decimals,
                 implementation: cmd.implementation
             };

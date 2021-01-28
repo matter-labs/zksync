@@ -115,7 +115,7 @@ export async function server() {
 }
 
 export async function withdrawalHelpers() {
-    await utils.spawn('yarn ts-tests withdrawal-helpers-test')
+    await utils.spawn('yarn ts-tests withdrawal-helpers-test');
 }
 
 export async function testkit(command: string, timeout: number) {

@@ -721,7 +721,7 @@ export async function getEthereumBalance(
             IERC20_INTERFACE,
             ethProvider
         );
-        
+
         balance = await erc20contract.balanceOf(address);
     }
     return balance;

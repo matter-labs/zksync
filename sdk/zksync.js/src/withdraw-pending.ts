@@ -1,19 +1,18 @@
-
 import { BigNumberish, ethers, Contract, BigNumber, utils, ContractTransaction } from 'ethers';
-import { Address, TokenLike, Network } from './types'; 
+import { Address, TokenLike, Network } from './types';
 import { SYNC_MAIN_CONTRACT_INTERFACE, MULTICALL_INTERFACE } from './utils';
 import { Provider } from '.';
 
 interface WithdrawPendingBalanceParams {
-    owner: Address,
-    token: Address,
-    amount: BigNumberish
+    owner: Address;
+    token: Address;
+    amount: BigNumberish;
 }
 
 interface MulticallParams {
-    address?: Address,
-    network?: Network,
-    gasLimit?: BigNumberish
+    address?: Address;
+    network?: Network;
+    gasLimit?: BigNumberish;
 }
 
 async function getWithdrawPendingBalanceParams(
@@ -23,17 +22,9 @@ async function getWithdrawPendingBalanceParams(
     token: TokenLike,
     amount?: BigNumberish
 ): Promise<WithdrawPendingBalanceParams> {
+    const tokenAddress = syncProvider.tokenSet.resolveTokenAddress(token);
 
-    const tokenAddress = syncProvider.tokenSet.resolveTokenAddress(
-        token
-    );
-
-    const withdrawAmount = amount 
-        ? amount
-        : await syncContract.getPendingBalance(
-        from,
-        tokenAddress
-    );
+    const withdrawAmount = amount ? amount : await syncContract.getPendingBalance(from, tokenAddress);
 
     return {
         owner: from,
@@ -43,7 +34,7 @@ async function getWithdrawPendingBalanceParams(
 }
 
 function getMulticallAddressByNetwork(network: Network) {
-    switch(network) {
+    switch (network) {
         case 'rinkeby':
         case 'rinkeby-beta':
             return '0x42ad527de7d4e9d9d011ac45b31d8551f8fe9821';
@@ -64,38 +55,22 @@ export async function withdrawPendingBalance(
     token: TokenLike,
     amount?: BigNumberish
 ): Promise<ContractTransaction> {
-
     if (!ethersWallet.provider) {
         throw new Error('The Ethereum Wallet must be connected to a provider');
     }
 
     const contractAddress = syncProvider.contractAddress.mainContract;
 
-    const zksyncContract = new Contract(
-        contractAddress,
-        SYNC_MAIN_CONTRACT_INTERFACE,
-        ethersWallet
-    );
+    const zksyncContract = new Contract(contractAddress, SYNC_MAIN_CONTRACT_INTERFACE, ethersWallet);
 
     const gasPrice = await ethersWallet.provider.getGasPrice();
-        
-    const callParams = await getWithdrawPendingBalanceParams(
-        syncProvider,
-        zksyncContract,
-        from,
-        token,
-        amount
-    );
 
-    return zksyncContract.withdrawPendingBalance(
-        callParams.owner,
-        callParams.token,
-        callParams.amount, 
-        {
-            gasLimit: BigNumber.from('200000'),
-            gasPrice,
-        }
-    ) as ContractTransaction;
+    const callParams = await getWithdrawPendingBalanceParams(syncProvider, zksyncContract, from, token, amount);
+
+    return zksyncContract.withdrawPendingBalance(callParams.owner, callParams.token, callParams.amount, {
+        gasLimit: BigNumber.from('200000'),
+        gasPrice
+    }) as ContractTransaction;
 }
 
 export async function withdrawPendingBalances(
@@ -107,25 +82,21 @@ export async function withdrawPendingBalances(
     amounts?: BigNumberish[]
 ): Promise<ContractTransaction> {
     if (tokens.length != addresses.length) {
-        throw new Error('The array of addresses and the tokens should be the same length')
+        throw new Error('The array of addresses and the tokens should be the same length');
     }
 
     const multicallAddress = multicallParams.address || getMulticallAddressByNetwork(multicallParams.network);
 
     const contractAddress = syncProvider.contractAddress.mainContract;
-    const zksyncContract = new Contract(
-        contractAddress,
-        SYNC_MAIN_CONTRACT_INTERFACE,
-        ethersWallet
-    );
+    const zksyncContract = new Contract(contractAddress, SYNC_MAIN_CONTRACT_INTERFACE, ethersWallet);
     const gasPrice = await ethersWallet.provider.getGasPrice();
-    
-    const tokensAddresses = tokens.map(token => syncProvider.tokenSet.resolveTokenAddress(token));
-        
+
+    const tokensAddresses = tokens.map((token) => syncProvider.tokenSet.resolveTokenAddress(token));
+
     if (!amounts) {
-        const pendingWithdrawalsPromises = addresses.map((address, i) => (
+        const pendingWithdrawalsPromises = addresses.map((address, i) =>
             zksyncContract.getPendingBalance(address, tokensAddresses[i])
-        ));
+        );
         amounts = await Promise.all(pendingWithdrawalsPromises);
     }
 
@@ -134,32 +105,19 @@ export async function withdrawPendingBalances(
     }
 
     const calls = addresses.map((address, i) => {
-        const callData = zksyncContract.interface.encodeFunctionData(
-            "withdrawPendingBalance",
-            [
-                address,
-                tokensAddresses[i],
-                amounts[i]
-            ]
-        )
+        const callData = zksyncContract.interface.encodeFunctionData('withdrawPendingBalance', [
+            address,
+            tokensAddresses[i],
+            amounts[i]
+        ]);
 
-        return [
-            zksyncContract.address,
-            callData
-        ];
+        return [zksyncContract.address, callData];
     });
 
-    const multicallContract = new Contract(
-        multicallAddress,
-        MULTICALL_INTERFACE,
-        ethersWallet
-    );
+    const multicallContract = new Contract(multicallAddress, MULTICALL_INTERFACE, ethersWallet);
 
-    return multicallContract.aggregate(
-        calls,
-        {
-            gasLimit: multicallParams.gasLimit || BigNumber.from('300000'),
-            gasPrice,
-        }
-    ) as ContractTransaction;
+    return multicallContract.aggregate(calls, {
+        gasLimit: multicallParams.gasLimit || BigNumber.from('300000'),
+        gasPrice
+    }) as ContractTransaction;
 }

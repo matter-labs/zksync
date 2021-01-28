@@ -1,6 +1,6 @@
 import { Wallet } from 'zksync';
 import { Tester } from './tester';
-import  { utils } from 'ethers';
+import { utils } from 'ethers';
 import './priority-ops';
 import './change-pub-key';
 import './withdrawal-helpers';
@@ -35,11 +35,7 @@ describe('Withdrawal helpers tests', () => {
     });
 
     it('should recover failed ETH withdraw', async () => {
-        await tester.testRecoverETHWithdrawal(
-            alice,
-            TEST_CONFIG.withdrawalHelpers.revert_receive_address,
-            TX_AMOUNT
-        );
+        await tester.testRecoverETHWithdrawal(alice, TEST_CONFIG.withdrawalHelpers.revert_receive_address, TX_AMOUNT);
     });
 
     it('should recover failed ERC20 withdraw', async () => {
@@ -54,10 +50,12 @@ describe('Withdrawal helpers tests', () => {
     it('should recover multiple withdrawals', async () => {
         await tester.testRecoverMultipleWithdrawals(
             alice,
-            [TEST_CONFIG.withdrawalHelpers.revert_receive_address, TEST_CONFIG.withdrawalHelpers.revert_receive_address],
+            [
+                TEST_CONFIG.withdrawalHelpers.revert_receive_address,
+                TEST_CONFIG.withdrawalHelpers.revert_receive_address
+            ],
             ['ETH', erc20Token],
             [TX_AMOUNT, TX_AMOUNT]
         );
     });
-
 });

@@ -51,9 +51,7 @@ export function getTokens(network: string) {
 }
 
 export function getRevertReceiveContractAbi() {
-    return fs.readFileSync(
-        `${process.env.ZKSYNC_HOME}/contracts/`
-    )
+    return fs.readFileSync(`${process.env.ZKSYNC_HOME}/contracts/`);
 }
 
 export async function waitForOnchainWithdrawal(
@@ -61,7 +59,7 @@ export async function waitForOnchainWithdrawal(
     hash: string,
     polling_interval: number = 200,
     polling_timeout: number = 35000
-): Promise<string|null> {
+): Promise<string | null> {
     let withdrawalTxHash = null;
     const polling_iterations = polling_timeout / polling_interval;
     for (let i = 0; i < polling_iterations; i++) {

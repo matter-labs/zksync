@@ -7,7 +7,6 @@ import "./TestnetERC20Token.sol";
 /// @title RevertTransferERC20Token - A ERC20 token contract which can revert transfers depending on a flag
 /// @dev Used for testing failed ERC-20 withdrawals from the zkSync smart contract
 contract RevertTransferERC20 is TestnetERC20Token {
-
     bool public revertTransfer;
 
     constructor(
@@ -30,5 +29,4 @@ contract RevertTransferERC20 is TestnetERC20Token {
         _transfer(_msgSender(), recipient, amount);
         return true;
     }
-
 }
