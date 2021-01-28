@@ -6,12 +6,12 @@ use crate::tx_queue::TxData;
 /// Ethereum Transaction queue is basically a queue which
 /// contains `TxData` and tracks the last popped block number.
 #[derive(Debug)]
-pub struct EthTxQueue {
+pub struct OperationQueue {
     pub(super) elements: VecDeque<TxData>,
     last_block_number: usize,
 }
 
-impl Default for EthTxQueue {
+impl Default for OperationQueue {
     fn default() -> Self {
         Self {
             last_block_number: 0,
@@ -20,7 +20,7 @@ impl Default for EthTxQueue {
     }
 }
 
-impl EthTxQueue {
+impl OperationQueue {
     /// Creates a new empty counter queue with the custom `last_block_number`.
     pub fn new(last_block_number: usize) -> Self {
         Self {
@@ -89,7 +89,7 @@ mod tests {
     /// Checks the main operations of the queue: `push_back`, `pop_front` and `get_count`.
     #[test]
     fn basic_operations() {
-        let mut queue: EthTxQueue = EthTxQueue::new(0);
+        let mut queue: OperationQueue = OperationQueue::new(0);
 
         // Create aggregate operations.
 
