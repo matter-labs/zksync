@@ -22,8 +22,7 @@ import {
     ChangePubkeyTypes,
     ChangePubKeyOnchain,
     ChangePubKeyECDSA,
-    ChangePubKeyCREATE2,
-    ZkSyncVersion
+    ChangePubKeyCREATE2
 } from './types';
 import {
     ERC20_APPROVE_TRESHOLD,
@@ -162,7 +161,7 @@ export class Wallet {
             validUntil: transfer.validUntil
         };
 
-        return this.signer.signSyncTransfer(transactionData, this.provider.zkSyncVersion);
+        return this.signer.signSyncTransfer(transactionData);
     }
 
     async signSyncTransfer(transfer: {
@@ -224,7 +223,7 @@ export class Wallet {
             validUntil: forcedExit.validUntil || MAX_TIMESTAMP
         };
 
-        return await this.signer.signSyncForcedExit(transactionData, this.provider.zkSyncVersion);
+        return await this.signer.signSyncForcedExit(transactionData);
     }
 
     async signSyncForcedExit(forcedExit: {
@@ -384,7 +383,7 @@ export class Wallet {
             validUntil: withdraw.validUntil
         };
 
-        return await this.signer.signSyncWithdraw(transactionData, this.provider.zkSyncVersion);
+        return await this.signer.signSyncWithdraw(transactionData);
     }
 
     async signWithdrawFromSyncToEthereum(withdraw: {
@@ -468,24 +467,21 @@ export class Wallet {
         }
 
         const feeTokenId = this.provider.tokenSet.resolveTokenId(changePubKey.feeToken);
-        const newPubKeyHash = await this.signer.pubKeyHash();
+        const newPkHash = await this.signer.pubKeyHash();
 
         await this.setRequiredAccountIdFromServer('Set Signing Key');
 
-        const changePubKeyTx: ChangePubKey = await this.signer.signSyncChangePubKey(
-            {
-                accountId: this.accountId,
-                account: this.address(),
-                newPkHash: await this.signer.pubKeyHash(),
-                nonce: changePubKey.nonce,
-                feeTokenId,
-                fee: BigNumber.from(changePubKey.fee).toString(),
-                ethAuthData: changePubKey.ethAuthData,
-                validFrom: changePubKey.validFrom,
-                validUntil: changePubKey.validUntil
-            },
-            this.provider.zkSyncVersion
-        );
+        const changePubKeyTx: ChangePubKey = await this.signer.signSyncChangePubKey({
+            accountId: this.accountId,
+            account: this.address(),
+            newPkHash,
+            nonce: changePubKey.nonce,
+            feeTokenId,
+            fee: BigNumber.from(changePubKey.fee).toString(),
+            ethAuthData: changePubKey.ethAuthData,
+            validFrom: changePubKey.validFrom,
+            validUntil: changePubKey.validUntil
+        });
 
         return changePubKeyTx;
     }
@@ -512,7 +508,6 @@ export class Wallet {
                 newPubKeyHash,
                 changePubKey.nonce,
                 this.accountId,
-                this.provider.zkSyncVersion,
                 changePubKey.batchHash
             );
             const ethSignature = (await this.getEthMessageSignature(changePubKeyMessage)).signature;
@@ -522,10 +517,6 @@ export class Wallet {
                 batchHash: changePubKey.batchHash
             };
         } else if (changePubKey.ethAuthType === 'CREATE2') {
-            if (this.provider.zkSyncVersion === 'contracts-3') {
-                throw new Error('CREATE2 authentication is not supported for zkSync version contracts-3');
-            }
-
             if (this.ethSigner instanceof Create2WalletSigner) {
                 const create2data = this.ethSigner.create2WalletData;
                 ethAuthData = {
