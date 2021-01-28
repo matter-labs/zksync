@@ -255,7 +255,6 @@ async fn test_find_block_by_height_or_hash(mut storage: StorageProcessor<'_>) ->
             .await?;
 
         // Initialize reference sample fields.
-        // Initialize reference sample fields.
         current_block_detail.block_number = block.block_number as i64;
         current_block_detail.new_state_root = block.new_root_hash.to_bytes();
         current_block_detail.block_size = block.block_transactions.len() as i64;

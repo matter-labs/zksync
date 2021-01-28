@@ -127,7 +127,7 @@ pub fn gen_unique_aggregated_operation(
     gen_unique_aggregated_operation_with_txs(block_number, action, block_chunks_size, vec![])
 }
 
-pub fn get_sample_block(
+pub fn gen_sample_block(
     block_number: BlockNumber,
     block_chunks_size: usize,
     txs: Vec<ExecutedOperations>,
@@ -157,7 +157,7 @@ pub fn gen_unique_operation_with_txs(
     Operation {
         id: None,
         action,
-        block: get_sample_block(block_number, block_chunks_size, txs),
+        block: gen_sample_block(block_number, block_chunks_size, txs),
     }
 }
 
@@ -169,7 +169,7 @@ pub fn gen_unique_aggregated_operation_with_txs(
     block_chunks_size: usize,
     txs: Vec<ExecutedOperations>,
 ) -> AggregatedOperation {
-    let block = get_sample_block(block_number, block_chunks_size, txs);
+    let block = gen_sample_block(block_number, block_chunks_size, txs);
 
     let result = match action {
         AggregatedActionType::CommitBlocks => {
