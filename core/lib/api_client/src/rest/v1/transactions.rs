@@ -144,7 +144,7 @@ impl Client {
         addresses: Vec<Address>,
         token_like: TokenLike,
     ) -> Result<BatchFee, ClientError> {
-        self.post("transactions/batch_fee")
+        self.post("transactions/fee/batch")
             .body(&IncomingTxBatchForFee {
                 tx_types,
                 addresses,

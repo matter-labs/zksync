@@ -9,9 +9,9 @@ use actix_web::{
 };
 
 // Workspace uses
-use zksync_api_client::rest::v1::IncomingTxForFee;
 pub use zksync_api_client::rest::v1::{
-    FastProcessingQuery, IncomingTx, IncomingTxBatch, IncomingTxBatchForFee, Receipt, TxData,
+    FastProcessingQuery, IncomingTx, IncomingTxBatch, IncomingTxBatchForFee, IncomingTxForFee,
+    Receipt, TxData,
 };
 use zksync_storage::{
     chain::operations_ext::records::TxReceiptResponse, QueryResult, StorageProcessor,
@@ -306,7 +306,7 @@ pub fn api_scope(tx_sender: TxSender) -> Scope {
         .route("{tx_hash}/receipts", web::get().to(tx_receipts))
         .route("submit", web::post().to(submit_tx))
         .route("submit/batch", web::post().to(submit_tx_batch))
-        .route("batch_fee", web::post().to(get_txs_batch_fee_in_wei))
+        .route("fee/batch", web::post().to(get_txs_batch_fee_in_wei))
         .route("fee", web::post().to(get_txs_fee_in_wei))
 }
 

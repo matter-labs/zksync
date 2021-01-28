@@ -21,7 +21,7 @@ fn generate_transactions(number: usize) -> IncomingTxBatchForFee {
 
 fn get_txs_batch_fee(client: Client, url: String, transaction: IncomingTxBatchForFee) {
     let res = client
-        .post(format!("{}/api/v1/transactions/batch_fee", url).as_str())
+        .post(format!("{}/api/v1/transactions/fee/batch", url).as_str())
         .json(&transaction)
         .send()
         .unwrap();
