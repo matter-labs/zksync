@@ -1,9 +1,8 @@
 
 import { BigNumberish, ethers, Contract, BigNumber, utils, ContractTransaction } from 'ethers';
-import { Address, TokenLike, Network } from '../types'; 
-import { SYNC_MAIN_CONTRACT_INTERFACE, MULTICALL_INTERFACE } from '../utils';
-import { Provider } from '../';
-import { ENGINE_METHOD_CIPHERS } from 'constants';
+import { Address, TokenLike, Network } from './types'; 
+import { SYNC_MAIN_CONTRACT_INTERFACE, MULTICALL_INTERFACE } from './utils';
+import { Provider } from '.';
 
 interface WithdrawPendingBalanceParams {
     owner: Address,

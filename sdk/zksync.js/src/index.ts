@@ -8,7 +8,7 @@ import * as wallet from './wallet';
 import * as types from './types';
 import * as utils from './utils';
 import * as crypto from './crypto';
-import * as withdrawalHelpers from './withdrawal-helpers';
+import * as withdrawalHelpers from './withdraw-pending';
 
 export {
     Wallet,
