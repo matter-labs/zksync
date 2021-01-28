@@ -5,6 +5,8 @@ use crate::tx_queue::TxData;
 
 /// Ethereum Transaction queue is basically a queue which
 /// contains `TxData` and tracks the last popped block number.
+///
+/// Must receive operations in ascending order of affected blocks.
 #[derive(Debug)]
 pub struct OperationQueue {
     pub(super) elements: VecDeque<TxData>,
@@ -31,8 +33,8 @@ impl OperationQueue {
 
     /// Returns a previously popped element to the front of the queue.
     pub fn return_popped(&mut self, element: TxData) {
-        assert!(
-            (element.get_block_range().1 as usize) == self.last_block_number,
+        assert_eq!(
+            self.last_block_number, (element.get_block_range().1 as usize),
             "Insert an element that affects the block numbered NOT equal to the last in the queue predecessor"
         );
         self.last_block_number = element.get_block_range().0 as usize - 1;
@@ -41,6 +43,11 @@ impl OperationQueue {
 
     /// Inserts an element to the end of the queue.
     pub fn push_back(&mut self, element: TxData) {
+        assert_eq!(
+            self.last_block_number + 1,
+            element.get_block_range().0 as usize,
+            "Insert an element that affects on not subsequent blocks"
+        );
         self.elements.push_back(element);
     }
 

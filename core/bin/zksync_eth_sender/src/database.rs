@@ -156,7 +156,7 @@ impl DatabaseInterface for Database {
             .ethereum_schema()
             .save_new_eth_tx(
                 op_type,
-                op.map(|(op_id, _)| op_id),
+                op,
                 deadline_block,
                 BigUint::from_str(&used_gas_price.to_string()).unwrap(),
                 raw_tx,

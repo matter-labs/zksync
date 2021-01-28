@@ -169,7 +169,7 @@ impl<'a, 'c> EthereumSchema<'a, 'c> {
     pub async fn save_new_eth_tx(
         &mut self,
         op_type: AggregatedActionType,
-        op_id: Option<i64>,
+        operation: Option<(i64, AggregatedOperation)>,
         last_deadline_block: i64,
         last_used_gas_price: BigUint,
         raw_tx: Vec<u8>,
@@ -198,7 +198,7 @@ impl<'a, 'c> EthereumSchema<'a, 'c> {
         .id;
 
         // If the operation ID was provided, we should also insert a binding entry.
-        if let Some(op_id) = op_id {
+        if let Some((op_id, op)) = operation {
             sqlx::query!(
                 "INSERT INTO eth_aggregated_ops_binding (op_id, eth_op_id) VALUES ($1, $2)",
                 op_id,
@@ -206,12 +206,12 @@ impl<'a, 'c> EthereumSchema<'a, 'c> {
             )
             .execute(transaction.conn())
             .await?;
-        }
 
-        // Update the stored stats.
-        EthereumSchema(&mut transaction)
-            .report_created_operation(op_type)
-            .await?;
+            // Update the stored stats.
+            EthereumSchema(&mut transaction)
+                .report_created_operation(op)
+                .await?;
+        }
 
         // Return the assigned ID and nonce.
         let response = InsertedOperationResponse {
@@ -291,19 +291,31 @@ impl<'a, 'c> EthereumSchema<'a, 'c> {
     /// and it's invoked within `db-reset` subcommand.
     async fn report_created_operation(
         &mut self,
-        operation_type: AggregatedActionType,
+        operation: AggregatedOperation,
     ) -> QueryResult<()> {
         let start = Instant::now();
         let mut transaction = self.0.start_transaction().await?;
 
         let mut current_stats = EthereumSchema(&mut transaction).load_eth_params().await?;
-        match operation_type {
-            AggregatedActionType::CommitBlocks => current_stats.last_committed_block += 1,
-            AggregatedActionType::PublishProofBlocksOnchain => {
-                current_stats.last_verified_block += 1
+        let (first_block, last_block) = {
+            let block_range = operation.get_block_range();
+            (i64::from(block_range.0), i64::from(block_range.1))
+        };
+
+        match operation {
+            AggregatedOperation::CommitBlocks(_) => {
+                assert_eq!(current_stats.last_committed_block, first_block - 1);
+                current_stats.last_committed_block = last_block;
             }
-            AggregatedActionType::ExecuteBlocks => current_stats.last_executed_block += 1,
-            AggregatedActionType::CreateProofBlocks => return Ok(()),
+            AggregatedOperation::PublishProofBlocksOnchain(_) => {
+                assert_eq!(current_stats.last_verified_block, first_block - 1);
+                current_stats.last_verified_block = last_block;
+            }
+            AggregatedOperation::ExecuteBlocks(_) => {
+                assert_eq!(current_stats.last_executed_block, first_block - 1);
+                current_stats.last_executed_block = last_block;
+            }
+            AggregatedOperation::CreateProofBlocks(_) => return Ok(()),
         };
 
         // Update the stored stats.

@@ -123,11 +123,10 @@ impl TxQueueBuilder {
 /// 1. If the amount of sent transactions is equal to the `MAX_PENDING_TXS` value,
 ///   no transaction is yielded until some of already sent ones are committed.
 /// 2. Otherwise, transactions are yielded according to the following policy:
-///   - If `verify` queue contains elements, and `commit` operation with corresponding
-///     ID is committed, the `verify` operation is yielded (meaning that `verify` operations
-///     are prioritized unless the amount of sent `commit` and `verify` operations is equal:
-///     if so, we should send the `commit` operation first).
-///   - Otherwise, if `withdraw` queue contains elements, a `withdraw` operation is yielded.
+///   - If `execute` queue contains elements for some blocks, and `verify` operations
+///     for corresponding blocks is committed, the `execute` operation is yielded.
+///   - If `verify` queue contains elements for some blocks, and `commit` operations
+///     for corresponding blocks is committed, the `verify` operation is yielded.
 ///   - Otherwise, if `commit` queue is not empty, a `commit` operation is yielded.
 /// 3. If all the queues are empty, no operation is returned.
 #[derive(Debug)]
