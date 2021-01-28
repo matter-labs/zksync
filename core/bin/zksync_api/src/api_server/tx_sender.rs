@@ -215,7 +215,9 @@ impl TxSender {
 
         // Resolve the token.
         let token = self.token_info_from_id(tx.token_id()).await?;
-        let msg_to_sign = tx.get_ethereum_sign_message(token).map(String::into_bytes);
+        let msg_to_sign = tx
+            .get_ethereum_sign_message(token.clone())
+            .map(String::into_bytes);
 
         let tx_fee_info = tx.get_fee_info();
 
@@ -262,6 +264,7 @@ impl TxSender {
         let verified_tx = verify_tx_info_message_signature(
             &tx,
             tx_sender,
+            token,
             self.get_tx_sender_type(&tx).await?,
             signature.clone(),
             msg_to_sign,
@@ -388,9 +391,9 @@ impl TxSender {
             // User provided at least one signature for the whole batch.
             let _txs = txs
                 .iter()
-                .zip(tokens.into_iter())
-                .zip(tx_senders.iter())
-                .map(|((tx, token), sender)| (tx.tx.clone(), token, sender.clone()))
+                .zip(tokens.iter().cloned())
+                .zip(tx_senders.iter().cloned())
+                .map(|((tx, token), sender)| (tx.tx.clone(), token, sender))
                 .collect::<Vec<_>>();
             // Create batch signature data.
             let batch_sign_data =
@@ -398,6 +401,7 @@ impl TxSender {
             let (verified_batch, sign_data) = verify_txs_batch_signature(
                 txs,
                 tx_senders,
+                tokens,
                 tx_sender_types,
                 batch_sign_data,
                 messages_to_sign,
@@ -410,12 +414,13 @@ impl TxSender {
             verified_txs.extend(verified_batch.into_iter());
         } else {
             // Otherwise, we process every transaction in turn.
-            for (tx, sender, sender_type, msg_to_sign) in
-                izip!(txs, tx_senders, tx_sender_types, messages_to_sign)
+            for (tx, sender, token, sender_type, msg_to_sign) in
+                izip!(txs, tx_senders, tokens, tx_sender_types, messages_to_sign)
             {
                 let verified_tx = verify_tx_info_message_signature(
                     &tx.tx,
                     sender,
+                    token,
                     sender_type,
                     tx.signature.clone(),
                     msg_to_sign,
@@ -571,6 +576,7 @@ async fn send_verify_request_and_recv(
 async fn verify_tx_info_message_signature(
     tx: &ZkSyncTx,
     tx_sender: Address,
+    token: Token,
     account_type: EthAccountType,
     signature: Option<TxEthSignature>,
     msg_to_sign: Option<Vec<u8>>,
@@ -605,6 +611,7 @@ async fn verify_tx_info_message_signature(
             eth_sign_data,
         }),
         senders: vec![tx_sender],
+        tokens: vec![token],
         response: sender,
     };
 
@@ -614,10 +621,11 @@ async fn verify_tx_info_message_signature(
 /// Send a request for Ethereum signature verification and wait for the response.
 /// Unlike in case of `verify_tx_info_message_signature`, we do not require
 /// every transaction from the batch to be signed. The signature must be obtained
-/// through signing hash of concatenated transactions bytes.
+/// through signing a human-readable message with accordance to zkSync protocol.
 async fn verify_txs_batch_signature(
     batch: Vec<TxWithSignature>,
     senders: Vec<Address>,
+    tokens: Vec<Token>,
     sender_types: Vec<EthAccountType>,
     batch_sign_data: BatchSignData,
     msgs_to_sign: Vec<Option<Vec<u8>>>,
@@ -648,6 +656,7 @@ async fn verify_txs_batch_signature(
     let request = VerifyTxSignatureRequest {
         tx: TxVariant::Batch(txs, batch_sign_data),
         senders,
+        tokens,
         response: sender,
     };
 

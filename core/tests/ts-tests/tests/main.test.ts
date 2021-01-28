@@ -139,6 +139,10 @@ describe(`ZkSync integration tests (token: ${token}, transport: ${transport})`, 
         await tester.testMultipleWalletsWrongSignature(alice, david, token, TX_AMOUNT);
     });
 
+    step('should test backwards compatibility', async () => {
+        await tester.testBackwardCompatibleEthMessages(alice, david, token, TX_AMOUNT);
+    });
+
     it('should check collected fees', async () => {
         const collectedFee = (await tester.operatorBalance(token)).sub(operatorBalance);
         expect(collectedFee.eq(tester.runningFee), 'Fee collection failed').to.be.true;
