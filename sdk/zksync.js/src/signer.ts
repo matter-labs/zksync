@@ -25,7 +25,8 @@ import {
     ChangePubKeyOnchain,
     ChangePubKeyECDSA,
     ChangePubKeyCREATE2,
-    ZkSyncVersion
+    ZkSyncVersion,
+    Create2Data
 } from './types';
 import validate = WebAssembly.validate;
 
@@ -368,11 +369,7 @@ export class Create2WalletSigner extends ethers.Signer {
     public readonly salt: string;
     constructor(
         public zkSyncPubkeyHash: string,
-        public create2WalletData: {
-            creatorAddress: string;
-            saltArg: string;
-            codeHash: string;
-        },
+        public create2WalletData: Create2Data,
         provider?: ethers.providers.Provider
     ) {
         super();
@@ -391,10 +388,10 @@ export class Create2WalletSigner extends ethers.Signer {
     }
 
     /**
-     * This signer can't sign messages but we return zeroed signature bytes to comply with zksync API for now.
+     * This signer can't sign messages but we return zeroed signature bytes to comply with ethers API.
      */
     async signMessage(_message) {
-        return '0x0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000';
+        return ethers.utils.hexlify(new Uint8Array(65));
     }
 
     async signTransaction(_message): Promise<string> {

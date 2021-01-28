@@ -1,8 +1,8 @@
 import { expect } from 'chai';
 import { BigNumber, utils } from 'ethers';
-import { Wallet, types } from 'zksync';
+import { Wallet, types, wallet } from 'zksync';
 
-import { Tester } from './tester';
+import { Tester, expectThrow } from './tester';
 import './priority-ops';
 import './change-pub-key';
 import './transfer';
@@ -26,6 +26,7 @@ describe(`ZkSync integration tests (token: ${token}, transport: ${transport})`, 
     let chuck: Wallet;
     let david: Wallet;
     let frank: Wallet;
+    let hilda: Wallet;
     let judy: Wallet;
     let operatorBalance: BigNumber;
 
@@ -33,10 +34,11 @@ describe(`ZkSync integration tests (token: ${token}, transport: ${transport})`, 
         tester = await Tester.init('localhost', transport);
         alice = await tester.fundedWallet('5.0');
         bob = await tester.emptyWallet();
+        chuck = await tester.emptyWallet();
         david = await tester.fundedWallet('1.0');
         frank = await tester.fundedWallet('1.0');
+        hilda = await tester.create2Wallet();
         judy = await tester.emptyWallet();
-        chuck = await tester.emptyWallet();
         operatorBalance = await tester.operatorBalance(token);
     });
 
@@ -61,7 +63,7 @@ describe(`ZkSync integration tests (token: ${token}, transport: ${transport})`, 
             expect(await tester.syncWallet.isERC20DepositsApproved(token, DEPOSIT_AMOUNT), 'Token should not be approved').to.be.false;
             const approveERC20_next = await tester.syncWallet.approveERC20TokenDeposits(token);
             await approveERC20_next.wait();
-           expect(await tester.syncWallet.isERC20DepositsApproved(token), 'The second deposit should be approved').to.be.true;
+            expect(await tester.syncWallet.isERC20DepositsApproved(token), 'The second deposit should be approved').to.be.true;
         }
     });
 
@@ -196,6 +198,43 @@ describe(`ZkSync integration tests (token: ${token}, transport: ${transport})`, 
             const [before, after] = await tester.testFullExit(carl, token);
             expect(before.eq(0), "Balance before Full Exit must be zero (we've already withdrawn all the funds)").to.be.true;
             expect(after.eq(0), "Balance after Full Exit must be zero").to.be.true;
+        });
+    });
+
+    describe('CREATE2 tests', () => {
+        step('should make a transfer from create2 account', async () => {
+            if (onlyBasic) {
+                return;
+            }
+            await tester.testDeposit(hilda, token, DEPOSIT_AMOUNT, true);
+            const cpk = await hilda.setSigningKey({
+                feeToken: token,
+                ethAuthType: 'CREATE2',
+            });
+            await cpk.awaitReceipt();
+            await tester.testTransfer(hilda, david, token, TX_AMOUNT);
+        });
+
+        step('should fail create2 tx that has ETH signature', async () => {
+            if (onlyBasic) {
+                return;
+            }
+            const fee = await hilda.provider.getTransactionFee("Transfer", david.address(), token);
+            const txData = await hilda.signSyncTransfer({
+                to: david.address(),
+                token,
+                amount: TX_AMOUNT,
+                fee: fee.totalFee,
+                nonce: await hilda.getNonce()
+            });
+            txData.ethereumSignature = {
+                type: 'EIP1271Signature',
+                signature: utils.hexlify(new Uint8Array(65))
+            }
+            await expectThrow(
+                wallet.submitSignedTransaction(txData, hilda.provider), 
+                "Eth signature from CREATE2 account not expected"
+            );
         });
     });
 });

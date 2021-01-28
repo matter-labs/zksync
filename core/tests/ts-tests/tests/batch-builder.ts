@@ -1,4 +1,4 @@
-import { Tester } from './tester';
+import { Tester, expectThrow } from './tester';
 import { expect } from 'chai';
 import { Wallet, types } from 'zksync';
 import { BigNumber } from 'ethers';
@@ -32,17 +32,6 @@ declare module './tester' {
         ): Promise<void>;
     }
 }
-
-const expectThrow = async (promise: Promise<any>, message: String) => {
-    let error = null;
-    try {
-        await promise;
-    } catch (err) {
-        error = err;
-    }
-    expect(error).to.be.an('Error');
-    expect(error.message).to.equal(message);
-};
 
 Tester.prototype.testBatchBuilderInvalidUsage = async function (wallet: Wallet, feeToken: TokenLike) {
     // Empty batch.
