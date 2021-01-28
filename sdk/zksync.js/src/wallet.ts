@@ -352,9 +352,10 @@ export class Wallet {
 
         messages.push(`Nonce: ${batchNonce}`);
         const message = messages.filter((part) => part.length != 0).join('\n');
-        const ethSignature = await this.ethMessageSigner.getEthMessageSignature(message);
+        const ethSignatures = this.ethSigner instanceof Create2WalletSigner ? [] :
+            [await this.ethMessageSigner.getEthMessageSignature(message)];
 
-        const transactionHashes = await this.provider.submitTxsBatch(batch, [ethSignature]);
+        const transactionHashes = await this.provider.submitTxsBatch(batch, ethSignatures);
         return transactionHashes.map((txHash, idx) => new Transaction(batch[idx], txHash, this.provider));
     }
 

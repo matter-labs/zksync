@@ -1,8 +1,7 @@
 import { Tester, expectThrow } from './tester';
 import { expect } from 'chai';
-import { Wallet, types } from 'zksync';
+import { Wallet, types, wallet } from 'zksync';
 import { BigNumber } from 'ethers';
-import { submitSignedTransactionsBatch } from 'zksync/build/wallet';
 
 type TokenLike = types.TokenLike;
 
@@ -23,7 +22,7 @@ declare module './tester' {
             feeToken: TokenLike,
             amount: BigNumber
         ): Promise<void>;
-        testBatchBuilderGenerisUsage(
+        testBatchBuilderGenericUsage(
             from: Wallet,
             to: Wallet,
             target: Wallet,
@@ -49,28 +48,28 @@ Tester.prototype.testBatchBuilderInvalidUsage = async function (wallet: Wallet, 
 
 // Set signing key and perform a withdraw in one batch.
 Tester.prototype.testBatchBuilderChangePubKey = async function (
-    wallet: Wallet,
+    sender: Wallet,
     token: TokenLike,
     amount: BigNumber,
     onchain: boolean
 ) {
     if (onchain) {
-        const handle = await wallet.onchainAuthSigningKey();
+        const handle = await sender.onchainAuthSigningKey();
         await handle.wait();
-        expect(await wallet.isOnchainAuthSigningKeySet(), 'ChangePubKey is unset onchain').to.be.true;
+        expect(await sender.isOnchainAuthSigningKeySet(), 'ChangePubKey is unset onchain').to.be.true;
     }
 
-    const batch = await wallet
+    const batch = await sender
         .batchBuilder()
         .addChangePubKey({ feeToken: token, ethAuthType: onchain ? 'Onchain' : 'ECDSA' })
-        .addWithdraw({ ethAddress: wallet.address(), token, amount })
+        .addWithdraw({ ethAddress: sender.address(), token, amount })
         .build(token);
 
-    const balanceBefore = await wallet.getBalance(token);
-    const handles = await submitSignedTransactionsBatch(wallet.provider, batch.txs, [batch.signature]);
+    const balanceBefore = await sender.getBalance(token);
+    const handles = await wallet.submitSignedTransactionsBatch(sender.provider, batch.txs, [batch.signature]);
     await Promise.all(handles.map((handle) => handle.awaitVerifyReceipt()));
-    expect(await wallet.isSigningKeySet(), 'ChangePubKey failed').to.be.true;
-    const balanceAfter = await wallet.getBalance(token);
+    expect(await sender.isSigningKeySet(), 'ChangePubKey failed').to.be.true;
+    const balanceAfter = await sender.getBalance(token);
     expect(balanceBefore.sub(balanceAfter).eq(amount.add(batch.totalFee)), 'Wrong amount in wallet after withdraw').to
         .be.true;
     this.runningFee = this.runningFee.add(batch.totalFee);
@@ -91,7 +90,7 @@ Tester.prototype.testBatchBuilderTransfers = async function (
 
     const senderBefore = await sender.getBalance(token);
     const receiverBefore = await receiver.getBalance(token);
-    const handles = await submitSignedTransactionsBatch(sender.provider, batch.txs, [batch.signature]);
+    const handles = await wallet.submitSignedTransactionsBatch(sender.provider, batch.txs, [batch.signature]);
     await Promise.all(handles.map((handle) => handle.awaitReceipt()));
     const senderAfter = await sender.getBalance(token);
     const receiverAfter = await receiver.getBalance(token);
@@ -121,7 +120,7 @@ Tester.prototype.testBatchBuilderPayInDifferentToken = async function (
     const senderBeforeFeeToken = await sender.getBalance(feeToken);
     const senderBefore = await sender.getBalance(token);
     const receiverBefore = await receiver.getBalance(token);
-    const handles = await submitSignedTransactionsBatch(sender.provider, batch.txs, [batch.signature]);
+    const handles = await wallet.submitSignedTransactionsBatch(sender.provider, batch.txs, [batch.signature]);
     await Promise.all(handles.map((handle) => handle.awaitReceipt()));
     const senderAfterFeeToken = await sender.getBalance(feeToken);
     const senderAfter = await sender.getBalance(token);
@@ -133,7 +132,7 @@ Tester.prototype.testBatchBuilderPayInDifferentToken = async function (
     // Do not increase running fee, feeToken is different.
 };
 
-Tester.prototype.testBatchBuilderGenerisUsage = async function (
+Tester.prototype.testBatchBuilderGenericUsage = async function (
     sender: Wallet,
     receiver: Wallet,
     target: Wallet,
@@ -149,7 +148,7 @@ Tester.prototype.testBatchBuilderGenerisUsage = async function (
 
     const senderBefore = await sender.getBalance(token);
     const receiverBefore = await receiver.getBalance(token);
-    const handles = await submitSignedTransactionsBatch(sender.provider, batch.txs, [batch.signature]);
+    const handles = await wallet.submitSignedTransactionsBatch(sender.provider, batch.txs, [batch.signature]);
     await Promise.all(handles.map((handle) => handle.awaitVerifyReceipt()));
     const senderAfter = await sender.getBalance(token);
     const receiverAfter = await receiver.getBalance(token);
