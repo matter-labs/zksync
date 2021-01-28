@@ -206,17 +206,10 @@ async fn create_aggregated_commits_storage(
 
     let mut new_blocks = Vec::new();
     let mut block_number = last_aggregate_committed_block + 1;
-    loop {
-        let block = BlockSchema(storage).get_block(block_number).await?;
-        match block {
-            Some(block) => {
-                new_blocks.push(block);
-                block_number += 1;
-            }
-            None => {
-                break;
-            }
-        }
+
+    while let Some(block) = BlockSchema(storage).get_block(block_number).await? {
+        new_blocks.push(block);
+        block_number += 1;
     }
 
     let commit_operation = create_new_commit_operation(
