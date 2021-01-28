@@ -11,11 +11,6 @@ import './forced-exit';
 import './misc';
 import './batch-builder';
 
-import { loadTestConfig } from './helpers';
-
-
-const TEST_CONFIG = loadTestConfig();
-
 const TX_AMOUNT = utils.parseEther('10.0');
 // should be enough for ~200 test transactions (excluding fees), increase if needed
 const DEPOSIT_AMOUNT = TX_AMOUNT.mul(200);
@@ -203,42 +198,6 @@ describe(`ZkSync integration tests (token: ${token}, transport: ${transport})`, 
             expect(after.eq(0), "Balance after Full Exit must be zero").to.be.true;
         });
     });
-
-    it('should recover failed ETH withdraw', async () => {
-        if (token !== 'ETH') {
-            return;
-        }
-        await tester.testRecoverETHWithdrawal(
-            alice,
-            TEST_CONFIG.withdrawalHelpers.revert_receive_address,
-            TX_AMOUNT
-        );
-    });
-
-    it('should recover failed ERC20 withdraw', async () => {
-        if (token === 'ETH') {
-            return;
-        }
-        await tester.testRecoverERC20Withdrawal(
-            alice,
-            TEST_CONFIG.withdrawalHelpers.revert_receive_address,
-            token,
-            TX_AMOUNT
-        );
-    });
-
-    it('should recover multiple withdrawals', async () => {
-        if (token === 'ETH') {
-            return;
-        }
-
-       await tester.testRecoverMultipleWithdrawals(
-           alice,
-           [TEST_CONFIG.withdrawalHelpers.revert_receive_address, TEST_CONFIG.withdrawalHelpers.revert_receive_address],
-           ['ETH', 'wBTC'],
-           [TX_AMOUNT, TX_AMOUNT]
-       );
-    })
 });
 
 // wBTC is chosen because it has decimals different from ETH (8 instead of 18).

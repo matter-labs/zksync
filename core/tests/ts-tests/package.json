@@ -14,7 +14,8 @@
   },
   "scripts": {
     "test": "zk f mocha tests/main.test.ts",
-    "api-test": "zk f mocha tests/api.test.ts"
+    "api-test": "zk f mocha tests/api.test.ts",
+    "withdrawal-helpers-test": "zk f mocha tests/withdrawal-helpers.test.ts"
   },
   "devDependencies": {
     "@types/chai": "^4.2.14",

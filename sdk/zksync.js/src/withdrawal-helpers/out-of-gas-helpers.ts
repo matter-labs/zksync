@@ -118,6 +118,8 @@ export async function withdrawPendingBalances(
         SYNC_MAIN_CONTRACT_INTERFACE,
         ethersWallet
     );
+    const gasPrice = await ethersWallet.provider.getGasPrice();
+    
     const tokensAddresses = tokens.map(token => syncProvider.tokenSet.resolveTokenAddress(token));
         
     if (!amounts) {
@@ -153,5 +155,11 @@ export async function withdrawPendingBalances(
         ethersWallet
     );
 
-    return multicallContract.aggregate(calls) as ContractTransaction;
+    return multicallContract.aggregate(
+        calls,
+        {
+            gasLimit: BigNumber.from('300000'),
+            gasPrice,
+        }
+    ) as ContractTransaction;
 }
