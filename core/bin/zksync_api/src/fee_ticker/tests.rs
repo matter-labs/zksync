@@ -251,6 +251,11 @@ fn test_ticker_formula() {
             let token_precision = block_on(MockApiProvider.get_token(token.clone()))
                 .unwrap()
                 .decimals;
+            let batched_fee_in_token = block_on(
+                ticker.get_batch_from_ticker_in_wei(token.clone(), vec![(tx_type, address)]),
+            )
+            .expect("failed to get batched fee for token");
+            assert_eq!(fee_in_token.total_fee, batched_fee_in_token);
 
             // Fee in usd
             (block_on(MockApiProvider.get_last_quote(token))

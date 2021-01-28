@@ -268,7 +268,18 @@ impl ZkSyncState {
     }
 
     pub(crate) fn get_free_account_id(&self) -> AccountId {
-        AccountId(self.balance_tree.items.len() as u32)
+        let mut account_id = AccountId(self.balance_tree.items.len() as u32);
+
+        // In the production database it somehow appeared that one account ID in the database got missing,
+        // meaning that it was never assigned, but the next one was inserted.
+        // This led to the fact that length of the tree is not equal to the most recent ID anymore.
+        // In order to prevent similar error-proneness in the future, we scan until we find the next free ID.
+        // Amount of steps here is not expected to be high.
+        while self.get_account(account_id).is_some() {
+            *account_id += 1;
+        }
+
+        account_id
     }
 
     pub fn collect_fee(&mut self, fees: &[CollectedFee], fee_account: AccountId) -> AccountUpdates {
@@ -418,7 +429,10 @@ mod tests {
     use super::*;
     use crate::tests::{AccountState::*, PlasmaTestBuilder};
     use zksync_crypto::rand::{Rng, SeedableRng, XorShiftRng};
-    use zksync_types::{tx::Withdraw, Nonce};
+    use zksync_types::{
+        tx::{Transfer, Withdraw},
+        Nonce,
+    };
 
     /// Checks if execute_txs_batch fails if it doesn't have enough balance.
     #[test]
@@ -457,6 +471,58 @@ mod tests {
         };
         let signed_zk_sync_tx2 = SignedZkSyncTx {
             tx: ZkSyncTx::Withdraw(Box::new(withdraw2)),
+            eth_sign_data: None,
+        };
+        tb.test_txs_batch_fail(
+            &[signed_zk_sync_tx1, signed_zk_sync_tx2],
+            "Batch execution failed, since tx #2 of batch failed with a reason: Not enough balance",
+        );
+    }
+
+    #[test]
+    fn execute_txs_batch_fail_transfers() {
+        let token_id = TokenId(0);
+        let amount = BigUint::from(100u32);
+        let fee = BigUint::from(10u32);
+
+        let mut tb = PlasmaTestBuilder::new();
+
+        let (account_id, account, sk) = tb.add_account(Unlocked);
+        tb.set_balance(account_id, token_id, &amount + &fee);
+
+        let new_address_1 = Address::random();
+        let new_address_2 = Address::random();
+
+        let transfer_1 = Transfer::new_signed(
+            account_id,
+            account.address,
+            new_address_1,
+            token_id,
+            amount.clone(),
+            fee.clone(),
+            account.nonce,
+            &sk,
+        )
+        .unwrap();
+
+        let transfer_2 = Transfer::new_signed(
+            account_id,
+            account.address,
+            new_address_2,
+            token_id,
+            amount,
+            fee,
+            account.nonce + 1,
+            &sk,
+        )
+        .unwrap();
+
+        let signed_zk_sync_tx1 = SignedZkSyncTx {
+            tx: ZkSyncTx::Transfer(Box::new(transfer_1)),
+            eth_sign_data: None,
+        };
+        let signed_zk_sync_tx2 = SignedZkSyncTx {
+            tx: ZkSyncTx::Transfer(Box::new(transfer_2)),
             eth_sign_data: None,
         };
         tb.test_txs_batch_fail(

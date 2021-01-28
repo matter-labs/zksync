@@ -78,6 +78,7 @@
 use sqlx::{postgres::Postgres, Connection, PgConnection, Transaction};
 // Workspace imports
 use zksync_basic_types::BlockNumber;
+use zksync_types::ActionType;
 // Local imports
 use crate::connection::{holder::ConnectionHolder, PooledConnection};
 
@@ -110,6 +111,22 @@ pub const MAX_BLOCK_INDEX: u32 = i32::MAX as u32;
 pub struct StorageProcessor<'a> {
     conn: ConnectionHolder<'a>,
     in_transaction: bool,
+}
+
+#[derive(sqlx::Type, Debug, Clone, PartialEq, Eq)]
+#[sqlx(rename = "action_type")]
+pub enum StorageActionType {
+    COMMIT,
+    VERIFY,
+}
+
+impl From<ActionType> for StorageActionType {
+    fn from(action_type: ActionType) -> Self {
+        match action_type {
+            ActionType::COMMIT => StorageActionType::COMMIT,
+            ActionType::VERIFY => StorageActionType::VERIFY,
+        }
+    }
 }
 
 impl<'a> StorageProcessor<'a> {

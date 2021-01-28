@@ -17,6 +17,7 @@ All notable changes to the core components will be documented in this file.
   structures.
 - `prometheus_exporter` was made a library to be used by several crates.
 - `prover_run_for_next_commit` function uses a parameterized timeout instead of a hard-coded one.
+- `action_type` column type in db is changed from `text` to `enum` for optimization.
 
 ### Added
 
