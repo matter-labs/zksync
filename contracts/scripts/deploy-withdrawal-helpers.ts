@@ -6,7 +6,6 @@ import { readContractCode } from '../src.ts/deploy';
 import { deployContract } from 'ethereum-waffle';
 import * as fs from 'fs';
 import * as path from 'path';
-import { recoverAddress } from 'ethers/lib/utils';
 
 const testConfigPath = path.join(process.env.ZKSYNC_HOME as string, `etc/test_config/constant`);
 const ethTestConfig = JSON.parse(fs.readFileSync(`${testConfigPath}/eth.json`, { encoding: 'utf-8' }));

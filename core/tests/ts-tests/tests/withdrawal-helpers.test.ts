@@ -5,8 +5,6 @@ import './priority-ops';
 import './change-pub-key';
 import './withdrawal-helpers';
 
-import * as api from './api';
-
 import { loadTestConfig } from './helpers';
 
 const TX_AMOUNT = utils.parseEther('1');
@@ -14,6 +12,7 @@ const DEPOSIT_AMOUNT = TX_AMOUNT.mul(200);
 
 const TEST_CONFIG = loadTestConfig();
 
+// The token here should have the ERC20 implementation from RevertTransferERC20.sol
 const erc20Token = 'wBTC';
 
 describe('Withdrawal helpers tests', () => {

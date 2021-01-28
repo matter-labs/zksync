@@ -33,6 +33,8 @@ async function getWithdrawPendingBalanceParams(
     };
 }
 
+// The addresses are taken from here:
+// https://github.com/makerdao/multicall
 function getMulticallAddressByNetwork(network: Network) {
     switch (network) {
         case 'rinkeby':

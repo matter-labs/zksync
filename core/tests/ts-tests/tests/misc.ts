@@ -13,14 +13,6 @@ declare module './tester' {
         testWrongSignature(from: Wallet, to: Wallet, token: TokenLike, amount: BigNumber): Promise<void>;
         testMultipleBatchSigners(wallets: Wallet[], token: TokenLike, amount: BigNumber): Promise<void>;
         testMultipleWalletsWrongSignature(from: Wallet, to: Wallet, token: TokenLike, amount: BigNumber): Promise<void>;
-        testRecoverETHWithdrawal(from: Wallet, to: Address, amount: BigNumber): Promise<void>;
-        testRecoverERC20Withdrawal(from: Wallet, to: Address, token: TokenLike, amount: BigNumber): Promise<void>;
-        testRecoverMultipleWithdrawals(
-            from: Wallet,
-            to: Address[],
-            token: TokenLike[],
-            amount: BigNumber[]
-        ): Promise<void>;
     }
 }
 

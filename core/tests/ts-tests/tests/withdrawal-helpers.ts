@@ -1,7 +1,7 @@
 import { Tester } from './tester';
 import { expect } from 'chai';
 import { Wallet, types, Provider, utils } from 'zksync';
-import { BigNumber, Contract, ethers, Signer } from 'ethers';
+import { BigNumber, ethers } from 'ethers';
 import { Address } from 'zksync/build/types';
 
 import { RevertReceiveAccountFactory, RevertTransferERC20Factory } from '../../../../contracts/typechain';
@@ -59,7 +59,7 @@ async function setRevert(
 
 Tester.prototype.testRecoverETHWithdrawal = async function (from: Wallet, to: Address, amount: BigNumber) {
     // Make sure that the withdrawal will fail
-    await setRevertReceive(from.ethSigner, to, true);
+    await setRevert(from.ethSigner, this.syncProvider, to, 'ETH', true);
 
     const balanceBefore = await this.ethProvider.getBalance(to);
     const withdrawTx = await from.withdrawFromSyncToEthereum({
@@ -69,7 +69,7 @@ Tester.prototype.testRecoverETHWithdrawal = async function (from: Wallet, to: Ad
     });
     await withdrawTx.awaitVerifyReceipt();
 
-    // Waiting for the withdrawl to be sent onchain
+    // Wait for the withdrawl to be sent onchain
     const withdrawalTxHash = await waitForOnchainWithdrawal(this.syncProvider, withdrawTx.txHash);
 
     // Double-check that zkSync tried to process withdrawal
@@ -80,7 +80,7 @@ Tester.prototype.testRecoverETHWithdrawal = async function (from: Wallet, to: Ad
     expect(balanceBefore.eq(balanceAfter), 'The withdrawal did not fail the first time').to.be.true;
 
     // Make sure that the withdrawal will pass now
-    await setRevertReceive(from.ethSigner, to, false);
+    await setRevert(from.ethSigner, this.syncProvider, to, 'ETH', true);
 
     // Re-try
     const withdrawPendingTx = await withdrawalHelpers.withdrawPendingBalance(
@@ -103,7 +103,7 @@ Tester.prototype.testRecoverERC20Withdrawal = async function (
     token: TokenLike,
     amount: BigNumber
 ) {
-    // Making sure that the withdrawal will be reverted
+    // Make sure that the withdrawal will be reverted
     await setRevert(from.ethSigner, from.provider, to, token, true);
 
     const getToBalance = () =>
@@ -117,7 +117,7 @@ Tester.prototype.testRecoverERC20Withdrawal = async function (
     });
     await withdrawTx.awaitVerifyReceipt();
 
-    // Waiting for the withdrawl to be sent onchain
+    // Wait for the withdrawl to be sent onchain
     const withdrawalTxHash = await waitForOnchainWithdrawal(this.syncProvider, withdrawTx.txHash);
 
     // Double-check that zkSync tried to process withdrawal
@@ -158,14 +158,14 @@ Tester.prototype.testRecoverMultipleWithdrawals = async function (
     );
 
     // Make sure that all the withdrawal will fall
-    for (const [i, recipient] of to.entries()) {
-        await setRevert(from.ethSigner, this.syncProvider, recipient, token[i], true);
+    for (let i = 0; i < to.length; i++) {
+        await setRevert(from.ethSigner, this.syncProvider, to[i], token[i], true);
     }
 
     // Send the withdrawals and wait until they are sent onchain
-    for (const [i, recipient] of to.entries()) {
+    for (let i = 0; i < to.length; i++) {
         const withdrawTx = await from.withdrawFromSyncToEthereum({
-            ethAddress: recipient,
+            ethAddress: to[i],
             token: token[i],
             amount: amount[i]
         });
@@ -187,8 +187,8 @@ Tester.prototype.testRecoverMultipleWithdrawals = async function (
     });
 
     // Make sure that all the withdrawal will pass now
-    for (const [i, recipient] of to.entries()) {
-        await setRevert(from.ethSigner, this.syncProvider, recipient, token[i], false);
+    for (let i = 0; i < to.length; i++) {
+        await setRevert(from.ethSigner, this.syncProvider, to[i], token[i], false);
     }
 
     const handle = await withdrawalHelpers.withdrawPendingBalances(
@@ -208,7 +208,7 @@ Tester.prototype.testRecoverMultipleWithdrawals = async function (
         })
     );
 
-    // Check that all the withdrawals indeed failed
+    // The funds should have arrived
     balancesAfterRecovery.forEach((balance, i) => {
         expect(balance.eq(balancesBefore[i].add(amount[i])), `The withdrawal ${i} was not recovered`).to.be.true;
     });

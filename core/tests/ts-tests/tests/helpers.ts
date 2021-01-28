@@ -1,3 +1,8 @@
+// Some helpers in this folder are very similar to those in zksync.js
+// In fact, they were copy-pasted.
+//
+// In the future there should be a centralized way to read the config. (ZKS-431)
+
 import * as fs from 'fs';
 import { Provider } from 'zksync';
 import { sleep } from 'zksync/build/utils';
@@ -33,25 +38,6 @@ export function loadTestConfig() {
         eth: ethConfig,
         withdrawalHelpers: withdrawalHelpersConfig
     };
-}
-
-export function loadTestVectorsConfig() {
-    let vectorsConfigPath = configPath('sdk/test-vectors.json');
-    return loadConfig(vectorsConfigPath);
-}
-
-export function getTokens(network: string) {
-    const configPath = `${process.env.ZKSYNC_HOME}/etc/tokens/${network}.json`;
-    console.log(configPath);
-    return JSON.parse(
-        fs.readFileSync(configPath, {
-            encoding: 'utf-8'
-        })
-    );
-}
-
-export function getRevertReceiveContractAbi() {
-    return fs.readFileSync(`${process.env.ZKSYNC_HOME}/contracts/`);
 }
 
 export async function waitForOnchainWithdrawal(

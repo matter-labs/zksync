@@ -202,8 +202,6 @@ describe(`ZkSync integration tests (token: ${token}, transport: ${transport})`, 
 
 // wBTC is chosen because it has decimals different from ETH (8 instead of 18).
 // Using this token will help us to detect decimals-related errors.
-// Also we can set it's transfers to be reverted, thus
-// enabling testing for recovering withdrawals
 const defaultERC20 = 'wBTC';
 
 let tokenAndTransport = [];
