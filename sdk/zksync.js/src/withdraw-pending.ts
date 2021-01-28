@@ -12,7 +12,8 @@ interface WithdrawPendingBalanceParams {
 
 interface MulticallParams {
     address?: Address,
-    network?: Network
+    network?: Network,
+    gasLimit?: BigNumberish
 }
 
 async function getWithdrawPendingBalanceParams(
@@ -157,7 +158,7 @@ export async function withdrawPendingBalances(
     return multicallContract.aggregate(
         calls,
         {
-            gasLimit: BigNumber.from('300000'),
+            gasLimit: multicallParams.gasLimit || BigNumber.from('300000'),
             gasPrice,
         }
     ) as ContractTransaction;

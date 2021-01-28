@@ -43,7 +43,6 @@ describe('Withdrawal helpers tests', () => {
     });
 
     it('should recover failed ERC20 withdraw', async () => {
-        console.log('balance: ', (await alice.getBalance(erc20Token)).toString());
         await tester.testRecoverERC20Withdrawal(
             alice,
             TEST_CONFIG.withdrawalHelpers.revert_receive_address,
