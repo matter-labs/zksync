@@ -144,15 +144,8 @@ impl Scenario for BatchTransferScenario {
         _fees: Fees,
         wallets: Vec<TestWallet>,
     ) -> anyhow::Result<Vec<TestWallet>> {
-        let max_batch_size = self.max_batch_size;
-        let batch_sizes = std::iter::repeat_with(move || match thread_rng().gen_range(0, 3) {
-            0 => 2,
-            1 => max_batch_size / 2,
-            2 => max_batch_size,
-            _ => unreachable!(),
-        });
-
         let txs = self.txs.drain(..);
+        let batch_sizes = batch_sizes_iter(self.max_batch_size);
         foreach_failsafe(
             "run/batch_transfers",
             DynamicChunks::new(txs, batch_sizes).map(|txs| monitor.send_txs_batch(txs)),
@@ -170,4 +163,15 @@ impl Scenario for BatchTransferScenario {
     ) -> anyhow::Result<()> {
         Ok(())
     }
+}
+
+/// Returns infinite iterator over the following batch sizes:
+/// `[2, max_batch_size / 2, max_batch_size]`
+pub fn batch_sizes_iter(max_batch_size: usize) -> impl Iterator<Item = usize> {
+    std::iter::repeat_with(move || match thread_rng().gen_range(0, 3) {
+        0 => 2,
+        1 => max_batch_size / 2,
+        2 => max_batch_size,
+        _ => unreachable!(),
+    })
 }

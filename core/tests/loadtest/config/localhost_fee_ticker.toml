@@ -19,4 +19,4 @@ name = 'fee_ticker'
 transfer_size = 1
 transfer_rounds = 10
 wallets_amount = 100
-max_batch_size = 50
+max_batch_size = 15
