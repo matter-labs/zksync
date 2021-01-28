@@ -1,11 +1,13 @@
 // Workspace imports
-use zksync_types::{ethereum::OperationType, BlockNumber, Operation};
+use zksync_types::{
+    aggregated_operations::{AggregatedActionType, AggregatedOperation},
+    ethereum::OperationType,
+    BlockNumber, Operation,
+};
 // Local imports
-use self::{counter_queue::CounterQueue, sparse_queue::SparseQueue};
-use zksync_types::aggregated_operations::{AggregatedActionType, AggregatedOperation};
+use self::eth_tx_queue::EthTxQueue;
 
-mod counter_queue;
-mod sparse_queue;
+mod eth_tx_queue;
 
 pub type RawTxData = Vec<u8>;
 
@@ -37,6 +39,10 @@ impl TxData {
             operation,
         }
     }
+
+    pub fn get_block_range(&self) -> (BlockNumber, BlockNumber) {
+        self.operation.1.get_block_range()
+    }
 }
 
 /// `TxQueueBuilder` is a structure aiming to simplify the process
@@ -48,7 +54,9 @@ pub struct TxQueueBuilder {
     max_pending_txs: usize,
     sent_pending_txs: usize,
 
-    aggregated_ops_count: usize,
+    commit_operations_count: usize,
+    verify_operations_count: usize,
+    execute_operations_count: usize,
 }
 
 impl TxQueueBuilder {
@@ -57,7 +65,9 @@ impl TxQueueBuilder {
         Self {
             max_pending_txs,
             sent_pending_txs: 0,
-            aggregated_ops_count: 0,
+            commit_operations_count: 0,
+            verify_operations_count: 0,
+            execute_operations_count: 0,
         }
     }
 
@@ -70,9 +80,25 @@ impl TxQueueBuilder {
     }
 
     /// Sets the amount of operations sent for the `commit` queue.
-    pub fn with_aggregated_ops_count(self, aggregated_ops_count: usize) -> Self {
+    pub fn with_commit_operations_count(self, commit_operations_count: usize) -> Self {
         Self {
-            aggregated_ops_count,
+            commit_operations_count,
+            ..self
+        }
+    }
+
+    /// Sets the amount of operations sent for the `verify` queue.
+    pub fn with_verify_operations_count(self, verify_operations_count: usize) -> Self {
+        Self {
+            verify_operations_count,
+            ..self
+        }
+    }
+
+    /// Sets the amount of operations sent for the `execute` queue.
+    pub fn with_execute_operations_count(self, execute_operations_count: usize) -> Self {
+        Self {
+            execute_operations_count,
             ..self
         }
     }
@@ -83,7 +109,9 @@ impl TxQueueBuilder {
             max_pending_txs: self.max_pending_txs,
             sent_pending_txs: self.sent_pending_txs,
 
-            aggregated_operations: CounterQueue::new(self.aggregated_ops_count),
+            commit_operations: EthTxQueue::new(self.commit_operations_count),
+            verify_operations: EthTxQueue::new(self.verify_operations_count),
+            execute_operations: EthTxQueue::new(self.execute_operations_count),
         }
     }
 }
@@ -107,30 +135,54 @@ pub struct TxQueue {
     max_pending_txs: usize,
     sent_pending_txs: usize,
 
-    aggregated_operations: CounterQueue<TxData>,
+    commit_operations: EthTxQueue,
+    verify_operations: EthTxQueue,
+    execute_operations: EthTxQueue,
 }
 
 impl TxQueue {
-    pub fn add_aggregate_operation(&mut self, aggregate_operation: TxData) {
-        if let Some(TxData {
-            operation: (id, _), ..
-        }) = self.aggregated_operations.back()
-        {
-            if *id >= aggregate_operation.operation.0 {
-                return;
-            }
-        }
-
-        self.aggregated_operations.push_back(aggregate_operation);
+    /// Adds the `commit` operation to the queue.
+    pub fn add_commit_operation(&mut self, commit_operation: TxData) {
+        self.commit_operations.push_back(commit_operation);
 
         log::info!(
-            "Adding operation to the queue. \
+            "Adding commit operation to the queue. \
             Sent pending txs count: {}, \
             max pending txs count: {}, \
-            size of op queue: {}",
+            size of commit queue: {}",
             self.sent_pending_txs,
             self.max_pending_txs,
-            self.aggregated_operations.len()
+            self.commit_operations.len()
+        );
+    }
+
+    /// Adds the `verify` operation to the queue.
+    pub fn add_verify_operation(&mut self, verify_operation: TxData) {
+        self.verify_operations.push_back(verify_operation);
+
+        log::info!(
+            "Adding verify operation to the queue. \
+            Sent pending txs count: {}, \
+            max pending txs count: {}, \
+            size of verify queue: {}",
+            self.sent_pending_txs,
+            self.max_pending_txs,
+            self.verify_operations.len()
+        );
+    }
+
+    /// Adds the `execute` operation to the queue.
+    pub fn add_execute_operation(&mut self, execute_operation: TxData) {
+        self.execute_operations.push_back(execute_operation);
+
+        log::info!(
+            "Adding execute operation to the queue. \
+            Sent pending txs count: {}, \
+            max pending txs count: {}, \
+            size of execute queue: {}",
+            self.sent_pending_txs,
+            self.max_pending_txs,
+            self.execute_operations.len()
         );
     }
 
@@ -141,7 +193,20 @@ impl TxQueue {
             "No transactions are expected to be returned"
         );
 
-        self.aggregated_operations.return_popped(element);
+        match &element.op_type {
+            AggregatedActionType::CommitBlocks => {
+                self.commit_operations.return_popped(element);
+            }
+            AggregatedActionType::PublishProofBlocksOnchain => {
+                self.verify_operations.return_popped(element);
+            }
+            AggregatedActionType::ExecuteBlocks => {
+                self.execute_operations.return_popped(element);
+            }
+            AggregatedActionType::CreateProofBlocks => {
+                panic!("Proof creation should never be sent to Ethereum");
+            }
+        }
 
         // We've incremented the counter when transaction was popped.
         // Now it's returned and counter should be decremented back.
@@ -168,8 +233,24 @@ impl TxQueue {
     /// Obtains the next operation from the underlying queues.
     /// This method does not use/affect `sent_pending_tx` counter.
     fn get_next_operation(&mut self) -> Option<TxData> {
-        // 1. Highest priority: verify operations.
-        self.aggregated_operations.pop_front()
+        // 1. Highest priority: execute operations.
+        if let Some(next_execute_block) = self.execute_operations.get_next_last_block_number() {
+            let current_verify_block = self.verify_operations.get_last_block_number();
+            if next_execute_block <= current_verify_block {
+                return Some(self.execute_operations.pop_front().unwrap());
+            }
+        }
+
+        // 2. After execute operations we should process verify operation.
+        if let Some(next_verify_block) = self.verify_operations.get_next_last_block_number() {
+            let current_commit_block = self.commit_operations.get_last_block_number();
+            if next_verify_block <= current_commit_block {
+                return Some(self.verify_operations.pop_front().unwrap());
+            }
+        }
+
+        // 3. Finally, check the commit queue.
+        self.commit_operations.pop_front()
     }
 
     /// Notifies the queue about the transaction being confirmed on the Ethereum blockchain.

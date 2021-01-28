@@ -5,12 +5,11 @@ use num::{BigInt, BigUint};
 use sqlx::types::BigDecimal;
 use zksync_basic_types::{H256, U256};
 // Workspace imports
+use zksync_types::aggregated_operations::{AggregatedActionType, AggregatedOperation};
 use zksync_types::ethereum::{ETHOperation, InsertedOperationResponse};
 // Local imports
 use self::records::{ETHParams, ETHStats, ETHTxHash, StorageETHOperation};
-use crate::chain::operations::records::StoredAggregatedOperation;
-use crate::{QueryResult, StorageProcessor};
-use zksync_types::aggregated_operations::{AggregatedActionType, AggregatedOperation};
+use crate::{chain::operations::records::StoredAggregatedOperation, QueryResult, StorageProcessor};
 
 pub mod records;
 
@@ -131,10 +130,18 @@ impl<'a, 'c> EthereumSchema<'a, 'c> {
         let raw_ops = sqlx::query_as!(
             StoredAggregatedOperation,
             "SELECT * FROM aggregate_operations
-            WHERE NOT EXISTS (SELECT * FROM eth_aggregated_ops_binding WHERE op_id = aggregate_operations.id)
+            WHERE EXISTS (SELECT * FROM eth_unprocessed_aggregated_ops WHERE op_id = aggregate_operations.id)
             ORDER BY id ASC",
         )
         .fetch_all(transaction.conn())
+        .await?;
+
+        let ops_id = raw_ops.iter().map(|op| op.id).collect::<Vec<_>>();
+        sqlx::query!(
+            "DELETE FROM eth_unprocessed_aggregated_ops WHERE op_id = ANY($1)",
+            &ops_id
+        )
+        .execute(transaction.conn())
         .await?;
 
         let mut operations = Vec::new();
@@ -284,22 +291,29 @@ impl<'a, 'c> EthereumSchema<'a, 'c> {
     /// and it's invoked within `db-reset` subcommand.
     async fn report_created_operation(
         &mut self,
-        _operation_type: AggregatedActionType,
+        operation_type: AggregatedActionType,
     ) -> QueryResult<()> {
         let start = Instant::now();
         let mut transaction = self.0.start_transaction().await?;
 
         let mut current_stats = EthereumSchema(&mut transaction).load_eth_params().await?;
-        current_stats.commit_ops += 1;
+        match operation_type {
+            AggregatedActionType::CommitBlocks => current_stats.last_committed_block += 1,
+            AggregatedActionType::PublishProofBlocksOnchain => {
+                current_stats.last_verified_block += 1
+            }
+            AggregatedActionType::ExecuteBlocks => current_stats.last_executed_block += 1,
+            AggregatedActionType::CreateProofBlocks => return Ok(()),
+        };
 
         // Update the stored stats.
         sqlx::query!(
             "UPDATE eth_parameters
-            SET commit_ops = $1, verify_ops = $2, withdraw_ops = $3
+            SET last_committed_block = $1, last_verified_block = $2, last_executed_block = $3
             WHERE id = true",
-            current_stats.commit_ops,
-            current_stats.verify_ops,
-            current_stats.withdraw_ops
+            current_stats.last_committed_block,
+            current_stats.last_verified_block,
+            current_stats.last_executed_block
         )
         .execute(transaction.conn())
         .await?;
@@ -390,30 +404,16 @@ impl<'a, 'c> EthereumSchema<'a, 'c> {
         let eth_op_id = EthereumSchema(&mut transaction).get_eth_op_id(hash).await?;
 
         // Set the `confirmed` and `final_hash` field of the entry.
-        let _eth_op_id: i64 = sqlx::query!(
+        sqlx::query!(
             "UPDATE eth_operations
                 SET confirmed = $1, final_hash = $2
-                WHERE id = $3
-                RETURNING id",
+                WHERE id = $3",
             true,
             hash.as_bytes(),
             eth_op_id
         )
-        .fetch_one(transaction.conn())
-        .await?
-        .id;
-
-        // If there is a ZKSync operation, mark it as confirmed as well.
-        // sqlx::query!(
-        //     "
-        //     UPDATE operations
-        //         SET processed = $1
-        //         WHERE id = (SELECT op_id FROM eth_aggregated_ops_binding WHERE eth_op_id = $2)",
-        //     true,
-        //     eth_op_id,
-        // )
-        // .execute(transaction.conn())
-        // .await?;
+        .execute(transaction.conn())
+        .await?;
 
         transaction.commit().await?;
 
@@ -462,9 +462,9 @@ impl<'a, 'c> EthereumSchema<'a, 'c> {
         pub struct NewETHParams {
             pub nonce: i64,
             pub gas_price_limit: i64,
-            pub commit_ops: i64,
-            pub verify_ops: i64,
-            pub withdraw_ops: i64,
+            pub last_committed_block: i64,
+            pub last_verified_block: i64,
+            pub last_executed_block: i64,
         }
 
         let old_params: Option<ETHParams> =
@@ -476,15 +476,15 @@ impl<'a, 'c> EthereumSchema<'a, 'c> {
             let params = NewETHParams {
                 nonce: 0,
                 gas_price_limit: 400 * 10e9 as i64,
-                commit_ops: 0,
-                verify_ops: 0,
-                withdraw_ops: 0,
+                last_committed_block: 0,
+                last_verified_block: 0,
+                last_executed_block: 0,
             };
 
             sqlx::query!(
-                "INSERT INTO eth_parameters (nonce, gas_price_limit, commit_ops, verify_ops, withdraw_ops)
+                "INSERT INTO eth_parameters (nonce, gas_price_limit, last_committed_block, last_verified_block, last_executed_block)
                 VALUES ($1, $2, $3, $4, $5)",
-                params.nonce, params.gas_price_limit, params.commit_ops, params.verify_ops, params.withdraw_ops
+                params.nonce, params.gas_price_limit, params.last_committed_block, params.last_verified_block, params.last_executed_block
             )
             .execute(self.0.conn())
             .await?;

@@ -338,20 +338,35 @@ impl<'a, 'c> OperationsSchema<'a, 'c> {
         &mut self,
         operation: AggregatedOperation,
     ) -> QueryResult<()> {
+        let mut transaction = self.0.start_transaction().await?;
+
         let aggregated_action_type = operation.get_action_type();
         let (from_block, to_block) = operation.get_block_range();
-        sqlx::query!(
+
+        let id = sqlx::query!(
             "INSERT INTO aggregate_operations (action_type, arguments, from_block, to_block)
             VALUES ($1, $2, $3, $4)
             ON CONFLICT (id)
-            DO NOTHING",
+            DO NOTHING
+            RETURNING id",
             aggregated_action_type.to_string(),
             serde_json::to_value(operation.clone()).expect("aggregated op serialize fail"),
             i64::from(from_block),
             i64::from(to_block)
         )
-        .execute(self.0.conn())
+        .fetch_one(transaction.conn())
+        .await?
+        .id;
+
+        sqlx::query!(
+            "INSERT INTO eth_unprocessed_aggregated_ops (op_id)
+            VALUES ($1)",
+            id
+        )
+        .execute(transaction.conn())
         .await?;
+
+        transaction.commit().await?;
         Ok(())
     }
 

@@ -525,9 +525,9 @@ async fn restore_state() {
     };
 
     let stats = ETHStats {
-        commit_ops: 1,
-        verify_ops: 1,
-        withdraw_ops: 0,
+        last_committed_block: 1,
+        last_verified_block: 1,
+        last_executed_block: 0,
     };
     let mut eth_sender = restored_eth_sender(stored_operations, stats).await;
 

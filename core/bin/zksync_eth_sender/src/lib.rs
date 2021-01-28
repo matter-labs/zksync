@@ -25,7 +25,10 @@ use self::{
     transactions::*,
     tx_queue::{TxData, TxQueue, TxQueueBuilder},
 };
-use zksync_types::{aggregated_operations::AggregatedOperation, gas_counter::GasCounter};
+use zksync_types::{
+    aggregated_operations::{AggregatedActionType, AggregatedOperation},
+    gas_counter::GasCounter,
+};
 
 mod database;
 mod ethereum_interface;
@@ -140,7 +143,9 @@ impl<ETH: EthereumInterface, DB: DatabaseInterface> ETHSender<ETH, DB> {
 
         let tx_queue = TxQueueBuilder::new(options.sender.max_txs_in_flight as usize)
             .with_sent_pending_txs(ongoing_ops.len())
-            .with_aggregated_ops_count(stats.commit_ops)
+            .with_commit_operations_count(stats.last_committed_block)
+            .with_verify_operations_count(stats.last_verified_block)
+            .with_execute_operations_count(stats.last_executed_block)
             .build();
 
         let gas_adjuster = GasAdjuster::new(&db).await;
@@ -724,9 +729,18 @@ impl<ETH: EthereumInterface, DB: DatabaseInterface> ETHSender<ETH, DB> {
     /// Encodes the zkSync operation to the tx payload and adds it to the queue.
     fn add_operation_to_queue(&mut self, op: (i64, AggregatedOperation)) {
         let raw_tx = self.operation_to_raw_tx(&op.1);
+        let tx_data = TxData::from_operation(op, raw_tx);
 
-        self.tx_queue
-            .add_aggregate_operation(TxData::from_operation(op.clone(), raw_tx));
+        match tx_data.op_type {
+            AggregatedActionType::CommitBlocks => self.tx_queue.add_commit_operation(tx_data),
+            AggregatedActionType::PublishProofBlocksOnchain => {
+                self.tx_queue.add_verify_operation(tx_data)
+            }
+            AggregatedActionType::ExecuteBlocks => self.tx_queue.add_execute_operation(tx_data),
+            AggregatedActionType::CreateProofBlocks => {
+                panic!("Can't add CreateProofBlocks operation to transaction queue")
+            }
+        }
     }
 }
 
