@@ -7,7 +7,7 @@ import { serializeTx, sleep } from 'zksync/build/utils';
 import { submitSignedTransactionsBatch } from 'zksync/build/wallet';
 import { MAX_TIMESTAMP } from 'zksync/build/utils';
 
-import { RevertReceiveAccountFactory } from '../../../../contracts/typechain';
+import { RevertReceiveAccountFactory, RevertTransferERC20Factory } from '../../../../contracts/typechain';
 import { waitForOnchainWithdrawal }  from './helpers';
 
 import { withdrawalHelpers } from 'zksync';
@@ -20,6 +20,7 @@ declare module './tester' {
         testMultipleBatchSigners(wallets: Wallet[], token: TokenLike, amount: BigNumber): Promise<void>;
         testMultipleWalletsWrongSignature(from: Wallet, to: Wallet, token: TokenLike, amount: BigNumber): Promise<void>;
         testRecoverETHWithdrawal(from: Wallet, to: Address, toOwner: Wallet, amount: BigNumber): Promise<void>;
+        testRecoverERC20Withdrawal(from: Wallet, to: Address, token: TokenLike, amount: BigNumber): Promise<void>;
     }
 }
 
@@ -219,5 +220,60 @@ Tester.prototype.testRecoverETHWithdrawal = async function (
     // The funds should have arrived
     const expectedToBalance = balanceBefore.add(amount);
     const toBalance = await this.ethProvider.getBalance(to);    
+    expect(toBalance.eq(expectedToBalance), "The withdrawal was not recovered").to.be.true;
+}
+
+Tester.prototype.testRecoverERC20Withdrawal = async function (
+    from: Wallet,
+    to: Address,
+    token: TokenLike,
+    amount: BigNumber
+) {
+    const tokenAddress = this.syncProvider.tokenSet.resolveTokenAddress(token);
+    const revertTransferERC20 = RevertTransferERC20Factory.connect(
+        tokenAddress,
+        from.ethSigner
+    );
+
+    // Making sure that the withdrawal will be reverted 
+    await revertTransferERC20.setRevertTransfer(true);
+
+    const balanceBefore = await revertTransferERC20.balanceOf(to);
+    const withdrawTx = await from.withdrawFromSyncToEthereum({
+        ethAddress: to,
+        token: token,
+        amount
+    });
+    await withdrawTx.awaitVerifyReceipt();
+    
+    // Waiting for the withdrawl to be sent onchain
+    const withdrawalTxHash = await waitForOnchainWithdrawal(
+        this.syncProvider,
+        withdrawTx.txHash
+    );
+    
+    // Double-check that zkSync tried to process withdrawal
+    expect(withdrawalTxHash, 'Withdrawal was not processed onchain').to.exist;
+
+    // Double-check that the withdrawal has indeed failed
+    const balanceAfter = await revertTransferERC20.balanceOf(to);
+    expect(balanceBefore.eq(balanceAfter), "The withdrawal did not fail the first time").to.be.true;
+
+    // Make sure that the withdrawal will pass now
+    const tx = await revertTransferERC20.setRevertTransfer(false);
+    await tx.wait();
+    
+    // Re-try
+    const withdrawPendingTx = await withdrawalHelpers.withdrawPendingBalance(
+        this.syncProvider,
+        from.ethSigner.connect(this.ethProvider),
+        to,
+        token,
+    );
+    await withdrawPendingTx.wait();
+
+    // The funds should have arrived
+    const expectedToBalance = balanceBefore.add(amount);
+    const toBalance = await revertTransferERC20.balanceOf(to);    
     expect(toBalance.eq(expectedToBalance), "The withdrawal was not recovered").to.be.true;
 }

@@ -204,10 +204,8 @@ describe(`ZkSync integration tests (token: ${token}, transport: ${transport})`, 
         });
     });
 
-    it('should recover failed ETH withdraw', async function() {
+    it('should recover failed ETH withdraw', async () => {
         if (token !== 'ETH') {
-            // This is better than skipping, because
-            // it shows the test as "passed"
             return;
         }
         await tester.testRecoverETHWithdrawal(
@@ -217,10 +215,24 @@ describe(`ZkSync integration tests (token: ${token}, transport: ${transport})`, 
             TX_AMOUNT
         );
     });
+
+    it('should recover failed ERC20 withdraw', async () => {
+        if (token === 'ETH') {
+            return;
+        }
+        await tester.testRecoverERC20Withdrawal(
+            alice,
+            TEST_CONFIG.withdrawalHelpers.revert_receive_address,
+            token,
+            TX_AMOUNT
+        );
+    });
 });
 
 // wBTC is chosen because it has decimals different from ETH (8 instead of 18).
 // Using this token will help us to detect decimals-related errors.
+// Also we can set it's transfers to be reverted, thus 
+// enabling testing for recovering withdrawals
 const defaultERC20 = 'wBTC';
 
 let tokenAndTransport = [];
