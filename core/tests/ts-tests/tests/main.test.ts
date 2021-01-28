@@ -211,7 +211,6 @@ describe(`ZkSync integration tests (token: ${token}, transport: ${transport})`, 
         await tester.testRecoverETHWithdrawal(
             alice,
             TEST_CONFIG.withdrawalHelpers.revert_receive_address,
-            tester.syncWallet,
             TX_AMOUNT
         );
     });

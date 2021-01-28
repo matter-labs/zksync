@@ -19,7 +19,7 @@ declare module './tester' {
         testWrongSignature(from: Wallet, to: Wallet, token: TokenLike, amount: BigNumber): Promise<void>;
         testMultipleBatchSigners(wallets: Wallet[], token: TokenLike, amount: BigNumber): Promise<void>;
         testMultipleWalletsWrongSignature(from: Wallet, to: Wallet, token: TokenLike, amount: BigNumber): Promise<void>;
-        testRecoverETHWithdrawal(from: Wallet, to: Address, toOwner: Wallet, amount: BigNumber): Promise<void>;
+        testRecoverETHWithdrawal(from: Wallet, to: Address, amount: BigNumber): Promise<void>;
         testRecoverERC20Withdrawal(from: Wallet, to: Address, token: TokenLike, amount: BigNumber): Promise<void>;
     }
 }
@@ -172,12 +172,11 @@ Tester.prototype.testMultipleWalletsWrongSignature = async function (
 Tester.prototype.testRecoverETHWithdrawal = async function (
     from: Wallet,
     to: Address,
-    toOwner: Wallet,
     amount: BigNumber
 ) {
     const revertReceiveContract = RevertReceiveAccountFactory.connect(
         to,
-        toOwner.ethSigner
+        from.ethSigner
     );
 
     // Making sure that the withdrawal will be reverted 
