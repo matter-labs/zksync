@@ -62,6 +62,9 @@ function statusEntry(txData) {
 
 function feeEntry(txData) {
     const fee = txData.fee || 0;
+    if (!txData.feeTokenName) {
+        return makeEntry('Fee').innerHTML(`${'ETH'} ${formatToken(fee, 'ETH')}`);
+    }
 
     try {
         const feeBN = BigNumber.from(fee);
@@ -73,7 +76,6 @@ function feeEntry(txData) {
     } catch {
         return makeEntry('Fee');
     }
-
     return makeEntry('Fee').innerHTML(`${txData.feeTokenName} ${formatToken(fee, txData.feeTokenName)}`);
 }
 

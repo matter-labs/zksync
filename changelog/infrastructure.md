@@ -18,6 +18,7 @@ components, the logs will have the following format:
 
 ### Fixed
 
+- (`explorer`): Bug with not displaying old blocks was fixed.
 - (`explorer`): bug with updating transaction data after searching another transaction was fixed.
 
 ## Release 2021-01-12
