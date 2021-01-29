@@ -45,7 +45,8 @@ impl OperationQueue {
     pub fn push_back(&mut self, element: TxData) {
         let next_block_number = self
             .get_next_last_block_number()
-            .unwrap_or(self.last_block_number);
+            .unwrap_or(self.last_block_number)
+            + 1;
         assert_eq!(
             next_block_number,
             element.get_block_range().0 as usize,
