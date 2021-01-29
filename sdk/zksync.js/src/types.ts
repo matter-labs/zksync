@@ -16,6 +16,12 @@ export type Nonce = number | 'committed';
 
 export type Network = 'localhost' | 'rinkeby' | 'ropsten' | 'mainnet' | 'rinkeby-beta' | 'ropsten-beta';
 
+export interface Create2Data {
+    creatorAddress: string;
+    saltArg: string;
+    codeHash: string;
+}
+
 export interface AccountState {
     address: Address;
     id?: number;

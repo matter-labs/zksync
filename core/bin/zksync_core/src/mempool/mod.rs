@@ -501,8 +501,8 @@ impl MempoolTransactionsHandler {
                 TxAddError::DbError
             })?;
 
-        // WARNING: we are saving account type in mempool, this presents
-        // a possibility for users to spam our database using lots of invalid txs
+        // FIXME: we are saving account type in mempool, this presents
+        // a possibility for users to spam our database using lots of invalid txs (ZKS-429)
         if let ZkSyncTx::ChangePubKey(tx) = &tx.tx {
             store_account_type(&tx, &mut transaction).await?;
         }
