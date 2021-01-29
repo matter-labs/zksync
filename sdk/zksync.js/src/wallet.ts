@@ -666,11 +666,7 @@ export class Wallet {
     }
 
     async isOnchainAuthSigningKeySet(nonce: Nonce = 'committed'): Promise<boolean> {
-        const mainZkSyncContract = new Contract(
-            this.provider.contractAddress.mainContract,
-            SYNC_MAIN_CONTRACT_INTERFACE,
-            this.ethSigner
-        );
+        const mainZkSyncContract = this.getZkSyncMainContract();
 
         const numNonce = await this.getNonce(nonce);
         try {
@@ -698,11 +694,7 @@ export class Wallet {
 
         const numNonce = await this.getNonce(nonce);
 
-        const mainZkSyncContract = new Contract(
-            this.provider.contractAddress.mainContract,
-            SYNC_MAIN_CONTRACT_INTERFACE,
-            this.ethSigner
-        );
+        const mainZkSyncContract = this.getZkSyncMainContract();
 
         try {
             return mainZkSyncContract.setAuthPubkeyHash(newPubKeyHash.replace('sync:', '0x'), numNonce, {
@@ -804,11 +796,7 @@ export class Wallet {
     }): Promise<ETHOperation> {
         const gasPrice = await this.ethSigner.provider.getGasPrice();
 
-        const mainZkSyncContract = new Contract(
-            this.provider.contractAddress.mainContract,
-            SYNC_MAIN_CONTRACT_INTERFACE,
-            this.ethSigner
-        );
+        const mainZkSyncContract = this.getZkSyncMainContract();
 
         let ethTransaction;
 
@@ -898,11 +886,7 @@ export class Wallet {
             accountId = accountState.id;
         }
 
-        const mainZkSyncContract = new Contract(
-            ethProxy.contractAddress.mainContract,
-            SYNC_MAIN_CONTRACT_INTERFACE,
-            this.ethSigner
-        );
+        const mainZkSyncContract = this.getZkSyncMainContract();
 
         const tokenAddress = this.provider.tokenSet.resolveTokenAddress(withdraw.token);
         try {
@@ -915,6 +899,14 @@ export class Wallet {
         } catch (e) {
             this.modifyEthersError(e);
         }
+    }
+
+    getZkSyncMainContract() {
+        return new ethers.Contract(
+            this.provider.contractAddress.mainContract,
+            SYNC_MAIN_CONTRACT_INTERFACE,
+            this.ethSigner
+        );
     }
 
     private modifyEthersError(error: any): never {

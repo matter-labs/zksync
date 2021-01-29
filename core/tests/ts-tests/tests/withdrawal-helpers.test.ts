@@ -27,6 +27,9 @@ describe('Withdrawal helpers tests', () => {
             await tester.testDeposit(alice, token, DEPOSIT_AMOUNT, true);
             await tester.testChangePubKey(alice, token, false);
         }
+
+        // This is needed to interact with blockchain
+        alice.ethSigner.connect(tester.ethProvider);
     });
 
     after('disconnect tester', async () => {

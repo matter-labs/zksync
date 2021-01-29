@@ -709,7 +709,7 @@ export function getCREATE2AddressAndSalt(
 export async function getEthereumBalance(
     ethProvider: ethers.providers.Provider,
     syncProvider: Provider,
-    address: TokenLike,
+    address: Address,
     token: TokenLike
 ): Promise<BigNumber> {
     let balance: BigNumber;
@@ -725,4 +725,21 @@ export async function getEthereumBalance(
         balance = await erc20contract.balanceOf(address);
     }
     return balance;
+}
+
+export async function getPendingBalance(
+    ethProvider: ethers.providers.Provider,
+    syncProvider: Provider,
+    address: Address,
+    token: TokenLike
+): Promise<BigNumberish> {
+    const zksyncContract = new Contract(
+        address,
+        SYNC_MAIN_CONTRACT_INTERFACE,
+        ethProvider
+    );
+
+    const tokenAddress = syncProvider.tokenSet.resolveTokenAddress(token);
+
+    return zksyncContract.getPendingBalance(address, tokenAddress);
 }
