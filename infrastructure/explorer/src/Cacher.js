@@ -1,13 +1,5 @@
 import LRU from 'lru-cache';
-import {
-    BLOCK_STORAGE_SLOT,
-    BLOCK_TRANSACTIONS_STORAGE_SLOT,
-    MAX_CACHED_BLOCKS,
-    MAX_CACHED_BLOCKS_TRANSACTIONS,
-    MAX_CACHED_TRANSACTIONS,
-    CACHE_VERSION_SLOT,
-    CACHE_VERSION
-} from './constants';
+import { MAX_CACHED_BLOCKS, MAX_CACHED_BLOCKS_TRANSACTIONS, MAX_CACHED_TRANSACTIONS } from './constants';
 import { getTxFee, getFromAddressOfTx, getTxToAddress, getTxAmount, getTxToken } from './blockUtils';
 
 class Cacher {

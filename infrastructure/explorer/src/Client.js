@@ -2,7 +2,6 @@ import config from './env-config';
 import * as constants from './constants';
 import { formatToken, isBlockVerified } from './utils';
 import { BlockExplorerClient } from './BlockExplorerClient';
-import timeConstants from './timeConstants';
 
 import { Provider } from 'zksync';
 
@@ -56,6 +55,8 @@ export class Client {
             syncProvider: window.syncProvider
         };
 
+        // Clear the localStorage since it could have been saved before
+        // But now localStorage is not used
         localStorage.clear();
         const client = new Client(props);
         const cacher = new Cacher(client);
