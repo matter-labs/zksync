@@ -1,12 +1,15 @@
 // External imports
 // Workspace imports
-use zksync_types::{AccountMap, Action};
+use zksync_types::{aggregated_operations::AggregatedActionType, AccountMap};
 // Local imports
 use super::block::apply_random_updates;
 use crate::tests::{create_rng, db_test};
-use crate::{chain::state::StateSchema, test_data::gen_operation};
 use crate::{
-    chain::{account::AccountSchema, block::BlockSchema},
+    chain::state::StateSchema,
+    test_data::{gen_unique_aggregated_operation, get_sample_block},
+};
+use crate::{
+    chain::{account::AccountSchema, block::BlockSchema, operations::OperationsSchema},
     QueryResult, StorageProcessor,
 };
 
@@ -24,7 +27,7 @@ async fn stored_accounts(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
     // Execute and commit block with them.
     // Also store account updates.
     BlockSchema(&mut storage)
-        .execute_operation(gen_operation(1, Action::Commit, block_size))
+        .save_block(get_sample_block(1, block_size, Default::default()))
         .await?;
     StateSchema(&mut storage)
         .commit_state_update(1, &updates_block, 0)
@@ -80,12 +83,10 @@ async fn stored_accounts(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
     }
 
     // Now add a proof, verify block and apply a state update.
-    BlockSchema(&mut storage)
-        .store_operation(gen_operation(
+    OperationsSchema(&mut storage)
+        .store_aggregated_action(gen_unique_aggregated_operation(
             1,
-            Action::Verify {
-                proof: Default::default(),
-            },
+            AggregatedActionType::ExecuteBlocks,
             block_size,
         ))
         .await?;

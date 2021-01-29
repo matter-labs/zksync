@@ -105,4 +105,5 @@ pub struct StoredAggregatedOperation {
     pub from_block: i64,
     pub to_block: i64,
     pub created_at: DateTime<Utc>,
+    pub confirmed: bool,
 }

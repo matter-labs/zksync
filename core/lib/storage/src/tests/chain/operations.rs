@@ -1,37 +1,40 @@
 // External imports
 // Workspace imports
-use zksync_types::ActionType;
+use zksync_types::aggregated_operations::AggregatedActionType;
 // Local imports
-use crate::tests::db_test;
 use crate::{
     chain::{
         block::BlockSchema,
         operations::{
-            records::{NewExecutedPriorityOperation, NewExecutedTransaction, NewOperation},
+            records::{NewExecutedPriorityOperation, NewExecutedTransaction},
             OperationsSchema,
         },
     },
+    test_data::gen_unique_aggregated_operation,
+    tests::db_test,
     QueryResult, StorageProcessor,
 };
 
 /// Checks the save&load routine for unconfirmed operations.
 #[db_test]
-async fn operations(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
+async fn aggregated_operations(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
     let block_number = 1;
-    let action_type = ActionType::COMMIT;
+    let action_type = AggregatedActionType::CommitBlocks;
     OperationsSchema(&mut storage)
-        .store_operation(NewOperation {
+        .store_aggregated_action(gen_unique_aggregated_operation(
             block_number,
-            action_type: action_type.to_string(),
-        })
+            action_type,
+            100,
+        ))
         .await?;
 
     let stored_operation = OperationsSchema(&mut storage)
-        .get_operation(block_number as u32, action_type)
+        .get_stored_aggregated_operation(block_number as u32, action_type)
         .await
         .unwrap();
 
-    assert_eq!(stored_operation.block_number, 1);
+    assert_eq!(stored_operation.from_block, 1);
+    assert_eq!(stored_operation.to_block, 1);
     assert_eq!(stored_operation.action_type, action_type.to_string());
     assert_eq!(stored_operation.confirmed, false);
 

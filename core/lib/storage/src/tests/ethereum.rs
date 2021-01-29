@@ -6,14 +6,12 @@ use zksync_basic_types::{H256, U256};
 use zksync_types::{
     aggregated_operations::{AggregatedActionType, AggregatedOperation},
     ethereum::ETHOperation,
-    Action,
 };
 // Local imports
-use crate::test_data::{gen_unique_aggregated_operation, gen_unique_operation, BLOCK_SIZE_CHUNKS};
+use crate::test_data::{gen_unique_aggregated_operation, BLOCK_SIZE_CHUNKS};
 use crate::tests::db_test;
 use crate::{
-    chain::block::BlockSchema, chain::operations::OperationsSchema, ethereum::EthereumSchema,
-    QueryResult, StorageProcessor,
+    chain::operations::OperationsSchema, ethereum::EthereumSchema, QueryResult, StorageProcessor,
 };
 use num::BigUint;
 
@@ -93,13 +91,6 @@ async fn ethereum_storage(mut storage: StorageProcessor<'_>) -> QueryResult<()> 
 
     // Store operation with ID 1.
     let block_number = 1;
-    BlockSchema(&mut storage)
-        .store_operation(gen_unique_operation(
-            block_number,
-            Action::Commit,
-            BLOCK_SIZE_CHUNKS,
-        ))
-        .await?;
     OperationsSchema(&mut storage)
         .store_aggregated_action(gen_unique_aggregated_operation(
             block_number,
@@ -131,7 +122,6 @@ async fn ethereum_storage(mut storage: StorageProcessor<'_>) -> QueryResult<()> 
         .load_unconfirmed_operations()
         .await?;
     let eth_op = unconfirmed_operations[0].clone();
-    let op = eth_op.op.clone().expect("No Operation entry");
     // assert_eq!(Some(op.0), operation.id);
     // Load the database ID, since we can't predict it for sure.
     assert_eq!(
@@ -141,15 +131,6 @@ async fn ethereum_storage(mut storage: StorageProcessor<'_>) -> QueryResult<()> 
 
     // Store operation with ID 2.
     let block_number = 2;
-    BlockSchema(&mut storage)
-        .store_operation(gen_unique_operation(
-            block_number,
-            Action::Verify {
-                proof: Default::default(),
-            },
-            BLOCK_SIZE_CHUNKS,
-        ))
-        .await?;
     OperationsSchema(&mut storage)
         .store_aggregated_action(gen_unique_aggregated_operation(
             block_number,
@@ -182,7 +163,6 @@ async fn ethereum_storage(mut storage: StorageProcessor<'_>) -> QueryResult<()> 
         .await?;
     assert_eq!(unconfirmed_operations.len(), 2);
     let eth_op = unconfirmed_operations[1].clone();
-    let op = eth_op.op.clone().expect("No Operation entry");
     // assert_eq!(op.id, operation_2.id);
     assert_eq!(
         eth_op,
@@ -246,13 +226,6 @@ async fn ethereum_unprocessed(mut storage: StorageProcessor<'_>) -> QueryResult<
 
     // Store operation with ID 1.
     let block_number = 1;
-    BlockSchema(&mut storage)
-        .store_operation(gen_unique_operation(
-            block_number,
-            Action::Commit,
-            BLOCK_SIZE_CHUNKS,
-        ))
-        .await?;
     OperationsSchema(&mut storage)
         .store_aggregated_action(gen_unique_aggregated_operation(
             block_number,
@@ -262,15 +235,6 @@ async fn ethereum_unprocessed(mut storage: StorageProcessor<'_>) -> QueryResult<
         .await?;
     let operation = OperationsSchema(&mut storage)
         .get_aggregated_op_that_affects_block(AggregatedActionType::CommitBlocks, block_number)
-        .await?;
-    BlockSchema(&mut storage)
-        .store_operation(gen_unique_operation(
-            block_number,
-            Action::Verify {
-                proof: Default::default(),
-            },
-            BLOCK_SIZE_CHUNKS,
-        ))
         .await?;
     OperationsSchema(&mut storage)
         .store_aggregated_action(gen_unique_aggregated_operation(
@@ -318,7 +282,6 @@ async fn ethereum_unprocessed(mut storage: StorageProcessor<'_>) -> QueryResult<
         .await?;
     assert_eq!(unconfirmed_operations.len(), 1);
     let eth_op = unconfirmed_operations[0].clone();
-    let op = eth_op.op.clone().expect("No Operation entry");
     // assert_eq!(op.id, operation.id);
     // Load the database ID, since we can't predict it for sure.
     assert_eq!(

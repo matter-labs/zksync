@@ -196,25 +196,20 @@ const AVAILABLE_AGGREGATE_PROOFS: &[usize] = &[1, 5];
 async fn create_aggregated_commits_storage(
     storage: &mut StorageProcessor<'_>,
 ) -> anyhow::Result<bool> {
-    let last_committed_block = BlockSchema(storage).get_last_committed_block().await?;
     let last_aggregate_committed_block = OperationsSchema(storage)
         .get_last_affected_block_by_aggregated_action(AggregatedActionType::CommitBlocks)
         .await?;
-    if last_committed_block <= last_aggregate_committed_block {
-        return Ok(false);
-    }
-
     let old_committed_block = BlockSchema(storage)
         .get_block(last_aggregate_committed_block)
         .await?
         .expect("Failed to get last committed block from db");
+
     let mut new_blocks = Vec::new();
-    for block_number in last_aggregate_committed_block + 1..=last_committed_block {
-        let block = BlockSchema(storage)
-            .get_block(block_number)
-            .await?
-            .expect("Failed to get committed block");
+    let mut block_number = last_aggregate_committed_block + 1;
+
+    while let Some(block) = BlockSchema(storage).get_block(block_number).await? {
         new_blocks.push(block);
+        block_number += 1;
     }
 
     let commit_operation = create_new_commit_operation(
@@ -241,16 +236,18 @@ async fn create_aggregated_commits_storage(
 async fn create_aggregated_prover_task_storage(
     storage: &mut StorageProcessor<'_>,
 ) -> anyhow::Result<bool> {
-    let last_committed_block = BlockSchema(storage).get_last_committed_block().await?;
+    let last_aggregate_committed_block = OperationsSchema(storage)
+        .get_last_affected_block_by_aggregated_action(AggregatedActionType::CommitBlocks)
+        .await?;
     let last_aggregate_create_proof_block = OperationsSchema(storage)
         .get_last_affected_block_by_aggregated_action(AggregatedActionType::CreateProofBlocks)
         .await?;
-    if last_committed_block <= last_aggregate_create_proof_block {
+    if last_aggregate_committed_block <= last_aggregate_create_proof_block {
         return Ok(false);
     }
 
     let mut blocks_with_proofs = Vec::new();
-    for block_number in last_aggregate_create_proof_block + 1..=last_committed_block {
+    for block_number in last_aggregate_create_proof_block + 1..=last_aggregate_committed_block {
         let proof_exists = ProverSchema(storage)
             .load_proof(block_number)
             .await?

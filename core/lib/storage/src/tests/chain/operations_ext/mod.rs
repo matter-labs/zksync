@@ -2,18 +2,18 @@
 use std::collections::HashMap;
 // External imports
 // Workspace imports
-use zksync_types::aggregated_operations::AggregatedActionType;
-use zksync_types::{Action, BlockNumber};
+use zksync_types::{aggregated_operations::AggregatedActionType, BlockNumber};
 // Local imports
 use self::setup::TransactionsHistoryTestSetup;
 use crate::{
+    chain::block::BlockSchema,
     chain::operations::OperationsSchema,
     chain::operations_ext::{
         records::{AccountOpReceiptResponse, AccountTxReceiptResponse},
         SearchDirection,
     },
     test_data::{
-        dummy_ethereum_tx_hash, gen_unique_aggregated_operation, gen_unique_operation,
+        dummy_ethereum_tx_hash, gen_unique_aggregated_operation, get_sample_block,
         BLOCK_SIZE_CHUNKS,
     },
     tests::db_test,
@@ -75,10 +75,8 @@ async fn update_blocks_status(mut storage: &mut StorageProcessor<'_>) -> QueryRe
     // Required since we use `EthereumSchema` in this test.
     storage.ethereum_schema().initialize_eth_data().await?;
     // Make first block committed.
-    storage
-        .chain()
-        .block_schema()
-        .store_operation(gen_unique_operation(1, Action::Commit, BLOCK_SIZE_CHUNKS))
+    BlockSchema(&mut storage)
+        .save_block(get_sample_block(1, BLOCK_SIZE_CHUNKS, Default::default()))
         .await?;
     OperationsSchema(&mut storage)
         .store_aggregated_action(gen_unique_aggregated_operation(
@@ -99,32 +97,18 @@ async fn update_blocks_status(mut storage: &mut StorageProcessor<'_>) -> QueryRe
     confirm_eth_op(storage, id, AggregatedActionType::CommitBlocks).await?;
 
     // Make first block verified.
-    storage
-        .chain()
-        .block_schema()
-        .store_operation(gen_unique_operation(
-            1,
-            Action::Verify {
-                proof: Default::default(),
-            },
-            BLOCK_SIZE_CHUNKS,
-        ))
-        .await?;
     OperationsSchema(&mut storage)
         .store_aggregated_action(gen_unique_aggregated_operation(
             1,
-            AggregatedActionType::CreateProofBlocks,
+            AggregatedActionType::ExecuteBlocks,
             BLOCK_SIZE_CHUNKS,
         ))
         .await?;
     let (id, _) = OperationsSchema(&mut storage)
-        .get_aggregated_op_that_affects_block(
-            AggregatedActionType::CreateProofBlocks,
-            1 as BlockNumber,
-        )
+        .get_aggregated_op_that_affects_block(AggregatedActionType::ExecuteBlocks, 1 as BlockNumber)
         .await?
         .unwrap();
-    confirm_eth_op(storage, id, AggregatedActionType::CreateProofBlocks).await?;
+    confirm_eth_op(storage, id, AggregatedActionType::ExecuteBlocks).await?;
 
     Ok(())
 }
@@ -340,8 +324,6 @@ async fn get_account_transactions_history_from(
 /// same as expected.
 #[db_test]
 async fn get_account_transactions_receipts(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
-    // TODO: the test itself is correct, but the `get_account_transactions_receipts`
-    // function still has outdated logic, after it is corrected the test should pass. (ZKS-375)
     let mut setup = TransactionsHistoryTestSetup::new();
     setup.add_block(1);
     setup.add_block_with_rejected_op(2);
@@ -650,8 +632,6 @@ async fn get_account_transactions_receipts(mut storage: StorageProcessor<'_>) ->
 /// same as expected.
 #[db_test]
 async fn get_account_operations_receipts(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
-    // TODO: the test itself is correct, but the `get_account_operations_receipts`
-    // function still has outdated logic, after it is corrected the test should pass. (ZKS-375)
     let mut setup = TransactionsHistoryTestSetup::new();
     setup.add_block(1);
     setup.add_block_with_rejected_op(2);
