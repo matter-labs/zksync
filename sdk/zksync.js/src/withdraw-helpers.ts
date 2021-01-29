@@ -45,6 +45,9 @@ function getMulticallAddressByNetwork(network: Network) {
 }
 
 Wallet.prototype.withdrawPendingBalance = async function (
+    // Here and in all the other functions in this file
+    // "this" is just to make the `this` typed.
+    // User do not have to pass it.
     this: Wallet,
     from: Address,
     token: TokenLike,
