@@ -11,13 +11,11 @@ import {
 import { getTxFee, getFromAddressOfTx, getTxToAddress, getTxAmount, getTxToken } from './blockUtils';
 
 class Cacher {
-
     initLRUCaches() {
         this.blocksCache = new LRU(MAX_CACHED_BLOCKS);
         this.blocksTxsCache = new LRU(MAX_CACHED_BLOCKS_TRANSACTIONS);
         this.txCache = new LRU(MAX_CACHED_TRANSACTIONS);
     }
-
 
     getCachedBlock(blockNumber) {
         return this.blocksCache.get(blockNumber);
@@ -68,7 +66,6 @@ class Cacher {
     cacheTransaction(hash, tx) {
         this.txCache.set(hash, tx);
     }
-
 
     constructor(client) {
         this.initLRUCaches();

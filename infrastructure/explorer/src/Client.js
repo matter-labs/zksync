@@ -11,7 +11,6 @@ import * as ethers from 'ethers';
 
 import Cacher from './Cacher';
 
-
 async function fetch(req) {
     let r = await axios(req);
     if (r.status == 200) {
