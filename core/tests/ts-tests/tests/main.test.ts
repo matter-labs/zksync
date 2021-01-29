@@ -1,5 +1,5 @@
 import { expect } from 'chai';
-import { BigNumber, utils, ethers } from 'ethers';
+import { BigNumber, utils } from 'ethers';
 import { Wallet, types } from 'zksync';
 
 import { Tester } from './tester';
