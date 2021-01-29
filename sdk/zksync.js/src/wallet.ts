@@ -1,7 +1,7 @@
 import { BigNumber, BigNumberish, Contract, ContractTransaction, ethers } from 'ethers';
 import { ErrorCode } from '@ethersproject/logger';
 import { EthMessageSigner } from './eth-message-signer';
-import { ETHProxy, Provider } from './provider';
+import { Provider } from './provider';
 import { Create2WalletSigner, Signer } from './signer';
 import { BatchBuilder } from './batch-builder';
 import {
@@ -22,8 +22,7 @@ import {
     ChangePubkeyTypes,
     ChangePubKeyOnchain,
     ChangePubKeyECDSA,
-    ChangePubKeyCREATE2,
-    ZkSyncVersion
+    ChangePubKeyCREATE2
 } from './types';
 import {
     ERC20_APPROVE_TRESHOLD,
@@ -32,15 +31,12 @@ import {
     MAX_ERC20_APPROVE_AMOUNT,
     SYNC_MAIN_CONTRACT_INTERFACE,
     ERC20_DEPOSIT_GAS_LIMIT,
-    getEthSignatureType,
     signMessagePersonalAPI,
     getSignedBytesFromMessage,
-    serializeTransfer,
     getChangePubkeyMessage,
     MAX_TIMESTAMP,
     getEthereumBalance
 } from './utils';
-import validate = WebAssembly.validate;
 
 const EthersErrorCode = ErrorCode;
 
@@ -469,7 +465,6 @@ export class Wallet {
         }
 
         const feeTokenId = this.provider.tokenSet.resolveTokenId(changePubKey.feeToken);
-        const newPubKeyHash = await this.signer.pubKeyHash();
 
         await this.setRequiredAccountIdFromServer('Set Signing Key');
 
@@ -871,7 +866,6 @@ export class Wallet {
         ethTxOptions?: ethers.providers.TransactionRequest;
     }): Promise<ETHOperation> {
         const gasPrice = await this.ethSigner.provider.getGasPrice();
-        const ethProxy = new ETHProxy(this.ethSigner.provider, this.provider.contractAddress);
 
         let accountId: number;
         if (withdraw.accountId != null) {

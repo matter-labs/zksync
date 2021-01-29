@@ -1,7 +1,7 @@
 import { BigNumberish, ethers, Contract, BigNumber, ContractTransaction } from 'ethers';
 import { Wallet } from '.';
 import { Address, TokenLike, Network } from './types';
-import { MULTICALL_INTERFACE, getPendingBalance } from './utils';
+import { MULTICALL_INTERFACE } from './utils';
 
 declare module './wallet' {
     interface Wallet {

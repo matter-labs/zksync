@@ -2,7 +2,7 @@ import { Tester } from './tester';
 import { expect } from 'chai';
 import { Wallet, types } from 'zksync';
 import { BigNumber } from 'ethers';
-import { SignedTransaction, TxEthSignature, Address } from 'zksync/build/types';
+import { SignedTransaction, TxEthSignature } from 'zksync/build/types';
 import { submitSignedTransactionsBatch } from 'zksync/build/wallet';
 import { MAX_TIMESTAMP } from 'zksync/build/utils';
 
