@@ -21,6 +21,7 @@ use batch_transfers::{BatchTransferScenario, BatchTransferScenarioConfig};
 use fee_ticker::{FeeTickerScenario, FeeTickerScenarioConfig};
 use num::BigUint;
 use serde::{Deserialize, Serialize};
+use zksync_types::TokenLike;
 // Workspace uses
 
 // Local uses
@@ -34,12 +35,14 @@ mod transfers;
 mod withdraw;
 
 /// Resources that are needed from the scenario executor to perform the scenario.
-#[derive(Debug, Clone, Ord, PartialOrd, Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub struct ScenarioResources {
     /// Total amount of non-empty wallets.
     pub wallets_amount: u64,
     /// Wei balance in each wallet.
     pub balance_per_wallet: BigUint,
+    /// Scenario token.
+    pub token_name: TokenLike,
     /// Scenario has deposit operations.
     pub has_deposits: bool,
 }
@@ -89,7 +92,7 @@ pub trait Scenario: Debug + Display + Send + Sync + 'static {
 /// Supported scenario types.
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
 #[serde(tag = "name", rename_all = "snake_case")]
-pub enum ScenarioConfig {
+pub enum ScenarioType {
     /// Bunch of transfers scenario.
     Transfer(TransferScenarioConfig),
     /// Withdraw / deposit scenario.
@@ -102,15 +105,27 @@ pub enum ScenarioConfig {
     FeeTicker(FeeTickerScenarioConfig),
 }
 
+/// Scenario config.
+#[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
+pub struct ScenarioConfig {
+    /// Scenario token name,
+    pub token_name: TokenLike,
+    /// Inner scenario config.
+    #[serde(flatten)]
+    pub inner: ScenarioType,
+}
+
 impl ScenarioConfig {
     /// Returns the scenario given its type.
     pub fn into_scenario(self) -> Box<dyn Scenario> {
-        match self {
-            Self::Transfer(cfg) => Box::new(TransferScenario::from(cfg)),
-            Self::Withdraw(cfg) => Box::new(WithdrawScenario::from(cfg)),
-            Self::FullExit(cfg) => Box::new(FullExitScenario::from(cfg)),
-            Self::BatchTransfers(cfg) => Box::new(BatchTransferScenario::from(cfg)),
-            Self::FeeTicker(cfg) => Box::new(FeeTickerScenario::from(cfg)),
+        match self.inner {
+            ScenarioType::Transfer(cfg) => Box::new(TransferScenario::new(self.token_name, cfg)),
+            ScenarioType::Withdraw(cfg) => Box::new(WithdrawScenario::new(self.token_name, cfg)),
+            ScenarioType::FullExit(cfg) => Box::new(FullExitScenario::new(self.token_name, cfg)),
+            ScenarioType::BatchTransfers(cfg) => {
+                Box::new(BatchTransferScenario::new(self.token_name, cfg))
+            }
+            ScenarioType::FeeTicker(cfg) => Box::new(FeeTickerScenario::new(self.token_name, cfg)),
         }
     }
 }

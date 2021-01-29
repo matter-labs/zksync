@@ -6,6 +6,7 @@ use num::BigUint;
 use serde::{Deserialize, Serialize};
 // Workspace uses
 use zksync::{types::BlockStatus, utils::closest_packable_token_amount};
+use zksync_types::TokenLike;
 // Local uses
 use super::{Fees, Scenario, ScenarioResources};
 use crate::{monitor::Monitor, test_wallet::TestWallet, utils::wait_all_failsafe};
@@ -28,12 +29,6 @@ impl Default for WithdrawScenarioConfig {
     }
 }
 
-impl From<WithdrawScenarioConfig> for WithdrawScenario {
-    fn from(config: WithdrawScenarioConfig) -> Self {
-        Self { config }
-    }
-}
-
 /// Withdraw scenario performs several deposit / withdraw operations.
 ///
 /// The purpose of the withdraw scenario is to ensure that deposits
@@ -41,12 +36,13 @@ impl From<WithdrawScenarioConfig> for WithdrawScenario {
 /// load of many transfers.
 #[derive(Debug)]
 pub struct WithdrawScenario {
+    token_name: TokenLike,
     config: WithdrawScenarioConfig,
 }
 
 impl fmt::Display for WithdrawScenario {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_str("withdraw")
+        write!(f, "withdraw({})", self.token_name)
     }
 }
 
@@ -59,6 +55,7 @@ impl Scenario for WithdrawScenario {
         ScenarioResources {
             wallets_amount: self.config.wallets_amount,
             balance_per_wallet,
+            token_name: self.token_name.clone(),
             has_deposits: true,
         }
     }
@@ -114,6 +111,10 @@ impl Scenario for WithdrawScenario {
 }
 
 impl WithdrawScenario {
+    pub fn new(token_name: TokenLike, config: WithdrawScenarioConfig) -> Self {
+        Self { token_name, config }
+    }
+
     async fn withdraw_and_deposit(
         monitor: &Monitor,
         fees: &Fees,

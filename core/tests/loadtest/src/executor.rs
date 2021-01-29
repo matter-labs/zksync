@@ -89,13 +89,7 @@ impl LoadtestExecutor {
 
         // Create main account to deposit money from and to return money back later.
         let main_wallet =
-            TestWallet::from_info(monitor.clone(), &config.main_wallet, &web3_url).await;
-        // Special case for erc20 tokens.
-        if !main_wallet.token_name().is_eth() {
-            main_wallet
-                .approve_erc20_deposits(main_wallet.token_name().clone())
-                .await?;
-        }
+            TestWallet::from_info(monitor.clone(), "ETH", &config.main_wallet, &web3_url).await;
 
         let default_fee = main_wallet.sufficient_fee().await?;
         let fees = Fees::from_config(&config.network, default_fee);
@@ -151,6 +145,8 @@ impl LoadtestExecutor {
         let mut wallets = Vec::new();
         let mut deposit_ops = Vec::new();
         for resource in resources {
+            let token_name = &resource.token_name;
+
             let wallet_balance = resource.balance_per_wallet + &total_fee;
             let scenario_amount =
                 (&wallet_balance + &total_fee) * BigUint::from(resource.wallets_amount);
@@ -158,17 +154,17 @@ impl LoadtestExecutor {
             let scenario_wallets = wait_all_chunks(
                 CHUNK_SIZES,
                 (0..resource.wallets_amount).map(|_| {
-                    TestWallet::new_random(
-                        self.main_wallet.token_name().clone(),
-                        self.monitor.clone(),
-                        &self.web3_url,
-                    )
+                    TestWallet::new_random(token_name.clone(), self.monitor.clone(), &self.web3_url)
                 }),
             )
             .await;
 
             // Special case for erc20 tokens.
-            if resource.has_deposits && !self.main_wallet.token_name().is_eth() {
+            if !token_name.is_eth() {
+                self.main_wallet.approve_erc20_deposits(token_name).await?;
+            }
+
+            if !token_name.is_eth() && resource.has_deposits {
                 vlog::info!(
                     "Approving {} wallets for ERC20 deposits.",
                     scenario_wallets.len(),
@@ -193,7 +189,6 @@ impl LoadtestExecutor {
             }
 
             // Make deposit from Ethereum network to the zkSync one.
-            let token_name = self.main_wallet.token_name();
             let amount_to_deposit = closest_packable_token_amount(
                 &(&scenario_amount + BigUint::from(Self::OPERATIONS_PER_WALLET)),
             );
@@ -266,7 +261,8 @@ impl LoadtestExecutor {
                 CHUNK_SIZES,
                 scenario_wallets.iter().map(|wallet| {
                     let amount = closest_packable_token_amount(&scenario_amount);
-                    self.main_wallet.sign_transfer(
+                    self.main_wallet.sign_transfer_token(
+                        wallet.token_name(),
                         wallet.address(),
                         amount,
                         self.fees.zksync.clone(),
@@ -444,7 +440,7 @@ impl LoadtestExecutor {
             for wallet in scenario_wallets {
                 // Refund remaining erc20 tokens to the main wallet
                 if !wallet.token_name().is_eth() {
-                    let balance = wallet.erc20_balance().await?;
+                    let balance = wallet.erc20_balance(wallet.token_name()).await?;
                     if balance > self.fees.eth {
                         let amount = balance - &self.fees.eth;
                         wallet
@@ -467,11 +463,11 @@ impl LoadtestExecutor {
             }
 
             // Withdraw remaining balance from the zkSync network back to the Ethereum one.
-            let token_name = self.main_wallet.token_name();
+            let token_name = scenario.requested_resources(&self.fees).token_name;
 
             let main_wallet_balance = self
                 .main_wallet
-                .token_balance(token_name, BlockStatus::Committed)
+                .token_balance(&token_name, BlockStatus::Committed)
                 .await?;
             if main_wallet_balance > self.fees.zksync {
                 vlog::info!(

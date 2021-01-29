@@ -2,8 +2,6 @@
 [main_wallet]
 address = '0x36615cf349d7f6344891b1e7ca7c72883f5dc049'
 private_key = '0x7726827caac94a7f9e1b160f7ea819f172f7b6f9d2a97f992c38edeab82d4110'
-# The name of the token used for testing.
-token_name = 'DAI'
 
 [network]
 # Network kind used for testing.
@@ -15,6 +13,8 @@ zksync_fee = 100000000000
 
 [[scenarios]]
 name = 'fee_ticker'
+# The name of the token used for testing.
+token_name = 'ETH'
 # Amount of money to be used in the transfer, in gwei.
 transfer_size = 1
 transfer_rounds = 10
@@ -23,6 +23,27 @@ max_batch_size = 15
 
 [[scenarios]]
 name = 'fee_ticker'
+# The name of the token used for testing.
+token_name = 'ETH'
+# Amount of money to be used in the transfer, in gwei.
+transfer_size = 1
+transfer_rounds = 10
+wallets_amount = 40
+
+[[scenarios]]
+name = 'fee_ticker'
+# The name of the token used for testing.
+token_name = 'DAI'
+# Amount of money to be used in the transfer, in gwei.
+transfer_size = 1
+transfer_rounds = 10
+wallets_amount = 40
+max_batch_size = 15
+
+[[scenarios]]
+name = 'fee_ticker'
+# The name of the token used for testing.
+token_name = 'DAI'
 # Amount of money to be used in the transfer, in gwei.
 transfer_size = 1
 transfer_rounds = 10

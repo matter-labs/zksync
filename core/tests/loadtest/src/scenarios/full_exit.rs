@@ -6,6 +6,7 @@ use num::BigUint;
 use serde::{Deserialize, Serialize};
 // Workspace uses
 use zksync::{types::BlockStatus, utils::closest_packable_token_amount};
+use zksync_types::TokenLike;
 // Local uses
 use super::{Fees, Scenario, ScenarioResources};
 use crate::{monitor::Monitor, test_wallet::TestWallet, utils::wait_all_failsafe};
@@ -23,20 +24,15 @@ impl Default for FullExitScenarioConfig {
     }
 }
 
-impl From<FullExitScenarioConfig> for FullExitScenario {
-    fn from(config: FullExitScenarioConfig) -> Self {
-        Self { config }
-    }
-}
-
 #[derive(Debug)]
 pub struct FullExitScenario {
+    token_name: TokenLike,
     config: FullExitScenarioConfig,
 }
 
 impl fmt::Display for FullExitScenario {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_str("full_exit")
+        write!(f, "full_exit({})", self.token_name)
     }
 }
 
@@ -52,6 +48,7 @@ impl Scenario for FullExitScenario {
         ScenarioResources {
             wallets_amount: self.config.wallets_amount,
             balance_per_wallet,
+            token_name: self.token_name.clone(),
             has_deposits: true,
         }
     }
@@ -110,6 +107,10 @@ impl Scenario for FullExitScenario {
 }
 
 impl FullExitScenario {
+    pub fn new(token_name: TokenLike, config: FullExitScenarioConfig) -> Self {
+        Self { token_name, config }
+    }
+
     async fn full_exit_and_deposit(
         monitor: &Monitor,
         fees: &Fees,

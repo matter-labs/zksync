@@ -9,7 +9,7 @@ use serde::{Deserialize, Serialize};
 // Workspace uses
 use zksync::provider::Provider;
 use zksync::utils::closest_packable_token_amount;
-use zksync_types::TxFeeTypes;
+use zksync_types::{TokenLike, TxFeeTypes};
 use zksync_utils::format_ether;
 
 // Local uses
@@ -49,14 +49,9 @@ impl Default for FeeTickerScenarioConfig {
     }
 }
 
-impl From<FeeTickerScenarioConfig> for FeeTickerScenario {
-    fn from(cfg: FeeTickerScenarioConfig) -> Self {
-        Self::new(cfg)
-    }
-}
-
 #[derive(Debug)]
 pub struct FeeTickerScenario {
+    token_name: TokenLike,
     transfer_size: BigUint,
     transfer_rounds: u64,
     wallets: usize,
@@ -65,7 +60,7 @@ pub struct FeeTickerScenario {
 
 impl fmt::Display for FeeTickerScenario {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_str("fee_ticker")
+        write!(f, "fee_ticker({})", self.token_name)
     }
 }
 
@@ -78,6 +73,7 @@ impl Scenario for FeeTickerScenario {
         ScenarioResources {
             balance_per_wallet: closest_packable_token_amount(&balance_per_wallet),
             wallets_amount: self.wallets as u64,
+            token_name: self.token_name.clone(),
             has_deposits: false,
         }
     }
@@ -131,8 +127,9 @@ impl Scenario for FeeTickerScenario {
 }
 
 impl FeeTickerScenario {
-    pub fn new(config: FeeTickerScenarioConfig) -> Self {
+    pub fn new(token_name: TokenLike, config: FeeTickerScenarioConfig) -> Self {
         Self {
+            token_name,
             transfer_size: gwei_to_wei(config.transfer_size),
             transfer_rounds: config.transfer_rounds,
             wallets: config.wallets_amount as usize,

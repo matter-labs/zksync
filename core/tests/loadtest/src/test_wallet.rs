@@ -33,11 +33,18 @@ pub struct TestWallet {
     nonce: AtomicU32,
 }
 
+// TODO split this god object into MainWallet and ScenarioWallet.
+
 impl TestWallet {
     const FEE_FACTOR: u64 = 3;
 
     /// Creates a new wallet from the given account information and Ethereum configuration options.
-    pub async fn from_info(monitor: Monitor, info: &AccountInfo, web3_url: &str) -> Self {
+    pub async fn from_info(
+        monitor: Monitor,
+        token_name: impl Into<TokenLike>,
+        info: &AccountInfo,
+        web3_url: &str,
+    ) -> Self {
         let credentials = WalletCredentials::from_eth_signer(
             info.address,
             PrivateKeySigner::new(info.private_key),
@@ -50,7 +57,7 @@ impl TestWallet {
             .await
             .unwrap();
 
-        let wallet = Self::from_wallet(info.token_name.clone(), monitor, inner, web3_url).await;
+        let wallet = Self::from_wallet(token_name.into(), monitor, inner, web3_url).await;
         save_wallet(info.clone());
         wallet
     }
@@ -64,10 +71,9 @@ impl TestWallet {
         let info = AccountInfo {
             address: address_from_pk,
             private_key: eth_private_key,
-            token_name,
         };
 
-        Self::from_info(monitor, &info, web3_url).await
+        Self::from_info(monitor, token_name, &info, web3_url).await
     }
 
     async fn from_wallet(
@@ -158,11 +164,11 @@ impl TestWallet {
     }
 
     /// Returns erc20 token balance in Ethereum network.
-    pub async fn erc20_balance(&self) -> Result<BigUint, ClientError> {
+    pub async fn erc20_balance(&self, token_name: &TokenLike) -> Result<BigUint, ClientError> {
         let token = self
             .inner
             .tokens
-            .resolve(self.token_name.clone())
+            .resolve(token_name.to_owned())
             .ok_or(ClientError::UnknownToken)?;
 
         let contract = Contract::new(
@@ -190,7 +196,7 @@ impl TestWallet {
         if token_name.is_eth() {
             self.eth_balance().await
         } else {
-            self.erc20_balance().await
+            self.erc20_balance(token_name).await
         }
     }
 
@@ -269,10 +275,22 @@ impl TestWallet {
         amount: impl Into<BigUint>,
         fee: BigUint,
     ) -> Result<(ZkSyncTx, Option<PackedEthSignature>), ClientError> {
+        self.sign_transfer_token(&self.token_name, to, amount, fee)
+            .await
+    }
+
+    // Creates a signed transfer tx to a given receiver.
+    pub async fn sign_transfer_token(
+        &self,
+        token_name: impl Into<TokenLike>,
+        to: impl Into<Address>,
+        amount: impl Into<BigUint>,
+        fee: BigUint,
+    ) -> Result<(ZkSyncTx, Option<PackedEthSignature>), ClientError> {
         self.inner
             .start_transfer()
             .nonce(self.pending_nonce())
-            .token(self.token_name.clone())?
+            .token(token_name)?
             .amount(amount)
             .fee(fee)
             .to(to.into())

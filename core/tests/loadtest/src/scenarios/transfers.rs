@@ -6,7 +6,7 @@ use num::BigUint;
 use serde::{Deserialize, Serialize};
 // Workspace uses
 use zksync::utils::closest_packable_token_amount;
-use zksync_types::{tx::PackedEthSignature, ZkSyncTx};
+use zksync_types::{tx::PackedEthSignature, TokenLike, ZkSyncTx};
 // Local uses
 use super::{Fees, Scenario, ScenarioResources};
 use crate::{
@@ -39,12 +39,6 @@ impl Default for TransferScenarioConfig {
     }
 }
 
-impl From<TransferScenarioConfig> for TransferScenario {
-    fn from(cfg: TransferScenarioConfig) -> Self {
-        Self::new(cfg)
-    }
-}
-
 /// Schematically, scenario will look like this:
 ///
 /// ```text
@@ -59,6 +53,7 @@ impl From<TransferScenarioConfig> for TransferScenario {
 /// ```
 #[derive(Debug)]
 pub struct TransferScenario {
+    token_name: TokenLike,
     transfer_size: BigUint,
     transfer_rounds: u64,
     wallets: u64,
@@ -66,8 +61,9 @@ pub struct TransferScenario {
 }
 
 impl TransferScenario {
-    pub fn new(config: TransferScenarioConfig) -> Self {
+    pub fn new(token_name: TokenLike, config: TransferScenarioConfig) -> Self {
         Self {
+            token_name,
             transfer_size: gwei_to_wei(config.transfer_size),
             transfer_rounds: config.transfer_rounds,
             wallets: config.wallets_amount,
@@ -78,7 +74,7 @@ impl TransferScenario {
 
 impl fmt::Display for TransferScenario {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_str("transfers")
+        write!(f, "transfers({})", self.token_name)
     }
 }
 
@@ -91,6 +87,7 @@ impl Scenario for TransferScenario {
         ScenarioResources {
             balance_per_wallet,
             wallets_amount: self.wallets,
+            token_name: self.token_name.clone(),
             has_deposits: false,
         }
     }
