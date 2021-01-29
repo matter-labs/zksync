@@ -11,16 +11,6 @@ import * as ethers from 'ethers';
 
 import Cacher from './Cacher';
 
-function initOnUnloadSaving(cacher) {
-    // Unfortunately there is no reliable way to save cache
-    // upon user leaving the page.
-    //
-    // window.onunload just does not give us enough time
-    // window.onbeforeunload might show weird popups in some browsers
-    setInterval(() => {
-        cacher.saveCacheToLocalStorage();
-    }, timeConstants.cacheSaving);
-}
 
 async function fetch(req) {
     let r = await axios(req);
@@ -67,9 +57,9 @@ export class Client {
             syncProvider: window.syncProvider
         };
 
+        localStorage.clear();
         const client = new Client(props);
         const cacher = new Cacher(client);
-        initOnUnloadSaving(cacher);
         client.cacher = cacher;
         return client;
     }

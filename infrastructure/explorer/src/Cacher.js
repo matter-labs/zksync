@@ -11,15 +11,6 @@ import {
 import { getTxFee, getFromAddressOfTx, getTxToAddress, getTxAmount, getTxToken } from './blockUtils';
 
 class Cacher {
-    checkCacheVersion() {
-        const version = localStorage.getItem(CACHE_VERSION_SLOT);
-        if (version !== CACHE_VERSION) {
-            localStorage.removeItem(BLOCK_STORAGE_SLOT);
-            localStorage.removeItem(BLOCK_TRANSACTIONS_STORAGE_SLOT);
-
-            localStorage.setItem(CACHE_VERSION_SLOT, CACHE_VERSION);
-        }
-    }
 
     initLRUCaches() {
         this.blocksCache = new LRU(MAX_CACHED_BLOCKS);
@@ -27,18 +18,6 @@ class Cacher {
         this.txCache = new LRU(MAX_CACHED_TRANSACTIONS);
     }
 
-    load(cache, slot) {
-        const stored = localStorage.getItem(slot);
-        if (!stored) {
-            return;
-        }
-
-        try {
-            cache.load(JSON.parse(stored));
-        } catch {
-            localStorage.removeItem(slot);
-        }
-    }
 
     getCachedBlock(blockNumber) {
         return this.blocksCache.get(blockNumber);
@@ -90,32 +69,9 @@ class Cacher {
         this.txCache.set(hash, tx);
     }
 
-    saveCacheToLocalStorage() {
-        // We don't store transactions here, because:
-        // a) A lot of them are already stored with block transactions
-        // b) It is unlikely that if a person wants to open a transaction
-        // first it will be verified, i.e. suitable for caching.
-        // c) We can not simply store all the transactions we want.
-        // localStorage has it's own limitation.
-        //
-        // Although to reach unlimited memory we could use
-        // https://developer.mozilla.org/en-US/docs/Web/API/IndexedDB_API
-        // But I believe it is an overkill
-        const blocksCacheDump = this.blocksCache.dump();
-        const blocksTxsCacheDump = this.blocksTxsCache.dump();
-        localStorage.setItem(BLOCK_STORAGE_SLOT, JSON.stringify(blocksCacheDump));
-        localStorage.setItem(BLOCK_TRANSACTIONS_STORAGE_SLOT, JSON.stringify(blocksTxsCacheDump));
-    }
 
     constructor(client) {
-        this.checkCacheVersion();
         this.initLRUCaches();
-        this.load(this.blocksCache, BLOCK_STORAGE_SLOT);
-        this.load(this.blocksTxsCache, BLOCK_TRANSACTIONS_STORAGE_SLOT);
-
-        this.blocksTxsCache.values().forEach((txs) => {
-            this.cacheTransactionsFromBlock(txs, client);
-        });
     }
 }
 
