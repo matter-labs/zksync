@@ -43,8 +43,11 @@ impl OperationQueue {
 
     /// Inserts an element to the end of the queue.
     pub fn push_back(&mut self, element: TxData) {
+        let next_block_number = self
+            .get_next_last_block_number()
+            .unwrap_or(self.last_block_number);
         assert_eq!(
-            self.last_block_number + 1,
+            next_block_number,
             element.get_block_range().0 as usize,
             "Insert an element that affects on not subsequent blocks"
         );
