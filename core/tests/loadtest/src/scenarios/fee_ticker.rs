@@ -17,7 +17,7 @@ use super::{batch_transfers::batch_sizes_iter, Fees, Scenario, ScenarioResources
 use crate::{
     monitor::Monitor,
     test_wallet::TestWallet,
-    utils::{gwei_to_wei, wait_all_failsafe_chunks, DynamicChunks, CHUNK_SIZES},
+    utils::{gwei_to_wei, wait_all_failsafe, wait_all_failsafe_chunks, DynamicChunks, CHUNK_SIZES},
 };
 
 /// Configuration options for the fee ticker scenario.
@@ -35,7 +35,7 @@ pub struct FeeTickerScenarioConfig {
     /// Maximum transactions batch size.
     ///
     /// The test uses the following batch sizes: `[2, max_batch_size / 2, max_batch_size]`
-    pub max_batch_size: u64,
+    pub max_batch_size: Option<u64>,
 }
 
 impl Default for FeeTickerScenarioConfig {
@@ -44,7 +44,7 @@ impl Default for FeeTickerScenarioConfig {
             transfer_size: 1,
             transfer_rounds: 10,
             wallets_amount: 100,
-            max_batch_size: 50,
+            max_batch_size: None,
         }
     }
 }
@@ -59,8 +59,8 @@ impl From<FeeTickerScenarioConfig> for FeeTickerScenario {
 pub struct FeeTickerScenario {
     transfer_size: BigUint,
     transfer_rounds: u64,
-    wallets: u64,
-    max_batch_size: usize,
+    wallets: usize,
+    max_batch_size: Option<usize>,
 }
 
 impl fmt::Display for FeeTickerScenario {
@@ -77,7 +77,7 @@ impl Scenario for FeeTickerScenario {
 
         ScenarioResources {
             balance_per_wallet: closest_packable_token_amount(&balance_per_wallet),
-            wallets_amount: self.wallets,
+            wallets_amount: self.wallets as u64,
             has_deposits: false,
         }
     }
@@ -99,24 +99,23 @@ impl Scenario for FeeTickerScenario {
     ) -> anyhow::Result<Vec<TestWallet>> {
         for i in 0..self.transfer_rounds {
             vlog::info!(
-                "Fee ticker stressing cycle [{}/{}] started",
+                "Fee ticker stressing cycle [{}/{}] started in {} mode",
                 i + 1,
                 self.transfer_rounds,
+                if self.max_batch_size.is_some() {
+                    "batch"
+                } else {
+                    "single"
+                }
             );
 
-            self.process_txs_batch_transfer(&monitor, &wallets).await?;
-
-            wait_all_failsafe_chunks(
-                "run/fee_ticker/single_tx_transfer",
-                CHUNK_SIZES,
-                (0..self.wallets as usize).map(|i| {
-                    let from = &wallets[i % wallets.len()];
-                    let to = &wallets[(i + 1) % wallets.len()];
-
-                    self.process_single_tx_transfer(&monitor, from, to)
-                }),
-            )
-            .await?;
+            match self.max_batch_size {
+                Some(max_batch_size) => {
+                    self.process_txs_batch_transfer(&monitor, &wallets, max_batch_size)
+                        .await
+                }
+                None => self.process_single_tx_transfer(&monitor, &wallets).await,
+            }?
         }
         Ok(wallets)
     }
@@ -136,30 +135,45 @@ impl FeeTickerScenario {
         Self {
             transfer_size: gwei_to_wei(config.transfer_size),
             transfer_rounds: config.transfer_rounds,
-            wallets: config.wallets_amount,
-            max_batch_size: config.max_batch_size as usize,
+            wallets: config.wallets_amount as usize,
+            max_batch_size: config.max_batch_size.map(|x| x as usize),
         }
     }
 
-    pub async fn process_single_tx_transfer(
+    async fn process_single_tx_transfer(
         &self,
         monitor: &Monitor,
-        from: &TestWallet,
-        to: &TestWallet,
+        wallets: &[TestWallet],
     ) -> anyhow::Result<()> {
-        let fee = from.sufficient_fee().await?;
+        wait_all_failsafe_chunks(
+            "run/fee_ticker/single_tx_transfer",
+            CHUNK_SIZES,
+            wallets
+                .iter()
+                .map(|wallet| Self::send_transfer_to_self(monitor, &self.transfer_size, wallet))
+                .collect::<Vec<_>>(),
+        )
+        .await?;
+        Ok(())
+    }
+
+    async fn send_transfer_to_self(
+        monitor: &Monitor,
+        transfer_size: &BigUint,
+        wallet: &TestWallet,
+    ) -> anyhow::Result<()> {
+        let fee = wallet.sufficient_fee().await?;
 
         vlog::debug!(
-            "Process transfer from {} to {}: got fee {}",
-            from.account_id().unwrap(),
-            to.account_id().unwrap(),
+            "Process transfer to self for {}: got fee {}",
+            wallet.account_id().unwrap(),
             format_ether(&fee)
         );
 
-        let (tx, eth_signature) = from
+        let (tx, eth_signature) = wallet
             .sign_transfer(
-                to.address(),
-                closest_packable_token_amount(&self.transfer_size),
+                wallet.address(),
+                closest_packable_token_amount(transfer_size),
                 fee,
             )
             .await?;
@@ -168,47 +182,60 @@ impl FeeTickerScenario {
         Ok(())
     }
 
-    pub async fn process_txs_batch_transfer(
+    async fn process_txs_batch_transfer(
         &self,
         monitor: &Monitor,
         wallets: &[TestWallet],
+        max_batch_size: usize,
     ) -> anyhow::Result<()> {
-        let batch_sizes = batch_sizes_iter(self.max_batch_size);
-        for wallets in DynamicChunks::new(wallets, batch_sizes) {
-            let token = wallets[0].token_name().to_owned();
-            let addresses = wallets.iter().map(|wallet| wallet.address()).collect();
+        let send_batch_task = DynamicChunks::new(wallets, batch_sizes_iter(max_batch_size))
+            .map(|wallets| {
+                let token = wallets[0].token_name().to_owned();
+                let addresses = wallets.iter().map(|wallet| wallet.address()).collect();
 
-            let total_fee = monitor
-                .provider
-                .get_txs_batch_fee(vec![TxFeeTypes::Transfer; wallets.len()], addresses, token)
-                .await?;
+                async move {
+                    let total_fee = monitor
+                        .provider
+                        .get_txs_batch_fee(
+                            vec![TxFeeTypes::Transfer; wallets.len()],
+                            addresses,
+                            token,
+                        )
+                        .await?;
 
-            vlog::debug!(
-                "Process batch transfers {}: got total fee {}",
-                wallets.len(),
-                format_ether(&total_fee)
-            );
+                    vlog::debug!(
+                        "Process batch transfers {}: got total fee {}",
+                        wallets.len(),
+                        format_ether(&total_fee)
+                    );
 
-            let mut total_fee = Some(total_fee);
-            let sign_transfers_task = wallets
-                .iter()
-                .map(|wallet| {
-                    wallet.sign_transfer(
-                        wallet.address(),
-                        self.transfer_size.clone(),
-                        total_fee.take().unwrap_or_default(),
+                    let mut total_fee = Some(total_fee);
+                    let sign_transfers_task = wallets
+                        .iter()
+                        .map(|wallet| {
+                            let transfer_size = self.transfer_size.clone();
+                            let fee = total_fee.take().unwrap_or_default();
+                            async move {
+                                wallet.refresh_nonce().await?;
+                                wallet
+                                    .sign_transfer(wallet.address(), transfer_size, fee)
+                                    .await
+                            }
+                        })
+                        .collect::<Vec<_>>();
+
+                    let txs_signed = wait_all_failsafe_chunks(
+                        "run/fee_ticker/prepare_batch",
+                        CHUNK_SIZES,
+                        sign_transfers_task,
                     )
-                })
-                .collect::<Vec<_>>();
-
-            let txs_signed = wait_all_failsafe_chunks(
-                "run/fee_ticker/prepare_batch",
-                CHUNK_SIZES,
-                sign_transfers_task,
-            )
-            .await?;
-            monitor.send_txs_batch(txs_signed).await?;
-        }
+                    .await?;
+                    monitor.send_txs_batch(txs_signed).await?;
+                    Ok(()) as anyhow::Result<()>
+                }
+            })
+            .collect::<Vec<_>>();
+        wait_all_failsafe("run/fee_ticker/batch_tx_transfer", send_batch_task).await?;
 
         Ok(())
     }
