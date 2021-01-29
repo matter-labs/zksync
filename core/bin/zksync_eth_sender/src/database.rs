@@ -35,6 +35,13 @@ pub(super) trait DatabaseInterface {
         connection: &mut StorageProcessor<'_>,
     ) -> anyhow::Result<Vec<(i64, AggregatedOperation)>>;
 
+    /// Remove the unprocessed operations from the database.
+    async fn remove_unprocessed_operations(
+        &self,
+        connection: &mut StorageProcessor<'_>,
+        operations_id: Vec<i64>,
+    ) -> anyhow::Result<()>;
+
     /// Saves a new unconfirmed operation to the database.
     async fn save_new_eth_tx(
         &self,
@@ -141,6 +148,19 @@ impl DatabaseInterface for Database {
             .load_unprocessed_operations()
             .await?;
         Ok(unprocessed_ops)
+    }
+
+    async fn remove_unprocessed_operations(
+        &self,
+        connection: &mut StorageProcessor<'_>,
+        operations_id: Vec<i64>,
+    ) -> anyhow::Result<()> {
+        connection
+            .ethereum_schema()
+            .remove_unprocessed_operations(operations_id)
+            .await?;
+
+        Ok(())
     }
 
     async fn save_new_eth_tx(

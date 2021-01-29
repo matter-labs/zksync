@@ -1,6 +1,7 @@
 // Built-in deps
 use std::{collections::VecDeque, convert::TryFrom, str::FromStr, time::Instant};
 // External imports
+use anyhow::format_err;
 use num::{BigInt, BigUint};
 use sqlx::types::BigDecimal;
 use zksync_basic_types::{H256, U256};
@@ -117,15 +118,12 @@ impl<'a, 'c> EthereumSchema<'a, 'c> {
         Ok(ops)
     }
 
-    /// Loads the operations which were stored in `operations` table, but not
-    /// in the `eth_operations`. This method is intended to be used after relaunch
-    /// to synchronize `eth_sender` state, as operations are sent to the `eth_sender`
-    /// only once.
+    /// Loads the operations which were stored in `aggregate_operations` table,
+    /// and are in `eth_unprocessed_aggregated_ops`.
     pub async fn load_unprocessed_operations(
         &mut self,
     ) -> QueryResult<Vec<(i64, AggregatedOperation)>> {
         let start = Instant::now();
-        let mut transaction = self.0.start_transaction().await?;
 
         let raw_ops = sqlx::query_as!(
             StoredAggregatedOperation,
@@ -133,15 +131,7 @@ impl<'a, 'c> EthereumSchema<'a, 'c> {
             WHERE EXISTS (SELECT * FROM eth_unprocessed_aggregated_ops WHERE op_id = aggregate_operations.id)
             ORDER BY id ASC",
         )
-        .fetch_all(transaction.conn())
-        .await?;
-
-        let ops_id = raw_ops.iter().map(|op| op.id).collect::<Vec<_>>();
-        sqlx::query!(
-            "DELETE FROM eth_unprocessed_aggregated_ops WHERE op_id = ANY($1)",
-            &ops_id
-        )
-        .execute(transaction.conn())
+        .fetch_all(self.0.conn())
         .await?;
 
         let mut operations = Vec::new();
@@ -158,10 +148,30 @@ impl<'a, 'c> EthereumSchema<'a, 'c> {
             }
         }
 
-        transaction.commit().await?;
-
         metrics::histogram!("sql.ethereum.load_unprocessed_operations", start.elapsed());
         Ok(operations)
+    }
+
+    /// Removes the given IDs from `eth_unprocessed_aggregated_ops`.
+    /// Used to indicate that operations have been successfully processed.
+    pub async fn remove_unprocessed_operations(
+        &mut self,
+        operations_id: Vec<i64>,
+    ) -> QueryResult<()> {
+        let start = Instant::now();
+
+        sqlx::query!(
+            "DELETE FROM eth_unprocessed_aggregated_ops WHERE op_id = ANY($1)",
+            &operations_id
+        )
+        .execute(self.0.conn())
+        .await?;
+
+        metrics::histogram!(
+            "sql.ethereum.remove_unprocessed_operations",
+            start.elapsed()
+        );
+        Ok(())
     }
 
     /// Stores the sent (but not confirmed yet) Ethereum transaction in the database.
@@ -304,15 +314,27 @@ impl<'a, 'c> EthereumSchema<'a, 'c> {
 
         match operation {
             AggregatedOperation::CommitBlocks(_) => {
-                assert_eq!(current_stats.last_committed_block, first_block - 1);
+                if current_stats.last_committed_block + 1 != first_block {
+                    return Err(format_err!(
+                        "Report created commit not in ascending order of affected blocks"
+                    ));
+                }
                 current_stats.last_committed_block = last_block;
             }
             AggregatedOperation::PublishProofBlocksOnchain(_) => {
-                assert_eq!(current_stats.last_verified_block, first_block - 1);
+                if current_stats.last_verified_block + 1 != first_block {
+                    return Err(format_err!(
+                        "Report published proof not in ascending order of affected blocks"
+                    ));
+                }
                 current_stats.last_verified_block = last_block;
             }
             AggregatedOperation::ExecuteBlocks(_) => {
-                assert_eq!(current_stats.last_executed_block, first_block - 1);
+                if current_stats.last_executed_block + 1 != first_block {
+                    return Err(format_err!(
+                        "Report executed blocks not in ascending order of affected blocks"
+                    ));
+                }
                 current_stats.last_executed_block = last_block;
             }
             AggregatedOperation::CreateProofBlocks(_) => return Ok(()),

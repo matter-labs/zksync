@@ -7,6 +7,7 @@
 use std::collections::VecDeque;
 use std::time::{Duration, Instant};
 // External uses
+use anyhow::format_err;
 use tokio::{task::JoinHandle, time};
 use web3::{
     contract::Options,
@@ -169,7 +170,9 @@ impl<ETH: EthereumInterface, DB: DatabaseInterface> ETHSender<ETH, DB> {
                 operation.1.get_block_range().0,
                 operation.1.get_block_range().1,
             );
-            sender.add_operation_to_queue(operation);
+            sender
+                .add_operation_to_queue(operation)
+                .expect("Failed add unprocessed ZKSync operation");
         }
 
         sender
@@ -178,12 +181,15 @@ impl<ETH: EthereumInterface, DB: DatabaseInterface> ETHSender<ETH, DB> {
     /// Main routine of `ETHSender`.
     pub async fn run(mut self) {
         loop {
-            time::timeout(
+            let load_new_operation_future = time::timeout(
                 self.options.sender.tx_poll_period(),
                 self.load_new_operations(),
-            )
-            .await
-            .unwrap_or_default();
+            );
+            // Display an error message only if the error is in receiving new operations and not the timeout.
+            if let Ok(load_new_operation) = load_new_operation_future.await {
+                load_new_operation
+                    .unwrap_or_else(|e| log::warn!("Failed load new operations : {}", e));
+            }
 
             if self.options.sender.is_enabled {
                 // ...and proceed them.
@@ -198,31 +204,29 @@ impl<ETH: EthereumInterface, DB: DatabaseInterface> ETHSender<ETH, DB> {
 
     /// Gets the incoming operations from the database and adds them to the
     /// transactions queue.
-    async fn load_new_operations(&mut self) {
+    async fn load_new_operations(&mut self) -> anyhow::Result<()> {
         let start = Instant::now();
-        let mut connection = match self.db.acquire_connection().await {
-            Ok(connection) => connection,
-            Err(err) => {
-                log::warn!("Unable to connect to the database: {}", err);
-                return;
-            }
-        };
+        let mut connection = self.db.acquire_connection().await?;
+        let mut transaction = connection.start_transaction().await?;
 
-        let new_operations = self
-            .db
-            .load_new_operations(&mut connection)
-            .await
-            .unwrap_or_else(|err| {
-                log::warn!("Unable to load new operations from the database: {}", err);
-                Vec::new()
-            });
+        let new_operations = self.db.load_new_operations(&mut transaction).await?;
+
+        // let's mark the operations as successful processed.
+        // So that next time you do not add them to the queue again.
+        let operations_id = new_operations.iter().map(|(id, _)| *id).collect::<Vec<_>>();
+        self.db
+            .remove_unprocessed_operations(&mut transaction, operations_id)
+            .await?;
+
+        transaction.commit().await?;
         drop(connection);
 
         for operation in new_operations {
-            self.add_operation_to_queue(operation);
+            self.add_operation_to_queue(operation.clone())?;
         }
 
         metrics::histogram!("eth_sender.load_new_operations", start.elapsed());
+        Ok(())
     }
 
     /// This method does two main things:
@@ -240,7 +244,12 @@ impl<ETH: EthereumInterface, DB: DatabaseInterface> ETHSender<ETH, DB> {
                 Self::process_error(e).await;
                 // Return the unperformed operation to the queue, since failing the
                 // operation initialization means that it was not stored in the database.
-                self.tx_queue.return_popped(tx);
+                if let Err(err_message) = self.tx_queue.return_popped(tx) {
+                    panic!(
+                        "Failed return previous sent operation to the queue: {}",
+                        err_message
+                    );
+                }
             }
         }
 
@@ -728,20 +737,24 @@ impl<ETH: EthereumInterface, DB: DatabaseInterface> ETHSender<ETH, DB> {
     }
 
     /// Encodes the zkSync operation to the tx payload and adds it to the queue.
-    fn add_operation_to_queue(&mut self, op: (i64, AggregatedOperation)) {
+    fn add_operation_to_queue(&mut self, op: (i64, AggregatedOperation)) -> anyhow::Result<()> {
         let raw_tx = self.operation_to_raw_tx(&op.1);
         let tx_data = TxData::from_operation(op, raw_tx);
 
         match tx_data.op_type {
-            AggregatedActionType::CommitBlocks => self.tx_queue.add_commit_operation(tx_data),
+            AggregatedActionType::CommitBlocks => self.tx_queue.add_commit_operation(tx_data)?,
             AggregatedActionType::PublishProofBlocksOnchain => {
-                self.tx_queue.add_verify_operation(tx_data)
+                self.tx_queue.add_verify_operation(tx_data)?
             }
-            AggregatedActionType::ExecuteBlocks => self.tx_queue.add_execute_operation(tx_data),
+            AggregatedActionType::ExecuteBlocks => self.tx_queue.add_execute_operation(tx_data)?,
             AggregatedActionType::CreateProofBlocks => {
-                panic!("Can't add CreateProofBlocks operation to transaction queue")
+                return Err(format_err!(
+                    "Can't add CreateProofBlocks operation to transaction queue"
+                ));
             }
         }
+
+        Ok(())
     }
 }
 

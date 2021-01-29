@@ -138,6 +138,14 @@ impl DatabaseInterface for MockDatabase {
         // Ok(unprocessed_operations)
     }
 
+    async fn remove_unprocessed_operations(
+        &self,
+        _connection: &mut StorageProcessor<'_>,
+        _operations_id: Vec<i64>,
+    ) -> anyhow::Result<()> {
+        todo!()
+    }
+
     async fn update_gas_price_params(
         &self,
         _connection: &mut StorageProcessor<'_>,

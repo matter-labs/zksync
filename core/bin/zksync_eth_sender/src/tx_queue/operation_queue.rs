@@ -1,5 +1,7 @@
 // Built-in imports
 use std::collections::VecDeque;
+// External uses
+use anyhow::format_err;
 // Local imports
 use crate::tx_queue::TxData;
 
@@ -32,27 +34,32 @@ impl OperationQueue {
     }
 
     /// Returns a previously popped element to the front of the queue.
-    pub fn return_popped(&mut self, element: TxData) {
-        assert_eq!(
-            self.last_block_number, (element.get_block_range().1 as usize),
-            "Insert an element that affects the block numbered NOT equal to the last in the queue predecessor"
-        );
+    pub fn return_popped(&mut self, element: TxData) -> anyhow::Result<()> {
+        if self.last_block_number != (element.get_block_range().1 as usize) {
+            return Err(format_err!("Insert an element that affects the block numbered NOT equal to the last in the queue predecessor"));
+        }
+
         self.last_block_number = element.get_block_range().0 as usize - 1;
         self.elements.push_front(element);
+
+        Ok(())
     }
 
     /// Inserts an element to the end of the queue.
-    pub fn push_back(&mut self, element: TxData) {
+    pub fn push_back(&mut self, element: TxData) -> anyhow::Result<()> {
         let next_block_number = self
             .get_next_last_block_number()
             .unwrap_or(self.last_block_number)
             + 1;
-        assert_eq!(
-            next_block_number,
-            element.get_block_range().0 as usize,
-            "Insert an element that affects on not subsequent blocks"
-        );
+
+        if next_block_number != element.get_block_range().0 as usize {
+            return Err(format_err!(
+                "Insert an element that affects on not subsequent blocks"
+            ));
+        }
         self.elements.push_back(element);
+
+        Ok(())
     }
 
     /// Attempts to take the next element from the queue. Returns `None`
