@@ -140,9 +140,16 @@ impl TestWallet {
 
     /// Returns the wallet balance in zkSync network.
     pub async fn balance(&self, block_status: BlockStatus) -> Result<BigUint, ClientError> {
-        self.inner
-            .get_balance(block_status, self.token_name.clone())
-            .await
+        self.token_balance(&self.token_name, block_status).await
+    }
+
+    /// Returns the wallet balance in zkSync network of the specified token.
+    pub async fn token_balance(
+        &self,
+        token_name: impl Into<TokenLike>,
+        block_status: BlockStatus,
+    ) -> Result<BigUint, ClientError> {
+        self.inner.get_balance(block_status, token_name).await
     }
 
     /// Returns the wallet balance in Ehtereum network.
@@ -173,9 +180,14 @@ impl TestWallet {
         Ok(balance)
     }
 
-    /// Returns eth balance if token name is ETH; otherwise returns erc20 balance.
+    /// Returns eth balance if the wallet token is ETH; otherwise returns erc20 balance.
     pub async fn l1_balance(&self) -> Result<BigUint, ClientError> {
-        if self.token_name.is_eth() {
+        self.token_l1_balance(&self.token_name).await
+    }
+
+    /// Returns eth balance if the given token is ETH; otherwise returns erc20 balance.
+    pub async fn token_l1_balance(&self, token_name: &TokenLike) -> Result<BigUint, ClientError> {
+        if token_name.is_eth() {
             self.eth_balance().await
         } else {
             self.erc20_balance().await
@@ -222,16 +234,27 @@ impl TestWallet {
         Ok((tx, None))
     }
 
-    // Creates a signed withdraw transaction with a fee provided.
+    /// Creates a signed withdraw transaction with a fee provided.
     pub async fn sign_withdraw(
         &self,
+        amount: impl Into<BigUint>,
+        fee: impl Into<BigUint>,
+    ) -> Result<(ZkSyncTx, Option<PackedEthSignature>), ClientError> {
+        self.sign_withdraw_token(&self.token_name, amount, fee)
+            .await
+    }
+
+    /// Creates a signed withdraw transaction with a fee provided for the given token.
+    pub async fn sign_withdraw_token(
+        &self,
+        token_name: impl Into<TokenLike>,
         amount: impl Into<BigUint>,
         fee: impl Into<BigUint>,
     ) -> Result<(ZkSyncTx, Option<PackedEthSignature>), ClientError> {
         self.inner
             .start_withdraw()
             .nonce(self.pending_nonce())
-            .token(self.token_name.clone())?
+            .token(token_name)?
             .amount(amount)
             .fee(fee)
             .to(self.inner.address())
@@ -259,13 +282,18 @@ impl TestWallet {
 
     // Deposits tokens from Ethereum to the contract.
     pub async fn deposit(&self, amount: impl Into<BigUint>) -> anyhow::Result<PriorityOp> {
+        self.deposit_token(&self.token_name, amount).await
+    }
+
+    /// Deposits given token from the Ethereum network to the zkSync.
+    pub async fn deposit_token(
+        &self,
+        token_name: impl Into<TokenLike>,
+        amount: impl Into<BigUint>,
+    ) -> anyhow::Result<PriorityOp> {
         let eth_tx_hash = self
             .eth_provider
-            .deposit(
-                self.token_name.clone(),
-                biguint_to_u256(amount.into()),
-                self.address(),
-            )
+            .deposit(token_name, biguint_to_u256(amount.into()), self.address())
             .await?;
 
         self.monitor

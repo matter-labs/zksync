@@ -17,13 +17,13 @@ zksync_fee = 100000000000
 name = 'fee_ticker'
 # Amount of money to be used in the transfer, in gwei.
 transfer_size = 1
-transfer_rounds = 50
-wallets_amount = 100
+transfer_rounds = 10
+wallets_amount = 40
 max_batch_size = 15
 
 [[scenarios]]
 name = 'fee_ticker'
 # Amount of money to be used in the transfer, in gwei.
 transfer_size = 1
-transfer_rounds = 50
-wallets_amount = 100
+transfer_rounds = 10
+wallets_amount = 40
