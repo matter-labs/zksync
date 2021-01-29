@@ -5,17 +5,13 @@ import { MULTICALL_INTERFACE, getPendingBalance } from './utils';
 
 declare module './wallet' {
     interface Wallet {
-        withdrawPendingBalance(
-            from: Address,
-            token: TokenLike,
-            amount?: BigNumberish
-        ): Promise<ContractTransaction>,
+        withdrawPendingBalance(from: Address, token: TokenLike, amount?: BigNumberish): Promise<ContractTransaction>;
         withdrawPendingBalances(
             addresses: Address[],
             tokens: TokenLike[],
             multicallParams: MulticallParams,
             amounts?: BigNumberish[]
-        ): Promise<ContractTransaction>
+        ): Promise<ContractTransaction>;
     }
 }
 
@@ -67,7 +63,7 @@ Wallet.prototype.withdrawPendingBalance = async function (
         gasLimit: BigNumber.from('200000'),
         gasPrice
     }) as ContractTransaction;
-}
+};
 
 Wallet.prototype.withdrawPendingBalances = async function (
     this: Wallet,
@@ -116,4 +112,4 @@ Wallet.prototype.withdrawPendingBalances = async function (
         gasLimit: multicallParams.gasLimit || BigNumber.from('300000'),
         gasPrice
     }) as ContractTransaction;
-}
+};

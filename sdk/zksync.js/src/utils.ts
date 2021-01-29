@@ -733,11 +733,7 @@ export async function getPendingBalance(
     address: Address,
     token: TokenLike
 ): Promise<BigNumberish> {
-    const zksyncContract = new Contract(
-        address,
-        SYNC_MAIN_CONTRACT_INTERFACE,
-        ethProvider
-    );
+    const zksyncContract = new Contract(address, SYNC_MAIN_CONTRACT_INTERFACE, ethProvider);
 
     const tokenAddress = syncProvider.tokenSet.resolveTokenAddress(token);
 

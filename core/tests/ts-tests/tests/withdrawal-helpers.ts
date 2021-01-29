@@ -79,10 +79,7 @@ Tester.prototype.testRecoverETHWithdrawal = async function (from: Wallet, to: Ad
     await setRevert(from.ethSigner, this.syncProvider, to, 'ETH', false);
 
     // Re-try
-    const withdrawPendingTx = await from.withdrawPendingBalance(
-        to,
-        'ETH'
-    );
+    const withdrawPendingTx = await from.withdrawPendingBalance(to, 'ETH');
     await withdrawPendingTx.wait();
 
     // The funds should have arrived
@@ -125,10 +122,7 @@ Tester.prototype.testRecoverERC20Withdrawal = async function (
     await setRevert(from.ethSigner, from.provider, to, token, false);
 
     // Re-try
-    const withdrawPendingTx = await from.withdrawPendingBalance(
-        to,
-        token
-    );
+    const withdrawPendingTx = await from.withdrawPendingBalance(to, token);
     await withdrawPendingTx.wait();
 
     // The funds should have arrived
@@ -183,13 +177,9 @@ Tester.prototype.testRecoverMultipleWithdrawals = async function (
         await setRevert(from.ethSigner, this.syncProvider, to[i], token[i], false);
     }
 
-    const handle = await from.withdrawPendingBalances(
-        to,
-        token,
-        {
-            address: TEST_CONFIG.withdrawalHelpers.multicall_address
-        }
-    );
+    const handle = await from.withdrawPendingBalances(to, token, {
+        address: TEST_CONFIG.withdrawalHelpers.multicall_address
+    });
     await handle.wait();
 
     const balancesAfterRecovery = await Promise.all(
