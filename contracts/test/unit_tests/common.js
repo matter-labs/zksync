@@ -72,5 +72,6 @@ module.exports = {
     deployTestContract,
     deployProxyContract,
     getCallRevertReason,
-    IERC20_INTERFACE
+    IERC20_INTERFACE,
+    DEFAULT_REVERT_REASON
 };

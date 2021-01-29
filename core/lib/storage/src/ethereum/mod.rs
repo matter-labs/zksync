@@ -427,6 +427,18 @@ impl<'a, 'c> EthereumSchema<'a, 'c> {
         .execute(transaction.conn())
         .await?;
 
+        // If there is a ZKSync operation, mark it as confirmed as well.
+        sqlx::query!(
+            "
+            UPDATE aggregate_operations
+                SET confirmed = $1
+                WHERE id = (SELECT op_id FROM eth_aggregated_ops_binding WHERE eth_op_id = $2)",
+            true,
+            eth_op_id,
+        )
+        .execute(transaction.conn())
+        .await?;
+
         transaction.commit().await?;
 
         metrics::histogram!("sql.ethereum.confirm_eth_tx", start.elapsed());

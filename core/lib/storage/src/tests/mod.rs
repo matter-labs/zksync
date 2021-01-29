@@ -1,9 +1,7 @@
 //! Tests for storage crate.
 //!
 //! These tests require an empty DB setup and ignored by default.
-//! To run them, use `zksync db-test-no-reset`/`franklin db-test` script
-//! (or, if it's a first run, then `zksync db-test`, which will create all the required
-//! test tables). Also be sure to have Postgres running locally.
+//! To run them, use `zk test db` command. Be sure to have Postgres running locally.
 //!
 //! All the tests in this module do roughly follow the same pattern, e.g.:
 //!

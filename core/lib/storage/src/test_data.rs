@@ -86,40 +86,6 @@ pub fn gen_acc_random_updates<R: Rng>(rng: &mut R) -> impl Iterator<Item = (u32,
     .into_iter()
 }
 
-/// Generates dummy operation with the default `new_root_hash` in the block.
-pub fn gen_operation(
-    block_number: BlockNumber,
-    action: Action,
-    block_chunks_size: usize,
-) -> Operation {
-    gen_operation_with_txs(block_number, action, block_chunks_size, vec![])
-}
-
-/// Generates dummy operation with the default `new_root_hash` in the block and given set of transactions.
-pub fn gen_operation_with_txs(
-    block_number: BlockNumber,
-    action: Action,
-    block_chunks_size: usize,
-    txs: Vec<ExecutedOperations>,
-) -> Operation {
-    Operation {
-        id: None,
-        action,
-        block: Block {
-            block_number,
-            new_root_hash: Fr::default(),
-            fee_account: 0,
-            block_transactions: txs,
-            processed_priority_ops: (0, 0),
-            block_chunks_size,
-            commit_gas_limit: 1_000_000.into(),
-            verify_gas_limit: 1_500_000.into(),
-            block_commitment: H256::zero(),
-            timestamp: 0,
-        },
-    }
-}
-
 /// Generates EthSignData for testing (not a valid signature)
 pub fn gen_eth_sign_data(message: String) -> EthSignData {
     let keypair = Random.generate();
@@ -161,7 +127,7 @@ pub fn gen_unique_aggregated_operation(
     gen_unique_aggregated_operation_with_txs(block_number, action, block_chunks_size, vec![])
 }
 
-fn get_sample_block(
+pub fn gen_sample_block(
     block_number: BlockNumber,
     block_chunks_size: usize,
     txs: Vec<ExecutedOperations>,
@@ -191,7 +157,7 @@ pub fn gen_unique_operation_with_txs(
     Operation {
         id: None,
         action,
-        block: get_sample_block(block_number, block_chunks_size, txs),
+        block: gen_sample_block(block_number, block_chunks_size, txs),
     }
 }
 
@@ -203,7 +169,7 @@ pub fn gen_unique_aggregated_operation_with_txs(
     block_chunks_size: usize,
     txs: Vec<ExecutedOperations>,
 ) -> AggregatedOperation {
-    let block = get_sample_block(block_number, block_chunks_size, txs);
+    let block = gen_sample_block(block_number, block_chunks_size, txs);
 
     let result = match action {
         AggregatedActionType::CommitBlocks => {
