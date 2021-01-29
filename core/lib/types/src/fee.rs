@@ -1,11 +1,9 @@
-// Built-in deps
-// External deps
-use num::{rational::Ratio, BigUint};
+use num::rational::Ratio;
+use num::BigUint;
 use serde::{Deserialize, Serialize};
-// Workspace deps
-use zksync_types::helpers::{pack_fee_amount, unpack_fee_amount};
+
+use crate::helpers::{closest_packable_fee_amount, pack_fee_amount, unpack_fee_amount};
 use zksync_utils::{round_precision, BigUintSerdeAsRadix10Str};
-// Local deps
 
 /// Type of the fee calculation pattern.
 /// Unlike the `TxFeeTypes`, this enum represents the fee
@@ -48,6 +46,14 @@ pub struct BatchFee {
     pub total_fee: BigUint,
 }
 
+impl BatchFee {
+    pub fn new(zkp_fee: &Ratio<BigUint>, gas_fee: &Ratio<BigUint>) -> BatchFee {
+        let (_, _, mut total_fee) = total_fee(zkp_fee, gas_fee);
+        total_fee = closest_packable_fee_amount(&total_fee);
+        BatchFee { total_fee }
+    }
+}
+
 impl Fee {
     pub fn new(
         fee_type: OutputFeeType,
@@ -68,10 +74,7 @@ impl Fee {
     }
 }
 
-pub(crate) fn total_fee(
-    zkp_fee: &Ratio<BigUint>,
-    gas_fee: &Ratio<BigUint>,
-) -> (BigUint, BigUint, BigUint) {
+fn total_fee(zkp_fee: &Ratio<BigUint>, gas_fee: &Ratio<BigUint>) -> (BigUint, BigUint, BigUint) {
     let zkp_fee = round_precision(zkp_fee, 18).ceil().to_integer();
     let gas_fee = round_precision(gas_fee, 18).ceil().to_integer();
 

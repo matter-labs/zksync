@@ -8,7 +8,7 @@ use serde::{Deserialize, Serialize};
 // Workspace uses
 use zksync_types::{
     tx::{EthSignData, TxEthSignature, TxHash},
-    BlockNumber, SignedZkSyncTx, ZkSyncTx,
+    Address, BatchFee, BlockNumber, Fee, SignedZkSyncTx, TokenLike, TxFeeTypes, ZkSyncTx,
 };
 
 // Local uses
@@ -44,6 +44,22 @@ pub struct TxData {
 pub struct IncomingTx {
     pub tx: ZkSyncTx,
     pub signature: Option<TxEthSignature>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct IncomingTxForFee {
+    pub tx_type: TxFeeTypes,
+    pub address: Address,
+    pub token_like: TokenLike,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct IncomingTxBatchForFee {
+    pub tx_types: Vec<TxFeeTypes>,
+    pub addresses: Vec<Address>,
+    pub token_like: TokenLike,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -100,6 +116,40 @@ impl Client {
         self.post("transactions/submit")
             .query(&FastProcessingQuery { fast_processing })
             .body(&IncomingTx { tx, signature })
+            .send()
+            .await
+    }
+
+    /// Get fee for single transaction.
+    pub async fn get_txs_fee(
+        &self,
+        tx_type: TxFeeTypes,
+        address: Address,
+        token_like: TokenLike,
+    ) -> Result<Fee, ClientError> {
+        self.post("transactions/fee")
+            .body(&IncomingTxForFee {
+                tx_type,
+                address,
+                token_like,
+            })
+            .send()
+            .await
+    }
+
+    /// Get txs fee for batch.
+    pub async fn get_batched_txs_fee(
+        &self,
+        tx_types: Vec<TxFeeTypes>,
+        addresses: Vec<Address>,
+        token_like: TokenLike,
+    ) -> Result<BatchFee, ClientError> {
+        self.post("transactions/fee/batch")
+            .body(&IncomingTxBatchForFee {
+                tx_types,
+                addresses,
+                token_like,
+            })
             .send()
             .await
     }
