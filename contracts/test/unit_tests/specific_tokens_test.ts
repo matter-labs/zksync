@@ -2,7 +2,7 @@ import { Contract, ethers, constants, BigNumber } from 'ethers';
 import { parseEther } from 'ethers/lib/utils';
 import { ETHProxy } from 'zksync';
 import { Address, TokenAddress } from 'zksync/build/types';
-import { Deployer, readContractCode, readProductionContracts, readTestContracts } from '../../src.ts/deploy';
+import { Deployer, readContractCode, readProductionContracts } from '../../src.ts/deploy';
 import { ZkSyncWithdrawalUnitTestFactory } from '../../typechain';
 
 const hardhat = require('hardhat');

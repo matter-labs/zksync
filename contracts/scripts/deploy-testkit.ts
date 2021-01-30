@@ -1,5 +1,5 @@
 import { ethers, Wallet } from 'ethers';
-import { Deployer, readContractCode, readTestContracts, readProductionContracts } from '../src.ts/deploy';
+import { Deployer, readContractCode, readProductionContracts } from '../src.ts/deploy';
 import { deployContract } from 'ethereum-waffle';
 import { ArgumentParser } from 'argparse';
 import * as fs from 'fs';

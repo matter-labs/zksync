@@ -1,8 +1,8 @@
-import { Contract, ethers, constants, BigNumber, BigNumberish } from 'ethers';
+import { Contract, ethers, constants, BigNumber } from 'ethers';
 import { keccak256, parseEther } from 'ethers/lib/utils';
 import { ETHProxy } from 'zksync';
 import { Address, TokenAddress } from 'zksync/build/types';
-import { Deployer, readContractCode, readProductionContracts, readTestContracts } from '../../src.ts/deploy';
+import { Deployer, readContractCode, readProductionContracts } from '../../src.ts/deploy';
 
 const hardhat = require('hardhat');
 const { simpleEncode } = require('ethereumjs-abi');
