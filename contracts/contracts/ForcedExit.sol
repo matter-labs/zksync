@@ -15,7 +15,7 @@ contract ForcedExit is Ownable, ReentrancyGuard {
 
     bool public enabled = true;
 
-    constructor() Ownable(msg.sender) {
+    constructor(address _master) Ownable(_master) {
         initializeReentrancyGuard();
     }
 
@@ -55,10 +55,11 @@ contract ForcedExit is Ownable, ReentrancyGuard {
 
     receive() external payable nonReentrant {
         require(enabled, "Contract is disabled");
-
-        emit FundsReceived(msg.value);
-
+        require(receiver != address(0), "Receiver must be non-zero");
+        
         (bool success, ) = receiver.call{value: msg.value}("");
         require(success, "d"); // ETH withdraw failed
+
+        emit FundsReceived(msg.value);
     }
 }
