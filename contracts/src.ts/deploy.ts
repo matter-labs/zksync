@@ -213,7 +213,7 @@ export class Deployer {
 
     public async deployForcedExit(ethTxOptions?: ethers.providers.TransactionRequest) {
         if (this.verbose) {
-            console.log('Deploying ForcedExit helper contract');
+            console.log('Deploying ForcedExit contract');
         }
         const forcedExitContract = await deployContract(this.deployWallet, this.contracts.forcedExit, [], {
             gasLimit: 6000000,
@@ -223,9 +223,9 @@ export class Deployer {
         const zksGasUsed = zksRec.gasUsed;
         const gasPrice = forcedExitContract.deployTransaction.gasPrice;
         if (this.verbose) {
-            console.log(`CONTRACTS_CONTRACT_TARGET_ADDR=${forcedExitContract.address}`);
+            console.log(`CONTRACTS_FORCED_EXIT_ADDR=${forcedExitContract.address}`);
             console.log(
-                `zkSync target deployed, gasUsed: ${zksGasUsed.toString()}, eth spent: ${formatEther(
+                `ForcedExit contract deployed, gasUsed: ${zksGasUsed.toString()}, eth spent: ${formatEther(
                     zksGasUsed.mul(gasPrice)
                 )}`
             );
