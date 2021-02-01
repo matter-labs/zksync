@@ -237,8 +237,7 @@ impl<'a, 'c> DataRestoreSchema<'a, 'c> {
         last_executed_block: BlockNumber,
     ) -> QueryResult<()> {
         let start = Instant::now();
-        // Withdraw ops counter is set equal to the `verify` ops counter
-        // since we assume that we've sent a withdraw for every `verify` op.
+
         sqlx::query!(
             "UPDATE eth_parameters
             SET last_committed_block = $1, last_verified_block = $2, last_executed_block = $3

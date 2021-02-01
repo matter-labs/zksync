@@ -261,6 +261,7 @@ impl StorageInteractor for DatabaseStorageInteractor<'_> {
             .await
             .expect("Can't get the last verified block");
 
+        // Use new schema to get `last_committed`, `last_verified_block` and `last_executed_block` (ZKS-427).
         self.storage
             .data_restore_schema()
             .initialize_eth_stats(

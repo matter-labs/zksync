@@ -158,10 +158,10 @@ impl DatabaseInterface for MockDatabase {
         Ok(())
     }
 
-    async fn restore_state(
+    async fn load_unconfirmed_operations(
         &self,
         _connection: &mut StorageProcessor<'_>,
-    ) -> anyhow::Result<(VecDeque<ETHOperation>, Vec<(i64, AggregatedOperation)>)> {
+    ) -> anyhow::Result<VecDeque<ETHOperation>> {
         todo!()
         // Ok((
         //     self.restore_state.clone(),

@@ -131,14 +131,27 @@ impl<ETH: EthereumInterface, DB: DatabaseInterface> ETHSender<ETH, DB> {
             .acquire_connection()
             .await
             .expect("Unable to connect to DB");
+        let mut transaction = connection
+            .start_transaction()
+            .await
+            .expect("Unable create database transaction");
 
-        let (ongoing_ops, unprocessed_ops) = db
-            .restore_state(&mut connection)
+        let ongoing_ops = db
+            .load_unconfirmed_operations(&mut transaction)
             .await
             .expect("Can't restore state");
 
+        let operations_id = ongoing_ops
+            .iter()
+            .filter_map(|eth_op| eth_op.op.as_ref())
+            .map(|aggregated_op| aggregated_op.0)
+            .collect::<Vec<_>>();
+        db.remove_unprocessed_operations(&mut transaction, operations_id)
+            .await
+            .expect("Failed remove unprocessed operations");
+
         let stats = db
-            .load_stats(&mut connection)
+            .load_stats(&mut transaction)
             .await
             .expect("Failed loading ETH operations stats");
 
@@ -151,31 +164,20 @@ impl<ETH: EthereumInterface, DB: DatabaseInterface> ETHSender<ETH, DB> {
 
         let gas_adjuster = GasAdjuster::new(&db).await;
 
+        transaction
+            .commit()
+            .await
+            .expect("Failed commit database transaction");
         drop(connection);
-        let mut sender = Self {
+
+        Self {
             ethereum,
             ongoing_ops,
             db,
             tx_queue,
             gas_adjuster,
             options,
-        };
-
-        // Add all the unprocessed operations to the queue.
-        for operation in unprocessed_ops {
-            log::info!(
-                "Adding unprocessed ZKSync operation <id -; action: {}; blocks: {}-{}> to queue",
-                // operation.id.expect("ID must be set"),
-                operation.1.get_action_type().to_string(),
-                operation.1.get_block_range().0,
-                operation.1.get_block_range().1,
-            );
-            sender
-                .add_operation_to_queue(operation)
-                .expect("Failed add unprocessed ZKSync operation");
         }
-
-        sender
     }
 
     /// Main routine of `ETHSender`.
@@ -185,10 +187,10 @@ impl<ETH: EthereumInterface, DB: DatabaseInterface> ETHSender<ETH, DB> {
                 self.options.sender.tx_poll_period(),
                 self.load_new_operations(),
             );
-            // Display an error message only if the error is in receiving new operations and not the timeout.
+            // If the time has expired then we do nothing, but if we received an error
+            // when loading an new operation, then panic.
             if let Ok(load_new_operation) = load_new_operation_future.await {
-                load_new_operation
-                    .unwrap_or_else(|e| log::warn!("Failed load new operations : {}", e));
+                load_new_operation.unwrap_or_else(|e| panic!("Failed load new operations: {}", e));
             }
 
             if self.options.sender.is_enabled {

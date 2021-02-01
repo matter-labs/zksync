@@ -352,7 +352,7 @@ impl MempoolBlocksHandler {
     }
 
     async fn run(mut self) {
-        log::info!("Block mempool handler is  running");
+        log::info!("Block mempool handler is running");
         while let Some(request) = self.requests.next().await {
             match request {
                 MempoolBlocksRequest::GetBlock(block) => {
@@ -564,7 +564,7 @@ impl MempoolTransactionsHandler {
     }
 
     async fn run(mut self) {
-        log::info!("Transaction mempool handler is  running");
+        log::info!("Transaction mempool handler is running");
         while let Some(request) = self.requests.next().await {
             match request {
                 MempoolTransactionRequest::NewTx(tx, resp) => {

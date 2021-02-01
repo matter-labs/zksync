@@ -186,6 +186,18 @@
       ]
     }
   },
+  "0d6babe453e10d8fd58e15eaac7b77d9d5ad315b84d36c66f7abb414202666d1": {
+    "query": "INSERT INTO eth_unprocessed_aggregated_ops (op_id)\n                VALUES ($1)",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "Int8"
+        ]
+      },
+      "nullable": []
+    }
+  },
   "0e390d0f58d24733d76253da2e4d9c9a0f5c96702d164fe3ad64af8aec43ee49": {
     "query": "\n                SELECT * FROM account_balance_updates\n                WHERE account_id = $1 AND block_number > $2\n            ",
     "describe": {
@@ -4022,18 +4034,6 @@
       "nullable": [
         null
       ]
-    }
-  },
-  "faa748174cd959672c7c14247c4dcb66194758e0eeefe4de5935a55e208a2139": {
-    "query": "INSERT INTO eth_unprocessed_aggregated_ops (op_id)\n            VALUES ($1)",
-    "describe": {
-      "columns": [],
-      "parameters": {
-        "Left": [
-          "Int8"
-        ]
-      },
-      "nullable": []
     }
   },
   "fd16aadbd04d4a48332d59c77290a588f1a33922418b55a08c656a44ff75b8e8": {

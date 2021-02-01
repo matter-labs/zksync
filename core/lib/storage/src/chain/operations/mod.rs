@@ -324,13 +324,18 @@ impl<'a, 'c> OperationsSchema<'a, 'c> {
         .await?
         .id;
 
-        sqlx::query!(
-            "INSERT INTO eth_unprocessed_aggregated_ops (op_id)
-            VALUES ($1)",
-            id
-        )
-        .execute(transaction.conn())
-        .await?;
+        if !matches!(
+            operation.get_action_type(),
+            AggregatedActionType::CreateProofBlocks
+        ) {
+            sqlx::query!(
+                "INSERT INTO eth_unprocessed_aggregated_ops (op_id)
+                VALUES ($1)",
+                id
+            )
+            .execute(transaction.conn())
+            .await?;
+        }
 
         transaction.commit().await?;
         Ok(())
