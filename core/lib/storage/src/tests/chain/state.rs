@@ -1,15 +1,12 @@
 // External imports
 // Workspace imports
-use zksync_types::{helpers::apply_updates, AccountMap, Action, ActionType};
+use zksync_types::aggregated_operations::AggregatedActionType;
+use zksync_types::{helpers::apply_updates, AccountMap};
 // Local imports
 use super::block::apply_random_updates;
 use crate::{
-    chain::{
-        block::BlockSchema,
-        operations::{records::NewOperation, OperationsSchema},
-        state::StateSchema,
-    },
-    test_data::gen_operation,
+    chain::{operations::OperationsSchema, state::StateSchema},
+    test_data::{gen_unique_aggregated_operation, BLOCK_SIZE_CHUNKS},
     tests::{create_rng, db_test},
     QueryResult, StorageProcessor,
 };
@@ -46,10 +43,11 @@ async fn low_level_commit_verify_state(mut storage: StorageProcessor<'_>) -> Que
     // We have to store the operations as well (and for verify below too).
     for block_number in 1..=3 {
         OperationsSchema(&mut storage)
-            .store_operation(NewOperation {
+            .store_aggregated_action(gen_unique_aggregated_operation(
                 block_number,
-                action_type: ActionType::COMMIT.to_string(),
-            })
+                AggregatedActionType::CommitBlocks,
+                BLOCK_SIZE_CHUNKS,
+            ))
             .await?;
     }
 
@@ -72,13 +70,14 @@ async fn low_level_commit_verify_state(mut storage: StorageProcessor<'_>) -> Que
     // Apply one state.
     StateSchema(&mut storage).apply_state_update(1).await?;
     OperationsSchema(&mut storage)
-        .store_operation(NewOperation {
-            block_number: 1,
-            action_type: ActionType::VERIFY.to_string(),
-        })
+        .store_aggregated_action(gen_unique_aggregated_operation(
+            1,
+            AggregatedActionType::ExecuteBlocks,
+            BLOCK_SIZE_CHUNKS,
+        ))
         .await?;
     OperationsSchema(&mut storage)
-        .confirm_operation(1, ActionType::VERIFY)
+        .confirm_aggregated_operations(1, 1, AggregatedActionType::ExecuteBlocks)
         .await?;
 
     // Check that the verified state is now equals to the committed state.
@@ -91,13 +90,14 @@ async fn low_level_commit_verify_state(mut storage: StorageProcessor<'_>) -> Que
     // Apply the rest of states and check that `load_verified_state` updates as well.
     StateSchema(&mut storage).apply_state_update(2).await?;
     OperationsSchema(&mut storage)
-        .store_operation(NewOperation {
-            block_number: 2,
-            action_type: ActionType::VERIFY.to_string(),
-        })
+        .store_aggregated_action(gen_unique_aggregated_operation(
+            2,
+            AggregatedActionType::ExecuteBlocks,
+            BLOCK_SIZE_CHUNKS,
+        ))
         .await?;
     OperationsSchema(&mut storage)
-        .confirm_operation(2, ActionType::VERIFY)
+        .confirm_aggregated_operations(2, 2, AggregatedActionType::ExecuteBlocks)
         .await?;
     let committed_2 = StateSchema(&mut storage)
         .load_committed_state(Some(2))
@@ -107,13 +107,14 @@ async fn low_level_commit_verify_state(mut storage: StorageProcessor<'_>) -> Que
 
     StateSchema(&mut storage).apply_state_update(3).await?;
     OperationsSchema(&mut storage)
-        .store_operation(NewOperation {
-            block_number: 3,
-            action_type: ActionType::VERIFY.to_string(),
-        })
+        .store_aggregated_action(gen_unique_aggregated_operation(
+            3,
+            AggregatedActionType::ExecuteBlocks,
+            BLOCK_SIZE_CHUNKS,
+        ))
         .await?;
     OperationsSchema(&mut storage)
-        .confirm_operation(3, ActionType::VERIFY)
+        .confirm_aggregated_operations(3, 3, AggregatedActionType::ExecuteBlocks)
         .await?;
     let committed_3 = StateSchema(&mut storage)
         .load_committed_state(Some(3))
@@ -162,19 +163,21 @@ async fn state_diff(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
         let (new_accounts_map, updates) = apply_random_updates(accounts_map.clone(), &mut rng);
         accounts_map = new_accounts_map;
 
-        BlockSchema(&mut storage)
-            .store_operation(gen_operation(block_number, Action::Commit, block_size))
+        OperationsSchema(&mut storage)
+            .store_aggregated_action(gen_unique_aggregated_operation(
+                block_number,
+                AggregatedActionType::CommitBlocks,
+                block_size,
+            ))
             .await?;
         StateSchema(&mut storage)
             .commit_state_update(block_number, &updates, 0)
             .await?;
 
-        BlockSchema(&mut storage)
-            .store_operation(gen_operation(
+        OperationsSchema(&mut storage)
+            .store_aggregated_action(gen_unique_aggregated_operation(
                 block_number,
-                Action::Verify {
-                    proof: Default::default(),
-                },
+                AggregatedActionType::ExecuteBlocks,
                 block_size,
             ))
             .await?;

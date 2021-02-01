@@ -224,7 +224,7 @@ Tester.prototype.testBackwardCompatibleEthMessages = async function (
     const batch = [signedTransfer, signedWithdraw];
     // The message is keccak256(batchBytes).
     // Transactions are serialized in the new format, the server will take this into account.
-    const batchBytes = ethers.utils.concat(batch.map((signedTx) => serializeTx(signedTx.tx, 'contracts-4')));
+    const batchBytes = ethers.utils.concat(batch.map((signedTx) => serializeTx(signedTx.tx)));
     const batchHash = ethers.utils.keccak256(batchBytes).slice(2);
     const message = Uint8Array.from(Buffer.from(batchHash, 'hex'));
 

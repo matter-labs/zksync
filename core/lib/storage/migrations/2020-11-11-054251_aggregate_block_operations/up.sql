@@ -7,7 +7,8 @@ CREATE TABLE aggregate_operations (
     arguments jsonb NOT NULL,
     from_block bigint not null,
     to_block bigint not null,
-    created_at TIMESTAMP with time zone NOT NULL DEFAULT now()
+    created_at TIMESTAMP with time zone NOT NULL DEFAULT now(),
+    confirmed bool NOT NULL DEFAULT false
 );
 
 CREATE TABLE eth_aggregated_ops_binding (

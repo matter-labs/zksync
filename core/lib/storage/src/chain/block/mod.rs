@@ -1,14 +1,13 @@
 // Built-in deps
-use std::time::Instant;
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::time::{Instant, SystemTime, UNIX_EPOCH};
 // External imports
-use zksync_basic_types::{H256, U256};
 // Workspace imports
+use zksync_basic_types::{H256, U256};
 use zksync_crypto::convert::FeConvert;
-use zksync_types::{block::PendingBlock, Action, ActionType, Fr, Operation};
 use zksync_types::{
-    block::{Block, ExecutedOperations},
-    AccountId, BlockNumber, ZkSyncOp,
+    aggregated_operations::AggregatedActionType,
+    block::{Block, ExecutedOperations, PendingBlock},
+    AccountId, BlockNumber, Fr, ZkSyncOp,
 };
 // Local imports
 use self::records::{
@@ -17,8 +16,8 @@ use self::records::{
 use crate::{
     chain::operations::{
         records::{
-            NewExecutedPriorityOperation, NewExecutedTransaction, NewOperation,
-            StoredExecutedPriorityOperation, StoredExecutedTransaction, StoredOperation,
+            NewExecutedPriorityOperation, NewExecutedTransaction, StoredExecutedPriorityOperation,
+            StoredExecutedTransaction,
         },
         OperationsSchema,
     },
@@ -36,40 +35,6 @@ pub mod records;
 pub struct BlockSchema<'a, 'c>(pub &'a mut StorageProcessor<'c>);
 
 impl<'a, 'c> BlockSchema<'a, 'c> {
-    /// Executes an operation:
-    /// 1. Stores the operation.
-    /// 2. Stores the proof (if it isn't stored already) for the verify operation.
-    pub async fn execute_operation(&mut self, op: Operation) -> QueryResult<Operation> {
-        let stored = self.store_operation(op).await?;
-        let result = stored.into_op(self.0).await;
-        result
-    }
-
-    pub async fn store_operation(&mut self, op: Operation) -> QueryResult<StoredOperation> {
-        let start = Instant::now();
-        let mut transaction = self.0.start_transaction().await?;
-
-        let block_number = op.block.block_number;
-
-        match &op.action {
-            Action::Commit => {
-                BlockSchema(&mut transaction).save_block(op.block).await?;
-            }
-            Action::Verify { .. } => {}
-        };
-
-        let new_operation = NewOperation {
-            block_number: i64::from(block_number),
-            action_type: op.action.to_string(),
-        };
-        let stored: StoredOperation = OperationsSchema(&mut transaction)
-            .store_operation(new_operation)
-            .await?;
-        transaction.commit().await?;
-        metrics::histogram!("sql.chain.block.execute_operation", start.elapsed());
-        Ok(stored)
-    }
-
     /// Given a block, stores its transactions in the database.
     pub async fn save_block_transactions(
         &mut self,
@@ -295,9 +260,6 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
         max_block: BlockNumber,
         limit: u32,
     ) -> QueryResult<Vec<BlockDetails>> {
-        // TODO: instead of operations, we need to use `aggregated_operations`
-        // BUT It is necessary somehow leave backward compatibility for the mainnet DB. (ZKS-375)
-
         let start = Instant::now();
         // This query does the following:
         // - joins the `operations` and `eth_tx_hashes` (using the intermediate `eth_ops_binding` table)
@@ -310,16 +272,17 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
             BlockDetails,
             r#"
             WITH eth_ops AS (
-                SELECT DISTINCT ON (block_number, action_type)
-                    operations.block_number,
+                SELECT DISTINCT ON (to_block, action_type)
+                    aggregate_operations.from_block,
+                    aggregate_operations.to_block,
                     eth_tx_hashes.tx_hash,
-                    operations.action_type,
-                    operations.created_at,
-                    confirmed
-                FROM operations
-                    left join eth_ops_binding on eth_ops_binding.op_id = operations.id
-                    left join eth_tx_hashes on eth_tx_hashes.eth_op_id = eth_ops_binding.eth_op_id
-                ORDER BY block_number DESC, action_type, confirmed
+                    aggregate_operations.action_type,
+                    aggregate_operations.created_at,
+                    aggregate_operations.confirmed
+                FROM aggregate_operations
+                    left join eth_aggregated_ops_binding on eth_aggregated_ops_binding.op_id = aggregate_operations.id
+                    left join eth_tx_hashes on eth_tx_hashes.eth_op_id = eth_aggregated_ops_binding.eth_op_id
+                ORDER BY to_block DESC, action_type, confirmed
             )
             SELECT
                 blocks.number AS "block_number!",
@@ -331,9 +294,9 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
                 verified.created_at AS "verified_at?"
             FROM blocks
             INNER JOIN eth_ops committed ON
-                committed.block_number = blocks.number AND committed.action_type = 'COMMIT' AND committed.confirmed = true
+                committed.from_block <= blocks.number AND committed.to_block >= blocks.number AND committed.action_type = 'CommitBlocks' AND committed.confirmed = true
             LEFT JOIN eth_ops verified ON
-                verified.block_number = blocks.number AND verified.action_type = 'VERIFY' AND verified.confirmed = true
+                verified.from_block <= blocks.number AND verified.to_block >= blocks.number AND verified.action_type = 'ExecuteBlocks' AND verified.confirmed = true
             WHERE
                 blocks.number <= $1
             ORDER BY blocks.number DESC
@@ -373,8 +336,6 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
     /// Will return `None` if the query is malformed or there is no block that matches
     /// the query.
     pub async fn find_block_by_height_or_hash(&mut self, query: String) -> Option<BlockDetails> {
-        // TODO: instead of operations, we need to use `aggregated_operations`
-        // BUT It is necessary somehow leave backward compatibility for the mainnet DB. (ZKS-375)
         let start = Instant::now();
         // If the input looks like hash, add the hash lookup part.
         let hash_bytes = if let Some(hex_query) = self.try_parse_hex(&query) {
@@ -415,16 +376,17 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
             BlockDetails,
             r#"
             WITH eth_ops AS (
-                SELECT DISTINCT ON (block_number, action_type)
-                    operations.block_number,
+                SELECT DISTINCT ON (to_block, action_type)
+                    aggregate_operations.from_block,
+                    aggregate_operations.to_block,
                     eth_tx_hashes.tx_hash,
-                    operations.action_type,
-                    operations.created_at,
-                    confirmed
-                FROM operations
-                    left join eth_ops_binding on eth_ops_binding.op_id = operations.id
-                    left join eth_tx_hashes on eth_tx_hashes.eth_op_id = eth_ops_binding.eth_op_id
-                ORDER BY block_number desc, action_type, confirmed
+                    aggregate_operations.action_type,
+                    aggregate_operations.created_at,
+                    aggregate_operations.confirmed
+                FROM aggregate_operations
+                    left join eth_aggregated_ops_binding on eth_aggregated_ops_binding.op_id = aggregate_operations.id
+                    left join eth_tx_hashes on eth_tx_hashes.eth_op_id = eth_aggregated_ops_binding.eth_op_id
+                ORDER BY to_block desc, action_type, confirmed
             )
             SELECT
                 blocks.number AS "block_number!",
@@ -436,9 +398,9 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
                 verified.created_at AS "verified_at?"
             FROM blocks
             INNER JOIN eth_ops committed ON
-                committed.block_number = blocks.number AND committed.action_type = 'COMMIT' AND committed.confirmed = true
+                committed.from_block <= blocks.number AND committed.to_block >= blocks.number AND committed.action_type = 'CommitBlocks' AND committed.confirmed = true
             LEFT JOIN eth_ops verified ON
-                verified.block_number = blocks.number AND verified.action_type = 'VERIFY' AND verified.confirmed = true
+                verified.from_block <= blocks.number AND verified.to_block >= blocks.number AND verified.action_type = 'ExecuteBlocks' AND verified.confirmed = true
             WHERE false
                 OR committed.tx_hash = $1
                 OR verified.tx_hash = $1
@@ -461,32 +423,11 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
         result
     }
 
-    pub async fn load_commit_op(&mut self, block_number: BlockNumber) -> Option<Operation> {
-        let start = Instant::now();
-        let op = OperationsSchema(self.0)
-            .get_operation(block_number, ActionType::COMMIT)
-            .await;
-        let result = if let Some(stored_op) = op {
-            stored_op.into_op(self.0).await.ok()
-        } else {
-            None
-        };
-        metrics::histogram!("sql.chain.block.load_commit_op", start.elapsed());
-        result
-    }
-
-    pub async fn load_committed_block(&mut self, block_number: BlockNumber) -> Option<Block> {
-        let start = Instant::now();
-        let op = self.load_commit_op(block_number).await;
-        metrics::histogram!("sql.chain.block.load_committed_block", start.elapsed());
-        op.map(|op| op.block)
-    }
-
     /// Returns the number of last block
     pub async fn get_last_committed_block(&mut self) -> QueryResult<BlockNumber> {
         let start = Instant::now();
         let result = OperationsSchema(self.0)
-            .get_last_block_by_action(ActionType::COMMIT, None)
+            .get_last_block_by_aggregated_action(AggregatedActionType::CommitBlocks, None)
             .await;
         metrics::histogram!("sql.chain.block.get_last_committed_block", start.elapsed());
         result
@@ -500,7 +441,7 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
     pub async fn get_last_verified_block(&mut self) -> QueryResult<BlockNumber> {
         let start = Instant::now();
         let result = OperationsSchema(self.0)
-            .get_last_block_by_action(ActionType::VERIFY, None)
+            .get_last_block_by_aggregated_action(AggregatedActionType::ExecuteBlocks, None)
             .await;
         metrics::histogram!("sql.chain.block.get_last_verified_block", start.elapsed());
         result
@@ -511,7 +452,7 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
     pub async fn get_last_verified_confirmed_block(&mut self) -> QueryResult<BlockNumber> {
         let start = Instant::now();
         let result = OperationsSchema(self.0)
-            .get_last_block_by_action(ActionType::VERIFY, Some(true))
+            .get_last_block_by_aggregated_action(AggregatedActionType::ExecuteBlocks, Some(true))
             .await;
         metrics::histogram!(
             "sql.chain.block.get_last_verified_confirmed_block",
@@ -647,16 +588,16 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
         Ok(())
     }
 
-    /// Returns the number of operations with the given `action_type` and `is_confirmed` status.
-    pub async fn count_operations(
+    /// Returns the number of aggregated operations with the given `action_type` and `is_confirmed` status.
+    pub async fn count_aggregated_operations(
         &mut self,
-        action_type: ActionType,
+        aggregated_action_type: AggregatedActionType,
         is_confirmed: bool,
     ) -> QueryResult<i64> {
         let start = Instant::now();
         let count = sqlx::query!(
-            r#"SELECT count(*) as "count!" FROM operations WHERE action_type = $1 AND confirmed = $2"#,
-            action_type.to_string(),
+            r#"SELECT count(*) as "count!" FROM aggregate_operations WHERE action_type = $1 AND confirmed = $2"#,
+            aggregated_action_type.to_string(),
             is_confirmed
         )
         .fetch_one(self.0.conn())
@@ -667,7 +608,7 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
         Ok(count)
     }
 
-    pub(crate) async fn save_block(&mut self, block: Block) -> QueryResult<()> {
+    pub async fn save_block(&mut self, block: Block) -> QueryResult<()> {
         let start = Instant::now();
         let mut transaction = self.0.start_transaction().await?;
 

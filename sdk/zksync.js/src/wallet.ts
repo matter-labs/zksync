@@ -23,7 +23,7 @@ import {
     ChangePubKeyOnchain,
     ChangePubKeyECDSA,
     ChangePubKeyCREATE2,
-    ZkSyncVersion
+    Create2Data
 } from './types';
 import {
     ERC20_APPROVE_TRESHOLD,
@@ -95,6 +95,19 @@ export class Wallet {
         return wallet;
     }
 
+    static async fromCreate2Data(
+        syncSigner: Signer,
+        provider: Provider,
+        create2Data: Create2Data,
+        accountId?: number
+    ): Promise<Wallet> {
+        const create2Signer = new Create2WalletSigner(await syncSigner.pubKeyHash(), create2Data);
+        return await Wallet.fromEthSigner(create2Signer, provider, syncSigner, accountId, {
+            verificationMethod: 'ERC-1271',
+            isSignedMsgPrefixed: true
+        });
+    }
+
     static async fromEthSignerNoKeys(
         ethWallet: ethers.Signer,
         provider: Provider,
@@ -162,7 +175,7 @@ export class Wallet {
             validUntil: transfer.validUntil
         };
 
-        return this.signer.signSyncTransfer(transactionData, this.provider.zkSyncVersion);
+        return this.signer.signSyncTransfer(transactionData);
     }
 
     async signSyncTransfer(transfer: {
@@ -185,17 +198,20 @@ export class Wallet {
             ? null
             : this.provider.tokenSet.formatToken(transfer.token, transfer.fee);
         const stringToken = this.provider.tokenSet.resolveTokenSymbol(transfer.token);
-        const txMessageEthSignature = await this.ethMessageSigner.ethSignTransfer({
-            stringAmount,
-            stringFee,
-            stringToken,
-            to: transfer.to,
-            nonce: transfer.nonce,
-            accountId: this.accountId
-        });
+        const ethereumSignature =
+            this.ethSigner instanceof Create2WalletSigner
+                ? null
+                : await this.ethMessageSigner.ethSignTransfer({
+                      stringAmount,
+                      stringFee,
+                      stringToken,
+                      to: transfer.to,
+                      nonce: transfer.nonce,
+                      accountId: this.accountId
+                  });
         return {
             tx: signedTransferTransaction,
-            ethereumSignature: txMessageEthSignature
+            ethereumSignature
         };
     }
 
@@ -224,7 +240,7 @@ export class Wallet {
             validUntil: forcedExit.validUntil || MAX_TIMESTAMP
         };
 
-        return await this.signer.signSyncForcedExit(transactionData, this.provider.zkSyncVersion);
+        return await this.signer.signSyncForcedExit(transactionData);
     }
 
     async signSyncForcedExit(forcedExit: {
@@ -241,16 +257,19 @@ export class Wallet {
             ? null
             : this.provider.tokenSet.formatToken(forcedExit.token, forcedExit.fee);
         const stringToken = this.provider.tokenSet.resolveTokenSymbol(forcedExit.token);
-        const txMessageEthSignature = await this.ethMessageSigner.ethSignForcedExit({
-            stringToken,
-            stringFee,
-            target: forcedExit.target,
-            nonce: forcedExit.nonce
-        });
+        const ethereumSignature =
+            this.ethSigner instanceof Create2WalletSigner
+                ? null
+                : await this.ethMessageSigner.ethSignForcedExit({
+                      stringToken,
+                      stringFee,
+                      target: forcedExit.target,
+                      nonce: forcedExit.nonce
+                  });
 
         return {
             tx: signedForcedExitTransaction,
-            ethereumSignature: txMessageEthSignature
+            ethereumSignature
         };
     }
 
@@ -332,9 +351,12 @@ export class Wallet {
 
         messages.push(`Nonce: ${batchNonce}`);
         const message = messages.filter((part) => part.length != 0).join('\n');
-        const ethSignature = await this.ethMessageSigner.getEthMessageSignature(message);
+        const ethSignatures =
+            this.ethSigner instanceof Create2WalletSigner
+                ? []
+                : [await this.ethMessageSigner.getEthMessageSignature(message)];
 
-        const transactionHashes = await this.provider.submitTxsBatch(batch, [ethSignature]);
+        const transactionHashes = await this.provider.submitTxsBatch(batch, ethSignatures);
         return transactionHashes.map((txHash, idx) => new Transaction(batch[idx], txHash, this.provider));
     }
 
@@ -384,7 +406,7 @@ export class Wallet {
             validUntil: withdraw.validUntil
         };
 
-        return await this.signer.signSyncWithdraw(transactionData, this.provider.zkSyncVersion);
+        return await this.signer.signSyncWithdraw(transactionData);
     }
 
     async signWithdrawFromSyncToEthereum(withdraw: {
@@ -407,18 +429,21 @@ export class Wallet {
             ? null
             : this.provider.tokenSet.formatToken(withdraw.token, withdraw.fee);
         const stringToken = this.provider.tokenSet.resolveTokenSymbol(withdraw.token);
-        const txMessageEthSignature = await this.ethMessageSigner.ethSignWithdraw({
-            stringAmount,
-            stringFee,
-            stringToken,
-            ethAddress: withdraw.ethAddress,
-            nonce: withdraw.nonce,
-            accountId: this.accountId
-        });
+        const ethereumSignature =
+            this.ethSigner instanceof Create2WalletSigner
+                ? null
+                : await this.ethMessageSigner.ethSignWithdraw({
+                      stringAmount,
+                      stringFee,
+                      stringToken,
+                      ethAddress: withdraw.ethAddress,
+                      nonce: withdraw.nonce,
+                      accountId: this.accountId
+                  });
 
         return {
             tx: signedWithdrawTransaction,
-            ethereumSignature: txMessageEthSignature
+            ethereumSignature
         };
     }
 
@@ -468,24 +493,21 @@ export class Wallet {
         }
 
         const feeTokenId = this.provider.tokenSet.resolveTokenId(changePubKey.feeToken);
-        const newPubKeyHash = await this.signer.pubKeyHash();
+        const newPkHash = await this.signer.pubKeyHash();
 
         await this.setRequiredAccountIdFromServer('Set Signing Key');
 
-        const changePubKeyTx: ChangePubKey = await this.signer.signSyncChangePubKey(
-            {
-                accountId: this.accountId,
-                account: this.address(),
-                newPkHash: await this.signer.pubKeyHash(),
-                nonce: changePubKey.nonce,
-                feeTokenId,
-                fee: BigNumber.from(changePubKey.fee).toString(),
-                ethAuthData: changePubKey.ethAuthData,
-                validFrom: changePubKey.validFrom,
-                validUntil: changePubKey.validUntil
-            },
-            this.provider.zkSyncVersion
-        );
+        const changePubKeyTx: ChangePubKey = await this.signer.signSyncChangePubKey({
+            accountId: this.accountId,
+            account: this.address(),
+            newPkHash,
+            nonce: changePubKey.nonce,
+            feeTokenId,
+            fee: BigNumber.from(changePubKey.fee).toString(),
+            ethAuthData: changePubKey.ethAuthData,
+            validFrom: changePubKey.validFrom,
+            validUntil: changePubKey.validUntil
+        });
 
         return changePubKeyTx;
     }
@@ -512,7 +534,6 @@ export class Wallet {
                 newPubKeyHash,
                 changePubKey.nonce,
                 this.accountId,
-                this.provider.zkSyncVersion,
                 changePubKey.batchHash
             );
             const ethSignature = (await this.getEthMessageSignature(changePubKeyMessage)).signature;
@@ -522,14 +543,10 @@ export class Wallet {
                 batchHash: changePubKey.batchHash
             };
         } else if (changePubKey.ethAuthType === 'CREATE2') {
-            if (this.provider.zkSyncVersion === 'contracts-3') {
-                throw new Error('CREATE2 authentication is not supported for zkSync version contracts-3');
-            }
-
             if (this.ethSigner instanceof Create2WalletSigner) {
                 const create2data = this.ethSigner.create2WalletData;
                 ethAuthData = {
-                    type: 'Onchain',
+                    type: 'CREATE2',
                     creatorAddress: create2data.creatorAddress,
                     saltArg: create2data.saltArg,
                     codeHash: create2data.codeHash

@@ -8,7 +8,7 @@ import { ZkSyncWithdrawalUnitTestFactory } from '../../typechain';
 const hardhat = require('hardhat');
 const { expect } = require('chai');
 const { deployContract } = require('ethereum-waffle');
-const { getCallRevertReason, IERC20_INTERFACE } = require('./common');
+const { getCallRevertReason, IERC20_INTERFACE, DEFAULT_REVERT_REASON } = require('./common');
 
 let wallet, exitWallet;
 
@@ -106,11 +106,11 @@ describe('zkSync process tokens which have no return value in `transfer` and `tr
             const { revertReason } = await getCallRevertReason(
                 async () => await zksyncContract.depositERC20(tokenContract.address, depositAmount, wallet.address)
             );
+            expect(revertReason).to.not.equal(DEFAULT_REVERT_REASON);
         } catch (e) {}
         const balanceAfter = await tokenContract.balanceOf(wallet.address);
 
         expect(balanceBefore).eq(balanceAfter);
-        expect(revertReason).to.not.equal(DEFAULT_REVERT_REASON);
     });
 
     it('Withdraw ERC20 success', async () => {

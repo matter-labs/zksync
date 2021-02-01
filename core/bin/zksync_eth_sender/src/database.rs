@@ -227,7 +227,11 @@ impl DatabaseInterface for Database {
                 transaction
                     .chain()
                     .operations_schema()
-                    .confirm_operations(first_block, last_block, ActionType::COMMIT)
+                    .confirm_aggregated_operations(
+                        first_block,
+                        last_block,
+                        AggregatedActionType::CommitBlocks,
+                    )
                     .await?;
             }
             Some((_, AggregatedOperation::ExecuteBlocks(op))) => {
@@ -238,23 +242,16 @@ impl DatabaseInterface for Database {
                         .state_schema()
                         .apply_state_update(block.block_number)
                         .await?;
-                    transaction
-                        .chain()
-                        .block_schema()
-                        .execute_operation(Operation {
-                            id: None,
-                            action: Action::Verify {
-                                proof: Default::default(),
-                            },
-                            block: block.clone(),
-                        })
-                        .await?;
                 }
 
                 transaction
                     .chain()
                     .operations_schema()
-                    .confirm_operations(first_block, last_block, ActionType::VERIFY)
+                    .confirm_aggregated_operations(
+                        first_block,
+                        last_block,
+                        AggregatedActionType::ExecuteBlocks,
+                    )
                     .await?;
             }
             _ => {}

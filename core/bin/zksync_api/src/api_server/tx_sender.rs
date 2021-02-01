@@ -389,6 +389,15 @@ impl TxSender {
 
         if !eth_signatures.is_empty() {
             // User provided at least one signature for the whole batch.
+            // In this case each sender cannot be CREATE2.
+            if tx_sender_types
+                .iter()
+                .any(|_type| matches!(_type, EthAccountType::CREATE2))
+            {
+                return Err(SubmitError::IncorrectTx(
+                    "Eth signature from CREATE2 account not expected".to_string(),
+                ));
+            }
             let _txs = txs
                 .iter()
                 .zip(tokens.iter().cloned())

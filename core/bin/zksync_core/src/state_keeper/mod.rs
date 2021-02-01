@@ -15,6 +15,7 @@ use zksync_crypto::ff::{PrimeField, PrimeFieldRepr};
 use zksync_state::state::{CollectedFee, OpSuccess, ZkSyncState};
 use zksync_storage::ConnectionPool;
 use zksync_types::{
+    aggregated_operations::AggregatedActionType,
     block::{
         Block, ExecutedOperations, ExecutedPriorityOp, ExecutedTx,
         PendingBlock as SendablePendingBlock,
@@ -328,19 +329,22 @@ impl ZkSyncStateInitParams {
         storage: &mut zksync_storage::StorageProcessor<'_>,
         block_number: BlockNumber,
     ) -> Result<u64, anyhow::Error> {
-        let storage_op = storage
+        let is_operation_exists = storage
             .chain()
             .operations_schema()
-            .get_operation(block_number, ActionType::COMMIT)
-            .await;
-        if let Some(storage_op) = storage_op {
-            Ok(storage_op
-                .into_op(storage)
-                .await
-                .map_err(|e| anyhow::format_err!("could not convert storage_op: {}", e))?
-                .block
-                .processed_priority_ops
-                .1)
+            .get_stored_aggregated_operation(block_number, AggregatedActionType::CommitBlocks)
+            .await
+            .is_some();
+
+        if is_operation_exists {
+            let block = storage
+                .chain()
+                .block_schema()
+                .get_block(block_number)
+                .await?
+                .expect("Block should exist");
+
+            Ok(block.processed_priority_ops.1)
         } else {
             Ok(0)
         }

@@ -16,7 +16,11 @@ export type Nonce = number | 'committed';
 
 export type Network = 'localhost' | 'rinkeby' | 'ropsten' | 'mainnet' | 'rinkeby-beta' | 'ropsten-beta';
 
-export type ZkSyncVersion = 'contracts-3' | 'contracts-4';
+export interface Create2Data {
+    creatorAddress: string;
+    saltArg: string;
+    codeHash: string;
+}
 
 export interface AccountState {
     address: Address;

@@ -1,12 +1,9 @@
 // External imports
 use anyhow::format_err;
 // Workspace imports
-use zksync_types::{
-    prover::{ProverJob, ProverJobType},
-    Action,
-};
+use zksync_types::prover::{ProverJob, ProverJobType};
 // Local imports
-use crate::test_data::{gen_operation, get_sample_aggregated_proof, get_sample_single_proof};
+use crate::test_data::{get_sample_aggregated_proof, get_sample_block, get_sample_single_proof};
 use crate::tests::db_test;
 use crate::{prover::ProverSchema, QueryResult, StorageProcessor};
 
@@ -194,7 +191,11 @@ async fn test_store_witness(mut storage: StorageProcessor<'_>) -> QueryResult<()
     storage
         .chain()
         .block_schema()
-        .execute_operation(gen_operation(BLOCK_NUMBER, Action::Commit, BLOCK_SIZE))
+        .save_block(get_sample_block(
+            BLOCK_NUMBER,
+            BLOCK_SIZE,
+            Default::default(),
+        ))
         .await?;
 
     // Store the witness.
