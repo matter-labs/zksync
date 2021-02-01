@@ -11,8 +11,8 @@ use zksync_types::{tx::PackedEthSignature, TokenLike, ZkSyncTx};
 use super::{Fees, Scenario, ScenarioResources};
 use crate::{
     monitor::Monitor,
-    test_wallet::TestWallet,
     utils::{foreach_failsafe, gwei_to_wei, wait_all_failsafe_chunks, CHUNK_SIZES},
+    wallet::ScenarioWallet,
 };
 
 /// Configuration options for the transfers scenario.
@@ -96,7 +96,7 @@ impl Scenario for TransferScenario {
         &mut self,
         _monitor: &Monitor,
         fees: &Fees,
-        wallets: &[TestWallet],
+        wallets: &[ScenarioWallet],
     ) -> anyhow::Result<()> {
         let transfers_number = (self.wallets * self.transfer_rounds) as usize;
 
@@ -131,8 +131,8 @@ impl Scenario for TransferScenario {
         &mut self,
         monitor: Monitor,
         _fees: Fees,
-        wallets: Vec<TestWallet>,
-    ) -> anyhow::Result<Vec<TestWallet>> {
+        wallets: Vec<ScenarioWallet>,
+    ) -> anyhow::Result<Vec<ScenarioWallet>> {
         foreach_failsafe(
             "run/transfers",
             self.txs
@@ -148,7 +148,7 @@ impl Scenario for TransferScenario {
         &mut self,
         _monitor: &Monitor,
         _fees: &Fees,
-        _wallets: &[TestWallet],
+        _wallets: &[ScenarioWallet],
     ) -> anyhow::Result<()> {
         Ok(())
     }

@@ -26,7 +26,7 @@ use zksync_types::TokenLike;
 
 // Local uses
 use self::{full_exit::FullExitScenario, transfers::TransferScenario, withdraw::WithdrawScenario};
-use crate::{monitor::Monitor, test_wallet::TestWallet, FiveSummaryStats};
+use crate::{monitor::Monitor, wallet::ScenarioWallet, FiveSummaryStats};
 
 mod batch_transfers;
 mod fee_ticker;
@@ -68,7 +68,7 @@ pub trait Scenario: Debug + Display + Send + Sync + 'static {
         &mut self,
         monitor: &Monitor,
         fees: &Fees,
-        wallets: &[TestWallet],
+        wallets: &[ScenarioWallet],
     ) -> anyhow::Result<()>;
 
     /// Runs main scenario routine with the enabled load monitor.
@@ -76,8 +76,8 @@ pub trait Scenario: Debug + Display + Send + Sync + 'static {
         &mut self,
         monitor: Monitor,
         fees: Fees,
-        wallets: Vec<TestWallet>,
-    ) -> anyhow::Result<Vec<TestWallet>>;
+        wallets: Vec<ScenarioWallet>,
+    ) -> anyhow::Result<Vec<ScenarioWallet>>;
 
     /// Performs actions after running the main scenario, for example, it can
     /// return the funds to the specified wallets.
@@ -85,7 +85,7 @@ pub trait Scenario: Debug + Display + Send + Sync + 'static {
         &mut self,
         monitor: &Monitor,
         fees: &Fees,
-        wallets: &[TestWallet],
+        wallets: &[ScenarioWallet],
     ) -> anyhow::Result<()>;
 }
 

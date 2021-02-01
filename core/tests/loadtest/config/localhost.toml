@@ -9,7 +9,7 @@ name = 'localhost'
 # Fee for the Ethereum transactions in gwei.
 eth_fee = 10000000000
 # Fee for the zkSync transactions in gwei.
-zksync_fee = 100000000
+zksync_fee = 10000000000
 
 # A list of scenarios used in parallel in this loadtest.
 [[scenarios]]
@@ -24,7 +24,7 @@ wallets_amount = 400
 
 [[scenarios]]
 name = "withdraw"
-token_name = 'ETH'
+token_name = 'GNT'
 # Amount of intermediate wallets to use.
 wallets_amount = 15
 # Amount of "withdraw and deposit" iterations.
@@ -38,7 +38,7 @@ wallets_amount = 10
 
 [[scenarios]]
 name = 'batch_transfers'
-token_name = 'ETH'
+token_name = 'DAI'
 # Amount of money to be used in the transfer, in gwei.
 transfer_size = 1
 # Amount of iterations to rotate funds, "length" of the test.

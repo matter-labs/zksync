@@ -13,7 +13,7 @@ zksync_fee = 100000000000
 
 [[scenarios]]
 name = 'transfer'
-token_name = 'DAI'
+token_name = 'GNT'
 # Amount of money to be used in the transfer, in gwei.
 transfer_size = 1
 transfer_rounds = 2
@@ -21,12 +21,12 @@ wallets_amount = 20
 
 [[scenarios]]
 name = "withdraw"
-token_name = 'DAI'
+token_name = 'ETH'
 wallets_amount = 15
 withdraw_rounds = 1
 
 [[scenarios]]
-token_name = 'DAI'
+token_name = 'BAT'
 name = "full_exit"
 wallets_amount = 10
 

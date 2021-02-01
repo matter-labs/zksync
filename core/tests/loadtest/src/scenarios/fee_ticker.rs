@@ -16,8 +16,8 @@ use zksync_utils::format_ether;
 use super::{batch_transfers::batch_sizes_iter, Fees, Scenario, ScenarioResources};
 use crate::{
     monitor::Monitor,
-    test_wallet::TestWallet,
     utils::{gwei_to_wei, wait_all_failsafe, wait_all_failsafe_chunks, DynamicChunks, CHUNK_SIZES},
+    wallet::ScenarioWallet,
 };
 
 /// Configuration options for the fee ticker scenario.
@@ -82,7 +82,7 @@ impl Scenario for FeeTickerScenario {
         &mut self,
         _monitor: &Monitor,
         _fees: &Fees,
-        _wallets: &[TestWallet],
+        _wallets: &[ScenarioWallet],
     ) -> anyhow::Result<()> {
         Ok(())
     }
@@ -91,8 +91,8 @@ impl Scenario for FeeTickerScenario {
         &mut self,
         monitor: Monitor,
         _fees: Fees,
-        wallets: Vec<TestWallet>,
-    ) -> anyhow::Result<Vec<TestWallet>> {
+        wallets: Vec<ScenarioWallet>,
+    ) -> anyhow::Result<Vec<ScenarioWallet>> {
         for i in 0..self.transfer_rounds {
             vlog::info!(
                 "Fee ticker stressing cycle [{}/{}] started in {} mode",
@@ -120,7 +120,7 @@ impl Scenario for FeeTickerScenario {
         &mut self,
         _monitor: &Monitor,
         _fees: &Fees,
-        _wallets: &[TestWallet],
+        _wallets: &[ScenarioWallet],
     ) -> anyhow::Result<()> {
         Ok(())
     }
@@ -140,7 +140,7 @@ impl FeeTickerScenario {
     async fn process_single_tx_transfer(
         &self,
         monitor: &Monitor,
-        wallets: &[TestWallet],
+        wallets: &[ScenarioWallet],
     ) -> anyhow::Result<()> {
         wait_all_failsafe_chunks(
             "run/fee_ticker/single_tx_transfer",
@@ -157,7 +157,7 @@ impl FeeTickerScenario {
     async fn send_transfer_to_self(
         monitor: &Monitor,
         transfer_size: &BigUint,
-        wallet: &TestWallet,
+        wallet: &ScenarioWallet,
     ) -> anyhow::Result<()> {
         let fee = wallet.sufficient_fee().await?;
 
@@ -182,7 +182,7 @@ impl FeeTickerScenario {
     async fn process_txs_batch_transfer(
         &self,
         monitor: &Monitor,
-        wallets: &[TestWallet],
+        wallets: &[ScenarioWallet],
         max_batch_size: usize,
     ) -> anyhow::Result<()> {
         let send_batch_task = DynamicChunks::new(wallets, batch_sizes_iter(max_batch_size))
