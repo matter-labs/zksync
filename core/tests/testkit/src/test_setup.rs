@@ -5,7 +5,7 @@ use futures::{
     channel::{mpsc, oneshot},
     SinkExt, StreamExt,
 };
-use num::BigUint;
+use num::{bigint::Sign, BigInt, BigUint, Zero};
 use std::collections::HashMap;
 use web3::transports::Http;
 use zksync_core::committer::{BlockCommitRequest, CommitRequest};
@@ -26,8 +26,8 @@ use zksync_crypto::rand::Rng;
 use crate::account_set::AccountSet;
 use crate::state_keeper_utils::*;
 use crate::types::*;
-use zksync_types::tx::TimeRange;
 
+use zksync_types::tx::TimeRange;
 /// Used to create transactions between accounts and check for their validity.
 /// Every new block should start with `.start_block()`
 /// and end with `execute_commit_and_verify_block()`
@@ -49,6 +49,25 @@ pub struct TestSetup {
     pub current_state_root: Option<Fr>,
 
     pub last_committed_block: Block,
+}
+
+#[derive(Debug)]
+pub struct EthAccountTransfer {
+    pub account_id: ETHAccountId,
+    pub token_id: TokenId,
+    pub amount: BigInt,
+}
+#[derive(Debug)]
+pub struct ZkSyncAccountTransfer {
+    pub account_id: ZKSyncAccountId,
+    pub token_id: TokenId,
+    pub amount: BigInt,
+}
+
+#[derive(Debug)]
+pub enum AccountTransfer {
+    EthAccountTransfer(EthAccountTransfer),
+    ZkSyncAccountTransfer(ZkSyncAccountTransfer),
 }
 
 impl TestSetup {
@@ -133,18 +152,126 @@ impl TestSetup {
         token: Token,
         amount: BigUint,
     ) -> (Vec<TransactionReceipt>, PriorityOp) {
-        let mut from_eth_balance = self.get_expected_eth_account_balance(from, token.0).await;
-        from_eth_balance -= &amount;
+        self.setup_basic_l1_balances(from, token).await;
+        self.setup_basic_l2_balances(to, token).await;
 
-        self.expected_changes_for_current_block
+        let (receipts, deposit_op, transfers) = self.create_deposit(from, to, token, amount).await;
+        self.apply_transfers(&transfers);
+        (receipts, deposit_op)
+    }
+
+    pub async fn setup_basic_l1_balances(&mut self, eth_account_id: ETHAccountId, token: Token) {
+        if !self
+            .expected_changes_for_current_block
             .eth_accounts_state
-            .insert((from, token.0), from_eth_balance);
+            .contains_key(&(eth_account_id, 0))
+        {
+            // Setup eth balance for fee
+            let balance = self.get_eth_balance(eth_account_id, 0).await;
+            self.expected_changes_for_current_block
+                .eth_accounts_state
+                .insert((eth_account_id, 0), balance);
+        }
 
-        let mut zksync0_old = self.get_expected_zksync_account_balance(to, token.0).await;
-        zksync0_old += &amount;
+        if !self
+            .expected_changes_for_current_block
+            .eth_accounts_state
+            .contains_key(&(eth_account_id, token.0))
+        {
+            // Setup token balance
+            let balance = self.get_eth_balance(eth_account_id, token.0).await;
+            self.expected_changes_for_current_block
+                .eth_accounts_state
+                .insert((eth_account_id, token.0), balance);
+        }
+    }
+
+    pub async fn setup_basic_l2_balances(&mut self, zk_account_id: ZKSyncAccountId, token: Token) {
+        // Setup zksync balance
+        let balance = self.get_zksync_balance(zk_account_id, token.0).await;
+
         self.expected_changes_for_current_block
             .sync_accounts_state
-            .insert((to, token.0), zksync0_old);
+            .insert((zk_account_id, token.0), balance);
+    }
+
+    pub fn apply_transfers(&mut self, transfers: &Vec<AccountTransfer>) {
+        for transfer in transfers {
+            match transfer {
+                AccountTransfer::EthAccountTransfer(tr) => {
+                    let key = (tr.account_id, tr.token_id);
+                    let mut balance = self
+                        .expected_changes_for_current_block
+                        .eth_accounts_state
+                        .get(&key)
+                        .cloned()
+                        .unwrap_or_default();
+                    let (sign, amount) = tr.amount.clone().into_parts();
+                    match sign {
+                        Sign::Minus => {
+                            balance -= amount;
+                        }
+                        Sign::NoSign => {
+                            assert!(amount.is_zero());
+                        }
+                        Sign::Plus => {
+                            balance += amount;
+                        }
+                    }
+                    self.expected_changes_for_current_block
+                        .eth_accounts_state
+                        .insert(key, balance);
+                }
+                AccountTransfer::ZkSyncAccountTransfer(tr) => {
+                    let key = (tr.account_id, tr.token_id);
+                    let mut balance = self
+                        .expected_changes_for_current_block
+                        .sync_accounts_state
+                        .get(&key)
+                        .cloned()
+                        .unwrap_or_default();
+                    let (sign, amount) = tr.amount.clone().into_parts();
+                    match sign {
+                        Sign::Minus => {
+                            balance -= amount;
+                        }
+                        Sign::NoSign => {
+                            assert!(amount.is_zero());
+                        }
+                        Sign::Plus => {
+                            balance += amount;
+                        }
+                    }
+                    self.expected_changes_for_current_block
+                        .sync_accounts_state
+                        .insert(key, balance);
+                }
+            }
+        }
+    }
+
+    pub async fn create_deposit(
+        &mut self,
+        from: ETHAccountId,
+        to: ZKSyncAccountId,
+        token: Token,
+        amount: BigUint,
+    ) -> (Vec<TransactionReceipt>, PriorityOp, Vec<AccountTransfer>) {
+        let mut transfers = vec![];
+
+        transfers.push(AccountTransfer::EthAccountTransfer(EthAccountTransfer {
+            account_id: from,
+            token_id: token.0,
+            amount: BigInt::from_biguint(Sign::Minus, amount.clone()),
+        }));
+
+        transfers.push(AccountTransfer::ZkSyncAccountTransfer(
+            ZkSyncAccountTransfer {
+                account_id: to,
+                token_id: token.0,
+                amount: BigInt::from_biguint(Sign::Plus, amount.clone()),
+            },
+        ));
 
         let token_address = if token.0 == 0 {
             None
@@ -156,7 +283,6 @@ impl TestSetup {
                     .expect("Token with token id does not exist"),
             )
         };
-        let mut eth_balance = self.get_expected_eth_account_balance(from, 0).await;
 
         let (receipts, deposit_op) = self.accounts.deposit(from, to, token_address, amount).await;
 
@@ -171,13 +297,15 @@ impl TestSetup {
             gas_fee += current_fee;
         }
 
-        eth_balance -= gas_fee;
-        self.expected_changes_for_current_block
-            .eth_accounts_state
-            .insert((from, 0), eth_balance);
+        transfers.push(AccountTransfer::EthAccountTransfer(EthAccountTransfer {
+            account_id: from,
+            token_id: 0,
+            amount: BigInt::from_biguint(Sign::Minus, gas_fee),
+        }));
 
         self.execute_priority_op(deposit_op.clone()).await;
-        (receipts, deposit_op)
+
+        (receipts, deposit_op, transfers)
     }
 
     async fn execute_tx(&mut self, tx: ZkSyncTx) {
@@ -204,12 +332,28 @@ impl TestSetup {
         amount: BigUint,
         rng: &mut impl Rng,
     ) -> Vec<TransactionReceipt> {
-        let mut from_eth_balance = self.get_expected_eth_account_balance(from, token.0).await;
-        from_eth_balance -= &amount;
+        self.setup_basic_l1_balances(from, token).await;
+        let (rec, transfers) = self
+            .create_deposit_to_random(from, token, amount, rng)
+            .await;
+        self.apply_transfers(&transfers);
+        rec
+    }
 
-        self.expected_changes_for_current_block
-            .eth_accounts_state
-            .insert((from, token.0), from_eth_balance);
+    pub async fn create_deposit_to_random(
+        &mut self,
+        from: ETHAccountId,
+        token: Token,
+        amount: BigUint,
+        rng: &mut impl Rng,
+    ) -> (Vec<TransactionReceipt>, Vec<AccountTransfer>) {
+        let mut transfers = vec![];
+
+        transfers.push(AccountTransfer::EthAccountTransfer(EthAccountTransfer {
+            account_id: from,
+            token_id: token.0,
+            amount: BigInt::from_biguint(Sign::Minus, amount.clone()),
+        }));
 
         let token_address = if token.0 == 0 {
             None
@@ -221,7 +365,6 @@ impl TestSetup {
                     .expect("Token with token id does not exist"),
             )
         };
-        let mut eth_balance = self.get_expected_eth_account_balance(from, 0).await;
 
         let (receipts, deposit_op) = self
             .accounts
@@ -239,17 +382,17 @@ impl TestSetup {
             gas_fee += current_fee;
         }
 
-        eth_balance -= gas_fee;
-        self.expected_changes_for_current_block
-            .eth_accounts_state
-            .insert((from, 0), eth_balance);
+        transfers.push(AccountTransfer::EthAccountTransfer(EthAccountTransfer {
+            account_id: from,
+            token_id: 0,
+            amount: BigInt::from_biguint(Sign::Minus, gas_fee),
+        }));
 
         self.execute_priority_op(deposit_op).await;
-        receipts
+        (receipts, transfers)
     }
 
     pub async fn execute_priority_op(&mut self, op: PriorityOp) {
-        println!("Execute priority op {:?}", op.serial_id);
         let block = ProposedBlock {
             priority_ops: vec![op],
             txs: Vec::new(),
@@ -287,6 +430,20 @@ impl TestSetup {
         from: ZKSyncAccountId,
         token: Token,
     ) -> (TransactionReceipt, PriorityOp) {
+        self.setup_basic_l1_balances(post_by, token).await;
+        self.setup_basic_l2_balances(from, token).await;
+        let (rec, op, transfers) = self.create_full_exit(post_by, from, token).await;
+        self.apply_transfers(&transfers);
+        (rec, op)
+    }
+
+    pub async fn create_full_exit(
+        &mut self,
+        post_by: ETHAccountId,
+        from: ZKSyncAccountId,
+        token: Token,
+    ) -> (TransactionReceipt, PriorityOp, Vec<AccountTransfer>) {
+        let mut transfers = vec![];
         let account_id = self
             .get_zksync_account_committed_state(from)
             .await
@@ -301,19 +458,20 @@ impl TestSetup {
         let zksync0_old = self
             .get_expected_zksync_account_balance(from, token.0)
             .await;
-        self.expected_changes_for_current_block
-            .sync_accounts_state
-            .insert((from, token.0), BigUint::from(0u32));
 
-        let mut post_by_eth_balance = self
-            .get_expected_eth_account_balance(post_by, token.0)
-            .await;
-        post_by_eth_balance += zksync0_old;
-        self.expected_changes_for_current_block
-            .eth_accounts_state
-            .insert((post_by, token.0), post_by_eth_balance);
+        transfers.push(AccountTransfer::EthAccountTransfer(EthAccountTransfer {
+            account_id: post_by,
+            token_id: token.0,
+            amount: BigInt::from_biguint(Sign::Plus, zksync0_old.clone()),
+        }));
 
-        let mut eth_balance = self.get_expected_eth_account_balance(post_by, 0).await;
+        transfers.push(AccountTransfer::ZkSyncAccountTransfer(
+            ZkSyncAccountTransfer {
+                account_id: from,
+                token_id: token.0,
+                amount: BigInt::from_biguint(Sign::Minus, zksync0_old),
+            },
+        ));
 
         let (receipt, full_exit_op) = self
             .accounts
@@ -326,13 +484,15 @@ impl TestSetup {
         )
         .await
         .expect("Failed to get transaction fee");
-        eth_balance -= gas_fee;
-        self.expected_changes_for_current_block
-            .eth_accounts_state
-            .insert((post_by, 0), eth_balance);
+
+        transfers.push(AccountTransfer::EthAccountTransfer(EthAccountTransfer {
+            account_id: post_by,
+            token_id: 0,
+            amount: BigInt::from_biguint(Sign::Minus, gas_fee),
+        }));
 
         self.execute_priority_op(full_exit_op.clone()).await;
-        (receipt, full_exit_op)
+        (receipt, full_exit_op, transfers)
     }
 
     pub async fn change_pubkey_with_tx(
@@ -455,8 +615,6 @@ impl TestSetup {
         token: Token,
         amount: BigUint,
         fee: BigUint,
-        valid_from: u32,
-        valid_until: u32,
         rng: &mut impl Rng,
     ) {
         let mut zksync0_old = self
@@ -745,6 +903,14 @@ impl TestSetup {
             &self.expected_changes_for_current_block.sync_accounts_state
         {
             let real = self.get_zksync_balance(*zksync_account, *token).await;
+            if balance > &real {
+                println!(
+                    "wrong zksync acc {} balance {}, real: {}",
+                    zksync_account.0,
+                    balance,
+                    real.clone()
+                );
+            }
             let is_diff_valid = real.clone() - balance == BigUint::from(0u32);
             if !is_diff_valid {
                 println!(
@@ -803,13 +969,15 @@ impl TestSetup {
     }
 
     async fn get_zksync_balance(&self, zksync_id: ZKSyncAccountId, token: TokenId) -> BigUint {
-        self.get_zksync_account_committed_state(zksync_id)
+        let result = self
+            .get_zksync_account_committed_state(zksync_id)
             .await
             .map(|(_, acc)| acc.get_balance(token))
-            .unwrap_or_default()
+            .unwrap_or_default();
+        result
     }
 
-    async fn get_eth_balance(&self, eth_account_id: ETHAccountId, token: TokenId) -> BigUint {
+    pub async fn get_eth_balance(&self, eth_account_id: ETHAccountId, token: TokenId) -> BigUint {
         let account = &self.accounts.eth_accounts[eth_account_id.0];
         let result = if token == 0 {
             account
@@ -822,10 +990,12 @@ impl TestSetup {
                 .await
                 .expect("Failed to get erc20 balance")
         };
-        result
+
+        let result = result
             + self
                 .get_balance_to_withdraw(eth_account_id, self.tokens[&token])
-                .await
+                .await;
+        result
     }
 
     pub async fn get_balance_to_withdraw(

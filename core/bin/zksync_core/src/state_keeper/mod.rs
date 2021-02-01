@@ -998,7 +998,7 @@ impl ZkSyncStateKeeper {
         pending_block.stored_account_updates = pending_block.account_updates.len();
         self.state.block_number += 1;
 
-        println!(
+        log::info!(
             "Creating full block: {}, operations: {}, chunks_left: {}, miniblock iterations: {}",
             block_commit_request.block.block_number,
             block_commit_request.block.block_transactions.len(),
