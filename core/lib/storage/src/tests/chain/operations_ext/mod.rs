@@ -13,7 +13,7 @@ use crate::{
         SearchDirection,
     },
     test_data::{
-        dummy_ethereum_tx_hash, gen_unique_aggregated_operation, get_sample_block,
+        dummy_ethereum_tx_hash, gen_sample_block, gen_unique_aggregated_operation,
         BLOCK_SIZE_CHUNKS,
     },
     tests::db_test,
@@ -76,7 +76,7 @@ async fn update_blocks_status(mut storage: &mut StorageProcessor<'_>) -> QueryRe
     storage.ethereum_schema().initialize_eth_data().await?;
     // Make first block committed.
     BlockSchema(&mut storage)
-        .save_block(get_sample_block(1, BLOCK_SIZE_CHUNKS, Default::default()))
+        .save_block(gen_sample_block(1, BLOCK_SIZE_CHUNKS, Default::default()))
         .await?;
     OperationsSchema(&mut storage)
         .store_aggregated_action(gen_unique_aggregated_operation(

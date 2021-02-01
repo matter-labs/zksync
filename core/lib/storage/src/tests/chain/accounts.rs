@@ -3,6 +3,8 @@
 use zksync_types::{aggregated_operations::AggregatedActionType, AccountMap};
 // Local imports
 use super::block::apply_random_updates;
+use crate::chain::operations::OperationsSchema;
+use crate::test_data::{gen_sample_block, gen_unique_aggregated_operation};
 use crate::tests::{create_rng, db_test};
 use crate::{
     chain::{
@@ -10,7 +12,6 @@ use crate::{
         block::BlockSchema,
         state::StateSchema,
     },
-    test_data::gen_operation,
     QueryResult, StorageProcessor,
 };
 
@@ -45,7 +46,7 @@ async fn stored_accounts(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
     // Execute and commit block with them.
     // Also store account updates.
     BlockSchema(&mut storage)
-        .save_block(get_sample_block(1, block_size, Default::default()))
+        .save_block(gen_sample_block(1, block_size, Default::default()))
         .await?;
     StateSchema(&mut storage)
         .commit_state_update(1, &updates_block, 0)

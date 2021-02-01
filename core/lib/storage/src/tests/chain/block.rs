@@ -15,8 +15,8 @@ use crate::{
     },
     ethereum::EthereumSchema,
     test_data::{
-        dummy_ethereum_tx_hash, gen_acc_random_updates, gen_unique_aggregated_operation,
-        get_sample_block, BLOCK_SIZE_CHUNKS,
+        dummy_ethereum_tx_hash, gen_acc_random_updates, gen_sample_block,
+        gen_unique_aggregated_operation, BLOCK_SIZE_CHUNKS,
     },
     tests::{create_rng, db_test},
     QueryResult, StorageProcessor,
@@ -55,19 +55,19 @@ async fn test_commit_rewind(mut storage: StorageProcessor<'_>) -> QueryResult<()
     // Execute and commit these blocks.
     // Also store account updates.
     BlockSchema(&mut storage)
-        .save_block(get_sample_block(1, BLOCK_SIZE_CHUNKS, Default::default()))
+        .save_block(gen_sample_block(1, BLOCK_SIZE_CHUNKS, Default::default()))
         .await?;
     StateSchema(&mut storage)
         .commit_state_update(1, &updates_block_1, 0)
         .await?;
     BlockSchema(&mut storage)
-        .save_block(get_sample_block(2, BLOCK_SIZE_CHUNKS, Default::default()))
+        .save_block(gen_sample_block(2, BLOCK_SIZE_CHUNKS, Default::default()))
         .await?;
     StateSchema(&mut storage)
         .commit_state_update(2, &updates_block_2, 0)
         .await?;
     BlockSchema(&mut storage)
-        .save_block(get_sample_block(3, BLOCK_SIZE_CHUNKS, Default::default()))
+        .save_block(gen_sample_block(3, BLOCK_SIZE_CHUNKS, Default::default()))
         .await?;
     StateSchema(&mut storage)
         .commit_state_update(3, &updates_block_3, 0)
@@ -215,7 +215,7 @@ async fn test_find_block_by_height_or_hash(mut storage: StorageProcessor<'_>) ->
         accounts_map = new_accounts_map;
 
         // Store the block in the block schema.
-        let block = get_sample_block(block_number, BLOCK_SIZE_CHUNKS, Default::default());
+        let block = gen_sample_block(block_number, BLOCK_SIZE_CHUNKS, Default::default());
         BlockSchema(&mut storage).save_block(block.clone()).await?;
         OperationsSchema(&mut storage)
             .store_aggregated_action(gen_unique_aggregated_operation(
@@ -371,7 +371,7 @@ async fn test_block_range(mut storage: StorageProcessor<'_>) -> QueryResult<()> 
 
         // Store the operation in the block schema.
         BlockSchema(&mut storage)
-            .save_block(get_sample_block(
+            .save_block(gen_sample_block(
                 block_number,
                 BLOCK_SIZE_CHUNKS,
                 Default::default(),
@@ -487,7 +487,7 @@ async fn unconfirmed_transaction(mut storage: StorageProcessor<'_>) -> QueryResu
 
         // Store the block in the block schema.
         BlockSchema(&mut storage)
-            .save_block(get_sample_block(
+            .save_block(gen_sample_block(
                 block_number,
                 BLOCK_SIZE_CHUNKS,
                 Default::default(),
@@ -678,8 +678,8 @@ async fn pending_block_workflow(mut storage: StorageProcessor<'_>) -> QueryResul
     let txs_1 = vec![executed_tx_1];
     let txs_2 = vec![executed_tx_2];
 
-    let block_1 = get_sample_block(1, BLOCK_SIZE_CHUNKS, txs_1.clone());
-    let block_2 = get_sample_block(2, BLOCK_SIZE_CHUNKS, txs_2.clone());
+    let block_1 = gen_sample_block(1, BLOCK_SIZE_CHUNKS, txs_1.clone());
+    let block_2 = gen_sample_block(2, BLOCK_SIZE_CHUNKS, txs_2.clone());
 
     let pending_block_1 = PendingBlock {
         number: 1,
