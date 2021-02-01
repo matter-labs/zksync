@@ -291,6 +291,22 @@
       ]
     }
   },
+  "10b5aa910eabf8c1537da0f0cecadbe33da406ad39703b741d0746add351b9d4": {
+    "query": "\n            INSERT INTO forced_exit_requests ( id, token_id, account_id, price_in_wei, valid_until )\n            VALUES ( $1, $2, $3, $4, $5 )\n            ",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "Int8",
+          "Int4",
+          "Int8",
+          "Numeric",
+          "Timestamptz"
+        ]
+      },
+      "nullable": []
+    }
+  },
   "15faacf14edd991dedc35011ef12eefc5a04771a6b3f24a4c655f9259c9ea572": {
     "query": "SELECT * FROM account_balance_updates WHERE block_number > $1 AND block_number <= $2 ",
     "describe": {
