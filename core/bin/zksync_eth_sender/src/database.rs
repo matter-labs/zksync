@@ -218,7 +218,7 @@ impl DatabaseInterface for Database {
         op: &ETHOperation,
     ) -> anyhow::Result<bool> {
         let previous_op = op.id - 1;
-        if previous_op < 0 {
+        if previous_op <= 0 {
             return Ok(true);
         }
 
