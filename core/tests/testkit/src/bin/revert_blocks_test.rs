@@ -1,14 +1,19 @@
-use crate::eth_account::{parse_ether, EthereumAccount};
-use crate::external_commands::{deploy_contracts, get_test_accounts, Contracts};
-use crate::zksync_account::ZkSyncAccount;
-use itertools::Itertools;
 use web3::transports::Http;
+
 use zksync_core::state_keeper::ZkSyncStateInitParams;
-use zksync_testkit::data_restore::verify_restore;
-use zksync_testkit::scenarios::{perform_basic_operations, BlockProcessing};
+use zksync_types::{block::Block, AccountMap, AccountTree};
+
 use zksync_testkit::*;
-use zksync_types::block::Block;
-use zksync_types::{AccountMap, AccountTree, PriorityOp};
+use zksync_testkit::{
+    data_restore::verify_restore,
+    scenarios::{perform_basic_operations, BlockProcessing},
+};
+
+use crate::{
+    eth_account::{parse_ether, EthereumAccount},
+    external_commands::{deploy_contracts, get_test_accounts, Contracts},
+    zksync_account::ZkSyncAccount,
+};
 
 fn create_test_setup_state(
     testkit_config: &TestkitConfig,
@@ -64,23 +69,20 @@ fn create_test_setup_state(
 }
 
 async fn execute_blocks(
-    contracts: &Contracts,
-    fee_account: &ZkSyncAccount,
     test_setup: &mut TestSetup,
-    testkit_config: &TestkitConfig,
+    start_block_number: u32,
     number_of_verified_iteration_blocks: u16, // Each operation generate 4 blocks
     number_of_committed_iteration_blocks: u16,
     number_of_reverted_iterations_blocks: u16,
-) -> (ZkSyncStateInitParams, Block, Vec<PriorityOp>) {
+) -> (ZkSyncStateInitParams, AccountSet<Http>, Block) {
     let deposit_amount = parse_ether("1.0").unwrap();
 
     let mut executed_blocks = Vec::new();
     let token = 0;
-    let mut priority_ops_states = Vec::new();
     let mut states = Vec::new();
 
     for _ in 0..number_of_verified_iteration_blocks {
-        let (blocks, priority_ops) = perform_basic_operations(
+        let blocks = perform_basic_operations(
             token,
             test_setup,
             deposit_amount.clone(),
@@ -88,11 +90,14 @@ async fn execute_blocks(
         )
         .await;
         executed_blocks.extend(blocks.into_iter());
-        states.push(test_setup.get_current_state().await);
-        priority_ops_states.push(priority_ops);
+        states.push((
+            test_setup.get_current_state().await,
+            test_setup.accounts.clone(),
+        ));
     }
+    test_setup.get_eth_balance(ETHAccountId(0), 0).await;
     for _ in 0..number_of_committed_iteration_blocks - number_of_verified_iteration_blocks {
-        let (blocks, priority_ops) = perform_basic_operations(
+        let blocks = perform_basic_operations(
             token,
             test_setup,
             deposit_amount.clone(),
@@ -100,9 +105,12 @@ async fn execute_blocks(
         )
         .await;
         executed_blocks.extend(blocks.into_iter());
-        states.push(test_setup.get_current_state().await);
-        priority_ops_states.push(priority_ops);
+        states.push((
+            test_setup.get_current_state().await,
+            test_setup.accounts.clone(),
+        ));
     }
+    test_setup.get_eth_balance(ETHAccountId(0), 0).await;
 
     let executed_blocks_reverse_order = executed_blocks
         .clone()
@@ -115,33 +123,18 @@ async fn execute_blocks(
         number_of_verified_iteration_blocks,
         number_of_committed_iteration_blocks - number_of_reverted_iterations_blocks,
     ) - 1;
-    let reverted_state = states[reverted_state_idx as usize].clone();
+    let (reverted_state, test_setup_accounts) = states[reverted_state_idx as usize].clone();
 
-    let executed_block = executed_blocks[(reverted_state.last_block_number - 1) as usize].clone();
-    let priority_ops = priority_ops_states
-        .into_iter()
-        .rev()
-        .take((number_of_reverted_iterations_blocks) as usize)
-        .rev()
-        .concat();
+    let executed_block = executed_blocks
+        [(reverted_state.last_block_number - start_block_number - 1) as usize]
+        .clone();
 
     test_setup
         .revert_blocks(&executed_blocks_reverse_order)
         .await
         .expect("revert_blocks call fails");
 
-    verify_restore(
-        &testkit_config.web3_url,
-        testkit_config.available_block_chunk_sizes.clone(),
-        contracts,
-        fee_account.address,
-        balance_tree_to_account_map(&reverted_state.tree),
-        vec![token],
-        test_setup.current_state_root.unwrap(), // executed_blocks.last().unwrap().new_root_hash,
-    )
-    .await;
-
-    (reverted_state, executed_block, priority_ops)
+    (reverted_state, test_setup_accounts, executed_block)
 }
 
 fn balance_tree_to_account_map(balance_tree: &AccountTree) -> AccountMap {
@@ -176,19 +169,70 @@ async fn revert_blocks_test() {
         None,
     );
 
-    execute_blocks(
+    // Verify 1
+    // Commit 3
+    // Revert 2
+    // Revert all uncommitted transactions
+    let (state, account_set, last_block) = execute_blocks(&mut test_setup, 0, 1, 3, 2).await;
+
+    sender.send(()).expect("sk stop send");
+    handler.join().expect("sk thread join");
+    let hash = state.tree.root_hash();
+    let start_block_number = state.last_block_number;
+
+    let (handler, sender, channels) = spawn_state_keeper(&fee_account.address, state);
+
+    let mut test_setup = TestSetup::new(
+        channels,
+        account_set.clone(),
         &contracts,
-        &fee_account,
-        &mut test_setup,
-        &test_config,
-        1,
-        2,
-        1,
-    )
-    .await;
+        commit_account.clone(),
+        hash,
+        Some(last_block),
+    );
+
+    // Verify 2
+    // Commit 3
+    // Revert 2
+    // Try to revert some unverified blocks
+
+    let (state, account_set, last_block) =
+        execute_blocks(&mut test_setup, start_block_number, 2, 3, 2).await;
     sender.send(()).expect("sk stop send");
     handler.join().expect("sk thread join");
 
+    let hash = state.tree.root_hash();
+    let start_block_number = state.last_block_number;
+
+    let (handler, sender, channels) = spawn_state_keeper(&fee_account.address, state);
+
+    let mut test_setup = TestSetup::new(
+        channels,
+        account_set.clone(),
+        &contracts,
+        commit_account.clone(),
+        hash,
+        Some(last_block),
+    );
+    // Verify 1
+    // Commit 1
+    // Revert 0
+    // Do not revert blocks for verifying restore
+
+    let (state, _, _) = execute_blocks(&mut test_setup, start_block_number, 1, 1, 0).await;
+    sender.send(()).expect("sk stop send");
+    handler.join().expect("sk thread join");
+
+    verify_restore(
+        test_config.web3_url.as_str(),
+        test_config.available_block_chunk_sizes.clone(),
+        &contracts,
+        fee_account.address,
+        balance_tree_to_account_map(&state.tree),
+        vec![0],
+        test_setup.current_state_root.unwrap(),
+    )
+    .await;
     println!("some blocks are committed and verified \n\n");
 }
 

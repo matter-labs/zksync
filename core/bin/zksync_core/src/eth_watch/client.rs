@@ -11,7 +11,7 @@ use web3::{
 };
 
 use zksync_contracts::zksync_contract;
-use zksync_types::{ethereum::CompleteWithdrawalsTx, Address, Nonce, PriorityOp, H160, U256};
+use zksync_types::{Address, Nonce, PriorityOp, H160, U256};
 
 struct ContractTopics {
     new_priority_request: Hash,

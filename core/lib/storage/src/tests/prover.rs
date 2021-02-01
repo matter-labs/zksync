@@ -3,7 +3,7 @@ use anyhow::format_err;
 // Workspace imports
 use zksync_types::prover::{ProverJob, ProverJobType};
 // Local imports
-use crate::test_data::{get_sample_aggregated_proof, get_sample_block, get_sample_single_proof};
+use crate::test_data::{gen_sample_block, get_sample_aggregated_proof, get_sample_single_proof};
 use crate::tests::db_test;
 use crate::{prover::ProverSchema, QueryResult, StorageProcessor};
 
@@ -191,7 +191,7 @@ async fn test_store_witness(mut storage: StorageProcessor<'_>) -> QueryResult<()
     storage
         .chain()
         .block_schema()
-        .save_block(get_sample_block(
+        .save_block(gen_sample_block(
             BLOCK_NUMBER,
             BLOCK_SIZE,
             Default::default(),

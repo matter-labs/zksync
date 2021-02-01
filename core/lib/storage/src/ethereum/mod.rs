@@ -1,16 +1,16 @@
 // Built-in deps
 use std::{collections::VecDeque, convert::TryFrom, str::FromStr, time::Instant};
 // External imports
+use anyhow::format_err;
 use num::{BigInt, BigUint};
 use sqlx::types::BigDecimal;
 use zksync_basic_types::{H256, U256};
 // Workspace imports
+use zksync_types::aggregated_operations::{AggregatedActionType, AggregatedOperation};
 use zksync_types::ethereum::{ETHOperation, InsertedOperationResponse};
 // Local imports
 use self::records::{ETHParams, ETHStats, ETHTxHash, StorageETHOperation};
-use crate::chain::operations::records::StoredAggregatedOperation;
-use crate::{QueryResult, StorageProcessor};
-use zksync_types::aggregated_operations::{AggregatedActionType, AggregatedOperation};
+use crate::{chain::operations::records::StoredAggregatedOperation, QueryResult, StorageProcessor};
 
 pub mod records;
 
@@ -118,23 +118,20 @@ impl<'a, 'c> EthereumSchema<'a, 'c> {
         Ok(ops)
     }
 
-    /// Loads the operations which were stored in `operations` table, but not
-    /// in the `eth_operations`. This method is intended to be used after relaunch
-    /// to synchronize `eth_sender` state, as operations are sent to the `eth_sender`
-    /// only once.
+    /// Loads the operations which were stored in `aggregate_operations` table,
+    /// and are in `eth_unprocessed_aggregated_ops`.
     pub async fn load_unprocessed_operations(
         &mut self,
     ) -> QueryResult<Vec<(i64, AggregatedOperation)>> {
         let start = Instant::now();
-        let mut transaction = self.0.start_transaction().await?;
 
         let raw_ops = sqlx::query_as!(
             StoredAggregatedOperation,
             "SELECT * FROM aggregate_operations
-            WHERE NOT EXISTS (SELECT * FROM eth_aggregated_ops_binding WHERE op_id = aggregate_operations.id)
+            WHERE EXISTS (SELECT * FROM eth_unprocessed_aggregated_ops WHERE op_id = aggregate_operations.id)
             ORDER BY id ASC",
         )
-        .fetch_all(transaction.conn())
+        .fetch_all(self.0.conn())
         .await?;
 
         let mut operations = Vec::new();
@@ -151,10 +148,30 @@ impl<'a, 'c> EthereumSchema<'a, 'c> {
             }
         }
 
-        transaction.commit().await?;
-
         metrics::histogram!("sql.ethereum.load_unprocessed_operations", start.elapsed());
         Ok(operations)
+    }
+
+    /// Removes the given IDs from `eth_unprocessed_aggregated_ops`.
+    /// Used to indicate that operations have been successfully processed.
+    pub async fn remove_unprocessed_operations(
+        &mut self,
+        operations_id: Vec<i64>,
+    ) -> QueryResult<()> {
+        let start = Instant::now();
+
+        sqlx::query!(
+            "DELETE FROM eth_unprocessed_aggregated_ops WHERE op_id = ANY($1)",
+            &operations_id
+        )
+        .execute(self.0.conn())
+        .await?;
+
+        metrics::histogram!(
+            "sql.ethereum.remove_unprocessed_operations",
+            start.elapsed()
+        );
+        Ok(())
     }
 
     /// Stores the sent (but not confirmed yet) Ethereum transaction in the database.
@@ -162,7 +179,7 @@ impl<'a, 'c> EthereumSchema<'a, 'c> {
     pub async fn save_new_eth_tx(
         &mut self,
         op_type: AggregatedActionType,
-        op_id: Option<i64>,
+        operation: Option<(i64, AggregatedOperation)>,
         last_deadline_block: i64,
         last_used_gas_price: BigUint,
         raw_tx: Vec<u8>,
@@ -191,7 +208,7 @@ impl<'a, 'c> EthereumSchema<'a, 'c> {
         .id;
 
         // If the operation ID was provided, we should also insert a binding entry.
-        if let Some(op_id) = op_id {
+        if let Some((op_id, op)) = operation {
             sqlx::query!(
                 "INSERT INTO eth_aggregated_ops_binding (op_id, eth_op_id) VALUES ($1, $2)",
                 op_id,
@@ -199,12 +216,12 @@ impl<'a, 'c> EthereumSchema<'a, 'c> {
             )
             .execute(transaction.conn())
             .await?;
-        }
 
-        // Update the stored stats.
-        EthereumSchema(&mut transaction)
-            .report_created_operation(op_type)
-            .await?;
+            // Update the stored stats.
+            EthereumSchema(&mut transaction)
+                .report_created_operation(op)
+                .await?;
+        }
 
         // Return the assigned ID and nonce.
         let response = InsertedOperationResponse {
@@ -284,22 +301,53 @@ impl<'a, 'c> EthereumSchema<'a, 'c> {
     /// and it's invoked within `db-reset` subcommand.
     async fn report_created_operation(
         &mut self,
-        _operation_type: AggregatedActionType,
+        operation: AggregatedOperation,
     ) -> QueryResult<()> {
         let start = Instant::now();
         let mut transaction = self.0.start_transaction().await?;
 
         let mut current_stats = EthereumSchema(&mut transaction).load_eth_params().await?;
-        current_stats.commit_ops += 1;
+        let (first_block, last_block) = {
+            let block_range = operation.get_block_range();
+            (i64::from(block_range.0), i64::from(block_range.1))
+        };
+
+        match operation {
+            AggregatedOperation::CommitBlocks(_) => {
+                if current_stats.last_committed_block + 1 != first_block {
+                    return Err(format_err!(
+                        "Report created commit not in ascending order of affected blocks"
+                    ));
+                }
+                current_stats.last_committed_block = last_block;
+            }
+            AggregatedOperation::PublishProofBlocksOnchain(_) => {
+                if current_stats.last_verified_block + 1 != first_block {
+                    return Err(format_err!(
+                        "Report published proof not in ascending order of affected blocks"
+                    ));
+                }
+                current_stats.last_verified_block = last_block;
+            }
+            AggregatedOperation::ExecuteBlocks(_) => {
+                if current_stats.last_executed_block + 1 != first_block {
+                    return Err(format_err!(
+                        "Report executed blocks not in ascending order of affected blocks"
+                    ));
+                }
+                current_stats.last_executed_block = last_block;
+            }
+            AggregatedOperation::CreateProofBlocks(_) => return Ok(()),
+        };
 
         // Update the stored stats.
         sqlx::query!(
             "UPDATE eth_parameters
-            SET commit_ops = $1, verify_ops = $2, withdraw_ops = $3
+            SET last_committed_block = $1, last_verified_block = $2, last_executed_block = $3
             WHERE id = true",
-            current_stats.commit_ops,
-            current_stats.verify_ops,
-            current_stats.withdraw_ops
+            current_stats.last_committed_block,
+            current_stats.last_verified_block,
+            current_stats.last_executed_block
         )
         .execute(transaction.conn())
         .await?;
@@ -390,18 +438,16 @@ impl<'a, 'c> EthereumSchema<'a, 'c> {
         let eth_op_id = EthereumSchema(&mut transaction).get_eth_op_id(hash).await?;
 
         // Set the `confirmed` and `final_hash` field of the entry.
-        let _eth_op_id: i64 = sqlx::query!(
+        sqlx::query!(
             "UPDATE eth_operations
                 SET confirmed = $1, final_hash = $2
-                WHERE id = $3
-                RETURNING id",
+                WHERE id = $3",
             true,
             hash.as_bytes(),
             eth_op_id
         )
-        .fetch_one(transaction.conn())
-        .await?
-        .id;
+        .execute(transaction.conn())
+        .await?;
 
         // If there is a ZKSync operation, mark it as confirmed as well.
         sqlx::query!(
@@ -462,9 +508,9 @@ impl<'a, 'c> EthereumSchema<'a, 'c> {
         pub struct NewETHParams {
             pub nonce: i64,
             pub gas_price_limit: i64,
-            pub commit_ops: i64,
-            pub verify_ops: i64,
-            pub withdraw_ops: i64,
+            pub last_committed_block: i64,
+            pub last_verified_block: i64,
+            pub last_executed_block: i64,
         }
 
         let old_params: Option<ETHParams> =
@@ -476,15 +522,15 @@ impl<'a, 'c> EthereumSchema<'a, 'c> {
             let params = NewETHParams {
                 nonce: 0,
                 gas_price_limit: 400 * 10e9 as i64,
-                commit_ops: 0,
-                verify_ops: 0,
-                withdraw_ops: 0,
+                last_committed_block: 0,
+                last_verified_block: 0,
+                last_executed_block: 0,
             };
 
             sqlx::query!(
-                "INSERT INTO eth_parameters (nonce, gas_price_limit, commit_ops, verify_ops, withdraw_ops)
+                "INSERT INTO eth_parameters (nonce, gas_price_limit, last_committed_block, last_verified_block, last_executed_block)
                 VALUES ($1, $2, $3, $4, $5)",
-                params.nonce, params.gas_price_limit, params.commit_ops, params.verify_ops, params.withdraw_ops
+                params.nonce, params.gas_price_limit, params.last_committed_block, params.last_verified_block, params.last_executed_block
             )
             .execute(self.0.conn())
             .await?;

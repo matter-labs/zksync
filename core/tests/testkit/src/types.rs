@@ -26,10 +26,10 @@ impl TestkitConfig {
     }
 }
 
-#[derive(Copy, Clone, PartialEq, Eq, Hash)]
+#[derive(Copy, Clone, PartialEq, Eq, Hash, Debug)]
 pub struct ETHAccountId(pub usize);
 
-#[derive(Copy, Clone, PartialEq, Eq, Hash)]
+#[derive(Copy, Clone, PartialEq, Eq, Hash, Debug)]
 pub struct ZKSyncAccountId(pub usize);
 
 #[derive(Copy, Clone, PartialEq, Eq, Hash)]
@@ -63,7 +63,7 @@ impl BlockExecutionResult {
 }
 
 // Struct used to keep expected balance changes after transactions execution.
-#[derive(Default)]
+#[derive(Default, Debug)]
 pub struct ExpectedAccountState {
     pub eth_accounts_state: HashMap<(ETHAccountId, TokenId), BigUint>,
     pub sync_accounts_state: HashMap<(ZKSyncAccountId, TokenId), BigUint>,

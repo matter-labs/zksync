@@ -17,12 +17,11 @@ use tokio::runtime::{Builder, Handle};
 // Workspace uses
 use zksync_types::{
     tx::{BatchSignData, TxEthSignature},
-    Address, SignedZkSyncTx, ZkSyncTx,
+    Address, SignedZkSyncTx, Token, ZkSyncTx,
 };
 // Local uses
 use crate::{eth_checker::EthereumChecker, tx_error::TxAddError};
 use zksync_config::ZkSyncConfig;
-use zksync_types::tx::EthSignData;
 use zksync_utils::panic_notify::ThreadPanicNotify;
 
 /// `TxVariant` is used to form a verify request. It is possible to wrap
@@ -84,23 +83,26 @@ async fn verify_eth_signature(
     eth_checker: &EthereumChecker<web3::transports::Http>,
 ) -> Result<(), TxAddError> {
     let accounts = &request.senders;
+    let tokens = &request.tokens;
 
     match &request.tx {
         TxVariant::Tx(tx) => {
-            if accounts.len() != 1 {
+            if accounts.len() != 1 || tokens.len() != 1 {
                 return Err(TxAddError::Other);
             }
-            verify_eth_signature_single_tx(tx, accounts[0], eth_checker).await?;
+            verify_eth_signature_single_tx(tx, accounts[0], tokens[0].clone(), eth_checker).await?;
         }
         TxVariant::Batch(txs, batch_sign_data) => {
             if accounts.len() != txs.len() {
                 return Err(TxAddError::Other);
             }
-            verify_eth_signature_txs_batch(accounts, batch_sign_data, eth_checker).await?;
+            verify_eth_signature_txs_batch(txs, accounts, batch_sign_data, eth_checker).await?;
             // In case there're signatures provided for some of transactions
             // we still verify them.
-            for (tx, &account) in txs.iter().zip(accounts.iter()) {
-                verify_eth_signature_single_tx(tx, account, eth_checker).await?;
+            for ((tx, &account), token) in
+                txs.iter().zip(accounts.iter()).zip(tokens.iter().cloned())
+            {
+                verify_eth_signature_single_tx(tx, account, token, eth_checker).await?;
             }
         }
     }
@@ -108,9 +110,35 @@ async fn verify_eth_signature(
     Ok(())
 }
 
+/// Given a single Ethereum signature and a message, checks that it
+/// was signed by an expected address.
+async fn verify_ethereum_signature(
+    eth_signature: &TxEthSignature,
+    message: &[u8],
+    sender_address: Address,
+    eth_checker: &EthereumChecker<web3::transports::Http>,
+) -> bool {
+    let signer_account = match eth_signature {
+        TxEthSignature::EthereumSignature(packed_signature) => {
+            packed_signature.signature_recover_signer(message)
+        }
+        TxEthSignature::EIP1271Signature(signature) => {
+            return eth_checker
+                .is_eip1271_signature_correct(sender_address, message, signature.clone())
+                .await
+                .expect("Unable to check EIP1271 signature")
+        }
+    };
+    match signer_account {
+        Ok(address) => address == sender_address,
+        Err(_) => false,
+    }
+}
+
 async fn verify_eth_signature_single_tx(
     tx: &SignedZkSyncTx,
     sender_address: Address,
+    token: Token,
     eth_checker: &EthereumChecker<web3::transports::Http>,
 ) -> Result<(), TxAddError> {
     let start = Instant::now();
@@ -135,31 +163,25 @@ async fn verify_eth_signature_single_tx(
 
     // Check the signature.
     if let Some(sign_data) = &tx.eth_sign_data {
-        match &sign_data.signature {
-            TxEthSignature::EthereumSignature(packed_signature) => {
-                let signer_account = packed_signature
-                    .signature_recover_signer(&sign_data.message)
-                    .or(Err(TxAddError::IncorrectEthSignature))?;
-
-                if signer_account != sender_address {
-                    return Err(TxAddError::IncorrectEthSignature);
-                }
+        let signature = &sign_data.signature;
+        let mut signature_correct =
+            verify_ethereum_signature(signature, &sign_data.message, sender_address, eth_checker)
+                .await;
+        if !signature_correct {
+            let old_message = tx.get_old_ethereum_sign_message(token);
+            if let Some(message) = old_message {
+                signature_correct = verify_ethereum_signature(
+                    signature,
+                    message.as_bytes(),
+                    sender_address,
+                    eth_checker,
+                )
+                .await;
             }
-            TxEthSignature::EIP1271Signature(signature) => {
-                let signature_correct = eth_checker
-                    .is_eip1271_signature_correct(
-                        sender_address,
-                        &sign_data.message,
-                        signature.clone(),
-                    )
-                    .await
-                    .expect("Unable to check EIP1271 signature");
-
-                if !signature_correct {
-                    return Err(TxAddError::IncorrectTx);
-                }
-            }
-        };
+        }
+        if !signature_correct {
+            return Err(TxAddError::IncorrectEthSignature);
+        }
     }
 
     metrics::histogram!(
@@ -170,6 +192,7 @@ async fn verify_eth_signature_single_tx(
 }
 
 async fn verify_eth_signature_txs_batch(
+    txs: &[SignedZkSyncTx],
     senders: &[Address],
     batch_sign_data: &BatchSignData,
     eth_checker: &EthereumChecker<web3::transports::Http>,
@@ -177,6 +200,7 @@ async fn verify_eth_signature_txs_batch(
     let start = Instant::now();
     // Cache for verified senders.
     let mut signers = HashSet::with_capacity(senders.len());
+    let old_message = BatchSignData::get_old_ethereum_batch_message(txs.iter().map(|tx| &tx.tx));
     // For every sender check whether there exists at least one signature that matches it.
     for sender in senders {
         if signers.contains(sender) {
@@ -189,33 +213,26 @@ async fn verify_eth_signature_txs_batch(
         // This block will set the `sender_correct` variable to `true` at the first match.
         let mut sender_correct = false;
         for signature in &batch_sign_data.signatures {
-            match signature {
-                TxEthSignature::EthereumSignature(packed_signature) => {
-                    let signer_account = packed_signature
-                        .signature_recover_signer(&batch_sign_data.message)
-                        .or(Err(TxAddError::IncorrectEthSignature))?;
-                    // Always cache it as it's correct one.
-                    signers.insert(signer_account);
-                    if sender == &signer_account {
-                        sender_correct = true;
-                        break;
-                    }
-                }
-                TxEthSignature::EIP1271Signature(signature) => {
-                    let signature_correct = eth_checker
-                        .is_eip1271_signature_correct(
-                            *sender,
-                            &batch_sign_data.message,
-                            signature.clone(),
-                        )
-                        .await
-                        .expect("Unable to check EIP1271 signature");
-                    if signature_correct {
-                        signers.insert(*sender);
-                        sender_correct = true;
-                        break;
-                    }
-                }
+            let mut signature_correct = verify_ethereum_signature(
+                signature,
+                &batch_sign_data.message,
+                *sender,
+                eth_checker,
+            )
+            .await;
+            if !signature_correct {
+                signature_correct = verify_ethereum_signature(
+                    signature,
+                    old_message.as_slice(),
+                    *sender,
+                    eth_checker,
+                )
+                .await;
+            }
+            if signature_correct {
+                signers.insert(sender);
+                sender_correct = true;
+                break;
             }
         }
         // No signature for this transaction found, return error.
@@ -256,6 +273,9 @@ pub struct VerifyTxSignatureRequest {
     /// the transaction and actual sender can be different. Thus, we require request sender to
     /// perform a database query and fetch actual addresses if necessary.
     pub senders: Vec<Address>,
+    /// Resolved tokens might be used to obtain old-formatted 2-FA messages.
+    /// Needed for backwards compatibility.
+    pub tokens: Vec<Token>,
     /// Channel for sending the check response.
     pub response: oneshot::Sender<Result<VerifiedTx, TxAddError>>,
 }

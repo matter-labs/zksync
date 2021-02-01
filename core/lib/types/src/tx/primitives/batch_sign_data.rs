@@ -89,4 +89,18 @@ impl BatchSignData {
             None => body,
         }
     }
+
+    /// Returns an old-format message that should be signed by Ethereum account key.
+    /// Needed for backwards compatibility.
+    pub fn get_old_ethereum_batch_message<'a, I>(txs: I) -> Vec<u8>
+    where
+        I: Iterator<Item = &'a ZkSyncTx>,
+    {
+        tiny_keccak::keccak256(
+            txs.flat_map(ZkSyncTx::get_bytes)
+                .collect::<Vec<u8>>()
+                .as_slice(),
+        )
+        .to_vec()
+    }
 }

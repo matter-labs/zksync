@@ -1,11 +1,15 @@
 // Workspace imports
-use zksync_types::{ethereum::OperationType, BlockNumber, Operation};
+use zksync_types::{
+    aggregated_operations::{AggregatedActionType, AggregatedOperation},
+    ethereum::OperationType,
+    BlockNumber, Operation,
+};
+// External uses
+use anyhow::format_err;
 // Local imports
-use self::{counter_queue::CounterQueue, sparse_queue::SparseQueue};
-use zksync_types::aggregated_operations::{AggregatedActionType, AggregatedOperation};
+use self::operation_queue::OperationQueue;
 
-mod counter_queue;
-mod sparse_queue;
+mod operation_queue;
 
 pub type RawTxData = Vec<u8>;
 
@@ -37,6 +41,10 @@ impl TxData {
             operation,
         }
     }
+
+    pub fn get_block_range(&self) -> (BlockNumber, BlockNumber) {
+        self.operation.1.get_block_range()
+    }
 }
 
 /// `TxQueueBuilder` is a structure aiming to simplify the process
@@ -48,7 +56,9 @@ pub struct TxQueueBuilder {
     max_pending_txs: usize,
     sent_pending_txs: usize,
 
-    aggregated_ops_count: usize,
+    commit_operations_count: usize,
+    verify_operations_count: usize,
+    execute_operations_count: usize,
 }
 
 impl TxQueueBuilder {
@@ -57,7 +67,9 @@ impl TxQueueBuilder {
         Self {
             max_pending_txs,
             sent_pending_txs: 0,
-            aggregated_ops_count: 0,
+            commit_operations_count: 0,
+            verify_operations_count: 0,
+            execute_operations_count: 0,
         }
     }
 
@@ -70,9 +82,25 @@ impl TxQueueBuilder {
     }
 
     /// Sets the amount of operations sent for the `commit` queue.
-    pub fn with_aggregated_ops_count(self, aggregated_ops_count: usize) -> Self {
+    pub fn with_commit_operations_count(self, commit_operations_count: usize) -> Self {
         Self {
-            aggregated_ops_count,
+            commit_operations_count,
+            ..self
+        }
+    }
+
+    /// Sets the amount of operations sent for the `verify` queue.
+    pub fn with_verify_operations_count(self, verify_operations_count: usize) -> Self {
+        Self {
+            verify_operations_count,
+            ..self
+        }
+    }
+
+    /// Sets the amount of operations sent for the `execute` queue.
+    pub fn with_execute_operations_count(self, execute_operations_count: usize) -> Self {
+        Self {
+            execute_operations_count,
             ..self
         }
     }
@@ -83,7 +111,9 @@ impl TxQueueBuilder {
             max_pending_txs: self.max_pending_txs,
             sent_pending_txs: self.sent_pending_txs,
 
-            aggregated_operations: CounterQueue::new(self.aggregated_ops_count),
+            commit_operations: OperationQueue::new(self.commit_operations_count),
+            verify_operations: OperationQueue::new(self.verify_operations_count),
+            execute_operations: OperationQueue::new(self.execute_operations_count),
         }
     }
 }
@@ -95,11 +125,10 @@ impl TxQueueBuilder {
 /// 1. If the amount of sent transactions is equal to the `MAX_PENDING_TXS` value,
 ///   no transaction is yielded until some of already sent ones are committed.
 /// 2. Otherwise, transactions are yielded according to the following policy:
-///   - If `verify` queue contains elements, and `commit` operation with corresponding
-///     ID is committed, the `verify` operation is yielded (meaning that `verify` operations
-///     are prioritized unless the amount of sent `commit` and `verify` operations is equal:
-///     if so, we should send the `commit` operation first).
-///   - Otherwise, if `withdraw` queue contains elements, a `withdraw` operation is yielded.
+///   - If `execute` queue contains elements for some blocks, and `verify` operations
+///     for corresponding blocks is committed, the `execute` operation is yielded.
+///   - If `verify` queue contains elements for some blocks, and `commit` operations
+///     for corresponding blocks is committed, the `verify` operation is yielded.
 ///   - Otherwise, if `commit` queue is not empty, a `commit` operation is yielded.
 /// 3. If all the queues are empty, no operation is returned.
 #[derive(Debug)]
@@ -107,45 +136,88 @@ pub struct TxQueue {
     max_pending_txs: usize,
     sent_pending_txs: usize,
 
-    aggregated_operations: CounterQueue<TxData>,
+    commit_operations: OperationQueue,
+    verify_operations: OperationQueue,
+    execute_operations: OperationQueue,
 }
 
 impl TxQueue {
-    pub fn add_aggregate_operation(&mut self, aggregate_operation: TxData) {
-        if let Some(TxData {
-            operation: (id, _), ..
-        }) = self.aggregated_operations.back()
-        {
-            if *id >= aggregate_operation.operation.0 {
-                return;
-            }
-        }
-
-        self.aggregated_operations.push_back(aggregate_operation);
+    /// Adds the `commit` operation to the queue.
+    pub fn add_commit_operation(&mut self, commit_operation: TxData) -> anyhow::Result<()> {
+        self.commit_operations.push_back(commit_operation)?;
 
         log::info!(
-            "Adding operation to the queue. \
+            "Adding commit operation to the queue. \
             Sent pending txs count: {}, \
             max pending txs count: {}, \
-            size of op queue: {}",
+            size of commit queue: {}",
             self.sent_pending_txs,
             self.max_pending_txs,
-            self.aggregated_operations.len()
+            self.commit_operations.len()
         );
+        Ok(())
+    }
+
+    /// Adds the `verify` operation to the queue.
+    pub fn add_verify_operation(&mut self, verify_operation: TxData) -> anyhow::Result<()> {
+        self.verify_operations.push_back(verify_operation)?;
+
+        log::info!(
+            "Adding verify operation to the queue. \
+            Sent pending txs count: {}, \
+            max pending txs count: {}, \
+            size of verify queue: {}",
+            self.sent_pending_txs,
+            self.max_pending_txs,
+            self.verify_operations.len()
+        );
+        Ok(())
+    }
+
+    /// Adds the `execute` operation to the queue.
+    pub fn add_execute_operation(&mut self, execute_operation: TxData) -> anyhow::Result<()> {
+        self.execute_operations.push_back(execute_operation)?;
+
+        log::info!(
+            "Adding execute operation to the queue. \
+            Sent pending txs count: {}, \
+            max pending txs count: {}, \
+            size of execute queue: {}",
+            self.sent_pending_txs,
+            self.max_pending_txs,
+            self.execute_operations.len()
+        );
+        Ok(())
     }
 
     /// Returns a previously popped element to the front of the queue.
-    pub fn return_popped(&mut self, element: TxData) {
+    pub fn return_popped(&mut self, element: TxData) -> anyhow::Result<()> {
         assert!(
             self.sent_pending_txs > 0,
             "No transactions are expected to be returned"
         );
 
-        self.aggregated_operations.return_popped(element);
+        match &element.op_type {
+            AggregatedActionType::CommitBlocks => {
+                self.commit_operations.return_popped(element)?;
+            }
+            AggregatedActionType::PublishProofBlocksOnchain => {
+                self.verify_operations.return_popped(element)?;
+            }
+            AggregatedActionType::ExecuteBlocks => {
+                self.execute_operations.return_popped(element)?;
+            }
+            AggregatedActionType::CreateProofBlocks => {
+                return Err(format_err!(
+                    "Proof creation should never be sent to Ethereum"
+                ));
+            }
+        }
 
         // We've incremented the counter when transaction was popped.
         // Now it's returned and counter should be decremented back.
         self.sent_pending_txs -= 1;
+        Ok(())
     }
 
     /// Gets the next transaction to send, according to the transaction sending policy.
@@ -168,8 +240,24 @@ impl TxQueue {
     /// Obtains the next operation from the underlying queues.
     /// This method does not use/affect `sent_pending_tx` counter.
     fn get_next_operation(&mut self) -> Option<TxData> {
-        // 1. Highest priority: verify operations.
-        self.aggregated_operations.pop_front()
+        // 1. Highest priority: execute operations.
+        if let Some(next_execute_block) = self.execute_operations.get_next_last_block_number() {
+            let current_verify_block = self.verify_operations.get_last_block_number();
+            if next_execute_block <= current_verify_block {
+                return Some(self.execute_operations.pop_front().unwrap());
+            }
+        }
+
+        // 2. After execute operations we should process verify operation.
+        if let Some(next_verify_block) = self.verify_operations.get_next_last_block_number() {
+            let current_commit_block = self.commit_operations.get_last_block_number();
+            if next_verify_block <= current_commit_block {
+                return Some(self.verify_operations.pop_front().unwrap());
+            }
+        }
+
+        // 3. Finally, check the commit queue.
+        self.commit_operations.pop_front()
     }
 
     /// Notifies the queue about the transaction being confirmed on the Ethereum blockchain.
@@ -187,150 +275,149 @@ impl TxQueue {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use zksync_storage::test_data::{gen_unique_aggregated_operation, BLOCK_SIZE_CHUNKS};
     use zksync_types::{block::Block, Action};
 
-    // fn get_tx_data(
-    //     operation_type: OperationType,
-    //     block_number: BlockNumber,
-    //     raw: RawTxData,
-    // ) -> TxData {
-    //     let block = Block::new_from_available_block_sizes(
-    //         block_number,
-    //         Default::default(),
-    //         0,
-    //         vec![],
-    //         (0, 0),
-    //         &[0],
-    //         1_000_000.into(),
-    //         1_500_000.into(),
-    //     );
+    fn get_tx_data(
+        operation_type: AggregatedActionType,
+        block_number: BlockNumber,
+        raw: RawTxData,
+    ) -> TxData {
+        let operation =
+            gen_unique_aggregated_operation(block_number, operation_type, BLOCK_SIZE_CHUNKS);
 
-    //     let action = match operation_type {
-    //         OperationType::Commit => Action::Commit,
-    //         _ => Action::Verify {
-    //             proof: Default::default(),
-    //         },
-    //     };
-
-    //     let operation = Operation {
-    //         id: None,
-    //         action,
-    //         block,
-    //     };
-
-    //     TxData::from_operation(operation_type, operation, raw)
-    // }
+        TxData::from_operation((block_number as i64, operation), raw)
+    }
 
     /// Checks the basic workflow of the queue including adding several operations
     /// and retrieving them later.
     #[test]
     fn basic_operations() {
-        todo!()
-        // const MAX_IN_FLY: usize = 3;
-        // const COMMIT_MARK: u8 = 0;
-        // const VERIFY_MARK: u8 = 1;
-        // const WITHDRAW_MARK: u8 = 2;
-        //
-        // let mut queue = TxQueueBuilder::new(MAX_IN_FLY).build();
-        //
-        // // Add 2 commit, 2 verify and 2 withdraw operations.
-        // queue.add_commit_operation(TxData::from_raw(
-        //     OperationType::Commit,
-        //     vec![COMMIT_MARK, 0],
-        // ));
-        // queue.add_commit_operation(TxData::from_raw(
-        //     OperationType::Commit,
-        //     vec![COMMIT_MARK, 1],
-        // ));
-        // queue.add_verify_operation(
-        //     1,
-        //     TxData::from_raw(OperationType::Verify, vec![VERIFY_MARK, 0]),
-        // );
-        // queue.add_verify_operation(
-        //     2,
-        //     TxData::from_raw(OperationType::Verify, vec![VERIFY_MARK, 1]),
-        // );
-        // queue.add_withdraw_operation(TxData::from_raw(
-        //     OperationType::Withdraw,
-        //     vec![WITHDRAW_MARK, 0],
-        // ));
-        // queue.add_withdraw_operation(TxData::from_raw(
-        //     OperationType::Withdraw,
-        //     vec![WITHDRAW_MARK, 1],
-        // ));
-        //
-        // // Retrieve the next {MAX_IN_FLY} operations.
-        //
-        // // The first operation should be `commit`, since we can't send `verify` before the commitment.
-        // let op_1 = queue.pop_front().unwrap();
-        // assert_eq!(op_1.raw, vec![COMMIT_MARK, 0]);
-        //
-        // // The second operation should be `verify`, since it has the highest priority.
-        // let op_2 = queue.pop_front().unwrap();
-        // assert_eq!(op_2.raw, vec![VERIFY_MARK, 0]);
-        //
-        // // The third operation should be `withdraw`, since it has higher priority than `commit`, and we can't
-        // // send the `verify` before the corresponding `commit` operation.
-        // let op_3 = queue.pop_front().unwrap();
-        // assert_eq!(op_3.raw, vec![WITHDRAW_MARK, 0]);
-        //
-        // // After that we have {MAX_IN_FLY} operations, and `pop_front` should yield nothing.
-        // assert_eq!(queue.pop_front(), None);
-        //
-        // // Report that one operation is completed.
-        // queue.report_commitment();
-        //
-        // // Now we should obtain the next commit operation.
-        // let op_4 = queue.pop_front().unwrap();
-        // assert_eq!(op_4.raw, vec![COMMIT_MARK, 1]);
-        //
-        // // The limit should be met again, and nothing more should be yielded.
-        // assert_eq!(queue.pop_front(), None);
-        //
-        // // Report the remaining three operations as completed.
-        // assert_eq!(queue.sent_pending_txs, MAX_IN_FLY);
-        // for _ in 0..MAX_IN_FLY {
-        //     queue.report_commitment();
-        // }
-        // assert_eq!(queue.sent_pending_txs, 0);
-        //
-        // // Pop remaining operations.
-        // let op_5 = queue.pop_front().unwrap();
-        // assert_eq!(op_5.raw, vec![VERIFY_MARK, 1]);
-        //
-        // let op_6 = queue.pop_front().unwrap();
-        // assert_eq!(op_6.raw, vec![WITHDRAW_MARK, 1]);
-        //
-        // // Though the limit is not met (2 txs in fly, and limit is 3), there should be no txs in the queue.
-        // assert_eq!(queue.pop_front(), None);
-        //
-        // let pending_count = queue.sent_pending_txs;
-        //
-        // // Return the operation to the queue.
-        // queue.return_popped(op_6);
-        //
-        // // Now, as we've returned tx to queue, pending count should be decremented.
-        // assert_eq!(queue.sent_pending_txs, pending_count - 1);
-        //
-        // let op_6 = queue.pop_front().unwrap();
-        // assert_eq!(op_6.raw, vec![WITHDRAW_MARK, 1]);
-        //
-        // // We've popped the tx once again, now pending count should be increased.
-        // assert_eq!(queue.sent_pending_txs, pending_count);
+        const MAX_IN_FLY: usize = 3;
+        const COMMIT_MARK: u8 = 0;
+        const VERIFY_MARK: u8 = 1;
+        const EXECUTE_MARK: u8 = 2;
+
+        let mut queue = TxQueueBuilder::new(MAX_IN_FLY).build();
+
+        // Add 2 commit, 2 verify and 2 withdraw operations.
+        queue
+            .add_commit_operation(get_tx_data(
+                AggregatedActionType::CommitBlocks,
+                1,
+                vec![COMMIT_MARK, 0],
+            ))
+            .unwrap();
+        queue
+            .add_commit_operation(get_tx_data(
+                AggregatedActionType::CommitBlocks,
+                2,
+                vec![COMMIT_MARK, 1],
+            ))
+            .unwrap();
+        queue
+            .add_verify_operation(get_tx_data(
+                AggregatedActionType::PublishProofBlocksOnchain,
+                1,
+                vec![VERIFY_MARK, 0],
+            ))
+            .unwrap();
+        queue
+            .add_verify_operation(get_tx_data(
+                AggregatedActionType::PublishProofBlocksOnchain,
+                2,
+                vec![VERIFY_MARK, 1],
+            ))
+            .unwrap();
+        queue
+            .add_execute_operation(get_tx_data(
+                AggregatedActionType::ExecuteBlocks,
+                1,
+                vec![EXECUTE_MARK, 0],
+            ))
+            .unwrap();
+        queue
+            .add_execute_operation(get_tx_data(
+                AggregatedActionType::ExecuteBlocks,
+                2,
+                vec![EXECUTE_MARK, 1],
+            ))
+            .unwrap();
+
+        // Retrieve the next {MAX_IN_FLY} operations.
+
+        // The first operation should be `commit`, since we can't send `verify` before the commitment.
+        let op_1 = queue.pop_front().unwrap();
+        assert_eq!(op_1.raw, vec![COMMIT_MARK, 0]);
+
+        // The second operation should be `verify`, since it has the highest priority.
+        let op_2 = queue.pop_front().unwrap();
+        assert_eq!(op_2.raw, vec![VERIFY_MARK, 0]);
+
+        // The third operation should be `withdraw`, since it has higher priority than `commit`, and we can't
+        // send the `verify` before the corresponding `commit` operation.
+        let op_3 = queue.pop_front().unwrap();
+        assert_eq!(op_3.raw, vec![EXECUTE_MARK, 0]);
+
+        // After that we have {MAX_IN_FLY} operations, and `pop_front` should yield nothing.
+        assert_eq!(queue.pop_front(), None);
+
+        // Report that one operation is completed.
+        queue.report_commitment();
+
+        // Now we should obtain the next commit operation.
+        let op_4 = queue.pop_front().unwrap();
+        assert_eq!(op_4.raw, vec![COMMIT_MARK, 1]);
+
+        // The limit should be met again, and nothing more should be yielded.
+        assert_eq!(queue.pop_front(), None);
+
+        // Report the remaining three operations as completed.
+        assert_eq!(queue.sent_pending_txs, MAX_IN_FLY);
+        for _ in 0..MAX_IN_FLY {
+            queue.report_commitment();
+        }
+        assert_eq!(queue.sent_pending_txs, 0);
+
+        // Pop remaining operations.
+        let op_5 = queue.pop_front().unwrap();
+        assert_eq!(op_5.raw, vec![VERIFY_MARK, 1]);
+
+        let op_6 = queue.pop_front().unwrap();
+        assert_eq!(op_6.raw, vec![EXECUTE_MARK, 1]);
+
+        // Though the limit is not met (2 txs in fly, and limit is 3), there should be no txs in the queue.
+        assert_eq!(queue.pop_front(), None);
+
+        let pending_count = queue.sent_pending_txs;
+
+        // Return the operation to the queue.
+        queue.return_popped(op_6).unwrap();
+
+        // Now, as we've returned tx to queue, pending count should be decremented.
+        assert_eq!(queue.sent_pending_txs, pending_count - 1);
+
+        let op_6 = queue.pop_front().unwrap();
+        assert_eq!(op_6.raw, vec![EXECUTE_MARK, 1]);
+
+        // We've popped the tx once again, now pending count should be increased.
+        assert_eq!(queue.sent_pending_txs, pending_count);
     }
 
     #[test]
     #[should_panic(expected = "No transactions are expected to be returned")]
     fn return_popped_empty() {
-        todo!()
-        // const MAX_IN_FLY: usize = 3;
-        // const COMMIT_MARK: u8 = 0;
-        //
-        // let mut queue = TxQueueBuilder::new(MAX_IN_FLY).build();
-        //
-        // queue.return_popped(TxData::from_raw(
-        //     OperationType::Commit,
-        //     vec![COMMIT_MARK, 0],
-        // ));
+        const MAX_IN_FLY: usize = 3;
+        const COMMIT_MARK: u8 = 0;
+
+        let mut queue = TxQueueBuilder::new(MAX_IN_FLY).build();
+
+        queue
+            .return_popped(get_tx_data(
+                AggregatedActionType::CommitBlocks,
+                1,
+                vec![COMMIT_MARK, 0],
+            ))
+            .unwrap();
     }
 }

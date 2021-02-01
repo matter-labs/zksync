@@ -329,21 +329,13 @@ impl ZkSyncStateInitParams {
         storage: &mut zksync_storage::StorageProcessor<'_>,
         block_number: BlockNumber,
     ) -> Result<u64, anyhow::Error> {
-        let is_operation_exists = storage
+        let block = storage
             .chain()
-            .operations_schema()
-            .get_stored_aggregated_operation(block_number, AggregatedActionType::CommitBlocks)
-            .await
-            .is_some();
+            .block_schema()
+            .get_block(block_number)
+            .await?;
 
-        if is_operation_exists {
-            let block = storage
-                .chain()
-                .block_schema()
-                .get_block(block_number)
-                .await?
-                .expect("Block should exist");
-
+        if let Some(block) = block {
             Ok(block.processed_priority_ops.1)
         } else {
             Ok(0)
@@ -998,7 +990,7 @@ impl ZkSyncStateKeeper {
         pending_block.stored_account_updates = pending_block.account_updates.len();
         self.state.block_number += 1;
 
-        println!(
+        log::info!(
             "Creating full block: {}, operations: {}, chunks_left: {}, miniblock iterations: {}",
             block_commit_request.block.block_number,
             block_commit_request.block.block_transactions.len(),
