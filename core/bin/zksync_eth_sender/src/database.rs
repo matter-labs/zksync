@@ -23,10 +23,10 @@ pub(super) trait DatabaseInterface {
     /// Loads the unconfirmed and unprocessed operations from the database.
     /// Unconfirmed operations are Ethereum operations that were started, but not confirmed yet.
     /// Unprocessed operations are zkSync operations that were not started at all.
-    async fn restore_state(
+    async fn load_unconfirmed_operations(
         &self,
         connection: &mut StorageProcessor<'_>,
-    ) -> anyhow::Result<(VecDeque<ETHOperation>, Vec<(i64, AggregatedOperation)>)>;
+    ) -> anyhow::Result<VecDeque<ETHOperation>>;
 
     /// Loads the unprocessed operations from the database.
     /// Unprocessed operations are zkSync operations that were not started at all.
@@ -34,6 +34,13 @@ pub(super) trait DatabaseInterface {
         &self,
         connection: &mut StorageProcessor<'_>,
     ) -> anyhow::Result<Vec<(i64, AggregatedOperation)>>;
+
+    /// Remove the unprocessed operations from the database.
+    async fn remove_unprocessed_operations(
+        &self,
+        connection: &mut StorageProcessor<'_>,
+        operations_id: Vec<i64>,
+    ) -> anyhow::Result<()>;
 
     /// Saves a new unconfirmed operation to the database.
     async fn save_new_eth_tx(
@@ -117,19 +124,16 @@ impl DatabaseInterface for Database {
         Ok(connection)
     }
 
-    async fn restore_state(
+    async fn load_unconfirmed_operations(
         &self,
         connection: &mut StorageProcessor<'_>,
-    ) -> anyhow::Result<(VecDeque<ETHOperation>, Vec<(i64, AggregatedOperation)>)> {
+    ) -> anyhow::Result<VecDeque<ETHOperation>> {
         let unconfirmed_ops = connection
             .ethereum_schema()
             .load_unconfirmed_operations()
             .await?;
-        let unprocessed_ops = connection
-            .ethereum_schema()
-            .load_unprocessed_operations()
-            .await?;
-        Ok((unconfirmed_ops, unprocessed_ops))
+
+        Ok(unconfirmed_ops)
     }
 
     async fn load_new_operations(
@@ -141,6 +145,19 @@ impl DatabaseInterface for Database {
             .load_unprocessed_operations()
             .await?;
         Ok(unprocessed_ops)
+    }
+
+    async fn remove_unprocessed_operations(
+        &self,
+        connection: &mut StorageProcessor<'_>,
+        operations_id: Vec<i64>,
+    ) -> anyhow::Result<()> {
+        connection
+            .ethereum_schema()
+            .remove_unprocessed_operations(operations_id)
+            .await?;
+
+        Ok(())
     }
 
     async fn save_new_eth_tx(
@@ -156,7 +173,7 @@ impl DatabaseInterface for Database {
             .ethereum_schema()
             .save_new_eth_tx(
                 op_type,
-                op.map(|(op_id, _)| op_id),
+                op,
                 deadline_block,
                 BigUint::from_str(&used_gas_price.to_string()).unwrap(),
                 raw_tx,

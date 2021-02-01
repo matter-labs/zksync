@@ -17,8 +17,7 @@ CREATE TABLE eth_aggregated_ops_binding (
     eth_op_id bigserial NOT NULL REFERENCES eth_operations(id)
 );
 
--- CREATE TABLE eth_confirmed_aggregated_ops (
---     op_id bigserial NOT NULL REFERENCES aggregate_operations(id),
---     confirmed boolean NOT NULL,
---     PRIMARY KEY (op_id)
--- );
+CREATE TABLE eth_unprocessed_aggregated_ops (
+    op_id bigserial NOT NULL REFERENCES aggregate_operations(id),
+    PRIMARY KEY (op_id)
+);

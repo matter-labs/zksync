@@ -15,7 +15,7 @@ use zksync_types::{
     account::Account,
     aggregated_operations::{
         AggregatedActionType, AggregatedOperation, BlocksCommitOperation,
-        BlocksCreateProofOperation, BlocksExecuteOperation,
+        BlocksCreateProofOperation, BlocksExecuteOperation, BlocksProofOperation,
     },
     tx::{EthSignData, PackedEthSignature, TxEthSignature},
     Action, Address, Operation, H256,
@@ -184,12 +184,17 @@ pub fn gen_unique_aggregated_operation_with_txs(
                 proofs_to_pad: 0,
             })
         }
+        AggregatedActionType::PublishProofBlocksOnchain => {
+            AggregatedOperation::PublishProofBlocksOnchain(BlocksProofOperation {
+                blocks: vec![block],
+                proof: Default::default(),
+            })
+        }
         AggregatedActionType::ExecuteBlocks => {
             AggregatedOperation::ExecuteBlocks(BlocksExecuteOperation {
                 blocks: vec![block],
             })
         }
-        _ => panic!("Invalid AggregatedActionType"),
     };
 
     result

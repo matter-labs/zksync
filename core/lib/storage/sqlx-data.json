@@ -186,6 +186,18 @@
       ]
     }
   },
+  "0d6babe453e10d8fd58e15eaac7b77d9d5ad315b84d36c66f7abb414202666d1": {
+    "query": "INSERT INTO eth_unprocessed_aggregated_ops (op_id)\n                VALUES ($1)",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "Int8"
+        ]
+      },
+      "nullable": []
+    }
+  },
   "0e390d0f58d24733d76253da2e4d9c9a0f5c96702d164fe3ad64af8aec43ee49": {
     "query": "\n                SELECT * FROM account_balance_updates\n                WHERE account_id = $1 AND block_number > $2\n            ",
     "describe": {
@@ -528,6 +540,60 @@
       "nullable": []
     }
   },
+  "1d7990ad148d2588d60be6200b45383185387c0dde1f4724d107668d34007997": {
+    "query": "SELECT * FROM aggregate_operations\n            WHERE EXISTS (SELECT * FROM eth_unprocessed_aggregated_ops WHERE op_id = aggregate_operations.id)\n            ORDER BY id ASC",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "id",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 1,
+          "name": "action_type",
+          "type_info": "Text"
+        },
+        {
+          "ordinal": 2,
+          "name": "arguments",
+          "type_info": "Jsonb"
+        },
+        {
+          "ordinal": 3,
+          "name": "from_block",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 4,
+          "name": "to_block",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 5,
+          "name": "created_at",
+          "type_info": "Timestamptz"
+        },
+        {
+          "ordinal": 6,
+          "name": "confirmed",
+          "type_info": "Bool"
+        }
+      ],
+      "parameters": {
+        "Left": []
+      },
+      "nullable": [
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false
+      ]
+    }
+  },
   "222e3946401772e3f6e0d9ce9909e8e7ac2dc830c5ecfcd522f56b3bf70fd679": {
     "query": "INSERT INTO data_restore_storage_state_update (storage_state) VALUES ($1)",
     "describe": {
@@ -625,28 +691,6 @@
         false,
         false,
         false,
-        false
-      ]
-    }
-  },
-  "24870d60d50ce4eb1bc6b76a2e1fc94d39d3f5025a4bf80d5a0c2916945fc6f8": {
-    "query": "UPDATE eth_operations\n                SET confirmed = $1, final_hash = $2\n                WHERE id = $3\n                RETURNING id",
-    "describe": {
-      "columns": [
-        {
-          "ordinal": 0,
-          "name": "id",
-          "type_info": "Int8"
-        }
-      ],
-      "parameters": {
-        "Left": [
-          "Bool",
-          "Bytea",
-          "Int8"
-        ]
-      },
-      "nullable": [
         false
       ]
     }
@@ -1433,15 +1477,13 @@
       "nullable": []
     }
   },
-  "5de811d61e00fd7b93311aa825d17e2b2f0ee46ee762f5064e842f5d0f2b5ad7": {
-    "query": "UPDATE eth_parameters\n            SET commit_ops = $1, verify_ops = $2, withdraw_ops = $3\n            WHERE id = true",
+  "5b92ff5c1c97c0d870e75902d4f89b0725075b8a2f3f41cc4a4e443f792d1b5c": {
+    "query": "DELETE FROM eth_unprocessed_aggregated_ops WHERE op_id = ANY($1)",
     "describe": {
       "columns": [],
       "parameters": {
         "Left": [
-          "Int8",
-          "Int8",
-          "Int8"
+          "Int8Array"
         ]
       },
       "nullable": []
@@ -1956,6 +1998,20 @@
       ]
     }
   },
+  "7c90aaae688509c8dfd07789587b99bb276ca7938818293b6a27c06b2e9a3657": {
+    "query": "UPDATE eth_operations\n                SET confirmed = $1, final_hash = $2\n                WHERE id = $3",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "Bool",
+          "Bytea",
+          "Int8"
+        ]
+      },
+      "nullable": []
+    }
+  },
   "7ff98a4fddc441ea83f72a4a75a7caf53b9661c37f26a90984a349bfa5aeab70": {
     "query": "INSERT INTO eth_aggregated_ops_binding (op_id, eth_op_id) VALUES ($1, $2)",
     "describe": {
@@ -2433,21 +2489,6 @@
       "nullable": []
     }
   },
-  "a70d2d4dd84c5a4bed92793d0a409a9b2858a39ff485e9b1d0f1bf42e89645b6": {
-    "query": "INSERT INTO aggregate_operations (action_type, arguments, from_block, to_block)\n            VALUES ($1, $2, $3, $4)\n            ON CONFLICT (id)\n            DO NOTHING",
-    "describe": {
-      "columns": [],
-      "parameters": {
-        "Left": [
-          "Text",
-          "Jsonb",
-          "Int8",
-          "Int8"
-        ]
-      },
-      "nullable": []
-    }
-  },
   "a77668a3dce7f7cd1f45816f932eea685d429c3d75b40ea8e1a1bb9fc29f11c6": {
     "query": "UPDATE prover_job_queue SET (job_status, updated_at, updated_by) = ($1, now(), 'server_clean_idle')\n            WHERE job_status = $2 and (now() - updated_at) >= interval '120 seconds'",
     "describe": {
@@ -2456,6 +2497,20 @@
         "Left": [
           "Int4",
           "Int4"
+        ]
+      },
+      "nullable": []
+    }
+  },
+  "a7c77ca1eaea92f29494328c6652246732e50e2c989ed87676e333c295e0c251": {
+    "query": "UPDATE eth_parameters\n            SET last_committed_block = $1, last_verified_block = $2, last_executed_block = $3\n            WHERE id = true",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "Int8",
+          "Int8",
+          "Int8"
         ]
       },
       "nullable": []
@@ -2471,60 +2526,6 @@
         ]
       },
       "nullable": []
-    }
-  },
-  "ab8774812664b1c1d4207e7fcd5e04a078293d295c469f043e5bc4933c0c2944": {
-    "query": "SELECT * FROM aggregate_operations\n            WHERE NOT EXISTS (SELECT * FROM eth_aggregated_ops_binding WHERE op_id = aggregate_operations.id)\n            ORDER BY id ASC",
-    "describe": {
-      "columns": [
-        {
-          "ordinal": 0,
-          "name": "id",
-          "type_info": "Int8"
-        },
-        {
-          "ordinal": 1,
-          "name": "action_type",
-          "type_info": "Text"
-        },
-        {
-          "ordinal": 2,
-          "name": "arguments",
-          "type_info": "Jsonb"
-        },
-        {
-          "ordinal": 3,
-          "name": "from_block",
-          "type_info": "Int8"
-        },
-        {
-          "ordinal": 4,
-          "name": "to_block",
-          "type_info": "Int8"
-        },
-        {
-          "ordinal": 5,
-          "name": "created_at",
-          "type_info": "Timestamptz"
-        },
-        {
-          "ordinal": 6,
-          "name": "confirmed",
-          "type_info": "Bool"
-        }
-      ],
-      "parameters": {
-        "Left": []
-      },
-      "nullable": [
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false
-      ]
     }
   },
   "b1c528c67d3c2ecea86e3ba1b2407cb4ee72149d66be0498be1c1162917c065d": {
@@ -2753,17 +2754,17 @@
         },
         {
           "ordinal": 3,
-          "name": "commit_ops",
+          "name": "last_committed_block",
           "type_info": "Int8"
         },
         {
           "ordinal": 4,
-          "name": "verify_ops",
+          "name": "last_verified_block",
           "type_info": "Int8"
         },
         {
           "ordinal": 5,
-          "name": "withdraw_ops",
+          "name": "last_executed_block",
           "type_info": "Int8"
         },
         {
@@ -3065,6 +3066,29 @@
       ]
     }
   },
+  "c2b72cb3aeb4b448b240edef3988a1026577a82fb4ae1c416fcaf4622afa4ac0": {
+    "query": "INSERT INTO aggregate_operations (action_type, arguments, from_block, to_block)\n            VALUES ($1, $2, $3, $4)\n            ON CONFLICT (id)\n            DO NOTHING\n            RETURNING id",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "id",
+          "type_info": "Int8"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Text",
+          "Jsonb",
+          "Int8",
+          "Int8"
+        ]
+      },
+      "nullable": [
+        false
+      ]
+    }
+  },
   "c55231e06a5969f1531b98a925fd1575ee60967b7c546ed5650a9d42a738abee": {
     "query": "\n                SELECT * FROM account_pubkey_updates\n                WHERE block_number = $1\n            ",
     "describe": {
@@ -3289,6 +3313,22 @@
           "Int4",
           "Numeric",
           "Timestamptz"
+        ]
+      },
+      "nullable": []
+    }
+  },
+  "d3b822a6639901acd986e82d2779a7318c3805385a7772db83063d9507c049a7": {
+    "query": "INSERT INTO eth_parameters (nonce, gas_price_limit, last_committed_block, last_verified_block, last_executed_block)\n                VALUES ($1, $2, $3, $4, $5)",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "Int8",
+          "Int8",
+          "Int8",
+          "Int8",
+          "Int8"
         ]
       },
       "nullable": []
@@ -3634,22 +3674,6 @@
       "columns": [],
       "parameters": {
         "Left": []
-      },
-      "nullable": []
-    }
-  },
-  "ec815cee37d8ac3557b523521a6bee44c7e8d949309e7dd9b0d0364edd2e85e9": {
-    "query": "INSERT INTO eth_parameters (nonce, gas_price_limit, commit_ops, verify_ops, withdraw_ops)\n                VALUES ($1, $2, $3, $4, $5)",
-    "describe": {
-      "columns": [],
-      "parameters": {
-        "Left": [
-          "Int8",
-          "Int8",
-          "Int8",
-          "Int8",
-          "Int8"
-        ]
       },
       "nullable": []
     }
