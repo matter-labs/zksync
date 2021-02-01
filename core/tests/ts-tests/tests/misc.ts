@@ -231,14 +231,8 @@ Tester.prototype.testBackwardCompatibleEthMessages = async function (
     // Both wallets sign it.
     const ethSignatures = [await to.getEthMessageSignature(message), await from.getEthMessageSignature(message)];
 
-    const senderBefore = await from.getBalance(token);
-    const receiverBefore = await to.getBalance(token);
     const handles = await submitSignedTransactionsBatch(to.provider, batch, ethSignatures);
-    await Promise.all(handles.map((handle) => handle.awaitVerifyReceipt()));
-    const senderAfter = await from.getBalance(token);
-    const receiverAfter = await to.getBalance(token);
-
-    expect(senderBefore.sub(senderAfter).eq(amount.add(totalFee)), 'Transfer failed').to.be.true;
-    expect(receiverBefore.sub(receiverAfter).eq(amount), 'Withdraw failed').to.be.true;
+    // We only expect that API doesn't reject this batch due to Eth signature error.
+    await Promise.all(handles.map((handle) => handle.awaitReceipt()));
     this.runningFee = this.runningFee.add(totalFee);
 };
