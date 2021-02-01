@@ -184,6 +184,21 @@ impl ZkSyncTx {
         }
     }
 
+    /// Returns a message that user has to sign to send the transaction in the old format.
+    /// If the transaction doesn't need a message signature, returns `None`.
+    /// Needed for backwards compatibility.
+    pub fn get_old_ethereum_sign_message(&self, token: Token) -> Option<String> {
+        match self {
+            ZkSyncTx::Transfer(tx) => {
+                Some(tx.get_old_ethereum_sign_message(&token.symbol, token.decimals))
+            }
+            ZkSyncTx::Withdraw(tx) => {
+                Some(tx.get_old_ethereum_sign_message(&token.symbol, token.decimals))
+            }
+            _ => None,
+        }
+    }
+
     /// Returns the corresponding part of the batch message user has to sign in order
     /// to send it. In this case we handle `ChangePubKey` on the server side and
     /// expect a line in the message for it.

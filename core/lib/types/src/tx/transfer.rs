@@ -14,7 +14,7 @@ use serde::{Deserialize, Serialize};
 use zksync_basic_types::Address;
 use zksync_crypto::franklin_crypto::eddsa::PrivateKey;
 use zksync_crypto::params::{max_account_id, max_token_id};
-use zksync_utils::BigUintSerdeAsRadix10Str;
+use zksync_utils::{format_units, BigUintSerdeAsRadix10Str};
 
 use super::{TxSignature, VerifiedSignatureCache};
 
@@ -188,5 +188,23 @@ impl Transfer {
         }
         message.push_str(format!("Nonce: {}", self.nonce).as_str());
         message
+    }
+
+    /// Returns an old-format message that should be signed by Ethereum account key.
+    /// Needed for backwards compatibility.
+    pub fn get_old_ethereum_sign_message(&self, token_symbol: &str, decimals: u8) -> String {
+        format!(
+            "Transfer {amount} {token}\n\
+            To: {to:?}\n\
+            Nonce: {nonce}\n\
+            Fee: {fee} {token}\n\
+            Account Id: {account_id}",
+            amount = format_units(&self.amount, decimals),
+            token = token_symbol,
+            to = self.to,
+            nonce = self.nonce,
+            fee = format_units(&self.fee, decimals),
+            account_id = self.account_id,
+        )
     }
 }

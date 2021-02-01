@@ -111,12 +111,19 @@ export class Provider {
     // return transaction hash (e.g. sync-tx:dead..beef)
     async submitTxsBatch(
         transactions: { tx: any; signature?: TxEthSignature }[],
-        ethSignatures?: TxEthSignature[]
+        ethSignatures?: TxEthSignature | TxEthSignature[]
     ): Promise<string[]> {
-        return await this.transport.request('submit_txs_batch', [
-            transactions,
-            ethSignatures == undefined ? [] : ethSignatures
-        ]);
+        let signatures: TxEthSignature[] = [];
+        // For backwards compatibility we allow sending single signature as well
+        // as no signatures at all.
+        if (ethSignatures == undefined) {
+            signatures = [];
+        } else if (ethSignatures instanceof Array) {
+            signatures = ethSignatures;
+        } else {
+            signatures.push(ethSignatures);
+        }
+        return await this.transport.request('submit_txs_batch', [transactions, signatures]);
     }
 
     async getContractAddress(): Promise<ContractAddress> {

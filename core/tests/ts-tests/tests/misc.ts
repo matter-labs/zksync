@@ -4,7 +4,7 @@ import { Wallet, types } from 'zksync';
 import { BigNumber, ethers } from 'ethers';
 import { SignedTransaction, TxEthSignature } from 'zksync/build/types';
 import { submitSignedTransactionsBatch } from 'zksync/build/wallet';
-import { MAX_TIMESTAMP } from 'zksync/build/utils';
+import { MAX_TIMESTAMP, serializeTx } from 'zksync/build/utils';
 
 type TokenLike = types.TokenLike;
 
@@ -13,6 +13,7 @@ declare module './tester' {
         testWrongSignature(from: Wallet, to: Wallet, token: TokenLike, amount: BigNumber): Promise<void>;
         testMultipleBatchSigners(wallets: Wallet[], token: TokenLike, amount: BigNumber): Promise<void>;
         testMultipleWalletsWrongSignature(from: Wallet, to: Wallet, token: TokenLike, amount: BigNumber): Promise<void>;
+        testBackwardCompatibleEthMessages(from: Wallet, to: Wallet, token: TokenLike, amount: BigNumber): Promise<void>;
     }
 }
 
@@ -159,4 +160,79 @@ Tester.prototype.testMultipleWalletsWrongSignature = async function (
         expect(e.jrpcError.message).to.equal('Eth signature is incorrect');
     }
     expect(thrown, 'Sending batch with incorrect ETH signature must throw').to.be.true;
+};
+
+// Checks that old formatted 2FA messages are supported.
+// The first transaction in a batch is a transfer, the second is a withdraw.
+// Signed by both senders.
+Tester.prototype.testBackwardCompatibleEthMessages = async function (
+    from: Wallet,
+    to: Wallet,
+    token: TokenLike,
+    amount: BigNumber
+) {
+    const totalFee = await this.syncProvider.getTransactionsBatchFee(
+        ['Transfer', 'Withdraw'],
+        [to.address(), to.address()],
+        token
+    );
+    // Transfer
+    const transferNonce = await from.getNonce();
+    const _transfer = {
+        to: to.address(),
+        token,
+        amount,
+        fee: totalFee,
+        nonce: transferNonce,
+        validFrom: 0,
+        validUntil: MAX_TIMESTAMP
+    };
+    const transfer = await from.getTransfer(_transfer);
+    // Resolve all the information needed for human-readable message.
+    const stringAmount = from.provider.tokenSet.formatToken(_transfer.token, transfer.amount);
+    let stringFee = from.provider.tokenSet.formatToken(_transfer.token, transfer.fee);
+    const stringToken = from.provider.tokenSet.resolveTokenSymbol(_transfer.token);
+    const transferMessage =
+        `Transfer ${stringAmount} ${stringToken}\n` +
+        `To: ${transfer.to.toLowerCase()}\n` +
+        `Nonce: ${transfer.nonce}\n` +
+        `Fee: ${stringFee} ${stringToken}\n` +
+        `Account Id: ${transfer.accountId}`;
+    const signedTransfer = { tx: transfer, ethereumSignature: await from.getEthMessageSignature(transferMessage) }; // Transfer
+
+    // Withdraw
+    const nonce = await to.getNonce();
+    const _withdraw = {
+        ethAddress: to.address(),
+        token,
+        amount,
+        fee: 0,
+        nonce,
+        validFrom: 0,
+        validUntil: MAX_TIMESTAMP
+    };
+    const withdraw = await to.getWithdrawFromSyncToEthereum(_withdraw);
+    stringFee = from.provider.tokenSet.formatToken(_transfer.token, 0);
+    const withdrawMessage =
+        `Withdraw ${stringAmount} ${stringToken}\n` +
+        `To: ${_withdraw.ethAddress.toLowerCase()}\n` +
+        `Nonce: ${withdraw.nonce}\n` +
+        `Fee: ${stringFee} ${stringToken}\n` +
+        `Account Id: ${withdraw.accountId}`;
+    const signedWithdraw = { tx: withdraw, ethereumSignature: await to.getEthMessageSignature(withdrawMessage) }; // Withdraw
+
+    const batch = [signedTransfer, signedWithdraw];
+    // The message is keccak256(batchBytes).
+    // Transactions are serialized in the new format, the server will take this into account.
+    const batchBytes = ethers.utils.concat(batch.map((signedTx) => serializeTx(signedTx.tx)));
+    const batchHash = ethers.utils.keccak256(batchBytes).slice(2);
+    const message = Uint8Array.from(Buffer.from(batchHash, 'hex'));
+
+    // Both wallets sign it.
+    const ethSignatures = [await to.getEthMessageSignature(message), await from.getEthMessageSignature(message)];
+
+    const handles = await submitSignedTransactionsBatch(to.provider, batch, ethSignatures);
+    // We only expect that API doesn't reject this batch due to Eth signature error.
+    await Promise.all(handles.map((handle) => handle.awaitVerifyReceipt()));
+    this.runningFee = this.runningFee.add(totalFee);
 };
