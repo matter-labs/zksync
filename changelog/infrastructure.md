@@ -11,6 +11,16 @@ components, the logs will have the following format:
 
 ### Removed
 
+### Changed
+
+### Added
+
+### Fixed
+
+## Release 2021-02-02
+
+### Removed
+
 - (`explorer`): 'localStorage' caching. It fixed the bug when the block have not updated the "Initiated" status.
 
 ### Changed
