@@ -183,7 +183,7 @@ async fn ethereum_storage(mut storage: StorageProcessor<'_>) -> QueryResult<()> 
     // Check that stats are updated as well.
     let updated_stats = EthereumSchema(&mut storage).load_stats().await?;
 
-    assert_eq!(updated_stats.last_committed_block, 2);
+    assert_eq!(updated_stats.last_committed_block, 1);
     assert_eq!(updated_stats.last_verified_block, 0);
     assert_eq!(updated_stats.last_executed_block, 0);
 
@@ -233,27 +233,36 @@ async fn ethereum_unprocessed(mut storage: StorageProcessor<'_>) -> QueryResult<
             BLOCK_SIZE_CHUNKS,
         ))
         .await?;
-    let operation = OperationsSchema(&mut storage)
+    let commit_operation = OperationsSchema(&mut storage)
         .get_aggregated_op_that_affects_block(AggregatedActionType::CommitBlocks, block_number)
         .await?;
     OperationsSchema(&mut storage)
         .store_aggregated_action(gen_unique_aggregated_operation(
             block_number,
-            AggregatedActionType::CreateProofBlocks,
+            AggregatedActionType::PublishProofBlocksOnchain,
             BLOCK_SIZE_CHUNKS,
         ))
         .await?;
     let verify_operation = OperationsSchema(&mut storage)
-        .get_aggregated_op_that_affects_block(AggregatedActionType::CommitBlocks, block_number)
+        .get_aggregated_op_that_affects_block(
+            AggregatedActionType::PublishProofBlocksOnchain,
+            block_number,
+        )
         .await?;
 
     // Now there must be one unprocessed operation.
     let unprocessed_operations = EthereumSchema(&mut storage)
         .load_unprocessed_operations()
         .await?;
-    assert_eq!(unprocessed_operations.len(), 1);
-    // assert_eq!(unprocessed_operations[0].id, operation.id);
-    // assert_eq!(unprocessed_operations[1].id, verify_operation.id);
+    assert_eq!(unprocessed_operations.len(), 2);
+    assert_eq!(
+        unprocessed_operations[0].0,
+        commit_operation.as_ref().unwrap().0
+    );
+    assert_eq!(
+        unprocessed_operations[1].0,
+        verify_operation.as_ref().unwrap().0
+    );
 
     // Check that it's not currently returned by `load_unconfirmed_operations`.
     let unconfirmed_operations = EthereumSchema(&mut storage)
@@ -262,7 +271,7 @@ async fn ethereum_unprocessed(mut storage: StorageProcessor<'_>) -> QueryResult<
     assert!(unconfirmed_operations.is_empty());
 
     // Store the Ethereum transaction.
-    let params = EthereumTxParams::new("CommitBlocks".into(), operation.clone());
+    let params = EthereumTxParams::new("CommitBlocks".into(), commit_operation.clone());
     let response = EthereumSchema(&mut storage)
         .save_new_eth_tx(
             AggregatedActionType::CommitBlocks,
@@ -289,17 +298,41 @@ async fn ethereum_unprocessed(mut storage: StorageProcessor<'_>) -> QueryResult<
         params.to_eth_op(eth_op.id, response.nonce.low_u64())
     );
 
-    // After we created an ETHOperation for the operation, there must be no unprocessed operations.
+    // After we created an ETHOperation for the operation, the number of unprocessed operations should not change.
+    let unprocessed_operations = EthereumSchema(&mut storage)
+        .load_unprocessed_operations()
+        .await?;
+    assert_eq!(unprocessed_operations.len(), 2);
+    assert_eq!(
+        unprocessed_operations[0].0,
+        commit_operation.as_ref().unwrap().0
+    );
+    assert_eq!(
+        unprocessed_operations[1].0,
+        verify_operation.as_ref().unwrap().0
+    );
+
+    // let's mark the operations as successful processed.
+    // So that next time you do not add them to the queue again.
+    let operations_id = unprocessed_operations
+        .iter()
+        .map(|(id, _)| *id)
+        .collect::<Vec<_>>();
+    EthereumSchema(&mut storage)
+        .remove_unprocessed_operations(operations_id)
+        .await?;
+
+    // Check that unprocessed operations have been deleted.
     let unprocessed_operations = EthereumSchema(&mut storage)
         .load_unprocessed_operations()
         .await?;
     assert_eq!(unprocessed_operations.len(), 0);
-    // assert_eq!(unprocessed_operations[0].id, verify_operation.id);
 
-    let verify_params = EthereumTxParams::new("CreateProofBlocks".into(), verify_operation.clone());
+    let verify_params =
+        EthereumTxParams::new("PublishProofBlocksOnchain".into(), verify_operation.clone());
     let response = EthereumSchema(&mut storage)
         .save_new_eth_tx(
-            AggregatedActionType::CreateProofBlocks,
+            AggregatedActionType::PublishProofBlocksOnchain,
             verify_params.op,
             verify_params.deadline_block as i64,
             verify_params.gas_price.clone(),
