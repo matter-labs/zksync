@@ -28,6 +28,7 @@ All notable changes to the core components will be documented in this file.
 - (`storage`): `action_type` column type in db is changed from `text` to `enum` for optimization.
 - (`FeeTicker`): Increased gas price estimate for transaction.
 - (`loadtest`): Scenario execution was made parallel.
+- Increased completeWithdrawal gas limit, that decreased the chance of the users to face the out-of-gas error
 
 ### Added
 

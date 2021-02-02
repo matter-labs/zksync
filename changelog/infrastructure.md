@@ -25,15 +25,17 @@ components, the logs will have the following format:
 
 ### Changed
 
-- (`explorer`): Deposits from and withdrawals to an L1 account with the same address are not displayed on the account
-  history page.
+- (`explorer`): Deposits from and withdrawals to an L1 account are only displayed in the history of operation initiator.
 
 ### Added
+
+- (`explorer`): `completeWithdrawals` tx hash was added to the explorer.
 
 ### Fixed
 
 - (`explorer`): Bug with not displaying old blocks was fixed.
-- (`explorer`): bug with updating transaction data after searching another transaction was fixed.
+- (`explorer`): Bug with updating transaction data after searching another transaction was fixed.
+- (`explorer`): Fixed processing of transactions with different prefixes.
 
 ## Release 2021-01-12
 
