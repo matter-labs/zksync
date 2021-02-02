@@ -97,6 +97,10 @@ impl ApiV01 {
                 "/withdrawal_processing_time",
                 web::get().to(Self::withdrawal_processing_time),
             )
+            .route(
+                "/forced_exit/enabled",
+                web::get().to(Self::is_forced_exit_enabled),
+            )
     }
 
     pub(crate) async fn access_storage(&self) -> ActixResult<StorageProcessor<'_>> {

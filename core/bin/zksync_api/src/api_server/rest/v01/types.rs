@@ -39,3 +39,7 @@ pub struct HandleBlocksQuery {
 pub struct BlockExplorerSearchQuery {
     pub query: String,
 }
+#[derive(Serialize, Deserialize)]
+pub struct IsForcedExitEnabledResponse {
+    pub enabled: bool,
+}

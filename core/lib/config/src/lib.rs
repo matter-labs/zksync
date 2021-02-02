@@ -2,7 +2,7 @@ use serde::Deserialize;
 
 pub use crate::configs::{
     ApiConfig, ChainConfig, ContractsConfig, DBConfig, ETHClientConfig, ETHSenderConfig,
-    ETHWatchConfig, MiscConfig, ProverConfig, TickerConfig,
+    ETHWatchConfig, ForcedExitRequestsConfig, MiscConfig, ProverConfig, TickerConfig,
 };
 
 pub mod configs;
@@ -19,6 +19,7 @@ pub struct ZkSyncConfig {
     pub eth_watch: ETHWatchConfig,
     pub prover: ProverConfig,
     pub ticker: TickerConfig,
+    pub forced_exit_requests: ForcedExitRequestsConfig,
 }
 
 impl ZkSyncConfig {
@@ -33,6 +34,7 @@ impl ZkSyncConfig {
             eth_watch: ETHWatchConfig::from_env(),
             prover: ProverConfig::from_env(),
             ticker: TickerConfig::from_env(),
+            forced_exit_requests: ForcedExitRequestsConfig::from_env(),
         }
     }
 }

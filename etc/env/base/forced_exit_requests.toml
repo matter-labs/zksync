@@ -1,0 +1,3 @@
+# Options for L1-based ForcedExit utility
+[forced_exit_requests]
+enabled=true

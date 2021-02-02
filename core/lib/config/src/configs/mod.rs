@@ -2,7 +2,8 @@
 pub use self::{
     api::ApiConfig, chain::ChainConfig, contracts::ContractsConfig, db::DBConfig,
     eth_client::ETHClientConfig, eth_sender::ETHSenderConfig, eth_watch::ETHWatchConfig,
-    misc::MiscConfig, prover::ProverConfig, ticker::TickerConfig,
+    forced_exit_requests::ForcedExitRequestsConfig, misc::MiscConfig, prover::ProverConfig,
+    ticker::TickerConfig,
 };
 
 pub mod api;
@@ -12,6 +13,7 @@ pub mod db;
 pub mod eth_client;
 pub mod eth_sender;
 pub mod eth_watch;
+pub mod forced_exit_requests;
 pub mod misc;
 pub mod prover;
 pub mod ticker;

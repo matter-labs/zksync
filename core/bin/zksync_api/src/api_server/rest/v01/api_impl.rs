@@ -492,4 +492,16 @@ impl ApiV01 {
         metrics::histogram!("api.v01.withdrawal_processing_time", start.elapsed());
         ok_json!(processing_time)
     }
+
+    pub async fn is_forced_exit_enabled(self_: web::Data<Self>) -> ActixResult<HttpResponse> {
+        let start = Instant::now();
+
+        let is_enabled = self_.config.forced_exit_requests.enabled;
+        let response = IsForcedExitEnabledResponse {
+            enabled: is_enabled,
+        };
+
+        metrics::histogram!("api.v01.is_forced_exit_enabled", start.elapsed());
+        ok_json!(response)
+    }
 }
