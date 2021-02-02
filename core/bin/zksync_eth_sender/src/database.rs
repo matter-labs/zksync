@@ -217,11 +217,15 @@ impl DatabaseInterface for Database {
         connection: &mut StorageProcessor<'_>,
         op: &ETHOperation,
     ) -> anyhow::Result<bool> {
-        let previous_op = op.id - 1;
-        if previous_op <= 0 {
+        // If the ID of the current operation is 1, then this is the first transaction
+        // and it is not needed for checking confirmation.
+        if op.id == 1 {
             return Ok(true);
         }
 
+        // Since the operations are sent to the Ethereum one by one,
+        // we simply consider the operation with ID less by one.
+        let previous_op = op.id - 1;
         let confirmed = connection
             .ethereum_schema()
             .is_aggregated_op_confirmed(previous_op)
@@ -248,6 +252,18 @@ impl DatabaseInterface for Database {
                         first_block,
                         last_block,
                         AggregatedActionType::CommitBlocks,
+                    )
+                    .await?;
+            }
+            Some((_, AggregatedOperation::PublishProofBlocksOnchain(op))) => {
+                let (first_block, last_block) = op.block_range();
+                transaction
+                    .chain()
+                    .operations_schema()
+                    .confirm_aggregated_operations(
+                        first_block,
+                        last_block,
+                        AggregatedActionType::PublishProofBlocksOnchain,
                     )
                     .await?;
             }
