@@ -255,7 +255,7 @@ fn test_ticker_formula() {
                 ticker.get_batch_from_ticker_in_wei(token.clone(), vec![(tx_type, address)]),
             )
             .expect("failed to get batched fee for token");
-            assert_eq!(fee_in_token.total_fee, batched_fee_in_token);
+            assert_eq!(fee_in_token.total_fee, batched_fee_in_token.total_fee);
 
             // Fee in usd
             (block_on(MockApiProvider.get_last_quote(token))

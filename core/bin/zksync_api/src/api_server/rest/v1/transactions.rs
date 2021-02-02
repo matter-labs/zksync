@@ -10,17 +10,17 @@ use actix_web::{
 
 // Workspace uses
 pub use zksync_api_client::rest::v1::{
-    FastProcessingQuery, IncomingTx, IncomingTxBatch, Receipt, TxData,
+    FastProcessingQuery, IncomingTx, IncomingTxBatch, IncomingTxBatchForFee, IncomingTxForFee,
+    Receipt, TxData,
 };
 use zksync_storage::{
     chain::operations_ext::records::TxReceiptResponse, QueryResult, StorageProcessor,
 };
-use zksync_types::{tx::TxHash, BlockNumber, SignedZkSyncTx};
-
-use crate::api_server::tx_sender::{SubmitError, TxSender};
+use zksync_types::{tx::TxHash, BatchFee, BlockNumber, Fee, SignedZkSyncTx};
 
 // Local uses
 use super::{ApiError, JsonResult, Pagination, PaginationQuery};
+use crate::api_server::tx_sender::{SubmitError, TxSender};
 
 #[derive(Debug, Clone, Copy)]
 pub enum SumbitErrorCode {
@@ -263,6 +263,35 @@ async fn submit_tx_batch(
     Ok(Json(tx_hashes))
 }
 
+async fn get_txs_fee_in_wei(
+    data: web::Data<ApiTransactionsData>,
+    Json(body): Json<IncomingTxForFee>,
+) -> JsonResult<Fee> {
+    let fee = data
+        .tx_sender
+        .get_txs_fee_in_wei(body.tx_type, body.address, body.token_like)
+        .await?;
+    Ok(Json(fee))
+}
+
+async fn get_txs_batch_fee_in_wei(
+    data: web::Data<ApiTransactionsData>,
+    Json(body): Json<IncomingTxBatchForFee>,
+) -> JsonResult<BatchFee> {
+    let txs = body
+        .tx_types
+        .into_iter()
+        .zip(body.addresses.into_iter())
+        .collect();
+    let fee = data
+        .tx_sender
+        .get_txs_batch_fee_in_wei(txs, body.token_like)
+        .await
+        .map_err(ApiError::from)?;
+
+    Ok(Json(fee))
+}
+
 pub fn api_scope(tx_sender: TxSender) -> Scope {
     let data = ApiTransactionsData::new(tx_sender);
 
@@ -277,14 +306,17 @@ pub fn api_scope(tx_sender: TxSender) -> Scope {
         .route("{tx_hash}/receipts", web::get().to(tx_receipts))
         .route("submit", web::post().to(submit_tx))
         .route("submit/batch", web::post().to(submit_tx_batch))
+        .route("fee/batch", web::post().to(get_txs_batch_fee_in_wei))
+        .route("fee", web::post().to(get_txs_fee_in_wei))
 }
 
 #[cfg(test)]
 mod tests {
     use actix_web::App;
     use bigdecimal::BigDecimal;
+    use ethabi::Address;
     use futures::{channel::mpsc, StreamExt};
-    use num::BigUint;
+    use num::{BigUint, Zero};
 
     use zksync_api_client::rest::v1::Client;
     use zksync_storage::ConnectionPool;
@@ -292,13 +324,15 @@ mod tests {
     use zksync_types::{
         tokens::TokenLike,
         tx::{PackedEthSignature, TxEthSignature},
-        AccountId, BlockNumber, Nonce, TokenId, ZkSyncTx,
+        AccountId, BlockNumber, Fee, Nonce,
+        OutputFeeType::Withdraw,
+        TokenId, TxFeeTypes, ZkSyncTx,
     };
 
     use crate::{
         api_server::helpers::try_parse_tx_hash,
         core_api_client::CoreApiClient,
-        fee_ticker::{Fee, OutputFeeType::Withdraw, TickerRequest},
+        fee_ticker::TickerRequest,
         signature_checker::{VerifiedTx, VerifyTxSignatureRequest},
     };
 
@@ -363,9 +397,11 @@ mod tests {
                         transactions,
                         ..
                     } => {
-                        let price = Ok(BigUint::from(transactions.len()));
+                        let fee = BatchFee {
+                            total_fee: BigUint::from(transactions.len()),
+                        };
 
-                        response.send(price).expect("Unable to send response");
+                        response.send(Ok(fee)).expect("Unable to send response");
                     }
                 }
             }
@@ -472,6 +508,23 @@ mod tests {
             try_parse_tx_hash(&transactions[0].tx_hash).unwrap()
         };
 
+        let fee = client
+            .get_txs_fee(
+                TxFeeTypes::Withdraw,
+                Address::random(),
+                TokenLike::Id(TokenId(0)),
+            )
+            .await?;
+        assert_ne!(fee.total_fee, BigUint::zero());
+
+        let fee = client
+            .get_batched_txs_fee(
+                vec![TxFeeTypes::Withdraw, TxFeeTypes::Transfer],
+                vec![Address::random(), Address::random()],
+                TokenLike::Id(TokenId(0)),
+            )
+            .await?;
+        assert_ne!(fee.total_fee, BigUint::zero());
         // Tx receipt by ID.
         let unknown_tx_hash = TxHash::default();
         assert!(client

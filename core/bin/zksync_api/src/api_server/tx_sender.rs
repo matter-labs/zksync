@@ -10,7 +10,7 @@ use futures::{
     channel::{mpsc, oneshot},
     prelude::*,
 };
-use num::bigint::ToBigInt;
+use num::{bigint::ToBigInt, BigUint, Zero};
 use thiserror::Error;
 
 // Workspace uses
@@ -19,18 +19,17 @@ use zksync_storage::ConnectionPool;
 use zksync_types::{
     tx::EthSignData,
     tx::{SignedZkSyncTx, TxEthSignature, TxHash},
-    Address, Token, TokenId, TokenLike, TxFeeTypes, ZkSyncTx,
+    Address, BatchFee, Fee, Token, TokenId, TokenLike, TxFeeTypes, ZkSyncTx,
 };
 
 // Local uses
 use crate::{
     core_api_client::CoreApiClient,
-    fee_ticker::{Fee, TickerRequest, TokenPriceRequestType},
+    fee_ticker::{TickerRequest, TokenPriceRequestType},
     signature_checker::{TxVariant, VerifiedTx, VerifyTxSignatureRequest},
     tx_error::TxAddError,
     utils::token_db_cache::TokenDBCache,
 };
-use num::{BigUint, Zero};
 
 #[derive(Clone)]
 pub struct TxSender {
@@ -295,7 +294,7 @@ impl TxSender {
         .await?;
 
         let required_total_usd_fee =
-            BigDecimal::from(required_eth_fee.to_bigint().unwrap()) * &eth_price_in_usd;
+            BigDecimal::from(required_eth_fee.total_fee.to_bigint().unwrap()) * &eth_price_in_usd;
 
         // Scaling the fee required since the price may change between signing the transaction and sending it to the server.
         let scaled_provided_fee_in_usd = scale_user_fee_up(provided_total_usd_fee.clone());
@@ -337,6 +336,23 @@ impl TxSender {
             .map_err(SubmitError::TxAdd)?;
 
         Ok(tx_hashes)
+    }
+
+    pub async fn get_txs_fee_in_wei(
+        &self,
+        tx_type: TxFeeTypes,
+        address: Address,
+        token: TokenLike,
+    ) -> Result<Fee, SubmitError> {
+        Self::ticker_request(self.ticker_requests.clone(), tx_type, address, token).await
+    }
+
+    pub async fn get_txs_batch_fee_in_wei(
+        &self,
+        transactions: Vec<(TxFeeTypes, Address)>,
+        token: TokenLike,
+    ) -> Result<BatchFee, SubmitError> {
+        Self::ticker_batch_fee_request(self.ticker_requests.clone(), transactions, token).await
     }
 
     /// For forced exits, we must check that target account exists for more
@@ -423,7 +439,7 @@ impl TxSender {
         mut ticker_request_sender: mpsc::Sender<TickerRequest>,
         transactions: Vec<(TxFeeTypes, Address)>,
         token: TokenLike,
-    ) -> Result<BigUint, SubmitError> {
+    ) -> Result<BatchFee, SubmitError> {
         let req = oneshot::channel();
         ticker_request_sender
             .send(TickerRequest::GetBatchTxFee {

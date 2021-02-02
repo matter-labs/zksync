@@ -5,16 +5,12 @@ use bigdecimal::BigDecimal;
 use jsonrpc_core::{Error, Result};
 // Workspace uses
 use zksync_types::{
-    helpers::closest_packable_fee_amount,
     tx::{TxEthSignature, TxHash},
-    Address, Token, TokenLike, TxFeeTypes, ZkSyncTx,
+    Address, BatchFee, Fee, Token, TokenLike, TxFeeTypes, ZkSyncTx,
 };
 
 // Local uses
-use crate::{
-    api_server::tx_sender::SubmitError,
-    fee_ticker::{BatchFee, Fee, TokenPriceRequestType},
-};
+use crate::{api_server::tx_sender::SubmitError, fee_ticker::TokenPriceRequestType};
 
 use super::{error::*, types::*, RpcApp};
 
@@ -31,12 +27,6 @@ impl RpcApp {
             depositing_ops,
         )
         .await?;
-
-        vlog::debug!(
-            "account_info: address {}, total request processing {}ms",
-            &address,
-            start.elapsed().as_millis()
-        );
 
         metrics::histogram!("api.rpc.account_info", start.elapsed());
         Ok(AccountInfoResp {
@@ -245,14 +235,10 @@ impl RpcApp {
 
         let transactions: Vec<(TxFeeTypes, Address)> =
             (tx_types.iter().cloned().zip(addresses.iter().cloned())).collect();
-        let mut total_fee =
-            Self::ticker_batch_fee_request(ticker, transactions, token.clone()).await?;
-
-        // Sum of transactions can be unpackable
-        total_fee = closest_packable_fee_amount(&total_fee);
+        let total_fee = Self::ticker_batch_fee_request(ticker, transactions, token.clone()).await?;
 
         metrics::histogram!("api.rpc.get_txs_batch_fee_in_wei", start.elapsed());
-        Ok(BatchFee { total_fee })
+        Ok(total_fee)
     }
 
     pub async fn _impl_get_token_price(self, token: TokenLike) -> Result<BigDecimal> {

@@ -40,6 +40,7 @@ pub mod account;
 pub mod block;
 pub mod config;
 pub mod ethereum;
+pub mod fee;
 pub mod gas_counter;
 pub mod helpers;
 pub mod mempool;
@@ -55,6 +56,7 @@ mod tests;
 
 pub use self::account::{Account, AccountUpdate, PubKeyHash};
 pub use self::block::{ExecutedOperations, ExecutedPriorityOp, ExecutedTx};
+pub use self::fee::{BatchFee, Fee, OutputFeeType};
 pub use self::operations::{
     ChangePubKeyOp, DepositOp, ForcedExitOp, FullExitOp, TransferOp, TransferToNewOp, WithdrawOp,
     ZkSyncOp,

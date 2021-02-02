@@ -9,6 +9,10 @@ components, the logs will have the following format:
 
 ## Unreleased
 
+### Removed
+
+- 'localStorage' caching, it fixed the bug, when entire block be "Initiated" for more than a day.
+
 ### Changed
 
 - (`explorer`): Deposits from and withdrawals to an L1 account with the same address are not displayed on the account
@@ -18,6 +22,7 @@ components, the logs will have the following format:
 
 ### Fixed
 
+- (`explorer`): Bug with not displaying old blocks was fixed.
 - (`explorer`): bug with updating transaction data after searching another transaction was fixed.
 
 ## Release 2021-01-12
