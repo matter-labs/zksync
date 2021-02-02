@@ -15,15 +15,16 @@ components, the logs will have the following format:
 
 ### Changed
 
-- (`explorer`): Deposits from and withdrawals to an L1 account with the same address are not displayed on the account
+- (`explorer`): deposits from and withdrawals to an L1 account with the same address are not displayed on the account
   history page.
 
 ### Added
 
 ### Fixed
 
-- (`explorer`): Bug with not displaying old blocks was fixed.
+- (`explorer`): bug with not displaying old blocks was fixed.
 - (`explorer`): bug with updating transaction data after searching another transaction was fixed.
+- (`explorer`): bug with not displaying some deposits and withdrawals for the accounts was fixed by not taking account address case into account.
 
 ## Release 2021-01-12
 
