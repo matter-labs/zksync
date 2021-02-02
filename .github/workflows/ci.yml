@@ -34,7 +34,9 @@ jobs:
         run: |
           ci_run zk
           ci_run zk fmt --check
-          ci_run zk lint --check
+          ci_run zk lint rust --check
+          ci_run zk lint js --check
+          ci_run zk lint md --check
 
   unit-tests:
     runs-on: [self-hosted, CI-worker]
@@ -58,7 +60,7 @@ jobs:
           ci_run ln -s /usr/src/keys/setup keys/setup
           ci_run zk
           ci_run zk run verify-keys unpack
-          ci_run zk contract build-dev
+          ci_run zk contract build
           ci_run zk run deploy-erc20 dev
           ci_run zk run deploy-eip1271
           ci_run zk db basic-setup
@@ -145,7 +147,7 @@ jobs:
           ci_run ln -s /usr/src/keys/setup keys/setup
           ci_run zk
           ci_run zk run verify-keys unpack
-          ci_run zk contract build-dev
+          ci_run zk contract build
 
       - name: integration-testkit
         run: ci_run zk test integration testkit --offline
