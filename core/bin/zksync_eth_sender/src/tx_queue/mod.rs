@@ -1,8 +1,7 @@
 // Workspace imports
 use zksync_types::{
     aggregated_operations::{AggregatedActionType, AggregatedOperation},
-    ethereum::OperationType,
-    BlockNumber, Operation,
+    BlockNumber,
 };
 // External uses
 use anyhow::format_err;
@@ -276,7 +275,6 @@ impl TxQueue {
 mod tests {
     use super::*;
     use zksync_storage::test_data::{gen_unique_aggregated_operation, BLOCK_SIZE_CHUNKS};
-    use zksync_types::{block::Block, Action};
 
     fn get_tx_data(
         operation_type: AggregatedActionType,

@@ -171,7 +171,7 @@ pub fn gen_unique_aggregated_operation_with_txs(
 ) -> AggregatedOperation {
     let block = gen_sample_block(block_number, block_chunks_size, txs);
 
-    let result = match action {
+    match action {
         AggregatedActionType::CommitBlocks => {
             AggregatedOperation::CommitBlocks(BlocksCommitOperation {
                 last_committed_block: block.clone(),
@@ -195,7 +195,5 @@ pub fn gen_unique_aggregated_operation_with_txs(
                 blocks: vec![block],
             })
         }
-    };
-
-    result
+    }
 }
