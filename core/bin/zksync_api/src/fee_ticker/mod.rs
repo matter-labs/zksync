@@ -212,7 +212,7 @@ pub fn run_ticker_task(
             let token_price_api =
                 CoinMarketCapAPI::new(client, base_url.parse().expect("Correct CoinMarketCap url"));
 
-            let ticker_api = TickerApi::new(db_pool.clone(), token_price_api);
+            let ticker_api = TickerApi::new(db_pool, token_price_api);
             let fee_ticker = FeeTicker::new(ticker_api, tricker_requests, ticker_config, validator);
 
             tokio::spawn(fee_ticker.run())

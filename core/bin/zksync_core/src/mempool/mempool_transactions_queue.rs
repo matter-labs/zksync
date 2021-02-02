@@ -74,7 +74,7 @@ impl MempoolTransactionsQueue {
             let mut ready_pending_transactions = Vec::new();
 
             while let Some(pending_tx) = self.pending_txs.peek() {
-                if u64::from(pending_tx.valid_from) <= block_timestamp {
+                if pending_tx.valid_from <= block_timestamp {
                     ready_pending_transactions.push(pending_tx.tx.clone());
                     self.pending_txs.pop();
                 } else {

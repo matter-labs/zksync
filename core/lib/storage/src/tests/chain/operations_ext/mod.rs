@@ -2,7 +2,7 @@
 use std::collections::HashMap;
 // External imports
 // Workspace imports
-use zksync_types::{aggregated_operations::AggregatedActionType, BlockNumber};
+use zksync_types::aggregated_operations::AggregatedActionType;
 // Local imports
 use self::setup::TransactionsHistoryTestSetup;
 use crate::{
@@ -81,7 +81,7 @@ async fn update_blocks_status(mut storage: &mut StorageProcessor<'_>) -> QueryRe
         ))
         .await?;
     let (id, aggregated_op) = OperationsSchema(&mut storage)
-        .get_aggregated_op_that_affects_block(AggregatedActionType::CommitBlocks, 1 as BlockNumber)
+        .get_aggregated_op_that_affects_block(AggregatedActionType::CommitBlocks, 1_u32)
         .await?
         .unwrap();
     storage
@@ -105,7 +105,7 @@ async fn update_blocks_status(mut storage: &mut StorageProcessor<'_>) -> QueryRe
         ))
         .await?;
     let (id, op) = OperationsSchema(&mut storage)
-        .get_aggregated_op_that_affects_block(AggregatedActionType::ExecuteBlocks, 1 as BlockNumber)
+        .get_aggregated_op_that_affects_block(AggregatedActionType::ExecuteBlocks, 1_u32)
         .await?
         .unwrap();
     confirm_eth_op(storage, (id, op), AggregatedActionType::ExecuteBlocks).await?;

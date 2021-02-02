@@ -223,7 +223,7 @@ pub fn calculate_and_print_max_zksync_main_circuit_size() {
                 gate_count
             );
             setup_power += 1;
-            chunks = chunks * 2;
+            chunks *= 2;
         }
     }
 }

@@ -18,7 +18,7 @@ use zksync_storage::{
 use zksync_types::{tx::TxHash, BlockNumber, SignedZkSyncTx};
 
 // Local uses
-use super::{Client, ClientError, Error as ApiError, JsonResult, Pagination, PaginationQuery};
+use super::{Error as ApiError, JsonResult, Pagination, PaginationQuery};
 use crate::api_server::rpc_server::types::TxWithSignature;
 use crate::api_server::tx_sender::{SubmitError, TxSender};
 

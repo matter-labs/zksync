@@ -955,16 +955,14 @@ mod execute_proposed_block {
         .unwrap();
 
         let mut premature_transfer = correct_transfer.clone();
-        premature_transfer
-            .time_range
-            .as_mut()
-            .map(|t| t.valid_from = u64::max_value());
+        if let Some(time_range) = premature_transfer.time_range.as_mut() {
+            time_range.valid_from = u64::max_value();
+        }
 
         let mut belated_transfer = correct_transfer.clone();
-        belated_transfer
-            .time_range
-            .as_mut()
-            .map(|t| t.valid_until = 0);
+        if let Some(time_range) = belated_transfer.time_range.as_mut() {
+            time_range.valid_until = 0;
+        }
 
         let correct_transfer = SignedZkSyncTx {
             tx: ZkSyncTx::Transfer(Box::new(correct_transfer)),

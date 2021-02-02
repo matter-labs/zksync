@@ -28,11 +28,11 @@ impl Clone for ZkSyncAccount {
     fn clone(&self) -> Self {
         Self {
             private_key: priv_key_from_fs(self.private_key.0),
-            pubkey_hash: self.pubkey_hash.clone(),
-            address: self.address.clone(),
-            eth_private_key: self.eth_private_key.clone(),
-            account_id: Mutex::new(self.account_id.lock().unwrap().clone()),
-            nonce: Mutex::new(self.nonce.lock().unwrap().clone()),
+            pubkey_hash: self.pubkey_hash,
+            address: self.address,
+            eth_private_key: self.eth_private_key,
+            account_id: Mutex::new(*self.account_id.lock().unwrap()),
+            nonce: Mutex::new(*self.nonce.lock().unwrap()),
         }
     }
 }

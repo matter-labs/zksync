@@ -146,14 +146,11 @@ impl EventsState {
         last_watched_block_number: u64,
         eth_blocks_step: u64,
         end_eth_blocks_offset: u64,
-    ) -> Result<
-        (
-            Vec<(&'a ZkSyncDeployedContract<T>, Vec<Log>)>,
-            Vec<NewTokenEvent>,
-            u64,
-        ),
-        anyhow::Error,
-    > {
+    ) -> anyhow::Result<(
+        Vec<(&'a ZkSyncDeployedContract<T>, Vec<Log>)>,
+        Vec<NewTokenEvent>,
+        u64,
+    )> {
         let latest_eth_block_minus_delta =
             EventsState::get_last_block_number(web3).await? - end_eth_blocks_offset;
 
@@ -204,14 +201,13 @@ impl EventsState {
                 BlockNumber::Earliest => panic!("Impossible in to block"),
                 BlockNumber::Pending => unreachable!(),
                 BlockNumber::Number(n) => {
-                    let number = if to_block_number_u64 < n.as_u64() {
+                    if to_block_number_u64 < n.as_u64() {
                         from_block_number_u64 = n.as_u64();
                         BlockNumber::Number(to_block_number_u64.into())
                     } else {
                         from_block_number_u64 = n.as_u64();
                         BlockNumber::Number(n)
-                    };
-                    number
+                    }
                 }
             };
 
