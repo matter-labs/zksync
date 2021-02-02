@@ -8,6 +8,7 @@ use crate::{
     eth_watch::start_eth_watch,
     mempool::run_mempool_tasks,
     private_api::start_private_core_api,
+    rejected_tx_cleaner::run_rejected_tx_cleaner,
     state_keeper::{start_state_keeper, ZkSyncStateInitParams, ZkSyncStateKeeper},
 };
 use futures::{
@@ -26,6 +27,7 @@ pub mod committer;
 pub mod eth_watch;
 pub mod mempool;
 pub mod private_api;
+pub mod rejected_tx_cleaner;
 pub mod state_keeper;
 
 pub async fn insert_pending_withdrawals(
@@ -199,6 +201,9 @@ pub async fn run_core(
         DEFAULT_CHANNEL_CAPACITY,
     );
 
+    // Start rejected transactions cleaner task.
+    let rejected_tx_cleaner_task = run_rejected_tx_cleaner(&config, connection_pool.clone());
+
     // Start block proposer.
     let proposer_task = run_block_proposer_task(
         &config,
@@ -220,6 +225,7 @@ pub async fn run_core(
         committer_task,
         mempool_task,
         proposer_task,
+        rejected_tx_cleaner_task,
     ];
 
     Ok(task_futures)

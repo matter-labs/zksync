@@ -1,3 +1,6 @@
+// Built-in uses
+use std::time;
+
 // External uses
 use serde::Deserialize;
 
@@ -8,9 +11,15 @@ pub struct DBConfig {
     pub pool_size: usize,
     /// Database URL.
     pub url: String,
+    /// Rejected transactions will be stored in the database for this amount of hours.
+    pub rejected_transactions_max_age: u64,
+    /// Sleep time (in hours) of the actor responsible for deleting failed transactions from the database.
+    pub rejected_transactions_cleaner_interval: u64,
 }
 
 impl DBConfig {
+    const SECS_PER_HOUR: u64 = 3600;
+
     pub fn from_env() -> Self {
         Self {
             pool_size: std::env::var("DB_POOL_SIZE")
@@ -18,7 +27,21 @@ impl DBConfig {
                 .parse()
                 .unwrap(),
             url: std::env::var("DATABASE_URL").expect("DATABASE_URL is set"),
+            rejected_transactions_max_age: std::env::var("DB_REJECTED_TRANSACTIONS_MAX_AGE")
+                .map_or(336, |s| s.parse().unwrap()),
+            rejected_transactions_cleaner_interval: std::env::var(
+                "DB_REJECTED_TRANSACTIONS_CLEANER_INTERVAL",
+            )
+            .map_or(24, |s| s.parse().unwrap()),
         }
+    }
+
+    pub fn rejected_transactions_max_age(&self) -> chrono::Duration {
+        chrono::Duration::hours(self.rejected_transactions_max_age as i64)
+    }
+
+    pub fn rejected_transactions_cleaner_interval(&self) -> time::Duration {
+        time::Duration::from_secs(self.rejected_transactions_cleaner_interval * Self::SECS_PER_HOUR)
     }
 }
 
@@ -31,6 +54,8 @@ mod tests {
         DBConfig {
             pool_size: 10,
             url: "postgres://postgres@localhost/plasma".into(),
+            rejected_transactions_max_age: 336,
+            rejected_transactions_cleaner_interval: 72,
         }
     }
 
@@ -39,6 +64,7 @@ mod tests {
         let config = r#"
 DB_POOL_SIZE="10"
 DATABASE_URL="postgres://postgres@localhost/plasma"
+DB_REJECTED_TRANSACTIONS_CLEANER_INTERVAL=72
         "#;
         set_env(config);
 
