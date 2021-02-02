@@ -1,3 +1,5 @@
+// Built-in uses
+use std::convert::TryFrom;
 // Workspace uses
 use zksync_basic_types::U256;
 // Local uses
@@ -82,10 +84,10 @@ async fn lower_gas_limit() {
 #[tokio::test]
 async fn gas_price_limit_restore() {
     // Price limit to set (should be obtained from the DB by GasAdjuster).
-    const PRICE_LIMIT: u64 = 1000;
+    const PRICE_LIMIT: i64 = 1000;
 
     let (_, db) = eth_and_db_clients().await;
-    db.update_gas_price_limit(PRICE_LIMIT.into()).await.unwrap();
+    db.update_gas_price_limit(PRICE_LIMIT).await.unwrap();
     let gas_adjuster: GasAdjuster<MockEthereum, MockDatabase> = GasAdjuster::new(&db).await;
 
     assert_eq!(gas_adjuster.get_current_max_price(), PRICE_LIMIT.into());
@@ -97,11 +99,11 @@ async fn gas_price_limit_restore() {
 #[tokio::test]
 async fn initial_upper_gas_limit() {
     // Initial price limit to set.
-    const PRICE_LIMIT: u64 = 1000;
+    const PRICE_LIMIT: i64 = 1000;
 
     let (mut ethereum, db) = eth_and_db_clients().await;
 
-    db.update_gas_price_limit(PRICE_LIMIT.into()).await.unwrap();
+    db.update_gas_price_limit(PRICE_LIMIT).await.unwrap();
     let mut gas_adjuster: GasAdjuster<MockEthereum, MockDatabase> = GasAdjuster::new(&db).await;
 
     // Set the gas price in Ethereum, which is greater than the current limit.
@@ -130,7 +132,7 @@ async fn initial_upper_gas_limit() {
 #[tokio::test]
 async fn gas_price_limit_scaling() {
     // Amount of times we'll call `GasAdjuster::keep_updated`.
-    const PRICE_UPDATES: u64 = 5;
+    const PRICE_UPDATES: i64 = 5;
     // Amount of samples to gather statistics.
     const N_SAMPLES: usize = GasStatistics::GAS_PRICE_SAMPLES_AMOUNT;
     // Initial price limit to set.
@@ -139,7 +141,7 @@ async fn gas_price_limit_scaling() {
     let (mut ethereum, db) = eth_and_db_clients().await;
     let mut connection = db.acquire_connection().await.unwrap();
 
-    db.update_gas_price_limit(PRICE_LIMIT.into()).await.unwrap();
+    db.update_gas_price_limit(PRICE_LIMIT as i64).await.unwrap();
 
     let mut gas_adjuster: GasAdjuster<MockEthereum, MockDatabase> = GasAdjuster::new(&db).await;
 
@@ -165,7 +167,7 @@ async fn gas_price_limit_scaling() {
     }
 
     // Stats are gathered. Now they're based on the Ethereum price.
-    expected_price = ethereum.gas_price.as_u64();
+    expected_price = u64::try_from(ethereum.gas_price).expect("Can't convert U256 to i64");
     for _ in 0..PRICE_UPDATES {
         // Request the gas price N times to gather statistics in GasAdjuster.
         // Each time the limit will be changed, so it's not checked. Instead, we check
@@ -207,7 +209,7 @@ async fn gas_price_limit_average_basis() {
 
     let (mut ethereum, db) = eth_and_db_clients().await;
     let mut connection = db.acquire_connection().await.unwrap();
-    db.update_gas_price_limit(PRICE_LIMIT.into()).await.unwrap();
+    db.update_gas_price_limit(PRICE_LIMIT as i64).await.unwrap();
     let mut gas_adjuster: GasAdjuster<MockEthereum, MockDatabase> = GasAdjuster::new(&db).await;
 
     // Set the client price way beyond the limit.
@@ -267,7 +269,7 @@ async fn gas_price_limit_preservation() {
 
     let (mut ethereum, db) = eth_and_db_clients().await;
     let mut connection = db.acquire_connection().await.unwrap();
-    db.update_gas_price_limit(price_limit.into()).await.unwrap();
+    db.update_gas_price_limit(price_limit as i64).await.unwrap();
     let mut gas_adjuster: GasAdjuster<MockEthereum, MockDatabase> = GasAdjuster::new(&db).await;
 
     // Set the client price way beyond the limit.

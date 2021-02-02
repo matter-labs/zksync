@@ -1,12 +1,13 @@
 // Local uses
 use self::mock::{
-    concurrent_eth_sender, create_signed_tx, create_signed_withdraw_tx, default_eth_sender,
+    concurrent_eth_sender, create_signed_tx, default_eth_parameters, default_eth_sender,
     restored_eth_sender,
 };
 use super::{
-    transactions::{ETHStats, ExecutedTxStatus, TxCheckOutcome},
+    transactions::{ExecutedTxStatus, TxCheckOutcome},
     ETHSender, TxCheckMode,
 };
+use zksync_storage::ethereum::records::ETHParams;
 
 const EXPECTED_WAIT_TIME_BLOCKS: u64 = 30;
 const WAIT_CONFIRMATIONS: u64 = 3;
@@ -45,12 +46,12 @@ async fn transaction_state() {
     let current_block = eth_sender.ethereum.block_number;
     let deadline_block = eth_sender.get_deadline_block(current_block);
     let operations = vec![
-        test_data::commit_operation(0), // Will be committed.
-        test_data::commit_operation(1), // Will be pending because of not enough confirmations.
-        test_data::commit_operation(2), // Will be failed.
-        test_data::commit_operation(3), // Will be failed and pending (not enough confirmations).
-        test_data::commit_operation(4), // Will be stuck.
-        test_data::commit_operation(5), // Will be pending due no response.
+        test_data::commit_blocks_operation(0), // Will be committed.
+        test_data::commit_blocks_operation(1), // Will be pending because of not enough confirmations.
+        test_data::commit_blocks_operation(2), // Will be failed.
+        test_data::commit_blocks_operation(3), // Will be failed and pending (not enough confirmations).
+        test_data::commit_blocks_operation(4), // Will be stuck.
+        test_data::commit_blocks_operation(5), // Will be pending due no response.
     ];
     let mut eth_operations = Vec::with_capacity(operations.len());
 
@@ -59,7 +60,7 @@ async fn transaction_state() {
             create_signed_tx(
                 eth_op_id as i64,
                 &eth_sender,
-                op,
+                op.clone(),
                 deadline_block,
                 eth_op_id as i64,
             )
@@ -214,33 +215,33 @@ async fn transaction_state() {
 }
 
 /// Test for a normal `ETHSender` workflow:
-/// - we send the two sequential operations (commit and verify);
+/// - we send the two sequential operations (commit, verify, execute);
 /// - they are successfully committed to the Ethereum;
-/// - `completeWithdrawals` tx is sent to the Ethereum;
-/// - notification is sent after `verify` operation is committed.
+/// - notification is sent after `execute` operation is committed.
 #[tokio::test]
 async fn operation_commitment_workflow() {
     let mut eth_sender = default_eth_sender().await;
 
-    // In this test we will run one commit and one verify operation and should
-    // obtain a notification about the operation being completed in the end.
-    let operations = vec![
-        test_data::commit_operation(0),
-        test_data::verify_operation(0),
+    // In this test we will run one commit blocks operation, one publish proof blocks onchain operation
+    // and execute blocks operation and should obtain a notification about the operation being completed in the end.
+    let aggregated_operations = vec![
+        test_data::commit_blocks_operation(0),
+        test_data::publish_proof_blocks_onchain_operations(0),
+        test_data::execute_blocks_operations(0),
     ];
 
-    for (eth_op_id, operation) in operations.iter().enumerate() {
+    for (eth_op_id, aggregated_operation) in aggregated_operations.iter().enumerate() {
         let nonce = eth_op_id as i64;
 
         // Send an operation to `ETHSender`.
         eth_sender
             .db
-            .send_operation(operation.clone())
+            .send_aggregated_operation(aggregated_operation.clone())
             .await
             .unwrap();
 
         // Retrieve it there and then process.
-        eth_sender.load_new_operations().await;
+        eth_sender.load_new_operations().await.unwrap();
 
         eth_sender.proceed_next_operations().await;
 
@@ -249,7 +250,7 @@ async fn operation_commitment_workflow() {
         let mut expected_tx = create_signed_tx(
             eth_op_id as i64,
             &eth_sender,
-            operation,
+            aggregated_operation.clone(),
             deadline_block,
             nonce,
         )
@@ -277,32 +278,6 @@ async fn operation_commitment_workflow() {
         expected_tx.final_hash = Some(expected_tx.used_tx_hashes[0]);
         eth_sender.db.assert_confirmed(&expected_tx).await;
     }
-    // Process the next operation and check that `completeWithdrawals` transaction is stored and sent.
-    eth_sender.proceed_next_operations().await;
-
-    let eth_op_idx = operations.len() as i64;
-    let nonce = eth_op_idx;
-    let deadline_block = eth_sender.get_deadline_block(eth_sender.ethereum.block_number);
-    let mut withdraw_op_tx =
-        create_signed_withdraw_tx(eth_op_idx, &eth_sender, None, deadline_block, nonce).await;
-
-    eth_sender.db.assert_stored(&withdraw_op_tx).await;
-    eth_sender
-        .ethereum
-        .assert_sent(&withdraw_op_tx.used_tx_hashes[0])
-        .await;
-
-    // Mark `completeWithdrawals` as completed.
-    eth_sender
-        .ethereum
-        .add_successfull_execution(withdraw_op_tx.used_tx_hashes[0], WAIT_CONFIRMATIONS)
-        .await;
-    eth_sender.proceed_next_operations().await;
-
-    // Check that `completeWithdrawals` is completed in the DB.
-    withdraw_op_tx.confirmed = true;
-    withdraw_op_tx.final_hash = Some(withdraw_op_tx.used_tx_hashes[0]);
-    eth_sender.db.assert_confirmed(&withdraw_op_tx).await;
 }
 
 /// A simple scenario for a stuck transaction:
@@ -315,22 +290,28 @@ async fn stuck_transaction() {
     let mut eth_sender = default_eth_sender().await;
 
     // Workflow for the test is similar to `operation_commitment_workflow`.
-    let operation = test_data::commit_operation(0);
+    let aggregated_operation = test_data::commit_blocks_operation(0);
     // Send an operation to `ETHSender`.
     eth_sender
         .db
-        .send_operation(operation.clone())
+        .send_aggregated_operation(aggregated_operation.clone())
         .await
         .unwrap();
 
-    eth_sender.load_new_operations().await;
+    eth_sender.load_new_operations().await.unwrap();
     eth_sender.proceed_next_operations().await;
 
     let eth_op_id = 0;
     let nonce = 0;
     let deadline_block = eth_sender.get_deadline_block(eth_sender.ethereum.block_number);
-    let mut stuck_tx =
-        create_signed_tx(eth_op_id, &eth_sender, &operation, deadline_block, nonce).await;
+    let mut stuck_tx = create_signed_tx(
+        eth_op_id,
+        &eth_sender,
+        aggregated_operation.clone(),
+        deadline_block,
+        nonce,
+    )
+    .await;
 
     // Skip some blocks and expect sender to send a new tx.
     eth_sender.ethereum.block_number += EXPECTED_WAIT_TIME_BLOCKS;
@@ -368,18 +349,17 @@ async fn stuck_transaction() {
 /// their order is respected and no processing of the next operation is started until
 /// the previous one is committed.
 ///
-/// This test includes all three operation types (commit, verify and withdraw).
+/// This test includes all three operation types (commit, verify and execute).
 #[tokio::test]
 async fn operations_order() {
     let mut eth_sender = default_eth_sender().await;
 
     // We send multiple the operations at once to the channel.
     let operations_count = 3;
-    let mut operations = Vec::new();
-    let commit_operations = &test_data::COMMIT_OPERATIONS[..operations_count];
-    let verify_operations = &test_data::VERIFY_OPERATIONS[..operations_count];
-    operations.extend_from_slice(commit_operations);
-    operations.extend_from_slice(verify_operations);
+
+    let commit_operations = &test_data::COMMIT_BLOCKS_OPERATIONS[..operations_count];
+    let verify_operations = &test_data::PUBLISH_PROOF_BLOCKS_ONCHAIN_OPERATIONS[..operations_count];
+    let execute_operations = &test_data::EXECUTE_BLOCKS_OPERATIONS[..operations_count];
 
     // Also we create the list of expected transactions.
     let mut expected_txs = Vec::new();
@@ -389,8 +369,12 @@ async fn operations_order() {
     // the logic of ID calculating is (i * 3), (i * 3 + 1), (i * 3 + 2).
     // On the first iteration the indices 0, 1 and 2 will be taken, then it
     // will be 3, 4 and 5, etc.
-    for (idx, (commit_operation, verify_operation)) in
-        commit_operations.iter().zip(verify_operations).enumerate()
+    let operation_iterator = commit_operations
+        .iter()
+        .zip(verify_operations)
+        .zip(execute_operations);
+    for (idx, ((commit_operation, verify_operation), execute_operation)) in
+        operation_iterator.enumerate()
     {
         // Create the commit operation.
         let start_block = 1 + WAIT_CONFIRMATIONS * (idx * 3) as u64;
@@ -401,13 +385,19 @@ async fn operations_order() {
         let commit_op_tx = create_signed_tx(
             eth_op_idx,
             &eth_sender,
-            commit_operation,
+            commit_operation.clone(),
             deadline_block,
             nonce,
         )
         .await;
 
         expected_txs.push(commit_op_tx);
+        // Send commit operation
+        eth_sender
+            .db
+            .send_aggregated_operation(commit_operation.clone())
+            .await
+            .unwrap();
 
         // Create the verify operation, as by priority it will be processed right after `commit`.
         let start_block = 1 + WAIT_CONFIRMATIONS * (idx * 3 + 1) as u64;
@@ -418,13 +408,19 @@ async fn operations_order() {
         let verify_op_tx = create_signed_tx(
             eth_op_idx,
             &eth_sender,
-            verify_operation,
+            verify_operation.clone(),
             deadline_block,
             nonce,
         )
         .await;
 
         expected_txs.push(verify_op_tx);
+        // Send verify operation
+        eth_sender
+            .db
+            .send_aggregated_operation(verify_operation.clone())
+            .await
+            .unwrap();
 
         // Create the withdraw operation.
         let start_block = 1 + WAIT_CONFIRMATIONS * (idx * 3 + 2) as u64;
@@ -432,20 +428,25 @@ async fn operations_order() {
         let eth_op_idx = (idx * 3 + 2) as i64;
         let nonce = eth_op_idx;
 
-        let withdraw_op_tx =
-            create_signed_withdraw_tx(eth_op_idx, &eth_sender, None, deadline_block, nonce).await;
+        let execute_op_tx = create_signed_tx(
+            eth_op_idx,
+            &eth_sender,
+            execute_operation.clone(),
+            deadline_block,
+            nonce,
+        )
+        .await;
 
-        expected_txs.push(withdraw_op_tx);
-    }
-
-    for operation in operations.iter() {
+        expected_txs.push(execute_op_tx);
+        // Send execute operation
         eth_sender
             .db
-            .send_operation(operation.clone())
+            .send_aggregated_operation(execute_operation.clone())
             .await
             .unwrap();
     }
-    eth_sender.load_new_operations().await;
+
+    eth_sender.load_new_operations().await.unwrap();
 
     // Then we go through the operations and check that the order of operations is preserved.
     for mut tx in expected_txs.into_iter() {
@@ -478,20 +479,26 @@ async fn transaction_failure() {
     let mut eth_sender = default_eth_sender().await;
 
     // Workflow for the test is similar to `operation_commitment_workflow`.
-    let operation = test_data::commit_operation(0);
+    let aggregated_operation = test_data::commit_blocks_operation(0);
     eth_sender
         .db
-        .send_operation(operation.clone())
+        .send_aggregated_operation(aggregated_operation.clone())
         .await
         .unwrap();
 
     let eth_op_id = 0;
     let nonce = 0;
     let deadline_block = eth_sender.get_deadline_block(eth_sender.ethereum.block_number);
-    let failing_tx =
-        create_signed_tx(eth_op_id, &eth_sender, &operation, deadline_block, nonce).await;
+    let failing_tx = create_signed_tx(
+        eth_op_id,
+        &eth_sender,
+        aggregated_operation.clone(),
+        deadline_block,
+        nonce,
+    )
+    .await;
 
-    eth_sender.load_new_operations().await;
+    eth_sender.load_new_operations().await.unwrap();
     eth_sender.proceed_next_operations().await;
 
     eth_sender
@@ -509,29 +516,36 @@ async fn restore_state() {
         // This `eth_sender` is required to generate the input only.
         let eth_sender = default_eth_sender().await;
 
-        let commit_op = test_data::commit_operation(0);
-        let verify_op = test_data::verify_operation(0);
+        let commit_op = test_data::commit_blocks_operation(0);
+        let verify_op = test_data::publish_proof_blocks_onchain_operations(0);
+        let execute_op = test_data::execute_blocks_operations(0);
 
         let deadline_block = eth_sender.get_deadline_block(1);
-        let commit_op_tx = create_signed_tx(0, &eth_sender, &commit_op, deadline_block, 0).await;
+        let commit_op_tx =
+            create_signed_tx(0, &eth_sender, commit_op.clone(), deadline_block, 0).await;
 
         let deadline_block = eth_sender.get_deadline_block(1 + WAIT_CONFIRMATIONS);
-        let verify_op_tx = create_signed_tx(1, &eth_sender, &verify_op, deadline_block, 1).await;
+        let verify_op_tx =
+            create_signed_tx(1, &eth_sender, verify_op.clone(), deadline_block, 1).await;
 
-        let operations = vec![commit_op, verify_op];
-        let stored_operations = vec![commit_op_tx, verify_op_tx];
+        let deadline_block = eth_sender.get_deadline_block(1 + 2 * WAIT_CONFIRMATIONS);
+        let execute_op_tx =
+            create_signed_tx(2, &eth_sender, execute_op.clone(), deadline_block, 2).await;
+
+        let operations = vec![commit_op, verify_op, execute_op];
+        let stored_operations = vec![commit_op_tx, verify_op_tx, execute_op_tx];
 
         (operations, stored_operations)
     };
 
-    let stats = ETHStats {
-        last_committed_block: 1,
-        last_verified_block: 1,
-        last_executed_block: 1,
-    };
-    let mut eth_sender = restored_eth_sender(stored_operations, stats).await;
+    let mut eth_parameters = default_eth_parameters();
+    eth_parameters.last_committed_block = 1;
+    eth_parameters.last_verified_block = 1;
+    eth_parameters.last_executed_block = 1;
 
-    for (eth_op_id, operation) in operations.iter().enumerate() {
+    let mut eth_sender = restored_eth_sender(stored_operations, eth_parameters).await;
+
+    for (eth_op_id, aggregated_operation) in operations.iter().enumerate() {
         // Note that we DO NOT send an operation to `ETHSender` and neither receive it.
 
         // We do process operations restored from the DB though.
@@ -543,7 +557,7 @@ async fn restore_state() {
         let mut expected_tx = create_signed_tx(
             eth_op_id as i64,
             &eth_sender,
-            operation,
+            aggregated_operation.clone(),
             deadline_block,
             nonce,
         )
@@ -574,21 +588,27 @@ async fn confirmations_independence() {
 
     let mut eth_sender = default_eth_sender().await;
 
-    let operation = test_data::commit_operation(0);
+    let aggregated_operation = test_data::commit_blocks_operation(0);
     eth_sender
         .db
-        .send_operation(operation.clone())
+        .send_aggregated_operation(aggregated_operation.clone())
         .await
         .unwrap();
 
-    eth_sender.load_new_operations().await;
+    eth_sender.load_new_operations().await.unwrap();
     eth_sender.proceed_next_operations().await;
 
     let eth_op_id = 0;
     let nonce = 0;
     let deadline_block = eth_sender.get_deadline_block(eth_sender.ethereum.block_number);
-    let mut stuck_tx =
-        create_signed_tx(eth_op_id, &eth_sender, &operation, deadline_block, nonce).await;
+    let mut stuck_tx = create_signed_tx(
+        eth_op_id,
+        &eth_sender,
+        aggregated_operation.clone(),
+        deadline_block,
+        nonce,
+    )
+    .await;
 
     eth_sender.ethereum.block_number += EXPECTED_WAIT_TIME_BLOCKS;
     eth_sender.proceed_next_operations().await;
@@ -625,8 +645,9 @@ async fn concurrent_operations_order() {
 
     // We send multiple the operations at once to the channel.
     let operations_count = 3;
-    let commit_operations = &test_data::COMMIT_OPERATIONS[..operations_count];
-    let verify_operations = &test_data::VERIFY_OPERATIONS[..operations_count];
+    let commit_operations = &test_data::COMMIT_BLOCKS_OPERATIONS[..operations_count];
+    let verify_operations = &test_data::PUBLISH_PROOF_BLOCKS_ONCHAIN_OPERATIONS[..operations_count];
+    let execute_operations = &test_data::EXECUTE_BLOCKS_OPERATIONS[..operations_count];
 
     // Also we create the list of expected transactions.
     let mut expected_txs = Vec::new();
@@ -636,14 +657,15 @@ async fn concurrent_operations_order() {
     // the logic of ID calculating is (i * 3), (i * 3 + 1), (i * 3 + 2).
     // On the first iteration the indices 0, 1 and 2 will be taken, then it
     // will be 3, 4 and 5, etc.
-
-    for (idx, (commit_operation, verify_operation)) in
-        commit_operations.iter().zip(verify_operations).enumerate()
+    let operation_iterator = commit_operations
+        .iter()
+        .zip(verify_operations)
+        .zip(execute_operations);
+    for (idx, ((commit_operation, verify_operation), execute_operation)) in
+        operation_iterator.enumerate()
     {
-        // Commit/verify transactions from one iteration will be sent concurrently,
+        // Commit/verify/execute transactions from one iteration will be sent concurrently,
         // thus the deadline block is the same for them.
-        // However, withdraw operation will be sent after these txs are confirmed,
-        // so it will have a different deadline block,
         let start_block = 1 + WAIT_CONFIRMATIONS * (idx * 3) as u64;
         let deadline_block = eth_sender.get_deadline_block(start_block);
 
@@ -654,7 +676,7 @@ async fn concurrent_operations_order() {
         let commit_op_tx = create_signed_tx(
             eth_op_idx,
             &eth_sender,
-            commit_operation,
+            commit_operation.clone(),
             deadline_block,
             nonce,
         )
@@ -669,7 +691,7 @@ async fn concurrent_operations_order() {
         let verify_op_tx = create_signed_tx(
             eth_op_idx,
             &eth_sender,
-            verify_operation,
+            verify_operation.clone(),
             deadline_block,
             nonce,
         )
@@ -677,56 +699,61 @@ async fn concurrent_operations_order() {
 
         expected_txs.push(verify_op_tx);
 
-        // Create the withdraw operation.
-        let start_block = 1 + WAIT_CONFIRMATIONS * (idx * 3 + 2) as u64;
-        let deadline_block = eth_sender.get_deadline_block(start_block);
+        // Create the execute operation, as by priority it will be processed right after `verify`.
         let eth_op_idx = (idx * 3 + 2) as i64;
         let nonce = eth_op_idx;
 
-        let withdraw_op_tx = create_signed_withdraw_tx(
+        let execute_op_tx = create_signed_tx(
             eth_op_idx,
             &eth_sender,
-            Some(verify_operation.clone()),
+            execute_operation.clone(),
             deadline_block,
             nonce,
         )
         .await;
 
-        expected_txs.push(withdraw_op_tx);
+        expected_txs.push(execute_op_tx);
     }
-    // Pair commit/verify operations.
-    let mut operations_iter = commit_operations.iter().zip(verify_operations);
+
+    let mut operation_iterator = commit_operations
+        .iter()
+        .zip(verify_operations)
+        .zip(execute_operations);
 
     // Then we go through the operations and check that the order of operations is preserved.
     // Here we take N txs at each interaction.
     for txs in expected_txs.chunks(MAX_TXS_IN_FLIGHT as usize) {
-        // We send operations by two, so the order will be "commit-verify-withdraw".
-        // If we'll send all the operations together, the order will be "commit-verify-commit-verify-withdraw",
-        // since withdraw is only sent after verify operation is confirmed.
-        let (commit_op, verify_op) = operations_iter.next().unwrap();
+        // We send operations by three, so the order will be "commit-verify-execute".
+        // If we'll send all the operations together, the order will be "commit-verify-execute".
+        let ((commit_op, verify_op), execute_op) = operation_iterator.next().unwrap();
 
         eth_sender
             .db
-            .send_operation(commit_op.clone())
+            .send_aggregated_operation(commit_op.clone())
             .await
             .unwrap();
         eth_sender
             .db
-            .send_operation(verify_op.clone())
+            .send_aggregated_operation(verify_op.clone())
+            .await
+            .unwrap();
+        eth_sender
+            .db
+            .send_aggregated_operation(execute_op.clone())
             .await
             .unwrap();
 
-        eth_sender.load_new_operations().await;
+        eth_sender.load_new_operations().await.unwrap();
 
         // Call `proceed_next_operations`. Several txs should be sent.
         eth_sender.proceed_next_operations().await;
 
         let commit_tx = &txs[0];
         let verify_tx = &txs[1];
-        let mut withdraw_tx = txs[2].clone();
+        let execute_tx = &txs[2];
 
         // Check that commit/verify txs are sent and add the successful execution for them.
-        for tx in &[commit_tx, verify_tx] {
+        for tx in &[commit_tx, verify_tx, execute_tx] {
             let current_tx_hash = tx.used_tx_hashes[0];
 
             // Check that current expected tx is stored.
@@ -743,7 +770,7 @@ async fn concurrent_operations_order() {
         // Call `proceed_next_operations` again. Both txs should become confirmed.
         eth_sender.proceed_next_operations().await;
 
-        for &tx in &[commit_tx, verify_tx] {
+        for &tx in &[commit_tx, verify_tx, execute_tx] {
             let mut tx = tx.clone();
             let current_tx_hash = tx.used_tx_hashes[0];
 
@@ -752,26 +779,5 @@ async fn concurrent_operations_order() {
             tx.final_hash = Some(current_tx_hash);
             eth_sender.db.assert_confirmed(&tx).await;
         }
-
-        // Now, the withdraw operation should be taken from the queue, and
-        // sent to the Ethereum.
-        eth_sender.proceed_next_operations().await;
-
-        let withdraw_tx_hash = withdraw_tx.used_tx_hashes[0];
-        eth_sender.db.assert_stored(&withdraw_tx).await;
-        eth_sender.ethereum.assert_sent(&withdraw_tx_hash).await;
-
-        // Mark the tx as successfully
-        eth_sender
-            .ethereum
-            .add_successfull_execution(withdraw_tx_hash, WAIT_CONFIRMATIONS)
-            .await;
-
-        // Call `proceed_next_operations` again. Withdraw tx should become confirmed.
-        eth_sender.proceed_next_operations().await;
-        // Update the fields in the tx and check if it's confirmed.
-        withdraw_tx.confirmed = true;
-        withdraw_tx.final_hash = Some(withdraw_tx_hash);
-        eth_sender.db.assert_confirmed(&withdraw_tx).await;
     }
 }
