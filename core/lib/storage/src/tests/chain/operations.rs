@@ -293,14 +293,14 @@ async fn remove_rejected_transactions(mut storage: StorageProcessor<'_>) -> Quer
         block_index: None,
         primary_account_address: Default::default(),
         nonce: Default::default(),
-        created_at: timestamp_1.clone(),
+        created_at: timestamp_1,
         eth_sign_data: None,
         batch_id: None,
     };
     let timestamp_2 = timestamp_1 - Duration::weeks(1);
     let mut executed_tx_2 = executed_tx_1.clone();
     // Set new timestamp and different tx_hash since it's a PK.
-    executed_tx_2.created_at = timestamp_2.clone();
+    executed_tx_2.created_at = timestamp_2;
     executed_tx_2.tx_hash = vec![0, 11, 21, 5];
     // Successful one.
     let mut executed_tx_3 = executed_tx_1.clone();
