@@ -4,12 +4,20 @@ All notable changes to the core components will be documented in this file.
 
 ## Unreleased
 
-- Removed the limitation on the number of withdrawals in the block.
-- (`FeeTicker`): Increased gas price estimate for transaction.
+### Removed
+
+### Changed
+
+### Added
+
+### Fixed
+
+## Release 2021-02-02
 
 ### Removed
 
 - `MetricsCounter` structure was removed because it is not used.
+- The limit on the number of withdrawals in the block.
 
 ### Changed
 
@@ -17,7 +25,10 @@ All notable changes to the core components will be documented in this file.
   structures.
 - `prometheus_exporter` was made a library to be used by several crates.
 - `prover_run_for_next_commit` function uses a parameterized timeout instead of a hard-coded one.
-- `action_type` column type in db is changed from `text` to `enum` for optimization.
+- (`storage`): `action_type` column type in db is changed from `text` to `enum` for optimization.
+- (`FeeTicker`): Increased gas price estimate for transaction.
+- (`loadtest`): Scenario execution was made parallel.
+- Increased completeWithdrawal gas limit, that decreased the chance of the users to face the out-of-gas error
 
 ### Added
 
@@ -25,6 +36,8 @@ All notable changes to the core components will be documented in this file.
 - `tokens_acceptable_for_fees` endpoint that returns the list of tokens acceptable for fees was added to REST API v0.1.
 
 ### Fixed
+
+- (`FeeTicker`): Performance for getting the batch fee was heavily optimized.
 
 ## Release 2021-01-12
 
