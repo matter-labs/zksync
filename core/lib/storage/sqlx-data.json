@@ -303,22 +303,6 @@
       ]
     }
   },
-  "10b5aa910eabf8c1537da0f0cecadbe33da406ad39703b741d0746add351b9d4": {
-    "query": "\n            INSERT INTO forced_exit_requests ( id, token_id, account_id, price_in_wei, valid_until )\n            VALUES ( $1, $2, $3, $4, $5 )\n            ",
-    "describe": {
-      "columns": [],
-      "parameters": {
-        "Left": [
-          "Int8",
-          "Int4",
-          "Int8",
-          "Numeric",
-          "Timestamptz"
-        ]
-      },
-      "nullable": []
-    }
-  },
   "15faacf14edd991dedc35011ef12eefc5a04771a6b3f24a4c655f9259c9ea572": {
     "query": "SELECT * FROM account_balance_updates WHERE block_number > $1 AND block_number <= $2 ",
     "describe": {
@@ -607,6 +591,24 @@
         false,
         false,
         false
+      ]
+    }
+  },
+  "1dfd4fafff703f719789690f88ba036e25bde60a69580e644ab24f2799249c99": {
+    "query": "SELECT MAX(id) FROM forced_exit_requests",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "max",
+          "type_info": "Int8"
+        }
+      ],
+      "parameters": {
+        "Left": []
+      },
+      "nullable": [
+        null
       ]
     }
   },
@@ -1417,6 +1419,22 @@
       ]
     }
   },
+  "53ab59757e47450b31e9fb2ad006943246acdb14ac03d79518bcc5e19bb66cc8": {
+    "query": "\n            INSERT INTO forced_exit_requests ( id, account_id, token_id, price_in_wei, valid_until )\n            VALUES ( $1, $2, $3, $4, $5 )\n            ",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "Int8",
+          "Int8",
+          "Int4",
+          "Numeric",
+          "Timestamptz"
+        ]
+      },
+      "nullable": []
+    }
+  },
   "58b251c3fbdf9be9b62f669f8cdc2d98940026c831e02a53337474d36a5224f0": {
     "query": "UPDATE aggregate_operations\n                SET confirmed = $1\n                WHERE from_block >= $2 AND to_block <= $3 AND action_type = $4",
     "describe": {
@@ -2026,6 +2044,50 @@
         ]
       },
       "nullable": []
+    }
+  },
+  "7dfa76c3e12c301dc3d7fbf820ecf0be45e0b1c5f01ce13f7cdc1a82880804c1": {
+    "query": "\n            SELECT * FROM forced_exit_requests\n            WHERE id = $1\n            LIMIT 1\n            ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "id",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 1,
+          "name": "account_id",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 2,
+          "name": "token_id",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 3,
+          "name": "price_in_wei",
+          "type_info": "Numeric"
+        },
+        {
+          "ordinal": 4,
+          "name": "valid_until",
+          "type_info": "Timestamptz"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Int8"
+        ]
+      },
+      "nullable": [
+        false,
+        false,
+        false,
+        false,
+        false
+      ]
     }
   },
   "7ff98a4fddc441ea83f72a4a75a7caf53b9661c37f26a90984a349bfa5aeab70": {

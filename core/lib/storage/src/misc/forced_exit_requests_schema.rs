@@ -4,17 +4,11 @@ use sqlx::types::BigDecimal;
 use std::time::Instant;
 // External imports
 // Workspace imports
-use zksync_types::{Token, TokenId, TokenLike, TokenPrice};
-use zksync_utils::ratio_to_big_decimal;
 // Local imports
 use crate::{QueryResult, StorageProcessor};
 use zksync_types::misc::{ForcedExitRequest, ForcedExitRequestId};
-use zksync_types::tokens::TokenMarketVolume;
 
 use super::records::DbForcedExitRequest;
-
-/// Precision of the USD price per token
-pub(crate) const STORED_USD_PRICE_PRECISION: usize = 6;
 
 /// ForcedExitRequests schema handles the `forced_exit_requests` table, providing methods to
 #[derive(Debug)]
@@ -26,12 +20,12 @@ impl<'a, 'c> ForcedExitRequestsSchema<'a, 'c> {
         let price_in_wei = BigDecimal::from(BigInt::from(request.price_in_wei.clone()));
         sqlx::query!(
             r#"
-            INSERT INTO forced_exit_requests ( id, token_id, account_id, price_in_wei, valid_until )
+            INSERT INTO forced_exit_requests ( id, account_id, token_id, price_in_wei, valid_until )
             VALUES ( $1, $2, $3, $4, $5 )
             "#,
             request.id,
-            i32::from(request.token_id),
             i64::from(request.account_id),
+            i32::from(request.token_id),
             price_in_wei,
             request.valid_until
         )
@@ -49,14 +43,15 @@ impl<'a, 'c> ForcedExitRequestsSchema<'a, 'c> {
         let start = Instant::now();
         // Unfortunately there were some bugs with
         // sqlx macros, so just have to resort to the old way
-        let request: DbForcedExitRequest = sqlx::query_as(
+        let request: DbForcedExitRequest = sqlx::query_as!(
+            DbForcedExitRequest,
             r#"
             SELECT * FROM forced_exit_requests
             WHERE id = $1
             LIMIT 1
             "#,
+            id
         )
-        .bind(id)
         .fetch_one(self.0.conn())
         .await?;
 
@@ -67,5 +62,19 @@ impl<'a, 'c> ForcedExitRequestsSchema<'a, 'c> {
         );
 
         Ok(request)
+    }
+
+    pub async fn get_max_used_id(&mut self) -> QueryResult<ForcedExitRequestId> {
+        let start = Instant::now();
+
+        let max_value: i64 = sqlx::query!(r#"SELECT MAX(id) FROM forced_exit_requests"#)
+            .fetch_one(self.0.conn())
+            .await?
+            .max
+            .unwrap_or(0);
+
+        metrics::histogram!("sql.forced_exit_requests.get_max_used_id", start.elapsed());
+
+        Ok(max_value)
     }
 }
