@@ -48,7 +48,9 @@ impl OperationQueue {
     /// Inserts an element to the end of the queue.
     pub fn push_back(&mut self, element: TxData) -> anyhow::Result<()> {
         let next_block_number = self
-            .get_next_last_block_number()
+            .elements
+            .back()
+            .map(|element| element.get_block_range().1 as usize)
             .unwrap_or(self.last_block_number)
             + 1;
 
@@ -81,7 +83,7 @@ impl OperationQueue {
         self.last_block_number
     }
 
-    /// Returns the value of the last affected block
+    /// Returns the value of the next affected block
     /// if will pop the top item out of the queue.
     pub fn get_next_last_block_number(&self) -> Option<usize> {
         self.elements
@@ -99,10 +101,7 @@ impl OperationQueue {
 mod tests {
     use super::*;
     use zksync_storage::test_data::{gen_unique_aggregated_operation, BLOCK_SIZE_CHUNKS};
-    use zksync_types::{
-        aggregated_operations::AggregatedActionType, block::Block, AccountId, Action, BlockNumber,
-        Operation,
-    };
+    use zksync_types::aggregated_operations::AggregatedActionType;
 
     /// Checks the main operations of the queue: `push_back`, `pop_front` and `get_count`.
     #[test]
@@ -132,7 +131,7 @@ mod tests {
         assert!(queue.get_next_last_block_number().is_none());
 
         // Insert the next element and obtain it.
-        queue.push_back(tx_data_1.clone());
+        queue.push_back(tx_data_1.clone()).unwrap();
         // Inserting the element should NOT update the last block number.
         assert_eq!(queue.get_last_block_number(), 0);
         assert_eq!(queue.get_next_last_block_number().unwrap(), 1);
@@ -143,11 +142,11 @@ mod tests {
         assert!(queue.get_next_last_block_number().is_none());
 
         // Perform the same check again and check that overall counter will become 2.
-        queue.push_back(tx_data_2.clone());
+        queue.push_back(tx_data_2.clone()).unwrap();
         assert_eq!(queue.get_last_block_number(), 1);
         assert_eq!(queue.get_next_last_block_number().unwrap(), 2);
 
-        assert_eq!(queue.pop_front().unwrap(), tx_data_2.clone());
+        assert_eq!(queue.pop_front().unwrap(), tx_data_2);
         assert_eq!(queue.get_last_block_number(), 2);
         assert!(queue.get_next_last_block_number().is_none());
 
@@ -156,7 +155,7 @@ mod tests {
         assert_eq!(queue.get_last_block_number(), 2);
 
         // Return the popped element back.
-        queue.return_popped(tx_data_2.clone());
+        queue.return_popped(tx_data_2.clone()).unwrap();
         assert_eq!(queue.get_last_block_number(), 1);
         assert_eq!(queue.get_last_block_number(), 1);
         assert_eq!(queue.get_next_last_block_number().unwrap(), 2);
