@@ -427,7 +427,6 @@ pub fn start_rpc_server(
         rpc_app.extend(&mut io);
 
         let server = ServerBuilder::new(io)
-            .request_middleware(super::loggers::http_rpc::request_middleware)
             .threads(super::THREADS_PER_SERVER)
             .start_http(&addr)
             .unwrap();

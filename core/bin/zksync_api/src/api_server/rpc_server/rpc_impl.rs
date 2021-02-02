@@ -28,12 +28,6 @@ impl RpcApp {
         )
         .await?;
 
-        vlog::debug!(
-            "account_info: address {}, total request processing {}ms",
-            &address,
-            start.elapsed().as_millis()
-        );
-
         metrics::histogram!("api.rpc.account_info", start.elapsed());
         Ok(AccountInfoResp {
             address,

@@ -10,6 +10,7 @@ local metrics = [
   "api.v01.status",
   "api.v01.testnet_config",
   "api.v01.tokens",
+  "api.v01.tokens_acceptable_for_fees",
   "api.v01.tx_by_hash",
   "api.v01.tx_history",
   "api.v01.tx_history_newer_than",
