@@ -16,10 +16,7 @@
 //! on accepting ChangePubKey tx saves account type - Owned or CREATE2
 
 // Built-in deps
-use std::{
-    collections::{HashMap, VecDeque},
-    sync::Arc,
-};
+use std::{collections::HashMap, sync::Arc};
 // External uses
 use futures::{
     channel::{

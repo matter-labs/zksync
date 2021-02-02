@@ -224,7 +224,7 @@ async fn test_find_block_by_height_or_hash(mut storage: StorageProcessor<'_>) ->
                 BLOCK_SIZE_CHUNKS,
             ))
             .await?;
-        let (id, _) = OperationsSchema(&mut storage)
+        let (id, op) = OperationsSchema(&mut storage)
             .get_aggregated_op_that_affects_block(AggregatedActionType::CommitBlocks, block_number)
             .await?
             .unwrap();
@@ -240,7 +240,7 @@ async fn test_find_block_by_height_or_hash(mut storage: StorageProcessor<'_>) ->
         let response = EthereumSchema(&mut storage)
             .save_new_eth_tx(
                 AggregatedActionType::CommitBlocks,
-                Some(id),
+                Some((id, op)),
                 100,
                 100u32.into(),
                 Default::default(),
@@ -269,7 +269,7 @@ async fn test_find_block_by_height_or_hash(mut storage: StorageProcessor<'_>) ->
                     BLOCK_SIZE_CHUNKS,
                 ))
                 .await?;
-            let (id, _) = OperationsSchema(&mut storage)
+            let (id, op) = OperationsSchema(&mut storage)
                 .get_aggregated_op_that_affects_block(
                     AggregatedActionType::ExecuteBlocks,
                     block_number,
@@ -283,7 +283,7 @@ async fn test_find_block_by_height_or_hash(mut storage: StorageProcessor<'_>) ->
                 let response = EthereumSchema(&mut storage)
                     .save_new_eth_tx(
                         AggregatedActionType::CreateProofBlocks,
-                        Some(id),
+                        Some((id, op)),
                         100,
                         100u32.into(),
                         Default::default(),
@@ -384,7 +384,7 @@ async fn test_block_range(mut storage: StorageProcessor<'_>) -> QueryResult<()> 
                 BLOCK_SIZE_CHUNKS,
             ))
             .await?;
-        let (id, _) = OperationsSchema(&mut storage)
+        let (id, op) = OperationsSchema(&mut storage)
             .get_aggregated_op_that_affects_block(AggregatedActionType::CommitBlocks, block_number)
             .await?
             .unwrap();
@@ -398,7 +398,7 @@ async fn test_block_range(mut storage: StorageProcessor<'_>) -> QueryResult<()> 
         let response = EthereumSchema(&mut storage)
             .save_new_eth_tx(
                 AggregatedActionType::CommitBlocks,
-                Some(id),
+                Some((id, op)),
                 100,
                 100u32.into(),
                 Default::default(),
@@ -420,7 +420,7 @@ async fn test_block_range(mut storage: StorageProcessor<'_>) -> QueryResult<()> 
                     BLOCK_SIZE_CHUNKS,
                 ))
                 .await?;
-            let (id, _) = OperationsSchema(&mut storage)
+            let (id, op) = OperationsSchema(&mut storage)
                 .get_aggregated_op_that_affects_block(
                     AggregatedActionType::ExecuteBlocks,
                     block_number,
@@ -431,7 +431,7 @@ async fn test_block_range(mut storage: StorageProcessor<'_>) -> QueryResult<()> 
             let response = EthereumSchema(&mut storage)
                 .save_new_eth_tx(
                     AggregatedActionType::ExecuteBlocks,
-                    Some(id),
+                    Some((id, op)),
                     100,
                     100u32.into(),
                     Default::default(),
@@ -500,7 +500,7 @@ async fn unconfirmed_transaction(mut storage: StorageProcessor<'_>) -> QueryResu
                 BLOCK_SIZE_CHUNKS,
             ))
             .await?;
-        let (id, _) = OperationsSchema(&mut storage)
+        let (id, op) = OperationsSchema(&mut storage)
             .get_aggregated_op_that_affects_block(AggregatedActionType::CommitBlocks, block_number)
             .await?
             .unwrap();
@@ -514,7 +514,7 @@ async fn unconfirmed_transaction(mut storage: StorageProcessor<'_>) -> QueryResu
         let response = EthereumSchema(&mut storage)
             .save_new_eth_tx(
                 AggregatedActionType::CommitBlocks,
-                Some(id),
+                Some((id, op)),
                 100,
                 100u32.into(),
                 Default::default(),
@@ -539,7 +539,7 @@ async fn unconfirmed_transaction(mut storage: StorageProcessor<'_>) -> QueryResu
                     BLOCK_SIZE_CHUNKS,
                 ))
                 .await?;
-            let (id, _) = OperationsSchema(&mut storage)
+            let (id, op) = OperationsSchema(&mut storage)
                 .get_aggregated_op_that_affects_block(
                     AggregatedActionType::ExecuteBlocks,
                     block_number,
@@ -551,7 +551,7 @@ async fn unconfirmed_transaction(mut storage: StorageProcessor<'_>) -> QueryResu
             let response = EthereumSchema(&mut storage)
                 .save_new_eth_tx(
                     AggregatedActionType::ExecuteBlocks,
-                    Some(id),
+                    Some((id, op)),
                     100,
                     100u32.into(),
                     Default::default(),

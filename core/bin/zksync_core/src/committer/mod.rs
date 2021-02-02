@@ -10,7 +10,7 @@ use crate::mempool::MempoolBlocksRequest;
 use zksync_storage::ConnectionPool;
 use zksync_types::{
     block::{Block, ExecutedOperations, PendingBlock},
-    AccountUpdates, Action, BlockNumber, Operation,
+    AccountUpdates, BlockNumber,
 };
 
 mod aggregated_committer;

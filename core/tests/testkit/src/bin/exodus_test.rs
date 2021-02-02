@@ -86,6 +86,7 @@ async fn trigger_exodus(
     info!("Done triggering exodus");
 }
 
+#[allow(dead_code)]
 async fn cancel_outstanding_deposits(
     test_setup: &TestSetup,
     deposit_receiver_account: ETHAccountId,

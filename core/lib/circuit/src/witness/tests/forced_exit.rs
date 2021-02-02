@@ -189,7 +189,7 @@ fn test_target_has_key_set() {
     let (account_from, account_to) = (&accounts[0], &accounts[1]);
     let forced_exit_op = ForcedExitOp {
         tx: account_from.zksync_account.sign_forced_exit(
-            0,
+            TOKEN_ID,
             BigUint::from(FEE_AMOUNT),
             &account_to.account.address,
             None,

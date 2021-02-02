@@ -1,6 +1,6 @@
 use std::cmp::Ordering;
 use std::collections::{BinaryHeap, VecDeque};
-use zksync_types::{mempool::SignedTxVariant, SignedZkSyncTx, ZkSyncTx};
+use zksync_types::mempool::SignedTxVariant;
 
 #[derive(Debug, Clone)]
 struct MempoolPendingTransaction {
@@ -106,6 +106,7 @@ mod tests {
     use super::*;
     use crate::mempool::Address;
     use zksync_types::tx::{TimeRange, Transfer, Withdraw};
+    use zksync_types::{SignedZkSyncTx, ZkSyncTx};
 
     fn get_transfer_with_timestamps(valid_from: u64, valid_until: u64) -> SignedTxVariant {
         let transfer = Transfer::new(

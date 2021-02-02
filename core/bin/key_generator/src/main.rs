@@ -22,7 +22,10 @@ use crate::recursive_keys::{
 };
 use crate::sample_proofs::make_sample_proofs;
 use crate::verifier_contract_generator::create_verifier_contract;
-use crate::zksync_key::{make_plonk_blocks_verify_keys, make_plonk_exodus_verify_key};
+use crate::zksync_key::{
+    calculate_and_print_max_zksync_main_circuit_size, make_plonk_blocks_verify_keys,
+    make_plonk_exodus_verify_key,
+};
 use zksync_config::configs::ChainConfig;
 
 #[derive(StructOpt)]
@@ -31,6 +34,8 @@ enum Command {
     Keys,
     /// Generate verifier contract based on verification keys
     Contract,
+    /// Counts available sizes (chunks and aggregated proof size) for available setups
+    CircuitSize,
 }
 
 #[derive(StructOpt)]
@@ -55,6 +60,10 @@ fn main() {
         }
         Command::Contract => {
             create_verifier_contract(config);
+        }
+        Command::CircuitSize => {
+            count_gates_recursive_verification_keys();
+            calculate_and_print_max_zksync_main_circuit_size();
         }
     }
 }

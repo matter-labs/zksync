@@ -203,7 +203,7 @@ mod signatures_with_vectors {
                         transfer_tx.fee.clone(),
                         sign_data.to,
                         sign_data.nonce,
-                        Default::default(),
+                        transfer_tx.time_range,
                     )
                     .await
                     .expect("Transfer signing error");
@@ -216,7 +216,9 @@ mod signatures_with_vectors {
                 );
 
                 assert_eq!(
-                    transfer.get_ethereum_sign_message(&sign_data.string_token, 0),
+                    transfer
+                        .get_ethereum_sign_message(&sign_data.string_token, 0)
+                        .into_bytes(),
                     outputs.eth_sign_message.unwrap()
                 );
 
@@ -257,7 +259,7 @@ mod signatures_with_vectors {
                         withdraw_tx.fee.clone(),
                         sign_data.eth_address,
                         sign_data.nonce,
-                        Default::default(),
+                        withdraw_tx.time_range,
                     )
                     .await
                     .expect("Withdraw signing error");
@@ -270,7 +272,9 @@ mod signatures_with_vectors {
                 );
 
                 assert_eq!(
-                    withdraw.get_ethereum_sign_message(&sign_data.string_token, 0),
+                    withdraw
+                        .get_ethereum_sign_message(&sign_data.string_token, 0)
+                        .into_bytes(),
                     outputs.eth_sign_message.unwrap()
                 );
 
@@ -311,7 +315,7 @@ mod signatures_with_vectors {
                         false,
                         token,
                         change_pubkey_tx.fee.clone(),
-                        Default::default(),
+                        change_pubkey_tx.time_range,
                     )
                     .await
                     .expect("Change pub key signing error");
@@ -325,7 +329,7 @@ mod signatures_with_vectors {
 
                 assert_eq!(
                     change_pub_key.get_eth_signed_data().unwrap(),
-                    outputs.eth_sign_message.unwrap().into_bytes()
+                    outputs.eth_sign_message.unwrap()
                 );
 
                 if let Some(expected_eth_signature) = outputs.eth_signature {
@@ -366,7 +370,7 @@ mod signatures_with_vectors {
                         token,
                         forced_exit.fee.clone(),
                         forced_exit.nonce,
-                        Default::default(),
+                        forced_exit.time_range,
                     )
                     .await
                     .expect("Forced exit signing error");

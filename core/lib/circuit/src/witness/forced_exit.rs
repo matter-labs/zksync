@@ -39,6 +39,8 @@ pub struct ForcedExitData {
     pub initiator_account_address: u32,
     pub target_account_address: u32,
     pub target_account_eth_address: Fr,
+    pub valid_from: u64,
+    pub valid_until: u64,
 }
 
 pub struct ForcedExitWitness<E: RescueEngine> {
@@ -60,6 +62,11 @@ impl Witness for ForcedExitWitness<Bn256> {
     type CalculateOpsInput = SigDataInput;
 
     fn apply_tx(tree: &mut CircuitAccountTree, forced_exit: &ForcedExitOp) -> Self {
+        let (valid_from, valid_until) = {
+            let time_range = forced_exit.tx.time_range;
+            (time_range.valid_from, time_range.valid_until)
+        };
+
         let forced_exit_data = ForcedExitData {
             amount: forced_exit
                 .withdraw_amount
@@ -73,6 +80,8 @@ impl Witness for ForcedExitWitness<Bn256> {
             initiator_account_address: forced_exit.tx.initiator_account_id,
             target_account_address: forced_exit.target_account_id,
             target_account_eth_address: eth_address_to_fr(&forced_exit.tx.target),
+            valid_from,
+            valid_until,
         };
         Self::apply_data(tree, &forced_exit_data)
     }
@@ -406,8 +415,8 @@ impl ForcedExitWitness<Bn256> {
                 a: Some(a),
                 b: Some(b),
                 new_pub_key_hash: Some(Fr::zero()),
-                valid_from: Some(Fr::zero()),
-                valid_until: Some(Fr::from_str(&u32::MAX.to_string()).unwrap()),
+                valid_from: Some(Fr::from_str(&forced_exit.valid_from.to_string()).unwrap()),
+                valid_until: Some(Fr::from_str(&forced_exit.valid_until.to_string()).unwrap()),
             },
             before_root: Some(before_root),
             intermediate_root: Some(intermediate_root),

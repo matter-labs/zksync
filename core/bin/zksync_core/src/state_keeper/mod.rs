@@ -15,7 +15,6 @@ use zksync_crypto::ff::{PrimeField, PrimeFieldRepr};
 use zksync_state::state::{CollectedFee, OpSuccess, ZkSyncState};
 use zksync_storage::ConnectionPool;
 use zksync_types::{
-    aggregated_operations::AggregatedActionType,
     block::{
         Block, ExecutedOperations, ExecutedPriorityOp, ExecutedTx,
         PendingBlock as SendablePendingBlock,
@@ -23,8 +22,8 @@ use zksync_types::{
     gas_counter::GasCounter,
     mempool::SignedTxVariant,
     tx::{TxHash, ZkSyncTx},
-    Account, AccountId, AccountTree, AccountUpdate, AccountUpdates, ActionType, Address,
-    BlockNumber, PriorityOp, SignedZkSyncTx, H256,
+    Account, AccountId, AccountTree, AccountUpdate, AccountUpdates, Address, BlockNumber,
+    PriorityOp, SignedZkSyncTx, H256,
 };
 // Local uses
 use crate::{

@@ -4,7 +4,7 @@
 use serde::Serialize;
 use std::time::Instant;
 use structopt::StructOpt;
-use zksync_crypto::proof::EncodedProofPlonk;
+use zksync_crypto::proof::EncodedSingleProof;
 use zksync_storage::ConnectionPool;
 use zksync_types::{AccountId, Address, TokenId, TokenLike};
 use zksync_utils::BigUintSerdeWrapper;
@@ -15,7 +15,7 @@ struct ExitProofData {
     account_id: AccountId,
     account_address: Address,
     amount: BigUintSerdeWrapper,
-    proof: EncodedProofPlonk,
+    proof: EncodedSingleProof,
 }
 
 #[derive(StructOpt)]

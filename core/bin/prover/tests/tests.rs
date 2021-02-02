@@ -42,13 +42,13 @@ struct MockProverConfigs {
 impl Default for MockProverConfigs {
     fn default() -> Self {
         let plonk_config = PlonkStepByStepProverConfig {
-            all_block_sizes: vec![6, 30, 74, 150, 320, 630],
-            aggregated_proof_sizes_with_setup_pow: vec![(1, 22), (5, 24), (10, 25), (20, 26)],
-            block_sizes: vec![6, 30],
+            all_block_sizes: vec![10, 32, 72, 156, 322, 654],
+            aggregated_proof_sizes_with_setup_pow: vec![(1, 22), (4, 23), (8, 24), (18, 25)],
+            block_sizes: vec![10, 32],
             download_setup_from_network: false,
         };
         let dummy_config = DummyProverConfig {
-            block_sizes: vec![6, 30],
+            block_sizes: vec![10, 32],
         };
         let prover_options = ProverConfig {
             prover: zksync_config::configs::prover::Prover {
@@ -133,7 +133,7 @@ fn test_data_for_prover() -> JobRequestData {
             .expect("failed to parse"),
     };
 
-    JobRequestData::BlockProof(prover_data, 6)
+    JobRequestData::BlockProof(prover_data, 10)
 }
 
 #[tokio::test]

@@ -109,7 +109,6 @@ pub async fn run_core(
         &config,
         eth_watch_req_sender.clone(),
         eth_watch_req_receiver,
-        connection_pool.clone(),
     );
 
     // Insert pending withdrawals into database (if required)
