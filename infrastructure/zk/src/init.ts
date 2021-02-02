@@ -24,6 +24,7 @@ export async function init() {
     await contract.build();
     await run.deployERC20('dev');
     await run.deployEIP1271();
+    await run.deployWithdrawalHelpersContracts();
     await server.genesis();
     await contract.redeploy();
     if (!process.env.CI) {

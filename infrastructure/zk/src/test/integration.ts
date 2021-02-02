@@ -94,6 +94,7 @@ export async function inDocker(command: string, timeout: number) {
 export async function all() {
     await server();
     await api();
+    await withdrawalHelpers();
     await zcli();
     await rustSDK();
     // have to kill server before running data-restore
@@ -111,6 +112,10 @@ export async function zcli() {
 
 export async function server() {
     await utils.spawn('yarn ts-tests test');
+}
+
+export async function withdrawalHelpers() {
+    await utils.spawn('yarn ts-tests withdrawal-helpers-test');
 }
 
 export async function testkit(command: string, timeout: number) {
@@ -206,6 +211,14 @@ command
     .option('--with-server')
     .action(async (cmd: Command) => {
         cmd.withServer ? await withServer(server, 1200) : await server();
+    });
+
+command
+    .command('withdrawal-helpers')
+    .description('run withdrawal helpers integration tests')
+    .option('--with-server')
+    .action(async (cmd: Command) => {
+        cmd.withServer ? await withServer(withdrawalHelpers, 1200) : await withdrawalHelpers();
     });
 
 command

@@ -46,6 +46,7 @@
     "upgrade-testnet-no-build": "ts-node scripts/upgrade-testnet.ts",
     "deploy-eip1271": "ts-node scripts/deploy-eip1271.ts",
     "deploy-erc20": "ts-node scripts/deploy-erc20.ts",
+    "deploy-withdrawal-helpers-contracts": "ts-node scripts/deploy-withdrawal-helpers.ts",
     "governance-add-erc20": "ts-node scripts/governance-add-erc20.ts",
     "server-add-erc20": "ts-node scripts/server-add-erc20.ts",
     "token-info": "ts-node scripts/token-info.ts",

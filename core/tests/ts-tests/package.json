@@ -14,7 +14,8 @@
   },
   "scripts": {
     "test": "zk f mocha tests/main.test.ts",
-    "api-test": "zk f mocha tests/api.test.ts"
+    "api-test": "zk f mocha tests/api.test.ts",
+    "withdrawal-helpers-test": "zk f mocha tests/withdrawal-helpers.test.ts"
   },
   "devDependencies": {
     "@types/chai": "^4.2.14",
@@ -28,7 +29,6 @@
     "mocha-steps": "^1.3.0",
     "node-fetch": "^2.6.1",
     "ts-node": "^9.0.0",
-    "typescript": "^4.0.5",
-    "zksync": "link:../../../sdk/zksync.js"
+    "typescript": "^4.0.5"
   }
 }
