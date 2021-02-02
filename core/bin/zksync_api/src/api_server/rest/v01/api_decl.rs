@@ -59,6 +59,10 @@ impl ApiV01 {
             .route("/status", web::get().to(Self::status))
             .route("/tokens", web::get().to(Self::tokens))
             .route(
+                "/tokens_acceptable_for_fees",
+                web::get().to(Self::tokens_acceptable_for_fees),
+            )
+            .route(
                 "/account/{address}/history/{offset}/{limit}",
                 web::get().to(Self::tx_history),
             )
