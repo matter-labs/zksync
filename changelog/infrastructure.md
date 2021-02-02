@@ -11,7 +11,7 @@ components, the logs will have the following format:
 
 ### Removed
 
-- 'localStorage' caching, it fixed the bug, when entire block be "Initiated" for more than a day.
+- (`explorer`): 'localStorage' caching. It fixed the bug when the block have not updated the "Initiated" status.
 
 ### Changed
 
