@@ -72,6 +72,7 @@ async function reason() {
         }
 
         for (const log of receipt.logs) {
+            console.log(log);
             try {
                 let parsedLog = franklinInterface.parseLog(log);
                 if (!parsedLog) {

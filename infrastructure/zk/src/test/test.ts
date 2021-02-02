@@ -40,8 +40,7 @@ export async function rustApi(reset: boolean, ...args: string[]) {
 }
 
 export async function contracts() {
-    await contract.build();
-    await utils.spawn('yarn contracts unit-test');
+    await utils.spawn('yarn contracts test');
 }
 
 export async function circuit(threads: number = 1, testName?: string, ...args: string[]) {

@@ -235,6 +235,24 @@ impl<'a, 'c> EthereumSchema<'a, 'c> {
         Ok(response)
     }
 
+    /// Returns whether the operation with the given id was confirmed.
+    /// If the operation with such id does not exist, then it returns Ok(false).
+    pub async fn is_aggregated_op_confirmed(&mut self, id: i64) -> QueryResult<bool> {
+        let start = Instant::now();
+        let confirmed = sqlx::query_as!(
+            StorageETHOperation,
+            "SELECT * FROM eth_operations WHERE id = $1",
+            id
+        )
+        .fetch_optional(self.0.conn())
+        .await?
+        .map(|op| op.confirmed)
+        .unwrap_or_default();
+
+        metrics::histogram!("sql.ethereum.is_aggregated_op_confirmed", start.elapsed());
+        Ok(confirmed)
+    }
+
     /// Retrieves the Ethereum operation ID given the tx hash.
     async fn get_eth_op_id(&mut self, hash: &H256) -> QueryResult<i64> {
         let start = Instant::now();

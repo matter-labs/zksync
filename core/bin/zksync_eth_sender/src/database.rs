@@ -214,20 +214,20 @@ impl DatabaseInterface for Database {
 
     async fn is_previous_operation_confirmed(
         &self,
-        _connection: &mut StorageProcessor<'_>,
-        _op: &ETHOperation,
+        connection: &mut StorageProcessor<'_>,
+        op: &ETHOperation,
     ) -> anyhow::Result<bool> {
-        // TODO
-        Ok(true)
-        // let previous_op = op.id - 1;
-        // if previous_op < 0 {
-        //     return Ok(true);
-        // }
-        //
-        // Ok(connection
-        //     .ethereum_schema()
-        //     .is_aggregated_op_confirmed(previous_op)
-        //     .await?)
+        let previous_op = op.id - 1;
+        if previous_op <= 0 {
+            return Ok(true);
+        }
+
+        let confirmed = connection
+            .ethereum_schema()
+            .is_aggregated_op_confirmed(previous_op)
+            .await?;
+
+        Ok(confirmed)
     }
 
     async fn confirm_operation(

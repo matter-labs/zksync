@@ -38,6 +38,8 @@ pub struct WithdrawData {
     pub token: u32,
     pub account_address: u32,
     pub eth_address: Fr,
+    pub valid_from: u64,
+    pub valid_until: u64,
 }
 
 pub struct WithdrawWitness<E: RescueEngine> {
@@ -54,12 +56,18 @@ impl Witness for WithdrawWitness<Bn256> {
     type CalculateOpsInput = SigDataInput;
 
     fn apply_tx(tree: &mut CircuitAccountTree, withdraw: &WithdrawOp) -> Self {
+        let (valid_from, valid_until) = {
+            let time_range = withdraw.tx.time_range.unwrap_or_default();
+            (time_range.valid_from, time_range.valid_until)
+        };
         let withdraw_data = WithdrawData {
             amount: withdraw.tx.amount.to_u128().unwrap(),
             fee: withdraw.tx.fee.to_u128().unwrap(),
             token: u32::from(withdraw.tx.token),
             account_address: withdraw.account_id,
             eth_address: eth_address_to_fr(&withdraw.tx.to),
+            valid_from,
+            valid_until,
         };
         // le_bit_vector_into_field_element()
         Self::apply_data(tree, &withdraw_data)
@@ -283,8 +291,8 @@ impl WithdrawWitness<Bn256> {
                 a: Some(a),
                 b: Some(b),
                 new_pub_key_hash: Some(Fr::zero()),
-                valid_from: Some(Fr::zero()),
-                valid_until: Some(Fr::from_str(&u32::MAX.to_string()).unwrap()),
+                valid_from: Some(Fr::from_str(&withdraw.valid_from.to_string()).unwrap()),
+                valid_until: Some(Fr::from_str(&withdraw.valid_until.to_string()).unwrap()),
             },
             before_root: Some(before_root),
             after_root: Some(after_root),

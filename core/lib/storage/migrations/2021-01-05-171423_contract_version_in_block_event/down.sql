@@ -1,1 +1,0 @@
-ALTER TABLE data_restore_events_state DROP contract_version;

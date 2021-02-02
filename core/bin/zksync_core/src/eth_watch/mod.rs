@@ -22,7 +22,6 @@ use web3::types::{Address, BlockNumber};
 
 // Workspace deps
 use zksync_crypto::params::PRIORITY_EXPIRATION;
-use zksync_storage::ConnectionPool;
 use zksync_types::{Nonce, PriorityOp, PubKeyHash, ZkSyncPriorityOp};
 
 // Local deps
@@ -30,17 +29,14 @@ use self::{
     client::EthClient,
     eth_state::ETHState,
     received_ops::{sift_outdated_ops, ReceivedPriorityOp},
-    storage::Storage,
 };
 
 pub use client::EthHttpClient;
-pub use storage::DBStorage;
 use zksync_config::ZkSyncConfig;
 
 mod client;
 mod eth_state;
 mod received_ops;
-mod storage;
 
 #[cfg(test)]
 mod tests;
@@ -92,20 +88,18 @@ pub enum EthWatchRequest {
     },
 }
 
-pub struct EthWatch<W: EthClient, S: Storage> {
+pub struct EthWatch<W: EthClient> {
     client: W,
-    storage: S,
     eth_state: ETHState,
     /// All ethereum events are accepted after sufficient confirmations to eliminate risk of block reorg.
     number_of_confirmations_for_event: u64,
     mode: WatcherMode,
 }
 
-impl<W: EthClient, S: Storage> EthWatch<W, S> {
-    pub fn new(client: W, storage: S, number_of_confirmations_for_event: u64) -> Self {
+impl<W: EthClient> EthWatch<W> {
+    pub fn new(client: W, number_of_confirmations_for_event: u64) -> Self {
         Self {
             client,
-            storage,
             eth_state: ETHState::default(),
             mode: WatcherMode::Working,
             number_of_confirmations_for_event,
@@ -408,17 +402,13 @@ pub fn start_eth_watch(
     config_options: &ZkSyncConfig,
     eth_req_sender: mpsc::Sender<EthWatchRequest>,
     eth_req_receiver: mpsc::Receiver<EthWatchRequest>,
-    db_pool: ConnectionPool,
 ) -> JoinHandle<()> {
     let transport = web3::transports::Http::new(&config_options.eth_client.web3_url).unwrap();
     let web3 = web3::Web3::new(transport);
     let eth_client = EthHttpClient::new(web3, config_options.contracts.contract_addr);
 
-    let storage = DBStorage::new(db_pool);
-
     let eth_watch = EthWatch::new(
         eth_client,
-        storage,
         config_options.eth_watch.confirmations_for_eth_event,
     );
 

@@ -3,40 +3,14 @@ use std::collections::HashMap;
 
 use web3::types::{Address, BlockNumber};
 
-use zksync_types::{
-    ethereum::CompleteWithdrawalsTx, Deposit, FullExit, PriorityOp, ZkSyncPriorityOp,
-};
+use zksync_types::{Deposit, FullExit, PriorityOp, ZkSyncPriorityOp};
 
-use crate::eth_watch::{client::EthClient, storage::Storage, EthWatch};
+use crate::eth_watch::{client::EthClient, EthWatch};
 use std::sync::Arc;
 use tokio::sync::RwLock;
 
-struct FakeStorage {
-    withdrawal_txs: Vec<CompleteWithdrawalsTx>,
-}
-
-impl FakeStorage {
-    fn new() -> Self {
-        Self {
-            withdrawal_txs: vec![],
-        }
-    }
-}
-
-#[async_trait::async_trait]
-impl Storage for FakeStorage {
-    async fn store_complete_withdrawals(
-        &mut self,
-        complete_withdrawals_txs: Vec<CompleteWithdrawalsTx>,
-    ) -> anyhow::Result<()> {
-        self.withdrawal_txs.extend(complete_withdrawals_txs);
-        Ok(())
-    }
-}
-
 struct FakeEthClientData {
     priority_ops: HashMap<u64, Vec<PriorityOp>>,
-    withdrawals: HashMap<u64, Vec<CompleteWithdrawalsTx>>,
     last_block_number: u64,
 }
 
@@ -44,7 +18,6 @@ impl FakeEthClientData {
     fn new() -> Self {
         Self {
             priority_ops: Default::default(),
-            withdrawals: Default::default(),
             last_block_number: 0,
         }
     }
@@ -125,9 +98,8 @@ impl EthClient for FakeEthClient {
     }
 }
 
-fn create_watcher<T: EthClient>(client: T) -> EthWatch<T, FakeStorage> {
-    let storage = FakeStorage::new();
-    EthWatch::new(client, storage, 1)
+fn create_watcher<T: EthClient>(client: T) -> EthWatch<T> {
+    EthWatch::new(client, 1)
 }
 
 #[tokio::test]

@@ -107,7 +107,7 @@ async fn ethereum_storage(mut storage: StorageProcessor<'_>) -> QueryResult<()> 
     let response = EthereumSchema(&mut storage)
         .save_new_eth_tx(
             AggregatedActionType::CommitBlocks,
-            Some(params.op.clone().unwrap().0),
+            params.op.clone(),
             params.deadline_block as i64,
             params.gas_price.clone(),
             params.raw_tx.clone(),
@@ -147,7 +147,7 @@ async fn ethereum_storage(mut storage: StorageProcessor<'_>) -> QueryResult<()> 
     let response_2 = EthereumSchema(&mut storage)
         .save_new_eth_tx(
             AggregatedActionType::CreateProofBlocks,
-            Some(params_2.op.clone().unwrap().0),
+            params_2.op.clone(),
             params_2.deadline_block as i64,
             params_2.gas_price.clone(),
             params_2.raw_tx.clone(),
@@ -183,9 +183,9 @@ async fn ethereum_storage(mut storage: StorageProcessor<'_>) -> QueryResult<()> 
     // Check that stats are updated as well.
     let updated_stats = EthereumSchema(&mut storage).load_stats().await?;
 
-    assert_eq!(updated_stats.commit_ops, 2);
-    assert_eq!(updated_stats.verify_ops, 0);
-    assert_eq!(updated_stats.withdraw_ops, 0);
+    assert_eq!(updated_stats.last_committed_block, 2);
+    assert_eq!(updated_stats.last_verified_block, 0);
+    assert_eq!(updated_stats.last_executed_block, 0);
 
     Ok(())
 }
@@ -266,7 +266,7 @@ async fn ethereum_unprocessed(mut storage: StorageProcessor<'_>) -> QueryResult<
     let response = EthereumSchema(&mut storage)
         .save_new_eth_tx(
             AggregatedActionType::CommitBlocks,
-            Some(params.op.clone().unwrap().0),
+            params.op.clone(),
             params.deadline_block as i64,
             params.gas_price.clone(),
             params.raw_tx.clone(),
@@ -300,7 +300,7 @@ async fn ethereum_unprocessed(mut storage: StorageProcessor<'_>) -> QueryResult<
     let response = EthereumSchema(&mut storage)
         .save_new_eth_tx(
             AggregatedActionType::CreateProofBlocks,
-            Some(verify_params.op.unwrap().0),
+            verify_params.op,
             verify_params.deadline_block as i64,
             verify_params.gas_price.clone(),
             verify_params.raw_tx.clone(),

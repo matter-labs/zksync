@@ -3,16 +3,13 @@ use std::time::Instant;
 // External imports
 use itertools::Itertools;
 // Workspace imports
-use zksync_types::{AccountId, AccountUpdate, ActionType, BlockNumber, Operation, Token, ZkSyncOp};
+use zksync_types::{AccountId, AccountUpdate, BlockNumber, Operation, Token, ZkSyncOp};
 // Local imports
 use self::records::{
     NewBlockEvent, NewStorageState, NewTokenEvent, NewZkSyncOp, StoredBlockEvent,
     StoredLastWatchedEthBlockNumber, StoredRollupOpsBlock, StoredStorageState, StoredZkSyncOp,
 };
-use crate::{
-    chain::{block::BlockSchema, operations::OperationsSchema, state::StateSchema},
-    tokens::TokensSchema,
-};
+use crate::{chain::state::StateSchema, tokens::TokensSchema};
 use crate::{QueryResult, StorageProcessor};
 
 pub mod records;
@@ -27,12 +24,12 @@ pub struct DataRestoreSchema<'a, 'c>(pub &'a mut StorageProcessor<'c>);
 impl<'a, 'c> DataRestoreSchema<'a, 'c> {
     pub async fn save_block_operations(
         &mut self,
-        commit_op: Operation,
-        verify_op: Operation,
+        _commit_op: Operation,
+        _verify_op: Operation,
     ) -> QueryResult<()> {
         let start = Instant::now();
-        let new_state = self.new_storage_state("None");
-        let mut transaction = self.0.start_transaction().await?;
+        let _new_state = self.new_storage_state("None");
+        let transaction = self.0.start_transaction().await?;
 
         // TODO: Restore code (ZKS-427)
 

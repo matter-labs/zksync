@@ -163,7 +163,7 @@ impl VecOptionalFrSerde {
 ///
 /// #[derive(Clone, Debug, Serialize, Deserialize)]
 /// pub struct SomeStructure {
-///     #[serde(with = "VeFrSerde")]
+///     #[serde(with = "VecFrSerde")]
 ///     pub vec_fr: Vec<Fr>,
 /// }
 /// ```
