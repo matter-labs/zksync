@@ -134,7 +134,7 @@ pub fn execute_blocks_operations(idx: usize) -> (i64, AggregatedOperation) {
     assert!(
         idx < EXECUTE_BLOCKS_OPERATIONS.len(),
         format!(
-            "Index {} is out of bounds for publish proof blocks onchain operations",
+            "Index {} is out of bounds for execute blocks onchain operations",
             idx
         )
     );
