@@ -3,6 +3,7 @@ local metrics = [
   "sql.ethereum.add_hash_entry",
   "sql.ethereum.confirm_eth_tx",
   "sql.ethereum.get_eth_op_id",
+  "sql.ethereum.is_aggregated_op_confirmed",
   "sql.ethereum.get_next_nonce",
   "sql.ethereum.initialize_eth_data",
   "sql.ethereum.load_average_gas_price",
