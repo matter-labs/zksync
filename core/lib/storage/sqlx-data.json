@@ -2233,6 +2233,18 @@
       ]
     }
   },
+  "8542fbcf1f669243a111348851c36ec3b01c4c11ac3391d55546d22a9e714e6b": {
+    "query": "DELETE FROM executed_transactions\n            WHERE success = false AND created_at < $1",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "Timestamptz"
+        ]
+      },
+      "nullable": []
+    }
+  },
   "85f509373fbcfdd2e477fe2458f1035be06e1a51f20979fa9dc0e5144e1de084": {
     "query": "SELECT max(block_number) FROM operations WHERE action_type = $1 AND confirmed IS DISTINCT FROM $2",
     "describe": {
