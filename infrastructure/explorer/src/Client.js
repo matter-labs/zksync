@@ -177,9 +177,9 @@ export class Client {
         const transactions = rawTransactions.filter((tx) => {
             const type = tx.tx.type || '';
             if (type == 'Deposit') {
-                return tx.tx.priority_op.to == address;
+                return tx.tx.priority_op.to.toLowerCase() == address.toLowerCase();
             } else if (type == 'Withdraw') {
-                return tx.tx.from == address;
+                return tx.tx.from.toLowerCase() == address.toLowerCase();
             } else return true;
         });
         const res = transactions.map(async (tx) => {

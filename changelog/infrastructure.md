@@ -24,6 +24,8 @@ components, the logs will have the following format:
 
 - (`explorer`): Bug with not displaying old blocks was fixed.
 - (`explorer`): bug with updating transaction data after searching another transaction was fixed.
+- (`explorer`): bug with not displaying some deposits and withdrawals for the accounts was fixed by not taking account
+  address case into account.
 
 ## Release 2021-01-12
 
