@@ -11,10 +11,8 @@ use zksync_basic_types::{H256, U256};
 use zksync_config::configs::eth_sender::{ETHSenderConfig, GasLimit, Sender};
 use zksync_eth_client::SignedCallResult;
 use zksync_storage::{ethereum::records::ETHParams, StorageProcessor};
-use zksync_types::ethereum::{
-    aggregated_operations::{AggregatedActionType, AggregatedOperation},
-    ETHOperation, EthOpId, InsertedOperationResponse,
-};
+use zksync_types::aggregated_operations::{AggregatedActionType, AggregatedOperation};
+use zksync_types::ethereum::{ETHOperation, EthOpId, InsertedOperationResponse};
 // Local uses
 use super::ETHSender;
 use crate::database::DatabaseInterface;
