@@ -10,6 +10,7 @@ use chrono::{SecondsFormat, Utc};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::{convert::TryFrom, time::Duration};
+use structopt::StructOpt;
 use zksync_crypto::rand::{thread_rng, Rng};
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -146,18 +147,36 @@ fn main_scope(sloppy_mode: bool) -> actix_web::Scope {
     }
 }
 
+/// Ticker implementation for dev environment
+///
+/// Implements coinmarketcap API for tokens deployed using `deploy-dev-erc20`
+/// Prices are randomly distributed around base values estimated from real world prices.
+#[derive(Debug, StructOpt, Clone, Copy)]
+struct FeeTickerOpts {
+    /// Activate "sloppy" mode.
+    ///
+    /// With the option, server will provide a random delay for requests
+    /// (60% of 0.1 delay, 30% of 0.1 - 1.0 delay, 10% of 5 seconds delay),
+    /// and will randomly return errors for 5% of requests.
+    #[structopt(long)]
+    sloppy: bool,
+}
+
 fn main() {
     vlog::init();
 
-    let sloppy_mode = std::env::args().nth(1).filter(|x| x == "--sloppy");
+    let opts = FeeTickerOpts::from_args();
+    if opts.sloppy {
+        vlog::info!("Fee ticker server will run in a sloppy mode.");
+    }
 
     let mut runtime = actix_rt::System::new("dev-ticker");
-    runtime.block_on(async {
+    runtime.block_on(async move {
         HttpServer::new(move || {
             App::new()
                 .wrap(middleware::Logger::default())
                 .wrap(Cors::new().send_wildcard().max_age(3600).finish())
-                .service(main_scope(sloppy_mode.is_some()))
+                .service(main_scope(opts.sloppy))
         })
         .bind("0.0.0.0:9876")
         .unwrap()
