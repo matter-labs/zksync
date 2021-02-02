@@ -14,7 +14,7 @@ zksync_fee = 100000000000
 [[scenarios]]
 name = 'fee_ticker'
 # The name of the token used for testing.
-token_name = 'ETH'
+token_name = 'BAT'
 # Amount of money to be used in the transfer, in gwei.
 transfer_size = 1
 transfer_rounds = 10
@@ -43,7 +43,7 @@ max_batch_size = 15
 [[scenarios]]
 name = 'fee_ticker'
 # The name of the token used for testing.
-token_name = 'DAI'
+token_name = 'tGLM'
 # Amount of money to be used in the transfer, in gwei.
 transfer_size = 1
 transfer_rounds = 10

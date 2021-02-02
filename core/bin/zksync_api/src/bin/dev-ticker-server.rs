@@ -9,12 +9,42 @@ use bigdecimal::BigDecimal;
 use chrono::{SecondsFormat, Utc};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
-use std::convert::TryFrom;
+use std::{convert::TryFrom, time::Duration};
 use zksync_crypto::rand::{thread_rng, Rng};
 
 #[derive(Debug, Serialize, Deserialize)]
 struct CoinMarketCapTokenQuery {
     symbol: String,
+}
+
+macro_rules! make_sloppy {
+    ($f: ident) => {{
+        |query| async {
+            if thread_rng().gen_range(0, 100) < 5 {
+                vlog::debug!("`{}` has been errored", stringify!($f));
+                return Ok(HttpResponse::InternalServerError().finish());
+            }
+
+            let duration = match thread_rng().gen_range(0, 100) {
+                0..=59 => Duration::from_millis(100),
+                60..=69 => Duration::from_secs(5),
+                _ => {
+                    let ms = thread_rng().gen_range(100, 1000);
+                    Duration::from_millis(ms)
+                }
+            };
+
+            vlog::debug!(
+                "`{}` has been delayed for {}ms",
+                stringify!($f),
+                duration.as_millis()
+            );
+            tokio::time::delay_for(duration).await;
+
+            let resp = $f(query).await;
+            resp
+        }
+    }};
 }
 
 async fn handle_coinmarketcap_token_price_query(
@@ -84,31 +114,50 @@ async fn handle_coingecko_token_price_query(req: HttpRequest) -> Result<HttpResp
     Ok(HttpResponse::Ok().json(resp))
 }
 
+fn main_scope(sloppy_mode: bool) -> actix_web::Scope {
+    if sloppy_mode {
+        web::scope("/")
+            .route(
+                "/cryptocurrency/quotes/latest",
+                web::get().to(make_sloppy!(handle_coinmarketcap_token_price_query)),
+            )
+            .route(
+                "/api/v3/coins/list",
+                web::get().to(make_sloppy!(handle_coingecko_token_list)),
+            )
+            .route(
+                "/api/v3/coins/{coin_id}/market_chart",
+                web::get().to(make_sloppy!(handle_coingecko_token_price_query)),
+            )
+    } else {
+        web::scope("/")
+            .route(
+                "/cryptocurrency/quotes/latest",
+                web::get().to(handle_coinmarketcap_token_price_query),
+            )
+            .route(
+                "/api/v3/coins/list",
+                web::get().to(handle_coingecko_token_list),
+            )
+            .route(
+                "/api/v3/coins/{coin_id}/market_chart",
+                web::get().to(handle_coingecko_token_price_query),
+            )
+    }
+}
+
 fn main() {
     vlog::init();
 
-    let mut runtime = actix_rt::System::new("dev-ticker");
+    let sloppy_mode = std::env::args().nth(1).filter(|x| x == "--sloppy");
 
+    let mut runtime = actix_rt::System::new("dev-ticker");
     runtime.block_on(async {
         HttpServer::new(move || {
             App::new()
                 .wrap(middleware::Logger::default())
                 .wrap(Cors::new().send_wildcard().max_age(3600).finish())
-                .service(
-                    web::scope("/")
-                        .route(
-                            "/cryptocurrency/quotes/latest",
-                            web::get().to(handle_coinmarketcap_token_price_query),
-                        )
-                        .route(
-                            "/api/v3/coins/list",
-                            web::get().to(handle_coingecko_token_list),
-                        )
-                        .route(
-                            "/api/v3/coins/{coin_id}/market_chart",
-                            web::get().to(handle_coingecko_token_price_query),
-                        ),
-                )
+                .service(main_scope(sloppy_mode.is_some()))
         })
         .bind("0.0.0.0:9876")
         .unwrap()
