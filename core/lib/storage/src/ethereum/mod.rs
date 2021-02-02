@@ -247,7 +247,7 @@ impl<'a, 'c> EthereumSchema<'a, 'c> {
         .fetch_optional(self.0.conn())
         .await?
         .map(|op| op.confirmed)
-        .unwrap_or_default();
+        .unwrap_or(false);
 
         metrics::histogram!("sql.ethereum.is_aggregated_op_confirmed", start.elapsed());
         Ok(confirmed)
