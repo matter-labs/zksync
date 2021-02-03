@@ -343,9 +343,24 @@ impl<'a, 'c> ProverSchema<'a, 'c> {
             last_block as BlockNumber
         } else {
             // this branch executes when prover job queue is empty
-            OperationsSchema(self.0)
-                .get_last_block_by_aggregated_action(AggregatedActionType::CreateProofBlocks, None)
-                .await?
+            match action_type {
+                ProverJobType::SingleProof => {
+                    OperationsSchema(self.0)
+                        .get_last_block_by_aggregated_action(
+                            AggregatedActionType::CreateProofBlocks,
+                            None,
+                        )
+                        .await?
+                }
+                ProverJobType::AggregatedProof => {
+                    OperationsSchema(self.0)
+                        .get_last_block_by_aggregated_action(
+                            AggregatedActionType::PublishProofBlocksOnchain,
+                            None,
+                        )
+                        .await?
+                }
+            }
         };
 
         Ok(result)
