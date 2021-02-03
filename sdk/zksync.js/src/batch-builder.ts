@@ -56,7 +56,8 @@ export class BatchBuilder {
         for (const tx of this.txs) {
             const fee = tx.tx.fee;
             const token = tx.token;
-            totalFee.set(token, totalFee.get(token) || 0 + fee);
+            const curr: BigNumber = totalFee.get(token) || BigNumber.from(0);
+            totalFee.set(token, curr.add(fee));
         }
 
         const { txs, message } = await this.processTransactions();
