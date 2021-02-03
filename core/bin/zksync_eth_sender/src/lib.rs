@@ -12,9 +12,10 @@ use web3::{
     contract::Options,
     types::{TransactionReceipt, H256, U256},
 };
+
 // Workspace uses
 use zksync_config::{ETHSenderConfig, ZkSyncConfig};
-use zksync_eth_client::SignedCallResult;
+use zksync_eth_client::{EthereumGateway, SignedCallResult};
 use zksync_storage::ConnectionPool;
 use zksync_types::{
     config,
@@ -25,14 +26,12 @@ use zksync_types::{
 // Local uses
 use self::{
     database::{Database, DatabaseInterface},
-    ethereum_interface::{EthereumHttpClient, EthereumInterface},
     gas_adjuster::GasAdjuster,
     transactions::*,
     tx_queue::{TxData, TxQueue, TxQueueBuilder},
 };
 
 mod database;
-mod ethereum_interface;
 mod gas_adjuster;
 mod transactions;
 mod tx_queue;
@@ -110,23 +109,23 @@ enum TxCheckMode {
 /// report the incident to the log and then panic to prevent continue working in a probably
 /// erroneous conditions. Failure handling policy is determined by a corresponding callback,
 /// which can be changed if needed.
-struct ETHSender<ETH: EthereumInterface, DB: DatabaseInterface> {
+struct ETHSender<DB: DatabaseInterface> {
     /// Ongoing operations queue.
     ongoing_ops: VecDeque<ETHOperation>,
     /// Connection to the database.
     db: DB,
     /// Ethereum intermediator.
-    ethereum: ETH,
+    ethereum: EthereumGateway,
     /// Queue for ordered transaction processing.
     tx_queue: TxQueue,
     /// Utility for managing the gas price for transactions.
-    gas_adjuster: GasAdjuster<ETH, DB>,
+    gas_adjuster: GasAdjuster<DB>,
     /// Settings for the `ETHSender`.
     options: ETHSenderConfig,
 }
 
-impl<ETH: EthereumInterface, DB: DatabaseInterface> ETHSender<ETH, DB> {
-    pub async fn new(options: ETHSenderConfig, db: DB, ethereum: ETH) -> Self {
+impl<DB: DatabaseInterface> ETHSender<DB> {
+    pub async fn new(options: ETHSenderConfig, db: DB, ethereum: EthereumGateway) -> Self {
         let mut connection = db
             .acquire_connection()
             .await
@@ -163,11 +162,11 @@ impl<ETH: EthereumInterface, DB: DatabaseInterface> ETHSender<ETH, DB> {
 
         // Add all the unprocessed operations to the queue.
         for operation in unprocessed_ops {
-            log::info!(
+            vlog::info!(
                 "Adding unprocessed ZKSync operation <id {}; action: {}; block: {}> to queue",
                 operation.id.expect("ID must be set"),
                 operation.action.to_string(),
-                operation.block.block_number
+                *operation.block.block_number
             );
             sender.add_operation_to_queue(operation);
         }
@@ -203,7 +202,7 @@ impl<ETH: EthereumInterface, DB: DatabaseInterface> ETHSender<ETH, DB> {
         let mut connection = match self.db.acquire_connection().await {
             Ok(connection) => connection,
             Err(err) => {
-                log::warn!("Unable to connect to the database: {}", err);
+                vlog::warn!("Unable to connect to the database: {}", err);
                 return;
             }
         };
@@ -213,7 +212,7 @@ impl<ETH: EthereumInterface, DB: DatabaseInterface> ETHSender<ETH, DB> {
             .load_new_operations(&mut connection)
             .await
             .unwrap_or_else(|err| {
-                log::warn!("Unable to load new operations from the database: {}", err);
+                vlog::warn!("Unable to load new operations from the database: {}", err);
                 Vec::new()
             });
         drop(connection);
@@ -264,12 +263,20 @@ impl<ETH: EthereumInterface, DB: DatabaseInterface> ETHSender<ETH, DB> {
                     self.tx_queue.report_commitment();
 
                     if current_op.is_verify() {
-                        let sync_op = current_op.op.expect("Should be verify operation");
-                        let contains_withdrawals = !sync_op.block.get_withdrawals_data().is_empty();
+                        let sync_op = current_op.clone().op.expect("Should be verify operation");
+                        // Number of times to call `completeWithdrawals` on the contract.
+                        // Value is equal to the number of withdrawals in the block divide by the maximum number of calls, rounded up.
+                        let number_complete_withdrawals_calls =
+                            (sync_op.block.get_withdrawals_count() - 1
+                                + config::MAX_WITHDRAWALS_TO_COMPLETE_IN_A_CALL as usize)
+                                / config::MAX_WITHDRAWALS_TO_COMPLETE_IN_A_CALL as usize;
 
-                        if contains_withdrawals {
+                        if number_complete_withdrawals_calls > 0 {
                             // Complete pending withdrawals after each verify.
-                            self.add_complete_withdrawals_to_queue();
+                            self.add_complete_withdrawals_to_queue(
+                                number_complete_withdrawals_calls,
+                                sync_op,
+                            );
                         }
                     }
                 }
@@ -291,9 +298,9 @@ impl<ETH: EthereumInterface, DB: DatabaseInterface> ETHSender<ETH, DB> {
     }
 
     async fn process_error(err: anyhow::Error) {
-        log::warn!("Error while trying to complete uncommitted op: {}", err);
+        vlog::warn!("Error while trying to complete uncommitted op: {}", err);
         if err.to_string().contains(RATE_LIMIT_HTTP_CODE) {
-            log::warn!(
+            vlog::warn!(
                 "Received rate limit response, waiting for {}s",
                 RATE_LIMIT_BACKOFF_PERIOD.as_secs()
             );
@@ -307,7 +314,7 @@ impl<ETH: EthereumInterface, DB: DatabaseInterface> ETHSender<ETH, DB> {
     /// Stores the new operation in the database and sends the corresponding transaction.
     async fn initialize_operation(&mut self, tx: TxData) -> anyhow::Result<()> {
         let current_block = self.ethereum.block_number().await?;
-        let deadline_block = self.get_deadline_block(current_block);
+        let deadline_block = self.get_deadline_block(current_block.as_u64());
         let gas_price = self
             .gas_adjuster
             .get_gas_price(&self.ethereum, None)
@@ -325,7 +332,7 @@ impl<ETH: EthereumInterface, DB: DatabaseInterface> ETHSender<ETH, DB> {
                 .save_new_eth_tx(
                     &mut transaction,
                     tx.op_type,
-                    tx.operation.clone(),
+                    Some(tx.operation.clone()),
                     deadline_block as i64,
                     gas_price,
                     tx.raw.clone(),
@@ -335,7 +342,7 @@ impl<ETH: EthereumInterface, DB: DatabaseInterface> ETHSender<ETH, DB> {
             let mut new_op = ETHOperation {
                 id: assigned_data.id,
                 op_type: tx.op_type,
-                op: tx.operation,
+                op: Some(tx.operation),
                 nonce: assigned_data.nonce,
                 last_deadline_block: deadline_block,
                 last_used_gas_price: gas_price,
@@ -362,17 +369,17 @@ impl<ETH: EthereumInterface, DB: DatabaseInterface> ETHSender<ETH, DB> {
         self.ongoing_ops.push_back(new_op.clone());
 
         // After storing all the tx data in the database, we can finally send the tx.
-        log::info!(
+        vlog::info!(
             "Sending new tx: [ETH Operation <id: {}, type: {:?}>. ETH tx: {}. ZKSync operation: {}]",
             new_op.id, new_op.op_type, self.eth_tx_description(&signed_tx), self.zksync_operation_description(&new_op),
         );
-        self.ethereum.send_tx(&signed_tx).await.unwrap_or_else(|e| {
+        if let Err(e) = self.ethereum.send_raw_tx(signed_tx.raw_tx).await {
             // Sending tx error is not critical: this will result in transaction being considered stuck,
             // and resent. We can't do anything about this failure either, since it's most probably is not
             // related to the node logic, so we just log this error and pretend to have this operation
             // processed.
-            log::warn!("Error while sending the operation: {}", e);
-        });
+            vlog::warn!("Error while sending the operation: {}", e);
+        };
 
         transaction.commit().await?;
 
@@ -398,7 +405,7 @@ impl<ETH: EthereumInterface, DB: DatabaseInterface> ETHSender<ETH, DB> {
                 "<id {}; action: {}; block: {}>",
                 op.id.expect("ID must be set"),
                 op.action.to_string(),
-                op.block.block_number
+                *op.block.block_number
             )
         } else {
             "<not applicable>".into()
@@ -434,7 +441,7 @@ impl<ETH: EthereumInterface, DB: DatabaseInterface> ETHSender<ETH, DB> {
             };
 
             match self
-                .check_transaction_state(mode, op, tx_hash, current_block)
+                .check_transaction_state(mode, op, *tx_hash, current_block.as_u64())
                 .await?
             {
                 TxCheckOutcome::Pending => {
@@ -466,11 +473,11 @@ impl<ETH: EthereumInterface, DB: DatabaseInterface> ETHSender<ETH, DB> {
                         .is_previous_operation_confirmed(&mut transaction, &op)
                         .await?
                     {
-                        log::info!("ETH Operation <id: {}> is confirmed ahead of time, considering it pending for now", op.id);
+                        vlog::info!("ETH Operation <id: {}> is confirmed ahead of time, considering it pending for now", op.id);
                         return Ok(OperationCommitment::Pending);
                     }
 
-                    log::info!(
+                    vlog::info!(
                         "Confirmed: [ETH Operation <id: {}, type: {:?}>. Tx hash: <{:#x}>. ZKSync operation: {}]",
                         op.id, op.op_type, tx_hash, self.zksync_operation_description(op),
                     );
@@ -485,7 +492,7 @@ impl<ETH: EthereumInterface, DB: DatabaseInterface> ETHSender<ETH, DB> {
                     // the last entry of the list, a new tx will be sent.
                 }
                 TxCheckOutcome::Failed(receipt) => {
-                    log::warn!(
+                    vlog::warn!(
                         "ETH transaction failed: tx: {:#x}, op_type: {:?}, op: {:?}; tx_receipt: {:#?} ",
                         tx_hash,
                         op.op_type,
@@ -500,7 +507,7 @@ impl<ETH: EthereumInterface, DB: DatabaseInterface> ETHSender<ETH, DB> {
 
         // Reaching this point will mean that the latest transaction got stuck.
         // We should create another tx based on it, and send it.
-        let deadline_block = self.get_deadline_block(current_block);
+        let deadline_block = self.get_deadline_block(current_block.as_u64());
         // Raw tx contents are the same for every transaction, so we just
         // create a new one from the old one with updated parameters.
         let new_tx = self.create_supplement_tx(deadline_block, op).await?;
@@ -520,12 +527,17 @@ impl<ETH: EthereumInterface, DB: DatabaseInterface> ETHSender<ETH, DB> {
             .add_hash_entry(&mut transaction, op.id, &new_tx.hash)
             .await?;
 
-        log::info!(
+        vlog::info!(
             "Stuck tx processing: sending tx for op, eth_op_id: {}; ETH tx: {}",
             op.id,
             self.eth_tx_description(&new_tx),
         );
-        self.ethereum.send_tx(&new_tx).await?;
+        let hash = self.ethereum.send_raw_tx(new_tx.raw_tx.clone()).await?;
+        anyhow::ensure!(
+            hash == new_tx.hash,
+            "Hash from signer and Ethereum node mismatch"
+        );
+
         transaction.commit().await?;
 
         metrics::histogram!("eth_sender.perform_commitment_step", start.elapsed());
@@ -535,14 +547,14 @@ impl<ETH: EthereumInterface, DB: DatabaseInterface> ETHSender<ETH, DB> {
     /// Handles a transaction execution failure by reporting the issue to the log
     /// and terminating the node.
     async fn failure_handler(&self, receipt: &TransactionReceipt) -> ! {
-        log::error!(
+        vlog::error!(
             "Ethereum transaction unexpectedly failed. Receipt: {:#?}",
             receipt
         );
-        if let Some(reason) = self.ethereum.failure_reason(receipt.transaction_hash).await {
-            log::error!("Failure reason for Ethereum tx: {:#?}", reason);
+        if let Ok(Some(reason)) = self.ethereum.failure_reason(receipt.transaction_hash).await {
+            vlog::error!("Failure reason for Ethereum tx: {:#?}", reason);
         } else {
-            log::error!("Unable to receive failure reason for Ethereum tx");
+            vlog::error!("Unable to receive failure reason for Ethereum tx");
         }
         panic!("Cannot operate after unexpected TX failure");
     }
@@ -558,7 +570,7 @@ impl<ETH: EthereumInterface, DB: DatabaseInterface> ETHSender<ETH, DB> {
         &self,
         mode: TxCheckMode,
         op: &ETHOperation,
-        tx_hash: &H256,
+        tx_hash: H256,
         current_block: u64,
     ) -> anyhow::Result<TxCheckOutcome> {
         let status = self.ethereum.get_tx_status(tx_hash).await?;
@@ -601,7 +613,10 @@ impl<ETH: EthereumInterface, DB: DatabaseInterface> ETHSender<ETH, DB> {
     }
 
     /// Creates a new Ethereum operation.
-    async fn sign_new_tx(ethereum: &ETH, op: &ETHOperation) -> anyhow::Result<SignedCallResult> {
+    async fn sign_new_tx(
+        ethereum: &EthereumGateway,
+        op: &ETHOperation,
+    ) -> anyhow::Result<SignedCallResult> {
         let tx_options = {
             // We set the gas limit for commit / verify operations as pre-calculated estimation.
             // This estimation is a higher bound based on a pre-calculated cost of every operation in the block.
@@ -613,7 +628,7 @@ impl<ETH: EthereumInterface, DB: DatabaseInterface> ETHSender<ETH, DB> {
                 op
             );
 
-            log::info!(
+            vlog::info!(
                 "Gas limit for <ETH Operation id: {}> is {}",
                 op.id,
                 gas_limit
@@ -695,7 +710,7 @@ impl<ETH: EthereumInterface, DB: DatabaseInterface> ETHSender<ETH, DB> {
             stuck_tx
         );
 
-        log::info!(
+        vlog::info!(
             "Replacing tx: hash: {:#x}, old_gas: {}, new_gas: {}, used nonce: {}, gas limit: {}",
             stuck_tx.used_tx_hashes.last().unwrap(),
             old_tx_gas_price,
@@ -718,16 +733,16 @@ impl<ETH: EthereumInterface, DB: DatabaseInterface> ETHSender<ETH, DB> {
                 let root = op.block.get_eth_encoded_root();
 
                 let public_data = op.block.get_eth_public_data();
-                log::debug!(
+                vlog::debug!(
                     "public_data for block_number {}: {}",
-                    op.block.block_number,
+                    *op.block.block_number,
                     hex::encode(&public_data)
                 );
 
                 let witness_data = op.block.get_eth_witness_data();
-                log::debug!(
+                vlog::debug!(
                     "witness_data for block {}: {}, {:?}",
-                    op.block.block_number,
+                    *op.block.block_number,
                     hex::encode(&witness_data.0),
                     &witness_data.1
                 );
@@ -735,8 +750,8 @@ impl<ETH: EthereumInterface, DB: DatabaseInterface> ETHSender<ETH, DB> {
                 self.ethereum.encode_tx_data(
                     "commitBlock",
                     (
-                        u64::from(op.block.block_number),
-                        u64::from(op.block.fee_account),
+                        u64::from(*op.block.block_number),
+                        u64::from(*op.block.fee_account),
                         vec![root],
                         public_data,
                         witness_data.0,
@@ -750,7 +765,7 @@ impl<ETH: EthereumInterface, DB: DatabaseInterface> ETHSender<ETH, DB> {
                 self.ethereum.encode_tx_data(
                     "verifyBlock",
                     (
-                        u64::from(block_number),
+                        u64::from(*block_number),
                         proof.proof.clone(),
                         withdrawals_data,
                     ),
@@ -784,43 +799,48 @@ impl<ETH: EthereumInterface, DB: DatabaseInterface> ETHSender<ETH, DB> {
                 }
 
                 self.tx_queue.add_verify_operation(
-                    block_number as usize,
+                    *block_number as usize,
                     TxData::from_operation(OperationType::Verify, op.clone(), raw_tx),
                 );
             }
         }
 
-        log::info!(
+        vlog::info!(
             "Added ZKSync operation <id {}; action: {}; block: {}> to queue",
             op.id.expect("ID must be set"),
             op.action.to_string(),
-            op.block.block_number
+            *op.block.block_number
         );
     }
 
     /// The same as `add_operation_to_queue`, but for the withdraw operation.
-    fn add_complete_withdrawals_to_queue(&mut self) {
+    fn add_complete_withdrawals_to_queue(&mut self, count: usize, operation: Operation) {
+        assert!(
+            count > 0,
+            "Cannot store a non-positive number of withdrawals"
+        );
         // function completeWithdrawals(uint32 _n) external {
         let raw_tx = self.ethereum.encode_tx_data(
             "completeWithdrawals",
             config::MAX_WITHDRAWALS_TO_COMPLETE_IN_A_CALL,
         );
 
-        log::info!("Adding withdraw operation to queue");
+        vlog::info!("Adding withdraw operation to queue");
 
-        self.tx_queue
-            .add_withdraw_operation(TxData::from_raw(OperationType::Withdraw, raw_tx));
+        self.tx_queue.add_withdraw_operation(
+            count,
+            TxData::from_operation(OperationType::Withdraw, operation, raw_tx),
+        );
     }
 }
 
 #[must_use]
-pub fn run_eth_sender(pool: ConnectionPool, options: ZkSyncConfig) -> JoinHandle<()> {
-    let ethereum = EthereumHttpClient::new(&options).expect("Ethereum client creation failed");
-
+pub fn run_eth_sender(pool: ConnectionPool, config: ZkSyncConfig) -> JoinHandle<()> {
+    let client = EthereumGateway::from_config(&config);
     let db = Database::new(pool);
 
     tokio::spawn(async move {
-        let eth_sender = ETHSender::new(options.eth_sender, db, ethereum).await;
+        let eth_sender = ETHSender::new(config.eth_sender.clone(), db, client).await;
 
         eth_sender.run().await
     })

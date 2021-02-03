@@ -15,18 +15,18 @@ zksync_api = { path = "../zksync_api", version = "1.0" }
 zksync_core = { path = "../zksync_core", version = "1.0" }
 zksync_witness_generator = { path = "../zksync_witness_generator", version = "1.0" }
 zksync_eth_sender = { path = "../zksync_eth_sender", version = "1.0" }
-zksync_prometheus_exporter = { path = "../zksync_prometheus_exporter", version = "1.0" }
 
+zksync_prometheus_exporter = { path = "../../lib/prometheus_exporter", version = "1.0" }
 zksync_config = { path = "../../lib/config", version = "1.0" }
 zksync_storage = { path = "../../lib/storage", version = "1.0" }
 
 anyhow = "1.0"
 structopt = "0.3.20"
-log = "0.4"
-env_logger = "0.6"
 ctrlc = { version = "3.1", features = ["termination"] }
 futures = "0.3"
 tokio = { version = "0.2", features = ["full"] }
+
+vlog = { path = "../../lib/vlog", version = "1.0" }
 
 [dev-dependencies]
 zksync_crypto = { path = "../../lib/crypto", version = "1.0" }

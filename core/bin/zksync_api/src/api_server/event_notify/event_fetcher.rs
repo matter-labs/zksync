@@ -13,7 +13,7 @@ macro_rules! await_db {
         match $e.await {
             Ok(res) => res,
             Err(err) => {
-                log::warn!("Unable to connect to the database: {}", err);
+                vlog::warn!("Unable to connect to the database: {}", err);
                 $on_exit
             }
         };
@@ -49,8 +49,8 @@ impl EventFetcher {
             miniblock_interval,
             db_pool,
 
-            last_committed_block: 0,
-            last_verified_block: 0,
+            last_committed_block: BlockNumber(0),
+            last_verified_block: BlockNumber(0),
             pending_block: None,
 
             operations_sender,
@@ -172,8 +172,11 @@ impl EventFetcher {
     ) {
         let start = Instant::now();
         // There may be more than one block in the gap.
-        for block_idx in (current_last_block + 1)..=new_last_operation {
-            let operation = await_db!(self.load_operation(block_idx, action), continue);
+        for block_idx in (*current_last_block + 1)..=*new_last_operation {
+            let operation = await_db!(
+                self.load_operation(BlockNumber(block_idx), action),
+                continue
+            );
             self.operations_sender
                 .send(operation)
                 .await

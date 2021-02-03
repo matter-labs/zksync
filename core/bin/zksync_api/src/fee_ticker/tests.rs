@@ -56,19 +56,19 @@ impl TestToken {
     }
 
     fn eth() -> Self {
-        Self::new(0, 182.0, None, 18)
+        Self::new(TokenId(0), 182.0, None, 18)
     }
 
     fn hex() -> Self {
-        Self::new(1, 1.0, Some(2.5), 6)
+        Self::new(TokenId(1), 1.0, Some(2.5), 6)
     }
 
     fn cheap() -> Self {
-        Self::new(2, 1.0, Some(2.5), 6)
+        Self::new(TokenId(2), 1.0, Some(2.5), 6)
     }
 
     fn expensive() -> Self {
-        Self::new(3, 173_134.192_3, Some(0.9), 18)
+        Self::new(TokenId(3), 173_134.192_3, Some(0.9), 18)
     }
 
     fn subsidized_tokens() -> Vec<Self> {
@@ -251,6 +251,11 @@ fn test_ticker_formula() {
             let token_precision = block_on(MockApiProvider.get_token(token.clone()))
                 .unwrap()
                 .decimals;
+            let batched_fee_in_token = block_on(
+                ticker.get_batch_from_ticker_in_wei(token.clone(), vec![(tx_type, address)]),
+            )
+            .expect("failed to get batched fee for token");
+            assert_eq!(fee_in_token.total_fee, batched_fee_in_token.total_fee);
 
             // Fee in usd
             (block_on(MockApiProvider.get_last_quote(token))
@@ -267,11 +272,14 @@ fn test_ticker_formula() {
     };
 
     let expected_price_of_eth_token_transfer_usd =
-        get_token_fee_in_usd(TxFeeTypes::Transfer, 0.into(), Address::default());
+        get_token_fee_in_usd(TxFeeTypes::Transfer, TokenId(0).into(), Address::default());
     let expected_price_of_eth_token_withdraw_usd =
-        get_token_fee_in_usd(TxFeeTypes::Withdraw, 0.into(), Address::default());
-    let expected_price_of_eth_token_fast_withdraw_usd =
-        get_token_fee_in_usd(TxFeeTypes::FastWithdraw, 0.into(), Address::default());
+        get_token_fee_in_usd(TxFeeTypes::Withdraw, TokenId(0).into(), Address::default());
+    let expected_price_of_eth_token_fast_withdraw_usd = get_token_fee_in_usd(
+        TxFeeTypes::FastWithdraw,
+        TokenId(0).into(),
+        Address::default(),
+    );
 
     // Cost of the transfer and withdraw in USD should be the same for all tokens up to +/- 3 digits
     // (mantissa len == 11)
@@ -351,7 +359,7 @@ async fn test_error_coingecko_api() {
         .unwrap()
         .tokens_schema()
         .update_historical_ticker_price(
-            1,
+            TokenId(1),
             TokenPrice {
                 usd_price: big_decimal_to_ratio(&BigDecimal::from(10)).unwrap(),
                 last_updated: chrono::offset::Utc::now(),
@@ -369,13 +377,17 @@ async fn test_error_coingecko_api() {
         config,
         validator,
     );
-    for _ in 0..1000 {
+    for _ in 0u16..1000u16 {
         ticker
-            .get_fee_from_ticker_in_wei(TxFeeTypes::FastWithdraw, 1.into(), Address::default())
+            .get_fee_from_ticker_in_wei(
+                TxFeeTypes::FastWithdraw,
+                TokenId(1).into(),
+                Address::default(),
+            )
             .await
             .unwrap();
         ticker
-            .get_token_price(1.into(), TokenPriceRequestType::USDForOneWei)
+            .get_token_price(TokenId(1).into(), TokenPriceRequestType::USDForOneWei)
             .await
             .unwrap();
     }
@@ -401,7 +413,7 @@ async fn test_error_api() {
         .unwrap()
         .tokens_schema()
         .update_historical_ticker_price(
-            1,
+            TokenId(1),
             TokenPrice {
                 usd_price: big_decimal_to_ratio(&BigDecimal::from(10)).unwrap(),
                 last_updated: chrono::offset::Utc::now(),
@@ -419,11 +431,15 @@ async fn test_error_api() {
     );
 
     ticker
-        .get_fee_from_ticker_in_wei(TxFeeTypes::FastWithdraw, 1.into(), Address::default())
+        .get_fee_from_ticker_in_wei(
+            TxFeeTypes::FastWithdraw,
+            TokenId(1).into(),
+            Address::default(),
+        )
         .await
         .unwrap();
     ticker
-        .get_token_price(1.into(), TokenPriceRequestType::USDForOneWei)
+        .get_token_price(TokenId(1).into(), TokenPriceRequestType::USDForOneWei)
         .await
         .unwrap();
 }

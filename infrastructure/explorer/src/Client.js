@@ -2,7 +2,6 @@ import config from './env-config';
 import * as constants from './constants';
 import { formatToken, isBlockVerified } from './utils';
 import { BlockExplorerClient } from './BlockExplorerClient';
-import timeConstants from './timeConstants';
 
 import { Provider } from 'zksync';
 
@@ -10,17 +9,6 @@ import axios from 'axios';
 import * as ethers from 'ethers';
 
 import Cacher from './Cacher';
-
-function initOnUnloadSaving(cacher) {
-    // Unfortunately there is no reliable way to save cache
-    // upon user leaving the page.
-    //
-    // window.onunload just does not give us enough time
-    // window.onbeforeunload might show weird popups in some browsers
-    setInterval(() => {
-        cacher.saveCacheToLocalStorage();
-    }, timeConstants.cacheSaving);
-}
 
 async function fetch(req) {
     let r = await axios(req);
@@ -67,9 +55,11 @@ export class Client {
             syncProvider: window.syncProvider
         };
 
+        // Clear the localStorage since it could have been saved before
+        // But now localStorage is not used
+        localStorage.clear();
         const client = new Client(props);
         const cacher = new Cacher(client);
-        initOnUnloadSaving(cacher);
         client.cacher = cacher;
         return client;
     }
@@ -183,7 +173,15 @@ export class Client {
         if (!address) {
             return [];
         }
-        const transactions = await this.blockExplorerClient.getAccountTransactions(address, offset, limit);
+        const rawTransactions = await this.blockExplorerClient.getAccountTransactions(address, offset, limit);
+        const transactions = rawTransactions.filter((tx) => {
+            const type = tx.tx.type || '';
+            if (type == 'Deposit') {
+                return tx.tx.priority_op.to.toLowerCase() == address.toLowerCase();
+            } else if (type == 'Withdraw') {
+                return tx.tx.from.toLowerCase() == address.toLowerCase();
+            } else return true;
+        });
         const res = transactions.map(async (tx) => {
             const type = tx.tx.type || '';
             const hash = tx.hash;

@@ -4,7 +4,6 @@ use anyhow::bail;
 use futures::{channel::mpsc, SinkExt, StreamExt};
 use num::BigUint;
 use std::collections::HashMap;
-use web3::transports::Http;
 use zksync_core::committer::{BlockCommitRequest, CommitRequest};
 use zksync_core::mempool::ProposedBlock;
 use zksync_core::state_keeper::StateKeeperRequest;
@@ -35,25 +34,25 @@ pub struct TestSetup {
     pub state_keeper_request_sender: mpsc::Sender<StateKeeperRequest>,
     pub proposed_blocks_receiver: mpsc::Receiver<CommitRequest>,
 
-    pub accounts: AccountSet<Http>,
+    pub accounts: AccountSet,
     pub tokens: HashMap<TokenId, Address>,
 
     pub expected_changes_for_current_block: ExpectedAccountState,
 
-    pub commit_account: EthereumAccount<Http>,
+    pub commit_account: EthereumAccount,
     pub current_state_root: Option<Fr>,
 }
 
 impl TestSetup {
     pub fn new(
         sk_channels: StateKeeperChannels,
-        accounts: AccountSet<Http>,
+        accounts: AccountSet,
         deployed_contracts: &Contracts,
-        commit_account: EthereumAccount<Http>,
+        commit_account: EthereumAccount,
     ) -> Self {
         let mut tokens = HashMap::new();
-        tokens.insert(1, deployed_contracts.test_erc20_address);
-        tokens.insert(0, Address::default());
+        tokens.insert(TokenId(1), deployed_contracts.test_erc20_address);
+        tokens.insert(TokenId(0), Address::default());
         Self {
             state_keeper_request_sender: sk_channels.requests,
             proposed_blocks_receiver: sk_channels.new_blocks,
@@ -125,7 +124,7 @@ impl TestSetup {
             .sync_accounts_state
             .insert((to, token.0), zksync0_old);
 
-        let token_address = if token.0 == 0 {
+        let token_address = if *token.0 == 0 {
             None
         } else {
             Some(
@@ -135,7 +134,9 @@ impl TestSetup {
                     .expect("Token with token id does not exist"),
             )
         };
-        let mut eth_balance = self.get_expected_eth_account_balance(from, 0).await;
+        let mut eth_balance = self
+            .get_expected_eth_account_balance(from, TokenId(0))
+            .await;
 
         let (receipts, deposit_op) = self.accounts.deposit(from, to, token_address, amount).await;
 
@@ -153,7 +154,7 @@ impl TestSetup {
         eth_balance -= gas_fee;
         self.expected_changes_for_current_block
             .eth_accounts_state
-            .insert((from, 0), eth_balance);
+            .insert((from, TokenId(0)), eth_balance);
 
         self.execute_priority_op(deposit_op).await;
         receipts
@@ -190,7 +191,7 @@ impl TestSetup {
             .eth_accounts_state
             .insert((from, token.0), from_eth_balance);
 
-        let token_address = if token.0 == 0 {
+        let token_address = if *token.0 == 0 {
             None
         } else {
             Some(
@@ -200,7 +201,9 @@ impl TestSetup {
                     .expect("Token with token id does not exist"),
             )
         };
-        let mut eth_balance = self.get_expected_eth_account_balance(from, 0).await;
+        let mut eth_balance = self
+            .get_expected_eth_account_balance(from, TokenId(0))
+            .await;
 
         let (receipts, deposit_op) = self
             .accounts
@@ -221,7 +224,7 @@ impl TestSetup {
         eth_balance -= gas_fee;
         self.expected_changes_for_current_block
             .eth_accounts_state
-            .insert((from, 0), eth_balance);
+            .insert((from, TokenId(0)), eth_balance);
 
         self.execute_priority_op(deposit_op).await;
         receipts
@@ -269,7 +272,7 @@ impl TestSetup {
             .await
             .map(|(id, _)| id)
             .expect("Account should be in the map");
-        let token_address = if token.0 == 0 {
+        let token_address = if *token.0 == 0 {
             Address::zero()
         } else {
             *self.tokens.get(&token.0).expect("Token does not exist")
@@ -290,7 +293,9 @@ impl TestSetup {
             .eth_accounts_state
             .insert((post_by, token.0), post_by_eth_balance);
 
-        let mut eth_balance = self.get_expected_eth_account_balance(post_by, 0).await;
+        let mut eth_balance = self
+            .get_expected_eth_account_balance(post_by, TokenId(0))
+            .await;
 
         let (receipt, full_exit_op) = self
             .accounts
@@ -306,7 +311,7 @@ impl TestSetup {
         eth_balance -= gas_fee;
         self.expected_changes_for_current_block
             .eth_accounts_state
-            .insert((post_by, 0), eth_balance);
+            .insert((post_by, TokenId(0)), eth_balance);
 
         self.execute_priority_op(full_exit_op).await;
         receipt
@@ -667,7 +672,7 @@ impl TestSetup {
         {
             let real_balance = self.get_eth_balance(*eth_account, *token).await;
             if expeted_balance != &real_balance {
-                println!("eth acc: {}, token: {}", eth_account.0, token);
+                println!("eth acc: {}, token: {}", eth_account.0, **token);
                 println!("expected: {}", expeted_balance);
                 println!("real:     {}", real_balance);
                 block_checks_failed = true;
@@ -734,7 +739,7 @@ impl TestSetup {
 
     async fn get_eth_balance(&self, eth_account_id: ETHAccountId, token: TokenId) -> BigUint {
         let account = &self.accounts.eth_accounts[eth_account_id.0];
-        let result = if token == 0 {
+        let result = if *token == 0 {
             account
                 .eth_balance()
                 .await

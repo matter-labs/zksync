@@ -7,6 +7,7 @@ import { readContractCode } from '../src.ts/deploy';
 import { deployContract } from 'ethereum-waffle';
 import * as fs from 'fs';
 import * as path from 'path';
+import { web3Provider } from './utils';
 
 const testConfigPath = path.join(process.env.ZKSYNC_HOME as string, `etc/test_config/constant`);
 const EIP1271TestConfig = JSON.parse(fs.readFileSync(`${testConfigPath}/eip1271.json`, { encoding: 'utf-8' }));
@@ -19,7 +20,7 @@ const ethTestConfig = JSON.parse(fs.readFileSync(`${testConfigPath}/eth.json`, {
             process.exit(1);
         }
 
-        const provider = new ethers.providers.JsonRpcProvider(process.env.ETH_CLIENT_WEB3_URL);
+        const provider = web3Provider();
         provider.pollingInterval = 10;
 
         const deployWallet = ethers.Wallet.fromMnemonic(ethTestConfig.test_mnemonic, "m/44'/60'/0'/0/0").connect(

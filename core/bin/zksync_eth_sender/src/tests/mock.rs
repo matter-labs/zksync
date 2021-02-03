@@ -2,25 +2,25 @@
 
 // Built-in deps
 use crate::database::DatabaseInterface;
-use crate::ethereum_interface::FailureInfo;
-use std::collections::{BTreeMap, HashMap, VecDeque};
+use std::collections::{BTreeMap, VecDeque};
 use tokio::sync::RwLock;
 use zksync_config::configs::eth_sender::{ETHSenderConfig, GasLimit, Sender};
 // External uses
-use web3::contract::{tokens::Tokenize, Options};
+use web3::contract::Options;
 use zksync_basic_types::{H256, U256};
 // Workspace uses
-use zksync_eth_client::SignedCallResult;
+
+use zksync_eth_client::{clients::mock::MockEthereum, ethereum_gateway::EthereumGateway};
 use zksync_storage::StorageProcessor;
 use zksync_types::{
     ethereum::{ETHOperation, EthOpId, InsertedOperationResponse, OperationType},
     Action, Operation,
 };
-// Local uses
-use super::ETHSender;
 
-use crate::ethereum_interface::EthereumInterface;
-use crate::transactions::{ETHStats, ExecutedTxStatus};
+// Local uses
+use crate::transactions::ETHStats;
+
+use super::ETHSender;
 
 /// Mock database is capable of recording all the incoming requests for the further analysis.
 #[derive(Debug, Default)]
@@ -296,14 +296,14 @@ impl DatabaseInterface for MockDatabase {
             OperationType::Commit | OperationType::Verify => {
                 let op = op.op.as_ref().unwrap();
                 // We're checking previous block, so for the edge case of first block we can say that it was confirmed.
-                let block_to_check = if op.block.block_number > 1 {
+                let block_to_check = if *op.block.block_number > 1 {
                     op.block.block_number - 1
                 } else {
                     return Ok(true);
                 };
 
                 let confirmed_operations = self.confirmed_operations.read().await.clone();
-                let maybe_operation = confirmed_operations.get(&(block_to_check as i64));
+                let maybe_operation = confirmed_operations.get(&(*block_to_check as i64));
 
                 let operation = match maybe_operation {
                     Some(op) => op,
@@ -322,147 +322,16 @@ impl DatabaseInterface for MockDatabase {
     }
 }
 
-/// Mock Ethereum client is capable of recording all the incoming requests for the further analysis.
-#[derive(Debug)]
-pub(in crate) struct MockEthereum {
-    pub block_number: u64,
-    pub gas_price: U256,
-    pub tx_statuses: RwLock<HashMap<H256, ExecutedTxStatus>>,
-    pub sent_txs: RwLock<HashMap<H256, SignedCallResult>>,
-}
-
-impl Default for MockEthereum {
-    fn default() -> Self {
-        Self {
-            block_number: 1,
-            gas_price: 100.into(),
-            tx_statuses: Default::default(),
-            sent_txs: Default::default(),
-        }
-    }
-}
-
-impl MockEthereum {
-    /// A fake `sha256` hasher, which calculates an `std::hash` instead.
-    /// This is done for simplicity and it's also much faster.
-    pub fn fake_sha256(data: &[u8]) -> H256 {
-        use std::collections::hash_map::DefaultHasher;
-        use std::hash::Hasher;
-
-        let mut hasher = DefaultHasher::new();
-        hasher.write(data);
-
-        let result = hasher.finish();
-
-        H256::from_low_u64_ne(result)
-    }
-
-    /// Checks that there was a request to send the provided transaction.
-    pub async fn assert_sent(&self, hash: &H256) {
-        assert!(
-            self.sent_txs.read().await.get(hash).is_some(),
-            format!("Transaction with hash {:?} was not sent", hash),
-        );
-    }
-
-    /// Adds an response for the sent transaction for `ETHSender` to receive.
-    pub async fn add_execution(&mut self, hash: &H256, status: &ExecutedTxStatus) {
-        self.tx_statuses.write().await.insert(*hash, status.clone());
-    }
-
-    /// Increments the blocks by a provided `confirmations` and marks the sent transaction
-    /// as a success.
-    pub async fn add_successfull_execution(&mut self, tx_hash: H256, confirmations: u64) {
-        self.block_number += confirmations;
-
-        let status = ExecutedTxStatus {
-            confirmations,
-            success: true,
-            receipt: None,
-        };
-        self.tx_statuses.write().await.insert(tx_hash, status);
-    }
-
-    /// Same as `add_successfull_execution`, but marks the transaction as a failure.
-    pub async fn add_failed_execution(&mut self, hash: &H256, confirmations: u64) {
-        self.block_number += confirmations;
-
-        let status = ExecutedTxStatus {
-            confirmations,
-            success: false,
-            receipt: Some(Default::default()),
-        };
-        self.tx_statuses.write().await.insert(*hash, status);
-    }
-}
-
-#[async_trait::async_trait]
-impl EthereumInterface for MockEthereum {
-    async fn get_tx_status(&self, hash: &H256) -> anyhow::Result<Option<ExecutedTxStatus>> {
-        Ok(self.tx_statuses.read().await.get(hash).cloned())
-    }
-
-    async fn block_number(&self) -> anyhow::Result<u64> {
-        Ok(self.block_number)
-    }
-
-    async fn gas_price(&self) -> anyhow::Result<U256> {
-        Ok(self.gas_price)
-    }
-
-    async fn send_tx(&self, signed_tx: &SignedCallResult) -> anyhow::Result<()> {
-        self.sent_txs
-            .write()
-            .await
-            .insert(signed_tx.hash, signed_tx.clone());
-
-        Ok(())
-    }
-
-    fn encode_tx_data<P: Tokenize>(&self, _func: &str, params: P) -> Vec<u8> {
-        ethabi::encode(params.into_tokens().as_ref())
-    }
-
-    async fn sign_prepared_tx(
-        &self,
-        raw_tx: Vec<u8>,
-        options: Options,
-    ) -> anyhow::Result<SignedCallResult> {
-        let gas_price = options.gas_price.unwrap_or(self.gas_price);
-        let nonce = options.nonce.expect("Nonce must be set for every tx");
-
-        // Nonce and gas_price are appended to distinguish the same transactions
-        // with different gas by their hash in tests.
-        let mut data_for_hash = raw_tx.clone();
-        data_for_hash.append(&mut ethabi::encode(gas_price.into_tokens().as_ref()));
-        data_for_hash.append(&mut ethabi::encode(nonce.into_tokens().as_ref()));
-        let hash = Self::fake_sha256(data_for_hash.as_ref()); // Okay for test purposes.
-
-        Ok(SignedCallResult {
-            raw_tx,
-            gas_price,
-            nonce,
-            hash,
-        })
-    }
-
-    async fn failure_reason(&self, _tx_hash: H256) -> Option<FailureInfo> {
-        None
-    }
-}
-
 /// Creates a default `ETHSender` with mock Ethereum connection/database and no operations in DB.
 /// Returns the `ETHSender` itself along with communication channels to interact with it.
-pub(in crate) async fn default_eth_sender() -> ETHSender<MockEthereum, MockDatabase> {
+pub(in crate) async fn default_eth_sender() -> ETHSender<MockDatabase> {
     build_eth_sender(1, Vec::new(), Default::default()).await
 }
 
 /// Creates an `ETHSender` with mock Ethereum connection/database and no operations in DB
 /// which supports multiple transactions in flight.
 /// Returns the `ETHSender` itself along with communication channels to interact with it.
-pub(in crate) async fn concurrent_eth_sender(
-    max_txs_in_flight: u64,
-) -> ETHSender<MockEthereum, MockDatabase> {
+pub(in crate) async fn concurrent_eth_sender(max_txs_in_flight: u64) -> ETHSender<MockDatabase> {
     build_eth_sender(max_txs_in_flight, Vec::new(), Default::default()).await
 }
 
@@ -471,7 +340,7 @@ pub(in crate) async fn concurrent_eth_sender(
 pub(in crate) async fn restored_eth_sender(
     restore_state: impl IntoIterator<Item = ETHOperation>,
     stats: ETHStats,
-) -> ETHSender<MockEthereum, MockDatabase> {
+) -> ETHSender<MockDatabase> {
     const MAX_TXS_IN_FLIGHT: u64 = 1;
 
     build_eth_sender(MAX_TXS_IN_FLIGHT, restore_state, stats).await
@@ -482,8 +351,8 @@ async fn build_eth_sender(
     max_txs_in_flight: u64,
     restore_state: impl IntoIterator<Item = ETHOperation>,
     stats: ETHStats,
-) -> ETHSender<MockEthereum, MockDatabase> {
-    let ethereum = MockEthereum::default();
+) -> ETHSender<MockDatabase> {
+    let ethereum = EthereumGateway::Mock(MockEthereum::default());
     let db = MockDatabase::with_restorable_state(restore_state, stats);
 
     let options = ETHSenderConfig {
@@ -512,7 +381,7 @@ async fn build_eth_sender(
 /// the internal `ETHSender` state.
 pub(in crate) async fn create_signed_tx(
     id: i64,
-    eth_sender: &ETHSender<MockEthereum, MockDatabase>,
+    eth_sender: &ETHSender<MockDatabase>,
     operation: &Operation,
     deadline_block: u64,
     nonce: i64,
@@ -551,7 +420,8 @@ pub(in crate) async fn create_signed_tx(
 /// Creates an `ETHOperation` object for a withdraw operation.
 pub(in crate) async fn create_signed_withdraw_tx(
     id: i64,
-    eth_sender: &ETHSender<MockEthereum, MockDatabase>,
+    eth_sender: &ETHSender<MockDatabase>,
+    operation: Option<Operation>,
     deadline_block: u64,
     nonce: i64,
 ) -> ETHOperation {
@@ -574,7 +444,7 @@ pub(in crate) async fn create_signed_withdraw_tx(
     ETHOperation {
         id,
         op_type,
-        op: None,
+        op: operation,
         nonce: signed_tx.nonce,
         last_deadline_block: deadline_block,
         last_used_gas_price: signed_tx.gas_price,

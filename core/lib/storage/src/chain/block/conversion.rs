@@ -23,17 +23,17 @@ use crate::{
         },
     },
     prover::ProverSchema,
-    QueryResult, StorageProcessor,
+    QueryResult, StorageActionType, StorageProcessor,
 };
 
 impl StoredOperation {
     pub async fn into_op(self, conn: &mut StorageProcessor<'_>) -> QueryResult<Operation> {
-        let block_number = self.block_number as BlockNumber;
+        let block_number = BlockNumber(self.block_number as u32);
         let id = Some(self.id);
 
-        let action = if self.action_type == ActionType::COMMIT.to_string() {
+        let action = if self.action_type == StorageActionType::from(ActionType::COMMIT) {
             Action::Commit
-        } else if self.action_type == ActionType::VERIFY.to_string() {
+        } else if self.action_type == StorageActionType::from(ActionType::VERIFY) {
             let proof = Box::new(ProverSchema(conn).load_proof(block_number).await?);
             Action::Verify {
                 proof: proof.expect("No proof for verify action").into(),
@@ -114,7 +114,7 @@ impl NewExecutedPriorityOperation {
         };
 
         Self {
-            block_number: i64::from(block),
+            block_number: i64::from(*block),
             block_index: exec_prior_op.block_index as i32,
             operation,
             from_account: from_account.as_ref().to_vec(),
@@ -172,7 +172,7 @@ impl NewExecutedTransaction {
         });
 
         Self {
-            block_number: i64::from(block),
+            block_number: i64::from(*block),
             tx_hash: exec_tx.signed_tx.hash().as_ref().to_vec(),
             from_account,
             to_account,
@@ -182,7 +182,7 @@ impl NewExecutedTransaction {
             fail_reason: exec_tx.fail_reason,
             block_index: exec_tx.block_index.map(|idx| idx as i32),
             primary_account_address: exec_tx.signed_tx.account().as_bytes().to_vec(),
-            nonce: exec_tx.signed_tx.nonce() as i64,
+            nonce: *exec_tx.signed_tx.nonce() as i64,
             created_at: exec_tx.created_at,
             eth_sign_data,
             batch_id: exec_tx.batch_id,

@@ -2,6 +2,7 @@
 use std::cmp::Ordering;
 // External deps
 use web3::types::H256;
+use zksync_types::BlockNumber;
 
 /// Rollup contract event type describing the state of the corresponding Rollup block
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
@@ -16,7 +17,7 @@ pub enum EventType {
 #[derive(Debug, Copy, Clone, Eq)]
 pub struct BlockEvent {
     /// Rollup block number
-    pub block_num: u32,
+    pub block_num: BlockNumber,
     /// Ethereum transaction type
     pub transaction_hash: H256,
     /// Rollup block type

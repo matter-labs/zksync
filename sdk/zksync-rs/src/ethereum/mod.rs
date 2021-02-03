@@ -4,11 +4,11 @@ use num::BigUint;
 use std::{convert::TryFrom, time::Duration};
 use std::{str::FromStr, time::Instant};
 use web3::contract::tokens::Tokenize;
-use web3::contract::{Contract, Options};
+use web3::contract::Options;
 use web3::transports::Http;
 use web3::types::{TransactionReceipt, H160, H256, U256};
-use web3::Web3;
-use zksync_eth_client::ETHClient;
+
+use zksync_eth_client::ETHDirectClient;
 use zksync_eth_signer::EthereumSigner;
 use zksync_types::{AccountId, PriorityOp, TokenLike};
 
@@ -45,7 +45,7 @@ pub fn ierc20_contract() -> ethabi::Contract {
 #[derive(Debug)]
 pub struct EthereumProvider<S: EthereumSigner> {
     tokens_cache: TokensCache,
-    eth_client: ETHClient<Http, S>,
+    eth_client: ETHDirectClient<S>,
     erc20_abi: ethabi::Contract,
     confirmation_timeout: Duration,
 }
@@ -72,7 +72,7 @@ impl<S: EthereumSigner> EthereumProvider<S> {
                 &address_response.main_contract
             };
 
-        let eth_client = ETHClient::new(
+        let eth_client = ETHDirectClient::new(
             transport,
             zksync_contract(),
             eth_addr,
@@ -94,8 +94,8 @@ impl<S: EthereumSigner> EthereumProvider<S> {
     }
 
     /// Exposes Ethereum node `web3` API.
-    pub fn web3(&self) -> &Web3<Http> {
-        &self.eth_client.web3
+    pub fn client(&self) -> &ETHDirectClient<S> {
+        &self.eth_client
     }
 
     /// Returns the zkSync contract address.
@@ -106,7 +106,7 @@ impl<S: EthereumSigner> EthereumProvider<S> {
     /// Returns the Ethereum account balance.
     pub async fn balance(&self) -> Result<BigUint, ClientError> {
         self.eth_client
-            .balance()
+            .sender_eth_balance()
             .await
             .map_err(|err| ClientError::NetworkError(err.to_string()))
             .map(u256_to_biguint)
@@ -141,20 +141,9 @@ impl<S: EthereumSigner> EthereumProvider<S> {
             .resolve(token)
             .ok_or(ClientError::UnknownToken)?;
 
-        let contract = Contract::new(
-            self.eth_client.web3.eth(),
-            token.address,
-            self.erc20_abi.clone(),
-        );
-
-        let query = contract.query(
-            "allowance",
-            (self.eth_client.sender_account, self.contract_address()),
-            None,
-            Options::default(),
-            None,
-        );
-        let current_allowance: U256 = query
+        let current_allowance = self
+            .eth_client
+            .allowance(token.address, self.erc20_abi.clone())
             .await
             .map_err(|err| ClientError::NetworkError(err.to_string()))?;
 
@@ -194,7 +183,14 @@ impl<S: EthereumSigner> EthereumProvider<S> {
 
         let signed_tx = self
             .eth_client
-            .sign_prepared_tx_for_addr(data, token.address, Default::default())
+            .sign_prepared_tx_for_addr(
+                data,
+                token.address,
+                Options {
+                    gas: Some(300_000.into()),
+                    ..Default::default()
+                },
+            )
             .await
             .map_err(|_| ClientError::IncorrectCredentials)?;
 
@@ -222,7 +218,11 @@ impl<S: EthereumSigner> EthereumProvider<S> {
             .ok_or(ClientError::UnknownToken)?;
 
         let signed_tx = if self.tokens_cache.is_eth(token) {
-            let options = Options::with(|options| options.value = Some(amount));
+            let options = Options {
+                value: Some(amount),
+                gas: Some(300_000.into()),
+                ..Default::default()
+            };
             self.eth_client
                 .sign_prepared_tx_for_addr(Vec::new(), to, options)
                 .await
@@ -238,7 +238,14 @@ impl<S: EthereumSigner> EthereumProvider<S> {
                 .expect("failed to encode parameters");
 
             self.eth_client
-                .sign_prepared_tx_for_addr(data, token_info.address, Default::default())
+                .sign_prepared_tx_for_addr(
+                    data,
+                    token_info.address,
+                    Options {
+                        gas: Some(300_000.into()),
+                        ..Default::default()
+                    },
+                )
                 .await
                 .map_err(|_| ClientError::IncorrectCredentials)?
         };
@@ -272,8 +279,10 @@ impl<S: EthereumSigner> EthereumProvider<S> {
                 gas: Some(200_000.into()),
                 ..Default::default()
             };
+            let data = self.eth_client.encode_tx_data("depositETH", sync_address);
+
             self.eth_client
-                .sign_call_tx("depositETH", sync_address, options)
+                .sign_prepared_tx(data, options)
                 .await
                 .map_err(|_| ClientError::IncorrectCredentials)?
         } else {
@@ -282,8 +291,10 @@ impl<S: EthereumSigner> EthereumProvider<S> {
                 ..Default::default()
             };
             let params = (token_info.address, amount, sync_address);
+            let data = self.eth_client.encode_tx_data("depositERC20", params);
+
             self.eth_client
-                .sign_call_tx("depositERC20", params, options)
+                .sign_prepared_tx(data, options)
                 .await
                 .map_err(|_| ClientError::IncorrectCredentials)?
         };
@@ -308,16 +319,19 @@ impl<S: EthereumSigner> EthereumProvider<S> {
             .tokens_cache
             .resolve(token.clone())
             .ok_or(ClientError::UnknownToken)?;
-        let account_id = U256::from(account_id);
+        let account_id = U256::from(*account_id);
 
         let options = Options {
             gas: Some(500_000.into()),
             ..Default::default()
         };
 
+        let data = self
+            .eth_client
+            .encode_tx_data("fullExit", (account_id, token.address));
         let signed_tx = self
             .eth_client
-            .sign_call_tx("fullExit", (account_id, token.address), options)
+            .sign_prepared_tx(data, options)
             .await
             .map_err(|_| ClientError::IncorrectCredentials)?;
 

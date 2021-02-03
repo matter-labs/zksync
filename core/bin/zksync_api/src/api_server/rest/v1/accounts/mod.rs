@@ -38,7 +38,7 @@ mod tests;
 mod types;
 
 fn unable_to_find_token(token_id: TokenId) -> anyhow::Error {
-    anyhow::anyhow!("Unable to find token with ID {}", token_id)
+    anyhow::anyhow!("Unable to find token with ID {}", *token_id)
 }
 
 // Additional parser because actix-web doesn't understand enums in path extractor.
@@ -187,7 +187,7 @@ impl ApiAccountsData {
             .operations_ext_schema()
             .get_account_transactions_receipts(
                 address,
-                location.block as u64,
+                *location.block as u64,
                 location.index,
                 search_direction_as_storage(direction),
                 limit as u64,
@@ -211,7 +211,7 @@ impl ApiAccountsData {
             .operations_ext_schema()
             .get_account_operations_receipts(
                 address,
-                location.block as u64,
+                *location.block as u64,
                 location.index.unwrap_or_default(),
                 search_direction_as_storage(direction),
                 limit as u64,
@@ -259,7 +259,7 @@ async fn account_tx_receipts(
     let address = data.find_account_address(account_query).await?;
 
     let receipts = data
-        .tx_receipts(address, location, direction, limit)
+        .tx_receipts(address, location, direction, *limit)
         .await
         .map_err(ApiError::internal)?;
 
@@ -275,7 +275,7 @@ async fn account_op_receipts(
     let address = data.find_account_address(account_query).await?;
 
     let receipts = data
-        .op_receipts(address, location, direction, limit)
+        .op_receipts(address, location, direction, *limit)
         .await
         .map_err(ApiError::internal)?;
 
@@ -306,7 +306,7 @@ pub fn api_scope(
         pool,
         tokens,
         core_api_client,
-        config.eth_watch.confirmations_for_eth_event as BlockNumber,
+        BlockNumber(config.eth_watch.confirmations_for_eth_event as u32),
     );
 
     web::scope("accounts")

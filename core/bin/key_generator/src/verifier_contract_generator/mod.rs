@@ -48,7 +48,7 @@ pub(crate) fn create_verifier_contract(config: ChainConfig) {
         .render_template(template, &template_params)
         .expect("failed to render Verifiers.sol template");
     std::fs::write(get_verifier_contract_key_path(), res).expect("failed to wrtie Verifier.sol");
-    log::info!("Verifier contract successfully generated");
+    vlog::info!("Verifier contract successfully generated");
 }
 
 fn get_verifier_template_file() -> PathBuf {

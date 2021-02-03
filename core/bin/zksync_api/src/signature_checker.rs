@@ -14,12 +14,14 @@ use futures::{
 };
 use tokio::runtime::{Builder, Handle};
 // Workspace uses
+use zksync_config::ZkSyncConfig;
+use zksync_eth_client::ethereum_gateway::EthereumGateway;
+use zksync_types::tx::EthSignData;
 use zksync_types::{tx::TxEthSignature, SignedZkSyncTx, ZkSyncTx};
+use zksync_utils::panic_notify::ThreadPanicNotify;
+
 // Local uses
 use crate::{eth_checker::EthereumChecker, tx_error::TxAddError};
-use zksync_config::ZkSyncConfig;
-use zksync_types::tx::EthSignData;
-use zksync_utils::panic_notify::ThreadPanicNotify;
 
 /// `TxVariant` is used to form a verify request. It is possible to wrap
 /// either a single transaction, or the transaction batch.
@@ -43,7 +45,7 @@ impl VerifiedTx {
     /// Ethereum signature (if required) and `ZKSync` signature.
     pub async fn verify(
         request: &mut VerifyTxSignatureRequest,
-        eth_checker: &EthereumChecker<web3::transports::Http>,
+        eth_checker: &EthereumChecker,
     ) -> Result<Self, TxAddError> {
         verify_eth_signature(request, eth_checker).await?;
         verify_tx_correctness(&mut request.tx)?;
@@ -77,7 +79,7 @@ impl VerifiedTx {
 /// Verifies the Ethereum signature of the (batch of) transaction(s).
 async fn verify_eth_signature(
     request: &VerifyTxSignatureRequest,
-    eth_checker: &EthereumChecker<web3::transports::Http>,
+    eth_checker: &EthereumChecker,
 ) -> Result<(), TxAddError> {
     match &request.tx {
         TxVariant::Tx(tx) => {
@@ -98,7 +100,7 @@ async fn verify_eth_signature(
 
 async fn verify_eth_signature_single_tx(
     tx: &SignedZkSyncTx,
-    eth_checker: &EthereumChecker<web3::transports::Http>,
+    eth_checker: &EthereumChecker,
 ) -> Result<(), TxAddError> {
     let start = Instant::now();
     // Check if the tx is a `ChangePubKey` operation without an Ethereum signature.
@@ -159,7 +161,7 @@ async fn verify_eth_signature_single_tx(
 async fn verify_eth_signature_txs_batch(
     txs: &[SignedZkSyncTx],
     eth_sign_data: &EthSignData,
-    eth_checker: &EthereumChecker<web3::transports::Http>,
+    eth_checker: &EthereumChecker,
 ) -> Result<(), TxAddError> {
     let start = Instant::now();
     match &eth_sign_data.signature {
@@ -230,10 +232,8 @@ pub fn start_sign_checker_detached(
     input: mpsc::Receiver<VerifyTxSignatureRequest>,
     panic_notify: mpsc::Sender<bool>,
 ) {
-    let transport = web3::transports::Http::new(&config.eth_client.web3_url).unwrap();
-    let web3 = web3::Web3::new(transport);
-
-    let eth_checker = EthereumChecker::new(web3, config.contracts.contract_addr);
+    let client = EthereumGateway::from_config(&config);
+    let eth_checker = EthereumChecker::new(client);
 
     /// Main signature check requests handler.
     /// Basically it receives the requests through the channel and verifies signatures,
@@ -241,7 +241,7 @@ pub fn start_sign_checker_detached(
     async fn checker_routine(
         handle: Handle,
         mut input: mpsc::Receiver<VerifyTxSignatureRequest>,
-        eth_checker: EthereumChecker<web3::transports::Http>,
+        eth_checker: EthereumChecker,
     ) {
         while let Some(mut request) = input.next().await {
             let eth_checker = eth_checker.clone();

@@ -1,6 +1,6 @@
 // External imports
 // Workspace imports
-use zksync_types::ActionType;
+use zksync_types::{ActionType, BlockNumber};
 // Local imports
 use crate::tests::db_test;
 use crate::{
@@ -11,7 +11,7 @@ use crate::{
             OperationsSchema,
         },
     },
-    QueryResult, StorageProcessor,
+    QueryResult, StorageActionType, StorageProcessor,
 };
 
 /// Checks the save&load routine for unconfirmed operations.
@@ -22,17 +22,20 @@ async fn operations(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
     OperationsSchema(&mut storage)
         .store_operation(NewOperation {
             block_number,
-            action_type: action_type.to_string(),
+            action_type: StorageActionType::from(action_type),
         })
         .await?;
 
     let stored_operation = OperationsSchema(&mut storage)
-        .get_operation(block_number as u32, action_type)
+        .get_operation(BlockNumber(block_number as u32), action_type)
         .await
         .unwrap();
 
     assert_eq!(stored_operation.block_number, 1);
-    assert_eq!(stored_operation.action_type, action_type.to_string());
+    assert_eq!(
+        stored_operation.action_type,
+        StorageActionType::from(action_type)
+    );
     assert_eq!(stored_operation.confirmed, false);
 
     Ok(())
@@ -186,7 +189,7 @@ async fn duplicated_operations(mut storage: StorageProcessor<'_>) -> QueryResult
 
     // Get the block transactions and check if there are exactly 2 txs.
     let block_txs = BlockSchema(&mut storage)
-        .get_block_transactions(BLOCK_NUMBER as u32)
+        .get_block_transactions(BlockNumber(BLOCK_NUMBER as u32))
         .await?;
 
     assert_eq!(block_txs.len(), 2);
@@ -244,7 +247,7 @@ async fn transaction_resent(mut storage: StorageProcessor<'_>) -> QueryResult<()
 
     // Get the block transactions and check if there is exactly 1 tx (failed tx not copied but replaced).
     let block_txs = BlockSchema(&mut storage)
-        .get_block_transactions(BLOCK_NUMBER as u32)
+        .get_block_transactions(BlockNumber(BLOCK_NUMBER as u32))
         .await?;
     assert_eq!(block_txs.len(), 1);
 
@@ -264,7 +267,7 @@ async fn transaction_resent(mut storage: StorageProcessor<'_>) -> QueryResult<()
 
     // ...and there still must be one operation.
     let block_txs = BlockSchema(&mut storage)
-        .get_block_transactions(BLOCK_NUMBER as u32)
+        .get_block_transactions(BlockNumber(BLOCK_NUMBER as u32))
         .await?;
     assert_eq!(block_txs.len(), 1);
 

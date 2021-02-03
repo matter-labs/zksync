@@ -1,9 +1,8 @@
 use crate::tx::TxSignature;
-use crate::AccountId;
 use crate::Close;
+use crate::{AccountId, Address, Nonce};
 use anyhow::{ensure, format_err};
 use serde::{Deserialize, Serialize};
-use zksync_basic_types::Address;
 use zksync_crypto::params::{ACCOUNT_ID_BIT_WIDTH, CHUNK_BYTES};
 use zksync_crypto::primitives::FromBytes;
 
@@ -42,10 +41,10 @@ impl CloseOp {
         Ok(Self {
             tx: Close {
                 account: account_address,
-                nonce,
+                nonce: Nonce(nonce),
                 signature,
             },
-            account_id,
+            account_id: AccountId(account_id),
         })
     }
 

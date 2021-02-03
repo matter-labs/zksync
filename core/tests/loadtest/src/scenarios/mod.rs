@@ -38,6 +38,8 @@ pub struct ScenarioResources {
     pub wallets_amount: u64,
     /// Wei balance in each wallet.
     pub balance_per_wallet: BigUint,
+    /// Scenario has deposit operations.
+    pub has_deposits: bool,
 }
 
 /// Sufficient fee for the related type of transaction.
@@ -51,7 +53,7 @@ pub struct Fees {
 
 /// Describes the general steps of a load test scenario.
 #[async_trait]
-pub trait Scenario: Debug + Display {
+pub trait Scenario: Debug + Display + Send + Sync + 'static {
     /// Returns resources that should be provided by the scenario executor.
     fn requested_resources(&self, fees: &Fees) -> ScenarioResources;
 
@@ -67,10 +69,10 @@ pub trait Scenario: Debug + Display {
     /// Runs main scenario routine with the enabled load monitor.
     async fn run(
         &mut self,
-        monitor: &Monitor,
-        fees: &Fees,
-        wallets: &[TestWallet],
-    ) -> anyhow::Result<()>;
+        monitor: Monitor,
+        fees: Fees,
+        wallets: Vec<TestWallet>,
+    ) -> anyhow::Result<Vec<TestWallet>>;
 
     /// Performs actions after running the main scenario, for example, it can
     /// return the funds to the specified wallets.

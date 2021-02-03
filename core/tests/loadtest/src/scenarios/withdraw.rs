@@ -59,6 +59,7 @@ impl Scenario for WithdrawScenario {
         ScenarioResources {
             wallets_amount: self.config.wallets_amount,
             balance_per_wallet,
+            has_deposits: true,
         }
     }
 
@@ -73,12 +74,12 @@ impl Scenario for WithdrawScenario {
 
     async fn run(
         &mut self,
-        monitor: &Monitor,
-        fees: &Fees,
-        wallets: &[TestWallet],
-    ) -> anyhow::Result<()> {
+        monitor: Monitor,
+        fees: Fees,
+        wallets: Vec<TestWallet>,
+    ) -> anyhow::Result<Vec<TestWallet>> {
         for i in 0..self.config.withdraw_rounds {
-            log::info!(
+            vlog::info!(
                 "Withdraw and deposit cycle [{}/{}] started",
                 i + 1,
                 self.config.withdraw_rounds
@@ -86,20 +87,20 @@ impl Scenario for WithdrawScenario {
 
             let futures = wallets
                 .iter()
-                .map(|wallet| Self::withdraw_and_deposit(monitor, fees, wallet))
+                .map(|wallet| Self::withdraw_and_deposit(&monitor, &fees, wallet))
                 .collect::<Vec<_>>();
             wait_all_failsafe(&format!("withdraw/run/cycle/{}", i), futures).await?;
 
-            log::info!(
+            vlog::info!(
                 "Withdraw and deposit cycle [{}/{}] finished",
                 i + 1,
                 self.config.withdraw_rounds
             );
         }
 
-        log::info!("Withdraw scenario has been finished");
+        vlog::info!("Withdraw scenario has been finished");
 
-        Ok(())
+        Ok(wallets)
     }
 
     async fn finalize(
@@ -131,13 +132,13 @@ impl WithdrawScenario {
 
         await_condition!(
             std::time::Duration::from_millis(1_00),
-            wallet.eth_balance().await? >= amount
+            wallet.l1_balance().await? >= amount
         );
 
-        let eth_balance = wallet.eth_balance().await?;
-        anyhow::ensure!(eth_balance > fees.eth, "Ethereum fee is too low");
+        let balance = wallet.l1_balance().await?;
+        anyhow::ensure!(balance > fees.eth, "Ethereum fee is too low");
 
-        let amount = closest_packable_token_amount(&(eth_balance - &fees.eth));
+        let amount = closest_packable_token_amount(&(balance - &fees.eth));
         monitor
             .wait_for_priority_op(BlockStatus::Verified, &wallet.deposit(amount).await?)
             .await?;

@@ -41,7 +41,7 @@ impl fmt::Display for FullExitScenario {
 }
 
 fn balance_per_wallet(fees: &Fees) -> BigUint {
-    &fees.eth * BigUint::from(2_u64)
+    &fees.eth * BigUint::from(4_u64)
 }
 
 #[async_trait]
@@ -52,6 +52,7 @@ impl Scenario for FullExitScenario {
         ScenarioResources {
             wallets_amount: self.config.wallets_amount,
             balance_per_wallet,
+            has_deposits: true,
         }
     }
 
@@ -74,36 +75,28 @@ impl Scenario for FullExitScenario {
         }
         wait_all_failsafe("full_exit/prepare", txs_queue.into_iter()).await?;
 
-        log::info!("All withdrawal transactions have been verified");
-
-        // Wait until the balance becomes as expected.
-        let expected_balance = withdraw_amount - &fees.zksync * BigUint::from(2_u64);
-        for wallet in wallets {
-            await_condition!(std::time::Duration::from_millis(1_00), {
-                wallet.eth_balance().await? >= expected_balance
-            });
-        }
+        vlog::info!("All withdrawal transactions have been verified");
 
         Ok(())
     }
 
     async fn run(
         &mut self,
-        monitor: &Monitor,
-        fees: &Fees,
-        wallets: &[TestWallet],
-    ) -> anyhow::Result<()> {
-        log::info!("Full exit and deposit cycle started");
+        monitor: Monitor,
+        fees: Fees,
+        wallets: Vec<TestWallet>,
+    ) -> anyhow::Result<Vec<TestWallet>> {
+        vlog::info!("Full exit and deposit cycle started");
 
-        let futures = wallets
+        let full_exit_task = wallets
             .iter()
-            .map(|wallet| Self::full_exit_and_deposit(monitor, fees, wallet))
+            .map(|wallet| Self::full_exit_and_deposit(&monitor, &fees, wallet))
             .collect::<Vec<_>>();
-        wait_all_failsafe("full_exit/run", futures).await?;
+        wait_all_failsafe("full_exit/run", full_exit_task).await?;
 
-        log::info!("Full exit scenario has been finished");
+        vlog::info!("Full exit scenario has been finished");
 
-        Ok(())
+        Ok(wallets)
     }
 
     async fn finalize(
@@ -126,7 +119,8 @@ impl FullExitScenario {
             .wait_for_priority_op(BlockStatus::Verified, &wallet.full_exit().await?)
             .await?;
 
-        let amount = closest_packable_token_amount(&(wallet.eth_balance().await? - &fees.eth));
+        let balance = wallet.l1_balance().await?;
+        let amount = closest_packable_token_amount(&(balance - &fees.eth));
         monitor
             .wait_for_priority_op(BlockStatus::Committed, &wallet.deposit(amount).await?)
             .await?;

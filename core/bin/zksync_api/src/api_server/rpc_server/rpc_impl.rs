@@ -1,21 +1,16 @@
 use std::collections::HashMap;
 use std::time::Instant;
 // External uses
+use bigdecimal::BigDecimal;
 use jsonrpc_core::{Error, Result};
-use num::BigUint;
 // Workspace uses
 use zksync_types::{
-    helpers::closest_packable_fee_amount,
     tx::{TxEthSignature, TxHash},
-    Address, Token, TokenLike, TxFeeTypes, ZkSyncTx,
+    Address, BatchFee, Fee, Token, TokenLike, TxFeeTypes, ZkSyncTx,
 };
 
 // Local uses
-use crate::{
-    api_server::tx_sender::SubmitError,
-    fee_ticker::{BatchFee, Fee, TokenPriceRequestType},
-};
-use bigdecimal::BigDecimal;
+use crate::{api_server::tx_sender::SubmitError, fee_ticker::TokenPriceRequestType};
 
 use super::{error::*, types::*, RpcApp};
 
@@ -32,12 +27,6 @@ impl RpcApp {
             depositing_ops,
         )
         .await?;
-
-        log::trace!(
-            "account_info: address {}, total request processing {}ms",
-            &address,
-            start.elapsed().as_millis()
-        );
 
         metrics::histogram!("api.rpc.account_info", start.elapsed());
         Ok(AccountInfoResp {
@@ -138,7 +127,7 @@ impl RpcApp {
         let start = Instant::now();
         let mut storage = self.access_storage().await?;
         let config = storage.config_schema().load_config().await.map_err(|err| {
-            log::warn!(
+            vlog::warn!(
                 "[{}:{}:{}] Internal Server Error: '{}'; input: N/A",
                 file!(),
                 line!(),
@@ -168,7 +157,7 @@ impl RpcApp {
         let start = Instant::now();
         let mut storage = self.access_storage().await?;
         let mut tokens = storage.tokens_schema().load_tokens().await.map_err(|err| {
-            log::warn!("Internal Server Error: '{}'; input: N/A", err);
+            vlog::warn!("Internal Server Error: '{}'; input: N/A", err);
             Error::internal_error()
         })?;
 
@@ -186,7 +175,7 @@ impl RpcApp {
                     has_gnt = Some(token.clone());
                 }
 
-                if id == 0 {
+                if *id == 0 {
                     ("ETH".to_string(), token)
                 } else {
                     (token.symbol.clone(), token)
@@ -244,18 +233,12 @@ impl RpcApp {
             return Err(SubmitError::InappropriateFeeToken.into());
         }
 
-        let mut total_fee = BigUint::from(0u32);
-
-        for (tx_type, address) in tx_types.iter().zip(addresses.iter()) {
-            let ticker = ticker.clone();
-            let fee = Self::ticker_request(ticker, *tx_type, *address, token.clone()).await?;
-            total_fee += fee.total_fee;
-        }
-        // Sum of transactions can be unpackable
-        total_fee = closest_packable_fee_amount(&total_fee);
+        let transactions: Vec<(TxFeeTypes, Address)> =
+            (tx_types.iter().cloned().zip(addresses.iter().cloned())).collect();
+        let total_fee = Self::ticker_batch_fee_request(ticker, transactions, token.clone()).await?;
 
         metrics::histogram!("api.rpc.get_txs_batch_fee_in_wei", start.elapsed());
-        Ok(BatchFee { total_fee })
+        Ok(total_fee)
     }
 
     pub async fn _impl_get_token_price(self, token: TokenLike) -> Result<BigDecimal> {

@@ -1,8 +1,8 @@
 use crate::FullExit;
+use crate::{AccountId, Address, TokenId};
 use anyhow::{ensure, format_err};
 use num::{BigUint, FromPrimitive, ToPrimitive};
 use serde::{Deserialize, Serialize};
-use zksync_basic_types::{AccountId, Address};
 use zksync_crypto::params::{
     ACCOUNT_ID_BIT_WIDTH, BALANCE_BIT_WIDTH, CHUNK_BYTES, ETH_ADDRESS_BIT_WIDTH, TOKEN_BIT_WIDTH,
 };
@@ -82,9 +82,9 @@ impl FullExitOp {
 
         Ok(Self {
             priority_op: FullExit {
-                account_id,
+                account_id: AccountId(account_id),
                 eth_address,
-                token,
+                token: TokenId(token),
             },
             withdraw_amount: Some(amount.into()),
         })

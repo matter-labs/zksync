@@ -1,5 +1,5 @@
 use actix_cors::Cors;
-use actix_web::{middleware, web, App, HttpResponse, HttpServer};
+use actix_web::{web, App, HttpResponse, HttpServer};
 use futures::channel::mpsc;
 use std::net::SocketAddr;
 use zksync_storage::ConnectionPool;
@@ -23,8 +23,6 @@ async fn start_server(
     sign_verifier: mpsc::Sender<VerifyTxSignatureRequest>,
     bind_to: SocketAddr,
 ) {
-    let logger_format = crate::api_server::loggers::rest::get_logger_format();
-
     HttpServer::new(move || {
         let api_v01 = api_v01.clone();
 
@@ -39,7 +37,6 @@ async fn start_server(
         };
 
         App::new()
-            .wrap(middleware::Logger::new(&logger_format))
             .wrap(Cors::new().send_wildcard().max_age(3600).finish())
             .service(api_v01.into_scope())
             .service(api_v1_scope)

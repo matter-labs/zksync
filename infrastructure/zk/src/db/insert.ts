@@ -2,6 +2,7 @@ import { Command } from 'commander';
 import * as utils from '../utils';
 import * as env from '../env';
 import fetch from 'node-fetch';
+import { web3Url } from '../utils';
 
 const SQL = () => `psql "${process.env.DATABASE_URL}" -c`;
 
@@ -34,7 +35,7 @@ export async function ethData() {
         params: [process.env.ETH_SENDER_SENDER_OPERATOR_COMMIT_ETH_ADDR as string, 'pending'],
         id: 1
     };
-    const reponse = await fetch(process.env.ETH_CLIENT_WEB3_URL as string, {
+    const reponse = await fetch(web3Url(), {
         method: 'post',
         body: JSON.stringify(body),
         headers: {

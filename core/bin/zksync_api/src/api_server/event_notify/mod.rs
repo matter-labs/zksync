@@ -83,14 +83,14 @@ pub fn start_sub_notifier(
                     if let Some(new_block) = new_block {
                         notifier.handle_new_block(new_block)
                             .await
-                            .map_err(|e| log::warn!("Failed to handle new block: {}",e))
+                            .map_err(|e| vlog::warn!("Failed to handle new block: {}",e))
                             .unwrap_or_default();
                     }
                 },
                 new_exec_batch = new_txs_receiver.next() => {
                     if let Some(new_exec_batch) = new_exec_batch {
                         notifier.handle_new_executed_batch(new_exec_batch)
-                            .map_err(|e| log::warn!("Failed to handle new exec batch: {}",e))
+                            .map_err(|e| vlog::warn!("Failed to handle new exec batch: {}",e))
                             .unwrap_or_default();
                     }
                 },
@@ -98,7 +98,7 @@ pub fn start_sub_notifier(
                     if let Some(new_sub) = new_sub {
                         notifier.handle_notify_req(new_sub)
                             .await
-                            .map_err(|e| log::warn!("Failed to handle notify request: {}",e))
+                            .map_err(|e| vlog::warn!("Failed to handle notify request: {}",e))
                             .unwrap_or_default();
                     }
                 },

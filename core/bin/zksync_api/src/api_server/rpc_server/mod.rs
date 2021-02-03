@@ -18,11 +18,11 @@ use zksync_storage::{
     },
     ConnectionPool, StorageProcessor,
 };
-use zksync_types::{tx::TxHash, Address, TokenLike, TxFeeTypes};
+use zksync_types::{tx::TxHash, Address, BatchFee, Fee, TokenLike, TxFeeTypes};
 
 // Local uses
 use crate::{
-    fee_ticker::{Fee, TickerRequest, TokenPriceRequestType},
+    fee_ticker::{TickerRequest, TokenPriceRequestType},
     signature_checker::VerifyTxSignatureRequest,
     utils::shared_lru_cache::SharedLruCache,
 };
@@ -262,6 +262,27 @@ impl RpcApp {
             })
     }
 
+    async fn ticker_batch_fee_request(
+        mut ticker_request_sender: mpsc::Sender<TickerRequest>,
+        transactions: Vec<(TxFeeTypes, Address)>,
+        token: TokenLike,
+    ) -> Result<BatchFee> {
+        let req = oneshot::channel();
+        ticker_request_sender
+            .send(TickerRequest::GetBatchTxFee {
+                transactions,
+                token: token.clone(),
+                response: req.0,
+            })
+            .await
+            .expect("ticker receiver dropped");
+        let resp = req.1.await.expect("ticker answer sender dropped");
+        resp.map_err(|err| {
+            vlog::warn!("Internal Server Error: '{}'; input: {:?}", err, token,);
+            Error::internal_error()
+        })
+    }
+
     async fn ticker_request(
         mut ticker_request_sender: mpsc::Sender<TickerRequest>,
         tx_type: TxFeeTypes,
@@ -406,7 +427,6 @@ pub fn start_rpc_server(
         rpc_app.extend(&mut io);
 
         let server = ServerBuilder::new(io)
-            .request_middleware(super::loggers::http_rpc::request_middleware)
             .threads(super::THREADS_PER_SERVER)
             .start_http(&addr)
             .unwrap();
