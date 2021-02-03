@@ -4,12 +4,25 @@ All notable changes to the core components will be documented in this file.
 
 ## Unreleased
 
-- Removed the limitation on the number of withdrawals in the block.
-- (`FeeTicker`): Increased gas price estimate for transaction.
+### Removed
+
+### Changed
+
+- The token name is now set for each scenario separately instead of the network section of the loadtest configuration.
+
+### Added
+
+- Added a stressing dev fee ticker scenario to the loadtest.
+- Added a `--sloppy` mode to the `dev-fee-ticker-server` to simulate bad networks with the random delays and fails.
+
+### Fixed
+
+## Release 2021-02-02
 
 ### Removed
 
 - `MetricsCounter` structure was removed because it is not used.
+- The limit on the number of withdrawals in the block.
 
 ### Changed
 
@@ -17,17 +30,19 @@ All notable changes to the core components will be documented in this file.
   structures.
 - `prometheus_exporter` was made a library to be used by several crates.
 - `prover_run_for_next_commit` function uses a parameterized timeout instead of a hard-coded one.
-- `action_type` column type in db is changed from `text` to `enum` for optimization.
-- The token name is now set for each scenario separately instead of the network section of the loadtest configuration.
+- (`storage`): `action_type` column type in db is changed from `text` to `enum` for optimization.
+- (`FeeTicker`): Increased gas price estimate for transaction.
+- (`loadtest`): Scenario execution was made parallel.
+- Increased completeWithdrawal gas limit, that decreased the chance of the users to face the out-of-gas error
 
 ### Added
 
 - `prometheus_exporter` is launched by every microservice.
 - `tokens_acceptable_for_fees` endpoint that returns the list of tokens acceptable for fees was added to REST API v0.1.
-- Added a stressing dev fee ticker scenario to the loadtest.
-- Added a `--sloppy` mode to the `dev-fee-ticker-server` to simulate bad networks with the random delays and fails.
 
 ### Fixed
+
+- (`FeeTicker`): Performance for getting the batch fee was heavily optimized.
 
 ## Release 2021-01-12
 
