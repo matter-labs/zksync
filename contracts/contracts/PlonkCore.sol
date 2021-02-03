@@ -402,9 +402,9 @@ contract Plonk4VerifierWithAccessToDNext {
 
         PairingsBn254.Fr[] memory partial_products = new PairingsBn254.Fr[](poly_nums.length);
         partial_products[0].assign(PairingsBn254.new_fr(1));
-        for (uint256 i = 1; i < dens.length - 1; i++) {
+        for (uint256 i = 1; i < dens.length; i++) {
             partial_products[i].assign(dens[i - 1]);
-            partial_products[i].mul_assign(dens[i]);
+            partial_products[i].mul_assign(partial_products[i-1]);
         }
 
         tmp_2.assign(partial_products[partial_products.length - 1]);
@@ -412,9 +412,10 @@ contract Plonk4VerifierWithAccessToDNext {
         tmp_2 = tmp_2.inverse(); // tmp_2 contains a^-1 * b^-1 (with! the last one)
 
         for (uint256 i = dens.length - 1; i < dens.length; i--) {
-            dens[i].assign(tmp_2); // all inversed
-            dens[i].mul_assign(partial_products[i]); // clear lowest terms
+            tmp_1.assign(tmp_2); // all inversed
+            tmp_1.mul_assign(partial_products[i]); // clear lowest terms
             tmp_2.mul_assign(dens[i]);
+            dens[i].assign(tmp_1);
         }
 
         for (uint256 i = 0; i < nums.length; i++) {
