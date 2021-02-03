@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 use sqlx::{types::BigDecimal, FromRow};
 // Workspace imports
 // Local imports
-use crate::tokens::utils::{address_to_stored_string, stored_str_address_to_address};
+use crate::utils::{address_to_stored_string, stored_str_address_to_address};
 use chrono::{DateTime, Utc};
 use zksync_types::tokens::{TokenMarketVolume, TokenPrice};
 use zksync_types::{Token, TokenId};

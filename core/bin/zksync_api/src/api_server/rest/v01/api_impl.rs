@@ -9,12 +9,27 @@ use crate::api_server::{
     rest::{
         helpers::{deposit_op_to_tx_by_hash, parse_tx_id, priority_op_to_tx_history},
         v01::{api_decl::ApiV01, types::*},
+        v1::{ApiError, Error, JsonResult},
     },
+    tx_sender::ticker_request,
 };
 use actix_web::{web, HttpResponse, Result as ActixResult};
+use std::ops::{Add, Mul};
+
+use bigdecimal::BigDecimal;
+use futures::{SinkExt, TryFutureExt};
+use num::{bigint::ToBigInt, BigUint};
+use web::Json;
+use zksync_config::test_config::unit_vectors::ForcedExit;
+
+use chrono::{DateTime, Duration, Utc};
+use std::str::FromStr;
 use std::time::Instant;
 use zksync_storage::chain::operations_ext::SearchDirection;
-use zksync_types::{Address, BlockNumber};
+use zksync_types::{
+    misc::{ForcedExitRequest, SaveForcedExitRequestQuery},
+    Address, BlockNumber, TokenLike, TxFeeTypes,
+};
 
 /// Helper macro which wraps the serializable object into `Ok(HttpResponse::Ok().json(...))`.
 macro_rules! ok_json {
@@ -503,5 +518,91 @@ impl ApiV01 {
 
         metrics::histogram!("api.v01.is_forced_exit_enabled", start.elapsed());
         ok_json!(response)
+    }
+
+    pub async fn register_forced_exit_request(
+        self_: web::Data<Self>,
+        params: web::Json<ForcedExitRegisterRequest>,
+    ) -> JsonResult<ForcedExitRequest> {
+        let start = Instant::now();
+
+        let time = Utc::now();
+
+        if !self_.config.forced_exit_requests.enabled {
+            return Err(ApiError::bad_request(
+                "ForcedExit requests feature is disabled!",
+            ));
+        }
+
+        let mut storage = self_.access_storage().await.map_err(|err| {
+            vlog::warn!("Internal Server Error: '{}';", err);
+            return ApiError::internal("");
+        })?;
+
+        self_
+            .forced_exit_checker
+            .check_forced_exit(&mut storage, params.target)
+            .await
+            .map_err(ApiError::from)?;
+
+        let price = ticker_request(
+            self_.ticker_request_sender.clone(),
+            TxFeeTypes::Withdraw,
+            TokenLike::Id(0),
+        )
+        .await
+        .map_err(ApiError::from)?;
+        let price = BigDecimal::from(price.total_fee.to_bigint().unwrap());
+
+        let scaling_coefficient = BigDecimal::from_str("1.6").unwrap();
+        let scaled_price = price * scaling_coefficient;
+
+        let user_price = params.price_in_wei.to_bigint().unwrap();
+        let user_price = BigDecimal::from(user_price);
+        let user_scaling_coefficient = BigDecimal::from_str("1.05").unwrap();
+        let user_scaled_fee = user_scaling_coefficient * user_price;
+
+        if user_scaled_fee < scaled_price {
+            return Err(ApiError::bad_request("Not enough fee"));
+        }
+
+        if params.tokens.len() > 10 {
+            return Err(ApiError::bad_request(
+                "Maximum number of tokens per FE request exceeded",
+            ));
+        }
+
+        let mut tokens_schema = storage.tokens_schema();
+
+        for token_id in params.tokens.iter() {
+            // The result is going nowhere.
+            // This is simply to make sure that the tokens
+            // that were supplied do indeed exist
+            tokens_schema
+                .get_token(TokenLike::Id(*token_id))
+                .await
+                .map_err(|e| {
+                    return ApiError::bad_request("One of the tokens does no exist");
+                })?;
+        }
+
+        let mut fe_schema = storage.forced_exit_requests_schema();
+
+        let valid_until = Utc::now().add(Duration::weeks(1));
+
+        let saved_fe_request = fe_schema
+            .store_request(SaveForcedExitRequestQuery {
+                target: params.target,
+                tokens: params.tokens.clone(),
+                price_in_wei: params.price_in_wei.clone(),
+                valid_until,
+            })
+            .await
+            .map_err(|e| {
+                return ApiError::internal("");
+            })?;
+
+        metrics::histogram!("api.v01.register_forced_exit_request", start.elapsed());
+        Ok(Json(saved_fe_request))
     }
 }

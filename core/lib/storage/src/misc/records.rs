@@ -1,13 +1,15 @@
+use crate::utils::{address_to_stored_string, stored_str_address_to_address};
 use chrono::{DateTime, Utc};
 use num::{bigint::ToBigInt, BigInt, ToPrimitive};
 use sqlx::{types::BigDecimal, FromRow};
+use zksync_basic_types::Address;
 use zksync_types::misc::ForcedExitRequest;
 
-#[derive(Debug, Clone, FromRow)]
+#[derive(Debug, Clone, sqlx::Type)]
 pub struct DbForcedExitRequest {
     pub id: i64,
-    pub account_id: i64,
-    pub token_id: i32,
+    pub target: String,
+    pub tokens: Vec<i32>,
     pub price_in_wei: BigDecimal,
     pub valid_until: DateTime<Utc>,
 }
@@ -15,10 +17,11 @@ pub struct DbForcedExitRequest {
 impl From<ForcedExitRequest> for DbForcedExitRequest {
     fn from(request: ForcedExitRequest) -> Self {
         let price_in_wei = BigDecimal::from(BigInt::from(request.price_in_wei.clone()));
+        let tokens: Vec<i32> = request.tokens.iter().map(|t| *t as i32).collect();
         Self {
             id: request.id,
-            account_id: request.account_id as i64,
-            token_id: request.token_id as i32,
+            target: address_to_stored_string(&request.target),
+            tokens: tokens,
             price_in_wei,
             valid_until: request.valid_until,
         }
@@ -36,10 +39,12 @@ impl Into<ForcedExitRequest> for DbForcedExitRequest {
             // means that invalid data is stored in the DB
             .expect("Invalid forced exit request has been stored");
 
+        let tokens: Vec<u16> = self.tokens.iter().map(|t| *t as u16).collect();
+
         ForcedExitRequest {
             id: self.id,
-            account_id: self.account_id.to_u32().expect("Account Id is negative"),
-            token_id: self.token_id as u16,
+            target: stored_str_address_to_address(&self.target),
+            tokens,
             price_in_wei,
             valid_until: self.valid_until,
         }

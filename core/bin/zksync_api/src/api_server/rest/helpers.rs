@@ -2,6 +2,7 @@
 
 use crate::core_api_client::EthBlockId;
 use actix_web::{HttpResponse, Result as ActixResult};
+use bigdecimal::BigDecimal;
 use std::collections::HashMap;
 use zksync_storage::chain::{
     block::records::BlockDetails,

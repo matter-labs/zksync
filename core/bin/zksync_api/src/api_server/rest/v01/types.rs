@@ -1,7 +1,10 @@
 //! Requests and responses used by the REST API.
 
+use num::BigUint;
 use serde::{Deserialize, Serialize};
-use zksync_types::{Account, AccountId};
+use zksync_types::TokenId;
+use zksync_types::{Account, AccountId, Address};
+use zksync_utils::BigUintSerdeAsRadix10Str;
 
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -42,4 +45,12 @@ pub struct BlockExplorerSearchQuery {
 #[derive(Serialize, Deserialize)]
 pub struct IsForcedExitEnabledResponse {
     pub enabled: bool,
+}
+
+#[derive(Deserialize)]
+pub struct ForcedExitRegisterRequest {
+    pub target: Address,
+    pub tokens: Vec<TokenId>,
+    #[serde(with = "BigUintSerdeAsRadix10Str")]
+    pub price_in_wei: BigUint,
 }

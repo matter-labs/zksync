@@ -6,7 +6,7 @@ use actix_web::{
     Scope,
 };
 
-use Error as ApiError;
+pub use Error as ApiError;
 // Workspace uses
 pub use zksync_api_client::rest::v1::{
     Client, ClientError, Pagination, PaginationQuery, MAX_LIMIT,
@@ -22,7 +22,7 @@ pub use self::error::{Error, ErrorBody};
 pub(crate) mod accounts;
 mod blocks;
 mod config;
-mod error;
+pub mod error;
 mod operations;
 mod search;
 #[cfg(test)]
@@ -30,7 +30,7 @@ mod test_utils;
 mod tokens;
 mod transactions;
 
-type JsonResult<T> = std::result::Result<web::Json<T>, Error>;
+pub type JsonResult<T> = std::result::Result<web::Json<T>, Error>;
 
 pub(crate) fn api_scope(tx_sender: TxSender, zk_config: &ZkSyncConfig) -> Scope {
     web::scope("/api/v1")

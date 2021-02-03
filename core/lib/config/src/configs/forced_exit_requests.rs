@@ -9,6 +9,6 @@ pub struct ForcedExitRequestsConfig {
 
 impl ForcedExitRequestsConfig {
     pub fn from_env() -> Self {
-        envy_load!("forced_exit_requests", "FORCED_EXIT_REQUESTS")
+        envy_load!("forced_exit_requests", "FORCED_EXIT_REQUESTS_")
     }
 }

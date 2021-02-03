@@ -895,13 +895,13 @@
         },
         {
           "ordinal": 8,
-          "name": "commitment",
-          "type_info": "Bytea"
+          "name": "timestamp",
+          "type_info": "Int8"
         },
         {
           "ordinal": 9,
-          "name": "timestamp",
-          "type_info": "Int8"
+          "name": "commitment",
+          "type_info": "Bytea"
         }
       ],
       "parameters": {
@@ -918,8 +918,8 @@
         false,
         false,
         false,
-        false,
-        true
+        true,
+        false
       ]
     }
   },
@@ -1417,22 +1417,6 @@
       "nullable": [
         null
       ]
-    }
-  },
-  "53ab59757e47450b31e9fb2ad006943246acdb14ac03d79518bcc5e19bb66cc8": {
-    "query": "\n            INSERT INTO forced_exit_requests ( id, account_id, token_id, price_in_wei, valid_until )\n            VALUES ( $1, $2, $3, $4, $5 )\n            ",
-    "describe": {
-      "columns": [],
-      "parameters": {
-        "Left": [
-          "Int8",
-          "Int8",
-          "Int4",
-          "Numeric",
-          "Timestamptz"
-        ]
-      },
-      "nullable": []
     }
   },
   "58b251c3fbdf9be9b62f669f8cdc2d98940026c831e02a53337474d36a5224f0": {
@@ -2119,13 +2103,13 @@
         },
         {
           "ordinal": 1,
-          "name": "account_id",
-          "type_info": "Int8"
+          "name": "target",
+          "type_info": "Text"
         },
         {
           "ordinal": 2,
-          "name": "token_id",
-          "type_info": "Int4"
+          "name": "tokens",
+          "type_info": "Int4Array"
         },
         {
           "ordinal": 3,
@@ -2422,13 +2406,13 @@
         },
         {
           "ordinal": 4,
-          "name": "previous_root_hash",
-          "type_info": "Bytea"
+          "name": "timestamp",
+          "type_info": "Int8"
         },
         {
           "ordinal": 5,
-          "name": "timestamp",
-          "type_info": "Int8"
+          "name": "previous_root_hash",
+          "type_info": "Bytea"
         }
       ],
       "parameters": {
@@ -2439,8 +2423,8 @@
         false,
         false,
         false,
-        false,
-        true
+        true,
+        false
       ]
     }
   },
@@ -3598,6 +3582,29 @@
         false,
         false,
         true,
+        false
+      ]
+    }
+  },
+  "df8ac3519c49215ebef5ac11c8fed5af12b097eb0c65f9a4ce078bb6e8342885": {
+    "query": "\n            INSERT INTO forced_exit_requests ( target, tokens, price_in_wei, valid_until )\n            VALUES ( $1, $2, $3, $4 )\n            RETURNING id\n            ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "id",
+          "type_info": "Int8"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Text",
+          "Int4Array",
+          "Numeric",
+          "Timestamptz"
+        ]
+      },
+      "nullable": [
         false
       ]
     }

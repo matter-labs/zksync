@@ -72,6 +72,8 @@
 // `sqlx` macros result in these warning being triggered.
 #![allow(clippy::toplevel_ref_arg, clippy::suspicious_else_formatting)]
 
+use forced_exit_requests_schema::ForcedExitRequestsSchema;
+use misc::forced_exit_requests_schema;
 // Built-in deps
 // use std::env;
 // External imports
@@ -95,6 +97,7 @@ pub mod misc;
 pub mod prover;
 pub mod test_data;
 pub mod tokens;
+mod utils;
 
 pub use crate::connection::ConnectionPool;
 pub type QueryResult<T> = Result<T, anyhow::Error>;
@@ -194,6 +197,10 @@ impl<'a> StorageProcessor<'a> {
     /// Gains access to the `Tokens` schema.
     pub fn tokens_schema(&mut self) -> tokens::TokensSchema<'_, 'a> {
         tokens::TokensSchema(self)
+    }
+
+    pub fn forced_exit_requests_schema(&mut self) -> ForcedExitRequestsSchema<'_, 'a> {
+        ForcedExitRequestsSchema(self)
     }
 
     fn conn(&mut self) -> &mut PgConnection {

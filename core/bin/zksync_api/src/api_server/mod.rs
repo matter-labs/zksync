@@ -18,6 +18,7 @@ use crate::signature_checker;
 
 mod admin_server;
 mod event_notify;
+mod forced_exit_checker;
 mod helpers;
 mod loggers;
 mod rest;
