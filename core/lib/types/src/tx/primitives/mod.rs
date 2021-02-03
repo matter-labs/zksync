@@ -1,5 +1,6 @@
-pub mod batch_sign_data;
 pub mod eip1271_signature;
+pub mod eth_batch_sign_data;
+pub mod eth_batch_signature;
 pub mod eth_signature;
 pub mod packed_eth_signature;
 pub mod packed_public_key;

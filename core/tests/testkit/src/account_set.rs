@@ -234,6 +234,7 @@ impl<T: Transport> AccountSet<T> {
             .expect("FullExit eth call failed")
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub async fn change_pubkey_with_onchain_auth(
         &self,
         eth_account: ETHAccountId,

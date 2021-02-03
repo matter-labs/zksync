@@ -12,7 +12,7 @@ async fn get_idle_job_from_queue(mut storage: &mut StorageProcessor<'_>) -> Quer
         .get_idle_prover_job_from_job_queue()
         .await?;
 
-    job.ok_or(format_err!("expect idle job from job queue"))
+    job.ok_or_else(|| format_err!("expect idle job from job queue"))
 }
 
 /// Checks that the `prover_job_queue` correctly processes requests to it.
@@ -28,28 +28,26 @@ async fn test_prover_job_queue(mut storage: StorageProcessor<'_>) -> QueryResult
 /// Checks that the single and aggregated proof can be stored and loaded.
 async fn test_store_proof(mut storage: &mut StorageProcessor<'_>) -> QueryResult<()> {
     // Attempt to load the proof that was not stored should result in None.
-    let (loaded_proof, loaded_aggregated_proof) = (
-        ProverSchema(&mut storage)
-            .load_proof(1)
-            .await
-            .expect("Error while obtaining proof"),
-        ProverSchema(&mut storage)
-            .load_aggregated_proof(1, 1)
-            .await
-            .expect("Error while obtaining proof"),
-    );
+    let loaded_proof = ProverSchema(&mut storage)
+        .load_proof(1)
+        .await
+        .expect("Error while obtaining proof");
+    let loaded_aggregated_proof = ProverSchema(&mut storage)
+        .load_aggregated_proof(1, 1)
+        .await
+        .expect("Error while obtaining proof");
+
     assert!(loaded_proof.is_none());
     assert!(loaded_aggregated_proof.is_none());
 
     // Attempt to store the proof for which there is no associated job in `job_prover_queue`.
-    let (proof, aggregated_proof) = (get_sample_single_proof(), get_sample_aggregated_proof());
+    let proof = get_sample_single_proof();
+    let aggregated_proof = get_sample_aggregated_proof();
 
-    let (stored_proof, stored_aggregated_proof) = (
-        ProverSchema(&mut storage).store_proof(1, 1, &proof).await,
-        ProverSchema(&mut storage)
-            .store_aggregated_proof(1, 1, 1, &aggregated_proof)
-            .await,
-    );
+    let stored_proof = ProverSchema(&mut storage).store_proof(1, 1, &proof).await;
+    let stored_aggregated_proof = ProverSchema(&mut storage)
+        .store_aggregated_proof(1, 1, 1, &aggregated_proof)
+        .await;
 
     assert!(stored_proof
         .err()
@@ -64,42 +62,37 @@ async fn test_store_proof(mut storage: &mut StorageProcessor<'_>) -> QueryResult
 
     // Add jobs to `job_prover_queue`.
     let job_data = serde_json::Value::default();
-    let (stored_job, stored_aggregated_job) = (
-        ProverSchema(&mut storage)
-            .add_prover_job_to_job_queue(1, 1, job_data.clone(), 0, ProverJobType::SingleProof)
-            .await,
-        ProverSchema(&mut storage)
-            .add_prover_job_to_job_queue(1, 1, job_data, 1, ProverJobType::AggregatedProof)
-            .await,
-    );
+    let stored_job = ProverSchema(&mut storage)
+        .add_prover_job_to_job_queue(1, 1, job_data.clone(), 0, ProverJobType::SingleProof)
+        .await;
+    let stored_aggregated_job = ProverSchema(&mut storage)
+        .add_prover_job_to_job_queue(1, 1, job_data, 1, ProverJobType::AggregatedProof)
+        .await;
+
     assert!(stored_job.is_ok());
     assert!(stored_aggregated_job.is_ok());
 
     // Get job id.
-    let (stored_job_id, stored_aggregated_job_id) = (
-        get_idle_job_from_queue(&mut storage).await?.job_id,
-        get_idle_job_from_queue(&mut storage).await?.job_id,
-    );
+    let stored_job_id = get_idle_job_from_queue(&mut storage).await?.job_id;
+    let stored_aggregated_job_id = get_idle_job_from_queue(&mut storage).await?.job_id;
 
     // Store proofs.
-    let (stored_proof, stored_aggregated_proof) = (
-        ProverSchema(&mut storage)
-            .store_proof(stored_job_id, 1, &proof)
-            .await,
-        ProverSchema(&mut storage)
-            .store_aggregated_proof(stored_aggregated_job_id, 1, 1, &aggregated_proof)
-            .await,
-    );
+    let stored_proof = ProverSchema(&mut storage)
+        .store_proof(stored_job_id, 1, &proof)
+        .await;
+    let stored_aggregated_proof = ProverSchema(&mut storage)
+        .store_aggregated_proof(stored_aggregated_job_id, 1, 1, &aggregated_proof)
+        .await;
+
     assert!(stored_proof.is_ok());
     assert!(stored_aggregated_proof.is_ok());
 
     // Now load it.
-    let (loaded_proof, loaded_aggregated_proof) = (
-        ProverSchema(&mut storage).load_proof(1).await?,
-        ProverSchema(&mut storage)
-            .load_aggregated_proof(1, 1)
-            .await?,
-    );
+    let loaded_proof = ProverSchema(&mut storage).load_proof(1).await?;
+    let loaded_aggregated_proof = ProverSchema(&mut storage)
+        .load_aggregated_proof(1, 1)
+        .await?;
+
     assert!(loaded_proof.is_some());
     assert!(loaded_aggregated_proof.is_some());
 

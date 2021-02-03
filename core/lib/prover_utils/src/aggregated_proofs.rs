@@ -85,7 +85,7 @@ pub fn gen_aggregate_proof(
     };
     let mut g2_bases = [<<Engine as EngineTrait>::G2Affine as CurveAffine>::zero(); 2];
     g2_bases.copy_from_slice(&universal_setup.g2_monomial_bases.as_ref()[..]);
-    let (proofs, vk_indexes) = proofs.clone().into_iter().fold(
+    let (proofs, vk_indexes) = proofs.into_iter().fold(
         (Vec::new(), Vec::new()),
         |(mut proofs, mut vk_idxs), SingleProofData { proof, vk_idx }| {
             proofs.push(proof.0);

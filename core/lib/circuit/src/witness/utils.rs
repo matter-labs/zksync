@@ -790,7 +790,7 @@ pub fn build_block_witness<'a>(
     witness_accum.calculate_pubdata_commitment();
 
     let mut block_commitment = block.block_commitment.as_bytes().to_vec();
-    block_commitment[0] = block_commitment[0] & (0xffu8 >> 3);
+    block_commitment[0] &= 0xffu8 >> 3;
     let block_commitment = fr_from_bytes(block_commitment);
     assert_eq!(
         witness_accum.pubdata_commitment.unwrap(),

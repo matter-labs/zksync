@@ -90,18 +90,20 @@ impl TestSetup {
             expected_changes_for_current_block: ExpectedAccountState::default(),
             commit_account,
             current_state_root: None,
-            last_committed_block: last_block.unwrap_or(Block::new(
-                0,
-                initial_root,
-                0,
-                vec![],
-                (0, 0),
-                0,
-                U256::from(0),
-                U256::from(0),
-                H256::default(),
-                0,
-            )),
+            last_committed_block: last_block.unwrap_or_else(|| {
+                Block::new(
+                    0,
+                    initial_root,
+                    0,
+                    vec![],
+                    (0, 0),
+                    0,
+                    U256::from(0),
+                    U256::from(0),
+                    H256::default(),
+                    0,
+                )
+            }),
         }
     }
 
@@ -195,7 +197,7 @@ impl TestSetup {
             .insert((zk_account_id, token.0), balance);
     }
 
-    pub fn apply_transfers(&mut self, transfers: &Vec<AccountTransfer>) {
+    pub fn apply_transfers(&mut self, transfers: &[AccountTransfer]) {
         for transfer in transfers {
             match transfer {
                 AccountTransfer::EthAccountTransfer(tr) => {

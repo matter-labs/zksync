@@ -41,6 +41,7 @@ pub struct ProverOutputRequest {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
+#[allow(clippy::large_enum_variant)]
 pub enum JobResultData {
     BlockProof(SingleProof),
     AggregatedBlockProof(AggregatedProof),

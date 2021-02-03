@@ -18,7 +18,9 @@ use thiserror::Error;
 use zksync_config::ZkSyncConfig;
 use zksync_storage::{chain::account::records::EthAccountType, ConnectionPool};
 use zksync_types::{
-    tx::{BatchSignData, EthSignData, SignedZkSyncTx, TxEthSignature, TxHash},
+    tx::{
+        EthBatchSignData, EthBatchSignatures, EthSignData, SignedZkSyncTx, TxEthSignature, TxHash,
+    },
     Address, Token, TokenId, TokenLike, TxFeeTypes, ZkSyncTx,
 };
 
@@ -286,8 +288,11 @@ impl TxSender {
     pub async fn submit_txs_batch(
         &self,
         txs: Vec<TxWithSignature>,
-        eth_signatures: Vec<TxEthSignature>,
+        eth_signatures: EthBatchSignatures,
     ) -> Result<Vec<TxHash>, SubmitError> {
+        // Bring the received signatures into a vector for simplified work.
+        let eth_signatures: Vec<_> = eth_signatures.into();
+
         if txs.is_empty() {
             return Err(SubmitError::TxAdd(TxAddError::EmptyBatch));
         }
@@ -406,7 +411,7 @@ impl TxSender {
                 .collect::<Vec<_>>();
             // Create batch signature data.
             let batch_sign_data =
-                BatchSignData::new(_txs, eth_signatures).map_err(SubmitError::other)?;
+                EthBatchSignData::new(_txs, eth_signatures).map_err(SubmitError::other)?;
             let (verified_batch, sign_data) = verify_txs_batch_signature(
                 txs,
                 tx_senders,
@@ -636,7 +641,7 @@ async fn verify_txs_batch_signature(
     senders: Vec<Address>,
     tokens: Vec<Token>,
     sender_types: Vec<EthAccountType>,
-    batch_sign_data: BatchSignData,
+    batch_sign_data: EthBatchSignData,
     msgs_to_sign: Vec<Option<Vec<u8>>>,
     req_channel: mpsc::Sender<VerifyTxSignatureRequest>,
 ) -> Result<VerifiedTx, SubmitError> {
