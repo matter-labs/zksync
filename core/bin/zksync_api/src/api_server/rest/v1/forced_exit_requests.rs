@@ -23,7 +23,7 @@ use crate::{
 use actix_web::{HttpResponse, Result as ActixResult};
 use std::ops::{Add, Mul};
 
-use bigdecimal::BigDecimal;
+use bigdecimal::{BigDecimal, FromPrimitive};
 use futures::{channel::mpsc, SinkExt, TryFutureExt};
 use num::{
     bigint::{ToBigInt, ToBigUint},
@@ -82,23 +82,32 @@ pub struct ForcedExitRegisterRequest {
 #[derive(Clone)]
 pub struct ApiForcedExitRequestsData {
     pub(crate) connection_pool: ConnectionPool,
-    pub(crate) config: ZkSyncConfig,
     pub(crate) forced_exit_checker: ForcedExitChecker,
     pub(crate) ticker_request_sender: mpsc::Sender<TickerRequest>,
+
+    pub(crate) is_enabled: bool,
+    pub(crate) price_scaling_factor: BigDecimal,
+    pub(crate) max_tokens: u8,
 }
 
 impl ApiForcedExitRequestsData {
     fn new(
         connection_pool: ConnectionPool,
-        config: ZkSyncConfig,
+        config: &ZkSyncConfig,
         ticker_request_sender: mpsc::Sender<TickerRequest>,
     ) -> Self {
         let forced_exit_checker = ForcedExitChecker::new(&config);
         Self {
             connection_pool,
-            config,
             forced_exit_checker,
             ticker_request_sender,
+
+            is_enabled: config.forced_exit_requests.enabled,
+            price_scaling_factor: BigDecimal::from_f64(
+                config.forced_exit_requests.price_scaling_factor,
+            )
+            .unwrap(),
+            max_tokens: config.forced_exit_requests.max_tokens,
         }
     }
 
@@ -121,9 +130,8 @@ async fn is_enabled(
 ) -> JsonResult<IsForcedExitEnabledResponse> {
     let start = Instant::now();
 
-    let is_enabled = data.config.forced_exit_requests.enabled;
     let response = IsForcedExitEnabledResponse {
-        enabled: is_enabled,
+        enabled: data.is_enabled,
     };
 
     metrics::histogram!("api.v01.is_forced_exit_enabled", start.elapsed());
@@ -132,6 +140,7 @@ async fn is_enabled(
 
 async fn get_forced_exit_request_fee(
     ticker_request_sender: mpsc::Sender<TickerRequest>,
+    price_scaling_factor: BigDecimal,
 ) -> Result<BigUint, SubmitError> {
     let price = ticker_request(
         ticker_request_sender.clone(),
@@ -141,17 +150,19 @@ async fn get_forced_exit_request_fee(
     .await?;
     let price = BigDecimal::from(price.total_fee.to_bigint().unwrap());
 
-    let scaling_coefficient = BigDecimal::from_str("1.6").unwrap();
-    let scaled_price = price * scaling_coefficient;
+    let scaled_price = price * price_scaling_factor;
     let scaled_price = scaled_price.round(0).to_bigint().unwrap();
 
     Ok(scaled_price.to_biguint().unwrap())
 }
 
 async fn get_fee(data: web::Data<ApiForcedExitRequestsData>) -> JsonResult<ForcedExitRequestFee> {
-    let request_fee = get_forced_exit_request_fee(data.ticker_request_sender.clone())
-        .await
-        .map_err(ApiError::from)?;
+    let request_fee = get_forced_exit_request_fee(
+        data.ticker_request_sender.clone(),
+        data.price_scaling_factor.clone(),
+    )
+    .await
+    .map_err(ApiError::from)?;
 
     Ok(Json(ForcedExitRequestFee { request_fee }))
 }
@@ -162,7 +173,7 @@ pub async fn submit_request(
 ) -> JsonResult<ForcedExitRequest> {
     let start = Instant::now();
 
-    if !data.config.forced_exit_requests.enabled {
+    if !data.is_enabled {
         return Err(ApiError::bad_request(
             "ForcedExit requests feature is disabled!",
         ));
@@ -178,9 +189,12 @@ pub async fn submit_request(
         .await
         .map_err(ApiError::from)?;
 
-    let price = get_forced_exit_request_fee(data.ticker_request_sender.clone())
-        .await
-        .map_err(ApiError::from)?;
+    let price = get_forced_exit_request_fee(
+        data.ticker_request_sender.clone(),
+        data.price_scaling_factor.clone(),
+    )
+    .await
+    .map_err(ApiError::from)?;
     let price = BigDecimal::from(price.to_bigint().unwrap());
 
     let user_fee = params.price_in_wei.to_bigint().unwrap();
@@ -237,8 +251,7 @@ pub fn api_scope(
     config: &ZkSyncConfig,
     ticker_request_sender: mpsc::Sender<TickerRequest>,
 ) -> Scope {
-    let data =
-        ApiForcedExitRequestsData::new(connection_pool, config.clone(), ticker_request_sender);
+    let data = ApiForcedExitRequestsData::new(connection_pool, config, ticker_request_sender);
 
     web::scope("forced_exit")
         .data(data)

@@ -5,6 +5,8 @@ use serde::Deserialize;
 #[derive(Debug, Deserialize, Clone, PartialEq)]
 pub struct ForcedExitRequestsConfig {
     pub enabled: bool,
+    pub price_scaling_factor: f64,
+    pub max_tokens: u8,
 }
 
 impl ForcedExitRequestsConfig {

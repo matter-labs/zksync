@@ -1,3 +1,12 @@
 # Options for L1-based ForcedExit utility
 [forced_exit_requests]
+# Whether the feature is enabled. Used to be able to quickly stop serving FE requests
+# in times of attacks or upgrages  
 enabled=true
+
+# The price that will be demanded from a user is equal to 
+# price_for_withdrawal * price_scaling
+price_scaling_factor=1.6
+
+# Maximum number of tokens in a request
+max_tokens=10
