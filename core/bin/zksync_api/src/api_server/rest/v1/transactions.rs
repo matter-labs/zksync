@@ -261,12 +261,7 @@ async fn submit_tx_batch(
         })
         .collect();
 
-    // TODO: multiple authors per batch in API
-    let signatures = if let Some(signature) = body.signature {
-        vec![signature]
-    } else {
-        Vec::new()
-    };
+    let signatures = body.signature;
     let tx_hashes = data
         .tx_sender
         .submit_txs_batch(txs, signatures)

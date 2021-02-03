@@ -6,7 +6,7 @@ use num::BigUint;
 // Workspace uses
 use zksync_types::{
     helpers::closest_packable_fee_amount,
-    tx::{TxEthSignature, TxHash},
+    tx::{EthBatchSignatures, TxEthSignature, TxHash},
     Address, Token, TokenLike, TxFeeTypes, ZkSyncTx,
 };
 
@@ -121,7 +121,7 @@ impl RpcApp {
     pub async fn _impl_submit_txs_batch(
         self,
         txs: Vec<TxWithSignature>,
-        eth_signatures: Vec<TxEthSignature>,
+        eth_signatures: EthBatchSignatures,
     ) -> Result<Vec<TxHash>> {
         let start = Instant::now();
         let result = self

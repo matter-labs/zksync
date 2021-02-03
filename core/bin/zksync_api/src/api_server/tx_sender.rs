@@ -18,7 +18,7 @@ use thiserror::Error;
 use zksync_config::ZkSyncConfig;
 use zksync_storage::{chain::account::records::EthAccountType, ConnectionPool};
 use zksync_types::{
-    tx::{BatchSignData, EthSignData, SignedZkSyncTx, TxEthSignature, TxHash},
+    tx::{BatchSignData, EthBatchSignatures, EthSignData, SignedZkSyncTx, TxEthSignature, TxHash},
     Address, Token, TokenId, TokenLike, TxFeeTypes, ZkSyncTx,
 };
 
@@ -286,8 +286,11 @@ impl TxSender {
     pub async fn submit_txs_batch(
         &self,
         txs: Vec<TxWithSignature>,
-        eth_signatures: Vec<TxEthSignature>,
+        eth_signatures: EthBatchSignatures,
     ) -> Result<Vec<TxHash>, SubmitError> {
+        // Bring the received signatures into a vector for simplified work.
+        let eth_signatures: Vec<_> = eth_signatures.into();
+
         if txs.is_empty() {
             return Err(SubmitError::TxAdd(TxAddError::EmptyBatch));
         }
