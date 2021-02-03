@@ -23,6 +23,8 @@ interface InternalTx {
     token: TokenLike;
 }
 
+type TotalFee = Map<TokenLike, BigNumber>;
+
 /**
  * Provides iterface for constructing batches of transactions.
  */
@@ -42,16 +44,21 @@ export class BatchBuilder {
      */
     async build(
         feeToken?: TokenLike
-    ): Promise<{ txs: SignedTransaction[]; signature: TxEthSignature; totalFee: BigNumber }> {
+    ): Promise<{ txs: SignedTransaction[]; signature: TxEthSignature; totalFee: TotalFee }> {
         if (this.txs.length == 0) {
             throw new Error('Transaction batch cannot be empty');
         }
         if (feeToken != undefined) {
             await this.setFeeToken(feeToken);
         }
-        const totalFee = this.txs
-            .map((tx) => tx.tx.fee)
-            .reduce((sum: BigNumber, current: BigNumber) => sum.add(current), BigNumber.from(0));
+        // Gather total fee for every token.
+        const totalFee: TotalFee = new Map();
+        for (const tx of this.txs) {
+            const fee = tx.tx.fee;
+            const token = tx.token;
+            totalFee.set(token, totalFee.get(token) || 0 + fee);
+        }
+
         const { txs, message } = await this.processTransactions();
 
         let signature = await this.wallet.getEthMessageSignature(message);
