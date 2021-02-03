@@ -4,6 +4,9 @@ use std::time;
 // External uses
 use serde::Deserialize;
 
+// Local uses
+use crate::envy_load;
+
 /// Used database configuration.
 #[derive(Debug, Deserialize, Clone, PartialEq)]
 pub struct DBConfig {
@@ -21,19 +24,7 @@ impl DBConfig {
     const SECS_PER_HOUR: u64 = 3600;
 
     pub fn from_env() -> Self {
-        Self {
-            pool_size: std::env::var("DB_POOL_SIZE")
-                .expect("DB_POOL_SIZE is set")
-                .parse()
-                .unwrap(),
-            url: std::env::var("DATABASE_URL").expect("DATABASE_URL is set"),
-            rejected_transactions_max_age: std::env::var("DB_REJECTED_TRANSACTIONS_MAX_AGE")
-                .map_or(336, |s| s.parse().unwrap()),
-            rejected_transactions_cleaner_interval: std::env::var(
-                "DB_REJECTED_TRANSACTIONS_CLEANER_INTERVAL",
-            )
-            .map_or(24, |s| s.parse().unwrap()),
-        }
+        envy_load!("contracts", "DATABASE_")
     }
 
     pub fn rejected_transactions_max_age(&self) -> chrono::Duration {
@@ -55,16 +46,17 @@ mod tests {
             pool_size: 10,
             url: "postgres://postgres@localhost/plasma".into(),
             rejected_transactions_max_age: 336,
-            rejected_transactions_cleaner_interval: 72,
+            rejected_transactions_cleaner_interval: 24,
         }
     }
 
     #[test]
     fn from_env() {
         let config = r#"
-DB_POOL_SIZE="10"
+DATABASE_POOL_SIZE="10"
 DATABASE_URL="postgres://postgres@localhost/plasma"
-DB_REJECTED_TRANSACTIONS_CLEANER_INTERVAL=72
+DATABASE_REJECTED_TRANSACTIONS_MAX_AGE="336"
+DATABASE_REJECTED_TRANSACTIONS_CLEANER_INTERVAL="24"
         "#;
         set_env(config);
 
