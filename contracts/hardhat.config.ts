@@ -27,7 +27,7 @@ const testConfig = {
 
 const localConfig = Object.assign({}, prodConfig);
 // @ts-ignore
-localConfig.UPGRADE_NOTICE_PERIOD = 0
+localConfig.UPGRADE_NOTICE_PERIOD = 0;
 localConfig.DUMMY_VERIFIER = process.env.CONTRACTS_TEST_DUMMY_VERIFIER === 'true';
 
 const contractDefs = {
