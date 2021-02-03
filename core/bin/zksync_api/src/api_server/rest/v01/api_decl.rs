@@ -107,17 +107,6 @@ impl ApiV01 {
                 "/withdrawal_processing_time",
                 web::get().to(Self::withdrawal_processing_time),
             )
-            .route(
-                "/forced_exit/enabled",
-                web::get().to(Self::is_forced_exit_enabled),
-            )
-            .route(
-                "/forced_exit/register",
-                // All the other routes in this file are the `get` routes
-                // Unfortunately to preserve consistency would mean to the JSON-RPC
-                // api which is even greater evil
-                web::post().to(Self::register_forced_exit_request),
-            )
     }
 
     pub(crate) async fn access_storage(&self) -> ActixResult<StorageProcessor<'_>> {

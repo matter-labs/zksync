@@ -23,6 +23,7 @@ pub(crate) mod accounts;
 mod blocks;
 mod config;
 pub mod error;
+mod forced_exit_requests;
 mod operations;
 mod search;
 #[cfg(test)]
@@ -48,6 +49,11 @@ pub(crate) fn api_scope(tx_sender: TxSender, zk_config: &ZkSyncConfig) -> Scope 
         .service(tokens::api_scope(
             tx_sender.pool.clone(),
             tx_sender.tokens,
+            tx_sender.ticker_requests.clone(),
+        ))
+        .service(forced_exit_requests::api_scope(
+            tx_sender.pool.clone(),
+            zk_config,
             tx_sender.ticker_requests,
         ))
 }
