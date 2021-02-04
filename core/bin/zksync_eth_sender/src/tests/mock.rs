@@ -139,6 +139,13 @@ impl DatabaseInterface for MockDatabase {
         Ok(())
     }
 
+    async fn restore_unprocessed_operations(
+        &self,
+        _connection: &mut StorageProcessor<'_>,
+    ) -> anyhow::Result<()> {
+        Ok(())
+    }
+
     async fn load_unconfirmed_operations(
         &self,
         _connection: &mut StorageProcessor<'_>,

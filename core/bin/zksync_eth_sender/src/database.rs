@@ -25,6 +25,13 @@ pub(super) trait DatabaseInterface {
         connection: &mut StorageProcessor<'_>,
     ) -> anyhow::Result<VecDeque<ETHOperation>>;
 
+    /// Load all aggregated operation that have no confirmation yet and have not yet been sent to Ethereum.
+    /// Use only after server restart.
+    async fn restore_unprocessed_operations(
+        &self,
+        connection: &mut StorageProcessor<'_>,
+    ) -> anyhow::Result<()>;
+
     /// Loads the unprocessed operations from the database.
     /// Unprocessed operations are zkSync operations that were not started at all.
     async fn load_new_operations(
@@ -131,6 +138,18 @@ impl DatabaseInterface for Database {
             .await?;
 
         Ok(unconfirmed_ops)
+    }
+
+    async fn restore_unprocessed_operations(
+        &self,
+        connection: &mut StorageProcessor<'_>,
+    ) -> anyhow::Result<()> {
+        connection
+            .ethereum_schema()
+            .restore_unprocessed_operations()
+            .await?;
+
+        Ok(())
     }
 
     async fn load_new_operations(

@@ -408,6 +408,19 @@
       "nullable": []
     }
   },
+  "18923147a9a9f03dae77d31f106ac53ca69321df1194c921baef8f48ff963c12": {
+    "query": "WITH aggregate_ops AS (\n                SELECT aggregate_operations.id FROM aggregate_operations\n                   WHERE confirmed = $1 and action_type != $2 and aggregate_operations.id != ANY(SELECT id from eth_aggregated_ops_binding)\n                ORDER BY aggregate_operations.id ASC\n              )\n              INSERT INTO eth_unprocessed_aggregated_ops (op_id)\n              SELECT id from aggregate_ops\n              ON CONFLICT (op_id)\n              DO NOTHING",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "Bool",
+          "Text"
+        ]
+      },
+      "nullable": []
+    }
+  },
   "18b31bb04ceac3422973692fdac7119b42f8d48fa98af34cfc644a30bd72d7b9": {
     "query": "\n                    WITH block_details AS (\n                        WITH eth_ops AS (\n                            SELECT DISTINCT ON (to_block, action_type)\n                                aggregate_operations.from_block,\n                                aggregate_operations.to_block,\n                                eth_tx_hashes.tx_hash,\n                                aggregate_operations.action_type,\n                                aggregate_operations.created_at,\n                                aggregate_operations.confirmed\n                            FROM aggregate_operations\n                                left join eth_aggregated_ops_binding on eth_aggregated_ops_binding.op_id = aggregate_operations.id\n                                left join eth_tx_hashes on eth_tx_hashes.eth_op_id = eth_aggregated_ops_binding.eth_op_id\n                            ORDER BY to_block DESC, action_type, confirmed\n                        )\n                        SELECT\n                            blocks.number AS details_block_number,\n                            committed.tx_hash AS commit_tx_hash,\n                            verified.tx_hash AS verify_tx_hash\n                        FROM blocks\n                        INNER JOIN eth_ops committed ON\n                            committed.from_block <= blocks.number AND committed.to_block >= blocks.number AND committed.action_type = 'CommitBlocks' AND committed.confirmed = true\n                        LEFT JOIN eth_ops verified ON\n                            verified.from_block <= blocks.number AND verified.to_block >= blocks.number AND verified.action_type = 'ExecuteBlocks' AND verified.confirmed = true\n                    )\n                    SELECT\n                        block_number, \n                        block_index as \"block_index?\",\n                        tx_hash,\n                        success,\n                        fail_reason as \"fail_reason?\",\n                        details.commit_tx_hash as \"commit_tx_hash?\",\n                        details.verify_tx_hash as \"verify_tx_hash?\"\n                    FROM executed_transactions\n                    LEFT JOIN block_details details ON details.details_block_number = executed_transactions.block_number\n                    WHERE (\n                        (primary_account_address = $1 OR from_account = $1 OR to_account = $1)\n                        AND (\n                            block_number = $2 AND (\n                                COALESCE(block_index, -1) >= $3\n                            ) OR (\n                                block_number > $2\n                            )\n                        )\n                    )\n                    ORDER BY block_number ASC, COALESCE(block_index, -1) ASC\n                    LIMIT $4\n                    ",
     "describe": {

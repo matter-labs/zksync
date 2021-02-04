@@ -136,6 +136,10 @@ impl<ETH: EthereumInterface, DB: DatabaseInterface> ETHSender<ETH, DB> {
             .await
             .expect("Unable create database transaction");
 
+        db.restore_unprocessed_operations(&mut transaction)
+            .await
+            .expect("Can't restore unprocessed operations");
+
         let ongoing_ops = db
             .load_unconfirmed_operations(&mut transaction)
             .await
