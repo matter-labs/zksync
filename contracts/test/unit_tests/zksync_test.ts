@@ -179,9 +179,6 @@ describe('ZK priority queue ops unit tests', function () {
 
         const govContract = deployer.governanceContract(wallet);
         await govContract.addToken(tokenContract.address);
-
-        const opsTestContractFactory = await hardhat.ethers.getContractFactory('OperationsTest');
-        await opsTestContractFactory.deploy();
     });
 
     async function performDeposit(to: Address, token: TokenAddress, depositAmount: BigNumber) {

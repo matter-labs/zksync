@@ -6,16 +6,16 @@ describe('Ownable unit tests', function () {
     this.timeout(50000);
 
     let testContract;
-    let owner_wallet;
-    let another_wallet;
+    let deployer;
+    let wallet;
     before(async () => {
-        [owner_wallet, another_wallet] = await hardhat.ethers.getSigners();
+        [deployer, wallet] = await hardhat.ethers.getSigners();
         const contractFactory = await hardhat.ethers.getContractFactory('Ownable');
-        testContract = await contractFactory.deploy(owner_wallet.address);
+        testContract = await contractFactory.deploy(deployer.address);
     });
 
     it('checking correctness of setting mastership in constructor', async () => {
-        expect(await testContract.getMaster()).to.equal(owner_wallet.address);
+        expect(await testContract.getMaster()).to.equal(deployer.address);
     });
 
     it('checking correctness of transferring mastership to zero address', async () => {
@@ -26,19 +26,19 @@ describe('Ownable unit tests', function () {
     });
 
     it('checking correctness of transferring mastership', async () => {
-        /// transfer mastership to another_wallet
-        await testContract.transferMastership(another_wallet.address);
-        expect(await testContract.getMaster()).to.equal(another_wallet.address);
+        /// transfer mastership to wallet
+        await testContract.transferMastership(wallet.address);
+        expect(await testContract.getMaster()).to.equal(wallet.address);
 
-        /// try to transfer mastership to owner_wallet by owner_wallet call
+        /// try to transfer mastership to deployer by deployer call
         let { revertReason } = await getCallRevertReason(() =>
-            testContract.transferMastership(owner_wallet.address, { gasLimit: '300000' })
+            testContract.transferMastership(deployer.address, { gasLimit: '300000' })
         );
         expect(revertReason).equal('1c');
 
-        /// transfer mastership back to owner_wallet
-        let testContract_with_wallet2_signer = await testContract.connect(another_wallet);
-        await testContract_with_wallet2_signer.transferMastership(owner_wallet.address);
-        expect(await testContract.getMaster()).to.equal(owner_wallet.address);
+        /// transfer mastership back to deployer
+        let testContract_with_wallet2_signer = await testContract.connect(wallet);
+        await testContract_with_wallet2_signer.transferMastership(deployer.address);
+        expect(await testContract.getMaster()).to.equal(deployer.address);
     });
 });
