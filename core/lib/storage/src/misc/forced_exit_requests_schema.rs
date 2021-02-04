@@ -77,18 +77,4 @@ impl<'a, 'c> ForcedExitRequestsSchema<'a, 'c> {
 
         Ok(request)
     }
-
-    pub async fn get_max_used_id(&mut self) -> QueryResult<ForcedExitRequestId> {
-        let start = Instant::now();
-
-        let max_value: i64 = sqlx::query!(r#"SELECT MAX(id) FROM forced_exit_requests"#)
-            .fetch_one(self.0.conn())
-            .await?
-            .max
-            .unwrap_or(0);
-
-        metrics::histogram!("sql.forced_exit_requests.get_max_used_id", start.elapsed());
-
-        Ok(max_value)
-    }
 }

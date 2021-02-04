@@ -594,24 +594,6 @@
       ]
     }
   },
-  "1dfd4fafff703f719789690f88ba036e25bde60a69580e644ab24f2799249c99": {
-    "query": "SELECT MAX(id) FROM forced_exit_requests",
-    "describe": {
-      "columns": [
-        {
-          "ordinal": 0,
-          "name": "max",
-          "type_info": "Int8"
-        }
-      ],
-      "parameters": {
-        "Left": []
-      },
-      "nullable": [
-        null
-      ]
-    }
-  },
   "222e3946401772e3f6e0d9ce9909e8e7ac2dc830c5ecfcd522f56b3bf70fd679": {
     "query": "INSERT INTO data_restore_storage_state_update (storage_state) VALUES ($1)",
     "describe": {
