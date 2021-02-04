@@ -141,20 +141,21 @@ pub async fn submit_request(
         .await
         .map_err(ApiError::from)?;
 
-    let price = get_fee_for_one_forced_exit(
+    let price_of_one_exit = get_fee_for_one_forced_exit(
         data.ticker_request_sender.clone(),
         data.price_scaling_factor.clone(),
     )
     .await
     .map_err(ApiError::from)?;
-    let price = BigDecimal::from(price.to_bigint().unwrap());
+    let price_of_one_exit = BigDecimal::from(price_of_one_exit.to_bigint().unwrap());
+    let price_of_request = price_of_one_exit * BigDecimal::from_usize(params.tokens.len()).unwrap();
 
     let user_fee = params.price_in_wei.to_bigint().unwrap();
     let user_fee = BigDecimal::from(user_fee);
     let user_scaling_coefficient = BigDecimal::from_str("1.05").unwrap();
     let user_scaled_fee = user_scaling_coefficient * user_fee;
 
-    if user_scaled_fee < price {
+    if user_scaled_fee < price_of_request {
         return Err(ApiError::bad_request("Not enough fee"));
     }
 
