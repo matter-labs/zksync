@@ -5681,6 +5681,7 @@ dependencies = [
  "bigdecimal",
  "chrono",
  "hex",
+ "num",
  "reqwest",
  "serde",
  "serde_json",

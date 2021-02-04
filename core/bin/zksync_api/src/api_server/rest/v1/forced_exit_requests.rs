@@ -56,27 +56,10 @@ use crate::api_server::rpc_server::types::TxWithSignature;
 use crate::api_server::tx_sender::{SubmitError, TxSender};
 
 use serde::{Deserialize, Serialize};
+pub use zksync_api_client::rest::v1::{
+    ForcedExitRegisterRequest, ForcedExitRequestFee, IsForcedExitEnabledResponse,
+};
 use zksync_utils::BigUintSerdeAsRadix10Str;
-
-#[derive(Debug, Serialize, Deserialize, Clone)]
-#[serde(rename_all = "camelCase")]
-pub struct ForcedExitRequestFee {
-    #[serde(with = "BigUintSerdeAsRadix10Str")]
-    pub request_fee: BigUint,
-}
-
-#[derive(Serialize, Deserialize)]
-pub struct IsForcedExitEnabledResponse {
-    pub enabled: bool,
-}
-
-#[derive(Deserialize)]
-pub struct ForcedExitRegisterRequest {
-    pub target: Address,
-    pub tokens: Vec<TokenId>,
-    #[serde(with = "BigUintSerdeAsRadix10Str")]
-    pub price_in_wei: BigUint,
-}
 
 /// Shared data between `api/v1/transactions` endpoints.
 #[derive(Clone)]
@@ -109,17 +92,6 @@ impl ApiForcedExitRequestsData {
             .unwrap(),
             max_tokens: config.forced_exit_requests.max_tokens,
         }
-    }
-
-    async fn tx_receipt(
-        storage: &mut StorageProcessor<'_>,
-        tx_hash: TxHash,
-    ) -> QueryResult<Option<TxReceiptResponse>> {
-        storage
-            .chain()
-            .operations_ext_schema()
-            .tx_receipt(tx_hash.as_ref())
-            .await
     }
 }
 
@@ -253,187 +225,272 @@ pub fn api_scope(
 ) -> Scope {
     let data = ApiForcedExitRequestsData::new(connection_pool, config, ticker_request_sender);
 
-    web::scope("forced_exit")
+    // `enabled` endpoint should always be there
+    let scope = web::scope("forced_exit")
         .data(data)
-        .route("enabled", web::get().to(is_enabled))
-        .route("submit", web::post().to(submit_request))
-        .route("fee", web::get().to(get_fee))
+        .route("enabled", web::get().to(is_enabled));
+
+    if config.forced_exit_requests.enabled {
+        scope
+            .route("submit", web::post().to(submit_request))
+            .route("fee", web::get().to(get_fee))
+    } else {
+        scope
+    }
 }
 
-//#[cfg(test)]
-// mod tests {
-//     use actix_web::App;
-//     use bigdecimal::BigDecimal;
-//     use futures::{channel::mpsc, StreamExt};
-//     use num::BigUint;
+#[cfg(test)]
+mod tests {
+    use actix_web::App;
+    use bigdecimal::BigDecimal;
+    use futures::{channel::mpsc, StreamExt};
+    use num::BigUint;
 
-//     use zksync_api_client::rest::v1::Client;
-//     use zksync_storage::ConnectionPool;
-//     use zksync_test_account::ZkSyncAccount;
-//     use zksync_types::{
-//         tokens::TokenLike,
-//         tx::{PackedEthSignature, TxEthSignature},
-//         ZkSyncTx,
-//     };
+    use crate::api_server::tx_sender::ticker_price_request;
+    use zksync_api_client::rest::v1::Client;
+    use zksync_config::{test_config::TestConfig, ForcedExitRequestsConfig};
+    use zksync_storage::ConnectionPool;
+    use zksync_test_account::ZkSyncAccount;
+    use zksync_types::TxFeeTypes;
+    use zksync_types::{
+        tokens::TokenLike,
+        tx::{PackedEthSignature, TxEthSignature},
+        ZkSyncTx,
+    };
 
-//     use crate::{
-//         // api_server::helpers::try_parse_tx_hash,
-//         core_api_client::CoreApiClient,
-//         fee_ticker::{Fee, OutputFeeType::Withdraw, TickerRequest},
-//         signature_checker::{VerifiedTx, VerifyTxSignatureRequest},
-//     };
+    use crate::{
+        // api_server::helpers::try_parse_tx_hash,
+        core_api_client::CoreApiClient,
+        fee_ticker::{Fee, OutputFeeType::Withdraw, TickerRequest},
+        signature_checker::{VerifiedTx, VerifyTxSignatureRequest},
+    };
 
-//     use super::super::test_utils::{TestServerConfig, TestTransactions};
-//     use super::*;
+    use super::super::test_utils::{TestServerConfig, TestTransactions};
+    use super::*;
 
-//     fn submit_txs_loopback() -> (CoreApiClient, actix_web::test::TestServer) {
-//         async fn send_tx(_tx: Json<SignedZkSyncTx>) -> Json<Result<(), ()>> {
-//             Json(Ok(()))
-//         }
+    fn submit_txs_loopback() -> (CoreApiClient, actix_web::test::TestServer) {
+        async fn send_tx(_tx: Json<SignedZkSyncTx>) -> Json<Result<(), ()>> {
+            Json(Ok(()))
+        }
 
-//         async fn send_txs_batch(
-//             _txs: Json<(Vec<SignedZkSyncTx>, Vec<TxEthSignature>)>,
-//         ) -> Json<Result<(), ()>> {
-//             Json(Ok(()))
-//         }
+        async fn send_txs_batch(
+            _txs: Json<(Vec<SignedZkSyncTx>, Vec<TxEthSignature>)>,
+        ) -> Json<Result<(), ()>> {
+            Json(Ok(()))
+        }
 
-//         let server = actix_web::test::start(move || {
-//             App::new()
-//                 .route("new_tx", web::post().to(send_tx))
-//                 .route("new_txs_batch", web::post().to(send_txs_batch))
-//         });
+        let server = actix_web::test::start(move || {
+            App::new()
+                .route("new_tx", web::post().to(send_tx))
+                .route("new_txs_batch", web::post().to(send_txs_batch))
+        });
 
-//         let url = server.url("").trim_end_matches('/').to_owned();
+        let url = server.url("").trim_end_matches('/').to_owned();
 
-//         (CoreApiClient::new(url), server)
-//     }
+        (CoreApiClient::new(url), server)
+    }
 
-//     fn dummy_fee_ticker() -> mpsc::Sender<TickerRequest> {
-//         let (sender, mut receiver) = mpsc::channel(10);
+    fn dummy_fee_ticker(zkp_fee: Option<u64>, gas_fee: Option<u64>) -> mpsc::Sender<TickerRequest> {
+        let (sender, mut receiver) = mpsc::channel(10);
 
-//         actix_rt::spawn(async move {
-//             while let Some(item) = receiver.next().await {
-//                 match item {
-//                     TickerRequest::GetTxFee { response, .. } => {
-//                         let fee = Ok(Fee::new(
-//                             Withdraw,
-//                             BigUint::from(1_u64).into(),
-//                             BigUint::from(1_u64).into(),
-//                             1_u64.into(),
-//                             1_u64.into(),
-//                         ));
+        let zkp_fee = zkp_fee.unwrap_or(1_u64);
+        let gas_fee = gas_fee.unwrap_or(1_u64);
 
-//                         response.send(fee).expect("Unable to send response");
-//                     }
-//                     TickerRequest::GetTokenPrice { response, .. } => {
-//                         let price = Ok(BigDecimal::from(1_u64));
+        actix_rt::spawn(async move {
+            while let Some(item) = receiver.next().await {
+                match item {
+                    TickerRequest::GetTxFee { response, .. } => {
+                        let fee = Ok(Fee::new(
+                            Withdraw,
+                            BigUint::from(zkp_fee).into(),
+                            BigUint::from(gas_fee).into(),
+                            1_u64.into(),
+                            1_u64.into(),
+                        ));
 
-//                         response.send(price).expect("Unable to send response");
-//                     }
-//                     TickerRequest::IsTokenAllowed { token, response } => {
-//                         // For test purposes, PHNX token is not allowed.
-//                         let is_phnx = match token {
-//                             TokenLike::Id(id) => id == 1,
-//                             TokenLike::Symbol(sym) => sym == "PHNX",
-//                             TokenLike::Address(_) => unreachable!(),
-//                         };
-//                         response.send(Ok(!is_phnx)).unwrap_or_default();
-//                     }
-//                 }
-//             }
-//         });
+                        response.send(fee).expect("Unable to send response");
+                    }
+                    TickerRequest::GetTokenPrice { response, .. } => {
+                        let price = Ok(BigDecimal::from(1_u64));
 
-//         sender
-//     }
+                        response.send(price).expect("Unable to send response");
+                    }
+                    TickerRequest::IsTokenAllowed { token, response } => {
+                        // For test purposes, PHNX token is not allowed.
+                        let is_phnx = match token {
+                            TokenLike::Id(id) => id == 1,
+                            TokenLike::Symbol(sym) => sym == "PHNX",
+                            TokenLike::Address(_) => unreachable!(),
+                        };
+                        response.send(Ok(!is_phnx)).unwrap_or_default();
+                    }
+                }
+            }
+        });
 
-//     fn dummy_sign_verifier() -> mpsc::Sender<VerifyTxSignatureRequest> {
-//         let (sender, mut receiver) = mpsc::channel::<VerifyTxSignatureRequest>(10);
+        sender
+    }
 
-//         actix_rt::spawn(async move {
-//             while let Some(item) = receiver.next().await {
-//                 let verified = VerifiedTx::unverified(item.tx);
-//                 item.response
-//                     .send(Ok(verified))
-//                     .expect("Unable to send response");
-//             }
-//         });
+    struct TestServer {
+        api_server: actix_web::test::TestServer,
+        #[allow(dead_code)]
+        pool: ConnectionPool,
+        fee_ticker: mpsc::Sender<TickerRequest>,
+    }
 
-//         sender
-//     }
+    impl TestServer {
+        async fn new() -> anyhow::Result<(Client, Self)> {
+            let cfg = TestServerConfig::default();
 
-//     struct TestServer {
-//         core_server: actix_web::test::TestServer,
-//         api_server: actix_web::test::TestServer,
-//         #[allow(dead_code)]
-//         pool: ConnectionPool,
-//     }
+            Self::new_with_config(cfg).await
+        }
 
-//     impl TestServer {
-//         async fn new() -> anyhow::Result<(Client, Self)> {
-//             let (core_client, core_server) = submit_txs_loopback();
+        async fn new_with_config(cfg: TestServerConfig) -> anyhow::Result<(Client, Self)> {
+            let pool = cfg.pool.clone();
 
-//             let cfg = TestServerConfig::default();
-//             let pool = cfg.pool.clone();
-//             cfg.fill_database().await?;
+            let fee_ticker = dummy_fee_ticker(None, None);
 
-//             let sign_verifier = dummy_sign_verifier();
-//             let fee_ticker = dummy_fee_ticker();
+            let fee_ticker2 = fee_ticker.clone();
+            let (api_client, api_server) = cfg.start_server(move |cfg| {
+                api_scope(cfg.pool.clone(), &cfg.config, fee_ticker2.clone())
+            });
 
-//             let (api_client, api_server) = cfg.start_server(move |cfg| {
-//                 api_scope(TxSender::with_client(
-//                     core_client.clone(),
-//                     cfg.pool.clone(),
-//                     sign_verifier.clone(),
-//                     fee_ticker.clone(),
-//                     &cfg.config,
-//                 ))
-//             });
+            Ok((
+                api_client,
+                Self {
+                    api_server,
+                    pool,
+                    fee_ticker,
+                },
+            ))
+        }
 
-//             Ok((
-//                 api_client,
-//                 Self {
-//                     core_server,
-//                     api_server,
-//                     pool,
-//                 },
-//             ))
-//         }
+        async fn new_with_fee_ticker(
+            cfg: TestServerConfig,
+            gas_fee: Option<u64>,
+            zkp_fee: Option<u64>,
+        ) -> anyhow::Result<(Client, Self)> {
+            let pool = cfg.pool.clone();
 
-//         async fn stop(self) {
-//             self.api_server.stop().await;
-//             self.core_server.stop().await;
-//         }
-//     }
+            let fee_ticker = dummy_fee_ticker(gas_fee, zkp_fee);
 
-//     #[actix_rt::test]
-//     #[cfg_attr(
-//         not(feature = "api_test"),
-//         ignore = "Use `zk test rust-api` command to perform this test"
-//     )]
-//     async fn test_submit_txs_loopback() -> anyhow::Result<()> {
-//         let (core_client, core_server) = submit_txs_loopback();
+            let fee_ticker2 = fee_ticker.clone();
+            let (api_client, api_server) = cfg.start_server(move |cfg| {
+                api_scope(cfg.pool.clone(), &cfg.config, fee_ticker2.clone())
+            });
 
-//         let signed_tx = SignedZkSyncTx {
-//             tx: TestServerConfig::gen_zk_txs(0).txs[0].0.clone(),
-//             eth_sign_data: None,
-//         };
+            Ok((
+                api_client,
+                Self {
+                    api_server,
+                    pool,
+                    fee_ticker,
+                },
+            ))
+        }
 
-//         core_client.send_tx(signed_tx.clone()).await??;
-//         core_client
-//             .send_txs_batch(vec![signed_tx], vec![])
-//             .await??;
+        async fn stop(self) {
+            self.api_server.stop().await;
+        }
+    }
 
-//         core_server.stop().await;
-//         Ok(())
-//     }
+    fn test_config_from_forced_exit_requests(
+        forced_exit_requests: ForcedExitRequestsConfig,
+    ) -> TestServerConfig {
+        let config_from_env = ZkSyncConfig::from_env();
+        let config = ZkSyncConfig {
+            forced_exit_requests,
+            ..config_from_env
+        };
 
-//     #[actix_rt::test]
-//     #[cfg_attr(
-//         not(feature = "api_test"),
-//         ignore = "Use `zk test rust-api` command to perform this test"
-//     )]
-//     async fn test_transactions_scope() -> anyhow::Result<()> {
-//         todo!();
+        TestServerConfig {
+            config,
+            pool: ConnectionPool::new(Some(1)),
+        }
+    }
 
-//     }
-// }
+    #[actix_rt::test]
+    #[cfg_attr(
+        not(feature = "api_test"),
+        ignore = "Use `zk test rust-api` command to perform this test"
+    )]
+    async fn test_disabled_forced_exit_requests() -> anyhow::Result<()> {
+        let forced_exit_requests = ForcedExitRequestsConfig::from_env();
+        let test_config = test_config_from_forced_exit_requests(ForcedExitRequestsConfig {
+            enabled: false,
+            ..forced_exit_requests
+        });
+
+        let (client, server) = TestServer::new_with_config(test_config).await?;
+        let enabled = client.is_forced_exit_enabled().await?.enabled;
+
+        assert_eq!(enabled, false);
+
+        let should_be_disabled_msg = "Forced-exit related requests don't fail when it's disabled";
+
+        client
+            .get_forced_exit_request_fee()
+            .await
+            .expect_err(should_be_disabled_msg);
+
+        let register_request = ForcedExitRegisterRequest {
+            target: Address::from_str("c0f97CC918C9d6fA4E9fc6be61a6a06589D199b2").unwrap(),
+            tokens: vec![0],
+            price_in_wei: BigUint::from_str("1212").unwrap(),
+        };
+
+        client
+            .submit_forced_exit_request(register_request)
+            .await
+            .expect_err(should_be_disabled_msg);
+
+        server.stop().await;
+        Ok(())
+    }
+
+    #[actix_rt::test]
+    #[cfg_attr(
+        not(feature = "api_test"),
+        ignore = "Use `zk test rust-api` command to perform this test"
+    )]
+    async fn test_forced_exit_requests_get_fee() -> anyhow::Result<()> {
+        let forced_exit_requests = ForcedExitRequestsConfig::from_env();
+        let test_config = test_config_from_forced_exit_requests(ForcedExitRequestsConfig {
+            price_scaling_factor: 1.5,
+            ..forced_exit_requests
+        });
+
+        let (client, server) =
+            TestServer::new_with_fee_ticker(test_config, Some(10000), Some(10000)).await?;
+
+        let enabled = client.is_forced_exit_enabled().await?.enabled;
+        assert_eq!(enabled, true);
+
+        let fee = client.get_forced_exit_request_fee().await?.request_fee;
+        // 30000 = (10000 + 10000) * 1.5
+        assert_eq!(fee, BigUint::from_u32(30000).unwrap());
+
+        server.stop().await;
+        Ok(())
+    }
+
+    // #[actix_rt::test]
+    // #[cfg_attr(
+    //     not(feature = "api_test"),
+    //     ignore = "Use `zk test rust-api` command to perform this test"
+    // )]
+    // async fn test_forced_exit_requests_submit() -> anyhow::Result<()>  {
+    //     let (client, server) = TestServer::new().await?;
+
+    //     let enabled = client.is_forced_exit_enabled().await?.enabled;
+    //     assert_eq!(enabled, true);
+
+    //     let fee = client.get_forced_exit_request_fee().await?.request_fee;
+
+    //     let fe_request = ForcedExitRegisterRequest {
+    //         target: ""
+    //     };
+
+    //     Ok(())
+    // }
+}

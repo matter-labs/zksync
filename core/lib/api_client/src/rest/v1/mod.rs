@@ -12,6 +12,9 @@ pub use self::{
     client::{Client, ClientError},
     config::Contracts,
     error::ErrorBody,
+    forced_exit_requests::{
+        ForcedExitRegisterRequest, ForcedExitRequestFee, IsForcedExitEnabledResponse,
+    },
     operations::{PriorityOpData, PriorityOpQuery, PriorityOpQueryError, PriorityOpReceipt},
     search::BlockSearchQuery,
     tokens::{TokenPriceKind, TokenPriceQuery},
@@ -24,6 +27,7 @@ mod blocks;
 mod client;
 mod config;
 mod error;
+mod forced_exit_requests;
 mod operations;
 mod search;
 mod tokens;

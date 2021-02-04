@@ -21,3 +21,4 @@ reqwest = { version = "0.10", features = ["blocking", "json"] }
 thiserror = "1.0"
 bigdecimal = { version = "0.2.0", features = ["serde"]}
 hex = "0.4"
+num = { version = "0.3.1", features = ["serde"] }
