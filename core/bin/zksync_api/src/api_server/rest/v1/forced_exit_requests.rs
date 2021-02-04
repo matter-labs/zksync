@@ -8,58 +8,36 @@ use actix_web::{
     Scope,
 };
 
-use crate::{
-    api_server::{
-        forced_exit_checker::ForcedExitChecker,
-        helpers::try_parse_hash,
-        rest::{
-            helpers::{deposit_op_to_tx_by_hash, parse_tx_id, priority_op_to_tx_history},
-            v01::{api_decl::ApiV01, types::*},
-        },
-        tx_sender::ticker_request,
-    },
-    fee_ticker::{Fee, TickerRequest},
-};
-use actix_web::{HttpResponse, Result as ActixResult};
-use std::ops::{Add, Mul};
-
 use bigdecimal::{BigDecimal, FromPrimitive};
-use futures::{channel::mpsc, SinkExt, TryFutureExt};
-use num::{
-    bigint::{ToBigInt, ToBigUint},
-    BigUint,
-};
-
-use zksync_config::{test_config::unit_vectors::ForcedExit, ZkSyncConfig};
-
-use chrono::{DateTime, Duration, Utc};
+use chrono::{Duration, Utc};
+use futures::channel::mpsc;
+use num::{bigint::ToBigInt, BigUint};
+use std::ops::Add;
 use std::str::FromStr;
 use std::time::Instant;
-use zksync_storage::{chain::operations_ext::SearchDirection, ConnectionPool};
-use zksync_types::{
-    misc::{ForcedExitRequest, SaveForcedExitRequestQuery},
-    Address, BlockNumber, TokenId, TokenLike, TxFeeTypes,
-};
 
 // Workspace uses
 pub use zksync_api_client::rest::v1::{
-    FastProcessingQuery, IncomingTx, IncomingTxBatch, Receipt, TxData,
+    FastProcessingQuery, ForcedExitRegisterRequest, ForcedExitRequestFee, IncomingTx,
+    IncomingTxBatch, IsForcedExitEnabledResponse, Receipt, TxData,
 };
-use zksync_storage::{
-    chain::operations_ext::records::TxReceiptResponse, QueryResult, StorageProcessor,
+use zksync_config::ZkSyncConfig;
+use zksync_storage::ConnectionPool;
+use zksync_types::{
+    misc::{ForcedExitRequest, SaveForcedExitRequestQuery},
+    TokenLike, TxFeeTypes,
 };
-use zksync_types::{tx::TxHash, SignedZkSyncTx};
 
 // Local uses
-use super::{Client, ClientError, Error as ApiError, JsonResult, Pagination, PaginationQuery};
-use crate::api_server::rpc_server::types::TxWithSignature;
-use crate::api_server::tx_sender::{SubmitError, TxSender};
+use super::{Error as ApiError, JsonResult};
 
-use serde::{Deserialize, Serialize};
-pub use zksync_api_client::rest::v1::{
-    ForcedExitRegisterRequest, ForcedExitRequestFee, IsForcedExitEnabledResponse,
+use crate::{
+    api_server::{
+        forced_exit_checker::ForcedExitChecker,
+        tx_sender::{ticker_request, SubmitError},
+    },
+    fee_ticker::TickerRequest,
 };
-use zksync_utils::BigUintSerdeAsRadix10Str;
 
 /// Shared data between `api/v1/transactions` endpoints.
 #[derive(Clone)]
@@ -193,7 +171,7 @@ pub async fn submit_request(
         tokens_schema
             .get_token(TokenLike::Id(*token_id))
             .await
-            .map_err(|e| {
+            .map_err(|_| {
                 return ApiError::bad_request("One of the tokens does no exist");
             })?;
     }
@@ -210,7 +188,7 @@ pub async fn submit_request(
             valid_until,
         })
         .await
-        .map_err(|e| {
+        .map_err(|_| {
             return ApiError::internal("");
         })?;
 
@@ -241,54 +219,20 @@ pub fn api_scope(
 
 #[cfg(test)]
 mod tests {
-    use actix_web::App;
     use bigdecimal::BigDecimal;
     use futures::{channel::mpsc, StreamExt};
     use num::BigUint;
 
-    use crate::api_server::tx_sender::ticker_price_request;
     use zksync_api_client::rest::v1::Client;
-    use zksync_config::{test_config::TestConfig, ForcedExitRequestsConfig};
+    use zksync_config::ForcedExitRequestsConfig;
     use zksync_storage::ConnectionPool;
-    use zksync_test_account::ZkSyncAccount;
-    use zksync_types::TxFeeTypes;
-    use zksync_types::{
-        tokens::TokenLike,
-        tx::{PackedEthSignature, TxEthSignature},
-        ZkSyncTx,
-    };
+    use zksync_types::tokens::TokenLike;
+    use zksync_types::Address;
 
-    use crate::{
-        // api_server::helpers::try_parse_tx_hash,
-        core_api_client::CoreApiClient,
-        fee_ticker::{Fee, OutputFeeType::Withdraw, TickerRequest},
-        signature_checker::{VerifiedTx, VerifyTxSignatureRequest},
-    };
+    use crate::fee_ticker::{Fee, OutputFeeType::Withdraw, TickerRequest};
 
-    use super::super::test_utils::{TestServerConfig, TestTransactions};
+    use super::super::test_utils::TestServerConfig;
     use super::*;
-
-    fn submit_txs_loopback() -> (CoreApiClient, actix_web::test::TestServer) {
-        async fn send_tx(_tx: Json<SignedZkSyncTx>) -> Json<Result<(), ()>> {
-            Json(Ok(()))
-        }
-
-        async fn send_txs_batch(
-            _txs: Json<(Vec<SignedZkSyncTx>, Vec<TxEthSignature>)>,
-        ) -> Json<Result<(), ()>> {
-            Json(Ok(()))
-        }
-
-        let server = actix_web::test::start(move || {
-            App::new()
-                .route("new_tx", web::post().to(send_tx))
-                .route("new_txs_batch", web::post().to(send_txs_batch))
-        });
-
-        let url = server.url("").trim_end_matches('/').to_owned();
-
-        (CoreApiClient::new(url), server)
-    }
 
     fn dummy_fee_ticker(zkp_fee: Option<u64>, gas_fee: Option<u64>) -> mpsc::Sender<TickerRequest> {
         let (sender, mut receiver) = mpsc::channel(10);
@@ -335,10 +279,13 @@ mod tests {
         api_server: actix_web::test::TestServer,
         #[allow(dead_code)]
         pool: ConnectionPool,
+        #[allow(dead_code)]
         fee_ticker: mpsc::Sender<TickerRequest>,
     }
 
     impl TestServer {
+        // It should be used in the test for submitting requests
+        #[allow(dead_code)]
         async fn new() -> anyhow::Result<(Client, Self)> {
             let cfg = TestServerConfig::default();
 

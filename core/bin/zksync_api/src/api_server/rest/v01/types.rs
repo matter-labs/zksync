@@ -1,8 +1,6 @@
 //! Requests and responses used by the REST API.
 
-use num::BigUint;
 use serde::{Deserialize, Serialize};
-use zksync_types::TokenId;
 use zksync_types::{Account, AccountId};
 
 #[derive(Debug, Serialize)]

@@ -5,11 +5,9 @@ use crate::{
     api_server::rest::{
         helpers::*,
         v01::{caches::Caches, network_status::SharedNetworkStatus},
-        TxSender,
     },
     core_api_client::{CoreApiClient, EthBlockId},
     fee_ticker::TickerRequest,
-    signature_checker::VerifyTxSignatureRequest,
 };
 use actix_web::{web, HttpResponse, Result as ActixResult};
 use futures::channel::mpsc;

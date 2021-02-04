@@ -1,8 +1,7 @@
 use crate::utils::{address_to_stored_string, stored_str_address_to_address};
 use chrono::{DateTime, Utc};
-use num::{bigint::ToBigInt, BigInt, ToPrimitive};
-use sqlx::{types::BigDecimal, FromRow};
-use zksync_basic_types::Address;
+use num::{bigint::ToBigInt, BigInt};
+use sqlx::types::BigDecimal;
 use zksync_types::misc::ForcedExitRequest;
 
 #[derive(Debug, Clone, sqlx::Type)]

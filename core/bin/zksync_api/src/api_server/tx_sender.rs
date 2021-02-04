@@ -5,7 +5,6 @@ use std::{fmt::Display, str::FromStr};
 
 // External uses
 use bigdecimal::BigDecimal;
-use chrono::Utc;
 use futures::{
     channel::{mpsc, oneshot},
     prelude::*,

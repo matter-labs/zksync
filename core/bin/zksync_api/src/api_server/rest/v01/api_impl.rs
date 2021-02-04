@@ -9,27 +9,13 @@ use crate::api_server::{
     rest::{
         helpers::{deposit_op_to_tx_by_hash, parse_tx_id, priority_op_to_tx_history},
         v01::{api_decl::ApiV01, types::*},
-        v1::{ApiError, Error, JsonResult},
     },
-    tx_sender::ticker_request,
 };
 use actix_web::{web, HttpResponse, Result as ActixResult};
-use std::ops::{Add, Mul};
 
-use bigdecimal::BigDecimal;
-use futures::{SinkExt, TryFutureExt};
-use num::{bigint::ToBigInt, BigUint};
-use web::Json;
-use zksync_config::test_config::unit_vectors::ForcedExit;
-
-use chrono::{DateTime, Duration, Utc};
-use std::str::FromStr;
 use std::time::Instant;
 use zksync_storage::chain::operations_ext::SearchDirection;
-use zksync_types::{
-    misc::{ForcedExitRequest, SaveForcedExitRequestQuery},
-    Address, BlockNumber, TokenLike, TxFeeTypes,
-};
+use zksync_types::{Address, BlockNumber};
 
 /// Helper macro which wraps the serializable object into `Ok(HttpResponse::Ok().json(...))`.
 macro_rules! ok_json {
