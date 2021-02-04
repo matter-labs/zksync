@@ -84,11 +84,11 @@ async fn is_enabled(
         enabled: data.is_enabled,
     };
 
-    metrics::histogram!("api.v01.is_forced_exit_enabled", start.elapsed());
+    metrics::histogram!("api.v01.are_forced_exit_requests_enabled", start.elapsed());
     Ok(Json(response))
 }
 
-async fn get_forced_exit_request_fee(
+async fn get_fee_for_one_forced_exit(
     ticker_request_sender: mpsc::Sender<TickerRequest>,
     price_scaling_factor: BigDecimal,
 ) -> Result<BigUint, SubmitError> {
@@ -106,8 +106,10 @@ async fn get_forced_exit_request_fee(
     Ok(scaled_price.to_biguint().unwrap())
 }
 
-async fn get_fee(data: web::Data<ApiForcedExitRequestsData>) -> JsonResult<ForcedExitRequestFee> {
-    let request_fee = get_forced_exit_request_fee(
+async fn get_forced_exit_request_fee(
+    data: web::Data<ApiForcedExitRequestsData>,
+) -> JsonResult<ForcedExitRequestFee> {
+    let request_fee = get_fee_for_one_forced_exit(
         data.ticker_request_sender.clone(),
         data.price_scaling_factor.clone(),
     )
@@ -139,7 +141,7 @@ pub async fn submit_request(
         .await
         .map_err(ApiError::from)?;
 
-    let price = get_forced_exit_request_fee(
+    let price = get_fee_for_one_forced_exit(
         data.ticker_request_sender.clone(),
         data.price_scaling_factor.clone(),
     )
@@ -204,14 +206,14 @@ pub fn api_scope(
     let data = ApiForcedExitRequestsData::new(connection_pool, config, ticker_request_sender);
 
     // `enabled` endpoint should always be there
-    let scope = web::scope("forced_exit")
+    let scope = web::scope("forced_exit_requests")
         .data(data)
         .route("enabled", web::get().to(is_enabled));
 
     if config.forced_exit_requests.enabled {
         scope
             .route("submit", web::post().to(submit_request))
-            .route("fee", web::get().to(get_fee))
+            .route("fee", web::get().to(get_forced_exit_request_fee))
     } else {
         scope
     }
@@ -369,7 +371,7 @@ mod tests {
         });
 
         let (client, server) = TestServer::new_with_config(test_config).await?;
-        let enabled = client.is_forced_exit_enabled().await?.enabled;
+        let enabled = client.are_forced_exit_requests_enabled().await?.enabled;
 
         assert_eq!(enabled, false);
 
@@ -410,7 +412,7 @@ mod tests {
         let (client, server) =
             TestServer::new_with_fee_ticker(test_config, Some(10000), Some(10000)).await?;
 
-        let enabled = client.is_forced_exit_enabled().await?.enabled;
+        let enabled = client.are_forced_exit_requests_enabled().await?.enabled;
         assert_eq!(enabled, true);
 
         let fee = client.get_forced_exit_request_fee().await?.request_fee;
@@ -429,7 +431,7 @@ mod tests {
     // async fn test_forced_exit_requests_submit() -> anyhow::Result<()>  {
     //     let (client, server) = TestServer::new().await?;
 
-    //     let enabled = client.is_forced_exit_enabled().await?.enabled;
+    //     let enabled = client.are_forced_exit_requests_enabled().await?.enabled;
     //     assert_eq!(enabled, true);
 
     //     let fee = client.get_forced_exit_request_fee().await?.request_fee;
