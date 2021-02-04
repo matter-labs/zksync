@@ -20,7 +20,6 @@ Tester.prototype.testVerifiedForcedExit = async function (
     // Forced exit is defined by `Withdraw` transaction type (as it's essentially just a forced withdraw),
     // therefore, when making requests to `syncProvider`, we will use the type `Withdraw`.
 
-    const tokenId = initiatorWallet.provider.tokenSet.resolveTokenId(token);
     const tokenAddress = initiatorWallet.provider.tokenSet.resolveTokenAddress(token);
 
     const onchainBalanceBefore = await targetWallet.getEthereumBalance(token);
