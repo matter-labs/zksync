@@ -856,9 +856,11 @@ impl TestSetup {
         proof: Option<EncodedAggregatedProof>,
     ) -> ETHExecResult {
         let proof = proof.unwrap_or_else(|| {
-            let mut default_proof = EncodedAggregatedProof::default();
-            default_proof.individual_vk_inputs = Vec::new();
-            default_proof.individual_vk_idxs = Vec::new();
+            let mut default_proof = EncodedAggregatedProof {
+                individual_vk_inputs: Vec::new(),
+                individual_vk_idxs: Vec::new(),
+                ..Default::default()
+            };
             for block in blocks {
                 let commitment = U256::from_big_endian(block.block_commitment.as_bytes());
                 default_proof.individual_vk_inputs.push(commitment);
