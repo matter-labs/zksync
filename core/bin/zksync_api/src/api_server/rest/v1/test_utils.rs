@@ -66,19 +66,30 @@ pub struct TestTransactions {
 }
 
 impl TestServerConfig {
-    pub fn start_server<F>(&self, scope_factory: F) -> (Client, actix_web::test::TestServer)
+    pub fn start_server_with_scope<F>(
+        &self,
+        scope: String,
+        scope_factory: F,
+    ) -> (Client, actix_web::test::TestServer)
     where
         F: Fn(&TestServerConfig) -> Scope + Clone + Send + 'static,
     {
         let this = self.clone();
         let server = actix_web::test::start(move || {
-            App::new().service(web::scope("/api/v1").service(scope_factory(&this)))
+            App::new().service(web::scope(scope.as_ref()).service(scope_factory(&this)))
         });
 
         let url = server.url("").trim_end_matches('/').to_owned();
 
         let client = Client::new(url);
         (client, server)
+    }
+
+    pub fn start_server<F>(&self, scope_factory: F) -> (Client, actix_web::test::TestServer)
+    where
+        F: Fn(&TestServerConfig) -> Scope + Clone + Send + 'static,
+    {
+        self.start_server_with_scope(String::from("/api/v1"), scope_factory)
     }
 
     /// Creates several transactions and the corresponding executed operations.

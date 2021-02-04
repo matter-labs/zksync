@@ -9,12 +9,9 @@ use zksync_types::BlockNumber;
 // Public uses
 pub use self::{
     blocks::{BlockInfo, TransactionInfo},
-    client::{Client, ClientError},
+    client::{Client, ClientError, Result as ClientResult},
     config::Contracts,
     error::ErrorBody,
-    forced_exit_requests::{
-        ForcedExitRegisterRequest, ForcedExitRequestFee, IsForcedExitEnabledResponse,
-    },
     operations::{PriorityOpData, PriorityOpQuery, PriorityOpQueryError, PriorityOpReceipt},
     search::BlockSearchQuery,
     tokens::{TokenPriceKind, TokenPriceQuery},
@@ -27,7 +24,6 @@ mod blocks;
 mod client;
 mod config;
 mod error;
-mod forced_exit_requests;
 mod operations;
 mod search;
 mod tokens;

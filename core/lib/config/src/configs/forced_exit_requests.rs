@@ -15,7 +15,7 @@ struct ForcedExitRequestsInternalConfig {
     pub enabled: bool,
     pub price_scaling_factor: f64,
     pub max_tokens_per_request: u8,
-    pub recomended_tx_interval: u64,
+    pub recomended_tx_interval: i64,
     pub tx_interval_scaling_factor: f64,
 }
 
@@ -24,8 +24,8 @@ pub struct ForcedExitRequestsConfig {
     pub enabled: bool,
     pub price_scaling_factor: f64,
     pub max_tokens_per_request: u8,
-    pub recomended_tx_interval: u64,
-    pub max_tx_interval: u64,
+    pub recomended_tx_interval: i64,
+    pub max_tx_interval: i64,
 }
 
 impl ForcedExitRequestsConfig {
@@ -41,7 +41,7 @@ impl ForcedExitRequestsConfig {
             price_scaling_factor: config.price_scaling_factor,
             max_tokens_per_request: config.max_tokens_per_request,
             recomended_tx_interval: config.recomended_tx_interval,
-            max_tx_interval: max_tx_interval.round() as u64,
+            max_tx_interval: max_tx_interval.round() as i64,
         }
     }
 }

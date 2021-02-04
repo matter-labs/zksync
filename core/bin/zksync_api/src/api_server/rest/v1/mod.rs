@@ -27,7 +27,7 @@ mod forced_exit_requests;
 mod operations;
 mod search;
 #[cfg(test)]
-mod test_utils;
+pub mod test_utils;
 mod tokens;
 mod transactions;
 
@@ -51,9 +51,9 @@ pub(crate) fn api_scope(tx_sender: TxSender, zk_config: &ZkSyncConfig) -> Scope 
             tx_sender.tokens,
             tx_sender.ticker_requests.clone(),
         ))
-        .service(forced_exit_requests::api_scope(
-            tx_sender.pool.clone(),
-            zk_config,
-            tx_sender.ticker_requests,
-        ))
+    // .service(forced_exit_requests::api_scope(
+    //     tx_sender.pool.clone(),
+    //     zk_config,
+    //     tx_sender.ticker_requests,
+    // ))
 }
