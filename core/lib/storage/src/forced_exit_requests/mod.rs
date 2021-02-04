@@ -6,7 +6,9 @@ use std::time::Instant;
 // Workspace imports
 // Local imports
 use crate::{QueryResult, StorageProcessor};
-use zksync_types::misc::{ForcedExitRequest, ForcedExitRequestId, SaveForcedExitRequestQuery};
+use zksync_types::forced_exit_requests::{
+    ForcedExitRequest, ForcedExitRequestId, SaveForcedExitRequestQuery,
+};
 
 pub mod records;
 

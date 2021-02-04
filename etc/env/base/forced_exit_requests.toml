@@ -8,5 +8,11 @@ enabled=true
 # price_for_withdrawal * price_scaling
 price_scaling_factor=1.6
 
-# Maximum number of tokens in a request
-max_tokens=10
+max_tokens_per_request=10
+
+# Recommended interval to send the transaction in milliseconds
+recomended_tx_interval=300
+
+# How many times the maximum acceptable interval will be longer 
+# than the recommended interval
+tx_interval_scaling_factor=1.5

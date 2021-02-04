@@ -3,7 +3,7 @@ use chrono::{DateTime, Utc};
 use num::{bigint::ToBigInt, BigInt};
 use sqlx::types::BigDecimal;
 use zksync_basic_types::TokenId;
-use zksync_types::misc::ForcedExitRequest;
+use zksync_types::forced_exit_requests::ForcedExitRequest;
 
 use super::utils;
 

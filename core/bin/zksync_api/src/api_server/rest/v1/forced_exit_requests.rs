@@ -24,7 +24,7 @@ pub use zksync_api_client::rest::v1::{
 use zksync_config::ZkSyncConfig;
 use zksync_storage::ConnectionPool;
 use zksync_types::{
-    misc::{ForcedExitRequest, SaveForcedExitRequestQuery},
+    forced_exit_requests::{ForcedExitRequest, SaveForcedExitRequestQuery},
     TokenLike, TxFeeTypes,
 };
 
@@ -48,7 +48,8 @@ pub struct ApiForcedExitRequestsData {
 
     pub(crate) is_enabled: bool,
     pub(crate) price_scaling_factor: BigDecimal,
-    pub(crate) max_tokens: u8,
+    pub(crate) max_tokens_per_request: u8,
+    pub(crate) max_tx_interval_millisecs: u64,
 }
 
 impl ApiForcedExitRequestsData {
@@ -68,7 +69,7 @@ impl ApiForcedExitRequestsData {
                 config.forced_exit_requests.price_scaling_factor,
             )
             .unwrap(),
-            max_tokens: config.forced_exit_requests.max_tokens,
+            max_tokens_per_request: config.forced_exit_requests.max_tokens_per_request,
         }
     }
 }
@@ -181,7 +182,7 @@ pub async fn submit_request(
 
     let mut fe_schema = storage.forced_exit_requests_schema();
 
-    let valid_until = Utc::now().add(Duration::weeks(1));
+    let valid_until = Utc::now().add(Duration::from_millis(self.max_tx_interval_millisecs));
 
     let saved_fe_request = fe_schema
         .store_request(SaveForcedExitRequestQuery {

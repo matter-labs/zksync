@@ -7,7 +7,7 @@ use crate::StorageProcessor;
 use chrono::{DateTime, Timelike, Utc};
 use num::{BigUint, FromPrimitive};
 use zksync_basic_types::Address;
-use zksync_types::misc::{ForcedExitRequest, SaveForcedExitRequestQuery};
+use zksync_types::forced_exit_requests::{ForcedExitRequest, SaveForcedExitRequestQuery};
 
 #[db_test]
 async fn store_forced_exit_request(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
