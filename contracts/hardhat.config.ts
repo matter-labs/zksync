@@ -27,6 +27,8 @@ const testConfig = {
 
 const localConfig = Object.assign({}, prodConfig);
 localConfig.DUMMY_VERIFIER = process.env.CONTRACTS_TEST_DUMMY_VERIFIER === 'true';
+// @ts-ignore
+localConfig.EASY_EXODUS = process.env.EASY_EXODUS === 'true';
 
 const contractDefs = {
     rinkeby: testnetConfig,
