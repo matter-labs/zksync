@@ -11,7 +11,7 @@ use zksync_storage::ConnectionPool;
 use zksync_types::aggregated_operations::AggregatedOperation;
 use zksync_types::tx::TxHash;
 use zksync_types::BlockNumber;
-use zksync_types::{block::ExecutedOperations, AccountId, ActionType, Address, Operation};
+use zksync_types::{block::ExecutedOperations, AccountId, ActionType, Address};
 
 pub struct OperationNotifier {
     state: NotifierState,

@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 
 // Workspace uses
 use zksync_types::{
-    tx::{EthSignData, TxEthSignature, TxHash},
+    tx::{EthBatchSignatures, EthSignData, TxEthSignature, TxHash},
     BlockNumber, SignedZkSyncTx, ZkSyncTx,
 };
 
@@ -50,7 +50,7 @@ pub struct IncomingTx {
 #[serde(rename_all = "camelCase")]
 pub struct IncomingTxBatch {
     pub txs: Vec<ZkSyncTx>,
-    pub signature: Option<TxEthSignature>,
+    pub signature: EthBatchSignatures,
 }
 
 /// Transaction (or priority operation) receipt.
@@ -108,7 +108,7 @@ impl Client {
     pub async fn submit_tx_batch(
         &self,
         txs: Vec<ZkSyncTx>,
-        signature: Option<TxEthSignature>,
+        signature: EthBatchSignatures,
     ) -> Result<Vec<TxHash>, ClientError> {
         self.post("transactions/submit/batch")
             .body(&IncomingTxBatch { txs, signature })

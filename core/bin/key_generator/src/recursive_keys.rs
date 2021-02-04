@@ -53,7 +53,7 @@ pub fn count_gates_recursive_verification_keys() {
             proofs = new_proofs;
         } else {
             log::info!("setup_size_log2: {}, proofs: {}", setup_power, proofs);
-            proofs = proofs * 2;
+            proofs *= 2;
             let new_setup_power = get_setup_size(proofs);
             assert_eq!(setup_power + 1, new_setup_power);
             setup_power = new_setup_power;

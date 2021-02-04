@@ -6,7 +6,7 @@ use jsonrpc_derive::rpc;
 // Workspace uses
 use zksync_crypto::params::ZKSYNC_VERSION;
 use zksync_types::{
-    tx::{TxEthSignature, TxHash},
+    tx::{EthBatchSignatures, TxEthSignature, TxHash},
     Address, Token, TokenLike, TxFeeTypes, ZkSyncTx,
 };
 
@@ -41,7 +41,7 @@ pub trait Rpc {
     fn submit_txs_batch(
         &self,
         txs: Vec<TxWithSignature>,
-        eth_signatures: Vec<TxEthSignature>,
+        eth_signatures: EthBatchSignatures,
     ) -> FutureResp<Vec<TxHash>>;
 
     #[rpc(name = "contract_address", returns = "ContractAddressResp")]
@@ -129,7 +129,7 @@ impl Rpc for RpcApp {
     fn submit_txs_batch(
         &self,
         txs: Vec<TxWithSignature>,
-        eth_signatures: Vec<TxEthSignature>,
+        eth_signatures: EthBatchSignatures,
     ) -> FutureResp<Vec<TxHash>> {
         let handle = self.runtime_handle.clone();
         let self_ = self.clone();

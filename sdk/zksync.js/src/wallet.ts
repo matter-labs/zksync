@@ -1,7 +1,7 @@
 import { BigNumber, BigNumberish, Contract, ContractTransaction, ethers } from 'ethers';
 import { ErrorCode } from '@ethersproject/logger';
 import { EthMessageSigner } from './eth-message-signer';
-import { ETHProxy, Provider } from './provider';
+import { Provider } from './provider';
 import { Create2WalletSigner, Signer } from './signer';
 import { BatchBuilder } from './batch-builder';
 import {
@@ -32,14 +32,12 @@ import {
     MAX_ERC20_APPROVE_AMOUNT,
     SYNC_MAIN_CONTRACT_INTERFACE,
     ERC20_DEPOSIT_GAS_LIMIT,
-    getEthSignatureType,
     signMessagePersonalAPI,
     getSignedBytesFromMessage,
-    serializeTransfer,
     getChangePubkeyMessage,
-    MAX_TIMESTAMP
+    MAX_TIMESTAMP,
+    getEthereumBalance
 } from './utils';
-import validate = WebAssembly.validate;
 
 const EthersErrorCode = ErrorCode;
 
@@ -682,11 +680,7 @@ export class Wallet {
     }
 
     async isOnchainAuthSigningKeySet(nonce: Nonce = 'committed'): Promise<boolean> {
-        const mainZkSyncContract = new Contract(
-            this.provider.contractAddress.mainContract,
-            SYNC_MAIN_CONTRACT_INTERFACE,
-            this.ethSigner
-        );
+        const mainZkSyncContract = this.getZkSyncMainContract();
 
         const numNonce = await this.getNonce(nonce);
         try {
@@ -714,11 +708,7 @@ export class Wallet {
 
         const numNonce = await this.getNonce(nonce);
 
-        const mainZkSyncContract = new Contract(
-            this.provider.contractAddress.mainContract,
-            SYNC_MAIN_CONTRACT_INTERFACE,
-            this.ethSigner
-        );
+        const mainZkSyncContract = this.getZkSyncMainContract();
 
         try {
             return mainZkSyncContract.setAuthPubkeyHash(newPubKeyHash.replace('sync:', '0x'), numNonce, {
@@ -767,22 +757,11 @@ export class Wallet {
     }
 
     async getEthereumBalance(token: TokenLike): Promise<BigNumber> {
-        let balance: BigNumber;
-        if (isTokenETH(token)) {
-            balance = await this.ethSigner.provider.getBalance(this.cachedAddress);
-        } else {
-            const erc20contract = new Contract(
-                this.provider.tokenSet.resolveTokenAddress(token),
-                IERC20_INTERFACE,
-                this.ethSigner
-            );
-            try {
-                balance = await erc20contract.balanceOf(this.cachedAddress);
-            } catch (e) {
-                this.modifyEthersError(e);
-            }
+        try {
+            return getEthereumBalance(this.ethSigner.provider, this.provider, this.cachedAddress, token);
+        } catch (e) {
+            this.modifyEthersError(e);
         }
-        return balance;
     }
 
     async isERC20DepositsApproved(
@@ -831,11 +810,7 @@ export class Wallet {
     }): Promise<ETHOperation> {
         const gasPrice = await this.ethSigner.provider.getGasPrice();
 
-        const mainZkSyncContract = new Contract(
-            this.provider.contractAddress.mainContract,
-            SYNC_MAIN_CONTRACT_INTERFACE,
-            this.ethSigner
-        );
+        const mainZkSyncContract = this.getZkSyncMainContract();
 
         let ethTransaction;
 
@@ -910,7 +885,6 @@ export class Wallet {
         ethTxOptions?: ethers.providers.TransactionRequest;
     }): Promise<ETHOperation> {
         const gasPrice = await this.ethSigner.provider.getGasPrice();
-        const ethProxy = new ETHProxy(this.ethSigner.provider, this.provider.contractAddress);
 
         let accountId: number;
         if (withdraw.accountId != null) {
@@ -925,11 +899,7 @@ export class Wallet {
             accountId = accountState.id;
         }
 
-        const mainZkSyncContract = new Contract(
-            ethProxy.contractAddress.mainContract,
-            SYNC_MAIN_CONTRACT_INTERFACE,
-            this.ethSigner
-        );
+        const mainZkSyncContract = this.getZkSyncMainContract();
 
         const tokenAddress = this.provider.tokenSet.resolveTokenAddress(withdraw.token);
         try {
@@ -942,6 +912,14 @@ export class Wallet {
         } catch (e) {
             this.modifyEthersError(e);
         }
+    }
+
+    getZkSyncMainContract() {
+        return new ethers.Contract(
+            this.provider.contractAddress.mainContract,
+            SYNC_MAIN_CONTRACT_INTERFACE,
+            this.ethSigner
+        );
     }
 
     private modifyEthersError(error: any): never {

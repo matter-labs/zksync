@@ -31,6 +31,8 @@ type Transfer = {
         to: string;
         token: number;
         type: 'Transfer';
+        validFrom: number;
+        validUntil: number;
     };
     success: boolean;
     fail_reason: string | null;
@@ -66,11 +68,14 @@ type ChangePubKey = {
         fee: string;
         nonce: number;
         ethAuthData: ChangePubKeyOnchain | ChangePubKeyECDSA | ChangePubKeyCREATE2;
+        ethSignature: string | null;
         signature: {
             pubKey: string;
             signature: string;
         };
         type: 'ChangePubKey';
+        validFrom: number;
+        validUntil: number;
     };
     success: boolean;
     fail_reason: string | null;
@@ -94,6 +99,8 @@ type Withdraw = {
         token: number;
         type: 'Withdraw';
         fast: boolean;
+        validFrom: number;
+        validUntil: number;
     };
     success: boolean;
     fail_reason: string | null;
@@ -131,6 +138,8 @@ type ForcedExit = {
             pubKey: string;
             signature: string;
         };
+        validFrom: number;
+        validUntil: number;
     };
     success: boolean;
     fail_reason: string | null;

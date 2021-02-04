@@ -14,7 +14,7 @@ export async function deployERC20(command: 'dev' | 'new', name?: string, symbol?
         await utils.spawn(`yarn --silent --cwd contracts deploy-erc20 add-multi '
             [
                 { "name": "DAI",  "symbol": "DAI",  "decimals": 18 },
-                { "name": "wBTC", "symbol": "wBTC", "decimals":  8 },
+                { "name": "wBTC", "symbol": "wBTC", "decimals":  8, "implementation": "RevertTransferERC20" },
                 { "name": "BAT",  "symbol": "BAT",  "decimals": 18 },
                 { "name": "MLTT", "symbol": "MLTT", "decimals": 18 }
             ]' > ./etc/tokens/localhost.json`);
@@ -59,6 +59,10 @@ export async function deployTestkit(genesisRoot: string, prodContracts: boolean 
 
 export async function deployEIP1271() {
     await utils.spawn(`yarn contracts deploy-eip1271`);
+}
+
+export async function deployWithdrawalHelpersContracts() {
+    await utils.spawn(`yarn contracts deploy-withdrawal-helpers-contracts`);
 }
 
 export async function testUpgrade(contract: string, gatekeeper: string) {

@@ -16,7 +16,7 @@ use futures::{
 use tokio::runtime::{Builder, Handle};
 // Workspace uses
 use zksync_types::{
-    tx::{BatchSignData, TxEthSignature},
+    tx::{EthBatchSignData, TxEthSignature},
     Address, SignedZkSyncTx, Token, ZkSyncTx,
 };
 // Local uses
@@ -29,7 +29,7 @@ use zksync_utils::panic_notify::ThreadPanicNotify;
 #[derive(Debug, Clone)]
 pub enum TxVariant {
     Tx(SignedZkSyncTx),
-    Batch(Vec<SignedZkSyncTx>, BatchSignData),
+    Batch(Vec<SignedZkSyncTx>, EthBatchSignData),
 }
 
 /// Wrapper on a `TxVariant` which guarantees that (a batch of)
@@ -69,7 +69,7 @@ impl VerifiedTx {
     }
 
     /// Takes the Vec of `SignedZkSyncTx` and the verified signature data out of the wrapper.
-    pub fn unwrap_batch(self) -> (Vec<SignedZkSyncTx>, BatchSignData) {
+    pub fn unwrap_batch(self) -> (Vec<SignedZkSyncTx>, EthBatchSignData) {
         match self.0 {
             TxVariant::Batch(txs, batch_sign_data) => (txs, batch_sign_data),
             TxVariant::Tx(_) => panic!("called `unwrap_batch` on a `Tx` value"),
@@ -194,13 +194,13 @@ async fn verify_eth_signature_single_tx(
 async fn verify_eth_signature_txs_batch(
     txs: &[SignedZkSyncTx],
     senders: &[Address],
-    batch_sign_data: &BatchSignData,
+    batch_sign_data: &EthBatchSignData,
     eth_checker: &EthereumChecker<web3::transports::Http>,
 ) -> Result<(), TxAddError> {
     let start = Instant::now();
     // Cache for verified senders.
     let mut signers = HashSet::with_capacity(senders.len());
-    let old_message = BatchSignData::get_old_ethereum_batch_message(txs.iter().map(|tx| &tx.tx));
+    let old_message = EthBatchSignData::get_old_ethereum_batch_message(txs.iter().map(|tx| &tx.tx));
     // For every sender check whether there exists at least one signature that matches it.
     for sender in senders {
         if signers.contains(sender) {

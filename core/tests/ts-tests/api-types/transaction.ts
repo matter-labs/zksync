@@ -39,6 +39,9 @@ type ChangePubKey = {
         newPkHash: string;
         nonce: number;
         type: 'ChangePubKey';
+        ethSignature: null;
+        validFrom: number;
+        validUntil: number;
     };
 };
 
@@ -66,6 +69,8 @@ type Transfer = {
         to: string;
         token: number;
         type: 'Transfer';
+        validFrom: number;
+        validUntil: number;
     };
 };
 
@@ -94,6 +99,8 @@ type Withdraw = {
         token: number;
         type: 'Withdraw';
         fast: boolean;
+        validFrom: number;
+        validUntil: number;
     };
 };
 
@@ -164,6 +171,8 @@ type ForcedExit = {
             signature: string;
         };
         type: 'ForcedExit';
+        validFrom: number;
+        validUntil: number;
     };
 };
 

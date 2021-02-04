@@ -52,10 +52,10 @@ fn get_change_pub_key() -> ChangePubKey {
 /// Checks that we can't create signature data from the empty batch.
 #[test]
 fn test_empty_batch() {
-    assert!(BatchSignData::new(Vec::new(), Vec::new()).is_err());
+    assert!(EthBatchSignData::new(Vec::new(), Vec::new()).is_err());
 }
 
-/// Checks the correctness of the message `BatchSignData::new()` returns.
+/// Checks the correctness of the message `EthBatchSignData::new()` returns.
 #[test]
 fn test_batch_message() -> Result<()> {
     let token = Token::new(0, Default::default(), "ETH", 18);
@@ -96,7 +96,7 @@ fn test_batch_message() -> Result<()> {
         .map(|(tx, token)| (tx.clone(), token, tx.account()))
         .collect::<Vec<_>>();
     // Shouldn't fail.
-    let batch_sign_data = BatchSignData::new(txs, Vec::new()).unwrap();
+    let batch_sign_data = EthBatchSignData::new(txs, Vec::new()).unwrap();
     assert_eq!(batch_sign_data.message, expected.into_bytes());
 
     // Batch from a single wallet, send withdraw without fee, cover the fee with phantom transfer.
@@ -128,7 +128,7 @@ fn test_batch_message() -> Result<()> {
         .map(|(tx, token)| (tx.clone(), token, tx.account()))
         .collect::<Vec<_>>();
 
-    let message = BatchSignData::get_batch_sign_message(txs);
+    let message = EthBatchSignData::get_batch_sign_message(txs);
     assert_eq!(message, expected.into_bytes());
 
     Ok(())

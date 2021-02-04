@@ -10,12 +10,12 @@ use crate::{Token, ZkSyncTx};
 /// Encapsulates transactions batch signature data. Should only be created via `new()`
 /// as long as errors are possible.
 #[derive(Debug, Clone)]
-pub struct BatchSignData {
+pub struct EthBatchSignData {
     pub signatures: Vec<TxEthSignature>,
     pub message: Vec<u8>,
 }
 
-impl BatchSignData {
+impl EthBatchSignData {
     /// Construct the message user is expected to sign for the given batch and pack
     /// it along with signatures. Since there can be multiple senders in a single batch,
     /// separate them with
@@ -24,12 +24,12 @@ impl BatchSignData {
     pub fn new(
         txs: Vec<(ZkSyncTx, Token, Address)>,
         signatures: Vec<TxEthSignature>,
-    ) -> anyhow::Result<BatchSignData> {
+    ) -> anyhow::Result<EthBatchSignData> {
         ensure!(!txs.is_empty(), "Transaction batch cannot be empty");
 
-        let message = BatchSignData::get_batch_sign_message(txs);
+        let message = EthBatchSignData::get_batch_sign_message(txs);
 
-        Ok(BatchSignData {
+        Ok(EthBatchSignData {
             signatures,
             message,
         })
@@ -49,14 +49,16 @@ impl BatchSignData {
         // Otherwise, process the whole group at once.
         match iter.peek() {
             Some(_) => {
-                let head = BatchSignData::group_message(first.1, Some(first.0));
+                let head = EthBatchSignData::group_message(first.1, Some(first.0));
                 let tail = itertools::join(
-                    iter.map(|(address, group)| BatchSignData::group_message(group, Some(address))),
+                    iter.map(|(address, group)| {
+                        EthBatchSignData::group_message(group, Some(address))
+                    }),
                     "\n\n",
                 );
                 format!("{}\n\n{}", head, tail)
             }
-            None => BatchSignData::group_message(first.1, None),
+            None => EthBatchSignData::group_message(first.1, None),
         }
         .into_bytes()
     }

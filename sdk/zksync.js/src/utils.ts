@@ -1,4 +1,5 @@
-import { utils, constants, ethers, BigNumber, BigNumberish } from 'ethers';
+import { utils, constants, ethers, BigNumber, BigNumberish, Contract } from 'ethers';
+import { Provider } from '.';
 import {
     PubKeyHash,
     TokenAddress,
@@ -27,6 +28,8 @@ export const SYNC_MAIN_CONTRACT_INTERFACE = new utils.Interface(require('../abi/
 export const SYNC_GOV_CONTRACT_INTERFACE = new utils.Interface(require('../abi/SyncGov.json').abi);
 
 export const IEIP1271_INTERFACE = new utils.Interface(require('../abi/IEIP1271.json').abi);
+
+export const MULTICALL_INTERFACE = new utils.Interface(require('../abi/Multicall.json').abi);
 
 export const MAX_ERC20_APPROVE_AMOUNT = BigNumber.from(
     '115792089237316195423570985008687907853269984665640564039457584007913129639935'
@@ -679,4 +682,38 @@ export function getCREATE2AddressAndSalt(
             .slice(2 + 12 * 2);
 
     return { address: address, salt: ethers.utils.hexlify(salt) };
+}
+
+export async function getEthereumBalance(
+    ethProvider: ethers.providers.Provider,
+    syncProvider: Provider,
+    address: Address,
+    token: TokenLike
+): Promise<BigNumber> {
+    let balance: BigNumber;
+    if (isTokenETH(token)) {
+        balance = await ethProvider.getBalance(address);
+    } else {
+        const erc20contract = new Contract(
+            syncProvider.tokenSet.resolveTokenAddress(token),
+            IERC20_INTERFACE,
+            ethProvider
+        );
+
+        balance = await erc20contract.balanceOf(address);
+    }
+    return balance;
+}
+
+export async function getPendingBalance(
+    ethProvider: ethers.providers.Provider,
+    syncProvider: Provider,
+    address: Address,
+    token: TokenLike
+): Promise<BigNumberish> {
+    const zksyncContract = new Contract(address, SYNC_MAIN_CONTRACT_INTERFACE, ethProvider);
+
+    const tokenAddress = syncProvider.tokenSet.resolveTokenAddress(token);
+
+    return zksyncContract.getPendingBalance(address, tokenAddress);
 }

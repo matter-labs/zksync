@@ -7,13 +7,21 @@ use lazy_static::lazy_static;
 // Workspace uses
 use zksync_basic_types::H256;
 use zksync_types::{
-    block::Block, Address, ExecutedOperations, ExecutedPriorityOp, Fr, FullExit, FullExitOp,
-    PriorityOp, ZkSyncOp, ZkSyncPriorityOp,
+    aggregated_operations::{
+        AggregatedActionType, AggregatedOperation, BlocksCommitOperation, BlocksExecuteOperation,
+        BlocksProofOperation,
+    },
+    block::Block,
+    Address, ExecutedOperations, ExecutedPriorityOp, Fr, FullExit, FullExitOp, PriorityOp,
+    ZkSyncOp, ZkSyncPriorityOp,
 };
-use zksync_types::{Action, Operation};
 
 /// Creates a dummy operation as a test input for `ETHSender` tests.
-fn get_operation(id: i64, block_number: u32, action: Action) -> Operation {
+fn gen_aggregated_operation(
+    id: i64,
+    block_number: u32,
+    action: AggregatedActionType,
+) -> (i64, AggregatedOperation) {
     // Create full exit operation for non-zero return data.
     let executed_full_exit_op = {
         let priority_op = FullExit {
@@ -37,53 +45,99 @@ fn get_operation(id: i64, block_number: u32, action: Action) -> Operation {
             created_at: DateTime::from(SystemTime::UNIX_EPOCH),
         }))
     };
-    Operation {
-        id: Some(id),
-        action,
-        block: Block::new(
-            block_number,
-            Fr::default(),
-            0,
-            vec![executed_full_exit_op],
-            (0, 0),
-            50,
-            1_000_000.into(),
-            1_500_000.into(),
-            H256::default(),
-            0,
-        ),
-    }
+    let block = Block::new(
+        block_number,
+        Fr::default(),
+        0,
+        vec![executed_full_exit_op],
+        (0, 0),
+        50,
+        1_000_000.into(),
+        1_500_000.into(),
+        H256::default(),
+        0,
+    );
+
+    let aggregated_operation = match action {
+        AggregatedActionType::CommitBlocks => {
+            AggregatedOperation::CommitBlocks(BlocksCommitOperation {
+                last_committed_block: block.clone(),
+                blocks: vec![block],
+            })
+        }
+        AggregatedActionType::CreateProofBlocks => {
+            panic!("Proof creation should never be sent to Ethereum");
+        }
+        AggregatedActionType::PublishProofBlocksOnchain => {
+            AggregatedOperation::PublishProofBlocksOnchain(BlocksProofOperation {
+                blocks: vec![block],
+                proof: Default::default(),
+            })
+        }
+        AggregatedActionType::ExecuteBlocks => {
+            AggregatedOperation::ExecuteBlocks(BlocksExecuteOperation {
+                blocks: vec![block],
+            })
+        }
+    };
+    println!("{:?}", aggregated_operation.get_block_range());
+
+    (id, aggregated_operation)
 }
 
 lazy_static! {
-    pub static ref COMMIT_OPERATIONS: Vec<Operation> = (1..10)
-        .map(|id| get_operation(id, id as u32, Action::Commit))
+    pub static ref COMMIT_BLOCKS_OPERATIONS: Vec<(i64, AggregatedOperation)> = (1..=10)
+        .map(|id| gen_aggregated_operation(id, id as u32, AggregatedActionType::CommitBlocks))
         .collect();
-    pub static ref VERIFY_OPERATIONS: Vec<Operation> = (11..20)
-        .map(|id| get_operation(
+    pub static ref PUBLISH_PROOF_BLOCKS_ONCHAIN_OPERATIONS: Vec<(i64, AggregatedOperation)> = (11
+        ..=20)
+        .map(|id| gen_aggregated_operation(
             id,
             (id - 10) as u32,
-            Action::Verify {
-                proof: Default::default()
-            }
+            AggregatedActionType::PublishProofBlocksOnchain
+        ))
+        .collect();
+    pub static ref EXECUTE_BLOCKS_OPERATIONS: Vec<(i64, AggregatedOperation)> = (21..=30)
+        .map(|id| gen_aggregated_operation(
+            id,
+            (id - 20) as u32,
+            AggregatedActionType::ExecuteBlocks
         ))
         .collect();
 }
 
-pub fn commit_operation(idx: usize) -> Operation {
+pub fn commit_blocks_operation(idx: usize) -> (i64, AggregatedOperation) {
     assert!(
-        idx < COMMIT_OPERATIONS.len(),
-        format!("Index {} is out of bounds for commit operations", idx)
+        idx < COMMIT_BLOCKS_OPERATIONS.len(),
+        format!(
+            "Index {} is out of bounds for commit blocks operations",
+            idx
+        )
     );
 
-    COMMIT_OPERATIONS[idx].clone()
+    COMMIT_BLOCKS_OPERATIONS[idx].clone()
 }
 
-pub fn verify_operation(idx: usize) -> Operation {
+pub fn publish_proof_blocks_onchain_operations(idx: usize) -> (i64, AggregatedOperation) {
     assert!(
-        idx < VERIFY_OPERATIONS.len(),
-        format!("Index {} is out of bounds for verify operations", idx)
+        idx < PUBLISH_PROOF_BLOCKS_ONCHAIN_OPERATIONS.len(),
+        format!(
+            "Index {} is out of bounds for publish proof blocks onchain operations",
+            idx
+        )
     );
 
-    VERIFY_OPERATIONS[idx].clone()
+    PUBLISH_PROOF_BLOCKS_ONCHAIN_OPERATIONS[idx].clone()
+}
+
+pub fn execute_blocks_operations(idx: usize) -> (i64, AggregatedOperation) {
+    assert!(
+        idx < EXECUTE_BLOCKS_OPERATIONS.len(),
+        format!(
+            "Index {} is out of bounds for execute blocks onchain operations",
+            idx
+        )
+    );
+
+    EXECUTE_BLOCKS_OPERATIONS[idx].clone()
 }

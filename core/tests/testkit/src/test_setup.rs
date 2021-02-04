@@ -90,18 +90,20 @@ impl TestSetup {
             expected_changes_for_current_block: ExpectedAccountState::default(),
             commit_account,
             current_state_root: None,
-            last_committed_block: last_block.unwrap_or(Block::new(
-                0,
-                initial_root,
-                0,
-                vec![],
-                (0, 0),
-                0,
-                U256::from(0),
-                U256::from(0),
-                H256::default(),
-                0,
-            )),
+            last_committed_block: last_block.unwrap_or_else(|| {
+                Block::new(
+                    0,
+                    initial_root,
+                    0,
+                    vec![],
+                    (0, 0),
+                    0,
+                    U256::from(0),
+                    U256::from(0),
+                    H256::default(),
+                    0,
+                )
+            }),
         }
     }
 
@@ -195,7 +197,7 @@ impl TestSetup {
             .insert((zk_account_id, token.0), balance);
     }
 
-    pub fn apply_transfers(&mut self, transfers: &Vec<AccountTransfer>) {
+    pub fn apply_transfers(&mut self, transfers: &[AccountTransfer]) {
         for transfer in transfers {
             match transfer {
                 AccountTransfer::EthAccountTransfer(tr) => {
@@ -823,6 +825,66 @@ impl TestSetup {
         self.last_committed_block = new_block.clone();
 
         new_block
+    }
+
+    pub async fn execute_block(&mut self) -> Block {
+        self.state_keeper_request_sender
+            .clone()
+            .send(StateKeeperRequest::SealBlock)
+            .await
+            .expect("sk receiver dropped");
+
+        self.await_for_block_commit_request().await.block
+    }
+
+    pub async fn commit_blocks(&mut self, blocks: &[Block]) -> ETHExecResult {
+        assert!(!blocks.is_empty());
+        let block_commit_op = BlocksCommitOperation {
+            last_committed_block: self.last_committed_block.clone(),
+            blocks: blocks.to_vec(),
+        };
+        self.last_committed_block = blocks.last().unwrap().clone();
+        self.commit_account
+            .commit_block(&block_commit_op)
+            .await
+            .expect("block commit send tx")
+    }
+
+    pub async fn prove_blocks(
+        &mut self,
+        blocks: &[Block],
+        proof: Option<EncodedAggregatedProof>,
+    ) -> ETHExecResult {
+        let proof = proof.unwrap_or_else(|| {
+            let mut default_proof = EncodedAggregatedProof::default();
+            default_proof.individual_vk_inputs = Vec::new();
+            default_proof.individual_vk_idxs = Vec::new();
+            for block in blocks {
+                let commitment = U256::from_big_endian(block.block_commitment.as_bytes());
+                default_proof.individual_vk_inputs.push(commitment);
+                default_proof.individual_vk_idxs.push(U256::from(0));
+            }
+            default_proof
+        });
+
+        let block_proof_op = BlocksProofOperation {
+            blocks: blocks.to_vec(),
+            proof,
+        };
+        self.commit_account
+            .verify_block(&block_proof_op)
+            .await
+            .expect("block verify send tx")
+    }
+
+    pub async fn execute_blocks_onchain(&mut self, blocks: &[Block]) -> ETHExecResult {
+        let block_execute_op = BlocksExecuteOperation {
+            blocks: blocks.to_vec(),
+        };
+        self.commit_account
+            .execute_block(&block_execute_op)
+            .await
+            .expect("execute block tx")
     }
 
     pub async fn execute_verify_commitments(

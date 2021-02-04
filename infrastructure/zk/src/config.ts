@@ -144,7 +144,7 @@ export async function compileConfig(environment?: string) {
     let outputFileContents = `# This file is generated automatically by 'zk config compile'\n`;
     outputFileContents += `# Do not edit manually!\n\n`;
     variables.forEach((value: string, key: string) => {
-        outputFileContents += `${key}="${value}"\n`;
+        outputFileContents += `${key}=${value}\n`;
     });
 
     const outputFileName = path.join(envDirPath(), `${environment}.env`);

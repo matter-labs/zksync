@@ -127,14 +127,14 @@ impl CostPerOperation {
 
     pub fn report(&self, description: &str, report_grief: bool) {
         let grief_info = if report_grief {
-            let mut info = String::from("perfect_grief_factor: ");
+            let mut info = String::from("\nuser gas cost over operator cost: ");
             info.push_str(&self.asymptotic_grief_factor());
             info
         } else {
             String::new()
         };
         println!(
-            "gas cost of {}: user_gas_cost: {} commit: {}, verify: {}, withdraw: {}, total: {}, {}",
+            "Gas cost of {}:\nuser_gas_cost: {}\ncommit: {}\nprove: {}\nexecute: {}\ntotal: {}{}",
             description,
             self.user_gas_cost,
             self.commit_cost,
@@ -143,6 +143,7 @@ impl CostPerOperation {
             self.total,
             grief_info
         );
+        println!()
     }
 }
 
@@ -246,12 +247,37 @@ async fn gas_price_test() {
 
     let rng = &mut XorShiftRng::from_seed([0, 1, 2, 3]);
 
-    commit_cost_of_empty_block(&mut test_setup).await; // warmup, init some storage slots
-    let base_cost = commit_cost_of_empty_block(&mut test_setup).await;
-    println!(
-        "block operations base cost: commit: {} verify: {} withdrawals: {}",
-        base_cost.base_commit_cost, base_cost.base_verify_cost, base_cost.base_withdraw_cost
-    );
+    commit_cost_of_n_empty_blocks(&mut test_setup, 1).await; // warmup, init some storage slots
+    let base_cost = commit_cost_of_n_empty_blocks(&mut test_setup, 1).await;
+    {
+        // Aggregated blocks amortization info
+        let n_blocks = 5;
+        let base_cost_n_blocks = commit_cost_of_n_empty_blocks(&mut test_setup, n_blocks).await;
+        let commit_cost_per_block = (base_cost_n_blocks.base_commit_cost
+            - base_cost.base_commit_cost.clone())
+            / (n_blocks - 1);
+        let commit_base_cost = &base_cost.base_commit_cost - &commit_cost_per_block;
+        let prove_cost_per_block = (base_cost_n_blocks.base_verify_cost
+            - base_cost.base_verify_cost.clone())
+            / (n_blocks - 1);
+        let prove_base_cost = &base_cost.base_verify_cost - &prove_cost_per_block;
+        let execute_cost_per_block = (base_cost_n_blocks.base_withdraw_cost
+            - base_cost.base_withdraw_cost.clone())
+            / (n_blocks - 1);
+        let execute_base_cost = &base_cost.base_withdraw_cost - &execute_cost_per_block;
+        println!("Cost of block operations (base_cost, cost_per_block):");
+        println!("NOTE: aggregated blocks(n) cost of tx = base_cost + cost_per_block*n");
+        println!(
+            "commit: ({}, {})\nprove: ({}, {})\nexecute: ({}, {})",
+            commit_base_cost,
+            commit_cost_per_block,
+            prove_base_cost,
+            prove_cost_per_block,
+            execute_base_cost,
+            execute_cost_per_block
+        );
+        println!();
+    }
 
     commit_cost_of_deposits(&mut test_setup, 100, Token(0), rng)
         .await
@@ -554,32 +580,42 @@ async fn commit_cost_of_full_exits(
     CostsSample::new(n_full_exits, user_gas_cost, full_exits_execute_results)
 }
 
-async fn commit_cost_of_empty_block(test_setup: &mut TestSetup) -> BaseCost {
-    test_setup.start_block();
-    let empty_block_exec_results = test_setup
-        .execute_commit_and_verify_block()
+async fn commit_cost_of_n_empty_blocks(test_setup: &mut TestSetup, n: usize) -> BaseCost {
+    let mut blocks = Vec::new();
+    for _ in 0..n {
+        test_setup.start_block();
+        let block = test_setup.execute_block().await;
+        assert_eq!(
+            block.block_chunks_size, MIN_BLOCK_SIZE_CHUNKS,
+            "block size mismatch"
+        );
+        blocks.push(block);
+    }
+    let base_commit_cost = test_setup
+        .commit_blocks(&blocks)
         .await
-        .expect("Block execution failed");
-    assert_eq!(
-        empty_block_exec_results.block_size_chunks, MIN_BLOCK_SIZE_CHUNKS,
-        "block size mismatch"
-    );
+        .expect_success()
+        .gas_used
+        .map(u256_to_bigint)
+        .expect("commit gas used empty");
+    let base_verify_cost = test_setup
+        .prove_blocks(&blocks, None)
+        .await
+        .expect_success()
+        .gas_used
+        .map(u256_to_bigint)
+        .expect("prove gas used empty");
+    let base_withdraw_cost = test_setup
+        .execute_blocks_onchain(&blocks)
+        .await
+        .expect_success()
+        .gas_used
+        .map(u256_to_bigint)
+        .expect("execute gas used empty");
     BaseCost {
-        base_commit_cost: empty_block_exec_results
-            .commit_result
-            .gas_used
-            .map(u256_to_bigint)
-            .expect("commit gas used empty"),
-        base_verify_cost: empty_block_exec_results
-            .verify_result
-            .gas_used
-            .map(u256_to_bigint)
-            .expect("commit gas used empty"),
-        base_withdraw_cost: empty_block_exec_results
-            .withdrawals_result
-            .gas_used
-            .map(u256_to_bigint)
-            .expect("commit gas used empty"),
+        base_commit_cost,
+        base_verify_cost,
+        base_withdraw_cost,
     }
 }
 

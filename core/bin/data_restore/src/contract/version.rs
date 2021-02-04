@@ -16,15 +16,15 @@ impl TryFrom<u32> for ZkSyncContractVersion {
 
     fn try_from(value: u32) -> Result<Self, Self::Error> {
         use ZkSyncContractVersion::*;
-        let res = match value {
+
+        match value {
             0 => Ok(V0),
             1 => Ok(V1),
             2 => Ok(V2),
             3 => Ok(V3),
             4 => Ok(V4),
             _ => Err(anyhow::anyhow!("Unsupported contract version")),
-        };
-        res
+        }
     }
 }
 impl Into<i32> for ZkSyncContractVersion {

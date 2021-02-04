@@ -7,9 +7,11 @@ use sqlx::Done;
 use zksync_types::BlockNumber;
 // Local imports
 use self::records::{StorageProverJobQueue, StoredAggregatedProof, StoredProof};
+use crate::chain::operations::OperationsSchema;
 use crate::prover::records::StorageBlockWitness;
 use crate::{QueryResult, StorageProcessor};
 use zksync_crypto::proof::{AggregatedProof, SingleProof};
+use zksync_types::aggregated_operations::AggregatedActionType;
 use zksync_types::prover::{ProverJob, ProverJobStatus, ProverJobType};
 
 pub mod records;
@@ -335,9 +337,32 @@ impl<'a, 'c> ProverSchema<'a, 'c> {
         )
         .fetch_one(self.0.conn())
         .await?
-        .max
-        .unwrap_or(0);
+        .max;
 
-        Ok(last_block as BlockNumber)
+        let result = if let Some(last_block) = last_block {
+            last_block as BlockNumber
+        } else {
+            // this branch executes when prover job queue is empty
+            match action_type {
+                ProverJobType::SingleProof => {
+                    OperationsSchema(self.0)
+                        .get_last_block_by_aggregated_action(
+                            AggregatedActionType::CreateProofBlocks,
+                            None,
+                        )
+                        .await?
+                }
+                ProverJobType::AggregatedProof => {
+                    OperationsSchema(self.0)
+                        .get_last_block_by_aggregated_action(
+                            AggregatedActionType::PublishProofBlocksOnchain,
+                            None,
+                        )
+                        .await?
+                }
+            }
+        };
+
+        Ok(result)
     }
 }
