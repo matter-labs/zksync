@@ -72,8 +72,6 @@
 // `sqlx` macros result in these warning being triggered.
 #![allow(clippy::toplevel_ref_arg, clippy::suspicious_else_formatting)]
 
-use forced_exit_requests_schema::ForcedExitRequestsSchema;
-use misc::forced_exit_requests_schema;
 // Built-in deps
 // use std::env;
 // External imports
@@ -93,11 +91,13 @@ pub mod connection;
 pub mod data_restore;
 pub mod diff;
 pub mod ethereum;
-pub mod misc;
+pub mod forced_exit_requests;
 pub mod prover;
 pub mod test_data;
 pub mod tokens;
 mod utils;
+
+use forced_exit_requests::ForcedExitRequestsSchema;
 
 pub use crate::connection::ConnectionPool;
 pub type QueryResult<T> = Result<T, anyhow::Error>;

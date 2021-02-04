@@ -1,6 +1,6 @@
 use std::str::FromStr;
 
-use crate::misc::forced_exit_requests_schema::ForcedExitRequestsSchema;
+use crate::forced_exit_requests::ForcedExitRequestsSchema;
 use crate::tests::db_test;
 use crate::QueryResult;
 use crate::StorageProcessor;
@@ -32,6 +32,7 @@ async fn store_forced_exit_request(mut storage: StorageProcessor<'_>) -> QueryRe
         tokens: vec![0],
         price_in_wei: BigUint::from_i32(121212).unwrap(),
         valid_until: DateTime::from(now),
+        fulfilled_at: None,
     };
 
     let response = ForcedExitRequestsSchema(&mut storage)

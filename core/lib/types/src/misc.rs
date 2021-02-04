@@ -16,6 +16,7 @@ pub struct ForcedExitRequest {
     #[serde(with = "BigUintSerdeAsRadix10Str")]
     pub price_in_wei: BigUint,
     pub valid_until: DateTime<Utc>,
+    pub fulfilled_at: Option<DateTime<Utc>>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq, Hash)]

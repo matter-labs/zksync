@@ -2091,7 +2091,7 @@
         {
           "ordinal": 2,
           "name": "tokens",
-          "type_info": "Int4Array"
+          "type_info": "Text"
         },
         {
           "ordinal": 3,
@@ -2101,6 +2101,11 @@
         {
           "ordinal": 4,
           "name": "valid_until",
+          "type_info": "Timestamptz"
+        },
+        {
+          "ordinal": 5,
+          "name": "fulfilled_at",
           "type_info": "Timestamptz"
         }
       ],
@@ -2114,7 +2119,8 @@
         false,
         false,
         false,
-        false
+        false,
+        true
       ]
     }
   },
@@ -3581,7 +3587,7 @@
       "parameters": {
         "Left": [
           "Text",
-          "Int4Array",
+          "Text",
           "Numeric",
           "Timestamptz"
         ]
