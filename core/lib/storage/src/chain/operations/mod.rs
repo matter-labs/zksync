@@ -2,6 +2,7 @@
 use std::time::Instant;
 // External imports
 use anyhow::format_err;
+use chrono::{Duration, Utc};
 // Workspace imports
 use zksync_types::{ethereum::CompleteWithdrawalsTx, tx::TxHash, ActionType, BlockNumber};
 // Local imports
@@ -249,6 +250,26 @@ impl<'a, 'c> OperationsSchema<'a, 'c> {
 
         transaction.commit().await?;
         metrics::histogram!("sql.chain.operations.store_executed_tx", start.elapsed());
+        Ok(())
+    }
+
+    /// Removes all rejected transactions with an age greater than `max_age` from the database.
+    pub async fn remove_rejected_transactions(&mut self, max_age: Duration) -> QueryResult<()> {
+        let start = Instant::now();
+
+        let offset = Utc::now() - max_age;
+        sqlx::query!(
+            "DELETE FROM executed_transactions
+            WHERE success = false AND created_at < $1",
+            offset
+        )
+        .execute(self.0.conn())
+        .await?;
+
+        metrics::histogram!(
+            "sql.chain.operations.remove_rejected_transactions",
+            start.elapsed()
+        );
         Ok(())
     }
 
