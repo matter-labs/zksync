@@ -118,8 +118,8 @@ impl<'a, 'c> EthereumSchema<'a, 'c> {
         Ok(ops)
     }
 
-    /// Load all aggregated operation that have no confirmation yet and have not yet been sent to Ethereum.
-    /// Use only after server restart.
+    /// Load all the aggregated operations that have no confirmation yet and have not yet been sent to Ethereum.
+    /// Should be used after server restart only.
     pub async fn restore_unprocessed_operations(&mut self) -> QueryResult<()> {
         let start = Instant::now();
 

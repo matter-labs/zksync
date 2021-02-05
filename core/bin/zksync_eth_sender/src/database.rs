@@ -25,8 +25,8 @@ pub(super) trait DatabaseInterface {
         connection: &mut StorageProcessor<'_>,
     ) -> anyhow::Result<VecDeque<ETHOperation>>;
 
-    /// Load all aggregated operation that have no confirmation yet and have not yet been sent to Ethereum.
-    /// Use only after server restart.
+    /// Load all the aggregated operations that have no confirmation yet and have not yet been sent to Ethereum.
+    /// Should be used after server restart only.
     async fn restore_unprocessed_operations(
         &self,
         connection: &mut StorageProcessor<'_>,
