@@ -1,7 +1,6 @@
 //! API testing helpers.
 
 // Built-in uses
-use std::str::FromStr;
 
 // External uses
 use actix_web::{web, App, Scope};
@@ -173,7 +172,7 @@ impl TestServerConfig {
         {
             let tx = from
                 .sign_transfer(
-                    0,
+                    TokenId(0),
                     "GLM",
                     1_u64.into(),
                     fee.into(),

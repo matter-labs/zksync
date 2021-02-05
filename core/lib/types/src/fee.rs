@@ -11,6 +11,7 @@ use zksync_utils::{round_precision, BigUintSerdeAsRadix10Str};
 /// point of view.
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum OutputFeeType {
+    Transfer,
     TransferToNew,
     Withdraw,
     FastWithdraw,

@@ -194,7 +194,12 @@ impl RpcApp {
         Ok(result)
     }
 
-    pub async fn _impl_get_tx_fee(self, tx_type: TxFeeTypes, token: TokenLike) -> Result<Fee> {
+    pub async fn _impl_get_tx_fee(
+        self,
+        tx_type: TxFeeTypes,
+        address: Address,
+        token: TokenLike,
+    ) -> Result<Fee> {
         let start = Instant::now();
         let ticker = self.tx_sender.ticker_requests.clone();
         let token_allowed = Self::token_allowed_for_fees(ticker.clone(), token.clone()).await?;
@@ -202,7 +207,7 @@ impl RpcApp {
             return Err(SubmitError::InappropriateFeeToken.into());
         }
 
-        let result = Self::ticker_request(ticker.clone(), tx_type, token).await;
+        let result = Self::ticker_request(ticker.clone(), tx_type, address, token).await;
         metrics::histogram!("api.rpc.get_tx_fee", start.elapsed());
         result
     }

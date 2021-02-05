@@ -10,6 +10,7 @@ use zksync_storage::ConnectionPool;
 use crate::{
     fee_ticker::{
         ticker_api::{TickerApi, TokenPriceAPI},
+        ticker_info::FeeTickerInfo,
         validator::{watcher::TokenWatcher, FeeTokenValidator},
         FeeTicker, TickerConfig, TickerRequest,
     },
@@ -20,19 +21,21 @@ static TICKER_CHANNEL_SIZE: usize = 32000;
 
 /// `TickerBalancer` is a struct used for scaling the ticker.
 /// Create `n` tickers and balance the load between them.
-pub(crate) struct TickerBalancer<API: TokenPriceAPI, WATCHER> {
-    tickers: Vec<FeeTicker<TickerApi<API>, WATCHER>>,
+pub(crate) struct TickerBalancer<API: TokenPriceAPI, INFO, WATCHER> {
+    tickers: Vec<FeeTicker<TickerApi<API>, INFO, WATCHER>>,
     channels: Vec<Sender<TickerRequest>>,
     requests: Receiver<TickerRequest>,
 }
 
-impl<API, WATCHER> TickerBalancer<API, WATCHER>
+impl<API, INFO, WATCHER> TickerBalancer<API, INFO, WATCHER>
 where
     API: TokenPriceAPI + Clone + Sync + Send + 'static,
+    INFO: FeeTickerInfo + Clone + Sync + Send + 'static,
     WATCHER: TokenWatcher + Clone + Sync + Send + 'static,
 {
     pub fn new(
         token_price_api: API,
+        ticker_info: INFO,
         ticker_config: TickerConfig,
         validator: FeeTokenValidator<WATCHER>,
         requests: Receiver<TickerRequest>,
@@ -54,6 +57,7 @@ where
             let (request_sender, request_receiver) = mpsc::channel(TICKER_CHANNEL_SIZE);
             tickers.push(FeeTicker::new(
                 ticker_api,
+                ticker_info.clone(),
                 request_receiver,
                 ticker_config.clone(),
                 validator.clone(),
@@ -95,6 +99,7 @@ where
 mod tests {
     use super::TickerBalancer;
     use crate::fee_ticker::ticker_api::coingecko::CoinGeckoAPI;
+    use crate::fee_ticker::ticker_info::TickerInfo;
     use crate::fee_ticker::validator::watcher::UniswapTokenWatcher;
     use crate::fee_ticker::TickerRequest;
     use futures::{
@@ -114,7 +119,7 @@ mod tests {
         }
         let (mut request_sender, request_receiver) = mpsc::channel(2);
 
-        let dispatcher = TickerBalancer::<CoinGeckoAPI, UniswapTokenWatcher> {
+        let dispatcher = TickerBalancer::<CoinGeckoAPI, TickerInfo, UniswapTokenWatcher> {
             tickers: vec![],
             channels: senders,
             requests: request_receiver,
@@ -126,6 +131,7 @@ mod tests {
                 .send(TickerRequest::GetTxFee {
                     tx_type: TxFeeTypes::Withdraw,
                     token: TokenId(i).into(),
+                    address: Default::default(),
                     response: channel.0,
                 })
                 .await
@@ -133,6 +139,7 @@ mod tests {
             if let Some(TickerRequest::GetTxFee {
                 tx_type: _,
                 token,
+                address: _,
                 response: _,
             }) = receivers[(i % 10) as usize].next().await
             {

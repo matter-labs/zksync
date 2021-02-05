@@ -2756,9 +2756,9 @@ dependencies = [
 
 [[package]]
 name = "metrics"
-version = "0.13.1"
+version = "0.13.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b6d31b8f6fe04ed4ac33f735f97576b37750df3baf684107d545a8d30efcf584"
+checksum = "1652e29336f4347777624b1e32b3977ee1dacf267dcb950352b0a69f12c85160"
 dependencies = [
  "metrics-macros",
  "proc-macro-hack",
@@ -3189,9 +3189,9 @@ dependencies = [
 
 [[package]]
 name = "ordered-float"
-version = "2.0.1"
+version = "2.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "dacdec97876ef3ede8c50efc429220641a0b11ba0048b4b0c357bccbc47c5204"
+checksum = "200778d2ad6b54038350cef50e9d2ec5fb964f96e8c14f43960522195d9138e3"
 dependencies = [
  "num-traits",
 ]

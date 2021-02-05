@@ -26,13 +26,14 @@ use tokio::time::Instant;
 use zksync_config::{configs::ticker::TokenPriceSource, ZkSyncConfig};
 use zksync_storage::ConnectionPool;
 use zksync_types::{
-    Address, BatchFee, ChangePubKeyOp, Fee, OutputFeeType, Token, TokenId, TokenLike,
+    Address, BatchFee, ChangePubKeyOp, Fee, OutputFeeType, Token, TokenId, TokenLike, TransferOp,
     TransferToNewOp, TxFeeTypes, WithdrawOp,
 };
 use zksync_utils::ratio_to_big_decimal;
 
 // Local deps
 use crate::fee_ticker::balancer::TickerBalancer;
+use crate::fee_ticker::ticker_info::{FeeTickerInfo, TickerInfo};
 use crate::fee_ticker::validator::MarketUpdater;
 use crate::fee_ticker::{
     ticker_api::{
@@ -48,6 +49,7 @@ use crate::utils::token_db_cache::TokenDBCache;
 
 mod constants;
 mod ticker_api;
+mod ticker_info;
 pub mod validator;
 
 mod balancer;
@@ -153,6 +155,7 @@ pub enum TokenPriceRequestType {
 pub enum TickerRequest {
     GetTxFee {
         tx_type: TxFeeTypes,
+        address: Address,
         token: TokenLike,
         response: oneshot::Sender<Result<Fee, anyhow::Error>>,
     },
@@ -172,8 +175,9 @@ pub enum TickerRequest {
     },
 }
 
-struct FeeTicker<API, WATCHER> {
+struct FeeTicker<API, INFO, WATCHER> {
     api: API,
+    info: INFO,
     requests: Receiver<TickerRequest>,
     config: TickerConfig,
     validator: FeeTokenValidator<WATCHER>,
@@ -215,8 +219,15 @@ pub fn run_ticker_task(
             let token_price_api =
                 CoinMarketCapAPI::new(client, base_url.parse().expect("Correct CoinMarketCap url"));
 
-            let ticker_api = TickerApi::new(db_pool, token_price_api);
-            let fee_ticker = FeeTicker::new(ticker_api, tricker_requests, ticker_config, validator);
+            let ticker_api = TickerApi::new(db_pool.clone(), token_price_api);
+            let ticker_info = TickerInfo::new(db_pool);
+            let fee_ticker = FeeTicker::new(
+                ticker_api,
+                ticker_info,
+                tricker_requests,
+                ticker_config,
+                validator,
+            );
 
             tokio::spawn(fee_ticker.run())
         }
@@ -225,9 +236,11 @@ pub fn run_ticker_task(
             let token_price_api =
                 CoinGeckoAPI::new(client, base_url.parse().expect("Correct CoinGecko url"))
                     .expect("failed to init CoinGecko client");
+            let ticker_info = TickerInfo::new(db_pool.clone());
 
             let mut ticker_balancer = TickerBalancer::new(
                 token_price_api,
+                ticker_info,
                 ticker_config,
                 validator,
                 tricker_requests,
@@ -240,15 +253,17 @@ pub fn run_ticker_task(
     }
 }
 
-impl<API: FeeTickerAPI, WATCHER: TokenWatcher> FeeTicker<API, WATCHER> {
+impl<API: FeeTickerAPI, INFO: FeeTickerInfo, WATCHER: TokenWatcher> FeeTicker<API, INFO, WATCHER> {
     fn new(
         api: API,
+        info: INFO,
         requests: Receiver<TickerRequest>,
         config: TickerConfig,
         validator: FeeTokenValidator<WATCHER>,
     ) -> Self {
         Self {
             api,
+            info,
             requests,
             config,
             validator,
@@ -270,8 +285,11 @@ impl<API: FeeTickerAPI, WATCHER: TokenWatcher> FeeTicker<API, WATCHER> {
                     tx_type,
                     token,
                     response,
+                    address,
                 } => {
-                    let fee = self.get_fee_from_ticker_in_wei(tx_type, token).await;
+                    let fee = self
+                        .get_fee_from_ticker_in_wei(tx_type, token, address)
+                        .await;
                     metrics::histogram!("ticker.get_tx_fee", start.elapsed());
                     response.send(fee).unwrap_or_default()
                 }
@@ -341,6 +359,7 @@ impl<API: FeeTickerAPI, WATCHER: TokenWatcher> FeeTicker<API, WATCHER> {
         &mut self,
         tx_type: TxFeeTypes,
         token: TokenLike,
+        recipient: Address,
     ) -> Result<Fee, anyhow::Error> {
         let zkp_cost_chunk = self.config.zkp_cost_chunk_usd.clone();
         let token = self.api.get_token(token).await?;
@@ -427,6 +446,11 @@ impl<API: FeeTickerAPI, WATCHER: TokenWatcher> FeeTicker<API, WATCHER> {
         Ok(token_risk_factor / token_price_usd)
     }
 
+    /// Returns `true` if account does not yet exist in the zkSync network.
+    async fn is_account_new(&mut self, address: Address) -> bool {
+        self.info.is_account_new(address).await
+    }
+
     async fn gas_tx_amount(
         &mut self,
         is_token_subsidized: bool,
@@ -436,7 +460,13 @@ impl<API: FeeTickerAPI, WATCHER: TokenWatcher> FeeTicker<API, WATCHER> {
         let (fee_type, op_chunks) = match tx_type {
             TxFeeTypes::Withdraw => (OutputFeeType::Withdraw, WithdrawOp::CHUNKS),
             TxFeeTypes::FastWithdraw => (OutputFeeType::FastWithdraw, WithdrawOp::CHUNKS),
-            TxFeeTypes::Transfer => (OutputFeeType::TransferToNew, TransferToNewOp::CHUNKS),
+            TxFeeTypes::Transfer => {
+                if self.is_account_new(recipient).await {
+                    (OutputFeeType::TransferToNew, TransferToNewOp::CHUNKS)
+                } else {
+                    (OutputFeeType::Transfer, TransferOp::CHUNKS)
+                }
+            }
             TxFeeTypes::ChangePubKey {
                 onchain_pubkey_auth,
             } => (
