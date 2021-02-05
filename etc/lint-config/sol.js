@@ -20,6 +20,7 @@ module.exports = {
     "reason-string": "off",
     "func-name-mixedcase": "off",
     "no-unused-vars": "off",
-    "max-states-count": "off"
+    "max-states-count": "off",
+    "compiler-version": ["warn", "^0.7.0"]
   }
 };

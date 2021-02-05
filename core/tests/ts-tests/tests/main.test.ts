@@ -1,8 +1,8 @@
 import { expect } from 'chai';
 import { BigNumber, utils } from 'ethers';
-import { Wallet, types, wallet } from 'zksync';
+import { Wallet, types } from 'zksync';
 
-import { Tester, expectThrow } from './tester';
+import { Tester } from './tester';
 import './priority-ops';
 import './change-pub-key';
 import './transfer';

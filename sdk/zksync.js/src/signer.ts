@@ -27,7 +27,6 @@ import {
     ChangePubKeyCREATE2,
     Create2Data
 } from './types';
-import validate = WebAssembly.validate;
 
 export class Signer {
     readonly #privateKey: Uint8Array;

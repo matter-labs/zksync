@@ -10,7 +10,6 @@ const wallet = Wallet.fromMnemonic(ethTestConfig.mnemonic, "m/44'/60'/0'/0/1").c
 const deployer = new Deployer({ deployWallet: wallet });
 
 async function main() {
-    const zkSyncContract = deployer.zkSyncContract(wallet);
     const governanceContract = deployer.governanceContract(wallet);
     console.log('total tokens', await governanceContract.totalTokens());
 }

@@ -35,7 +35,7 @@ function getFullExitPubdata({ accountId, tokenId, amount, owner }) {
     ]);
 }
 
-function getFullExitPriorityQueueData({ accountId, tokenId, amount, owner }) {
+function getFullExitPriorityQueueData({ accountId, tokenId, owner }) {
     return ethers.utils.concat([
         ethers.utils.arrayify('0x06'),
         ethers.utils.arrayify(accountId),
@@ -129,7 +129,7 @@ describe('Operations unit tests', function () {
         const amount = '0x101112131415161718191a1b1c1d1e1f';
         const owner = '0x823B747710C5bC9b8A47243f2c3d1805F1aA00c5';
 
-        const priorityQueueData = getFullExitPriorityQueueData({ accountId, tokenId, amount, owner });
+        const priorityQueueData = getFullExitPriorityQueueData({ accountId, tokenId, owner });
         await testContract.testFullExitPriorityQueue({ accountId, tokenId, amount, owner }, priorityQueueData);
     });
 
