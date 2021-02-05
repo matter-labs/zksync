@@ -139,7 +139,7 @@ impl EventsState {
     /// * `eth_blocks_step` - Ethereum blocks delta step
     /// * `end_eth_blocks_offset` - last block delta
     ///
-    #[allow(clippy::needless_lifetimes)]
+    #[allow(clippy::needless_lifetimes)] // Cargo clippy gives a false positive warning on needless_lifetimes there, so can be allowed.
     async fn get_new_events_and_last_watched_block<'a, T: Transport>(
         web3: &Web3<T>,
         zksync_contracts: &'a [ZkSyncDeployedContract<T>],
