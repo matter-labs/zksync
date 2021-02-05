@@ -379,8 +379,6 @@ mod tests {
         let (client, server) = TestServer::new_with_config(test_config).await?;
 
         let status = client.get_forced_exit_requests_status().await?;
-        //panic!("LAZHA");
-        //println!("{}", status)
 
         assert_eq!(status, ForcedExitRequestStatus::Disabled);
 
@@ -391,10 +389,10 @@ mod tests {
             price_in_wei: BigUint::from_str("1212").unwrap(),
         };
 
-        // client
-        //     .submit_forced_exit_request(register_request)
-        //     .await
-        //     .expect_err(should_be_disabled_msg);
+        client
+            .submit_forced_exit_request(register_request)
+            .await
+            .expect_err(should_be_disabled_msg);
 
         server.stop().await;
         Ok(())
@@ -426,6 +424,40 @@ mod tests {
                 panic!("ForcedExitRequests feature is not disabled");
             }
         }
+
+        server.stop().await;
+        Ok(())
+    }
+
+    #[actix_rt::test]
+    #[cfg_attr(
+        not(feature = "api_test"),
+        ignore = "Use `zk test rust-api` command to perform this test"
+    )]
+    async fn test_forced_exit_requests_wrongs_tokens_number() -> anyhow::Result<()> {
+        let forced_exit_requests = ForcedExitRequestsConfig::from_env();
+        let test_config = get_test_config_from_forced_exit_requests(ForcedExitRequestsConfig {
+            max_tokens_per_request: 5,
+            ..forced_exit_requests
+        });
+
+        let (client, server) =
+            TestServer::new_with_fee_ticker(test_config, Some(10000), Some(10000)).await?;
+
+        let status = client.get_forced_exit_requests_status().await?;
+
+        assert_ne!(status, ForcedExitRequestStatus::Disabled);
+
+        let register_request = ForcedExitRegisterRequest {
+            target: Address::from_str("c0f97CC918C9d6fA4E9fc6be61a6a06589D199b2").unwrap(),
+            tokens: vec![0, 1, 2, 3, 4, 5, 6, 7],
+            price_in_wei: BigUint::from_str("1212").unwrap(),
+        };
+
+        client
+            .submit_forced_exit_request(register_request)
+            .await
+            .expect_err("Api does not take the limit on the number of tokens into account");
 
         server.stop().await;
         Ok(())
