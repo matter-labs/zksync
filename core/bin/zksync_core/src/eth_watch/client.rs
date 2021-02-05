@@ -4,13 +4,12 @@ use anyhow::format_err;
 use ethabi::Hash;
 use std::fmt::Debug;
 use web3::{
-    contract::{Contract, Options},
-    transports::Http,
+    contract::Options,
     types::{BlockNumber, FilterBuilder, Log},
-    Web3,
 };
 
 use zksync_contracts::zksync_contract;
+use zksync_eth_client::ethereum_gateway::EthereumGateway;
 use zksync_types::{Address, Nonce, PriorityOp, H160, U256};
 
 struct ContractTopics {
@@ -42,20 +41,18 @@ pub trait EthClient {
 }
 
 pub struct EthHttpClient {
-    web3: Web3<Http>,
-    zksync_contract: Contract<Http>,
+    client: EthereumGateway,
     topics: ContractTopics,
+    zksync_contract_addr: H160,
 }
 
 impl EthHttpClient {
-    pub fn new(web3: Web3<Http>, zksync_contract_addr: H160) -> Self {
-        let zksync_contract = Contract::new(web3.eth(), zksync_contract_addr, zksync_contract());
-
-        let topics = ContractTopics::new(zksync_contract.abi());
+    pub fn new(client: EthereumGateway, zksync_contract_addr: H160) -> Self {
+        let topics = ContractTopics::new(&zksync_contract());
         Self {
-            zksync_contract,
-            web3,
+            client,
             topics,
+            zksync_contract_addr,
         }
     }
 
@@ -70,14 +67,13 @@ impl EthHttpClient {
         T::Error: Debug,
     {
         let filter = FilterBuilder::default()
-            .address(vec![self.zksync_contract.address()])
+            .address(vec![self.zksync_contract_addr])
             .from_block(from)
             .to_block(to)
             .topics(Some(topics), None, None, None)
             .build();
 
-        self.web3
-            .eth()
+        self.client
             .logs(filter)
             .await?
             .into_iter()
@@ -111,14 +107,14 @@ impl EthClient for EthHttpClient {
     }
 
     async fn block_number(&self) -> anyhow::Result<u64> {
-        Ok(self.web3.eth().block_number().await?.as_u64())
+        Ok(self.client.block_number().await?.as_u64())
     }
 
-    async fn get_auth_fact(&self, address: Address, nonce: u32) -> anyhow::Result<Vec<u8>> {
-        self.zksync_contract
-            .query(
+    async fn get_auth_fact(&self, address: Address, nonce: Nonce) -> anyhow::Result<Vec<u8>> {
+        self.client
+            .call_main_contract_function(
                 "authFacts",
-                (address, u64::from(nonce)),
+                (address, u64::from(*nonce)),
                 None,
                 Options::default(),
                 None,
@@ -127,11 +123,15 @@ impl EthClient for EthHttpClient {
             .map_err(|e| format_err!("Failed to query contract authFacts: {}", e))
     }
 
-    async fn get_auth_fact_reset_time(&self, address: Address, nonce: u32) -> anyhow::Result<u64> {
-        self.zksync_contract
-            .query(
+    async fn get_auth_fact_reset_time(
+        &self,
+        address: Address,
+        nonce: Nonce,
+    ) -> anyhow::Result<u64> {
+        self.client
+            .call_main_contract_function(
                 "authFactsResetTimer",
-                (address, u64::from(nonce)),
+                (address, u64::from(*nonce)),
                 None,
                 Options::default(),
                 None,

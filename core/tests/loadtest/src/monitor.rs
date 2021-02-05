@@ -128,7 +128,7 @@ impl MonitorInner {
         if self.current_stats != stats {
             self.total_stats += self.current_stats;
 
-            log::trace!("Transactions {:?}", self.current_stats);
+            vlog::debug!("Transactions {:?}", self.current_stats);
 
             swap(&mut self.current_stats, &mut stats);
         }
@@ -147,7 +147,7 @@ impl Drop for MonitorInner {
     fn drop(&mut self) {
         self.total_stats += self.current_stats;
 
-        log::trace!("Total {:?}", self.total_stats);
+        vlog::debug!("Total {:?}", self.total_stats);
     }
 }
 
@@ -327,7 +327,7 @@ impl Monitor {
             .drain(..)
             .collect::<Vec<_>>();
 
-        log::trace!("Awaiting for verification, pending tasks {}", tasks.len());
+        vlog::debug!("Awaiting for verification, pending tasks {}", tasks.len());
 
         wait_all_chunks(CHUNK_SIZES, tasks).await;
     }
@@ -348,7 +348,7 @@ impl Monitor {
 
     /// Returns the priority operation for the given transaction and monitors its progress in
     /// the zkSync network.
-    pub(crate) async fn get_priority_op<S: EthereumSigner + Clone>(
+    pub(crate) async fn get_priority_op<S: EthereumSigner>(
         &self,
         eth_provider: &EthereumProvider<S>,
         eth_tx_hash: H256,
@@ -374,7 +374,7 @@ impl Monitor {
                 .monitor_priority_op(priority_op2.clone())
                 .await
             {
-                log::warn!("Monitored priority op execution failed. {}", e);
+                vlog::warn!("Monitored priority op execution failed. {}", e);
                 monitor
                     .log_event(Event::OpErrored(priority_op2.serial_id))
                     .await;
@@ -422,7 +422,7 @@ impl Monitor {
             self.api_data_pool
                 .write()
                 .await
-                .store_block(block.block_number as BlockNumber);
+                .store_block(BlockNumber(block.block_number as u32));
         }
 
         Ok(TxLifecycle {

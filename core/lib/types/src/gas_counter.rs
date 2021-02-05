@@ -3,7 +3,7 @@
 //! Server uses this module to ensure that generated transactions
 //! won't run out of the gas and won't trespass the block gas limit.
 // Workspace deps
-use zksync_basic_types::U256;
+use zksync_basic_types::*;
 // Local deps
 use crate::{config::MAX_WITHDRAWALS_TO_COMPLETE_IN_A_CALL, Block, ZkSyncOp};
 
@@ -231,92 +231,92 @@ mod tests {
     fn commit_and_verify_cost() {
         let change_pubkey_op = ChangePubKeyOp {
             tx: ChangePubKey::new(
-                1,
+                AccountId(1),
                 Default::default(),
                 Default::default(),
-                0,
+                TokenId(0),
                 Default::default(),
                 Default::default(),
                 Default::default(),
                 None,
                 None,
             ),
-            account_id: 1,
+            account_id: AccountId(1),
         };
         let deposit_op = DepositOp {
             priority_op: Deposit {
                 from: Default::default(),
-                token: 0,
+                token: TokenId(0),
                 amount: Default::default(),
                 to: Default::default(),
             },
-            account_id: 1,
+            account_id: AccountId(1),
         };
         let transfer_op = TransferOp {
             tx: Transfer::new(
-                1,
+                AccountId(1),
                 Default::default(),
                 Default::default(),
-                0,
+                TokenId(0),
                 Default::default(),
                 Default::default(),
-                0,
+                Nonce(0),
                 Default::default(),
                 None,
             ),
-            from: 1,
-            to: 1,
+            from: AccountId(1),
+            to: AccountId(1),
         };
         let transfer_to_new_op = TransferToNewOp {
             tx: Transfer::new(
-                1,
+                AccountId(1),
                 Default::default(),
                 Default::default(),
-                0,
+                TokenId(0),
                 Default::default(),
                 Default::default(),
-                0,
+                Nonce(0),
                 Default::default(),
                 None,
             ),
-            from: 1,
-            to: 1,
+            from: AccountId(1),
+            to: AccountId(1),
         };
         let noop_op = NoopOp {};
         let full_exit_op = FullExitOp {
             priority_op: FullExit {
-                account_id: 0,
+                account_id: AccountId(0),
                 eth_address: Default::default(),
-                token: 0,
+                token: TokenId(0),
             },
             withdraw_amount: None,
         };
         let forced_exit_op = ForcedExitOp {
             tx: ForcedExit::new(
-                1,
+                AccountId(1),
                 Default::default(),
-                0,
+                TokenId(0),
                 Default::default(),
-                0,
+                Nonce(0),
                 Default::default(),
                 None,
             ),
-            target_account_id: 1,
+            target_account_id: AccountId(1),
             withdraw_amount: None,
         };
         let withdraw_op = WithdrawOp {
             tx: Withdraw::new(
-                1,
+                AccountId(1),
                 Default::default(),
                 Default::default(),
-                0,
+                TokenId(0),
                 Default::default(),
                 Default::default(),
-                0,
+                Nonce(0),
                 Default::default(),
                 None,
             ),
-            account_id: 1,
+            account_id: AccountId(1),
         };
 
         let test_vector_commit = vec![
@@ -376,17 +376,17 @@ mod tests {
     fn gas_counter() {
         let change_pubkey_op = ChangePubKeyOp {
             tx: ChangePubKey::new(
-                1,
+                AccountId(1),
                 Default::default(),
                 Default::default(),
-                0,
+                TokenId(0),
                 Default::default(),
                 Default::default(),
                 Default::default(),
                 None,
                 None,
             ),
-            account_id: 1,
+            account_id: AccountId(1),
         };
         let zksync_op = ZkSyncOp::from(change_pubkey_op);
 

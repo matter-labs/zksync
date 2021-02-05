@@ -1,19 +1,18 @@
 use std::collections::HashMap;
 // External uses
+use bigdecimal::BigDecimal;
 use futures::{FutureExt, TryFutureExt};
 use jsonrpc_core::Error;
 use jsonrpc_derive::rpc;
+
 // Workspace uses
 use zksync_crypto::params::ZKSYNC_VERSION;
 use zksync_types::{
     tx::{EthBatchSignatures, TxEthSignature, TxHash},
-    Address, Token, TokenLike, TxFeeTypes, ZkSyncTx,
+    Address, BatchFee, Fee, Token, TokenLike, TxFeeTypes, ZkSyncTx,
 };
 
 // Local uses
-use crate::fee_ticker::{BatchFee, Fee};
-use bigdecimal::BigDecimal;
-
 use super::{types::*, RpcApp};
 
 pub type FutureResp<T> = Box<dyn futures01::Future<Item = T, Error = Error> + Send>;

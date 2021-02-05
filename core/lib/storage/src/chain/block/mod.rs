@@ -38,7 +38,7 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
     /// Given a block, stores its transactions in the database.
     pub async fn save_block_transactions(
         &mut self,
-        block_number: u32,
+        block_number: BlockNumber,
         operations: Vec<ExecutedOperations>,
     ) -> QueryResult<()> {
         let start = Instant::now();
@@ -71,7 +71,7 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
         let block = sqlx::query_as!(
             StorageBlock,
             "SELECT * FROM blocks WHERE number = $1",
-            i64::from(block)
+            i64::from(*block)
         )
         .fetch_optional(self.0.conn())
         .await?;
@@ -104,7 +104,7 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
         let result = Some(Block::new(
             block,
             new_root_hash,
-            stored_block.fee_account_id as AccountId,
+            AccountId(stored_block.fee_account_id as u32),
             block_transactions,
             (
                 stored_block.unprocessed_prior_op_before as u64,
@@ -182,7 +182,7 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
                 FROM everything
                 ORDER BY created_at DESC
             "#,
-            i64::from(block)
+            i64::from(*block)
         )
         .fetch_all(self.0.conn())
         .await?;
@@ -205,7 +205,7 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
             let executed_ops = sqlx::query_as!(
                 StoredExecutedTransaction,
                 "SELECT * FROM executed_transactions WHERE block_number = $1",
-                i64::from(block)
+                i64::from(*block)
             )
             .fetch_all(self.0.conn())
             .await?;
@@ -213,7 +213,7 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
             let executed_priority_ops = sqlx::query_as!(
                 StoredExecutedPriorityOperation,
                 "SELECT * FROM executed_priority_operations WHERE block_number = $1",
-                i64::from(block)
+                i64::from(*block)
             )
             .fetch_all(self.0.conn())
             .await?;
@@ -302,7 +302,7 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
             ORDER BY blocks.number DESC
             LIMIT $2;
             "#,
-            i64::from(max_block),
+            i64::from(*max_block),
             i64::from(limit)
         ).fetch_all(self.0.conn())
         .await?;
@@ -495,7 +495,7 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
         };
         // Fill the block that's going to be returned with its operations.
         let executed_ops = BlockSchema(&mut transaction)
-            .get_block_executed_ops(block.number as u32)
+            .get_block_executed_ops(BlockNumber(block.number as u32))
             .await?;
 
         let mut success_operations = Vec::new();
@@ -510,7 +510,7 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
         let previous_block_root_hash = H256::from_slice(&block.previous_root_hash);
 
         let result = PendingBlock {
-            number: block.number as u32,
+            number: BlockNumber(block.number as u32),
             chunks_left: block.chunks_left as usize,
             unprocessed_priority_op_before: block.unprocessed_priority_op_before as u64,
             pending_block_iteration: block.pending_block_iteration as usize,
@@ -546,7 +546,7 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
         let mut transaction = self.0.start_transaction().await?;
 
         let storage_block = StoragePendingBlock {
-            number: pending_block.number.into(),
+            number: (*pending_block.number).into(),
             chunks_left: pending_block.chunks_left as i64,
             unprocessed_priority_op_before: pending_block.unprocessed_priority_op_before as i64,
             pending_block_iteration: pending_block.pending_block_iteration as i64,
@@ -612,9 +612,9 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
         let start = Instant::now();
         let mut transaction = self.0.start_transaction().await?;
 
-        let number = i64::from(block.block_number);
+        let number = i64::from(*block.block_number);
         let root_hash = block.new_root_hash.to_bytes();
-        let fee_account_id = i64::from(block.fee_account);
+        let fee_account_id = i64::from(*block.fee_account);
         let unprocessed_prior_op_before = block.processed_priority_ops.0 as i64;
         let unprocessed_prior_op_after = block.processed_priority_ops.1 as i64;
         let block_size = block.block_chunks_size as i64;
@@ -674,7 +674,7 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
         tree_cache: serde_json::Value,
     ) -> QueryResult<()> {
         let start = Instant::now();
-        if block == 0 {
+        if *block == 0 {
             return Ok(());
         }
 
@@ -685,7 +685,7 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
             INSERT INTO account_tree_cache (block, tree_cache)
             VALUES ($1, $2)
             ",
-            block as i64,
+            *block as i64,
             tree_cache_str,
         )
         .execute(self.0.conn())
@@ -714,7 +714,7 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
         metrics::histogram!("sql.chain.block.get_account_tree_cache", start.elapsed());
         Ok(account_tree_cache.map(|w| {
             (
-                w.block as BlockNumber,
+                BlockNumber(w.block as u32),
                 serde_json::from_str(&w.tree_cache)
                     .expect("Failed to deserialize Account Tree Cache"),
             )
@@ -733,7 +733,7 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
             SELECT * FROM account_tree_cache
             WHERE block = $1
             ",
-            block as i64
+            *block as i64
         )
         .fetch_optional(self.0.conn())
         .await?;
@@ -749,9 +749,9 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
 
     pub async fn save_genesis_block(&mut self, root_hash: Fr) -> QueryResult<()> {
         let block = Block {
-            block_number: 0,
+            block_number: BlockNumber(0),
             new_root_hash: root_hash,
-            fee_account: 0,
+            fee_account: AccountId(0),
             block_transactions: Vec::new(),
             processed_priority_ops: (0, 0),
             block_chunks_size: 0,

@@ -46,10 +46,12 @@ impl ApiBlocksData {
             return Ok(Some(block));
         }
 
-        let blocks = self.blocks_range(Some(block_number), 1).await?;
+        let blocks = self
+            .blocks_range(Some(block_number), BlockNumber(1))
+            .await?;
         if let Some(block) = blocks.into_iter().next() {
             // Check if this is exactly the requested block.
-            if block.block_number != block_number as i64 {
+            if block.block_number != *block_number as i64 {
                 return Ok(None);
             }
 
@@ -73,13 +75,13 @@ impl ApiBlocksData {
         max_block: Option<BlockNumber>,
         limit: BlockNumber,
     ) -> QueryResult<Vec<records::BlockDetails>> {
-        let max_block = max_block.unwrap_or(BlockNumber::MAX);
+        let max_block = max_block.unwrap_or(BlockNumber(u32::MAX));
 
         let mut storage = self.pool.access_storage().await?;
         storage
             .chain()
             .block_schema()
-            .load_block_range(max_block, limit)
+            .load_block_range(max_block, *limit)
             .await
     }
 
@@ -104,7 +106,7 @@ pub(super) mod convert {
 
     pub fn block_info_from_details(inner: records::BlockDetails) -> BlockInfo {
         BlockInfo {
-                block_number: inner.block_number as BlockNumber,
+                block_number: BlockNumber(inner.block_number as u32),
                 new_state_root: Fr::from_bytes(&inner.new_state_root).unwrap_or_else(|err| {
                     panic!(
                         "Database provided an incorrect new_state_root field: {:?}, an error occurred {}",
@@ -143,7 +145,7 @@ pub(super) mod convert {
                     inner.tx_hash, err
                 )
             }),
-            block_number: inner.block_number as BlockNumber,
+            block_number: BlockNumber(inner.block_number as u32),
             op: inner.op,
             success: inner.success,
             fail_reason: inner.fail_reason,
@@ -205,7 +207,7 @@ async fn blocks_range(
     let range = if let Pagination::After(after) = pagination {
         range
             .into_iter()
-            .filter(|block| block.block_number > after as i64)
+            .filter(|block| block.block_number > *after as i64)
             .map(convert::block_info_from_details)
             .collect()
     } else {
@@ -250,7 +252,7 @@ mod tests {
             let blocks = storage
                 .chain()
                 .block_schema()
-                .load_block_range(10, 10)
+                .load_block_range(BlockNumber(10), 10)
                 .await?;
 
             blocks
@@ -259,14 +261,26 @@ mod tests {
                 .collect()
         };
 
-        assert_eq!(client.block_by_id(1).await?.unwrap(), blocks[7]);
-        assert_eq!(client.blocks_range(Pagination::Last, 10).await?, blocks);
         assert_eq!(
-            client.blocks_range(Pagination::Before(2), 5).await?,
+            client.block_by_id(BlockNumber(1)).await?.unwrap(),
+            blocks[7]
+        );
+        assert_eq!(
+            client
+                .blocks_range(Pagination::Last, BlockNumber(10))
+                .await?,
+            blocks
+        );
+        assert_eq!(
+            client
+                .blocks_range(Pagination::Before(BlockNumber(2)), BlockNumber(5))
+                .await?,
             &blocks[7..8]
         );
         assert_eq!(
-            client.blocks_range(Pagination::After(7), 5).await?,
+            client
+                .blocks_range(Pagination::After(BlockNumber(7)), BlockNumber(5))
+                .await?,
             &blocks[0..1]
         );
 
@@ -277,7 +291,7 @@ mod tests {
             let transactions = storage
                 .chain()
                 .block_schema()
-                .get_block_transactions(1)
+                .get_block_transactions(BlockNumber(1))
                 .await?;
 
             transactions
@@ -285,8 +299,11 @@ mod tests {
                 .map(convert::transaction_info_from_transaction_item)
                 .collect()
         };
-        assert_eq!(client.block_transactions(1).await?, expected_txs);
-        assert_eq!(client.block_transactions(6).await?, vec![]);
+        assert_eq!(
+            client.block_transactions(BlockNumber(1)).await?,
+            expected_txs
+        );
+        assert_eq!(client.block_transactions(BlockNumber(6)).await?, vec![]);
 
         server.stop().await;
         Ok(())

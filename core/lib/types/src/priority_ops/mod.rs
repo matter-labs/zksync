@@ -76,23 +76,35 @@ impl ZkSyncPriorityOp {
             DepositOp::OP_CODE => {
                 let pub_data_left = pub_data;
 
-                ensure!(pub_data_left.len() >= TX_TYPE_BIT_WIDTH / 8);
+                ensure!(
+                    pub_data_left.len() >= TX_TYPE_BIT_WIDTH / 8,
+                    "pub_data_left too short"
+                );
                 let (_, pub_data_left) = pub_data_left.split_at(TX_TYPE_BIT_WIDTH / 8);
 
                 // account_id
-                ensure!(pub_data_left.len() >= ACCOUNT_ID_BIT_WIDTH / 8);
+                ensure!(
+                    pub_data_left.len() >= ACCOUNT_ID_BIT_WIDTH / 8,
+                    "pub_data_left too short"
+                );
                 let (_, pub_data_left) = pub_data_left.split_at(ACCOUNT_ID_BIT_WIDTH / 8);
 
                 // token
                 let (token, pub_data_left) = {
-                    ensure!(pub_data_left.len() >= TOKEN_BIT_WIDTH / 8);
+                    ensure!(
+                        pub_data_left.len() >= TOKEN_BIT_WIDTH / 8,
+                        "pub_data_left too short"
+                    );
                     let (token, left) = pub_data_left.split_at(TOKEN_BIT_WIDTH / 8);
                     (u16::from_be_bytes(token.try_into().unwrap()), left)
                 };
 
                 // amount
                 let (amount, pub_data_left) = {
-                    ensure!(pub_data_left.len() >= BALANCE_BIT_WIDTH / 8);
+                    ensure!(
+                        pub_data_left.len() >= BALANCE_BIT_WIDTH / 8,
+                        "pub_data_left too short"
+                    );
                     let (amount, left) = pub_data_left.split_at(BALANCE_BIT_WIDTH / 8);
                     let amount = u128::from_be_bytes(amount.try_into().unwrap());
                     (BigUint::from(amount), left)
@@ -100,7 +112,10 @@ impl ZkSyncPriorityOp {
 
                 // account
                 let (account, pub_data_left) = {
-                    ensure!(pub_data_left.len() >= FR_ADDRESS_LEN);
+                    ensure!(
+                        pub_data_left.len() >= FR_ADDRESS_LEN,
+                        "pub_data_left too short"
+                    );
                     let (account, left) = pub_data_left.split_at(FR_ADDRESS_LEN);
                     (Address::from_slice(account), left)
                 };
@@ -112,32 +127,44 @@ impl ZkSyncPriorityOp {
 
                 Ok(Self::Deposit(Deposit {
                     from: sender,
-                    token,
+                    token: TokenId(token),
                     amount,
                     to: account,
                 }))
             }
             FullExitOp::OP_CODE => {
-                ensure!(pub_data.len() >= TX_TYPE_BIT_WIDTH / 8);
+                ensure!(
+                    pub_data.len() >= TX_TYPE_BIT_WIDTH / 8,
+                    "pub_data_left too short"
+                );
                 let (_, pub_data_left) = pub_data.split_at(TX_TYPE_BIT_WIDTH / 8);
 
                 // account_id
                 let (account_id, pub_data_left) = {
-                    ensure!(pub_data_left.len() >= ACCOUNT_ID_BIT_WIDTH / 8);
+                    ensure!(
+                        pub_data_left.len() >= ACCOUNT_ID_BIT_WIDTH / 8,
+                        "pub_data_left too short"
+                    );
                     let (account_id, left) = pub_data_left.split_at(ACCOUNT_ID_BIT_WIDTH / 8);
                     (u32::from_bytes(account_id).unwrap(), left)
                 };
 
                 // owner
                 let (eth_address, pub_data_left) = {
-                    ensure!(pub_data_left.len() >= ETH_ADDRESS_BIT_WIDTH / 8);
+                    ensure!(
+                        pub_data_left.len() >= ETH_ADDRESS_BIT_WIDTH / 8,
+                        "pub_data_left too short"
+                    );
                     let (eth_address, left) = pub_data_left.split_at(ETH_ADDRESS_BIT_WIDTH / 8);
                     (Address::from_slice(eth_address), left)
                 };
 
                 // token
                 let (token, pub_data_left) = {
-                    ensure!(pub_data_left.len() >= TOKEN_BIT_WIDTH / 8);
+                    ensure!(
+                        pub_data_left.len() >= TOKEN_BIT_WIDTH / 8,
+                        "pub_data_left too short"
+                    );
                     let (token, left) = pub_data_left.split_at(TOKEN_BIT_WIDTH / 8);
                     (u16::from_be_bytes(token.try_into().unwrap()), left)
                 };
@@ -150,9 +177,9 @@ impl ZkSyncPriorityOp {
                 );
 
                 Ok(Self::FullExit(FullExit {
-                    account_id,
+                    account_id: AccountId(account_id),
                     eth_address,
-                    token,
+                    token: TokenId(token),
                 }))
             }
             _ => {

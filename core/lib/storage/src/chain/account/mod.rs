@@ -36,7 +36,7 @@ impl<'a, 'c> AccountSchema<'a, 'c> {
             INSERT INTO eth_account_types VALUES ( $1, $2 )
             ON CONFLICT (account_id) DO UPDATE SET account_type = $2
             "#,
-            i64::from(account_id),
+            i64::from(*account_id),
             account_type as EthAccountType
         )
         .execute(self.0.conn())
@@ -59,7 +59,7 @@ impl<'a, 'c> AccountSchema<'a, 'c> {
             SELECT account_id, account_type as "account_type!: EthAccountType" 
             FROM eth_account_types WHERE account_id = $1
             "#,
-            i64::from(account_id)
+            i64::from(*account_id)
         )
         .fetch_optional(self.0.conn())
         .await?;
@@ -138,7 +138,7 @@ impl<'a, 'c> AccountSchema<'a, 'c> {
                 SELECT * FROM account_balance_updates
                 WHERE account_id = $1 AND block_number > $2
             ",
-            i64::from(account_id),
+            i64::from(*account_id),
             last_block
         )
         .fetch_all(transaction.conn())
@@ -150,7 +150,7 @@ impl<'a, 'c> AccountSchema<'a, 'c> {
                 SELECT * FROM account_creates
                 WHERE account_id = $1 AND block_number > $2
             ",
-            i64::from(account_id),
+            i64::from(*account_id),
             last_block
         )
         .fetch_all(transaction.conn())
@@ -162,7 +162,7 @@ impl<'a, 'c> AccountSchema<'a, 'c> {
                 SELECT * FROM account_pubkey_updates
                 WHERE account_id = $1 AND block_number > $2
             ",
-            i64::from(account_id),
+            i64::from(*account_id),
             last_block
         )
         .fetch_all(transaction.conn())
@@ -240,7 +240,7 @@ impl<'a, 'c> AccountSchema<'a, 'c> {
                 SELECT * FROM accounts
                 WHERE id = $1
             ",
-            i64::from(account_id)
+            i64::from(*account_id)
         )
         .fetch_optional(&mut transaction)
         .await?;
@@ -252,7 +252,7 @@ impl<'a, 'c> AccountSchema<'a, 'c> {
                     SELECT * FROM balances
                     WHERE account_id = $1
                 ",
-                i64::from(account_id)
+                i64::from(*account_id)
             )
             .fetch_all(&mut transaction)
             .await?;
@@ -291,7 +291,7 @@ impl<'a, 'c> AccountSchema<'a, 'c> {
         .fetch_optional(self.0.conn())
         .await?;
 
-        let account_id = result.map(|record| record.account_id as AccountId);
+        let account_id = result.map(|record| AccountId(record.account_id as u32));
         metrics::histogram!("sql.chain.account.account_id_by_address", start.elapsed());
         Ok(account_id)
     }
@@ -304,7 +304,7 @@ impl<'a, 'c> AccountSchema<'a, 'c> {
         // Find the account address in `account_creates` table.
         let result = sqlx::query!(
             "SELECT address FROM account_creates WHERE account_id = $1",
-            i64::from(account_id)
+            i64::from(*account_id)
         )
         .fetch_optional(self.0.conn())
         .await?;

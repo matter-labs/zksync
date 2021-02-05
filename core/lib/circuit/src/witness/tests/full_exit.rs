@@ -3,7 +3,7 @@ use num::BigUint;
 use zksync_crypto::franklin_crypto::bellman::pairing::bn256::Bn256;
 // Workspace deps
 use zksync_state::{handler::TxHandler, state::ZkSyncState};
-use zksync_types::{operations::FullExitOp, FullExit};
+use zksync_types::{operations::FullExitOp, AccountId, FullExit, TokenId};
 // Local deps
 use crate::witness::{
     full_exit::FullExitWitness,
@@ -17,13 +17,13 @@ use crate::witness::{
 #[ignore]
 fn test_full_exit_success() {
     // Input data.
-    let accounts = vec![WitnessTestAccount::new(1, 10)];
+    let accounts = vec![WitnessTestAccount::new(AccountId(1), 10)];
     let account = &accounts[0];
     let full_exit_op = FullExitOp {
         priority_op: FullExit {
             account_id: account.id,
             eth_address: account.account.address,
-            token: 0,
+            token: TokenId(0),
         },
         withdraw_amount: Some(BigUint::from(10u32).into()),
     };
@@ -46,12 +46,12 @@ fn test_full_exit_success() {
 fn test_full_exit_failure_no_account_in_tree() {
     // Input data.
     let accounts = &[];
-    let account = WitnessTestAccount::new_empty(1); // Will not be included into ZkSyncState
+    let account = WitnessTestAccount::new_empty(AccountId(1)); // Will not be included into ZkSyncState
     let full_exit_op = FullExitOp {
         priority_op: FullExit {
             account_id: account.id,
             eth_address: account.account.address,
-            token: 0,
+            token: TokenId(0),
         },
         withdraw_amount: None,
     };
@@ -73,8 +73,8 @@ fn test_full_exit_failure_no_account_in_tree() {
 #[ignore]
 fn test_full_exit_initialted_from_wrong_account_owner() {
     // Input data.
-    let accounts = vec![WitnessTestAccount::new(1, 10)];
-    let invalid_account = WitnessTestAccount::new(2, 10);
+    let accounts = vec![WitnessTestAccount::new(AccountId(1), 10)];
+    let invalid_account = WitnessTestAccount::new(AccountId(2), 10);
     let account = &accounts[0];
     let invalid_account_eth_address = invalid_account.account.address;
     assert!(invalid_account_eth_address != account.account.address);
@@ -82,7 +82,7 @@ fn test_full_exit_initialted_from_wrong_account_owner() {
         priority_op: FullExit {
             account_id: account.id,
             eth_address: invalid_account_eth_address,
-            token: 0,
+            token: TokenId(0),
         },
         withdraw_amount: Some(BigUint::from(0u32).into()),
     };
@@ -118,13 +118,13 @@ fn test_incorrect_full_exit_withdraw_amount() {
 
     for (initial_balance, withdraw_amount, success) in test_vector {
         // Input data.
-        let accounts = vec![WitnessTestAccount::new(1, initial_balance)];
+        let accounts = vec![WitnessTestAccount::new(AccountId(1), initial_balance)];
         let account = &accounts[0];
         let full_exit_op = FullExitOp {
             priority_op: FullExit {
                 account_id: account.id,
                 eth_address: account.account.address,
-                token: 0,
+                token: TokenId(0),
             },
             withdraw_amount: Some(BigUint::from(withdraw_amount).into()),
         };

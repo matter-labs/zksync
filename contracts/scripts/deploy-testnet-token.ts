@@ -1,10 +1,11 @@
 import { deployContract } from 'ethereum-waffle';
-import { ethers, Wallet } from 'ethers';
+import { Wallet } from 'ethers';
 import { readContractCode } from '../src.ts/deploy';
 import { encodeConstructorArgs, publishSourceCodeToEtherscan } from '../src.ts/publish-utils';
 import * as fs from 'fs';
 import * as path from 'path';
 import { ArgumentParser } from 'argparse';
+import { web3Provider } from './utils';
 
 const mainnetTokens = require(`${process.env.ZKSYNC_HOME}/etc/tokens/mainnet`);
 
@@ -25,7 +26,7 @@ async function main() {
     parser.addArgument('--deployerPrivateKey', { required: false, help: 'Wallet used to deploy contracts' });
     const args = parser.parseArgs(process.argv.slice(2));
 
-    const provider = new ethers.providers.JsonRpcProvider(process.env.ETH_CLIENT_WEB3_URL);
+    const provider = web3Provider();
     const wallet = args.deployerPrivateKey
         ? new Wallet(args.deployerPrivateKey, provider)
         : Wallet.fromMnemonic(ethTestConfig.mnemonic, "m/44'/60'/0'/0/1").connect(provider);

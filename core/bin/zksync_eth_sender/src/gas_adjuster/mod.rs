@@ -2,8 +2,9 @@
 use std::{collections::VecDeque, marker::PhantomData, time::Instant};
 // External deps
 use zksync_basic_types::U256;
+use zksync_eth_client::EthereumGateway;
 // Local deps
-use crate::{database::DatabaseInterface, ethereum_interface::EthereumInterface};
+use crate::database::DatabaseInterface;
 
 mod parameters;
 
@@ -20,19 +21,17 @@ mod tests;
 /// gas price for transactions that were not mined by the network
 /// within a reasonable time.
 #[derive(Debug)]
-pub(super) struct GasAdjuster<ETH: EthereumInterface, DB: DatabaseInterface> {
+pub(super) struct GasAdjuster<DB: DatabaseInterface> {
     /// Collected statistics about recently used gas prices.
     statistics: GasStatistics,
     /// Timestamp of the last maximum gas price update.
     last_price_renewal: Instant,
     /// Timestamp of the last sample added to the `statistics`.
     last_sample_added: Instant,
-
-    _etherum_client: PhantomData<ETH>,
     _db: PhantomData<DB>,
 }
 
-impl<ETH: EthereumInterface, DB: DatabaseInterface> GasAdjuster<ETH, DB> {
+impl<DB: DatabaseInterface> GasAdjuster<DB> {
     pub async fn new(db: &DB) -> Self {
         let mut connection = db
             .acquire_connection()
@@ -47,21 +46,20 @@ impl<ETH: EthereumInterface, DB: DatabaseInterface> GasAdjuster<ETH, DB> {
             last_price_renewal: Instant::now(),
             last_sample_added: Instant::now(),
 
-            _etherum_client: PhantomData,
             _db: PhantomData,
         }
     }
 
     async fn get_suggested_price(
         &self,
-        ethereum: &ETH,
+        ethereum: &EthereumGateway,
         old_tx_gas_price: Option<U256>,
     ) -> anyhow::Result<U256> {
         if let Some(price) = self.statistics.get_average_price() {
             return Ok(price);
         }
 
-        let network_price = ethereum.gas_price().await?;
+        let network_price = ethereum.get_gas_price().await?;
         let scaled_price = if let Some(old_price) = old_tx_gas_price {
             // Stuck transaction, scale it up.
             self.scale_up(old_price, network_price)
@@ -76,7 +74,7 @@ impl<ETH: EthereumInterface, DB: DatabaseInterface> GasAdjuster<ETH, DB> {
     /// Replacement price is usually suggested to be at least 10% higher, we make it 15% higher.
     pub async fn get_gas_price(
         &mut self,
-        ethereum: &ETH,
+        ethereum: &EthereumGateway,
         old_tx_gas_price: Option<U256>,
     ) -> anyhow::Result<U256> {
         let scaled_price = self.get_suggested_price(ethereum, old_tx_gas_price).await?;
@@ -86,7 +84,7 @@ impl<ETH: EthereumInterface, DB: DatabaseInterface> GasAdjuster<ETH, DB> {
         if price == self.get_current_max_price() {
             // We're suggesting the max price, so we must notify the log
             // entry about it.
-            log::warn!("Maximum possible gas price will be used: <{}>", price);
+            vlog::warn!("Maximum possible gas price will be used: <{}>", price);
         }
 
         // Report used price to be gathered by the statistics module.
@@ -98,17 +96,17 @@ impl<ETH: EthereumInterface, DB: DatabaseInterface> GasAdjuster<ETH, DB> {
     /// Performs an actualization routine for `GasAdjuster`:
     /// This method is intended to be invoked periodically, and it updates the
     /// current max gas price limit according to the configurable update interval.
-    pub async fn keep_updated(&mut self, ethereum: &ETH, db: &DB) {
+    pub async fn keep_updated(&mut self, ethereum: &EthereumGateway, db: &DB) {
         if self.last_sample_added.elapsed() >= parameters::sample_adding_interval() {
             // Report the current price to be gathered by the statistics module.
-            match ethereum.gas_price().await {
+            match ethereum.get_gas_price().await {
                 Ok(network_price) => {
                     self.statistics.add_sample(network_price);
 
                     self.last_sample_added = Instant::now();
                 }
                 Err(err) => {
-                    log::warn!("Cannot add the sample gas price: {}", err);
+                    vlog::warn!("Cannot add the sample gas price: {}", err);
                 }
             }
         }
@@ -123,7 +121,7 @@ impl<ETH: EthereumInterface, DB: DatabaseInterface> GasAdjuster<ETH, DB> {
             let mut connection = match db.acquire_connection().await {
                 Ok(connection) => connection,
                 Err(err) => {
-                    log::warn!("Cannot update the gas limit value in the database: {}", err);
+                    vlog::warn!("Cannot update the gas limit value in the database: {}", err);
                     return;
                 }
             };
@@ -138,7 +136,7 @@ impl<ETH: EthereumInterface, DB: DatabaseInterface> GasAdjuster<ETH, DB> {
             if let Err(err) = result {
                 // Inability of update the value in the DB is not critical as it's not
                 // an essential logic part, so just report the error to the log.
-                log::warn!("Cannot update the gas limit value in the database: {}", err);
+                vlog::warn!("Cannot update the gas limit value in the database: {}", err);
             }
         }
     }

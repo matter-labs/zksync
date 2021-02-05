@@ -3,7 +3,7 @@ use std::str::FromStr;
 // Workspace deps
 use zksync_storage::{data_restore::records::NewBlockEvent, StorageProcessor};
 use zksync_types::{
-    Action, Operation, Token, TokenGenesisListItem, TokenId,
+    AccountId, Action, BlockNumber, Operation, Token, TokenGenesisListItem, TokenId,
     {block::Block, AccountUpdate, AccountUpdates, ZkSyncOp},
 };
 
@@ -60,7 +60,7 @@ impl<'a> DatabaseStorageInteractor<'a> {
 #[async_trait::async_trait]
 impl StorageInteractor for DatabaseStorageInteractor<'_> {
     async fn save_rollup_ops(&mut self, blocks: &[RollupOpsBlock]) {
-        let mut ops: Vec<(u32, &ZkSyncOp, u32)> = vec![];
+        let mut ops: Vec<(BlockNumber, &ZkSyncOp, AccountId)> = vec![];
 
         for block in blocks {
             for op in &block.ops {
@@ -160,7 +160,7 @@ impl StorageInteractor for DatabaseStorageInteractor<'_> {
             .await
             .expect("Cant load comitted state");
         assert!(
-            _last_committed == 0 && _accounts.is_empty(),
+            *_last_committed == 0 && _accounts.is_empty(),
             "db should be empty"
         );
         self.storage

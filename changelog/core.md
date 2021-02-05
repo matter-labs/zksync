@@ -4,29 +4,40 @@ All notable changes to the core components will be documented in this file.
 
 ## Unreleased
 
+### Removed
+
 ### Changed
 
-- The fee for normal transfers is set as expensive as the fee for transfer_to_new.
+### Added
 
-## Unreleased
+### Fixed
 
-- Removed the limitation on the number of withdrawals in the block.
-- (`FeeTicker`): Increased gas price estimate for transaction.
+## Release 2021-02-02
 
 ### Removed
 
 - `MetricsCounter` structure was removed because it is not used.
+- The limit on the number of withdrawals in the block.
 
 ### Changed
 
+- Type aliases (`TokenId`, `AccountId`, `Nonce`, `BlockNumber`, `PriorityOpId`, `EthBlockId`) are replaced with wrapper
+  structures.
 - `prometheus_exporter` was made a library to be used by several crates.
 - `prover_run_for_next_commit` function uses a parameterized timeout instead of a hard-coded one.
+- (`storage`): `action_type` column type in db is changed from `text` to `enum` for optimization.
+- (`FeeTicker`): Increased gas price estimate for transaction.
+- (`loadtest`): Scenario execution was made parallel.
+- Increased completeWithdrawal gas limit, that decreased the chance of the users to face the out-of-gas error
 
 ### Added
 
 - `prometheus_exporter` is launched by every microservice.
+- `tokens_acceptable_for_fees` endpoint that returns the list of tokens acceptable for fees was added to REST API v0.1.
 
 ### Fixed
+
+- (`FeeTicker`): Performance for getting the batch fee was heavily optimized.
 
 ## Release 2021-01-12
 

@@ -2,7 +2,6 @@ use crate::eth_account::EthereumAccount;
 use crate::zksync_account::ZkSyncAccount;
 use num::BigUint;
 use web3::types::{TransactionReceipt, U64};
-use web3::Transport;
 use zksync_crypto::rand::Rng;
 use zksync_types::{AccountId, Address, Nonce, PriorityOp, TokenId, ZkSyncTx};
 
@@ -12,12 +11,12 @@ use zksync_types::tx::TimeRange;
 /// Account set is used to create transactions using stored account
 /// in a convenient way
 #[derive(Clone)]
-pub struct AccountSet<T: Transport> {
-    pub eth_accounts: Vec<EthereumAccount<T>>,
+pub struct AccountSet {
+    pub eth_accounts: Vec<EthereumAccount>,
     pub zksync_accounts: Vec<ZkSyncAccount>,
     pub fee_account_id: ZKSyncAccountId,
 }
-impl<T: Transport> AccountSet<T> {
+impl AccountSet {
     /// Create deposit from eth account to zksync account
     pub async fn deposit(
         &self,

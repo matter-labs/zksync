@@ -26,8 +26,8 @@ use zksync_types::{
     helpers::{apply_updates, closest_packable_fee_amount, closest_packable_token_amount},
     operations::{ChangePubKeyOp, TransferToNewOp},
     AccountId, AccountMap, Action, Address, BlockNumber, Deposit, DepositOp, ExecutedOperations,
-    ExecutedPriorityOp, ExecutedTx, FullExit, FullExitOp, PriorityOp, Token, Transfer, TransferOp,
-    ZkSyncOp, ZkSyncTx, H256,
+    ExecutedPriorityOp, ExecutedTx, FullExit, FullExitOp, Nonce, PriorityOp, Token, TokenId,
+    Transfer, TransferOp, ZkSyncOp, ZkSyncTx, H256,
 };
 
 // Local uses
@@ -39,10 +39,10 @@ pub const VERIFIED_OP_SERIAL_ID: u64 = 10;
 pub const COMMITTED_OP_SERIAL_ID: u64 = 243;
 /// Number of committed blocks.
 #[allow(dead_code)]
-pub const COMMITTED_BLOCKS_COUNT: BlockNumber = 8;
+pub const COMMITTED_BLOCKS_COUNT: BlockNumber = BlockNumber(8);
 /// Number of verified blocks.
 #[allow(dead_code)]
-pub const VERIFIED_BLOCKS_COUNT: BlockNumber = 3;
+pub const VERIFIED_BLOCKS_COUNT: BlockNumber = BlockNumber(3);
 
 #[derive(Debug, Clone)]
 pub struct TestServerConfig {
@@ -83,7 +83,7 @@ impl TestServerConfig {
 
     /// Creates several transactions and the corresponding executed operations.
     pub fn gen_zk_txs(fee: u64) -> TestTransactions {
-        Self::gen_zk_txs_for_account(0xdead, ZkSyncAccount::rand().address, fee)
+        Self::gen_zk_txs_for_account(AccountId(0xdead), ZkSyncAccount::rand().address, fee)
     }
 
     /// Creates several transactions and the corresponding executed operations for the
@@ -94,7 +94,7 @@ impl TestServerConfig {
         fee: u64,
     ) -> TestTransactions {
         let from = ZkSyncAccount::rand();
-        from.set_account_id(Some(0xf00d));
+        from.set_account_id(Some(AccountId(0xf00d)));
 
         let mut to = ZkSyncAccount::rand();
         to.set_account_id(Some(account_id));
@@ -104,8 +104,14 @@ impl TestServerConfig {
 
         // Sign change pubkey tx pair
         {
-            let tx =
-                from.sign_change_pubkey_tx(None, false, 0, fee.into(), false, Default::default());
+            let tx = from.sign_change_pubkey_tx(
+                None,
+                false,
+                TokenId(0),
+                fee.into(),
+                false,
+                Default::default(),
+            );
 
             let zksync_op = ZkSyncOp::ChangePubKeyOffchain(Box::new(ChangePubKeyOp {
                 tx: tx.clone(),
@@ -131,7 +137,7 @@ impl TestServerConfig {
         {
             let tx = from
                 .sign_transfer(
-                    0,
+                    TokenId(0),
                     "ETH",
                     closest_packable_token_amount(&10_u64.into()),
                     closest_packable_fee_amount(&fee.into()),
@@ -205,10 +211,10 @@ impl TestServerConfig {
                 to.get_account_id().unwrap(),
                 to.address,
                 from.address,
-                0,
+                TokenId(0),
                 2_u64.into(),
                 fee.into(),
-                0,
+                Nonce(0),
                 Default::default(),
                 None,
             );
@@ -242,35 +248,41 @@ impl TestServerConfig {
         todo!();
 
         // static INITED: Lazy<Mutex<bool>> = Lazy::new(|| Mutex::new(false));
-
+        //
         // // Hold this guard until transaction will be committed to avoid double init.
         // let mut inited_guard = INITED.lock().await;
         // if *inited_guard {
         //     return Ok(());
         // }
         // *inited_guard = true;
-
+        //
         // let mut storage = self.pool.access_storage().await?;
-
+        //
         // // Check if database is been already inited.
-        // if storage.chain().block_schema().get_block(1).await?.is_some() {
+        // if storage
+        //     .chain()
+        //     .block_schema()
+        //     .get_block(BlockNumber(1))
+        //     .await?
+        //     .is_some()
+        // {
         //     return Ok(());
         // }
-
+        //
         // // Make changes atomic.
         // let mut storage = storage.start_transaction().await?;
-
+        //
         // // Below lies the initialization of the data for the test.
         // let mut rng = XorShiftRng::from_seed([0, 1, 2, 3]);
-
+        //
         // // Required since we use `EthereumSchema` in this test.
         // storage.ethereum_schema().initialize_eth_data().await?;
-
+        //
         // // Insert PHNX token
         // storage
         //     .tokens_schema()
         //     .store_token(Token::new(
-        //         1,
+        //         TokenId(1),
         //         Address::from_str("38A2fDc11f526Ddd5a607C1F251C065f40fBF2f7").unwrap(),
         //         "PHNX",
         //         18,
@@ -280,26 +292,27 @@ impl TestServerConfig {
         // storage
         //     .tokens_schema()
         //     .store_token(Token::new(
-        //         16,
+        //         TokenId(16),
         //         Address::from_str("d94e3dc39d4cad1dad634e7eb585a57a19dc7efe").unwrap(),
         //         "GNT",
         //         18,
         //     ))
         //     .await?;
-
+        //
         // let mut accounts = AccountMap::default();
-
+        //
         // // Create and apply several blocks to work with.
-        // for block_number in 1..=COMMITTED_BLOCKS_COUNT {
+        // for block_number in 1..=*COMMITTED_BLOCKS_COUNT {
+        //     let block_number = BlockNumber(block_number);
         //     let updates = (0..3)
         //         .flat_map(|_| gen_acc_random_updates(&mut rng))
         //         .collect::<Vec<_>>();
         //     apply_updates(&mut accounts, updates.clone());
-
+        //
         //     // Add transactions to every odd block.
-        //     let txs = if block_number % 2 == 1 {
+        //     let txs = if *block_number % 2 == 1 {
         //         let (&id, account) = accounts.iter().next().unwrap();
-
+        //
         //         Self::gen_zk_txs_for_account(id, account.address, 1_000)
         //             .txs
         //             .into_iter()
@@ -308,14 +321,14 @@ impl TestServerConfig {
         //     } else {
         //         vec![]
         //     };
-
+        //
         //     // Storage transactions in the block schema.
         //     storage
         //         .chain()
         //         .block_schema()
         //         .save_block_transactions(block_number, txs.clone())
         //         .await?;
-
+        //
         //     // Store the commit operation in the block schema.
         //     let operation = storage
         //         .chain()
@@ -332,7 +345,7 @@ impl TestServerConfig {
         //         .state_schema()
         //         .commit_state_update(block_number, &updates, 0)
         //         .await?;
-
+        //
         //     // Store & confirm the operation in the ethereum schema, as it's used for obtaining
         //     // commit/verify hashes.
         //     let ethereum_op_id = operation.id.unwrap() as i64;
@@ -355,7 +368,7 @@ impl TestServerConfig {
         //         .ethereum_schema()
         //         .confirm_eth_tx(&eth_tx_hash)
         //         .await?;
-
+        //
         //     // Add verification for the block if required.
         //     if block_number <= VERIFIED_BLOCKS_COUNT {
         //         storage
@@ -373,7 +386,7 @@ impl TestServerConfig {
         //                 BLOCK_SIZE_CHUNKS,
         //             ))
         //             .await?;
-
+        //
         //         let ethereum_op_id = operation.id.unwrap() as i64;
         //         let eth_tx_hash = dummy_ethereum_tx_hash(ethereum_op_id);
         //         let response = storage
@@ -396,7 +409,7 @@ impl TestServerConfig {
         //             .await?;
         //     }
         // }
-
+        //
         // // Store priority operations for some tests.
         // let ops = vec![
         //     // Verified priority operation.
@@ -404,7 +417,7 @@ impl TestServerConfig {
         //         block_number: 2,
         //         block_index: 2,
         //         operation: serde_json::to_value(
-        //             dummy_deposit_op(Address::default(), 1, VERIFIED_OP_SERIAL_ID, 2).op,
+        //             dummy_deposit_op(Address::default(), AccountId(1), VERIFIED_OP_SERIAL_ID, 2).op,
         //         )
         //         .unwrap(),
         //         from_account: Default::default(),
@@ -419,10 +432,11 @@ impl TestServerConfig {
         //     },
         //     // Committed priority operation.
         //     NewExecutedPriorityOperation {
-        //         block_number: VERIFIED_BLOCKS_COUNT as i64 + 1,
+        //         block_number: *VERIFIED_BLOCKS_COUNT as i64 + 1,
         //         block_index: 1,
         //         operation: serde_json::to_value(
-        //             dummy_full_exit_op(1, Address::default(), COMMITTED_OP_SERIAL_ID, 3).op,
+        //             dummy_full_exit_op(AccountId(1), Address::default(), COMMITTED_OP_SERIAL_ID, 3)
+        //                 .op,
         //         )
         //         .unwrap(),
         //         from_account: Default::default(),
@@ -436,7 +450,7 @@ impl TestServerConfig {
         //         created_at: chrono::Utc::now(),
         //     },
         // ];
-
+        //
         // for op in ops {
         //     storage
         //         .chain()
@@ -444,7 +458,7 @@ impl TestServerConfig {
         //         .store_executed_priority_op(op)
         //         .await?;
         // }
-
+        //
         // // Get the accounts by their IDs.
         // for (account_id, _account) in accounts {
         //     let account_state = storage
@@ -452,19 +466,19 @@ impl TestServerConfig {
         //         .account_schema()
         //         .account_state_by_id(account_id)
         //         .await?;
-
+        //
         //     // Check that committed state is available.
         //     assert!(
         //         account_state.committed.is_some(),
         //         "No committed state for account"
         //     );
         // }
-
+        //
         // storage.commit().await?;
         // // Storage has been inited, so we can safely drop this guard.
         // drop(inited_guard);
-
-        Ok(())
+        //
+        // Ok(())
     }
 }
 
@@ -478,7 +492,7 @@ pub fn dummy_deposit_op(
     let deposit_op = ZkSyncOp::Deposit(Box::new(DepositOp {
         priority_op: Deposit {
             from: address,
-            token: 0,
+            token: TokenId(0),
             amount: 1_u64.into(),
             to: address,
         },
@@ -510,7 +524,7 @@ pub fn dummy_full_exit_op(
         priority_op: FullExit {
             account_id,
             eth_address,
-            token: 0,
+            token: TokenId(0),
         },
         withdraw_amount: None,
     }));

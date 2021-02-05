@@ -8,7 +8,7 @@ use futures::future;
 use jsonrpc_core::Params;
 use num::BigUint;
 use serde_json::{json, Value};
-use web3::types::{BlockNumber, Bytes};
+use web3::types::{BlockNumber as Web3BlockNumber, Bytes};
 use web3::{contract::tokens::Tokenize, types::Transaction, RequestId, Transport};
 
 use db_test_macro::test as db_test;
@@ -18,8 +18,9 @@ use zksync_storage::{
     chain::account::AccountSchema, data_restore::DataRestoreSchema, StorageProcessor,
 };
 use zksync_types::{
-    block::Block, Address, Deposit, DepositOp, ExecutedOperations, ExecutedPriorityOp, ExecutedTx,
-    Log, PriorityOp, Withdraw, WithdrawOp, ZkSyncOp, H256,
+    block::Block, AccountId, Address, BlockNumber, Deposit, DepositOp, ExecutedOperations,
+    ExecutedPriorityOp, ExecutedTx, Log, Nonce, PriorityOp, TokenId, Withdraw, WithdrawOp,
+    ZkSyncOp, H256,
 };
 
 use crate::contract::ZkSyncDeployedContract;
@@ -33,7 +34,7 @@ use crate::{
 use web3::api::{Eth, Namespace};
 
 fn create_withdraw_operations(
-    account_id: u32,
+    account_id: AccountId,
     from: Address,
     to: Address,
     amount: u32,
@@ -43,10 +44,10 @@ fn create_withdraw_operations(
             account_id,
             from,
             to,
-            0,
+            TokenId(0),
             amount.into(),
             0u32.into(),
-            0,
+            Nonce(0),
             Default::default(),
             None,
         ),
@@ -68,11 +69,11 @@ fn create_deposit(from: Address, to: Address, amount: u32) -> ExecutedOperations
     let deposit_op = ZkSyncOp::Deposit(Box::new(DepositOp {
         priority_op: Deposit {
             from,
-            token: 0,
+            token: TokenId(0),
             amount: amount.into(),
             to,
         },
-        account_id: 0,
+        account_id: AccountId(0),
     }));
     let priority_operation = PriorityOp {
         serial_id: 0,
@@ -90,11 +91,11 @@ fn create_deposit(from: Address, to: Address, amount: u32) -> ExecutedOperations
     ExecutedOperations::PriorityOp(Box::new(executed_deposit_op))
 }
 
-fn create_block(block_number: u32, transactions: Vec<ExecutedOperations>) -> Block {
+fn create_block(block_number: BlockNumber, transactions: Vec<ExecutedOperations>) -> Block {
     Block::new(
         block_number,
         Fr::default(),
-        0,
+        AccountId(0),
         transactions,
         (0, 0),
         100,
@@ -112,8 +113,8 @@ fn create_transaction(number: u32, block: Block) -> Transaction {
     let witness_data = block.get_eth_witness_data();
     let fake_data = [0u8; 4];
     let params = (
-        u64::from(block.block_number),
-        u64::from(block.fee_account),
+        u64::from(*block.block_number),
+        u64::from(*block.fee_account),
         vec![root],
         public_data,
         witness_data.0,
@@ -127,8 +128,8 @@ fn create_transaction(number: u32, block: Block) -> Transaction {
         hash,
         nonce: u32_to_32bytes(1).into(),
         block_hash: Some(u32_to_32bytes(100).into()),
-        block_number: Some(block.block_number.into()),
-        transaction_index: Some(block.block_number.into()),
+        block_number: Some((*block.block_number).into()),
+        transaction_index: Some((*block.block_number).into()),
         from: [5u8; 20].into(),
         to: Some([7u8; 20].into()),
         value: u32_to_32bytes(10).into(),
@@ -326,16 +327,16 @@ async fn test_run_state_update(mut storage: StorageProcessor<'_>) {
         create_transaction(
             1,
             create_block(
-                1,
+                BlockNumber(1),
                 vec![create_deposit(Default::default(), Default::default(), 50)],
             ),
         ),
         create_transaction(
             2,
             create_block(
-                2,
+                BlockNumber(2),
                 vec![create_withdraw_operations(
-                    0,
+                    AccountId(0),
                     Default::default(),
                     Default::default(),
                     10,
@@ -359,8 +360,8 @@ async fn test_run_state_update(mut storage: StorageProcessor<'_>) {
         .push(ZkSyncDeployedContract::version3(
             eth,
             [1u8; 20].into(),
-            BlockNumber::Earliest,
-            BlockNumber::Latest,
+            Web3BlockNumber::Earliest,
+            Web3BlockNumber::Latest,
         ));
     driver.run_state_update(&mut interactor).await;
 
@@ -371,7 +372,7 @@ async fn test_run_state_update(mut storage: StorageProcessor<'_>) {
         .unwrap()
         .verified
         .unwrap();
-    let balance = account.get_balance(0);
+    let balance = account.get_balance(TokenId(0));
 
     assert_eq!(BigUint::from(40u32), balance);
     assert_eq!(driver.events_state.committed_events.len(), 2);
@@ -398,14 +399,14 @@ async fn test_run_state_update(mut storage: StorageProcessor<'_>) {
         .push(ZkSyncDeployedContract::version3(
             eth,
             [1u8; 20].into(),
-            BlockNumber::Earliest,
-            BlockNumber::Latest,
+            Web3BlockNumber::Earliest,
+            Web3BlockNumber::Latest,
         ));
 
     // Load state from db and check it
     assert!(driver.load_state_from_storage(&mut interactor).await);
     assert_eq!(driver.events_state.committed_events.len(), events.len());
-    assert_eq!(driver.tree_state.state.block_number, 2)
+    assert_eq!(*driver.tree_state.state.block_number, 2)
 }
 
 #[tokio::test]
@@ -492,16 +493,16 @@ async fn test_with_inmemory_storage() {
         create_transaction(
             1,
             create_block(
-                1,
+                BlockNumber(1),
                 vec![create_deposit(Default::default(), Default::default(), 50)],
             ),
         ),
         create_transaction(
             2,
             create_block(
-                2,
+                BlockNumber(2),
                 vec![create_withdraw_operations(
-                    0,
+                    AccountId(0),
                     Default::default(),
                     Default::default(),
                     10,
@@ -526,8 +527,8 @@ async fn test_with_inmemory_storage() {
         .push(ZkSyncDeployedContract::version3(
             eth,
             [1u8; 20].into(),
-            BlockNumber::Earliest,
-            BlockNumber::Latest,
+            Web3BlockNumber::Earliest,
+            Web3BlockNumber::Latest,
         ));
 
     driver.run_state_update(&mut interactor).await;
@@ -536,7 +537,7 @@ async fn test_with_inmemory_storage() {
     let (_, account) = interactor
         .get_account_by_address(&Default::default())
         .unwrap();
-    let balance = account.get_balance(0);
+    let balance = account.get_balance(TokenId(0));
 
     assert_eq!(BigUint::from(40u32), balance);
     assert_eq!(driver.events_state.committed_events.len(), 2);
@@ -560,12 +561,12 @@ async fn test_with_inmemory_storage() {
         .push(ZkSyncDeployedContract::version3(
             eth,
             [1u8; 20].into(),
-            BlockNumber::Earliest,
-            BlockNumber::Latest,
+            Web3BlockNumber::Earliest,
+            Web3BlockNumber::Latest,
         ));
 
     // Load state from db and check it
     assert!(driver.load_state_from_storage(&mut interactor).await);
     assert_eq!(driver.events_state.committed_events.len(), events.len());
-    assert_eq!(driver.tree_state.state.block_number, 2)
+    assert_eq!(*driver.tree_state.state.block_number, 2)
 }

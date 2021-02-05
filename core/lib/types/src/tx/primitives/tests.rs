@@ -5,17 +5,17 @@ use anyhow::Result;
 use zksync_basic_types::Address;
 use zksync_utils::format_units;
 // Local uses
-use crate::{tx::*, Token, Transfer, Withdraw, ZkSyncTx};
+use crate::{tx::*, AccountId, Nonce, Token, TokenId, Transfer, Withdraw, ZkSyncTx};
 
 fn get_transfer() -> Transfer {
     Transfer::new(
-        4242,
+        AccountId(4242),
         Address::from_str("2e46cd9538248826ede540012c0e8d13f223d587").unwrap(),
         Address::random(),
-        0,
+        TokenId(0),
         500u32.into(),
         0u32.into(),
-        0,
+        Nonce(0),
         Default::default(),
         None,
     )
@@ -23,13 +23,13 @@ fn get_transfer() -> Transfer {
 
 fn get_withdraw() -> Withdraw {
     Withdraw::new(
-        33,
+        AccountId(33),
         Address::from_str("8971d4b0ec2bc8324238c25f2516e9d823b7077b").unwrap(),
         Address::random(),
-        0,
+        TokenId(0),
         100u32.into(),
         10u32.into(),
-        12,
+        Nonce(12),
         Default::default(),
         None,
     )
@@ -37,12 +37,12 @@ fn get_withdraw() -> Withdraw {
 
 fn get_change_pub_key() -> ChangePubKey {
     ChangePubKey::new(
-        123,
+        AccountId(123),
         Address::from_str("b9154aec27863a01d085d257f238f755a728f4e5").unwrap(),
         Default::default(),
-        0,
+        TokenId(0),
         Default::default(),
-        13,
+        Nonce(13),
         Default::default(),
         None,
         None,
@@ -58,7 +58,7 @@ fn test_empty_batch() {
 /// Checks the correctness of the message `EthBatchSignData::new()` returns.
 #[test]
 fn test_batch_message() -> Result<()> {
-    let token = Token::new(0, Default::default(), "ETH", 18);
+    let token = Token::new(TokenId(0), Default::default(), "ETH", 18);
     let transfer = get_transfer();
     let withdraw = get_withdraw();
     let change_pub_key = get_change_pub_key();

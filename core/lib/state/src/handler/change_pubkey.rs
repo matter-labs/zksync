@@ -70,7 +70,7 @@ impl TxHandler<ChangePubKey> for ZkSyncState {
 
         // Update nonce.
         ensure!(op.tx.nonce == account.nonce, "Nonce mismatch");
-        account.nonce += 1;
+        *account.nonce += 1;
 
         // Update pubkey hash.
         account.pub_key_hash = op.tx.new_pk_hash;

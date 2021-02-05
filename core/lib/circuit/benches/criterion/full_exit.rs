@@ -4,7 +4,7 @@ use criterion::{black_box, criterion_group, Bencher, BenchmarkId, Criterion};
 use num::BigUint;
 use zksync_circuit::witness::Witness;
 use zksync_crypto::franklin_crypto::bellman::pairing::bn256::Bn256;
-use zksync_types::{FullExit, FullExitOp};
+use zksync_types::{FullExit, FullExitOp, TokenId};
 
 use zksync_circuit::witness::full_exit::FullExitWitness;
 
@@ -18,7 +18,7 @@ fn full_exit_apply_tx(b: &mut Bencher<'_>, number_of_accounts: &usize) {
         priority_op: FullExit {
             account_id: account.id,
             eth_address: account.account.address,
-            token: 0,
+            token: TokenId(0),
         },
         withdraw_amount: Some(BigUint::from(10u32).into()),
     };
@@ -38,7 +38,7 @@ fn full_exit_get_pubdata(b: &mut Bencher<'_>) {
         priority_op: FullExit {
             account_id: account.id,
             eth_address: account.account.address,
-            token: 0,
+            token: TokenId(0),
         },
         withdraw_amount: Some(BigUint::from(10u32).into()),
     };
@@ -58,7 +58,7 @@ fn full_exit_calculate_operations(b: &mut Bencher<'_>) {
         priority_op: FullExit {
             account_id: account.id,
             eth_address: account.account.address,
-            token: 0,
+            token: TokenId(0),
         },
         withdraw_amount: Some(BigUint::from(10u32).into()),
     };

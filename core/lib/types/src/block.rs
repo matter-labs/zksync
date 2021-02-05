@@ -355,8 +355,8 @@ impl Block {
         public_data: &[u8],
     ) -> H256 {
         let mut hash_arg = vec![0u8; 64];
-        U256::from(block_number).to_big_endian(&mut hash_arg[0..32]);
-        U256::from(fee_account).to_big_endian(&mut hash_arg[32..]);
+        U256::from(*block_number).to_big_endian(&mut hash_arg[0..32]);
+        U256::from(*fee_account).to_big_endian(&mut hash_arg[32..]);
         hash_arg = sha256(&hash_arg).to_vec();
 
         hash_arg.extend_from_slice(&old_state_hash.as_bytes());

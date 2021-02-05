@@ -31,6 +31,7 @@ use zksync_types::aggregated_operations::{
 use zksync_types::prover::{
     ProverJobType, AGGREGATED_PROOF_JOB_PRIORITY, SINGLE_PROOF_JOB_PRIORITY,
 };
+use zksync_types::BlockNumber;
 use zksync_utils::panic_notify::ThreadPanicNotify;
 
 #[cfg(test)]
@@ -119,7 +120,7 @@ async fn get_job<DB: DatabaseInterface>(
     data: web::Data<AppState<DB>>,
     r: web::Json<ProverInputRequest>,
 ) -> actix_web::Result<HttpResponse> {
-    log::trace!("request block to prove from worker: {}", r.prover_name);
+    vlog::trace!("request block to prove from worker: {}", r.prover_name);
     if r.prover_name.is_empty() {
         return Err(actix_web::error::ErrorBadRequest("empty name"));
     }
@@ -133,7 +134,7 @@ async fn get_job<DB: DatabaseInterface>(
             actix_web::error::ErrorInternalServerError("storage layer error")
         })?;
     if let Some(prover_job) = ret {
-        log::info!("satisfied request to prove from worker");
+        vlog::info!("satisfied request to prove from worker");
         Ok(HttpResponse::Ok().json(ProverInputResponse {
             job_id: prover_job.job_id,
             first_block: prover_job.first_block,
@@ -146,8 +147,8 @@ async fn get_job<DB: DatabaseInterface>(
     } else {
         Ok(HttpResponse::Ok().json(ProverInputResponse {
             job_id: 0,
-            first_block: 0,
-            last_block: 0,
+            first_block: BlockNumber(0),
+            last_block: BlockNumber(0),
             data: None,
         }))
     }
@@ -159,7 +160,7 @@ async fn working_on<DB: DatabaseInterface>(
 ) -> actix_web::Result<HttpResponse> {
     // These heartbeats aren't really important, as they're sent
     // continuously while prover is performing computations.
-    log::trace!("Received heartbeat for prover_run with id: {}", r.job_id);
+    vlog::trace!("Received heartbeat for prover_run with id: {}", r.job_id);
     let mut storage = data
         .access_storage()
         .await
@@ -185,7 +186,7 @@ async fn publish<DB: DatabaseInterface>(
         .map_err(actix_web::error::ErrorInternalServerError)?;
     let storage_result = match &r.data {
         JobResultData::BlockProof(single_proof) => {
-            log::info!(
+            vlog::info!(
                 "Received a proof for job: {}, single block: {}",
                 r.job_id,
                 r.first_block
@@ -195,7 +196,7 @@ async fn publish<DB: DatabaseInterface>(
                 .await
         }
         JobResultData::AggregatedBlockProof(aggregated_proof) => {
-            log::info!(
+            vlog::info!(
                 "Received a proof for job: {}, aggregated blocks: [{},{}]",
                 r.job_id,
                 r.first_block,
@@ -234,7 +235,7 @@ async fn stopped<DB: DatabaseInterface>(
         .await
         .map_err(actix_web::error::ErrorInternalServerError)?;
 
-    log::info!(
+    vlog::info!(
         "Prover instance '{}' send a stopping notification",
         &prover_name
     );
@@ -289,7 +290,7 @@ async fn update_prover_job_queue_loop<DB: DatabaseInterface>(database: DB) {
         update_prover_job_queue(database.clone())
             .await
             .unwrap_or_else(|e| {
-                log::warn!("Failed to update prover job queue: {}", e);
+                vlog::warn!("Failed to update prover job queue: {}", e);
             });
     }
 }
@@ -401,7 +402,7 @@ pub fn run_prover_server<DB: DatabaseInterface>(
                         .await
                         .expect("Failed to access storage");
 
-                    database
+                    *database
                         .load_last_verified_block(&mut storage)
                         .await
                         .expect("Failed to get last verified block number")
@@ -412,7 +413,7 @@ pub fn run_prover_server<DB: DatabaseInterface>(
                 for offset in 0..witness_generator_opts.witness_generators {
                     let start_block = (last_verified_block + offset + 1) as u32;
                     let block_step = witness_generator_opts.witness_generators as u32;
-                    log::info!(
+                    vlog::info!(
                         "Starting witness generator ({},{})",
                         start_block,
                         block_step
@@ -420,8 +421,8 @@ pub fn run_prover_server<DB: DatabaseInterface>(
                     let pool_maintainer = witness_generator::WitnessGenerator::new(
                         database.clone(),
                         witness_generator_opts.prepare_data_interval(),
-                        start_block,
-                        block_step,
+                        BlockNumber(start_block),
+                        BlockNumber(block_step),
                     );
                     pool_maintainer.start(panic_notify.clone());
                 }

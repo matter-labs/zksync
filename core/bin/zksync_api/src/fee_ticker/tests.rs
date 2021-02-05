@@ -56,19 +56,19 @@ impl TestToken {
     }
 
     fn eth() -> Self {
-        Self::new(0, 182.0, None, 18)
+        Self::new(TokenId(0), 182.0, None, 18)
     }
 
     fn hex() -> Self {
-        Self::new(1, 1.0, Some(2.5), 6)
+        Self::new(TokenId(1), 1.0, Some(2.5), 6)
     }
 
     fn cheap() -> Self {
-        Self::new(2, 1.0, Some(2.5), 6)
+        Self::new(TokenId(2), 1.0, Some(2.5), 6)
     }
 
     fn expensive() -> Self {
-        Self::new(3, 173_134.192_3, Some(0.9), 18)
+        Self::new(TokenId(3), 173_134.192_3, Some(0.9), 18)
     }
 
     fn subsidized_tokens() -> Vec<Self> {
@@ -227,20 +227,27 @@ fn test_ticker_formula() {
     let config = get_test_ticker_config();
     let mut ticker = FeeTicker::new(MockApiProvider, mpsc::channel(1).1, config, validator);
 
-    let mut get_token_fee_in_usd = |tx_type: TxFeeTypes, token: TokenLike| -> Ratio<BigUint> {
-        let fee_in_token = block_on(ticker.get_fee_from_ticker_in_wei(tx_type, token.clone()))
-            .expect("failed to get fee in token");
-        let token_precision = block_on(MockApiProvider.get_token(token.clone()))
-            .unwrap()
-            .decimals;
+    let mut get_token_fee_in_usd =
+        |tx_type: TxFeeTypes, token: TokenLike, address: Address| -> Ratio<BigUint> {
+            let fee_in_token =
+                block_on(ticker.get_fee_from_ticker_in_wei(tx_type, token.clone(), address))
+                    .expect("failed to get fee in token");
+            let token_precision = block_on(MockApiProvider.get_token(token.clone()))
+                .unwrap()
+                .decimals;
+            let batched_fee_in_token = block_on(
+                ticker.get_batch_from_ticker_in_wei(token.clone(), vec![(tx_type, address)]),
+            )
+            .expect("failed to get batched fee for token");
+            assert_eq!(fee_in_token.total_fee, batched_fee_in_token.total_fee);
 
-        // Fee in usd
-        (block_on(MockApiProvider.get_last_quote(token))
-            .expect("failed to get fee in usd")
-            .usd_price
-            / BigUint::from(10u32).pow(u32::from(token_precision)))
-            * fee_in_token.total_fee
-    };
+            // Fee in usd
+            (block_on(MockApiProvider.get_last_quote(token))
+                .expect("failed to get fee in usd")
+                .usd_price
+                / BigUint::from(10u32).pow(u32::from(token_precision)))
+                * fee_in_token.total_fee
+        };
 
     let get_relative_diff = |a: &Ratio<BigUint>, b: &Ratio<BigUint>| -> BigDecimal {
         let max = std::cmp::max(a.clone(), b.clone());
@@ -249,11 +256,14 @@ fn test_ticker_formula() {
     };
 
     let expected_price_of_eth_token_transfer_usd =
-        get_token_fee_in_usd(TxFeeTypes::Transfer, 0.into());
+        get_token_fee_in_usd(TxFeeTypes::Transfer, TokenId(0).into());
     let expected_price_of_eth_token_withdraw_usd =
-        get_token_fee_in_usd(TxFeeTypes::Withdraw, 0.into());
-    let expected_price_of_eth_token_fast_withdraw_usd =
-        get_token_fee_in_usd(TxFeeTypes::FastWithdraw, 0.into());
+        get_token_fee_in_usd(TxFeeTypes::Withdraw, TokenId(0).into(), Address::default());
+    let expected_price_of_eth_token_fast_withdraw_usd = get_token_fee_in_usd(
+        TxFeeTypes::FastWithdraw,
+        TokenId(0).into(),
+        Address::default(),
+    );
 
     // Cost of the transfer and withdraw in USD should be the same for all tokens up to +/- 3 digits
     // (mantissa len == 11)
@@ -327,7 +337,7 @@ async fn test_error_coingecko_api() {
         .unwrap()
         .tokens_schema()
         .update_historical_ticker_price(
-            1,
+            TokenId(1),
             TokenPrice {
                 usd_price: big_decimal_to_ratio(&BigDecimal::from(10)).unwrap(),
                 last_updated: chrono::offset::Utc::now(),
@@ -341,11 +351,11 @@ async fn test_error_coingecko_api() {
     let mut ticker = FeeTicker::new(ticker_api, mpsc::channel(1).1, config, validator);
     for _ in 0..1000 {
         ticker
-            .get_fee_from_ticker_in_wei(TxFeeTypes::FastWithdraw, 1.into())
+            .get_fee_from_ticker_in_wei(TxFeeTypes::FastWithdraw, TokenId(1).into())
             .await
             .unwrap();
         ticker
-            .get_token_price(1.into(), TokenPriceRequestType::USDForOneWei)
+            .get_token_price(TokenId(1).into(), TokenPriceRequestType::USDForOneWei)
             .await
             .unwrap();
     }
@@ -371,7 +381,7 @@ async fn test_error_api() {
         .unwrap()
         .tokens_schema()
         .update_historical_ticker_price(
-            1,
+            TokenId(1),
             TokenPrice {
                 usd_price: big_decimal_to_ratio(&BigDecimal::from(10)).unwrap(),
                 last_updated: chrono::offset::Utc::now(),
@@ -383,11 +393,15 @@ async fn test_error_api() {
     let mut ticker = FeeTicker::new(ticker_api, mpsc::channel(1).1, config, validator);
 
     ticker
-        .get_fee_from_ticker_in_wei(TxFeeTypes::FastWithdraw, 1.into())
+        .get_fee_from_ticker_in_wei(
+            TxFeeTypes::FastWithdraw,
+            TokenId(1).into(),
+            Address::default(),
+        )
         .await
         .unwrap();
     ticker
-        .get_token_price(1.into(), TokenPriceRequestType::USDForOneWei)
+        .get_token_price(TokenId(1).into(), TokenPriceRequestType::USDForOneWei)
         .await
         .unwrap();
 }

@@ -107,7 +107,7 @@ impl ZkSyncState {
         );
 
         from_account.sub_balance(op.tx.token, &(&op.tx.amount + &op.tx.fee));
-        from_account.nonce += 1;
+        *from_account.nonce += 1;
 
         let from_new_balance = from_account.get_balance(op.tx.token);
         let from_new_nonce = from_account.nonce;
@@ -176,7 +176,7 @@ impl ZkSyncState {
         );
 
         account.sub_balance(op.tx.token, &op.tx.fee);
-        account.nonce += 1;
+        *account.nonce += 1;
 
         let new_balance = account.get_balance(op.tx.token);
         let new_nonce = account.nonce;
@@ -217,10 +217,15 @@ impl ZkSyncState {
             "TransferToNew to account id is bigger than max supported"
         );
 
-        assert!(
-            self.get_account(op.to).is_none(),
-            format!("Transfer to new account exists {:?}", op.to)
-        );
+        if let Some(account) = self.get_account(op.to) {
+            vlog::error!(
+                "Attempt to execute transfer to new account for an existing account. Account: {:#?}; Transfer: {:#?}",
+                account,
+                op
+            );
+            panic!("Transfer to new account exists");
+        }
+
         let mut to_account = {
             let (acc, upd) = Account::create_account(op.to, op.tx.to);
             updates.extend(upd.into_iter());
@@ -236,7 +241,7 @@ impl ZkSyncState {
             "Not enough balance"
         );
         from_account.sub_balance(op.tx.token, &(&op.tx.amount + &op.tx.fee));
-        from_account.nonce += 1;
+        *from_account.nonce += 1;
         let from_new_balance = from_account.get_balance(op.tx.token);
         let from_new_nonce = from_account.nonce;
 

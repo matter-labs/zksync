@@ -4,7 +4,7 @@ use zksync_crypto::rand::{Rng, SeedableRng, XorShiftRng};
 use zksync_types::{
     mempool::SignedTxVariant,
     tx::{ChangePubKey, Transfer, Withdraw},
-    Address, SignedZkSyncTx, ZkSyncTx,
+    AccountId, Address, Nonce, SignedZkSyncTx, TokenId, ZkSyncTx,
 };
 // Local imports
 use crate::test_data::gen_eth_sign_data;
@@ -20,48 +20,48 @@ use crate::{
 /// Generates several different `SignedZkSyncTx` objects.
 fn franklin_txs() -> Vec<SignedZkSyncTx> {
     let transfer_1 = Transfer::new(
-        42,
+        AccountId(42),
         Address::random(),
         Address::random(),
-        0,
+        TokenId(0),
         100u32.into(),
         10u32.into(),
-        10,
+        Nonce(10),
         Default::default(),
         None,
     );
 
     let transfer_2 = Transfer::new(
-        4242,
+        AccountId(4242),
         Address::random(),
         Address::random(),
-        0,
+        TokenId(0),
         500u32.into(),
         20u32.into(),
-        11,
+        Nonce(11),
         Default::default(),
         None,
     );
 
     let withdraw = Withdraw::new(
-        33,
+        AccountId(33),
         Address::random(),
         Address::random(),
-        0,
+        TokenId(0),
         100u32.into(),
         10u32.into(),
-        12,
+        Nonce(12),
         Default::default(),
         None,
     );
 
     let change_pubkey = ChangePubKey::new(
-        123,
+        AccountId(123),
         Address::random(),
         Default::default(),
-        0,
+        TokenId(0),
         Default::default(),
-        13,
+        Nonce(13),
         Default::default(),
         None,
         None,
@@ -95,13 +95,13 @@ fn gen_transfers(n: usize) -> Vec<SignedZkSyncTx> {
     (0..n)
         .map(|id| {
             let transfer = Transfer::new(
-                id as u32,
+                AccountId(id as u32),
                 Address::random(),
                 Address::random(),
-                0,
+                TokenId(0),
                 100u32.into(),
                 10u32.into(),
-                10,
+                Nonce(10),
                 Default::default(),
                 None,
             );

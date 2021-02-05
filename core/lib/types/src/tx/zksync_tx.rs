@@ -10,6 +10,7 @@ use crate::{
     utils::deserialize_eth_message,
     CloseOp, ForcedExitOp, Nonce, Token, TokenId, TokenLike, TransferOp, TxFeeTypes, WithdrawOp,
 };
+use zksync_crypto::params::ETH_TOKEN_ID;
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct EthSignData {
@@ -145,7 +146,7 @@ impl ZkSyncTx {
         match self {
             ZkSyncTx::Transfer(tx) => tx.token,
             ZkSyncTx::Withdraw(tx) => tx.token,
-            ZkSyncTx::Close(_) => 0,
+            ZkSyncTx::Close(_) => ETH_TOKEN_ID,
             ZkSyncTx::ChangePubKey(tx) => tx.fee_token,
             ZkSyncTx::ForcedExit(tx) => tx.token,
         }

@@ -3,7 +3,7 @@ use criterion::{black_box, criterion_group, BatchSize, Bencher, Criterion, Throu
 // Local uses
 use zksync_crypto::circuit::account::CircuitAccount;
 use zksync_crypto::primitives::{BitConvert, BitIteratorLe, GetBits};
-use zksync_types::{Account, Address, PubKeyHash};
+use zksync_types::{Account, Address, Nonce, PubKeyHash, TokenId};
 
 /// Input size for byte slices (module-wide for calculating the throughput).
 const BYTE_SLICE_SIZE: usize = 512;
@@ -75,9 +75,9 @@ fn bench_circuit_account_transform(b: &mut Bencher<'_>) {
         let mut account = Account::default_with_address(&Address::from_slice(
             &hex::decode("0102030405060708091011121314151617181920").unwrap(),
         ));
-        account.set_balance(1, 1u32.into());
-        account.set_balance(2, 2u32.into());
-        account.nonce = 3;
+        account.set_balance(TokenId(1), 1u32.into());
+        account.set_balance(TokenId(2), 2u32.into());
+        account.nonce = Nonce(3);
         account.pub_key_hash =
             PubKeyHash::from_hex("sync:0102030405060708091011121314151617181920").unwrap();
         account

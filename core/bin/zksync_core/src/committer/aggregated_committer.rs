@@ -10,7 +10,7 @@ use zksync_types::aggregated_operations::{
     AggregatedActionType, AggregatedOperation, BlocksCommitOperation, BlocksCreateProofOperation,
     BlocksExecuteOperation, BlocksProofOperation,
 };
-use zksync_types::{block::Block, gas_counter::GasCounter, U256};
+use zksync_types::{block::Block, gas_counter::GasCounter, BlockNumber, U256};
 
 fn create_new_commit_operation(
     last_committed_block: &Block,
@@ -209,7 +209,7 @@ async fn create_aggregated_commits_storage(
 
     while let Some(block) = BlockSchema(storage).get_block(block_number).await? {
         new_blocks.push(block);
-        block_number += 1;
+        block_number.0 += 1;
     }
 
     let commit_operation = create_new_commit_operation(
@@ -247,7 +247,8 @@ async fn create_aggregated_prover_task_storage(
     }
 
     let mut blocks_with_proofs = Vec::new();
-    for block_number in last_aggregate_create_proof_block + 1..=last_aggregate_committed_block {
+    for block_number in last_aggregate_create_proof_block.0 + 1..=last_aggregate_committed_block.0 {
+        let block_number = BlockNumber(block_number);
         let proof_exists = ProverSchema(storage)
             .load_proof(block_number)
             .await?
@@ -364,9 +365,9 @@ async fn create_aggregated_execute_operation_storage(
     }
 
     let mut blocks = Vec::new();
-    for block_number in last_aggregate_executed_block + 1..=last_aggregate_publish_proof_block {
+    for block_number in last_aggregate_executed_block.0 + 1..=last_aggregate_publish_proof_block.0 {
         let block = BlockSchema(storage)
-            .get_block(block_number)
+            .get_block(BlockNumber(block_number))
             .await?
             .expect("Failed to get block that should be committed");
         blocks.push(block);
@@ -405,7 +406,7 @@ pub async fn create_aggregated_operations_storage(
 
 fn log_aggregated_op_creation(aggregated_op: &AggregatedOperation) {
     let (first, last) = aggregated_op.get_block_range();
-    log::info!(
+    vlog::info!(
         "Created aggregated operation: {}, blocks: [{},{}]",
         aggregated_op.get_action_type().to_string(),
         first,

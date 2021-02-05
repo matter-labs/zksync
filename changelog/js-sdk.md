@@ -4,7 +4,13 @@ All notable changes to `zksync.js` will be documented in this file.
 
 ## Unreleased
 
-**Version 0.8.4** is being developed.
+### Added
+
+### Changed
+
+### Fixed
+
+## Version 0.8.4
 
 ### Added
 
@@ -12,6 +18,7 @@ All notable changes to `zksync.js` will be documented in this file.
 - `newMockProvider` and `DummyTransport`. Tests for the library.
 - `closestGreaterOrEqPackableTransactionAmount` and `closestGreaterOrEqPackableTransactionFee` functions. Tests for
   them.
+- Checks for ERC-1271 wallets for whether the messages should be prefixed
 
 ### Changed
 

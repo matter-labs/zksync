@@ -202,9 +202,9 @@ impl Transfer {
             amount = format_units(&self.amount, decimals),
             token = token_symbol,
             to = self.to,
-            nonce = self.nonce,
+            nonce = *self.nonce,
             fee = format_units(&self.fee, decimals),
-            account_id = self.account_id,
+            account_id = *self.account_id,
         )
     }
 }

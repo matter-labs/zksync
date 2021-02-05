@@ -3,13 +3,13 @@ use anyhow::format_err;
 use std::convert::TryFrom;
 use web3::contract::Contract;
 use web3::types::Transaction;
-use web3::types::{BlockNumber, FilterBuilder, Log, H256, U256};
+use web3::types::{BlockNumber as Web3BlockNumber, FilterBuilder, Log, H256, U256};
 use web3::{Transport, Web3};
 // Workspace deps
 use crate::contract::ZkSyncDeployedContract;
 use crate::eth_tx_helpers::get_block_number_from_ethereum_transaction;
 use crate::events::{BlockEvent, EventType};
-use zksync_types::{Address, TokenId};
+use zksync_types::{Address, BlockNumber, TokenId};
 
 #[derive(Debug)]
 pub struct NewTokenEvent {
@@ -26,7 +26,9 @@ impl TryFrom<Log> for NewTokenEvent {
         }
         Ok(NewTokenEvent {
             address: Address::from_slice(&event.topics[1].as_fixed_bytes()[12..]),
-            id: U256::from_big_endian(&event.topics[2].as_fixed_bytes()[..]).as_u32() as u16,
+            id: TokenId(
+                U256::from_big_endian(&event.topics[2].as_fixed_bytes()[..]).as_u32() as u16,
+            ),
         })
     }
 }
@@ -171,8 +173,8 @@ impl EventsState {
         let token_logs = EventsState::get_token_added_logs(
             web3,
             governance_contract,
-            BlockNumber::Number(from_block_number_u64.into()),
-            BlockNumber::Number(to_block_number_u64.into()),
+            Web3BlockNumber::Number(from_block_number_u64.into()),
+            Web3BlockNumber::Number(to_block_number_u64.into()),
         )
         .await?;
         let mut logs = vec![];
@@ -182,31 +184,31 @@ impl EventsState {
                 break;
             }
             let from_block_number = match zksync_contract.from {
-                BlockNumber::Latest => panic!("Impossible in from block"),
-                BlockNumber::Earliest => BlockNumber::Number(from_block_number_u64.into()),
-                BlockNumber::Pending => unreachable!(),
-                BlockNumber::Number(n) => {
+                Web3BlockNumber::Latest => panic!("Impossible in from block"),
+                Web3BlockNumber::Earliest => Web3BlockNumber::Number(from_block_number_u64.into()),
+                Web3BlockNumber::Pending => unreachable!(),
+                Web3BlockNumber::Number(n) => {
                     if from_block_number_u64 > n.as_u64() {
                         continue;
                     }
-                    BlockNumber::Number(from_block_number_u64.into())
+                    Web3BlockNumber::Number(from_block_number_u64.into())
                 }
             };
 
             let to_block_number = match zksync_contract.to {
-                BlockNumber::Latest => {
+                Web3BlockNumber::Latest => {
                     from_block_number_u64 = to_block_number_u64;
-                    BlockNumber::Number(to_block_number_u64.into())
+                    Web3BlockNumber::Number(to_block_number_u64.into())
                 }
-                BlockNumber::Earliest => panic!("Impossible in to block"),
-                BlockNumber::Pending => unreachable!(),
-                BlockNumber::Number(n) => {
+                Web3BlockNumber::Earliest => panic!("Impossible in to block"),
+                Web3BlockNumber::Pending => unreachable!(),
+                Web3BlockNumber::Number(n) => {
                     if to_block_number_u64 < n.as_u64() {
                         from_block_number_u64 = n.as_u64();
-                        BlockNumber::Number(to_block_number_u64.into())
+                        Web3BlockNumber::Number(to_block_number_u64.into())
                     } else {
                         from_block_number_u64 = n.as_u64();
-                        BlockNumber::Number(n)
+                        Web3BlockNumber::Number(n)
                     }
                 }
             };
@@ -236,8 +238,8 @@ impl EventsState {
     async fn get_token_added_logs<T: Transport>(
         web3: &Web3<T>,
         contract: &(ethabi::Contract, Contract<T>),
-        from: BlockNumber,
-        to: BlockNumber,
+        from: Web3BlockNumber,
+        to: Web3BlockNumber,
     ) -> Result<Vec<NewTokenEvent>, anyhow::Error> {
         let new_token_event_topic = contract
             .0
@@ -274,8 +276,8 @@ impl EventsState {
     async fn get_block_logs<T: Transport>(
         web3: &Web3<T>,
         contract: &ZkSyncDeployedContract<T>,
-        from_block_number: BlockNumber,
-        to_block_number: BlockNumber,
+        from_block_number: Web3BlockNumber,
+        to_block_number: Web3BlockNumber,
     ) -> Result<Vec<Log>, anyhow::Error> {
         let block_verified_topic = contract
             .abi
@@ -355,8 +357,12 @@ impl EventsState {
                 const U256_SIZE: usize = 32;
                 // Fields in `BlocksRevert` are not `indexed`, thus they're located in `data`.
                 assert_eq!(log.data.0.len(), U256_SIZE * 2);
-                let total_verified = U256::from_big_endian(&log.data.0[..U256_SIZE]).as_u32();
-                let total_committed = U256::from_big_endian(&log.data.0[U256_SIZE..]).as_u32();
+                let total_verified = zksync_types::BlockNumber(
+                    U256::from_big_endian(&log.data.0[..U256_SIZE]).as_u32(),
+                );
+                let total_committed = zksync_types::BlockNumber(
+                    U256::from_big_endian(&log.data.0[U256_SIZE..]).as_u32(),
+                );
 
                 self.committed_events
                     .retain(|bl| bl.block_num <= total_committed);
@@ -374,7 +380,7 @@ impl EventsState {
             let block_num = log.topics[1];
 
             let mut block = BlockEvent {
-                block_num: U256::from(block_num.as_bytes()).as_u32(),
+                block_num: BlockNumber(U256::from(block_num.as_bytes()).as_u32()),
                 transaction_hash,
                 block_type: EventType::Committed,
                 contract_version: contract.version,

@@ -6,6 +6,7 @@ use zksync_basic_types::{H256, U256};
 use zksync_types::{
     aggregated_operations::{AggregatedActionType, AggregatedOperation},
     ethereum::ETHOperation,
+    BlockNumber,
 };
 // Local imports
 use crate::test_data::{gen_unique_aggregated_operation, BLOCK_SIZE_CHUNKS};
@@ -90,7 +91,7 @@ async fn ethereum_storage(mut storage: StorageProcessor<'_>) -> QueryResult<()> 
     assert!(unconfirmed_operations.is_empty());
 
     // Store operation with ID 1.
-    let block_number = 1;
+    let block_number = BlockNumber(1);
     OperationsSchema(&mut storage)
         .store_aggregated_action(gen_unique_aggregated_operation(
             block_number,
@@ -130,7 +131,7 @@ async fn ethereum_storage(mut storage: StorageProcessor<'_>) -> QueryResult<()> 
     );
 
     // Store operation with ID 2.
-    let block_number = 2;
+    let block_number = BlockNumber(2);
     OperationsSchema(&mut storage)
         .store_aggregated_action(gen_unique_aggregated_operation(
             block_number,
@@ -225,7 +226,7 @@ async fn ethereum_unprocessed(mut storage: StorageProcessor<'_>) -> QueryResult<
     assert!(unprocessed_operations.is_empty());
 
     // Store operation with ID 1.
-    let block_number = 1;
+    let block_number = BlockNumber(1);
     OperationsSchema(&mut storage)
         .store_aggregated_action(gen_unique_aggregated_operation(
             block_number,
