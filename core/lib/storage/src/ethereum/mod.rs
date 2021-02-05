@@ -118,6 +118,35 @@ impl<'a, 'c> EthereumSchema<'a, 'c> {
         Ok(ops)
     }
 
+    /// Load all the aggregated operations that have no confirmation yet and have not yet been sent to Ethereum.
+    /// Should be used after server restart only.
+    pub async fn restore_unprocessed_operations(&mut self) -> QueryResult<()> {
+        let start = Instant::now();
+
+        sqlx::query!(
+            "WITH aggregate_ops AS (
+                SELECT aggregate_operations.id FROM aggregate_operations
+                   WHERE confirmed = $1 and action_type != $2 and aggregate_operations.id != ANY(SELECT id from eth_aggregated_ops_binding)
+                ORDER BY aggregate_operations.id ASC
+              )
+              INSERT INTO eth_unprocessed_aggregated_ops (op_id)
+              SELECT id from aggregate_ops
+              ON CONFLICT (op_id)
+              DO NOTHING",
+              false,
+              AggregatedActionType::CreateProofBlocks.to_string()
+        )
+        .execute(self.0.conn())
+        .await?;
+
+        metrics::histogram!(
+            "sql.ethereum.restore_unprocessed_operations",
+            start.elapsed()
+        );
+
+        Ok(())
+    }
+
     /// Loads the operations which were stored in `aggregate_operations` table,
     /// and are in `eth_unprocessed_aggregated_ops`.
     pub async fn load_unprocessed_operations(
