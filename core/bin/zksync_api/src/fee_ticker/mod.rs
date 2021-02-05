@@ -74,6 +74,10 @@ impl GasOperationsCost {
 
         let standard_cost = vec![
             (
+                OutputFeeType::Transfer,
+                constants::BASE_TRANSFER_COST.into(),
+            ),
+            (
                 OutputFeeType::TransferToNew,
                 constants::BASE_TRANSFER_TO_NEW_COST.into(),
             ),
@@ -102,6 +106,10 @@ impl GasOperationsCost {
         .collect::<HashMap<_, _>>();
 
         let subsidize_cost = vec![
+            (
+                OutputFeeType::Transfer,
+                constants::SUBSIDY_TRANSFER_COST.into(),
+            ),
             (
                 OutputFeeType::TransferToNew,
                 constants::SUBSIDY_TRANSFER_TO_NEW_COST.into(),

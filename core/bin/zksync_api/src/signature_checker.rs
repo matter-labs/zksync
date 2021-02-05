@@ -90,7 +90,9 @@ async fn verify_eth_signature(
     let tokens = &request.tokens;
 
     // TODO: Remove this code after Golem update [ZKS-173]
-    if network == Network::Rinkeby && tokens.iter().find(|t| t.symbol == "GNT").is_some() {
+    if (network == Network::Rinkeby || network == Network::Localhost)
+        && tokens.iter().find(|t| t.symbol == "GNT").is_some()
+    {
         return Ok(());
     }
 
