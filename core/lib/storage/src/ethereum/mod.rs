@@ -274,7 +274,7 @@ impl<'a, 'c> EthereumSchema<'a, 'c> {
         let start = Instant::now();
         let confirmed = sqlx::query_as!(
             StorageETHOperation,
-            "SELECT * FROM eth_operations WHERE id = $1",
+            "SELECT * FROM eth_operations WHERE id <= $1 ORDER BY ID DESC LIMIT 1",
             id
         )
         .fetch_optional(self.0.conn())
