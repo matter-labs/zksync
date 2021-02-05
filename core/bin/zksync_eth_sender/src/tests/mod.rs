@@ -511,30 +511,70 @@ async fn transaction_failure() {
 /// they will be processed normally.
 #[tokio::test]
 async fn restore_state() {
-    let (operations, stored_operations) = {
+    let (stored_eth_operations, aggregated_operations, unprocessed_operations) = {
         // This `eth_sender` is required to generate the input only.
         let eth_sender = default_eth_sender().await;
 
-        let commit_op = test_data::commit_blocks_operation(0);
-        let verify_op = test_data::publish_proof_blocks_onchain_operations(0);
-        let execute_op = test_data::execute_blocks_operations(0);
+        // Aggregated operations for which Ethereum transactions have been created but have not yet been confirmed.
+        let processed_commit_op = test_data::commit_blocks_operation(0);
+        let processed_verify_op = test_data::publish_proof_blocks_onchain_operations(0);
+        let processed_execute_op = test_data::execute_blocks_operations(0);
 
         let deadline_block = eth_sender.get_deadline_block(1);
-        let commit_op_tx =
-            create_signed_tx(0, &eth_sender, commit_op.clone(), deadline_block, 0).await;
+        let commit_op_tx = create_signed_tx(
+            0,
+            &eth_sender,
+            processed_commit_op.clone(),
+            deadline_block,
+            0,
+        )
+        .await;
 
         let deadline_block = eth_sender.get_deadline_block(1 + WAIT_CONFIRMATIONS);
-        let verify_op_tx =
-            create_signed_tx(1, &eth_sender, verify_op.clone(), deadline_block, 1).await;
+        let verify_op_tx = create_signed_tx(
+            1,
+            &eth_sender,
+            processed_verify_op.clone(),
+            deadline_block,
+            1,
+        )
+        .await;
 
         let deadline_block = eth_sender.get_deadline_block(1 + 2 * WAIT_CONFIRMATIONS);
-        let execute_op_tx =
-            create_signed_tx(2, &eth_sender, execute_op.clone(), deadline_block, 2).await;
+        let execute_op_tx = create_signed_tx(
+            2,
+            &eth_sender,
+            processed_execute_op.clone(),
+            deadline_block,
+            2,
+        )
+        .await;
 
-        let operations = vec![commit_op, verify_op, execute_op];
-        let stored_operations = vec![commit_op_tx, verify_op_tx, execute_op_tx];
+        let stored_eth_operations = vec![commit_op_tx, verify_op_tx, execute_op_tx];
 
-        (operations, stored_operations)
+        // Aggregated operations that have not yet been processed.
+        let unprocessed_commit_op = test_data::commit_blocks_operation(1);
+        let unprocessed_verify_op = test_data::publish_proof_blocks_onchain_operations(1);
+        let unprocessed_execute_op = test_data::execute_blocks_operations(1);
+
+        // All aggregated operations must be in the database even after server restart.
+        let aggregated_operations = vec![
+            processed_commit_op,
+            processed_verify_op,
+            processed_execute_op,
+            unprocessed_commit_op,
+            unprocessed_verify_op,
+            unprocessed_execute_op.clone(),
+        ];
+        // Aggregated operations from the table `eth_unprocessed_aggregated_ops` are deleted after the operation is added to the queue,
+        // therefore, after restarting the server, it may contain not all really unprocessed operations.
+        let unprocessed_operations = vec![unprocessed_execute_op];
+
+        (
+            stored_eth_operations,
+            aggregated_operations,
+            unprocessed_operations,
+        )
     };
 
     let mut eth_parameters = default_eth_parameters();
@@ -542,9 +582,17 @@ async fn restore_state() {
     eth_parameters.last_verified_block = 1;
     eth_parameters.last_executed_block = 1;
 
-    let mut eth_sender = restored_eth_sender(stored_operations, eth_parameters).await;
+    let mut eth_sender = restored_eth_sender(
+        stored_eth_operations,
+        aggregated_operations.clone(),
+        unprocessed_operations,
+        eth_parameters,
+    )
+    .await;
 
-    for (eth_op_id, aggregated_operation) in operations.iter().enumerate() {
+    eth_sender.load_new_operations().await.unwrap();
+
+    for (eth_op_id, aggregated_operation) in aggregated_operations.iter().enumerate() {
         // Note that we DO NOT send an operation to `ETHSender` and neither receive it.
 
         // We do process operations restored from the DB though.
