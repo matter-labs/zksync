@@ -22,14 +22,14 @@ impl CommitCost {
     // These values are estimated using the `gas_price_test` in `testkit`.
 
     // TODO: overvalued for quick fix of tx fails (ZKS-109).
-    pub const BASE_COST: u64 = 300_000;
-    pub const DEPOSIT_COST: u64 = 10_397;
-    pub const CHANGE_PUBKEY_COST_OFFCHAIN: u64 = 15_866;
-    pub const CHANGE_PUBKEY_COST_ONCHAIN: u64 = 3_929;
-    pub const TRANSFER_COST: u64 = 334;
-    pub const TRANSFER_TO_NEW_COST: u64 = 862;
-    pub const FULL_EXIT_COST: u64 = 10_165;
-    pub const WITHDRAW_COST: u64 = 2_167;
+    pub const BASE_COST: u64 = 40_000;
+    pub const DEPOSIT_COST: u64 = 7_000;
+    pub const CHANGE_PUBKEY_COST_OFFCHAIN: u64 = 11_050;
+    pub const CHANGE_PUBKEY_COST_ONCHAIN: u64 = 4_000;
+    pub const TRANSFER_COST: u64 = 250;
+    pub const TRANSFER_TO_NEW_COST: u64 = 780;
+    pub const FULL_EXIT_COST: u64 = 7_000;
+    pub const WITHDRAW_COST: u64 = 3_500;
     pub const FORCED_EXIT_COST: u64 = Self::WITHDRAW_COST; // TODO: Verify value (ZKS-109).
 
     pub fn base_cost() -> U256 {
@@ -71,13 +71,13 @@ impl VerifyCost {
     // These values are estimated using the `gas_price_test` in `testkit`.
 
     // TODO: overvalued for quick fix of tx fails (ZKS-109).
-    pub const BASE_COST: u64 = 1_000_000;
-    pub const DEPOSIT_COST: u64 = 0;
+    pub const BASE_COST: u64 = 10_000;
+    pub const DEPOSIT_COST: u64 = 50;
     pub const CHANGE_PUBKEY_COST: u64 = 0;
     pub const TRANSFER_COST: u64 = 0;
     pub const TRANSFER_TO_NEW_COST: u64 = 0;
-    pub const FULL_EXIT_COST: u64 = 2_499;
-    pub const WITHDRAW_COST: u64 = 45_668;
+    pub const FULL_EXIT_COST: u64 = 30_000;
+    pub const WITHDRAW_COST: u64 = 48_000;
     pub const FORCED_EXIT_COST: u64 = Self::WITHDRAW_COST; // TODO: Verify value (ZKS-109).
 
     pub fn base_cost() -> U256 {
@@ -147,8 +147,8 @@ impl GasCounter {
     pub const COMPLETE_WITHDRAWALS_ERC20_COST: u64 = 200_000;
 
     /// constants for gas limit calculation of aggregated operations
-    pub const BASE_COMMIT_BLOCKS_TX_COST: usize = 40_000;
-    pub const BASE_EXECUTE_BLOCKS_TX_COST: usize = 70_000;
+    pub const BASE_COMMIT_BLOCKS_TX_COST: usize = 45_000;
+    pub const BASE_EXECUTE_BLOCKS_TX_COST: usize = 45_000;
     pub const BASE_PROOF_BLOCKS_TX_COST: usize = 1_500_000;
 
     pub fn new() -> Self {

@@ -7,7 +7,10 @@ use zksync_prover_utils::fs_utils::{
 };
 
 pub fn make_recursive_verification_keys(config: ChainConfig) {
-    for (proofs, setup_power) in config.circuit.aggregated_proof_sizes_with_setup_pow() {
+    for (proofs, setup_power) in config
+        .circuit
+        .supported_aggregated_proof_sizes_with_setup_pow()
+    {
         let path = get_recursive_verification_key_path(proofs);
         vlog::info!(
             "Generating recursive verification key for {} proofs into: {}",

@@ -66,7 +66,7 @@ async fn main() {
         let available_sizes = ZkSyncConfig::from_env()
             .chain
             .circuit
-            .aggregated_proof_sizes;
+            .supported_aggregated_proof_sizes;
         for aggregated_size in &aggregated_proof_sizes {
             available_sizes
                 .iter()
@@ -78,7 +78,7 @@ async fn main() {
         ZkSyncConfig::from_env()
             .chain
             .circuit
-            .aggregated_proof_sizes
+            .supported_aggregated_proof_sizes
     };
 
     info!(
@@ -93,7 +93,7 @@ async fn main() {
     let available_aggregated_proof_sizes = ZkSyncConfig::from_env()
         .chain
         .circuit
-        .aggregated_proof_sizes_with_setup_pow();
+        .supported_aggregated_proof_sizes_with_setup_pow();
 
     let testkit_config = TestkitConfig::from_env();
 

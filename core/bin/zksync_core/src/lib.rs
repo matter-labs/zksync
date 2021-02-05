@@ -136,6 +136,7 @@ pub async fn run_core(
         proposed_blocks_receiver,
         mempool_block_request_sender.clone(),
         connection_pool.clone(),
+        &config,
     );
 
     // Start mempool.

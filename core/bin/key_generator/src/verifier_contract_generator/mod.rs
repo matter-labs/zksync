@@ -40,12 +40,12 @@ pub(crate) fn create_verifier_contract(config: ChainConfig) {
     let chunks = to_json(config.circuit.supported_block_chunks_sizes);
     template_params.insert("chunks".to_string(), chunks);
 
-    let sizes = to_json(config.circuit.aggregated_proof_sizes.clone());
+    let sizes = to_json(config.circuit.supported_aggregated_proof_sizes.clone());
     template_params.insert("sizes".to_string(), sizes);
 
     let templates_for_key_getters = config
         .circuit
-        .aggregated_proof_sizes
+        .supported_aggregated_proof_sizes
         .into_iter()
         .map(|blocks| {
             let key_getter_name = format!("getVkAggregated{}", blocks);

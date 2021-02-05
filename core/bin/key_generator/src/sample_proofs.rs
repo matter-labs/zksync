@@ -54,7 +54,7 @@ pub fn make_sample_proofs(config: ChainConfig) -> anyhow::Result<()> {
 
     let max_aggregated_size = *config
         .circuit
-        .aggregated_proof_sizes
+        .supported_aggregated_proof_sizes
         .iter()
         .max()
         .ok_or_else(|| anyhow::anyhow!("Aggregated proof sizes should not be empty"))?;
@@ -63,7 +63,7 @@ pub fn make_sample_proofs(config: ChainConfig) -> anyhow::Result<()> {
     let aggregated_proof = {
         let min_aggregated_size = *config
             .circuit
-            .aggregated_proof_sizes
+            .supported_aggregated_proof_sizes
             .iter()
             .min()
             .ok_or_else(|| anyhow::anyhow!("Aggregated proof sizes should not be empty"))?;
@@ -79,7 +79,9 @@ pub fn make_sample_proofs(config: ChainConfig) -> anyhow::Result<()> {
         gen_aggregate_proof(
             vks,
             proof_data,
-            &config.circuit.aggregated_proof_sizes_with_setup_pow(),
+            &config
+                .circuit
+                .supported_aggregated_proof_sizes_with_setup_pow(),
             false,
         )?
     };

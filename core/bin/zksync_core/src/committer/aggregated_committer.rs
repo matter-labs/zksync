@@ -1,6 +1,7 @@
 use chrono::{DateTime, Utc};
 use std::cmp::max;
 use std::time::Duration;
+use zksync_config::ZkSyncConfig;
 use zksync_crypto::proof::AggregatedProof;
 use zksync_storage::chain::block::BlockSchema;
 use zksync_storage::chain::operations::OperationsSchema;
@@ -188,13 +189,9 @@ fn create_execute_blocks_operation(
     })
 }
 
-const MAX_BLOCK_TO_COMMIT: usize = 5;
-const BLOCK_COMMIT_DEADLINE: Duration = Duration::from_secs(10);
-const MAX_GAS_TX: u64 = 2_000_000;
-const AVAILABLE_AGGREGATE_PROOFS: &[usize] = &[1, 5];
-
 async fn create_aggregated_commits_storage(
     storage: &mut StorageProcessor<'_>,
+    config: &ZkSyncConfig,
 ) -> anyhow::Result<bool> {
     let last_aggregate_committed_block = OperationsSchema(storage)
         .get_last_affected_block_by_aggregated_action(AggregatedActionType::CommitBlocks)
@@ -216,9 +213,9 @@ async fn create_aggregated_commits_storage(
         &old_committed_block,
         &new_blocks,
         Utc::now(),
-        MAX_BLOCK_TO_COMMIT,
-        BLOCK_COMMIT_DEADLINE,
-        MAX_GAS_TX.into(),
+        config.chain.state_keeper.max_aggregated_blocks_to_commit,
+        config.chain.state_keeper.block_commit_deadline(),
+        config.chain.state_keeper.max_aggregated_tx_gas.into(),
     );
 
     if let Some(commit_operation) = commit_operation {
@@ -235,6 +232,7 @@ async fn create_aggregated_commits_storage(
 
 async fn create_aggregated_prover_task_storage(
     storage: &mut StorageProcessor<'_>,
+    config: &ZkSyncConfig,
 ) -> anyhow::Result<bool> {
     let last_aggregate_committed_block = OperationsSchema(storage)
         .get_last_affected_block_by_aggregated_action(AggregatedActionType::CommitBlocks)
@@ -266,10 +264,10 @@ async fn create_aggregated_prover_task_storage(
 
     let create_proof_operation = create_new_create_proof_operation(
         &blocks_with_proofs,
-        AVAILABLE_AGGREGATE_PROOFS,
+        &config.chain.state_keeper.aggregated_proof_sizes,
         Utc::now(),
-        BLOCK_COMMIT_DEADLINE,
-        MAX_GAS_TX.into(),
+        config.chain.state_keeper.block_prove_deadline(),
+        config.chain.state_keeper.max_aggregated_tx_gas.into(),
     );
     if let Some(operation) = create_proof_operation {
         let aggregated_op = operation.into();
@@ -350,6 +348,7 @@ async fn create_aggregated_publish_proof_operation_storage(
 
 async fn create_aggregated_execute_operation_storage(
     storage: &mut StorageProcessor<'_>,
+    config: &ZkSyncConfig,
 ) -> anyhow::Result<bool> {
     let last_aggregate_executed_block = OperationsSchema(storage)
         .get_last_affected_block_by_aggregated_action(AggregatedActionType::ExecuteBlocks)
@@ -376,9 +375,9 @@ async fn create_aggregated_execute_operation_storage(
     let execute_operation = create_execute_blocks_operation(
         &blocks,
         Utc::now(),
-        MAX_BLOCK_TO_COMMIT,
-        BLOCK_COMMIT_DEADLINE,
-        MAX_GAS_TX.into(),
+        config.chain.state_keeper.max_aggregated_blocks_to_execute,
+        config.chain.state_keeper.block_execute_deadline(),
+        config.chain.state_keeper.max_aggregated_tx_gas.into(),
     );
 
     if let Some(operation) = execute_operation {
@@ -395,11 +394,12 @@ async fn create_aggregated_execute_operation_storage(
 
 pub async fn create_aggregated_operations_storage(
     storage: &mut StorageProcessor<'_>,
+    config: &ZkSyncConfig,
 ) -> anyhow::Result<()> {
-    while create_aggregated_commits_storage(storage).await? {}
-    while create_aggregated_prover_task_storage(storage).await? {}
+    while create_aggregated_commits_storage(storage, config).await? {}
+    while create_aggregated_prover_task_storage(storage, config).await? {}
     while create_aggregated_publish_proof_operation_storage(storage).await? {}
-    while create_aggregated_execute_operation_storage(storage).await? {}
+    while create_aggregated_execute_operation_storage(storage, config).await? {}
 
     Ok(())
 }

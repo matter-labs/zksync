@@ -45,7 +45,7 @@ pub struct ForcedExit {
     #[serde(skip)]
     cached_signer: VerifiedSignatureCache,
     /// Time range when the transaction is valid
-    #[serde(flatten)]
+    #[serde(flatten, default)]
     pub time_range: TimeRange,
 }
 

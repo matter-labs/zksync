@@ -36,8 +36,9 @@ impl ProverConfig for PlonkStepByStepProverConfig {
     fn from_env() -> Self {
         let env_config = ChainConfig::from_env();
 
-        let aggregated_proof_sizes_with_setup_pow =
-            env_config.circuit.aggregated_proof_sizes_with_setup_pow();
+        let aggregated_proof_sizes_with_setup_pow = env_config
+            .circuit
+            .supported_aggregated_proof_sizes_with_setup_pow();
 
         Self {
             download_setup_from_network: parse_env("MISC_PROVER_DOWNLOAD_SETUP"),
