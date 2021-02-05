@@ -50,18 +50,18 @@ pub fn used_account_subtree_depth() -> usize {
 pub fn max_account_id() -> AccountId {
     let list_count = 2u32.saturating_pow(used_account_subtree_depth() as u32);
     if list_count == u32::MAX {
-        list_count
+        AccountId(list_count)
     } else {
-        list_count - 1
+        AccountId(list_count - 1)
     }
 }
 
 /// Max token id, based on the number of processable tokens
 pub fn max_token_id() -> TokenId {
-    number_of_processable_tokens() as u16 - 1
+    TokenId(number_of_processable_tokens() as u16 - 1)
 }
 
-pub const ETH_TOKEN_ID: TokenId = 0;
+pub const ETH_TOKEN_ID: TokenId = TokenId(0);
 
 pub const ACCOUNT_ID_BIT_WIDTH: usize = 32;
 

@@ -102,7 +102,7 @@ impl PlonkStepByStepProver {
         };
 
         if proofs_to_pad > 0 {
-            log::info!(
+            vlog::info!(
                 "Padding aggregated proofs. proofs: {}, proofs to pad: {}, aggregate_size: {}",
                 proofs.len(),
                 proofs_to_pad,

@@ -1,6 +1,6 @@
 // External imports
 // Workspace imports
-use zksync_types::aggregated_operations::AggregatedActionType;
+use zksync_types::{aggregated_operations::AggregatedActionType, BlockNumber};
 // Local imports
 use crate::{
     chain::{
@@ -22,14 +22,14 @@ async fn aggregated_operations(mut storage: StorageProcessor<'_>) -> QueryResult
     let action_type = AggregatedActionType::CommitBlocks;
     OperationsSchema(&mut storage)
         .store_aggregated_action(gen_unique_aggregated_operation(
-            block_number,
+            BlockNumber(block_number),
             action_type,
             100,
         ))
         .await?;
 
     let stored_operation = OperationsSchema(&mut storage)
-        .get_stored_aggregated_operation(block_number as u32, action_type)
+        .get_stored_aggregated_operation(BlockNumber(block_number as u32), action_type)
         .await
         .unwrap();
 
@@ -189,7 +189,7 @@ async fn duplicated_operations(mut storage: StorageProcessor<'_>) -> QueryResult
 
     // Get the block transactions and check if there are exactly 2 txs.
     let block_txs = BlockSchema(&mut storage)
-        .get_block_transactions(BLOCK_NUMBER as u32)
+        .get_block_transactions(BlockNumber(BLOCK_NUMBER as u32))
         .await?;
 
     assert_eq!(block_txs.len(), 2);
@@ -247,7 +247,7 @@ async fn transaction_resent(mut storage: StorageProcessor<'_>) -> QueryResult<()
 
     // Get the block transactions and check if there is exactly 1 tx (failed tx not copied but replaced).
     let block_txs = BlockSchema(&mut storage)
-        .get_block_transactions(BLOCK_NUMBER as u32)
+        .get_block_transactions(BlockNumber(BLOCK_NUMBER as u32))
         .await?;
     assert_eq!(block_txs.len(), 1);
 
@@ -267,7 +267,7 @@ async fn transaction_resent(mut storage: StorageProcessor<'_>) -> QueryResult<()
 
     // ...and there still must be one operation.
     let block_txs = BlockSchema(&mut storage)
-        .get_block_transactions(BLOCK_NUMBER as u32)
+        .get_block_transactions(BlockNumber(BLOCK_NUMBER as u32))
         .await?;
     assert_eq!(block_txs.len(), 1);
 

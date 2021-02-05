@@ -7,7 +7,6 @@ use futures::{
 };
 use num::{bigint::Sign, BigInt, BigUint, Zero};
 use std::collections::HashMap;
-use web3::transports::Http;
 use zksync_core::committer::{BlockCommitRequest, CommitRequest};
 use zksync_core::mempool::ProposedBlock;
 use zksync_core::state_keeper::{StateKeeperRequest, ZkSyncStateInitParams};
@@ -16,7 +15,8 @@ use zksync_types::{
     block::Block,
     mempool::SignedTxVariant,
     tx::SignedZkSyncTx,
-    Account, AccountId, AccountMap, Address, Fr, PriorityOp, TokenId, ZkSyncTx, H256, U256,
+    Account, AccountId, AccountMap, Address, BlockNumber, Fr, PriorityOp, TokenId, ZkSyncTx, H256,
+    U256,
 };
 
 use web3::types::TransactionReceipt;
@@ -40,12 +40,12 @@ pub struct TestSetup {
     pub state_keeper_request_sender: mpsc::Sender<StateKeeperRequest>,
     pub proposed_blocks_receiver: mpsc::Receiver<CommitRequest>,
 
-    pub accounts: AccountSet<Http>,
+    pub accounts: AccountSet,
     pub tokens: HashMap<TokenId, Address>,
 
     pub expected_changes_for_current_block: ExpectedAccountState,
 
-    pub commit_account: EthereumAccount<Http>,
+    pub commit_account: EthereumAccount,
     pub current_state_root: Option<Fr>,
 
     pub last_committed_block: Block,
@@ -73,15 +73,15 @@ pub enum AccountTransfer {
 impl TestSetup {
     pub fn new(
         sk_channels: StateKeeperChannels,
-        accounts: AccountSet<Http>,
+        accounts: AccountSet,
         deployed_contracts: &Contracts,
-        commit_account: EthereumAccount<Http>,
+        commit_account: EthereumAccount,
         initial_root: Fr,
         last_block: Option<Block>,
     ) -> Self {
         let mut tokens = HashMap::new();
-        tokens.insert(1, deployed_contracts.test_erc20_address);
-        tokens.insert(0, Address::default());
+        tokens.insert(TokenId(1), deployed_contracts.test_erc20_address);
+        tokens.insert(TokenId(0), Address::default());
         Self {
             state_keeper_request_sender: sk_channels.requests,
             proposed_blocks_receiver: sk_channels.new_blocks,
@@ -92,9 +92,9 @@ impl TestSetup {
             current_state_root: None,
             last_committed_block: last_block.unwrap_or_else(|| {
                 Block::new(
-                    0,
+                    BlockNumber(0),
                     initial_root,
-                    0,
+                    AccountId(0),
                     vec![],
                     (0, 0),
                     0,
@@ -166,13 +166,13 @@ impl TestSetup {
         if !self
             .expected_changes_for_current_block
             .eth_accounts_state
-            .contains_key(&(eth_account_id, 0))
+            .contains_key(&(eth_account_id, TokenId(0)))
         {
             // Setup eth balance for fee
-            let balance = self.get_eth_balance(eth_account_id, 0).await;
+            let balance = self.get_eth_balance(eth_account_id, TokenId(0)).await;
             self.expected_changes_for_current_block
                 .eth_accounts_state
-                .insert((eth_account_id, 0), balance);
+                .insert((eth_account_id, TokenId(0)), balance);
         }
 
         if !self
@@ -275,7 +275,7 @@ impl TestSetup {
             },
         ));
 
-        let token_address = if token.0 == 0 {
+        let token_address = if token.0 == TokenId(0) {
             None
         } else {
             Some(
@@ -301,7 +301,7 @@ impl TestSetup {
 
         transfers.push(AccountTransfer::EthAccountTransfer(EthAccountTransfer {
             account_id: from,
-            token_id: 0,
+            token_id: TokenId(0),
             amount: BigInt::from_biguint(Sign::Minus, gas_fee),
         }));
 
@@ -357,7 +357,7 @@ impl TestSetup {
             amount: BigInt::from_biguint(Sign::Minus, amount.clone()),
         }));
 
-        let token_address = if token.0 == 0 {
+        let token_address = if token.0 == TokenId(0) {
             None
         } else {
             Some(
@@ -386,7 +386,7 @@ impl TestSetup {
 
         transfers.push(AccountTransfer::EthAccountTransfer(EthAccountTransfer {
             account_id: from,
-            token_id: 0,
+            token_id: TokenId(0),
             amount: BigInt::from_biguint(Sign::Minus, gas_fee),
         }));
 
@@ -451,7 +451,7 @@ impl TestSetup {
             .await
             .map(|(id, _)| id)
             .expect("Account should be in the map");
-        let token_address = if token.0 == 0 {
+        let token_address = if token.0 == TokenId(0) {
             Address::zero()
         } else {
             *self.tokens.get(&token.0).expect("Token does not exist")
@@ -489,7 +489,7 @@ impl TestSetup {
 
         transfers.push(AccountTransfer::EthAccountTransfer(EthAccountTransfer {
             account_id: post_by,
-            token_id: 0,
+            token_id: TokenId(0),
             amount: BigInt::from_biguint(Sign::Minus, gas_fee),
         }));
 
@@ -1043,7 +1043,7 @@ impl TestSetup {
 
     pub async fn get_eth_balance(&self, eth_account_id: ETHAccountId, token: TokenId) -> BigUint {
         let account = &self.accounts.eth_accounts[eth_account_id.0];
-        let result = if token == 0 {
+        let result = if token == TokenId(0) {
             account
                 .eth_balance()
                 .await

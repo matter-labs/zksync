@@ -20,6 +20,7 @@ use crate::{
     QueryResult, StorageProcessor,
 };
 use zksync_types::aggregated_operations::AggregatedOperation;
+use zksync_types::BlockNumber;
 
 mod setup;
 
@@ -71,23 +72,30 @@ async fn update_blocks_status(mut storage: &mut StorageProcessor<'_>) -> QueryRe
     storage.ethereum_schema().initialize_eth_data().await?;
     // Make first block committed.
     BlockSchema(&mut storage)
-        .save_block(gen_sample_block(1, BLOCK_SIZE_CHUNKS, Default::default()))
+        .save_block(gen_sample_block(
+            BlockNumber(1),
+            BLOCK_SIZE_CHUNKS,
+            Default::default(),
+        ))
         .await?;
     OperationsSchema(&mut storage)
         .store_aggregated_action(gen_unique_aggregated_operation(
-            1,
+            BlockNumber(1),
             AggregatedActionType::CommitBlocks,
             BLOCK_SIZE_CHUNKS,
         ))
         .await?;
     let (id, aggregated_op) = OperationsSchema(&mut storage)
-        .get_aggregated_op_that_affects_block(AggregatedActionType::CommitBlocks, 1_u32)
+        .get_aggregated_op_that_affects_block(
+            AggregatedActionType::CommitBlocks,
+            BlockNumber(1_u32),
+        )
         .await?
         .unwrap();
     storage
         .chain()
         .state_schema()
-        .commit_state_update(1, &[], 0)
+        .commit_state_update(BlockNumber(1), &[], 0)
         .await?;
     confirm_eth_op(
         storage,
@@ -99,13 +107,16 @@ async fn update_blocks_status(mut storage: &mut StorageProcessor<'_>) -> QueryRe
     // Make first block verified.
     OperationsSchema(&mut storage)
         .store_aggregated_action(gen_unique_aggregated_operation(
-            1,
+            BlockNumber(1),
             AggregatedActionType::ExecuteBlocks,
             BLOCK_SIZE_CHUNKS,
         ))
         .await?;
     let (id, op) = OperationsSchema(&mut storage)
-        .get_aggregated_op_that_affects_block(AggregatedActionType::ExecuteBlocks, 1_u32)
+        .get_aggregated_op_that_affects_block(
+            AggregatedActionType::ExecuteBlocks,
+            BlockNumber(1_u32),
+        )
         .await?
         .unwrap();
     confirm_eth_op(storage, (id, op), AggregatedActionType::ExecuteBlocks).await?;

@@ -6,7 +6,7 @@ use zksync_state::{
     handler::TxHandler,
     state::{CollectedFee, ZkSyncState},
 };
-use zksync_types::{ForcedExit, ForcedExitOp};
+use zksync_types::{AccountId, ForcedExit, ForcedExitOp, TokenId};
 // Local deps
 use crate::witness::{
     forced_exit::ForcedExitWitness,
@@ -28,8 +28,8 @@ fn test_forced_exit_success() {
     for (withdraw_amount, fee_amount) in test_vector {
         // Input data.
         let mut accounts = vec![
-            WitnessTestAccount::new(1, fee_amount),
-            WitnessTestAccount::new(2, withdraw_amount),
+            WitnessTestAccount::new(AccountId(1), fee_amount),
+            WitnessTestAccount::new(AccountId(2), withdraw_amount),
         ];
         // Remove pubkey hash from the target account.
         accounts[1].set_empty_pubkey_hash();
@@ -37,7 +37,7 @@ fn test_forced_exit_success() {
         let (account_from, account_to) = (&accounts[0], &accounts[1]);
         let forced_exit_op = ForcedExitOp {
             tx: account_from.zksync_account.sign_forced_exit(
-                0,
+                TokenId(0),
                 BigUint::from(fee_amount),
                 &account_to.account.address,
                 None,
@@ -80,8 +80,8 @@ fn corrupted_ops_input() {
     let fee_amount = 1;
     let withdraw_amount = 100;
     let mut accounts = vec![
-        WitnessTestAccount::new(1, fee_amount),
-        WitnessTestAccount::new(2, withdraw_amount),
+        WitnessTestAccount::new(AccountId(1), fee_amount),
+        WitnessTestAccount::new(AccountId(2), withdraw_amount),
     ];
     // Remove pubkey hash from the target account.
     accounts[1].set_empty_pubkey_hash();
@@ -89,7 +89,7 @@ fn corrupted_ops_input() {
     let (account_from, account_to) = (&accounts[0], &accounts[1]);
     let forced_exit_op = ForcedExitOp {
         tx: account_from.zksync_account.sign_forced_exit(
-            0,
+            TokenId(0),
             BigUint::from(fee_amount),
             &account_to.account.address,
             None,
@@ -129,21 +129,21 @@ fn corrupted_ops_input() {
 #[test]
 #[ignore]
 fn test_incorrect_target() {
-    const TOKEN_ID: u16 = 0;
+    const TOKEN_ID: TokenId = TokenId(0);
     const WITHDRAW_AMOUNT: u64 = 7;
     const FEE_AMOUNT: u64 = 3;
 
     // Operation is not valid, since target account does not exist.
     const ERR_MSG: &str = "op_valid is true/enforce equal to one";
 
-    let accounts = vec![WitnessTestAccount::new(1, FEE_AMOUNT)];
+    let accounts = vec![WitnessTestAccount::new(AccountId(1), FEE_AMOUNT)];
 
-    let incorrect_account = WitnessTestAccount::new_empty(2);
+    let incorrect_account = WitnessTestAccount::new_empty(AccountId(2));
 
     let (account_from, account_to) = (&accounts[0], &incorrect_account);
     let forced_exit_op = ForcedExitOp {
         tx: account_from.zksync_account.sign_forced_exit(
-            0,
+            TokenId(0),
             BigUint::from(FEE_AMOUNT),
             &account_to.account.address,
             None,
@@ -176,14 +176,14 @@ fn test_incorrect_target() {
 #[test]
 #[ignore]
 fn test_target_has_key_set() {
-    const TOKEN_ID: u16 = 0;
+    const TOKEN_ID: TokenId = TokenId(0);
     const FEE_AMOUNT: u64 = 3;
     const WITHDRAW_AMOUNT: u64 = 100;
 
     // Input data: we DO NOT reset the signing key for the second account.
     let accounts = vec![
-        WitnessTestAccount::new(1, FEE_AMOUNT),
-        WitnessTestAccount::new(2, WITHDRAW_AMOUNT),
+        WitnessTestAccount::new(AccountId(1), FEE_AMOUNT),
+        WitnessTestAccount::new(AccountId(2), WITHDRAW_AMOUNT),
     ];
 
     let (account_from, account_to) = (&accounts[0], &accounts[1]);
@@ -224,7 +224,7 @@ fn test_target_has_key_set() {
 #[test]
 #[ignore]
 fn test_not_enough_fees() {
-    const TOKEN_ID: u16 = 0;
+    const TOKEN_ID: TokenId = TokenId(0);
     const FEE_AMOUNT: u64 = 3;
     const WITHDRAW_AMOUNT: u64 = 100;
 
@@ -235,14 +235,14 @@ fn test_not_enough_fees() {
 
     // Input data: we DO NOT reset the signing key for the second account.
     let accounts = vec![
-        WitnessTestAccount::new(1, 0u64), // Note that initiator account has no enough funds to cover fees.
-        WitnessTestAccount::new(2, WITHDRAW_AMOUNT),
+        WitnessTestAccount::new(AccountId(1), 0u64), // Note that initiator account has no enough funds to cover fees.
+        WitnessTestAccount::new(AccountId(2), WITHDRAW_AMOUNT),
     ];
 
     let (account_from, account_to) = (&accounts[0], &accounts[1]);
     let forced_exit_op = ForcedExitOp {
         tx: account_from.zksync_account.sign_forced_exit(
-            0,
+            TokenId(0),
             BigUint::from(FEE_AMOUNT),
             &account_to.account.address,
             None,
@@ -276,7 +276,7 @@ fn test_not_enough_fees() {
 #[test]
 #[ignore]
 fn test_not_enough_balance() {
-    const TOKEN_ID: u16 = 0;
+    const TOKEN_ID: TokenId = TokenId(0);
     const FEE_AMOUNT: u64 = 3;
     const WITHDRAW_AMOUNT: u64 = 100;
 
@@ -286,14 +286,14 @@ fn test_not_enough_balance() {
 
     // Input data: we DO NOT reset the signing key for the second account.
     let accounts = vec![
-        WitnessTestAccount::new(1, FEE_AMOUNT),
-        WitnessTestAccount::new(2, 0u64), // Note that target account has no enough funds for withdrawal.
+        WitnessTestAccount::new(AccountId(1), FEE_AMOUNT),
+        WitnessTestAccount::new(AccountId(2), 0u64), // Note that target account has no enough funds for withdrawal.
     ];
 
     let (account_from, account_to) = (&accounts[0], &accounts[1]);
     let forced_exit_op = ForcedExitOp {
         tx: account_from.zksync_account.sign_forced_exit(
-            0,
+            TokenId(0),
             BigUint::from(FEE_AMOUNT),
             &account_to.account.address,
             None,
@@ -327,7 +327,7 @@ fn test_not_enough_balance() {
 #[test]
 #[ignore]
 fn test_not_exact_withdrawal_amount() {
-    const TOKEN_ID: u16 = 0;
+    const TOKEN_ID: TokenId = TokenId(0);
     const FEE_AMOUNT: u64 = 3;
     const ACCOUNT_BALANCE: u64 = FEE_AMOUNT * 2;
     const WITHDRAW_AMOUNT: u64 = 100;
@@ -338,14 +338,14 @@ fn test_not_exact_withdrawal_amount() {
 
     // Input data: we DO NOT reset the signing key for the second account.
     let accounts = vec![
-        WitnessTestAccount::new(1, FEE_AMOUNT),
-        WitnessTestAccount::new(2, ACCOUNT_BALANCE), // Note that target account has more funds than `WITHDRAW_AMOUNT`.
+        WitnessTestAccount::new(AccountId(1), FEE_AMOUNT),
+        WitnessTestAccount::new(AccountId(2), ACCOUNT_BALANCE), // Note that target account has more funds than `WITHDRAW_AMOUNT`.
     ];
 
     let (account_from, account_to) = (&accounts[0], &accounts[1]);
     let forced_exit_op = ForcedExitOp {
         tx: account_from.zksync_account.sign_forced_exit(
-            0,
+            TokenId(0),
             BigUint::from(FEE_AMOUNT),
             &account_to.account.address,
             None,

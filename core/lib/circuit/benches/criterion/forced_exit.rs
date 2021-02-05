@@ -4,7 +4,7 @@ use criterion::{black_box, criterion_group, Bencher, BenchmarkId, Criterion};
 use num::BigUint;
 use zksync_circuit::witness::{utils::SigDataInput, Witness};
 use zksync_crypto::franklin_crypto::bellman::pairing::bn256::Bn256;
-use zksync_types::ForcedExitOp;
+use zksync_types::{ForcedExitOp, TokenId};
 
 use zksync_circuit::witness::forced_exit::ForcedExitWitness;
 
@@ -17,7 +17,7 @@ fn forced_exit_apply_tx(b: &mut Bencher<'_>, number_of_accounts: &usize) {
     let account_to = &accounts[0];
     let forced_exit_op = ForcedExitOp {
         tx: account_from.zksync_account.sign_forced_exit(
-            0,
+            TokenId(0),
             BigUint::from(1u64),
             &account_to.account.address,
             None,
@@ -42,7 +42,7 @@ fn forced_exit_get_pubdata(b: &mut Bencher<'_>) {
     let account_to = &accounts[0];
     let forced_exit_op = ForcedExitOp {
         tx: account_from.zksync_account.sign_forced_exit(
-            0,
+            TokenId(0),
             BigUint::from(1u64),
             &account_to.account.address,
             None,
@@ -67,7 +67,7 @@ fn forced_exit_calculate_operations(b: &mut Bencher<'_>) {
     let account_to = &accounts[0];
     let forced_exit_op = ForcedExitOp {
         tx: account_from.zksync_account.sign_forced_exit(
-            0,
+            TokenId(0),
             BigUint::from(1u64),
             &account_to.account.address,
             None,

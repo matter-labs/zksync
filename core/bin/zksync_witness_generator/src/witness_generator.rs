@@ -113,7 +113,7 @@ impl<DB: DatabaseInterface> WitnessGenerator<DB> {
                 .load_committed_state(&mut storage, Some(block))
                 .await?;
             for (id, account) in accounts {
-                circuit_account_tree.insert(id, account.into());
+                circuit_account_tree.insert(*id, account.into());
             }
             circuit_account_tree.set_internals(serde_json::from_value(account_tree_cache)?);
             if block != cached_block {
@@ -134,7 +134,7 @@ impl<DB: DatabaseInterface> WitnessGenerator<DB> {
                     updated_accounts.dedup();
                     for idx in updated_accounts {
                         circuit_account_tree
-                            .insert(idx, accounts.get(&idx).cloned().unwrap_or_default().into());
+                            .insert(*idx, accounts.get(&idx).cloned().unwrap_or_default().into());
                     }
                 }
                 circuit_account_tree.root_hash();
@@ -153,7 +153,7 @@ impl<DB: DatabaseInterface> WitnessGenerator<DB> {
                 .load_committed_state(&mut storage, Some(block))
                 .await?;
             for (id, account) in accounts {
-                circuit_account_tree.insert(id, account.into());
+                circuit_account_tree.insert(*id, account.into());
             }
             circuit_account_tree.root_hash();
             let account_tree_cache = circuit_account_tree.get_internals();
@@ -166,7 +166,7 @@ impl<DB: DatabaseInterface> WitnessGenerator<DB> {
                 .await?;
         }
 
-        if block != 0 {
+        if block != BlockNumber(0) {
             let storage_block = self
                 .database
                 .load_block(&mut storage, block)
@@ -189,14 +189,14 @@ impl<DB: DatabaseInterface> WitnessGenerator<DB> {
         let mut storage = self.database.acquire_connection().await?;
 
         let mut circuit_account_tree = self.load_account_tree(block.block_number - 1).await?;
-        log::trace!(
+        vlog::trace!(
             "Witness generator loading circuit account tree {}s",
             timer.elapsed().as_secs()
         );
 
         let timer = time::Instant::now();
         let witness: ProverData = build_block_witness(&mut circuit_account_tree, &block)?.into();
-        log::trace!(
+        vlog::trace!(
             "Witness generator witness build {}s",
             timer.elapsed().as_secs()
         );
@@ -224,17 +224,19 @@ impl<DB: DatabaseInterface> WitnessGenerator<DB> {
     ) -> BlockNumber {
         match block_info {
             BlockInfo::NotReadyBlock => current_block, // Keep waiting
-            BlockInfo::WithWitness | BlockInfo::NoWitness(_) => current_block + block_step, // Go to the next block
+            BlockInfo::WithWitness | BlockInfo::NoWitness(_) => {
+                BlockNumber(*current_block + *block_step)
+            } // Go to the next block
         }
     }
 
     /// Updates witness data in database in an infinite loop,
     /// awaiting `rounds_interval` time between updates.
     async fn maintain(self) {
-        log::info!(
+        vlog::info!(
             "preparing prover data routine started with start_block({}), block_step({})",
-            self.start_block,
-            self.block_step
+            *self.start_block,
+            *self.block_step
         );
         let mut current_block = self.start_block;
         loop {
@@ -242,7 +244,7 @@ impl<DB: DatabaseInterface> WitnessGenerator<DB> {
             let should_work = match self.should_work_on_block(current_block).await {
                 Ok(should_work) => should_work,
                 Err(err) => {
-                    log::warn!("witness for block {} check failed: {}", current_block, err);
+                    vlog::warn!("witness for block {} check failed: {}", current_block, err);
                     continue;
                 }
             };
@@ -251,7 +253,7 @@ impl<DB: DatabaseInterface> WitnessGenerator<DB> {
             if let BlockInfo::NoWitness(block) = should_work {
                 let block_number = block.block_number;
                 if let Err(err) = self.prepare_witness_and_save_it(block).await {
-                    log::warn!("Witness generator ({},{}) failed to prepare witness for block: {}, err: {}",
+                    vlog::warn!("Witness generator ({},{}) failed to prepare witness for block: {}, err: {}",
                         self.start_block, self.block_step, block_number, err);
                     continue; // Retry the same block on the next iteration.
                 }
@@ -268,22 +270,30 @@ mod tests {
     use super::*;
     use crate::database::Database;
     use zksync_crypto::Fr;
-    use zksync_types::{H256, U256};
+    use zksync_types::{AccountId, H256, U256};
 
     #[test]
     fn test_next_witness_block() {
         assert_eq!(
-            WitnessGenerator::<Database>::next_witness_block(3, 4, &BlockInfo::NotReadyBlock),
-            3
+            WitnessGenerator::<Database>::next_witness_block(
+                BlockNumber(3),
+                BlockNumber(4),
+                &BlockInfo::NotReadyBlock
+            ),
+            BlockNumber(3)
         );
         assert_eq!(
-            WitnessGenerator::<Database>::next_witness_block(3, 4, &BlockInfo::WithWitness),
-            7
+            WitnessGenerator::<Database>::next_witness_block(
+                BlockNumber(3),
+                BlockNumber(4),
+                &BlockInfo::WithWitness
+            ),
+            BlockNumber(7)
         );
         let empty_block = Block::new(
-            0,
+            BlockNumber(0),
             Fr::default(),
-            0,
+            AccountId(0),
             vec![],
             (0, 0),
             0,
@@ -294,11 +304,11 @@ mod tests {
         );
         assert_eq!(
             WitnessGenerator::<Database>::next_witness_block(
-                3,
-                4,
+                BlockNumber(3),
+                BlockNumber(4),
                 &BlockInfo::NoWitness(empty_block)
             ),
-            7
+            BlockNumber(7)
         );
     }
 }

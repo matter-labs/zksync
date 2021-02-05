@@ -17,7 +17,7 @@ use zksync_types::{
     aggregated_operations::{AggregatedActionType, AggregatedOperation},
     block::Block,
     prover::{ProverJob, ProverJobStatus, ProverJobType},
-    AccountMap, AccountTree, AccountUpdates, Address, BlockNumber,
+    AccountId, AccountMap, AccountTree, AccountUpdates, Address, BlockNumber,
 };
 // Local uses
 use crate::DatabaseInterface;
@@ -59,7 +59,7 @@ impl MockDatabase {
         let validator_account = zksync_types::Account::default_with_address(
             &Address::from_str("34083bbd70d394110487feaa087da875a54624ec").unwrap(),
         );
-        let validator_account_id: u32 = 0;
+        let validator_account_id = AccountId(0);
         accounts.insert(validator_account_id, validator_account.clone());
 
         tree.insert(0, validator_account);
@@ -99,8 +99,8 @@ impl DatabaseInterface for MockDatabase {
 
         let new_job = StorageProverJobQueue {
             job_status: ProverJobStatus::Idle.to_number(),
-            first_block: i64::from(first_block),
-            last_block: i64::from(last_block),
+            first_block: i64::from(*first_block),
+            last_block: i64::from(*last_block),
             job_type: job_type.to_string(),
             created_at: Utc::now(),
             updated_at: Utc::now(),
@@ -131,7 +131,7 @@ impl DatabaseInterface for MockDatabase {
             .max()
             .unwrap_or_default();
 
-        Ok(block_number as BlockNumber)
+        Ok(BlockNumber(block_number as u32))
     }
 
     async fn pending_jobs_count(&self, _: &mut StorageProcessor<'_>) -> anyhow::Result<u32> {
@@ -164,7 +164,7 @@ impl DatabaseInterface for MockDatabase {
         let proofs = self.proofs.read().await;
         let single_proof = proofs
             .iter()
-            .find(|proof| proof.block_number == block_number as i64)
+            .find(|proof| proof.block_number == *block_number as i64)
             .map(|stored| serde_json::from_value(stored.proof.clone()).unwrap());
 
         Ok(single_proof)
@@ -189,7 +189,7 @@ impl DatabaseInterface for MockDatabase {
         &self,
         _: &mut StorageProcessor<'_>,
     ) -> anyhow::Result<BlockNumber> {
-        Ok(0)
+        Ok(BlockNumber(0))
     }
 
     async fn load_block(
@@ -213,7 +213,7 @@ impl DatabaseInterface for MockDatabase {
     ) -> anyhow::Result<Option<(BlockNumber, serde_json::Value)>> {
         let account_tree_cache = self.account_tree_cache.read().await;
         let result = (
-            account_tree_cache.block as BlockNumber,
+            BlockNumber(account_tree_cache.block as u32),
             serde_json::from_str(&account_tree_cache.tree_cache)
                 .expect("Failed to deserialize Account Tree Cache"),
         );
@@ -238,8 +238,8 @@ impl DatabaseInterface for MockDatabase {
 
             Some(ProverJob::new(
                 job.id,
-                job.first_block as BlockNumber,
-                job.last_block as BlockNumber,
+                BlockNumber(job.first_block as u32),
+                BlockNumber(job.last_block as u32),
                 job.job_data.clone(),
             ))
         } else {
@@ -282,7 +282,7 @@ impl DatabaseInterface for MockDatabase {
             job.updated_by = "server_finish_job".to_string();
         }
         let proof = StoredProof {
-            block_number: i64::from(block_number),
+            block_number: i64::from(*block_number),
             created_at: Utc::now(),
             proof: serde_json::to_value(proof).unwrap(),
         };
@@ -324,18 +324,18 @@ impl DatabaseInterface for MockDatabase {
     async fn load_committed_state(
         &self,
         _: &mut StorageProcessor<'_>,
-        _block: Option<u32>,
-    ) -> anyhow::Result<(u32, AccountMap)> {
+        _block: Option<BlockNumber>,
+    ) -> anyhow::Result<(BlockNumber, AccountMap)> {
         let (last_block, accounts) = self.accounts_state.read().await.clone();
-        Ok((last_block, accounts))
+        Ok((BlockNumber(last_block), accounts))
     }
 
     async fn load_state_diff(
         &self,
         _: &mut StorageProcessor<'_>,
-        _from_block: u32,
-        _to_block: Option<u32>,
-    ) -> anyhow::Result<Option<(u32, AccountUpdates)>> {
+        _from_block: BlockNumber,
+        _to_block: Option<BlockNumber>,
+    ) -> anyhow::Result<Option<(BlockNumber, AccountUpdates)>> {
         Ok(None)
     }
 
@@ -345,7 +345,7 @@ impl DatabaseInterface for MockDatabase {
         block: BlockNumber,
         tree_cache: serde_json::Value,
     ) -> anyhow::Result<()> {
-        if block == 0 {
+        if *block == 0 {
             return Ok(());
         }
         let tree_cache =
@@ -353,7 +353,7 @@ impl DatabaseInterface for MockDatabase {
 
         let mut account_tree_cache = self.account_tree_cache.write().await;
         *account_tree_cache = AccountTreeCache {
-            block: i64::from(block),
+            block: i64::from(*block),
             tree_cache,
         };
 
@@ -368,7 +368,7 @@ impl DatabaseInterface for MockDatabase {
         let block_witness = self.block_witness.read().await;
         let witness = block_witness
             .iter()
-            .find(|witness| witness.block == block_number as i64)
+            .find(|witness| witness.block == *block_number as i64)
             .map(|w| serde_json::from_str(&w.witness).expect("Failed to deserialize witness"));
 
         Ok(witness)
@@ -384,12 +384,12 @@ impl DatabaseInterface for MockDatabase {
         let mut block_witness = self.block_witness.write().await;
         let is_block_not_saved_yet = block_witness
             .iter()
-            .find(|witness| witness.block == block as i64)
+            .find(|witness| witness.block == *block as i64)
             .is_none();
 
         if is_block_not_saved_yet {
             block_witness.push(StorageBlockWitness {
-                block: block as i64,
+                block: *block as i64,
                 witness: witness_str,
             });
         }

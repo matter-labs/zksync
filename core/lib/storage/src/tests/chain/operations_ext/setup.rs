@@ -11,8 +11,8 @@ use zksync_types::block::{Block, ExecutedOperations, ExecutedPriorityOp, Execute
 use zksync_types::operations::{ChangePubKeyOp, ZkSyncOp};
 use zksync_types::priority_ops::PriorityOp;
 use zksync_types::{
-    Address, CloseOp, Deposit, DepositOp, FullExit, FullExitOp, Token, TransferOp, TransferToNewOp,
-    WithdrawOp,
+    AccountId, Address, BlockNumber, CloseOp, Deposit, DepositOp, FullExit, FullExitOp, Token,
+    TokenId, TransferOp, TransferToNewOp, WithdrawOp,
 };
 // Local imports
 
@@ -31,16 +31,16 @@ pub struct TransactionsHistoryTestSetup {
 impl TransactionsHistoryTestSetup {
     pub fn new() -> Self {
         let tokens = vec![
-            Token::new(0, Address::zero(), "ETH", 18), // used for deposits
-            Token::new(1, Address::random(), "DAI", 18), // used for transfers
-            Token::new(2, Address::random(), "FAU", 6), // used for withdraws
+            Token::new(TokenId(0), Address::zero(), "ETH", 18), // used for deposits
+            Token::new(TokenId(1), Address::random(), "DAI", 18), // used for transfers
+            Token::new(TokenId(2), Address::random(), "FAU", 6), // used for withdraws
         ];
 
-        let from_account_id = 0xbabe;
+        let from_account_id = AccountId(0xbabe);
         let from_zksync_account = ZkSyncAccount::rand();
         from_zksync_account.set_account_id(Some(from_account_id));
 
-        let to_account_id = 0xdcba;
+        let to_account_id = AccountId(0xdcba);
         let to_zksync_account = ZkSyncAccount::rand();
         to_zksync_account.set_account_id(Some(to_account_id));
 
@@ -81,9 +81,9 @@ impl TransactionsHistoryTestSetup {
         ];
 
         let block = Block::new(
-            block_id,
+            BlockNumber(block_id),
             Fr::zero(),
-            0,
+            AccountId(0),
             operations,
             (0, 0), // Not important
             100,
@@ -118,9 +118,9 @@ impl TransactionsHistoryTestSetup {
         ];
 
         let block = Block::new(
-            block_id,
+            BlockNumber(block_id),
             Fr::zero(),
-            0,
+            AccountId(0),
             operations,
             (0, 0), // Not important
             100,
@@ -319,7 +319,7 @@ impl TransactionsHistoryTestSetup {
             tx: self.from_zksync_account.sign_change_pubkey_tx(
                 None,
                 false,
-                0,
+                TokenId(0),
                 Default::default(),
                 false,
                 Default::default(),

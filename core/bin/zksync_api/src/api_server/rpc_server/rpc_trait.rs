@@ -1,19 +1,18 @@
 use std::collections::HashMap;
 // External uses
+use bigdecimal::BigDecimal;
 use futures::{FutureExt, TryFutureExt};
 use jsonrpc_core::Error;
 use jsonrpc_derive::rpc;
+
 // Workspace uses
 use zksync_crypto::params::ZKSYNC_VERSION;
 use zksync_types::{
     tx::{EthBatchSignatures, TxEthSignature, TxHash},
-    Address, Token, TokenLike, TxFeeTypes, ZkSyncTx,
+    Address, BatchFee, Fee, Token, TokenLike, TxFeeTypes, ZkSyncTx,
 };
 
 // Local uses
-use crate::fee_ticker::{BatchFee, Fee};
-use bigdecimal::BigDecimal;
-
 use super::{types::*, RpcApp};
 
 pub type FutureResp<T> = Box<dyn futures01::Future<Item = T, Error = Error> + Send>;
@@ -159,14 +158,14 @@ impl Rpc for RpcApp {
     fn get_tx_fee(
         &self,
         tx_type: TxFeeTypes,
-        _address: Address,
+        address: Address,
         token_like: TokenLike,
     ) -> FutureResp<Fee> {
         let handle = self.runtime_handle.clone();
         let self_ = self.clone();
         let resp = async move {
             handle
-                .spawn(self_._impl_get_tx_fee(tx_type, token_like))
+                .spawn(self_._impl_get_tx_fee(tx_type, address, token_like))
                 .await
                 .unwrap()
         };
@@ -176,14 +175,14 @@ impl Rpc for RpcApp {
     fn get_txs_batch_fee_in_wei(
         &self,
         tx_types: Vec<TxFeeTypes>,
-        _addresses: Vec<Address>,
+        addresses: Vec<Address>,
         token_like: TokenLike,
     ) -> FutureResp<BatchFee> {
         let handle = self.runtime_handle.clone();
         let self_ = self.clone();
         let resp = async move {
             handle
-                .spawn(self_._impl_get_txs_batch_fee_in_wei(tx_types, token_like))
+                .spawn(self_._impl_get_txs_batch_fee_in_wei(tx_types, addresses, token_like))
                 .await
                 .unwrap()
         };

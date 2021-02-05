@@ -12,7 +12,7 @@ pub struct BlocksCommitOperation {
 
 pub fn stored_block_info(block: &Block) -> Token {
     Token::Tuple(vec![
-        Token::Uint(U256::from(block.block_number)),
+        Token::Uint(U256::from(*block.block_number)),
         Token::Uint(U256::from(block.number_of_processed_prior_ops())),
         Token::FixedBytes(
             block
@@ -50,8 +50,8 @@ impl BlocksCommitOperation {
                     Token::Bytes(block.get_eth_public_data()),
                     Token::Uint(U256::from(block.timestamp)),
                     Token::Array(onchain_ops),
-                    Token::Uint(U256::from(block.block_number)),
-                    Token::Uint(U256::from(block.fee_account)),
+                    Token::Uint(U256::from(*block.block_number)),
+                    Token::Uint(U256::from(*block.fee_account)),
                 ])
             })
             .collect();

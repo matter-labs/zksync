@@ -128,12 +128,12 @@ async fn heartbeat_future_handle<CLIENT>(
         };
         tokio::time::delay_for(timeout_value).await;
 
-        log::info!("Starting sending heartbeats for job with ID: {}", job_id);
+        vlog::info!("Starting sending heartbeats for job with ID: {}", job_id);
 
         client
             .working_on(job_id, &prover_name)
             .await
-            .map_err(|e| log::warn!("Failed to send heartbeat: {}", e))
+            .map_err(|e| vlog::warn!("Failed to send heartbeat: {}", e))
             .unwrap_or_default();
     }
 }
@@ -148,7 +148,7 @@ pub async fn prover_work_cycle<PROVER, CLIENT>(
     CLIENT: 'static + Sync + Send + ApiClient + Clone,
     PROVER: ProverImpl + Send + Sync + 'static,
 {
-    log::info!("Running worker cycle");
+    vlog::info!("Running worker cycle");
     let mut new_job_poll_timer = tokio::time::interval(prover_options.prover.cycle_wait());
     loop {
         new_job_poll_timer.tick().await;
@@ -167,7 +167,7 @@ pub async fn prover_work_cycle<PROVER, CLIENT>(
         {
             Ok(job) => job,
             Err(e) => {
-                log::warn!("Failed to get job for prover: {}", e);
+                vlog::warn!("Failed to get job for prover: {}", e);
                 continue;
             }
         };
@@ -184,7 +184,7 @@ pub async fn prover_work_cycle<PROVER, CLIENT>(
             continue;
         };
 
-        log::info!(
+        vlog::info!(
             "got job id: {}, blocks: [{}, {}]",
             job_id,
             first_block,
@@ -202,7 +202,7 @@ pub async fn prover_work_cycle<PROVER, CLIENT>(
 
         pin_mut!(heartbeat_future_handle, compute_proof_future);
 
-        log::info!(
+        vlog::info!(
             "starting to compute proof for blocks: [{}, {}]",
             first_block,
             last_block
@@ -224,10 +224,10 @@ pub async fn prover_work_cycle<PROVER, CLIENT>(
                 data: proof,
             })
             .await
-            .map_err(|e| log::warn!("Failed to publish proof: {}", e))
+            .map_err(|e| vlog::warn!("Failed to publish proof: {}", e))
             .unwrap_or_default();
 
-        log::info!(
+        vlog::info!(
             "finished and published proof for blocks: [{}, {}]",
             first_block,
             last_block

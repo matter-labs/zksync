@@ -41,6 +41,7 @@ pub mod aggregated_operations;
 pub mod block;
 pub mod config;
 pub mod ethereum;
+pub mod fee;
 pub mod gas_counter;
 pub mod helpers;
 pub mod mempool;
@@ -57,6 +58,7 @@ mod tests;
 
 pub use self::account::{Account, AccountUpdate, PubKeyHash};
 pub use self::block::{ExecutedOperations, ExecutedPriorityOp, ExecutedTx};
+pub use self::fee::{BatchFee, Fee, OutputFeeType};
 pub use self::operations::{
     ChangePubKeyOp, DepositOp, ForcedExitOp, FullExitOp, TransferOp, TransferToNewOp, WithdrawOp,
     ZkSyncOp,
@@ -70,8 +72,8 @@ pub use self::{operations::CloseOp, tx::Close};
 
 pub use zksync_basic_types::*;
 
-pub type AccountMap = zksync_crypto::fnv::FnvHashMap<u32, Account>;
-pub type AccountUpdates = Vec<(u32, AccountUpdate)>;
+pub type AccountMap = zksync_crypto::fnv::FnvHashMap<AccountId, Account>;
+pub type AccountUpdates = Vec<(AccountId, AccountUpdate)>;
 pub type AccountTree = SparseMerkleTree<Account, Fr, RescueHasher<Engine>>;
 pub type SerialId = u64;
 

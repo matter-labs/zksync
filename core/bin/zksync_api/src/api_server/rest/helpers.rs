@@ -61,7 +61,7 @@ pub fn deposit_op_to_tx_by_hash(
                 tx_type: "Deposit".into(),
                 from: format!("{:?}", deposit.from),
                 to: format!("{:?}", deposit.to),
-                token: deposit.token as i32,
+                token: *deposit.token as i32,
                 amount: deposit.amount.to_string(),
                 fee: None,
                 block_number: -1,
@@ -147,7 +147,7 @@ pub async fn parse_tx_id(
 
         let next_block_id = last_block_id + 1;
 
-        return Ok((next_block_id as u64, 0));
+        return Ok((*next_block_id as u64, 0));
     }
 
     let parts: Vec<u64> = data

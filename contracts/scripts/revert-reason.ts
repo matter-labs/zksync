@@ -2,6 +2,8 @@ import { ethers } from 'ethers';
 import { readContractCode, readProductionContracts } from '../src.ts/deploy';
 import { Interface } from 'ethers/lib/utils';
 import * as chalk from 'chalk';
+import { web3Url } from './utils';
+
 const contracts = readProductionContracts();
 const franklinInterface = new Interface(contracts.zkSync.abi);
 const governanceInterface = new Interface(contracts.governance.abi);
@@ -20,7 +22,7 @@ function hex_to_ascii(str1) {
 async function reason() {
     const args = process.argv.slice(2);
     const hash = args[0];
-    const web3 = args[1] == null ? process.env.ETH_CLIENT_WEB3_URL : args[1];
+    const web3 = args[1] == null ? web3Url() : args[1];
     console.log('tx hash:', hash);
     console.log('provider:', web3);
 

@@ -56,8 +56,6 @@ impl EIP1271Config {
 /// Common Ethereum parameters.
 #[derive(Debug, Deserialize)]
 pub struct EthConfig {
-    /// Address of the local Ethereum node.
-    pub web3_url: String,
     /// Set of 12 words for connecting to an Ethereum wallet.
     pub test_mnemonic: String,
 }

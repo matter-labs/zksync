@@ -84,7 +84,7 @@ export function getTxToken(tx) {
     }
 
     if (tx.op.type === 'ChangePubKey') {
-        return tx.op.feeToken;
+        return tx.op.feeToken || 0;
     }
 
     return tx.op.token;

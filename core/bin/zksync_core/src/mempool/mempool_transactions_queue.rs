@@ -106,17 +106,17 @@ mod tests {
     use super::*;
     use crate::mempool::Address;
     use zksync_types::tx::{TimeRange, Transfer, Withdraw};
-    use zksync_types::{SignedZkSyncTx, ZkSyncTx};
+    use zksync_types::{AccountId, Nonce, SignedZkSyncTx, TokenId, ZkSyncTx};
 
     fn get_transfer_with_timestamps(valid_from: u64, valid_until: u64) -> SignedTxVariant {
         let transfer = Transfer::new(
-            4242,
+            AccountId(4242),
             Address::random(),
             Address::random(),
-            0,
+            TokenId(0),
             500u32.into(),
             20u32.into(),
-            11,
+            Nonce(11),
             TimeRange::new(valid_from, valid_until),
             None,
         );
@@ -129,13 +129,13 @@ mod tests {
 
     fn get_withdraw() -> SignedTxVariant {
         let withdraw = Withdraw::new(
-            3,
+            AccountId(3),
             "7777777777777777777777777777777777777777".parse().unwrap(),
             [9u8; 20].into(),
-            1,
+            TokenId(1),
             20u32.into(),
             10u32.into(),
-            2,
+            Nonce(2),
             Default::default(),
             None,
         );

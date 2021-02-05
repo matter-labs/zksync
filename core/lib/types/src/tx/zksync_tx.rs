@@ -10,6 +10,7 @@ use crate::{
     utils::deserialize_eth_message,
     CloseOp, ForcedExitOp, Nonce, Token, TokenId, TokenLike, TransferOp, TxFeeTypes, WithdrawOp,
 };
+use zksync_crypto::params::ETH_TOKEN_ID;
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct EthSignData {
@@ -145,7 +146,7 @@ impl ZkSyncTx {
         match self {
             ZkSyncTx::Transfer(tx) => tx.token,
             ZkSyncTx::Withdraw(tx) => tx.token,
-            ZkSyncTx::Close(_) => 0,
+            ZkSyncTx::Close(_) => ETH_TOKEN_ID,
             ZkSyncTx::ChangePubKey(tx) => tx.fee_token,
             ZkSyncTx::ForcedExit(tx) => tx.token,
         }
@@ -264,7 +265,7 @@ impl ZkSyncTx {
     /// - Fee provided in the transaction.
     ///
     /// Returns `None` if transaction doesn't require fee.
-    pub fn get_fee_info(&self) -> Option<(TxFeeTypes, TokenLike, BigUint)> {
+    pub fn get_fee_info(&self) -> Option<(TxFeeTypes, TokenLike, Address, BigUint)> {
         match self {
             ZkSyncTx::Withdraw(withdraw) => {
                 let fee_type = if withdraw.fast {
@@ -276,17 +277,20 @@ impl ZkSyncTx {
                 Some((
                     fee_type,
                     TokenLike::Id(withdraw.token),
+                    withdraw.to,
                     withdraw.fee.clone(),
                 ))
             }
             ZkSyncTx::ForcedExit(forced_exit) => Some((
                 TxFeeTypes::Withdraw,
                 TokenLike::Id(forced_exit.token),
+                forced_exit.target,
                 forced_exit.fee.clone(),
             )),
             ZkSyncTx::Transfer(transfer) => Some((
                 TxFeeTypes::Transfer,
                 TokenLike::Id(transfer.token),
+                transfer.to,
                 transfer.fee.clone(),
             )),
             ZkSyncTx::ChangePubKey(change_pubkey) => Some((
@@ -294,6 +298,7 @@ impl ZkSyncTx {
                     onchain_pubkey_auth: !change_pubkey.is_ecdsa(),
                 },
                 TokenLike::Id(change_pubkey.fee_token),
+                change_pubkey.account,
                 change_pubkey.fee.clone(),
             )),
             _ => None,

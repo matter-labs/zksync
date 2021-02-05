@@ -109,15 +109,9 @@ pub fn create_exit_circuit_with_public_input(
     let account_address_fe = Fr::from_str(&account_id.to_string()).unwrap();
     let token_id_fe = Fr::from_str(&token_id.to_string()).unwrap();
     let root_hash = account_tree.root_hash();
-    let (account_witness, _, balance, _) = apply_leaf_operation(
-        account_tree,
-        account_id,
-        u32::from(token_id),
-        |_| {},
-        |_| {},
-    );
-    let (audit_path, audit_balance_path) =
-        get_audits(account_tree, account_id, u32::from(token_id));
+    let (account_witness, _, balance, _) =
+        apply_leaf_operation(account_tree, *account_id, *token_id as u32, |_| {}, |_| {});
+    let (audit_path, audit_balance_path) = get_audits(account_tree, *account_id, *token_id as u32);
 
     let mut pubdata_commitment = Vec::new();
     append_be_fixed_width(
@@ -131,7 +125,7 @@ pub fn create_exit_circuit_with_public_input(
         ACCOUNT_ID_BIT_WIDTH,
     );
     let account_address = account_tree
-        .get(account_id)
+        .get(*account_id)
         .expect("account should be in the tree")
         .address;
     append_be_fixed_width(&mut pubdata_commitment, &account_address, ADDRESS_WIDTH);
@@ -176,22 +170,22 @@ mod test {
     use zksync_crypto::circuit::account::CircuitAccount;
     use zksync_crypto::circuit::CircuitAccountTree;
     use zksync_crypto::franklin_crypto::circuit::test::TestConstraintSystem;
-    use zksync_types::Account;
+    use zksync_types::{Account, Nonce};
 
     #[test]
     #[ignore]
     fn test_zksync_exit_circuit_correct_proof() {
-        let test_account_id = 0xde;
-        let token_id = 0x1d;
+        let test_account_id = AccountId(0xde);
+        let token_id = TokenId(0x1d);
         let mut test_account = Account::default_with_address(
             &"abababababababababababababababababababab".parse().unwrap(),
         );
         test_account.set_balance(token_id, BigUint::from(0xbeefu32));
-        test_account.nonce = 0xbabe;
+        test_account.nonce = Nonce(0xbabe);
 
         let mut circuit_account_tree =
             CircuitAccountTree::new(zksync_crypto::params::account_tree_depth());
-        circuit_account_tree.insert(test_account_id, CircuitAccount::from(test_account));
+        circuit_account_tree.insert(*test_account_id, CircuitAccount::from(test_account));
 
         let zksync_exit_circuit = create_exit_circuit_with_public_input(
             &mut circuit_account_tree,

@@ -77,7 +77,7 @@ function getTxFeeEntry(tx, token) {
     const entry = makeEntry('Fee');
     const fee = getTxFee(tx);
 
-    if (!fee) {
+    if (!fee && tx.op.type != 'ChangePubKey') {
         return entry;
     }
 

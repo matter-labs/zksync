@@ -54,9 +54,11 @@ impl<'a, 'c> EthereumSchema<'a, 'c> {
         for eth_op in eth_ops {
             let raw_op = sqlx::query_as!(
                 StoredAggregatedOperation,
-                "SELECT aggregate_operations.* FROM eth_aggregated_ops_binding
+                r#"
+                SELECT aggregate_operations.* FROM eth_aggregated_ops_binding
                 LEFT JOIN aggregate_operations ON aggregate_operations.id = op_id
-                WHERE eth_op_id = $1",
+                WHERE eth_op_id = $1
+                "#,
                 eth_op.id
             )
             .fetch_optional(transaction.conn())
@@ -156,9 +158,11 @@ impl<'a, 'c> EthereumSchema<'a, 'c> {
 
         let raw_ops = sqlx::query_as!(
             StoredAggregatedOperation,
-            "SELECT * FROM aggregate_operations
+            r#"
+            SELECT * FROM aggregate_operations
             WHERE EXISTS (SELECT * FROM eth_unprocessed_aggregated_ops WHERE op_id = aggregate_operations.id)
-            ORDER BY id ASC",
+            ORDER BY id ASC
+            "#,
         )
         .fetch_all(self.0.conn())
         .await?;
@@ -356,7 +360,7 @@ impl<'a, 'c> EthereumSchema<'a, 'c> {
         let mut current_stats = EthereumSchema(&mut transaction).load_eth_params().await?;
         let (first_block, last_block) = {
             let block_range = operation.get_block_range();
-            (i64::from(block_range.0), i64::from(block_range.1))
+            (i64::from(*block_range.0), i64::from(*block_range.1))
         };
 
         match operation {

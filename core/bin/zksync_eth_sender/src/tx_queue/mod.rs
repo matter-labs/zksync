@@ -110,9 +110,15 @@ impl TxQueueBuilder {
             max_pending_txs: self.max_pending_txs,
             sent_pending_txs: self.sent_pending_txs,
 
-            commit_operations: OperationQueue::new(self.commit_operations_count),
-            verify_operations: OperationQueue::new(self.verify_operations_count),
-            execute_operations: OperationQueue::new(self.execute_operations_count),
+            commit_operations: OperationQueue::new(BlockNumber(
+                self.commit_operations_count as u32,
+            )),
+            verify_operations: OperationQueue::new(BlockNumber(
+                self.verify_operations_count as u32,
+            )),
+            execute_operations: OperationQueue::new(BlockNumber(
+                self.execute_operations_count as u32,
+            )),
         }
     }
 }
@@ -145,7 +151,7 @@ impl TxQueue {
     pub fn add_commit_operation(&mut self, commit_operation: TxData) -> anyhow::Result<()> {
         self.commit_operations.push_back(commit_operation)?;
 
-        log::info!(
+        vlog::info!(
             "Adding commit operation to the queue. \
             Sent pending txs count: {}, \
             max pending txs count: {}, \
@@ -161,7 +167,7 @@ impl TxQueue {
     pub fn add_verify_operation(&mut self, verify_operation: TxData) -> anyhow::Result<()> {
         self.verify_operations.push_back(verify_operation)?;
 
-        log::info!(
+        vlog::info!(
             "Adding verify operation to the queue. \
             Sent pending txs count: {}, \
             max pending txs count: {}, \
@@ -177,7 +183,7 @@ impl TxQueue {
     pub fn add_execute_operation(&mut self, execute_operation: TxData) -> anyhow::Result<()> {
         self.execute_operations.push_back(execute_operation)?;
 
-        log::info!(
+        vlog::info!(
             "Adding execute operation to the queue. \
             Sent pending txs count: {}, \
             max pending txs count: {}, \
@@ -242,7 +248,7 @@ impl TxQueue {
         // 1. Highest priority: execute operations.
         if let Some(next_execute_block) = self.execute_operations.get_next_last_block_number() {
             let current_verify_block = self.verify_operations.get_last_block_number();
-            if next_execute_block <= current_verify_block {
+            if *next_execute_block <= *current_verify_block {
                 return Some(self.execute_operations.pop_front().unwrap());
             }
         }
@@ -250,7 +256,7 @@ impl TxQueue {
         // 2. After execute operations we should process verify operation.
         if let Some(next_verify_block) = self.verify_operations.get_next_last_block_number() {
             let current_commit_block = self.commit_operations.get_last_block_number();
-            if next_verify_block <= current_commit_block {
+            if *next_verify_block <= *current_commit_block {
                 return Some(self.verify_operations.pop_front().unwrap());
             }
         }
@@ -284,7 +290,7 @@ mod tests {
         let operation =
             gen_unique_aggregated_operation(block_number, operation_type, BLOCK_SIZE_CHUNKS);
 
-        TxData::from_operation((block_number as i64, operation), raw)
+        TxData::from_operation((*block_number as i64, operation), raw)
     }
 
     /// Checks the basic workflow of the queue including adding several operations
@@ -302,42 +308,42 @@ mod tests {
         queue
             .add_commit_operation(get_tx_data(
                 AggregatedActionType::CommitBlocks,
-                1,
+                BlockNumber(1),
                 vec![COMMIT_MARK, 0],
             ))
             .unwrap();
         queue
             .add_commit_operation(get_tx_data(
                 AggregatedActionType::CommitBlocks,
-                2,
+                BlockNumber(2),
                 vec![COMMIT_MARK, 1],
             ))
             .unwrap();
         queue
             .add_verify_operation(get_tx_data(
                 AggregatedActionType::PublishProofBlocksOnchain,
-                1,
+                BlockNumber(1),
                 vec![VERIFY_MARK, 0],
             ))
             .unwrap();
         queue
             .add_verify_operation(get_tx_data(
                 AggregatedActionType::PublishProofBlocksOnchain,
-                2,
+                BlockNumber(2),
                 vec![VERIFY_MARK, 1],
             ))
             .unwrap();
         queue
             .add_execute_operation(get_tx_data(
                 AggregatedActionType::ExecuteBlocks,
-                1,
+                BlockNumber(1),
                 vec![EXECUTE_MARK, 0],
             ))
             .unwrap();
         queue
             .add_execute_operation(get_tx_data(
                 AggregatedActionType::ExecuteBlocks,
-                2,
+                BlockNumber(2),
                 vec![EXECUTE_MARK, 1],
             ))
             .unwrap();
@@ -413,7 +419,7 @@ mod tests {
         queue
             .return_popped(get_tx_data(
                 AggregatedActionType::CommitBlocks,
-                1,
+                BlockNumber(1),
                 vec![COMMIT_MARK, 0],
             ))
             .unwrap();

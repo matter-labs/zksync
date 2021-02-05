@@ -3,7 +3,7 @@ use std::collections::HashMap;
 
 use web3::types::{Address, BlockNumber};
 
-use zksync_types::{Deposit, FullExit, PriorityOp, ZkSyncPriorityOp};
+use zksync_types::{AccountId, Deposit, FullExit, Nonce, PriorityOp, TokenId, ZkSyncPriorityOp};
 
 use crate::eth_watch::{client::EthClient, EthWatch};
 use std::sync::Arc;
@@ -84,7 +84,7 @@ impl EthClient for FakeEthClient {
     async fn get_auth_fact(
         &self,
         _address: Address,
-        _nonce: u32,
+        _nonce: Nonce,
     ) -> Result<Vec<u8>, anyhow::Error> {
         unreachable!()
     }
@@ -92,7 +92,7 @@ impl EthClient for FakeEthClient {
     async fn get_auth_fact_reset_time(
         &self,
         _address: Address,
-        _nonce: u32,
+        _nonce: Nonce,
     ) -> Result<u64, anyhow::Error> {
         unreachable!()
     }
@@ -115,7 +115,7 @@ async fn test_operation_queues() {
                 serial_id: 0,
                 data: ZkSyncPriorityOp::Deposit(Deposit {
                     from: from_addr,
-                    token: 0,
+                    token: TokenId(0),
                     amount: Default::default(),
                     to: to_addr,
                 }),
@@ -127,7 +127,7 @@ async fn test_operation_queues() {
                 serial_id: 1,
                 data: ZkSyncPriorityOp::Deposit(Deposit {
                     from: Default::default(),
-                    token: 0,
+                    token: TokenId(0),
                     amount: Default::default(),
                     to: Default::default(),
                 }),
@@ -138,9 +138,9 @@ async fn test_operation_queues() {
             PriorityOp {
                 serial_id: 2,
                 data: ZkSyncPriorityOp::FullExit(FullExit {
-                    account_id: 1,
+                    account_id: AccountId(1),
                     eth_address: from_addr,
-                    token: 0,
+                    token: TokenId(0),
                 }),
                 deadline_block: 0,
                 eth_block: 4,
@@ -193,7 +193,7 @@ async fn test_operation_queues_time_lag() {
                 serial_id: 0,
                 data: ZkSyncPriorityOp::Deposit(Deposit {
                     from: Default::default(),
-                    token: 0,
+                    token: TokenId(0),
                     amount: Default::default(),
                     to: [2u8; 20].into(),
                 }),
@@ -204,9 +204,9 @@ async fn test_operation_queues_time_lag() {
             PriorityOp {
                 serial_id: 1,
                 data: ZkSyncPriorityOp::FullExit(FullExit {
-                    account_id: 0,
+                    account_id: AccountId(0),
                     eth_address: Default::default(),
-                    token: 0,
+                    token: TokenId(0),
                 }),
                 deadline_block: 0,
                 eth_hash: [3; 32].into(),
@@ -216,7 +216,7 @@ async fn test_operation_queues_time_lag() {
                 serial_id: 2,
                 data: ZkSyncPriorityOp::Deposit(Deposit {
                     from: Default::default(),
-                    token: 0,
+                    token: TokenId(0),
                     amount: Default::default(),
                     to: Default::default(),
                 }),
@@ -259,7 +259,7 @@ async fn test_restore_and_poll() {
                 serial_id: 0,
                 data: ZkSyncPriorityOp::Deposit(Deposit {
                     from: Default::default(),
-                    token: 0,
+                    token: TokenId(0),
                     amount: Default::default(),
                     to: [2u8; 20].into(),
                 }),
@@ -271,7 +271,7 @@ async fn test_restore_and_poll() {
                 serial_id: 1,
                 data: ZkSyncPriorityOp::Deposit(Deposit {
                     from: Default::default(),
-                    token: 0,
+                    token: TokenId(0),
                     amount: Default::default(),
                     to: Default::default(),
                 }),
@@ -290,7 +290,7 @@ async fn test_restore_and_poll() {
                 serial_id: 3,
                 data: ZkSyncPriorityOp::Deposit(Deposit {
                     from: Default::default(),
-                    token: 0,
+                    token: TokenId(0),
                     amount: Default::default(),
                     to: [2u8; 20].into(),
                 }),
@@ -301,9 +301,9 @@ async fn test_restore_and_poll() {
             PriorityOp {
                 serial_id: 4,
                 data: ZkSyncPriorityOp::FullExit(FullExit {
-                    account_id: 0,
+                    account_id: AccountId(0),
                     eth_address: Default::default(),
-                    token: 0,
+                    token: TokenId(0),
                 }),
                 deadline_block: 0,
                 eth_hash: [3; 32].into(),
@@ -334,7 +334,7 @@ async fn test_restore_and_poll_time_lag() {
                 serial_id: 0,
                 data: ZkSyncPriorityOp::Deposit(Deposit {
                     from: Default::default(),
-                    token: 0,
+                    token: TokenId(0),
                     amount: Default::default(),
                     to: [2u8; 20].into(),
                 }),
@@ -345,9 +345,9 @@ async fn test_restore_and_poll_time_lag() {
             PriorityOp {
                 serial_id: 1,
                 data: ZkSyncPriorityOp::FullExit(FullExit {
-                    account_id: 0,
+                    account_id: AccountId(0),
                     eth_address: Default::default(),
-                    token: 0,
+                    token: TokenId(0),
                 }),
                 deadline_block: 0,
                 eth_hash: [3; 32].into(),

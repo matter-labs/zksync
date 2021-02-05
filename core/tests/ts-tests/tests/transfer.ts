@@ -56,16 +56,21 @@ Tester.prototype.testBatch = async function (sender: Wallet, receiver: Wallet, t
         token
     );
 
-    const tx = {
+    const tx_with_fee = {
         to: receiver.address(),
         token,
         amount,
-        fee: fee.div(2)
+        fee
     };
-
+    const tx_without_fee = {
+        to: receiver.address(),
+        token,
+        amount,
+        fee: 0
+    };
     const senderBefore = await sender.getBalance(token);
     const receiverBefore = await receiver.getBalance(token);
-    const handles = await sender.syncMultiTransfer([{ ...tx }, { ...tx }]);
+    const handles = await sender.syncMultiTransfer([tx_with_fee, tx_without_fee]);
     await Promise.all(handles.map((handle) => handle.awaitReceipt()));
     const senderAfter = await sender.getBalance(token);
     const receiverAfter = await receiver.getBalance(token);

@@ -89,7 +89,7 @@ async fn save_pending_block(
 
     let block_number = pending_block.number;
 
-    log::trace!("persist pending block #{}", block_number);
+    vlog::trace!("persist pending block #{}", block_number);
 
     transaction
         .chain()
@@ -148,7 +148,7 @@ async fn commit_block(
         .count();
     metrics::histogram!(
         "committer.priority_ops_per_block",
-        total_priority_ops as f64
+        total_priority_ops as u64
     );
 
     transaction
@@ -162,7 +162,7 @@ async fn commit_block(
         .await
         .expect("committer must commit the pending block into db");
 
-    log::info!("commit block #{}", block.block_number);
+    vlog::info!("commit block #{}", block.block_number);
 
     transaction
         .chain()
@@ -174,7 +174,7 @@ async fn commit_block(
     mempool_req_sender
         .send(MempoolBlocksRequest::UpdateNonces(accounts_updated))
         .await
-        .map_err(|e| log::warn!("Failed notify mempool about account updates: {}", e))
+        .map_err(|e| vlog::warn!("Failed notify mempool about account updates: {}", e))
         .unwrap_or_default();
 
     transaction
@@ -197,7 +197,7 @@ async fn poll_for_new_proofs_task(pool: ConnectionPool) {
 
         aggregated_committer::create_aggregated_operations_storage(&mut storage)
             .await
-            .map_err(|e| log::error!("Failed to create aggregated operation: {}", e))
+            .map_err(|e| vlog::error!("Failed to create aggregated operation: {}", e))
             .unwrap_or_default();
     }
 }

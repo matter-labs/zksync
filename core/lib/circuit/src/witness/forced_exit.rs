@@ -76,9 +76,9 @@ impl Witness for ForcedExitWitness<Bn256> {
                 .to_u128()
                 .unwrap(),
             fee: forced_exit.tx.fee.to_u128().unwrap(),
-            token: u32::from(forced_exit.tx.token),
-            initiator_account_address: forced_exit.tx.initiator_account_id,
-            target_account_address: forced_exit.target_account_id,
+            token: *forced_exit.tx.token as u32,
+            initiator_account_address: *forced_exit.tx.initiator_account_id,
+            target_account_address: *forced_exit.target_account_id,
             target_account_eth_address: eth_address_to_fr(&forced_exit.tx.target),
             valid_from,
             valid_until,
@@ -249,7 +249,7 @@ impl ForcedExitWitness<Bn256> {
     fn apply_data(tree: &mut CircuitAccountTree, forced_exit: &ForcedExitData) -> Self {
         //preparing data and base witness
         let before_root = tree.root_hash();
-        log::debug!("Initial root = {}", before_root);
+        vlog::debug!("Initial root = {}", before_root);
         let (audit_path_initiator_before, audit_balance_path_initiator_before) = get_audits(
             tree,
             forced_exit.initiator_account_address,
@@ -307,7 +307,7 @@ impl ForcedExitWitness<Bn256> {
         );
 
         let intermediate_root = tree.root_hash();
-        log::debug!("Intermediate root = {}", intermediate_root);
+        vlog::debug!("Intermediate root = {}", intermediate_root);
 
         let (audit_path_initiator_intermediate, audit_balance_path_initiator_intermediate) =
             get_audits(

@@ -12,7 +12,7 @@ use super::{Fees, Scenario, ScenarioResources};
 use crate::{
     monitor::Monitor,
     test_wallet::TestWallet,
-    utils::{gwei_to_wei, wait_all_failsafe_chunks, CHUNK_SIZES},
+    utils::{foreach_failsafe, gwei_to_wei, wait_all_failsafe_chunks, CHUNK_SIZES},
 };
 
 /// Configuration options for the transfers scenario.
@@ -103,7 +103,7 @@ impl Scenario for TransferScenario {
     ) -> anyhow::Result<()> {
         let transfers_number = (self.wallets * self.transfer_rounds) as usize;
 
-        log::info!(
+        vlog::info!(
             "All the initial transfers have been verified, creating {} transactions \
             for the transfers step",
             transfers_number
@@ -125,27 +125,26 @@ impl Scenario for TransferScenario {
         )
         .await?;
 
-        log::info!("Created {} transactions...", self.txs.len());
+        vlog::info!("Created {} transactions...", self.txs.len());
 
         Ok(())
     }
 
     async fn run(
         &mut self,
-        monitor: &Monitor,
-        _fees: &Fees,
-        _wallets: &[TestWallet],
-    ) -> anyhow::Result<()> {
-        wait_all_failsafe_chunks(
+        monitor: Monitor,
+        _fees: Fees,
+        wallets: Vec<TestWallet>,
+    ) -> anyhow::Result<Vec<TestWallet>> {
+        foreach_failsafe(
             "run/transfers",
-            CHUNK_SIZES,
             self.txs
                 .drain(..)
                 .map(|(tx, sign)| monitor.send_tx(tx, sign)),
         )
         .await?;
 
-        Ok(())
+        Ok(wallets)
     }
 
     async fn finalize(

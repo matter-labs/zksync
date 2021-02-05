@@ -1,14 +1,14 @@
 // External deps
 use web3::{
     contract::Contract,
-    types::{H160, H256},
+    types::{BlockNumber as Web3BlockNumber, FilterBuilder, Log, H160, H256, U256},
     Transport, Web3,
 };
 // Workspace deps
 use zksync_contracts::{governance_contract, upgrade_gatekeeper};
 use zksync_crypto::Fr;
 
-use zksync_types::{AccountMap, AccountUpdate};
+use zksync_types::{AccountId, AccountMap, AccountUpdate, BlockNumber};
 // Local deps
 use crate::contract::{ZkSyncContractVersion, ZkSyncDeployedContract};
 use crate::storage_interactor::StorageInteractor;
@@ -19,7 +19,6 @@ use crate::{
 use ethabi::Address;
 use std::convert::TryFrom;
 use std::marker::PhantomData;
-use web3::types::{BlockNumber, FilterBuilder, Log, U256};
 
 /// Storage state update:
 /// - None - The state is updated completely last time - start from fetching the new events
@@ -138,8 +137,8 @@ where
 
         let filter = FilterBuilder::default()
             .address(vec![upgrade_gatekeeper_contract_address])
-            .from_block(BlockNumber::Earliest)
-            .to_block(BlockNumber::Latest)
+            .from_block(Web3BlockNumber::Earliest)
+            .to_block(Web3BlockNumber::Latest)
             .topics(Some(vec![upgrade_contract_event]), None, None, None)
             .build();
 
@@ -160,7 +159,7 @@ where
             .get_gatekeeper_logs(upgrade_gatekeeper_contract_addr)
             .await?;
 
-        let mut last_updated_block = BlockNumber::Earliest;
+        let mut last_updated_block = Web3BlockNumber::Earliest;
         let mut contract_version = vec![];
         let mut previous_version: Option<ZkSyncContractVersion> = None;
         // Find starts and ends for contracts
@@ -168,7 +167,7 @@ where
             let block_number = log.block_number.expect("Block number should exist");
             let version = U256::from(log.topics[1].as_bytes()).as_u32();
             let version = ZkSyncContractVersion::try_from(version)?;
-            let current_block = BlockNumber::Number(block_number);
+            let current_block = Web3BlockNumber::Number(block_number);
             if let Some(previous_version) = previous_version {
                 contract_version.push((last_updated_block, current_block, previous_version));
             }
@@ -177,7 +176,7 @@ where
         }
         contract_version.push((
             last_updated_block,
-            BlockNumber::Latest,
+            Web3BlockNumber::Latest,
             previous_version.expect("At least one contract should exist"),
         ));
 
@@ -246,7 +245,7 @@ where
             .events_state
             .set_genesis_block_number(&genesis_transaction)
             .expect("Cant set genesis block number for events state");
-        log::info!("genesis_eth_block_number: {:?}", &genesis_eth_block_number);
+        vlog::info!("genesis_eth_block_number: {:?}", &genesis_eth_block_number);
 
         interactor
             .save_events_state(&[], &[], genesis_eth_block_number)
@@ -255,7 +254,7 @@ where
         let genesis_fee_account =
             get_genesis_account(&genesis_transaction).expect("Cant get genesis account address");
 
-        log::info!(
+        vlog::info!(
             "genesis fee account address: 0x{}",
             hex::encode(genesis_fee_account.address.as_ref())
         );
@@ -266,9 +265,9 @@ where
         };
 
         let mut account_map = AccountMap::default();
-        account_map.insert(0, genesis_fee_account);
+        account_map.insert(AccountId(0), genesis_fee_account);
 
-        let current_block = 0;
+        let current_block = BlockNumber(0);
         let current_unprocessed_priority_op = 0;
         let fee_acc_num = 0;
 
@@ -276,16 +275,16 @@ where
             current_block,
             account_map,
             current_unprocessed_priority_op,
-            fee_acc_num,
+            AccountId(fee_acc_num),
             self.available_block_chunk_sizes.clone(),
         );
 
-        log::info!("Genesis tree root hash: {:?}", tree_state.root_hash());
-        log::debug!("Genesis accounts: {:?}", tree_state.get_accounts());
+        vlog::info!("Genesis tree root hash: {:?}", tree_state.root_hash());
+        vlog::debug!("Genesis accounts: {:?}", tree_state.get_accounts());
 
         interactor.save_genesis_tree_state(account_update).await;
 
-        log::info!("Saved genesis tree state\n");
+        vlog::info!("Saved genesis tree state\n");
 
         self.tree_state = tree_state;
     }
@@ -297,7 +296,7 @@ where
     }
     /// Stops states from storage
     pub async fn load_state_from_storage(&mut self, interactor: &mut I) -> bool {
-        log::info!("Loading state from storage");
+        vlog::info!("Loading state from storage");
         let state = interactor.get_storage_state().await;
         self.events_state = interactor.get_block_events_state_from_storage().await;
         let tree_state = interactor.get_tree_state().await;
@@ -329,13 +328,13 @@ where
             .await;
 
         let last_verified_block = self.tree_state.state.block_number;
-        log::info!(
+        vlog::info!(
             "State has been loaded\nProcessed {:?} blocks on contract\nRoot hash: {:?}\n",
             last_verified_block,
             self.tree_state.root_hash()
         );
 
-        self.finite_mode && (total_verified_blocks == last_verified_block)
+        self.finite_mode && (total_verified_blocks == *last_verified_block)
     }
 
     /// Activates states updates
@@ -343,7 +342,7 @@ where
         let mut last_watched_block: u64 = self.events_state.last_watched_eth_block_number;
         let mut final_hash_was_found = false;
         loop {
-            log::info!("Last watched ethereum block: {:?}", last_watched_block);
+            vlog::info!("Last watched ethereum block: {:?}", last_watched_block);
 
             // Update events
             if self.update_events_state(interactor).await {
@@ -365,7 +364,7 @@ where
                     // to keep the `state_keeper` consistent with the `eth_sender`.
                     interactor.update_eth_state().await;
 
-                    log::info!(
+                    vlog::info!(
                         "State updated\nProcessed {:?} blocks of total {:?} verified on contract\nRoot hash: {:?}\n",
                         last_verified_block,
                         total_verified_blocks,
@@ -380,15 +379,15 @@ where
                         if root_hash == self.tree_state.root_hash() {
                             final_hash_was_found = true;
 
-                            log::info!(
+                            vlog::info!(
                                 "Correct expected root hash was met on the block {} out of {}",
-                                last_verified_block,
+                                *last_verified_block,
                                 total_verified_blocks
                             );
                         }
                     }
 
-                    if self.finite_mode && last_verified_block == total_verified_blocks {
+                    if self.finite_mode && *last_verified_block == total_verified_blocks {
                         // Check if the final hash was found and panic otherwise.
                         if self.final_hash.is_some() && !final_hash_was_found {
                             panic!("Final hash was not met during the state restoring process");
@@ -401,7 +400,7 @@ where
             }
 
             if last_watched_block == self.events_state.last_watched_eth_block_number {
-                log::info!("sleep block");
+                vlog::info!("sleep block");
                 std::thread::sleep(std::time::Duration::from_secs(5));
             } else {
                 last_watched_block = self.events_state.last_watched_eth_block_number;
@@ -459,7 +458,7 @@ where
                 .await;
         }
 
-        log::debug!("Updated state");
+        vlog::debug!("Updated state");
     }
 
     /// Gets new operations blocks from events, updates rollup operations stored state.
@@ -469,7 +468,7 @@ where
 
         interactor.save_rollup_ops(&new_blocks).await;
 
-        log::debug!("Updated operations storage");
+        vlog::debug!("Updated operations storage");
 
         new_blocks
     }

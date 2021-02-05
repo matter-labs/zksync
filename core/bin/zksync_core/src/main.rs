@@ -7,7 +7,7 @@ use zksync_storage::ConnectionPool;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    env_logger::init();
+    vlog::init();
     // handle ctrl+c
     let config = ZkSyncConfig::from_env();
     let (stop_signal_sender, mut stop_signal_receiver) = mpsc::channel(256);
@@ -40,7 +40,7 @@ async fn main() -> anyhow::Result<()> {
             panic!("Operation counting actor is not supposed to finish its execution")
         },
         _ = async { stop_signal_receiver.next().await } => {
-            log::warn!("Stop signal received, shutting down");
+            vlog::warn!("Stop signal received, shutting down");
         }
     };
 

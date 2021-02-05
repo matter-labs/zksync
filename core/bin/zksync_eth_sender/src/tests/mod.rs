@@ -3,10 +3,8 @@ use self::mock::{
     concurrent_eth_sender, create_signed_tx, default_eth_parameters, default_eth_sender,
     restored_eth_sender,
 };
-use super::{
-    transactions::{ExecutedTxStatus, TxCheckOutcome},
-    ETHSender, TxCheckMode,
-};
+use super::{transactions::TxCheckOutcome, ETHSender, TxCheckMode};
+use zksync_eth_client::ethereum_gateway::ExecutedTxStatus;
 
 const EXPECTED_WAIT_TIME_BLOCKS: u64 = 30;
 const WAIT_CONFIRMATIONS: u64 = 3;
@@ -42,7 +40,7 @@ async fn deadline_block() {
 #[tokio::test]
 async fn transaction_state() {
     let mut eth_sender = default_eth_sender().await;
-    let current_block = eth_sender.ethereum.block_number;
+    let current_block = eth_sender.ethereum.get_mock().unwrap().block_number;
     let deadline_block = eth_sender.get_deadline_block(current_block);
     let operations = vec![
         test_data::commit_blocks_operation(0), // Will be committed.
@@ -75,6 +73,8 @@ async fn transaction_state() {
     };
     eth_sender
         .ethereum
+        .get_mut_mock()
+        .unwrap()
         .add_execution(&eth_operations[0].used_tx_hashes[0], &committed_response)
         .await;
 
@@ -86,6 +86,8 @@ async fn transaction_state() {
     };
     eth_sender
         .ethereum
+        .get_mut_mock()
+        .unwrap()
         .add_execution(&eth_operations[1].used_tx_hashes[0], &pending_response)
         .await;
 
@@ -97,6 +99,8 @@ async fn transaction_state() {
     };
     eth_sender
         .ethereum
+        .get_mut_mock()
+        .unwrap()
         .add_execution(&eth_operations[2].used_tx_hashes[0], &failed_response)
         .await;
 
@@ -108,6 +112,8 @@ async fn transaction_state() {
     };
     eth_sender
         .ethereum
+        .get_mut_mock()
+        .unwrap()
         .add_execution(
             &eth_operations[3].used_tx_hashes[0],
             &pending_failed_response,
@@ -120,7 +126,7 @@ async fn transaction_state() {
             .check_transaction_state(
                 TxCheckMode::Latest,
                 &eth_operations[0],
-                &eth_operations[0].used_tx_hashes[0],
+                eth_operations[0].used_tx_hashes[0],
                 current_block + committed_response.confirmations,
             )
             .await
@@ -134,7 +140,7 @@ async fn transaction_state() {
             .check_transaction_state(
                 TxCheckMode::Latest,
                 &eth_operations[1],
-                &eth_operations[1].used_tx_hashes[0],
+                eth_operations[1].used_tx_hashes[0],
                 current_block + pending_response.confirmations,
             )
             .await
@@ -148,7 +154,7 @@ async fn transaction_state() {
             .check_transaction_state(
                 TxCheckMode::Latest,
                 &eth_operations[2],
-                &eth_operations[2].used_tx_hashes[0],
+                eth_operations[2].used_tx_hashes[0],
                 current_block + failed_response.confirmations,
             )
             .await
@@ -162,7 +168,7 @@ async fn transaction_state() {
             .check_transaction_state(
                 TxCheckMode::Latest,
                 &eth_operations[3],
-                &eth_operations[3].used_tx_hashes[0],
+                eth_operations[3].used_tx_hashes[0],
                 current_block + pending_failed_response.confirmations,
             )
             .await
@@ -176,7 +182,7 @@ async fn transaction_state() {
             .check_transaction_state(
                 TxCheckMode::Latest,
                 &eth_operations[4],
-                &eth_operations[4].used_tx_hashes[0],
+                eth_operations[4].used_tx_hashes[0],
                 current_block + EXPECTED_WAIT_TIME_BLOCKS,
             )
             .await
@@ -190,7 +196,7 @@ async fn transaction_state() {
             .check_transaction_state(
                 TxCheckMode::Latest,
                 &eth_operations[5],
-                &eth_operations[5].used_tx_hashes[0],
+                eth_operations[5].used_tx_hashes[0],
                 current_block + EXPECTED_WAIT_TIME_BLOCKS - 1,
             )
             .await
@@ -204,7 +210,7 @@ async fn transaction_state() {
             .check_transaction_state(
                 TxCheckMode::Old,
                 &eth_operations[5],
-                &eth_operations[5].used_tx_hashes[0],
+                eth_operations[5].used_tx_hashes[0],
                 current_block + EXPECTED_WAIT_TIME_BLOCKS - 1,
             )
             .await
@@ -245,7 +251,8 @@ async fn operation_commitment_workflow() {
         eth_sender.proceed_next_operations().await;
 
         // Now we should see that transaction is stored in the database and sent to the Ethereum.
-        let deadline_block = eth_sender.get_deadline_block(eth_sender.ethereum.block_number);
+        let deadline_block =
+            eth_sender.get_deadline_block(eth_sender.ethereum.get_mock().unwrap().block_number);
         let mut expected_tx = create_signed_tx(
             eth_op_id as i64,
             &eth_sender,
@@ -260,13 +267,17 @@ async fn operation_commitment_workflow() {
 
         eth_sender
             .ethereum
-            .assert_sent(&expected_tx.used_tx_hashes[0])
+            .get_mock()
+            .unwrap()
+            .assert_sent(&expected_tx.used_tx_hashes[0].as_bytes().to_vec())
             .await;
 
         // Increment block, make the transaction look successfully executed, and process the
         // operation again.
         eth_sender
             .ethereum
+            .get_mut_mock()
+            .unwrap()
             .add_successfull_execution(expected_tx.used_tx_hashes[0], WAIT_CONFIRMATIONS)
             .await;
 
@@ -302,7 +313,8 @@ async fn stuck_transaction() {
 
     let eth_op_id = 0;
     let nonce = 0;
-    let deadline_block = eth_sender.get_deadline_block(eth_sender.ethereum.block_number);
+    let deadline_block =
+        eth_sender.get_deadline_block(eth_sender.ethereum.get_mock().unwrap().block_number);
     let mut stuck_tx = create_signed_tx(
         eth_op_id,
         &eth_sender,
@@ -313,13 +325,13 @@ async fn stuck_transaction() {
     .await;
 
     // Skip some blocks and expect sender to send a new tx.
-    eth_sender.ethereum.block_number += EXPECTED_WAIT_TIME_BLOCKS;
+    eth_sender.ethereum.get_mut_mock().unwrap().block_number += EXPECTED_WAIT_TIME_BLOCKS;
     eth_sender.proceed_next_operations().await;
 
     // Check that new transaction is sent (and created based on the previous stuck tx).
     let expected_sent_tx = eth_sender
         .create_supplement_tx(
-            eth_sender.get_deadline_block(eth_sender.ethereum.block_number),
+            eth_sender.get_deadline_block(eth_sender.ethereum.get_mock().unwrap().block_number),
             &mut stuck_tx,
         )
         .await
@@ -327,13 +339,17 @@ async fn stuck_transaction() {
     eth_sender.db.assert_stored(&stuck_tx).await;
     eth_sender
         .ethereum
-        .assert_sent(&expected_sent_tx.hash)
+        .get_mut_mock()
+        .unwrap()
+        .assert_sent(&expected_sent_tx.hash.as_bytes().to_vec())
         .await;
 
     // Increment block, make the transaction look successfully executed, and process the
     // operation again.
     eth_sender
         .ethereum
+        .get_mut_mock()
+        .unwrap()
         .add_successfull_execution(stuck_tx.used_tx_hashes[1], WAIT_CONFIRMATIONS)
         .await;
     eth_sender.proceed_next_operations().await;
@@ -455,11 +471,18 @@ async fn operations_order() {
 
         // Check that current expected tx is stored.
         eth_sender.db.assert_stored(&tx).await;
-        eth_sender.ethereum.assert_sent(&current_tx_hash).await;
+        eth_sender
+            .ethereum
+            .get_mock()
+            .unwrap()
+            .assert_sent(&current_tx_hash.as_bytes().to_vec())
+            .await;
 
         // Mark the tx as successfully
         eth_sender
             .ethereum
+            .get_mut_mock()
+            .unwrap()
             .add_successfull_execution(current_tx_hash, WAIT_CONFIRMATIONS)
             .await;
         eth_sender.proceed_next_operations().await;
@@ -487,7 +510,8 @@ async fn transaction_failure() {
 
     let eth_op_id = 0;
     let nonce = 0;
-    let deadline_block = eth_sender.get_deadline_block(eth_sender.ethereum.block_number);
+    let deadline_block =
+        eth_sender.get_deadline_block(eth_sender.ethereum.get_mock().unwrap().block_number);
     let failing_tx = create_signed_tx(
         eth_op_id,
         &eth_sender,
@@ -502,6 +526,8 @@ async fn transaction_failure() {
 
     eth_sender
         .ethereum
+        .get_mut_mock()
+        .unwrap()
         .add_failed_execution(&failing_tx.used_tx_hashes[0], WAIT_CONFIRMATIONS)
         .await;
     eth_sender.proceed_next_operations().await;
@@ -551,7 +577,8 @@ async fn restore_state() {
         // The rest of this test is the same as in `operation_commitment_workflow`.
         eth_sender.proceed_next_operations().await;
 
-        let deadline_block = eth_sender.get_deadline_block(eth_sender.ethereum.block_number);
+        let deadline_block =
+            eth_sender.get_deadline_block(eth_sender.ethereum.get_mock().unwrap().block_number);
         let nonce = eth_op_id as i64;
         let mut expected_tx = create_signed_tx(
             eth_op_id as i64,
@@ -567,6 +594,8 @@ async fn restore_state() {
 
         eth_sender
             .ethereum
+            .get_mut_mock()
+            .unwrap()
             .add_successfull_execution(expected_tx.used_tx_hashes[0], WAIT_CONFIRMATIONS)
             .await;
         eth_sender.proceed_next_operations().await;
@@ -599,7 +628,8 @@ async fn confirmations_independence() {
 
     let eth_op_id = 0;
     let nonce = 0;
-    let deadline_block = eth_sender.get_deadline_block(eth_sender.ethereum.block_number);
+    let deadline_block =
+        eth_sender.get_deadline_block(eth_sender.ethereum.get_mock().unwrap().block_number);
     let mut stuck_tx = create_signed_tx(
         eth_op_id,
         &eth_sender,
@@ -609,22 +639,29 @@ async fn confirmations_independence() {
     )
     .await;
 
-    eth_sender.ethereum.block_number += EXPECTED_WAIT_TIME_BLOCKS;
+    eth_sender.ethereum.get_mut_mock().unwrap().block_number += EXPECTED_WAIT_TIME_BLOCKS;
     eth_sender.proceed_next_operations().await;
 
     let next_tx = eth_sender
         .create_supplement_tx(
-            eth_sender.get_deadline_block(eth_sender.ethereum.block_number),
+            eth_sender.get_deadline_block(eth_sender.ethereum.get_mock().unwrap().block_number),
             &mut stuck_tx,
         )
         .await
         .unwrap();
     eth_sender.db.assert_stored(&stuck_tx).await;
-    eth_sender.ethereum.assert_sent(&next_tx.hash).await;
+    eth_sender
+        .ethereum
+        .get_mut_mock()
+        .unwrap()
+        .assert_sent(&next_tx.hash.as_bytes().to_vec())
+        .await;
 
     // Add a confirmation for a *stuck* transaction.
     eth_sender
         .ethereum
+        .get_mut_mock()
+        .unwrap()
         .add_successfull_execution(stuck_tx.used_tx_hashes[0], WAIT_CONFIRMATIONS)
         .await;
     eth_sender.proceed_next_operations().await;
@@ -757,11 +794,18 @@ async fn concurrent_operations_order() {
 
             // Check that current expected tx is stored.
             eth_sender.db.assert_stored(&tx).await;
-            eth_sender.ethereum.assert_sent(&current_tx_hash).await;
+            eth_sender
+                .ethereum
+                .get_mock()
+                .unwrap()
+                .assert_sent(&current_tx_hash.as_bytes().to_vec())
+                .await;
 
             // Mark the tx as successfully
             eth_sender
                 .ethereum
+                .get_mut_mock()
+                .unwrap()
                 .add_successfull_execution(current_tx_hash, WAIT_CONFIRMATIONS)
                 .await;
         }

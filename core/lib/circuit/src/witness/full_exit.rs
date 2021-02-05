@@ -55,8 +55,8 @@ impl Witness for FullExitWitness<Bn256> {
         (full_exit, is_success): &(FullExitOp, bool),
     ) -> Self {
         let full_exit = FullExitData {
-            token: u32::from(full_exit.priority_op.token),
-            account_address: full_exit.priority_op.account_id,
+            token: *full_exit.priority_op.token as u32,
+            account_address: *full_exit.priority_op.account_id,
             eth_address: eth_address_to_fr(&full_exit.priority_op.eth_address),
             full_exit_amount: full_exit
                 .withdraw_amount
@@ -163,7 +163,7 @@ impl FullExitWitness<Bn256> {
     ) -> Self {
         //preparing data and base witness
         let before_root = tree.root_hash();
-        log::debug!("Initial root = {}", before_root);
+        vlog::debug!("Initial root = {}", before_root);
         let (audit_path_before, audit_balance_path_before) =
             get_audits(tree, full_exit.account_address, full_exit.token);
 
@@ -195,7 +195,7 @@ impl FullExitWitness<Bn256> {
         };
 
         let after_root = tree.root_hash();
-        log::debug!("After root = {}", after_root);
+        vlog::debug!("After root = {}", after_root);
         let (audit_path_after, audit_balance_path_after) =
             get_audits(tree, full_exit.account_address, full_exit.token);
 

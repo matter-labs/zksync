@@ -8,7 +8,7 @@ use zksync_config::ZkSyncConfig;
 use zksync_crypto::franklin_crypto::bellman::pairing::ff::{PrimeField, PrimeFieldRepr};
 use zksync_prover::{client, ApiClient};
 use zksync_prover_utils::api::ProverInputRequest;
-use zksync_types::{block::Block, H256};
+use zksync_types::{block::Block, AccountId, BlockNumber, TokenId, H256};
 // Local deps
 use super::mock::MockDatabase;
 use crate::{run_prover_server, DatabaseInterface};
@@ -138,18 +138,22 @@ async fn test_api_client_simple_simulation(prover_name: &str, database: MockData
     assert!(job.data.is_some());
 
     let mut storage = database.acquire_connection().await.unwrap();
-    let witness = database.load_witness(&mut storage, 1).await.unwrap();
+    let witness = database
+        .load_witness(&mut storage, BlockNumber(1))
+        .await
+        .unwrap();
     assert!(witness.is_some());
 }
 
 pub async fn get_test_block() -> Block {
     let (circuit_tree, accounts) = MockDatabase::get_default_tree_and_accounts();
-    let validator_account_id = 0;
+    let validator_account_id = AccountId(0);
     let validator_account = accounts.get(&validator_account_id).unwrap();
-    let mut state = zksync_state::state::ZkSyncState::from_acc_map(accounts.clone(), 1);
+    let mut state =
+        zksync_state::state::ZkSyncState::from_acc_map(accounts.clone(), BlockNumber(1));
     let deposit_priority_op = zksync_types::ZkSyncPriorityOp::Deposit(zksync_types::Deposit {
         from: validator_account.address,
-        token: 0,
+        token: TokenId(0),
         amount: BigUint::from(10u32),
         to: validator_account.address,
     });

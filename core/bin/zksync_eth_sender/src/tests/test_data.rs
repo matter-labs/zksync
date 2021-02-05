@@ -12,22 +12,22 @@ use zksync_types::{
         BlocksProofOperation,
     },
     block::Block,
-    Address, ExecutedOperations, ExecutedPriorityOp, Fr, FullExit, FullExitOp, PriorityOp,
-    ZkSyncOp, ZkSyncPriorityOp,
+    AccountId, Address, BlockNumber, ExecutedOperations, ExecutedPriorityOp, Fr, FullExit,
+    FullExitOp, PriorityOp, TokenId, ZkSyncOp, ZkSyncPriorityOp,
 };
 
 /// Creates a dummy operation as a test input for `ETHSender` tests.
 fn gen_aggregated_operation(
     id: i64,
-    block_number: u32,
+    block_number: BlockNumber,
     action: AggregatedActionType,
 ) -> (i64, AggregatedOperation) {
     // Create full exit operation for non-zero return data.
     let executed_full_exit_op = {
         let priority_op = FullExit {
-            account_id: 0,
+            account_id: AccountId(0),
             eth_address: Address::zero(),
-            token: 0,
+            token: TokenId(0),
         };
         ExecutedOperations::PriorityOp(Box::new(ExecutedPriorityOp {
             priority_op: PriorityOp {
@@ -48,7 +48,7 @@ fn gen_aggregated_operation(
     let block = Block::new(
         block_number,
         Fr::default(),
-        0,
+        AccountId(0),
         vec![executed_full_exit_op],
         (0, 0),
         50,
@@ -87,20 +87,24 @@ fn gen_aggregated_operation(
 
 lazy_static! {
     pub static ref COMMIT_BLOCKS_OPERATIONS: Vec<(i64, AggregatedOperation)> = (1..=10)
-        .map(|id| gen_aggregated_operation(id, id as u32, AggregatedActionType::CommitBlocks))
+        .map(|id| gen_aggregated_operation(
+            id,
+            BlockNumber(id as u32),
+            AggregatedActionType::CommitBlocks
+        ))
         .collect();
     pub static ref PUBLISH_PROOF_BLOCKS_ONCHAIN_OPERATIONS: Vec<(i64, AggregatedOperation)> = (11
         ..=20)
         .map(|id| gen_aggregated_operation(
             id,
-            (id - 10) as u32,
+            BlockNumber((id - 10) as u32),
             AggregatedActionType::PublishProofBlocksOnchain
         ))
         .collect();
     pub static ref EXECUTE_BLOCKS_OPERATIONS: Vec<(i64, AggregatedOperation)> = (21..=30)
         .map(|id| gen_aggregated_operation(
             id,
-            (id - 20) as u32,
+            BlockNumber((id - 20) as u32),
             AggregatedActionType::ExecuteBlocks
         ))
         .collect();

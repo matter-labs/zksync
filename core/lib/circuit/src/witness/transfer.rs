@@ -65,9 +65,9 @@ impl Witness for TransferWitness<Bn256> {
         let transfer_data = TransferData {
             amount: transfer.tx.amount.to_u128().unwrap(),
             fee: transfer.tx.fee.to_u128().unwrap(),
-            token: u32::from(transfer.tx.token),
-            from_account_address: transfer.from,
-            to_account_address: transfer.to,
+            token: *transfer.tx.token as u32,
+            from_account_address: *transfer.from,
+            to_account_address: *transfer.to,
             valid_from: time_range.valid_from,
             valid_until: time_range.valid_until,
         };
@@ -210,7 +210,7 @@ impl TransferWitness<Bn256> {
     fn apply_data(tree: &mut CircuitAccountTree, transfer: &TransferData) -> Self {
         //preparing data and base witness
         let before_root = tree.root_hash();
-        log::debug!("Initial root = {}", before_root);
+        vlog::debug!("Initial root = {}", before_root);
         let (audit_path_from_before, audit_balance_path_from_before) =
             get_audits(tree, transfer.from_account_address, transfer.token);
 
@@ -270,7 +270,7 @@ impl TransferWitness<Bn256> {
         );
 
         let intermediate_root = tree.root_hash();
-        log::debug!("Intermediate root = {}", intermediate_root);
+        vlog::debug!("Intermediate root = {}", intermediate_root);
 
         let (audit_path_from_intermediate, audit_balance_path_from_intermediate) =
             get_audits(tree, transfer.from_account_address, transfer.token);

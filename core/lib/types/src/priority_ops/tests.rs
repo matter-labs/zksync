@@ -2,7 +2,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     priority_ops::{FullExit, PriorityOp},
-    Address, SerialId, ZkSyncPriorityOp, H256,
+    AccountId, Address, SerialId, TokenId, ZkSyncPriorityOp, H256,
 };
 
 /// Tests the migration of `PriorityOp::eth_hash` from the `Vec<u8>` to `H256` type
@@ -20,9 +20,9 @@ mod backward_compatibility {
 
     fn old_value() -> OldPriorityOp {
         let operation = FullExit {
-            account_id: 155,
+            account_id: AccountId(155),
             eth_address: Address::default(),
-            token: 1000,
+            token: TokenId(1000),
         };
         OldPriorityOp {
             serial_id: 12345,

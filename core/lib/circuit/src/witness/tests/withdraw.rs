@@ -4,7 +4,7 @@ use zksync_crypto::franklin_crypto::bellman::pairing::bn256::Bn256;
 // Workspace deps
 use zksync_state::state::CollectedFee;
 use zksync_state::{handler::TxHandler, state::ZkSyncState};
-use zksync_types::{operations::WithdrawOp, tx::Withdraw, Address};
+use zksync_types::{operations::WithdrawOp, tx::Withdraw, AccountId, Address, TokenId};
 // Local deps
 use crate::witness::{
     tests::test_utils::{
@@ -29,13 +29,13 @@ fn test_withdraw() {
 
     for (initial_balance, transfer_amount, fee_amount) in test_vector {
         // Input data.
-        let accounts = vec![WitnessTestAccount::new(1, initial_balance)];
+        let accounts = vec![WitnessTestAccount::new(AccountId(1), initial_balance)];
         let account = &accounts[0];
         let withdraw_op = WithdrawOp {
             tx: account
                 .zksync_account
                 .sign_withdraw(
-                    0,
+                    TokenId(0),
                     "",
                     BigUint::from(transfer_amount),
                     BigUint::from(fee_amount),
@@ -76,13 +76,13 @@ fn corrupted_ops_input() {
     const EXPECTED_PANIC_MSG: &str = "op_valid is true";
 
     // Legit input data.
-    let accounts = vec![WitnessTestAccount::new(1, 10)];
+    let accounts = vec![WitnessTestAccount::new(AccountId(1), 10)];
     let account = &accounts[0];
     let withdraw_op = WithdrawOp {
         tx: account
             .zksync_account
             .sign_withdraw(
-                0,
+                TokenId(0),
                 "",
                 BigUint::from(7u64),
                 BigUint::from(3u64),
@@ -123,7 +123,7 @@ fn corrupted_ops_input() {
 #[test]
 #[ignore]
 fn test_incorrect_withdraw_account_from() {
-    const TOKEN_ID: u16 = 0;
+    const TOKEN_ID: TokenId = TokenId(0);
     const INITIAL_BALANCE: u64 = 10;
     const TOKEN_AMOUNT: u64 = 7;
     const FEE_AMOUNT: u64 = 3;
@@ -131,11 +131,11 @@ fn test_incorrect_withdraw_account_from() {
     // Operation is not valid, since `from` ID is different from the tx body.
     const ERR_MSG: &str = "op_valid is true/enforce equal to one";
 
-    let incorrect_from_account = WitnessTestAccount::new(3, INITIAL_BALANCE);
+    let incorrect_from_account = WitnessTestAccount::new(AccountId(3), INITIAL_BALANCE);
 
     // Input data: transaction is signed by an incorrect account (address of account
     // and ID of the `from` accounts differ).
-    let accounts = vec![WitnessTestAccount::new(1, INITIAL_BALANCE)];
+    let accounts = vec![WitnessTestAccount::new(AccountId(1), INITIAL_BALANCE)];
     let account_from = &accounts[0];
     let withdraw_op = WithdrawOp {
         tx: incorrect_from_account
@@ -175,7 +175,7 @@ fn test_incorrect_withdraw_account_from() {
 #[test]
 #[ignore]
 fn test_incorrect_withdraw_amount() {
-    const TOKEN_ID: u16 = 0;
+    const TOKEN_ID: TokenId = TokenId(0);
     // Balance check should fail.
     // "balance-fee bits" is message for subtraction check in circuit.
     // For details see `circuit.rs`.
@@ -190,7 +190,7 @@ fn test_incorrect_withdraw_amount() {
 
     for (initial_balance, transfer_amount, fee_amount) in test_vector {
         // Input data: account does not have enough funds.
-        let accounts = vec![WitnessTestAccount::new(1, initial_balance)];
+        let accounts = vec![WitnessTestAccount::new(AccountId(1), initial_balance)];
         let account_from = &accounts[0];
         let withdraw_op = WithdrawOp {
             tx: account_from
@@ -232,7 +232,7 @@ fn test_incorrect_withdraw_amount() {
 #[test]
 #[ignore]
 fn test_withdraw_replay() {
-    const TOKEN_ID: u16 = 0;
+    const TOKEN_ID: TokenId = TokenId(0);
     const INITIAL_BALANCE: u64 = 10;
     const TOKEN_AMOUNT: u64 = 7;
     const FEE_AMOUNT: u64 = 3;
@@ -241,12 +241,12 @@ fn test_withdraw_replay() {
     // with the same private key.
     const ERR_MSG: &str = "op_valid is true/enforce equal to one";
 
-    let account_base = WitnessTestAccount::new(1, INITIAL_BALANCE);
+    let account_base = WitnessTestAccount::new(AccountId(1), INITIAL_BALANCE);
     // Create a copy of the base account with the same keys.
-    let mut account_copy = WitnessTestAccount::new_empty(2);
+    let mut account_copy = WitnessTestAccount::new_empty(AccountId(2));
     account_copy.account = account_base.account.clone();
 
-    let account_to = WitnessTestAccount::new_empty(3); // Will not be included into state.
+    let account_to = WitnessTestAccount::new_empty(AccountId(3)); // Will not be included into state.
 
     // Input data
     let accounts = vec![account_base, account_copy];

@@ -14,7 +14,7 @@ use zksync_api_client::rest::v1::{
     Client, TokenPriceKind, MAX_LIMIT,
 };
 use zksync_config::test_config::TestConfig;
-use zksync_types::{Address, TokenLike};
+use zksync_types::{Address, TokenId, TokenLike};
 
 // Local uses
 use super::{ApiDataPool, ApiTestsBuilder};
@@ -115,11 +115,11 @@ pub fn wire_tests<'a>(builder: ApiTestsBuilder<'a>, monitor: &'a Monitor) -> Api
     // Prebuilt token-like requests
     let tokens = [
         // Ethereum.
-        TokenLike::Id(0),
+        TokenLike::Id(TokenId(0)),
         TokenLike::Symbol("ETH".to_string()),
         TokenLike::Address(Address::default()),
         // PHNX, see rest/v1/test_utils.rs
-        TokenLike::Id(1),
+        TokenLike::Id(TokenId(1)),
         TokenLike::Symbol("PHNX".to_string()),
         TokenLike::Address(Address::from_str("38A2fDc11f526Ddd5a607C1F251C065f40fBF2f7").unwrap()),
     ];
