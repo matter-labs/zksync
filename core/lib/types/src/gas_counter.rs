@@ -147,8 +147,8 @@ impl GasCounter {
     pub const COMPLETE_WITHDRAWALS_ERC20_COST: u64 = 200_000;
 
     /// constants for gas limit calculation of aggregated operations
-    pub const BASE_COMMIT_BLOCKS_TX_COST: usize = 45_000;
-    pub const BASE_EXECUTE_BLOCKS_TX_COST: usize = 45_000;
+    pub const BASE_COMMIT_BLOCKS_TX_COST: usize = 450_000;
+    pub const BASE_EXECUTE_BLOCKS_TX_COST: usize = 450_000;
     pub const BASE_PROOF_BLOCKS_TX_COST: usize = 1_500_000;
 
     pub fn new() -> Self {
