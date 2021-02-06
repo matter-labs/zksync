@@ -5,8 +5,7 @@
   "scripts": {
     "serve": "yarn copy_config && vue-cli-service serve --port=7000",
     "build": "yarn copy_config && vue-cli-service build",
-    "copy_config": "cp ../../etc/js/env-config.js src/",
-    "lint": "vue-cli-service lint"
+    "copy_config": "cp ../../etc/js/env-config.js src/"
   },
   "dependencies": {
     "axios": "^0.21.1",
