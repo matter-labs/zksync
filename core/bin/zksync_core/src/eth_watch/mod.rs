@@ -31,7 +31,7 @@ use self::{
     received_ops::{sift_outdated_ops, ReceivedPriorityOp},
 };
 
-pub use client::EthHttpClient;
+pub use client::{get_contract_events, get_web3_block_number, EthHttpClient};
 use zksync_config::ZkSyncConfig;
 
 mod client;
@@ -53,7 +53,7 @@ const RATE_LIMIT_DELAY: Duration = Duration::from_secs(30);
 /// watcher goes into "backoff" mode in which polling is disabled for a
 /// certain amount of time.
 #[derive(Debug)]
-enum WatcherMode {
+pub enum WatcherMode {
     /// ETHWatcher operates normally.
     Working,
     /// Polling is currently disabled.

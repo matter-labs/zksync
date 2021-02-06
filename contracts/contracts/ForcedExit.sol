@@ -17,6 +17,9 @@ contract ForcedExit is Ownable, ReentrancyGuard {
 
     constructor(address _master) Ownable(_master) {
         initializeReentrancyGuard();
+
+        // The master is the default receiver
+        receiver = payable(_master);
     }
 
     event FundsReceived(
@@ -53,7 +56,10 @@ contract ForcedExit is Ownable, ReentrancyGuard {
         require(success, "d"); // ETH withdraw failed
     }
 
-    receive() external payable nonReentrant {
+    // We ave to use fallback instead of `receive` since the ethabi 
+    // library can't decode the receive function:
+    // https://github.com/rust-ethereum/ethabi/issues/185
+    fallback() external payable nonReentrant {
         require(enabled, "Contract is disabled");
         require(receiver != address(0), "Receiver must be non-zero");
         
