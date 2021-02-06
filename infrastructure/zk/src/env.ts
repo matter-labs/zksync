@@ -36,7 +36,7 @@ export function set(env: string) {
         throw new Error(envFile + ' not found');
     }
     if (!fs.existsSync(envDir)) {
-        throw new Error(envFile + ' not found');
+        throw new Error(envDir + ' not found');
     }
 
     fs.writeFileSync('etc/env/current', env);
