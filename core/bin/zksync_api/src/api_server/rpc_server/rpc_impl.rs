@@ -111,7 +111,7 @@ impl RpcApp {
     pub async fn _impl_submit_txs_batch(
         self,
         txs: Vec<TxWithSignature>,
-        eth_signatures: EthBatchSignatures,
+        eth_signatures: Option<EthBatchSignatures>,
     ) -> Result<Vec<TxHash>> {
         let start = Instant::now();
         let result = self

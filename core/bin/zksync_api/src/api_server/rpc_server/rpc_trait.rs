@@ -40,7 +40,7 @@ pub trait Rpc {
     fn submit_txs_batch(
         &self,
         txs: Vec<TxWithSignature>,
-        eth_signatures: EthBatchSignatures,
+        eth_signatures: Option<EthBatchSignatures>,
     ) -> FutureResp<Vec<TxHash>>;
 
     #[rpc(name = "contract_address", returns = "ContractAddressResp")]
@@ -128,7 +128,7 @@ impl Rpc for RpcApp {
     fn submit_txs_batch(
         &self,
         txs: Vec<TxWithSignature>,
-        eth_signatures: EthBatchSignatures,
+        eth_signatures: Option<EthBatchSignatures>,
     ) -> FutureResp<Vec<TxHash>> {
         let handle = self.runtime_handle.clone();
         let self_ = self.clone();

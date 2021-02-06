@@ -289,10 +289,10 @@ impl TxSender {
     pub async fn submit_txs_batch(
         &self,
         txs: Vec<TxWithSignature>,
-        eth_signatures: EthBatchSignatures,
+        eth_signatures: Option<EthBatchSignatures>,
     ) -> Result<Vec<TxHash>, SubmitError> {
         // Bring the received signatures into a vector for simplified work.
-        let eth_signatures: Vec<_> = eth_signatures.into();
+        let eth_signatures = EthBatchSignatures::api_arg_to_vec(eth_signatures);
 
         if txs.is_empty() {
             return Err(SubmitError::TxAdd(TxAddError::EmptyBatch));

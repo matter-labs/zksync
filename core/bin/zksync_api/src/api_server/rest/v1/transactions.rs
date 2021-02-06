@@ -264,7 +264,7 @@ async fn submit_tx_batch(
     let signatures = body.signature;
     let tx_hashes = data
         .tx_sender
-        .submit_txs_batch(txs, signatures)
+        .submit_txs_batch(txs, Some(signatures))
         .await
         .map_err(ApiError::from)?;
 
@@ -643,7 +643,7 @@ mod tests {
         let batch_signature = {
             let batch_message = EthBatchSignData::get_batch_sign_message(txs);
             let eth_sig = PackedEthSignature::sign(&acc.eth_private_key, &batch_message).unwrap();
-            let single_signature = Some(TxEthSignature::EthereumSignature(eth_sig));
+            let single_signature = TxEthSignature::EthereumSignature(eth_sig);
 
             EthBatchSignatures::Single(single_signature)
         };
@@ -709,7 +709,7 @@ mod tests {
         let batch_signature = {
             let batch_message = EthBatchSignData::get_batch_sign_message(txs);
             let eth_sig = PackedEthSignature::sign(&from.eth_private_key, &batch_message).unwrap();
-            let single_signature = Some(TxEthSignature::EthereumSignature(eth_sig));
+            let single_signature = TxEthSignature::EthereumSignature(eth_sig);
 
             EthBatchSignatures::Single(single_signature)
         };
@@ -758,7 +758,7 @@ mod tests {
         let batch_signature = {
             let batch_message = EthBatchSignData::get_batch_sign_message(txs);
             let eth_sig = PackedEthSignature::sign(&from.eth_private_key, &batch_message).unwrap();
-            let single_signature = Some(TxEthSignature::EthereumSignature(eth_sig));
+            let single_signature = TxEthSignature::EthereumSignature(eth_sig);
 
             EthBatchSignatures::Single(single_signature)
         };

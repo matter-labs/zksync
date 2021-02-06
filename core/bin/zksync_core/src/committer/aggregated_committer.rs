@@ -108,7 +108,9 @@ fn create_new_create_proof_operation(
     let aggregate_proof_size = available_aggregate_proof_sizes
         .iter()
         .rev()
-        .find(|aggregate_size| *aggregate_size >= &new_blocks_with_proofs.len())
+        .find(|aggregate_size| {
+            *aggregate_size >= &std::cmp::min(new_blocks_with_proofs.len(), max_aggregate_size)
+        })
         .cloned()
         .expect("failed to find correct aggregate proof size");
 

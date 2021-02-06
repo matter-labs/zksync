@@ -7,23 +7,20 @@ use serde::{Deserialize, Serialize};
 #[serde(untagged)]
 pub enum EthBatchSignatures {
     /// Old version of the batch signature, represents a maximum of one signature for one batch.
-    Single(Option<TxEthSignature>),
+    Single(TxEthSignature),
     /// New version of the batch signature, represents multiple signatures for one batch.
     Multi(Vec<TxEthSignature>),
 }
 
-impl Into<Vec<TxEthSignature>> for EthBatchSignatures {
-    fn into(self) -> Vec<TxEthSignature> {
-        match self {
+impl EthBatchSignatures {
+    pub fn api_arg_to_vec(api_argument: Option<EthBatchSignatures>) -> Vec<TxEthSignature> {
+        match api_argument {
             // If the signature is one, then just wrap it around the vector
-            EthBatchSignatures::Single(single_signature) => {
-                if let Some(signature) = single_signature {
-                    vec![signature]
-                } else {
-                    Vec::new()
-                }
+            Some(EthBatchSignatures::Single(single_signature)) => {
+                vec![single_signature]
             }
-            EthBatchSignatures::Multi(signatures) => signatures,
+            Some(EthBatchSignatures::Multi(signatures)) => signatures,
+            None => Vec::new(),
         }
     }
 }
