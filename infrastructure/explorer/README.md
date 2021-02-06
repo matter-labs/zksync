@@ -10,13 +10,13 @@ yarn copy_config
 ### Compiles and hot-reloads for development
 
 ```
-yarn run serve
+yarn serve
 ```
 
 ### Compiles and minifies for production
 
 ```
-yarn run build
+yarn build
 ```
 
 ### Customize configuration
