@@ -13,20 +13,20 @@ use serde::Deserialize;
 #[derive(Debug, Deserialize, Clone, PartialEq)]
 struct ForcedExitRequestsInternalConfig {
     pub enabled: bool,
-    pub price_scaling_factor: f64,
     pub max_tokens_per_request: u8,
     pub recomended_tx_interval: i64,
     pub tx_interval_scaling_factor: f64,
+    pub price_per_token: i64,
     pub digits_in_id: u8,
 }
 
 #[derive(Debug, Deserialize, Clone, PartialEq)]
 pub struct ForcedExitRequestsConfig {
     pub enabled: bool,
-    pub price_scaling_factor: f64,
     pub max_tokens_per_request: u8,
     pub recomended_tx_interval: i64,
     pub max_tx_interval: i64,
+    pub price_per_token: i64,
     pub digits_in_id: u8,
 }
 
@@ -40,11 +40,11 @@ impl ForcedExitRequestsConfig {
 
         ForcedExitRequestsConfig {
             enabled: config.enabled,
-            price_scaling_factor: config.price_scaling_factor,
             max_tokens_per_request: config.max_tokens_per_request,
             recomended_tx_interval: config.recomended_tx_interval,
             max_tx_interval: max_tx_interval.round() as i64,
             digits_in_id: config.digits_in_id,
+            price_per_token: config.price_per_token,
         }
     }
 }

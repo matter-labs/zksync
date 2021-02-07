@@ -4,10 +4,6 @@
 # in times of attacks or upgrages  
 enabled=true
 
-# The price that will be demanded from a user is equal to 
-# price_for_withdrawal * price_scaling
-price_scaling_factor=1.6
-
 max_tokens_per_request=10
 
 # Recommended interval to send the transaction in milliseconds
@@ -19,3 +15,6 @@ tx_interval_scaling_factor=1.5
 
 # Number of digits in id
 digits_in_id=13
+
+# Price per exit in wei (currently it's 0.03 ETH)
+price_per_token=30000000000000000

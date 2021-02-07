@@ -51,10 +51,10 @@ pub struct ApiForcedExitRequestsData {
     pub(crate) ticker_request_sender: mpsc::Sender<TickerRequest>,
 
     pub(crate) is_enabled: bool,
-    pub(crate) price_scaling_factor: BigDecimal,
     pub(crate) max_tokens_per_request: u8,
     pub(crate) recomended_tx_interval_millisecs: i64,
     pub(crate) max_tx_interval_millisecs: i64,
+    pub(crate) price_per_token: i64,
 }
 
 impl ApiForcedExitRequestsData {
@@ -70,10 +70,7 @@ impl ApiForcedExitRequestsData {
             ticker_request_sender,
 
             is_enabled: config.forced_exit_requests.enabled,
-            price_scaling_factor: BigDecimal::from_f64(
-                config.forced_exit_requests.price_scaling_factor,
-            )
-            .unwrap(),
+            price_per_token: config.forced_exit_requests.price_per_token,
             max_tokens_per_request: config.forced_exit_requests.max_tokens_per_request,
             recomended_tx_interval_millisecs: config.forced_exit_requests.recomended_tx_interval,
             max_tx_interval_millisecs: config.forced_exit_requests.max_tx_interval,
@@ -90,11 +87,7 @@ async fn get_status(
 
     let response = if data.is_enabled {
         ForcedExitRequestStatus::Enabled(ConfigInfo {
-            request_fee: get_fee_for_one_forced_exit(
-                data.ticker_request_sender.clone(),
-                data.price_scaling_factor.clone(),
-            )
-            .await?,
+            request_fee: BigUint::from(data.price_per_token as u64),
             max_tokens_per_request: data.max_tokens_per_request,
             recomended_tx_interval_millis: data.recomended_tx_interval_millisecs,
         })
@@ -104,24 +97,6 @@ async fn get_status(
 
     metrics::histogram!("api.forced_exit_requests.v01.status", start.elapsed());
     Ok(Json(response))
-}
-
-async fn get_fee_for_one_forced_exit(
-    ticker_request_sender: mpsc::Sender<TickerRequest>,
-    price_scaling_factor: BigDecimal,
-) -> Result<BigUint, SubmitError> {
-    let price = ticker_request(
-        ticker_request_sender.clone(),
-        TxFeeTypes::Withdraw,
-        TokenLike::Id(0),
-    )
-    .await?;
-    let price = BigDecimal::from(price.total_fee.to_bigint().unwrap());
-
-    let scaled_price = price * price_scaling_factor;
-    let scaled_price = scaled_price.round(0).to_bigint().unwrap();
-
-    Ok(scaled_price.to_biguint().unwrap())
 }
 
 pub async fn submit_request(
@@ -146,12 +121,7 @@ pub async fn submit_request(
         .await
         .map_err(ApiError::from)?;
 
-    let price_of_one_exit = get_fee_for_one_forced_exit(
-        data.ticker_request_sender.clone(),
-        data.price_scaling_factor.clone(),
-    )
-    .await
-    .map_err(ApiError::from)?;
+    let price_of_one_exit = BigDecimal::from(data.price_per_token);
     let price_of_one_exit = BigDecimal::from(price_of_one_exit.to_bigint().unwrap());
     let price_of_request = price_of_one_exit * BigDecimal::from_usize(params.tokens.len()).unwrap();
 
@@ -406,19 +376,20 @@ mod tests {
     async fn test_forced_exit_requests_get_fee() -> anyhow::Result<()> {
         let forced_exit_requests = ForcedExitRequestsConfig::from_env();
         let test_config = get_test_config_from_forced_exit_requests(ForcedExitRequestsConfig {
-            price_scaling_factor: 1.5,
+            price_per_token: 1000000000,
             ..forced_exit_requests
         });
 
-        let (client, server) =
-            TestServer::new_with_fee_ticker(test_config, Some(10000), Some(10000)).await?;
+        let (client, server) = TestServer::new_with_config(test_config).await?;
 
         let status = client.get_forced_exit_requests_status().await?;
 
         match status {
             ForcedExitRequestStatus::Enabled(config_info) => {
-                // 10000 * 1.5 = 15000
-                assert_eq!(config_info.request_fee, BigUint::from_u32(30000).unwrap());
+                assert_eq!(
+                    config_info.request_fee,
+                    BigUint::from_u32(1000000000).unwrap()
+                );
             }
             ForcedExitRequestStatus::Disabled => {
                 panic!("ForcedExitRequests feature is not disabled");
