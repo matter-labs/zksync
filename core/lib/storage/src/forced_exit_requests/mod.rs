@@ -1,3 +1,4 @@
+use chrono::{DateTime, Utc};
 // Built-in deps
 use num::BigInt;
 use sqlx::types::BigDecimal;
@@ -65,8 +66,6 @@ impl<'a, 'c> ForcedExitRequestsSchema<'a, 'c> {
         id: ForcedExitRequestId,
     ) -> QueryResult<ForcedExitRequest> {
         let start = Instant::now();
-        // Unfortunately there were some bugs with
-        // sqlx macros, so just have to resort to the old way
         let request: DbForcedExitRequest = sqlx::query_as!(
             DbForcedExitRequest,
             r#"
@@ -86,5 +85,29 @@ impl<'a, 'c> ForcedExitRequestsSchema<'a, 'c> {
         );
 
         Ok(request)
+    }
+
+    pub async fn fulfill_request(
+        &mut self,
+        id: ForcedExitRequestId,
+        fulfilled_at: DateTime<Utc>,
+    ) -> QueryResult<()> {
+        let start = Instant::now();
+
+        sqlx::query!(
+            r#"
+            UPDATE forced_exit_requests
+                SET fulfilled_at = $1
+                WHERE id = $2
+            "#,
+            fulfilled_at,
+            id
+        )
+        .execute(self.0.conn())
+        .await?;
+
+        metrics::histogram!("sql.forced_exit_requests.fulfill_request", start.elapsed());
+
+        Ok(())
     }
 }

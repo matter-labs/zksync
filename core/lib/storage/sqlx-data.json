@@ -594,6 +594,19 @@
       ]
     }
   },
+  "1e491f4afb54c10a9e4f2ea467bd7f219e7a32bdf741691cb6f350d50caae417": {
+    "query": "\n            UPDATE forced_exit_requests\n                SET fulfilled_at = $1\n                WHERE id = $2\n            ",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "Timestamptz",
+          "Int8"
+        ]
+      },
+      "nullable": []
+    }
+  },
   "222e3946401772e3f6e0d9ce9909e8e7ac2dc830c5ecfcd522f56b3bf70fd679": {
     "query": "INSERT INTO data_restore_storage_state_update (storage_state) VALUES ($1)",
     "describe": {

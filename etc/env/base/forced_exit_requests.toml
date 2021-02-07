@@ -16,3 +16,6 @@ recomended_tx_interval=300
 # How many times the maximum acceptable interval will be longer 
 # than the recommended interval
 tx_interval_scaling_factor=1.5
+
+# Number of digits in id
+digits_in_id=13

@@ -17,6 +17,7 @@ struct ForcedExitRequestsInternalConfig {
     pub max_tokens_per_request: u8,
     pub recomended_tx_interval: i64,
     pub tx_interval_scaling_factor: f64,
+    pub digits_in_id: u8,
 }
 
 #[derive(Debug, Deserialize, Clone, PartialEq)]
@@ -26,6 +27,7 @@ pub struct ForcedExitRequestsConfig {
     pub max_tokens_per_request: u8,
     pub recomended_tx_interval: i64,
     pub max_tx_interval: i64,
+    pub digits_in_id: u8,
 }
 
 impl ForcedExitRequestsConfig {
@@ -42,6 +44,7 @@ impl ForcedExitRequestsConfig {
             max_tokens_per_request: config.max_tokens_per_request,
             recomended_tx_interval: config.recomended_tx_interval,
             max_tx_interval: max_tx_interval.round() as i64,
+            digits_in_id: config.digits_in_id,
         }
     }
 }

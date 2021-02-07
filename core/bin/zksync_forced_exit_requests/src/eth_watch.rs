@@ -28,6 +28,8 @@ use zksync_types::forced_exit_requests::FundsReceivedEvent;
 /// before repeating the request.
 const RATE_LIMIT_DELAY: Duration = Duration::from_secs(30);
 
+use super::ForcedExitSender;
+
 struct ContractTopics {
     pub funds_received: Hash,
 }
@@ -106,6 +108,7 @@ struct ForcedExitContractWatcher {
     config: ZkSyncConfig,
     eth_client: EthClient,
     last_viewed_block: u64,
+    forced_exit_sender: ForcedExitSender,
 
     mode: WatcherMode,
 }
@@ -183,7 +186,9 @@ impl ForcedExitContractWatcher {
         let events = events.unwrap();
 
         for e in events {
-            dbg!("An event has come for us: {}", e.amount);
+            self.forced_exit_sender
+                .process_request(e.amount as i64)
+                .await;
         }
 
         self.last_viewed_block = block;
@@ -199,16 +204,27 @@ pub fn run_forced_exit_contract_watcher(
     let web3 = web3::Web3::new(transport);
     let eth_client = EthClient::new(web3, config.contracts.forced_exit_addr);
 
-    let mut contract_watcher = ForcedExitContractWatcher {
-        core_api_client,
-        connection_pool,
-        config,
-        eth_client,
-        last_viewed_block: 0,
-        mode: WatcherMode::Working,
-    };
-
     tokio::spawn(async move {
+        // It is ok to unwrap here, since if fe_sender is not created, then
+        // the watcher is meaningless
+        let forced_exit_sender = ForcedExitSender::new(
+            core_api_client.clone(),
+            connection_pool.clone(),
+            config.clone(),
+        )
+        .await
+        .unwrap();
+
+        let mut contract_watcher = ForcedExitContractWatcher {
+            core_api_client,
+            connection_pool,
+            config,
+            eth_client,
+            last_viewed_block: 0,
+            forced_exit_sender,
+            mode: WatcherMode::Working,
+        };
+
         let mut timer = time::interval(Duration::from_secs(1));
 
         loop {

@@ -25,10 +25,10 @@ web3 = "0.13.0"
 log = "0.4"
 env_logger = "0.6"
 metrics = "0.13.0-alpha.8"
+chrono = { version = "0.4", features = ["serde", "rustc-serialize"] }
 
 tokio = { version = "0.2", features = ["full"] }
 anyhow = "1.0"
 async-trait = "0.1"
 
-[dev-dependencies]
 num = { version = "0.3.1", features = ["serde"] }
