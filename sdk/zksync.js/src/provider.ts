@@ -17,7 +17,7 @@ import {
 import { isTokenETH, sleep, SYNC_GOV_CONTRACT_INTERFACE, TokenSet } from './utils';
 
 export async function getDefaultProvider(network: Network, transport: 'WS' | 'HTTP' = 'HTTP'): Promise<Provider> {
-    if(transport === 'WS') {
+    if (transport === 'WS') {
         console.warn('Websocket support will be removed in future. Use HTTP transport instead.');
     }
     if (network === 'localhost') {
