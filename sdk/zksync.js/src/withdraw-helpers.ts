@@ -1,5 +1,5 @@
 import { BigNumberish, ethers, Contract, BigNumber, ContractTransaction } from 'ethers';
-import { Wallet } from '.';
+import { Wallet } from './wallet';
 import { Address, TokenLike, Network } from './types';
 import { MULTICALL_INTERFACE } from './utils';
 
