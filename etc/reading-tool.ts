@@ -1,7 +1,7 @@
 import * as fs from 'fs';
 
 function configPath(postfix: string) {
-    return `${process.env.ZKSYNC_HOME}/etc/test_config/${postfix}`;
+    return `./test_config/${postfix}`;
 }
 
 function loadConfig(path: string) {
@@ -21,11 +21,15 @@ export function loadTestConfig() {
     const eipConfig = Object.assign(eipConstantConfig, eipVolatileConfig);
 
     const ethConstantPath = configPath('constant/eth.json');
-    let ethConfig = loadConfig(ethConstantPath);
+    const ethConfig = loadConfig(ethConstantPath);
+
+    const withdrawalHelpersConfigPoth = configPath('volatile/withdrawal-helpers.json');
+    const withdrawalHelpersConfig = loadConfig(withdrawalHelpersConfigPoth);
 
     return {
         eip1271: eipConfig,
-        eth: ethConfig
+        eth: ethConfig,
+        withdrawalHelpers: withdrawalHelpersConfig
     };
 }
 
@@ -35,7 +39,7 @@ export function loadTestVectorsConfig() {
 }
 
 export function getTokens(network: string) {
-    const configPath = `${process.env.ZKSYNC_HOME}/etc/tokens/${network}.json`;
+    const configPath = `./tokens/${network}.json`;
     console.log(configPath);
     return JSON.parse(
         fs.readFileSync(configPath, {

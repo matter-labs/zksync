@@ -13,7 +13,7 @@ import {
     parseHexWithPrefix
 } from '../src/utils';
 import { privateKeyFromSeed, signTransactionBytes } from '../src/crypto';
-import { loadTestVectorsConfig } from './helpers';
+import { loadTestVectorsConfig } from '../../../etc/reading-tool';
 
 const vectors = loadTestVectorsConfig();
 const cryptoPrimitivesVectors = vectors['cryptoPrimitivesTest'];

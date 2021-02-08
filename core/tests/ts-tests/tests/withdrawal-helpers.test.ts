@@ -5,7 +5,7 @@ import './priority-ops';
 import './change-pub-key';
 import './withdrawal-helpers';
 
-import { loadTestConfig } from './helpers';
+import { loadTestConfig } from '../../../../etc/reading-tool';
 
 const TX_AMOUNT = utils.parseEther('1');
 const DEPOSIT_AMOUNT = TX_AMOUNT.mul(200);
