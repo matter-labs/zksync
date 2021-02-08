@@ -17,7 +17,7 @@ use vlog::*;
 use web3::transports::Http;
 use zksync_crypto::proof::EncodedSingleProof;
 use zksync_testkit::*;
-use zksync_types::{AccountId, AccountMap, Nonce, TokenId};
+use zksync_types::{AccountId, AccountMap, Nonce, PriorityOp, TokenId};
 
 const PRIORITY_EXPIRATION: u64 = 101;
 
@@ -53,16 +53,14 @@ async fn commit_deposit_to_expire(
     to: ZKSyncAccountId,
     token: Token,
     deposit_amount: &BigUint,
-) -> u64 {
+) -> (u64, Vec<PriorityOp>) {
     info!("Commit deposit to expire");
-    // test_setup.start_block();
-    test_setup
+    let (_, priority_op) = test_setup
         .deposit(from, to, token, deposit_amount.clone())
         .await;
-    // test_setup.execute_commit_block().await.0.expect_success();
 
     info!("Done commit deposit to expire");
-    test_setup.eth_block_number().await
+    (test_setup.eth_block_number().await, vec![priority_op])
 }
 
 // Trigger exodus mode using `eth_account`, it is preferred to use not operator account for this
@@ -92,6 +90,7 @@ async fn cancel_outstanding_deposits(
     deposit_receiver_account: ETHAccountId,
     deposit_token: Token,
     deposit_amount: &BigUint,
+    expired_priority_ops: &[PriorityOp],
     call_cancel_account: ETHAccountId,
 ) {
     info!("Canceling outstangind deposits");
@@ -100,8 +99,9 @@ async fn cancel_outstanding_deposits(
         .get_balance_to_withdraw(deposit_receiver_account, token_address)
         .await;
 
+    let (number, data) = PriorityOp::get_args_for_priority_queue_cancel(expired_priority_ops);
     test_setup
-        .cancel_outstanding_deposits(call_cancel_account)
+        .cancel_outstanding_deposits(call_cancel_account, number, data)
         .await;
 
     let balance_to_withdraw_after = test_setup
@@ -442,7 +442,7 @@ async fn exit_test() {
     let verified_accounts_state = test_setup.get_accounts_state().await;
 
     let expired_deposit_amount = parse_ether("0.3").unwrap();
-    let expire_count_start_block = commit_deposit_to_expire(
+    let (expire_count_start_block, expired_priority_ops) = commit_deposit_to_expire(
         &mut test_setup,
         ETHAccountId(0),
         ZKSyncAccountId(1),
@@ -451,15 +451,15 @@ async fn exit_test() {
     )
     .await;
     trigger_exodus(&test_setup, ETHAccountId(1), expire_count_start_block).await;
-    // TODO implement new cancelOutstandingDepositsForExodusMode contract method
-    // cancel_outstanding_deposits(
-    //     &test_setup,
-    //     ETHAccountId(1),
-    //     Token(TokenId(0)),
-    //     &expired_deposit_amount,
-    //     ETHAccountId(1),
-    // )
-    // .await;
+    cancel_outstanding_deposits(
+        &test_setup,
+        ETHAccountId(1),
+        Token(TokenId(0)),
+        &expired_deposit_amount,
+        &expired_priority_ops,
+        ETHAccountId(1),
+    )
+    .await;
 
     check_exit_correct_proof_other_token(
         &mut test_setup,

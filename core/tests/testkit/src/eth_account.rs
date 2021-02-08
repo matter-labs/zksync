@@ -188,10 +188,12 @@ impl EthereumAccount {
     pub async fn cancel_outstanding_deposits_for_exodus_mode(
         &self,
         number: u64,
+        priority_op_data: Vec<Vec<u8>>,
     ) -> Result<ETHExecResult, anyhow::Error> {
-        let data = self
-            .main_contract_eth_client
-            .encode_tx_data("cancelOutstandingDepositsForExodusMode", number);
+        let data = self.main_contract_eth_client.encode_tx_data(
+            "cancelOutstandingDepositsForExodusMode",
+            (number, priority_op_data),
+        );
         let signed_tx = self
             .main_contract_eth_client
             .sign_prepared_tx(data, default_tx_options())

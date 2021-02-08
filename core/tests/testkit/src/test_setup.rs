@@ -1108,10 +1108,14 @@ impl TestSetup {
             .expect("Trigger exodus if needed call");
     }
 
-    pub async fn cancel_outstanding_deposits(&self, eth_account: ETHAccountId) {
-        const DEPOSITS_TO_CANCEL: u64 = 100;
+    pub async fn cancel_outstanding_deposits(
+        &self,
+        eth_account: ETHAccountId,
+        number: u64,
+        data: Vec<Vec<u8>>,
+    ) {
         self.accounts.eth_accounts[eth_account.0]
-            .cancel_outstanding_deposits_for_exodus_mode(DEPOSITS_TO_CANCEL)
+            .cancel_outstanding_deposits_for_exodus_mode(number, data)
             .await
             .expect("Failed to cancel outstanding deposits");
     }

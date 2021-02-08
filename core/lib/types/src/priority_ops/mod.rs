@@ -2,7 +2,7 @@
 
 use anyhow::{bail, ensure, format_err};
 use ethabi::{decode, ParamType};
-use num::BigUint;
+use num::{BigUint, ToPrimitive};
 use serde::{Deserialize, Serialize};
 use std::convert::{TryFrom, TryInto};
 use zksync_basic_types::{Address, Log, H256, U256};
@@ -195,6 +195,29 @@ impl ZkSyncPriorityOp {
             Self::FullExit(_) => FullExitOp::CHUNKS,
         }
     }
+
+    /// Returns data needed to cancel priority queue events in exodus mode.
+    fn get_args_for_priority_queue_cancel<'a, I: IntoIterator<Item = &'a Self> + 'a>(
+        queue_entries: I,
+    ) -> (u64, Vec<Vec<u8>>) {
+        let mut n = 0;
+        let mut deposits_data = Vec::new();
+        for queue_entry in queue_entries.into_iter() {
+            n += 1;
+            if let Some(deposit) = queue_entry.try_get_deposit() {
+                // Deposit pubdata for priority queue
+                let mut data = Vec::new();
+                data.push(DepositOp::OP_CODE);
+                data.extend_from_slice(&[0u8; 4]);
+                data.extend_from_slice(&deposit.token.to_be_bytes());
+                data.extend_from_slice(&deposit.amount.to_u128().unwrap().to_be_bytes());
+                data.extend_from_slice(&deposit.to.as_bytes());
+                deposits_data.push(data);
+            }
+        }
+        deposits_data.resize(n as usize, Vec::new());
+        (n, deposits_data)
+    }
 }
 
 /// Priority operation description with the metadata required for server to process it.
@@ -261,5 +284,13 @@ impl TryFrom<Log> for PriorityOp {
                 .expect("Event block number is missing")
                 .as_u64(),
         })
+    }
+}
+
+impl PriorityOp {
+    pub fn get_args_for_priority_queue_cancel(queue_entries: &[Self]) -> (u64, Vec<Vec<u8>>) {
+        ZkSyncPriorityOp::get_args_for_priority_queue_cancel(
+            queue_entries.iter().map(|priority_op| &priority_op.data),
+        )
     }
 }
