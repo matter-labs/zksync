@@ -1,11 +1,12 @@
 use actix_web::client;
 use anyhow::format_err;
+use chrono::{DateTime, Utc};
 use ethabi::{Contract as ContractAbi, Hash};
-use std::fmt::Debug;
 use std::{
     convert::TryFrom,
     time::{Duration, Instant},
 };
+use std::{convert::TryInto, fmt::Debug};
 use tokio::task::JoinHandle;
 use tokio::time;
 use web3::{
@@ -97,7 +98,7 @@ impl EthClient {
         result
     }
 
-    async fn get_block_number(&self) -> anyhow::Result<u64> {
+    async fn block_number(&self) -> anyhow::Result<u64> {
         get_web3_block_number(&self.web3).await
     }
 }
@@ -113,7 +114,72 @@ struct ForcedExitContractWatcher {
     mode: WatcherMode,
 }
 
+fn dummy_get_min() -> i64 {
+    1
+}
+
+// Usually blocks are created much slower (at rate 1 block per 10-20s),
+// but the block time falls through time, so just to double-check
+const MILLIS_PER_BLOCK: i64 = 7000;
+
+// Returns number of blocks that should have been created during the time
+fn time_range_to_block_diff(from: DateTime<Utc>, to: DateTime<Utc>) -> u64 {
+    let millis_from = from.timestamp_millis();
+    let millis_to = to.timestamp_millis();
+
+    // It does not really matter to wether cail or floor the division
+    return ((millis_to - millis_from) / MILLIS_PER_BLOCK)
+        .try_into()
+        .unwrap();
+}
+
+// clean the db from txs being older than ...
+fn clean() {}
+
 impl ForcedExitContractWatcher {
+    async fn restore_state_from_eth(&mut self, block: u64) -> anyhow::Result<()> {
+        //let last_block = self.eth_client.get_block_number().await.expect("Failed to restore ");
+
+        let mut storage = self.connection_pool.access_storage().await?;
+        let mut fe_schema = storage.forced_exit_requests_schema();
+
+        let oldest_request = fe_schema.get_oldest_unfulfilled_request().await?;
+
+        let wait_confirmations: u64 = self
+            .config
+            .forced_exit_requests
+            .wait_confirmations
+            .try_into()
+            .unwrap();
+
+        // No oldest requests means that there are no requests that were possibly ignored
+        let oldest_request = match oldest_request {
+            Some(r) => r,
+            None => {
+                self.last_viewed_block = block - wait_confirmations;
+                return Ok(());
+            }
+        };
+
+        let block_diff = time_range_to_block_diff(oldest_request.created_at, Utc::now());
+        let max_possible_viewed_block = block - wait_confirmations;
+
+        self.last_viewed_block = std::cmp::min(block - block_diff, max_possible_viewed_block);
+        /*
+        blocks = time_diff_to_blocks =
+
+        last_processed_block = block - blocks
+
+
+        comes a tx => check that it's valid
+        comes a tx => check that the id hasn't already been added to the fulfilled db
+        if everything is finve => add the tx
+
+        once the block is processed, remove everything too old and unfulfilled and move on
+        */
+        Ok(())
+    }
+
     // TODO try to move it to eth client
     fn is_backoff_requested(&self, error: &anyhow::Error) -> bool {
         error.to_string().contains("429 Too Many Requests")
@@ -158,25 +224,36 @@ impl ForcedExitContractWatcher {
     }
 
     pub async fn poll(&mut self) {
-        let current_block = self.eth_client.get_block_number().await;
-
         if !self.polling_allowed() {
             // Polling is currently disabled, skip it.
             return;
         }
 
-        if let Err(error) = current_block {
+        let last_block = self.eth_client.block_number().await;
+
+        if let Err(error) = last_block {
             self.handle_infura_error(error);
             return;
         }
-        let block = current_block.unwrap();
-        if self.last_viewed_block >= block {
+
+        let wait_confirmations: u64 = self
+            .config
+            .forced_exit_requests
+            .wait_confirmations
+            .try_into()
+            .unwrap();
+
+        let last_block = last_block.unwrap();
+
+        let last_confirmed_block = last_block - wait_confirmations;
+
+        if last_confirmed_block <= self.last_viewed_block {
             return;
         }
 
         let events = self
             .eth_client
-            .get_funds_received_events(self.last_viewed_block + 1, block)
+            .get_funds_received_events(self.last_viewed_block + 1, last_confirmed_block)
             .await;
 
         if let Err(error) = events {
@@ -191,7 +268,42 @@ impl ForcedExitContractWatcher {
                 .await;
         }
 
-        self.last_viewed_block = block;
+        self.last_viewed_block = last_block;
+    }
+
+    pub async fn run(mut self) {
+        // As infura may be not responsive, we want to retry the query until we've actually got the
+        // block number.
+        // Normally, however, this loop is not expected to last more than one iteration.
+        let block = loop {
+            let block = self.eth_client.block_number().await;
+
+            match block {
+                Ok(block) => {
+                    break block;
+                }
+                Err(error) => {
+                    log::warn!(
+                        "Unable to fetch last block number: '{}'. Retrying again in {} seconds",
+                        error,
+                        RATE_LIMIT_DELAY.as_secs()
+                    );
+
+                    time::delay_for(RATE_LIMIT_DELAY).await;
+                }
+            }
+        };
+
+        self.restore_state_from_eth(block)
+            .await
+            .expect("Failed to restore state for ForcedExit eth_watcher");
+
+        let mut timer = time::interval(Duration::from_secs(1));
+
+        loop {
+            timer.tick().await;
+            self.poll().await;
+        }
     }
 }
 
@@ -225,11 +337,6 @@ pub fn run_forced_exit_contract_watcher(
             mode: WatcherMode::Working,
         };
 
-        let mut timer = time::interval(Duration::from_secs(1));
-
-        loop {
-            timer.tick().await;
-            contract_watcher.poll().await;
-        }
+        contract_watcher.run().await;
     })
 }

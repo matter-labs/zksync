@@ -2118,6 +2118,11 @@
         },
         {
           "ordinal": 5,
+          "name": "created_at",
+          "type_info": "Timestamptz"
+        },
+        {
+          "ordinal": 6,
           "name": "fulfilled_at",
           "type_info": "Timestamptz"
         }
@@ -2128,6 +2133,7 @@
         ]
       },
       "nullable": [
+        false,
         false,
         false,
         false,
@@ -2241,6 +2247,60 @@
         ]
       },
       "nullable": []
+    }
+  },
+  "8a9cf4dca8a6f276a1366a232f0981f0ccaa9e1837a75dc72a85f37f646ed179": {
+    "query": "\n            SELECT * FROM forced_exit_requests\n            WHERE fulfilled_at IS NULL AND created_at = (\n                SELECT MIN(created_at) FROM forced_exit_requests\n            )\n            LIMIT 1\n            ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "id",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 1,
+          "name": "target",
+          "type_info": "Text"
+        },
+        {
+          "ordinal": 2,
+          "name": "tokens",
+          "type_info": "Text"
+        },
+        {
+          "ordinal": 3,
+          "name": "price_in_wei",
+          "type_info": "Numeric"
+        },
+        {
+          "ordinal": 4,
+          "name": "valid_until",
+          "type_info": "Timestamptz"
+        },
+        {
+          "ordinal": 5,
+          "name": "created_at",
+          "type_info": "Timestamptz"
+        },
+        {
+          "ordinal": 6,
+          "name": "fulfilled_at",
+          "type_info": "Timestamptz"
+        }
+      ],
+      "parameters": {
+        "Left": []
+      },
+      "nullable": [
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        true
+      ]
     }
   },
   "8aa384bd2d145e1b7a8a6e18b560af991da3ef0d41ee5cae8f0c0573287acf04": {
@@ -2855,6 +2915,65 @@
         null,
         null,
         null
+      ]
+    }
+  },
+  "be9256cd3f1bf963746b135b29678dc82a050dde0eca60258dd991b2d7d7d1eb": {
+    "query": "\n            INSERT INTO forced_exit_requests ( target, tokens, price_in_wei, valid_until )\n            VALUES ( $1, $2, $3, $4 )\n            RETURNING *\n            ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "id",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 1,
+          "name": "target",
+          "type_info": "Text"
+        },
+        {
+          "ordinal": 2,
+          "name": "tokens",
+          "type_info": "Text"
+        },
+        {
+          "ordinal": 3,
+          "name": "price_in_wei",
+          "type_info": "Numeric"
+        },
+        {
+          "ordinal": 4,
+          "name": "valid_until",
+          "type_info": "Timestamptz"
+        },
+        {
+          "ordinal": 5,
+          "name": "created_at",
+          "type_info": "Timestamptz"
+        },
+        {
+          "ordinal": 6,
+          "name": "fulfilled_at",
+          "type_info": "Timestamptz"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Text",
+          "Text",
+          "Numeric",
+          "Timestamptz"
+        ]
+      },
+      "nullable": [
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        true
       ]
     }
   },
@@ -3583,29 +3702,6 @@
         false,
         false,
         true,
-        false
-      ]
-    }
-  },
-  "df8ac3519c49215ebef5ac11c8fed5af12b097eb0c65f9a4ce078bb6e8342885": {
-    "query": "\n            INSERT INTO forced_exit_requests ( target, tokens, price_in_wei, valid_until )\n            VALUES ( $1, $2, $3, $4 )\n            RETURNING id\n            ",
-    "describe": {
-      "columns": [
-        {
-          "ordinal": 0,
-          "name": "id",
-          "type_info": "Int8"
-        }
-      ],
-      "parameters": {
-        "Left": [
-          "Text",
-          "Text",
-          "Numeric",
-          "Timestamptz"
-        ]
-      },
-      "nullable": [
         false
       ]
     }

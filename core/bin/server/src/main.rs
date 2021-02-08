@@ -83,31 +83,31 @@ async fn main() -> anyhow::Result<()> {
     run_prover_server(database, stop_signal_sender, ZkSyncConfig::from_env());
 
     log::info!("Starting the ForcedExitRequests actors");
-    let forced_exit_requests_task_handle = run_forced_exit_requests_actors(connection_pool, config);
+    //let forced_exit_requests_task_handle = run_forced_exit_requests_actors(connection_pool, config);
 
     tokio::select! {
-        _ = async { wait_for_tasks(core_task_handles).await } => {
-            // We don't need to do anything here, since Core actors will panic upon future resolving.
-        },
-        _ = async { api_task_handle.await } => {
-            panic!("API server actors aren't supposed to finish their execution")
-        },
-        _ = async { eth_sender_task_handle.await } => {
-            panic!("Ethereum Sender actors aren't supposed to finish their execution")
-        },
-        _ = async { prometheus_task_handle.await } => {
-            panic!("Prometheus exporter actors aren't supposed to finish their execution")
-        },
-        _ = async { counter_task_handle.unwrap().await } => {
-            panic!("Operation counting actor is not supposed to finish its execution")
-        },
-        _ = async { forced_exit_requests_task_handle.await } => {
-            panic!("ForcedExitRequests actor is not supposed to finish its execution")
-        },
-        _ = async { stop_signal_receiver.next().await } => {
-            log::warn!("Stop signal received, shutting down");
-        }
-    };
+         _ = async { wait_for_tasks(core_task_handles).await } => {
+             // We don't need to do anything here, since Core actors will panic upon future resolving.
+         },
+         _ = async { api_task_handle.await } => {
+             panic!("API server actors aren't supposed to finish their execution")
+         },
+         _ = async { eth_sender_task_handle.await } => {
+             panic!("Ethereum Sender actors aren't supposed to finish their execution")
+         },
+         _ = async { prometheus_task_handle.await } => {
+             panic!("Prometheus exporter actors aren't supposed to finish their execution")
+         },
+         _ = async { counter_task_handle.unwrap().await } => {
+             panic!("Operation counting actor is not supposed to finish its execution")
+         },
+    //     _ = async { forced_exit_requests_task_handle.await } => {
+     //        panic!("ForcedExitRequests actor is not supposed to finish its execution")
+      //   },
+         _ = async { stop_signal_receiver.next().await } => {
+             log::warn!("Stop signal received, shutting down");
+         }
+     };
 
     Ok(())
 }

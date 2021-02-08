@@ -17,12 +17,17 @@ zksync_storage = { path = "../../lib/storage", version = "1.0" }
 zksync_config = { path = "../../lib/config", version = "1.0" }
 zksync_contracts = { path = "../../lib/contracts", version = "1.0" }
 
+zksync_crypto = { path = "../../lib/crypto", version = "1.0" }
+
+franklin_crypto = { package = "franklin-crypto", version = "0.0.5", git = "https://github.com/matter-labs/franklin-crypto.git", branch="beta", features = ["multicore", "plonk"]}
+
 zksync_core = { path = "../zksync_core", version = "1.0" }
 zksync_api = { path = "../zksync_api", version = "1.0" }
 actix-web = "3.0.0"
 ethabi = "12.0.0"
 web3 = "0.13.0"
 log = "0.4"
+hex = "0.4"
 env_logger = "0.6"
 metrics = "0.13.0-alpha.8"
 chrono = { version = "0.4", features = ["serde", "rustc-serialize"] }

@@ -28,7 +28,7 @@ pub use zksync_api_client::rest::v1::{
 use zksync_config::ZkSyncConfig;
 use zksync_storage::ConnectionPool;
 use zksync_types::{
-    forced_exit_requests::{ForcedExitRequest, SaveForcedExitRequestQuery},
+    forced_exit_requests::{ForcedExitRequest, ForcedExitRequestId, SaveForcedExitRequestQuery},
     TokenLike, TxFeeTypes,
 };
 
@@ -105,14 +105,8 @@ pub async fn submit_request(
 ) -> JsonResult<ForcedExitRequest> {
     let start = Instant::now();
 
-    if !data.is_enabled {
-        return Err(ApiError::bad_request(
-            "ForcedExit requests feature is disabled!",
-        ));
-    }
-
     let mut storage = data.connection_pool.access_storage().await.map_err(|err| {
-        vlog::warn!("Internal Server Error: '{}';", err);
+        log::warn!("Internal Server Error: '{}';", err);
         return ApiError::internal("");
     })?;
 
@@ -122,7 +116,6 @@ pub async fn submit_request(
         .map_err(ApiError::from)?;
 
     let price_of_one_exit = BigDecimal::from(data.price_per_token);
-    let price_of_one_exit = BigDecimal::from(price_of_one_exit.to_bigint().unwrap());
     let price_of_request = price_of_one_exit * BigDecimal::from_usize(params.tokens.len()).unwrap();
 
     let user_fee = params.price_in_wei.to_bigint().unwrap();
@@ -170,8 +163,40 @@ pub async fn submit_request(
             return ApiError::internal("");
         })?;
 
-    metrics::histogram!("api.v01.register_forced_exit_request", start.elapsed());
+    metrics::histogram!(
+        "api.forced_exit_requests.v01.submit_request",
+        start.elapsed()
+    );
     Ok(Json(saved_fe_request))
+}
+
+pub async fn get_request_by_id(
+    data: web::Data<ApiForcedExitRequestsData>,
+    web::Path(request_id): web::Path<ForcedExitRequestId>,
+) -> JsonResult<ForcedExitRequest> {
+    let start = Instant::now();
+
+    let mut storage = data.connection_pool.access_storage().await.map_err(|err| {
+        vlog::warn!("Internal Server Error: '{}';", err);
+        return ApiError::internal("");
+    })?;
+
+    let mut fe_requests_schema = storage.forced_exit_requests_schema();
+
+    metrics::histogram!(
+        "api.forced_exit_requests.v01.get_request_by_id",
+        start.elapsed()
+    );
+
+    let fe_request_from_db = fe_requests_schema
+        .get_request_by_id(request_id)
+        .await
+        .map_err(ApiError::internal)?;
+
+    match fe_request_from_db {
+        Some(fe_request) => Ok(Json(fe_request)),
+        None => Err(ApiError::not_found("Request with such id does not exist")),
+    }
 }
 
 pub fn api_scope(
@@ -187,7 +212,9 @@ pub fn api_scope(
         .route("status", web::get().to(get_status));
 
     if config.forced_exit_requests.enabled {
-        scope.route("submit", web::post().to(submit_request))
+        scope
+            .route("/submit", web::post().to(submit_request))
+            .route("/requests/{id}", web::get().to(get_request_by_id))
     } else {
         scope
     }

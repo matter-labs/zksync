@@ -18,3 +18,9 @@ digits_in_id=13
 
 # Price per exit in wei (currently it's 0.03 ETH)
 price_per_token=30000000000000000
+
+# Wait confirmations
+wait_confirmations=1
+
+# The account Id of the ForcedExit sender
+sender_account_id=1

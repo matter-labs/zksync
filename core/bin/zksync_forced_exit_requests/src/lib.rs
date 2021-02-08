@@ -13,12 +13,7 @@ use web3::{
 use zksync_config::ZkSyncConfig;
 use zksync_storage::ConnectionPool;
 
-use zksync_contracts::zksync_contract;
-use zksync_types::{Address, Nonce, PriorityOp, H160, U256};
-
 use zksync_api::core_api_client::CoreApiClient;
-use zksync_core::eth_watch::get_contract_events;
-use zksync_types::forced_exit_requests::FundsReceivedEvent;
 
 pub mod eth_watch;
 pub mod forced_exit_sender;

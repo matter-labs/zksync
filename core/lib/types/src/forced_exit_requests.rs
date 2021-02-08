@@ -7,21 +7,10 @@ use serde::{Deserialize, Serialize};
 
 pub type ForcedExitRequestId = i64;
 
-use anyhow::{bail, ensure, format_err};
+use anyhow::format_err;
 use ethabi::{decode, ParamType};
-use std::convert::{TryFrom, TryInto};
-use zksync_basic_types::{Log, H256, U256};
-use zksync_crypto::params::{
-    ACCOUNT_ID_BIT_WIDTH, BALANCE_BIT_WIDTH, ETH_ADDRESS_BIT_WIDTH, FR_ADDRESS_LEN,
-    TOKEN_BIT_WIDTH, TX_TYPE_BIT_WIDTH,
-};
-
-use super::{
-    operations::{DepositOp, FullExitOp},
-    utils::h256_as_vec,
-    AccountId, SerialId,
-};
-use zksync_crypto::primitives::FromBytes;
+use std::convert::TryFrom;
+use zksync_basic_types::{Log, U256};
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq, Hash)]
 #[serde(rename_all = "camelCase")]
@@ -32,6 +21,7 @@ pub struct ForcedExitRequest {
     #[serde(with = "BigUintSerdeAsRadix10Str")]
     pub price_in_wei: BigUint,
     pub valid_until: DateTime<Utc>,
+    pub created_at: DateTime<Utc>,
     pub fulfilled_at: Option<DateTime<Utc>>,
 }
 

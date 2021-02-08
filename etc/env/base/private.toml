@@ -25,3 +25,7 @@ secret_auth="sample"
 [misc]
 # Private key for the fee seller account
 fee_account_private_key="0x27593fea79697e947890ecbecce7901b0008345e5d7259710d0dd5e500d040be"
+
+[forced_exit_requests]
+# L2 private key of the account that sends ForcedExits (unprefixed hex)
+sender_private_key="0092788f3890ed50dcab7f72fb574a0a9d30b1bc778ba076c609c311a8555352" 

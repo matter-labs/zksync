@@ -35,6 +35,10 @@ impl Error {
         Self::with_code(StatusCode::NOT_IMPLEMENTED, title)
     }
 
+    pub fn not_found(title: impl Display) -> Self {
+        Self::with_code(StatusCode::NOT_FOUND, title)
+    }
+
     fn with_code(http_code: StatusCode, title: impl Display) -> Self {
         Self {
             http_code,

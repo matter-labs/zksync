@@ -14,6 +14,7 @@ pub struct DbForcedExitRequest {
     pub tokens: String,
     pub price_in_wei: BigDecimal,
     pub valid_until: DateTime<Utc>,
+    pub created_at: DateTime<Utc>,
     pub fulfilled_at: Option<DateTime<Utc>>,
 }
 
@@ -28,6 +29,7 @@ impl From<ForcedExitRequest> for DbForcedExitRequest {
             tokens: tokens,
             price_in_wei,
             valid_until: request.valid_until,
+            created_at: request.created_at,
             fulfilled_at: request.fulfilled_at,
         }
     }
@@ -55,6 +57,7 @@ impl Into<ForcedExitRequest> for DbForcedExitRequest {
             target: stored_str_address_to_address(&self.target),
             tokens,
             price_in_wei,
+            created_at: self.created_at,
             valid_until: self.valid_until,
             fulfilled_at: self.fulfilled_at,
         }

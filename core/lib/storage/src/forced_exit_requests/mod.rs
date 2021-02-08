@@ -35,11 +35,12 @@ impl<'a, 'c> ForcedExitRequestsSchema<'a, 'c> {
 
         let tokens = utils::tokens_vec_to_str(request.tokens.clone());
 
-        let id: i64 = sqlx::query!(
+        let stored_request: DbForcedExitRequest = sqlx::query_as!(
+            DbForcedExitRequest,
             r#"
             INSERT INTO forced_exit_requests ( target, tokens, price_in_wei, valid_until )
             VALUES ( $1, $2, $3, $4 )
-            RETURNING id
+            RETURNING *
             "#,
             target_str,
             &tokens,
@@ -47,26 +48,18 @@ impl<'a, 'c> ForcedExitRequestsSchema<'a, 'c> {
             request.valid_until
         )
         .fetch_one(self.0.conn())
-        .await?
-        .id;
+        .await?;
 
         metrics::histogram!("sql.forced_exit_requests.store_request", start.elapsed());
-        Ok(ForcedExitRequest {
-            id,
-            target: request.target,
-            tokens: request.tokens.clone(),
-            price_in_wei: request.price_in_wei.clone(),
-            valid_until: request.valid_until,
-            fulfilled_at: None,
-        })
+        Ok(stored_request.into())
     }
 
     pub async fn get_request_by_id(
         &mut self,
         id: ForcedExitRequestId,
-    ) -> QueryResult<ForcedExitRequest> {
+    ) -> QueryResult<Option<ForcedExitRequest>> {
         let start = Instant::now();
-        let request: DbForcedExitRequest = sqlx::query_as!(
+        let request: Option<ForcedExitRequest> = sqlx::query_as!(
             DbForcedExitRequest,
             r#"
             SELECT * FROM forced_exit_requests
@@ -75,10 +68,10 @@ impl<'a, 'c> ForcedExitRequestsSchema<'a, 'c> {
             "#,
             id
         )
-        .fetch_one(self.0.conn())
-        .await?;
+        .fetch_optional(self.0.conn())
+        .await?
+        .map(|r| r.into());
 
-        let request: ForcedExitRequest = request.into();
         metrics::histogram!(
             "sql.forced_exit_requests.get_request_by_id",
             start.elapsed()
@@ -109,5 +102,32 @@ impl<'a, 'c> ForcedExitRequestsSchema<'a, 'c> {
         metrics::histogram!("sql.forced_exit_requests.fulfill_request", start.elapsed());
 
         Ok(())
+    }
+
+    pub async fn get_oldest_unfulfilled_request(
+        &mut self,
+    ) -> QueryResult<Option<ForcedExitRequest>> {
+        let start = Instant::now();
+
+        let request: Option<ForcedExitRequest> = sqlx::query_as!(
+            DbForcedExitRequest,
+            r#"
+            SELECT * FROM forced_exit_requests
+            WHERE fulfilled_at IS NULL AND created_at = (
+                SELECT MIN(created_at) FROM forced_exit_requests
+            )
+            LIMIT 1
+            "#
+        )
+        .fetch_optional(self.0.conn())
+        .await?
+        .map(|r| r.into());
+
+        metrics::histogram!(
+            "sql.forced_exit_requests.get_min_unfulfilled_request",
+            start.elapsed()
+        );
+
+        Ok(request)
     }
 }

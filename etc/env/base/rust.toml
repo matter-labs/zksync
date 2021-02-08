@@ -22,7 +22,8 @@ exodus_test=info,\
 loadtest=info,\
 kube=debug,\
 dev_ticker=info,\
-block_sizes_test=info\
+block_sizes_test=info,\
+zksync_forced_exit_requests=info\
 """
 
 # `RUST_BACKTRACE` variable
