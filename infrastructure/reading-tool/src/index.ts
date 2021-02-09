@@ -1,7 +1,7 @@
 import * as fs from 'fs';
 
 function configPath(postfix: string) {
-    return `./test_config/${postfix}`;
+    return `${process.env.ZKSYNC_HOME}/etc/test_config/${postfix}`;
 }
 
 function loadConfig(path: string) {
@@ -39,7 +39,7 @@ export function loadTestVectorsConfig() {
 }
 
 export function getTokens(network: string) {
-    const configPath = `./tokens/${network}.json`;
+    const configPath = `${process.env.ZKSYNC_HOME}/etc/tokens/${network}.json`;
     console.log(configPath);
     return JSON.parse(
         fs.readFileSync(configPath, {
