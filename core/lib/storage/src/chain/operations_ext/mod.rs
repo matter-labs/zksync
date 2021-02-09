@@ -381,31 +381,30 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
         let mut tx_history = sqlx::query_as!(
             TransactionsHistoryItem,
             r#"
-            with eth_ops as (
-                select distinct on (to_block, action_type)
-                    aggregate_operations.from_block,
-                    aggregate_operations.to_block,
-                    aggregate_operations.action_type,
-                    aggregate_operations.confirmed
-                from aggregate_operations
-                order by to_block DESC, action_type, confirmed
-            ), transactions as (
-                select
+            WITH aggr_exec AS (
+                SELECT 
+                    aggregate_operations.confirmed, 
+                    execute_aggregated_blocks_binding.block_number 
+                FROM aggregate_operations
+                    INNER JOIN execute_aggregated_blocks_binding ON aggregate_operations.id = execute_aggregated_blocks_binding.op_id
+            ),
+            transactions AS (
+                SELECT
                     *
-                from (
-                    select
-                        concat_ws(',', block_number, block_index) as tx_id,
+                FROM (
+                    SELECT
+                        concat_ws(',', block_number, block_index) AS tx_id,
                         tx,
-                        'sync-tx:' || encode(tx_hash, 'hex') as hash,
+                        'sync-tx:' || encode(tx_hash, 'hex') AS hash,
                         null as pq_id,
                         null as eth_block,
                         success,
                         fail_reason,
                         block_number,
                         created_at
-                    from
+                    FROM
                         executed_transactions
-                    where
+                    WHERE
                         from_account = $1
                         or
                         to_account = $1
@@ -447,8 +446,7 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
                 coalesce(verified.confirmed, false) as "verified!",
                 created_at as "created_at!"
             from transactions
-            left join eth_ops verified on
-                verified.from_block <= transactions.block_number AND verified.to_block >= transactions.block_number AND verified.action_type = 'ExecuteBlocks' AND verified.confirmed = true
+            LEFT JOIN aggr_exec verified ON transactions.block_number = verified.block_number
             order by transactions.block_number desc, created_at desc
             "#,
             address.as_ref(), offset as i64, limit as i64
@@ -540,14 +538,18 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
         let mut tx_history = sqlx::query_as!(
             TransactionsHistoryItem,
             r#"
-            with eth_ops as (
-                select distinct on (to_block, action_type)
-                    aggregate_operations.from_block,
-                    aggregate_operations.to_block,
-                    aggregate_operations.action_type,
-                    aggregate_operations.confirmed
-                from aggregate_operations
-                order by to_block DESC, action_type, confirmed
+            WITH aggr_comm AS (
+                SELECT 
+                   aggregate_operations.confirmed, 
+                   commit_aggregated_blocks_binding.block_number 
+               FROM aggregate_operations
+                   INNER JOIN commit_aggregated_blocks_binding ON aggregate_operations.id = commit_aggregated_blocks_binding.op_id
+           ), aggr_exec AS (
+                SELECT 
+                   aggregate_operations.confirmed, 
+                   execute_aggregated_blocks_binding.block_number 
+               FROM aggregate_operations
+                   INNER JOIN execute_aggregated_blocks_binding ON aggregate_operations.id = execute_aggregated_blocks_binding.op_id
             ), transactions as (
                 select
                     *
@@ -613,10 +615,10 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
                 coalesce(verified.confirmed, false) as "verified!",
                 created_at as "created_at!"
             from transactions
-            left join eth_ops committed on
-                committed.from_block <= transactions.block_number AND committed.to_block >= transactions.block_number AND committed.action_type = 'CommitBlocks' AND committed.confirmed = true
-            left join eth_ops verified on
-                verified.from_block <= transactions.block_number AND verified.to_block >= transactions.block_number AND verified.action_type = 'ExecuteBlocks' AND verified.confirmed = true
+            left join aggr_comm committed on
+                committed.block_number = transactions.block_number AND committed.confirmed = true
+            left join aggr_exec verified on
+                verified.block_number = transactions.block_number AND verified.confirmed = true
             order by transactions.block_number desc, created_at desc
             "#,
             address.as_ref(),
@@ -693,29 +695,34 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
                     AccountTxReceiptResponse,
                     r#"
                     WITH block_details AS (
-                        WITH eth_ops AS (
-                            SELECT DISTINCT ON (to_block, action_type)
-                                aggregate_operations.from_block,
-                                aggregate_operations.to_block,
-                                eth_tx_hashes.tx_hash,
-                                aggregate_operations.action_type,
-                                aggregate_operations.created_at,
-                                aggregate_operations.confirmed
+                        WITH aggr_comm AS (
+                            SELECT 
+                                aggregate_operations.created_at, 
+                                eth_operations.final_hash, 
+                                commit_aggregated_blocks_binding.block_number 
                             FROM aggregate_operations
-                                left join eth_aggregated_ops_binding on eth_aggregated_ops_binding.op_id = aggregate_operations.id
-                                left join eth_tx_hashes on eth_tx_hashes.eth_op_id = eth_aggregated_ops_binding.eth_op_id
-                            ORDER BY to_block DESC, action_type, confirmed
+                                INNER JOIN commit_aggregated_blocks_binding ON aggregate_operations.id = commit_aggregated_blocks_binding.op_id
+                                INNER JOIN eth_aggregated_ops_binding ON aggregate_operations.id = eth_aggregated_ops_binding.op_id
+                                INNER JOIN eth_operations ON eth_operations.id = eth_aggregated_ops_binding.eth_op_id
+                        )
+                        , aggr_exec as (
+                             SELECT 
+                                aggregate_operations.created_at, 
+                                eth_operations.final_hash, 
+                                execute_aggregated_blocks_binding.block_number 
+                            FROM aggregate_operations
+                                INNER JOIN execute_aggregated_blocks_binding ON aggregate_operations.id = execute_aggregated_blocks_binding.op_id
+                                INNER JOIN eth_aggregated_ops_binding ON aggregate_operations.id = eth_aggregated_ops_binding.op_id
+                                INNER JOIN eth_operations ON eth_operations.id = eth_aggregated_ops_binding.eth_op_id
                         )
                         SELECT
                             blocks.number AS details_block_number,
-                            committed.tx_hash AS commit_tx_hash,
-                            verified.tx_hash AS verify_tx_hash
+                            committed.final_hash AS commit_tx_hash,
+                            verified.final_hash AS verify_tx_hash
                         FROM blocks
-                        INNER JOIN eth_ops committed ON
-                            committed.from_block <= blocks.number AND committed.to_block >= blocks.number AND committed.action_type = 'CommitBlocks' AND committed.confirmed = true
-                        LEFT JOIN eth_ops verified ON
-                            verified.from_block <= blocks.number AND verified.to_block >= blocks.number AND verified.action_type = 'ExecuteBlocks' AND verified.confirmed = true
-                    )
+                                INNER JOIN aggr_comm committed ON blocks.number = committed.block_number
+                                LEFT JOIN aggr_exec verified ON blocks.number = verified.block_number
+                        )
                     SELECT
                         block_number, 
                         block_index as "block_index?",
@@ -752,28 +759,33 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
                     AccountTxReceiptResponse,
                     r#"
                     WITH block_details AS (
-                        WITH eth_ops AS (
-                            SELECT DISTINCT ON (to_block, action_type)
-                                aggregate_operations.from_block,
-                                aggregate_operations.to_block,
-                                eth_tx_hashes.tx_hash,
-                                aggregate_operations.action_type,
-                                aggregate_operations.created_at,
-                                aggregate_operations.confirmed
+                        WITH aggr_comm AS (
+                            SELECT 
+                                aggregate_operations.created_at, 
+                                eth_operations.final_hash, 
+                                commit_aggregated_blocks_binding.block_number 
                             FROM aggregate_operations
-                                left join eth_aggregated_ops_binding on eth_aggregated_ops_binding.op_id = aggregate_operations.id
-                                left join eth_tx_hashes on eth_tx_hashes.eth_op_id = eth_aggregated_ops_binding.eth_op_id
-                            ORDER BY to_block DESC, action_type, confirmed
+                                INNER JOIN commit_aggregated_blocks_binding ON aggregate_operations.id = commit_aggregated_blocks_binding.op_id
+                                INNER JOIN eth_aggregated_ops_binding ON aggregate_operations.id = eth_aggregated_ops_binding.op_id
+                                INNER JOIN eth_operations ON eth_operations.id = eth_aggregated_ops_binding.eth_op_id
+                        )
+                        , aggr_exec as (
+                             SELECT 
+                                aggregate_operations.created_at, 
+                                eth_operations.final_hash, 
+                                execute_aggregated_blocks_binding.block_number 
+                            FROM aggregate_operations
+                                INNER JOIN execute_aggregated_blocks_binding ON aggregate_operations.id = execute_aggregated_blocks_binding.op_id
+                                INNER JOIN eth_aggregated_ops_binding ON aggregate_operations.id = eth_aggregated_ops_binding.op_id
+                                INNER JOIN eth_operations ON eth_operations.id = eth_aggregated_ops_binding.eth_op_id
                         )
                         SELECT
                             blocks.number AS details_block_number,
-                            committed.tx_hash AS commit_tx_hash,
-                            verified.tx_hash AS verify_tx_hash
+                            committed.final_hash AS commit_tx_hash,
+                            verified.final_hash AS verify_tx_hash
                         FROM blocks
-                        INNER JOIN eth_ops committed ON
-                            committed.from_block <= blocks.number AND committed.to_block >= blocks.number AND committed.action_type = 'CommitBlocks' AND committed.confirmed = true
-                        LEFT JOIN eth_ops verified ON
-                            verified.from_block <= blocks.number AND verified.to_block >= blocks.number AND verified.action_type = 'ExecuteBlocks' AND verified.confirmed = true
+                                INNER JOIN aggr_comm committed ON blocks.number = committed.block_number
+                                LEFT JOIN aggr_exec verified ON blocks.number = verified.block_number
                     )
                     SELECT
                         block_number, 
@@ -840,28 +852,33 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
                     AccountOpReceiptResponse,
                     r#"
                     WITH block_details AS (
-                        WITH eth_ops AS (
-                            SELECT DISTINCT ON (to_block, action_type)
-                                aggregate_operations.from_block,
-                                aggregate_operations.to_block,
-                                eth_tx_hashes.tx_hash,
-                                aggregate_operations.action_type,
-                                aggregate_operations.created_at,
-                                aggregate_operations.confirmed
+                        WITH aggr_comm AS (
+                            SELECT 
+                                aggregate_operations.created_at, 
+                                eth_operations.final_hash, 
+                                commit_aggregated_blocks_binding.block_number 
                             FROM aggregate_operations
-                                left join eth_aggregated_ops_binding on eth_aggregated_ops_binding.op_id = aggregate_operations.id
-                                left join eth_tx_hashes on eth_tx_hashes.eth_op_id = eth_aggregated_ops_binding.eth_op_id
-                            ORDER BY to_block DESC, action_type, confirmed
+                                INNER JOIN commit_aggregated_blocks_binding ON aggregate_operations.id = commit_aggregated_blocks_binding.op_id
+                                INNER JOIN eth_aggregated_ops_binding ON aggregate_operations.id = eth_aggregated_ops_binding.op_id
+                                INNER JOIN eth_operations ON eth_operations.id = eth_aggregated_ops_binding.eth_op_id
+                        )
+                        , aggr_exec as (
+                             SELECT 
+                                aggregate_operations.created_at, 
+                                eth_operations.final_hash, 
+                                execute_aggregated_blocks_binding.block_number 
+                            FROM aggregate_operations
+                                INNER JOIN execute_aggregated_blocks_binding ON aggregate_operations.id = execute_aggregated_blocks_binding.op_id
+                                INNER JOIN eth_aggregated_ops_binding ON aggregate_operations.id = eth_aggregated_ops_binding.op_id
+                                INNER JOIN eth_operations ON eth_operations.id = eth_aggregated_ops_binding.eth_op_id
                         )
                         SELECT
                             blocks.number AS details_block_number,
-                            committed.tx_hash AS commit_tx_hash,
-                            verified.tx_hash AS verify_tx_hash
+                            committed.final_hash AS commit_tx_hash,
+                            verified.final_hash AS verify_tx_hash
                         FROM blocks
-                        INNER JOIN eth_ops committed ON
-                            committed.from_block <= blocks.number AND committed.to_block >= blocks.number AND committed.action_type = 'CommitBlocks' AND committed.confirmed = true
-                        LEFT JOIN eth_ops verified ON
-                            verified.from_block <= blocks.number AND verified.to_block >= blocks.number AND verified.action_type = 'ExecuteBlocks' AND verified.confirmed = true
+                                INNER JOIN aggr_comm committed ON blocks.number = committed.block_number
+                                LEFT JOIN aggr_exec verified ON blocks.number = verified.block_number
                     )
                     SELECT
                         block_number, 
@@ -897,28 +914,33 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
                     AccountOpReceiptResponse,
                     r#"
                     WITH block_details AS (
-                        WITH eth_ops AS (
-                            SELECT DISTINCT ON (to_block, action_type)
-                                aggregate_operations.from_block,
-                                aggregate_operations.to_block,
-                                eth_tx_hashes.tx_hash,
-                                aggregate_operations.action_type,
-                                aggregate_operations.created_at,
-                                aggregate_operations.confirmed
+                        WITH aggr_comm AS (
+                            SELECT 
+                                aggregate_operations.created_at, 
+                                eth_operations.final_hash, 
+                                commit_aggregated_blocks_binding.block_number 
                             FROM aggregate_operations
-                                left join eth_aggregated_ops_binding on eth_aggregated_ops_binding.op_id = aggregate_operations.id
-                                left join eth_tx_hashes on eth_tx_hashes.eth_op_id = eth_aggregated_ops_binding.eth_op_id
-                            ORDER BY to_block DESC, action_type, confirmed
+                                INNER JOIN commit_aggregated_blocks_binding ON aggregate_operations.id = commit_aggregated_blocks_binding.op_id
+                                INNER JOIN eth_aggregated_ops_binding ON aggregate_operations.id = eth_aggregated_ops_binding.op_id
+                                INNER JOIN eth_operations ON eth_operations.id = eth_aggregated_ops_binding.eth_op_id
+                        )
+                        , aggr_exec as (
+                             SELECT 
+                                aggregate_operations.created_at, 
+                                eth_operations.final_hash, 
+                                execute_aggregated_blocks_binding.block_number 
+                            FROM aggregate_operations
+                                INNER JOIN execute_aggregated_blocks_binding ON aggregate_operations.id = execute_aggregated_blocks_binding.op_id
+                                INNER JOIN eth_aggregated_ops_binding ON aggregate_operations.id = eth_aggregated_ops_binding.op_id
+                                INNER JOIN eth_operations ON eth_operations.id = eth_aggregated_ops_binding.eth_op_id
                         )
                         SELECT
                             blocks.number AS details_block_number,
-                            committed.tx_hash AS commit_tx_hash,
-                            verified.tx_hash AS verify_tx_hash
+                            committed.final_hash AS commit_tx_hash,
+                            verified.final_hash AS verify_tx_hash
                         FROM blocks
-                        INNER JOIN eth_ops committed ON
-                            committed.from_block <= blocks.number AND committed.to_block >= blocks.number AND committed.action_type = 'CommitBlocks' AND committed.confirmed = true
-                        LEFT JOIN eth_ops verified ON
-                            verified.from_block <= blocks.number AND verified.to_block >= blocks.number AND verified.action_type = 'ExecuteBlocks' AND verified.confirmed = true
+                                INNER JOIN aggr_comm committed ON blocks.number = committed.block_number
+                                LEFT JOIN aggr_exec verified ON blocks.number = verified.block_number
                     )
                     SELECT
                         block_number, 
