@@ -83,3 +83,6 @@ ALTER TABLE eth_parameters
 
 UPDATE eth_parameters SET last_executed_block = (SELECT last_verified_block FROM eth_parameters WHERE id = true);
 
+CREATE INDEX IF NOT EXISTS aggregate_operations_block_range_index ON aggregate_operations USING btree (from_block, to_block);
+CREATE INDEX IF NOT EXISTS aggregate_operations_action_type_index ON aggregate_operations (action_type);
+CREATE INDEX IF NOT EXISTS eth_aggregated_ops_binding_op_id_index ON eth_aggregated_ops_binding (op_id);
