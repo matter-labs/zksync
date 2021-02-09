@@ -15,7 +15,7 @@ components, the logs will have the following format:
 
 ### Added
 
-- reading-tool for reading test config.
+- (`reading-tool`): tool for reading test config.
 
 ### Fixed
 
