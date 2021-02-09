@@ -26,4 +26,4 @@ from aggregate_operations
 WHERE aggregate_operations.action_type = 'CommitBlocks';
 
 create index eth_agg_op_binding_idx on eth_aggregated_ops_binding using BTREE (op_id);
-create index aggregate_ops_range_idx on plasma.public.aggregate_operations using BTREE (from_block, to_block desc);
+create index aggregate_ops_range_idx on aggregate_operations using BTREE (from_block, to_block desc);
