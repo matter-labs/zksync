@@ -324,10 +324,35 @@ impl<'a, 'c> OperationsSchema<'a, 'c> {
         .await?
         .id;
 
-        if !matches!(
-            operation.get_action_type(),
-            AggregatedActionType::CreateProofBlocks
-        ) {
+        if operation.is_commit() {
+            sqlx::query!(
+                r#"
+                INSERT INTO commit_aggregated_blocks_binding
+                SELECT 
+                    aggregate_operations.id, blocks.number
+                FROM aggregate_operations
+                INNER JOIN blocks ON blocks.number BETWEEN aggregate_operations.from_block AND aggregate_operations.to_block
+                WHERE aggregate_operations.action_type = 'CommitBlocks' and aggregate_operations.id = $1
+                "#, 
+                id
+            ).execute(transaction.conn()).await?;
+        }
+
+        if operation.is_execute() {
+            sqlx::query!(
+                r#"
+                INSERT INTO execute_aggregated_blocks_binding
+                SELECT 
+                    aggregate_operations.id, blocks.number
+                FROM aggregate_operations
+                INNER JOIN blocks ON blocks.number BETWEEN aggregate_operations.from_block AND aggregate_operations.to_block
+                WHERE aggregate_operations.action_type = 'ExecuteBlocks' and aggregate_operations.id = $1
+                "#, 
+                id
+            ).execute(transaction.conn()).await?;
+        }
+
+        if !operation.is_create_proof() {
             sqlx::query!(
                 "INSERT INTO eth_unprocessed_aggregated_ops (op_id)
                 VALUES ($1)",

@@ -203,6 +203,28 @@ impl AggregatedOperation {
             AggregatedOperation::ExecuteBlocks(op) => op.block_range(),
         }
     }
+
+    pub fn is_commit(&self) -> bool {
+        matches!(self.get_action_type(), AggregatedActionType::CommitBlocks)
+    }
+
+    pub fn is_execute(&self) -> bool {
+        matches!(self.get_action_type(), AggregatedActionType::ExecuteBlocks)
+    }
+
+    pub fn is_create_proof(&self) -> bool {
+        matches!(
+            self.get_action_type(),
+            AggregatedActionType::CreateProofBlocks
+        )
+    }
+
+    pub fn is_publish_proofs(&self) -> bool {
+        matches!(
+            self.get_action_type(),
+            AggregatedActionType::PublishProofBlocksOnchain
+        )
+    }
 }
 
 impl From<BlocksCommitOperation> for AggregatedOperation {
