@@ -280,6 +280,7 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
                     INNER JOIN commit_aggregated_blocks_binding ON aggregate_operations.id = commit_aggregated_blocks_binding.op_id
                     INNER JOIN eth_aggregated_ops_binding ON aggregate_operations.id = eth_aggregated_ops_binding.op_id
                     INNER JOIN eth_operations ON eth_operations.id = eth_aggregated_ops_binding.eth_op_id
+                WHERE aggregate_operations.confirmed = true 
             )
             ,aggr_exec as (
                  SELECT 
@@ -290,6 +291,7 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
                     INNER JOIN execute_aggregated_blocks_binding ON aggregate_operations.id = execute_aggregated_blocks_binding.op_id
                     INNER JOIN eth_aggregated_ops_binding ON aggregate_operations.id = eth_aggregated_ops_binding.op_id
                     INNER JOIN eth_operations ON eth_operations.id = eth_aggregated_ops_binding.eth_op_id
+                WHERE aggregate_operations.confirmed = true 
             )
             SELECT
                 blocks.number AS "block_number!",
@@ -389,6 +391,7 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
                     INNER JOIN commit_aggregated_blocks_binding ON aggregate_operations.id = commit_aggregated_blocks_binding.op_id
                     INNER JOIN eth_aggregated_ops_binding ON aggregate_operations.id = eth_aggregated_ops_binding.op_id
                     INNER JOIN eth_operations ON eth_operations.id = eth_aggregated_ops_binding.eth_op_id
+                WHERE aggregate_operations.confirmed = true 
             )
             ,aggr_exec as (
                  SELECT 
@@ -399,6 +402,7 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
                     INNER JOIN execute_aggregated_blocks_binding ON aggregate_operations.id = execute_aggregated_blocks_binding.op_id
                     INNER JOIN eth_aggregated_ops_binding ON aggregate_operations.id = eth_aggregated_ops_binding.op_id
                     INNER JOIN eth_operations ON eth_operations.id = eth_aggregated_ops_binding.eth_op_id
+                WHERE aggregate_operations.confirmed = true 
             )
             SELECT
                 blocks.number AS "block_number!",
