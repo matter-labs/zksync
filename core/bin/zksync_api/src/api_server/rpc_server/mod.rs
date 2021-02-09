@@ -18,7 +18,7 @@ use zksync_storage::{
     },
     ConnectionPool, StorageProcessor,
 };
-use zksync_types::{tx::TxHash, Address, BatchFee, Fee, TokenLike, TxFeeTypes};
+use zksync_types::{tx::TxHash, Address, BatchFee, BlockNumber, Fee, TokenLike, TxFeeTypes};
 
 // Local uses
 use crate::{
@@ -184,20 +184,24 @@ impl RpcApp {
             Some(block)
         } else {
             let mut storage = self.access_storage().await?;
-            let block = storage
+            let blocks = storage
                 .chain()
                 .block_schema()
-                .find_block_by_height_or_hash(block_number.to_string())
-                .await;
+                .load_block_range(BlockNumber(block_number as u32), 1)
+                .await
+                .unwrap_or_default();
 
-            if let Some(block) = block.clone() {
+            if !blocks.is_empty() && blocks[0].block_number == block_number {
                 // Unverified blocks can still change, so we can't cache them.
-                if block.verified_at.is_some() && block.block_number == block_number {
-                    self.cache_of_blocks_info.insert(block_number, block);
-                }
+                self.cache_of_blocks_info
+                    .insert(block_number, blocks[0].clone());
             }
 
-            block
+            if !blocks.is_empty() {
+                Some(blocks[0].clone())
+            } else {
+                None
+            }
         };
 
         metrics::histogram!("api.rpc.get_block_info", start.elapsed());
