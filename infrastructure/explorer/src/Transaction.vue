@@ -120,7 +120,22 @@ export default {
 
             if (txData.tx_type == 'Withdraw') {
                 txData.tx_type = 'Withdrawal';
-                txData.withdrawalTxHash = await client.withdrawalTxHash(`sync-tx:${removeTxHashPrefix(this.tx_hash)}`);
+
+                // If the server gives an error, then ignore it.
+                try {
+                    txData.withdrawalTxHash = await client.withdrawalTxHash(
+                        `sync-tx:${removeTxHashPrefix(this.tx_hash)}`
+                    );
+                } catch (_e) {}
+            }
+
+            if (txData.tx_type == 'ForcedExit') {
+                // If the server gives an error, then ignore it.
+                try {
+                    txData.withdrawalTxHash = await client.withdrawalTxHash(
+                        `sync-tx:${removeTxHashPrefix(this.tx_hash)}`
+                    );
+                } catch (_e) {}
             }
 
             let block = {
