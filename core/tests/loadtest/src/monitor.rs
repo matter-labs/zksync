@@ -7,10 +7,7 @@ use std::{
 };
 // External uses
 use futures::Future;
-use tokio::{
-    sync::{Mutex, MutexGuard},
-    task::JoinHandle,
-};
+use tokio::sync::{Mutex, MutexGuard};
 // Workspace uses
 use zksync::{
     error::ClientError, ethereum::PriorityOpHolder, provider::Provider, types::BlockStatus,
@@ -25,7 +22,6 @@ use zksync_types::{
 use crate::{
     api::ApiDataPool,
     journal::{Journal, TxLifecycle, TxVariant},
-    utils::{wait_all_chunks, CHUNK_SIZES},
 };
 
 type SerialId = u64;
@@ -87,7 +83,7 @@ struct MonitorInner {
     current_stats: Stats,
     total_stats: Stats,
     journal: Journal,
-    pending_tasks: Vec<JoinHandle<()>>,
+    running_tasks_counter: usize,
 }
 
 /// Load monitor - measures the execution time of the main stages of the life cycle of
@@ -248,7 +244,7 @@ impl Monitor {
         tx_variant: TxVariant,
     ) {
         let monitor = self.clone();
-        let handle = tokio::spawn(async move {
+        self.spawn(async move {
             let tx_result = monitor
                 .clone()
                 .monitor_tx(created_at, sent_at, tx_hash, tx_variant)
@@ -266,7 +262,6 @@ impl Monitor {
 
             monitor.record_tx(tx_hash, tx_result).await;
         });
-        self.inner().await.pending_tasks.push(handle);
     }
 
     /// Waits for the transaction to reach the desired status.
@@ -318,18 +313,17 @@ impl Monitor {
         Ok(())
     }
 
-    /// Waits for all pending zkSync operations to verify.
+    /// Waits for all running tasks to complete.
     pub async fn wait_for_verify(&self) {
-        let tasks = self
-            .inner()
-            .await
-            .pending_tasks
-            .drain(..)
-            .collect::<Vec<_>>();
+        vlog::debug!(
+            "Awaiting for verification, pending tasks {}",
+            self.inner().await.running_tasks_counter
+        );
 
-        vlog::debug!("Awaiting for verification, pending tasks {}", tasks.len());
-
-        wait_all_chunks(CHUNK_SIZES, tasks).await;
+        await_condition!(
+            Self::POLLING_INTERVAL,
+            self.inner().await.running_tasks_counter == 0
+        )
     }
 
     /// Enables a collecting metrics process.
@@ -368,7 +362,7 @@ impl Monitor {
 
         let monitor = self.clone();
         let priority_op2 = priority_op.clone();
-        let handle = tokio::spawn(async move {
+        self.spawn(async move {
             if let Err(e) = monitor
                 .clone()
                 .monitor_priority_op(priority_op2.clone())
@@ -380,7 +374,6 @@ impl Monitor {
                     .await;
             }
         });
-        self.inner().await.pending_tasks.push(handle);
 
         Ok(priority_op)
     }
@@ -450,5 +443,22 @@ impl Monitor {
             .await;
 
         Ok(())
+    }
+
+    /// Spawns a task parallely and increment the running tasks counter until the task will finish.
+    fn spawn<T>(&self, task: T)
+    where
+        T: Future + Send + 'static,
+        T::Output: Send + 'static,
+    {
+        let monitor = self.clone();
+        let task = async move {
+            monitor.inner().await.running_tasks_counter += 1;
+            let result = task.await;
+            monitor.inner().await.running_tasks_counter -= 1;
+
+            result
+        };
+        tokio::spawn(task);
     }
 }
