@@ -3,6 +3,7 @@ import { deployContract } from 'ethereum-waffle';
 import { constants, ethers } from 'ethers';
 import * as fs from 'fs';
 import * as path from 'path';
+import { web3Provider } from './utils';
 import { readProductionContracts } from '../src.ts/deploy';
 
 const { expect } = require('chai');
@@ -25,7 +26,7 @@ async function main() {
         process.exit(1);
     }
 
-    const provider = new ethers.providers.JsonRpcProvider(process.env.ETH_CLIENT_WEB3_URL);
+    const provider = web3Provider();
 
     const wallet = ethers.Wallet.fromMnemonic(ethTestConfig.test_mnemonic, "m/44'/60'/0'/0/0").connect(provider);
 

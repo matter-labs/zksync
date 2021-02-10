@@ -5,8 +5,8 @@ use web3::types::Address;
 
 use zksync_types::block::Block;
 use zksync_types::{
-    Account, AccountId, AccountMap, AccountUpdate, AccountUpdates, Action, Operation, Token,
-    TokenGenesisListItem,
+    Account, AccountId, AccountMap, AccountUpdate, AccountUpdates, Action, BlockNumber, Operation,
+    Token, TokenGenesisListItem, TokenId,
 };
 
 use crate::{
@@ -21,11 +21,11 @@ use crate::{
 pub struct InMemoryStorageInteractor {
     rollups: Vec<RollupOpsBlock>,
     storage_state: StorageUpdateState,
-    tokens: HashMap<u16, Token>,
+    tokens: HashMap<TokenId, Token>,
     events_state: Vec<BlockEvent>,
     last_watched_block: u64,
-    last_committed_block: u32,
-    last_verified_block: u32,
+    last_committed_block: BlockNumber,
+    last_verified_block: BlockNumber,
     accounts: AccountMap,
 }
 
@@ -60,12 +60,12 @@ impl StorageInteractor for InMemoryStorageInteractor {
         self.last_committed_block = commit_op.block.block_number;
         self.last_verified_block = verify_op.block.block_number;
 
-        self.commit_state_update(block.block_number, accounts_updated);
+        self.commit_state_update(*block.block_number, accounts_updated);
         self.storage_state = StorageUpdateState::None
         // TODO save operations
     }
 
-    async fn store_token(&mut self, token: TokenGenesisListItem, token_id: u16) {
+    async fn store_token(&mut self, token: TokenGenesisListItem, token_id: TokenId) {
         let token = Token {
             id: token_id,
             symbol: token.symbol,
@@ -91,7 +91,7 @@ impl StorageInteractor for InMemoryStorageInteractor {
                 Token {
                     id,
                     address,
-                    symbol: format!("ERC20-{}", id),
+                    symbol: format!("ERC20-{}", *id),
                     decimals: 18,
                 },
             );
@@ -102,7 +102,7 @@ impl StorageInteractor for InMemoryStorageInteractor {
     }
 
     async fn save_genesis_tree_state(&mut self, genesis_acc_update: AccountUpdate) {
-        self.commit_state_update(0, vec![(0, genesis_acc_update)]);
+        self.commit_state_update(0, vec![(AccountId(0), genesis_acc_update)]);
     }
 
     async fn get_block_events_state_from_storage(&mut self) -> EventsState {
@@ -123,7 +123,7 @@ impl StorageInteractor for InMemoryStorageInteractor {
             last_block_number: self.last_verified_block,
             account_map: self.accounts.clone(),
             unprocessed_prior_ops: 0,
-            fee_acc_id: 0,
+            fee_acc_id: AccountId(0),
         }
     }
 
@@ -148,8 +148,8 @@ impl InMemoryStorageInteractor {
             tokens: Default::default(),
             events_state: vec![],
             last_watched_block: 0,
-            last_committed_block: 0,
-            last_verified_block: 0,
+            last_committed_block: BlockNumber(0),
+            last_verified_block: BlockNumber(0),
             accounts: Default::default(),
         }
     }

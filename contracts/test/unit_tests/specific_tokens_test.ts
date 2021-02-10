@@ -7,7 +7,6 @@ import { ZkSyncWithdrawalUnitTestFactory } from '../../typechain';
 
 const hardhat = require('hardhat');
 const { expect } = require('chai');
-const { deployContract } = require('ethereum-waffle');
 const { getCallRevertReason, IERC20_INTERFACE, DEFAULT_REVERT_REASON } = require('./common');
 
 let wallet, exitWallet;
@@ -325,8 +324,6 @@ describe('zkSync process tokens which take fee from recipient', function () {
 
     let zksyncContract;
     let tokenContract;
-    let ethProxy;
-    let FEE_AMOUNT;
     before(async () => {
         [wallet, exitWallet] = await hardhat.ethers.getSigners();
 
@@ -338,16 +335,10 @@ describe('zkSync process tokens which take fee from recipient', function () {
 
         const tokenContractDeployFactory = await hardhat.ethers.getContractFactory('MintableERC20FeeAndDividendsTest');
         tokenContract = await tokenContractDeployFactory.deploy(true, false);
-        FEE_AMOUNT = BigNumber.from(await tokenContract.FEE_AMOUNT_AS_VALUE());
         await tokenContract.mint(wallet.address, parseEther('1000000'));
 
         const govContract = deployer.governanceContract(wallet);
         await govContract.addToken(tokenContract.address);
-
-        ethProxy = new ETHProxy(wallet.provider, {
-            mainContract: zksyncContract.address,
-            govContract: govContract.address
-        });
     });
 
     it('Make a deposit of tokens that should take a fee from recipient contract', async () => {
@@ -364,8 +355,6 @@ describe('zkSync process tokens which adds dividends to recipient', function () 
 
     let zksyncContract;
     let tokenContract;
-    let ethProxy;
-    let DIVIDEND_AMOUNT;
     before(async () => {
         [wallet, exitWallet] = await hardhat.ethers.getSigners();
 
@@ -377,16 +366,10 @@ describe('zkSync process tokens which adds dividends to recipient', function () 
 
         const tokenContractDeployFactory = await hardhat.ethers.getContractFactory('MintableERC20FeeAndDividendsTest');
         tokenContract = await tokenContractDeployFactory.deploy(false, false);
-        DIVIDEND_AMOUNT = BigNumber.from(await tokenContract.DIVIDEND_AMOUNT_AS_VALUE());
         await tokenContract.mint(wallet.address, parseEther('1000000'));
 
         const govContract = deployer.governanceContract(wallet);
         await govContract.addToken(tokenContract.address);
-
-        ethProxy = new ETHProxy(wallet.provider, {
-            mainContract: zksyncContract.address,
-            govContract: govContract.address
-        });
     });
 
     it('Make a deposit of tokens that should adds dividends to the recipient', async () => {

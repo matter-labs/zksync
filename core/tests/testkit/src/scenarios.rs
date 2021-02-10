@@ -14,6 +14,8 @@ use crate::{
     zksync_account::ZkSyncAccount,
 };
 
+use zksync_types::{Nonce, TokenId};
+
 use super::*;
 
 /// Performs a fixed set of operations which covers most of the main server's functionality.
@@ -72,7 +74,7 @@ pub async fn perform_basic_tests() {
             let rng_zksync_key = ZkSyncAccount::rand().private_key;
             ZkSyncAccount::new(
                 rng_zksync_key,
-                0,
+                Nonce(0),
                 eth_account.address,
                 eth_account.private_key,
             )
@@ -97,7 +99,7 @@ pub async fn perform_basic_tests() {
 
     let deposit_amount = parse_ether("1.0").unwrap();
 
-    let token = 1;
+    let token = TokenId(1);
     perform_basic_operations(
         token,
         &mut test_setup,
@@ -129,7 +131,7 @@ pub enum BlockProcessing {
 }
 
 pub async fn perform_basic_operations(
-    token: u16,
+    token: TokenId,
     test_setup: &mut TestSetup,
     deposit_amount: BigUint,
     blocks_processing: BlockProcessing,
@@ -157,7 +159,10 @@ pub async fn perform_basic_operations(
         test_setup.execute_commit_block().await
     };
     executed_blocks.push(block);
-    println!("Deposit to other account test success, token_id: {}", token);
+    println!(
+        "Deposit to other account test success, token_id: {}",
+        *token
+    );
 
     // test two deposits
     test_setup.start_block();
@@ -189,7 +194,7 @@ pub async fn perform_basic_operations(
         test_setup.execute_commit_block().await
     };
     executed_blocks.push(block);
-    println!("Deposit test success, token_id: {}", token);
+    println!("Deposit test success, token_id: {}", *token);
     //
     // test transfers
     test_setup.start_block();
@@ -283,7 +288,7 @@ pub async fn perform_basic_operations(
         test_setup.execute_commit_block().await
     };
     executed_blocks.push(block);
-    println!("Transfer test success, token_id: {}", token);
+    println!("Transfer test success, token_id: {}", *token);
 
     test_setup.start_block();
     test_setup

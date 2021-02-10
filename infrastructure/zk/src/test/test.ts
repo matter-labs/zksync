@@ -1,6 +1,5 @@
 import { Command } from 'commander';
 import * as utils from '../utils';
-import * as contract from '../contract';
 
 import * as integration from './integration';
 export { integration };

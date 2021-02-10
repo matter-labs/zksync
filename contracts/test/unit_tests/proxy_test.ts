@@ -2,7 +2,7 @@ const { expect } = require('chai');
 const { getCallRevertReason } = require('./common');
 const hardhat = require('hardhat');
 
-import { Contract, constants } from 'ethers';
+import { constants } from 'ethers';
 
 const TX_OPTS = {
     gasLimit: 300000
@@ -12,9 +12,11 @@ describe('Proxy unit tests', function () {
 
     let proxyTestContract;
     let dummyFirst;
-    let wallet, wallet1;
+    let wallet;
     before(async () => {
-        [wallet, wallet1] = await hardhat.ethers.getSigners();
+        const wallets = await hardhat.ethers.getSigners();
+        // Get some wallet different from than the default one.
+        wallet = wallets[1];
 
         const dummyFactory = await hardhat.ethers.getContractFactory('DummyFirst');
         dummyFirst = await dummyFactory.deploy();
@@ -29,7 +31,7 @@ describe('Proxy unit tests', function () {
     });
 
     it('checking that requireMaster calls present', async () => {
-        const testContract_with_wallet2_signer = await proxyTestContract.connect(wallet1);
+        const testContract_with_wallet2_signer = await proxyTestContract.connect(wallet);
         expect(
             (
                 await getCallRevertReason(() =>

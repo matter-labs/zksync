@@ -222,8 +222,8 @@ impl DatabaseInterface for Database {
     async fn load_committed_state(
         &self,
         connection: &mut StorageProcessor<'_>,
-        block: Option<u32>,
-    ) -> anyhow::Result<(u32, AccountMap)> {
+        block: Option<BlockNumber>,
+    ) -> anyhow::Result<(BlockNumber, AccountMap)> {
         let result = connection
             .chain()
             .state_schema()
@@ -236,9 +236,9 @@ impl DatabaseInterface for Database {
     async fn load_state_diff(
         &self,
         connection: &mut StorageProcessor<'_>,
-        from_block: u32,
-        to_block: Option<u32>,
-    ) -> anyhow::Result<Option<(u32, AccountUpdates)>> {
+        from_block: BlockNumber,
+        to_block: Option<BlockNumber>,
+    ) -> anyhow::Result<Option<(BlockNumber, AccountUpdates)>> {
         let result = connection
             .chain()
             .state_schema()

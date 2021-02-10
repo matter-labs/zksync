@@ -12,7 +12,7 @@ use crate::api_server::{
     },
 };
 use actix_web::{web, HttpResponse, Result as ActixResult};
-
+use num::{rational::Ratio, BigUint, FromPrimitive};
 use std::time::Instant;
 use zksync_storage::chain::operations_ext::SearchDirection;
 use zksync_types::{Address, BlockNumber};
@@ -53,6 +53,28 @@ impl ApiV01 {
 
         metrics::histogram!("api.v01.tokens", start.elapsed());
         ok_json!(vec_tokens)
+    }
+
+    pub async fn tokens_acceptable_for_fees(self_: web::Data<Self>) -> ActixResult<HttpResponse> {
+        let start = Instant::now();
+
+        let liquidity_volume = Ratio::from(
+            BigUint::from_f64(self_.config.ticker.liquidity_volume)
+                .expect("TickerConfig::liquidity_volume must be positive"),
+        );
+
+        let mut storage = self_.access_storage().await?;
+        let tokens = storage
+            .tokens_schema()
+            .load_tokens_by_market_volume(liquidity_volume)
+            .await
+            .map_err(Self::db_error)?;
+
+        let mut tokens = tokens.values().cloned().collect::<Vec<_>>();
+        tokens.sort_by_key(|t| t.id);
+
+        metrics::histogram!("api.v01.tokens_acceptable_for_fees", start.elapsed());
+        ok_json!(tokens)
     }
 
     pub async fn tx_history(
@@ -409,7 +431,7 @@ impl ApiV01 {
         let resp = storage
             .chain()
             .block_schema()
-            .load_block_range(max_block, limit)
+            .load_block_range(BlockNumber(max_block), limit)
             .await
             .map_err(|err| {
                 vlog::warn!(
@@ -453,7 +475,7 @@ impl ApiV01 {
             .get_block_transactions(block_id)
             .await
             .map_err(|err| {
-                vlog::warn!("Internal Server Error: '{}'; input: {}", err, block_id);
+                vlog::warn!("Internal Server Error: '{}'; input: {}", err, *block_id);
                 HttpResponse::InternalServerError().finish()
             })?;
 

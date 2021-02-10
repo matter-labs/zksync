@@ -1,6 +1,7 @@
 use ethabi::{ParamType, Token};
 
 use crate::{contract::default::get_rollup_ops_from_data, rollup_ops::RollupOpsBlock};
+use zksync_types::{AccountId, BlockNumber};
 
 fn decode_commitment_parameters(input_data: Vec<u8>) -> anyhow::Result<Vec<Token>> {
     let commit_operation = ParamType::Tuple(vec![
@@ -55,9 +56,9 @@ pub fn rollup_ops_blocks_from_bytes(data: Vec<u8>) -> anyhow::Result<Vec<RollupO
                     ) {
                         let ops = get_rollup_ops_from_data(public_data.as_slice())?;
                         blocks.push(RollupOpsBlock {
-                            block_num: block_num.as_u32(),
+                            block_num: BlockNumber(block_num.as_u32()),
                             ops,
-                            fee_account: fee_acc.as_u32(),
+                            fee_account: AccountId(fee_acc.as_u32()),
                         })
                     } else {
                         return Err(std::io::Error::new(
@@ -127,8 +128,8 @@ mod test {
         let blocks = rollup_ops_blocks_from_bytes(input_data[4..].to_vec()).unwrap();
         assert_eq!(blocks.len(), 1);
         let block = blocks[0].clone();
-        assert_eq!(block.block_num, 24);
-        assert_eq!(block.fee_account, 0);
+        assert_eq!(block.block_num, BlockNumber(24));
+        assert_eq!(block.fee_account, AccountId(0));
         assert_eq!(block.ops.len(), 5);
     }
 }

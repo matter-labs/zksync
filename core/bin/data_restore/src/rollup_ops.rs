@@ -4,16 +4,17 @@ use zksync_types::operations::ZkSyncOp;
 
 use crate::eth_tx_helpers::{get_ethereum_transaction, get_input_data_from_ethereum_transaction};
 use crate::events::BlockEvent;
+use zksync_types::{AccountId, BlockNumber};
 
 /// Description of a Rollup operations block
 #[derive(Debug, Clone)]
 pub struct RollupOpsBlock {
     /// Rollup block number
-    pub block_num: u32,
+    pub block_num: BlockNumber,
     /// Rollup operations in block
     pub ops: Vec<ZkSyncOp>,
     /// Fee account
-    pub fee_account: u32,
+    pub fee_account: AccountId,
 }
 
 impl RollupOpsBlock {

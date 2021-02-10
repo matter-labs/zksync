@@ -51,7 +51,7 @@ pub async fn init_session(out_dir: impl AsRef<Path>) -> anyhow::Result<()> {
     let (sender, receiver) = channel(2048);
     let out_dir = out_dir.as_ref().to_owned();
 
-    log::info!(
+    vlog::info!(
         "Load tests log will saved into the file://{} directory.",
         out_dir.to_string_lossy()
     );

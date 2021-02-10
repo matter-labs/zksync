@@ -75,28 +75,28 @@ impl Scenario for FullExitScenario {
         }
         wait_all_failsafe("full_exit/prepare", txs_queue.into_iter()).await?;
 
-        log::info!("All withdrawal transactions have been verified");
+        vlog::info!("All withdrawal transactions have been verified");
 
         Ok(())
     }
 
     async fn run(
         &mut self,
-        monitor: &Monitor,
-        fees: &Fees,
-        wallets: &[TestWallet],
-    ) -> anyhow::Result<()> {
-        log::info!("Full exit and deposit cycle started");
+        monitor: Monitor,
+        fees: Fees,
+        wallets: Vec<TestWallet>,
+    ) -> anyhow::Result<Vec<TestWallet>> {
+        vlog::info!("Full exit and deposit cycle started");
 
-        let futures = wallets
+        let full_exit_task = wallets
             .iter()
-            .map(|wallet| Self::full_exit_and_deposit(monitor, fees, wallet))
+            .map(|wallet| Self::full_exit_and_deposit(&monitor, &fees, wallet))
             .collect::<Vec<_>>();
-        wait_all_failsafe("full_exit/run", futures).await?;
+        wait_all_failsafe("full_exit/run", full_exit_task).await?;
 
-        log::info!("Full exit scenario has been finished");
+        vlog::info!("Full exit scenario has been finished");
 
-        Ok(())
+        Ok(wallets)
     }
 
     async fn finalize(

@@ -15,6 +15,7 @@ const CONFIG_FILES = [
     'eth_watch.toml',
     'fee_ticker.toml',
     'misc.toml',
+    'dev_liquidity_token_watcher.toml',
     'prover.toml',
     'rust.toml',
     'private.toml',

@@ -45,7 +45,7 @@ impl<'a, 'c> OperationsSchema<'a, 'c> {
             "sql.chain.operations.get_last_block_by_aggregated_action",
             start.elapsed()
         );
-        Ok(max_block as BlockNumber)
+        Ok(BlockNumber(max_block as u32))
     }
 
     pub async fn get_stored_aggregated_operation(
@@ -57,7 +57,7 @@ impl<'a, 'c> OperationsSchema<'a, 'c> {
         let result = sqlx::query_as!(
             StoredAggregatedOperation,
             "SELECT * FROM aggregate_operations WHERE from_block >= $1 AND to_block <= $1 AND action_type = $2",
-            i64::from(block_number),
+            i64::from(*block_number),
             aggregated_action_type.to_string()
         )
         .fetch_optional(self.0.conn())
@@ -147,8 +147,8 @@ impl<'a, 'c> OperationsSchema<'a, 'c> {
                 SET confirmed = $1
                 WHERE from_block >= $2 AND to_block <= $3 AND action_type = $4",
             true,
-            i64::from(first_block),
-            i64::from(last_block),
+            i64::from(*first_block),
+            i64::from(*last_block),
             action_type.to_string()
         )
         .execute(self.0.conn())
@@ -278,7 +278,7 @@ impl<'a, 'c> OperationsSchema<'a, 'c> {
             .get_tx_by_hash(withdrawal_hash.as_ref())
             .await?;
         let block_number = if let Some(tx) = tx_by_hash {
-            tx.block_number as BlockNumber
+            BlockNumber(tx.block_number as u32)
         } else {
             return Ok(None);
         };
@@ -317,17 +317,42 @@ impl<'a, 'c> OperationsSchema<'a, 'c> {
             RETURNING id",
             aggregated_action_type.to_string(),
             serde_json::to_value(operation.clone()).expect("aggregated op serialize fail"),
-            i64::from(from_block),
-            i64::from(to_block)
+            i64::from(*from_block),
+            i64::from(*to_block)
         )
         .fetch_one(transaction.conn())
         .await?
         .id;
 
-        if !matches!(
-            operation.get_action_type(),
-            AggregatedActionType::CreateProofBlocks
-        ) {
+        if operation.is_commit() {
+            sqlx::query!(
+                r#"
+                INSERT INTO commit_aggregated_blocks_binding
+                SELECT 
+                    aggregate_operations.id, blocks.number
+                FROM aggregate_operations
+                INNER JOIN blocks ON blocks.number BETWEEN aggregate_operations.from_block AND aggregate_operations.to_block
+                WHERE aggregate_operations.action_type = 'CommitBlocks' and aggregate_operations.id = $1
+                "#, 
+                id
+            ).execute(transaction.conn()).await?;
+        }
+
+        if operation.is_execute() {
+            sqlx::query!(
+                r#"
+                INSERT INTO execute_aggregated_blocks_binding
+                SELECT 
+                    aggregate_operations.id, blocks.number
+                FROM aggregate_operations
+                INNER JOIN blocks ON blocks.number BETWEEN aggregate_operations.from_block AND aggregate_operations.to_block
+                WHERE aggregate_operations.action_type = 'ExecuteBlocks' and aggregate_operations.id = $1
+                "#, 
+                id
+            ).execute(transaction.conn()).await?;
+        }
+
+        if !operation.is_create_proof() {
             sqlx::query!(
                 "INSERT INTO eth_unprocessed_aggregated_ops (op_id)
                 VALUES ($1)",
@@ -352,7 +377,7 @@ impl<'a, 'c> OperationsSchema<'a, 'c> {
         .fetch_one(self.0.conn())
         .await?
         .max
-        .map(|b| b as BlockNumber)
+        .map(|b| BlockNumber(b as u32))
         .unwrap_or_default();
         Ok(block_number)
     }
@@ -367,7 +392,7 @@ impl<'a, 'c> OperationsSchema<'a, 'c> {
             "SELECT * FROM aggregate_operations \
             WHERE action_type = $1 and from_block <= $2 and $2 <= to_block",
             aggregated_action.to_string(),
-            i64::from(block_number)
+            i64::from(*block_number)
         )
         .fetch_optional(self.0.conn())
         .await?

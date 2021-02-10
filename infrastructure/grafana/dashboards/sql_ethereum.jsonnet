@@ -11,6 +11,7 @@ local metrics = [
   "sql.ethereum.load_gas_price_limit",
   "sql.ethereum.load_stats",
   "sql.ethereum.load_unconfirmed_operations",
+  "sql.ethereum.restore_unprocessed_operations",
   "sql.ethereum.load_unprocessed_operations",
   "sql.ethereum.report_created_operation",
   "sql.ethereum.save_new_eth_tx",

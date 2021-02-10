@@ -6,6 +6,7 @@ use backoff::future::FutureOperation;
 use backoff::Error::{Permanent, Transient};
 use futures::Future;
 use reqwest::Url;
+use vlog::*;
 // Workspace deps
 use crate::auth_utils::AuthTokenGenerator;
 use zksync_prover_utils::api::{

@@ -54,8 +54,8 @@ impl Witness for DepositWitness<Bn256> {
     fn apply_tx(tree: &mut CircuitAccountTree, deposit: &DepositOp) -> Self {
         let deposit_data = DepositData {
             amount: deposit.priority_op.amount.to_string().parse().unwrap(),
-            token: u32::from(deposit.priority_op.token),
-            account_address: deposit.account_id,
+            token: *deposit.priority_op.token as u32,
+            account_address: *deposit.account_id,
             address: eth_address_to_fr(&deposit.priority_op.to),
         };
         Self::apply_data(tree, &deposit_data)
@@ -112,7 +112,7 @@ impl Witness for DepositWitness<Bn256> {
             .map(|x| le_bit_vector_into_field_element(&x.to_vec()))
             .collect();
 
-        log::debug!(
+        vlog::debug!(
             "acc_path{} \n bal_path {} ",
             self.before.witness.account_path.len(),
             self.before.witness.balance_subtree_path.len()
@@ -185,7 +185,7 @@ impl DepositWitness<Bn256> {
     fn apply_data(tree: &mut CircuitAccountTree, deposit: &DepositData) -> Self {
         //preparing data and base witness
         let before_root = tree.root_hash();
-        log::debug!("deposit Initial root = {}", before_root);
+        vlog::debug!("deposit Initial root = {}", before_root);
         let (audit_path_before, audit_balance_path_before) =
             get_audits(tree, deposit.account_address, deposit.token);
 
@@ -194,7 +194,7 @@ impl DepositWitness<Bn256> {
         let account_address_fe = Fr::from_str(&deposit.account_address.to_string()).unwrap();
         let token_fe = Fr::from_str(&deposit.token.to_string()).unwrap();
         let amount_as_field_element = Fr::from_str(&deposit.amount.to_string()).unwrap();
-        log::debug!("amount_as_field_element is: {}", amount_as_field_element);
+        vlog::debug!("amount_as_field_element is: {}", amount_as_field_element);
         //calculate a and b
         let a = amount_as_field_element;
         let b = Fr::zero();
@@ -213,7 +213,7 @@ impl DepositWitness<Bn256> {
             );
 
         let after_root = tree.root_hash();
-        log::debug!("deposit After root = {}", after_root);
+        vlog::debug!("deposit After root = {}", after_root);
         let (audit_path_after, audit_balance_path_after) =
             get_audits(tree, deposit.account_address, deposit.token);
 

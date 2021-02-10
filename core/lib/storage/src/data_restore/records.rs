@@ -59,9 +59,9 @@ impl NewZkSyncOp {
         fee_account: AccountId,
     ) -> Self {
         Self {
-            block_num: i64::from(block),
+            block_num: i64::from(*block),
             operation: serde_json::to_value(franklin_op.clone()).unwrap(),
-            fee_account: i64::from(fee_account),
+            fee_account: i64::from(*fee_account),
         }
     }
 }

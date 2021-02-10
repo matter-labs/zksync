@@ -179,7 +179,7 @@ impl FromStr for AccountQuery {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         if let Ok(id) = s.parse() {
-            return Ok(Self::Id(id));
+            return Ok(Self::Id(AccountId(id)));
         }
 
         let s = remove_prefix(s);
@@ -222,7 +222,7 @@ impl AccountReceiptsQuery {
             AccountReceipts::Latest => Self::from_parts(
                 TxLocation {
                     // TODO: use `zksync_storage::MAX_BLOCK_NUMBER` instead
-                    block: BlockNumber::MAX,
+                    block: BlockNumber(u32::MAX),
                     index: None,
                 },
                 SearchDirection::Older,
@@ -236,7 +236,7 @@ impl AccountReceiptsQuery {
             direction: Some(direction),
             block: Some(location.block),
             index: location.index,
-            limit,
+            limit: BlockNumber(limit),
         }
     }
 }

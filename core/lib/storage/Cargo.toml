@@ -24,13 +24,14 @@ serde = "1.0.90"
 serde_json = "1.0.0"
 num = { version = "0.3.1", features = ["serde"] }
 chrono = { version = "0.4", features = ["serde", "rustc-serialize"] }
-log = "0.4"
 anyhow = "1.0"
 lazy_static = "1.4.0"
 itertools = "0.8"
 hex = "0.4"
-metrics = "0.13.0-alpha.8"
+metrics = "=0.13.0-alpha.8"
 parity-crypto = { version = "0.6.2", features = ["publickey"] }
+
+vlog = { path = "../../lib/vlog", version = "1.0" }
 
 async-trait = "0.1"
 deadpool = "0.5.2"
@@ -49,5 +50,4 @@ zksync_test_account = { path = "../../tests/test_account" }
 db_test_macro = { path = "./db_test_macro" }
 zksync_config = { path = "../config", version = "1.0" }
 
-env_logger = "0.6"
 tokio = { version = "0.2", features = ["full"] }

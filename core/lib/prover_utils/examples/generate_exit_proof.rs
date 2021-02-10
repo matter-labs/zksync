@@ -36,7 +36,7 @@ struct Opt {
 
 #[tokio::main]
 async fn main() {
-    env_logger::init();
+    vlog::init();
 
     let opt = Opt::from_args();
 
@@ -44,7 +44,7 @@ async fn main() {
     let token = TokenLike::parse(&opt.token);
 
     let timer = Instant::now();
-    log::info!("Restoring state from db");
+    vlog::info!("Restoring state from db");
     let connection_pool = ConnectionPool::new(Some(1));
     let mut storage = connection_pool
         .access_storage()
@@ -77,7 +77,7 @@ async fn main() {
         .expect("Failed to load verified state")
         .1;
 
-    log::info!("Restored state from db: {} s", timer.elapsed().as_secs());
+    vlog::info!("Restored state from db: {} s", timer.elapsed().as_secs());
 
     let (proof, amount) =
         zksync_prover_utils::exit_proof::create_exit_proof(accounts, account_id, address, token_id)

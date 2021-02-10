@@ -33,18 +33,6 @@ impl From<StorageETHStats> for ETHStats {
     }
 }
 
-/// State of the executed Ethereum transaction.
-#[derive(Debug, Clone)]
-pub(super) struct ExecutedTxStatus {
-    /// Amount of confirmations for a block containing the transaction.
-    pub confirmations: u64,
-    /// Whether transaction was executed successfully or failed.
-    pub success: bool,
-    /// Receipt for a transaction. Will be set to `Some` only if the transaction
-    /// failed during execution.
-    pub receipt: Option<TransactionReceipt>,
-}
-
 /// The result of the check for the Ethereum transaction commitment.
 #[derive(Debug, PartialEq)]
 pub enum TxCheckOutcome {

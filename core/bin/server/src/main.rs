@@ -27,24 +27,23 @@ struct Opt {
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    env_logger::init();
     let opt = Opt::from_args();
-
     let config = ZkSyncConfig::from_env();
     let server_mode = if opt.genesis {
         ServerCommand::Genesis
     } else {
+        vlog::init();
         ServerCommand::Launch
     };
 
     if let ServerCommand::Genesis = server_mode {
-        log::info!("Performing the server genesis initialization");
+        vlog::info!("Performing the server genesis initialization",);
         genesis_init(&config).await;
         return Ok(());
     }
 
     // It's a `ServerCommand::Launch`, perform the usual routine.
-    log::info!("Running the zkSync server");
+    vlog::info!("Running the zkSync server");
 
     let connection_pool = ConnectionPool::new(None);
 
@@ -64,50 +63,50 @@ async fn main() -> anyhow::Result<()> {
         run_prometheus_exporter(connection_pool.clone(), config.api.prometheus.port, true);
 
     // Run core actors.
-    log::info!("Starting the Core actors");
+    vlog::info!("Starting the Core actors");
     let core_task_handles = run_core(connection_pool.clone(), stop_signal_sender.clone(), &config)
         .await
         .expect("Unable to start Core actors");
 
     // Run API actors.
-    log::info!("Starting the API server actors");
+    vlog::info!("Starting the API server actors");
     let api_task_handle = run_api(connection_pool.clone(), stop_signal_sender.clone(), &config);
 
     // Run Ethereum sender actors.
-    log::info!("Starting the Ethereum sender actors");
+    vlog::info!("Starting the Ethereum sender actors");
     let eth_sender_task_handle = run_eth_sender(connection_pool.clone(), config.clone());
 
     // Run prover server & witness generator.
-    log::info!("Starting the Prover server actors");
-    let database = zksync_witness_generator::database::Database::new(connection_pool.clone());
+    vlog::info!("Starting the Prover server actors");
+    let database = zksync_witness_generator::database::Database::new(connection_pool);
     run_prover_server(database, stop_signal_sender, ZkSyncConfig::from_env());
 
-    log::info!("Starting the ForcedExitRequests actors");
+    vlog::info!("Starting the ForcedExitRequests actors");
     //let forced_exit_requests_task_handle = run_forced_exit_requests_actors(connection_pool, config);
 
     tokio::select! {
-         _ = async { wait_for_tasks(core_task_handles).await } => {
-             // We don't need to do anything here, since Core actors will panic upon future resolving.
-         },
-         _ = async { api_task_handle.await } => {
-             panic!("API server actors aren't supposed to finish their execution")
-         },
-         _ = async { eth_sender_task_handle.await } => {
-             panic!("Ethereum Sender actors aren't supposed to finish their execution")
-         },
-         _ = async { prometheus_task_handle.await } => {
-             panic!("Prometheus exporter actors aren't supposed to finish their execution")
-         },
-         _ = async { counter_task_handle.unwrap().await } => {
-             panic!("Operation counting actor is not supposed to finish its execution")
-         },
+        _ = async { wait_for_tasks(core_task_handles).await } => {
+            // We don't need to do anything here, since Core actors will panic upon future resolving.
+        },
+        _ = async { api_task_handle.await } => {
+            panic!("API server actors aren't supposed to finish their execution")
+        },
+        _ = async { eth_sender_task_handle.await } => {
+            panic!("Ethereum Sender actors aren't supposed to finish their execution")
+        },
+        _ = async { prometheus_task_handle.await } => {
+            panic!("Prometheus exporter actors aren't supposed to finish their execution")
+        },
+        _ = async { counter_task_handle.unwrap().await } => {
+            panic!("Operation counting actor is not supposed to finish its execution")
+        },
     //     _ = async { forced_exit_requests_task_handle.await } => {
      //        panic!("ForcedExitRequests actor is not supposed to finish its execution")
       //   },
-         _ = async { stop_signal_receiver.next().await } => {
-             log::warn!("Stop signal received, shutting down");
-         }
-     };
+        _ = async { stop_signal_receiver.next().await } => {
+            vlog::warn!("Stop signal received, shutting down");
+        }
+    };
 
     Ok(())
 }

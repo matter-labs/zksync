@@ -54,9 +54,11 @@ impl<'a, 'c> EthereumSchema<'a, 'c> {
         for eth_op in eth_ops {
             let raw_op = sqlx::query_as!(
                 StoredAggregatedOperation,
-                "SELECT aggregate_operations.* FROM eth_aggregated_ops_binding
+                r#"
+                SELECT aggregate_operations.* FROM eth_aggregated_ops_binding
                 LEFT JOIN aggregate_operations ON aggregate_operations.id = op_id
-                WHERE eth_op_id = $1",
+                WHERE eth_op_id = $1
+                "#,
                 eth_op.id
             )
             .fetch_optional(transaction.conn())
@@ -118,6 +120,35 @@ impl<'a, 'c> EthereumSchema<'a, 'c> {
         Ok(ops)
     }
 
+    /// Load all the aggregated operations that have no confirmation yet and have not yet been sent to Ethereum.
+    /// Should be used after server restart only.
+    pub async fn restore_unprocessed_operations(&mut self) -> QueryResult<()> {
+        let start = Instant::now();
+
+        sqlx::query!(
+            "WITH aggregate_ops AS (
+                SELECT aggregate_operations.id FROM aggregate_operations
+                   WHERE confirmed = $1 and action_type != $2 and aggregate_operations.id != ANY(SELECT id from eth_aggregated_ops_binding)
+                ORDER BY aggregate_operations.id ASC
+              )
+              INSERT INTO eth_unprocessed_aggregated_ops (op_id)
+              SELECT id from aggregate_ops
+              ON CONFLICT (op_id)
+              DO NOTHING",
+              false,
+              AggregatedActionType::CreateProofBlocks.to_string()
+        )
+        .execute(self.0.conn())
+        .await?;
+
+        metrics::histogram!(
+            "sql.ethereum.restore_unprocessed_operations",
+            start.elapsed()
+        );
+
+        Ok(())
+    }
+
     /// Loads the operations which were stored in `aggregate_operations` table,
     /// and are in `eth_unprocessed_aggregated_ops`.
     pub async fn load_unprocessed_operations(
@@ -127,9 +158,11 @@ impl<'a, 'c> EthereumSchema<'a, 'c> {
 
         let raw_ops = sqlx::query_as!(
             StoredAggregatedOperation,
-            "SELECT * FROM aggregate_operations
+            r#"
+            SELECT * FROM aggregate_operations
             WHERE EXISTS (SELECT * FROM eth_unprocessed_aggregated_ops WHERE op_id = aggregate_operations.id)
-            ORDER BY id ASC",
+            ORDER BY id ASC
+            "#,
         )
         .fetch_all(self.0.conn())
         .await?;
@@ -241,7 +274,7 @@ impl<'a, 'c> EthereumSchema<'a, 'c> {
         let start = Instant::now();
         let confirmed = sqlx::query_as!(
             StorageETHOperation,
-            "SELECT * FROM eth_operations WHERE id = $1",
+            "SELECT * FROM eth_operations WHERE id <= $1 ORDER BY ID DESC LIMIT 1",
             id
         )
         .fetch_optional(self.0.conn())
@@ -327,7 +360,7 @@ impl<'a, 'c> EthereumSchema<'a, 'c> {
         let mut current_stats = EthereumSchema(&mut transaction).load_eth_params().await?;
         let (first_block, last_block) = {
             let block_range = operation.get_block_range();
-            (i64::from(block_range.0), i64::from(block_range.1))
+            (i64::from(*block_range.0), i64::from(*block_range.1))
         };
 
         match operation {

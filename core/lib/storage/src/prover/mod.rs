@@ -27,8 +27,8 @@ impl<'a, 'c> ProverSchema<'a, 'c> {
     pub async fn pending_jobs_count(&mut self) -> QueryResult<u32> {
         let start = Instant::now();
         let pending_jobs_count = sqlx::query!(
-            "SELECT COUNT(*) FROM prover_job_queue WHERE job_status = $1",
-            ProverJobStatus::Idle.to_number()
+            "SELECT COUNT(*) FROM prover_job_queue WHERE job_status != $1",
+            ProverJobStatus::Done.to_number()
         )
         .fetch_one(self.0.conn())
         .await?
@@ -58,8 +58,8 @@ impl<'a, 'c> ProverSchema<'a, 'c> {
             ProverJobStatus::Idle.to_number(),
             job_priority,
             job_type.to_string(),
-            i64::from(first_block),
-            i64::from(last_block),
+            i64::from(*first_block),
+            i64::from(*last_block),
             job_data,
         ).execute(self.0.conn()).await?;
         Ok(())
@@ -113,8 +113,8 @@ impl<'a, 'c> ProverSchema<'a, 'c> {
 
             Some(ProverJob::new(
                 job.id,
-                job.first_block as BlockNumber,
-                job.last_block as BlockNumber,
+                BlockNumber(job.first_block as u32),
+                BlockNumber(job.last_block as u32),
                 job.job_data,
             ))
         } else {
@@ -192,7 +192,7 @@ impl<'a, 'c> ProverSchema<'a, 'c> {
         sqlx::query!(
             "INSERT INTO proofs (block_number, proof)
             VALUES ($1, $2)",
-            i64::from(block_number),
+            i64::from(*block_number),
             serde_json::to_value(proof).unwrap()
         )
         .execute(transaction.conn())
@@ -232,8 +232,8 @@ impl<'a, 'c> ProverSchema<'a, 'c> {
         sqlx::query!(
             "INSERT INTO aggregated_proofs (first_block, last_block, proof)
             VALUES ($1, $2, $3)",
-            i64::from(first_block),
-            i64::from(last_block),
+            i64::from(*first_block),
+            i64::from(*last_block),
             serde_json::to_value(proof).unwrap()
         )
         .execute(transaction.conn())
@@ -253,7 +253,7 @@ impl<'a, 'c> ProverSchema<'a, 'c> {
         let proof = sqlx::query_as!(
             StoredProof,
             "SELECT * FROM proofs WHERE block_number = $1",
-            i64::from(block_number),
+            i64::from(*block_number),
         )
         .fetch_optional(self.0.conn())
         .await?
@@ -273,8 +273,8 @@ impl<'a, 'c> ProverSchema<'a, 'c> {
         let proof = sqlx::query_as!(
             StoredAggregatedProof,
             "SELECT * FROM aggregated_proofs WHERE first_block = $1 and last_block = $2",
-            i64::from(first_block),
-            i64::from(last_block)
+            i64::from(*first_block),
+            i64::from(*last_block)
         )
         .fetch_optional(self.0.conn())
         .await?
@@ -297,7 +297,7 @@ impl<'a, 'c> ProverSchema<'a, 'c> {
             VALUES ($1, $2)
             ON CONFLICT (block)
             DO NOTHING",
-            i64::from(block),
+            i64::from(*block),
             witness_str
         )
         .execute(self.0.conn())
@@ -316,7 +316,7 @@ impl<'a, 'c> ProverSchema<'a, 'c> {
         let block_witness = sqlx::query_as!(
             StorageBlockWitness,
             "SELECT * FROM block_witness WHERE block = $1",
-            i64::from(block_number),
+            i64::from(*block_number),
         )
         .fetch_optional(self.0.conn())
         .await?;
@@ -340,7 +340,7 @@ impl<'a, 'c> ProverSchema<'a, 'c> {
         .max;
 
         let result = if let Some(last_block) = last_block {
-            last_block as BlockNumber
+            BlockNumber(last_block as u32)
         } else {
             // this branch executes when prover job queue is empty
             match action_type {

@@ -221,7 +221,7 @@ impl MempoolState {
             .await
             .expect("mempool db transaction commit");
 
-        log::info!(
+        vlog::info!(
             "{} transactions were restored from the persistent mempool storage",
             all_mempool_txs.len()
         );
@@ -234,7 +234,7 @@ impl MempoolState {
     }
 
     fn nonce(&self, address: &Address) -> Nonce {
-        *self.account_nonces.get(address).unwrap_or(&0)
+        *self.account_nonces.get(address).unwrap_or(&Nonce(0))
     }
 
     fn add_tx(&mut self, tx: SignedZkSyncTx) -> Result<(), TxAddError> {
@@ -286,8 +286,12 @@ impl MempoolBlocksHandler {
             .prepare_tx_for_block(chunks_left, block_timestamp)
             .await;
 
-        log::trace!("Proposed priority ops for block: {:#?}", priority_ops);
-        log::trace!("Proposed txs for block: {:#?}", txs);
+        if !priority_ops.is_empty() {
+            vlog::debug!("Proposed priority ops for block: {:?}", priority_ops);
+        }
+        if !txs.is_empty() {
+            vlog::debug!("Proposed txs for block: {:?}", txs);
+        }
         metrics::histogram!("mempool.propose_new_block", start.elapsed());
         ProposedBlock { priority_ops, txs }
     }
@@ -349,7 +353,7 @@ impl MempoolBlocksHandler {
     }
 
     async fn run(mut self) {
-        log::info!("Block mempool handler is running");
+        vlog::info!("Block mempool handler is running");
         while let Some(request) = self.requests.next().await {
             match request {
                 MempoolBlocksRequest::GetBlock(block) => {
@@ -480,12 +484,12 @@ async fn store_account_type(
 impl MempoolTransactionsHandler {
     async fn add_tx(&mut self, tx: SignedZkSyncTx) -> Result<(), TxAddError> {
         let mut storage = self.db_pool.access_storage().await.map_err(|err| {
-            log::warn!("Mempool storage access error: {}", err);
+            vlog::warn!("Mempool storage access error: {}", err);
             TxAddError::DbError
         })?;
 
         let mut transaction = storage.start_transaction().await.map_err(|err| {
-            log::warn!("Mempool storage access error: {}", err);
+            vlog::warn!("Mempool storage access error: {}", err);
             TxAddError::DbError
         })?;
         transaction
@@ -494,7 +498,7 @@ impl MempoolTransactionsHandler {
             .insert_tx(&tx)
             .await
             .map_err(|err| {
-                log::warn!("Mempool storage access error: {}", err);
+                vlog::warn!("Mempool storage access error: {}", err);
                 TxAddError::DbError
             })?;
 
@@ -505,7 +509,7 @@ impl MempoolTransactionsHandler {
         }
 
         transaction.commit().await.map_err(|err| {
-            log::warn!("Mempool storage access error: {}", err);
+            vlog::warn!("Mempool storage access error: {}", err);
             TxAddError::DbError
         })?;
 
@@ -518,7 +522,7 @@ impl MempoolTransactionsHandler {
         eth_signatures: Vec<TxEthSignature>,
     ) -> Result<(), TxAddError> {
         let mut storage = self.db_pool.access_storage().await.map_err(|err| {
-            log::warn!("Mempool storage access error: {}", err);
+            vlog::warn!("Mempool storage access error: {}", err);
             TxAddError::DbError
         })?;
 
@@ -533,7 +537,7 @@ impl MempoolTransactionsHandler {
         }
 
         let mut transaction = storage.start_transaction().await.map_err(|err| {
-            log::warn!("Mempool storage access error: {}", err);
+            vlog::warn!("Mempool storage access error: {}", err);
             TxAddError::DbError
         })?;
         for tx in txs {
@@ -547,11 +551,11 @@ impl MempoolTransactionsHandler {
             .insert_batch(&batch.txs, eth_signatures)
             .await
             .map_err(|err| {
-                log::warn!("Mempool storage access error: {}", err);
+                vlog::warn!("Mempool storage access error: {}", err);
                 TxAddError::DbError
             })?;
         transaction.commit().await.map_err(|err| {
-            log::warn!("Mempool storage access error: {}", err);
+            vlog::warn!("Mempool storage access error: {}", err);
             TxAddError::DbError
         })?;
 
@@ -561,7 +565,7 @@ impl MempoolTransactionsHandler {
     }
 
     async fn run(mut self) {
-        log::info!("Transaction mempool handler is running");
+        vlog::info!("Transaction mempool handler is running");
         while let Some(request) = self.requests.next().await {
             match request {
                 MempoolTransactionRequest::NewTx(tx, resp) => {

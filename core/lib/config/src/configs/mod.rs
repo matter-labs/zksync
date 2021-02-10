@@ -1,7 +1,8 @@
 // Public re-exports
 pub use self::{
     api::ApiConfig, chain::ChainConfig, contracts::ContractsConfig, db::DBConfig,
-    eth_client::ETHClientConfig, eth_sender::ETHSenderConfig, eth_watch::ETHWatchConfig,
+    dev_liquidity_token_watcher::DevLiquidityTokenWatcherConfig, eth_client::ETHClientConfig,
+    eth_sender::ETHSenderConfig, eth_watch::ETHWatchConfig,
     forced_exit_requests::ForcedExitRequestsConfig, misc::MiscConfig, prover::ProverConfig,
     ticker::TickerConfig,
 };
@@ -10,6 +11,7 @@ pub mod api;
 pub mod chain;
 pub mod contracts;
 pub mod db;
+pub mod dev_liquidity_token_watcher;
 pub mod eth_client;
 pub mod eth_sender;
 pub mod eth_watch;

@@ -1,13 +1,14 @@
 use web3::transports::Http;
 
 use zksync_core::state_keeper::ZkSyncStateInitParams;
-use zksync_types::{block::Block, AccountMap, AccountTree};
+use zksync_types::{block::Block, AccountId, AccountMap, AccountTree};
 
 use zksync_testkit::*;
 use zksync_testkit::{
     data_restore::verify_restore,
     scenarios::{perform_basic_operations, BlockProcessing},
 };
+use zksync_types::{BlockNumber, Nonce, TokenId};
 
 use crate::{
     eth_account::{parse_ether, EthereumAccount},
@@ -19,7 +20,7 @@ fn create_test_setup_state(
     testkit_config: &TestkitConfig,
     contracts: &Contracts,
     fee_account: &ZkSyncAccount,
-) -> (EthereumAccount<Http>, AccountSet<Http>) {
+) -> (EthereumAccount, AccountSet) {
     let transport = Http::new(&testkit_config.web3_url).expect("http transport start");
     let (test_accounts_info, commit_account_info) = get_test_accounts();
     let commit_account = EthereumAccount::new(
@@ -51,7 +52,7 @@ fn create_test_setup_state(
             let rng_zksync_key = ZkSyncAccount::rand().private_key;
             ZkSyncAccount::new(
                 rng_zksync_key,
-                0,
+                Nonce(0),
                 eth_account.address,
                 eth_account.private_key,
             )
@@ -70,11 +71,11 @@ fn create_test_setup_state(
 
 async fn execute_blocks(
     test_setup: &mut TestSetup,
-    start_block_number: u32,
+    start_block_number: BlockNumber,
     number_of_verified_iteration_blocks: u16, // Each operation generate 4 blocks
     number_of_committed_iteration_blocks: u16,
     number_of_reverted_iterations_blocks: u16,
-) -> (ZkSyncStateInitParams, AccountSet<Http>, Block) {
+) -> (ZkSyncStateInitParams, AccountSet, Block) {
     let deposit_amount = parse_ether("1.0").unwrap();
 
     let mut executed_blocks = Vec::new();
@@ -83,7 +84,7 @@ async fn execute_blocks(
 
     for _ in 0..number_of_verified_iteration_blocks {
         let blocks = perform_basic_operations(
-            token,
+            TokenId(token),
             test_setup,
             deposit_amount.clone(),
             BlockProcessing::CommitAndVerify,
@@ -95,10 +96,12 @@ async fn execute_blocks(
             test_setup.accounts.clone(),
         ));
     }
-    test_setup.get_eth_balance(ETHAccountId(0), 0).await;
+    test_setup
+        .get_eth_balance(ETHAccountId(0), TokenId(0))
+        .await;
     for _ in 0..number_of_committed_iteration_blocks - number_of_verified_iteration_blocks {
         let blocks = perform_basic_operations(
-            token,
+            TokenId(token),
             test_setup,
             deposit_amount.clone(),
             BlockProcessing::NoVerify,
@@ -110,7 +113,9 @@ async fn execute_blocks(
             test_setup.accounts.clone(),
         ));
     }
-    test_setup.get_eth_balance(ETHAccountId(0), 0).await;
+    test_setup
+        .get_eth_balance(ETHAccountId(0), TokenId(0))
+        .await;
 
     let executed_blocks_reverse_order = executed_blocks
         .clone()
@@ -126,7 +131,7 @@ async fn execute_blocks(
     let (reverted_state, test_setup_accounts) = states[reverted_state_idx as usize].clone();
 
     let executed_block = executed_blocks
-        [(reverted_state.last_block_number - start_block_number - 1) as usize]
+        [(*reverted_state.last_block_number - *start_block_number - 1) as usize]
         .clone();
 
     test_setup
@@ -140,7 +145,7 @@ async fn execute_blocks(
 fn balance_tree_to_account_map(balance_tree: &AccountTree) -> AccountMap {
     let mut account_map = AccountMap::default();
     for (id, account) in balance_tree.items.iter() {
-        account_map.insert(*id as u32, account.clone());
+        account_map.insert(AccountId(*id as u32), account.clone());
     }
     account_map
 }
@@ -173,7 +178,8 @@ async fn revert_blocks_test() {
     // Commit 3
     // Revert 2
     // Revert all uncommitted transactions
-    let (state, account_set, last_block) = execute_blocks(&mut test_setup, 0, 1, 3, 2).await;
+    let (state, account_set, last_block) =
+        execute_blocks(&mut test_setup, BlockNumber(0), 1, 3, 2).await;
 
     sender.send(()).expect("sk stop send");
     handler.join().expect("sk thread join");
@@ -229,7 +235,7 @@ async fn revert_blocks_test() {
         &contracts,
         fee_account.address,
         balance_tree_to_account_map(&state.tree),
-        vec![0],
+        vec![TokenId(0)],
         test_setup.current_state_root.unwrap(),
     )
     .await;

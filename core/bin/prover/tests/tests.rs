@@ -26,7 +26,8 @@ use zksync_prover_utils::api::{
     JobRequestData, ProverInputRequest, ProverInputResponse, ProverOutputRequest,
 };
 use zksync_types::{
-    block::smallest_block_size_for_chunks, operations::DepositOp, Account, Address, Deposit,
+    block::smallest_block_size_for_chunks, operations::DepositOp, Account, AccountId, Address,
+    BlockNumber, Deposit, TokenId,
 };
 
 /// Set of different parameters needed for the prover to work
@@ -79,20 +80,21 @@ impl Default for MockProverConfigs {
 fn test_data_for_prover() -> JobRequestData {
     let mut circuit_account_tree =
         CircuitAccountTree::new(zksync_crypto::params::account_tree_depth());
-    let fee_account_id = 0;
+    let fee_account_id = AccountId(0);
 
     // Init the fee account.
     let fee_account = Account::default_with_address(&Address::default());
-    circuit_account_tree.insert(fee_account_id, CircuitAccount::from(fee_account));
+    circuit_account_tree.insert(*fee_account_id, CircuitAccount::from(fee_account));
 
-    let mut witness_accum = WitnessBuilder::new(&mut circuit_account_tree, fee_account_id, 1, 0);
+    let mut witness_accum =
+        WitnessBuilder::new(&mut circuit_account_tree, fee_account_id, BlockNumber(1), 0);
 
-    let empty_account_id = 1;
+    let empty_account_id = AccountId(1);
     let empty_account_address = [7u8; 20].into();
     let deposit_op = DepositOp {
         priority_op: Deposit {
             from: empty_account_address,
-            token: 0,
+            token: TokenId(0),
             amount: BigUint::from(1u32),
             to: empty_account_address,
         },
@@ -264,8 +266,8 @@ impl zksync_prover::ApiClient for MockApiClient {
         *self.last_job_id.lock().await += 1;
         let response = ProverInputResponse {
             job_id: last_job_id,
-            first_block: 1,
-            last_block: 1,
+            first_block: BlockNumber(1),
+            last_block: BlockNumber(1),
             data: Some(test_data_for_prover()),
         };
 

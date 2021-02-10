@@ -20,7 +20,7 @@ pub struct DbToken {
 impl From<Token> for DbToken {
     fn from(token: Token) -> Self {
         Self {
-            id: token.id as i32,
+            id: *token.id as i32,
             address: address_to_stored_string(&token.address),
             symbol: token.symbol,
             decimals: token.decimals as i16,
@@ -31,7 +31,7 @@ impl From<Token> for DbToken {
 impl Into<Token> for DbToken {
     fn into(self) -> Token {
         Token {
-            id: self.id as TokenId,
+            id: TokenId(self.id as u16),
             address: stored_str_address_to_address(&self.address),
             symbol: self.symbol,
             decimals: self.decimals as u8,

@@ -16,7 +16,7 @@ use zksync_state::{
 };
 use zksync_types::{
     operations::{DepositOp, FullExitOp, TransferOp, TransferToNewOp, WithdrawOp},
-    Address, Deposit, FullExit, Transfer, Withdraw,
+    AccountId, Address, BlockNumber, Deposit, FullExit, TokenId, Transfer, Withdraw,
 };
 // Local deps
 use crate::{
@@ -52,14 +52,14 @@ mod withdraw;
 /// Returns the resulting `WitnessBuilder` and the hash obtained
 /// from `ZkSyncState` for further correctness checks.
 fn apply_many_ops() -> ZkSyncCircuit<'static, Bn256> {
-    const ETH_TOKEN: u16 = 0;
-    const NNM_TOKEN: u16 = 2;
+    const ETH_TOKEN: TokenId = TokenId(0);
+    const NNM_TOKEN: TokenId = TokenId(2);
 
     // Create two accounts: we will perform all the operations with the first one,
     // while the second one will be used as "target" account for transfers.
     let accounts = vec![
-        WitnessTestAccount::new_empty(1),
-        WitnessTestAccount::new_empty(2),
+        WitnessTestAccount::new_empty(AccountId(1)),
+        WitnessTestAccount::new_empty(AccountId(2)),
     ];
     let (account, account_to) = (&accounts[0], &accounts[1]);
 
@@ -102,7 +102,7 @@ fn apply_many_ops() -> ZkSyncCircuit<'static, Bn256> {
         SigDataInput::from_transfer_op(&transfer_op).expect("SigDataInput creation failed");
 
     // Transfer token to a new account.
-    let new_account = WitnessTestAccount::new_empty(3);
+    let new_account = WitnessTestAccount::new_empty(AccountId(3));
     let transfer_to_new_op = TransferToNewOp {
         tx: account
             .zksync_account
@@ -150,7 +150,7 @@ fn apply_many_ops() -> ZkSyncCircuit<'static, Bn256> {
         priority_op: FullExit {
             account_id: account.id,
             eth_address: account.account.address,
-            token: 0,
+            token: TokenId(0),
         },
         withdraw_amount: Some(BigUint::from(900u32).into()),
     };
@@ -158,7 +158,8 @@ fn apply_many_ops() -> ZkSyncCircuit<'static, Bn256> {
 
     // Initialize Plasma and WitnessBuilder.
     let (mut plasma_state, mut circuit_account_tree) = ZkSyncStateGenerator::generate(&accounts);
-    let mut witness_accum = WitnessBuilder::new(&mut circuit_account_tree, FEE_ACCOUNT_ID, 1, 0);
+    let mut witness_accum =
+        WitnessBuilder::new(&mut circuit_account_tree, FEE_ACCOUNT_ID, BlockNumber(1), 0);
 
     // Fees to be collected.
     let mut fees = vec![];

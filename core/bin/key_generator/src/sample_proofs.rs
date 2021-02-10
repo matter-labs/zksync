@@ -8,7 +8,7 @@ use zksync_crypto::proof::{PrecomputedSampleProofs, SingleProof};
 use zksync_prover_utils::aggregated_proofs::{gen_aggregate_proof, prepare_proof_data};
 use zksync_prover_utils::fs_utils::get_precomputed_proofs_path;
 use zksync_prover_utils::{PlonkVerificationKey, SetupForStepByStepProver};
-use zksync_types::{Account, BlockNumber};
+use zksync_types::{Account, AccountId, BlockNumber};
 
 fn generate_zksync_circuit_proofs(
     amount: usize,
@@ -17,11 +17,12 @@ fn generate_zksync_circuit_proofs(
     let mut proofs = Vec::new();
     for n in 0..amount {
         let zksync_circuit = {
-            let block_number = n as BlockNumber;
+            let block_number = BlockNumber(n as u32);
 
             let mut account_tree = CircuitAccountTree::new(account_tree_depth());
             account_tree.insert(0, Account::default().into());
-            let mut witness_builder = WitnessBuilder::new(&mut account_tree, 0, block_number, 0);
+            let mut witness_builder =
+                WitnessBuilder::new(&mut account_tree, AccountId(0), block_number, 0);
             witness_builder.extend_pubdata_with_noops(block_size);
             witness_builder.collect_fees(&[]);
             witness_builder.calculate_pubdata_commitment();
@@ -53,7 +54,7 @@ pub fn make_sample_proofs(config: ChainConfig) -> anyhow::Result<()> {
 
     let max_aggregated_size = *config
         .circuit
-        .aggregated_proof_sizes
+        .supported_aggregated_proof_sizes
         .iter()
         .max()
         .ok_or_else(|| anyhow::anyhow!("Aggregated proof sizes should not be empty"))?;
@@ -62,7 +63,7 @@ pub fn make_sample_proofs(config: ChainConfig) -> anyhow::Result<()> {
     let aggregated_proof = {
         let min_aggregated_size = *config
             .circuit
-            .aggregated_proof_sizes
+            .supported_aggregated_proof_sizes
             .iter()
             .min()
             .ok_or_else(|| anyhow::anyhow!("Aggregated proof sizes should not be empty"))?;
@@ -78,7 +79,9 @@ pub fn make_sample_proofs(config: ChainConfig) -> anyhow::Result<()> {
         gen_aggregate_proof(
             vks,
             proof_data,
-            &config.circuit.aggregated_proof_sizes_with_setup_pow(),
+            &config
+                .circuit
+                .supported_aggregated_proof_sizes_with_setup_pow(),
             false,
         )?
     };

@@ -21,7 +21,7 @@ import {
 const TEST_PRIORITY_EXPIRATION = 101;
 const CHUNK_SIZE = 9;
 
-let wallet, exitWallet;
+let wallet;
 
 describe('zkSync signature verification unit tests', function () {
     this.timeout(50000);
@@ -29,7 +29,7 @@ describe('zkSync signature verification unit tests', function () {
     let testContract: ZKSyncSignatureUnitTest;
     const randomWallet = ethers.Wallet.createRandom();
     before(async () => {
-        [wallet, exitWallet] = await hardhat.ethers.getSigners();
+        [wallet] = await hardhat.ethers.getSigners();
 
         const contracts = readProductionContracts();
         contracts.zkSync = readContractCode('dev-contracts/ZKSyncSignatureUnitTest');
@@ -165,10 +165,8 @@ describe('ZK priority queue ops unit tests', function () {
 
     let zksyncContract;
     let tokenContract;
-    let ethProxy;
-    let operationTestContract;
     before(async () => {
-        [wallet, exitWallet] = await hardhat.ethers.getSigners();
+        [wallet] = await hardhat.ethers.getSigners();
 
         const contracts = readProductionContracts();
         const deployer = new Deployer({ deployWallet: wallet, contracts });
@@ -181,14 +179,6 @@ describe('ZK priority queue ops unit tests', function () {
 
         const govContract = deployer.governanceContract(wallet);
         await govContract.addToken(tokenContract.address);
-
-        ethProxy = new ETHProxy(wallet.provider, {
-            mainContract: zksyncContract.address,
-            govContract: govContract.address
-        });
-
-        const opsTestContractFactory = await hardhat.ethers.getContractFactory('OperationsTest');
-        operationTestContract = await opsTestContractFactory.deploy();
     });
 
     async function performDeposit(to: Address, token: TokenAddress, depositAmount: BigNumber) {
@@ -295,7 +285,7 @@ describe('zkSync withdraw unit tests', function () {
     let incorrectTokenContract;
     let ethProxy;
     before(async () => {
-        [wallet, exitWallet] = await hardhat.ethers.getSigners();
+        [wallet] = await hardhat.ethers.getSigners();
         const contracts = readProductionContracts();
         contracts.zkSync = readContractCode('dev-contracts/ZkSyncWithdrawalUnitTest');
         const deployer = new Deployer({ deployWallet: wallet, contracts });
@@ -437,7 +427,7 @@ describe('zkSync auth pubkey onchain unit tests', function () {
     let zksyncContract;
     let tokenContract;
     before(async () => {
-        [wallet, exitWallet] = await hardhat.ethers.getSigners();
+        [wallet] = await hardhat.ethers.getSigners();
 
         const deployer = new Deployer({ deployWallet: wallet });
         await deployer.deployAll({ gasLimit: 6500000 });
@@ -500,7 +490,7 @@ describe('zkSync auth pubkey onchain unit tests', function () {
         for (const pkHash of [shortPubkeyHash, longPubkeyHash]) {
             const { revertReason } = await getCallRevertReason(
                 async () =>
-                    await zksyncContract.setAuthPubkeyHash(shortPubkeyHash, nonce, {
+                    await zksyncContract.setAuthPubkeyHash(pkHash, nonce, {
                         gasLimit: 300000
                     })
             );
@@ -531,7 +521,7 @@ describe('zkSync test process next operation', function () {
     };
 
     before(async () => {
-        [wallet, exitWallet] = await hardhat.ethers.getSigners();
+        [wallet] = await hardhat.ethers.getSigners();
 
         const contracts = readProductionContracts();
         contracts.zkSync = readContractCode('dev-contracts/ZkSyncProcessOpUnitTest');
@@ -752,5 +742,8 @@ describe('zkSync test process next operation', function () {
 
         const expectedHash = keccak256(ethers.utils.concat([EMPTY_KECCAK, pubdata]));
         await zksyncContract.collectOnchainOpsExternal(blockData, expectedHash, 0, [1, 0, 0, 0, 0, 0]);
+
+        const committedPriorityRequestsAfter = await zksyncContract.totalCommittedPriorityRequests();
+        expect(committedPriorityRequestsAfter, 'priority request number').eq(committedPriorityRequestsBefore);
     });
 });

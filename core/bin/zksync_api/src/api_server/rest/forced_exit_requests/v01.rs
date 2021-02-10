@@ -106,7 +106,7 @@ pub async fn submit_request(
     let start = Instant::now();
 
     let mut storage = data.connection_pool.access_storage().await.map_err(|err| {
-        log::warn!("Internal Server Error: '{}';", err);
+        vlog::warn!("Internal Server Error: '{}';", err);
         return ApiError::internal("");
     })?;
 
@@ -237,46 +237,46 @@ mod tests {
     use super::*;
     use crate::api_server::v1::test_utils::TestServerConfig;
 
-    fn dummy_fee_ticker(zkp_fee: Option<u64>, gas_fee: Option<u64>) -> mpsc::Sender<TickerRequest> {
-        let (sender, mut receiver) = mpsc::channel(10);
+    // fn dummy_fee_ticker(zkp_fee: Option<u64>, gas_fee: Option<u64>) -> mpsc::Sender<TickerRequest> {
+    //     let (sender, mut receiver) = mpsc::channel(10);
 
-        let zkp_fee = zkp_fee.unwrap_or(1_u64);
-        let gas_fee = gas_fee.unwrap_or(1_u64);
+    //     let zkp_fee = zkp_fee.unwrap_or(1_u64);
+    //     let gas_fee = gas_fee.unwrap_or(1_u64);
 
-        actix_rt::spawn(async move {
-            while let Some(item) = receiver.next().await {
-                match item {
-                    TickerRequest::GetTxFee { response, .. } => {
-                        let fee = Ok(Fee::new(
-                            Withdraw,
-                            BigUint::from(zkp_fee).into(),
-                            BigUint::from(gas_fee).into(),
-                            1_u64.into(),
-                            1_u64.into(),
-                        ));
+    //     actix_rt::spawn(async move {
+    //         while let Some(item) = receiver.next().await {
+    //             match item {
+    //                 TickerRequest::GetTxFee { response, .. } => {
+    //                     let fee = Ok(Fee::new(
+    //                         Withdraw,
+    //                         BigUint::from(zkp_fee).into(),
+    //                         BigUint::from(gas_fee).into(),
+    //                         1_u64.into(),
+    //                         1_u64.into(),
+    //                     ));
 
-                        response.send(fee).expect("Unable to send response");
-                    }
-                    TickerRequest::GetTokenPrice { response, .. } => {
-                        let price = Ok(BigDecimal::from(1_u64));
+    //                     response.send(fee).expect("Unable to send response");
+    //                 }
+    //                 TickerRequest::GetTokenPrice { response, .. } => {
+    //                     let price = Ok(BigDecimal::from(1_u64));
 
-                        response.send(price).expect("Unable to send response");
-                    }
-                    TickerRequest::IsTokenAllowed { token, response } => {
-                        // For test purposes, PHNX token is not allowed.
-                        let is_phnx = match token {
-                            TokenLike::Id(id) => id == 1,
-                            TokenLike::Symbol(sym) => sym == "PHNX",
-                            TokenLike::Address(_) => unreachable!(),
-                        };
-                        response.send(Ok(!is_phnx)).unwrap_or_default();
-                    }
-                }
-            }
-        });
+    //                     response.send(price).expect("Unable to send response");
+    //                 }
+    //                 TickerRequest::IsTokenAllowed { token, response } => {
+    //                     // For test purposes, PHNX token is not allowed.
+    //                     let is_phnx = match token {
+    //                         TokenLike::Id(id) => id == 1,
+    //                         TokenLike::Symbol(sym) => sym == "PHNX",
+    //                         TokenLike::Address(_) => unreachable!(),
+    //                     };
+    //                     response.send(Ok(!is_phnx)).unwrap_or_default();
+    //                 }
+    //             }
+    //         }
+    //     });
 
-        sender
-    }
+    //     sender
+    // }
 
     struct TestServer {
         api_server: actix_web::test::TestServer,

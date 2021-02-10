@@ -27,7 +27,7 @@ use franklin_crypto::{
     jubjub::JubjubEngine,
 };
 
-use crate::utils::{set_panic_hook};
+use crate::utils::set_panic_hook;
 use sha2::{Digest, Sha256};
 
 // When the `wee_alloc` feature is enabled, use `wee_alloc` as the global

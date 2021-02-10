@@ -158,7 +158,7 @@ impl ChangePubKey {
         signature: Option<TxSignature>,
         eth_signature: Option<PackedEthSignature>,
     ) -> Self {
-        // TODO: support CREATE2
+        // TODO: support CREATE2 (ZKS-452)
         let eth_auth_data = Some(
             eth_signature
                 .map(|eth_signature| {

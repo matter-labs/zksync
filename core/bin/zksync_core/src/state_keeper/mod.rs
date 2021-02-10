@@ -94,6 +94,13 @@ impl PendingBlock {
     }
 }
 
+pub fn system_time_timestamp() -> u64 {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .expect("failed to get system time")
+        .as_secs()
+}
+
 /// Responsible for tx processing and block forming.
 pub struct ZkSyncStateKeeper {
     /// Current plasma state
@@ -138,7 +145,7 @@ impl ZkSyncStateInitParams {
         Self {
             tree: AccountTree::new(zksync_crypto::params::account_tree_depth()),
             acc_id_by_addr: HashMap::new(),
-            last_block_number: 0,
+            last_block_number: BlockNumber(0),
             unprocessed_priority_op: 0,
         }
     }
@@ -165,7 +172,7 @@ impl ZkSyncStateInitParams {
 
         // We've checked that pending block is greater than the last committed block,
         // but it must be greater exactly by 1.
-        assert_eq!(pending_block.number, self.last_block_number + 1);
+        assert_eq!(*pending_block.number, *self.last_block_number + 1);
 
         Some(pending_block)
     }
@@ -252,7 +259,7 @@ impl ZkSyncStateInitParams {
                 }
             }
         }
-        if block_number != 0 {
+        if *block_number != 0 {
             let storage_root_hash = storage
                 .chain()
                 .block_schema()
@@ -277,9 +284,9 @@ impl ZkSyncStateInitParams {
         self.unprocessed_priority_op =
             Self::unprocessed_priority_op_id(storage, block_number).await?;
 
-        log::info!(
+        vlog::info!(
             "Loaded committed state: last block number: {}, unprocessed priority op: {}",
-            self.last_block_number,
+            *self.last_block_number,
             self.unprocessed_priority_op
         );
         Ok(())
@@ -310,13 +317,13 @@ impl ZkSyncStateInitParams {
         Ok(())
     }
 
-    pub fn insert_account(&mut self, id: u32, acc: Account) {
+    pub fn insert_account(&mut self, id: AccountId, acc: Account) {
         self.acc_id_by_addr.insert(acc.address, id);
-        self.tree.insert(id, acc);
+        self.tree.insert(*id, acc);
     }
 
-    pub fn remove_account(&mut self, id: u32) -> Option<Account> {
-        if let Some(acc) = self.tree.remove(id) {
+    pub fn remove_account(&mut self, id: AccountId) -> Option<Account> {
+        if let Some(acc) = self.tree.remove(*id) {
             self.acc_id_by_addr.remove(&acc.address);
             Some(acc)
         } else {
@@ -389,10 +396,7 @@ impl ZkSyncStateKeeper {
                 initial_state.unprocessed_priority_op,
                 max_block_size,
                 previous_root_hash,
-                SystemTime::now()
-                    .duration_since(UNIX_EPOCH)
-                    .expect("failed to get system time")
-                    .as_secs(),
+                system_time_timestamp(),
             ),
             available_block_chunk_sizes,
             max_miniblock_iterations,
@@ -403,7 +407,7 @@ impl ZkSyncStateKeeper {
         };
 
         let root = keeper.state.root_hash();
-        log::info!("created state keeper, root hash = {}", root);
+        vlog::info!("created state keeper, root hash = {}", root);
 
         keeper
     }
@@ -437,7 +441,7 @@ impl ZkSyncStateKeeper {
             }
             self.pending_block.stored_account_updates = self.pending_block.account_updates.len();
 
-            log::info!(
+            vlog::info!(
                 "Executed restored proposed block: {} transactions, {} priority operations, {} failed transactions",
                 txs_count,
                 priority_op_count,
@@ -446,7 +450,7 @@ impl ZkSyncStateKeeper {
             self.pending_block.failed_txs = pending_block.failed_txs;
             self.pending_block.timestamp = pending_block.timestamp;
         } else {
-            log::info!("There is no pending block to restore");
+            vlog::info!("There is no pending block to restore");
         }
 
         metrics::histogram!("state_keeper.initialize", start.elapsed());
@@ -471,7 +475,7 @@ impl ZkSyncStateKeeper {
             .expect("db failed");
 
         assert!(
-            last_committed == 0 && accounts.is_empty(),
+            *last_committed == 0 && accounts.is_empty(),
             "db should be empty"
         );
         let fee_account = Account::default_with_address(fee_account_address);
@@ -479,17 +483,17 @@ impl ZkSyncStateKeeper {
             address: *fee_account_address,
             nonce: fee_account.nonce,
         };
-        accounts.insert(0, fee_account);
+        accounts.insert(AccountId(0), fee_account);
         transaction
             .chain()
             .state_schema()
-            .commit_state_update(0, &[(0, db_account_update)], 0)
+            .commit_state_update(BlockNumber(0), &[(AccountId(0), db_account_update)], 0)
             .await
             .expect("db fail");
         transaction
             .chain()
             .state_schema()
-            .apply_state_update(0)
+            .apply_state_update(BlockNumber(0))
             .await
             .expect("db fail");
 
@@ -506,7 +510,7 @@ impl ZkSyncStateKeeper {
             .commit()
             .await
             .expect("Unable to commit transaction in statekeeper");
-        log::info!("Genesis block created, state: {}", state.root_hash());
+        vlog::info!("Genesis block created, state: {}", state.root_hash());
         println!("CONTRACTS_GENESIS_ROOT=0x{}", ff::to_hex(&root_hash));
         metrics::histogram!("state_keeper.create_genesis_block", start.elapsed());
     }
@@ -545,6 +549,11 @@ impl ZkSyncStateKeeper {
     async fn execute_proposed_block(&mut self, proposed_block: ProposedBlock) {
         let start = Instant::now();
         let mut executed_ops = Vec::new();
+
+        // If pending block is empty we update timestamp
+        if self.pending_block.success_operations.is_empty() {
+            self.pending_block.timestamp = system_time_timestamp();
+        }
 
         // We want to store this variable before moving anything from the pending block.
         let empty_proposed_block = proposed_block.is_empty();
@@ -810,7 +819,7 @@ impl ZkSyncStateKeeper {
                     executed_operations.push(exec_result);
                 }
                 Err(e) => {
-                    log::warn!("Failed to execute transaction: {:?}, {}", tx, e);
+                    vlog::warn!("Failed to execute transaction: {:?}, {}", tx, e);
                     let failed_tx = ExecutedTx {
                         signed_tx: tx.clone(),
                         success: false,
@@ -897,7 +906,7 @@ impl ZkSyncStateKeeper {
                 exec_result
             }
             Err(e) => {
-                log::warn!("Failed to execute transaction: {:?}, {}", tx, e);
+                vlog::warn!("Failed to execute transaction: {:?}, {}", tx, e);
                 let failed_tx = ExecutedTx {
                     signed_tx: tx.clone(),
                     success: false,
@@ -928,10 +937,7 @@ impl ZkSyncStateKeeper {
                     .last()
                     .expect("failed to get max block size"),
                 H256::default(),
-                SystemTime::now()
-                    .duration_since(UNIX_EPOCH)
-                    .expect("failed to get system time")
-                    .as_secs(),
+                system_time_timestamp(),
             ),
         );
 
@@ -987,11 +993,11 @@ impl ZkSyncStateKeeper {
             first_update_order_id,
         };
         pending_block.stored_account_updates = pending_block.account_updates.len();
-        self.state.block_number += 1;
+        *self.state.block_number += 1;
 
-        log::info!(
+        vlog::info!(
             "Creating full block: {}, operations: {}, chunks_left: {}, miniblock iterations: {}",
-            block_commit_request.block.block_number,
+            *block_commit_request.block.block_number,
             block_commit_request.block.block_transactions.len(),
             pending_block.chunks_left,
             pending_block.pending_block_iteration
@@ -1045,9 +1051,9 @@ impl ZkSyncStateKeeper {
         };
         self.pending_block.stored_account_updates = self.pending_block.account_updates.len();
 
-        log::trace!(
+        vlog::debug!(
             "Persisting mini block: {}, operations: {}, failed_txs: {}, chunks_left: {}, miniblock iterations: {}",
-            pending_block.number,
+            *pending_block.number,
             pending_block.success_operations.len(),
             pending_block.failed_txs.len(),
             pending_block.chunks_left,

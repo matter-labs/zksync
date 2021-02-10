@@ -40,9 +40,9 @@ where
     let api_client = api_client_from_env();
     let prover = PROVER::create_from_config(prover_config);
 
-    env_logger::init();
+    vlog::init();
 
-    log::info!("creating prover, worker name: {}", worker_name);
+    vlog::info!("creating prover, worker name: {}", worker_name);
 
     // Create client.
 
@@ -52,12 +52,12 @@ where
     {
         let shutdown_request = shutdown_request.clone();
         ctrlc::set_handler(move || {
-            log::info!(
+            vlog::info!(
                 "Termination signal received. It will be handled after the currently working round"
             );
 
             if shutdown_request.get() {
-                log::warn!("Second shutdown request received, shutting down without waiting for round to be completed");
+                vlog::warn!("Second shutdown request received, shutting down without waiting for round to be completed");
                 std::process::exit(0);
             }
 

@@ -3,7 +3,7 @@
 //! Server uses this module to ensure that generated transactions
 //! won't run out of the gas and won't trespass the block gas limit.
 // Workspace deps
-use zksync_basic_types::U256;
+use zksync_basic_types::*;
 // Local deps
 use crate::{config::MAX_WITHDRAWALS_TO_COMPLETE_IN_A_CALL, Block, ZkSyncOp};
 
@@ -22,14 +22,14 @@ impl CommitCost {
     // These values are estimated using the `gas_price_test` in `testkit`.
 
     // TODO: overvalued for quick fix of tx fails (ZKS-109).
-    pub const BASE_COST: u64 = 300_000;
-    pub const DEPOSIT_COST: u64 = 10_397;
-    pub const CHANGE_PUBKEY_COST_OFFCHAIN: u64 = 15_866;
-    pub const CHANGE_PUBKEY_COST_ONCHAIN: u64 = 3_929;
-    pub const TRANSFER_COST: u64 = 334;
-    pub const TRANSFER_TO_NEW_COST: u64 = 862;
-    pub const FULL_EXIT_COST: u64 = 10_165;
-    pub const WITHDRAW_COST: u64 = 2_167;
+    pub const BASE_COST: u64 = 40_000;
+    pub const DEPOSIT_COST: u64 = 7_000;
+    pub const CHANGE_PUBKEY_COST_OFFCHAIN: u64 = 11_050;
+    pub const CHANGE_PUBKEY_COST_ONCHAIN: u64 = 4_000;
+    pub const TRANSFER_COST: u64 = 250;
+    pub const TRANSFER_TO_NEW_COST: u64 = 780;
+    pub const FULL_EXIT_COST: u64 = 7_000;
+    pub const WITHDRAW_COST: u64 = 3_500;
     pub const FORCED_EXIT_COST: u64 = Self::WITHDRAW_COST; // TODO: Verify value (ZKS-109).
 
     pub fn base_cost() -> U256 {
@@ -42,7 +42,6 @@ impl CommitCost {
             ZkSyncOp::Noop(_) => 0,
             ZkSyncOp::Deposit(_) => Self::DEPOSIT_COST,
             ZkSyncOp::ChangePubKeyOffchain(change_pubkey) => {
-                // TODO: determine correct cost of this tx
                 if change_pubkey.tx.is_ecdsa() {
                     Self::CHANGE_PUBKEY_COST_OFFCHAIN
                 } else {
@@ -71,13 +70,13 @@ impl VerifyCost {
     // These values are estimated using the `gas_price_test` in `testkit`.
 
     // TODO: overvalued for quick fix of tx fails (ZKS-109).
-    pub const BASE_COST: u64 = 1_000_000;
-    pub const DEPOSIT_COST: u64 = 0;
+    pub const BASE_COST: u64 = 10_000;
+    pub const DEPOSIT_COST: u64 = 50;
     pub const CHANGE_PUBKEY_COST: u64 = 0;
     pub const TRANSFER_COST: u64 = 0;
     pub const TRANSFER_TO_NEW_COST: u64 = 0;
-    pub const FULL_EXIT_COST: u64 = 2_499;
-    pub const WITHDRAW_COST: u64 = 45_668;
+    pub const FULL_EXIT_COST: u64 = 30_000;
+    pub const WITHDRAW_COST: u64 = 48_000;
     pub const FORCED_EXIT_COST: u64 = Self::WITHDRAW_COST; // TODO: Verify value (ZKS-109).
 
     pub fn base_cost() -> U256 {
@@ -147,8 +146,8 @@ impl GasCounter {
     pub const COMPLETE_WITHDRAWALS_ERC20_COST: u64 = 200_000;
 
     /// constants for gas limit calculation of aggregated operations
-    pub const BASE_COMMIT_BLOCKS_TX_COST: usize = 40_000;
-    pub const BASE_EXECUTE_BLOCKS_TX_COST: usize = 70_000;
+    pub const BASE_COMMIT_BLOCKS_TX_COST: usize = 450_000;
+    pub const BASE_EXECUTE_BLOCKS_TX_COST: usize = 450_000;
     pub const BASE_PROOF_BLOCKS_TX_COST: usize = 1_500_000;
 
     pub fn new() -> Self {
@@ -231,92 +230,92 @@ mod tests {
     fn commit_and_verify_cost() {
         let change_pubkey_op = ChangePubKeyOp {
             tx: ChangePubKey::new(
-                1,
+                AccountId(1),
                 Default::default(),
                 Default::default(),
-                0,
+                TokenId(0),
                 Default::default(),
                 Default::default(),
                 Default::default(),
                 None,
                 None,
             ),
-            account_id: 1,
+            account_id: AccountId(1),
         };
         let deposit_op = DepositOp {
             priority_op: Deposit {
                 from: Default::default(),
-                token: 0,
+                token: TokenId(0),
                 amount: Default::default(),
                 to: Default::default(),
             },
-            account_id: 1,
+            account_id: AccountId(1),
         };
         let transfer_op = TransferOp {
             tx: Transfer::new(
-                1,
+                AccountId(1),
                 Default::default(),
                 Default::default(),
-                0,
+                TokenId(0),
                 Default::default(),
                 Default::default(),
-                0,
+                Nonce(0),
                 Default::default(),
                 None,
             ),
-            from: 1,
-            to: 1,
+            from: AccountId(1),
+            to: AccountId(1),
         };
         let transfer_to_new_op = TransferToNewOp {
             tx: Transfer::new(
-                1,
+                AccountId(1),
                 Default::default(),
                 Default::default(),
-                0,
+                TokenId(0),
                 Default::default(),
                 Default::default(),
-                0,
+                Nonce(0),
                 Default::default(),
                 None,
             ),
-            from: 1,
-            to: 1,
+            from: AccountId(1),
+            to: AccountId(1),
         };
         let noop_op = NoopOp {};
         let full_exit_op = FullExitOp {
             priority_op: FullExit {
-                account_id: 0,
+                account_id: AccountId(0),
                 eth_address: Default::default(),
-                token: 0,
+                token: TokenId(0),
             },
             withdraw_amount: None,
         };
         let forced_exit_op = ForcedExitOp {
             tx: ForcedExit::new(
-                1,
+                AccountId(1),
                 Default::default(),
-                0,
+                TokenId(0),
                 Default::default(),
-                0,
+                Nonce(0),
                 Default::default(),
                 None,
             ),
-            target_account_id: 1,
+            target_account_id: AccountId(1),
             withdraw_amount: None,
         };
         let withdraw_op = WithdrawOp {
             tx: Withdraw::new(
-                1,
+                AccountId(1),
                 Default::default(),
                 Default::default(),
-                0,
+                TokenId(0),
                 Default::default(),
                 Default::default(),
-                0,
+                Nonce(0),
                 Default::default(),
                 None,
             ),
-            account_id: 1,
+            account_id: AccountId(1),
         };
 
         let test_vector_commit = vec![
@@ -376,17 +375,17 @@ mod tests {
     fn gas_counter() {
         let change_pubkey_op = ChangePubKeyOp {
             tx: ChangePubKey::new(
-                1,
+                AccountId(1),
                 Default::default(),
                 Default::default(),
-                0,
+                TokenId(0),
                 Default::default(),
                 Default::default(),
                 Default::default(),
                 None,
                 None,
             ),
-            account_id: 1,
+            account_id: AccountId(1),
         };
         let zksync_op = ZkSyncOp::from(change_pubkey_op);
 

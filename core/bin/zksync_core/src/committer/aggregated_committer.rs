@@ -1,6 +1,7 @@
 use chrono::{DateTime, Utc};
 use std::cmp::max;
 use std::time::Duration;
+use zksync_config::ZkSyncConfig;
 use zksync_crypto::proof::AggregatedProof;
 use zksync_storage::chain::block::BlockSchema;
 use zksync_storage::chain::operations::OperationsSchema;
@@ -10,7 +11,7 @@ use zksync_types::aggregated_operations::{
     AggregatedActionType, AggregatedOperation, BlocksCommitOperation, BlocksCreateProofOperation,
     BlocksExecuteOperation, BlocksProofOperation,
 };
-use zksync_types::{block::Block, gas_counter::GasCounter, U256};
+use zksync_types::{block::Block, gas_counter::GasCounter, BlockNumber, U256};
 
 fn create_new_commit_operation(
     last_committed_block: &Block,
@@ -107,7 +108,9 @@ fn create_new_create_proof_operation(
     let aggregate_proof_size = available_aggregate_proof_sizes
         .iter()
         .rev()
-        .find(|aggregate_size| *aggregate_size >= &new_blocks_with_proofs.len())
+        .find(|aggregate_size| {
+            *aggregate_size >= &std::cmp::min(new_blocks_with_proofs.len(), max_aggregate_size)
+        })
         .cloned()
         .expect("failed to find correct aggregate proof size");
 
@@ -188,13 +191,9 @@ fn create_execute_blocks_operation(
     })
 }
 
-const MAX_BLOCK_TO_COMMIT: usize = 5;
-const BLOCK_COMMIT_DEADLINE: Duration = Duration::from_secs(10);
-const MAX_GAS_TX: u64 = 2_000_000;
-const AVAILABLE_AGGREGATE_PROOFS: &[usize] = &[1, 5];
-
 async fn create_aggregated_commits_storage(
     storage: &mut StorageProcessor<'_>,
+    config: &ZkSyncConfig,
 ) -> anyhow::Result<bool> {
     let last_aggregate_committed_block = OperationsSchema(storage)
         .get_last_affected_block_by_aggregated_action(AggregatedActionType::CommitBlocks)
@@ -209,16 +208,16 @@ async fn create_aggregated_commits_storage(
 
     while let Some(block) = BlockSchema(storage).get_block(block_number).await? {
         new_blocks.push(block);
-        block_number += 1;
+        block_number.0 += 1;
     }
 
     let commit_operation = create_new_commit_operation(
         &old_committed_block,
         &new_blocks,
         Utc::now(),
-        MAX_BLOCK_TO_COMMIT,
-        BLOCK_COMMIT_DEADLINE,
-        MAX_GAS_TX.into(),
+        config.chain.state_keeper.max_aggregated_blocks_to_commit,
+        config.chain.state_keeper.block_commit_deadline(),
+        config.chain.state_keeper.max_aggregated_tx_gas.into(),
     );
 
     if let Some(commit_operation) = commit_operation {
@@ -235,6 +234,7 @@ async fn create_aggregated_commits_storage(
 
 async fn create_aggregated_prover_task_storage(
     storage: &mut StorageProcessor<'_>,
+    config: &ZkSyncConfig,
 ) -> anyhow::Result<bool> {
     let last_aggregate_committed_block = OperationsSchema(storage)
         .get_last_affected_block_by_aggregated_action(AggregatedActionType::CommitBlocks)
@@ -247,7 +247,8 @@ async fn create_aggregated_prover_task_storage(
     }
 
     let mut blocks_with_proofs = Vec::new();
-    for block_number in last_aggregate_create_proof_block + 1..=last_aggregate_committed_block {
+    for block_number in last_aggregate_create_proof_block.0 + 1..=last_aggregate_committed_block.0 {
+        let block_number = BlockNumber(block_number);
         let proof_exists = ProverSchema(storage)
             .load_proof(block_number)
             .await?
@@ -265,10 +266,10 @@ async fn create_aggregated_prover_task_storage(
 
     let create_proof_operation = create_new_create_proof_operation(
         &blocks_with_proofs,
-        AVAILABLE_AGGREGATE_PROOFS,
+        &config.chain.state_keeper.aggregated_proof_sizes,
         Utc::now(),
-        BLOCK_COMMIT_DEADLINE,
-        MAX_GAS_TX.into(),
+        config.chain.state_keeper.block_prove_deadline(),
+        config.chain.state_keeper.max_aggregated_tx_gas.into(),
     );
     if let Some(operation) = create_proof_operation {
         let aggregated_op = operation.into();
@@ -349,6 +350,7 @@ async fn create_aggregated_publish_proof_operation_storage(
 
 async fn create_aggregated_execute_operation_storage(
     storage: &mut StorageProcessor<'_>,
+    config: &ZkSyncConfig,
 ) -> anyhow::Result<bool> {
     let last_aggregate_executed_block = OperationsSchema(storage)
         .get_last_affected_block_by_aggregated_action(AggregatedActionType::ExecuteBlocks)
@@ -364,9 +366,9 @@ async fn create_aggregated_execute_operation_storage(
     }
 
     let mut blocks = Vec::new();
-    for block_number in last_aggregate_executed_block + 1..=last_aggregate_publish_proof_block {
+    for block_number in last_aggregate_executed_block.0 + 1..=last_aggregate_publish_proof_block.0 {
         let block = BlockSchema(storage)
-            .get_block(block_number)
+            .get_block(BlockNumber(block_number))
             .await?
             .expect("Failed to get block that should be committed");
         blocks.push(block);
@@ -375,9 +377,9 @@ async fn create_aggregated_execute_operation_storage(
     let execute_operation = create_execute_blocks_operation(
         &blocks,
         Utc::now(),
-        MAX_BLOCK_TO_COMMIT,
-        BLOCK_COMMIT_DEADLINE,
-        MAX_GAS_TX.into(),
+        config.chain.state_keeper.max_aggregated_blocks_to_execute,
+        config.chain.state_keeper.block_execute_deadline(),
+        config.chain.state_keeper.max_aggregated_tx_gas.into(),
     );
 
     if let Some(operation) = execute_operation {
@@ -394,18 +396,19 @@ async fn create_aggregated_execute_operation_storage(
 
 pub async fn create_aggregated_operations_storage(
     storage: &mut StorageProcessor<'_>,
+    config: &ZkSyncConfig,
 ) -> anyhow::Result<()> {
-    while create_aggregated_commits_storage(storage).await? {}
-    while create_aggregated_prover_task_storage(storage).await? {}
+    while create_aggregated_commits_storage(storage, config).await? {}
+    while create_aggregated_prover_task_storage(storage, config).await? {}
     while create_aggregated_publish_proof_operation_storage(storage).await? {}
-    while create_aggregated_execute_operation_storage(storage).await? {}
+    while create_aggregated_execute_operation_storage(storage, config).await? {}
 
     Ok(())
 }
 
 fn log_aggregated_op_creation(aggregated_op: &AggregatedOperation) {
     let (first, last) = aggregated_op.get_block_range();
-    log::info!(
+    vlog::info!(
         "Created aggregated operation: {}, blocks: [{},{}]",
         aggregated_op.get_action_type().to_string(),
         first,

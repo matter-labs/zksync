@@ -1,7 +1,7 @@
 use super::{AccountState::*, PlasmaTestBuilder};
 use crate::state::CollectedFee;
 use num::{BigUint, Zero};
-use zksync_types::account::AccountUpdate;
+use zksync_types::{account::AccountUpdate, AccountId, TokenId};
 
 /// Checks if fees are collected correctly.
 /// Fees are not only in ETH and may be zero.
@@ -9,7 +9,7 @@ use zksync_types::account::AccountUpdate;
 fn success() {
     let mut tb = PlasmaTestBuilder::new();
     let (account_id, account, _) = tb.add_account(Locked);
-    tb.set_balance(account_id, 0, 145u32);
+    tb.set_balance(account_id, TokenId(0), 145u32);
 
     let nonce = account.nonce;
     let mut state_clone = tb.state.clone();
@@ -17,15 +17,15 @@ fn success() {
     let actual_updates = tb.state.collect_fee(
         &[
             CollectedFee {
-                token: 0,
+                token: TokenId(0),
                 amount: BigUint::from(145u32),
             },
             CollectedFee {
-                token: 1,
+                token: TokenId(1),
                 amount: BigUint::from(0u32),
             },
             CollectedFee {
-                token: 2,
+                token: TokenId(2),
                 amount: BigUint::from(123456u32),
             },
         ],
@@ -38,7 +38,7 @@ fn success() {
             AccountUpdate::UpdateBalance {
                 old_nonce: nonce,
                 new_nonce: nonce,
-                balance_update: (0, BigUint::from(145u32), BigUint::from(290u32)),
+                balance_update: (TokenId(0), BigUint::from(145u32), BigUint::from(290u32)),
             },
         ),
         (
@@ -46,7 +46,7 @@ fn success() {
             AccountUpdate::UpdateBalance {
                 old_nonce: nonce,
                 new_nonce: nonce,
-                balance_update: (2, BigUint::zero(), BigUint::from(123456u32)),
+                balance_update: (TokenId(2), BigUint::zero(), BigUint::from(123456u32)),
             },
         ),
     ];
@@ -59,5 +59,5 @@ fn success() {
 #[should_panic(expected = "Fee account should be present in the account tree: 145")]
 fn invalid_account() {
     let mut tb = PlasmaTestBuilder::new();
-    tb.state.collect_fee(&[], 145);
+    tb.state.collect_fee(&[], AccountId(145));
 }

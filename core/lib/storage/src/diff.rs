@@ -5,7 +5,7 @@ use num::bigint::ToBigInt;
 use zksync_basic_types::Address;
 // Workspace imports
 use zksync_types::PubKeyHash;
-use zksync_types::{AccountUpdate, TokenId};
+use zksync_types::{AccountId, AccountUpdate, Nonce, TokenId};
 // Local imports
 use crate::chain::account::records::*;
 
@@ -48,8 +48,8 @@ impl From<StorageAccountPubkeyUpdate> for StorageAccountDiff {
     }
 }
 
-impl Into<(u32, AccountUpdate)> for StorageAccountDiff {
-    fn into(self) -> (u32, AccountUpdate) {
+impl Into<(AccountId, AccountUpdate)> for StorageAccountDiff {
+    fn into(self) -> (AccountId, AccountUpdate) {
         match self {
             StorageAccountDiff::BalanceUpdate(upd) => {
                 let old_balance = upd.old_balance.to_bigint().unwrap();
@@ -59,33 +59,33 @@ impl Into<(u32, AccountUpdate)> for StorageAccountDiff {
                 let new_balance = new_balance.to_biguint().unwrap();
 
                 (
-                    upd.account_id as u32,
+                    AccountId(upd.account_id as u32),
                     AccountUpdate::UpdateBalance {
-                        old_nonce: upd.old_nonce as u32,
-                        new_nonce: upd.new_nonce as u32,
-                        balance_update: (upd.coin_id as TokenId, old_balance, new_balance),
+                        old_nonce: Nonce(upd.old_nonce as u32),
+                        new_nonce: Nonce(upd.new_nonce as u32),
+                        balance_update: (TokenId(upd.coin_id as u16), old_balance, new_balance),
                     },
                 )
             }
             StorageAccountDiff::Create(upd) => (
-                upd.account_id as u32,
+                AccountId(upd.account_id as u32),
                 AccountUpdate::Create {
-                    nonce: upd.nonce as u32,
+                    nonce: Nonce(upd.nonce as u32),
                     address: Address::from_slice(&upd.address.as_slice()),
                 },
             ),
             StorageAccountDiff::Delete(upd) => (
-                upd.account_id as u32,
+                AccountId(upd.account_id as u32),
                 AccountUpdate::Delete {
-                    nonce: upd.nonce as u32,
+                    nonce: Nonce(upd.nonce as u32),
                     address: Address::from_slice(&upd.address.as_slice()),
                 },
             ),
             StorageAccountDiff::ChangePubKey(upd) => (
-                upd.account_id as u32,
+                AccountId(upd.account_id as u32),
                 AccountUpdate::ChangePubKeyHash {
-                    old_nonce: upd.old_nonce as u32,
-                    new_nonce: upd.new_nonce as u32,
+                    old_nonce: Nonce(upd.old_nonce as u32),
+                    new_nonce: Nonce(upd.new_nonce as u32),
                     old_pub_key_hash: PubKeyHash::from_bytes(&upd.old_pubkey_hash)
                         .expect("PubkeyHash update from db deserialize"),
                     new_pub_key_hash: PubKeyHash::from_bytes(&upd.new_pubkey_hash)

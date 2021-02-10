@@ -7,6 +7,7 @@ use serde::{Deserialize, Serialize};
 use tokio::{task::JoinHandle, time};
 // Workspace uses
 use crate::mempool::MempoolBlocksRequest;
+use zksync_config::ZkSyncConfig;
 use zksync_storage::ConnectionPool;
 use zksync_types::{
     block::{Block, ExecutedOperations, PendingBlock},
@@ -89,7 +90,7 @@ async fn save_pending_block(
 
     let block_number = pending_block.number;
 
-    log::trace!("persist pending block #{}", block_number);
+    vlog::trace!("persist pending block #{}", block_number);
 
     transaction
         .chain()
@@ -148,7 +149,7 @@ async fn commit_block(
         .count();
     metrics::histogram!(
         "committer.priority_ops_per_block",
-        total_priority_ops as f64
+        total_priority_ops as u64
     );
 
     transaction
@@ -162,7 +163,7 @@ async fn commit_block(
         .await
         .expect("committer must commit the pending block into db");
 
-    log::info!("commit block #{}", block.block_number);
+    vlog::info!("commit block #{}", block.block_number);
 
     transaction
         .chain()
@@ -174,7 +175,7 @@ async fn commit_block(
     mempool_req_sender
         .send(MempoolBlocksRequest::UpdateNonces(accounts_updated))
         .await
-        .map_err(|e| log::warn!("Failed notify mempool about account updates: {}", e))
+        .map_err(|e| vlog::warn!("Failed notify mempool about account updates: {}", e))
         .unwrap_or_default();
 
     transaction
@@ -185,7 +186,7 @@ async fn commit_block(
     metrics::histogram!("committer.commit_block", start.elapsed());
 }
 
-async fn poll_for_new_proofs_task(pool: ConnectionPool) {
+async fn poll_for_new_proofs_task(pool: ConnectionPool, config: ZkSyncConfig) {
     let mut timer = time::interval(PROOF_POLL_INTERVAL);
     loop {
         timer.tick().await;
@@ -195,9 +196,9 @@ async fn poll_for_new_proofs_task(pool: ConnectionPool) {
             .await
             .expect("db connection failed for committer");
 
-        aggregated_committer::create_aggregated_operations_storage(&mut storage)
+        aggregated_committer::create_aggregated_operations_storage(&mut storage, &config)
             .await
-            .map_err(|e| log::error!("Failed to create aggregated operation: {}", e))
+            .map_err(|e| vlog::error!("Failed to create aggregated operation: {}", e))
             .unwrap_or_default();
     }
 }
@@ -207,11 +208,12 @@ pub fn run_committer(
     rx_for_ops: Receiver<CommitRequest>,
     mempool_req_sender: Sender<MempoolBlocksRequest>,
     pool: ConnectionPool,
+    config: &ZkSyncConfig,
 ) -> JoinHandle<()> {
     tokio::spawn(handle_new_commit_task(
         rx_for_ops,
         mempool_req_sender,
         pool.clone(),
     ));
-    tokio::spawn(poll_for_new_proofs_task(pool))
+    tokio::spawn(poll_for_new_proofs_task(pool, config.clone()))
 }

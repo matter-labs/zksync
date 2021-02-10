@@ -67,6 +67,7 @@ pub fn api_scope(pool: ConnectionPool) -> Scope {
 #[cfg(test)]
 mod tests {
     use super::{super::test_utils::TestServerConfig, *};
+    use zksync_types::BlockNumber;
 
     #[actix_rt::test]
     #[cfg_attr(
@@ -81,7 +82,7 @@ mod tests {
 
         // Search for the existing block by number.
         let block_info = client
-            .search_block(1)
+            .search_block(BlockNumber(1))
             .await?
             .expect("block should be exist");
         // Search for the existing block by root hash.

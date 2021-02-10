@@ -1,28 +1,29 @@
 //! Mocking utilities for tests.
 
 // Built-in deps
-use std::collections::{HashMap, VecDeque};
+use std::collections::VecDeque;
 use std::convert::TryFrom;
 // External uses
 use tokio::sync::RwLock;
-use web3::contract::{tokens::Tokenize, Options};
-use zksync_basic_types::{H256, U256};
+use web3::contract::Options;
+use zksync_basic_types::{BlockNumber, H256, U256};
 // Workspace uses
 use zksync_config::configs::eth_sender::{ETHSenderConfig, GasLimit, Sender};
-use zksync_eth_client::SignedCallResult;
+use zksync_eth_client::EthereumGateway;
 use zksync_storage::{ethereum::records::ETHParams, StorageProcessor};
 use zksync_types::aggregated_operations::{AggregatedActionType, AggregatedOperation};
 use zksync_types::ethereum::{ETHOperation, EthOpId, InsertedOperationResponse};
 // Local uses
 use super::ETHSender;
 use crate::database::DatabaseInterface;
-use crate::ethereum_interface::{EthereumInterface, FailureInfo};
-use crate::transactions::{ETHStats, ExecutedTxStatus};
+use crate::transactions::ETHStats;
+use zksync_eth_client::clients::mock::MockEthereum;
 
 /// Mock database is capable of recording all the incoming requests for the further analysis.
 #[derive(Debug)]
 pub(in crate) struct MockDatabase {
     eth_operations: RwLock<Vec<ETHOperation>>,
+    aggregated_operations: RwLock<Vec<(i64, AggregatedOperation)>>,
     unprocessed_operations: RwLock<Vec<(i64, AggregatedOperation)>>,
     eth_parameters: RwLock<ETHParams>,
 }
@@ -31,12 +32,15 @@ impl MockDatabase {
     /// Creates a database with emulation of previously stored uncommitted requests.
     pub fn with_restorable_state(
         eth_operations: Vec<ETHOperation>,
+        aggregated_operations: Vec<(i64, AggregatedOperation)>,
+        unprocessed_operations: Vec<(i64, AggregatedOperation)>,
         eth_parameters: ETHParams,
     ) -> Self {
         Self {
             eth_operations: RwLock::new(eth_operations),
+            aggregated_operations: RwLock::new(aggregated_operations),
+            unprocessed_operations: RwLock::new(unprocessed_operations),
             eth_parameters: RwLock::new(eth_parameters),
-            unprocessed_operations: RwLock::new(Vec::new()),
         }
     }
 
@@ -53,6 +57,10 @@ impl MockDatabase {
         aggregated_operation: (i64, AggregatedOperation),
     ) -> anyhow::Result<()> {
         self.unprocessed_operations
+            .write()
+            .await
+            .push(aggregated_operation.clone());
+        self.aggregated_operations
             .write()
             .await
             .push(aggregated_operation);
@@ -135,6 +143,33 @@ impl DatabaseInterface for MockDatabase {
             i64::try_from(gas_price_limit).expect("Can't convert U256 to i64");
         eth_parameters.average_gas_price =
             Some(i64::try_from(average_gas_price).expect("Can't convert U256 to i64"));
+
+        Ok(())
+    }
+
+    async fn restore_unprocessed_operations(
+        &self,
+        _connection: &mut StorageProcessor<'_>,
+    ) -> anyhow::Result<()> {
+        let aggregated_operations = self.aggregated_operations.read().await;
+        let eth_operations = self.eth_operations.read().await;
+        let mut unprocessed_operations = self.unprocessed_operations.write().await;
+
+        let mut new_unprocessed_operations = Vec::new();
+
+        for operation in aggregated_operations.iter() {
+            let is_operation_in_queue = unprocessed_operations
+                .iter()
+                .any(|unprocessed_operation| unprocessed_operation.0 == operation.0);
+            let is_operation_send_to_ethereum = eth_operations
+                .iter()
+                .any(|ethereum_operation| ethereum_operation.op.as_ref().unwrap().0 == operation.0);
+            if !is_operation_in_queue && !is_operation_send_to_ethereum {
+                new_unprocessed_operations.push(operation.clone());
+            }
+        }
+
+        unprocessed_operations.extend(new_unprocessed_operations);
 
         Ok(())
     }
@@ -290,7 +325,7 @@ impl DatabaseInterface for MockDatabase {
             let op = op.op.as_ref().unwrap();
             // We're checking previous block, so for the edge case of first block we can say that previous operation was confirmed.
             let (first_block, _) = op.1.get_block_range();
-            if first_block == 1 {
+            if first_block == BlockNumber(1) {
                 return Ok(true);
             }
 
@@ -315,135 +350,6 @@ impl DatabaseInterface for MockDatabase {
     }
 }
 
-/// Mock Ethereum client is capable of recording all the incoming requests for the further analysis.
-#[derive(Debug)]
-pub(in crate) struct MockEthereum {
-    pub block_number: u64,
-    pub gas_price: U256,
-    pub tx_statuses: RwLock<HashMap<H256, ExecutedTxStatus>>,
-    pub sent_txs: RwLock<HashMap<H256, SignedCallResult>>,
-}
-
-impl Default for MockEthereum {
-    fn default() -> Self {
-        Self {
-            block_number: 1,
-            gas_price: 100.into(),
-            tx_statuses: Default::default(),
-            sent_txs: Default::default(),
-        }
-    }
-}
-
-impl MockEthereum {
-    /// A fake `sha256` hasher, which calculates an `std::hash` instead.
-    /// This is done for simplicity and it's also much faster.
-    pub fn fake_sha256(data: &[u8]) -> H256 {
-        use std::collections::hash_map::DefaultHasher;
-        use std::hash::Hasher;
-
-        let mut hasher = DefaultHasher::new();
-        hasher.write(data);
-
-        let result = hasher.finish();
-
-        H256::from_low_u64_ne(result)
-    }
-
-    /// Checks that there was a request to send the provided transaction.
-    pub async fn assert_sent(&self, hash: &H256) {
-        assert!(
-            self.sent_txs.read().await.get(hash).is_some(),
-            format!("Transaction with hash {:?} was not sent", hash),
-        );
-    }
-
-    /// Adds an response for the sent transaction for `ETHSender` to receive.
-    pub async fn add_execution(&mut self, hash: &H256, status: &ExecutedTxStatus) {
-        self.tx_statuses.write().await.insert(*hash, status.clone());
-    }
-
-    /// Increments the blocks by a provided `confirmations` and marks the sent transaction
-    /// as a success.
-    pub async fn add_successfull_execution(&mut self, tx_hash: H256, confirmations: u64) {
-        self.block_number += confirmations;
-
-        let status = ExecutedTxStatus {
-            confirmations,
-            success: true,
-            receipt: None,
-        };
-        self.tx_statuses.write().await.insert(tx_hash, status);
-    }
-
-    /// Same as `add_successfull_execution`, but marks the transaction as a failure.
-    pub async fn add_failed_execution(&mut self, hash: &H256, confirmations: u64) {
-        self.block_number += confirmations;
-
-        let status = ExecutedTxStatus {
-            confirmations,
-            success: false,
-            receipt: Some(Default::default()),
-        };
-        self.tx_statuses.write().await.insert(*hash, status);
-    }
-}
-
-#[async_trait::async_trait]
-impl EthereumInterface for MockEthereum {
-    async fn get_tx_status(&self, hash: &H256) -> anyhow::Result<Option<ExecutedTxStatus>> {
-        Ok(self.tx_statuses.read().await.get(hash).cloned())
-    }
-
-    async fn block_number(&self) -> anyhow::Result<u64> {
-        Ok(self.block_number)
-    }
-
-    async fn gas_price(&self) -> anyhow::Result<U256> {
-        Ok(self.gas_price)
-    }
-
-    async fn send_tx(&self, signed_tx: &SignedCallResult) -> anyhow::Result<()> {
-        self.sent_txs
-            .write()
-            .await
-            .insert(signed_tx.hash, signed_tx.clone());
-
-        Ok(())
-    }
-
-    fn encode_tx_data<P: Tokenize>(&self, _func: &str, params: P) -> Vec<u8> {
-        ethabi::encode(params.into_tokens().as_ref())
-    }
-
-    async fn sign_prepared_tx(
-        &self,
-        raw_tx: Vec<u8>,
-        options: Options,
-    ) -> anyhow::Result<SignedCallResult> {
-        let gas_price = options.gas_price.unwrap_or(self.gas_price);
-        let nonce = options.nonce.expect("Nonce must be set for every tx");
-
-        // Nonce and gas_price are appended to distinguish the same transactions
-        // with different gas by their hash in tests.
-        let mut data_for_hash = raw_tx.clone();
-        data_for_hash.append(&mut ethabi::encode(gas_price.into_tokens().as_ref()));
-        data_for_hash.append(&mut ethabi::encode(nonce.into_tokens().as_ref()));
-        let hash = Self::fake_sha256(data_for_hash.as_ref()); // Okay for test purposes.
-
-        Ok(SignedCallResult {
-            raw_tx,
-            gas_price,
-            nonce,
-            hash,
-        })
-    }
-
-    async fn failure_reason(&self, _tx_hash: H256) -> Option<FailureInfo> {
-        None
-    }
-}
-
 /// Creates a default `ETHParams` for use by mock `ETHSender` .
 pub(in crate) fn default_eth_parameters() -> ETHParams {
     ETHParams {
@@ -459,38 +365,66 @@ pub(in crate) fn default_eth_parameters() -> ETHParams {
 
 /// Creates a default `ETHSender` with mock Ethereum connection/database and no operations in DB.
 /// Returns the `ETHSender` itself along with communication channels to interact with it.
-pub(in crate) async fn default_eth_sender() -> ETHSender<MockEthereum, MockDatabase> {
-    build_eth_sender(1, Vec::new(), default_eth_parameters()).await
+pub(in crate) async fn default_eth_sender() -> ETHSender<MockDatabase> {
+    build_eth_sender(
+        1,
+        Vec::new(),
+        Vec::new(),
+        Vec::new(),
+        default_eth_parameters(),
+    )
+    .await
 }
 
 /// Creates an `ETHSender` with mock Ethereum connection/database and no operations in DB
 /// which supports multiple transactions in flight.
 /// Returns the `ETHSender` itself along with communication channels to interact with it.
-pub(in crate) async fn concurrent_eth_sender(
-    max_txs_in_flight: u64,
-) -> ETHSender<MockEthereum, MockDatabase> {
-    build_eth_sender(max_txs_in_flight, Vec::new(), default_eth_parameters()).await
+pub(in crate) async fn concurrent_eth_sender(max_txs_in_flight: u64) -> ETHSender<MockDatabase> {
+    build_eth_sender(
+        max_txs_in_flight,
+        Vec::new(),
+        Vec::new(),
+        Vec::new(),
+        default_eth_parameters(),
+    )
+    .await
 }
 
 /// Creates an `ETHSender` with mock Ethereum connection/database and restores its state "from DB".
 /// Returns the `ETHSender` itself along with communication channels to interact with it.
 pub(in crate) async fn restored_eth_sender(
     eth_operations: Vec<ETHOperation>,
+    aggregated_operations: Vec<(i64, AggregatedOperation)>,
+    unprocessed_operations: Vec<(i64, AggregatedOperation)>,
     eth_parameters: ETHParams,
-) -> ETHSender<MockEthereum, MockDatabase> {
+) -> ETHSender<MockDatabase> {
     const MAX_TXS_IN_FLIGHT: u64 = 1;
 
-    build_eth_sender(MAX_TXS_IN_FLIGHT, eth_operations, eth_parameters).await
+    build_eth_sender(
+        MAX_TXS_IN_FLIGHT,
+        eth_operations,
+        aggregated_operations,
+        unprocessed_operations,
+        eth_parameters,
+    )
+    .await
 }
 
 /// Helper method for configurable creation of `ETHSender`.
 async fn build_eth_sender(
     max_txs_in_flight: u64,
     eth_operations: Vec<ETHOperation>,
+    aggregated_operations: Vec<(i64, AggregatedOperation)>,
+    unprocessed_operations: Vec<(i64, AggregatedOperation)>,
     eth_parameters: ETHParams,
-) -> ETHSender<MockEthereum, MockDatabase> {
-    let ethereum = MockEthereum::default();
-    let db = MockDatabase::with_restorable_state(eth_operations, eth_parameters);
+) -> ETHSender<MockDatabase> {
+    let ethereum = EthereumGateway::Mock(MockEthereum::default());
+    let db = MockDatabase::with_restorable_state(
+        eth_operations,
+        aggregated_operations,
+        unprocessed_operations,
+        eth_parameters,
+    );
 
     let options = ETHSenderConfig {
         sender: Sender {
@@ -518,7 +452,7 @@ async fn build_eth_sender(
 /// the internal `ETHSender` state.
 pub(in crate) async fn create_signed_tx(
     id: i64,
-    eth_sender: &ETHSender<MockEthereum, MockDatabase>,
+    eth_sender: &ETHSender<MockDatabase>,
     aggregated_operation: (i64, AggregatedOperation),
     deadline_block: u64,
     nonce: i64,

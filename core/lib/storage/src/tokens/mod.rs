@@ -2,6 +2,7 @@
 use std::collections::HashMap;
 use std::time::Instant;
 // External imports
+use num::{rational::Ratio, BigUint};
 // Workspace imports
 use zksync_types::{Token, TokenId, TokenLike, TokenPrice};
 use zksync_utils::ratio_to_big_decimal;
@@ -33,7 +34,7 @@ impl<'a, 'c> TokensSchema<'a, 'c> {
             DO
               UPDATE SET address = $2, symbol = $3, decimals = $4
             "#,
-            i32::from(token.id),
+            i32::from(*token.id),
             address_to_stored_string(&token.address),
             token.symbol,
             i16::from(token.decimals),
@@ -72,6 +73,40 @@ impl<'a, 'c> TokensSchema<'a, 'c> {
         result
     }
 
+    /// Loads all the stored tokens, which have market_volume (ticker_market_volume table)
+    /// not less than parameter (min_market_volume)
+    pub async fn load_tokens_by_market_volume(
+        &mut self,
+        min_market_volume: Ratio<BigUint>,
+    ) -> QueryResult<HashMap<TokenId, Token>> {
+        let start = Instant::now();
+        let tokens = sqlx::query_as!(
+            DbToken,
+            r#"
+            SELECT id, address, symbol, decimals
+            FROM tokens
+            INNER JOIN ticker_market_volume
+            ON tokens.id = ticker_market_volume.token_id
+            WHERE ticker_market_volume.market_volume >= $1
+            ORDER BY id ASC
+            "#,
+            ratio_to_big_decimal(&min_market_volume, STORED_USD_PRICE_PRECISION)
+        )
+        .fetch_all(self.0.conn())
+        .await?;
+
+        let result = Ok(tokens
+            .into_iter()
+            .map(|t| {
+                let token: Token = t.into();
+                (token.id, token)
+            })
+            .collect());
+
+        metrics::histogram!("sql.token.load_tokens_by_market_volume", start.elapsed());
+        result
+    }
+
     /// Get the number of tokens from Database
     pub async fn get_count(&mut self) -> QueryResult<i64> {
         let start = Instant::now();
@@ -100,7 +135,7 @@ impl<'a, 'c> TokensSchema<'a, 'c> {
                     WHERE id = $1
                     LIMIT 1
                     "#,
-                    i32::from(token_id)
+                    i32::from(*token_id)
                 )
                 .fetch_optional(self.0.conn())
                 .await?
@@ -149,7 +184,7 @@ impl<'a, 'c> TokensSchema<'a, 'c> {
             WHERE token_id = $1
             LIMIT 1
             "#,
-            i32::from(token_id)
+            i32::from(*token_id)
         )
         .fetch_optional(self.0.conn())
         .await?;
@@ -174,7 +209,7 @@ impl<'a, 'c> TokensSchema<'a, 'c> {
             DO
               UPDATE SET market_volume = $2, last_updated = $3
             "#,
-            i32::from(token_id),
+            i32::from(*token_id),
             market_volume_rounded.clone(),
             market_volume.last_updated
         )
@@ -197,7 +232,7 @@ impl<'a, 'c> TokensSchema<'a, 'c> {
             WHERE token_id = $1
             LIMIT 1
             "#,
-            i32::from(token_id)
+            i32::from(*token_id)
         )
         .fetch_optional(self.0.conn())
         .await?;
@@ -225,7 +260,7 @@ impl<'a, 'c> TokensSchema<'a, 'c> {
             DO
               UPDATE SET usd_price = $2, last_updated = $3
             "#,
-            i32::from(token_id),
+            i32::from(*token_id),
             usd_price_rounded.clone(),
             price.last_updated
         )

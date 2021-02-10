@@ -19,7 +19,7 @@ use zksync_storage::{
     },
     ConnectionPool, StorageProcessor,
 };
-use zksync_types::{block::ExecutedOperations, PriorityOp, H160, H256};
+use zksync_types::{block::ExecutedOperations, BlockNumber, PriorityOp, H160, H256};
 
 /// `ApiV01` structure contains the implementation of `/api/v0.1` endpoints set.
 /// It is considered (somewhat) stable and will be supported for a while.
@@ -66,6 +66,10 @@ impl ApiV01 {
             .route("/testnet_config", web::get().to(Self::testnet_config))
             .route("/status", web::get().to(Self::status))
             .route("/tokens", web::get().to(Self::tokens))
+            .route(
+                "/tokens_acceptable_for_fees",
+                web::get().to(Self::tokens_acceptable_for_fees),
+            )
             .route(
                 "/account/{address}/history/{offset}/{limit}",
                 web::get().to(Self::tx_history),
@@ -184,7 +188,7 @@ impl ApiV01 {
 
     pub async fn get_block_executed_ops(
         &self,
-        block_id: u32,
+        block_id: BlockNumber,
     ) -> Result<Vec<ExecutedOperations>, actix_web::error::Error> {
         if let Some(executed_ops) = self.caches.block_executed_ops.get(&block_id) {
             return Ok(executed_ops);
@@ -198,7 +202,7 @@ impl ApiV01 {
             .get_block_executed_ops(block_id)
             .await
             .map_err(|err| {
-                vlog::warn!("Internal Server Error: '{}'; input: {}", err, block_id);
+                vlog::warn!("Internal Server Error: '{}'; input: {}", err, *block_id);
                 HttpResponse::InternalServerError().finish()
             })?;
 
@@ -212,7 +216,7 @@ impl ApiV01 {
             if !block_details.is_empty() && block_verified(&block_details[0]) {
                 self.caches
                     .block_executed_ops
-                    .insert(block_id, executed_ops.clone());
+                    .insert(*block_id, executed_ops.clone());
             }
         }
         transaction.commit().await.unwrap_or_default();
@@ -222,7 +226,7 @@ impl ApiV01 {
 
     pub async fn get_block_info(
         &self,
-        block_id: u32,
+        block_id: BlockNumber,
     ) -> Result<Option<BlockDetails>, actix_web::error::Error> {
         if let Some(block) = self.caches.blocks_info.get(&block_id) {
             return Ok(Some(block));
@@ -235,17 +239,15 @@ impl ApiV01 {
             .load_block_range(block_id, 1)
             .await
             .map_err(|err| {
-                vlog::warn!("Internal Server Error: '{}'; input: {}", err, block_id);
+                vlog::warn!("Internal Server Error: '{}'; input: {}", err, *block_id);
                 HttpResponse::InternalServerError().finish()
             })?;
 
         if !blocks.is_empty()
             && block_verified(&blocks[0])
-            && blocks[0].block_number == block_id as i64
+            && blocks[0].block_number == *block_id as i64
         {
-            self.caches
-                .blocks_info
-                .insert(block_id as u32, blocks[0].clone());
+            self.caches.blocks_info.insert(*block_id, blocks[0].clone());
         }
 
         Ok(blocks.pop())

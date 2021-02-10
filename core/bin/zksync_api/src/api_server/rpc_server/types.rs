@@ -8,7 +8,7 @@ use serde::{Deserialize, Serialize};
 // Workspace uses
 use zksync_storage::StorageProcessor;
 use zksync_types::{
-    tx::TxEthSignature, Account, AccountId, Address, Nonce, PriorityOp, PubKeyHash,
+    tx::TxEthSignature, Account, AccountId, Address, Nonce, PriorityOp, PubKeyHash, TokenId,
     ZkSyncPriorityOp, ZkSyncTx,
 };
 use zksync_utils::{BigUintSerdeAsRadix10Str, BigUintSerdeWrapper};
@@ -45,7 +45,12 @@ impl ResponseAccountState {
 
         // Old code used `HashMap` as well and didn't rely on the particular order,
         // so here we use `HashMap` as well for the consistency.
-        let balances: HashMap<_, _> = inner.balances.into_iter().collect();
+        let mut balances: HashMap<_, _> = inner.balances.into_iter().collect();
+
+        // TODO: Remove this code after Golem update [ZKS-173]
+        if let Some(balance) = balances.get("GNT").cloned() {
+            balances.insert("tGLM".to_string(), balance);
+        }
 
         Ok(Self {
             balances,
@@ -85,7 +90,7 @@ impl DepositingAccountBalances {
         let mut balances = HashMap::new();
 
         for op in pending_ops.deposits {
-            let token_symbol = if op.token_id == 0 {
+            let token_symbol = if *op.token_id == 0 {
                 "ETH".to_string()
             } else {
                 tokens
@@ -98,6 +103,15 @@ impl DepositingAccountBalances {
 
             let expected_accept_block =
                 op.received_on_block + pending_ops.confirmations_for_eth_event;
+
+            // TODO: Remove this code after Golem update [ZKS-173]
+            if token_symbol == "GNT" {
+                let balance = balances
+                    .entry("tGLM".to_string())
+                    .or_insert_with(DepositingFunds::default);
+
+                balance.amount += BigUint::from(op.amount);
+            }
 
             let balance = balances
                 .entry(token_symbol)
@@ -163,7 +177,7 @@ pub struct ContractAddressResp {
 #[serde(rename_all = "camelCase")]
 pub struct OngoingDeposit {
     pub received_on_block: u64,
-    pub token_id: u16,
+    pub token_id: TokenId,
     pub amount: u128,
     pub eth_tx_hash: String,
 }

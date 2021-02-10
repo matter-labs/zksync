@@ -7,9 +7,12 @@ use zksync_prover_utils::fs_utils::{
 };
 
 pub fn make_recursive_verification_keys(config: ChainConfig) {
-    for (proofs, setup_power) in config.circuit.aggregated_proof_sizes_with_setup_pow() {
+    for (proofs, setup_power) in config
+        .circuit
+        .supported_aggregated_proof_sizes_with_setup_pow()
+    {
         let path = get_recursive_verification_key_path(proofs);
-        log::info!(
+        vlog::info!(
             "Generating recursive verification key for {} proofs into: {}",
             proofs,
             path.display()
@@ -52,7 +55,7 @@ pub fn count_gates_recursive_verification_keys() {
         if new_setup_power <= setup_power {
             proofs = new_proofs;
         } else {
-            log::info!("setup_size_log2: {}, proofs: {}", setup_power, proofs);
+            vlog::info!("setup_size_log2: {}, proofs: {}", setup_power, proofs);
             proofs *= 2;
             let new_setup_power = get_setup_size(proofs);
             assert_eq!(setup_power + 1, new_setup_power);

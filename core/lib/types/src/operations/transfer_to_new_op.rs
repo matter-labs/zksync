@@ -1,11 +1,10 @@
-use crate::AccountId;
 use crate::{
     helpers::{pack_fee_amount, pack_token_amount, unpack_fee_amount, unpack_token_amount},
     Transfer,
 };
+use crate::{AccountId, Address, Nonce, TokenId};
 use anyhow::{ensure, format_err};
 use serde::{Deserialize, Serialize};
-use zksync_basic_types::Address;
 use zksync_crypto::params::{
     ACCOUNT_ID_BIT_WIDTH, AMOUNT_EXPONENT_BIT_WIDTH, AMOUNT_MANTISSA_BIT_WIDTH, CHUNK_BYTES,
     FEE_EXPONENT_BIT_WIDTH, FEE_MANTISSA_BIT_WIDTH, FR_ADDRESS_LEN, TOKEN_BIT_WIDTH,
@@ -73,10 +72,18 @@ impl TransferToNewOp {
 
         Ok(Self {
             tx: Transfer::new(
-                from_id, from, to, token, amount, fee, nonce, time_range, None,
+                AccountId(from_id),
+                from,
+                to,
+                TokenId(token),
+                amount,
+                fee,
+                Nonce(nonce),
+                time_range,
+                None,
             ),
-            from: from_id,
-            to: to_id,
+            from: AccountId(from_id),
+            to: AccountId(to_id),
         })
     }
 

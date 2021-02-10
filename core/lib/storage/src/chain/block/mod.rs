@@ -38,7 +38,7 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
     /// Given a block, stores its transactions in the database.
     pub async fn save_block_transactions(
         &mut self,
-        block_number: u32,
+        block_number: BlockNumber,
         operations: Vec<ExecutedOperations>,
     ) -> QueryResult<()> {
         let start = Instant::now();
@@ -71,7 +71,7 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
         let block = sqlx::query_as!(
             StorageBlock,
             "SELECT * FROM blocks WHERE number = $1",
-            i64::from(block)
+            i64::from(*block)
         )
         .fetch_optional(self.0.conn())
         .await?;
@@ -104,7 +104,7 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
         let result = Some(Block::new(
             block,
             new_root_hash,
-            stored_block.fee_account_id as AccountId,
+            AccountId(stored_block.fee_account_id as u32),
             block_transactions,
             (
                 stored_block.unprocessed_prior_op_before as u64,
@@ -182,7 +182,7 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
                 FROM everything
                 ORDER BY created_at DESC
             "#,
-            i64::from(block)
+            i64::from(*block)
         )
         .fetch_all(self.0.conn())
         .await?;
@@ -205,7 +205,7 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
             let executed_ops = sqlx::query_as!(
                 StoredExecutedTransaction,
                 "SELECT * FROM executed_transactions WHERE block_number = $1",
-                i64::from(block)
+                i64::from(*block)
             )
             .fetch_all(self.0.conn())
             .await?;
@@ -213,7 +213,7 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
             let executed_priority_ops = sqlx::query_as!(
                 StoredExecutedPriorityOperation,
                 "SELECT * FROM executed_priority_operations WHERE block_number = $1",
-                i64::from(block)
+                i64::from(*block)
             )
             .fetch_all(self.0.conn())
             .await?;
@@ -271,38 +271,45 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
         let details = sqlx::query_as!(
             BlockDetails,
             r#"
-            WITH eth_ops AS (
-                SELECT DISTINCT ON (to_block, action_type)
-                    aggregate_operations.from_block,
-                    aggregate_operations.to_block,
-                    eth_tx_hashes.tx_hash,
-                    aggregate_operations.action_type,
-                    aggregate_operations.created_at,
-                    aggregate_operations.confirmed
+            WITH aggr_comm AS (
+                SELECT 
+                    aggregate_operations.created_at, 
+                    eth_operations.final_hash, 
+                    commit_aggregated_blocks_binding.block_number 
                 FROM aggregate_operations
-                    left join eth_aggregated_ops_binding on eth_aggregated_ops_binding.op_id = aggregate_operations.id
-                    left join eth_tx_hashes on eth_tx_hashes.eth_op_id = eth_aggregated_ops_binding.eth_op_id
-                ORDER BY to_block DESC, action_type, confirmed
+                    INNER JOIN commit_aggregated_blocks_binding ON aggregate_operations.id = commit_aggregated_blocks_binding.op_id
+                    INNER JOIN eth_aggregated_ops_binding ON aggregate_operations.id = eth_aggregated_ops_binding.op_id
+                    INNER JOIN eth_operations ON eth_operations.id = eth_aggregated_ops_binding.eth_op_id
+                WHERE aggregate_operations.confirmed = true 
+            )
+            ,aggr_exec as (
+                 SELECT 
+                    aggregate_operations.created_at, 
+                    eth_operations.final_hash, 
+                    execute_aggregated_blocks_binding.block_number 
+                FROM aggregate_operations
+                    INNER JOIN execute_aggregated_blocks_binding ON aggregate_operations.id = execute_aggregated_blocks_binding.op_id
+                    INNER JOIN eth_aggregated_ops_binding ON aggregate_operations.id = eth_aggregated_ops_binding.op_id
+                    INNER JOIN eth_operations ON eth_operations.id = eth_aggregated_ops_binding.eth_op_id
+                WHERE aggregate_operations.confirmed = true 
             )
             SELECT
                 blocks.number AS "block_number!",
                 blocks.root_hash AS "new_state_root!",
                 blocks.block_size AS "block_size!",
-                committed.tx_hash AS "commit_tx_hash?",
-                verified.tx_hash AS "verify_tx_hash?",
+                committed.final_hash AS "commit_tx_hash?",
+                verified.final_hash AS "verify_tx_hash?",
                 committed.created_at AS "committed_at!",
                 verified.created_at AS "verified_at?"
             FROM blocks
-            INNER JOIN eth_ops committed ON
-                committed.from_block <= blocks.number AND committed.to_block >= blocks.number AND committed.action_type = 'CommitBlocks' AND committed.confirmed = true
-            LEFT JOIN eth_ops verified ON
-                verified.from_block <= blocks.number AND verified.to_block >= blocks.number AND verified.action_type = 'ExecuteBlocks' AND verified.confirmed = true
+                     INNER JOIN aggr_comm committed ON blocks.number = committed.block_number
+                     LEFT JOIN aggr_exec verified ON blocks.number = verified.block_number
             WHERE
                 blocks.number <= $1
             ORDER BY blocks.number DESC
             LIMIT $2;
             "#,
-            i64::from(max_block),
+            i64::from(*max_block),
             i64::from(limit)
         ).fetch_all(self.0.conn())
         .await?;
@@ -375,35 +382,42 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
         let result = sqlx::query_as!(
             BlockDetails,
             r#"
-            WITH eth_ops AS (
-                SELECT DISTINCT ON (to_block, action_type)
-                    aggregate_operations.from_block,
-                    aggregate_operations.to_block,
-                    eth_tx_hashes.tx_hash,
-                    aggregate_operations.action_type,
-                    aggregate_operations.created_at,
-                    aggregate_operations.confirmed
+            WITH aggr_comm AS (
+                SELECT 
+                    aggregate_operations.created_at, 
+                    eth_operations.final_hash, 
+                    commit_aggregated_blocks_binding.block_number 
                 FROM aggregate_operations
-                    left join eth_aggregated_ops_binding on eth_aggregated_ops_binding.op_id = aggregate_operations.id
-                    left join eth_tx_hashes on eth_tx_hashes.eth_op_id = eth_aggregated_ops_binding.eth_op_id
-                ORDER BY to_block desc, action_type, confirmed
+                    INNER JOIN commit_aggregated_blocks_binding ON aggregate_operations.id = commit_aggregated_blocks_binding.op_id
+                    INNER JOIN eth_aggregated_ops_binding ON aggregate_operations.id = eth_aggregated_ops_binding.op_id
+                    INNER JOIN eth_operations ON eth_operations.id = eth_aggregated_ops_binding.eth_op_id
+                WHERE aggregate_operations.confirmed = true 
+            )
+            ,aggr_exec as (
+                 SELECT 
+                    aggregate_operations.created_at, 
+                    eth_operations.final_hash, 
+                    execute_aggregated_blocks_binding.block_number 
+                FROM aggregate_operations
+                    INNER JOIN execute_aggregated_blocks_binding ON aggregate_operations.id = execute_aggregated_blocks_binding.op_id
+                    INNER JOIN eth_aggregated_ops_binding ON aggregate_operations.id = eth_aggregated_ops_binding.op_id
+                    INNER JOIN eth_operations ON eth_operations.id = eth_aggregated_ops_binding.eth_op_id
+                WHERE aggregate_operations.confirmed = true 
             )
             SELECT
                 blocks.number AS "block_number!",
                 blocks.root_hash AS "new_state_root!",
                 blocks.block_size AS "block_size!",
-                committed.tx_hash AS "commit_tx_hash?",
-                verified.tx_hash AS "verify_tx_hash?",
+                committed.final_hash AS "commit_tx_hash?",
+                verified.final_hash AS "verify_tx_hash?",
                 committed.created_at AS "committed_at!",
                 verified.created_at AS "verified_at?"
             FROM blocks
-            INNER JOIN eth_ops committed ON
-                committed.from_block <= blocks.number AND committed.to_block >= blocks.number AND committed.action_type = 'CommitBlocks' AND committed.confirmed = true
-            LEFT JOIN eth_ops verified ON
-                verified.from_block <= blocks.number AND verified.to_block >= blocks.number AND verified.action_type = 'ExecuteBlocks' AND verified.confirmed = true
+                     INNER JOIN aggr_comm committed ON blocks.number = committed.block_number
+                     LEFT JOIN aggr_exec verified ON blocks.number = verified.block_number
             WHERE false
-                OR committed.tx_hash = $1
-                OR verified.tx_hash = $1
+                OR committed.final_hash = $1
+                OR verified.final_hash = $1
                 OR blocks.root_hash = $1
                 OR blocks.number = $2
             ORDER BY blocks.number DESC
@@ -495,7 +509,7 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
         };
         // Fill the block that's going to be returned with its operations.
         let executed_ops = BlockSchema(&mut transaction)
-            .get_block_executed_ops(block.number as u32)
+            .get_block_executed_ops(BlockNumber(block.number as u32))
             .await?;
 
         let mut success_operations = Vec::new();
@@ -510,7 +524,7 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
         let previous_block_root_hash = H256::from_slice(&block.previous_root_hash);
 
         let result = PendingBlock {
-            number: block.number as u32,
+            number: BlockNumber(block.number as u32),
             chunks_left: block.chunks_left as usize,
             unprocessed_priority_op_before: block.unprocessed_priority_op_before as u64,
             pending_block_iteration: block.pending_block_iteration as usize,
@@ -546,7 +560,7 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
         let mut transaction = self.0.start_transaction().await?;
 
         let storage_block = StoragePendingBlock {
-            number: pending_block.number.into(),
+            number: (*pending_block.number).into(),
             chunks_left: pending_block.chunks_left as i64,
             unprocessed_priority_op_before: pending_block.unprocessed_priority_op_before as i64,
             pending_block_iteration: pending_block.pending_block_iteration as i64,
@@ -612,9 +626,9 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
         let start = Instant::now();
         let mut transaction = self.0.start_transaction().await?;
 
-        let number = i64::from(block.block_number);
+        let number = i64::from(*block.block_number);
         let root_hash = block.new_root_hash.to_bytes();
-        let fee_account_id = i64::from(block.fee_account);
+        let fee_account_id = i64::from(*block.fee_account);
         let unprocessed_prior_op_before = block.processed_priority_ops.0 as i64;
         let unprocessed_prior_op_after = block.processed_priority_ops.1 as i64;
         let block_size = block.block_chunks_size as i64;
@@ -674,7 +688,7 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
         tree_cache: serde_json::Value,
     ) -> QueryResult<()> {
         let start = Instant::now();
-        if block == 0 {
+        if *block == 0 {
             return Ok(());
         }
 
@@ -685,7 +699,7 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
             INSERT INTO account_tree_cache (block, tree_cache)
             VALUES ($1, $2)
             ",
-            block as i64,
+            *block as i64,
             tree_cache_str,
         )
         .execute(self.0.conn())
@@ -714,7 +728,7 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
         metrics::histogram!("sql.chain.block.get_account_tree_cache", start.elapsed());
         Ok(account_tree_cache.map(|w| {
             (
-                w.block as BlockNumber,
+                BlockNumber(w.block as u32),
                 serde_json::from_str(&w.tree_cache)
                     .expect("Failed to deserialize Account Tree Cache"),
             )
@@ -733,7 +747,7 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
             SELECT * FROM account_tree_cache
             WHERE block = $1
             ",
-            block as i64
+            *block as i64
         )
         .fetch_optional(self.0.conn())
         .await?;
@@ -749,9 +763,9 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
 
     pub async fn save_genesis_block(&mut self, root_hash: Fr) -> QueryResult<()> {
         let block = Block {
-            block_number: 0,
+            block_number: BlockNumber(0),
             new_root_hash: root_hash,
-            fee_account: 0,
+            fee_account: AccountId(0),
             block_transactions: Vec::new(),
             processed_priority_ops: (0, 0),
             block_chunks_size: 0,

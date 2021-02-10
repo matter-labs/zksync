@@ -131,7 +131,7 @@ impl ApiDataPoolInner {
     }
 
     /// Generates a random pagination block range.
-    pub fn random_block_range(&self) -> (Pagination, BlockNumber) {
+    pub fn random_block_range(&self) -> (Pagination, u32) {
         let mut rng = thread_rng();
 
         let block_number = self.random_block();
@@ -142,8 +142,8 @@ impl ApiDataPoolInner {
             _ => unreachable!(),
         };
 
-        let limit = rng.gen_range(1, MAX_REQUEST_LIMIT + 1);
-        (pagination, limit as BlockNumber)
+        let limit = rng.gen_range(1, MAX_REQUEST_LIMIT as u32 + 1);
+        (pagination, limit)
     }
 
     /// Generates a random transaction identifier (block number, position in block).
@@ -155,7 +155,7 @@ impl ApiDataPoolInner {
         // Sometimes we have gaps in the block list, so it is not always
         // possible to randomly generate an existing block number.
         for _ in 0..MAX_REQUEST_LIMIT {
-            let number = rng.gen_range(from, to + 1);
+            let number = BlockNumber(rng.gen_range(*from, *to + 1));
             if let Some(&block_txs) = self.blocks.get(&number) {
                 let tx_id = rng.gen_range(0, block_txs);
                 return (number, tx_id);

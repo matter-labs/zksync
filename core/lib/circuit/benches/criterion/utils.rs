@@ -4,12 +4,12 @@ use num::BigUint;
 use zksync_crypto::circuit::{account::CircuitAccount, CircuitAccountTree};
 use zksync_state::state::ZkSyncState;
 use zksync_test_account::ZkSyncAccount;
-use zksync_types::{Account, AccountId, AccountMap, Address};
+use zksync_types::{Account, AccountId, AccountMap, Address, BlockNumber, TokenId};
 
 // Public re-exports
 pub use zksync_circuit::witness::utils::WitnessBuilder;
 
-pub const FEE_ACCOUNT_ID: u32 = 0;
+pub const FEE_ACCOUNT_ID: AccountId = AccountId(0);
 
 /// Helper structure to generate `ZkSyncState` and `CircuitAccountTree`.
 #[derive(Debug)]
@@ -17,7 +17,7 @@ pub struct ZkSyncStateGenerator;
 
 impl ZkSyncStateGenerator {
     fn create_state(accounts: AccountMap) -> (ZkSyncState, CircuitAccountTree) {
-        let plasma_state = ZkSyncState::from_acc_map(accounts, 1);
+        let plasma_state = ZkSyncState::from_acc_map(accounts, BlockNumber(1));
 
         let mut circuit_account_tree =
             CircuitAccountTree::new(zksync_crypto::params::account_tree_depth());
@@ -65,7 +65,7 @@ impl WitnessTestAccount {
 
         let account = {
             let mut account = Account::default_with_address(&zksync_account.address);
-            account.add_balance(0, &BigUint::from(balance));
+            account.add_balance(TokenId(0), &BigUint::from(balance));
             account.pub_key_hash = zksync_account.pubkey_hash;
             account
         };

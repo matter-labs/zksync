@@ -50,7 +50,7 @@ impl Client {
         &self,
         block_number: BlockNumber,
     ) -> client::Result<Option<BlockInfo>> {
-        self.get(&format!("blocks/{}", block_number)).send().await
+        self.get(&format!("blocks/{}", *block_number)).send().await
     }
 
     /// Returns information about transactions of the block with the specified number.
@@ -58,7 +58,7 @@ impl Client {
         &self,
         block_number: BlockNumber,
     ) -> client::Result<Vec<TransactionInfo>> {
-        self.get(&format!("blocks/{}/transactions", block_number))
+        self.get(&format!("blocks/{}/transactions", *block_number))
             .send()
             .await
     }
@@ -67,7 +67,7 @@ impl Client {
     pub async fn blocks_range(
         &self,
         from: Pagination,
-        limit: BlockNumber,
+        limit: u32,
     ) -> client::Result<Vec<BlockInfo>> {
         self.get("blocks")
             .query(&from.into_query(limit))

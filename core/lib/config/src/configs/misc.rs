@@ -5,6 +5,13 @@ use zksync_types::H256;
 // Local uses
 use crate::envy_load;
 
+#[derive(Debug, Deserialize, Clone, PartialEq)]
+#[serde(rename_all = "lowercase")]
+pub enum LogFormat {
+    Json,
+    Plain,
+}
+
 /// Miscellaneous options for different infrastructure elements.
 ///
 /// While these options may not be used by the server, it's helpful to provide an interface for them too,
@@ -26,6 +33,8 @@ pub struct MiscConfig {
     pub max_liquidation_fee_percent: u64,
     /// Fee seller account private key.
     pub fee_account_private_key: H256,
+    /// Log format
+    pub log_format: LogFormat,
 }
 
 impl MiscConfig {
@@ -50,6 +59,7 @@ mod tests {
             fee_account_private_key: hash(
                 "27593fea79697e947890ecbecce7901b0008345e5d7259710d0dd5e500d040be",
             ),
+            log_format: LogFormat::Json,
         }
     }
 
@@ -63,6 +73,7 @@ MISC_ZKSYNC_ACTION="dont_ask"
 MISC_ETHERSCAN_API_KEY="unset"
 MISC_MAX_LIQUIDATION_FEE_PERCENT="5"
 MISC_FEE_ACCOUNT_PRIVATE_KEY="0x27593fea79697e947890ecbecce7901b0008345e5d7259710d0dd5e500d040be"
+MISC_LOG_FORMAT="json"
         "#;
         set_env(config);
 

@@ -1,6 +1,6 @@
 import { constants } from 'ethers';
 const { expect } = require('chai');
-const { wallet2, getCallRevertReason } = require('./common');
+const { getCallRevertReason } = require('./common');
 const { performance } = require('perf_hooks');
 const hardhat = require('hardhat');
 
@@ -11,13 +11,15 @@ describe('UpgradeGatekeeper unit tests', function () {
     this.timeout(50000);
 
     let provider;
-    let wallet, wallet1;
+    let wallet;
     let proxyTestContract, proxyDummyInterface;
     let dummyFirst, dummySecond;
     let upgradeGatekeeperContract;
     before(async () => {
         provider = hardhat.ethers.provider;
-        [wallet, wallet1] = await hardhat.ethers.getSigners();
+        const wallets = await hardhat.ethers.getSigners();
+        // Get some wallet different from than the default one.
+        wallet = wallets[1];
 
         const dummy1Factory = await hardhat.ethers.getContractFactory('DummyFirst');
         dummyFirst = await dummy1Factory.deploy();
@@ -47,7 +49,7 @@ describe('UpgradeGatekeeper unit tests', function () {
     });
 
     it('checking that requireMaster calls present', async () => {
-        const UpgradeGatekeeperContract_with_wallet2_signer = await upgradeGatekeeperContract.connect(wallet1);
+        const UpgradeGatekeeperContract_with_wallet2_signer = await upgradeGatekeeperContract.connect(wallet);
         expect(
             (
                 await getCallRevertReason(() =>
@@ -69,7 +71,7 @@ describe('UpgradeGatekeeper unit tests', function () {
         ).equal('1c');
     });
 
-    it('checking UpgradeGatekeeper reverts; activation and cancelation upgrade', async () => {
+    it('checking UpgradeGatekeeper reverts; activation and cancellation upgrade', async () => {
         expect((await getCallRevertReason(() => upgradeGatekeeperContract.cancelUpgrade())).revertReason).equal(
             'cpu11'
         );

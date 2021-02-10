@@ -34,6 +34,8 @@ use self::{
 pub use client::{get_contract_events, get_web3_block_number, EthHttpClient};
 use zksync_config::ZkSyncConfig;
 
+use zksync_eth_client::ethereum_gateway::EthereumGateway;
+
 mod client;
 mod eth_state;
 mod received_ops;
@@ -164,7 +166,7 @@ impl<W: EthClient> EthWatch<W> {
         let new_state = ETHState::new(last_ethereum_block, unconfirmed_queue, priority_queue);
 
         self.set_new_state(new_state);
-        log::trace!("ETH state: {:#?}", self.eth_state);
+        vlog::debug!("ETH state: {:#?}", self.eth_state);
         Ok(())
     }
 
@@ -294,7 +296,7 @@ impl<W: EthClient> EthWatch<W> {
             WatcherMode::Working => true,
             WatcherMode::Backoff(delay_until) => {
                 if Instant::now() >= delay_until {
-                    log::info!("Exiting the backoff mode");
+                    vlog::info!("Exiting the backoff mode");
                     self.mode = WatcherMode::Working;
                     true
                 } else {
@@ -317,7 +319,7 @@ impl<W: EthClient> EthWatch<W> {
                     break block;
                 }
                 Err(error) => {
-                    log::warn!(
+                    vlog::warn!(
                         "Unable to fetch last block number: '{}'. Retrying again in {} seconds",
                         error,
                         RATE_LIMIT_DELAY.as_secs()
@@ -348,7 +350,7 @@ impl<W: EthClient> EthWatch<W> {
 
                     if let Err(error) = poll_result {
                         if self.is_backoff_requested(&error) {
-                            log::warn!(
+                            vlog::warn!(
                                 "Rate limit was reached, as reported by Ethereum node. \
                                 Entering the backoff mode"
                             );
@@ -356,7 +358,7 @@ impl<W: EthClient> EthWatch<W> {
                         } else {
                             // Some unexpected kind of error, we won't shutdown the node because of it,
                             // but rather expect node administrators to handle the situation.
-                            log::error!("Failed to process new blocks {}", error);
+                            vlog::error!("Failed to process new blocks {}", error);
                         }
                     }
                 }
@@ -403,9 +405,8 @@ pub fn start_eth_watch(
     eth_req_sender: mpsc::Sender<EthWatchRequest>,
     eth_req_receiver: mpsc::Receiver<EthWatchRequest>,
 ) -> JoinHandle<()> {
-    let transport = web3::transports::Http::new(&config_options.eth_client.web3_url).unwrap();
-    let web3 = web3::Web3::new(transport);
-    let eth_client = EthHttpClient::new(web3, config_options.contracts.contract_addr);
+    let client = EthereumGateway::from_config(&config_options);
+    let eth_client = EthHttpClient::new(client, config_options.contracts.contract_addr);
 
     let eth_watch = EthWatch::new(
         eth_client,

@@ -2,18 +2,18 @@ use std::collections::HashMap;
 use zksync::{tokens_cache::TokensCache, utils::*, web3::types::H160, zksync_types::Token};
 use zksync_config::test_config::unit_vectors::{Config as TestVectorsConfig, TestEntry};
 use zksync_crypto::PrivateKey;
-use zksync_types::tx::TxSignature;
+use zksync_types::{tx::TxSignature, AccountId, Nonce, TokenId};
 
 #[test]
 fn test_tokens_cache() {
     let mut tokens: HashMap<String, Token> = HashMap::default();
 
-    let token_eth = Token::new(0, H160::default(), "ETH", 18);
+    let token_eth = Token::new(TokenId(0), H160::default(), "ETH", 18);
     tokens.insert("ETH".to_string(), token_eth.clone());
-    let token_dai = Token::new(1, H160::random(), "DAI", 18);
+    let token_dai = Token::new(TokenId(1), H160::random(), "DAI", 18);
     tokens.insert("DAI".to_string(), token_dai.clone());
 
-    let uncahed_token = Token::new(2, H160::random(), "UNC", 5);
+    let uncahed_token = Token::new(TokenId(2), H160::random(), "UNC", 5);
 
     let tokens_hash = TokensCache::new(tokens);
 
@@ -404,7 +404,7 @@ mod wallet_tests {
     use zksync_types::{
         tokens::get_genesis_token_list,
         tx::{PackedEthSignature, TxHash},
-        Address, PubKeyHash, TokenLike, TxFeeTypes, ZkSyncTx, H256,
+        Address, PubKeyHash, TokenId, TokenLike, TxFeeTypes, ZkSyncTx, H256,
     };
 
     #[derive(Debug, Clone)]
@@ -444,11 +444,11 @@ mod wallet_tests {
 
             Ok(AccountInfo {
                 address,
-                id: Some(42),
+                id: Some(AccountId(42)),
                 depositing: Default::default(),
                 committed: AccountState {
                     balances: committed_balances,
-                    nonce: 0,
+                    nonce: Nonce(0),
                     pub_key_hash: self.pub_key_hash().await,
                 },
                 verified: AccountState {
@@ -467,7 +467,7 @@ mod wallet_tests {
             let tokens = (1..)
                 .zip(&genesis_tokens[..3])
                 .map(|(id, token)| Token {
-                    id,
+                    id: TokenId(id),
                     symbol: token.symbol.clone(),
                     address: token.address[2..]
                         .parse()
@@ -571,7 +571,7 @@ mod wallet_tests {
     #[tokio::test]
     async fn test_wallet_account_id() {
         let wallet = get_test_wallet(&[14; 32], Network::Mainnet).await;
-        assert_eq!(wallet.account_id(), Some(42));
+        assert_eq!(wallet.account_id(), Some(AccountId(42)));
     }
 
     #[tokio::test]

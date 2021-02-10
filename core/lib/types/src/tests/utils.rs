@@ -4,9 +4,9 @@ use chrono::Utc;
 
 pub fn create_full_exit_op() -> ExecutedOperations {
     let priority_op = FullExit {
-        account_id: 0,
+        account_id: AccountId(0),
         eth_address: Address::zero(),
-        token: 0,
+        token: TokenId(0),
     };
     ExecutedOperations::PriorityOp(Box::new(ExecutedPriorityOp {
         priority_op: PriorityOp {
@@ -28,17 +28,17 @@ pub fn create_full_exit_op() -> ExecutedOperations {
 pub fn create_withdraw_tx() -> ExecutedOperations {
     let withdraw_op = ZkSyncOp::Withdraw(Box::new(WithdrawOp {
         tx: Withdraw::new(
-            0,
+            AccountId(0),
             Default::default(),
             Default::default(),
-            0,
+            TokenId(0),
             100u32.into(),
             10u32.into(),
-            12,
+            Nonce(12),
             Default::default(),
             None,
         ),
-        account_id: 0,
+        account_id: AccountId(0),
     }));
 
     let executed_withdraw_op = ExecutedTx {
@@ -57,17 +57,17 @@ pub fn create_withdraw_tx() -> ExecutedOperations {
 pub fn create_change_pubkey_tx() -> ExecutedOperations {
     let change_pubkey_op = ZkSyncOp::ChangePubKeyOffchain(Box::new(ChangePubKeyOp {
         tx: ChangePubKey::new(
-            1,
+            AccountId(1),
             Default::default(),
             Default::default(),
-            0,
+            TokenId(0),
             Default::default(),
             Default::default(),
             Default::default(),
             None,
             None,
         ),
-        account_id: 0,
+        account_id: AccountId(0),
     }));
 
     let executed_change_pubkey_op = ExecutedTx {

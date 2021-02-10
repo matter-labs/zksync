@@ -18,11 +18,11 @@ use zksync_storage::{
     },
     ConnectionPool, StorageProcessor,
 };
-use zksync_types::{tx::TxHash, Address, TokenLike, TxFeeTypes};
+use zksync_types::{tx::TxHash, Address, BatchFee, BlockNumber, Fee, TokenLike, TxFeeTypes};
 
 // Local uses
 use crate::{
-    fee_ticker::{Fee, TickerRequest, TokenPriceRequestType},
+    fee_ticker::{TickerRequest, TokenPriceRequestType},
     signature_checker::VerifyTxSignatureRequest,
     utils::shared_lru_cache::SharedLruCache,
 };
@@ -184,20 +184,24 @@ impl RpcApp {
             Some(block)
         } else {
             let mut storage = self.access_storage().await?;
-            let block = storage
+            let blocks = storage
                 .chain()
                 .block_schema()
-                .find_block_by_height_or_hash(block_number.to_string())
-                .await;
+                .load_block_range(BlockNumber(block_number as u32), 1)
+                .await
+                .unwrap_or_default();
 
-            if let Some(block) = block.clone() {
+            if !blocks.is_empty() && blocks[0].block_number == block_number {
                 // Unverified blocks can still change, so we can't cache them.
-                if block.verified_at.is_some() && block.block_number == block_number {
-                    self.cache_of_blocks_info.insert(block_number, block);
-                }
+                self.cache_of_blocks_info
+                    .insert(block_number, blocks[0].clone());
             }
 
-            block
+            if !blocks.is_empty() {
+                Some(blocks[0].clone())
+            } else {
+                None
+            }
         };
 
         metrics::histogram!("api.rpc.get_block_info", start.elapsed());
@@ -262,15 +266,38 @@ impl RpcApp {
             })
     }
 
+    async fn ticker_batch_fee_request(
+        mut ticker_request_sender: mpsc::Sender<TickerRequest>,
+        transactions: Vec<(TxFeeTypes, Address)>,
+        token: TokenLike,
+    ) -> Result<BatchFee> {
+        let req = oneshot::channel();
+        ticker_request_sender
+            .send(TickerRequest::GetBatchTxFee {
+                transactions,
+                token: token.clone(),
+                response: req.0,
+            })
+            .await
+            .expect("ticker receiver dropped");
+        let resp = req.1.await.expect("ticker answer sender dropped");
+        resp.map_err(|err| {
+            vlog::warn!("Internal Server Error: '{}'; input: {:?}", err, token,);
+            Error::internal_error()
+        })
+    }
+
     async fn ticker_request(
         mut ticker_request_sender: mpsc::Sender<TickerRequest>,
         tx_type: TxFeeTypes,
+        address: Address,
         token: TokenLike,
     ) -> Result<Fee> {
         let req = oneshot::channel();
         ticker_request_sender
             .send(TickerRequest::GetTxFee {
                 tx_type,
+                address,
                 token: token.clone(),
                 response: req.0,
             })
@@ -404,7 +431,6 @@ pub fn start_rpc_server(
         rpc_app.extend(&mut io);
 
         let server = ServerBuilder::new(io)
-            .request_middleware(super::loggers::http_rpc::request_middleware)
             .threads(super::THREADS_PER_SERVER)
             .start_http(&addr)
             .unwrap();

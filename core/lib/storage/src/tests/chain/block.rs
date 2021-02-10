@@ -1,10 +1,9 @@
 // External imports
 // Workspace imports
-use zksync_basic_types::H256;
 use zksync_crypto::{convert::FeConvert, rand::XorShiftRng};
 use zksync_types::{
-    aggregated_operations::AggregatedActionType, helpers::apply_updates, AccountMap, AccountUpdate,
-    AccountUpdates, BlockNumber,
+    aggregated_operations::AggregatedActionType, helpers::apply_updates, AccountId, AccountMap,
+    AccountUpdate, AccountUpdates, BlockNumber, TokenId, H256,
 };
 // Local imports
 use crate::{
@@ -28,7 +27,7 @@ use crate::{
 pub fn apply_random_updates(
     mut accounts: AccountMap,
     rng: &mut XorShiftRng,
-) -> (AccountMap, Vec<(u32, AccountUpdate)>) {
+) -> (AccountMap, Vec<(AccountId, AccountUpdate)>) {
     let updates = (0..3)
         .flat_map(|_| gen_acc_random_updates(rng))
         .collect::<AccountUpdates>();
@@ -41,7 +40,6 @@ pub fn apply_random_updates(
 /// Make sure that we can get state for all blocks.
 #[db_test]
 async fn test_commit_rewind(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
-    let _ = env_logger::try_init();
     let mut rng = create_rng();
 
     // Create the input data for three blocks.
@@ -55,51 +53,63 @@ async fn test_commit_rewind(mut storage: StorageProcessor<'_>) -> QueryResult<()
     // Execute and commit these blocks.
     // Also store account updates.
     BlockSchema(&mut storage)
-        .save_block(gen_sample_block(1, BLOCK_SIZE_CHUNKS, Default::default()))
+        .save_block(gen_sample_block(
+            BlockNumber(1),
+            BLOCK_SIZE_CHUNKS,
+            Default::default(),
+        ))
         .await?;
     StateSchema(&mut storage)
-        .commit_state_update(1, &updates_block_1, 0)
+        .commit_state_update(BlockNumber(1), &updates_block_1, 0)
         .await?;
     BlockSchema(&mut storage)
-        .save_block(gen_sample_block(2, BLOCK_SIZE_CHUNKS, Default::default()))
+        .save_block(gen_sample_block(
+            BlockNumber(2),
+            BLOCK_SIZE_CHUNKS,
+            Default::default(),
+        ))
         .await?;
     StateSchema(&mut storage)
-        .commit_state_update(2, &updates_block_2, 0)
+        .commit_state_update(BlockNumber(2), &updates_block_2, 0)
         .await?;
     BlockSchema(&mut storage)
-        .save_block(gen_sample_block(3, BLOCK_SIZE_CHUNKS, Default::default()))
+        .save_block(gen_sample_block(
+            BlockNumber(3),
+            BLOCK_SIZE_CHUNKS,
+            Default::default(),
+        ))
         .await?;
     StateSchema(&mut storage)
-        .commit_state_update(3, &updates_block_3, 0)
+        .commit_state_update(BlockNumber(3), &updates_block_3, 0)
         .await?;
 
     // Check that they are stored in state.
     let (block, state) = StateSchema(&mut storage)
-        .load_committed_state(Some(1))
+        .load_committed_state(Some(BlockNumber(1)))
         .await?;
-    assert_eq!((block, &state), (1, &accounts_block_1));
+    assert_eq!((block, &state), (BlockNumber(1), &accounts_block_1));
 
     let (block, state) = StateSchema(&mut storage)
-        .load_committed_state(Some(2))
+        .load_committed_state(Some(BlockNumber(2)))
         .await?;
-    assert_eq!((block, &state), (2, &accounts_block_2));
+    assert_eq!((block, &state), (BlockNumber(2), &accounts_block_2));
 
     let (block, state) = StateSchema(&mut storage)
-        .load_committed_state(Some(3))
+        .load_committed_state(Some(BlockNumber(3)))
         .await?;
-    assert_eq!((block, &state), (3, &accounts_block_3));
+    assert_eq!((block, &state), (BlockNumber(3), &accounts_block_3));
 
     // Add proofs for the first two blocks.
     OperationsSchema(&mut storage)
         .store_aggregated_action(gen_unique_aggregated_operation(
-            1,
+            BlockNumber(1),
             AggregatedActionType::ExecuteBlocks,
             BLOCK_SIZE_CHUNKS,
         ))
         .await?;
     OperationsSchema(&mut storage)
         .store_aggregated_action(gen_unique_aggregated_operation(
-            2,
+            BlockNumber(2),
             AggregatedActionType::ExecuteBlocks,
             BLOCK_SIZE_CHUNKS,
         ))
@@ -107,23 +117,23 @@ async fn test_commit_rewind(mut storage: StorageProcessor<'_>) -> QueryResult<()
 
     // Check that we still can get the state for these blocks.
     let (block, state) = StateSchema(&mut storage)
-        .load_committed_state(Some(1))
+        .load_committed_state(Some(BlockNumber(1)))
         .await?;
-    assert_eq!((block, &state), (1, &accounts_block_1));
+    assert_eq!((block, &state), (BlockNumber(1), &accounts_block_1));
 
     let (block, state) = StateSchema(&mut storage)
-        .load_committed_state(Some(2))
+        .load_committed_state(Some(BlockNumber(2)))
         .await?;
-    assert_eq!((block, &state), (2, &accounts_block_2));
+    assert_eq!((block, &state), (BlockNumber(2), &accounts_block_2));
 
     let (block, state) = StateSchema(&mut storage)
-        .load_committed_state(Some(3))
+        .load_committed_state(Some(BlockNumber(3)))
         .await?;
-    assert_eq!((block, &state), (3, &accounts_block_3));
+    assert_eq!((block, &state), (BlockNumber(3), &accounts_block_3));
 
     // Check that with no id provided, the latest state is loaded.
     let (block, state) = StateSchema(&mut storage).load_committed_state(None).await?;
-    assert_eq!((block, &state), (3, &accounts_block_3));
+    assert_eq!((block, &state), (BlockNumber(3), &accounts_block_3));
 
     Ok(())
 }
@@ -189,13 +199,14 @@ async fn test_find_block_by_height_or_hash(mut storage: StorageProcessor<'_>) ->
     EthereumSchema(&mut storage).initialize_eth_data().await?;
 
     let mut accounts_map = AccountMap::default();
-    let n_committed = 5;
+    let n_committed = 5u32;
     let n_verified = n_committed - 2;
 
     let mut expected_outcome: Vec<BlockDetails> = Vec::new();
 
     // Create and apply several blocks to work with.
     for block_number in 1..=n_committed {
+        let block_number = BlockNumber(block_number);
         // Create blanked block detail object which we will fill
         // with the relevant data and use for the comparison later.
         let mut current_block_detail = BlockDetails {
@@ -255,13 +266,13 @@ async fn test_find_block_by_height_or_hash(mut storage: StorageProcessor<'_>) ->
             .await?;
 
         // Initialize reference sample fields.
-        current_block_detail.block_number = block.block_number as i64;
+        current_block_detail.block_number = *block.block_number as i64;
         current_block_detail.new_state_root = block.new_root_hash.to_bytes();
         current_block_detail.block_size = block.block_transactions.len() as i64;
         current_block_detail.commit_tx_hash = Some(eth_tx_hash.as_ref().to_vec());
 
         // Add verification for the block if required.
-        if block_number <= n_verified {
+        if *block_number <= n_verified {
             OperationsSchema(&mut storage)
                 .store_aggregated_action(gen_unique_aggregated_operation(
                     block_number,
@@ -279,7 +290,7 @@ async fn test_find_block_by_height_or_hash(mut storage: StorageProcessor<'_>) ->
             let eth_tx_hash = dummy_ethereum_tx_hash(id);
 
             // Do not add an ethereum confirmation for the last operation.
-            if block_number != n_verified {
+            if *block_number != n_verified {
                 let response = EthereumSchema(&mut storage)
                     .save_new_eth_tx(
                         AggregatedActionType::CreateProofBlocks,
@@ -327,16 +338,16 @@ async fn test_block_range(mut storage: StorageProcessor<'_>) -> QueryResult<()> 
         max_block: BlockNumber,
         limit: u32,
     ) -> QueryResult<()> {
-        let start_block = if max_block >= limit {
+        let start_block = if *max_block >= limit {
             (max_block - limit) + 1
         } else {
-            1
+            BlockNumber(1)
         };
         let block_range = BlockSchema(storage)
             .load_block_range(max_block, limit)
             .await?;
         // Go in the reversed order, since the blocks themselves are ordered backwards.
-        for (idx, block_number) in (start_block..=max_block).rev().enumerate() {
+        for (idx, block_number) in (*start_block..=*max_block).rev().enumerate() {
             let expected = BlockSchema(storage)
                 .find_block_by_height_or_hash(block_number.to_string())
                 .await
@@ -366,6 +377,7 @@ async fn test_block_range(mut storage: StorageProcessor<'_>) -> QueryResult<()> 
 
     // Create and apply several blocks to work with.
     for block_number in 1..=n_committed {
+        let block_number = BlockNumber(block_number);
         let (new_accounts_map, updates) = apply_random_updates(accounts_map.clone(), &mut rng);
         accounts_map = new_accounts_map;
 
@@ -412,7 +424,7 @@ async fn test_block_range(mut storage: StorageProcessor<'_>) -> QueryResult<()> 
             .await?;
 
         // Add verification for the block if required.
-        if block_number <= n_verified {
+        if *block_number <= n_verified {
             OperationsSchema(&mut storage)
                 .store_aggregated_action(gen_unique_aggregated_operation(
                     block_number,
@@ -447,14 +459,16 @@ async fn test_block_range(mut storage: StorageProcessor<'_>) -> QueryResult<()> 
     }
 
     // Check the block range method given the various combinations of the limit and the end block.
+    let n_commited_block_number = BlockNumber(n_committed);
+    let n_verified_block_number = BlockNumber(n_verified);
     let test_vector = vec![
-        (n_committed as BlockNumber, n_committed),
-        (n_verified as BlockNumber, n_verified),
-        (n_committed as BlockNumber, n_verified),
-        (n_verified as BlockNumber, 1),
-        (n_committed as BlockNumber, 1),
-        (n_committed as BlockNumber, 0),
-        (n_committed as BlockNumber, 100),
+        (n_commited_block_number, n_committed),
+        (n_verified_block_number, n_verified),
+        (n_commited_block_number, n_verified),
+        (n_verified_block_number, 1),
+        (n_commited_block_number, 1),
+        (n_commited_block_number, 0),
+        (n_commited_block_number, 100),
     ];
 
     for (max_block, limit) in test_vector {
@@ -482,6 +496,7 @@ async fn unconfirmed_transaction(mut storage: StorageProcessor<'_>) -> QueryResu
 
     // Create and apply several blocks to work with.
     for block_number in 1..=n_committed {
+        let block_number = BlockNumber(block_number);
         let (new_accounts_map, updates) = apply_random_updates(accounts_map.clone(), &mut rng);
         accounts_map = new_accounts_map;
 
@@ -524,14 +539,14 @@ async fn unconfirmed_transaction(mut storage: StorageProcessor<'_>) -> QueryResu
             .add_hash_entry(response.id, &eth_tx_hash)
             .await?;
 
-        if block_number <= n_commited_confirmed {
+        if *block_number <= n_commited_confirmed {
             EthereumSchema(&mut storage)
                 .confirm_eth_tx(&eth_tx_hash)
                 .await?;
         }
 
         // Add verification for the block if required.
-        if block_number <= n_verified {
+        if *block_number <= n_verified {
             OperationsSchema(&mut storage)
                 .store_aggregated_action(gen_unique_aggregated_operation(
                     block_number,
@@ -577,7 +592,7 @@ async fn unconfirmed_transaction(mut storage: StorageProcessor<'_>) -> QueryResu
         .is_none());
 
     let block_range = BlockSchema(&mut storage)
-        .load_block_range(n_committed, 100)
+        .load_block_range(BlockNumber(n_committed), 100)
         .await?;
 
     assert_eq!(block_range.len(), n_commited_confirmed as usize);
@@ -598,14 +613,13 @@ async fn pending_block_workflow(mut storage: StorageProcessor<'_>) -> QueryResul
         operations::{ChangePubKeyOp, TransferToNewOp},
         ExecutedOperations, ExecutedTx, ZkSyncOp, ZkSyncTx,
     };
+    vlog::init();
 
-    let _ = env_logger::try_init();
-
-    let from_account_id = 0xbabe;
+    let from_account_id = AccountId(0xbabe);
     let from_zksync_account = ZkSyncAccount::rand();
     from_zksync_account.set_account_id(Some(from_account_id));
 
-    let to_account_id = 0xdcba;
+    let to_account_id = AccountId(0xdcba);
     let to_zksync_account = ZkSyncAccount::rand();
     to_zksync_account.set_account_id(Some(to_account_id));
 
@@ -613,7 +627,7 @@ async fn pending_block_workflow(mut storage: StorageProcessor<'_>) -> QueryResul
         let tx = from_zksync_account.sign_change_pubkey_tx(
             None,
             false,
-            0,
+            TokenId(0),
             Default::default(),
             false,
             Default::default(),
@@ -642,7 +656,7 @@ async fn pending_block_workflow(mut storage: StorageProcessor<'_>) -> QueryResul
     let (tx_2, executed_tx_2) = {
         let tx = from_zksync_account
             .sign_transfer(
-                0,
+                TokenId(0),
                 "",
                 1u32.into(),
                 0u32.into(),
@@ -678,11 +692,11 @@ async fn pending_block_workflow(mut storage: StorageProcessor<'_>) -> QueryResul
     let txs_1 = vec![executed_tx_1];
     let txs_2 = vec![executed_tx_2];
 
-    let block_1 = gen_sample_block(1, BLOCK_SIZE_CHUNKS, txs_1.clone());
-    let block_2 = gen_sample_block(2, BLOCK_SIZE_CHUNKS, txs_2.clone());
+    let block_1 = gen_sample_block(BlockNumber(1), BLOCK_SIZE_CHUNKS, txs_1.clone());
+    let block_2 = gen_sample_block(BlockNumber(2), BLOCK_SIZE_CHUNKS, txs_2.clone());
 
     let pending_block_1 = PendingBlock {
-        number: 1,
+        number: BlockNumber(1),
         chunks_left: 10,
         unprocessed_priority_op_before: 0,
         pending_block_iteration: 1,
@@ -692,7 +706,7 @@ async fn pending_block_workflow(mut storage: StorageProcessor<'_>) -> QueryResul
         timestamp: 0,
     };
     let pending_block_2 = PendingBlock {
-        number: 2,
+        number: BlockNumber(2),
         chunks_left: 12,
         unprocessed_priority_op_before: 0,
         pending_block_iteration: 2,
@@ -728,7 +742,9 @@ async fn pending_block_workflow(mut storage: StorageProcessor<'_>) -> QueryResul
     );
 
     // Check that stored tx can already be loaded from the database.
-    let pending_ops = BlockSchema(&mut storage).get_block_executed_ops(1).await?;
+    let pending_ops = BlockSchema(&mut storage)
+        .get_block_executed_ops(BlockNumber(1))
+        .await?;
     assert_eq!(pending_ops.len(), 1);
 
     // Also check that we can find the transaction by its hash.
@@ -765,9 +781,13 @@ async fn pending_block_workflow(mut storage: StorageProcessor<'_>) -> QueryResul
     assert_eq!(pending_block.number, pending_block_2.number);
 
     // Check that stored tx can already be loaded from the database.
-    let committed_ops = BlockSchema(&mut storage).get_block_executed_ops(1).await?;
+    let committed_ops = BlockSchema(&mut storage)
+        .get_block_executed_ops(BlockNumber(1))
+        .await?;
     assert_eq!(committed_ops.len(), 1);
-    let pending_ops = BlockSchema(&mut storage).get_block_executed_ops(2).await?;
+    let pending_ops = BlockSchema(&mut storage)
+        .get_block_executed_ops(BlockNumber(2))
+        .await?;
     assert_eq!(pending_ops.len(), 1);
 
     // Also check that we can find the transaction by its hash.
@@ -840,12 +860,12 @@ async fn test_operations_counter(mut storage: StorageProcessor<'_>) -> QueryResu
 
     // Store new operations.
     for (block_number, action_type) in &[
-        (1, AggregatedActionType::CommitBlocks),
-        (2, AggregatedActionType::CommitBlocks),
-        (3, AggregatedActionType::CommitBlocks),
-        (4, AggregatedActionType::CommitBlocks),
-        (1, AggregatedActionType::ExecuteBlocks),
-        (2, AggregatedActionType::ExecuteBlocks),
+        (BlockNumber(1), AggregatedActionType::CommitBlocks),
+        (BlockNumber(2), AggregatedActionType::CommitBlocks),
+        (BlockNumber(3), AggregatedActionType::CommitBlocks),
+        (BlockNumber(4), AggregatedActionType::CommitBlocks),
+        (BlockNumber(1), AggregatedActionType::ExecuteBlocks),
+        (BlockNumber(2), AggregatedActionType::ExecuteBlocks),
     ] {
         storage
             .chain()
@@ -860,11 +880,11 @@ async fn test_operations_counter(mut storage: StorageProcessor<'_>) -> QueryResu
 
     // Set all of them confirmed except one.
     for (block_number, action_type) in &[
-        (1, AggregatedActionType::CommitBlocks),
-        (2, AggregatedActionType::CommitBlocks),
-        (3, AggregatedActionType::CommitBlocks),
-        (1, AggregatedActionType::ExecuteBlocks),
-        (2, AggregatedActionType::ExecuteBlocks),
+        (BlockNumber(1), AggregatedActionType::CommitBlocks),
+        (BlockNumber(2), AggregatedActionType::CommitBlocks),
+        (BlockNumber(3), AggregatedActionType::CommitBlocks),
+        (BlockNumber(1), AggregatedActionType::ExecuteBlocks),
+        (BlockNumber(2), AggregatedActionType::ExecuteBlocks),
     ] {
         storage
             .chain()
