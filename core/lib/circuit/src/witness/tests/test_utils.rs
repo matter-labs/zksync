@@ -17,6 +17,7 @@ use crate::{circuit::ZkSyncCircuit, witness::Witness};
 pub use crate::witness::utils::WitnessBuilder;
 
 pub const FEE_ACCOUNT_ID: AccountId = AccountId(0);
+pub const BLOCK_TIMESTAMP: u64 = 0x12345678u64;
 
 /// Verifies that circuit has no unsatisfied constraints, and returns an error otherwise.
 pub fn check_circuit_non_panicking(circuit: ZkSyncCircuit<Engine>) -> Result<(), String> {
@@ -139,8 +140,12 @@ pub fn generic_test_scenario<W, F>(
 {
     // Initialize Plasma and WitnessBuilder.
     let (mut plasma_state, mut circuit_account_tree) = ZkSyncStateGenerator::generate(&accounts);
-    let mut witness_accum =
-        WitnessBuilder::new(&mut circuit_account_tree, FEE_ACCOUNT_ID, BlockNumber(1));
+    let mut witness_accum = WitnessBuilder::new(
+        &mut circuit_account_tree,
+        FEE_ACCOUNT_ID,
+        BlockNumber(1),
+        BLOCK_TIMESTAMP,
+    );
 
     // Apply op on plasma
     let fees = apply_op_on_plasma(&mut plasma_state, &op);
@@ -150,9 +155,14 @@ pub fn generic_test_scenario<W, F>(
     let witness = W::apply_tx(&mut witness_accum.account_tree, &op);
     let circuit_operations = witness.calculate_operations(input);
     let pub_data_from_witness = witness.get_pubdata();
+    let offset_commitment = witness.get_offset_commitment_data();
 
     // Prepare circuit
-    witness_accum.add_operation_with_pubdata(circuit_operations, pub_data_from_witness);
+    witness_accum.add_operation_with_pubdata(
+        circuit_operations,
+        pub_data_from_witness,
+        offset_commitment,
+    );
     witness_accum.collect_fees(&fees);
     witness_accum.calculate_pubdata_commitment();
 
@@ -185,8 +195,12 @@ pub fn corrupted_input_test_scenario<W, F>(
 {
     // Initialize Plasma and WitnessBuilder.
     let (mut plasma_state, mut circuit_account_tree) = ZkSyncStateGenerator::generate(&accounts);
-    let mut witness_accum =
-        WitnessBuilder::new(&mut circuit_account_tree, FEE_ACCOUNT_ID, BlockNumber(1));
+    let mut witness_accum = WitnessBuilder::new(
+        &mut circuit_account_tree,
+        FEE_ACCOUNT_ID,
+        BlockNumber(1),
+        BLOCK_TIMESTAMP,
+    );
 
     // Apply op on plasma
     let fees = apply_op_on_plasma(&mut plasma_state, &op);
@@ -196,9 +210,14 @@ pub fn corrupted_input_test_scenario<W, F>(
     let witness = W::apply_tx(&mut witness_accum.account_tree, &op);
     let circuit_operations = witness.calculate_operations(input.clone());
     let pub_data_from_witness = witness.get_pubdata();
+    let offset_commitment = witness.get_offset_commitment_data();
 
     // Prepare circuit
-    witness_accum.add_operation_with_pubdata(circuit_operations, pub_data_from_witness);
+    witness_accum.add_operation_with_pubdata(
+        circuit_operations,
+        pub_data_from_witness,
+        offset_commitment,
+    );
     witness_accum.collect_fees(&fees);
     witness_accum.calculate_pubdata_commitment();
 
@@ -240,8 +259,12 @@ pub fn incorrect_op_test_scenario<W, F>(
 {
     // Initialize WitnessBuilder.
     let (_, mut circuit_account_tree) = ZkSyncStateGenerator::generate(&accounts);
-    let mut witness_accum =
-        WitnessBuilder::new(&mut circuit_account_tree, FEE_ACCOUNT_ID, BlockNumber(1));
+    let mut witness_accum = WitnessBuilder::new(
+        &mut circuit_account_tree,
+        FEE_ACCOUNT_ID,
+        BlockNumber(1),
+        BLOCK_TIMESTAMP,
+    );
 
     // Collect fees without actually applying the tx on plasma
     let fees = collect_fees();
@@ -250,9 +273,14 @@ pub fn incorrect_op_test_scenario<W, F>(
     let witness = W::apply_tx(&mut witness_accum.account_tree, &op);
     let circuit_operations = witness.calculate_operations(input.clone());
     let pub_data_from_witness = witness.get_pubdata();
+    let offset_commitment = witness.get_offset_commitment_data();
 
     // Prepare circuit
-    witness_accum.add_operation_with_pubdata(circuit_operations, pub_data_from_witness);
+    witness_accum.add_operation_with_pubdata(
+        circuit_operations,
+        pub_data_from_witness,
+        offset_commitment,
+    );
     witness_accum.collect_fees(&fees);
     witness_accum.calculate_pubdata_commitment();
 

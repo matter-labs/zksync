@@ -1,8 +1,8 @@
 const { expect } = require('chai');
-const { deployContract } = require('ethereum-waffle');
-const { wallet, wallet2, deployTestContract, getCallRevertReason } = require('./common');
+const { getCallRevertReason } = require('./common');
+const hardhat = require('hardhat');
 
-import { Contract, constants } from 'ethers';
+import { constants } from 'ethers';
 
 const TX_OPTS = {
     gasLimit: 300000
@@ -11,42 +11,48 @@ describe('Proxy unit tests', function () {
     this.timeout(50000);
 
     let proxyTestContract;
-    let proxyDummyInterface;
-    let DummyFirst;
+    let dummyFirst;
+    let wallet;
     before(async () => {
-        DummyFirst = await deployTestContract('../../build/DummyFirst');
-        proxyTestContract = await deployContract(wallet, require('../../build/Proxy'), [DummyFirst.address, [1, 2]], {
-            gasLimit: 6000000
-        });
-        proxyDummyInterface = new Contract(proxyTestContract.address, require('../../build/DummyTarget').abi, wallet);
+        const wallets = await hardhat.ethers.getSigners();
+        // Get some wallet different from than the default one.
+        wallet = wallets[1];
 
-        // check delegatecall
+        const dummyFactory = await hardhat.ethers.getContractFactory('DummyFirst');
+        dummyFirst = await dummyFactory.deploy();
+        const proxyFactory = await hardhat.ethers.getContractFactory('Proxy');
+        proxyTestContract = await proxyFactory.deploy(dummyFirst.address, [1, 2]);
+    });
+
+    it('check delegatecall', async () => {
+        const dummyFactory = await hardhat.ethers.getContractFactory('DummyFirst');
+        const proxyDummyInterface = dummyFactory.attach(proxyTestContract.address);
         expect(await proxyDummyInterface.get_DUMMY_INDEX()).to.equal(1);
     });
 
     it('checking that requireMaster calls present', async () => {
-        const testContract_with_wallet2_signer = await proxyTestContract.connect(wallet2);
+        const testContract_with_wallet2_signer = await proxyTestContract.connect(wallet);
         expect(
             (
                 await getCallRevertReason(() =>
                     testContract_with_wallet2_signer.upgradeTarget(constants.AddressZero, [], TX_OPTS)
                 )
             ).revertReason
-        ).equal('oro11');
+        ).equal('1c');
         expect(
             (await getCallRevertReason(() => testContract_with_wallet2_signer.upgradeNoticePeriodStarted(TX_OPTS)))
                 .revertReason
-        ).equal('oro11');
+        ).equal('1c');
         expect(
             (await getCallRevertReason(() => testContract_with_wallet2_signer.upgradePreparationStarted(TX_OPTS)))
                 .revertReason
-        ).equal('oro11');
+        ).equal('1c');
         expect(
             (await getCallRevertReason(() => testContract_with_wallet2_signer.upgradeCanceled(TX_OPTS))).revertReason
-        ).equal('oro11');
+        ).equal('1c');
         expect(
             (await getCallRevertReason(() => testContract_with_wallet2_signer.upgradeFinishes(TX_OPTS))).revertReason
-        ).equal('oro11');
+        ).equal('1c');
     });
 
     it('checking Proxy reverts', async () => {

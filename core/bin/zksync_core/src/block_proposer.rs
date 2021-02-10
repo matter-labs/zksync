@@ -21,11 +21,13 @@ use crate::{
 
 fn create_mempool_req(
     last_priority_op_number: u64,
+    block_timestamp: u64,
 ) -> (MempoolBlocksRequest, oneshot::Receiver<ProposedBlock>) {
     let (response_sender, receiver) = oneshot::channel();
     (
         MempoolBlocksRequest::GetBlock(GetBlockRequest {
             last_priority_op_number,
+            block_timestamp,
             response_sender,
         }),
         receiver,
@@ -40,8 +42,9 @@ struct BlockProposer {
 }
 
 impl BlockProposer {
-    async fn propose_new_block(&mut self) -> ProposedBlock {
-        let (mempool_req, resp) = create_mempool_req(self.current_priority_op_number);
+    async fn propose_new_block(&mut self, block_timestamp: u64) -> ProposedBlock {
+        let (mempool_req, resp) =
+            create_mempool_req(self.current_priority_op_number, block_timestamp);
         self.mempool_requests
             .send(mempool_req)
             .await
@@ -50,8 +53,23 @@ impl BlockProposer {
         resp.await.expect("Mempool new block request failed")
     }
 
+    async fn get_pending_block_timestamp(&mut self) -> u64 {
+        let (block_timestamp_sender, block_timestamp_receiver) = oneshot::channel();
+        self.statekeeper_requests
+            .send(StateKeeperRequest::GetPendingBlockTimestamp(
+                block_timestamp_sender,
+            ))
+            .await
+            .expect("state keeper receiver dropped");
+
+        block_timestamp_receiver
+            .await
+            .expect("State keeper pending block timestamp request failed")
+    }
+
     async fn commit_new_tx_mini_batch(&mut self) {
-        let proposed_block = self.propose_new_block().await;
+        let block_timestamp = self.get_pending_block_timestamp().await;
+        let proposed_block = self.propose_new_block(block_timestamp).await;
 
         self.current_priority_op_number += proposed_block.priority_ops.len() as u64;
         self.statekeeper_requests

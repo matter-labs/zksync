@@ -68,6 +68,7 @@ impl TransferToNewOp {
         )
         .ok_or_else(|| format_err!("Cant get fee from transfer to new pubdata"))?;
         let nonce = 0; // It is unknown from pubdata
+        let time_range = Default::default();
 
         Ok(Self {
             tx: Transfer::new(
@@ -78,6 +79,7 @@ impl TransferToNewOp {
                 amount,
                 fee,
                 Nonce(nonce),
+                time_range,
                 None,
             ),
             from: AccountId(from_id),

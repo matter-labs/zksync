@@ -6,8 +6,9 @@ use jsonrpc_core::Error;
 use jsonrpc_derive::rpc;
 
 // Workspace uses
+use zksync_crypto::params::ZKSYNC_VERSION;
 use zksync_types::{
-    tx::{TxEthSignature, TxHash},
+    tx::{EthBatchSignatures, TxEthSignature, TxHash},
     Address, BatchFee, Fee, Token, TokenLike, TxFeeTypes, ZkSyncTx,
 };
 
@@ -39,7 +40,7 @@ pub trait Rpc {
     fn submit_txs_batch(
         &self,
         txs: Vec<TxWithSignature>,
-        eth_signature: Option<TxEthSignature>,
+        eth_signatures: Option<EthBatchSignatures>,
     ) -> FutureResp<Vec<TxHash>>;
 
     #[rpc(name = "contract_address", returns = "ContractAddressResp")]
@@ -49,19 +50,21 @@ pub trait Rpc {
     #[rpc(name = "tokens", returns = "Token")]
     fn tokens(&self) -> FutureResp<HashMap<String, Token>>;
 
+    // _address argument is left for the backward compatibility.
     #[rpc(name = "get_tx_fee", returns = "Fee")]
     fn get_tx_fee(
         &self,
         tx_type: TxFeeTypes,
-        address: Address,
+        _address: Address,
         token_like: TokenLike,
     ) -> FutureResp<Fee>;
 
+    // _addresses argument is left for the backward compatibility.
     #[rpc(name = "get_txs_batch_fee_in_wei", returns = "BatchFee")]
     fn get_txs_batch_fee_in_wei(
         &self,
         tx_types: Vec<TxFeeTypes>,
-        addresses: Vec<Address>,
+        _addresses: Vec<Address>,
         token_like: TokenLike,
     ) -> FutureResp<BatchFee>;
 
@@ -73,6 +76,9 @@ pub trait Rpc {
 
     #[rpc(name = "get_eth_tx_for_withdrawal", returns = "Option<String>")]
     fn get_eth_tx_for_withdrawal(&self, withdrawal_hash: TxHash) -> FutureResp<Option<String>>;
+
+    #[rpc(name = "get_zksync_version", returns = "String")]
+    fn get_zksync_version(&self) -> Result<String, Error>;
 }
 
 impl Rpc for RpcApp {
@@ -122,13 +128,13 @@ impl Rpc for RpcApp {
     fn submit_txs_batch(
         &self,
         txs: Vec<TxWithSignature>,
-        eth_signature: Option<TxEthSignature>,
+        eth_signatures: Option<EthBatchSignatures>,
     ) -> FutureResp<Vec<TxHash>> {
         let handle = self.runtime_handle.clone();
         let self_ = self.clone();
         let resp = async move {
             handle
-                .spawn(self_._impl_submit_txs_batch(txs, eth_signature))
+                .spawn(self_._impl_submit_txs_batch(txs, eth_signatures))
                 .await
                 .unwrap()
         };
@@ -217,5 +223,9 @@ impl Rpc for RpcApp {
                 .unwrap()
         };
         Box::new(resp.boxed().compat())
+    }
+
+    fn get_zksync_version(&self) -> Result<String, Error> {
+        Ok(String::from(ZKSYNC_VERSION))
     }
 }

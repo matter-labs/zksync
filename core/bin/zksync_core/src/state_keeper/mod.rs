@@ -1,3 +1,4 @@
+use anyhow::{ensure, Result};
 use std::collections::{HashMap, VecDeque};
 use std::time::Instant;
 // External uses
@@ -10,6 +11,7 @@ use itertools::Itertools;
 use tokio::task::JoinHandle;
 // Workspace uses
 use zksync_crypto::ff;
+use zksync_crypto::ff::{PrimeField, PrimeFieldRepr};
 use zksync_state::state::{CollectedFee, OpSuccess, ZkSyncState};
 use zksync_storage::ConnectionPool;
 use zksync_types::{
@@ -20,14 +22,15 @@ use zksync_types::{
     gas_counter::GasCounter,
     mempool::SignedTxVariant,
     tx::{TxHash, ZkSyncTx},
-    Account, AccountId, AccountTree, AccountUpdate, AccountUpdates, ActionType, Address,
-    BlockNumber, PriorityOp, SignedZkSyncTx,
+    Account, AccountId, AccountTree, AccountUpdate, AccountUpdates, Address, BlockNumber,
+    PriorityOp, SignedZkSyncTx, H256,
 };
 // Local uses
 use crate::{
     committer::{AppliedUpdatesRequest, BlockCommitRequest, CommitRequest},
     mempool::ProposedBlock,
 };
+use std::time::{SystemTime, UNIX_EPOCH};
 
 #[cfg(test)]
 mod tests;
@@ -39,9 +42,11 @@ pub enum ExecutedOpId {
 
 pub enum StateKeeperRequest {
     GetAccount(Address, oneshot::Sender<Option<(AccountId, Account)>>),
+    GetPendingBlockTimestamp(oneshot::Sender<u64>),
     GetLastUnprocessedPriorityOp(oneshot::Sender<u64>),
     ExecuteMiniBlock(ProposedBlock),
     SealBlock,
+    GetCurrentState(oneshot::Sender<ZkSyncStateInitParams>),
 }
 
 #[derive(Debug, Clone)]
@@ -60,10 +65,17 @@ struct PendingBlock {
     collected_fees: Vec<CollectedFee>,
     /// Number of stored account updates in the db (from `account_updates` field)
     stored_account_updates: usize,
+    previous_block_root_hash: H256,
+    timestamp: u64,
 }
 
 impl PendingBlock {
-    fn new(unprocessed_priority_op_before: u64, chunks_left: usize) -> Self {
+    fn new(
+        unprocessed_priority_op_before: u64,
+        chunks_left: usize,
+        previous_block_root_hash: H256,
+        timestamp: u64,
+    ) -> Self {
         Self {
             success_operations: Vec::new(),
             failed_txs: Vec::new(),
@@ -76,8 +88,17 @@ impl PendingBlock {
             fast_processing_required: false,
             collected_fees: Vec::new(),
             stored_account_updates: 0,
+            previous_block_root_hash,
+            timestamp,
         }
     }
+}
+
+pub fn system_time_timestamp() -> u64 {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .expect("failed to get system time")
+        .as_secs()
 }
 
 /// Responsible for tx processing and block forming.
@@ -105,6 +126,7 @@ pub struct ZkSyncStateKeeper {
     failed_txs_pending_len: usize,
 }
 
+#[derive(Debug, Clone)]
 pub struct ZkSyncStateInitParams {
     pub tree: AccountTree,
     pub acc_id_by_addr: HashMap<Address, AccountId>,
@@ -313,19 +335,14 @@ impl ZkSyncStateInitParams {
         storage: &mut zksync_storage::StorageProcessor<'_>,
         block_number: BlockNumber,
     ) -> Result<u64, anyhow::Error> {
-        let storage_op = storage
+        let block = storage
             .chain()
-            .operations_schema()
-            .get_operation(block_number, ActionType::COMMIT)
-            .await;
-        if let Some(storage_op) = storage_op {
-            Ok(storage_op
-                .into_op(storage)
-                .await
-                .map_err(|e| anyhow::format_err!("could not convert storage_op: {}", e))?
-                .block
-                .processed_priority_ops
-                .1)
+            .block_schema()
+            .get_block(block_number)
+            .await?;
+
+        if let Some(block) = block {
+            Ok(block.processed_priority_ops.1)
         } else {
             Ok(0)
         }
@@ -362,13 +379,25 @@ impl ZkSyncStateKeeper {
             .expect("Fee account should be present in the account tree");
         // Keeper starts with the NEXT block
         let max_block_size = *available_block_chunk_sizes.iter().max().unwrap();
+        let mut be_bytes = [0u8; 32];
+        state
+            .root_hash()
+            .into_repr()
+            .write_be(be_bytes.as_mut())
+            .expect("Write commit bytes");
+        let previous_root_hash = H256::from(be_bytes);
         let keeper = ZkSyncStateKeeper {
             state,
             fee_account_id,
             current_unprocessed_priority_op: initial_state.unprocessed_priority_op,
             rx_for_blocks,
             tx_for_commitments,
-            pending_block: PendingBlock::new(initial_state.unprocessed_priority_op, max_block_size),
+            pending_block: PendingBlock::new(
+                initial_state.unprocessed_priority_op,
+                max_block_size,
+                previous_root_hash,
+                system_time_timestamp(),
+            ),
             available_block_chunk_sizes,
             max_miniblock_iterations,
             fast_miniblock_iterations,
@@ -419,6 +448,7 @@ impl ZkSyncStateKeeper {
                 pending_block.failed_txs.len()
             );
             self.pending_block.failed_txs = pending_block.failed_txs;
+            self.pending_block.timestamp = pending_block.timestamp;
         } else {
             vlog::info!("There is no pending block to restore");
         }
@@ -467,12 +497,19 @@ impl ZkSyncStateKeeper {
             .await
             .expect("db fail");
 
+        let state = ZkSyncState::from_acc_map(accounts, last_committed + 1);
+        let root_hash = state.root_hash();
+        transaction
+            .chain()
+            .block_schema()
+            .save_genesis_block(root_hash)
+            .await
+            .expect("db fail");
+
         transaction
             .commit()
             .await
             .expect("Unable to commit transaction in statekeeper");
-        let state = ZkSyncState::from_acc_map(accounts, last_committed + 1);
-        let root_hash = state.root_hash();
         vlog::info!("Genesis block created, state: {}", state.root_hash());
         println!("CONTRACTS_GENESIS_ROOT=0x{}", ff::to_hex(&root_hash));
         metrics::histogram!("state_keeper.create_genesis_block", start.elapsed());
@@ -486,6 +523,11 @@ impl ZkSyncStateKeeper {
                 StateKeeperRequest::GetAccount(addr, sender) => {
                     sender.send(self.account(&addr)).unwrap_or_default();
                 }
+                StateKeeperRequest::GetPendingBlockTimestamp(sender) => {
+                    sender
+                        .send(self.pending_block.timestamp)
+                        .unwrap_or_default();
+                }
                 StateKeeperRequest::GetLastUnprocessedPriorityOp(sender) => {
                     sender
                         .send(self.current_unprocessed_priority_op)
@@ -497,6 +539,9 @@ impl ZkSyncStateKeeper {
                 StateKeeperRequest::SealBlock => {
                     self.seal_pending_block().await;
                 }
+                StateKeeperRequest::GetCurrentState(sender) => {
+                    sender.send(self.get_current_state()).unwrap_or_default();
+                }
             }
         }
     }
@@ -504,6 +549,11 @@ impl ZkSyncStateKeeper {
     async fn execute_proposed_block(&mut self, proposed_block: ProposedBlock) {
         let start = Instant::now();
         let mut executed_ops = Vec::new();
+
+        // If pending block is empty we update timestamp
+        if self.pending_block.success_operations.is_empty() {
+            self.pending_block.timestamp = system_time_timestamp();
+        }
 
         // We want to store this variable before moving anything from the pending block.
         let empty_proposed_block = proposed_block.is_empty();
@@ -643,6 +693,64 @@ impl ZkSyncStateKeeper {
         Ok(exec_result)
     }
 
+    /// Checks that block timestamp is valid for the execution of the transaction.
+    /// Returns a corresponding error if the transaction can't be executed in the block because of an invalid timestamp.
+    fn check_transaction_timestamps(
+        &mut self,
+        tx: ZkSyncTx,
+        block_timestamp: u64,
+    ) -> Result<(), anyhow::Error> {
+        let time_range = match tx {
+            ZkSyncTx::Transfer(tx) => tx.time_range.unwrap_or_default(),
+            ZkSyncTx::Withdraw(tx) => tx.time_range.unwrap_or_default(),
+            ZkSyncTx::ForcedExit(tx) => tx.time_range,
+            ZkSyncTx::ChangePubKey(tx) => tx.time_range.unwrap_or_default(),
+            ZkSyncTx::Close(tx) => tx.time_range,
+        };
+        ensure!(
+            time_range.is_valid(block_timestamp),
+            "The transaction can't be executed in the block because of an invalid timestamp"
+        );
+        Ok(())
+    }
+
+    fn execute_txs_batch(
+        &mut self,
+        txs: &[SignedZkSyncTx],
+        block_timestamp: u64,
+    ) -> Vec<Result<OpSuccess, anyhow::Error>> {
+        for (id, tx) in txs.iter().enumerate() {
+            if let Err(error) = self.check_transaction_timestamps(tx.tx.clone(), block_timestamp) {
+                // Create message for an error.
+                let error_msg = format!(
+                    "Batch execution failed, since tx #{} of batch failed with a reason: {}",
+                    id + 1,
+                    error
+                );
+
+                // Create the same error for each transaction.
+                let errors = (0..txs.len())
+                    .map(|_| Err(anyhow::format_err!("{}", error_msg)))
+                    .collect();
+
+                // Stop execution and return an error.
+                return errors;
+            }
+        }
+
+        self.state.execute_txs_batch(txs)
+    }
+
+    fn execute_tx(
+        &mut self,
+        tx: ZkSyncTx,
+        block_timestamp: u64,
+    ) -> Result<OpSuccess, anyhow::Error> {
+        self.check_transaction_timestamps(tx.clone(), block_timestamp)?;
+
+        self.state.execute_tx(tx)
+    }
+
     fn apply_batch(
         &mut self,
         txs: &[SignedZkSyncTx],
@@ -678,7 +786,7 @@ impl ZkSyncStateKeeper {
             }
         }
 
-        let all_updates = self.state.execute_txs_batch(txs);
+        let all_updates = self.execute_txs_batch(txs, self.pending_block.timestamp);
         let mut executed_operations = Vec::new();
 
         for (tx, tx_updates) in txs.iter().zip(all_updates) {
@@ -767,7 +875,7 @@ impl ZkSyncStateKeeper {
             }
         }
 
-        let tx_updates = self.state.execute_tx(tx.tx.clone());
+        let tx_updates = self.execute_tx(tx.tx.clone(), self.pending_block.timestamp);
 
         let exec_result = match tx_updates {
             Ok(OpSuccess {
@@ -828,6 +936,8 @@ impl ZkSyncStateKeeper {
                     .available_block_chunk_sizes
                     .last()
                     .expect("failed to get max block size"),
+                H256::default(),
+                system_time_timestamp(),
             ),
         );
 
@@ -854,20 +964,26 @@ impl ZkSyncStateKeeper {
         let commit_gas_limit = pending_block.gas_counter.commit_gas_limit();
         let verify_gas_limit = pending_block.gas_counter.verify_gas_limit();
 
-        let block_commit_request = BlockCommitRequest {
-            block: Block::new_from_available_block_sizes(
-                self.state.block_number,
-                self.state.root_hash(),
-                self.fee_account_id,
-                block_transactions,
-                (
-                    pending_block.unprocessed_priority_op_before,
-                    self.current_unprocessed_priority_op,
-                ),
-                &self.available_block_chunk_sizes,
-                commit_gas_limit,
-                verify_gas_limit,
+        let block = Block::new_from_available_block_sizes(
+            self.state.block_number,
+            self.state.root_hash(),
+            self.fee_account_id,
+            block_transactions,
+            (
+                pending_block.unprocessed_priority_op_before,
+                self.current_unprocessed_priority_op,
             ),
+            &self.available_block_chunk_sizes,
+            commit_gas_limit,
+            verify_gas_limit,
+            pending_block.previous_block_root_hash,
+            pending_block.timestamp,
+        );
+
+        self.pending_block.previous_block_root_hash = block.get_eth_encoded_root();
+
+        let block_commit_request = BlockCommitRequest {
+            block,
             accounts_updated: pending_block.account_updates.clone(),
         };
         let first_update_order_id = pending_block.stored_account_updates;
@@ -924,6 +1040,8 @@ impl ZkSyncStateKeeper {
             pending_block_iteration: self.pending_block.pending_block_iteration,
             success_operations: new_success_operations,
             failed_txs: new_failed_operations,
+            previous_block_root_hash: self.pending_block.previous_block_root_hash,
+            timestamp: self.pending_block.timestamp,
         };
         let first_update_order_id = self.pending_block.stored_account_updates;
         let account_updates = self.pending_block.account_updates[first_update_order_id..].to_vec();
@@ -952,6 +1070,14 @@ impl ZkSyncStateKeeper {
 
     fn account(&self, address: &Address) -> Option<(AccountId, Account)> {
         self.state.get_account_by_address(address)
+    }
+    pub fn get_current_state(&self) -> ZkSyncStateInitParams {
+        ZkSyncStateInitParams {
+            tree: self.state.get_balance_tree(),
+            acc_id_by_addr: self.state.get_account_addresses(),
+            last_block_number: self.state.block_number - 1,
+            unprocessed_priority_op: self.current_unprocessed_priority_op,
+        }
     }
 }
 

@@ -8,7 +8,7 @@ use futures::future;
 use jsonrpc_core::Params;
 use num::BigUint;
 use serde_json::{json, Value};
-use web3::types::Bytes;
+use web3::types::{BlockNumber as Web3BlockNumber, Bytes};
 use web3::{contract::tokens::Tokenize, types::Transaction, RequestId, Transport};
 
 use db_test_macro::test as db_test;
@@ -23,6 +23,7 @@ use zksync_types::{
     ZkSyncOp, H256,
 };
 
+use crate::contract::ZkSyncDeployedContract;
 use crate::{
     data_restore_driver::DataRestoreDriver,
     database_storage_interactor::DatabaseStorageInteractor,
@@ -30,6 +31,7 @@ use crate::{
     tests::utils::{create_log, u32_to_32bytes},
     END_ETH_BLOCKS_OFFSET, ETH_BLOCKS_STEP,
 };
+use web3::api::{Eth, Namespace};
 
 fn create_withdraw_operations(
     account_id: AccountId,
@@ -46,6 +48,7 @@ fn create_withdraw_operations(
             amount.into(),
             0u32.into(),
             Nonce(0),
+            Default::default(),
             None,
         ),
         account_id,
@@ -98,6 +101,8 @@ fn create_block(block_number: BlockNumber, transactions: Vec<ExecutedOperations>
         100,
         1_000_000.into(),
         1_500_000.into(),
+        H256::default(),
+        0,
     )
 }
 
@@ -343,13 +348,21 @@ async fn test_run_state_update(mut storage: StorageProcessor<'_>) {
     let mut driver = DataRestoreDriver::new(
         transport.clone(),
         [1u8; 20].into(),
-        [1u8; 20].into(),
         ETH_BLOCKS_STEP,
         END_ETH_BLOCKS_OFFSET,
         vec![6, 30],
         true,
         None,
     );
+    let eth = Eth::new(transport.clone());
+    driver
+        .zksync_contracts
+        .push(ZkSyncDeployedContract::version3(
+            eth,
+            [1u8; 20].into(),
+            Web3BlockNumber::Earliest,
+            Web3BlockNumber::Latest,
+        ));
     driver.run_state_update(&mut interactor).await;
 
     // Check that it's stores some account, created by deposit
@@ -374,13 +387,22 @@ async fn test_run_state_update(mut storage: StorageProcessor<'_>) {
     let mut driver = DataRestoreDriver::new(
         transport.clone(),
         [1u8; 20].into(),
-        [1u8; 20].into(),
         ETH_BLOCKS_STEP,
         END_ETH_BLOCKS_OFFSET,
         vec![6, 30],
         true,
         None,
     );
+    let eth = Eth::new(transport.clone());
+    driver
+        .zksync_contracts
+        .push(ZkSyncDeployedContract::version3(
+            eth,
+            [1u8; 20].into(),
+            Web3BlockNumber::Earliest,
+            Web3BlockNumber::Latest,
+        ));
+
     // Load state from db and check it
     assert!(driver.load_state_from_storage(&mut interactor).await);
     assert_eq!(driver.events_state.committed_events.len(), events.len());
@@ -492,13 +514,23 @@ async fn test_with_inmemory_storage() {
     let mut driver = DataRestoreDriver::new(
         transport.clone(),
         [1u8; 20].into(),
-        [1u8; 20].into(),
         ETH_BLOCKS_STEP,
         END_ETH_BLOCKS_OFFSET,
         vec![6, 30],
         true,
         None,
     );
+
+    let eth = Eth::new(transport.clone());
+    driver
+        .zksync_contracts
+        .push(ZkSyncDeployedContract::version3(
+            eth,
+            [1u8; 20].into(),
+            Web3BlockNumber::Earliest,
+            Web3BlockNumber::Latest,
+        ));
+
     driver.run_state_update(&mut interactor).await;
 
     // Check that it's stores some account, created by deposit
@@ -517,13 +549,22 @@ async fn test_with_inmemory_storage() {
     let mut driver = DataRestoreDriver::new(
         transport.clone(),
         [1u8; 20].into(),
-        [1u8; 20].into(),
         ETH_BLOCKS_STEP,
         END_ETH_BLOCKS_OFFSET,
         vec![6, 30],
         true,
         None,
     );
+    let eth = Eth::new(transport.clone());
+    driver
+        .zksync_contracts
+        .push(ZkSyncDeployedContract::version3(
+            eth,
+            [1u8; 20].into(),
+            Web3BlockNumber::Earliest,
+            Web3BlockNumber::Latest,
+        ));
+
     // Load state from db and check it
     assert!(driver.load_state_from_storage(&mut interactor).await);
     assert_eq!(driver.events_state.committed_events.len(), events.len());

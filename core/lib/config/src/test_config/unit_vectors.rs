@@ -9,6 +9,7 @@ use zksync_utils::{
 };
 // Local uses
 use super::{config_path, load_json};
+use zksync_types::tx::TimeRange;
 
 #[derive(Debug, Deserialize)]
 pub struct Config {
@@ -98,6 +99,8 @@ pub struct Transfer {
     #[serde(with = "BigUintSerdeAsRadix10Str")]
     pub fee: BigUint,
     pub nonce: Nonce,
+    #[serde(flatten)]
+    pub time_range: TimeRange,
 }
 
 #[derive(Debug, Deserialize)]
@@ -110,6 +113,8 @@ pub struct ChangePubKey {
     #[serde(with = "BigUintSerdeAsRadix10Str")]
     pub fee: BigUint,
     pub nonce: Nonce,
+    #[serde(flatten)]
+    pub time_range: TimeRange,
 }
 
 #[derive(Debug, Deserialize)]
@@ -124,6 +129,8 @@ pub struct Withdraw {
     #[serde(with = "BigUintSerdeAsRadix10Str")]
     pub fee: BigUint,
     pub nonce: Nonce,
+    #[serde(flatten)]
+    pub time_range: TimeRange,
 }
 
 #[derive(Debug, Deserialize)]
@@ -136,6 +143,8 @@ pub struct ForcedExit {
     #[serde(with = "BigUintSerdeAsRadix10Str")]
     pub fee: BigUint,
     pub nonce: Nonce,
+    #[serde(flatten)]
+    pub time_range: TimeRange,
 }
 
 #[derive(Debug, Deserialize)]
@@ -174,7 +183,8 @@ pub struct TxOutput {
     #[serde(with = "ZeroPrefixHexSerde")]
     pub sign_bytes: Vec<u8>,
     pub signature: Signature,
-    pub eth_sign_message: Option<String>,
+    #[serde(with = "OptionBytesToHexSerde::<ZeroxPrefix>")]
+    pub eth_sign_message: Option<Vec<u8>>,
     #[serde(with = "OptionBytesToHexSerde::<ZeroxPrefix>")]
     pub eth_signature: Option<Vec<u8>>,
 }

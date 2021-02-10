@@ -20,6 +20,7 @@ fn change_pubkey_offchain_apply_tx(b: &mut Bencher<'_>, number_of_accounts: &usi
             TokenId(0),
             Default::default(),
             false,
+            Default::default(),
         ),
         account_id: account.id,
     };
@@ -43,6 +44,7 @@ fn change_pubkey_offchain_get_pubdata(b: &mut Bencher<'_>) {
             TokenId(0),
             Default::default(),
             false,
+            Default::default(),
         ),
         account_id: account.id,
     };
@@ -66,6 +68,7 @@ fn change_pubkey_offchain_calculate_operations(b: &mut Bencher<'_>) {
             TokenId(0),
             Default::default(),
             false,
+            Default::default(),
         ),
         account_id: account.id,
     };

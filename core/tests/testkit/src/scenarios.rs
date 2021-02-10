@@ -4,6 +4,8 @@ use num::BigUint;
 use std::time::Instant;
 use web3::transports::Http;
 
+use zksync_types::block::Block;
+
 use crate::{
     data_restore::verify_restore,
     eth_account::{parse_ether, EthereumAccount},
@@ -27,11 +29,13 @@ pub async fn perform_basic_tests() {
     let fee_account = ZkSyncAccount::rand();
     let fee_account_address = fee_account.address;
     let (sk_thread_handle, stop_state_keeper_sender, sk_channels) =
-        spawn_state_keeper(&fee_account_address);
+        spawn_state_keeper(&fee_account_address, genesis_state(&fee_account_address));
+
+    let initial_root = genesis_state(&fee_account.address).tree.root_hash();
 
     let deploy_timer = Instant::now();
     println!("deploying contracts");
-    let contracts = deploy_contracts(false, Default::default());
+    let contracts = deploy_contracts(false, initial_root);
     println!(
         "contracts deployed {:#?}, {} secs",
         contracts,
@@ -84,7 +88,14 @@ pub async fn perform_basic_tests() {
         fee_account_id: ZKSyncAccountId(0),
     };
 
-    let mut test_setup = TestSetup::new(sk_channels, accounts, &contracts, commit_account);
+    let mut test_setup = TestSetup::new(
+        sk_channels,
+        accounts,
+        &contracts,
+        commit_account,
+        initial_root,
+        None,
+    );
 
     let deposit_amount = parse_ether("1.0").unwrap();
 
@@ -105,7 +116,7 @@ pub async fn perform_basic_tests() {
         fee_account_address,
         test_setup.get_accounts_state().await,
         tokens,
-        test_setup.current_state_root.expect("Should exist"),
+        test_setup.last_committed_block.new_root_hash,
     )
     .await;
 
@@ -124,29 +135,34 @@ pub async fn perform_basic_operations(
     test_setup: &mut TestSetup,
     deposit_amount: BigUint,
     blocks_processing: BlockProcessing,
-) {
-    // test deposit to other account
+) -> Vec<Block> {
+    let mut executed_blocks = Vec::new();
+
+    // // test deposit to other account
     test_setup.start_block();
+
     test_setup
         .deposit(
             ETHAccountId(0),
-            ZKSyncAccountId(2),
+            ZKSyncAccountId(1),
             Token(token),
             deposit_amount.clone(),
         )
         .await;
-    if blocks_processing == BlockProcessing::CommitAndVerify {
+    let block = if blocks_processing == BlockProcessing::CommitAndVerify {
         test_setup
             .execute_commit_and_verify_block()
             .await
-            .expect("Block execution failed");
-        println!(
-            "Deposit to other account test success, token_id: {}",
-            *token
-        );
+            .expect("Block execution failed")
+            .block
     } else {
-        test_setup.execute_commit_block().await.0.expect_success();
-    }
+        test_setup.execute_commit_block().await
+    };
+    executed_blocks.push(block);
+    println!(
+        "Deposit to other account test success, token_id: {}",
+        *token
+    );
 
     // test two deposits
     test_setup.start_block();
@@ -158,24 +174,28 @@ pub async fn perform_basic_operations(
             deposit_amount.clone(),
         )
         .await;
+
     test_setup
         .deposit(
             ETHAccountId(0),
-            ZKSyncAccountId(1),
+            ZKSyncAccountId(2),
             Token(token),
             deposit_amount.clone(),
         )
         .await;
-    if blocks_processing == BlockProcessing::CommitAndVerify {
+
+    let block = if blocks_processing == BlockProcessing::CommitAndVerify {
         test_setup
             .execute_commit_and_verify_block()
             .await
-            .expect("Block execution failed");
-        println!("Deposit test success, token_id: {}", *token);
+            .expect("Block execution failed")
+            .block
     } else {
-        test_setup.execute_commit_block().await.0.expect_success();
-    }
-
+        test_setup.execute_commit_block().await
+    };
+    executed_blocks.push(block);
+    println!("Deposit test success, token_id: {}", *token);
+    //
     // test transfers
     test_setup.start_block();
 
@@ -202,10 +222,11 @@ pub async fn perform_basic_operations(
             Token(token),
             &deposit_amount / BigUint::from(8u32),
             &deposit_amount / BigUint::from(8u32),
+            Default::default(),
         )
         .await;
-
-    //should be executed as a transfer
+    //
+    // //should be executed as a transfer
     test_setup
         .transfer(
             ZKSyncAccountId(1),
@@ -213,6 +234,7 @@ pub async fn perform_basic_operations(
             Token(token),
             &deposit_amount / BigUint::from(8u32),
             &deposit_amount / BigUint::from(8u32),
+            Default::default(),
         )
         .await;
 
@@ -224,6 +246,7 @@ pub async fn perform_basic_operations(
         deposit_amount.clone(),
         BigUint::from(0u32),
         Some(nonce + 1),
+        Default::default(),
         false,
     );
     test_setup
@@ -238,6 +261,7 @@ pub async fn perform_basic_operations(
             Token(token),
             &deposit_amount / BigUint::from(4u32),
             &deposit_amount / BigUint::from(4u32),
+            Default::default(),
         )
         .await;
 
@@ -254,26 +278,37 @@ pub async fn perform_basic_operations(
             &deposit_amount / BigUint::from(4u32),
         )
         .await;
-    if blocks_processing == BlockProcessing::CommitAndVerify {
+    let block = if blocks_processing == BlockProcessing::CommitAndVerify {
         test_setup
             .execute_commit_and_verify_block()
             .await
-            .expect("Block execution failed");
-        println!("Transfer test success, token_id: {}", *token);
+            .expect("Block execution failed")
+            .block
     } else {
-        test_setup.execute_commit_block().await.0.expect_success();
-    }
+        test_setup.execute_commit_block().await
+    };
+    executed_blocks.push(block);
+    println!("Transfer test success, token_id: {}", *token);
 
     test_setup.start_block();
     test_setup
         .full_exit(ETHAccountId(0), ZKSyncAccountId(1), Token(token))
         .await;
-    if blocks_processing == BlockProcessing::CommitAndVerify {
+    test_setup
+        .full_exit(ETHAccountId(0), ZKSyncAccountId(1), Token(token))
+        .await;
+
+    let block = if blocks_processing == BlockProcessing::CommitAndVerify {
         test_setup
             .execute_commit_and_verify_block()
             .await
-            .expect("Block execution failed");
+            .expect("Block execution failed")
+            .block
     } else {
-        test_setup.execute_commit_block().await.0.expect_success();
-    }
+        test_setup.execute_commit_block().await
+    };
+    executed_blocks.push(block);
+    println!("FullExit test success, token_id: {}", token);
+
+    executed_blocks
 }

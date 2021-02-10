@@ -13,6 +13,9 @@ forced_exit_minimum_account_age_secs=0
 # Ability to perform change pub key with zero fee
 enforce_pubkey_change_fee=true
 
+max_number_of_transactions_per_batch=200
+max_number_of_authors_per_batch=10
+
 # Configuration for the admin API server
 [api.admin]
 port=8080

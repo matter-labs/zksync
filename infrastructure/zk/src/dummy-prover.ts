@@ -3,8 +3,7 @@ import * as utils from './utils';
 
 import * as server from './server';
 import * as contract from './contract';
-
-const VERIFIER_FILE = 'contracts/contracts/Verifier.sol';
+import * as env from './env';
 
 async function performRedeployment() {
     await contract.build();
@@ -13,30 +12,24 @@ async function performRedeployment() {
 }
 
 export async function run() {
-    await utils.spawn('cargo run --release --bin dummy_prover dummy-prover-instance');
+    const child = utils.background('cargo run --release --bin dummy_prover dummy-prover-instance');
+    process.on('SIGINT', () => {
+        child.kill('SIGINT');
+    });
 }
 
 export async function status() {
-    try {
-        // using grep and not native fs.readFile because grep -l stops after first match
-        await utils.exec(`grep -l 'constant DUMMY_VERIFIER = true' ${VERIFIER_FILE}`);
+    if (process.env.CONTRACTS_TEST_DUMMY_VERIFIER == 'true') {
         console.log('Dummy Prover status: enabled');
         return true;
-    } catch (err) {
-        console.log('Dummy Prover status: disabled');
-        return false;
     }
-}
-
-export async function ensureDisabled() {
-    const enabled = await status();
-    if (enabled) {
-        throw new Error("This is not allowed, please change DUMMY_VERIFIER constant value to 'false'");
-    }
+    console.log('Dummy Prover status: disabled');
+    return false;
 }
 
 async function setStatus(value: boolean, redeploy: boolean) {
-    utils.replaceInFile(VERIFIER_FILE, '(.*constant DUMMY_VERIFIER)(.*);', `$1 = ${value};`);
+    env.modify('CONTRACTS_TEST_DUMMY_VERIFIER', `CONTRACTS_TEST_DUMMY_VERIFIER="${value}"`);
+    env.modify_contracts_toml('CONTRACTS_TEST_DUMMY_VERIFIER', `CONTRACTS_TEST_DUMMY_VERIFIER="${value}"`);
     await status();
     if (redeploy) {
         console.log('Redeploying the contract...');
@@ -78,8 +71,3 @@ command
     .description('check if dummy prover is enabled')
     // @ts-ignore
     .action(status);
-
-command
-    .command('ensure-disabled')
-    .description('checks if dummy-prover is disabled and exits with code 1 otherwise')
-    .action(ensureDisabled);

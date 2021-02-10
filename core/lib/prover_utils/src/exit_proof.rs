@@ -7,7 +7,7 @@ use std::time::Instant;
 use zksync_circuit::exit_circuit::create_exit_circuit_with_public_input;
 use zksync_crypto::circuit::account::CircuitAccount;
 use zksync_crypto::circuit::CircuitAccountTree;
-use zksync_crypto::proof::EncodedProofPlonk;
+use zksync_crypto::proof::EncodedSingleProof;
 use zksync_types::{AccountId, AccountMap, Address, TokenId};
 
 pub fn create_exit_proof(
@@ -15,7 +15,7 @@ pub fn create_exit_proof(
     account_id: AccountId,
     owner: Address,
     token_id: TokenId,
-) -> Result<(EncodedProofPlonk, BigUint), anyhow::Error> {
+) -> Result<(EncodedSingleProof, BigUint), anyhow::Error> {
     let timer = Instant::now();
     let mut circuit_account_tree =
         CircuitAccountTree::new(zksync_crypto::params::account_tree_depth());
@@ -40,10 +40,14 @@ pub fn create_exit_proof(
 
     let zksync_exit_circuit =
         create_exit_circuit_with_public_input(&mut circuit_account_tree, account_id, token_id);
+    let commitment = zksync_exit_circuit
+        .pub_data_commitment
+        .expect("Witness should contract commitment");
+    vlog::info!("Proof commitment: {:?}", commitment);
 
     let proof = gen_verified_proof_for_exit_circuit(zksync_exit_circuit)
         .map_err(|e| format_err!("Failed to generate proof: {}", e))?;
 
     vlog::info!("Exit proof created: {} s", timer.elapsed().as_secs());
-    Ok((proof, balance))
+    Ok((proof.serialize_single_proof(), balance))
 }

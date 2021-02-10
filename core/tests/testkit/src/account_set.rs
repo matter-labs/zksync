@@ -6,9 +6,11 @@ use zksync_crypto::rand::Rng;
 use zksync_types::{AccountId, Address, Nonce, PriorityOp, TokenId, ZkSyncTx};
 
 use crate::types::*;
+use zksync_types::tx::TimeRange;
 
 /// Account set is used to create transactions using stored account
 /// in a convenient way
+#[derive(Clone)]
 pub struct AccountSet {
     pub eth_accounts: Vec<EthereumAccount>,
     pub zksync_accounts: Vec<ZkSyncAccount>,
@@ -70,6 +72,7 @@ impl AccountSet {
         amount: BigUint,
         fee: BigUint,
         nonce: Option<Nonce>,
+        time_range: TimeRange,
         increment_nonce: bool,
     ) -> ZkSyncTx {
         let from = &self.zksync_accounts[from.0];
@@ -84,6 +87,7 @@ impl AccountSet {
                 &to.address,
                 nonce,
                 increment_nonce,
+                time_range,
             )
             .0,
         ))
@@ -116,6 +120,7 @@ impl AccountSet {
                 &to_address,
                 nonce,
                 increment_nonce,
+                Default::default(),
             )
             .0,
         ))
@@ -134,6 +139,7 @@ impl AccountSet {
         fee: BigUint,
         nonce: Option<Nonce>,
         increment_nonce: bool,
+        time_range: TimeRange,
     ) -> ZkSyncTx {
         let from = &self.zksync_accounts[from.0];
         let to = &self.eth_accounts[to.0];
@@ -147,6 +153,7 @@ impl AccountSet {
                 &to.address,
                 nonce,
                 increment_nonce,
+                time_range,
             )
             .0,
         ))
@@ -164,6 +171,7 @@ impl AccountSet {
         fee: BigUint,
         nonce: Option<Nonce>,
         increment_nonce: bool,
+        time_range: TimeRange,
     ) -> ZkSyncTx {
         let from = &self.zksync_accounts[initiator.0];
         let target = &self.zksync_accounts[target.0];
@@ -173,6 +181,7 @@ impl AccountSet {
             &target.address,
             nonce,
             increment_nonce,
+            time_range,
         )))
     }
 
@@ -202,6 +211,7 @@ impl AccountSet {
                 &to_address,
                 nonce,
                 increment_nonce,
+                Default::default(),
             )
             .0,
         ))
@@ -223,6 +233,7 @@ impl AccountSet {
             .expect("FullExit eth call failed")
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub async fn change_pubkey_with_onchain_auth(
         &self,
         eth_account: ETHAccountId,
@@ -231,6 +242,7 @@ impl AccountSet {
         fee: BigUint,
         nonce: Option<Nonce>,
         increment_nonce: bool,
+        time_range: TimeRange,
     ) -> ZkSyncTx {
         let zksync_account = &self.zksync_accounts[zksync_signer.0];
         let auth_nonce = nonce.unwrap_or_else(|| zksync_account.nonce());
@@ -247,6 +259,7 @@ impl AccountSet {
             fee_token,
             fee,
             true,
+            time_range,
         )))
     }
 
@@ -257,6 +270,7 @@ impl AccountSet {
         fee: BigUint,
         nonce: Option<Nonce>,
         increment_nonce: bool,
+        time_range: TimeRange,
     ) -> ZkSyncTx {
         let zksync_account = &self.zksync_accounts[zksync_signer.0];
         ZkSyncTx::ChangePubKey(Box::new(zksync_account.sign_change_pubkey_tx(
@@ -265,6 +279,7 @@ impl AccountSet {
             fee_token,
             fee,
             false,
+            time_range,
         )))
     }
 }

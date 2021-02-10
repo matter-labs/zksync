@@ -5,27 +5,33 @@ use std::fs::File;
 use std::sync::{Arc, Mutex};
 use zksync_crypto::bellman::kate_commitment::{Crs, CrsForMonomialForm};
 use zksync_crypto::bellman::plonk::better_cs::{
-    adaptor::TranspilationVariant, cs::PlonkCsWidth4WithNextStepParams, keys::Proof,
-    keys::SetupPolynomials, keys::VerificationKey,
+    adaptor::TranspilationVariant, cs::PlonkCsWidth4WithNextStepParams, keys::SetupPolynomials,
+    keys::VerificationKey, verifier::verify,
 };
-use zksync_crypto::bellman::plonk::commitments::transcript::keccak_transcript::RollingKeccakTranscript;
-use zksync_crypto::bellman::plonk::{prove_by_steps, setup, transpile, verify};
+use zksync_crypto::bellman::plonk::{
+    commitments::transcript::keccak_transcript::RollingKeccakTranscript, prove_by_steps, setup,
+    transpile,
+};
 use zksync_crypto::franklin_crypto::bellman::Circuit;
-use zksync_crypto::primitives::EthereumSerializer;
-use zksync_crypto::proof::EncodedProofPlonk;
+use zksync_crypto::franklin_crypto::plonk::circuit::bigint::field::RnsParameters;
+use zksync_crypto::franklin_crypto::rescue::bn256::Bn256RescueParams;
+use zksync_crypto::franklin_crypto::rescue::rescue_transcript::RescueTranscriptForRNS;
+use zksync_crypto::pairing::Engine as EngineTrait;
+use zksync_crypto::params::RECURSIVE_CIRCUIT_VK_TREE_DEPTH;
+use zksync_crypto::proof::SingleProof;
+use zksync_crypto::recursive_aggregation_circuit::circuit::create_vks_tree;
 use zksync_crypto::{Engine, Fr};
 
+pub mod aggregated_proofs;
 pub mod api;
 pub mod exit_proof;
 pub mod fs_utils;
 pub mod network_utils;
-pub mod prover_data;
-pub mod serialization;
 
 pub const SETUP_MIN_POW2: u32 = 20;
 pub const SETUP_MAX_POW2: u32 = 26;
 
-pub struct PlonkVerificationKey(VerificationKey<Engine, PlonkCsWidth4WithNextStepParams>);
+pub struct PlonkVerificationKey(pub VerificationKey<Engine, PlonkCsWidth4WithNextStepParams>);
 
 impl PlonkVerificationKey {
     pub fn read_verification_key_for_main_circuit(
@@ -40,6 +46,20 @@ impl PlonkVerificationKey {
         let verification_key =
             VerificationKey::read(File::open(get_exodus_verification_key_path())?)?;
         Ok(Self(verification_key))
+    }
+
+    pub fn get_vk_tree_root_hash(blocks_chunks: &[usize]) -> Fr {
+        let block_vks = blocks_chunks
+            .iter()
+            .map(|block_chunks| {
+                PlonkVerificationKey::read_verification_key_for_main_circuit(*block_chunks)
+                    .expect("Failed to get block vk")
+                    .0
+            })
+            .collect::<Vec<_>>();
+        let (_, (vk_tree, _)) = create_vks_tree(&block_vks, RECURSIVE_CIRCUIT_VK_TREE_DEPTH)
+            .expect("Failed to create vk tree");
+        vk_tree.get_commitment()
     }
 }
 
@@ -75,8 +95,13 @@ impl SetupForStepByStepProver {
         &self,
         circuit: C,
         vk: &PlonkVerificationKey,
-    ) -> Result<EncodedProofPlonk, anyhow::Error> {
-        let proof = prove_by_steps::<_, _, RollingKeccakTranscript<Fr>>(
+    ) -> Result<SingleProof, anyhow::Error> {
+        let rns_params =
+            RnsParameters::<Engine, <Engine as EngineTrait>::Fq>::new_for_field(68, 110, 4);
+        let rescue_params = Bn256RescueParams::new_checked_2_into_1();
+
+        let transcript_params = (&rescue_params, &rns_params);
+        let proof = prove_by_steps::<_, _, RescueTranscriptForRNS<Engine>>(
             circuit,
             &self.hints,
             &self.setup_polynomials,
@@ -84,11 +109,13 @@ impl SetupForStepByStepProver {
             self.key_monomial_form
                 .as_ref()
                 .expect("Setup should have universal setup struct"),
+            Some(transcript_params),
         )?;
 
-        let valid = verify::<_, RollingKeccakTranscript<Fr>>(&proof, &vk.0)?;
+        let valid =
+            verify::<_, _, RescueTranscriptForRNS<Engine>>(&proof, &vk.0, Some(transcript_params))?;
         anyhow::ensure!(valid, "proof for block is invalid");
-        Ok(serialize_proof(&proof))
+        Ok(proof.into())
     }
 }
 
@@ -105,7 +132,7 @@ impl Drop for SetupForStepByStepProver {
 /// Generates proof for exit given circuit using step-by-step algorithm.
 pub fn gen_verified_proof_for_exit_circuit<C: Circuit<Engine> + Clone>(
     circuit: C,
-) -> Result<EncodedProofPlonk, anyhow::Error> {
+) -> Result<SingleProof, anyhow::Error> {
     let vk = VerificationKey::read(File::open(get_exodus_verification_key_path())?)?;
 
     vlog::info!("Proof for circuit started");
@@ -123,75 +150,14 @@ pub fn gen_verified_proof_for_exit_circuit<C: Circuit<Engine> + Clone>(
         &setup,
         None,
         &key_monomial_form,
+        None,
     )?;
 
-    let valid = verify::<_, RollingKeccakTranscript<Fr>>(&proof, &vk)?;
+    let valid = verify::<_, _, RollingKeccakTranscript<Fr>>(&proof, &vk, None)?;
     anyhow::ensure!(valid, "proof for exit is invalid");
 
     vlog::info!("Proof for circuit successful");
-    Ok(serialize_proof(&proof))
-}
-
-pub fn serialize_proof(
-    proof: &Proof<Engine, PlonkCsWidth4WithNextStepParams>,
-) -> EncodedProofPlonk {
-    let mut inputs = vec![];
-    for input in proof.input_values.iter() {
-        let ser = EthereumSerializer::serialize_fe(input);
-        inputs.push(ser);
-    }
-    let mut serialized_proof = vec![];
-
-    for c in proof.wire_commitments.iter() {
-        let (x, y) = EthereumSerializer::serialize_g1(c);
-        serialized_proof.push(x);
-        serialized_proof.push(y);
-    }
-
-    let (x, y) = EthereumSerializer::serialize_g1(&proof.grand_product_commitment);
-    serialized_proof.push(x);
-    serialized_proof.push(y);
-
-    for c in proof.quotient_poly_commitments.iter() {
-        let (x, y) = EthereumSerializer::serialize_g1(c);
-        serialized_proof.push(x);
-        serialized_proof.push(y);
-    }
-
-    for c in proof.wire_values_at_z.iter() {
-        serialized_proof.push(EthereumSerializer::serialize_fe(c));
-    }
-
-    for c in proof.wire_values_at_z_omega.iter() {
-        serialized_proof.push(EthereumSerializer::serialize_fe(c));
-    }
-
-    serialized_proof.push(EthereumSerializer::serialize_fe(
-        &proof.grand_product_at_z_omega,
-    ));
-    serialized_proof.push(EthereumSerializer::serialize_fe(
-        &proof.quotient_polynomial_at_z,
-    ));
-    serialized_proof.push(EthereumSerializer::serialize_fe(
-        &proof.linearization_polynomial_at_z,
-    ));
-
-    for c in proof.permutation_polynomials_at_z.iter() {
-        serialized_proof.push(EthereumSerializer::serialize_fe(c));
-    }
-
-    let (x, y) = EthereumSerializer::serialize_g1(&proof.opening_at_z_proof);
-    serialized_proof.push(x);
-    serialized_proof.push(y);
-
-    let (x, y) = EthereumSerializer::serialize_g1(&proof.opening_at_z_omega_proof);
-    serialized_proof.push(x);
-    serialized_proof.push(y);
-
-    EncodedProofPlonk {
-        inputs,
-        proof: serialized_proof,
-    }
+    Ok(proof.into())
 }
 
 /// Reads universal setup from disk or downloads from network.

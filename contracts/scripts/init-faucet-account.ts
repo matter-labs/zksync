@@ -79,11 +79,16 @@ async function main() {
     console.log('Deposit successful');
 
     if (!(await faucetWallet.isSigningKeySet())) {
-        const setSigningKey = await faucetWallet.setSigningKey({ feeToken: 'MLTT' });
+        const setSigningKey = await faucetWallet.setSigningKey({ feeToken: 'MLTT', ethAuthType: 'ECDSA' });
         await setSigningKey.awaitReceipt();
         console.log('Signing key is set');
     }
     console.log('Faucet account is prepared');
 }
 
-main();
+main()
+    .then(() => process.exit(0))
+    .catch((err) => {
+        console.error('Error:', err.message || err);
+        process.exit(1);
+    });

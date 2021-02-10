@@ -10,7 +10,7 @@ function verfiyKeysTarball() {
     return `verify-keys-${keyDir}-account-${accountTreeDepth}_-balance-${balanceTreeDepth}.tar.gz`;
 }
 
-export async function gen(command: 'contract' | 'all') {
+export async function gen(command: 'contract' | 'all' | 'circuit-size') {
     const accountTreeDepth = process.env.CHAIN_CIRCUIT_ACCOUNT_TREE_DEPTH;
     const balanceTreeDepth = process.env.CHAIN_CIRCUIT_BALANCE_TREE_DEPTH;
     const keyDir = process.env.CHAIN_CIRCUIT_KEY_DIR;
@@ -18,12 +18,16 @@ export async function gen(command: 'contract' | 'all') {
 
     if (command == 'all') {
         const time = new Date();
-        fs.utimesSync('core/models/src/lib.rs', time, time);
+        fs.utimesSync('core/lib/crypto/src/params.rs', time, time);
         fs.mkdirSync(outputDir, { recursive: true });
         await utils.spawn('cargo run --bin key_generator --release -- keys');
+        await utils.spawn('cargo run --bin key_generator --release -- contract');
+    } else if (command == 'contract') {
+        await utils.spawn('cargo run --bin key_generator --release -- contract');
+    } else if (command == 'circuit-size') {
+        await utils.spawn('cargo run --bin key_generator --release -- circuit-size');
     }
 
-    await utils.spawn('cargo run --bin key_generator --release -- contract');
     fs.copyFileSync(`${outputDir}/KeysWithPlonkVerifier.sol`, 'contracts/contracts/KeysWithPlonkVerifier.sol');
 }
 
@@ -38,9 +42,8 @@ export async function unpack() {
 
 export async function pack() {
     const keysTarball = verfiyKeysTarball();
-    await utils.exec(`tar cvzf ${keysTarball}`);
     fs.mkdirSync('keys/packed', { recursive: true });
-    fs.renameSync(keysTarball, `keys/packed/${keysTarball}`);
+    await utils.exec(`tar cvzf keys/packed/${keysTarball}  ${process.env.KEY_DIR}/*`);
     console.log('Keys packed');
 }
 
@@ -54,8 +57,10 @@ command
     .description('generate verification keys')
     .action(async (command?: string) => {
         command = command || 'all';
-        if (command != 'all' && command != 'contract') {
-            throw new Error('Can only generate "all" or "contract" keys');
+        if (command != 'all' && command != 'contract' && command != 'circuit-size') {
+            throw new Error(
+                'Can only generate "all" or "contract" keys, or "circuit-size" for circuit size estimation'
+            );
         }
         await gen(command);
     });

@@ -11,11 +11,13 @@ categories = ["cryptography"]
 readme = "README.md"
 
 [dependencies]
-franklin_crypto = { package = "franklin-crypto", version = "0.0.5", git = "https://github.com/matter-labs/franklin-crypto.git", branch="check-franklin-circuit-transpile"}
+franklin_crypto = { package = "franklin-crypto", version = "0.0.5", git = "https://github.com/matter-labs/franklin-crypto.git", branch="beta", features = ["multicore", "plonk"]}
+recursive_aggregation_circuit = { package = "recursive_aggregation_circuit", version = "1.0.0", git = "https://github.com/matter-labs/recursive_aggregation_circuit.git", branch="master"}
 rand = "0.4"
 
 num = { version = "0.3.1", features = ["serde"] }
 zksync_basic_types = { path = "../basic_types", version = "1.0" }
+ethabi = "12.0.0"
 
 serde = "1.0"
 anyhow = "1.0"
@@ -23,6 +25,7 @@ lazy_static = "1.2.0"
 fnv = "1.0.3"
 rayon = "1.0.3"
 hex = "0.4"
+base64 = "0.13"
 
 [dev-dependencies]
 serde_json = "1.0"

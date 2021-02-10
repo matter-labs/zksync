@@ -9,7 +9,7 @@ import { Signer } from './signer';
 const W3CWebSocket = websocket.w3cwebsocket;
 
 export abstract class AbstractJSONRPCTransport {
-    abstract async request(method: string, params): Promise<any>;
+    abstract request(method: string, params): Promise<any>;
     subscriptionsSupported(): boolean {
         return false;
     }
@@ -17,7 +17,7 @@ export abstract class AbstractJSONRPCTransport {
     async subscribe(subMethod: string, subParams, unsubMethod: string, cb: (data: any) => void): Promise<Subscription> {
         throw new Error('subscription are not supported for this transport');
     }
-    abstract async disconnect();
+    abstract disconnect();
 }
 
 // Has jrpcError field which is JRPC error object.
@@ -229,6 +229,10 @@ export class DummyTransport extends AbstractJSONRPCTransport {
                     pubKeyHash: ''
                 }
             };
+        }
+
+        if (method == 'get_zksync_version') {
+            return 'contracts-4';
         }
 
         return {

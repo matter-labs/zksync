@@ -193,6 +193,28 @@ impl ZkSyncOp {
             ZkSyncOp::ForcedExit(op) => op.get_updated_account_ids(),
         }
     }
+
+    pub fn is_onchain_operation(&self) -> bool {
+        matches!(
+            self,
+            &ZkSyncOp::Deposit(_)
+                | &ZkSyncOp::Withdraw(_)
+                | &ZkSyncOp::FullExit(_)
+                | &ZkSyncOp::ChangePubKeyOffchain(_)
+                | &ZkSyncOp::ForcedExit(_)
+        )
+    }
+
+    pub fn is_processable_onchain_operation(&self) -> bool {
+        matches!(
+            self,
+            &ZkSyncOp::Withdraw(_) | &ZkSyncOp::FullExit(_) | &ZkSyncOp::ForcedExit(_)
+        )
+    }
+
+    pub fn is_priority_op(&self) -> bool {
+        matches!(self, &ZkSyncOp::Deposit(_) | &ZkSyncOp::FullExit(_))
+    }
 }
 
 impl From<NoopOp> for ZkSyncOp {

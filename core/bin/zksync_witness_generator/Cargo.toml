@@ -27,8 +27,7 @@ tracing = "0.1.22"
 
 serde = "1.0.90"
 serde_json = "1.0.0"
-metrics = "0.13.0-alpha.8"
-
+metrics = "=0.13.0-alpha.8"
 tokio = { version = "0.2", features = ["full"] }
 futures = "0.3"
 actix-rt = "1.1.1"
@@ -38,6 +37,7 @@ actix-web-httpauth = "0.5.0"
 ctrlc = { version = "3.1", features = ["termination"] }
 jsonwebtoken = "7"
 anyhow = "1.0"
+async-trait = "0.1.42"
 
 [dev-dependencies]
 zksync_prover = { path = "../prover", version = "1.0" }

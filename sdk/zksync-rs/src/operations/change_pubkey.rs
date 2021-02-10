@@ -17,6 +17,8 @@ pub struct ChangePubKeyBuilder<'a, S: EthereumSigner, P: Provider> {
     fee_token: Option<Token>,
     fee: Option<BigUint>,
     nonce: Option<Nonce>,
+    valid_from: Option<u32>,
+    valid_until: Option<u32>,
 }
 
 impl<'a, S, P> ChangePubKeyBuilder<'a, S, P>
@@ -32,6 +34,8 @@ where
             fee_token: None,
             fee: None,
             nonce: None,
+            valid_from: None,
+            valid_until: None,
         }
     }
 
@@ -71,10 +75,12 @@ where
             }
         };
 
+        let time_range = Default::default();
+
         Ok(ZkSyncTx::from(
             self.wallet
                 .signer
-                .sign_change_pubkey_tx(nonce, self.onchain_auth, fee_token, fee)
+                .sign_change_pubkey_tx(nonce, self.onchain_auth, fee_token, fee, time_range)
                 .await
                 .map_err(ClientError::SigningError)?,
         ))
@@ -132,6 +138,18 @@ where
     /// Sets the transaction nonce.
     pub fn nonce(mut self, nonce: Nonce) -> Self {
         self.nonce = Some(nonce);
+        self
+    }
+
+    /// Sets the unix format timestamp of the first moment when transaction execution is valid.
+    pub fn valid_from(mut self, valid_from: u32) -> Self {
+        self.valid_from = Some(valid_from);
+        self
+    }
+
+    /// Sets the unix format timestamp of the last moment when transaction execution is valid.
+    pub fn valid_until(mut self, valid_until: u32) -> Self {
+        self.valid_until = Some(valid_until);
         self
     }
 }

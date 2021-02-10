@@ -35,7 +35,8 @@ async function reason() {
         try {
             const parsedTransaction = franklinInterface.parseTransaction({ data: tx.data });
             if (parsedTransaction) {
-                console.log('parsed tx: ', parsedTransaction);
+                console.log('parsed tx: ', parsedTransaction.name, parsedTransaction);
+                console.log('tx args: ', parsedTransaction.name, JSON.stringify(parsedTransaction.args, null, 2));
             } else {
                 console.log('tx:', tx);
             }
@@ -56,7 +57,7 @@ async function reason() {
 
             // If more than 90% of gas was used, report it as an error.
             const threshold = gasLimit.mul(90).div(100);
-            if (gasUsed >= threshold) {
+            if (gasUsed.gte(threshold)) {
                 const error = chalk.bold.red;
                 console.log(error('More than 90% of gas limit was used!'));
                 console.log(error('It may be the reason of the transaction failure'));
@@ -73,6 +74,7 @@ async function reason() {
         }
 
         for (const log of receipt.logs) {
+            console.log(log);
             try {
                 let parsedLog = franklinInterface.parseLog(log);
                 if (!parsedLog) {
@@ -94,4 +96,9 @@ async function reason() {
     }
 }
 
-reason();
+reason()
+    .then(() => process.exit(0))
+    .catch((err) => {
+        console.error('Error:', err.message || err);
+        process.exit(1);
+    });

@@ -12,6 +12,7 @@ fn expected_fail() {
         account: account.address,
         nonce: account.nonce,
         signature: TxSignature::default(),
+        time_range: Default::default(),
     };
 
     tb.test_tx_fail(close.into(), "Account closing is disabled");

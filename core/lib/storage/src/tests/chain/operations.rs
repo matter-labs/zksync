@@ -1,41 +1,42 @@
 // External imports
+use chrono::{Duration, Utc};
 // Workspace imports
-use zksync_types::{ActionType, BlockNumber};
+use zksync_types::{aggregated_operations::AggregatedActionType, BlockNumber};
 // Local imports
-use crate::tests::db_test;
 use crate::{
     chain::{
         block::BlockSchema,
         operations::{
-            records::{NewExecutedPriorityOperation, NewExecutedTransaction, NewOperation},
+            records::{NewExecutedPriorityOperation, NewExecutedTransaction},
             OperationsSchema,
         },
     },
-    QueryResult, StorageActionType, StorageProcessor,
+    test_data::gen_unique_aggregated_operation,
+    tests::db_test,
+    QueryResult, StorageProcessor,
 };
 
 /// Checks the save&load routine for unconfirmed operations.
 #[db_test]
-async fn operations(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
+async fn aggregated_operations(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
     let block_number = 1;
-    let action_type = ActionType::COMMIT;
+    let action_type = AggregatedActionType::CommitBlocks;
     OperationsSchema(&mut storage)
-        .store_operation(NewOperation {
-            block_number,
-            action_type: StorageActionType::from(action_type),
-        })
+        .store_aggregated_action(gen_unique_aggregated_operation(
+            BlockNumber(block_number),
+            action_type,
+            100,
+        ))
         .await?;
 
     let stored_operation = OperationsSchema(&mut storage)
-        .get_operation(BlockNumber(block_number as u32), action_type)
+        .get_stored_aggregated_operation(BlockNumber(block_number as u32), action_type)
         .await
         .unwrap();
 
-    assert_eq!(stored_operation.block_number, 1);
-    assert_eq!(
-        stored_operation.action_type,
-        StorageActionType::from(action_type)
-    );
+    assert_eq!(stored_operation.from_block, 1);
+    assert_eq!(stored_operation.to_block, 1);
+    assert_eq!(stored_operation.action_type, action_type.to_string());
     assert_eq!(stored_operation.confirmed, false);
 
     Ok(())
@@ -270,6 +271,102 @@ async fn transaction_resent(mut storage: StorageProcessor<'_>) -> QueryResult<()
         .get_block_transactions(BlockNumber(BLOCK_NUMBER as u32))
         .await?;
     assert_eq!(block_txs.len(), 1);
+
+    Ok(())
+}
+
+/// Checks that rejected transactions are removed correctly depending on the given age limit.
+#[db_test]
+async fn remove_rejected_transactions(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
+    const BLOCK_NUMBER: i64 = 1;
+    // Two failed transactions created a week and two weeks ago respectively and one successful.
+    let timestamp_1 = Utc::now() - Duration::weeks(1);
+    let executed_tx_1 = NewExecutedTransaction {
+        block_number: BLOCK_NUMBER,
+        tx_hash: vec![0x12, 0xAD, 0xBE, 0xEF],
+        tx: Default::default(),
+        operation: Default::default(),
+        from_account: Default::default(),
+        to_account: None,
+        success: false,
+        fail_reason: None,
+        block_index: None,
+        primary_account_address: Default::default(),
+        nonce: Default::default(),
+        created_at: timestamp_1,
+        eth_sign_data: None,
+        batch_id: None,
+    };
+    let timestamp_2 = timestamp_1 - Duration::weeks(1);
+    let mut executed_tx_2 = executed_tx_1.clone();
+    // Set new timestamp and different tx_hash since it's a PK.
+    executed_tx_2.created_at = timestamp_2;
+    executed_tx_2.tx_hash = vec![0, 11, 21, 5];
+    // Successful one.
+    let mut executed_tx_3 = executed_tx_1.clone();
+    executed_tx_3.success = true;
+    executed_tx_3.tx_hash = vec![1, 1, 2, 30];
+    executed_tx_3.created_at = timestamp_2 - Duration::weeks(1);
+    // Store them.
+    storage
+        .chain()
+        .operations_schema()
+        .store_executed_tx(executed_tx_1)
+        .await?;
+    storage
+        .chain()
+        .operations_schema()
+        .store_executed_tx(executed_tx_2)
+        .await?;
+    storage
+        .chain()
+        .operations_schema()
+        .store_executed_tx(executed_tx_3)
+        .await?;
+    // First check, no transactions removed.
+    storage
+        .chain()
+        .operations_schema()
+        .remove_rejected_transactions(Duration::weeks(3))
+        .await?;
+    let block_number = BlockNumber(0);
+    let count = storage
+        .chain()
+        .stats_schema()
+        .count_outstanding_proofs(block_number)
+        .await?;
+    assert_eq!(count, 3);
+    // Second transaction should be removed.
+    storage
+        .chain()
+        .operations_schema()
+        .remove_rejected_transactions(Duration::days(10))
+        .await?;
+    let count = storage
+        .chain()
+        .stats_schema()
+        .count_outstanding_proofs(block_number)
+        .await?;
+    assert_eq!(count, 2);
+    // Finally, no rejected transactions remain.
+    storage
+        .chain()
+        .operations_schema()
+        .remove_rejected_transactions(Duration::days(4))
+        .await?;
+    let count = storage
+        .chain()
+        .stats_schema()
+        .count_outstanding_proofs(block_number)
+        .await?;
+    assert_eq!(count, 1);
+    // The last one is indeed succesful.
+    let count = storage
+        .chain()
+        .stats_schema()
+        .count_total_transactions()
+        .await?;
+    assert_eq!(count, 1);
 
     Ok(())
 }

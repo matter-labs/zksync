@@ -65,6 +65,10 @@ impl Witness for CloseAccountWitness<Bn256> {
         pubdata_bits
     }
 
+    fn get_offset_commitment_data(&self) -> Vec<bool> {
+        vec![false; CloseOp::CHUNKS * 8]
+    }
+
     fn calculate_operations(&self, input: SigDataInput) -> Vec<Operation<Bn256>> {
         let pubdata_chunks: Vec<_> = self
             .get_pubdata()
@@ -178,6 +182,8 @@ impl CloseAccountWitness<Bn256> {
                 a: Some(a),
                 b: Some(b),
                 new_pub_key_hash: Some(Fr::zero()),
+                valid_from: Some(Fr::zero()),
+                valid_until: Some(Fr::from_str(&u32::MAX.to_string()).unwrap()),
             },
             before_root: Some(before_root),
             after_root: Some(after_root),

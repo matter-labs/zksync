@@ -31,6 +31,8 @@ use crate::{
         WitnessBuilder,
     },
 };
+use zksync_crypto::params::CHUNK_BIT_WIDTH;
+use zksync_types::operations::NoopOp;
 
 /// Creates a random private key and returns a public key hash for it.
 fn generate_pubkey_hash(
@@ -123,8 +125,13 @@ fn test_noop() {
     let mut circuit_account_tree = CircuitAccountTree::new(account_tree_depth());
     circuit_account_tree.insert(0, CircuitAccount::default());
 
-    let mut witness_accum =
-        WitnessBuilder::new(&mut circuit_account_tree, AccountId(0), BlockNumber(1));
+    let timestamp = 0xffbbccddeeff1122u64;
+    let mut witness_accum = WitnessBuilder::new(
+        &mut circuit_account_tree,
+        AccountId(0),
+        BlockNumber(1),
+        timestamp,
+    );
     witness_accum.extend_pubdata_with_noops(1);
     witness_accum.collect_fees(&[]);
     witness_accum.calculate_pubdata_commitment();
@@ -160,6 +167,8 @@ fn incorrect_circuit_pubdata() {
     let p_g = FixedGenerators::SpendingKeyGenerator;
     let rng = &mut XorShiftRng::from_seed([0x3dbe_6258, 0x8d31_3d76, 0x3237_db17, 0xe5bc_0654]);
     let phasher = RescueHasher::<Bn256>::default();
+
+    let timestamp = Fr::from_str(&rng.gen::<u64>().to_string()).unwrap();
 
     // Account tree, which we'll manually fill
     let mut tree: CircuitAccountTree = CircuitAccountTree::new(params::account_tree_depth());
@@ -218,11 +227,13 @@ fn incorrect_circuit_pubdata() {
 
     for (pubdata_old_hash, pubdata_new_hash, circuit_old_hash, expected_msg) in test_vector {
         let public_data_commitment = public_data_commitment::<Bn256>(
-            &[false; 64],
+            &[false; NoopOp::CHUNKS * CHUNK_BIT_WIDTH],
             Some(pubdata_old_hash),
             Some(pubdata_new_hash),
             Some(validator_address),
             Some(block_number),
+            Some(timestamp),
+            &[false; NoopOp::CHUNKS * 8],
         );
 
         let circuit_instance = ZkSyncCircuit {
@@ -237,6 +248,7 @@ fn incorrect_circuit_pubdata() {
             validator_address: Some(validator_address),
             validator_balances: validator_balances.clone(),
             validator_audit_path: validator_audit_path.clone(),
+            block_timestamp: Some(timestamp),
         };
 
         let error = check_circuit_non_panicking(circuit_instance)
@@ -255,11 +267,13 @@ fn incorrect_circuit_pubdata() {
     // ---------------------------
 
     let pub_data_commitment = public_data_commitment::<Bn256>(
-        &[false; 64],
+        &[false; NoopOp::CHUNKS * CHUNK_BIT_WIDTH],
         Some(tree.root_hash()),
         Some(tree.root_hash()),
         Some(Default::default()),
         Some(block_number),
+        Some(timestamp),
+        &[false; NoopOp::CHUNKS * 8],
     );
 
     let circuit_instance = ZkSyncCircuit {
@@ -274,6 +288,7 @@ fn incorrect_circuit_pubdata() {
         validator_address: Some(validator_address),
         validator_balances: validator_balances.clone(),
         validator_audit_path: validator_audit_path.clone(),
+        block_timestamp: Some(timestamp),
     };
 
     // Validator address is a part of pubdata, which is used to calculate the new root hash,
@@ -297,11 +312,13 @@ fn incorrect_circuit_pubdata() {
 
     let incorrect_block_number = Fr::from_str("2").unwrap();
     let pub_data_commitment = public_data_commitment::<Bn256>(
-        &[false; 64],
+        &[false; NoopOp::CHUNKS * CHUNK_BIT_WIDTH],
         Some(tree.root_hash()),
         Some(tree.root_hash()),
         Some(validator_address),
         Some(incorrect_block_number),
+        Some(timestamp),
+        &[false; NoopOp::CHUNKS * 8],
     );
 
     let circuit_instance = ZkSyncCircuit {
@@ -316,6 +333,7 @@ fn incorrect_circuit_pubdata() {
         validator_address: Some(validator_address),
         validator_balances,
         validator_audit_path,
+        block_timestamp: Some(timestamp),
     };
 
     // Block number is a part of pubdata, which is used to calculate the new root hash,

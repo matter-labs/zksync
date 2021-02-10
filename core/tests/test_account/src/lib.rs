@@ -6,7 +6,10 @@ use num::BigUint;
 use zksync_basic_types::H256;
 use zksync_crypto::rand::{thread_rng, Rng};
 use zksync_crypto::{priv_key_from_fs, PrivateKey};
-use zksync_types::tx::{ChangePubKey, PackedEthSignature, TxSignature};
+use zksync_types::tx::{
+    ChangePubKey, ChangePubKeyECDSAData, ChangePubKeyEthAuthData, PackedEthSignature, TimeRange,
+    TxSignature,
+};
 use zksync_types::{
     AccountId, Address, Close, ForcedExit, Nonce, PubKeyHash, TokenId, Transfer, Withdraw,
 };
@@ -19,6 +22,19 @@ pub struct ZkSyncAccount {
     pub eth_private_key: H256,
     account_id: Mutex<Option<AccountId>>,
     nonce: Mutex<Nonce>,
+}
+
+impl Clone for ZkSyncAccount {
+    fn clone(&self) -> Self {
+        Self {
+            private_key: priv_key_from_fs(self.private_key.0),
+            pubkey_hash: self.pubkey_hash,
+            address: self.address,
+            eth_private_key: self.eth_private_key,
+            account_id: Mutex::new(*self.account_id.lock().unwrap()),
+            nonce: Mutex::new(*self.nonce.lock().unwrap()),
+        }
+    }
 }
 
 impl fmt::Debug for ZkSyncAccount {
@@ -109,6 +125,7 @@ impl ZkSyncAccount {
         to: &Address,
         nonce: Option<Nonce>,
         increment_nonce: bool,
+        time_range: TimeRange,
     ) -> (Transfer, PackedEthSignature) {
         let mut stored_nonce = self.nonce.lock().unwrap();
         let transfer = Transfer::new_signed(
@@ -122,6 +139,7 @@ impl ZkSyncAccount {
             amount,
             fee,
             nonce.unwrap_or_else(|| *stored_nonce),
+            time_range,
             &self.private_key,
         )
         .expect("Failed to sign transfer");
@@ -143,6 +161,7 @@ impl ZkSyncAccount {
         target: &Address,
         nonce: Option<Nonce>,
         increment_nonce: bool,
+        time_range: TimeRange,
     ) -> ForcedExit {
         let mut stored_nonce = self.nonce.lock().unwrap();
         let forced_exit = ForcedExit::new_signed(
@@ -154,6 +173,7 @@ impl ZkSyncAccount {
             token_id,
             fee,
             nonce.unwrap_or_else(|| *stored_nonce),
+            time_range,
             &self.private_key,
         )
         .expect("Failed to sign forced exit");
@@ -175,6 +195,7 @@ impl ZkSyncAccount {
         eth_address: &Address,
         nonce: Option<Nonce>,
         increment_nonce: bool,
+        time_range: TimeRange,
     ) -> (Withdraw, PackedEthSignature) {
         let mut stored_nonce = self.nonce.lock().unwrap();
         let withdraw = Withdraw::new_signed(
@@ -188,6 +209,7 @@ impl ZkSyncAccount {
             amount,
             fee,
             nonce.unwrap_or_else(|| *stored_nonce),
+            time_range,
             &self.private_key,
         )
         .expect("Failed to sign withdraw");
@@ -208,6 +230,7 @@ impl ZkSyncAccount {
             account: self.address,
             nonce: nonce.unwrap_or_else(|| *stored_nonce),
             signature: TxSignature::default(),
+            time_range: Default::default(),
         };
         close.signature = TxSignature::sign_musig(&self.private_key, &close.get_bytes());
 
@@ -224,6 +247,7 @@ impl ZkSyncAccount {
         fee_token: TokenId,
         fee: BigUint,
         auth_onchain: bool,
+        time_range: TimeRange,
     ) -> ChangePubKey {
         let account_id = self
             .account_id
@@ -240,27 +264,29 @@ impl ZkSyncAccount {
             fee_token,
             fee,
             nonce,
+            time_range,
             None,
             &self.private_key,
         )
         .expect("Can't sign ChangePubKey operation");
-        change_pubkey.eth_signature = if auth_onchain {
-            None
+        change_pubkey.eth_auth_data = if auth_onchain {
+            Some(ChangePubKeyEthAuthData::Onchain)
         } else {
             let sign_bytes = change_pubkey
                 .get_eth_signed_data()
                 .expect("Failed to construct change pubkey signed message.");
             let eth_signature = PackedEthSignature::sign(&self.eth_private_key, &sign_bytes)
                 .expect("Signature should succeed");
-            Some(eth_signature)
+            Some(ChangePubKeyEthAuthData::ECDSA(ChangePubKeyECDSAData {
+                eth_signature,
+                batch_hash: H256::zero(),
+            }))
         };
 
-        if !auth_onchain {
-            assert!(
-                change_pubkey.verify_eth_signature() == Some(self.address),
-                "eth signature is incorrect"
-            );
-        }
+        assert!(
+            change_pubkey.is_eth_auth_data_valid(),
+            "eth auth data is incorrect"
+        );
 
         if increment_nonce {
             **stored_nonce += 1;

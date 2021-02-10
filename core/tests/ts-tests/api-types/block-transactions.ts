@@ -1,3 +1,20 @@
+interface ChangePubKeyOnchain {
+    type: 'Onchain';
+}
+
+interface ChangePubKeyECDSA {
+    type: 'ECDSA';
+    ethSignature: string;
+    batchHash: string;
+}
+
+interface ChangePubKeyCREATE2 {
+    type: 'CREATE2';
+    creatorAddress: string;
+    saltArg: string;
+    codeHash: string;
+}
+
 type Transfer = {
     tx_hash: string;
     block_number: number;
@@ -14,6 +31,8 @@ type Transfer = {
         to: string;
         token: number;
         type: 'Transfer';
+        validFrom: number;
+        validUntil: number;
     };
     success: boolean;
     fail_reason: string | null;
@@ -44,16 +63,19 @@ type ChangePubKey = {
     op: {
         account: string;
         accountId: number;
-        ethSignature: string | null;
         newPkHash: string;
         feeToken: number;
         fee: string;
         nonce: number;
+        ethAuthData: ChangePubKeyOnchain | ChangePubKeyECDSA | ChangePubKeyCREATE2;
+        ethSignature: string | null;
         signature: {
             pubKey: string;
             signature: string;
         };
         type: 'ChangePubKey';
+        validFrom: number;
+        validUntil: number;
     };
     success: boolean;
     fail_reason: string | null;
@@ -77,6 +99,8 @@ type Withdraw = {
         token: number;
         type: 'Withdraw';
         fast: boolean;
+        validFrom: number;
+        validUntil: number;
     };
     success: boolean;
     fail_reason: string | null;
@@ -114,6 +138,8 @@ type ForcedExit = {
             pubKey: string;
             signature: string;
         };
+        validFrom: number;
+        validUntil: number;
     };
     success: boolean;
     fail_reason: string | null;

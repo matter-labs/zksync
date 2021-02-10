@@ -14,7 +14,13 @@ export type TokenAddress = string;
 
 export type Nonce = number | 'committed';
 
-export type Network = 'localhost' | 'rinkeby' | 'ropsten' | 'mainnet';
+export type Network = 'localhost' | 'rinkeby' | 'ropsten' | 'mainnet' | 'rinkeby-beta' | 'ropsten-beta';
+
+export interface Create2Data {
+    creatorAddress: string;
+    saltArg: string;
+    codeHash: string;
+}
 
 export interface AccountState {
     address: Address;
@@ -76,6 +82,8 @@ export interface Transfer {
     fee: BigNumberish;
     nonce: number;
     signature: Signature;
+    validFrom: number;
+    validUntil: number;
 }
 
 export interface Withdraw {
@@ -88,6 +96,8 @@ export interface Withdraw {
     fee: BigNumberish;
     nonce: number;
     signature: Signature;
+    validFrom: number;
+    validUntil: number;
 }
 
 export interface ForcedExit {
@@ -98,6 +108,27 @@ export interface ForcedExit {
     fee: BigNumberish;
     nonce: number;
     signature: Signature;
+    validFrom: number;
+    validUntil: number;
+}
+
+export type ChangePubkeyTypes = 'Onchain' | 'ECDSA' | 'CREATE2';
+
+export interface ChangePubKeyOnchain {
+    type: 'Onchain';
+}
+
+export interface ChangePubKeyECDSA {
+    type: 'ECDSA';
+    ethSignature: string;
+    batchHash?: string;
+}
+
+export interface ChangePubKeyCREATE2 {
+    type: 'CREATE2';
+    creatorAddress: string;
+    saltArg: string;
+    codeHash: string;
 }
 
 export interface ChangePubKey {
@@ -109,7 +140,9 @@ export interface ChangePubKey {
     fee: BigNumberish;
     nonce: number;
     signature: Signature;
-    ethSignature: string;
+    ethAuthData: ChangePubKeyOnchain | ChangePubKeyECDSA | ChangePubKeyCREATE2;
+    validFrom: number;
+    validUntil: number;
 }
 
 export interface CloseAccount {

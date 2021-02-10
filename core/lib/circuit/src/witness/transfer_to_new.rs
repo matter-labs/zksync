@@ -38,6 +38,8 @@ pub struct TransferToNewData {
     pub from_account_address: u32,
     pub to_account_address: u32,
     pub new_address: Fr,
+    pub valid_from: u64,
+    pub valid_until: u64,
 }
 
 pub struct TransferToNewWitness<E: RescueEngine> {
@@ -59,6 +61,7 @@ impl Witness for TransferToNewWitness<Bn256> {
     type CalculateOpsInput = SigDataInput;
 
     fn apply_tx(tree: &mut CircuitAccountTree, transfer_to_new: &TransferToNewOp) -> Self {
+        let time_range = transfer_to_new.tx.time_range.unwrap_or_default();
         let transfer_data = TransferToNewData {
             amount: transfer_to_new.tx.amount.to_string().parse().unwrap(),
             fee: transfer_to_new.tx.fee.to_string().parse().unwrap(),
@@ -66,6 +69,8 @@ impl Witness for TransferToNewWitness<Bn256> {
             from_account_address: *transfer_to_new.from,
             to_account_address: *transfer_to_new.to,
             new_address: eth_address_to_fr(&transfer_to_new.tx.to),
+            valid_from: time_range.valid_from,
+            valid_until: time_range.valid_until,
         };
         // le_bit_vector_into_field_element()
         Self::apply_data(tree, &transfer_data)
@@ -114,6 +119,10 @@ impl Witness for TransferToNewWitness<Bn256> {
             false,
         );
         pubdata_bits
+    }
+
+    fn get_offset_commitment_data(&self) -> Vec<bool> {
+        vec![false; TransferToNewOp::CHUNKS * 8]
     }
 
     fn calculate_operations(&self, input: SigDataInput) -> Vec<Operation<Bn256>> {
@@ -274,6 +283,9 @@ impl TransferToNewWitness<Bn256> {
 
         let fee_encoded: Fr = le_bit_vector_into_field_element(&fee_bits);
         vlog::debug!("fee_encoded in test_transfer_to_new {}", fee_encoded);
+
+        let valid_from = transfer_to_new.valid_from;
+        let valid_until = transfer_to_new.valid_until;
         //applying first transfer part
         let (
             account_witness_from_before,
@@ -410,6 +422,8 @@ impl TransferToNewWitness<Bn256> {
                 b: Some(b),
                 pub_nonce: Some(Fr::zero()),
                 new_pub_key_hash: Some(Fr::zero()),
+                valid_from: Some(Fr::from_str(&valid_from.to_string()).unwrap()),
+                valid_until: Some(Fr::from_str(&valid_until.to_string()).unwrap()),
             },
             before_root: Some(before_root),
             intermediate_root: Some(intermediate_root),

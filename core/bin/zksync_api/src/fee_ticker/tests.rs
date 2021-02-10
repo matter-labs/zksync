@@ -377,7 +377,7 @@ async fn test_error_coingecko_api() {
         config,
         validator,
     );
-    for _ in 0u16..1000u16 {
+    for _ in 0..1000 {
         ticker
             .get_fee_from_ticker_in_wei(
                 TxFeeTypes::FastWithdraw,

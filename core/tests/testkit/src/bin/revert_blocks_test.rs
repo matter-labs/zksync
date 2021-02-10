@@ -1,29 +1,26 @@
 use web3::transports::Http;
 
+use zksync_core::state_keeper::ZkSyncStateInitParams;
+use zksync_types::{block::Block, AccountId, AccountMap, AccountTree};
+
 use zksync_testkit::*;
 use zksync_testkit::{
     data_restore::verify_restore,
     scenarios::{perform_basic_operations, BlockProcessing},
 };
-use zksync_types::{Nonce, TokenId};
+use zksync_types::{BlockNumber, Nonce, TokenId};
 
-use crate::eth_account::{parse_ether, EthereumAccount};
-use crate::external_commands::{deploy_contracts, get_test_accounts, Contracts};
-use crate::zksync_account::ZkSyncAccount;
+use crate::{
+    eth_account::{parse_ether, EthereumAccount},
+    external_commands::{deploy_contracts, get_test_accounts, Contracts},
+    zksync_account::ZkSyncAccount,
+};
 
-/// Executes blocks with some basic operations with new state keeper
-/// if block_processing is equal to BlockProcessing::NoVerify this should revert all not verified blocks
-async fn execute_blocks_with_new_state_keeper(
-    contracts: Contracts,
-    block_processing: BlockProcessing,
-) {
-    let testkit_config = TestkitConfig::from_env();
-
-    let fee_account = ZkSyncAccount::rand();
-    let (sk_thread_handle, stop_state_keeper_sender, sk_channels) =
-        spawn_state_keeper(&fee_account.address);
-
-    let fee_account_address = fee_account.address;
+fn create_test_setup_state(
+    testkit_config: &TestkitConfig,
+    contracts: &Contracts,
+    fee_account: &ZkSyncAccount,
+) -> (EthereumAccount, AccountSet) {
     let transport = Http::new(&testkit_config.web3_url).expect("http transport start");
     let (test_accounts_info, commit_account_info) = get_test_accounts();
     let commit_account = EthereumAccount::new(
@@ -50,7 +47,7 @@ async fn execute_blocks_with_new_state_keeper(
 
     let zksync_accounts = {
         let mut zksync_accounts = Vec::new();
-        zksync_accounts.push(fee_account);
+        zksync_accounts.push(fee_account.clone());
         zksync_accounts.extend(eth_accounts.iter().map(|eth_account| {
             let rng_zksync_key = ZkSyncAccount::rand().private_key;
             ZkSyncAccount::new(
@@ -69,64 +66,180 @@ async fn execute_blocks_with_new_state_keeper(
         fee_account_id: ZKSyncAccountId(0),
     };
 
-    let mut test_setup = TestSetup::new(sk_channels, accounts, &contracts, commit_account);
+    (commit_account, accounts)
+}
 
+async fn execute_blocks(
+    test_setup: &mut TestSetup,
+    start_block_number: BlockNumber,
+    number_of_verified_iteration_blocks: u16, // Each operation generate 4 blocks
+    number_of_committed_iteration_blocks: u16,
+    number_of_reverted_iterations_blocks: u16,
+) -> (ZkSyncStateInitParams, AccountSet, Block) {
     let deposit_amount = parse_ether("1.0").unwrap();
 
-    let mut tokens = vec![];
-    let token = TokenId(0);
-    perform_basic_operations(
-        token,
-        &mut test_setup,
-        deposit_amount.clone(),
-        block_processing,
-    )
-    .await;
-    tokens.push(token);
+    let mut executed_blocks = Vec::new();
+    let token = 0;
+    let mut states = Vec::new();
 
-    if block_processing == BlockProcessing::NoVerify {
-        let blocks_committed = test_setup
-            .total_blocks_committed()
-            .await
-            .expect("total_blocks_committed call fails");
-        let blocks_verified = test_setup
-            .total_blocks_verified()
-            .await
-            .expect("total_blocks_verified call fails");
-        assert_ne!(blocks_committed, blocks_verified, "no blocks to revert");
-        test_setup
-            .revert_blocks(blocks_committed - blocks_verified)
-            .await
-            .expect("revert_blocks call fails");
-    } else {
-        // Do not restore in reverting state, because there no valid blocks in blockchain
-        println!("Start restoring");
-
-        verify_restore(
-            &testkit_config.web3_url,
-            testkit_config.available_block_chunk_sizes.clone(),
-            &contracts,
-            fee_account_address,
-            test_setup.get_accounts_state().await,
-            tokens,
-            test_setup.current_state_root.expect("Should exist"),
+    for _ in 0..number_of_verified_iteration_blocks {
+        let blocks = perform_basic_operations(
+            TokenId(token),
+            test_setup,
+            deposit_amount.clone(),
+            BlockProcessing::CommitAndVerify,
         )
         .await;
+        executed_blocks.extend(blocks.into_iter());
+        states.push((
+            test_setup.get_current_state().await,
+            test_setup.accounts.clone(),
+        ));
     }
+    test_setup
+        .get_eth_balance(ETHAccountId(0), TokenId(0))
+        .await;
+    for _ in 0..number_of_committed_iteration_blocks - number_of_verified_iteration_blocks {
+        let blocks = perform_basic_operations(
+            TokenId(token),
+            test_setup,
+            deposit_amount.clone(),
+            BlockProcessing::NoVerify,
+        )
+        .await;
+        executed_blocks.extend(blocks.into_iter());
+        states.push((
+            test_setup.get_current_state().await,
+            test_setup.accounts.clone(),
+        ));
+    }
+    test_setup
+        .get_eth_balance(ETHAccountId(0), TokenId(0))
+        .await;
 
-    stop_state_keeper_sender.send(()).expect("sk stop send");
-    sk_thread_handle.join().expect("sk thread join");
+    let executed_blocks_reverse_order = executed_blocks
+        .clone()
+        .into_iter()
+        .rev()
+        .take((number_of_reverted_iterations_blocks * 4) as usize)
+        .collect::<Vec<_>>();
+
+    let reverted_state_idx = std::cmp::max(
+        number_of_verified_iteration_blocks,
+        number_of_committed_iteration_blocks - number_of_reverted_iterations_blocks,
+    ) - 1;
+    let (reverted_state, test_setup_accounts) = states[reverted_state_idx as usize].clone();
+
+    let executed_block = executed_blocks
+        [(*reverted_state.last_block_number - *start_block_number - 1) as usize]
+        .clone();
+
+    test_setup
+        .revert_blocks(&executed_blocks_reverse_order)
+        .await
+        .expect("revert_blocks call fails");
+
+    (reverted_state, test_setup_accounts, executed_block)
+}
+
+fn balance_tree_to_account_map(balance_tree: &AccountTree) -> AccountMap {
+    let mut account_map = AccountMap::default();
+    for (id, account) in balance_tree.items.iter() {
+        account_map.insert(AccountId(*id as u32), account.clone());
+    }
+    account_map
 }
 
 async fn revert_blocks_test() {
+    let fee_account = ZkSyncAccount::rand();
+    let test_config = TestkitConfig::from_env();
+
+    let state = genesis_state(&fee_account.address);
+
     println!("deploying contracts");
-    let contracts = deploy_contracts(false, Default::default());
+    let contracts = deploy_contracts(false, state.tree.root_hash());
     println!("contracts deployed");
 
-    execute_blocks_with_new_state_keeper(contracts.clone(), BlockProcessing::NoVerify).await;
-    println!("some blocks are committed and reverted");
+    let (commit_account, account_set) =
+        create_test_setup_state(&test_config, &contracts, &fee_account);
 
-    execute_blocks_with_new_state_keeper(contracts, BlockProcessing::CommitAndVerify).await;
+    let hash = state.tree.root_hash();
+    let (handler, sender, channels) = spawn_state_keeper(&fee_account.address, state);
+    let mut test_setup = TestSetup::new(
+        channels,
+        account_set.clone(),
+        &contracts,
+        commit_account.clone(),
+        hash,
+        None,
+    );
+
+    // Verify 1
+    // Commit 3
+    // Revert 2
+    // Revert all uncommitted transactions
+    let (state, account_set, last_block) =
+        execute_blocks(&mut test_setup, BlockNumber(0), 1, 3, 2).await;
+
+    sender.send(()).expect("sk stop send");
+    handler.join().expect("sk thread join");
+    let hash = state.tree.root_hash();
+    let start_block_number = state.last_block_number;
+
+    let (handler, sender, channels) = spawn_state_keeper(&fee_account.address, state);
+
+    let mut test_setup = TestSetup::new(
+        channels,
+        account_set.clone(),
+        &contracts,
+        commit_account.clone(),
+        hash,
+        Some(last_block),
+    );
+
+    // Verify 2
+    // Commit 3
+    // Revert 2
+    // Try to revert some unverified blocks
+
+    let (state, account_set, last_block) =
+        execute_blocks(&mut test_setup, start_block_number, 2, 3, 2).await;
+    sender.send(()).expect("sk stop send");
+    handler.join().expect("sk thread join");
+
+    let hash = state.tree.root_hash();
+    let start_block_number = state.last_block_number;
+
+    let (handler, sender, channels) = spawn_state_keeper(&fee_account.address, state);
+
+    let mut test_setup = TestSetup::new(
+        channels,
+        account_set.clone(),
+        &contracts,
+        commit_account.clone(),
+        hash,
+        Some(last_block),
+    );
+    // Verify 1
+    // Commit 1
+    // Revert 0
+    // Do not revert blocks for verifying restore
+
+    let (state, _, _) = execute_blocks(&mut test_setup, start_block_number, 1, 1, 0).await;
+    sender.send(()).expect("sk stop send");
+    handler.join().expect("sk thread join");
+
+    verify_restore(
+        test_config.web3_url.as_str(),
+        test_config.available_block_chunk_sizes.clone(),
+        &contracts,
+        fee_account.address,
+        balance_tree_to_account_map(&state.tree),
+        vec![TokenId(0)],
+        test_setup.current_state_root.unwrap(),
+    )
+    .await;
+    println!("some blocks are committed and verified \n\n");
 }
 
 #[tokio::main]

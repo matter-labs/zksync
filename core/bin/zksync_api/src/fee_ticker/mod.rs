@@ -33,13 +33,13 @@ use zksync_utils::ratio_to_big_decimal;
 
 // Local deps
 use crate::fee_ticker::balancer::TickerBalancer;
+use crate::fee_ticker::ticker_info::{FeeTickerInfo, TickerInfo};
 use crate::fee_ticker::validator::MarketUpdater;
 use crate::fee_ticker::{
     ticker_api::{
         coingecko::CoinGeckoAPI, coinmarkercap::CoinMarketCapAPI, FeeTickerAPI, TickerApi,
         CONNECTION_TIMEOUT,
     },
-    ticker_info::{FeeTickerInfo, TickerInfo},
     validator::{
         watcher::{TokenWatcher, UniswapTokenWatcher},
         FeeTokenValidator,
@@ -347,11 +347,6 @@ impl<API: FeeTickerAPI, INFO: FeeTickerInfo, WATCHER: TokenWatcher> FeeTicker<AP
             .map(|price| ratio_to_big_decimal(&(price.usd_price / factor), 100))
     }
 
-    /// Returns `true` if account does not yet exist in the zkSync network.
-    async fn is_account_new(&mut self, address: Address) -> bool {
-        self.info.is_account_new(address).await
-    }
-
     /// Returns `true` if the token is subsidized.
     fn is_token_subsidized(&self, token: &Token) -> bool {
         // We have disabled the subsidies up until the contract upgrade (when the prices will indeed become that
@@ -457,6 +452,11 @@ impl<API: FeeTickerAPI, INFO: FeeTickerInfo, WATCHER: TokenWatcher> FeeTicker<AP
             .usd_price
             / BigUint::from(10u32).pow(u32::from(token.decimals));
         Ok(token_risk_factor / token_price_usd)
+    }
+
+    /// Returns `true` if account does not yet exist in the zkSync network.
+    async fn is_account_new(&mut self, address: Address) -> bool {
+        self.info.is_account_new(address).await
     }
 
     async fn gas_tx_amount(

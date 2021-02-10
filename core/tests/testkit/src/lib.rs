@@ -1,4 +1,3 @@
-use zksync_core::state_keeper::ZkSyncStateInitParams;
 use zksync_types::{Account, AccountId, Address};
 
 pub use self::{
@@ -6,6 +5,7 @@ pub use self::{
     types::*,
 };
 
+use zksync_core::state_keeper::ZkSyncStateInitParams;
 pub use zksync_test_account as zksync_account;
 
 pub mod account_set;

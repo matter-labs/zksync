@@ -49,7 +49,7 @@ pub fn used_account_subtree_depth() -> usize {
 /// Max token id, based on the depth of the used left subtree
 pub fn max_account_id() -> AccountId {
     let list_count = 2u32.saturating_pow(used_account_subtree_depth() as u32);
-    if list_count == u32::max_value() {
+    if list_count == u32::MAX {
         AccountId(list_count)
     } else {
         AccountId(list_count - 1)
@@ -105,6 +105,9 @@ pub const AMOUNT_MANTISSA_BIT_WIDTH: usize = 35;
 pub const FEE_EXPONENT_BIT_WIDTH: usize = 5;
 pub const FEE_MANTISSA_BIT_WIDTH: usize = 11;
 
+/// Timestamp bit width
+pub const TIMESTAMP_BIT_WIDTH: usize = 8 * 8;
+
 // Signature data
 pub const SIGNATURE_S_BIT_WIDTH: usize = 254;
 pub const SIGNATURE_S_BIT_WIDTH_PADDED: usize = 256;
@@ -133,10 +136,33 @@ pub const SIGNED_WITHDRAW_BIT_WIDTH: usize = TX_TYPE_BIT_WIDTH
     + BALANCE_BIT_WIDTH
     + FEE_EXPONENT_BIT_WIDTH
     + FEE_MANTISSA_BIT_WIDTH
+    + NONCE_BIT_WIDTH
+    + 2 * TIMESTAMP_BIT_WIDTH;
+
+/// Size of the data that is signed for withdraw tx without timestamps
+pub const OLD_SIGNED_WITHDRAW_BIT_WIDTH: usize = TX_TYPE_BIT_WIDTH
+    + ACCOUNT_ID_BIT_WIDTH
+    + 2 * ADDRESS_WIDTH
+    + TOKEN_BIT_WIDTH
+    + BALANCE_BIT_WIDTH
+    + FEE_EXPONENT_BIT_WIDTH
+    + FEE_MANTISSA_BIT_WIDTH
     + NONCE_BIT_WIDTH;
 
 /// Size of the data that is signed for transfer tx
 pub const SIGNED_TRANSFER_BIT_WIDTH: usize = TX_TYPE_BIT_WIDTH
+    + ACCOUNT_ID_BIT_WIDTH
+    + 2 * ADDRESS_WIDTH
+    + TOKEN_BIT_WIDTH
+    + AMOUNT_EXPONENT_BIT_WIDTH
+    + AMOUNT_MANTISSA_BIT_WIDTH
+    + FEE_EXPONENT_BIT_WIDTH
+    + FEE_MANTISSA_BIT_WIDTH
+    + NONCE_BIT_WIDTH
+    + 2 * TIMESTAMP_BIT_WIDTH;
+
+/// Size of the data that is signed for transfer tx without timestamps
+pub const OLD_SIGNED_TRANSFER_BIT_WIDTH: usize = TX_TYPE_BIT_WIDTH
     + ACCOUNT_ID_BIT_WIDTH
     + 2 * ADDRESS_WIDTH
     + TOKEN_BIT_WIDTH
@@ -153,7 +179,8 @@ pub const SIGNED_FORCED_EXIT_BIT_WIDTH: usize = TX_TYPE_BIT_WIDTH
     + TOKEN_BIT_WIDTH
     + FEE_EXPONENT_BIT_WIDTH
     + FEE_MANTISSA_BIT_WIDTH
-    + NONCE_BIT_WIDTH;
+    + NONCE_BIT_WIDTH
+    + 2 * TIMESTAMP_BIT_WIDTH;
 
 /// Size of the data that is signed for change pubkey tx
 pub const SIGNED_CHANGE_PUBKEY_BIT_WIDTH: usize = TX_TYPE_BIT_WIDTH
@@ -163,7 +190,26 @@ pub const SIGNED_CHANGE_PUBKEY_BIT_WIDTH: usize = TX_TYPE_BIT_WIDTH
     + TOKEN_BIT_WIDTH
     + FEE_EXPONENT_BIT_WIDTH
     + FEE_MANTISSA_BIT_WIDTH
+    + NONCE_BIT_WIDTH
+    + 2 * TIMESTAMP_BIT_WIDTH;
+
+/// Size of the data that is signed for change pubkey tx, without timestamps
+pub const OLD_SIGNED_CHANGE_PUBKEY_BIT_WIDTH: usize = TX_TYPE_BIT_WIDTH
+    + ACCOUNT_ID_BIT_WIDTH
+    + ADDRESS_WIDTH
+    + NEW_PUBKEY_HASH_WIDTH
+    + TOKEN_BIT_WIDTH
+    + FEE_EXPONENT_BIT_WIDTH
+    + FEE_MANTISSA_BIT_WIDTH
     + NONCE_BIT_WIDTH;
+
+/// Number of inputs in the basic circuit that is aggregated by recursive circuit
+pub const RECURSIVE_CIRCUIT_NUM_INPUTS: usize = 1;
+/// Depth of the tree which contains different verification keys for basic circuit
+pub const RECURSIVE_CIRCUIT_VK_TREE_DEPTH: usize = 3;
+
+/// Major version of the ZkSync
+pub const ZKSYNC_VERSION: &str = "contracts-4";
 
 lazy_static! {
     pub static ref JUBJUB_PARAMS: AltJubjubBn256 = AltJubjubBn256::new();

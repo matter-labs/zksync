@@ -17,9 +17,9 @@ use zksync_storage::{
     chain::operations_ext::records::TxReceiptResponse, QueryResult, StorageProcessor,
 };
 use zksync_types::{tx::TxHash, BatchFee, BlockNumber, Fee, SignedZkSyncTx};
-
 // Local uses
-use super::{ApiError, JsonResult, Pagination, PaginationQuery};
+use super::{Error as ApiError, JsonResult, Pagination, PaginationQuery};
+use crate::api_server::rpc_server::types::TxWithSignature;
 use crate::api_server::tx_sender::{SubmitError, TxSender};
 
 #[derive(Debug, Clone, Copy)]
@@ -252,11 +252,19 @@ async fn submit_tx_batch(
     data: web::Data<ApiTransactionsData>,
     Json(body): Json<IncomingTxBatch>,
 ) -> JsonResult<Vec<TxHash>> {
-    let txs = body.txs.into_iter().zip(std::iter::repeat(None)).collect();
+    let txs = body
+        .txs
+        .into_iter()
+        .map(|tx| TxWithSignature {
+            tx,
+            signature: None,
+        })
+        .collect();
 
+    let signatures = body.signature;
     let tx_hashes = data
         .tx_sender
-        .submit_txs_batch(txs, body.signature)
+        .submit_txs_batch(txs, Some(signatures))
         .await
         .map_err(ApiError::from)?;
 
@@ -314,19 +322,18 @@ pub fn api_scope(tx_sender: TxSender) -> Scope {
 mod tests {
     use actix_web::App;
     use bigdecimal::BigDecimal;
-    use ethabi::Address;
     use futures::{channel::mpsc, StreamExt};
-    use num::{BigUint, Zero};
+    use num::BigUint;
 
     use zksync_api_client::rest::v1::Client;
     use zksync_storage::ConnectionPool;
     use zksync_test_account::ZkSyncAccount;
     use zksync_types::{
-        tokens::TokenLike,
-        tx::{PackedEthSignature, TxEthSignature},
+        tokens::{Token, TokenLike},
+        tx::{EthBatchSignData, EthBatchSignatures, PackedEthSignature, TxEthSignature},
         AccountId, BlockNumber, Fee, Nonce,
         OutputFeeType::Withdraw,
-        TokenId, TxFeeTypes, ZkSyncTx,
+        TokenId, ZkSyncTx,
     };
 
     use crate::{
@@ -345,7 +352,7 @@ mod tests {
         }
 
         async fn send_txs_batch(
-            _txs: Json<(Vec<SignedZkSyncTx>, Option<TxEthSignature>)>,
+            _txs: Json<(Vec<SignedZkSyncTx>, Vec<TxEthSignature>)>,
         ) -> Json<Result<(), ()>> {
             Json(Ok(()))
         }
@@ -428,6 +435,7 @@ mod tests {
     struct TestServer {
         core_server: actix_web::test::TestServer,
         api_server: actix_web::test::TestServer,
+        #[allow(dead_code)]
         pool: ConnectionPool,
     }
 
@@ -482,7 +490,9 @@ mod tests {
         };
 
         core_client.send_tx(signed_tx.clone()).await??;
-        core_client.send_txs_batch(vec![signed_tx], None).await??;
+        core_client
+            .send_txs_batch(vec![signed_tx], vec![])
+            .await??;
 
         core_server.stop().await;
         Ok(())
@@ -508,23 +518,6 @@ mod tests {
             try_parse_tx_hash(&transactions[0].tx_hash).unwrap()
         };
 
-        let fee = client
-            .get_txs_fee(
-                TxFeeTypes::Withdraw,
-                Address::random(),
-                TokenLike::Id(TokenId(0)),
-            )
-            .await?;
-        assert_ne!(fee.total_fee, BigUint::zero());
-
-        let fee = client
-            .get_batched_txs_fee(
-                vec![TxFeeTypes::Withdraw, TxFeeTypes::Transfer],
-                vec![Address::random(), Address::random()],
-                TokenLike::Id(TokenId(0)),
-            )
-            .await?;
-        assert_ne!(fee.total_fee, BigUint::zero());
         // Tx receipt by ID.
         let unknown_tx_hash = TxHash::default();
         assert!(client
@@ -565,9 +558,7 @@ mod tests {
         ];
 
         for (query, expected_response) in queries {
-            let actual_response = client
-                .tx_receipts(query.0, query.1, BlockNumber(query.2))
-                .await?;
+            let actual_response = client.tx_receipts(query.0, query.1, query.2).await?;
 
             assert_eq!(
                 actual_response,
@@ -635,7 +626,8 @@ mod tests {
 
         // Submit correct transactions batch.
         let TestTransactions { acc, txs } = TestServerConfig::gen_zk_txs(1_00);
-        let (txs, tx_hashes): (Vec<_>, Vec<_>) = txs
+        let eth = Token::new(TokenId(0), Default::default(), "ETH", 18);
+        let (good_batch, tx_hashes): (Vec<_>, Vec<_>) = txs
             .into_iter()
             .map(|(tx, _op)| {
                 let tx_hash = tx.hash();
@@ -643,13 +635,21 @@ mod tests {
             })
             .unzip();
 
-        let batch_message = crate::api_server::tx_sender::get_batch_sign_message(txs.iter());
-        let signature = PackedEthSignature::sign(&acc.eth_private_key, &batch_message).unwrap();
+        let txs = good_batch
+            .iter()
+            .zip(std::iter::repeat(eth))
+            .map(|(tx, token)| (tx.clone(), token, tx.account()))
+            .collect::<Vec<_>>();
+        let batch_signature = {
+            let batch_message = EthBatchSignData::get_batch_sign_message(txs);
+            let eth_sig = PackedEthSignature::sign(&acc.eth_private_key, &batch_message).unwrap();
+            let single_signature = TxEthSignature::EthereumSignature(eth_sig);
+
+            EthBatchSignatures::Single(single_signature)
+        };
 
         assert_eq!(
-            client
-                .submit_tx_batch(txs, Some(TxEthSignature::EthereumSignature(signature)))
-                .await?,
+            client.submit_tx_batch(good_batch, batch_signature).await?,
             tx_hashes
         );
 
@@ -675,14 +675,16 @@ mod tests {
         let to = ZkSyncAccount::rand();
 
         // Submit transaction with a fee token that is not allowed.
+
         let (tx, eth_sig) = from.sign_transfer(
             TokenId(1),
             "PHNX",
             100u64.into(),
             100u64.into(),
             &to.address,
-            Nonce(0).into(),
+            Some(Nonce(0)),
             false,
+            Default::default(),
         );
         let transfer_bad_token = ZkSyncTx::Transfer(Box::new(tx));
         assert!(client
@@ -697,11 +699,23 @@ mod tests {
             .contains("Chosen token is not suitable for paying fees"));
 
         // Prepare batch and make the same mistake.
+        let bad_token = Token::new(TokenId(1), Default::default(), "PHNX", 18);
         let bad_batch = vec![transfer_bad_token.clone(), transfer_bad_token];
-        let batch_message = crate::api_server::tx_sender::get_batch_sign_message(bad_batch.iter());
-        let eth_sig = PackedEthSignature::sign(&from.eth_private_key, &batch_message).unwrap();
+        let txs = bad_batch
+            .iter()
+            .zip(std::iter::repeat(bad_token))
+            .map(|(tx, token)| (tx.clone(), token, tx.account()))
+            .collect::<Vec<_>>();
+        let batch_signature = {
+            let batch_message = EthBatchSignData::get_batch_sign_message(txs);
+            let eth_sig = PackedEthSignature::sign(&from.eth_private_key, &batch_message).unwrap();
+            let single_signature = TxEthSignature::EthereumSignature(eth_sig);
+
+            EthBatchSignatures::Single(single_signature)
+        };
+
         assert!(client
-            .submit_tx_batch(bad_batch, Some(TxEthSignature::EthereumSignature(eth_sig)),)
+            .submit_tx_batch(bad_batch, batch_signature)
             .await
             .unwrap_err()
             .to_string()
@@ -714,8 +728,9 @@ mod tests {
             100u64.into(),
             0u64.into(), // Note that fee is zero, which is OK.
             &to.address,
-            Nonce(0).into(),
+            Some(Nonce(0)),
             false,
+            Default::default(),
         );
         let phnx_transfer = ZkSyncTx::Transfer(Box::new(tx));
         let phnx_transfer_hash = phnx_transfer.hash();
@@ -725,21 +740,31 @@ mod tests {
             0u64.into(),
             200u64.into(), // Here we pay fees for both transfers in ETH.
             &to.address,
-            Nonce(0).into(),
+            Some(Nonce(0)),
             false,
+            Default::default(),
         );
         let fee_tx = ZkSyncTx::Transfer(Box::new(tx));
         let fee_tx_hash = fee_tx.hash();
 
+        let eth = Token::new(TokenId(0), Default::default(), "ETH", 18);
         let good_batch = vec![phnx_transfer, fee_tx];
         let good_batch_hashes = vec![phnx_transfer_hash, fee_tx_hash];
-        let batch_message = crate::api_server::tx_sender::get_batch_sign_message(good_batch.iter());
-        let eth_sig = PackedEthSignature::sign(&from.eth_private_key, &batch_message).unwrap();
+        let txs = good_batch
+            .iter()
+            .zip(std::iter::repeat(eth))
+            .map(|(tx, token)| (tx.clone(), token, tx.account()))
+            .collect::<Vec<_>>();
+        let batch_signature = {
+            let batch_message = EthBatchSignData::get_batch_sign_message(txs);
+            let eth_sig = PackedEthSignature::sign(&from.eth_private_key, &batch_message).unwrap();
+            let single_signature = TxEthSignature::EthereumSignature(eth_sig);
+
+            EthBatchSignatures::Single(single_signature)
+        };
 
         assert_eq!(
-            client
-                .submit_tx_batch(good_batch, Some(TxEthSignature::EthereumSignature(eth_sig)))
-                .await?,
+            client.submit_tx_batch(good_batch, batch_signature).await?,
             good_batch_hashes
         );
 
@@ -773,6 +798,7 @@ mod tests {
             &to.address,
             None,
             false,
+            Default::default(),
         );
         client
             .submit_tx(
@@ -808,6 +834,7 @@ mod tests {
             &to.address,
             None,
             false,
+            Default::default(),
         );
         client
             .submit_tx(

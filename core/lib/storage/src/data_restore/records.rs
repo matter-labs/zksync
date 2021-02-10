@@ -82,6 +82,7 @@ pub struct NewBlockEvent {
     pub block_type: String, // 'Committed', 'Verified'
     pub transaction_hash: Vec<u8>,
     pub block_num: i64,
+    pub contract_version: i32,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
@@ -90,4 +91,5 @@ pub struct StoredBlockEvent {
     pub block_type: String, // 'Committed', 'Verified'
     pub transaction_hash: Vec<u8>,
     pub block_num: i64,
+    pub contract_version: i32,
 }

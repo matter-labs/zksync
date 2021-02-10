@@ -15,34 +15,22 @@ use zksync_storage::ethereum::records::ETHStats as StorageETHStats;
 /// 1 operation anyway.
 #[derive(Debug, Default, Clone, PartialEq)]
 pub struct ETHStats {
-    /// Amount of sent commit operations.
-    pub commit_ops: usize,
-    /// Amount of sent verify operations.
-    pub verify_ops: usize,
-    /// Amount of sent withdraw operations.
-    pub withdraw_ops: usize,
+    /// Number of the last block for which was committed.
+    pub last_committed_block: usize,
+    /// Number of the last block for which was verified.
+    pub last_verified_block: usize,
+    /// Number of the last block for which was executed.
+    pub last_executed_block: usize,
 }
 
 impl From<StorageETHStats> for ETHStats {
     fn from(stored: StorageETHStats) -> Self {
         Self {
-            commit_ops: stored.commit_ops as usize,
-            verify_ops: stored.verify_ops as usize,
-            withdraw_ops: stored.withdraw_ops as usize,
+            last_committed_block: stored.last_committed_block as usize,
+            last_verified_block: stored.last_verified_block as usize,
+            last_executed_block: stored.last_executed_block as usize,
         }
     }
-}
-
-/// State of the executed Ethereum transaction.
-#[derive(Debug, Clone)]
-pub(super) struct ExecutedTxStatus {
-    /// Amount of confirmations for a block containing the transaction.
-    pub confirmations: u64,
-    /// Whether transaction was executed successfully or failed.
-    pub success: bool,
-    /// Receipt for a transaction. Will be set to `Some` only if the transaction
-    /// failed during execution.
-    pub receipt: Option<TransactionReceipt>,
 }
 
 /// The result of the check for the Ethereum transaction commitment.

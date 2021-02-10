@@ -267,6 +267,7 @@ impl TestWallet {
                 self.address(),
             )
             .await?;
+        println!("{:?}", eth_tx_hash);
 
         self.monitor
             .get_priority_op(&self.eth_provider, eth_tx_hash)

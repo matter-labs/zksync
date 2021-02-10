@@ -5,7 +5,7 @@ use std::{convert::TryFrom, fmt, str::FromStr};
 use ethabi::{decode, ParamType};
 use serde::{Deserialize, Serialize};
 // Local uses
-use crate::{Action, Operation};
+use crate::aggregated_operations::{AggregatedActionType, AggregatedOperation};
 use zksync_basic_types::{Log, H256, U256};
 
 /// Numerical identifier of the Ethereum operation.
@@ -53,9 +53,9 @@ pub struct ETHOperation {
     // Numeric ID of the operation.
     pub id: i64,
     /// Type of the operation.
-    pub op_type: OperationType,
+    pub op_type: AggregatedActionType,
     /// Optional ZKSync operation associated with Ethereum operation.
-    pub op: Option<Operation>,
+    pub op: Option<(i64, AggregatedOperation)>,
     /// Used nonce (fixed for all the sent transactions).
     pub nonce: U256,
     /// Deadline block of the last sent transaction.
@@ -81,16 +81,6 @@ impl ETHOperation {
     /// increased gas amount.
     pub fn is_stuck(&self, current_block: u64) -> bool {
         current_block >= self.last_deadline_block
-    }
-
-    /// Checks whether this object relates to the `Verify` zkSync operation.
-    pub fn is_verify(&self) -> bool {
-        if let Some(op) = &self.op {
-            matches!(op.action, Action::Verify { .. })
-                && matches!(self.op_type, OperationType::Verify)
-        } else {
-            false
-        }
     }
 
     /// Completes the object state with the data obtained from the database.

@@ -67,7 +67,7 @@ impl Client {
     pub async fn blocks_range(
         &self,
         from: Pagination,
-        limit: BlockNumber,
+        limit: u32,
     ) -> client::Result<Vec<BlockInfo>> {
         self.get("blocks")
             .query(&from.into_query(limit))

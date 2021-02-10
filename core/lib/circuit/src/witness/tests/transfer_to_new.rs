@@ -9,6 +9,7 @@ use zksync_state::{
 };
 use zksync_types::{operations::TransferToNewOp, tx::Transfer, AccountId, TokenId};
 // Local deps
+use crate::witness::tests::test_utils::BLOCK_TIMESTAMP;
 use crate::witness::{
     tests::test_utils::{
         corrupted_input_test_scenario, generic_test_scenario, incorrect_op_test_scenario,
@@ -17,6 +18,7 @@ use crate::witness::{
     transfer_to_new::TransferToNewWitness,
     utils::SigDataInput,
 };
+use zksync_types::tx::TimeRange;
 
 /// Basic check for execution of `TransferToNew` operation in circuit.
 /// Here we create one account and perform a transfer to a new account.
@@ -48,6 +50,7 @@ fn test_transfer_to_new_success() {
                     &account_to.account.address,
                     None,
                     true,
+                    Default::default(),
                 )
                 .0,
             from: account_from.id,
@@ -97,6 +100,7 @@ fn corrupted_ops_input() {
                 &account_to.account.address,
                 None,
                 true,
+                Default::default(),
             )
             .0,
         from: account_from.id,
@@ -159,6 +163,7 @@ fn test_incorrect_transfer_account_from() {
                 &account_to.account.address,
                 None,
                 true,
+                Default::default(),
             )
             .0,
         from: account_from.id,
@@ -214,6 +219,7 @@ fn test_incorrect_transfer_account_to() {
                 &account_to.account.address,
                 None,
                 true,
+                Default::default(),
             )
             .0,
         from: account_from.id,
@@ -272,6 +278,7 @@ fn test_incorrect_transfer_amount() {
                     &account_to.account.address,
                     None,
                     true,
+                    Default::default(),
                 )
                 .0,
             from: account_from.id,
@@ -336,6 +343,7 @@ fn test_transfer_replay() {
                 &account_to.account.address,
                 None,
                 true,
+                Default::default(),
             )
             .0,
         from: account_copy.id,
@@ -357,4 +365,65 @@ fn test_transfer_replay() {
             }]
         },
     );
+}
+
+/// Basic check for execution of `TransferToNew` operation in circuit with incorrect timestamps.
+#[test]
+#[ignore]
+fn test_incorrect_transfer_to_new_timestamp() {
+    // Test vector of (initial_balance, transfer_amount, fee_amount, time_range).
+    let test_vector = vec![
+        (10u64, 7u64, 3u64, TimeRange::new(0, 0)),
+        (10u64, 7u64, 3u64, TimeRange::new(0, BLOCK_TIMESTAMP - 1)),
+        (
+            10u64,
+            7u64,
+            3u64,
+            TimeRange::new(BLOCK_TIMESTAMP + 1, u64::max_value()),
+        ),
+    ];
+
+    for (initial_balance, transfer_amount, fee_amount, time_range) in test_vector {
+        // Input data.
+        let accounts = vec![WitnessTestAccount::new(AccountId(1), initial_balance)];
+        let account_from = &accounts[0];
+        let account_to = WitnessTestAccount::new_empty(AccountId(2)); // Will not be included into state.
+        let transfer_op = TransferToNewOp {
+            tx: account_from
+                .zksync_account
+                .sign_transfer(
+                    TokenId(0),
+                    "",
+                    BigUint::from(transfer_amount),
+                    BigUint::from(fee_amount),
+                    &account_to.account.address,
+                    None,
+                    true,
+                    time_range,
+                )
+                .0,
+            from: account_from.id,
+            to: account_to.id,
+        };
+
+        // Additional data required for performing the operation.
+        let input = SigDataInput::from_transfer_to_new_op(&transfer_op)
+            .expect("SigDataInput creation failed");
+
+        // Operation is not valid, since transaction timestamp is invalid.
+        const ERR_MSG: &str = "op_valid is true/enforce equal to one";
+
+        incorrect_op_test_scenario::<TransferToNewWitness<Bn256>, _>(
+            &accounts,
+            transfer_op,
+            input,
+            ERR_MSG,
+            || {
+                vec![CollectedFee {
+                    token: TokenId(0),
+                    amount: fee_amount.into(),
+                }]
+            },
+        );
+    }
 }

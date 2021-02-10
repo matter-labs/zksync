@@ -5,6 +5,7 @@ use std::io::BufReader;
 use std::path::PathBuf;
 use zksync_crypto::bellman::kate_commitment::{Crs, CrsForLagrangeForm, CrsForMonomialForm};
 use zksync_crypto::params::{account_tree_depth, balance_tree_depth};
+use zksync_crypto::proof::PrecomputedSampleProofs;
 use zksync_crypto::Engine;
 
 pub fn get_keys_root_dir() -> PathBuf {
@@ -90,4 +91,22 @@ pub fn get_verifier_contract_key_path() -> PathBuf {
     let mut contract = get_keys_root_dir();
     contract.push("KeysWithPlonkVerifier.sol");
     contract
+}
+
+pub fn get_recursive_verification_key_path(number_of_proofs: usize) -> PathBuf {
+    let mut key = get_keys_root_dir();
+    key.push(&format!("recursive_{}.key", number_of_proofs));
+    key
+}
+
+pub fn get_precomputed_proofs_path() -> PathBuf {
+    let mut path = get_keys_root_dir();
+    path.push("precomputed_proofs.json");
+    path
+}
+
+pub fn load_precomputed_proofs() -> anyhow::Result<PrecomputedSampleProofs> {
+    let path = get_precomputed_proofs_path();
+    let file = File::open(path)?;
+    Ok(serde_json::from_reader(file)?)
 }

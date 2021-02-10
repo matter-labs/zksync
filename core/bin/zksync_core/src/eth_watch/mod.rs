@@ -22,7 +22,6 @@ use web3::types::{Address, BlockNumber};
 
 // Workspace deps
 use zksync_crypto::params::PRIORITY_EXPIRATION;
-use zksync_storage::ConnectionPool;
 use zksync_types::{Nonce, PriorityOp, PubKeyHash, ZkSyncPriorityOp};
 
 // Local deps
@@ -30,11 +29,9 @@ use self::{
     client::EthClient,
     eth_state::ETHState,
     received_ops::{sift_outdated_ops, ReceivedPriorityOp},
-    storage::Storage,
 };
 
 pub use client::EthHttpClient;
-pub use storage::DBStorage;
 use zksync_config::ZkSyncConfig;
 
 use zksync_eth_client::ethereum_gateway::EthereumGateway;
@@ -42,7 +39,6 @@ use zksync_eth_client::ethereum_gateway::EthereumGateway;
 mod client;
 mod eth_state;
 mod received_ops;
-mod storage;
 
 #[cfg(test)]
 mod tests;
@@ -92,25 +88,20 @@ pub enum EthWatchRequest {
         eth_hash: Vec<u8>,
         resp: oneshot::Sender<Option<PriorityOp>>,
     },
-    GetPendingWithdrawalsQueueIndex {
-        resp: oneshot::Sender<anyhow::Result<u32>>,
-    },
 }
 
-pub struct EthWatch<W: EthClient, S: Storage> {
+pub struct EthWatch<W: EthClient> {
     client: W,
-    storage: S,
     eth_state: ETHState,
     /// All ethereum events are accepted after sufficient confirmations to eliminate risk of block reorg.
     number_of_confirmations_for_event: u64,
     mode: WatcherMode,
 }
 
-impl<W: EthClient, S: Storage> EthWatch<W, S> {
-    pub fn new(client: W, storage: S, number_of_confirmations_for_event: u64) -> Self {
+impl<W: EthClient> EthWatch<W> {
+    pub fn new(client: W, number_of_confirmations_for_event: u64) -> Self {
         Self {
             client,
-            storage,
             eth_state: ETHState::default(),
             mode: WatcherMode::Working,
             number_of_confirmations_for_event,
@@ -139,26 +130,6 @@ impl<W: EthClient, S: Storage> EthWatch<W, S> {
         self.client
             .get_priority_op_events(block_from, block_to)
             .await
-    }
-
-    async fn update_withdrawals(
-        &mut self,
-        previous_block_with_accepted_events: u64,
-        new_block_with_accepted_events: u64,
-    ) -> anyhow::Result<()> {
-        // Get new complete withdrawals events
-        let complete_withdrawals_txs = self
-            .client
-            .get_complete_withdrawals_event(
-                BlockNumber::Number(previous_block_with_accepted_events.into()),
-                BlockNumber::Number(new_block_with_accepted_events.into()),
-            )
-            .await?;
-
-        self.storage
-            .store_complete_withdrawals(complete_withdrawals_txs)
-            .await?;
-        Ok(())
     }
 
     async fn process_new_blocks(&mut self, last_ethereum_block: u64) -> anyhow::Result<()> {
@@ -209,12 +180,6 @@ impl<W: EthClient, S: Storage> EthWatch<W, S> {
         let previous_block_with_accepted_events =
             new_block_with_accepted_events.saturating_sub(unprocessed_blocks_amount);
 
-        self.update_withdrawals(
-            previous_block_with_accepted_events,
-            new_block_with_accepted_events,
-        )
-        .await?;
-
         let unconfirmed_queue = self.get_unconfirmed_ops(current_ethereum_block).await?;
         let priority_queue = self
             .client
@@ -255,17 +220,12 @@ impl<W: EthClient, S: Storage> EthWatch<W, S> {
         nonce: Nonce,
         pub_key_hash: &PubKeyHash,
     ) -> anyhow::Result<bool> {
+        let auth_fact_reset_time = self.client.get_auth_fact_reset_time(address, nonce).await?;
+        if auth_fact_reset_time != 0 {
+            return Ok(false);
+        }
         let auth_fact = self.client.get_auth_fact(address, nonce).await?;
         Ok(auth_fact.as_slice() == tiny_keccak::keccak256(&pub_key_hash.data[..]))
-    }
-
-    async fn pending_withdrawals_queue_index(&self) -> anyhow::Result<u32> {
-        let first_pending_withdrawal_index =
-            self.client.get_first_pending_withdrawal_index().await?;
-
-        let number_of_pending_withdrawals = self.client.get_number_of_pending_withdrawals().await?;
-
-        Ok(first_pending_withdrawal_index + number_of_pending_withdrawals)
     }
 
     fn find_ongoing_op_by_hash(&self, eth_hash: &[u8]) -> Option<PriorityOp> {
@@ -434,13 +394,6 @@ impl<W: EthClient, S: Storage> EthWatch<W, S> {
                         .unwrap_or(false);
                     resp.send(authorized).unwrap_or_default();
                 }
-                EthWatchRequest::GetPendingWithdrawalsQueueIndex { resp } => {
-                    let pending_withdrawals_queue_index =
-                        self.pending_withdrawals_queue_index().await;
-
-                    resp.send(pending_withdrawals_queue_index)
-                        .unwrap_or_default();
-                }
             }
         }
     }
@@ -451,16 +404,12 @@ pub fn start_eth_watch(
     config_options: &ZkSyncConfig,
     eth_req_sender: mpsc::Sender<EthWatchRequest>,
     eth_req_receiver: mpsc::Receiver<EthWatchRequest>,
-    db_pool: ConnectionPool,
 ) -> JoinHandle<()> {
     let client = EthereumGateway::from_config(&config_options);
     let eth_client = EthHttpClient::new(client, config_options.contracts.contract_addr);
 
-    let storage = DBStorage::new(db_pool);
-
     let eth_watch = EthWatch::new(
         eth_client,
-        storage,
         config_options.eth_watch.confirmations_for_eth_event,
     );
 

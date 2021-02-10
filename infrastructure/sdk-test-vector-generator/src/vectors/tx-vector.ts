@@ -3,6 +3,8 @@ import * as ethers from 'ethers';
 import * as zksync from 'zksync';
 import { TestVector, TestVectorEntry } from '../types';
 import { generateArray } from '../utils';
+import { MAX_TIMESTAMP } from 'zksync/build/utils';
+import { ChangePubKeyOnchain } from 'zksync/build/types';
 
 /**
  * Interface for the transactions test vector.
@@ -73,7 +75,9 @@ async function getTransferSignVector(
         tokenId: 0,
         amount: '1000000000000',
         fee: '1000000',
-        nonce: 12
+        nonce: 12,
+        validFrom: 0,
+        validUntil: MAX_TIMESTAMP
     };
     const transferSignBytes = signer.transferSignBytes(transferData);
     const transferSignature = (await signer.signSyncTransfer(transferData)).signature;
@@ -85,7 +89,9 @@ async function getTransferSignVector(
         accountId: transferData.accountId,
         nonce: transferData.nonce
     };
-    const transferEthSignMessage = ethMessageSigner.getTransferEthSignMessage(transferEthSignInput);
+    const transferEthSignMessage = utils.hexlify(
+        utils.toUtf8Bytes(ethMessageSigner.getTransferEthSignMessage(transferEthSignInput))
+    );
     const transferEthSignature = await ethMessageSigner.ethSignTransfer(transferEthSignInput);
 
     const transferItem = {
@@ -120,7 +126,12 @@ async function getChangePubKeySignVector(
         newPkHash: await signer.pubKeyHash(),
         feeTokenId: 0,
         fee: '1000000000',
-        nonce: 13
+        nonce: 13,
+        validFrom: 0,
+        validUntil: MAX_TIMESTAMP,
+        ethAuthData: {
+            type: 'Onchain' // this does not matter for L2 signature verification
+        } as ChangePubKeyOnchain
     };
     const changePubKeySignBytes = signer.changePubKeySignBytes(changePubKeyData);
     const changePubKeySignature = (await signer.signSyncChangePubKey(changePubKeyData)).signature;
@@ -129,7 +140,9 @@ async function getChangePubKeySignVector(
         accountId: changePubKeyData.accountId,
         nonce: changePubKeyData.nonce
     };
-    const changePubKeyEthSignMessage = ethMessageSigner.getChangePubKeyEthSignMessage(changePubKeyEthSignInput);
+    const changePubKeyEthSignMessage = utils.hexlify(
+        ethMessageSigner.getChangePubKeyEthSignMessage(changePubKeyEthSignInput)
+    );
     const changePubKeyEthSignature = await ethMessageSigner.ethSignChangePubKey(changePubKeyEthSignInput);
 
     const changePubKeyItem = {
@@ -165,7 +178,9 @@ async function getWithdrawSignVector(
         tokenId: 0,
         amount: '1000000000000',
         fee: '1000000',
-        nonce: 12
+        nonce: 12,
+        validFrom: 0,
+        validUntil: MAX_TIMESTAMP
     };
     const withdrawSignBytes = signer.withdrawSignBytes(withdrawData);
     const withdrawSignature = (await signer.signSyncWithdraw(withdrawData)).signature;
@@ -177,7 +192,9 @@ async function getWithdrawSignVector(
         accountId: withdrawData.accountId,
         nonce: withdrawData.nonce
     };
-    const withdrawEthSignMessage = ethMessageSigner.getWithdrawEthSignMessage(withdrawEthSignInput);
+    const withdrawEthSignMessage = utils.hexlify(
+        utils.toUtf8Bytes(ethMessageSigner.getWithdrawEthSignMessage(withdrawEthSignInput))
+    );
     const withdrawEthSignature = await ethMessageSigner.ethSignWithdraw(withdrawEthSignInput);
 
     const withdrawItem = {
@@ -208,7 +225,9 @@ async function getForcedExitSignVector(ethPrivateKey: Uint8Array, signer: zksync
         target: '0x19aa2ed8712072e918632259780e587698ef58df',
         tokenId: 0,
         fee: '1000000',
-        nonce: 12
+        nonce: 12,
+        validFrom: 0,
+        validUntil: MAX_TIMESTAMP
     };
     const forcedExitSignBytes = signer.forcedExitSignBytes(forcedExitData);
     const forcedExitSignature = (await signer.signSyncForcedExit(forcedExitData)).signature;
