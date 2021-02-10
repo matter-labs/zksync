@@ -2207,6 +2207,18 @@
       ]
     }
   },
+  "8542fbcf1f669243a111348851c36ec3b01c4c11ac3391d55546d22a9e714e6b": {
+    "query": "DELETE FROM executed_transactions\n            WHERE success = false AND created_at < $1",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "Timestamptz"
+        ]
+      },
+      "nullable": []
+    }
+  },
   "8a039b0bae78afb5d106d84f7d136be17670909814f92a8e8070ba99a9aea21c": {
     "query": "SELECT * FROM data_restore_last_watched_eth_block LIMIT 1",
     "describe": {
