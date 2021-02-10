@@ -10,7 +10,7 @@ function verfiyKeysTarball() {
     return `verify-keys-${keyDir}-account-${accountTreeDepth}_-balance-${balanceTreeDepth}.tar.gz`;
 }
 
-export async function gen(command: 'contract' | 'all') {
+export async function gen(command: 'contract' | 'all' | 'circuit-size') {
     const accountTreeDepth = process.env.CHAIN_CIRCUIT_ACCOUNT_TREE_DEPTH;
     const balanceTreeDepth = process.env.CHAIN_CIRCUIT_BALANCE_TREE_DEPTH;
     const keyDir = process.env.CHAIN_CIRCUIT_KEY_DIR;
@@ -21,9 +21,13 @@ export async function gen(command: 'contract' | 'all') {
         fs.utimesSync('core/lib/crypto/src/params.rs', time, time);
         fs.mkdirSync(outputDir, { recursive: true });
         await utils.spawn('cargo run --bin key_generator --release -- keys');
+        await utils.spawn('cargo run --bin key_generator --release -- contract');
+    } else if (command == 'contract') {
+        await utils.spawn('cargo run --bin key_generator --release -- contract');
+    } else if (command == 'circuit-size') {
+        await utils.spawn('cargo run --bin key_generator --release -- circuit-size');
     }
 
-    await utils.spawn('cargo run --bin key_generator --release -- contract');
     fs.copyFileSync(`${outputDir}/KeysWithPlonkVerifier.sol`, 'contracts/contracts/KeysWithPlonkVerifier.sol');
 }
 
@@ -53,8 +57,10 @@ command
     .description('generate verification keys')
     .action(async (command?: string) => {
         command = command || 'all';
-        if (command != 'all' && command != 'contract') {
-            throw new Error('Can only generate "all" or "contract" keys');
+        if (command != 'all' && command != 'contract' && command != 'circuit-size') {
+            throw new Error(
+                'Can only generate "all" or "contract" keys, or "circuit-size" for circuit size estimation'
+            );
         }
         await gen(command);
     });

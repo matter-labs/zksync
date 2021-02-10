@@ -1,5 +1,10 @@
-[db]
+[database]
 # Datbase URL is defined in the `private.toml`
 
 # Amount of open connections to the database.
 pool_size=10
+
+# Rejected transactions will be stored in the database for this amount of hours.
+rejected_transactions_max_age=336
+# Sleep time (in hours) of the actor responsible for deleting failed transactions.
+rejected_transactions_cleaner_interval=24
