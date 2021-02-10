@@ -36,11 +36,11 @@ max_aggregated_blocks_to_commit=10
 # Max L2 blocks to execute in one L1 transaction
 max_aggregated_blocks_to_execute=10
 # Time (seconds) after block is created with timestamp T after which L1 aggregated commit operation must be created
-block_commit_deadline=10
+block_commit_deadline=1
 # Time (seconds) after block is created with timestamp T after which L1 aggregated prove operation must be created
-block_prove_deadline=10
+block_prove_deadline=1
 # Time (seconds) after block is created with timestamp T after which L1 aggregated execute operation must be created
-block_execute_deadline=10
+block_execute_deadline=1
 # Max gas that can be used to execute aggregated operation
 # for now (should be > 4kk which is max gas for one block commit/verify/execute)
 max_aggregated_tx_gas=5000000
