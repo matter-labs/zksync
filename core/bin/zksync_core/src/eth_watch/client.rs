@@ -5,7 +5,9 @@ use ethabi::Hash;
 use std::fmt::Debug;
 use web3::{
     contract::Options,
+    transports::http,
     types::{BlockNumber, FilterBuilder, Log},
+    Web3,
 };
 
 use zksync_contracts::zksync_contract;
@@ -143,7 +145,7 @@ impl EthClient for EthHttpClient {
 }
 
 pub async fn get_contract_events<T>(
-    web3: &Web3<Http>,
+    web3: &Web3<http::Http>,
     contract_address: Address,
     from: BlockNumber,
     to: BlockNumber,
@@ -176,6 +178,6 @@ where
         .collect()
 }
 
-pub async fn get_web3_block_number(web3: &Web3<Http>) -> anyhow::Result<u64> {
+pub async fn get_web3_block_number(web3: &Web3<http::Http>) -> anyhow::Result<u64> {
     Ok(web3.eth().block_number().await?.as_u64())
 }

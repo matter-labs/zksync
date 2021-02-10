@@ -37,10 +37,7 @@ use zksync_types::{
 use crate::api_server::rest::v1::{Error as ApiError, JsonResult};
 
 use crate::{
-    api_server::{
-        forced_exit_checker::ForcedExitChecker,
-        tx_sender::{ticker_request, SubmitError},
-    },
+    api_server::{forced_exit_checker::ForcedExitChecker, tx_sender::SubmitError},
     fee_ticker::TickerRequest,
 };
 

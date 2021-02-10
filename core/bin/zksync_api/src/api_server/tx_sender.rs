@@ -227,7 +227,7 @@ impl TxSender {
                 || self.enforce_pubkey_change_fee;
 
             let fee_allowed =
-                token_allowed_for_fees(ticker_request_sender.clone(), token.clone()).await?;
+                Self::token_allowed_for_fees(ticker_request_sender.clone(), token.clone()).await?;
 
             if !fee_allowed {
                 return Err(SubmitError::InappropriateFeeToken);
@@ -322,7 +322,8 @@ impl TxSender {
                     continue;
                 }
                 let fee_allowed =
-                    token_allowed_for_fees(self.ticker_requests.clone(), token.clone()).await?;
+                    Self::token_allowed_for_fees(self.ticker_requests.clone(), token.clone())
+                        .await?;
 
                 transaction_types.push((tx_type, address));
 
@@ -549,81 +550,81 @@ impl TxSender {
             // TODO Make error more clean
             .ok_or_else(|| SubmitError::other("Token not found in the DB"))
     }
-}
 
-async fn ticker_batch_fee_request(
-    mut ticker_request_sender: mpsc::Sender<TickerRequest>,
-    transactions: Vec<(TxFeeTypes, Address)>,
-    token: TokenLike,
-) -> Result<BatchFee, SubmitError> {
-    let req = oneshot::channel();
-    ticker_request_sender
-        .send(TickerRequest::GetBatchTxFee {
-            transactions,
-            token: token.clone(),
-            response: req.0,
-        })
-        .await
-        .map_err(SubmitError::internal)?;
-    let resp = req.1.await.map_err(SubmitError::internal)?;
-    resp.map_err(|err| internal_error!(err))
-}
+    async fn ticker_batch_fee_request(
+        mut ticker_request_sender: mpsc::Sender<TickerRequest>,
+        transactions: Vec<(TxFeeTypes, Address)>,
+        token: TokenLike,
+    ) -> Result<BatchFee, SubmitError> {
+        let req = oneshot::channel();
+        ticker_request_sender
+            .send(TickerRequest::GetBatchTxFee {
+                transactions,
+                token: token.clone(),
+                response: req.0,
+            })
+            .await
+            .map_err(SubmitError::internal)?;
+        let resp = req.1.await.map_err(SubmitError::internal)?;
+        resp.map_err(|err| internal_error!(err))
+    }
 
-async fn ticker_request(
-    mut ticker_request_sender: mpsc::Sender<TickerRequest>,
-    tx_type: TxFeeTypes,
-    address: Address,
-    token: TokenLike,
-) -> Result<Fee, SubmitError> {
-    let req = oneshot::channel();
-    ticker_request_sender
-        .send(TickerRequest::GetTxFee {
-            tx_type,
-            address,
-            token: token.clone(),
-            response: req.0,
-        })
-        .await
-        .map_err(SubmitError::internal)?;
+    async fn ticker_request(
+        mut ticker_request_sender: mpsc::Sender<TickerRequest>,
+        tx_type: TxFeeTypes,
+        address: Address,
+        token: TokenLike,
+    ) -> Result<Fee, SubmitError> {
+        let req = oneshot::channel();
+        ticker_request_sender
+            .send(TickerRequest::GetTxFee {
+                tx_type,
+                address,
+                token: token.clone(),
+                response: req.0,
+            })
+            .await
+            .map_err(SubmitError::internal)?;
 
-    let resp = req.1.await.map_err(SubmitError::internal)?;
-    resp.map_err(|err| internal_error!(err))
-}
+        let resp = req.1.await.map_err(SubmitError::internal)?;
+        resp.map_err(|err| internal_error!(err))
+    }
 
-pub async fn token_allowed_for_fees(
-    mut ticker_request_sender: mpsc::Sender<TickerRequest>,
-    token: TokenLike,
-) -> Result<bool, SubmitError> {
-    let (sender, receiver) = oneshot::channel();
-    ticker_request_sender
-        .send(TickerRequest::IsTokenAllowed {
-            token: token.clone(),
-            response: sender,
-        })
-        .await
-        .expect("ticker receiver dropped");
-    receiver
-        .await
-        .expect("ticker answer sender dropped")
-        .map_err(SubmitError::internal)
-}
+    pub async fn token_allowed_for_fees(
+        mut ticker_request_sender: mpsc::Sender<TickerRequest>,
+        token: TokenLike,
+    ) -> Result<bool, SubmitError> {
+        let (sender, receiver) = oneshot::channel();
+        ticker_request_sender
+            .send(TickerRequest::IsTokenAllowed {
+                token: token.clone(),
+                response: sender,
+            })
+            .await
+            .expect("ticker receiver dropped");
+        receiver
+            .await
+            .expect("ticker answer sender dropped")
+            .map_err(SubmitError::internal)
+    }
 
-pub async fn ticker_price_request(
-    mut ticker_request_sender: mpsc::Sender<TickerRequest>,
-    token: TokenLike,
-    req_type: TokenPriceRequestType,
-) -> Result<BigDecimal, SubmitError> {
-    let req = oneshot::channel();
-    ticker_request_sender
-        .send(TickerRequest::GetTokenPrice {
-            token: token.clone(),
-            response: req.0,
-            req_type,
-        })
-        .await
-        .map_err(SubmitError::internal)?;
-    let resp = req.1.await.map_err(SubmitError::internal)?;
-    resp.map_err(|err| internal_error!(err))
+    pub async fn ticker_price_request(
+        mut ticker_request_sender: mpsc::Sender<TickerRequest>,
+        token: TokenLike,
+        req_type: TokenPriceRequestType,
+    ) -> Result<BigDecimal, SubmitError> {
+        let req = oneshot::channel();
+        ticker_request_sender
+            .send(TickerRequest::GetTokenPrice {
+                token: token.clone(),
+                response: req.0,
+                req_type,
+            })
+            .await
+            .map_err(SubmitError::internal)?;
+        let resp = req.1.await.map_err(SubmitError::internal)?;
+        resp.map_err(|err| internal_error!(err))
+    }
 }
 
 async fn send_verify_request_and_recv(

@@ -78,11 +78,11 @@ async fn main() -> anyhow::Result<()> {
 
     // Run prover server & witness generator.
     vlog::info!("Starting the Prover server actors");
-    let database = zksync_witness_generator::database::Database::new(connection_pool);
+    let database = zksync_witness_generator::database::Database::new(connection_pool.clone());
     run_prover_server(database, stop_signal_sender, ZkSyncConfig::from_env());
 
     vlog::info!("Starting the ForcedExitRequests actors");
-    //let forced_exit_requests_task_handle = run_forced_exit_requests_actors(connection_pool, config);
+    let forced_exit_requests_task_handle = run_forced_exit_requests_actors(connection_pool, config);
 
     tokio::select! {
         _ = async { wait_for_tasks(core_task_handles).await } => {
@@ -100,9 +100,9 @@ async fn main() -> anyhow::Result<()> {
         _ = async { counter_task_handle.unwrap().await } => {
             panic!("Operation counting actor is not supposed to finish its execution")
         },
-    //     _ = async { forced_exit_requests_task_handle.await } => {
-     //        panic!("ForcedExitRequests actor is not supposed to finish its execution")
-      //   },
+        _ = async { forced_exit_requests_task_handle.await } => {
+            panic!("ForcedExitRequests actor is not supposed to finish its execution")
+        },
         _ = async { stop_signal_receiver.next().await } => {
             vlog::warn!("Stop signal received, shutting down");
         }

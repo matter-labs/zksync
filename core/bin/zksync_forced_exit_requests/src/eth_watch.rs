@@ -312,7 +312,7 @@ pub fn run_forced_exit_contract_watcher(
     connection_pool: ConnectionPool,
     config: ZkSyncConfig,
 ) -> JoinHandle<()> {
-    let transport = web3::transports::Http::new(&config.eth_client.web3_url).unwrap();
+    let transport = web3::transports::Http::new(&config.eth_client.web3_url[0]).unwrap();
     let web3 = web3::Web3::new(transport);
     let eth_client = EthClient::new(web3, config.contracts.forced_exit_addr);
 

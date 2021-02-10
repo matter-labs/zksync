@@ -38,7 +38,7 @@ use crate::api_server::rest::v1::{Error as ApiError, JsonResult};
 use crate::{
     api_server::{
         forced_exit_checker::ForcedExitChecker,
-        tx_sender::{ticker_request, SubmitError},
+        tx_sender::{SubmitError, TxSender},
     },
     fee_ticker::TickerRequest,
 };
