@@ -121,6 +121,13 @@ export async function loadtest(...args: string[]) {
     await utils.spawn(`cargo run --release --bin loadtest -- ${args.join(' ')}`);
 }
 
+export async function readVariable(address: string, contractName:string, variableName: string, file?: string) {
+    if(file === undefined)
+        await utils.spawn(`yarn --silent --cwd contracts read-variable read ${address} ${contractName} ${variableName}`);
+    else
+        await utils.spawn(`yarn --silent --cwd contracts read-variable read ${address} ${contractName} ${variableName} -f ${file}`);
+}
+
 export const command = new Command('run')
     .description('run miscellaneous applications')
     .addCommand(verifyKeys.command)
@@ -219,4 +226,12 @@ command
     .allowUnknownOption()
     .action(async (options: string[]) => {
         await loadtest(...options);
+    });
+
+command
+    .command('read-variable <address> <contractName> <variableName>')
+    .option('-f --file <file>','file with contract source code(default $ZKSYNC_HOME/contracts/contracts/${contractName}.sol)')
+    .description('Read value of contract variable')
+    .action(async (address: string, contractName: string, variableName: string, cmd: Command) => {
+        await readVariable(address, contractName, variableName, cmd.file);
     });
