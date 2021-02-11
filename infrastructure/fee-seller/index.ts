@@ -58,13 +58,20 @@ async function withdrawTokens(zksWallet: zksync.Wallet) {
     const provider = zksWallet.provider;
     const accountState = await zksWallet.getAccountState();
     for (const token in accountState.committed.balances) {
-        if (provider.tokenSet.resolveTokenSymbol(token) === 'MLTT') {
+        const tokenSymbol = provider.tokenSet.resolveTokenSymbol(token);
+        if (tokenSymbol === 'MLTT') {
             continue;
         }
 
         const tokenCommittedBalance = BigNumber.from(accountState.committed.balances[token]);
 
-        const withdrawFee = (await provider.getTransactionFee('Withdraw', zksWallet.address(), token)).totalFee;
+        let withdrawFee = ethers.utils.parseEther('0.0');
+        try {
+            withdrawFee = (await provider.getTransactionFee('Withdraw', zksWallet.address(), token)).totalFee;
+        } catch (e) {
+            console.log(`Can't withdraw token ${tokenSymbol}: ${e}`);
+            continue;
+        }
 
         if (isOperationFeeAcceptable(tokenCommittedBalance, withdrawFee, MAX_LIQUIDATION_FEE_PERCENT)) {
             const amountAfterWithdraw = tokenCommittedBalance.sub(withdrawFee);
@@ -209,13 +216,15 @@ async function sellTokens(zksWallet: zksync.Wallet) {
                 }
 
                 console.log('Sending swap tx.');
+                const nonce = await zksWallet.ethSigner.getTransactionCount('latest');
                 const ethTransaction = await zksWallet.ethSigner.sendTransaction({
                     from: apiResponse.from,
                     to: apiResponse.to,
                     gasLimit: BigNumber.from(apiResponse.gas),
                     gasPrice: BigNumber.from(apiResponse.gasPrice),
                     value: BigNumber.from(apiResponse.value),
-                    data: apiResponse.data
+                    data: apiResponse.data,
+                    nonce
                 });
                 console.log(`Tx hash: ${ethTransaction.hash}`);
 
@@ -247,7 +256,13 @@ async function sendETH(zksWallet: zksync.Wallet, feeAccumulatorAddress: string) 
         const ethToSend = ethBalance.sub(ETH_TRANSFER_THRESHOLD.add(ethTransferFee));
         if (isOperationFeeAcceptable(ethToSend, ethTransferFee, MAX_LIQUIDATION_FEE_PERCENT)) {
             console.log(`Sending ${fmtToken(zksWallet.provider, 'ETH', ethToSend)} to ${feeAccumulatorAddress}`);
-            const tx = await ethWallet.sendTransaction({ to: feeAccumulatorAddress, value: ethToSend, gasPrice });
+            const nonce = await ethWallet.getTransactionCount('latest');
+            const tx = await ethWallet.sendTransaction({
+                to: feeAccumulatorAddress,
+                value: ethToSend,
+                gasPrice,
+                nonce
+            });
             console.log(`Tx hash: ${tx.hash}`);
 
             await sendNotification(
