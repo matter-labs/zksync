@@ -27,6 +27,8 @@ pub struct ZkSyncState {
 
     /// Current block number
     pub block_number: BlockNumber,
+
+    next_free_id: AccountId,
 }
 
 #[derive(Debug, Clone)]
@@ -59,6 +61,7 @@ impl ZkSyncState {
             balance_tree,
             block_number: BlockNumber(0),
             account_id_by_address: HashMap::new(),
+            next_free_id: AccountId(0),
         }
     }
 
@@ -76,10 +79,12 @@ impl ZkSyncState {
         account_id_by_address: HashMap<Address, AccountId>,
         current_block: BlockNumber,
     ) -> Self {
+        let next_free_id = AccountId(balance_tree.items.len() as u32);
         Self {
             balance_tree,
             block_number: current_block,
             account_id_by_address,
+            next_free_id,
         }
     }
 
@@ -101,7 +106,11 @@ impl ZkSyncState {
     pub fn get_account(&self, account_id: AccountId) -> Option<Account> {
         let start = std::time::Instant::now();
 
-        let account = self.balance_tree.get(*account_id).cloned();
+        let account = if account_id < self.next_free_id {
+            self.balance_tree.get(*account_id).cloned()
+        } else {
+            None
+        };
 
         vlog::trace!(
             "Get account (id {}) execution time: {}ms",
@@ -268,18 +277,7 @@ impl ZkSyncState {
     }
 
     pub(crate) fn get_free_account_id(&self) -> AccountId {
-        let mut account_id = AccountId(self.balance_tree.items.len() as u32);
-
-        // In the production database it somehow appeared that one account ID in the database got missing,
-        // meaning that it was never assigned, but the next one was inserted.
-        // This led to the fact that length of the tree is not equal to the most recent ID anymore.
-        // In order to prevent similar error-proneness in the future, we scan until we find the next free ID.
-        // Amount of steps here is not expected to be high.
-        while self.get_account(account_id).is_some() {
-            *account_id += 1;
-        }
-
-        account_id
+        self.next_free_id
     }
 
     pub fn collect_fee(&mut self, fees: &[CollectedFee], fee_account: AccountId) -> AccountUpdates {
@@ -330,6 +328,9 @@ impl ZkSyncState {
     pub fn insert_account(&mut self, id: AccountId, account: Account) {
         self.account_id_by_address.insert(account.address, id);
         self.balance_tree.insert(*id, account);
+        if id == self.next_free_id {
+            *self.next_free_id += 1;
+        }
     }
 
     #[allow(dead_code)]
@@ -337,6 +338,9 @@ impl ZkSyncState {
         if let Some(account) = self.get_account(id) {
             self.account_id_by_address.remove(&account.address);
             self.balance_tree.remove(*id);
+            if *id == *self.next_free_id - 1 {
+                *self.next_free_id -= 1;
+            }
         }
     }
 
@@ -895,5 +899,83 @@ mod tests {
             plasma_state_updated_back.root_hash(),
             initial_plasma_state.root_hash()
         );
+    }
+
+    /// Checks if next_free_id field behaves as expected after some creations and deletions of accounts.
+    #[test]
+    fn test_next_free_id() {
+        let mut rng = XorShiftRng::from_seed([1, 2, 3, 4]);
+
+        let mut random_addresses = Vec::new();
+        for _ in 0..10 {
+            random_addresses.push(Address::from(rng.gen::<[u8; 20]>()));
+        }
+
+        let mut initial_plasma_state =
+            ZkSyncState::from_acc_map(AccountMap::default(), BlockNumber(0));
+        assert_eq!(*initial_plasma_state.next_free_id, 0);
+        let updates = vec![
+            (
+                AccountId(0),
+                AccountUpdate::Create {
+                    address: random_addresses[0],
+                    nonce: Nonce(0),
+                },
+            ),
+            (
+                AccountId(1),
+                AccountUpdate::Create {
+                    address: random_addresses[1],
+                    nonce: Nonce(0),
+                },
+            ),
+            (
+                AccountId(1),
+                AccountUpdate::Delete {
+                    address: random_addresses[1],
+                    nonce: Nonce(0),
+                },
+            ),
+            (
+                AccountId(0),
+                AccountUpdate::Delete {
+                    address: random_addresses[0],
+                    nonce: Nonce(0),
+                },
+            ),
+            (
+                AccountId(0),
+                AccountUpdate::Create {
+                    address: random_addresses[2],
+                    nonce: Nonce(0),
+                },
+            ),
+            (
+                AccountId(1),
+                AccountUpdate::Create {
+                    address: random_addresses[3],
+                    nonce: Nonce(0),
+                },
+            ),
+            (
+                AccountId(0),
+                AccountUpdate::Delete {
+                    address: random_addresses[2],
+                    nonce: Nonce(0),
+                },
+            ),
+            (
+                AccountId(1),
+                AccountUpdate::Delete {
+                    address: random_addresses[3],
+                    nonce: Nonce(0),
+                },
+            ),
+        ];
+        let expected_ids = vec![1, 2, 1, 0, 1, 2, 2, 1];
+        for (update, expected_id) in updates.iter().zip(expected_ids.iter()) {
+            initial_plasma_state.apply_account_updates(vec![update.clone()]);
+            assert_eq!(*initial_plasma_state.next_free_id, *expected_id);
+        }
     }
 }
