@@ -393,7 +393,7 @@ where
         {
             // We use an aggregated block in contracts, which means that several BlockEvent can include the same tx_hash,
             // but for correct restore we need to generate RollupBlocks from this tx only once.
-            // These blocks go one after the other,, and checking only the last transaction hash is safety
+            // These blocks go one after the other, and checking only the last transaction hash is safety
             if let Some(tx) = last_event_tx_hash {
                 if tx == event.transaction_hash {
                     continue;
