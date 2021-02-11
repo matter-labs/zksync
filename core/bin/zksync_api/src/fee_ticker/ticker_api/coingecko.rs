@@ -59,7 +59,7 @@ impl TokenPriceAPI for CoinGeckoAPI {
 
         // If we use 2 day interval we will get hourly prices and not minute by minute which makes
         // response faster and smaller
-        let request = self
+        let market_chart = self
             .client
             .get(market_chart_url)
             .timeout(REQUEST_TIMEOUT)
