@@ -105,7 +105,7 @@ async fn main() {
     };
     let storage = connection_pool.access_storage().await.unwrap();
     let web3 = Web3::new(transport);
-    let contract = ZkSyncDeployedContract::version4(web3.eth().clone(), config.contract_addr);
+    let contract = ZkSyncDeployedContract::version4(web3.eth(), config.contract_addr);
     let mut driver = DataRestoreDriver::new(
         web3,
         config.governance_addr,
