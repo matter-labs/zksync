@@ -385,13 +385,16 @@ where
     pub async fn get_new_operation_blocks_from_events(&mut self) -> Vec<RollupOpsBlock> {
         let mut blocks = Vec::new();
 
-        let mut last_event_tx = None;
+        let mut last_event_tx_hash = None;
         for event in self
             .events_state
             .get_only_verified_committed_events()
             .iter()
         {
-            if let Some(tx) = last_event_tx {
+            // We use an aggregated block in contracts, which means that several BlockEvent can include the same tx_hash,
+            // but for correct restore we need to generate RollupBlocks from this tx only once.
+            // These blocks go one after the other,, and checking only the last transaction hash is safety
+            if let Some(tx) = last_event_tx_hash {
                 if tx == event.transaction_hash {
                     continue;
                 }
@@ -401,7 +404,7 @@ where
                 .await
                 .expect("Cant get new operation blocks from events");
             blocks.extend(block);
-            last_event_tx = Some(event.transaction_hash);
+            last_event_tx_hash = Some(event.transaction_hash);
         }
 
         blocks

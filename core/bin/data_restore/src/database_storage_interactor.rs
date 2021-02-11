@@ -64,9 +64,6 @@ impl StorageInteractor for DatabaseStorageInteractor<'_> {
         let mut ops: Vec<(BlockNumber, &ZkSyncOp, AccountId)> = vec![];
 
         for block in blocks {
-            if block.block_num.0 == 5702 {
-                vlog::info!("Block number 5702");
-            }
             for op in &block.ops {
                 ops.push((block.block_num, op, block.fee_account));
             }
