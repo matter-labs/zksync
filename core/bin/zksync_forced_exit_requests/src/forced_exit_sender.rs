@@ -3,6 +3,7 @@ use std::{convert::TryFrom, time::Instant};
 use anyhow::format_err;
 use ethabi::{Contract as ContractAbi, Hash};
 use fee_ticker::validator::watcher;
+use franklin_crypto::bellman::PrimeFieldRepr;
 use num::{BigUint, FromPrimitive, ToPrimitive};
 use std::fmt::Debug;
 use tokio::task::JoinHandle;
@@ -31,16 +32,8 @@ use zksync_types::forced_exit_requests::FundsReceivedEvent;
 use zksync_types::ForcedExit;
 use zksync_types::SignedZkSyncTx;
 
-use franklin_crypto::{
-    alt_babyjubjub::fs::FsRepr,
-    bellman::{pairing::bn256, PrimeFieldRepr},
-};
-use zksync_crypto::franklin_crypto::{eddsa::PrivateKey, jubjub::JubjubEngine};
-
-pub type Engine = bn256::Bn256;
-
-pub type Fr = bn256::Fr;
-pub type Fs = <Engine as JubjubEngine>::Fs;
+use super::PrivateKey;
+use super::{Engine, Fs, FsRepr};
 
 use zksync_crypto::ff::PrimeField;
 
@@ -61,7 +54,7 @@ async fn get_operator_account_id(
     let mut accounts_schema = storage.chain().account_schema();
 
     let account_id = accounts_schema
-        .account_id_by_address(config.eth_sender.sender.operator_commit_eth_addr)
+        .account_id_by_address(config.forced_exit_requests.sender_account_address)
         .await?;
 
     account_id.ok_or(anyhow::Error::msg("1"))
@@ -90,10 +83,12 @@ impl ForcedExitSender {
         connection_pool: ConnectionPool,
         config: ZkSyncConfig,
     ) -> anyhow::Result<Self> {
-        let operator_account_id = config.forced_exit_requests.sender_account_id;
+        let operator_account_id = get_operator_account_id(connection_pool.clone(), &config)
+            .await
+            .expect("Failed to get the sender id");
 
         let sender_private_key =
-            hex::decode(config.clone().forced_exit_requests.sender_private_key)
+            hex::decode(&config.clone().forced_exit_requests.sender_private_key[2..])
                 .expect("Decoding private key failed");
         let sender_private_key =
             read_signing_key(&sender_private_key).expect("Reading private key failed");

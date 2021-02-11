@@ -18,6 +18,9 @@ zksync_config = { path = "../../lib/config", version = "1.0" }
 zksync_contracts = { path = "../../lib/contracts", version = "1.0" }
 
 zksync_crypto = { path = "../../lib/crypto", version = "1.0" }
+zksync_eth_signer = { path = "../../lib/eth_signer", version = "1.0" }
+
+vlog = { path = "../../lib/vlog", version = "1.0" }
 
 franklin_crypto = { package = "franklin-crypto", version = "0.0.5", git = "https://github.com/matter-labs/franklin-crypto.git", branch="beta", features = ["multicore", "plonk"]}
 

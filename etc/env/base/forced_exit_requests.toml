@@ -22,5 +22,5 @@ price_per_token=30000000000000000
 # Wait confirmations
 wait_confirmations=1
 
-# The account Id of the ForcedExit sender
-sender_account_id=1
+# The account of the ForcedExit sender
+sender_account_address="0xe1faB3eFD74A77C23B426c302D96372140FF7d0C"
