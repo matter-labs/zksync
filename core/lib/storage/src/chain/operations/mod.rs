@@ -353,21 +353,15 @@ impl<'a, 'c> OperationsSchema<'a, 'c> {
             return Ok(None);
         };
 
-        let execute_block_operation = self
-            .get_aggregated_op_that_affects_block(AggregatedActionType::ExecuteBlocks, block_number)
+        let withdrawal_hash = EthereumSchema(self.0)
+            .aggregated_op_final_hash(block_number)
             .await?;
-
-        let res = if let Some((op_id, _)) = execute_block_operation {
-            EthereumSchema(self.0).aggregated_op_final_hash(op_id).await
-        } else {
-            Ok(None)
-        };
 
         metrics::histogram!(
             "sql.chain.operations.eth_withdraw_tx_for_execute_block",
             start.elapsed()
         );
-        res
+        Ok(withdrawal_hash)
     }
 
     /// Returns the hash of the Ethereum transaction in which the

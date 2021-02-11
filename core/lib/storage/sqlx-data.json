@@ -2201,68 +2201,6 @@
       ]
     }
   },
-  "83064cc95efff2cea2b6ff1b3ae13e07a247afb40c2a287968988110404cd175": {
-    "query": "SELECT eth_operations.* FROM aggregate_operations\n                  LEFT JOIN eth_aggregated_ops_binding ON eth_aggregated_ops_binding.op_id = aggregate_operations.id\n                  LEFT JOIN eth_operations ON eth_aggregated_ops_binding.eth_op_id = eth_operations.id\n            WHERE\n                  eth_operations.confirmed = true AND aggregate_operations.id = $1\n            LIMIT 1",
-    "describe": {
-      "columns": [
-        {
-          "ordinal": 0,
-          "name": "id",
-          "type_info": "Int8"
-        },
-        {
-          "ordinal": 1,
-          "name": "nonce",
-          "type_info": "Int8"
-        },
-        {
-          "ordinal": 2,
-          "name": "confirmed",
-          "type_info": "Bool"
-        },
-        {
-          "ordinal": 3,
-          "name": "raw_tx",
-          "type_info": "Bytea"
-        },
-        {
-          "ordinal": 4,
-          "name": "op_type",
-          "type_info": "Text"
-        },
-        {
-          "ordinal": 5,
-          "name": "final_hash",
-          "type_info": "Bytea"
-        },
-        {
-          "ordinal": 6,
-          "name": "last_deadline_block",
-          "type_info": "Int8"
-        },
-        {
-          "ordinal": 7,
-          "name": "last_used_gas_price",
-          "type_info": "Numeric"
-        }
-      ],
-      "parameters": {
-        "Left": [
-          "Int8"
-        ]
-      },
-      "nullable": [
-        false,
-        false,
-        false,
-        false,
-        false,
-        true,
-        false,
-        false
-      ]
-    }
-  },
   "83cc9ff843c9dd1c974b651f5ed1e0c6bea94454db1d6f01b8fdf556cdd77d81": {
     "query": "DELETE FROM mempool_txs\n            WHERE tx_hash = $1",
     "describe": {
@@ -3111,6 +3049,69 @@
         null,
         null,
         null
+      ]
+    }
+  },
+  "bec05747dcfbf729bfd6e5d6aedf8da39f6d0d4ab5f0eae8dfed6c07adac1ba8": {
+    "query": "SELECT eth_operations.* FROM aggregate_operations\n                LEFT JOIN eth_aggregated_ops_binding ON eth_aggregated_ops_binding.op_id = aggregate_operations.id\n                LEFT JOIN eth_operations ON eth_aggregated_ops_binding.eth_op_id = eth_operations.id\n            WHERE\n                ($1 BETWEEN from_block AND to_block) AND action_type = $2 AND eth_operations.confirmed = true \n            LIMIT 1",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "id",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 1,
+          "name": "nonce",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 2,
+          "name": "confirmed",
+          "type_info": "Bool"
+        },
+        {
+          "ordinal": 3,
+          "name": "raw_tx",
+          "type_info": "Bytea"
+        },
+        {
+          "ordinal": 4,
+          "name": "op_type",
+          "type_info": "Text"
+        },
+        {
+          "ordinal": 5,
+          "name": "final_hash",
+          "type_info": "Bytea"
+        },
+        {
+          "ordinal": 6,
+          "name": "last_deadline_block",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 7,
+          "name": "last_used_gas_price",
+          "type_info": "Numeric"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Int8",
+          "Text"
+        ]
+      },
+      "nullable": [
+        false,
+        false,
+        false,
+        false,
+        false,
+        true,
+        false,
+        false
       ]
     }
   },

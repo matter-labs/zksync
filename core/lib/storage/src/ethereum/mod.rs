@@ -8,6 +8,7 @@ use zksync_basic_types::{H256, U256};
 // Workspace imports
 use zksync_types::aggregated_operations::{AggregatedActionType, AggregatedOperation};
 use zksync_types::ethereum::{ETHOperation, InsertedOperationResponse};
+use zksync_types::BlockNumber;
 // Local imports
 use self::records::{ETHParams, ETHStats, ETHTxHash, StorageETHOperation};
 use crate::{chain::operations::records::StoredAggregatedOperation, QueryResult, StorageProcessor};
@@ -591,16 +592,20 @@ impl<'a, 'c> EthereumSchema<'a, 'c> {
         Ok(())
     }
 
-    pub async fn aggregated_op_final_hash(&mut self, op_id: i64) -> QueryResult<Option<H256>> {
+    pub async fn aggregated_op_final_hash(
+        &mut self,
+        block_number: BlockNumber,
+    ) -> QueryResult<Option<H256>> {
         let eth_operation = sqlx::query_as!(
             StorageETHOperation,
             "SELECT eth_operations.* FROM aggregate_operations
-                  LEFT JOIN eth_aggregated_ops_binding ON eth_aggregated_ops_binding.op_id = aggregate_operations.id
-                  LEFT JOIN eth_operations ON eth_aggregated_ops_binding.eth_op_id = eth_operations.id
+                LEFT JOIN eth_aggregated_ops_binding ON eth_aggregated_ops_binding.op_id = aggregate_operations.id
+                LEFT JOIN eth_operations ON eth_aggregated_ops_binding.eth_op_id = eth_operations.id
             WHERE
-                  eth_operations.confirmed = true AND aggregate_operations.id = $1
+                ($1 BETWEEN from_block AND to_block) AND action_type = $2 AND eth_operations.confirmed = true 
             LIMIT 1",
-            op_id
+            i64::from(*block_number),
+            AggregatedActionType::ExecuteBlocks.to_string(),
         )
         .fetch_optional(self.0.conn())
         .await?;
