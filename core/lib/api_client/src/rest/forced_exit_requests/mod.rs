@@ -35,7 +35,8 @@ pub enum ForcedExitRequestStatus {
 pub struct ForcedExitRegisterRequest {
     pub target: Address,
     pub tokens: Vec<TokenId>,
-    // We still gotta specify that, since the price might change
+    // Even though the price is constant, we still need to specify it,
+    // since the price might change (with config)
     #[serde(with = "BigUintSerdeAsRadix10Str")]
     pub price_in_wei: BigUint,
 }

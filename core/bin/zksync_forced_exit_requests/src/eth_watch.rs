@@ -116,10 +116,6 @@ struct ForcedExitContractWatcher {
     mode: WatcherMode,
 }
 
-fn dummy_get_min() -> i64 {
-    1
-}
-
 // Usually blocks are created much slower (at rate 1 block per 10-20s),
 // but the block time falls through time, so just to double-check
 const MILLIS_PER_BLOCK: i64 = 7000;
@@ -134,9 +130,6 @@ fn time_range_to_block_diff(from: DateTime<Utc>, to: DateTime<Utc>) -> u64 {
         .try_into()
         .unwrap();
 }
-
-// clean the db from txs being older than ...
-fn clean() {}
 
 impl ForcedExitContractWatcher {
     async fn restore_state_from_eth(&mut self, block: u64) -> anyhow::Result<()> {
@@ -320,9 +313,9 @@ pub fn run_forced_exit_contract_watcher(
 
     tokio::spawn(async move {
         // It is fine to unwrap here, since without it there is not way
-        prepare_forced_exit_sender(connection_pool.clone(), core_api_client.clone(), &config)
-            .await
-            .unwrap();
+        //prepare_forced_exit_sender(connection_pool.clone(), core_api_client.clone(), &config)
+        //  .await
+        // .unwrap();
 
         // It is ok to unwrap here, since if fe_sender is not created, then
         // the watcher is meaningless
