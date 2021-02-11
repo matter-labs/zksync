@@ -106,7 +106,13 @@ impl StorageInteractor for DatabaseStorageInteractor<'_> {
             .expect("Cant execute verify operation");
 
         let block_number = block.block_number;
-        if let Err(_) = transaction.chain().block_schema().save_block(block).await {
+        if transaction
+            .chain()
+            .block_schema()
+            .save_block(block)
+            .await
+            .is_err()
+        {
             vlog::info!("Block {} was reverted", block_number)
         }
 

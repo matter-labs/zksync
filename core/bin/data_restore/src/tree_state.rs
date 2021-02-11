@@ -23,6 +23,12 @@ pub struct TreeState {
     pub last_fee_account_address: Address,
 }
 
+impl Default for TreeState {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl TreeState {
     /// Returns empty self state
     pub fn new() -> Self {
