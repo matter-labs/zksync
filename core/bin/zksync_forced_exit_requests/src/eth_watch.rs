@@ -263,7 +263,7 @@ impl ForcedExitContractWatcher {
                 .await;
         }
 
-        self.last_viewed_block = last_block;
+        self.last_viewed_block = last_confirmed_block;
     }
 
     pub async fn run(mut self) {
@@ -312,10 +312,11 @@ pub fn run_forced_exit_contract_watcher(
     let eth_client = EthClient::new(web3, config.contracts.forced_exit_addr);
 
     tokio::spawn(async move {
-        // It is fine to unwrap here, since without it there is not way
-        //prepare_forced_exit_sender(connection_pool.clone(), core_api_client.clone(), &config)
-        //  .await
-        // .unwrap();
+        // It is fine to unwrap here, since without it there is not way we
+        // can be sure that the forced exit sender will work properly
+        prepare_forced_exit_sender(connection_pool.clone(), core_api_client.clone(), &config)
+            .await
+            .unwrap();
 
         // It is ok to unwrap here, since if fe_sender is not created, then
         // the watcher is meaningless

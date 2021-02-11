@@ -64,7 +64,7 @@ describe.only('Withdrawal helpers tests', () => {
         );
     });
 
-    it.only('forced_exit_requests should recover multiple tokens', async () => {
+    it.only('forced_exit_request should recover single token', async () => {
         await tester.testForcedExitRequestOneToken(
             alice,
             bob.ethSigner,

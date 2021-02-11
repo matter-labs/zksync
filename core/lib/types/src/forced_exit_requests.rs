@@ -33,7 +33,7 @@ pub struct SaveForcedExitRequestQuery {
     pub price_in_wei: BigUint,
     pub valid_until: DateTime<Utc>,
 }
-
+#[derive(Debug, Clone, Copy)]
 pub struct FundsReceivedEvent {
     pub amount: u64,
 }

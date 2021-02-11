@@ -254,6 +254,9 @@ impl ForcedExitSender {
 
     pub async fn process_request(&self, amount: i64) {
         let id = self.extract_id_from_amount(amount);
+        // After extracting the id we need to delete it from the db
+        // to make sure that amount is the same as in the db
+        let amount = amount - id;
 
         let mut storage = match self.connection_pool.access_storage().await {
             Ok(storage) => storage,
@@ -295,35 +298,5 @@ impl ForcedExitSender {
         self.fulfill_request(&mut storage, id)
             .await
             .expect("Error while fulfulling the request");
-
-        // let db_transaction = match fe_schema.0.start_transaction().await {
-        //     Ok(transaction ) => transaction,
-        //     Err(error) => {
-        //         log::warn!("Failed to start db transaction for processing forced_exit_requests, reason {}", error);
-        //         return;
-        //     }
-        // };
-
-        // send_to_mempool();
-        // await until its committed
-
-        //  db_transaction
-        //      .fe_schema()
-        //    .fulfill_request()
-
-        // let fe_request = fe_schema.get_request_by_id(id).await;
-        // // The error means that such on id does not exists
-        // // TOOD: Actually handle differently when id does not exist or an actual error
-        // if let Err(_) = fe_request {
-        //     return;
-        // }
-
-        // let fe_request = fe_request.unwrap().unwrap();
-
-        // TODO: take aging into account
-
-        // let tx = self.construct_forced_exit(storage, fe_request).await.expect("Failed to construct forced exit transaction");
-        // TODO: Handle such cases gracefully, and not panic
-        // self.core_api_client.send_tx(tx).await.expect("An erro occureed, while submitting tx");
     }
 }

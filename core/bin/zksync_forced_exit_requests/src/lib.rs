@@ -207,12 +207,14 @@ pub async fn register_signing_key<'a>(
 ) -> anyhow::Result<()> {
     let eth_sk = get_verified_eth_sk(sender_address).await;
 
+    let pub_key_hash = PubKeyHash::from_privkey(sender_sk);
+
     // Unfortunately, currently the only way to create a CPK
     // transaction from eth_private_key is to cre
     let mut cpk_tx = ChangePubKey::new_signed(
         sender_id,
         sender_address,
-        PubKeyHash::from_privkey(sender_sk),
+        pub_key_hash.clone(),
         TokenId::from_str("0").unwrap(),
         BigUint::from(0u8),
         Nonce::from_str("0").unwrap(),
@@ -229,9 +231,20 @@ pub async fn register_signing_key<'a>(
     let eth_signature =
         PackedEthSignature::sign(&eth_sk, &eth_sign_bytes).expect("Failed to sign eth message");
 
-    cpk_tx.eth_signature = Some(PackedEthSignature::from(eth_signature.clone()));
+    let cpk_tx_signed = ChangePubKey::new_signed(
+        sender_id,
+        sender_address,
+        pub_key_hash,
+        TokenId::from_str("0").unwrap(),
+        BigUint::from(0u8),
+        Nonce::from_str("0").unwrap(),
+        TimeRange::default(),
+        Some(eth_signature.clone()),
+        sender_sk,
+    )
+    .expect("Failed to created signed CPK transaction");
 
-    let tx = ZkSyncTx::ChangePubKey(Box::new(cpk_tx));
+    let tx = ZkSyncTx::ChangePubKey(Box::new(cpk_tx_signed));
     let eth_sign_data = EthSignData {
         signature: TxEthSignature::EthereumSignature(eth_signature),
         message: eth_sign_bytes,
@@ -246,7 +259,8 @@ pub async fn register_signing_key<'a>(
     api_client
         .send_tx(tx_signed)
         .await
-        .expect("Failed to send CPK transaction");
+        .expect("Failed to send CPK transaction")
+        .expect("Failed to send");
 
     wait_for_change_pub_key_tx(storage, tx_hash)
         .await
