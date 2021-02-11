@@ -50,7 +50,7 @@ impl<'a, 'c> DataRestoreSchema<'a, 'c> {
                 .await?;
         }
 
-        if commit_op.blocks.len() != 0 {
+        if commit_op.blocks.is_empty() {
             OperationsSchema(&mut transaction)
                 .confirm_aggregated_operations(
                     commit_op.blocks.first().unwrap().block_number,
@@ -60,7 +60,7 @@ impl<'a, 'c> DataRestoreSchema<'a, 'c> {
                 .await?;
         }
 
-        if execute_op.blocks.len() != 0 {
+        if execute_op.blocks.is_empty() {
             OperationsSchema(&mut transaction)
                 .confirm_aggregated_operations(
                     execute_op.blocks.first().unwrap().block_number,
