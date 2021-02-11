@@ -165,14 +165,12 @@ export class BatchBuilder {
             pubKeyHash: null
         };
         const feeType = {
-            ChangePubKey: {
-                onchainPubkeyAuth: changePubKey.ethAuthType === 'Onchain'
-            }
+            ChangePubKey: changePubKey.ethAuthType
         };
         this.txs.push({
             type: 'ChangePubKey',
             tx: _changePubKey,
-            feeType: feeType,
+            feeType,
             address: this.wallet.address(),
             token: _changePubKey.feeToken
         });

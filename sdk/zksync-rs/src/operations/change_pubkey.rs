@@ -9,6 +9,7 @@ use zksync_types::{
 use crate::{
     error::ClientError, operations::SyncTransactionHandle, provider::Provider, wallet::Wallet,
 };
+use zksync_types::tokens::{ChangePubKeyFeeType, ChangePubKeyFeeTypeArg};
 
 #[derive(Debug)]
 pub struct ChangePubKeyBuilder<'a, S: EthereumSigner, P: Provider> {
@@ -52,8 +53,14 @@ where
                     .wallet
                     .provider
                     .get_tx_fee(
-                        TxFeeTypes::ChangePubKey {
-                            onchain_pubkey_auth: self.onchain_auth,
+                        if self.onchain_auth {
+                            TxFeeTypes::ChangePubKey(ChangePubKeyFeeTypeArg::CurrentVersion(
+                                ChangePubKeyFeeType::Onchain,
+                            ))
+                        } else {
+                            TxFeeTypes::ChangePubKey(ChangePubKeyFeeTypeArg::CurrentVersion(
+                                ChangePubKeyFeeType::ECDSA,
+                            ))
                         },
                         self.wallet.address(),
                         fee_token.id,

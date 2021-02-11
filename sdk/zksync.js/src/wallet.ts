@@ -581,9 +581,7 @@ export class Wallet {
             changePubKey.fee = 0;
 
             const feeType = {
-                ChangePubKey: {
-                    onchainPubkeyAuth: changePubKey.ethAuthType === 'Onchain'
-                }
+                ChangePubKey: changePubKey.ethAuthType
             };
             const fullFee = await this.provider.getTransactionFee(feeType, this.address(), changePubKey.feeToken);
             changePubKey.fee = fullFee.totalFee;

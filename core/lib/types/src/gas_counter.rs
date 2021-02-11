@@ -24,6 +24,7 @@ impl CommitCost {
     // TODO: overvalued for quick fix of tx fails (ZKS-109).
     pub const BASE_COST: u64 = 40_000;
     pub const DEPOSIT_COST: u64 = 7_000;
+    pub const OLD_CHANGE_PUBKEY_COST_OFFCHAIN: u64 = 15_000;
     pub const CHANGE_PUBKEY_COST_OFFCHAIN: u64 = 11_050;
     pub const CHANGE_PUBKEY_COST_ONCHAIN: u64 = 4_000;
     pub const TRANSFER_COST: u64 = 250;

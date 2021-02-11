@@ -138,6 +138,23 @@ pub struct TokenMarketVolume {
     pub last_updated: DateTime<Utc>,
 }
 
+#[derive(Debug, Serialize, Deserialize, Clone, Copy, PartialEq, Hash, Eq)]
+pub enum ChangePubKeyFeeType {
+    Onchain,
+    ECDSA,
+    CREATE2,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, Copy, PartialEq, Hash, Eq)]
+#[serde(untagged)]
+pub enum ChangePubKeyFeeTypeArg {
+    PreContracts4Version {
+        #[serde(rename = "onchainPubkeyAuth")]
+        onchain_pubkey_auth: bool,
+    },
+    CurrentVersion(ChangePubKeyFeeType),
+}
+
 /// Type of transaction fees that exist in the zkSync network.
 #[derive(Debug, Serialize, Deserialize, Clone, Copy, PartialEq, Hash, Eq)]
 pub enum TxFeeTypes {
@@ -148,10 +165,7 @@ pub enum TxFeeTypes {
     /// Fee for the `Transfer` operation.
     Transfer,
     /// Fee for the `ChangePubKey` operation.
-    ChangePubKey {
-        #[serde(rename = "onchainPubkeyAuth")]
-        onchain_pubkey_auth: bool,
-    },
+    ChangePubKey(ChangePubKeyFeeTypeArg),
 }
 
 #[cfg(test)]
@@ -159,15 +173,57 @@ mod tests {
     use super::*;
 
     #[test]
-    fn tx_fee_type_deserialize() {
+    fn tx_fee_type_deserialize_old_type() {
         let deserialized: TxFeeTypes =
             serde_json::from_str(r#"{ "ChangePubKey": { "onchainPubkeyAuth": true }}"#).unwrap();
 
         assert_eq!(
             deserialized,
-            TxFeeTypes::ChangePubKey {
+            TxFeeTypes::ChangePubKey(ChangePubKeyFeeTypeArg::PreContracts4Version {
                 onchain_pubkey_auth: true,
-            }
+            })
+        );
+
+        let deserialized: TxFeeTypes =
+            serde_json::from_str(r#"{ "ChangePubKey": { "onchainPubkeyAuth": false }}"#).unwrap();
+        assert_eq!(
+            deserialized,
+            TxFeeTypes::ChangePubKey(ChangePubKeyFeeTypeArg::PreContracts4Version {
+                onchain_pubkey_auth: false,
+            })
+        );
+    }
+
+    #[test]
+    fn tx_fee_type_deserialize() {
+        let deserialized: TxFeeTypes =
+            serde_json::from_str(r#"{ "ChangePubKey": "Onchain" }"#).unwrap();
+
+        assert_eq!(
+            deserialized,
+            TxFeeTypes::ChangePubKey(ChangePubKeyFeeTypeArg::CurrentVersion(
+                ChangePubKeyFeeType::Onchain
+            ))
+        );
+
+        let deserialized: TxFeeTypes =
+            serde_json::from_str(r#"{ "ChangePubKey": "ECDSA" }"#).unwrap();
+
+        assert_eq!(
+            deserialized,
+            TxFeeTypes::ChangePubKey(ChangePubKeyFeeTypeArg::CurrentVersion(
+                ChangePubKeyFeeType::ECDSA
+            ))
+        );
+
+        let deserialized: TxFeeTypes =
+            serde_json::from_str(r#"{ "ChangePubKey": "CREATE2" }"#).unwrap();
+
+        assert_eq!(
+            deserialized,
+            TxFeeTypes::ChangePubKey(ChangePubKeyFeeTypeArg::CurrentVersion(
+                ChangePubKeyFeeType::CREATE2
+            ))
         );
     }
 }
