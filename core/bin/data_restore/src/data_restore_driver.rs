@@ -1,7 +1,7 @@
 // External deps
 use web3::{
     contract::Contract,
-    types::{BlockNumber as Web3BlockNumber, FilterBuilder, Log, H160, H256, U256},
+    types::{BlockNumber as Web3BlockNumber, FilterBuilder, Log, H160, H256},
     Transport, Web3,
 };
 // Workspace deps
@@ -10,14 +10,16 @@ use zksync_crypto::Fr;
 
 use zksync_types::{AccountId, AccountMap, AccountUpdate, BlockNumber};
 // Local deps
-use crate::contract::{ZkSyncContractVersion, ZkSyncDeployedContract};
-use crate::storage_interactor::StorageInteractor;
 use crate::{
-    contract::get_genesis_account, eth_tx_helpers::get_ethereum_transaction,
-    events_state::EventsState, rollup_ops::RollupOpsBlock, tree_state::TreeState,
+    contract::{get_genesis_account, ZkSyncDeployedContract},
+    eth_tx_helpers::get_ethereum_transaction,
+    events_state::EventsState,
+    rollup_ops::RollupOpsBlock,
+    storage_interactor::StorageInteractor,
+    tree_state::TreeState,
 };
 use ethabi::Address;
-use std::convert::TryFrom;
+
 use std::marker::PhantomData;
 
 /// Storage state update:
@@ -51,7 +53,7 @@ pub struct DataRestoreDriver<T: Transport, I> {
     /// Provides Ethereum Governance contract unterface
     pub governance_contract: (ethabi::Contract, Contract<T>),
     /// Provides Ethereum Rollup contract unterface
-    pub zksync_contracts: Vec<ZkSyncDeployedContract<T>>,
+    pub zksync_contract: ZkSyncDeployedContract<T>,
     /// Rollup contract events state
     pub events_state: EventsState,
     /// Rollup accounts state
@@ -60,8 +62,6 @@ pub struct DataRestoreDriver<T: Transport, I> {
     pub eth_blocks_step: u64,
     /// The distance to the last ethereum block
     pub end_eth_blocks_offset: u64,
-    /// Available block chunk sizes
-    pub available_block_chunk_sizes: Vec<usize>,
     /// Finite mode flag. In finite mode, driver will only work until
     /// amount of restored blocks will become equal to amount of known
     /// verified blocks. After that, it will stop.
@@ -89,16 +89,14 @@ where
     ///
     #[allow(clippy::too_many_arguments)]
     pub fn new(
-        web3_transport: T,
+        web3: Web3<T>,
         governance_contract_eth_addr: H160,
         eth_blocks_step: u64,
         end_eth_blocks_offset: u64,
-        available_block_chunk_sizes: Vec<usize>,
         finite_mode: bool,
         final_hash: Option<Fr>,
+        zksync_contract: ZkSyncDeployedContract<T>,
     ) -> Self {
-        let web3 = Web3::new(web3_transport);
-
         let governance_contract = {
             let abi = governance_contract();
             (
@@ -109,16 +107,15 @@ where
 
         let events_state = EventsState::default();
 
-        let tree_state = TreeState::new(available_block_chunk_sizes.clone());
+        let tree_state = TreeState::new();
         Self {
             web3,
             governance_contract,
-            zksync_contracts: vec![],
+            zksync_contract,
             events_state,
             tree_state,
             eth_blocks_step,
             end_eth_blocks_offset,
-            available_block_chunk_sizes,
             finite_mode,
             final_hash,
             phantom_data: Default::default(),
@@ -149,82 +146,6 @@ where
             .await
             .map_err(|e| anyhow::format_err!("No new logs: {}", e))?;
         Ok(result)
-    }
-    pub async fn init_contracts(
-        &mut self,
-        upgrade_gatekeeper_contract_addr: Address,
-        zksync_contract_addr: Address,
-    ) -> anyhow::Result<()> {
-        let logs = self
-            .get_gatekeeper_logs(upgrade_gatekeeper_contract_addr)
-            .await?;
-
-        let mut last_updated_block = Web3BlockNumber::Earliest;
-        let mut contract_version = vec![];
-        let mut previous_version: Option<ZkSyncContractVersion> = None;
-        // Find starts and ends for contracts
-        for log in logs {
-            let block_number = log.block_number.expect("Block number should exist");
-            let version = U256::from(log.topics[1].as_bytes()).as_u32();
-            let version = ZkSyncContractVersion::try_from(version)?;
-            let current_block = Web3BlockNumber::Number(block_number);
-            if let Some(previous_version) = previous_version {
-                contract_version.push((last_updated_block, current_block, previous_version));
-            }
-            previous_version = Some(version);
-            last_updated_block = current_block;
-        }
-        contract_version.push((
-            last_updated_block,
-            Web3BlockNumber::Latest,
-            previous_version.expect("At least one contract should exist"),
-        ));
-
-        for (from, to, version) in contract_version {
-            match version {
-                ZkSyncContractVersion::V0 => {
-                    self.zksync_contracts.push(ZkSyncDeployedContract::version0(
-                        self.web3.eth(),
-                        zksync_contract_addr,
-                        from,
-                        to,
-                    ))
-                }
-                ZkSyncContractVersion::V1 => {
-                    self.zksync_contracts.push(ZkSyncDeployedContract::version1(
-                        self.web3.eth(),
-                        zksync_contract_addr,
-                        from,
-                        to,
-                    ))
-                }
-                ZkSyncContractVersion::V2 => {
-                    self.zksync_contracts.push(ZkSyncDeployedContract::version2(
-                        self.web3.eth(),
-                        zksync_contract_addr,
-                        from,
-                        to,
-                    ))
-                }
-                ZkSyncContractVersion::V3 => {
-                    self.zksync_contracts.push(ZkSyncDeployedContract::version3(
-                        self.web3.eth(),
-                        zksync_contract_addr,
-                        from,
-                        to,
-                    ))
-                }
-                ZkSyncContractVersion::V4 => {
-                    self.zksync_contracts.push(ZkSyncDeployedContract::version4(
-                        self.web3.eth(),
-                        zksync_contract_addr,
-                        from,
-                        to,
-                    ))
-                }
-            }
-        }
-        Ok(())
     }
 
     /// Sets the 'genesis' state.
@@ -276,7 +197,6 @@ where
             account_map,
             current_unprocessed_priority_op,
             AccountId(fee_acc_num),
-            self.available_block_chunk_sizes.clone(),
         );
 
         vlog::info!("Genesis tree root hash: {:?}", tree_state.root_hash());
@@ -289,11 +209,6 @@ where
         self.tree_state = tree_state;
     }
 
-    fn actual_zksync_contract(&self) -> &ZkSyncDeployedContract<T> {
-        self.zksync_contracts
-            .last()
-            .expect("At least one should exist")
-    }
     /// Stops states from storage
     pub async fn load_state_from_storage(&mut self, interactor: &mut I) -> bool {
         vlog::info!("Loading state from storage");
@@ -305,7 +220,6 @@ where
             tree_state.account_map,           // account map
             tree_state.unprocessed_prior_ops, // unprocessed priority op
             tree_state.fee_acc_id,            // fee account
-            self.available_block_chunk_sizes.clone(),
         );
         match state {
             StorageUpdateState::Events => {
@@ -322,10 +236,7 @@ where
             }
             StorageUpdateState::None => {}
         }
-        let total_verified_blocks = self
-            .actual_zksync_contract()
-            .get_total_verified_blocks()
-            .await;
+        let total_verified_blocks = self.zksync_contract.get_total_verified_blocks().await;
 
         let last_verified_block = self.tree_state.state.block_number;
         vlog::info!(
@@ -353,10 +264,8 @@ where
                     // Update tree
                     self.update_tree_state(interactor, new_ops_blocks).await;
 
-                    let total_verified_blocks = self
-                        .actual_zksync_contract()
-                        .get_total_verified_blocks()
-                        .await;
+                    let total_verified_blocks =
+                        self.zksync_contract.get_total_verified_blocks().await;
 
                     let last_verified_block = self.tree_state.state.block_number;
 
@@ -378,7 +287,6 @@ where
                     if let Some(root_hash) = self.final_hash {
                         if root_hash == self.tree_state.root_hash() {
                             final_hash_was_found = true;
-
                             vlog::info!(
                                 "Correct expected root hash was met on the block {} out of {}",
                                 *last_verified_block,
@@ -415,7 +323,7 @@ where
             .events_state
             .update_events_state(
                 &self.web3,
-                &self.zksync_contracts,
+                &self.zksync_contract,
                 &self.governance_contract,
                 self.eth_blocks_step,
                 self.end_eth_blocks_offset,
@@ -477,15 +385,23 @@ where
     pub async fn get_new_operation_blocks_from_events(&mut self) -> Vec<RollupOpsBlock> {
         let mut blocks = Vec::new();
 
+        let mut last_event_tx = None;
         for event in self
             .events_state
             .get_only_verified_committed_events()
             .iter()
         {
+            if let Some(tx) = last_event_tx {
+                if tx == event.transaction_hash {
+                    continue;
+                }
+            }
+
             let block = RollupOpsBlock::get_rollup_ops_blocks(&self.web3, &event)
                 .await
                 .expect("Cant get new operation blocks from events");
             blocks.extend(block);
+            last_event_tx = Some(event.transaction_hash);
         }
 
         blocks

@@ -37,44 +37,39 @@ fn decode_commitment_parameters(input_data: Vec<u8>) -> anyhow::Result<Vec<Token
 
 pub fn rollup_ops_blocks_from_bytes(data: Vec<u8>) -> anyhow::Result<Vec<RollupOpsBlock>> {
     let fee_account_argument_id = 5;
+    let op_block_number_argument_id = 4;
     let public_data_argument_id = 1;
 
     let decoded_commitment_parameters = decode_commitment_parameters(data)?;
     assert_eq!(decoded_commitment_parameters.len(), 2);
 
-    if let (ethabi::Token::Tuple(block), ethabi::Token::Array(operations)) = (
-        &decoded_commitment_parameters[0],
-        &decoded_commitment_parameters[1],
-    ) {
+    if let ethabi::Token::Array(operations) = &decoded_commitment_parameters[1] {
         let mut blocks = vec![];
-        if let ethabi::Token::Uint(block_num) = block[0] {
-            for operation in operations {
-                if let ethabi::Token::Tuple(operation) = operation {
-                    if let (ethabi::Token::Uint(fee_acc), ethabi::Token::Bytes(public_data)) = (
-                        &operation[fee_account_argument_id],
-                        &operation[public_data_argument_id],
-                    ) {
-                        let ops = get_rollup_ops_from_data(public_data.as_slice())?;
-                        blocks.push(RollupOpsBlock {
-                            block_num: BlockNumber(block_num.as_u32()),
-                            ops,
-                            fee_account: AccountId(fee_acc.as_u32()),
-                        })
-                    } else {
-                        return Err(std::io::Error::new(
-                            std::io::ErrorKind::NotFound,
-                            "can't parse operation parameters",
-                        )
-                        .into());
-                    }
+        for operation in operations {
+            if let ethabi::Token::Tuple(operation) = operation {
+                if let (
+                    ethabi::Token::Uint(fee_acc),
+                    ethabi::Token::Bytes(public_data),
+                    ethabi::Token::Uint(block_number),
+                ) = (
+                    &operation[fee_account_argument_id],
+                    &operation[public_data_argument_id],
+                    &operation[op_block_number_argument_id],
+                ) {
+                    let ops = get_rollup_ops_from_data(public_data.as_slice())?;
+                    blocks.push(RollupOpsBlock {
+                        block_num: BlockNumber(block_number.as_u32()),
+                        ops,
+                        fee_account: AccountId(fee_acc.as_u32()),
+                    })
+                } else {
+                    return Err(std::io::Error::new(
+                        std::io::ErrorKind::NotFound,
+                        "can't parse operation parameters",
+                    )
+                    .into());
                 }
             }
-        } else {
-            return Err(std::io::Error::new(
-                std::io::ErrorKind::NotFound,
-                "can't parse block parameters",
-            )
-            .into());
         }
         Ok(blocks)
     } else {

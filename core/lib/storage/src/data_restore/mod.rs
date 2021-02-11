@@ -3,14 +3,19 @@ use std::time::Instant;
 // External imports
 use itertools::Itertools;
 // Workspace imports
-use zksync_types::{AccountId, AccountUpdate, BlockNumber, Operation, Token, ZkSyncOp};
+use zksync_types::{AccountId, AccountUpdate, BlockNumber, Token, ZkSyncOp};
 // Local imports
 use self::records::{
     NewBlockEvent, NewStorageState, NewTokenEvent, NewZkSyncOp, StoredBlockEvent,
     StoredLastWatchedEthBlockNumber, StoredRollupOpsBlock, StoredStorageState, StoredZkSyncOp,
 };
+
+use crate::chain::operations::OperationsSchema;
 use crate::{chain::state::StateSchema, tokens::TokensSchema};
 use crate::{QueryResult, StorageProcessor};
+use zksync_types::aggregated_operations::{
+    AggregatedActionType, AggregatedOperation, BlocksCommitOperation, BlocksExecuteOperation,
+};
 
 pub mod records;
 
@@ -24,36 +29,50 @@ pub struct DataRestoreSchema<'a, 'c>(pub &'a mut StorageProcessor<'c>);
 impl<'a, 'c> DataRestoreSchema<'a, 'c> {
     pub async fn save_block_operations(
         &mut self,
-        _commit_op: Operation,
-        _verify_op: Operation,
+        commit_op: BlocksCommitOperation,
+        execute_op: BlocksExecuteOperation,
     ) -> QueryResult<()> {
         let start = Instant::now();
-        let _new_state = self.new_storage_state("None");
-        let transaction = self.0.start_transaction().await?;
+        let new_state = self.new_storage_state("None");
+        let mut transaction = self.0.start_transaction().await?;
 
-        // TODO: Restore code (ZKS-427)
+        OperationsSchema(&mut transaction)
+            .store_aggregated_action(AggregatedOperation::CommitBlocks(commit_op.clone()))
+            .await?;
+        OperationsSchema(&mut transaction)
+            .store_aggregated_action(AggregatedOperation::ExecuteBlocks(execute_op.clone()))
+            .await?;
+        // The state is expected to be updated, so it's necessary
+        // to do it here.
+        for block in commit_op.blocks.iter() {
+            StateSchema(&mut transaction)
+                .apply_state_update(block.block_number)
+                .await?;
+        }
 
-        // let commit_op = BlockSchema(&mut transaction)
-        //     .store_operation(commit_op)
-        //     .await?;
-        // let verify_op = BlockSchema(&mut transaction)
-        //     .store_operation(verify_op)
-        //     .await?;
-        // // The state is expected to be updated, so it's necessary
-        // // to do it here.
-        // StateSchema(&mut transaction)
-        //     .apply_state_update(commit_op.block_number as u32)
-        //     .await?;
-        // OperationsSchema(&mut transaction)
-        //     .confirm_operation(commit_op.block_number as u32, ActionType::COMMIT)
-        //     .await?;
-        // OperationsSchema(&mut transaction)
-        //     .confirm_operation(verify_op.block_number as u32, ActionType::VERIFY)
-        //     .await?;
+        if commit_op.blocks.len() != 0 {
+            OperationsSchema(&mut transaction)
+                .confirm_aggregated_operations(
+                    commit_op.blocks.first().unwrap().block_number,
+                    commit_op.blocks.last().unwrap().block_number,
+                    AggregatedActionType::CommitBlocks,
+                )
+                .await?;
+        }
 
-        // DataRestoreSchema(&mut transaction)
-        //     .update_storage_state(new_state)
-        //     .await?;
+        if execute_op.blocks.len() != 0 {
+            OperationsSchema(&mut transaction)
+                .confirm_aggregated_operations(
+                    execute_op.blocks.first().unwrap().block_number,
+                    execute_op.blocks.last().unwrap().block_number,
+                    AggregatedActionType::ExecuteBlocks,
+                )
+                .await?;
+        }
+
+        DataRestoreSchema(&mut transaction)
+            .update_storage_state(new_state)
+            .await?;
         transaction.commit().await?;
         metrics::histogram!("sql.data_restore.save_block_operations", start.elapsed());
         Ok(())

@@ -1845,26 +1845,6 @@
       ]
     }
   },
-  "71a9539df6b4362ab57a5397be0da6fac8ef23554dce5281e22704964c6f2d29": {
-    "query": "SELECT COUNT(*) FROM prover_job_queue WHERE job_status = $1",
-    "describe": {
-      "columns": [
-        {
-          "ordinal": 0,
-          "name": "count",
-          "type_info": "Int8"
-        }
-      ],
-      "parameters": {
-        "Left": [
-          "Int4"
-        ]
-      },
-      "nullable": [
-        null
-      ]
-    }
-  },
   "74a5cc4affa23433b5b7834df6dfa1a7a2c5a65f23289de3de5a4f1b93f89c06": {
     "query": "SELECT address FROM account_creates WHERE account_id = $1",
     "describe": {
@@ -2309,6 +2289,26 @@
         ]
       },
       "nullable": []
+    }
+  },
+  "92663f125319988e4b5d80d3d58286ca90a29ec2fa97d87750942c9e0615d1bc": {
+    "query": "SELECT COUNT(*) FROM prover_job_queue WHERE job_status != $1",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "count",
+          "type_info": "Int8"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Int4"
+        ]
+      },
+      "nullable": [
+        null
+      ]
     }
   },
   "93bd5b76565dfbadecfd66a394127fd5b701d09dc3d61adb30b337fd12d86f6a": {

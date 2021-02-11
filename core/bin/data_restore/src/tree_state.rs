@@ -21,18 +21,15 @@ pub struct TreeState {
     pub current_unprocessed_priority_op: u64,
     /// The last fee account address
     pub last_fee_account_address: Address,
-    /// Available block chunk sizes
-    pub available_block_chunk_sizes: Vec<usize>,
 }
 
 impl TreeState {
     /// Returns empty self state
-    pub fn new(available_block_chunk_sizes: Vec<usize>) -> Self {
+    pub fn new() -> Self {
         Self {
             state: ZkSyncState::empty(),
             current_unprocessed_priority_op: 0,
             last_fee_account_address: Address::default(),
-            available_block_chunk_sizes,
         }
     }
 
@@ -50,7 +47,6 @@ impl TreeState {
         accounts: AccountMap,
         current_unprocessed_priority_op: u64,
         fee_account: AccountId,
-        available_block_chunk_sizes: Vec<usize>,
     ) -> Self {
         let state = ZkSyncState::from_acc_map(accounts, current_block);
         let last_fee_account_address = state
@@ -61,7 +57,6 @@ impl TreeState {
             state,
             current_unprocessed_priority_op,
             last_fee_account_address,
-            available_block_chunk_sizes,
         }
     }
 
@@ -298,7 +293,7 @@ impl TreeState {
         // As we restoring an already executed block, this value isn't important.
         let gas_limit = 0.into();
 
-        let block = Block::new_from_available_block_sizes(
+        let block = Block::new_with_current_chunk_size(
             ops_block.block_num,
             self.state.root_hash(),
             ops_block.fee_account,
@@ -307,7 +302,6 @@ impl TreeState {
                 last_unprocessed_prior_op,
                 self.current_unprocessed_priority_op,
             ),
-            &self.available_block_chunk_sizes,
             gas_limit,
             gas_limit,
             H256::default(),
@@ -619,7 +613,7 @@ mod test {
         //     fee_account: AccountId(0),
         // };
         //
-        let mut tree = TreeState::new(vec![50]);
+        let mut tree = TreeState::new();
         tree.update_tree_states_from_ops_block(&block1)
             .expect("Cant update state from block 1");
         let zero_acc = tree.get_account(AccountId(0)).expect("Cant get 0 account");
@@ -800,7 +794,7 @@ mod test {
             fee_account: AccountId(0),
         };
 
-        let mut tree = TreeState::new(vec![50]);
+        let mut tree = TreeState::new();
         tree.update_tree_states_from_ops_block(&block)
             .expect("Cant update state from block");
 

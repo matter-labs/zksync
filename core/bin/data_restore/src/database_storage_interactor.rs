@@ -3,7 +3,7 @@ use std::str::FromStr;
 // Workspace deps
 use zksync_storage::{data_restore::records::NewBlockEvent, StorageProcessor};
 use zksync_types::{
-    AccountId, Action, BlockNumber, Operation, Token, TokenGenesisListItem, TokenId,
+    AccountId, BlockNumber, Token, TokenGenesisListItem, TokenId,
     {block::Block, AccountUpdate, AccountUpdates, ZkSyncOp},
 };
 
@@ -19,6 +19,7 @@ use crate::{
         stored_ops_block_into_ops_block, StorageInteractor,
     },
 };
+use zksync_types::aggregated_operations::{BlocksCommitOperation, BlocksExecuteOperation};
 
 impl From<&NewTokenEvent> for zksync_storage::data_restore::records::NewTokenEvent {
     fn from(event: &NewTokenEvent) -> Self {
@@ -63,6 +64,9 @@ impl StorageInteractor for DatabaseStorageInteractor<'_> {
         let mut ops: Vec<(BlockNumber, &ZkSyncOp, AccountId)> = vec![];
 
         for block in blocks {
+            if block.block_num.0 == 5702 {
+                vlog::info!("Block number 5702");
+            }
             for op in &block.ops {
                 ops.push((block.block_num, op, block.fee_account));
             }
@@ -82,18 +86,13 @@ impl StorageInteractor for DatabaseStorageInteractor<'_> {
             .await
             .expect("Failed initializing a DB transaction");
 
-        let commit_op = Operation {
-            action: Action::Commit,
-            block: block.clone(),
-            id: None,
+        let commit_aggregated_operation = BlocksCommitOperation {
+            last_committed_block: block.clone(),
+            blocks: vec![block.clone()],
         };
 
-        let verify_op = Operation {
-            action: Action::Verify {
-                proof: Box::new(Default::default()),
-            },
-            block: block.clone(),
-            id: None,
+        let execute_aggregated_operation = BlocksExecuteOperation {
+            blocks: vec![block.clone()],
         };
 
         transaction
@@ -105,9 +104,14 @@ impl StorageInteractor for DatabaseStorageInteractor<'_> {
 
         transaction
             .data_restore_schema()
-            .save_block_operations(commit_op, verify_op)
+            .save_block_operations(commit_aggregated_operation, execute_aggregated_operation)
             .await
             .expect("Cant execute verify operation");
+
+        let block_number = block.block_number;
+        if let Err(_) = transaction.chain().block_schema().save_block(block).await {
+            vlog::info!("Block {} was reverted", block_number)
+        }
 
         transaction
             .commit()

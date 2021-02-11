@@ -231,7 +231,6 @@ async fn revert_blocks_test() {
 
     verify_restore(
         test_config.web3_url.as_str(),
-        test_config.available_block_chunk_sizes.clone(),
         &contracts,
         fee_account.address,
         balance_tree_to_account_map(&state.tree),

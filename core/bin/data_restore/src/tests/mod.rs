@@ -8,8 +8,11 @@ use futures::future;
 use jsonrpc_core::Params;
 use num::BigUint;
 use serde_json::{json, Value};
-use web3::types::{BlockNumber as Web3BlockNumber, Bytes};
-use web3::{contract::tokens::Tokenize, types::Transaction, RequestId, Transport};
+use web3::{
+    contract::tokens::Tokenize,
+    types::{Bytes, Transaction},
+    RequestId, Transport, Web3,
+};
 
 use db_test_macro::test as db_test;
 use zksync_contracts::{governance_contract, zksync_contract};
@@ -345,24 +348,17 @@ async fn test_run_state_update(mut storage: StorageProcessor<'_>) {
         ),
     ]);
 
+    let eth = Eth::new(transport.clone());
     let mut driver = DataRestoreDriver::new(
-        transport.clone(),
+        Web3::new(transport.clone()),
         [1u8; 20].into(),
         ETH_BLOCKS_STEP,
         END_ETH_BLOCKS_OFFSET,
-        vec![6, 30],
         true,
         None,
+        ZkSyncDeployedContract::version3(eth, [1u8; 20].into()),
     );
-    let eth = Eth::new(transport.clone());
-    driver
-        .zksync_contracts
-        .push(ZkSyncDeployedContract::version3(
-            eth,
-            [1u8; 20].into(),
-            Web3BlockNumber::Earliest,
-            Web3BlockNumber::Latest,
-        ));
+
     driver.run_state_update(&mut interactor).await;
 
     // Check that it's stores some account, created by deposit
@@ -384,24 +380,17 @@ async fn test_run_state_update(mut storage: StorageProcessor<'_>) {
     assert_eq!(driver.events_state.committed_events.len(), events.len());
 
     // Nullify the state of driver
+    let eth = Eth::new(transport.clone());
+
     let mut driver = DataRestoreDriver::new(
-        transport.clone(),
+        Web3::new(transport.clone()),
         [1u8; 20].into(),
         ETH_BLOCKS_STEP,
         END_ETH_BLOCKS_OFFSET,
-        vec![6, 30],
         true,
         None,
+        ZkSyncDeployedContract::version3(eth, [1u8; 20].into()),
     );
-    let eth = Eth::new(transport.clone());
-    driver
-        .zksync_contracts
-        .push(ZkSyncDeployedContract::version3(
-            eth,
-            [1u8; 20].into(),
-            Web3BlockNumber::Earliest,
-            Web3BlockNumber::Latest,
-        ));
 
     // Load state from db and check it
     assert!(driver.load_state_from_storage(&mut interactor).await);
@@ -510,26 +499,18 @@ async fn test_with_inmemory_storage() {
             ),
         ),
     ]);
+    let web3 = Web3::new(transport.clone());
 
+    let eth = Eth::new(transport.clone());
     let mut driver = DataRestoreDriver::new(
-        transport.clone(),
+        web3.clone(),
         [1u8; 20].into(),
         ETH_BLOCKS_STEP,
         END_ETH_BLOCKS_OFFSET,
-        vec![6, 30],
         true,
         None,
+        ZkSyncDeployedContract::version3(eth, [1u8; 20].into()),
     );
-
-    let eth = Eth::new(transport.clone());
-    driver
-        .zksync_contracts
-        .push(ZkSyncDeployedContract::version3(
-            eth,
-            [1u8; 20].into(),
-            Web3BlockNumber::Earliest,
-            Web3BlockNumber::Latest,
-        ));
 
     driver.run_state_update(&mut interactor).await;
 
@@ -546,24 +527,16 @@ async fn test_with_inmemory_storage() {
     assert_eq!(driver.events_state.committed_events.len(), events.len());
 
     // Nullify the state of driver
+    let eth = Eth::new(transport.clone());
     let mut driver = DataRestoreDriver::new(
-        transport.clone(),
+        web3.clone(),
         [1u8; 20].into(),
         ETH_BLOCKS_STEP,
         END_ETH_BLOCKS_OFFSET,
-        vec![6, 30],
         true,
         None,
+        ZkSyncDeployedContract::version3(eth, [1u8; 20].into()),
     );
-    let eth = Eth::new(transport.clone());
-    driver
-        .zksync_contracts
-        .push(ZkSyncDeployedContract::version3(
-            eth,
-            [1u8; 20].into(),
-            Web3BlockNumber::Earliest,
-            Web3BlockNumber::Latest,
-        ));
 
     // Load state from db and check it
     assert!(driver.load_state_from_storage(&mut interactor).await);
