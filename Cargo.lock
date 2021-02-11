@@ -5832,6 +5832,7 @@ dependencies = [
 name = "zksync_config"
 version = "1.0.0"
 dependencies = [
+ "chrono",
  "envy",
  "num",
  "serde",
