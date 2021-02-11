@@ -54,11 +54,11 @@ where
                     .provider
                     .get_tx_fee(
                         if self.onchain_auth {
-                            TxFeeTypes::ChangePubKey(ChangePubKeyFeeTypeArg::CurrentVersion(
+                            TxFeeTypes::ChangePubKey(ChangePubKeyFeeTypeArg::ContractsV4Version(
                                 ChangePubKeyFeeType::Onchain,
                             ))
                         } else {
-                            TxFeeTypes::ChangePubKey(ChangePubKeyFeeTypeArg::CurrentVersion(
+                            TxFeeTypes::ChangePubKey(ChangePubKeyFeeTypeArg::ContractsV4Version(
                                 ChangePubKeyFeeType::ECDSA,
                             ))
                         },

@@ -103,19 +103,19 @@ impl GasOperationsCost {
                 constants::BASE_CHANGE_PUBKEY_ONCHAIN_COST.into(),
             ),
             (
-                OutputFeeType::ChangePubKey(ChangePubKeyFeeTypeArg::CurrentVersion(
+                OutputFeeType::ChangePubKey(ChangePubKeyFeeTypeArg::ContractsV4Version(
                     ChangePubKeyFeeType::Onchain,
                 )),
                 constants::BASE_CHANGE_PUBKEY_ONCHAIN_COST.into(),
             ),
             (
-                OutputFeeType::ChangePubKey(ChangePubKeyFeeTypeArg::CurrentVersion(
+                OutputFeeType::ChangePubKey(ChangePubKeyFeeTypeArg::ContractsV4Version(
                     ChangePubKeyFeeType::ECDSA,
                 )),
                 constants::BASE_CHANGE_PUBKEY_OFFCHAIN_COST.into(),
             ),
             (
-                OutputFeeType::ChangePubKey(ChangePubKeyFeeTypeArg::CurrentVersion(
+                OutputFeeType::ChangePubKey(ChangePubKeyFeeTypeArg::ContractsV4Version(
                     ChangePubKeyFeeType::CREATE2,
                 )),
                 constants::BASE_CHANGE_PUBKEY_OFFCHAIN_COST.into(),
@@ -154,19 +154,19 @@ impl GasOperationsCost {
                 constants::BASE_CHANGE_PUBKEY_ONCHAIN_COST.into(),
             ),
             (
-                OutputFeeType::ChangePubKey(ChangePubKeyFeeTypeArg::CurrentVersion(
+                OutputFeeType::ChangePubKey(ChangePubKeyFeeTypeArg::ContractsV4Version(
                     ChangePubKeyFeeType::Onchain,
                 )),
                 constants::BASE_CHANGE_PUBKEY_ONCHAIN_COST.into(),
             ),
             (
-                OutputFeeType::ChangePubKey(ChangePubKeyFeeTypeArg::CurrentVersion(
+                OutputFeeType::ChangePubKey(ChangePubKeyFeeTypeArg::ContractsV4Version(
                     ChangePubKeyFeeType::ECDSA,
                 )),
                 constants::SUBSIDY_CHANGE_PUBKEY_OFFCHAIN_COST.into(),
             ),
             (
-                OutputFeeType::ChangePubKey(ChangePubKeyFeeTypeArg::CurrentVersion(
+                OutputFeeType::ChangePubKey(ChangePubKeyFeeTypeArg::ContractsV4Version(
                     ChangePubKeyFeeType::CREATE2,
                 )),
                 constants::SUBSIDY_CHANGE_PUBKEY_OFFCHAIN_COST.into(),

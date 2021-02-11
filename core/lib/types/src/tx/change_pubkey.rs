@@ -413,7 +413,7 @@ impl ChangePubKey {
 
     pub fn get_fee_type(&self) -> TxFeeTypes {
         if let Some(auth_data) = &self.eth_auth_data {
-            TxFeeTypes::ChangePubKey(ChangePubKeyFeeTypeArg::CurrentVersion(
+            TxFeeTypes::ChangePubKey(ChangePubKeyFeeTypeArg::ContractsV4Version(
                 auth_data.get_fee_type(),
             ))
         } else {

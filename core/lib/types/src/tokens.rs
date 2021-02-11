@@ -152,7 +152,7 @@ pub enum ChangePubKeyFeeTypeArg {
         #[serde(rename = "onchainPubkeyAuth")]
         onchain_pubkey_auth: bool,
     },
-    CurrentVersion(ChangePubKeyFeeType),
+    ContractsV4Version(ChangePubKeyFeeType),
 }
 
 /// Type of transaction fees that exist in the zkSync network.
@@ -201,7 +201,7 @@ mod tests {
 
         assert_eq!(
             deserialized,
-            TxFeeTypes::ChangePubKey(ChangePubKeyFeeTypeArg::CurrentVersion(
+            TxFeeTypes::ChangePubKey(ChangePubKeyFeeTypeArg::ContractsV4Version(
                 ChangePubKeyFeeType::Onchain
             ))
         );
@@ -211,7 +211,7 @@ mod tests {
 
         assert_eq!(
             deserialized,
-            TxFeeTypes::ChangePubKey(ChangePubKeyFeeTypeArg::CurrentVersion(
+            TxFeeTypes::ChangePubKey(ChangePubKeyFeeTypeArg::ContractsV4Version(
                 ChangePubKeyFeeType::ECDSA
             ))
         );
@@ -221,7 +221,7 @@ mod tests {
 
         assert_eq!(
             deserialized,
-            TxFeeTypes::ChangePubKey(ChangePubKeyFeeTypeArg::CurrentVersion(
+            TxFeeTypes::ChangePubKey(ChangePubKeyFeeTypeArg::ContractsV4Version(
                 ChangePubKeyFeeType::CREATE2
             ))
         );
