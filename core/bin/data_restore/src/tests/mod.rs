@@ -356,7 +356,7 @@ async fn test_run_state_update(mut storage: StorageProcessor<'_>) {
         END_ETH_BLOCKS_OFFSET,
         true,
         None,
-        ZkSyncDeployedContract::version3(eth, [1u8; 20].into()),
+        ZkSyncDeployedContract::version4(eth, [1u8; 20].into()),
     );
 
     driver.run_state_update(&mut interactor).await;
@@ -389,7 +389,7 @@ async fn test_run_state_update(mut storage: StorageProcessor<'_>) {
         END_ETH_BLOCKS_OFFSET,
         true,
         None,
-        ZkSyncDeployedContract::version3(eth, [1u8; 20].into()),
+        ZkSyncDeployedContract::version4(eth, [1u8; 20].into()),
     );
 
     // Load state from db and check it
@@ -509,7 +509,7 @@ async fn test_with_inmemory_storage() {
         END_ETH_BLOCKS_OFFSET,
         true,
         None,
-        ZkSyncDeployedContract::version3(eth, [1u8; 20].into()),
+        ZkSyncDeployedContract::version4(eth, [1u8; 20].into()),
     );
 
     driver.run_state_update(&mut interactor).await;
@@ -535,7 +535,7 @@ async fn test_with_inmemory_storage() {
         END_ETH_BLOCKS_OFFSET,
         true,
         None,
-        ZkSyncDeployedContract::version3(eth, [1u8; 20].into()),
+        ZkSyncDeployedContract::version4(eth, [1u8; 20].into()),
     );
 
     // Load state from db and check it

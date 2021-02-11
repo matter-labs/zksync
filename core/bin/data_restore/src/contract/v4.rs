@@ -123,7 +123,7 @@ mod test {
         let blocks = rollup_ops_blocks_from_bytes(input_data[4..].to_vec()).unwrap();
         assert_eq!(blocks.len(), 1);
         let block = blocks[0].clone();
-        assert_eq!(block.block_num, BlockNumber(24));
+        assert_eq!(block.block_num, BlockNumber(25));
         assert_eq!(block.fee_account, AccountId(0));
         assert_eq!(block.ops.len(), 5);
     }
