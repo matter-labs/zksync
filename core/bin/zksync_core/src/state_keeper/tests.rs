@@ -291,6 +291,7 @@ mod apply_priority_op {
 
 mod apply_tx {
     use super::*;
+    use zksync_types::gas_counter::{VerifyCost, TX_GAS_LIMIT};
 
     /// Checks if withdrawal is processed correctly by the state_keeper
     #[test]
@@ -385,12 +386,13 @@ mod apply_tx {
     }
 
     /// Checks if processing withdrawal fails because the gas limit is reached.
-    /// This sends 46 withdrawals (very ineficcient, but all constants in
+    /// This sends 46 withdrawals (very inefficient, but all constants in
     /// GasCounter are hardcoded, so I see no way out)
     #[test]
     fn gas_limit_reached() {
-        let withdrawals_number = 46;
-        let mut tester = StateKeeperTester::new(6 * withdrawals_number, 1, 1);
+        let withdrawals_number = (TX_GAS_LIMIT - VerifyCost::base_cost().as_u64() * 130 / 100)
+            / (VerifyCost::WITHDRAW_COST * 130 / 100);
+        let mut tester = StateKeeperTester::new(6 * withdrawals_number as usize, 1, 1);
         for i in 1..=withdrawals_number {
             let withdrawal = create_account_and_withdrawal(
                 &mut tester,
@@ -401,10 +403,20 @@ mod apply_tx {
                 Default::default(),
             );
             let result = tester.state_keeper.apply_tx(&withdrawal);
-            if i < withdrawals_number {
-                assert!(result.is_ok())
+            if i <= withdrawals_number {
+                assert!(
+                    result.is_ok(),
+                    "i: {}, withdrawals: {}",
+                    i,
+                    withdrawals_number
+                )
             } else {
-                assert!(result.is_err())
+                assert!(
+                    result.is_err(),
+                    "i: {}, withdrawals: {}",
+                    i,
+                    withdrawals_number
+                )
             }
         }
     }

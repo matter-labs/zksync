@@ -1,6 +1,7 @@
 // Built-in deps
 use std::time::Instant;
 // External imports
+use chrono::{Duration, Utc};
 // Workspace imports
 use zksync_types::{tx::TxHash, BlockNumber};
 // Local imports
@@ -233,6 +234,26 @@ impl<'a, 'c> OperationsSchema<'a, 'c> {
         Ok(())
     }
 
+    /// Removes all rejected transactions with an age greater than `max_age` from the database.
+    pub async fn remove_rejected_transactions(&mut self, max_age: Duration) -> QueryResult<()> {
+        let start = Instant::now();
+
+        let offset = Utc::now() - max_age;
+        sqlx::query!(
+            "DELETE FROM executed_transactions
+            WHERE success = false AND created_at < $1",
+            offset
+        )
+        .execute(self.0.conn())
+        .await?;
+
+        metrics::histogram!(
+            "sql.chain.operations.remove_rejected_transactions",
+            start.elapsed()
+        );
+        Ok(())
+    }
+
     /// Stores executed priority operation in database.
     ///
     /// This method is made public to fill the database for tests, do not use it for
@@ -324,10 +345,35 @@ impl<'a, 'c> OperationsSchema<'a, 'c> {
         .await?
         .id;
 
-        if !matches!(
-            operation.get_action_type(),
-            AggregatedActionType::CreateProofBlocks
-        ) {
+        if operation.is_commit() {
+            sqlx::query!(
+                r#"
+                INSERT INTO commit_aggregated_blocks_binding
+                SELECT 
+                    aggregate_operations.id, blocks.number
+                FROM aggregate_operations
+                INNER JOIN blocks ON blocks.number BETWEEN aggregate_operations.from_block AND aggregate_operations.to_block
+                WHERE aggregate_operations.action_type = 'CommitBlocks' and aggregate_operations.id = $1
+                "#, 
+                id
+            ).execute(transaction.conn()).await?;
+        }
+
+        if operation.is_execute() {
+            sqlx::query!(
+                r#"
+                INSERT INTO execute_aggregated_blocks_binding
+                SELECT 
+                    aggregate_operations.id, blocks.number
+                FROM aggregate_operations
+                INNER JOIN blocks ON blocks.number BETWEEN aggregate_operations.from_block AND aggregate_operations.to_block
+                WHERE aggregate_operations.action_type = 'ExecuteBlocks' and aggregate_operations.id = $1
+                "#, 
+                id
+            ).execute(transaction.conn()).await?;
+        }
+
+        if !operation.is_create_proof() {
             sqlx::query!(
                 "INSERT INTO eth_unprocessed_aggregated_ops (op_id)
                 VALUES ($1)",

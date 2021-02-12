@@ -23,6 +23,7 @@ use zksync_eth_client::clients::mock::MockEthereum;
 #[derive(Debug)]
 pub(in crate) struct MockDatabase {
     eth_operations: RwLock<Vec<ETHOperation>>,
+    aggregated_operations: RwLock<Vec<(i64, AggregatedOperation)>>,
     unprocessed_operations: RwLock<Vec<(i64, AggregatedOperation)>>,
     eth_parameters: RwLock<ETHParams>,
 }
@@ -31,12 +32,15 @@ impl MockDatabase {
     /// Creates a database with emulation of previously stored uncommitted requests.
     pub fn with_restorable_state(
         eth_operations: Vec<ETHOperation>,
+        aggregated_operations: Vec<(i64, AggregatedOperation)>,
+        unprocessed_operations: Vec<(i64, AggregatedOperation)>,
         eth_parameters: ETHParams,
     ) -> Self {
         Self {
             eth_operations: RwLock::new(eth_operations),
+            aggregated_operations: RwLock::new(aggregated_operations),
+            unprocessed_operations: RwLock::new(unprocessed_operations),
             eth_parameters: RwLock::new(eth_parameters),
-            unprocessed_operations: RwLock::new(Vec::new()),
         }
     }
 
@@ -53,6 +57,10 @@ impl MockDatabase {
         aggregated_operation: (i64, AggregatedOperation),
     ) -> anyhow::Result<()> {
         self.unprocessed_operations
+            .write()
+            .await
+            .push(aggregated_operation.clone());
+        self.aggregated_operations
             .write()
             .await
             .push(aggregated_operation);
@@ -143,6 +151,26 @@ impl DatabaseInterface for MockDatabase {
         &self,
         _connection: &mut StorageProcessor<'_>,
     ) -> anyhow::Result<()> {
+        let aggregated_operations = self.aggregated_operations.read().await;
+        let eth_operations = self.eth_operations.read().await;
+        let mut unprocessed_operations = self.unprocessed_operations.write().await;
+
+        let mut new_unprocessed_operations = Vec::new();
+
+        for operation in aggregated_operations.iter() {
+            let is_operation_in_queue = unprocessed_operations
+                .iter()
+                .any(|unprocessed_operation| unprocessed_operation.0 == operation.0);
+            let is_operation_send_to_ethereum = eth_operations
+                .iter()
+                .any(|ethereum_operation| ethereum_operation.op.as_ref().unwrap().0 == operation.0);
+            if !is_operation_in_queue && !is_operation_send_to_ethereum {
+                new_unprocessed_operations.push(operation.clone());
+            }
+        }
+
+        unprocessed_operations.extend(new_unprocessed_operations);
+
         Ok(())
     }
 
@@ -338,35 +366,65 @@ pub(in crate) fn default_eth_parameters() -> ETHParams {
 /// Creates a default `ETHSender` with mock Ethereum connection/database and no operations in DB.
 /// Returns the `ETHSender` itself along with communication channels to interact with it.
 pub(in crate) async fn default_eth_sender() -> ETHSender<MockDatabase> {
-    build_eth_sender(1, Vec::new(), default_eth_parameters()).await
+    build_eth_sender(
+        1,
+        Vec::new(),
+        Vec::new(),
+        Vec::new(),
+        default_eth_parameters(),
+    )
+    .await
 }
 
 /// Creates an `ETHSender` with mock Ethereum connection/database and no operations in DB
 /// which supports multiple transactions in flight.
 /// Returns the `ETHSender` itself along with communication channels to interact with it.
 pub(in crate) async fn concurrent_eth_sender(max_txs_in_flight: u64) -> ETHSender<MockDatabase> {
-    build_eth_sender(max_txs_in_flight, Vec::new(), default_eth_parameters()).await
+    build_eth_sender(
+        max_txs_in_flight,
+        Vec::new(),
+        Vec::new(),
+        Vec::new(),
+        default_eth_parameters(),
+    )
+    .await
 }
 
 /// Creates an `ETHSender` with mock Ethereum connection/database and restores its state "from DB".
 /// Returns the `ETHSender` itself along with communication channels to interact with it.
 pub(in crate) async fn restored_eth_sender(
     eth_operations: Vec<ETHOperation>,
+    aggregated_operations: Vec<(i64, AggregatedOperation)>,
+    unprocessed_operations: Vec<(i64, AggregatedOperation)>,
     eth_parameters: ETHParams,
 ) -> ETHSender<MockDatabase> {
     const MAX_TXS_IN_FLIGHT: u64 = 1;
 
-    build_eth_sender(MAX_TXS_IN_FLIGHT, eth_operations, eth_parameters).await
+    build_eth_sender(
+        MAX_TXS_IN_FLIGHT,
+        eth_operations,
+        aggregated_operations,
+        unprocessed_operations,
+        eth_parameters,
+    )
+    .await
 }
 
 /// Helper method for configurable creation of `ETHSender`.
 async fn build_eth_sender(
     max_txs_in_flight: u64,
     eth_operations: Vec<ETHOperation>,
+    aggregated_operations: Vec<(i64, AggregatedOperation)>,
+    unprocessed_operations: Vec<(i64, AggregatedOperation)>,
     eth_parameters: ETHParams,
 ) -> ETHSender<MockDatabase> {
     let ethereum = EthereumGateway::Mock(MockEthereum::default());
-    let db = MockDatabase::with_restorable_state(eth_operations, eth_parameters);
+    let db = MockDatabase::with_restorable_state(
+        eth_operations,
+        aggregated_operations,
+        unprocessed_operations,
+        eth_parameters,
+    );
 
     let options = ETHSenderConfig {
         sender: Sender {

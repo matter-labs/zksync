@@ -20,6 +20,7 @@ local metrics = [
   "sql.chain.operations.get_last_block_by_aggregated_action",
   "sql.chain.operations.get_operation",
   "sql.chain.operations.no_stored_pending_withdrawals",
+  "sql.chain.operations.remove_rejected_transactions",
   "sql.chain.operations.store_executed_priority_op",
   "sql.chain.operations.store_executed_tx",
   "sql.chain.operations.store_operation",
