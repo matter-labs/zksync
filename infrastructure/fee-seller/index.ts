@@ -9,9 +9,12 @@
  *    Each step happens one after another without waiting for previous to complete
  *    so this script should be run frequently (e.g. once every 15 min).
  *
+ * Sends all Ethereum transactions with sequential nonce starting with the next available not finalized nonce.
+ * If the fee account already has a pending transaction with such a nonce, then it ignores it and replaces old the transaction.
+ *
  * Each operation is performed only if transaction fee of this operation is less then MAX_LIQUIDATION_FEE_PERCENT.
  *
- * See Env parameters for available configuration parameters
+ * See Env parameters for available configuration parameters.
  */
 import Axios from 'axios';
 import { BigNumber, ethers } from 'ethers';
@@ -24,6 +27,7 @@ import {
     isOperationFeeAcceptable,
     sendNotification
 } from './utils';
+import { EthParameters } from './types';
 
 /** Env parameters. */
 const FEE_ACCOUNT_PRIVATE_KEY = process.env.MISC_FEE_ACCOUNT_PRIVATE_KEY;
@@ -146,11 +150,12 @@ async function transferEstablishedTokens(zksWallet: zksync.Wallet, establishedTo
 }
 
 /** Swap tokens for ETH */
-async function sellTokens(zksWallet: zksync.Wallet) {
+async function sellTokens(zksWallet: zksync.Wallet, ethParameters: EthParameters) {
     const zksProvider = zksWallet.provider;
     const tokens = await zksProvider.getTokens();
     for (const token in tokens) {
-        if (zksWallet.provider.tokenSet.resolveTokenSymbol(token) === 'MLTT' || zksync.utils.isTokenETH(token)) {
+        const tokenSymbol = zksWallet.provider.tokenSet.resolveTokenSymbol(token);
+        if (tokenSymbol === 'MLTT' || zksync.utils.isTokenETH(token)) {
             continue;
         }
 
@@ -209,14 +214,14 @@ async function sellTokens(zksWallet: zksync.Wallet) {
                 await approveTokenIfNotApproved(
                     zksWallet.ethSigner,
                     zksProvider.tokenSet.resolveTokenAddress(token),
-                    INCH_APPROVE
+                    INCH_APPROVE,
+                    ethParameters
                 );
                 if (apiResponse.to.toLowerCase() != INCH_EXCHANGE.toLowerCase()) {
                     throw new Error('Incorrect exchange address');
                 }
 
                 console.log('Sending swap tx.');
-                const nonce = await zksWallet.ethSigner.getTransactionCount('latest');
                 const ethTransaction = await zksWallet.ethSigner.sendTransaction({
                     from: apiResponse.from,
                     to: apiResponse.to,
@@ -224,7 +229,7 @@ async function sellTokens(zksWallet: zksync.Wallet) {
                     gasPrice: BigNumber.from(apiResponse.gasPrice),
                     value: BigNumber.from(apiResponse.value),
                     data: apiResponse.data,
-                    nonce
+                    nonce: ethParameters.getNextNonce()
                 });
                 console.log(`Tx hash: ${ethTransaction.hash}`);
 
@@ -246,7 +251,7 @@ async function sellTokens(zksWallet: zksync.Wallet) {
 }
 
 /** Send ETH to the accumulator account */
-async function sendETH(zksWallet: zksync.Wallet, feeAccumulatorAddress: string) {
+async function sendETH(zksWallet: zksync.Wallet, feeAccumulatorAddress: string, ethParameters: EthParameters) {
     const ethWallet = zksWallet.ethSigner;
     const ethProvider = ethWallet.provider;
     const ethBalance = await ethWallet.getBalance();
@@ -256,12 +261,11 @@ async function sendETH(zksWallet: zksync.Wallet, feeAccumulatorAddress: string) 
         const ethToSend = ethBalance.sub(ETH_TRANSFER_THRESHOLD.add(ethTransferFee));
         if (isOperationFeeAcceptable(ethToSend, ethTransferFee, MAX_LIQUIDATION_FEE_PERCENT)) {
             console.log(`Sending ${fmtToken(zksWallet.provider, 'ETH', ethToSend)} to ${feeAccumulatorAddress}`);
-            const nonce = await ethWallet.getTransactionCount('latest');
             const tx = await ethWallet.sendTransaction({
                 to: feeAccumulatorAddress,
                 value: ethToSend,
                 gasPrice,
-                nonce
+                nonce: ethParameters.getNextNonce()
             });
             console.log(`Tx hash: ${tx.hash}`);
 
@@ -282,10 +286,11 @@ async function sendETH(zksWallet: zksync.Wallet, feeAccumulatorAddress: string) 
     const ethWallet = new ethers.Wallet(FEE_ACCOUNT_PRIVATE_KEY).connect(ethProvider);
     const zksProvider = await zksync.getDefaultProvider(ETH_NETWORK, 'HTTP');
     const zksWallet = await zksync.Wallet.fromEthSigner(ethWallet, zksProvider);
+    const ethParameters = new EthParameters(await zksWallet.ethSigner.getTransactionCount('latest'));
     try {
         if (!(await zksWallet.isSigningKeySet())) {
             console.log('Changing fee account signing key');
-            const signingKeyTx = await zksWallet.setSigningKey({ feeToken: 'ETH' });
+            const signingKeyTx = await zksWallet.setSigningKey({ feeToken: 'ETH', ethAuthType: 'ECDSA' });
             await signingKeyTx.awaitReceipt();
         }
 
@@ -313,10 +318,10 @@ async function sendETH(zksWallet: zksync.Wallet, feeAccumulatorAddress: string) 
             await withdrawTokens(zksWallet);
 
             console.log('Step 3 - selling tokens for ETH');
-            await sellTokens(zksWallet);
+            await sellTokens(zksWallet, ethParameters);
 
             console.log('Step 4 - sending ETH to the reserve fee accumulator address');
-            await sendETH(zksWallet, RESERVE_FEE_ACCUMULATOR_ADDRESS);
+            await sendETH(zksWallet, RESERVE_FEE_ACCUMULATOR_ADDRESS, ethParameters);
         } else {
             // default scenario: all funds to be sent to the operator
             console.log('All funds to be sent to the operator address');
@@ -325,10 +330,10 @@ async function sendETH(zksWallet: zksync.Wallet, feeAccumulatorAddress: string) 
             await withdrawTokens(zksWallet);
 
             console.log('Step 2 - selling tokens for ETH');
-            await sellTokens(zksWallet);
+            await sellTokens(zksWallet, ethParameters);
 
             console.log('Step 3 - sending ETH to the operator address');
-            await sendETH(zksWallet, OPERATOR_FEE_ETH_ADDRESS);
+            await sendETH(zksWallet, OPERATOR_FEE_ETH_ADDRESS, ethParameters);
         }
     } catch (e) {
         console.error('Failed to proceed with fee liquidation: ', e);
