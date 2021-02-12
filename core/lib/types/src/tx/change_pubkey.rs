@@ -1,6 +1,6 @@
 use crate::{
     helpers::{is_fee_amount_packable, pack_fee_amount},
-    AccountId, Nonce,
+    AccountId, Nonce, TxFeeTypes,
 };
 
 use crate::account::PubKeyHash;
@@ -16,6 +16,7 @@ use zksync_crypto::{
 use zksync_utils::{format_units, BigUintSerdeAsRadix10Str};
 
 use super::{PackedEthSignature, TimeRange, TxSignature, VerifiedSignatureCache};
+use crate::tokens::{ChangePubKeyFeeType, ChangePubKeyFeeTypeArg};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -94,6 +95,14 @@ impl ChangePubKeyEthAuthData {
                 bytes.extend_from_slice(code_hash.as_bytes());
                 bytes
             }
+        }
+    }
+
+    pub fn get_fee_type(&self) -> ChangePubKeyFeeType {
+        match self {
+            ChangePubKeyEthAuthData::Onchain => ChangePubKeyFeeType::Onchain,
+            ChangePubKeyEthAuthData::ECDSA(_) => ChangePubKeyFeeType::ECDSA,
+            ChangePubKeyEthAuthData::CREATE2(_) => ChangePubKeyFeeType::CREATE2,
         }
     }
 }
@@ -400,5 +409,17 @@ impl ChangePubKey {
             );
         }
         message
+    }
+
+    pub fn get_fee_type(&self) -> TxFeeTypes {
+        if let Some(auth_data) = &self.eth_auth_data {
+            TxFeeTypes::ChangePubKey(ChangePubKeyFeeTypeArg::ContractsV4Version(
+                auth_data.get_fee_type(),
+            ))
+        } else {
+            TxFeeTypes::ChangePubKey(ChangePubKeyFeeTypeArg::PreContracts4Version {
+                onchain_pubkey_auth: self.eth_auth_data.is_none(),
+            })
+        }
     }
 }
