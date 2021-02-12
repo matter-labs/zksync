@@ -145,13 +145,13 @@ impl GasOperationsCost {
                 OutputFeeType::ChangePubKey(ChangePubKeyFeeTypeArg::PreContracts4Version {
                     onchain_pubkey_auth: false,
                 }),
-                constants::BASE_CHANGE_PUBKEY_OFFCHAIN_COST.into(),
+                constants::SUBSIDY_CHANGE_PUBKEY_OFFCHAIN_COST.into(),
             ),
             (
                 OutputFeeType::ChangePubKey(ChangePubKeyFeeTypeArg::PreContracts4Version {
                     onchain_pubkey_auth: true,
                 }),
-                constants::BASE_CHANGE_PUBKEY_ONCHAIN_COST.into(),
+                constants::SUBSIDY_CHANGE_PUBKEY_OFFCHAIN_COST.into(),
             ),
             (
                 OutputFeeType::ChangePubKey(ChangePubKeyFeeTypeArg::ContractsV4Version(
