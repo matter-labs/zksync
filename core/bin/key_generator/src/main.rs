@@ -62,8 +62,8 @@ fn main() {
             create_verifier_contract(config);
         }
         Command::CircuitSize => {
-            count_gates_recursive_verification_keys();
             calculate_and_print_max_zksync_main_circuit_size();
+            count_gates_recursive_verification_keys();
         }
     }
 }

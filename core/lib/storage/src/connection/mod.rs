@@ -44,7 +44,7 @@ impl Manager<PgConnection, SqlxError> for DbPool {
 /// the fixed size pool of connection to the database.
 ///
 /// The size of the pool and the database URL are configured via environment
-/// variables `DB_POOL_SIZE` and `DATABASE_URL` respectively.
+/// variables `DATABASE_POOL_SIZE` and `DATABASE_URL` respectively.
 #[derive(Clone)]
 pub struct ConnectionPool {
     pool: Pool,
@@ -59,10 +59,10 @@ impl fmt::Debug for ConnectionPool {
 impl ConnectionPool {
     /// Establishes a pool of the connections to the database and
     /// creates a new `ConnectionPool` object.
-    /// pool_max_size - number of connections in pool, if not set env variable "DB_POOL_SIZE" is going to be used.
+    /// pool_max_size - number of connections in pool, if not set env variable "DATABASE_POOL_SIZE" is going to be used.
     pub fn new(pool_max_size: Option<u32>) -> Self {
         let database_url = Self::get_database_url();
-        let max_size = pool_max_size.unwrap_or_else(|| parse_env("DB_POOL_SIZE"));
+        let max_size = pool_max_size.unwrap_or_else(|| parse_env("DATABASE_POOL_SIZE"));
 
         let pool = DbPool::create(database_url, max_size as usize);
 
