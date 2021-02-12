@@ -23,7 +23,7 @@ export function loadTestConfig(withWithdrawalHelpers: boolean) {
     const ethConstantPath = configPath('constant/eth.json');
     const ethConfig = loadConfig(ethConstantPath);
 
-    if(withWithdrawalHelpers) {
+    if (withWithdrawalHelpers) {
         const withdrawalHelpersConfigPath = configPath('volatile/withdrawal-helpers.json');
         const withdrawalHelpersConfig = loadConfig(withdrawalHelpersConfigPath);
         return {
@@ -31,8 +31,7 @@ export function loadTestConfig(withWithdrawalHelpers: boolean) {
             eth: ethConfig,
             withdrawalHelpers: withdrawalHelpersConfig
         };
-    }
-    else {
+    } else {
         return {
             eip1271: eipConfig,
             eth: ethConfig
