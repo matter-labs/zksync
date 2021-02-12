@@ -1,0 +1,21 @@
+{
+  "name": "revert-tool",
+  "version": "1.0.0",
+  "main": "index.ts",
+  "license": "MIT",
+  "private": true,
+  "dependencies": {
+    "ethers": "^5.0.19",
+    "zksync": "link:../../sdk/zksync.js"
+  },
+  "devDependencies": {
+    "ts-node": "^9.0.0",
+    "tslint": "^6.0.0-beta0",
+    "typescript": "^4.0.5"
+  },
+  "scripts": {
+    "start": "ts-node index.ts",
+    "build": "tesc build",
+    "watch": "tsc --watch"
+  }
+}
