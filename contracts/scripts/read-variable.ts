@@ -7,11 +7,13 @@ import * as solc from 'solc';
 
 const provider = web3Provider();
 
-const cash: Map<BigNumber, string> = new Map<BigNumber, string>();
+const cache: Map<BigNumber, string> = new Map<BigNumber, string>();
 
 async function getStorageAt(address: string, slot: BigNumber): Promise<string> {
-    if (!cash.has(slot)) cash.set(slot, (await provider.getStorageAt(address, slot)).substr(2, 64));
-    return cash.get(slot);
+    if (!cache.has(slot)) {
+        cache.set(slot, (await provider.getStorageAt(address, slot)).substr(2, 64));
+    }
+    return cache.get(slot);
 }
 
 function hexToUtf8(hex: string): string {
@@ -78,8 +80,9 @@ async function readDynamicBytes(slot: BigNumber, address: string): Promise<strin
         const length = (Number.parseInt(data, 16) - 1) / 2;
         const firstSlot = BigNumber.from(ethers.utils.solidityKeccak256(['uint'], [slot]));
         let hex: string = '';
-        for (let slotShift = 0; slotShift * 32 < length; slotShift++)
+        for (let slotShift = 0; slotShift * 32 < length; slotShift++) {
             hex += await getStorageAt(address, firstSlot.add(slotShift));
+        }
         return hex;
     }
 }
@@ -147,7 +150,9 @@ async function readArray(slot: BigNumber, address: string, type: string): Promis
     if (types[type].encoding === 'dynamic_array') {
         length = Number.parseInt(await getStorageAt(address, slot), 16);
         slot = BigNumber.from(ethers.utils.solidityKeccak256(['uint'], [slot]));
-    } else length = Number.parseInt(type.substring(type.lastIndexOf(')') + 1, type.lastIndexOf('_')), 10);
+    } else {
+        length = Number.parseInt(type.substring(type.lastIndexOf(')') + 1, type.lastIndexOf('_')), 10);
+    }
     if (Number.parseInt(types[baseType].numberOfBytes, 10) < 32) {
         let shift: number = -Number.parseInt(types[baseType].numberOfBytes, 10);
         for (let i = 0; i < length; i++) {
@@ -175,8 +180,8 @@ async function readVariable(slot: BigNumber, shift: number, address: string, typ
 
 async function readPartOfStruct(slot: BigNumber, address: string, type: string, params: string[]): Promise<object> {
     const last = params.pop();
-    for (const member of types[type].members)
-        if (member.label === last)
+    for (const member of types[type].members) {
+        if (member.label === last) {
             return readPartOfVariable(
                 slot.add(Number.parseInt(member.slot, 10)),
                 member.offset,
@@ -184,18 +189,21 @@ async function readPartOfStruct(slot: BigNumber, address: string, type: string, 
                 member.type,
                 params
             );
+        }
+    }
 }
 
 async function readPartOfArray(slot: BigNumber, address: string, type: string, params: string[]): Promise<any> {
     const index = Number.parseInt(params.pop(), 10);
     const baseType = types[type].base;
-    if (types[type].encoding === 'dynamic_array')
+    if (types[type].encoding === 'dynamic_array') {
         slot = BigNumber.from(ethers.utils.solidityKeccak256(['uint'], [slot]));
+    }
     if (Number.parseInt(types[baseType].numberOfBytes, 10) < 32) {
         const inOne = Math.floor(32 / Number.parseInt(types[baseType].numberOfBytes, 10));
         const shift = Number.parseInt(types[baseType].numberOfBytes, 10) * (index % inOne);
         return readPartOfVariable(slot.add(Math.floor(index / inOne)), shift, address, baseType, params);
-    } else
+    } else {
         return readPartOfVariable(
             slot.add((index * Number.parseInt(types[baseType].numberOfBytes, 10)) / 32),
             0,
@@ -203,6 +211,7 @@ async function readPartOfArray(slot: BigNumber, address: string, type: string, p
             baseType,
             params
         );
+    }
 }
 
 function parseKey(key: string, type: string): string {
@@ -214,7 +223,9 @@ function parseKey(key: string, type: string): string {
         if (key.length === 42) return key.substring(2, key.length).padStart(64, '0');
         else return key.padStart(64, ' 0');
     }
-    if (type === 't_string_memory_ptr') return utf8ToHex(key);
+    if (type === 't_string_memory_ptr') {
+        return utf8ToHex(key);
+    }
     if (type === 't_bytes_memory_ptr') {
         if (key.substr(0, 2) === '0x') return key.substring(2, key.length);
         else return key;
@@ -239,48 +250,76 @@ async function readPartOfVariable(
     type: string,
     params: string[]
 ): Promise<any> {
-    if (params.length === 0) return readVariable(slot, shift, address, type);
-    if (type.substr(0, 7) === 't_array') return readPartOfArray(slot, address, type, params);
-    if (type.substr(0, 8) === 't_struct') return readPartOfStruct(slot, address, type, params);
-    if (types[type].encoding === 'mapping') return readPartOfMap(slot, address, type, params);
+    if (params.length === 0) {
+        return readVariable(slot, shift, address, type);
+    }
+    if (type.substr(0, 7) === 't_array') {
+        return readPartOfArray(slot, address, type, params);
+    }
+    if (type.substr(0, 8) === 't_struct') {
+        return readPartOfStruct(slot, address, type, params);
+    }
+    if (types[type].encoding === 'mapping') {
+        return readPartOfMap(slot, address, type, params);
+    }
     return readPrimitive(slot, shift, address, type);
 }
 
 function parseName(fullName: string): string[] {
     const firstPoint = fullName.indexOf('.');
     const firstBracket = fullName.indexOf('[');
-    if (firstPoint === -1 && firstBracket === -1) return [];
+    if (firstPoint === -1 && firstBracket === -1) {
+        return [];
+    }
     const result = [];
     let first: number;
-    if (firstPoint === -1) first = firstBracket;
-    else if (firstBracket === -1) first = firstPoint;
-    else first = Math.min(firstPoint, firstBracket);
+    if (firstPoint === -1) {
+        first = firstBracket;
+    } else if (firstBracket === -1) {
+        first = firstPoint;
+    } else {
+        first = Math.min(firstPoint, firstBracket);
+    }
     let str: string = '';
     let bracket: boolean = false;
     for (let i = first; i < fullName.length; i++) {
         if (fullName.charAt(i) === '.') {
-            if (bracket) throw new Error('Invalid name');
+            if (bracket) {
+                throw new Error('Invalid name');
+            }
             if (i !== first) result.push(str);
             str = '';
         } else if (fullName.charAt(i) === '[') {
-            if (bracket) throw new Error('Invalid name');
+            if (bracket) {
+                throw new Error('Invalid name');
+            }
             bracket = true;
             if (i !== first) result.push(str);
             str = '';
         } else if (fullName.charAt(i) === ']') {
-            if (!bracket) throw new Error('Invalid name');
+            if (!bracket) {
+                throw new Error('Invalid name');
+            }
             bracket = false;
-        } else str += fullName.charAt(i);
+        } else {
+            str += fullName.charAt(i);
+        }
     }
-    if (bracket) throw new Error('Invalid name');
+    if (bracket) {
+        throw new Error('Invalid name');
+    }
     result.push(str);
     return result.reverse();
 }
 
 function getVariableName(fullName: string): string {
     let variableName: string = fullName;
-    if (variableName.indexOf('[') !== -1) variableName = variableName.substr(0, variableName.indexOf('['));
-    if (variableName.indexOf('.') !== -1) variableName = variableName.substr(0, variableName.indexOf('.'));
+    if (variableName.indexOf('[') !== -1) {
+        variableName = variableName.substr(0, variableName.indexOf('['));
+    }
+    if (variableName.indexOf('.') !== -1) {
+        variableName = variableName.substr(0, variableName.indexOf('.'));
+    }
     return variableName;
 }
 
@@ -288,13 +327,11 @@ function compileAndGetStorage(file: string, contractName): any {
     const contractCode = fs.readFileSync(file, {
         encoding: 'utf-8'
     });
+    const sourceFiles = {};
+    sourceFiles[`${contractName}.sol`] = { content: contractCode };
     const input = {
         language: 'Solidity',
-        sources: {
-            'Test.sol': {
-                content: contractCode
-            }
-        },
+        sources: sourceFiles,
         settings: {
             outputSelection: {
                 '*': {
@@ -304,13 +341,17 @@ function compileAndGetStorage(file: string, contractName): any {
         }
     };
     const output = JSON.parse(solc.compile(JSON.stringify(input)));
-    if (output.contracts === undefined) throw new Error(JSON.stringify(output.errors));
+    if (output.contracts === undefined) {
+        throw new Error(JSON.stringify(output.errors));
+    }
     types = output.contracts[`${contractName}.sol`][contractName].storageLayout.types;
     return output.contracts[`${contractName}.sol`][contractName].storageLayout.storage;
 }
 
 async function getValue(address: string, contractName: string, name: string, file?: string): Promise<any> {
-    if (file === undefined) file = `${process.env.ZKSYNC_HOME}/contracts/contracts/${contractName}.sol`;
+    if (file === undefined) {
+        file = `${process.env.ZKSYNC_HOME}/contracts/contracts/${contractName}.sol`;
+    }
     const storage = compileAndGetStorage(file, contractName);
 
     const variableName = getVariableName(name);
@@ -320,7 +361,9 @@ async function getValue(address: string, contractName: string, name: string, fil
     storage.forEach((node) => {
         if (node.label === variableName) variable = node;
     });
-    if (variable === undefined) throw new Error('Invalid name');
+    if (variable === undefined) {
+        throw new Error('Invalid name');
+    }
     return readPartOfVariable(BigNumber.from(variable.slot), variable.offset, address, variable.type, params);
 }
 

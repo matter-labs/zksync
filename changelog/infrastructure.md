@@ -15,7 +15,7 @@ components, the logs will have the following format:
 
 ### Added
 
--(`read-variable`): tool for read private and public variables from contracts.
+- (`read-variable`): tool for read private and public variables from contracts.
 
 ### Fixed
 
