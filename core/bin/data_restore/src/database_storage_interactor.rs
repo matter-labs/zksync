@@ -19,6 +19,7 @@ use crate::{
         stored_ops_block_into_ops_block, StorageInteractor,
     },
 };
+use zksync_storage::chain::block::SaveBlockError;
 use zksync_types::aggregated_operations::{BlocksCommitOperation, BlocksExecuteOperation};
 
 impl From<&NewTokenEvent> for zksync_storage::data_restore::records::NewTokenEvent {
@@ -106,14 +107,13 @@ impl StorageInteractor for DatabaseStorageInteractor<'_> {
             .expect("Cant execute verify operation");
 
         let block_number = block.block_number;
-        if transaction
-            .chain()
-            .block_schema()
-            .save_block(block)
-            .await
-            .is_err()
-        {
-            vlog::info!("Block {} was reverted", block_number)
+        if let Err(e) = transaction.chain().block_schema().save_block(block).await {
+            match e {
+                SaveBlockError::Database(e) => {
+                    vlog::info!("Block {} was reverted {}", block_number, e)
+                }
+                _ => panic!("Failed with database {:?}", e),
+            }
         }
 
         transaction

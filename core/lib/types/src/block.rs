@@ -166,8 +166,8 @@ impl Block {
             timestamp,
         }
     }
+
     /// Creates a new block, choosing block chunk size
-    ///
     #[allow(clippy::too_many_arguments)]
     pub fn new_with_current_chunk_size(
         block_number: BlockNumber,

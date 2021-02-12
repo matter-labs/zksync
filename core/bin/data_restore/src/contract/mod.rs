@@ -31,7 +31,11 @@ impl<T: Transport> ZkSyncDeployedContract<T> {
     /// * `zksync_contract` - Rollup contract
     ///
     pub async fn get_total_verified_blocks(&self) -> u32 {
-        let func = "totalBlocksExecuted";
+        use ZkSyncContractVersion::*;
+        let func = match self.version {
+            V0 | V1 | V2 | V3 => "totalBlocksVerified",
+            V4 => "totalBlocksExecuted",
+        };
         self.web3_contract
             .query::<U256, Option<Address>, Option<BlockId>, ()>(
                 func,
