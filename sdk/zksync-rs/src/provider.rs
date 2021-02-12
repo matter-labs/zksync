@@ -184,6 +184,15 @@ impl RpcProvider {
         }
     }
 
+    /// Creates a new `Provider` object connected to a custom address and the desired zkSync network.
+    pub fn from_addr_and_network(rpc_addr: impl Into<String>, network: Network) -> Self {
+        Self {
+            rpc_addr: rpc_addr.into(),
+            client: reqwest::Client::new(),
+            network,
+        }
+    }
+
     /// Submits a batch transaction to the zkSync network.
     /// Returns the hashes of the created transactions.
     pub async fn send_txs_batch(
