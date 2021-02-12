@@ -1,7 +1,6 @@
 // Built-in deps
 use std::time::{Instant, SystemTime, UNIX_EPOCH};
 // External imports
-use sqlx::error::{BoxDynError, DatabaseError};
 // Workspace imports
 use zksync_basic_types::{H256, U256};
 use zksync_crypto::convert::FeConvert;
@@ -27,43 +26,6 @@ use crate::{
 
 mod conversion;
 pub mod records;
-
-/// Error for saving blocks, use it for packing errors from sqlx crate
-#[derive(thiserror::Error, Debug)]
-pub enum SaveBlockError {
-    /// Error returned from the database.
-    #[error("error returned from database: {0}")]
-    Database(Box<dyn DatabaseError>),
-
-    /// Error communicating with the database backend.
-    #[error("error communicating with the server: {0}")]
-    Io(#[from] std::io::Error),
-
-    /// Error occurred while attempting to establish a TLS connection.
-    #[error("error occurred while attempting to establish a TLS connection: {0}")]
-    Tls(#[source] BoxDynError),
-
-    #[error("error: {0}")]
-    OtherErrors(#[source] anyhow::Error),
-}
-
-impl From<anyhow::Error> for SaveBlockError {
-    fn from(e: anyhow::Error) -> Self {
-        Self::OtherErrors(e)
-    }
-}
-
-impl From<sqlx::Error> for SaveBlockError {
-    fn from(err: sqlx::Error) -> Self {
-        use sqlx::Error::*;
-        match err {
-            Database(e) => Self::Database(e),
-            Io(e) => Self::Io(e),
-            Tls(e) => Self::Tls(e),
-            _ => Self::OtherErrors(err.into()),
-        }
-    }
-}
 
 /// Block schema is a primary sidechain storage controller.
 ///
@@ -646,7 +608,7 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
         Ok(count)
     }
 
-    pub async fn save_block(&mut self, block: Block) -> QueryResult<(), SaveBlockError> {
+    pub async fn save_block(&mut self, block: Block) -> QueryResult<()> {
         let start = Instant::now();
         let mut transaction = self.0.start_transaction().await?;
 

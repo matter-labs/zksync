@@ -3,6 +3,7 @@ use std::str::FromStr;
 // Workspace deps
 use zksync_storage::{data_restore::records::NewBlockEvent, StorageProcessor};
 use zksync_types::{
+    aggregated_operations::{BlocksCommitOperation, BlocksExecuteOperation},
     AccountId, BlockNumber, Token, TokenGenesisListItem, TokenId,
     {block::Block, AccountUpdate, AccountUpdates, ZkSyncOp},
 };
@@ -19,8 +20,6 @@ use crate::{
         stored_ops_block_into_ops_block, StorageInteractor,
     },
 };
-use zksync_storage::chain::block::SaveBlockError;
-use zksync_types::aggregated_operations::{BlocksCommitOperation, BlocksExecuteOperation};
 
 impl From<&NewTokenEvent> for zksync_storage::data_restore::records::NewTokenEvent {
     fn from(event: &NewTokenEvent) -> Self {
@@ -106,15 +105,12 @@ impl StorageInteractor for DatabaseStorageInteractor<'_> {
             .await
             .expect("Cant execute verify operation");
 
-        let block_number = block.block_number;
-        if let Err(e) = transaction.chain().block_schema().save_block(block).await {
-            match e {
-                SaveBlockError::Database(e) => {
-                    vlog::info!("Block {} was reverted {}", block_number, e)
-                }
-                _ => panic!("Failed with database {:?}", e),
-            }
-        }
+        transaction
+            .chain()
+            .block_schema()
+            .save_block(block)
+            .await
+            .expect("Unable save block");
 
         transaction
             .commit()

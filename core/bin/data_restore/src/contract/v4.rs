@@ -7,7 +7,7 @@ fn decode_commitment_parameters(input_data: Vec<u8>) -> anyhow::Result<Vec<Token
     let commit_operation = ParamType::Tuple(vec![
         Box::new(ParamType::FixedBytes(32)), // bytes32 encoded_root,
         Box::new(ParamType::Bytes),          // bytes calldata _publicData,
-        Box::new(ParamType::Uint(256)),      // uint64 _timestamp,
+        Box::new(ParamType::Uint(256)),      // uint256 _timestamp,
         Box::new(ParamType::Array(Box::new(ParamType::Tuple(vec![
             Box::new(ParamType::Bytes),    // bytes eht_witness
             Box::new(ParamType::Uint(32)), //uint32 public_data_offset
@@ -18,7 +18,7 @@ fn decode_commitment_parameters(input_data: Vec<u8>) -> anyhow::Result<Vec<Token
     let stored_block = ParamType::Tuple(vec![
         Box::new(ParamType::Uint(32)),       // uint32 _block_number
         Box::new(ParamType::Uint(64)),       // uint32 _number_of_processed_prior_ops
-        Box::new(ParamType::FixedBytes(32)), //bytes32  processable_ops_hash
+        Box::new(ParamType::FixedBytes(32)), // bytes32  processable_ops_hash
         Box::new(ParamType::Uint(256)),      // uint256 timestamp
         Box::new(ParamType::FixedBytes(32)), // bytes32 eth_encoded_root
         Box::new(ParamType::FixedBytes(32)), // commitment

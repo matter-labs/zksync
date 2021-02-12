@@ -132,11 +132,11 @@ impl TreeState {
                     let from = self
                         .state
                         .get_account(op.from)
-                        .ok_or_else(|| format_err!("Nonexistent account"))?;
+                        .ok_or_else(|| format_err!("TransferFail: Nonexistent account"))?;
                     let to = self
                         .state
                         .get_account(op.to)
-                        .ok_or_else(|| format_err!("Nonexistent account"))?;
+                        .ok_or_else(|| format_err!("TransferFail: Nonexistent account"))?;
                     op.tx.from = from.address;
                     op.tx.to = to.address;
                     op.tx.nonce = from.nonce;
@@ -288,7 +288,7 @@ impl TreeState {
 
         let fee_account_address = self
             .get_account(ops_block.fee_account)
-            .ok_or_else(|| format_err!("Nonexistent account"))?
+            .ok_or_else(|| format_err!("Nonexistent fee account"))?
             .address;
 
         let fee_updates = self.state.collect_fee(&fees, ops_block.fee_account);
