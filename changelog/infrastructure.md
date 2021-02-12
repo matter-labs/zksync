@@ -13,11 +13,13 @@ components, the logs will have the following format:
 
 ### Changed
 
+- (`fee-seller`): migrating to zksync V0.9.0.
+
 ### Added
 
 ### Fixed
 
-- (`fee-seller`): sends all Ethereum transactions with sequential nonce starting with the next available not finalized
+- (`fee-seller`): Sends all Ethereum transactions with sequential nonce starting with the next available not finalized
   nonce. Thereby resend stuck transactions after the next time you run the script.
 
 ## Release 2021-02-02
