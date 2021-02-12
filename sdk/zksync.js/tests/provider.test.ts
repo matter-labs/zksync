@@ -1,6 +1,6 @@
 import { expect } from 'chai';
 import { Provider } from '../src/provider';
-import { getTokens } from './helpers';
+import { getTokens } from 'reading-tool';
 
 describe('Provider tests', function () {
     it('Update token set', async function () {
