@@ -38,14 +38,15 @@ impl UniswapTokenWatcher {
 
         let query = format!("{{token(id: \"{:#x}\"){{tradeVolumeUSD}}}}", address);
 
-        let request = self.client.post(&self.addr).json(&serde_json::json!({
-            "query": query.clone(),
-        }));
-        let api_request_future = tokio::time::timeout(REQUEST_TIMEOUT, request.send());
-
-        let response: GraphqlResponse = api_request_future
+        let response = self
+            .client
+            .post(&self.addr)
+            .json(&serde_json::json!({
+                "query": query.clone(),
+            }))
+            .timeout(REQUEST_TIMEOUT)
+            .send()
             .await
-            .map_err(|_| anyhow::format_err!("Uniswap API request timeout"))?
             .map_err(|err| anyhow::format_err!("Uniswap API request failed: {}", err))?
             .json::<GraphqlResponse>()
             .await?;

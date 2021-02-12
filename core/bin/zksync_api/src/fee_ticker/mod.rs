@@ -46,6 +46,7 @@ use crate::fee_ticker::{
     },
 };
 use crate::utils::token_db_cache::TokenDBCache;
+use zksync_types::tokens::{ChangePubKeyFeeType, ChangePubKeyFeeTypeArg};
 
 mod constants;
 mod ticker_api;
@@ -90,16 +91,34 @@ impl GasOperationsCost {
                 standard_fast_withdrawal_cost.into(),
             ),
             (
-                OutputFeeType::ChangePubKey {
+                OutputFeeType::ChangePubKey(ChangePubKeyFeeTypeArg::PreContracts4Version {
                     onchain_pubkey_auth: false,
-                },
+                }),
+                constants::BASE_OLD_CHANGE_PUBKEY_OFFCHAIN_COST.into(),
+            ),
+            (
+                OutputFeeType::ChangePubKey(ChangePubKeyFeeTypeArg::PreContracts4Version {
+                    onchain_pubkey_auth: true,
+                }),
+                constants::BASE_CHANGE_PUBKEY_ONCHAIN_COST.into(),
+            ),
+            (
+                OutputFeeType::ChangePubKey(ChangePubKeyFeeTypeArg::ContractsV4Version(
+                    ChangePubKeyFeeType::Onchain,
+                )),
+                constants::BASE_CHANGE_PUBKEY_ONCHAIN_COST.into(),
+            ),
+            (
+                OutputFeeType::ChangePubKey(ChangePubKeyFeeTypeArg::ContractsV4Version(
+                    ChangePubKeyFeeType::ECDSA,
+                )),
                 constants::BASE_CHANGE_PUBKEY_OFFCHAIN_COST.into(),
             ),
             (
-                OutputFeeType::ChangePubKey {
-                    onchain_pubkey_auth: true,
-                },
-                constants::BASE_CHANGE_PUBKEY_ONCHAIN_COST.into(),
+                OutputFeeType::ChangePubKey(ChangePubKeyFeeTypeArg::ContractsV4Version(
+                    ChangePubKeyFeeType::CREATE2,
+                )),
+                constants::BASE_CHANGE_PUBKEY_OFFCHAIN_COST.into(),
             ),
         ]
         .into_iter()
@@ -123,16 +142,34 @@ impl GasOperationsCost {
                 subsidy_fast_withdrawal_cost.into(),
             ),
             (
-                OutputFeeType::ChangePubKey {
+                OutputFeeType::ChangePubKey(ChangePubKeyFeeTypeArg::PreContracts4Version {
                     onchain_pubkey_auth: false,
-                },
+                }),
                 constants::SUBSIDY_CHANGE_PUBKEY_OFFCHAIN_COST.into(),
             ),
             (
-                OutputFeeType::ChangePubKey {
+                OutputFeeType::ChangePubKey(ChangePubKeyFeeTypeArg::PreContracts4Version {
                     onchain_pubkey_auth: true,
-                },
+                }),
+                constants::SUBSIDY_CHANGE_PUBKEY_OFFCHAIN_COST.into(),
+            ),
+            (
+                OutputFeeType::ChangePubKey(ChangePubKeyFeeTypeArg::ContractsV4Version(
+                    ChangePubKeyFeeType::Onchain,
+                )),
                 constants::BASE_CHANGE_PUBKEY_ONCHAIN_COST.into(),
+            ),
+            (
+                OutputFeeType::ChangePubKey(ChangePubKeyFeeTypeArg::ContractsV4Version(
+                    ChangePubKeyFeeType::ECDSA,
+                )),
+                constants::SUBSIDY_CHANGE_PUBKEY_OFFCHAIN_COST.into(),
+            ),
+            (
+                OutputFeeType::ChangePubKey(ChangePubKeyFeeTypeArg::ContractsV4Version(
+                    ChangePubKeyFeeType::CREATE2,
+                )),
+                constants::SUBSIDY_CHANGE_PUBKEY_OFFCHAIN_COST.into(),
             ),
         ]
         .into_iter()
@@ -475,14 +512,9 @@ impl<API: FeeTickerAPI, INFO: FeeTickerInfo, WATCHER: TokenWatcher> FeeTicker<AP
                     (OutputFeeType::Transfer, TransferOp::CHUNKS)
                 }
             }
-            TxFeeTypes::ChangePubKey {
-                onchain_pubkey_auth,
-            } => (
-                OutputFeeType::ChangePubKey {
-                    onchain_pubkey_auth,
-                },
-                ChangePubKeyOp::CHUNKS,
-            ),
+            TxFeeTypes::ChangePubKey(arg) => {
+                (OutputFeeType::ChangePubKey(arg), ChangePubKeyOp::CHUNKS)
+            }
         };
         // Convert chunks amount to `BigUint`.
         let op_chunks = BigUint::from(op_chunks);

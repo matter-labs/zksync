@@ -112,17 +112,6 @@ describe(`ZkSync integration tests (token: ${token}, transport: ${transport})`, 
         await tester.testRejectedBatch(alice, bob, token, TX_AMOUNT);
     });
 
-    step('should execute a withdrawal', async () => {
-        await tester.testVerifiedWithdraw(alice, token, TX_AMOUNT);
-    });
-
-    step('should execute a ForcedExit', async () => {
-        if (onlyBasic) {
-            return;
-        }
-        await tester.testVerifiedForcedExit(alice, bob, token);
-    });
-
     step('should test batch-builder', async () => {
         // We will pay with different token.
         const feeToken = token == 'ETH' ? 'wBTC' : 'ETH';
@@ -150,6 +139,17 @@ describe(`ZkSync integration tests (token: ${token}, transport: ${transport})`, 
 
     step('should test backwards compatibility', async () => {
         await tester.testBackwardCompatibleEthMessages(alice, david, token, TX_AMOUNT);
+    });
+
+    step('should execute a withdrawal', async () => {
+        await tester.testVerifiedWithdraw(alice, token, TX_AMOUNT);
+    });
+
+    step('should execute a ForcedExit', async () => {
+        if (onlyBasic) {
+            return;
+        }
+        await tester.testVerifiedForcedExit(alice, bob, token);
     });
 
     it('should check collected fees', async () => {
