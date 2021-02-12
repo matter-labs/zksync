@@ -94,6 +94,13 @@ impl PendingBlock {
     }
 }
 
+pub fn system_time_timestamp() -> u64 {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .expect("failed to get system time")
+        .as_secs()
+}
+
 /// Responsible for tx processing and block forming.
 pub struct ZkSyncStateKeeper {
     /// Current plasma state
@@ -389,10 +396,7 @@ impl ZkSyncStateKeeper {
                 initial_state.unprocessed_priority_op,
                 max_block_size,
                 previous_root_hash,
-                SystemTime::now()
-                    .duration_since(UNIX_EPOCH)
-                    .expect("failed to get system time")
-                    .as_secs(),
+                system_time_timestamp(),
             ),
             available_block_chunk_sizes,
             max_miniblock_iterations,
@@ -545,6 +549,11 @@ impl ZkSyncStateKeeper {
     async fn execute_proposed_block(&mut self, proposed_block: ProposedBlock) {
         let start = Instant::now();
         let mut executed_ops = Vec::new();
+
+        // If pending block is empty we update timestamp
+        if self.pending_block.success_operations.is_empty() {
+            self.pending_block.timestamp = system_time_timestamp();
+        }
 
         // We want to store this variable before moving anything from the pending block.
         let empty_proposed_block = proposed_block.is_empty();
@@ -928,10 +937,7 @@ impl ZkSyncStateKeeper {
                     .last()
                     .expect("failed to get max block size"),
                 H256::default(),
-                SystemTime::now()
-                    .duration_since(UNIX_EPOCH)
-                    .expect("failed to get system time")
-                    .as_secs(),
+                system_time_timestamp(),
             ),
         );
 

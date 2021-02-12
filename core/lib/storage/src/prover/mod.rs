@@ -27,8 +27,8 @@ impl<'a, 'c> ProverSchema<'a, 'c> {
     pub async fn pending_jobs_count(&mut self) -> QueryResult<u32> {
         let start = Instant::now();
         let pending_jobs_count = sqlx::query!(
-            "SELECT COUNT(*) FROM prover_job_queue WHERE job_status = $1",
-            ProverJobStatus::Idle.to_number()
+            "SELECT COUNT(*) FROM prover_job_queue WHERE job_status != $1",
+            ProverJobStatus::Done.to_number()
         )
         .fetch_one(self.0.conn())
         .await?

@@ -8,6 +8,8 @@ All notable changes to the core components will be documented in this file.
 
 ### Changed
 
+- Rejected transactions are now stored in the database for 2 weeks only.
+
 ### Added
 
 ### Fixed

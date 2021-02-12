@@ -161,20 +161,18 @@ async fn pending_jobs_count(mut storage: &mut StorageProcessor<'_>) -> QueryResu
     let jobs_count = ProverSchema(&mut storage).pending_jobs_count().await?;
     assert_eq!(jobs_count, 3);
 
-    // Get a job and now the number of idle jobs must be 2.
     let first_job = get_idle_job_from_queue(&mut storage).await?;
     let jobs_count = ProverSchema(&mut storage).pending_jobs_count().await?;
-    assert_eq!(jobs_count, 2);
+    assert_eq!(jobs_count, 3);
 
     // Create next run & repeat checks.
     let second_job = get_idle_job_from_queue(&mut storage).await?;
     let jobs_count = ProverSchema(&mut storage).pending_jobs_count().await?;
-    assert_eq!(jobs_count, 1);
+    assert_eq!(jobs_count, 3);
 
-    // And finally store the proof for the third block.
     let third_job = get_idle_job_from_queue(&mut storage).await?;
     let jobs_count = ProverSchema(&mut storage).pending_jobs_count().await?;
-    assert_eq!(jobs_count, 0);
+    assert_eq!(jobs_count, 3);
 
     // Record prover is working and stopped it.
     ProverSchema(&mut storage)
@@ -196,7 +194,7 @@ async fn pending_jobs_count(mut storage: &mut StorageProcessor<'_>) -> QueryResu
         )
         .await?;
     let jobs_count = ProverSchema(&mut storage).pending_jobs_count().await?;
-    assert_eq!(jobs_count, 0);
+    assert_eq!(jobs_count, 2);
 
     ProverSchema(&mut storage)
         .record_prover_stop("test_prover")

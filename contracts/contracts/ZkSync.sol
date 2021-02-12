@@ -553,7 +553,7 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
         bool trigger =
             block.number >= priorityRequests[firstPriorityRequestId].expirationBlock &&
                 priorityRequests[firstPriorityRequestId].expirationBlock != 0;
-        if (trigger) {
+        if ($$(EASY_EXODUS) || trigger) {
             if (!exodusMode) {
                 exodusMode = true;
                 emit ExodusMode();

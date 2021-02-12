@@ -59,8 +59,7 @@ contract Verifier is KeysWithPlonkVerifier, KeysWithPlonkVerifierOld, Config {
         uint128 _amount,
         uint256[] calldata _proof
     ) external view returns (bool) {
-        bytes32 commitment =
-            sha256(abi.encodePacked(uint256(_rootHash) & INPUT_MASK, _accountId, _owner, _tokenId, _amount));
+        bytes32 commitment = sha256(abi.encodePacked(_rootHash, _accountId, _owner, _tokenId, _amount));
 
         uint256[] memory inputs = new uint256[](1);
         inputs[0] = uint256(commitment) & INPUT_MASK;

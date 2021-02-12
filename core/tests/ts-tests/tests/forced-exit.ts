@@ -1,7 +1,6 @@
 import { Tester } from './tester';
 import { expect } from 'chai';
 import { Wallet, types } from 'zksync';
-import { sleep } from 'zksync/build/utils';
 
 type TokenLike = types.TokenLike;
 
@@ -32,17 +31,7 @@ Tester.prototype.testVerifiedForcedExit = async function (
 
     // Checking that there are some complete withdrawals tx hash for this ForcedExit
     // we should wait some time for `completeWithdrawals` transaction to be processed
-    let withdrawalTxHash = null;
-    const polling_interval = 200; // ms
-    const polling_timeout = 35000; // ms
-    const polling_iterations = polling_timeout / polling_interval;
-    for (let i = 0; i < polling_iterations; i++) {
-        withdrawalTxHash = await this.syncProvider.getEthTxForWithdrawal(handle.txHash);
-        if (withdrawalTxHash != null) {
-            break;
-        }
-        await sleep(polling_interval);
-    }
+    const withdrawalTxHash = await this.syncProvider.getEthTxForWithdrawal(handle.txHash);
     expect(withdrawalTxHash, 'Withdrawal was not processed onchain').to.exist;
 
     await this.ethProvider.waitForTransaction(withdrawalTxHash as string);
