@@ -70,6 +70,9 @@ export class HTTPTransport extends AbstractJSONRPCTransport {
     async disconnect() {}
 }
 
+/**
+ * @deprecated Websocket support will be removed in future. Use HTTP transport instead.
+ */
 export class WSTransport extends AbstractJSONRPCTransport {
     ws: WebSocketAsPromised;
     private subscriptionCallback: Map<string, (data: any) => void>;
