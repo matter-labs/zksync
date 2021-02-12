@@ -8,7 +8,7 @@ import { sleep } from 'zksync/build/utils';
 import { RevertReceiveAccountFactory, RevertTransferERC20Factory } from '../../../../contracts/typechain';
 import { loadTestConfig } from 'reading-tool';
 
-const TEST_CONFIG = loadTestConfig();
+const TEST_CONFIG = loadTestConfig(true);
 
 type TokenLike = types.TokenLike;
 

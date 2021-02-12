@@ -12,7 +12,7 @@ function loadConfig(path: string) {
     );
 }
 
-export function loadTestConfig() {
+export function loadTestConfig(withWithdrawalHelpers: boolean) {
     const eipConstantPath = configPath('constant/eip1271.json');
     const eipVolatilePath = configPath('volatile/eip1271.json');
 
@@ -23,14 +23,21 @@ export function loadTestConfig() {
     const ethConstantPath = configPath('constant/eth.json');
     const ethConfig = loadConfig(ethConstantPath);
 
-    const withdrawalHelpersConfigPoth = configPath('volatile/withdrawal-helpers.json');
-    const withdrawalHelpersConfig = loadConfig(withdrawalHelpersConfigPoth);
-
-    return {
-        eip1271: eipConfig,
-        eth: ethConfig,
-        withdrawalHelpers: withdrawalHelpersConfig
-    };
+    if(withWithdrawalHelpers) {
+        const withdrawalHelpersConfigPath = configPath('volatile/withdrawal-helpers.json');
+        const withdrawalHelpersConfig = loadConfig(withdrawalHelpersConfigPath);
+        return {
+            eip1271: eipConfig,
+            eth: ethConfig,
+            withdrawalHelpers: withdrawalHelpersConfig
+        };
+    }
+    else {
+        return {
+            eip1271: eipConfig,
+            eth: ethConfig
+        };
+    }
 }
 
 export function loadTestVectorsConfig() {
