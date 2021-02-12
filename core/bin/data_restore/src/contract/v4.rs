@@ -43,6 +43,9 @@ pub fn rollup_ops_blocks_from_bytes(data: Vec<u8>) -> anyhow::Result<Vec<RollupO
     let decoded_commitment_parameters = decode_commitment_parameters(data)?;
     assert_eq!(decoded_commitment_parameters.len(), 2);
 
+    // Destruct deserialized parts of transaction input data for getting operations
+    // Input data consists of stored block and operations
+    // Transform operations to RollupBlock
     if let ethabi::Token::Array(operations) = &decoded_commitment_parameters[1] {
         let mut blocks = vec![];
         for operation in operations {
