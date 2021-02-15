@@ -16,13 +16,13 @@ async function getStorageAt(address: string, slot: BigNumber): Promise<string> {
     return cache.get(slot);
 }
 
-// Read bytes from storage like utf-8 string
+// Read bytes from storage like hex string
 async function readBytes(slot: BigNumber, shift: number, bytes: number, address: string): Promise<string> {
     const data = await getStorageAt(address, slot);
     return '0x' + data.substr(66 - bytes * 2 - shift * 2, bytes * 2);
 }
 
-// Read dynamic sized bytes (encoding - bytes in solidity)
+// Read dynamic sized bytes (encoding: bytes)
 async function readDynamicBytes(slot: BigNumber, address: string): Promise<string> {
     const data = await getStorageAt(address, slot);
     if (Number.parseInt(data.substr(64, 2), 16) % 2 === 0) {
@@ -105,6 +105,7 @@ async function readPrimitive(slot: BigNumber, shift: number, address: string, ty
     }
 }
 
+// Read user defined struct
 async function readStruct(slot: BigNumber, address: string, type: string): Promise<object> {
     const result = {};
     const data = new Map();
@@ -120,6 +121,7 @@ async function readStruct(slot: BigNumber, address: string, type: string): Promi
     return result;
 }
 
+// Read array (Static or dynamic sized)
 async function readArray(slot: BigNumber, address: string, type: string): Promise<any> {
     let length: number;
     const baseType = types[type].base;
@@ -150,6 +152,7 @@ async function readArray(slot: BigNumber, address: string, type: string): Promis
     return Promise.all(data);
 }
 
+// Read any type, except mapping (it needs key for reading)
 async function readVariable(slot: BigNumber, shift: number, address: string, type: string): Promise<any> {
     if (type.substr(0, 7) === 't_array') return readArray(slot, address, type);
     if (type.substr(0, 8) === 't_struct') return readStruct(slot, address, type);
@@ -225,6 +228,7 @@ async function readPartOfMap(slot: BigNumber, address: string, type: string, par
     return readPartOfVariable(slot, 0, address, valueType, params);
 }
 
+// Read part of variable (By indexes, field names, keys)
 async function readPartOfVariable(
     slot: BigNumber,
     shift: number,
@@ -247,7 +251,7 @@ async function readPartOfVariable(
     return readPrimitive(slot, shift, address, type);
 }
 
-// Get array indexes, struct fields and mapping keys from name
+// Get array of indexes, struct fields and mapping keys from name
 function parseName(fullName: string): string[] {
     const firstPoint = fullName.indexOf('.');
     const firstBracket = fullName.indexOf('[');
