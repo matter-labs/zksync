@@ -13,7 +13,7 @@ import {
     parseHexWithPrefix
 } from '../src/utils';
 import { privateKeyFromSeed, signTransactionBytes } from '../src/crypto';
-import { loadTestVectorsConfig } from './helpers';
+import { loadTestVectorsConfig } from 'reading-tool';
 
 const vectors = loadTestVectorsConfig();
 const cryptoPrimitivesVectors = vectors['cryptoPrimitivesTest'];
@@ -139,7 +139,10 @@ describe(txVectors['description'], function () {
                 expect(utils.hexlify(signBytes)).to.eql(expected.signBytes, 'Sign bytes do not match');
                 expect(signature).to.eql(expected.signature, 'Signature does not match');
                 expect(ethSignature).to.eql(expected.ethSignature, 'Ethereum signature does not match');
-                expect(ethSignMessage).to.eql(expected.ethSignMessage, 'Ethereum signature message does not match');
+                expect(utils.hexlify(utils.toUtf8Bytes(ethSignMessage))).to.eql(
+                    expected.ethSignMessage,
+                    'Ethereum signature message does not match'
+                );
             }
         }
     });
@@ -161,7 +164,10 @@ describe(txVectors['description'], function () {
                 expect(utils.hexlify(signBytes)).to.eql(expected.signBytes, 'Sign bytes do not match');
                 expect(signature).to.eql(expected.signature, 'Signature does not match');
                 expect(ethSignature).to.eql(expected.ethSignature, 'Ethereum signature does not match');
-                expect(ethSignMessage).to.eql(expected.ethSignMessage, 'Ethereum signature message does not match');
+                expect(utils.hexlify(ethSignMessage)).to.eql(
+                    expected.ethSignMessage,
+                    'Ethereum signature message does not match'
+                );
             }
         }
     });
@@ -183,7 +189,10 @@ describe(txVectors['description'], function () {
                 expect(utils.hexlify(signBytes)).to.eql(expected.signBytes, 'Sign bytes do not match');
                 expect(signature).to.eql(expected.signature, 'Signature does not match');
                 expect(ethSignature).to.eql(expected.ethSignature, 'Ethereum signature does not match');
-                expect(ethSignMessage).to.eql(expected.ethSignMessage, 'Ethereum signature message does not match');
+                expect(utils.hexlify(utils.toUtf8Bytes(ethSignMessage))).to.eql(
+                    expected.ethSignMessage,
+                    'Ethereum signature message does not match'
+                );
             }
         }
     });

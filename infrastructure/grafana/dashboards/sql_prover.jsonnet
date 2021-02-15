@@ -4,7 +4,6 @@ local metrics = [
   "sql.prover.get_witness",
   "sql.prover.load_proof",
   "sql.prover.pending_jobs_count",
-  "sql.prover.prover_by_id",
   "sql.prover.prover_run_for_next_commit",
   "sql.prover.record_prover_is_working",
   "sql.prover.record_prover_stop",

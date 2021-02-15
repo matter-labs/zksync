@@ -38,6 +38,8 @@ pub struct TransferData {
     pub token: u32,
     pub from_account_address: u32,
     pub to_account_address: u32,
+    pub valid_from: u64,
+    pub valid_until: u64,
 }
 
 pub struct TransferWitness<E: RescueEngine> {
@@ -59,12 +61,15 @@ impl Witness for TransferWitness<Bn256> {
     type CalculateOpsInput = SigDataInput;
 
     fn apply_tx(tree: &mut CircuitAccountTree, transfer: &TransferOp) -> Self {
+        let time_range = transfer.tx.time_range.unwrap_or_default();
         let transfer_data = TransferData {
             amount: transfer.tx.amount.to_u128().unwrap(),
             fee: transfer.tx.fee.to_u128().unwrap(),
             token: *transfer.tx.token as u32,
             from_account_address: *transfer.from,
             to_account_address: *transfer.to,
+            valid_from: time_range.valid_from,
+            valid_until: time_range.valid_until,
         };
         // le_bit_vector_into_field_element()
         Self::apply_data(tree, &transfer_data)
@@ -107,6 +112,10 @@ impl Witness for TransferWitness<Bn256> {
             false,
         );
         pubdata_bits
+    }
+
+    fn get_offset_commitment_data(&self) -> Vec<bool> {
+        vec![false; TransferOp::CHUNKS * 8]
     }
 
     fn calculate_operations(&self, input: SigDataInput) -> Vec<Operation<Bn256>> {
@@ -238,6 +247,9 @@ impl TransferWitness<Bn256> {
 
         let fee_encoded: Fr = le_bit_vector_into_field_element(&fee_bits);
 
+        let valid_from = transfer.valid_from;
+        let valid_until = transfer.valid_until;
+
         //applying first transfer part
         let (
             account_witness_from_before,
@@ -360,6 +372,8 @@ impl TransferWitness<Bn256> {
                 a: Some(a),
                 b: Some(b),
                 new_pub_key_hash: Some(Fr::zero()),
+                valid_from: Some(Fr::from_str(&valid_from.to_string()).unwrap()),
+                valid_until: Some(Fr::from_str(&valid_until.to_string()).unwrap()),
             },
             before_root: Some(before_root),
             intermediate_root: Some(intermediate_root),

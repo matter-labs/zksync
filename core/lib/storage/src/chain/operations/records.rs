@@ -97,3 +97,14 @@ pub struct StoredCompleteWithdrawalsTransaction {
     pub pending_withdrawals_queue_start_index: i64,
     pub pending_withdrawals_queue_end_index: i64,
 }
+
+#[derive(Debug, Clone, FromRow)]
+pub struct StoredAggregatedOperation {
+    pub id: i64,
+    pub action_type: String,
+    pub arguments: serde_json::Value,
+    pub from_block: i64,
+    pub to_block: i64,
+    pub created_at: DateTime<Utc>,
+    pub confirmed: bool,
+}

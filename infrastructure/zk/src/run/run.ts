@@ -5,6 +5,7 @@ import fs from 'fs';
 import * as path from 'path';
 import * as verifyKeys from './verify-keys';
 import * as dataRestore from './data-restore';
+import * as docker from '../docker';
 
 export { verifyKeys, dataRestore };
 
@@ -13,11 +14,14 @@ export async function deployERC20(command: 'dev' | 'new', name?: string, symbol?
         await utils.spawn(`yarn --silent --cwd contracts deploy-erc20 add-multi '
             [
                 { "name": "DAI",  "symbol": "DAI",  "decimals": 18 },
-                { "name": "wBTC", "symbol": "wBTC", "decimals":  8 },
+                { "name": "wBTC", "symbol": "wBTC", "decimals":  8, "implementation": "RevertTransferERC20" },
                 { "name": "BAT",  "symbol": "BAT",  "decimals": 18 },
                 { "name": "GNT",  "symbol": "GNT",  "decimals": 18 },
                 { "name": "MLTT", "symbol": "MLTT", "decimals": 18 }
             ]' > ./etc/tokens/localhost.json`);
+        if (!process.env.CI) {
+            await docker.restart('dev-liquidity-token-watcher');
+        }
     } else if (command == 'new') {
         await utils.spawn(
             `yarn --cwd contracts deploy-erc20 add --token-name ${name} --symbol ${symbol} --decimals ${decimals}`
@@ -46,6 +50,7 @@ export async function tokenInfo(address: string) {
 // installs all dependencies and builds our js packages
 export async function yarn() {
     await utils.spawn('yarn');
+    await utils.spawn('yarn reading-tool build');
     await utils.spawn('yarn zksync prepublish');
 }
 
@@ -56,6 +61,10 @@ export async function deployTestkit(genesisRoot: string, prodContracts: boolean 
 
 export async function deployEIP1271() {
     await utils.spawn(`yarn contracts deploy-eip1271`);
+}
+
+export async function deployWithdrawalHelpersContracts() {
+    await utils.spawn(`yarn contracts deploy-withdrawal-helpers-contracts`);
 }
 
 export async function testUpgrade(contract: string, gatekeeper: string) {

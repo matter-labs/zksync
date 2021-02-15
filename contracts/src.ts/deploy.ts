@@ -1,5 +1,5 @@
 import { deployContract } from 'ethereum-waffle';
-import { Contract, ethers, Signer, providers } from 'ethers';
+import { ethers, Signer, providers } from 'ethers';
 import { formatEther, Interface } from 'ethers/lib/utils';
 import * as fs from 'fs';
 import {
@@ -8,6 +8,16 @@ import {
     publishAbiToTesseracts,
     publishSourceCodeToEtherscan
 } from './publish-utils';
+import {
+    Governance,
+    GovernanceFactory,
+    UpgradeGatekeeper,
+    UpgradeGatekeeperFactory,
+    Verifier,
+    VerifierFactory,
+    ZkSync,
+    ZkSyncFactory
+} from '../typechain';
 
 export interface Contracts {
     governance;
@@ -36,7 +46,10 @@ export interface DeployerConfig {
 }
 
 export function readContractCode(name: string) {
-    return JSON.parse(fs.readFileSync(`build/${name}.json`, { encoding: 'utf-8' }));
+    const fileName = name.split('/').pop();
+    return JSON.parse(
+        fs.readFileSync(`artifacts/cache/solpp-generated-contracts/${name}.sol/${fileName}.json`, { encoding: 'utf-8' })
+    );
 }
 
 export function readProductionContracts(): Contracts {
@@ -117,7 +130,7 @@ export class Deployer {
             console.log('Deploying verifier target');
         }
         const verifierContract = await deployContract(this.deployWallet, this.contracts.verifier, [], {
-            gasLimit: 4000000,
+            gasLimit: 8000000,
             ...ethTxOptions
         });
         const verRec = await verifierContract.deployTransaction.wait();
@@ -267,23 +280,19 @@ export class Deployer {
         await this.deployProxiesAndGatekeeper(ethTxOptions);
     }
 
-    public governanceContract(signerOrProvider: Signer | providers.Provider): Contract {
-        return new ethers.Contract(this.addresses.Governance, this.contracts.governance.abi, signerOrProvider);
+    public governanceContract(signerOrProvider: Signer | providers.Provider): Governance {
+        return GovernanceFactory.connect(this.addresses.Governance, signerOrProvider);
     }
 
-    public zkSyncContract(signerOrProvider: Signer | providers.Provider): Contract {
-        return new ethers.Contract(this.addresses.ZkSync, this.contracts.zkSync.abi, signerOrProvider);
+    public zkSyncContract(signerOrProvider: Signer | providers.Provider): ZkSync {
+        return ZkSyncFactory.connect(this.addresses.ZkSync, signerOrProvider);
     }
 
-    public verifierContract(signerOrProvider: Signer | providers.Provider): Contract {
-        return new ethers.Contract(this.addresses.Verifier, this.contracts.verifier.abi, signerOrProvider);
+    public verifierContract(signerOrProvider: Signer | providers.Provider): Verifier {
+        return VerifierFactory.connect(this.addresses.Verifier, signerOrProvider);
     }
 
-    public upgradeGatekeeperContract(signerOrProvider: Signer | providers.Provider): Contract {
-        return new ethers.Contract(
-            this.addresses.UpgradeGatekeeper,
-            this.contracts.upgradeGatekeeper.abi,
-            signerOrProvider
-        );
+    public upgradeGatekeeperContract(signerOrProvider: Signer | providers.Provider): UpgradeGatekeeper {
+        return UpgradeGatekeeperFactory.connect(this.addresses.UpgradeGatekeeper, signerOrProvider);
     }
 }

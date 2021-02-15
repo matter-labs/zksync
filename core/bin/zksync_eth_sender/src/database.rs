@@ -1,8 +1,3 @@
-//! Module encapsulating the database interaction.
-//! The essential part of this module is the trait that abstracts
-//! the database interaction, so `ETHSender` won't require an actual
-//! database to run, which is required for tests.
-
 // Built-in deps
 use std::collections::VecDeque;
 use std::str::FromStr;
@@ -11,12 +6,10 @@ use num::BigUint;
 use zksync_basic_types::{H256, U256};
 // Workspace uses
 use zksync_storage::{ConnectionPool, StorageProcessor};
-use zksync_types::{
-    ethereum::{ETHOperation, EthOpId, InsertedOperationResponse, OperationType},
-    Operation,
-};
+use zksync_types::ethereum::{ETHOperation, EthOpId, InsertedOperationResponse};
 // Local uses
 use super::transactions::ETHStats;
+use zksync_types::aggregated_operations::{AggregatedActionType, AggregatedOperation};
 
 /// Abstract database access trait, optimized for the needs of `ETHSender`.
 #[async_trait::async_trait]
@@ -27,24 +20,38 @@ pub(super) trait DatabaseInterface {
     /// Loads the unconfirmed and unprocessed operations from the database.
     /// Unconfirmed operations are Ethereum operations that were started, but not confirmed yet.
     /// Unprocessed operations are zkSync operations that were not started at all.
-    async fn restore_state(
+    async fn load_unconfirmed_operations(
         &self,
         connection: &mut StorageProcessor<'_>,
-    ) -> anyhow::Result<(VecDeque<ETHOperation>, Vec<Operation>)>;
+    ) -> anyhow::Result<VecDeque<ETHOperation>>;
+
+    /// Load all the aggregated operations that have no confirmation yet and have not yet been sent to Ethereum.
+    /// Should be used after server restart only.
+    async fn restore_unprocessed_operations(
+        &self,
+        connection: &mut StorageProcessor<'_>,
+    ) -> anyhow::Result<()>;
 
     /// Loads the unprocessed operations from the database.
     /// Unprocessed operations are zkSync operations that were not started at all.
     async fn load_new_operations(
         &self,
         connection: &mut StorageProcessor<'_>,
-    ) -> anyhow::Result<Vec<Operation>>;
+    ) -> anyhow::Result<Vec<(i64, AggregatedOperation)>>;
+
+    /// Remove the unprocessed operations from the database.
+    async fn remove_unprocessed_operations(
+        &self,
+        connection: &mut StorageProcessor<'_>,
+        operations_id: Vec<i64>,
+    ) -> anyhow::Result<()>;
 
     /// Saves a new unconfirmed operation to the database.
     async fn save_new_eth_tx(
         &self,
         connection: &mut StorageProcessor<'_>,
-        op_type: OperationType,
-        op: Option<Operation>,
+        op_type: AggregatedActionType,
+        op: Option<(i64, AggregatedOperation)>,
         deadline_block: i64,
         used_gas_price: U256,
         raw_tx: Vec<u8>,
@@ -121,25 +128,34 @@ impl DatabaseInterface for Database {
         Ok(connection)
     }
 
-    async fn restore_state(
+    async fn load_unconfirmed_operations(
         &self,
         connection: &mut StorageProcessor<'_>,
-    ) -> anyhow::Result<(VecDeque<ETHOperation>, Vec<Operation>)> {
+    ) -> anyhow::Result<VecDeque<ETHOperation>> {
         let unconfirmed_ops = connection
             .ethereum_schema()
             .load_unconfirmed_operations()
             .await?;
-        let unprocessed_ops = connection
+
+        Ok(unconfirmed_ops)
+    }
+
+    async fn restore_unprocessed_operations(
+        &self,
+        connection: &mut StorageProcessor<'_>,
+    ) -> anyhow::Result<()> {
+        connection
             .ethereum_schema()
-            .load_unprocessed_operations()
+            .restore_unprocessed_operations()
             .await?;
-        Ok((unconfirmed_ops, unprocessed_ops))
+
+        Ok(())
     }
 
     async fn load_new_operations(
         &self,
         connection: &mut StorageProcessor<'_>,
-    ) -> anyhow::Result<Vec<Operation>> {
+    ) -> anyhow::Result<Vec<(i64, AggregatedOperation)>> {
         let unprocessed_ops = connection
             .ethereum_schema()
             .load_unprocessed_operations()
@@ -147,11 +163,24 @@ impl DatabaseInterface for Database {
         Ok(unprocessed_ops)
     }
 
+    async fn remove_unprocessed_operations(
+        &self,
+        connection: &mut StorageProcessor<'_>,
+        operations_id: Vec<i64>,
+    ) -> anyhow::Result<()> {
+        connection
+            .ethereum_schema()
+            .remove_unprocessed_operations(operations_id)
+            .await?;
+
+        Ok(())
+    }
+
     async fn save_new_eth_tx(
         &self,
         connection: &mut StorageProcessor<'_>,
-        op_type: OperationType,
-        op: Option<Operation>,
+        op_type: AggregatedActionType,
+        op: Option<(i64, AggregatedOperation)>,
         deadline_block: i64,
         used_gas_price: U256,
         raw_tx: Vec<u8>,
@@ -160,7 +189,7 @@ impl DatabaseInterface for Database {
             .ethereum_schema()
             .save_new_eth_tx(
                 op_type,
-                op.map(|op| op.id.unwrap()),
+                op,
                 deadline_block,
                 BigUint::from_str(&used_gas_price.to_string()).unwrap(),
                 raw_tx,
@@ -204,32 +233,19 @@ impl DatabaseInterface for Database {
         connection: &mut StorageProcessor<'_>,
         op: &ETHOperation,
     ) -> anyhow::Result<bool> {
-        let confirmed = match op.op_type {
-            OperationType::Commit | OperationType::Verify => {
-                let op = op.op.as_ref().unwrap();
-                // We're checking previous block, so for the edge case of first block we can say that it was confirmed.
-                let block_to_check = if *op.block.block_number > 1 {
-                    op.block.block_number - 1
-                } else {
-                    return Ok(true);
-                };
+        // If the ID of the current operation is 1, then this is the first transaction
+        // and it is not needed for checking confirmation.
+        if op.id == 1 {
+            return Ok(true);
+        }
 
-                let maybe_operation = connection
-                    .chain()
-                    .operations_schema()
-                    .get_operation(block_to_check, op.action.get_type())
-                    .await;
-                let operation = match maybe_operation {
-                    Some(op) => op,
-                    None => return Ok(false),
-                };
-                operation.confirmed
-            }
-            OperationType::Withdraw => {
-                // Withdrawals aren't actually sequential, so we don't really care.
-                true
-            }
-        };
+        // Since the operations are sent to the Ethereum one by one,
+        // we simply consider the operation with ID less by one.
+        let previous_op = op.id - 1;
+        let confirmed = connection
+            .ethereum_schema()
+            .is_aggregated_op_confirmed(previous_op)
+            .await?;
 
         Ok(confirmed)
     }
@@ -240,20 +256,59 @@ impl DatabaseInterface for Database {
         hash: &H256,
         op: &ETHOperation,
     ) -> anyhow::Result<()> {
-        if let OperationType::Verify = op.op_type {
-            let mut transaction = connection.start_transaction().await?;
+        let mut transaction = connection.start_transaction().await?;
 
-            transaction.ethereum_schema().confirm_eth_tx(hash).await?;
-            transaction
-                .chain()
-                .state_schema()
-                .apply_state_update(op.op.as_ref().unwrap().block.block_number)
-                .await?;
+        match &op.op {
+            Some((_, AggregatedOperation::CommitBlocks(op))) => {
+                let (first_block, last_block) = op.block_range();
+                transaction
+                    .chain()
+                    .operations_schema()
+                    .confirm_aggregated_operations(
+                        first_block,
+                        last_block,
+                        AggregatedActionType::CommitBlocks,
+                    )
+                    .await?;
+            }
+            Some((_, AggregatedOperation::PublishProofBlocksOnchain(op))) => {
+                let (first_block, last_block) = op.block_range();
+                transaction
+                    .chain()
+                    .operations_schema()
+                    .confirm_aggregated_operations(
+                        first_block,
+                        last_block,
+                        AggregatedActionType::PublishProofBlocksOnchain,
+                    )
+                    .await?;
+            }
+            Some((_, AggregatedOperation::ExecuteBlocks(op))) => {
+                let (first_block, last_block) = op.block_range();
+                for block in &op.blocks {
+                    transaction
+                        .chain()
+                        .state_schema()
+                        .apply_state_update(block.block_number)
+                        .await?;
+                }
 
-            transaction.commit().await?;
-        } else {
-            connection.ethereum_schema().confirm_eth_tx(hash).await?;
+                transaction
+                    .chain()
+                    .operations_schema()
+                    .confirm_aggregated_operations(
+                        first_block,
+                        last_block,
+                        AggregatedActionType::ExecuteBlocks,
+                    )
+                    .await?;
+            }
+            _ => {}
         }
+
+        transaction.ethereum_schema().confirm_eth_tx(hash).await?;
+        transaction.commit().await?;
+
         Ok(())
     }
 

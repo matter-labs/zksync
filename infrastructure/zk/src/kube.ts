@@ -11,7 +11,7 @@ export async function updateConfig() {
         namespace = 'dev';
     } else if (env == 'prod') {
         namespace = 'zksync';
-    } else if (['stage', 'rinkeby', 'ropsten', 'breaking'].includes(env)) {
+    } else if (['stage', 'rinkeby', 'ropsten', 'breaking', 'rinkeby-beta', 'rospten-beta'].includes(env)) {
         namespace = env;
     } else {
         console.error('Unknown environment');

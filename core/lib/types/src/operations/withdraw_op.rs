@@ -76,6 +76,7 @@ impl WithdrawOp {
         )
         .ok_or_else(|| format_err!("Cant get fee from withdraw pubdata"))?;
         let nonce = 0; // From pubdata it is unknown
+        let time_range = Default::default();
 
         Ok(Self {
             tx: Withdraw::new(
@@ -86,6 +87,7 @@ impl WithdrawOp {
                 amount,
                 fee,
                 Nonce(nonce),
+                time_range,
                 None,
             ),
             account_id: AccountId(account_id),

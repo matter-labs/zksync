@@ -10,7 +10,7 @@ const provider = web3Provider();
 const testConfigPath = path.join(process.env.ZKSYNC_HOME as string, `etc/test_config/constant`);
 const ethTestConfig = JSON.parse(fs.readFileSync(`${testConfigPath}/eth.json`, { encoding: 'utf-8' }));
 
-(async () => {
+async function main() {
     const parser = new ArgumentParser({
         version: '0.1.0',
         addHelp: true,
@@ -21,7 +21,7 @@ const ethTestConfig = JSON.parse(fs.readFileSync(`${testConfigPath}/eth.json`, {
 
     parser.addArgument('--contract', {
         required: false,
-        help: 'Contract name: Governance, ZkSync, Verifier, Proxies or all by default.'
+        help: 'Contract name: Governance, ZkSync, Verifier or all by default.'
     });
     parser.addArgument('--gasPrice', { required: false, help: 'Gas price in GWei.' });
     parser.addArgument('--nonce', { required: false, help: 'nonce (requires --contract argument)' });
@@ -29,7 +29,10 @@ const ethTestConfig = JSON.parse(fs.readFileSync(`${testConfigPath}/eth.json`, {
 
     const wallet = args.deployerPrivateKey
         ? new Wallet(args.deployerPrivateKey, provider)
-        : Wallet.fromMnemonic(ethTestConfig.mnemonic, "m/44'/60'/0'/0/1").connect(provider);
+        : Wallet.fromMnemonic(
+              process.env.MNEMONIC ? process.env.MNEMONIC : ethTestConfig.mnemonic,
+              "m/44'/60'/0'/0/1"
+          ).connect(provider);
 
     const gasPrice = args.gasPrice ? parseUnits(args.gasPrice, 'gwei') : await provider.getGasPrice();
     console.log(`Using gas price: ${formatUnits(gasPrice, 'gwei')} gwei`);
@@ -40,6 +43,7 @@ const ethTestConfig = JSON.parse(fs.readFileSync(`${testConfigPath}/eth.json`, {
             process.exit(1);
         }
         console.log(`Using nonce: ${args.nonce}`);
+        args.nonce = parseInt(args.nonce);
     }
 
     const governorAddress = args.governor ? args.governor : wallet.address;
@@ -62,4 +66,11 @@ const ethTestConfig = JSON.parse(fs.readFileSync(`${testConfigPath}/eth.json`, {
     if (args.contract === 'Proxies' || args.contract == null) {
         await deployer.deployProxiesAndGatekeeper({ gasPrice, nonce: args.nonce });
     }
-})();
+}
+
+main()
+    .then(() => process.exit(0))
+    .catch((err) => {
+        console.error('Error:', err.message || err);
+        process.exit(1);
+    });

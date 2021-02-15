@@ -1,22 +1,25 @@
-import { AbstractJSONRPCTransport, HTTPTransport, WSTransport, DummyTransport } from './transport';
-import { ethers, Contract, BigNumber } from 'ethers';
+import { AbstractJSONRPCTransport, DummyTransport, HTTPTransport, WSTransport } from './transport';
+import { BigNumber, Contract, ethers } from 'ethers';
 import {
     AccountState,
     Address,
-    TokenLike,
-    TransactionReceipt,
-    PriorityOperationReceipt,
-    ContractAddress,
-    Tokens,
-    TokenAddress,
-    TxEthSignature,
-    Fee,
     ChangePubKeyFee,
-    Network
+    ContractAddress,
+    Fee,
+    Network,
+    PriorityOperationReceipt,
+    TokenAddress,
+    TokenLike,
+    Tokens,
+    TransactionReceipt,
+    TxEthSignature
 } from './types';
 import { isTokenETH, sleep, SYNC_GOV_CONTRACT_INTERFACE, TokenSet } from './utils';
 
 export async function getDefaultProvider(network: Network, transport: 'WS' | 'HTTP' = 'HTTP'): Promise<Provider> {
+    if (transport === 'WS') {
+        console.warn('Websocket support will be removed in future. Use HTTP transport instead.');
+    }
     if (network === 'localhost') {
         if (transport === 'WS') {
             return await Provider.newWebsocketProvider('ws://127.0.0.1:3031');
@@ -34,6 +37,18 @@ export async function getDefaultProvider(network: Network, transport: 'WS' | 'HT
             return await Provider.newWebsocketProvider('wss://rinkeby-api.zksync.io/jsrpc-ws');
         } else if (transport === 'HTTP') {
             return await Provider.newHttpProvider('https://rinkeby-api.zksync.io/jsrpc');
+        }
+    } else if (network === 'ropsten-beta') {
+        if (transport === 'WS') {
+            return await Provider.newWebsocketProvider('wss://ropsten-beta-api.zksync.io/jsrpc-ws');
+        } else if (transport === 'HTTP') {
+            return await Provider.newHttpProvider('https://ropsten-beta-api.zksync.io/jsrpc');
+        }
+    } else if (network === 'rinkeby-beta') {
+        if (transport === 'WS') {
+            return await Provider.newWebsocketProvider('wss://rinkeby-beta-api.zksync.io/jsrpc-ws');
+        } else if (transport === 'HTTP') {
+            return await Provider.newHttpProvider('https://rinkeby-beta-api.zksync.io/jsrpc');
         }
     } else if (network === 'mainnet') {
         if (transport === 'WS') {
@@ -55,6 +70,9 @@ export class Provider {
 
     private constructor(public transport: AbstractJSONRPCTransport) {}
 
+    /**
+     * @deprecated Websocket support will be removed in future. Use HTTP transport instead.
+     */
     static async newWebsocketProvider(address: string): Promise<Provider> {
         const transport = await WSTransport.connect(address);
         const provider = new Provider(transport);
@@ -99,9 +117,19 @@ export class Provider {
     // return transaction hash (e.g. sync-tx:dead..beef)
     async submitTxsBatch(
         transactions: { tx: any; signature?: TxEthSignature }[],
-        ethSignature?: TxEthSignature
+        ethSignatures?: TxEthSignature | TxEthSignature[]
     ): Promise<string[]> {
-        return await this.transport.request('submit_txs_batch', [transactions, ethSignature]);
+        let signatures: TxEthSignature[] = [];
+        // For backwards compatibility we allow sending single signature as well
+        // as no signatures at all.
+        if (ethSignatures == undefined) {
+            signatures = [];
+        } else if (ethSignatures instanceof Array) {
+            signatures = ethSignatures;
+        } else {
+            signatures.push(ethSignatures);
+        }
+        return await this.transport.request('submit_txs_batch', [transactions, signatures]);
     }
 
     async getContractAddress(): Promise<ContractAddress> {
@@ -212,7 +240,7 @@ export class Provider {
     }
 
     async getTransactionsBatchFee(
-        txTypes: ('Withdraw' | 'Transfer' | 'FastWithdraw')[],
+        txTypes: ('Withdraw' | 'Transfer' | 'FastWithdraw' | ChangePubKeyFee)[],
         addresses: Address[],
         tokenLike: TokenLike
     ): Promise<BigNumber> {

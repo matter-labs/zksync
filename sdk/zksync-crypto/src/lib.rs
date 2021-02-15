@@ -27,7 +27,7 @@ use franklin_crypto::{
     jubjub::JubjubEngine,
 };
 
-use crate::utils::{rescue_hash_tx_msg, set_panic_hook};
+use crate::utils::set_panic_hook;
 use sha2::{Digest, Sha256};
 
 // When the `wee_alloc` feature is enabled, use `wee_alloc` as the global
@@ -119,6 +119,11 @@ pub fn private_key_to_pubkey(private_key: &[u8]) -> Result<Vec<u8>, JsValue> {
     Ok(pubkey_buf)
 }
 
+#[wasm_bindgen(js_name = "rescueHash")]
+pub fn rescue_hash_tx_msg(msg: &[u8]) -> Vec<u8> {
+    utils::rescue_hash_tx_msg(msg)
+}
+
 #[wasm_bindgen]
 /// We use musig Schnorr signature scheme.
 /// It is impossible to restore signer for signature, that is why we provide public key of the signer
@@ -141,7 +146,7 @@ pub fn sign_musig(private_key: &[u8], msg: &[u8]) -> Result<Vec<u8>, JsValue> {
 
     let signature = JUBJUB_PARAMS.with(|jubjub_params| {
         RESCUE_PARAMS.with(|rescue_params| {
-            let hashed_msg = rescue_hash_tx_msg(msg);
+            let hashed_msg = utils::rescue_hash_tx_msg(msg);
             let seed = Seed::deterministic_seed(&private_key, &hashed_msg);
             private_key.musig_rescue_sign(&hashed_msg, &seed, p_g, rescue_params, jubjub_params)
         })

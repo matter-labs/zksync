@@ -23,6 +23,18 @@ export default {
         WS_API_ADDR: 'wss://ropsten-api.zksync.io/jsrpc-ws',
         HTTP_RPC_API_ADDR: 'https://ropsten-api.zksync.io/jsrpc'
     },
+    'https://rinkeby-beta.zkscan.io': {
+        API_SERVER: 'https://rinkeby-beta-api.zksync.io',
+        ETH_NETWORK: 'rinkeby',
+        WS_API_ADDR: 'wss://rinkeby-beta-api.zksync.io/jsrpc-ws',
+        HTTP_RPC_API_ADDR: 'https://rinkeby-beta-api.zksync.io/jsrpc'
+    },
+    'https://ropsten-beta.zkscan.io': {
+        API_SERVER: 'https://ropsten-beta-api.zksync.io',
+        ETH_NETWORK: 'ropsten',
+        WS_API_ADDR: 'wss://ropsten-beta-api.zksync.io/jsrpc-ws',
+        HTTP_RPC_API_ADDR: 'https://ropsten-beta-api.zksync.io/jsrpc'
+    },
     'https://zkscan.io': {
         API_SERVER: 'https://api.zksync.io',
         ETH_NETWORK: 'mainnet',

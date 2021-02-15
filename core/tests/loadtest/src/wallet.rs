@@ -256,6 +256,7 @@ impl MainWallet {
             .eth_provider
             .deposit(token_name, biguint_to_u256(amount.into()), self.address())
             .await?;
+        println!("{:?}", eth_tx_hash);
 
         self.monitor
             .get_priority_op(&self.eth_provider, eth_tx_hash)

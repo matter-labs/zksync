@@ -25,6 +25,7 @@ fn to_existing() {
         amount.clone(),
         fee.clone(),
         from_account.nonce,
+        Default::default(),
         &from_sk,
     )
     .unwrap();
@@ -74,6 +75,7 @@ fn insufficient_funds() {
         amount,
         fee,
         from_account.nonce,
+        Default::default(),
         &from_sk,
     )
     .unwrap();
@@ -104,6 +106,7 @@ fn to_new() {
         amount.clone(),
         fee.clone(),
         account.nonce,
+        Default::default(),
         &sk,
     )
     .unwrap();
@@ -161,6 +164,7 @@ fn to_new_failure() {
         too_big_amount,
         fee,
         account.nonce,
+        Default::default(),
         &sk,
     )
     .unwrap();
@@ -188,6 +192,7 @@ fn to_self() {
         amount.clone(),
         fee.clone(),
         account.nonce,
+        Default::default(),
         &sk,
     )
     .unwrap();
@@ -225,6 +230,7 @@ fn nonce_mismatch() {
         amount,
         fee,
         account.nonce + 1,
+        Default::default(),
         &sk,
     )
     .unwrap();
@@ -254,6 +260,7 @@ fn invalid_account_id() {
         amount,
         fee,
         account.nonce,
+        Default::default(),
         &sk,
     )
     .unwrap();
@@ -291,6 +298,7 @@ fn execute_txs_batch_success_transfers() {
         small_amount.clone(),
         fee.clone(),
         account.nonce,
+        Default::default(),
         &sk,
     )
     .unwrap();
@@ -303,6 +311,7 @@ fn execute_txs_batch_success_transfers() {
         small_amount,
         fee.clone(),
         account.nonce + 1,
+        Default::default(),
         &sk,
     )
     .unwrap();
@@ -315,6 +324,7 @@ fn execute_txs_batch_success_transfers() {
         amount * 2u64,
         fee,
         account.nonce + 1,
+        Default::default(),
         &sk,
     )
     .unwrap();

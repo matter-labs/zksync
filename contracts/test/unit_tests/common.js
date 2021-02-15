@@ -2,7 +2,7 @@ const ethers = require('ethers');
 const { use } = require('chai');
 const { solidity, deployContract, MockProvider } = require('ethereum-waffle');
 
-const IERC20_INTERFACE = require('openzeppelin-solidity/build/contracts/IERC20');
+const IERC20_INTERFACE = require('@openzeppelin/contracts/build/contracts/IERC20');
 const { rawEncode } = require('ethereumjs-abi');
 const DEFAULT_REVERT_REASON = 'VM did not revert';
 
@@ -52,7 +52,13 @@ async function getCallRevertReason(f) {
     try {
         result = await f();
     } catch (e) {
-        revertReason = (e.reason && e.reason[0]) || e.results[e.hashes[0]].reason;
+        try {
+            const data = e.stackTrace[e.stackTrace.length - 1].message.slice(4);
+            revertReason = ethers.utils.defaultAbiCoder.decode(['string'], data)[0];
+        } catch (err2) {
+            throw e;
+        }
+        // revertReason = (e.reason && e.reason[0]) || e.results[e.hashes[0]].reason
     }
     return { revertReason, result };
 }
@@ -66,5 +72,6 @@ module.exports = {
     deployTestContract,
     deployProxyContract,
     getCallRevertReason,
-    IERC20_INTERFACE
+    IERC20_INTERFACE,
+    DEFAULT_REVERT_REASON
 };

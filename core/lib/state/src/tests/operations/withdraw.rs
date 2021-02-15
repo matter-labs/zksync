@@ -22,6 +22,7 @@ fn success() {
         amount.clone(),
         fee.clone(),
         account.nonce,
+        Default::default(),
         &sk,
     )
     .unwrap();
@@ -59,6 +60,7 @@ fn insufficient_funds() {
         amount,
         fee,
         account.nonce,
+        Default::default(),
         &sk,
     )
     .unwrap();
@@ -86,6 +88,7 @@ fn nonce_mismatch() {
         amount,
         fee,
         account.nonce + 1,
+        Default::default(),
         &sk,
     )
     .unwrap();
@@ -115,6 +118,7 @@ fn invalid_account_id() {
         amount,
         fee,
         account.nonce,
+        Default::default(),
         &sk,
     )
     .unwrap();

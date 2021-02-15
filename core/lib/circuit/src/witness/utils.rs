@@ -51,10 +51,12 @@ pub struct WitnessBuilder<'a> {
     pub account_tree: &'a mut CircuitAccountTree,
     pub fee_account_id: AccountId,
     pub block_number: BlockNumber,
+    pub timestamp: u64,
     pub initial_root_hash: Fr,
     pub initial_used_subtree_root_hash: Fr,
     pub operations: Vec<Operation<Engine>>,
     pub pubdata: Vec<bool>,
+    pub offset_commitment: Vec<bool>,
     pub root_before_fees: Option<Fr>,
     pub root_after_fees: Option<Fr>,
     pub fee_account_balances: Option<Vec<Option<Fr>>>,
@@ -68,6 +70,7 @@ impl<'a> WitnessBuilder<'a> {
         account_tree: &'a mut CircuitAccountTree,
         fee_account_id: AccountId,
         block_number: BlockNumber,
+        timestamp: u64,
     ) -> WitnessBuilder {
         let initial_root_hash = account_tree.root_hash();
         let initial_used_subtree_root_hash = get_used_subtree_root_hash(account_tree);
@@ -75,10 +78,12 @@ impl<'a> WitnessBuilder<'a> {
             account_tree,
             fee_account_id,
             block_number,
+            timestamp,
             initial_root_hash,
             initial_used_subtree_root_hash,
             operations: Vec::new(),
             pubdata: Vec::new(),
+            offset_commitment: Vec::new(),
             root_before_fees: None,
             root_after_fees: None,
             fee_account_balances: None,
@@ -89,9 +94,15 @@ impl<'a> WitnessBuilder<'a> {
     }
 
     /// Add witness generated for operation
-    pub fn add_operation_with_pubdata(&mut self, ops: Vec<Operation<Engine>>, pubdata: Vec<bool>) {
+    pub fn add_operation_with_pubdata(
+        &mut self,
+        ops: Vec<Operation<Engine>>,
+        pubdata: Vec<bool>,
+        offset_commitment: Vec<bool>,
+    ) {
         self.operations.extend(ops.into_iter());
         self.pubdata.extend(pubdata.into_iter());
+        self.offset_commitment.extend(offset_commitment.into_iter());
     }
 
     /// Add noops if pubdata isn't of right size
@@ -106,6 +117,7 @@ impl<'a> WitnessBuilder<'a> {
                 *self.fee_account_id,
             ));
             self.pubdata.extend(vec![false; CHUNK_BIT_WIDTH]);
+            self.offset_commitment.extend(vec![false; 8])
         }
     }
 
@@ -160,6 +172,8 @@ impl<'a> WitnessBuilder<'a> {
             ),
             Some(Fr::from_str(&self.fee_account_id.to_string()).expect("failed to parse")),
             Some(Fr::from_str(&self.block_number.to_string()).unwrap()),
+            Some(Fr::from_str(&self.timestamp.to_string()).unwrap()),
+            &self.offset_commitment,
         );
         self.pubdata_commitment = Some(public_data_commitment);
     }
@@ -177,6 +191,7 @@ impl<'a> WitnessBuilder<'a> {
                     .expect("pubdata commitment not present"),
             ),
             block_number: Some(Fr::from_str(&self.block_number.to_string()).unwrap()),
+            block_timestamp: Some(Fr::from_str(&self.timestamp.to_string()).unwrap()),
             validator_account: self
                 .fee_account_witness
                 .expect("fee account witness not present"),
@@ -248,6 +263,8 @@ pub fn public_data_commitment<E: JubjubEngine>(
     new_root: Option<E::Fr>,
     validator_address: Option<E::Fr>,
     block_number: Option<E::Fr>,
+    timestamp: Option<E::Fr>,
+    offset_commitment: &[bool],
 ) -> E::Fr {
     let mut public_data_initial_bits = vec![];
 
@@ -306,8 +323,25 @@ pub fn public_data_commitment<E: JubjubEngine>(
     hash_result = [0u8; 32];
     h.result(&mut hash_result[..]);
 
+    let mut timestamp_bits = vec![];
+    let timstamp_unpadded_bits: Vec<bool> =
+        BitIterator::new(timestamp.unwrap().into_repr()).collect();
+    timestamp_bits.extend(vec![false; 256 - timstamp_unpadded_bits.len()]);
+    timestamp_bits.extend(timstamp_unpadded_bits.into_iter());
+    let timestamp_bytes = be_bit_vector_into_bytes(&timestamp_bits);
+    let mut packed_with_timestamp = vec![];
+    packed_with_timestamp.extend(hash_result.iter());
+    packed_with_timestamp.extend(timestamp_bytes.iter());
+
+    h = Sha256::new();
+    h.input(&packed_with_timestamp);
+    hash_result = [0u8; 32];
+    h.result(&mut hash_result[..]);
+
     let mut final_bytes = vec![];
-    let pubdata_bytes = be_bit_vector_into_bytes(&pubdata_bits.to_vec());
+    let pubdata_with_offset = [pubdata_bits, offset_commitment].concat();
+    let pubdata_bytes = be_bit_vector_into_bytes(&pubdata_with_offset);
+    // let pubdata_bytes = be_bit_vector_into_bytes(&pubdata_bits.to_vec());
     final_bytes.extend(hash_result.iter());
     final_bytes.extend(pubdata_bytes);
 
@@ -605,7 +639,12 @@ pub fn build_block_witness<'a>(
 
     vlog::info!("building prover data for block {}", &block_number);
 
-    let mut witness_accum = WitnessBuilder::new(account_tree, block.fee_account, block_number);
+    let mut witness_accum = WitnessBuilder::new(
+        account_tree,
+        block.fee_account,
+        block_number,
+        block.timestamp,
+    );
 
     let ops = block
         .block_transactions
@@ -614,6 +653,7 @@ pub fn build_block_witness<'a>(
 
     let mut operations = vec![];
     let mut pub_data = vec![];
+    let mut offset_commitment = vec![];
     let mut fees = vec![];
     for op in ops {
         match op {
@@ -624,6 +664,7 @@ pub fn build_block_witness<'a>(
                 let deposit_operations = deposit_witness.calculate_operations(());
                 operations.extend(deposit_operations);
                 pub_data.extend(deposit_witness.get_pubdata());
+                offset_commitment.extend(deposit_witness.get_offset_commitment_data())
             }
             ZkSyncOp::Transfer(transfer) => {
                 let transfer_witness =
@@ -638,6 +679,7 @@ pub fn build_block_witness<'a>(
                     amount: transfer.tx.fee,
                 });
                 pub_data.extend(transfer_witness.get_pubdata());
+                offset_commitment.extend(transfer_witness.get_offset_commitment_data())
             }
             ZkSyncOp::TransferToNew(transfer_to_new) => {
                 let transfer_to_new_witness = TransferToNewWitness::apply_tx(
@@ -655,6 +697,7 @@ pub fn build_block_witness<'a>(
                     amount: transfer_to_new.tx.fee,
                 });
                 pub_data.extend(transfer_to_new_witness.get_pubdata());
+                offset_commitment.extend(transfer_to_new_witness.get_offset_commitment_data())
             }
             ZkSyncOp::Withdraw(withdraw) => {
                 let withdraw_witness =
@@ -669,6 +712,7 @@ pub fn build_block_witness<'a>(
                     amount: withdraw.tx.fee,
                 });
                 pub_data.extend(withdraw_witness.get_pubdata());
+                offset_commitment.extend(withdraw_witness.get_offset_commitment_data())
             }
             ZkSyncOp::Close(close) => {
                 let close_account_witness =
@@ -679,6 +723,7 @@ pub fn build_block_witness<'a>(
 
                 operations.extend(close_account_operations);
                 pub_data.extend(close_account_witness.get_pubdata());
+                offset_commitment.extend(close_account_witness.get_offset_commitment_data())
             }
             ZkSyncOp::FullExit(full_exit_op) => {
                 let success = full_exit_op.withdraw_amount.is_some();
@@ -692,6 +737,7 @@ pub fn build_block_witness<'a>(
 
                 operations.extend(full_exit_operations);
                 pub_data.extend(full_exit_witness.get_pubdata());
+                offset_commitment.extend(full_exit_witness.get_offset_commitment_data())
             }
             ZkSyncOp::ChangePubKeyOffchain(change_pkhash_op) => {
                 let change_pkhash_witness = ChangePubkeyOffChainWitness::apply_tx(
@@ -708,6 +754,7 @@ pub fn build_block_witness<'a>(
                     amount: change_pkhash_op.tx.fee,
                 });
                 pub_data.extend(change_pkhash_witness.get_pubdata());
+                offset_commitment.extend(change_pkhash_witness.get_offset_commitment_data())
             }
             ZkSyncOp::ForcedExit(forced_exit) => {
                 let forced_exit_witness =
@@ -722,12 +769,13 @@ pub fn build_block_witness<'a>(
                     amount: forced_exit.tx.fee,
                 });
                 pub_data.extend(forced_exit_witness.get_pubdata());
+                offset_commitment.extend(forced_exit_witness.get_offset_commitment_data())
             }
             ZkSyncOp::Noop(_) => {} // Noops are handled below
         }
     }
 
-    witness_accum.add_operation_with_pubdata(operations, pub_data);
+    witness_accum.add_operation_with_pubdata(operations, pub_data, offset_commitment);
     witness_accum.extend_pubdata_with_noops(block_size);
     assert_eq!(witness_accum.pubdata.len(), CHUNK_BIT_WIDTH * block_size);
     assert_eq!(witness_accum.operations.len(), block_size);
@@ -740,5 +788,14 @@ pub fn build_block_witness<'a>(
         block.new_root_hash
     );
     witness_accum.calculate_pubdata_commitment();
+
+    let mut block_commitment = block.block_commitment.as_bytes().to_vec();
+    block_commitment[0] &= 0xffu8 >> 3;
+    let block_commitment = fr_from_bytes(block_commitment);
+    assert_eq!(
+        witness_accum.pubdata_commitment.unwrap(),
+        block_commitment,
+        "witness accumulator and server different commitment"
+    );
     Ok(witness_accum)
 }

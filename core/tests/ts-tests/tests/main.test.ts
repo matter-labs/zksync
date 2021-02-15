@@ -9,6 +9,8 @@ import './transfer';
 import './withdraw';
 import './forced-exit';
 import './misc';
+import './batch-builder';
+import './create2';
 
 const TX_AMOUNT = utils.parseEther('10.0');
 // should be enough for ~200 test transactions (excluding fees), increase if needed
@@ -23,6 +25,9 @@ describe(`ZkSync integration tests (token: ${token}, transport: ${transport})`, 
     let alice: Wallet;
     let bob: Wallet;
     let chuck: Wallet;
+    let david: Wallet;
+    let frank: Wallet;
+    let judy: Wallet;
     let operatorBalance: BigNumber;
 
     before('create tester and test wallets', async () => {
@@ -30,6 +35,9 @@ describe(`ZkSync integration tests (token: ${token}, transport: ${transport})`, 
         alice = await tester.fundedWallet('5.0');
         bob = await tester.emptyWallet();
         chuck = await tester.emptyWallet();
+        david = await tester.fundedWallet('1.0');
+        frank = await tester.fundedWallet('1.0');
+        judy = await tester.emptyWallet();
         operatorBalance = await tester.operatorBalance(token);
     });
 
@@ -45,16 +53,24 @@ describe(`ZkSync integration tests (token: ${token}, transport: ${transport})`, 
         if (token == 'ETH') {
             await tester.testDeposit(alice, token, DEPOSIT_AMOUNT);
         } else {
-            expect(await tester.syncWallet.isERC20DepositsApproved(token), 'Token should not be approved').to.be.false;
+            expect(await tester.syncWallet.isERC20DepositsApproved(token), 'Token should not be approved').to.be
+                .false;
             const approveERC20 = await tester.syncWallet.approveERC20TokenDeposits(token, DEPOSIT_AMOUNT);
             await approveERC20.wait();
-            expect(await tester.syncWallet.isERC20DepositsApproved(token, DEPOSIT_AMOUNT), 'Token should be approved').to.be.true;
+            expect(
+                await tester.syncWallet.isERC20DepositsApproved(token, DEPOSIT_AMOUNT),
+                'Token should be approved'
+            ).to.be.true;
             await tester.testDeposit(alice, token, DEPOSIT_AMOUNT);
             // It should not be approved because we have approved only DEPOSIT_AMOUNT, not the maximum possible amount of deposit
-            expect(await tester.syncWallet.isERC20DepositsApproved(token, DEPOSIT_AMOUNT), 'Token should not be approved').to.be.false;
+            expect(
+                await tester.syncWallet.isERC20DepositsApproved(token, DEPOSIT_AMOUNT),
+                'Token should not be approved'
+            ).to.be.false;
             const approveERC20_next = await tester.syncWallet.approveERC20TokenDeposits(token);
             await approveERC20_next.wait();
-           expect(await tester.syncWallet.isERC20DepositsApproved(token), 'The second deposit should be approved').to.be.true;
+            expect(await tester.syncWallet.isERC20DepositsApproved(token), 'The second deposit should be approved')
+                .to.be.true;
         }
     });
 
@@ -96,6 +112,35 @@ describe(`ZkSync integration tests (token: ${token}, transport: ${transport})`, 
         await tester.testRejectedBatch(alice, bob, token, TX_AMOUNT);
     });
 
+    step('should test batch-builder', async () => {
+        // We will pay with different token.
+        const feeToken = token == 'ETH' ? 'wBTC' : 'ETH';
+        // Add these accounts to the network.
+        await tester.testTransfer(alice, david, token, TX_AMOUNT.mul(10));
+        await tester.testTransfer(alice, judy, token, TX_AMOUNT.mul(10));
+        await tester.testTransfer(alice, frank, token, TX_AMOUNT.mul(10));
+        // Also deposit another token to pay with.
+        await tester.testDeposit(frank, feeToken, DEPOSIT_AMOUNT, true);
+
+        await tester.testBatchBuilderInvalidUsage(david, token);
+        await tester.testBatchBuilderChangePubKey(david, token, TX_AMOUNT, true);
+        await tester.testBatchBuilderChangePubKey(frank, token, TX_AMOUNT, false);
+        await tester.testBatchBuilderTransfers(david, frank, token, TX_AMOUNT);
+        await tester.testBatchBuilderPayInDifferentToken(frank, david, token, feeToken, TX_AMOUNT);
+        // Finally, transfer, withdraw and forced exit in a single batch.
+        await tester.testBatchBuilderGenericUsage(david, frank, judy, token, TX_AMOUNT);
+    });
+
+    step('should test multi-signers', async () => {
+        // At this point, all these wallets already have their public keys set.
+        await tester.testMultipleBatchSigners([alice, david, frank], token, TX_AMOUNT);
+        await tester.testMultipleWalletsWrongSignature(alice, david, token, TX_AMOUNT);
+    });
+
+    step('should test backwards compatibility', async () => {
+        await tester.testBackwardCompatibleEthMessages(alice, david, token, TX_AMOUNT);
+    });
+
     step('should execute a withdrawal', async () => {
         await tester.testVerifiedWithdraw(alice, token, TX_AMOUNT);
     });
@@ -109,7 +154,7 @@ describe(`ZkSync integration tests (token: ${token}, transport: ${transport})`, 
 
     it('should check collected fees', async () => {
         const collectedFee = (await tester.operatorBalance(token)).sub(operatorBalance);
-        expect(collectedFee.eq(tester.runningFee), 'Fee collection failed').to.be.true;
+        expect(collectedFee.eq(tester.runningFee), `Fee collection failed, expected: ${tester.runningFee.toString()}, got: ${collectedFee.toString()}`).to.be.true;
     });
 
     it('should fail trying to send tx with wrong signature', async () => {
@@ -143,8 +188,8 @@ describe(`ZkSync integration tests (token: ${token}, transport: ${transport})`, 
             const oldSigner = carl.ethSigner;
             carl.ethSigner = tester.ethWallet;
             const [before, after] = await tester.testFullExit(carl, token);
-            expect(before.eq(0), "Balance before Full Exit must be non-zero").to.be.false;
-            expect(before.eq(after), "Balance after incorrect Full Exit should not change").to.be.true;
+            expect(before.eq(0), 'Balance before Full Exit must be non-zero').to.be.false;
+            expect(before.eq(after), 'Balance after incorrect Full Exit should not change').to.be.true;
             carl.ethSigner = oldSigner;
         });
 
@@ -153,8 +198,8 @@ describe(`ZkSync integration tests (token: ${token}, transport: ${transport})`, 
                 return;
             }
             const [before, after] = await tester.testFullExit(carl, token);
-            expect(before.eq(0), "Balance before Full Exit must be non-zero").to.be.false;
-            expect(after.eq(0), "Balance after Full Exit must be zero").to.be.true;
+            expect(before.eq(0), 'Balance before Full Exit must be non-zero').to.be.false;
+            expect(after.eq(0), 'Balance after Full Exit must be zero').to.be.true;
         });
 
         step('should execute full-exit on an empty wallet', async () => {
@@ -162,8 +207,51 @@ describe(`ZkSync integration tests (token: ${token}, transport: ${transport})`, 
                 return;
             }
             const [before, after] = await tester.testFullExit(carl, token);
-            expect(before.eq(0), "Balance before Full Exit must be zero (we've already withdrawn all the funds)").to.be.true;
-            expect(after.eq(0), "Balance after Full Exit must be zero").to.be.true;
+            expect(before.eq(0), "Balance before Full Exit must be zero (we've already withdrawn all the funds)").to
+                .be.true;
+            expect(after.eq(0), 'Balance after Full Exit must be zero').to.be.true;
+        });
+    });
+
+    describe('CREATE2 tests', () => {
+        let hilda: Wallet;
+
+        step('should setup a create2 account', async () => {
+            if (onlyBasic) {
+                return;
+            }
+            hilda = await tester.create2Wallet();
+            await tester.testDeposit(hilda, token, DEPOSIT_AMOUNT, true);
+            const cpk = await hilda.setSigningKey({
+                feeToken: token,
+                ethAuthType: 'CREATE2'
+            });
+            await cpk.awaitReceipt();
+        });
+
+        step('should make transfers from create2 account', async () => {
+            if (onlyBasic) {
+                return;
+            }
+            await tester.testTransfer(hilda, david, token, TX_AMOUNT);
+            await tester.testBatch(hilda, david, token, TX_AMOUNT);
+        });
+
+        it('should fail eth-signed tx from create2 account', async () => {
+            if (onlyBasic) {
+                return;
+            }
+            await tester.testCreate2TxFail(hilda, david, token, TX_AMOUNT);
+        });
+
+        it('should fail eth-signed batch from create2 account', async () => {
+            if (onlyBasic) {
+                return;
+            }
+            // here we have a signle eth signature for the whole batch
+            await tester.testCreate2SignedBatchFail(hilda, david, token, TX_AMOUNT);
+            // here the only each individual transaction is signed
+            await tester.testCreate2BatchFail(hilda, david, token, TX_AMOUNT);
         });
     });
 });
@@ -177,7 +265,7 @@ if (process.env.TEST_TRANSPORT) {
     if (process.env.TEST_TOKEN) {
         // Both transport and token are set, use config from env.
         const envTransport = process.env.TEST_TRANSPORT.toUpperCase();
-        const envToken = process.env.TEST_TOKEN.toUpperCase();
+        const envToken = process.env.TEST_TOKEN;
         tokenAndTransport = [
             {
                 transport: envTransport,

@@ -14,6 +14,7 @@ use zksync_types::{
     },
 };
 // Local imports
+use crate::chain::operations::records::StoredAggregatedOperation;
 use crate::{
     chain::{
         block::BlockSchema,
@@ -25,6 +26,7 @@ use crate::{
     prover::ProverSchema,
     QueryResult, StorageActionType, StorageProcessor,
 };
+use zksync_types::aggregated_operations::AggregatedOperation;
 
 impl StoredOperation {
     pub async fn into_op(self, conn: &mut StorageProcessor<'_>) -> QueryResult<Operation> {
@@ -187,5 +189,15 @@ impl NewExecutedTransaction {
             eth_sign_data,
             batch_id: exec_tx.batch_id,
         }
+    }
+}
+
+impl StoredAggregatedOperation {
+    pub fn into_aggregated_op(self) -> (i64, AggregatedOperation) {
+        (
+            self.id,
+            serde_json::from_value(self.arguments)
+                .expect("Incorrect serialized aggregated operation in storage"),
+        )
     }
 }

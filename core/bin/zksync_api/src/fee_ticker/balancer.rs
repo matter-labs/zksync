@@ -130,16 +130,16 @@ mod tests {
             request_sender
                 .send(TickerRequest::GetTxFee {
                     tx_type: TxFeeTypes::Withdraw,
-                    address: Default::default(),
                     token: TokenId(i).into(),
+                    address: Default::default(),
                     response: channel.0,
                 })
                 .await
                 .unwrap();
             if let Some(TickerRequest::GetTxFee {
                 tx_type: _,
-                address: _,
                 token,
+                address: _,
                 response: _,
             }) = receivers[(i % 10) as usize].next().await
             {

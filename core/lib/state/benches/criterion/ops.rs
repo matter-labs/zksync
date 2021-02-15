@@ -16,6 +16,7 @@ use zksync_types::{
 };
 // Local uses
 use zksync_state::state::ZkSyncState;
+use zksync_types::tx::{ChangePubKeyECDSAData, ChangePubKeyEthAuthData};
 
 const ETH_TOKEN_ID: TokenId = TokenId(0x00);
 // The amount is not important, since we always work with 1 account.
@@ -75,6 +76,7 @@ fn apply_transfer_to_new_op(b: &mut Bencher<'_>) {
         10u32.into(),
         1u32.into(),
         Nonce(0),
+        Default::default(),
         private_key,
     )
     .expect("failed to sign transfer");
@@ -113,6 +115,7 @@ fn apply_transfer_tx(b: &mut Bencher<'_>) {
         10u32.into(),
         1u32.into(),
         Nonce(0),
+        Default::default(),
         private_key,
     )
     .expect("failed to sign transfer");
@@ -204,6 +207,7 @@ fn apply_withdraw_tx(b: &mut Bencher<'_>) {
         10u32.into(),
         1u32.into(),
         Nonce(0),
+        Default::default(),
         private_key,
     )
     .expect("failed to sign withdraw");
@@ -244,17 +248,21 @@ fn apply_change_pubkey_op(b: &mut Bencher<'_>) {
         TokenId(0),
         Default::default(),
         Nonce(nonce),
+        Default::default(),
         None,
         None,
     );
 
-    change_pubkey.eth_signature = {
+    change_pubkey.eth_auth_data = {
         let sign_bytes = change_pubkey
             .get_eth_signed_data()
             .expect("Failed to construct ChangePubKey signed message.");
         let eth_signature =
             PackedEthSignature::sign(eth_private_key, &sign_bytes).expect("Signing failed");
-        Some(eth_signature)
+        Some(ChangePubKeyEthAuthData::ECDSA(ChangePubKeyECDSAData {
+            eth_signature,
+            batch_hash: H256::zero(),
+        }))
     };
 
     let change_pubkey_tx = ZkSyncTx::ChangePubKey(Box::new(change_pubkey));

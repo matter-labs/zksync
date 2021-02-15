@@ -51,6 +51,8 @@ pub struct OperationArguments<E: RescueEngine> {
     pub new_pub_key_hash: Option<E::Fr>,
     pub eth_address: Option<E::Fr>,
     pub pub_nonce: Option<E::Fr>,
+    pub valid_from: Option<E::Fr>,
+    pub valid_until: Option<E::Fr>,
 }
 
 #[derive(Clone)]

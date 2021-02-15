@@ -1,13 +1,26 @@
+import { expect } from 'chai';
 import * as ethers from 'ethers';
 import * as zksync from 'zksync';
 import * as fs from 'fs';
 import * as path from 'path';
+import * as crypto from 'crypto';
 
-const franklin_abi = require('../../../../contracts/build/ZkSync.json').abi;
+const zksyncAbi = require('../../../../contracts/artifacts/cache/solpp-generated-contracts/ZkSync.sol/ZkSync.json').abi;
 type Network = 'localhost' | 'rinkeby' | 'ropsten';
 
 const testConfigPath = path.join(process.env.ZKSYNC_HOME as string, `etc/test_config/constant`);
 const ethTestConfig = JSON.parse(fs.readFileSync(`${testConfigPath}/eth.json`, { encoding: 'utf-8' }));
+
+export async function expectThrow(promise: Promise<any>, message: String) {
+    let error = null;
+    try {
+        await promise;
+    } catch (err) {
+        error = err;
+    }
+    expect(error).to.be.an('Error');
+    expect(error.message).to.include(message);
+}
 
 export class Tester {
     public contract: ethers.Contract;
@@ -19,7 +32,7 @@ export class Tester {
         public ethWallet: ethers.Wallet,
         public syncWallet: zksync.Wallet
     ) {
-        this.contract = new ethers.Contract(syncProvider.contractAddress.mainContract, franklin_abi, ethWallet);
+        this.contract = new ethers.Contract(syncProvider.contractAddress.mainContract, zksyncAbi, ethWallet);
         this.runningFee = ethers.BigNumber.from(0);
     }
 
@@ -68,5 +81,19 @@ export class Tester {
         const tokenSymbol = this.syncProvider.tokenSet.resolveTokenSymbol(token);
         const balance = accountState.committed.balances[tokenSymbol] || '0';
         return ethers.BigNumber.from(balance);
+    }
+
+    async create2Wallet() {
+        const signer = await zksync.Signer.fromSeed(crypto.randomBytes(32));
+        const randomHex = (length: number) => {
+            const bytes = crypto.randomBytes(length);
+            return ethers.utils.hexlify(bytes);
+        };
+        const create2Data = {
+            creatorAddress: randomHex(20),
+            saltArg: randomHex(32),
+            codeHash: randomHex(32)
+        };
+        return await zksync.Wallet.fromCreate2Data(signer, this.syncProvider, create2Data);
     }
 }

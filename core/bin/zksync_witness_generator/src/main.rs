@@ -3,6 +3,7 @@ use std::cell::RefCell;
 use zksync_config::ZkSyncConfig;
 use zksync_prometheus_exporter::run_prometheus_exporter;
 use zksync_storage::ConnectionPool;
+use zksync_witness_generator::database::Database;
 use zksync_witness_generator::run_prover_server;
 
 #[tokio::main]
@@ -24,13 +25,14 @@ async fn main() -> anyhow::Result<()> {
     }
 
     let connection_pool = ConnectionPool::new(Some(WITNESS_GENERATOR_CONNECTION_POOL_SIZE));
-    let config = ZkSyncConfig::from_env();
+    let database = Database::new(connection_pool.clone());
+    let zksync_config = ZkSyncConfig::from_env();
 
     // Run prometheus data exporter.
     let (prometheus_task_handle, _) =
-        run_prometheus_exporter(connection_pool.clone(), config.api.prometheus.port, false);
+        run_prometheus_exporter(connection_pool, zksync_config.api.prometheus.port, false);
 
-    run_prover_server(connection_pool, stop_signal_sender, config);
+    run_prover_server(database, stop_signal_sender, zksync_config);
 
     tokio::select! {
         _ = async { prometheus_task_handle.await } => {

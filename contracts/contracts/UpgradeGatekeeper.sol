@@ -1,4 +1,6 @@
-pragma solidity ^0.5.8;
+// SPDX-License-Identifier: MIT OR Apache-2.0
+
+pragma solidity ^0.7.0;
 pragma experimental ABIEncoderV2;
 
 import "./SafeMath.sol";
@@ -37,7 +39,7 @@ contract UpgradeGatekeeper is UpgradeEvents, Ownable {
     /// @notice Contract constructor
     /// @param _mainContract Contract which defines notice period duration and allows finish upgrade during preparation of it
     /// @dev Calls Ownable contract constructor
-    constructor(UpgradeableMaster _mainContract) public Ownable(msg.sender) {
+    constructor(UpgradeableMaster _mainContract) Ownable(msg.sender) {
         mainContract = _mainContract;
         versionId = 0;
     }
@@ -62,7 +64,7 @@ contract UpgradeGatekeeper is UpgradeEvents, Ownable {
         uint256 noticePeriod = mainContract.getNoticePeriod();
         mainContract.upgradeNoticePeriodStarted();
         upgradeStatus = UpgradeStatus.NoticePeriod;
-        noticePeriodFinishTimestamp = now.add(noticePeriod);
+        noticePeriodFinishTimestamp = block.timestamp.add(noticePeriod);
         nextTargets = newTargets;
         emit NoticePeriodStart(versionId, newTargets, noticePeriod);
     }
@@ -85,7 +87,7 @@ contract UpgradeGatekeeper is UpgradeEvents, Ownable {
         requireMaster(msg.sender);
         require(upgradeStatus == UpgradeStatus.NoticePeriod, "ugp11"); // ugp11 - unable to activate preparation status in case of not active notice period status
 
-        if (now >= noticePeriodFinishTimestamp) {
+        if (block.timestamp >= noticePeriodFinishTimestamp) {
             upgradeStatus = UpgradeStatus.Preparation;
             mainContract.upgradePreparationStarted();
             emit PreparationStart(versionId);

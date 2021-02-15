@@ -2,18 +2,19 @@ use crate::{
     helpers::{
         is_fee_amount_packable, is_token_amount_packable, pack_fee_amount, pack_token_amount,
     },
+    tx::TimeRange,
     AccountId, Nonce, TokenId,
 };
 use num::BigUint;
 
 use crate::account::PubKeyHash;
+use crate::utils::ethereum_sign_message_part;
 use crate::Engine;
 use serde::{Deserialize, Serialize};
 use zksync_basic_types::Address;
 use zksync_crypto::franklin_crypto::eddsa::PrivateKey;
 use zksync_crypto::params::{max_account_id, max_token_id};
-use zksync_utils::format_units;
-use zksync_utils::BigUintSerdeAsRadix10Str;
+use zksync_utils::{format_units, BigUintSerdeAsRadix10Str};
 
 use super::{TxSignature, VerifiedSignatureCache};
 
@@ -37,6 +38,10 @@ pub struct Transfer {
     pub fee: BigUint,
     /// Current account nonce.
     pub nonce: Nonce,
+    /// Time range when the transaction is valid
+    /// This fields must be Option<...> because of backward compatibility with first version of ZkSync
+    #[serde(flatten)]
+    pub time_range: Option<TimeRange>,
     /// Transaction zkSync signature.
     pub signature: TxSignature,
     #[serde(skip)]
@@ -60,6 +65,7 @@ impl Transfer {
         amount: BigUint,
         fee: BigUint,
         nonce: Nonce,
+        time_range: TimeRange,
         signature: Option<TxSignature>,
     ) -> Self {
         let mut tx = Self {
@@ -70,6 +76,7 @@ impl Transfer {
             amount,
             fee,
             nonce,
+            time_range: Some(time_range),
             signature: signature.clone().unwrap_or_default(),
             cached_signer: VerifiedSignatureCache::NotCached,
         };
@@ -90,9 +97,12 @@ impl Transfer {
         amount: BigUint,
         fee: BigUint,
         nonce: Nonce,
+        time_range: TimeRange,
         private_key: &PrivateKey<Engine>,
     ) -> Result<Self, anyhow::Error> {
-        let mut tx = Self::new(account_id, from, to, token, amount, fee, nonce, None);
+        let mut tx = Self::new(
+            account_id, from, to, token, amount, fee, nonce, time_range, None,
+        );
         tx.signature = TxSignature::sign_musig(private_key, &tx.get_bytes());
         if !tx.check_correctness() {
             anyhow::bail!(crate::tx::TRANSACTION_SIGNATURE_ERROR);
@@ -111,6 +121,9 @@ impl Transfer {
         out.extend_from_slice(&pack_token_amount(&self.amount));
         out.extend_from_slice(&pack_fee_amount(&self.fee));
         out.extend_from_slice(&self.nonce.to_be_bytes());
+        if let Some(time_range) = &self.time_range {
+            out.extend_from_slice(&time_range.to_be_bytes());
+        }
         out
     }
 
@@ -129,7 +142,11 @@ impl Transfer {
             && is_fee_amount_packable(&self.fee)
             && self.account_id <= max_account_id()
             && self.token <= max_token_id()
-            && self.to != Address::zero();
+            && self.to != Address::zero()
+            && self
+                .time_range
+                .map(|r| r.check_correctness())
+                .unwrap_or(true);
         if valid {
             let signer = self.verify_signature();
             valid = valid && signer.is_some();
@@ -149,8 +166,33 @@ impl Transfer {
         }
     }
 
+    /// Get the first part of the message we expect to be signed by Ethereum account key.
+    /// The only difference is the missing `nonce` since it's added at the end of the transactions
+    /// batch message.
+    pub fn get_ethereum_sign_message_part(&self, token_symbol: &str, decimals: u8) -> String {
+        ethereum_sign_message_part(
+            "Transfer",
+            token_symbol,
+            decimals,
+            &self.amount,
+            &self.fee,
+            &self.to,
+        )
+    }
+
     /// Gets message that should be signed by Ethereum keys of the account for 2-Factor authentication.
     pub fn get_ethereum_sign_message(&self, token_symbol: &str, decimals: u8) -> String {
+        let mut message = self.get_ethereum_sign_message_part(token_symbol, decimals);
+        if !message.is_empty() {
+            message.push('\n');
+        }
+        message.push_str(format!("Nonce: {}", self.nonce).as_str());
+        message
+    }
+
+    /// Returns an old-format message that should be signed by Ethereum account key.
+    /// Needed for backwards compatibility.
+    pub fn get_old_ethereum_sign_message(&self, token_symbol: &str, decimals: u8) -> String {
         format!(
             "Transfer {amount} {token}\n\
             To: {to:?}\n\

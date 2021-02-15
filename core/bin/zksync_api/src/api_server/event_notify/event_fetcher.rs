@@ -3,7 +3,10 @@ use futures::{channel::mpsc, SinkExt};
 use std::time::{Duration, Instant};
 use zksync_storage::ConnectionPool;
 use zksync_types::{
-    block::ExecutedOperations, block::PendingBlock, ActionType, BlockNumber, Operation,
+    aggregated_operations::{AggregatedActionType, AggregatedOperation},
+    block::ExecutedOperations,
+    block::PendingBlock,
+    BlockNumber,
 };
 
 /// Simple awaiter for the database futures, which will add a log entry upon DB failure
@@ -34,7 +37,7 @@ pub struct EventFetcher {
     last_verified_block: BlockNumber,
     pending_block: Option<PendingBlock>,
 
-    operations_sender: mpsc::Sender<Operation>,
+    operations_sender: mpsc::Sender<AggregatedOperation>,
     txs_sender: mpsc::Sender<ExecutedOps>,
 }
 
@@ -42,7 +45,7 @@ impl EventFetcher {
     pub async fn new(
         db_pool: ConnectionPool,
         miniblock_interval: Duration,
-        operations_sender: mpsc::Sender<Operation>,
+        operations_sender: mpsc::Sender<AggregatedOperation>,
         txs_sender: mpsc::Sender<ExecutedOps>,
     ) -> anyhow::Result<Self> {
         let mut fetcher = EventFetcher {
@@ -85,7 +88,7 @@ impl EventFetcher {
                 self.send_operations(
                     self.last_verified_block,
                     last_verified_block,
-                    ActionType::VERIFY,
+                    AggregatedActionType::ExecuteBlocks,
                 )
                 .await;
                 self.last_verified_block = last_verified_block;
@@ -97,7 +100,7 @@ impl EventFetcher {
                 self.send_operations(
                     self.last_committed_block,
                     last_committed_block,
-                    ActionType::COMMIT,
+                    AggregatedActionType::CommitBlocks,
                 )
                 .await;
                 self.last_committed_block = last_committed_block;
@@ -168,17 +171,17 @@ impl EventFetcher {
         &mut self,
         current_last_block: BlockNumber,
         new_last_operation: BlockNumber,
-        action: ActionType,
+        aggregated_action: AggregatedActionType,
     ) {
         let start = Instant::now();
         // There may be more than one block in the gap.
         for block_idx in (*current_last_block + 1)..=*new_last_operation {
-            let operation = await_db!(
-                self.load_operation(BlockNumber(block_idx), action),
+            let aggregated_operation = await_db!(
+                self.load_aggregated_operation(BlockNumber(block_idx), aggregated_action),
                 continue
             );
             self.operations_sender
-                .send(operation)
+                .send(aggregated_operation)
                 .await
                 .unwrap_or_default();
         }
@@ -234,11 +237,11 @@ impl EventFetcher {
         Ok(last_block)
     }
 
-    async fn load_operation(
+    async fn load_aggregated_operation(
         &mut self,
         block_number: BlockNumber,
-        action_type: ActionType,
-    ) -> anyhow::Result<Operation> {
+        aggregated_action_type: AggregatedActionType,
+    ) -> anyhow::Result<AggregatedOperation> {
         let start = Instant::now();
         let mut storage = self
             .db_pool
@@ -246,14 +249,15 @@ impl EventFetcher {
             .await
             .expect("Can't get access to the storage");
 
-        let op = storage
+        let aggregated_operation = storage
             .chain()
             .operations_schema()
-            .get_operation(block_number, action_type)
-            .await
+            .get_aggregated_op_that_affects_block(aggregated_action_type, block_number)
+            .await?
+            .map(|(_, operation)| operation)
             .expect("Operation must exist");
 
         metrics::histogram!("api.event_fetcher.load_operation", start.elapsed());
-        op.into_op(&mut storage).await
+        Ok(aggregated_operation)
     }
 }

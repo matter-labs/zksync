@@ -10,6 +10,6 @@ module.exports = {
     plugins: ['@typescript-eslint'],
     rules: {
         // This is the only rule that should be enforced in typescript
-        '@typescript-eslint/no-unused-vars': 'error'
+        '@typescript-eslint/no-unused-vars': ["error", { "argsIgnorePattern": "^_" }]
     }
 };

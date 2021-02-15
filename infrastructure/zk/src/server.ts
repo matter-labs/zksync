@@ -5,14 +5,19 @@ import fs from 'fs';
 import * as db from './db/db';
 
 export async function server() {
-    await utils.spawn('cargo run --bin zksync_server --release');
+    let child = utils.background('cargo run --bin zksync_server --release');
+
+    // delegate processing of pressing `Ctrl + C`
+    process.on('SIGINT', () => {
+        child.kill('SIGINT');
+    });
 }
 
 export async function genesis() {
     await db.reset();
     await utils.confirmAction();
     await utils.spawn('cargo run --bin zksync_server --release -- --genesis | tee genesis.log');
-    const genesisRoot = fs.readFileSync('genesis.log').toString();
+    const genesisRoot = fs.readFileSync('genesis.log').toString().trim();
     const date = new Date();
     const [year, month, day, hour, minute, second] = [
         date.getFullYear(),

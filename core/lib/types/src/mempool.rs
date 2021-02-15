@@ -10,7 +10,7 @@ use super::{
 pub struct SignedTxsBatch {
     pub txs: Vec<SignedZkSyncTx>,
     pub batch_id: i64,
-    pub eth_signature: Option<TxEthSignature>,
+    pub eth_signatures: Vec<TxEthSignature>,
 }
 
 /// A wrapper around possible atomic block elements: it can be either
@@ -31,12 +31,12 @@ impl SignedTxVariant {
     pub fn batch(
         txs: Vec<SignedZkSyncTx>,
         batch_id: i64,
-        eth_signature: Option<TxEthSignature>,
+        eth_signatures: Vec<TxEthSignature>,
     ) -> Self {
         Self::Batch(SignedTxsBatch {
             txs,
             batch_id,
-            eth_signature,
+            eth_signatures,
         })
     }
 
@@ -44,6 +44,13 @@ impl SignedTxVariant {
         match self {
             Self::Tx(tx) => vec![tx.hash()],
             Self::Batch(batch) => batch.txs.iter().map(|tx| tx.hash()).collect(),
+        }
+    }
+
+    pub fn get_transactions(&self) -> Vec<SignedZkSyncTx> {
+        match self {
+            Self::Tx(tx) => vec![tx.clone()],
+            Self::Batch(batch) => batch.txs.clone(),
         }
     }
 }

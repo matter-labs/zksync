@@ -1,4 +1,6 @@
-pragma solidity ^0.5.8;
+// SPDX-License-Identifier: MIT OR Apache-2.0
+
+pragma solidity ^0.7.0;
 
 /**
  * @dev Wrappers over Solidity's arithmetic operations with added overflow
@@ -25,7 +27,7 @@ library SafeMath {
      */
     function add(uint256 a, uint256 b) internal pure returns (uint256) {
         uint256 c = a + b;
-        require(c >= a, "SafeMath: addition overflow");
+        require(c >= a, "14");
 
         return c;
     }
@@ -40,7 +42,7 @@ library SafeMath {
      * - Subtraction cannot overflow.
      */
     function sub(uint256 a, uint256 b) internal pure returns (uint256) {
-        return sub(a, b, "SafeMath: subtraction overflow");
+        return sub(a, b, "v");
     }
 
     /**
@@ -83,7 +85,7 @@ library SafeMath {
         }
 
         uint256 c = a * b;
-        require(c / a == b, "SafeMath: multiplication overflow");
+        require(c / a == b, "15");
 
         return c;
     }
@@ -100,7 +102,7 @@ library SafeMath {
      * - The divisor cannot be zero.
      */
     function div(uint256 a, uint256 b) internal pure returns (uint256) {
-        return div(a, b, "SafeMath: division by zero");
+        return div(a, b, "x");
     }
 
     /**
@@ -141,7 +143,7 @@ library SafeMath {
      * - The divisor cannot be zero.
      */
     function mod(uint256 a, uint256 b) internal pure returns (uint256) {
-        return mod(a, b, "SafeMath: modulo by zero");
+        return mod(a, b, "y");
     }
 
     /**

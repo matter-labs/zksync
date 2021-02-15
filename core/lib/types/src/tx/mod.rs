@@ -15,7 +15,9 @@ mod tests;
 #[doc(hidden)]
 pub use self::close::Close;
 pub use self::{
-    change_pubkey::ChangePubKey,
+    change_pubkey::{
+        ChangePubKey, ChangePubKeyCREATE2Data, ChangePubKeyECDSAData, ChangePubKeyEthAuthData,
+    },
     forced_exit::ForcedExit,
     transfer::Transfer,
     withdraw::Withdraw,
@@ -24,9 +26,11 @@ pub use self::{
 
 // Re-export primitives associated with transactions.
 pub use self::primitives::{
-    eip1271_signature::EIP1271Signature, eth_signature::TxEthSignature,
+    eip1271_signature::EIP1271Signature, eth_batch_sign_data::EthBatchSignData,
+    eth_batch_signature::EthBatchSignatures, eth_signature::TxEthSignature,
     packed_eth_signature::PackedEthSignature, packed_public_key::PackedPublicKey,
-    packed_signature::PackedSignature, signature::TxSignature, tx_hash::TxHash,
+    packed_signature::PackedSignature, signature::TxSignature, time_range::TimeRange,
+    tx_hash::TxHash,
 };
 
 pub(crate) use self::primitives::signature_cache::VerifiedSignatureCache;

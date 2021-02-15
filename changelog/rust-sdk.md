@@ -4,6 +4,10 @@ All notable changes to `zksync_rs` will be documented in this file.
 
 ## Unreleased
 
+### Added
+
+- Constructor of RpcProvider from address and network.
+
 **Version 0.2.2** is being developed.
 
 ### Added

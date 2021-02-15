@@ -6,12 +6,16 @@ use zksync_state::{
     handler::TxHandler,
     state::{CollectedFee, TransferOutcome, ZkSyncState},
 };
-use zksync_types::{operations::TransferOp, tx::Transfer, AccountId, TokenId};
+use zksync_types::{
+    operations::TransferOp,
+    tx::{TimeRange, Transfer},
+    AccountId, TokenId,
+};
 // Local deps
 use crate::witness::{
     tests::test_utils::{
         corrupted_input_test_scenario, generic_test_scenario, incorrect_op_test_scenario,
-        WitnessTestAccount,
+        WitnessTestAccount, BLOCK_TIMESTAMP,
     },
     transfer::TransferWitness,
     utils::SigDataInput,
@@ -49,6 +53,7 @@ fn test_transfer_success() {
                     &account_to.account.address,
                     None,
                     true,
+                    Default::default(),
                 )
                 .0,
             from: account_from.id,
@@ -94,6 +99,7 @@ fn test_transfer_to_self() {
                 &account.account.address,
                 None,
                 true,
+                Default::default(),
             )
             .0,
         from: account.id,
@@ -140,6 +146,7 @@ fn corrupted_ops_input() {
                 &account.account.address,
                 None,
                 true,
+                Default::default(),
             )
             .0,
         from: account.id,
@@ -203,6 +210,7 @@ fn test_incorrect_transfer_account_from() {
                 &account_to.account.address,
                 None,
                 true,
+                Default::default(),
             )
             .0,
         from: account_from.id,
@@ -257,6 +265,7 @@ fn test_incorrect_transfer_account_to() {
                 &incorrect_account_to.account.address,
                 None,
                 true,
+                Default::default(),
             )
             .0,
         from: account_from.id,
@@ -315,6 +324,7 @@ fn test_incorrect_transfer_amount() {
                     &account_to.account.address,
                     None,
                     true,
+                    Default::default(),
                 )
                 .0,
             from: account_from.id,
@@ -381,6 +391,7 @@ fn test_transfer_replay() {
                 &account_to.account.address,
                 None,
                 true,
+                Default::default(),
             )
             .0,
         from: account_copy.id,
@@ -401,4 +412,67 @@ fn test_transfer_replay() {
             }]
         },
     );
+}
+
+/// Basic check for execution of `Transfer` operation in circuit with incorrect timestamps.
+#[test]
+#[ignore]
+fn test_incorrect_transfer_timestamp() {
+    // Test vector of (initial_balance, transfer_amount, fee_amount, time_range).
+    let test_vector = vec![
+        (10u64, 7u64, 3u64, TimeRange::new(0, 0)),
+        (10u64, 7u64, 3u64, TimeRange::new(0, BLOCK_TIMESTAMP - 1)),
+        (
+            10u64,
+            7u64,
+            3u64,
+            TimeRange::new(BLOCK_TIMESTAMP + 1, u64::max_value()),
+        ),
+    ];
+
+    for (initial_balance, transfer_amount, fee_amount, time_range) in test_vector {
+        // Input data.
+        let accounts = vec![
+            WitnessTestAccount::new(AccountId(1), initial_balance),
+            WitnessTestAccount::new_empty(AccountId(2)),
+        ];
+        let (account_from, account_to) = (&accounts[0], &accounts[1]);
+        let transfer_op = TransferOp {
+            tx: account_from
+                .zksync_account
+                .sign_transfer(
+                    TokenId(0),
+                    "",
+                    BigUint::from(transfer_amount),
+                    BigUint::from(fee_amount),
+                    &account_to.account.address,
+                    None,
+                    true,
+                    time_range,
+                )
+                .0,
+            from: account_from.id,
+            to: account_to.id,
+        };
+
+        // Additional data required for performing the operation.
+        let input =
+            SigDataInput::from_transfer_op(&transfer_op).expect("SigDataInput creation failed");
+
+        // Operation is not valid, since transaction timestamp is invalid.
+        const ERR_MSG: &str = "op_valid is true/enforce equal to one";
+
+        incorrect_op_test_scenario::<TransferWitness<Bn256>, _>(
+            &accounts,
+            transfer_op,
+            input,
+            ERR_MSG,
+            || {
+                vec![CollectedFee {
+                    token: TokenId(0),
+                    amount: fee_amount.into(),
+                }]
+            },
+        );
+    }
 }

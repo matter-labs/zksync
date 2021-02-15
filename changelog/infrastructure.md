@@ -15,6 +15,8 @@ components, the logs will have the following format:
 
 ### Added
 
+- (`reading-tool`): tool for reading test config.
+
 ### Fixed
 
 ## Release 2021-02-02

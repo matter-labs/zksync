@@ -1,7 +1,6 @@
 //! API testing helpers.
 
 // Built-in uses
-use std::str::FromStr;
 
 // External uses
 use actix_web::{web, App, Scope};
@@ -14,33 +13,40 @@ use zksync_config::ZkSyncConfig;
 use zksync_crypto::rand::{SeedableRng, XorShiftRng};
 use zksync_storage::{
     chain::operations::records::NewExecutedPriorityOperation,
+    chain::operations::OperationsSchema,
+    prover::ProverSchema,
     test_data::{
-        dummy_ethereum_tx_hash, gen_acc_random_updates, gen_unique_operation,
-        gen_unique_operation_with_txs, BLOCK_SIZE_CHUNKS,
+        dummy_ethereum_tx_hash, gen_acc_random_updates, gen_sample_block,
+        gen_unique_aggregated_operation_with_txs, get_sample_aggregated_proof,
+        get_sample_single_proof, BLOCK_SIZE_CHUNKS,
     },
     ConnectionPool,
 };
 use zksync_test_account::ZkSyncAccount;
 use zksync_types::{
-    ethereum::OperationType,
+    aggregated_operations::AggregatedActionType,
     helpers::{apply_updates, closest_packable_fee_amount, closest_packable_token_amount},
     operations::{ChangePubKeyOp, TransferToNewOp},
-    AccountId, AccountMap, Action, Address, BlockNumber, Deposit, DepositOp, ExecutedOperations,
+    prover::ProverJobType,
+    AccountId, AccountMap, Address, BlockNumber, Deposit, DepositOp, ExecutedOperations,
     ExecutedPriorityOp, ExecutedTx, FullExit, FullExitOp, Nonce, PriorityOp, Token, TokenId,
     Transfer, TransferOp, ZkSyncOp, ZkSyncTx, H256,
 };
 
 // Local uses
 use super::Client;
+use std::str::FromStr;
 
 /// Serial ID of the verified priority operation.
 pub const VERIFIED_OP_SERIAL_ID: u64 = 10;
 /// Serial ID of the committed priority operation.
 pub const COMMITTED_OP_SERIAL_ID: u64 = 243;
 /// Number of committed blocks.
-pub const COMMITTED_BLOCKS_COUNT: BlockNumber = BlockNumber(8);
+pub const COMMITTED_BLOCKS_COUNT: u32 = 8;
 /// Number of verified blocks.
-pub const VERIFIED_BLOCKS_COUNT: BlockNumber = BlockNumber(3);
+pub const VERIFIED_BLOCKS_COUNT: u32 = 5;
+/// Number of executed blocks.
+pub const EXECUTED_BLOCKS_COUNT: u32 = 3;
 
 #[derive(Debug, Clone)]
 pub struct TestServerConfig {
@@ -102,7 +108,14 @@ impl TestServerConfig {
 
         // Sign change pubkey tx pair
         {
-            let tx = from.sign_change_pubkey_tx(None, false, TokenId(0), fee.into(), false);
+            let tx = from.sign_change_pubkey_tx(
+                None,
+                false,
+                TokenId(0),
+                fee.into(),
+                false,
+                Default::default(),
+            );
 
             let zksync_op = ZkSyncOp::ChangePubKeyOffchain(Box::new(ChangePubKeyOp {
                 tx: tx.clone(),
@@ -135,6 +148,7 @@ impl TestServerConfig {
                     &to.address,
                     None,
                     false,
+                    Default::default(),
                 )
                 .0;
 
@@ -170,6 +184,7 @@ impl TestServerConfig {
                     &to.address,
                     None,
                     false,
+                    Default::default(),
                 )
                 .0;
 
@@ -204,6 +219,7 @@ impl TestServerConfig {
                 2_u64.into(),
                 fee.into(),
                 Nonce(0),
+                Default::default(),
                 None,
             );
 
@@ -288,7 +304,7 @@ impl TestServerConfig {
         let mut accounts = AccountMap::default();
 
         // Create and apply several blocks to work with.
-        for block_number in 1..=*COMMITTED_BLOCKS_COUNT {
+        for block_number in 1..=COMMITTED_BLOCKS_COUNT {
             let block_number = BlockNumber(block_number);
             let updates = (0..3)
                 .flat_map(|_| gen_acc_random_updates(&mut rng))
@@ -308,22 +324,13 @@ impl TestServerConfig {
                 vec![]
             };
 
-            // Storage transactions in the block schema.
             storage
                 .chain()
                 .block_schema()
-                .save_block_transactions(block_number, txs.clone())
-                .await?;
-
-            // Store the commit operation in the block schema.
-            let operation = storage
-                .chain()
-                .block_schema()
-                .execute_operation(gen_unique_operation_with_txs(
+                .save_block(gen_sample_block(
                     block_number,
-                    Action::Commit,
                     BLOCK_SIZE_CHUNKS,
-                    txs,
+                    txs.clone(),
                 ))
                 .await?;
             storage
@@ -333,14 +340,31 @@ impl TestServerConfig {
                 .await?;
 
             // Store & confirm the operation in the ethereum schema, as it's used for obtaining
-            // commit/verify hashes.
-            let ethereum_op_id = operation.id.unwrap() as i64;
-            let eth_tx_hash = dummy_ethereum_tx_hash(ethereum_op_id);
+            // commit/verify/execute hashes.
+            let aggregated_operation = gen_unique_aggregated_operation_with_txs(
+                block_number,
+                AggregatedActionType::CommitBlocks,
+                BLOCK_SIZE_CHUNKS,
+                txs.clone(),
+            );
+            OperationsSchema(&mut storage)
+                .store_aggregated_action(aggregated_operation)
+                .await?;
+            let (id, op) = OperationsSchema(&mut storage)
+                .get_aggregated_op_that_affects_block(
+                    AggregatedActionType::CommitBlocks,
+                    block_number,
+                )
+                .await?
+                .unwrap();
+
+            // Store the Ethereum transaction.
+            let eth_tx_hash = dummy_ethereum_tx_hash(id);
             let response = storage
                 .ethereum_schema()
                 .save_new_eth_tx(
-                    OperationType::Commit,
-                    Some(ethereum_op_id),
+                    AggregatedActionType::CommitBlocks,
+                    Some((id, op)),
                     100,
                     100u32.into(),
                     Default::default(),
@@ -356,30 +380,118 @@ impl TestServerConfig {
                 .await?;
 
             // Add verification for the block if required.
-            if block_number <= VERIFIED_BLOCKS_COUNT {
-                storage
-                    .prover_schema()
-                    .store_proof(block_number, &Default::default())
-                    .await?;
-                let operation = storage
-                    .chain()
-                    .block_schema()
-                    .execute_operation(gen_unique_operation(
+            if *block_number <= VERIFIED_BLOCKS_COUNT {
+                // Add jobs to `job_prover_queue`.
+                let job_data = serde_json::Value::default();
+                ProverSchema(&mut storage)
+                    .add_prover_job_to_job_queue(
                         block_number,
-                        Action::Verify {
-                            proof: Default::default(),
-                        },
-                        BLOCK_SIZE_CHUNKS,
-                    ))
+                        block_number,
+                        job_data.clone(),
+                        0,
+                        ProverJobType::SingleProof,
+                    )
+                    .await?;
+                ProverSchema(&mut storage)
+                    .add_prover_job_to_job_queue(
+                        block_number,
+                        block_number,
+                        job_data,
+                        1,
+                        ProverJobType::AggregatedProof,
+                    )
                     .await?;
 
-                let ethereum_op_id = operation.id.unwrap() as i64;
-                let eth_tx_hash = dummy_ethereum_tx_hash(ethereum_op_id);
+                // Get job id.
+                let stored_job_id = ProverSchema(&mut storage)
+                    .get_idle_prover_job_from_job_queue()
+                    .await?
+                    .unwrap()
+                    .job_id;
+                let stored_aggregated_job_id = ProverSchema(&mut storage)
+                    .get_idle_prover_job_from_job_queue()
+                    .await?
+                    .unwrap()
+                    .job_id;
+
+                // Store proofs.
+                let proof = get_sample_single_proof();
+                let aggregated_proof = get_sample_aggregated_proof();
+                ProverSchema(&mut storage)
+                    .store_proof(stored_job_id, block_number, &proof)
+                    .await?;
+                ProverSchema(&mut storage)
+                    .store_aggregated_proof(
+                        stored_aggregated_job_id,
+                        block_number,
+                        block_number,
+                        &aggregated_proof,
+                    )
+                    .await?;
+
+                let aggregated_operation = gen_unique_aggregated_operation_with_txs(
+                    block_number,
+                    AggregatedActionType::PublishProofBlocksOnchain,
+                    BLOCK_SIZE_CHUNKS,
+                    txs.clone(),
+                );
+                OperationsSchema(&mut storage)
+                    .store_aggregated_action(aggregated_operation)
+                    .await?;
+                let (id, op) = OperationsSchema(&mut storage)
+                    .get_aggregated_op_that_affects_block(
+                        AggregatedActionType::PublishProofBlocksOnchain,
+                        block_number,
+                    )
+                    .await?
+                    .unwrap();
+
                 let response = storage
                     .ethereum_schema()
                     .save_new_eth_tx(
-                        OperationType::Verify,
-                        Some(ethereum_op_id),
+                        AggregatedActionType::PublishProofBlocksOnchain,
+                        Some((id, op)),
+                        100,
+                        100u32.into(),
+                        Default::default(),
+                    )
+                    .await?;
+                let eth_tx_hash = dummy_ethereum_tx_hash(id);
+                storage
+                    .ethereum_schema()
+                    .add_hash_entry(response.id, &eth_tx_hash)
+                    .await?;
+                storage
+                    .ethereum_schema()
+                    .confirm_eth_tx(&eth_tx_hash)
+                    .await?;
+            }
+
+            if *block_number <= EXECUTED_BLOCKS_COUNT {
+                let aggregated_operation = gen_unique_aggregated_operation_with_txs(
+                    block_number,
+                    AggregatedActionType::ExecuteBlocks,
+                    BLOCK_SIZE_CHUNKS,
+                    txs.clone(),
+                );
+                OperationsSchema(&mut storage)
+                    .store_aggregated_action(aggregated_operation)
+                    .await?;
+                let (id, op) = OperationsSchema(&mut storage)
+                    .get_aggregated_op_that_affects_block(
+                        AggregatedActionType::ExecuteBlocks,
+                        block_number,
+                    )
+                    .await?
+                    .unwrap();
+
+                // Store the Ethereum transaction.
+                let eth_tx_hash = dummy_ethereum_tx_hash(id);
+                let response = storage
+                    .ethereum_schema()
+                    .save_new_eth_tx(
+                        AggregatedActionType::ExecuteBlocks,
+                        Some((id, op)),
                         100,
                         100u32.into(),
                         Default::default(),
@@ -418,7 +530,7 @@ impl TestServerConfig {
             },
             // Committed priority operation.
             NewExecutedPriorityOperation {
-                block_number: *VERIFIED_BLOCKS_COUNT as i64 + 1,
+                block_number: EXECUTED_BLOCKS_COUNT as i64 + 1,
                 block_index: 1,
                 operation: serde_json::to_value(
                     dummy_full_exit_op(AccountId(1), Address::default(), COMMITTED_OP_SERIAL_ID, 3)
