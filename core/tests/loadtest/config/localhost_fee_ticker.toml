@@ -12,29 +12,39 @@ eth_fee = 10000000000
 zksync_fee = 100000000000
 
 [[scenarios]]
-name = 'transfer'
-token_name = 'GNT'
+name = 'fee_ticker'
+# The name of the token used for testing.
+token_name = 'BAT'
 # Amount of money to be used in the transfer, in gwei.
 transfer_size = 1
-transfer_rounds = 2
-wallets_amount = 20
+transfer_rounds = 10
+wallets_amount = 40
+max_batch_size = 15
 
 [[scenarios]]
-name = "withdraw"
+name = 'fee_ticker'
+# The name of the token used for testing.
 token_name = 'ETH'
-wallets_amount = 15
-withdraw_rounds = 1
+# Amount of money to be used in the transfer, in gwei.
+transfer_size = 1
+transfer_rounds = 10
+wallets_amount = 40
 
 [[scenarios]]
-token_name = 'BAT'
-name = "full_exit"
-wallets_amount = 10
-
-[[scenarios]]
-name = 'batch_transfers'
+name = 'fee_ticker'
+# The name of the token used for testing.
 token_name = 'DAI'
 # Amount of money to be used in the transfer, in gwei.
 transfer_size = 1
 transfer_rounds = 10
-wallets_amount = 20
-max_batch_size = 10
+wallets_amount = 40
+max_batch_size = 15
+
+[[scenarios]]
+name = 'fee_ticker'
+# The name of the token used for testing.
+token_name = 'tGLM'
+# Amount of money to be used in the transfer, in gwei.
+transfer_size = 1
+transfer_rounds = 10
+wallets_amount = 40

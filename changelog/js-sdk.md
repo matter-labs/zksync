@@ -8,6 +8,10 @@ All notable changes to `zksync.js` will be documented in this file.
 
 ### Changed
 
+### Deprecated
+
+- WebSocket provider.
+
 ### Fixed
 
 ## Version 0.8.4

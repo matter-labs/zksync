@@ -1545,6 +1545,38 @@
       ]
     }
   },
+  "4fc97e18f8e63d63d3a52db84ddd38243a865011e69a60061af37ebc2a8f1566": {
+    "query": "SELECT * FROM complete_withdrawals_transactions\n                        WHERE pending_withdrawals_queue_start_index <= $1\n                            AND $1 < pending_withdrawals_queue_end_index\n                    LIMIT 1\n                    ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "tx_hash",
+          "type_info": "Bytea"
+        },
+        {
+          "ordinal": 1,
+          "name": "pending_withdrawals_queue_start_index",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 2,
+          "name": "pending_withdrawals_queue_end_index",
+          "type_info": "Int8"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Int8"
+        ]
+      },
+      "nullable": [
+        false,
+        false,
+        false
+      ]
+    }
+  },
   "50a7a224aeba0065b57858fc989c3a09d45f833b68fbc9909a73817f782dd3c3": {
     "query": "\n            WITH aggr_exec AS (\n                SELECT \n                    aggregate_operations.confirmed, \n                    execute_aggregated_blocks_binding.block_number \n                FROM aggregate_operations\n                    INNER JOIN execute_aggregated_blocks_binding ON aggregate_operations.id = execute_aggregated_blocks_binding.op_id\n                WHERE aggregate_operations.confirmed = true \n            ),\n            transactions AS (\n                SELECT\n                    *\n                FROM (\n                    SELECT\n                        concat_ws(',', block_number, block_index) AS tx_id,\n                        tx,\n                        'sync-tx:' || encode(tx_hash, 'hex') AS hash,\n                        null as pq_id,\n                        null as eth_block,\n                        success,\n                        fail_reason,\n                        block_number,\n                        created_at\n                    FROM\n                        executed_transactions\n                    WHERE\n                        from_account = $1\n                        or\n                        to_account = $1\n                        or\n                        primary_account_address = $1\n                    union all\n                    select\n                        concat_ws(',', block_number, block_index) as tx_id,\n                        operation as tx,\n                        '0x' || encode(eth_hash, 'hex') as hash,\n                        priority_op_serialid as pq_id,\n                        eth_block,\n                        true as success,\n                        null as fail_reason,\n                        block_number,\n                        created_at\n                    from \n                        executed_priority_operations\n                    where \n                        from_account = $1\n                        or\n                        to_account = $1) t\n                order by\n                    block_number desc, created_at desc\n                offset \n                    $2\n                limit \n                    $3\n            )\n            select\n                tx_id as \"tx_id!\",\n                hash as \"hash?\",\n                eth_block as \"eth_block?\",\n                pq_id as \"pq_id?\",\n                tx as \"tx!\",\n                success as \"success?\",\n                fail_reason as \"fail_reason?\",\n                true as \"commited!\",\n                coalesce(verified.confirmed, false) as \"verified!\",\n                created_at as \"created_at!\"\n            from transactions\n            LEFT JOIN aggr_exec verified ON transactions.block_number = verified.block_number\n            order by transactions.block_number desc, created_at desc\n            ",
     "describe": {
@@ -1906,26 +1938,6 @@
       ]
     }
   },
-  "706ef27f938ebad45a346d50886fb9930f5ca72edf8ba7000ea3664f0e7e1e58": {
-    "query": "SELECT eth_operations.final_hash as final_hash FROM aggregate_operations\n                  LEFT JOIN eth_aggregated_ops_binding ON eth_aggregated_ops_binding.op_id = aggregate_operations.id\n                  LEFT JOIN eth_operations ON eth_aggregated_ops_binding.eth_op_id = eth_operations.id\n            WHERE\n                  eth_operations.confirmed = true AND aggregate_operations.id = $1",
-    "describe": {
-      "columns": [
-        {
-          "ordinal": 0,
-          "name": "final_hash",
-          "type_info": "Bytea"
-        }
-      ],
-      "parameters": {
-        "Left": [
-          "Int8"
-        ]
-      },
-      "nullable": [
-        true
-      ]
-    }
-  },
   "714d10cb76076a8c10d147a14bfda609e7d809186b602406b671d4dd79a0ca8e": {
     "query": "SELECT * FROM accounts",
     "describe": {
@@ -2161,6 +2173,32 @@
         ]
       },
       "nullable": []
+    }
+  },
+  "80c2eb3abd0f05fb464113ca06dc2a7f1fe860bc4fcac0da805f13e980ca75a5": {
+    "query": "SELECT * FROM pending_withdrawals WHERE withdrawal_hash = $1\n            LIMIT 1",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "id",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 1,
+          "name": "withdrawal_hash",
+          "type_info": "Bytea"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Bytea"
+        ]
+      },
+      "nullable": [
+        false,
+        false
+      ]
     }
   },
   "83cc9ff843c9dd1c974b651f5ed1e0c6bea94454db1d6f01b8fdf556cdd77d81": {
@@ -3011,6 +3049,69 @@
         null,
         null,
         null
+      ]
+    }
+  },
+  "bec05747dcfbf729bfd6e5d6aedf8da39f6d0d4ab5f0eae8dfed6c07adac1ba8": {
+    "query": "SELECT eth_operations.* FROM aggregate_operations\n                LEFT JOIN eth_aggregated_ops_binding ON eth_aggregated_ops_binding.op_id = aggregate_operations.id\n                LEFT JOIN eth_operations ON eth_aggregated_ops_binding.eth_op_id = eth_operations.id\n            WHERE\n                ($1 BETWEEN from_block AND to_block) AND action_type = $2 AND eth_operations.confirmed = true \n            LIMIT 1",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "id",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 1,
+          "name": "nonce",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 2,
+          "name": "confirmed",
+          "type_info": "Bool"
+        },
+        {
+          "ordinal": 3,
+          "name": "raw_tx",
+          "type_info": "Bytea"
+        },
+        {
+          "ordinal": 4,
+          "name": "op_type",
+          "type_info": "Text"
+        },
+        {
+          "ordinal": 5,
+          "name": "final_hash",
+          "type_info": "Bytea"
+        },
+        {
+          "ordinal": 6,
+          "name": "last_deadline_block",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 7,
+          "name": "last_used_gas_price",
+          "type_info": "Numeric"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Int8",
+          "Text"
+        ]
+      },
+      "nullable": [
+        false,
+        false,
+        false,
+        false,
+        false,
+        true,
+        false,
+        false
       ]
     }
   },

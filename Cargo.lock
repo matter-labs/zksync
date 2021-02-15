@@ -5735,6 +5735,7 @@ dependencies = [
  "reqwest",
  "serde",
  "serde_json",
+ "structopt",
  "thiserror",
  "tiny-keccak 1.5.0",
  "tokio 0.1.22",
@@ -5809,6 +5810,7 @@ dependencies = [
  "toml",
  "tracing",
  "url 2.1.1",
+ "zksync_crypto",
  "zksync_types",
  "zksync_utils",
 ]

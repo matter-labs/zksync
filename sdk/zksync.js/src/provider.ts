@@ -17,6 +17,9 @@ import {
 import { isTokenETH, sleep, SYNC_GOV_CONTRACT_INTERFACE, TokenSet } from './utils';
 
 export async function getDefaultProvider(network: Network, transport: 'WS' | 'HTTP' = 'HTTP'): Promise<Provider> {
+    if (transport === 'WS') {
+        console.warn('Websocket support will be removed in future. Use HTTP transport instead.');
+    }
     if (network === 'localhost') {
         if (transport === 'WS') {
             return await Provider.newWebsocketProvider('ws://127.0.0.1:3031');
@@ -67,6 +70,9 @@ export class Provider {
 
     private constructor(public transport: AbstractJSONRPCTransport) {}
 
+    /**
+     * @deprecated Websocket support will be removed in future. Use HTTP transport instead.
+     */
     static async newWebsocketProvider(address: string): Promise<Provider> {
         const transport = await WSTransport.connect(address);
         const provider = new Provider(transport);

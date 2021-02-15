@@ -14,6 +14,8 @@ local metrics = [
   "sql.chain.operations.add_pending_withdrawal",
   "sql.chain.operations.confirm_operation",
   "sql.chain.operations.eth_tx_for_withdrawal",
+  "sql.chain.operations.eth_withdraw_tx_for_complete_withdrawal",
+  "sql.chain.operations.eth_withdraw_tx_for_execute_block",
   "sql.chain.operations.get_executed_operation",
   "sql.chain.operations.get_executed_priority_operation_by_hash",
   "sql.chain.operations.get_executed_priority_operation",

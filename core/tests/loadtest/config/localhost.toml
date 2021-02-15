@@ -2,8 +2,6 @@
 [main_wallet]
 address = '0x36615cf349d7f6344891b1e7ca7c72883f5dc049'
 private_key = '0x7726827caac94a7f9e1b160f7ea819f172f7b6f9d2a97f992c38edeab82d4110'
-# The name of the token used for testing.
-token_name = 'ETH'
 
 [network]
 # Network kind used for testing.
@@ -11,11 +9,12 @@ name = 'localhost'
 # Fee for the Ethereum transactions in gwei.
 eth_fee = 10000000000
 # Fee for the zkSync transactions in gwei.
-zksync_fee = 100000000
+zksync_fee = 10000000000
 
 # A list of scenarios used in parallel in this loadtest.
 [[scenarios]]
 name = 'transfer'
+token_name = 'ETH'
 # Amount of money to be used in the transfer, in gwei.
 transfer_size = 1
 # Amount of iterations to rotate funds, "length" of the test.
@@ -25,6 +24,7 @@ wallets_amount = 400
 
 [[scenarios]]
 name = "withdraw"
+token_name = 'GNT'
 # Amount of intermediate wallets to use.
 wallets_amount = 15
 # Amount of "withdraw and deposit" iterations.
@@ -32,11 +32,13 @@ withdraw_rounds = 4
 
 [[scenarios]]
 name = "full_exit"
+token_name = 'ETH'
 # Amount of intermediate wallets to use.
 wallets_amount = 10
 
 [[scenarios]]
 name = 'batch_transfers'
+token_name = 'DAI'
 # Amount of money to be used in the transfer, in gwei.
 transfer_size = 1
 # Amount of iterations to rotate funds, "length" of the test.

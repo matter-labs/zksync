@@ -7,7 +7,7 @@ use zksync_types::{tx::TxHash, BlockNumber};
 // Local imports
 use self::records::{
     NewExecutedPriorityOperation, NewExecutedTransaction, StoredAggregatedOperation,
-    StoredExecutedPriorityOperation,
+    StoredCompleteWithdrawalsTransaction, StoredExecutedPriorityOperation, StoredPendingWithdrawal,
 };
 use crate::chain::operations::records::StoredExecutedTransaction;
 use crate::chain::operations_ext::OperationsExtSchema;
@@ -289,7 +289,56 @@ impl<'a, 'c> OperationsSchema<'a, 'c> {
         Ok(())
     }
 
-    pub async fn eth_tx_for_withdrawal(
+    /// On old contracts, a separate operation was used to withdraw - `CompleteWithdrawals`.
+    ///
+    /// NOTE: Currently `CompleteWithdrawals` is deprecated but the information is still stored
+    /// in the database and it is useful to be able to issue an ether hash for this operation.
+    async fn eth_withdraw_tx_for_complete_withdrawal(
+        &mut self,
+        withdrawal_hash: &TxHash,
+    ) -> QueryResult<Option<H256>> {
+        let start = Instant::now();
+        let pending_withdrawal = sqlx::query_as!(
+            StoredPendingWithdrawal,
+            "SELECT * FROM pending_withdrawals WHERE withdrawal_hash = $1
+            LIMIT 1",
+            withdrawal_hash.as_ref().to_vec(),
+        )
+        .fetch_optional(self.0.conn())
+        .await?;
+
+        let res = match pending_withdrawal {
+            Some(pending_withdrawal) => {
+                let pending_withdrawal_id = pending_withdrawal.id;
+
+                sqlx::query_as!(
+                    StoredCompleteWithdrawalsTransaction,
+                    "SELECT * FROM complete_withdrawals_transactions
+                        WHERE pending_withdrawals_queue_start_index <= $1
+                            AND $1 < pending_withdrawals_queue_end_index
+                    LIMIT 1
+                    ",
+                    pending_withdrawal_id,
+                )
+                .fetch_optional(self.0.conn())
+                .await?
+                .map(|complete_withdrawals_transaction| {
+                    H256::from_slice(&complete_withdrawals_transaction.tx_hash)
+                })
+            }
+            None => None,
+        };
+
+        metrics::histogram!(
+            "sql.chain.operations.eth_withdraw_tx_for_complete_withdrawal",
+            start.elapsed()
+        );
+        Ok(res)
+    }
+
+    /// On the current version of contracts all withdrawals are made as Internal Transactions in `executeBlocks`, so the hash
+    /// of the transaction in which the withdrawals from the contract to the user took place will be the same as `ExecuteBlocks` tx.
+    async fn eth_withdraw_tx_for_execute_block(
         &mut self,
         withdrawal_hash: &TxHash,
     ) -> QueryResult<Option<H256>> {
@@ -304,21 +353,43 @@ impl<'a, 'c> OperationsSchema<'a, 'c> {
             return Ok(None);
         };
 
-        let execute_block_operation = self
-            .get_aggregated_op_that_affects_block(AggregatedActionType::ExecuteBlocks, block_number)
+        let withdrawal_hash = EthereumSchema(self.0)
+            .aggregated_op_final_hash(block_number)
             .await?;
 
-        let res = if let Some((op_id, _)) = execute_block_operation {
-            EthereumSchema(self.0).aggregated_op_final_hash(op_id).await
-        } else {
-            Ok(None)
-        };
+        metrics::histogram!(
+            "sql.chain.operations.eth_withdraw_tx_for_execute_block",
+            start.elapsed()
+        );
+        Ok(withdrawal_hash)
+    }
+
+    /// Returns the hash of the Ethereum transaction in which the
+    /// funds were withdrawn corresponding to the withdraw operation on L2.
+    pub async fn eth_tx_for_withdrawal(
+        &mut self,
+        withdrawal_hash: &TxHash,
+    ) -> QueryResult<Option<H256>> {
+        let start = Instant::now();
+
+        // For a long time, the operation `CompleteWithdrawals` was used to withdraw funds,
+        // now it is used `ExecuteBlocks`, so we should check each of the possible options.
+        let eth_withdraw_tx_for_execute_block = self
+            .eth_withdraw_tx_for_execute_block(withdrawal_hash)
+            .await?;
+        let eth_withdraw_tx_for_complete_withdrawal = self
+            .eth_withdraw_tx_for_complete_withdrawal(withdrawal_hash)
+            .await?;
+
+        let eth_tx_hash =
+            eth_withdraw_tx_for_execute_block.or(eth_withdraw_tx_for_complete_withdrawal);
 
         metrics::histogram!(
             "sql.chain.operations.eth_tx_for_withdrawal",
             start.elapsed()
         );
-        res
+
+        Ok(eth_tx_hash)
     }
 
     pub async fn store_aggregated_action(
