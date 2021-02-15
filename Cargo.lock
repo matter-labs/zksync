@@ -5810,6 +5810,7 @@ dependencies = [
  "toml",
  "tracing",
  "url 2.1.1",
+ "zksync_crypto",
  "zksync_types",
  "zksync_utils",
 ]

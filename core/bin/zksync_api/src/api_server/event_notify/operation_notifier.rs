@@ -86,7 +86,7 @@ impl OperationNotifier {
                 block.block_transactions.clone(),
                 action,
                 block.block_number,
-            )?;
+            );
 
             let updated_accounts: Vec<AccountId> = block
                 .block_transactions
@@ -124,7 +124,7 @@ impl OperationNotifier {
         ops: Vec<ExecutedOperations>,
         action: ActionType,
         block_number: BlockNumber,
-    ) -> Result<(), anyhow::Error> {
+    ) {
         let start = Instant::now();
         for tx in ops {
             match tx {
@@ -157,7 +157,6 @@ impl OperationNotifier {
             }
         }
         metrics::histogram!("api.notifier.handle_executed_operations", start.elapsed());
-        Ok(())
     }
 
     /// More convenient alias for `handle_executed_operations`.
@@ -169,7 +168,8 @@ impl OperationNotifier {
             exec_batch.operations,
             ActionType::COMMIT,
             exec_batch.block_number,
-        )
+        );
+        Ok(())
     }
 
     /// Removes provided subscription from the list.
