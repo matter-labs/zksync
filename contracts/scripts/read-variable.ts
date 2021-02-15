@@ -27,7 +27,7 @@ async function readDynamicBytes(slot: BigNumber, address: string): Promise<strin
     const data = await getStorageAt(address, slot);
     if (Number.parseInt(data.substr(64, 2), 16) % 2 === 0) {
         const length = Number.parseInt(data.substr(64, 2), 16) / 2;
-        return data.substr(0, 2 * length);
+        return '0x' + data.substr(2, 2 * length);
     } else {
         const length = (Number.parseInt(data, 16) - 1) / 2;
         const firstSlot = BigNumber.from(ethers.utils.solidityKeccak256(['uint'], [slot]));
@@ -115,9 +115,9 @@ async function readStruct(slot: BigNumber, address: string, type: string): Promi
             readVariable(slot.add(Number.parseInt(member.slot, 10)), member.offset, address, member.type)
         );
     });
-    (await Promise.all(data)).forEach((value, key) => {
-        result[key] = value;
-    });
+    for (const [key, value] of data) {
+        result[key] = await value;
+    }
     return result;
 }
 
@@ -251,7 +251,7 @@ async function readPartOfVariable(
     return readPrimitive(slot, shift, address, type);
 }
 
-// Get array of indexes, struct fields and mapping keys from name
+// Get reverse array of indexes, struct fields and mapping keys from name
 function parseName(fullName: string): string[] {
     const firstPoint = fullName.indexOf('.');
     const firstBracket = fullName.indexOf('[');
