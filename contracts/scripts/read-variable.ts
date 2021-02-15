@@ -11,165 +11,143 @@ const cache: Map<BigNumber, string> = new Map<BigNumber, string>();
 
 async function getStorageAt(address: string, slot: BigNumber): Promise<string> {
     if (!cache.has(slot)) {
-        cache.set(slot, (await provider.getStorageAt(address, slot)).substr(2, 64));
+        cache.set(slot, await provider.getStorageAt(address, slot));
     }
     return cache.get(slot);
 }
 
-function hexToUtf8(hex: string): string {
-    return decodeURIComponent('%' + hex.match(/.{1,2}/g).join('%'));
+// Read bytes from storage like utf-8 string
+async function readBytes(slot: BigNumber, shift: number, bytes: number, address: string): Promise<string> {
+    const data = await getStorageAt(address, slot);
+    return '0x' + data.substr(66 - bytes * 2 - shift * 2, bytes * 2);
 }
 
-function bytesToHex(array: Uint8Array): string {
-    let result: string = '';
-    array.forEach((byte) => {
-        result += byte.toString(16).padStart(2, '0');
-    });
-    return result;
-}
-
-function utf8ToHex(str: string): string {
-    return bytesToHex(ethers.utils.toUtf8Bytes(str));
-}
-
-function hexToUnsignedNumber(hex: string): string {
-    return BigNumber.from('0x' + hex).toString();
-}
-
-function hexToSignedNumber(hex: string): string {
-    let bn: bigint = BigInt('0x' + hex);
-    if (parseInt(hex.substr(0, 1), 16) > 7) {
-        bn =
-            BigInt(
-                '0b' +
-                    bn
-                        .toString(2)
-                        .split('')
-                        .map((i) => {
-                            return '0' === i ? 1 : 0;
-                        })
-                        .join('')
-            ) + BigInt(1);
-        bn = -bn;
-    }
-    return bn.toString();
-}
-
-function numberTo32Hex(input: string): string {
-    const hex = BigNumber.from(input).toHexString();
-    return hex.substring(2, hex.length).padStart(64, '0');
-}
-
-function hexStringToByte(str) {
-    if (!str) {
-        return new Uint8Array();
-    }
-    const a = [];
-    for (let i = 0, len = str.length; i < len; i += 2) {
-        a.push(parseInt(str.substr(i, 2), 16));
-    }
-    return new Uint8Array(a);
-}
-
+// Read dynamic sized bytes (encoding - bytes in solidity)
 async function readDynamicBytes(slot: BigNumber, address: string): Promise<string> {
     const data = await getStorageAt(address, slot);
-    if (Number.parseInt(data.substr(62, 2), 16) % 2 === 0) {
-        const length = Number.parseInt(data.substr(62, 2), 16) / 2;
+    if (Number.parseInt(data.substr(64, 2), 16) % 2 === 0) {
+        const length = Number.parseInt(data.substr(64, 2), 16) / 2;
         return data.substr(0, 2 * length);
     } else {
         const length = (Number.parseInt(data, 16) - 1) / 2;
         const firstSlot = BigNumber.from(ethers.utils.solidityKeccak256(['uint'], [slot]));
-        let hex: string = '';
+        const slots = [];
         for (let slotShift = 0; slotShift * 32 < length; slotShift++) {
-            hex += await getStorageAt(address, firstSlot.add(slotShift));
+            slots.push(getStorageAt(address, firstSlot.add(slotShift)));
+        }
+
+        const lastLength = length % 32;
+        let hex: string = '0x';
+        for (let i = 0; i < slots.length; i++) {
+            if (i === slots.length - 1) {
+                hex += (await slots[i]).substr(2, lastLength * 2);
+            } else {
+                hex += (await slots[i]).substr(2, 64);
+            }
         }
         return hex;
     }
 }
 
-async function readBytes(slot: BigNumber, shift: number, bytes: number, address: string): Promise<string> {
-    const data = await getStorageAt(address, slot);
-    return data.substr(64 - bytes * 2 - shift * 2, bytes * 2);
-}
-
+// Functions for read all types, except user defined structs and arrays
 async function readString(slot: BigNumber, address: string): Promise<string> {
-    return hexToUtf8(await readDynamicBytes(slot, address));
+    return ethers.utils.toUtf8String(await readDynamicBytes(slot, address));
 }
 
-async function readSignedNumber(slot: BigNumber, shift: number, bytes: number, address: string): Promise<string> {
-    return hexToSignedNumber(await readBytes(slot, shift, bytes, address));
-}
-
-async function readUnsignedNumber(slot: BigNumber, shift: number, bytes: number, address: string): Promise<string> {
-    return hexToUnsignedNumber(await readBytes(slot, shift, bytes, address));
+async function readNumber(slot: BigNumber, shift: number, label: string, address: string): Promise<string> {
+    let bytes: number;
+    if (label.substr(0, 3) === 'int') {
+        bytes = +label.substring(3, label.length) / 8;
+    } else {
+        bytes = +label.substring(4, label.length) / 8;
+    }
+    let data: string = await readBytes(slot, shift, bytes, address);
+    data = data.substring(2, data.length);
+    data = '0x' + data.padStart(64, '0');
+    return ethers.utils.defaultAbiCoder.decode([label], data).toString();
 }
 
 async function readBoolean(slot: BigNumber, shift: number, address: string): Promise<boolean> {
-    return parseInt(await readBytes(slot, shift, 1, address), 16) === 1;
+    return (await readNumber(slot, shift, 'uint8', address)) !== '0';
 }
 
 async function readAddress(slot: BigNumber, shift: number, address: string): Promise<string> {
-    return '0x' + (await readBytes(slot, shift, 20, address));
+    return readBytes(slot, shift, 20, address);
 }
 
 async function readEnum(slot: BigNumber, shift: number, bytes: number, address: string): Promise<string> {
-    return await readUnsignedNumber(slot, shift, bytes, address);
+    return await readNumber(slot, shift, 'uint' + bytes * 8, address);
 }
 
 let types: any;
 
 async function readPrimitive(slot: BigNumber, shift: number, address: string, type: string): Promise<any> {
-    if (type.substr(0, 5) === 't_int') return readSignedNumber(slot, shift, types[type].numberOfBytes, address);
-    if (type.substr(0, 6) === 't_uint') return readUnsignedNumber(slot, shift, types[type].numberOfBytes, address);
-    if (type === 't_bool') return readBoolean(slot, shift, address);
-    if (type === 't_address' || type === 't_address_payable') return readAddress(slot, shift, address);
-    if (type === 't_bytes_storage') return readDynamicBytes(slot, address);
-    if (type.substr(0, 7) === 't_bytes') return readBytes(slot, shift, types[type].numberOfBytes, address);
-    if (type === 't_string_storage') return readString(slot, address);
-    if (type.substr(0, 6) === 't_enum') return readEnum(slot, shift, types[type].numberOfBytes, address);
-    return undefined;
+    if (type.substr(0, 5) === 't_int' || type.substr(0, 6) === 't_uint') {
+        return readNumber(slot, shift, types[type].label, address);
+    }
+    if (type === 't_bool') {
+        return readBoolean(slot, shift, address);
+    }
+    if (type === 't_address' || type === 't_address_payable') {
+        return readAddress(slot, shift, address);
+    }
+    if (type === 't_bytes_storage') {
+        return readDynamicBytes(slot, address);
+    }
+    if (type.substr(0, 7) === 't_bytes') {
+        return readBytes(slot, shift, types[type].numberOfBytes, address);
+    }
+    if (type === 't_string_storage') {
+        return readString(slot, address);
+    }
+    if (type.substr(0, 6) === 't_enum') {
+        return readEnum(slot, shift, types[type].numberOfBytes, address);
+    }
 }
 
 async function readStruct(slot: BigNumber, address: string, type: string): Promise<object> {
     const result = {};
-    for (const member of types[type].members) {
-        result[member.label] = await readVariable(
-            slot.add(Number.parseInt(member.slot, 10)),
-            member.offset,
-            address,
-            member.type
+    const data = new Map();
+    types[type].members.forEach((member) => {
+        data.set(
+            member.label,
+            readVariable(slot.add(Number.parseInt(member.slot, 10)), member.offset, address, member.type)
         );
-    }
+    });
+    (await Promise.all(data)).forEach((value, key) => {
+        result[key] = value;
+    });
     return result;
 }
 
 async function readArray(slot: BigNumber, address: string, type: string): Promise<any> {
-    const result = [];
     let length: number;
     const baseType = types[type].base;
     if (types[type].encoding === 'dynamic_array') {
-        length = Number.parseInt(await getStorageAt(address, slot), 16);
+        length = +(await readNumber(slot, 0, 'uint256', address));
         slot = BigNumber.from(ethers.utils.solidityKeccak256(['uint'], [slot]));
     } else {
         length = Number.parseInt(type.substring(type.lastIndexOf(')') + 1, type.lastIndexOf('_')), 10);
     }
-    if (Number.parseInt(types[baseType].numberOfBytes, 10) < 32) {
-        let shift: number = -Number.parseInt(types[baseType].numberOfBytes, 10);
+    const baseBytes = +types[baseType].numberOfBytes;
+    const data = [];
+    if (baseBytes < 32) {
+        let shift: number = -baseBytes;
         for (let i = 0; i < length; i++) {
-            shift += Number.parseInt(types[baseType].numberOfBytes, 10);
-            if (shift + Number.parseInt(types[baseType].numberOfBytes, 10) > 32) {
+            shift += baseBytes;
+            if (shift + baseBytes > 32) {
                 shift = 0;
                 slot = slot.add(1);
             }
-            result.push(await readVariable(slot, shift, address, baseType));
+            data.push(readVariable(slot, shift, address, baseType));
         }
     } else {
         for (let i = 0; i < length; i++) {
-            result.push(await readVariable(slot, 0, address, baseType));
-            slot = slot.add(Number.parseInt(types[baseType].numberOfBytes, 10) / 32);
+            data.push(readVariable(slot, 0, address, baseType));
+            slot = slot.add(baseBytes / 32);
         }
     }
-    return result;
+    return Promise.all(data);
 }
 
 async function readVariable(slot: BigNumber, shift: number, address: string, type: string): Promise<any> {
@@ -178,68 +156,72 @@ async function readVariable(slot: BigNumber, shift: number, address: string, typ
     return readPrimitive(slot, shift, address, type);
 }
 
+// Read field of struct
 async function readPartOfStruct(slot: BigNumber, address: string, type: string, params: string[]): Promise<object> {
     const last = params.pop();
-    for (const member of types[type].members) {
-        if (member.label === last) {
-            return readPartOfVariable(
-                slot.add(Number.parseInt(member.slot, 10)),
-                member.offset,
-                address,
-                member.type,
-                params
-            );
-        }
-    }
+    const member = types[type].members.find((element) => {
+        return element.label === last;
+    });
+    return readPartOfVariable(slot.add(Number.parseInt(member.slot, 10)), member.offset, address, member.type, params);
 }
 
+// Read array element by index
 async function readPartOfArray(slot: BigNumber, address: string, type: string, params: string[]): Promise<any> {
-    const index = Number.parseInt(params.pop(), 10);
+    const index = +params.pop();
     const baseType = types[type].base;
     if (types[type].encoding === 'dynamic_array') {
         slot = BigNumber.from(ethers.utils.solidityKeccak256(['uint'], [slot]));
     }
-    if (Number.parseInt(types[baseType].numberOfBytes, 10) < 32) {
-        const inOne = Math.floor(32 / Number.parseInt(types[baseType].numberOfBytes, 10));
-        const shift = Number.parseInt(types[baseType].numberOfBytes, 10) * (index % inOne);
-        return readPartOfVariable(slot.add(Math.floor(index / inOne)), shift, address, baseType, params);
+    const baseBytes = +types[baseType].numberOfBytes;
+    if (baseBytes < 32) {
+        const inOne = Math.floor(32 / baseBytes);
+        slot = slot.add(Math.floor(index / inOne));
+        const shift = baseBytes * (index % inOne);
+        return readPartOfVariable(slot, shift, address, baseType, params);
     } else {
-        return readPartOfVariable(
-            slot.add((index * Number.parseInt(types[baseType].numberOfBytes, 10)) / 32),
-            0,
-            address,
-            baseType,
-            params
-        );
+        slot = slot.add((index * baseBytes) / 32);
+        return readPartOfVariable(slot, 0, address, baseType, params);
     }
 }
 
-function parseKey(key: string, type: string): string {
+// Encode key for mapping type
+function encodeKey(key: string, type: string): string {
     if (type === 't_bool') {
-        if (key === 'false' || key === '0') return numberTo32Hex('0');
-        else return numberTo32Hex('1');
+        if (key === 'false' || key === '0') {
+            return ethers.utils.defaultAbiCoder.encode(['bool'], [false]);
+        } else {
+            return ethers.utils.defaultAbiCoder.encode(['bool'], [true]);
+        }
     }
     if (type === 't_address' || type === 't_address_payable') {
-        if (key.length === 42) return key.substring(2, key.length).padStart(64, '0');
-        else return key.padStart(64, ' 0');
+        if (key.length === 42) {
+            return '0x' + key.substring(2, key.length).padStart(64, '0');
+        } else {
+            return '0x' + key.padStart(64, '0');
+        }
     }
     if (type === 't_string_memory_ptr') {
-        return utf8ToHex(key);
+        return ethers.utils.hexlify(ethers.utils.toUtf8Bytes(key));
     }
     if (type === 't_bytes_memory_ptr') {
-        if (key.substr(0, 2) === '0x') return key.substring(2, key.length);
-        else return key;
+        if (key.substr(0, 2) === '0x') {
+            return key;
+        } else {
+            return '0x' + key;
+        }
     }
-    return numberTo32Hex(key);
+    return ethers.utils.defaultAbiCoder.encode([types[type].label], [+key]);
 }
 
+// Read mapping element by key
 async function readPartOfMap(slot: BigNumber, address: string, type: string, params: string[]): Promise<any> {
     const key = params.pop();
     const valueType = types[type].value;
     const keyType = types[type].key;
-    slot = BigNumber.from(
-        ethers.utils.keccak256(hexStringToByte(parseKey(key, keyType) + numberTo32Hex(slot.toString())))
-    );
+    const encodedKey = encodeKey(key, keyType);
+    const encodedSlot = ethers.utils.defaultAbiCoder.encode(['uint'], [slot]);
+    const hex = encodedKey + encodedSlot.substring(2, encodedSlot.length);
+    slot = BigNumber.from(ethers.utils.keccak256(ethers.utils.arrayify(hex)));
     return readPartOfVariable(slot, 0, address, valueType, params);
 }
 
@@ -265,6 +247,7 @@ async function readPartOfVariable(
     return readPrimitive(slot, shift, address, type);
 }
 
+// Get array indexes, struct fields and mapping keys from name
 function parseName(fullName: string): string[] {
     const firstPoint = fullName.indexOf('.');
     const firstBracket = fullName.indexOf('[');
@@ -312,6 +295,7 @@ function parseName(fullName: string): string[] {
     return result.reverse();
 }
 
+// Get variableName (Without indexes, fields, keys)
 function getVariableName(fullName: string): string {
     let variableName: string = fullName;
     if (variableName.indexOf('[') !== -1) {
@@ -361,7 +345,7 @@ async function getValue(address: string, contractName: string, name: string, fil
     storage.forEach((node) => {
         if (node.label === variableName) variable = node;
     });
-    if (variable === undefined) {
+    if (!variable) {
         throw new Error('Invalid name');
     }
     return readPartOfVariable(BigNumber.from(variable.slot), variable.offset, address, variable.type, params);
