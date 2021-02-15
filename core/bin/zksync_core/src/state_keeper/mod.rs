@@ -80,13 +80,16 @@ impl PendingBlock {
         available_chunks_sizes: &[usize],
         previous_block_root_hash: H256,
         timestamp: u64,
+        should_include_last_transfer: bool,
     ) -> Self {
         // TransferOp chunks are subtracted to reserve space for last transfer.
-        let chunks_left = *available_chunks_sizes
+        let mut chunks_left = *available_chunks_sizes
             .iter()
             .max()
-            .expect("Expected at least one block chunks size")
-            - TransferOp::CHUNKS;
+            .expect("Expected at least one block chunks size");
+        if should_include_last_transfer {
+            chunks_left -= TransferOp::CHUNKS;
+        }
         Self {
             success_operations: Vec::new(),
             failed_txs: Vec::new(),
@@ -412,6 +415,7 @@ impl ZkSyncStateKeeper {
                 &available_block_chunk_sizes,
                 previous_root_hash,
                 system_time_timestamp(),
+                tx_signer.is_some(),
             ),
             available_block_chunk_sizes,
             max_miniblock_iterations,
@@ -964,6 +968,7 @@ impl ZkSyncStateKeeper {
                 &self.available_block_chunk_sizes,
                 H256::default(),
                 system_time_timestamp(),
+                self.tx_signer.is_some(),
             ),
         );
         // Once block is sealed, we refresh the counters for the next block.
