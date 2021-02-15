@@ -50,25 +50,21 @@ impl<'a, 'c> DataRestoreSchema<'a, 'c> {
                 .await?;
         }
 
-        if commit_op.blocks.is_empty() {
-            OperationsSchema(&mut transaction)
-                .confirm_aggregated_operations(
-                    commit_op.blocks.first().unwrap().block_number,
-                    commit_op.blocks.last().unwrap().block_number,
-                    AggregatedActionType::CommitBlocks,
-                )
-                .await?;
-        }
+        OperationsSchema(&mut transaction)
+            .confirm_aggregated_operations(
+                commit_op.blocks.first().unwrap().block_number,
+                commit_op.blocks.last().unwrap().block_number,
+                AggregatedActionType::CommitBlocks,
+            )
+            .await?;
 
-        if execute_op.blocks.is_empty() {
-            OperationsSchema(&mut transaction)
-                .confirm_aggregated_operations(
-                    execute_op.blocks.first().unwrap().block_number,
-                    execute_op.blocks.last().unwrap().block_number,
-                    AggregatedActionType::ExecuteBlocks,
-                )
-                .await?;
-        }
+        OperationsSchema(&mut transaction)
+            .confirm_aggregated_operations(
+                execute_op.blocks.first().unwrap().block_number,
+                execute_op.blocks.last().unwrap().block_number,
+                AggregatedActionType::ExecuteBlocks,
+            )
+            .await?;
 
         DataRestoreSchema(&mut transaction)
             .update_storage_state(new_state)
