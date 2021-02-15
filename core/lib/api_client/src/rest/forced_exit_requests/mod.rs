@@ -6,7 +6,7 @@
 use serde::{Deserialize, Serialize};
 
 // Workspace uses
-use zksync_types::{tx::TxHash, Address, TokenId};
+use zksync_types::{forced_exit_requests::ForcedExitRequest, tx::TxHash, Address, TokenId};
 use zksync_utils::BigUintSerdeAsRadix10Str;
 
 use num::BigUint;
@@ -54,7 +54,7 @@ impl Client {
     pub async fn submit_forced_exit_request(
         &self,
         regiter_request: ForcedExitRegisterRequest,
-    ) -> ClientResult<TxHash> {
+    ) -> ClientResult<ForcedExitRequest> {
         self.post_with_scope(FORCED_EXIT_REQUESTS_SCOPE, "submit")
             .body(&regiter_request)
             .send()

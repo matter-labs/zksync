@@ -10,7 +10,6 @@ use actix_web::{
 
 use bigdecimal::{BigDecimal, FromPrimitive};
 use chrono::{Duration, Utc};
-use futures::channel::mpsc;
 use num::{bigint::ToBigInt, BigUint};
 use std::ops::Add;
 use std::str::FromStr;
@@ -29,26 +28,18 @@ use zksync_config::ZkSyncConfig;
 use zksync_storage::ConnectionPool;
 use zksync_types::{
     forced_exit_requests::{ForcedExitRequest, ForcedExitRequestId, SaveForcedExitRequestQuery},
-    Address, TokenLike, TxFeeTypes,
+    Address, TokenLike,
 };
 
 // Local uses
 use crate::api_server::rest::v1::{Error as ApiError, JsonResult};
 
-use crate::{
-    api_server::{
-        forced_exit_checker::ForcedExitChecker,
-        tx_sender::{SubmitError, TxSender},
-    },
-    fee_ticker::TickerRequest,
-};
+use crate::api_server::forced_exit_checker::ForcedExitAccountAgeChecker;
 
 /// Shared data between `api/v1/transactions` endpoints.
-#[derive(Clone)]
 pub struct ApiForcedExitRequestsData {
     pub(crate) connection_pool: ConnectionPool,
-    pub(crate) forced_exit_checker: ForcedExitChecker,
-    pub(crate) ticker_request_sender: mpsc::Sender<TickerRequest>,
+    pub(crate) forced_exit_checker: Box<dyn ForcedExitAccountAgeChecker>,
 
     pub(crate) is_enabled: bool,
     pub(crate) max_tokens_per_request: u8,
@@ -62,13 +53,11 @@ impl ApiForcedExitRequestsData {
     fn new(
         connection_pool: ConnectionPool,
         config: &ZkSyncConfig,
-        ticker_request_sender: mpsc::Sender<TickerRequest>,
+        forced_exit_checker: Box<dyn ForcedExitAccountAgeChecker>,
     ) -> Self {
-        let forced_exit_checker = ForcedExitChecker::new(&config);
         Self {
             connection_pool,
             forced_exit_checker,
-            ticker_request_sender,
 
             is_enabled: config.forced_exit_requests.enabled,
             price_per_token: config.forced_exit_requests.price_per_token,
@@ -205,9 +194,9 @@ pub async fn get_request_by_id(
 pub fn api_scope(
     connection_pool: ConnectionPool,
     config: &ZkSyncConfig,
-    ticker_request_sender: mpsc::Sender<TickerRequest>,
+    fe_checker: Box<dyn ForcedExitAccountAgeChecker>,
 ) -> Scope {
-    let data = ApiForcedExitRequestsData::new(connection_pool, config, ticker_request_sender);
+    let data = ApiForcedExitRequestsData::new(connection_pool, config, fe_checker);
 
     // `enabled` endpoint should always be there
     let scope = web::scope("v0.1")
@@ -225,68 +214,23 @@ pub fn api_scope(
 
 #[cfg(test)]
 mod tests {
-    use bigdecimal::BigDecimal;
-    use futures::{channel::mpsc, StreamExt};
+    use std::ops::Mul;
+
     use num::BigUint;
 
     use zksync_api_client::rest::v1::Client;
     use zksync_config::ForcedExitRequestsConfig;
     use zksync_storage::ConnectionPool;
-    use zksync_types::tokens::TokenLike;
-    use zksync_types::Address;
-
-    use crate::fee_ticker::{Fee, OutputFeeType::Withdraw, TickerRequest};
+    use zksync_types::{Address, TokenId};
 
     use super::*;
+    use crate::api_server::forced_exit_checker::DummyForcedExitChecker;
     use crate::api_server::v1::test_utils::TestServerConfig;
-
-    // fn dummy_fee_ticker(zkp_fee: Option<u64>, gas_fee: Option<u64>) -> mpsc::Sender<TickerRequest> {
-    //     let (sender, mut receiver) = mpsc::channel(10);
-
-    //     let zkp_fee = zkp_fee.unwrap_or(1_u64);
-    //     let gas_fee = gas_fee.unwrap_or(1_u64);
-
-    //     actix_rt::spawn(async move {
-    //         while let Some(item) = receiver.next().await {
-    //             match item {
-    //                 TickerRequest::GetTxFee { response, .. } => {
-    //                     let fee = Ok(Fee::new(
-    //                         Withdraw,
-    //                         BigUint::from(zkp_fee).into(),
-    //                         BigUint::from(gas_fee).into(),
-    //                         1_u64.into(),
-    //                         1_u64.into(),
-    //                     ));
-
-    //                     response.send(fee).expect("Unable to send response");
-    //                 }
-    //                 TickerRequest::GetTokenPrice { response, .. } => {
-    //                     let price = Ok(BigDecimal::from(1_u64));
-
-    //                     response.send(price).expect("Unable to send response");
-    //                 }
-    //                 TickerRequest::IsTokenAllowed { token, response } => {
-    //                     // For test purposes, PHNX token is not allowed.
-    //                     let is_phnx = match token {
-    //                         TokenLike::Id(id) => id == 1,
-    //                         TokenLike::Symbol(sym) => sym == "PHNX",
-    //                         TokenLike::Address(_) => unreachable!(),
-    //                     };
-    //                     response.send(Ok(!is_phnx)).unwrap_or_default();
-    //                 }
-    //             }
-    //         }
-    //     });
-
-    //     sender
-    // }
 
     struct TestServer {
         api_server: actix_web::test::TestServer,
         #[allow(dead_code)]
         pool: ConnectionPool,
-        #[allow(dead_code)]
-        fee_ticker: mpsc::Sender<TickerRequest>,
     }
 
     impl TestServer {
@@ -295,53 +239,22 @@ mod tests {
         async fn new() -> anyhow::Result<(Client, Self)> {
             let cfg = TestServerConfig::default();
 
-            Self::new_with_config(cfg).await
+            Self::from_config(cfg).await
         }
 
-        async fn new_with_config(cfg: TestServerConfig) -> anyhow::Result<(Client, Self)> {
+        async fn from_config(cfg: TestServerConfig) -> anyhow::Result<(Client, Self)> {
             let pool = cfg.pool.clone();
 
-            let fee_ticker = dummy_fee_ticker(None, None);
-
-            let fee_ticker2 = fee_ticker.clone();
-            let (api_client, api_server) = cfg
-                .start_server_with_scope(String::from("api/forced_exit_requests"), move |cfg| {
-                    api_scope(cfg.pool.clone(), &cfg.config, fee_ticker2.clone())
+            let (api_client, api_server) =
+                cfg.start_server_with_scope(String::from("api/forced_exit_requests"), move |cfg| {
+                    api_scope(
+                        cfg.pool.clone(),
+                        &cfg.config,
+                        Box::new(DummyForcedExitChecker {}),
+                    )
                 });
 
-            Ok((
-                api_client,
-                Self {
-                    api_server,
-                    pool,
-                    fee_ticker,
-                },
-            ))
-        }
-
-        async fn new_with_fee_ticker(
-            cfg: TestServerConfig,
-            gas_fee: Option<u64>,
-            zkp_fee: Option<u64>,
-        ) -> anyhow::Result<(Client, Self)> {
-            let pool = cfg.pool.clone();
-
-            let fee_ticker = dummy_fee_ticker(gas_fee, zkp_fee);
-
-            let fee_ticker2 = fee_ticker.clone();
-            let (api_client, api_server) = cfg
-                .start_server_with_scope(String::from("/api/forced_exit_requests"), move |cfg| {
-                    api_scope(cfg.pool.clone(), &cfg.config, fee_ticker2.clone())
-                });
-
-            Ok((
-                api_client,
-                Self {
-                    api_server,
-                    pool,
-                    fee_ticker,
-                },
-            ))
+            Ok((api_client, Self { api_server, pool }))
         }
 
         async fn stop(self) {
@@ -376,23 +289,22 @@ mod tests {
             ..forced_exit_requests
         });
 
-        let (client, server) = TestServer::new_with_config(test_config).await?;
+        let (client, server) = TestServer::from_config(test_config).await?;
 
         let status = client.get_forced_exit_requests_status().await?;
 
         assert_eq!(status, ForcedExitRequestStatus::Disabled);
 
-        let should_be_disabled_msg = "Forced-exit related requests don't fail when it's disabled";
         let register_request = ForcedExitRegisterRequest {
             target: Address::from_str("c0f97CC918C9d6fA4E9fc6be61a6a06589D199b2").unwrap(),
-            tokens: vec![0],
+            tokens: vec![TokenId(0)],
             price_in_wei: BigUint::from_str("1212").unwrap(),
         };
 
         client
             .submit_forced_exit_request(register_request)
             .await
-            .expect_err(should_be_disabled_msg);
+            .expect_err("Forced-exit related requests don't fail when it's disabled");
 
         server.stop().await;
         Ok(())
@@ -410,7 +322,7 @@ mod tests {
             ..forced_exit_requests
         });
 
-        let (client, server) = TestServer::new_with_config(test_config).await?;
+        let (client, server) = TestServer::from_config(test_config).await?;
 
         let status = client.get_forced_exit_requests_status().await?;
 
@@ -435,24 +347,30 @@ mod tests {
         not(feature = "api_test"),
         ignore = "Use `zk test rust-api` command to perform this test"
     )]
-    async fn test_forced_exit_requests_wrongs_tokens_number() -> anyhow::Result<()> {
-        let forced_exit_requests = ForcedExitRequestsConfig::from_env();
+    async fn test_forced_exit_requests_wrong_tokens_number() -> anyhow::Result<()> {
+        let forced_exit_requests_config = ForcedExitRequestsConfig::from_env();
         let test_config = get_test_config_from_forced_exit_requests(ForcedExitRequestsConfig {
             max_tokens_per_request: 5,
-            ..forced_exit_requests
+            ..forced_exit_requests_config
         });
 
-        let (client, server) =
-            TestServer::new_with_fee_ticker(test_config, Some(10000), Some(10000)).await?;
+        let (client, server) = TestServer::from_config(test_config).await?;
 
         let status = client.get_forced_exit_requests_status().await?;
-
         assert_ne!(status, ForcedExitRequestStatus::Disabled);
+
+        let price_per_token = forced_exit_requests_config.price_per_token;
+        // 6 tokens:
+        let tokens: Vec<u16> = vec![0, 1, 2, 3, 4, 5];
+        let tokens: Vec<TokenId> = tokens.iter().map(|t| TokenId(*t)).collect();
+        let price_in_wei = BigUint::from_i64(price_per_token)
+            .unwrap()
+            .mul(tokens.len());
 
         let register_request = ForcedExitRegisterRequest {
             target: Address::from_str("c0f97CC918C9d6fA4E9fc6be61a6a06589D199b2").unwrap(),
-            tokens: vec![0, 1, 2, 3, 4, 5, 6, 7],
-            price_in_wei: BigUint::from_str("1212").unwrap(),
+            tokens,
+            price_in_wei,
         };
 
         client
@@ -464,23 +382,48 @@ mod tests {
         Ok(())
     }
 
-    // #[actix_rt::test]
-    // #[cfg_attr(
-    //     not(feature = "api_test"),
-    //     ignore = "Use `zk test rust-api` command to perform this test"
-    // )]
-    // async fn test_forced_exit_requests_submit() -> anyhow::Result<()>  {
-    //     let (client, server) = TestServer::new().await?;
+    #[actix_rt::test]
+    #[cfg_attr(
+        not(feature = "api_test"),
+        ignore = "Use `zk test rust-api` command to perform this test"
+    )]
+    async fn test_forced_exit_requests_submit() -> anyhow::Result<()> {
+        let price_per_token: i64 = 1000000000000000000;
+        let max_tokens_per_request = 3;
+        let config = ForcedExitRequestsConfig {
+            max_tokens_per_request,
+            price_per_token,
+            ..ForcedExitRequestsConfig::from_env()
+        };
+        let server_config = get_test_config_from_forced_exit_requests(config);
 
-    //     let enabled = client.are_forced_exit_requests_enabled().await?.enabled;
-    //     assert_eq!(enabled, true);
+        let (client, server) = TestServer::from_config(server_config).await?;
 
-    //     let fee = client.get_forced_exit_request_fee().await?.request_fee;
+        let status = client.get_forced_exit_requests_status().await?;
+        assert!(matches!(status, ForcedExitRequestStatus::Enabled(_)));
 
-    //     let fe_request = ForcedExitRegisterRequest {
-    //         target: ""
-    //     };
+        let tokens: Vec<u16> = vec![0, 1, 2];
+        let tokens: Vec<TokenId> = tokens.iter().map(|t| TokenId(*t)).collect();
 
-    //     Ok(())
-    // }
+        let price_in_wei = BigUint::from_i64(price_per_token)
+            .unwrap()
+            .mul(tokens.len());
+
+        let target = Address::from_str("c0f97CC918C9d6fA4E9fc6be61a6a06589D199b2").unwrap();
+
+        let fe_request = ForcedExitRegisterRequest {
+            target,
+            tokens: tokens.clone(),
+            price_in_wei: price_in_wei.clone(),
+        };
+
+        let submit_result = client.submit_forced_exit_request(fe_request).await?;
+
+        assert_eq!(submit_result.price_in_wei, price_in_wei);
+        assert_eq!(submit_result.tokens, tokens);
+        assert_eq!(submit_result.target, target);
+
+        server.stop().await;
+        Ok(())
+    }
 }

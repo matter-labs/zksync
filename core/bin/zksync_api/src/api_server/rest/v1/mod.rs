@@ -50,9 +50,4 @@ pub(crate) fn api_scope(tx_sender: TxSender, zk_config: &ZkSyncConfig) -> Scope 
             tx_sender.tokens,
             tx_sender.ticker_requests.clone(),
         ))
-    // .service(forced_exit_requests::api_scope(
-    //     tx_sender.pool.clone(),
-    //     zk_config,
-    //     tx_sender.ticker_requests,
-    // ))
 }

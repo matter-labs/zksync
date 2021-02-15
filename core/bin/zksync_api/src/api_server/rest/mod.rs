@@ -37,11 +37,8 @@ async fn start_server(
             v1::api_scope(tx_sender, &api_v01.config)
         };
 
-        let forced_exit_requests_api_scope = forced_exit_requests::api_scope(
-            api_v01.connection_pool.clone(),
-            &api_v01.config,
-            fee_ticker.clone(),
-        );
+        let forced_exit_requests_api_scope =
+            forced_exit_requests::api_scope(api_v01.connection_pool.clone(), &api_v01.config);
 
         App::new()
             .wrap(Cors::new().send_wildcard().max_age(3600).finish())

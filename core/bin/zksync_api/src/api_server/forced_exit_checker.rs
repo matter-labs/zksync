@@ -6,6 +6,16 @@ use zksync_types::Address;
 use crate::internal_error;
 
 use chrono::Utc;
+
+#[async_trait::async_trait]
+pub trait ForcedExitAccountAgeChecker {
+    async fn check_forced_exit<'a>(
+        &self,
+        storage: &mut StorageProcessor<'a>,
+        target_account_address: Address,
+    ) -> Result<(), SubmitError>;
+}
+
 #[derive(Clone)]
 pub struct ForcedExitChecker {
     /// Mimimum age of the account for `ForcedExit` operations to be allowed.
@@ -22,8 +32,11 @@ impl ForcedExitChecker {
             forced_exit_minimum_account_age,
         }
     }
+}
 
-    pub async fn check_forced_exit<'a>(
+#[async_trait::async_trait]
+impl ForcedExitAccountAgeChecker for ForcedExitChecker {
+    async fn check_forced_exit<'a>(
         &self,
         storage: &mut StorageProcessor<'a>,
         target_account_address: Address,
@@ -48,5 +61,18 @@ impl ForcedExitChecker {
 
             Some(..) => Ok(()),
         }
+    }
+}
+
+pub struct DummyForcedExitChecker;
+
+#[async_trait::async_trait]
+impl ForcedExitAccountAgeChecker for DummyForcedExitChecker {
+    async fn check_forced_exit<'a>(
+        &self,
+        _storage: &mut StorageProcessor<'a>,
+        _target_account_address: Address,
+    ) -> Result<(), SubmitError> {
+        Ok(())
     }
 }

@@ -26,7 +26,7 @@ use zksync_types::{
 // Local uses
 use crate::api_server::rpc_server::types::TxWithSignature;
 use crate::{
-    api_server::forced_exit_checker::ForcedExitChecker,
+    api_server::forced_exit_checker::{ForcedExitAccountAgeChecker, ForcedExitChecker},
     core_api_client::CoreApiClient,
     fee_ticker::{TickerRequest, TokenPriceRequestType},
     signature_checker::{TxVariant, VerifiedTx, VerifyTxSignatureRequest},
