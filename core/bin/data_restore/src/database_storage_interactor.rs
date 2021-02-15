@@ -110,7 +110,7 @@ impl StorageInteractor for DatabaseStorageInteractor<'_> {
             .block_schema()
             .save_block(block)
             .await
-            .expect("Unable save block");
+            .expect("Unable to save block");
 
         transaction
             .commit()
