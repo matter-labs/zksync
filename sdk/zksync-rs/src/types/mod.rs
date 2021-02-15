@@ -164,3 +164,10 @@ pub struct Fee {
     #[serde(with = "BigUintSerdeAsRadix10Str")]
     pub total_fee: BigUint,
 }
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct BatchFee {
+    #[serde(with = "BigUintSerdeAsRadix10Str")]
+    pub total_fee: BigUint,
+}

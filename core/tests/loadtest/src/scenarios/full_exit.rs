@@ -6,9 +6,10 @@ use num::BigUint;
 use serde::{Deserialize, Serialize};
 // Workspace uses
 use zksync::{types::BlockStatus, utils::closest_packable_token_amount};
+use zksync_types::TokenLike;
 // Local uses
 use super::{Fees, Scenario, ScenarioResources};
-use crate::{monitor::Monitor, test_wallet::TestWallet, utils::wait_all_failsafe};
+use crate::{monitor::Monitor, utils::wait_all_failsafe, wallet::ScenarioWallet};
 
 /// Configuration options for the full exit scenario.
 #[derive(Debug, Serialize, Deserialize, Copy, Clone, Ord, PartialOrd, Eq, PartialEq)]
@@ -23,20 +24,15 @@ impl Default for FullExitScenarioConfig {
     }
 }
 
-impl From<FullExitScenarioConfig> for FullExitScenario {
-    fn from(config: FullExitScenarioConfig) -> Self {
-        Self { config }
-    }
-}
-
 #[derive(Debug)]
 pub struct FullExitScenario {
+    token_name: TokenLike,
     config: FullExitScenarioConfig,
 }
 
 impl fmt::Display for FullExitScenario {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_str("full_exit")
+        write!(f, "full_exit({})", self.token_name)
     }
 }
 
@@ -52,6 +48,7 @@ impl Scenario for FullExitScenario {
         ScenarioResources {
             wallets_amount: self.config.wallets_amount,
             balance_per_wallet,
+            token_name: self.token_name.clone(),
             has_deposits: true,
         }
     }
@@ -60,7 +57,7 @@ impl Scenario for FullExitScenario {
         &mut self,
         monitor: &Monitor,
         fees: &Fees,
-        wallets: &[TestWallet],
+        wallets: &[ScenarioWallet],
     ) -> anyhow::Result<()> {
         // Withdraw some amount to have enough funds to perform `full_exit` operation.
         let withdraw_amount = closest_packable_token_amount(&balance_per_wallet(fees));
@@ -84,8 +81,8 @@ impl Scenario for FullExitScenario {
         &mut self,
         monitor: Monitor,
         fees: Fees,
-        wallets: Vec<TestWallet>,
-    ) -> anyhow::Result<Vec<TestWallet>> {
+        wallets: Vec<ScenarioWallet>,
+    ) -> anyhow::Result<Vec<ScenarioWallet>> {
         vlog::info!("Full exit and deposit cycle started");
 
         let full_exit_task = wallets
@@ -103,17 +100,21 @@ impl Scenario for FullExitScenario {
         &mut self,
         _monitor: &Monitor,
         _fees: &Fees,
-        _wallets: &[TestWallet],
+        _wallets: &[ScenarioWallet],
     ) -> anyhow::Result<()> {
         Ok(())
     }
 }
 
 impl FullExitScenario {
+    pub fn new(token_name: TokenLike, config: FullExitScenarioConfig) -> Self {
+        Self { token_name, config }
+    }
+
     async fn full_exit_and_deposit(
         monitor: &Monitor,
         fees: &Fees,
-        wallet: &TestWallet,
+        wallet: &ScenarioWallet,
     ) -> anyhow::Result<()> {
         monitor
             .wait_for_priority_op(BlockStatus::Verified, &wallet.full_exit().await?)

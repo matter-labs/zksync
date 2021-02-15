@@ -7,6 +7,7 @@ use std::time::Duration;
 // External uses
 use async_trait::async_trait;
 use jsonrpc_core::{types::response::Output, ErrorCode};
+use num::BigUint;
 
 // Workspace uses
 use zksync_types::{
@@ -54,6 +55,14 @@ pub trait Provider {
         address: Address,
         token: impl Into<TokenLike> + Send + 'async_trait,
     ) -> ResponseResult<Fee>;
+
+    /// Obtains minimum fee required to process transactions batch in zkSync network.
+    async fn get_txs_batch_fee(
+        &self,
+        tx_types: Vec<TxFeeTypes>,
+        addresses: Vec<Address>,
+        token: impl Into<TokenLike> + Send + 'async_trait,
+    ) -> ResponseResult<BigUint>;
 
     /// Requests and returns information about an Ethereum operation given its `serial_id`.
     async fn ethop_info(&self, serial_id: u32) -> ResponseResult<EthOpInfo>;
@@ -122,6 +131,18 @@ impl Provider for RpcProvider {
         let token = token.into();
         let msg = JsonRpcRequest::get_tx_fee(tx_type, address, token);
         self.send_and_deserialize(&msg).await
+    }
+
+    async fn get_txs_batch_fee(
+        &self,
+        tx_types: Vec<TxFeeTypes>,
+        addresses: Vec<Address>,
+        token: impl Into<TokenLike> + Send + 'async_trait,
+    ) -> ResponseResult<BigUint> {
+        let msg = JsonRpcRequest::get_txs_batch_fee_in_wei(tx_types, addresses, token.into());
+
+        let batch_fee: BatchFee = self.send_and_deserialize(&msg).await?;
+        Ok(batch_fee.total_fee)
     }
 
     async fn ethop_info(&self, serial_id: u32) -> ResponseResult<EthOpInfo> {
@@ -393,6 +414,15 @@ mod messages {
         pub fn get_tx_fee(tx_type: TxFeeTypes, address: Address, token_symbol: TokenLike) -> Self {
             let params = json_values![tx_type, address, token_symbol];
             Self::create("get_tx_fee", params)
+        }
+
+        pub fn get_txs_batch_fee_in_wei(
+            tx_types: Vec<TxFeeTypes>,
+            addresses: Vec<Address>,
+            token_like: TokenLike,
+        ) -> Self {
+            let params = json_values![tx_types, addresses, token_like];
+            Self::create("get_txs_batch_fee_in_wei", params)
         }
     }
 }

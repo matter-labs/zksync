@@ -37,6 +37,12 @@ impl From<&str> for TokenLike {
     }
 }
 
+impl From<&TokenLike> for TokenLike {
+    fn from(inner: &TokenLike) -> Self {
+        inner.to_owned()
+    }
+}
+
 impl fmt::Display for TokenLike {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
