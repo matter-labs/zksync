@@ -24,12 +24,6 @@ pub struct ZkSyncDeployedContract<T: Transport> {
 
 impl<T: Transport> ZkSyncDeployedContract<T> {
     /// Returns total number of verified blocks on Rollup contract
-    ///
-    /// # Arguments
-    ///
-    /// * `web3` - Web3 provider url
-    /// * `zksync_contract` - Rollup contract
-    ///
     pub async fn get_total_verified_blocks(&self) -> u32 {
         use ZkSyncContractVersion::*;
         let func = match self.version {
