@@ -10,6 +10,20 @@ All notable changes to `zksync.js` will be documented in this file.
 
 ### Deprecated
 
+### Fixed
+
+## Version 0.9.0 (15.02.2021)
+
+### Added
+
+- Support of the new contracts upgrade functionality.
+- BatchBuilder class for convenient batches creating.
+- `zksync-crypto` release 0.4.5.
+
+### Changed
+
+### Deprecated
+
 - WebSocket provider.
 
 ### Fixed

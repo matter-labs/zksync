@@ -6,9 +6,20 @@ All notable changes to `zksync_rs` will be documented in this file.
 
 ### Added
 
-- Constructor of RpcProvider from address and network.
+### Changed
 
-**Version 0.2.2** is being developed.
+### Deprecated
+
+### Fixed
+
+## Version 0.3.0 (15.02.2021)
+
+### Added
+
+- Constructor of RpcProvider from address and network.
+- Support of the new contracts upgrade functionality.
+
+## Version 0.2.2 is being developed.
 
 ### Added
 
