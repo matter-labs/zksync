@@ -110,6 +110,9 @@ pub enum ScenarioType {
 pub struct ScenarioConfig {
     /// Scenario token name,
     pub token_name: TokenLike,
+    /// Fee for the zkSync transactions in gwei.
+    #[serde(default)]
+    pub zksync_fee: Option<u64>,
     /// Inner scenario config.
     #[serde(flatten)]
     pub inner: ScenarioType,

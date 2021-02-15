@@ -30,8 +30,7 @@ pub struct NetworkConfig {
     /// Network kind used for testing.
     pub name: Network,
     /// Fee for the Ethereum transactions in gwei.
-    #[serde(default)]
-    pub eth_fee: Option<u64>,
+    pub eth_fee: u64,
     /// Fee for the zkSync transactions in gwei.
     #[serde(default)]
     pub zksync_fee: Option<u64>,
