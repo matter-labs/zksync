@@ -83,9 +83,11 @@ where
     ///
     /// * `web3_transport` - Web3 provider transport
     /// * `governance_contract_eth_addr` - Governance contract address
-    /// * `zksync_contract_eth_addr` - Rollup contract address
     /// * `eth_blocks_step` - The step distance of viewing events in the ethereum blocks
     /// * `end_eth_blocks_offset` - The distance to the last ethereum block
+    /// * `finite_mode` - Finite mode flag.
+    /// * `final_hash` - Hash of the last block which we want to restore
+    /// * `zksync_contract` - Current deployed zksync contract
     ///
     #[allow(clippy::too_many_arguments)]
     pub fn new(
@@ -393,7 +395,7 @@ where
         {
             // We use an aggregated block in contracts, which means that several BlockEvent can include the same tx_hash,
             // but for correct restore we need to generate RollupBlocks from this tx only once.
-            // These blocks go one after the other, and checking only the last transaction hash is safety
+            // These blocks go one after the other, and checking only the last transaction hash is safe
             if let Some(tx) = last_event_tx_hash {
                 if tx == event.transaction_hash {
                     continue;
