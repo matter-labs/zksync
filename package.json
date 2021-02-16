@@ -14,6 +14,7 @@
       "infrastructure/explorer",
       "infrastructure/zk",
       "infrastructure/eth_transfer",
+      "infrastructure/reading-tool",
       "core/tests/ts-tests"
     ],
     "nohoist": [
@@ -33,7 +34,8 @@
     "zcli": "yarn workspace zcli",
     "ts-tests": "yarn workspace ts-tests",
     "explorer": "yarn workspace sync-explorer",
-    "zk": "yarn workspace zk"
+    "zk": "yarn workspace zk",
+    "reading-tool": "yarn workspace reading-tool"
   },
   "devDependencies": {
     "@typescript-eslint/eslint-plugin": "^4.10.0",

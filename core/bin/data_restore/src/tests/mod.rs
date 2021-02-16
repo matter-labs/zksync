@@ -8,8 +8,11 @@ use futures::future;
 use jsonrpc_core::Params;
 use num::BigUint;
 use serde_json::{json, Value};
-use web3::types::{BlockNumber as Web3BlockNumber, Bytes};
-use web3::{contract::tokens::Tokenize, types::Transaction, RequestId, Transport};
+use web3::{
+    contract::tokens::Tokenize,
+    types::{Bytes, Transaction},
+    RequestId, Transport, Web3,
+};
 
 use db_test_macro::test as db_test;
 use zksync_contracts::{governance_contract, zksync_contract};
@@ -32,6 +35,7 @@ use crate::{
     END_ETH_BLOCKS_OFFSET, ETH_BLOCKS_STEP,
 };
 use web3::api::{Eth, Namespace};
+use zksync_types::aggregated_operations::BlocksCommitOperation;
 
 fn create_withdraw_operations(
     account_id: AccountId,
@@ -106,6 +110,37 @@ fn create_block(block_number: BlockNumber, transactions: Vec<ExecutedOperations>
     )
 }
 
+fn create_transaction_v4(number: u32, stored_block: Block, blocks: Vec<Block>) -> Transaction {
+    let hash: H256 = u32_to_32bytes(number).into();
+    let block_number = blocks
+        .last()
+        .expect("at least one should exist")
+        .block_number
+        .0;
+    let fake_data = [0u8; 4];
+    let mut input_data = vec![];
+    let op = BlocksCommitOperation {
+        last_committed_block: stored_block,
+        blocks,
+    };
+    input_data.extend_from_slice(&fake_data);
+    input_data.extend_from_slice(&ethabi::encode(op.get_eth_tx_args().as_ref()));
+
+    Transaction {
+        hash,
+        nonce: u32_to_32bytes(1).into(),
+        block_hash: Some(u32_to_32bytes(100).into()),
+        block_number: Some(block_number.into()),
+        transaction_index: Some(block_number.into()),
+        from: [5u8; 20].into(),
+        to: Some([7u8; 20].into()),
+        value: u32_to_32bytes(10).into(),
+        gas_price: u32_to_32bytes(1).into(),
+        gas: u32_to_32bytes(1).into(),
+        input: Bytes(input_data),
+        raw: None,
+    }
+}
 fn create_transaction(number: u32, block: Block) -> Transaction {
     let hash: H256 = u32_to_32bytes(number).into();
     let root = block.get_eth_encoded_root();
@@ -345,24 +380,17 @@ async fn test_run_state_update(mut storage: StorageProcessor<'_>) {
         ),
     ]);
 
+    let eth = Eth::new(transport.clone());
     let mut driver = DataRestoreDriver::new(
-        transport.clone(),
+        Web3::new(transport.clone()),
         [1u8; 20].into(),
         ETH_BLOCKS_STEP,
         END_ETH_BLOCKS_OFFSET,
-        vec![6, 30],
         true,
         None,
+        ZkSyncDeployedContract::version4(eth, [1u8; 20].into()),
     );
-    let eth = Eth::new(transport.clone());
-    driver
-        .zksync_contracts
-        .push(ZkSyncDeployedContract::version3(
-            eth,
-            [1u8; 20].into(),
-            Web3BlockNumber::Earliest,
-            Web3BlockNumber::Latest,
-        ));
+
     driver.run_state_update(&mut interactor).await;
 
     // Check that it's stores some account, created by deposit
@@ -384,24 +412,17 @@ async fn test_run_state_update(mut storage: StorageProcessor<'_>) {
     assert_eq!(driver.events_state.committed_events.len(), events.len());
 
     // Nullify the state of driver
+    let eth = Eth::new(transport.clone());
+
     let mut driver = DataRestoreDriver::new(
-        transport.clone(),
+        Web3::new(transport.clone()),
         [1u8; 20].into(),
         ETH_BLOCKS_STEP,
         END_ETH_BLOCKS_OFFSET,
-        vec![6, 30],
         true,
         None,
+        ZkSyncDeployedContract::version4(eth, [1u8; 20].into()),
     );
-    let eth = Eth::new(transport.clone());
-    driver
-        .zksync_contracts
-        .push(ZkSyncDeployedContract::version3(
-            eth,
-            [1u8; 20].into(),
-            Web3BlockNumber::Earliest,
-            Web3BlockNumber::Latest,
-        ));
 
     // Load state from db and check it
     assert!(driver.load_state_from_storage(&mut interactor).await);
@@ -439,6 +460,20 @@ async fn test_with_inmemory_storage() {
                 2,
                 u32_to_32bytes(2).into(),
             ),
+            create_log(
+                block_verified_topic,
+                vec![u32_to_32bytes(3).into()],
+                Bytes(vec![]),
+                3,
+                u32_to_32bytes(3).into(),
+            ),
+            create_log(
+                block_verified_topic,
+                vec![u32_to_32bytes(4).into()],
+                Bytes(vec![]),
+                4,
+                u32_to_32bytes(3).into(),
+            ),
         ],
     );
 
@@ -463,6 +498,20 @@ async fn test_with_inmemory_storage() {
                 Bytes(vec![]),
                 2,
                 u32_to_32bytes(2).into(),
+            ),
+            create_log(
+                block_committed_topic,
+                vec![u32_to_32bytes(3).into()],
+                Bytes(vec![]),
+                3,
+                u32_to_32bytes(3).into(),
+            ),
+            create_log(
+                block_committed_topic,
+                vec![u32_to_32bytes(4).into()],
+                Bytes(vec![]),
+                4,
+                u32_to_32bytes(3).into(),
             ),
         ],
     );
@@ -509,27 +558,42 @@ async fn test_with_inmemory_storage() {
                 )],
             ),
         ),
+        create_transaction_v4(
+            3,
+            create_block(
+                BlockNumber(2),
+                vec![create_deposit(Default::default(), Default::default(), 50)],
+            ),
+            vec![
+                create_block(
+                    BlockNumber(3),
+                    vec![create_deposit(Default::default(), Default::default(), 50)],
+                ),
+                create_block(
+                    BlockNumber(4),
+                    vec![create_withdraw_operations(
+                        AccountId(0),
+                        Default::default(),
+                        Default::default(),
+                        10,
+                    )],
+                ),
+            ],
+        ),
     ]);
 
+    let web3 = Web3::new(transport.clone());
+
+    let eth = Eth::new(transport.clone());
     let mut driver = DataRestoreDriver::new(
-        transport.clone(),
+        web3.clone(),
         [1u8; 20].into(),
         ETH_BLOCKS_STEP,
         END_ETH_BLOCKS_OFFSET,
-        vec![6, 30],
         true,
         None,
+        ZkSyncDeployedContract::version4(eth, [1u8; 20].into()),
     );
-
-    let eth = Eth::new(transport.clone());
-    driver
-        .zksync_contracts
-        .push(ZkSyncDeployedContract::version3(
-            eth,
-            [1u8; 20].into(),
-            Web3BlockNumber::Earliest,
-            Web3BlockNumber::Latest,
-        ));
 
     driver.run_state_update(&mut interactor).await;
 
@@ -539,34 +603,26 @@ async fn test_with_inmemory_storage() {
         .unwrap();
     let balance = account.get_balance(TokenId(0));
 
-    assert_eq!(BigUint::from(40u32), balance);
-    assert_eq!(driver.events_state.committed_events.len(), 2);
+    assert_eq!(BigUint::from(80u32), balance);
+    assert_eq!(driver.events_state.committed_events.len(), 4);
     let events = interactor.load_committed_events_state();
 
     assert_eq!(driver.events_state.committed_events.len(), events.len());
 
     // Nullify the state of driver
+    let eth = Eth::new(transport.clone());
     let mut driver = DataRestoreDriver::new(
-        transport.clone(),
+        web3.clone(),
         [1u8; 20].into(),
         ETH_BLOCKS_STEP,
         END_ETH_BLOCKS_OFFSET,
-        vec![6, 30],
         true,
         None,
+        ZkSyncDeployedContract::version4(eth, [1u8; 20].into()),
     );
-    let eth = Eth::new(transport.clone());
-    driver
-        .zksync_contracts
-        .push(ZkSyncDeployedContract::version3(
-            eth,
-            [1u8; 20].into(),
-            Web3BlockNumber::Earliest,
-            Web3BlockNumber::Latest,
-        ));
 
     // Load state from db and check it
     assert!(driver.load_state_from_storage(&mut interactor).await);
     assert_eq!(driver.events_state.committed_events.len(), events.len());
-    assert_eq!(*driver.tree_state.state.block_number, 2)
+    assert_eq!(*driver.tree_state.state.block_number, 4)
 }

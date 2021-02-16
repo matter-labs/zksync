@@ -14,7 +14,7 @@ use serde::{Deserialize, Serialize};
 use web3::types::H256;
 // Workspace uses
 use zksync::Network;
-use zksync_types::{Address, TokenLike};
+use zksync_types::Address;
 // Local uses
 use crate::scenarios::ScenarioConfig;
 
@@ -23,8 +23,6 @@ use crate::scenarios::ScenarioConfig;
 pub struct AccountInfo {
     pub address: Address,
     pub private_key: H256,
-    /// The name of the token used for testing.
-    pub token_name: TokenLike,
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, Eq, PartialEq)]

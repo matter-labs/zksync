@@ -31,12 +31,13 @@ import {
     isTokenETH,
     MAX_ERC20_APPROVE_AMOUNT,
     SYNC_MAIN_CONTRACT_INTERFACE,
-    ERC20_DEPOSIT_GAS_LIMIT,
+    ERC20_RECOMMENDED_DEPOSIT_GAS_LIMIT,
     signMessagePersonalAPI,
     getSignedBytesFromMessage,
     getChangePubkeyMessage,
     MAX_TIMESTAMP,
-    getEthereumBalance
+    getEthereumBalance,
+    ETH_RECOMMENDED_DEPOSIT_GAS_LIMIT
 } from './utils';
 
 const EthersErrorCode = ErrorCode;
@@ -581,9 +582,7 @@ export class Wallet {
             changePubKey.fee = 0;
 
             const feeType = {
-                ChangePubKey: {
-                    onchainPubkeyAuth: changePubKey.ethAuthType === 'Onchain'
-                }
+                ChangePubKey: changePubKey.ethAuthType
             };
             const fullFee = await this.provider.getTransactionFee(feeType, this.address(), changePubKey.feeToken);
             changePubKey.fee = fullFee.totalFee;
@@ -818,7 +817,7 @@ export class Wallet {
             try {
                 ethTransaction = await mainZkSyncContract.depositETH(deposit.depositTo, {
                     value: BigNumber.from(deposit.amount),
-                    gasLimit: BigNumber.from('200000'),
+                    gasLimit: BigNumber.from(ETH_RECOMMENDED_DEPOSIT_GAS_LIMIT),
                     gasPrice,
                     ...deposit.ethTxOptions
                 });
@@ -860,9 +859,9 @@ export class Wallet {
                         (estimate) => estimate,
                         () => BigNumber.from('0')
                     );
-                    txRequest.gasLimit = gasEstimate.gte(ERC20_DEPOSIT_GAS_LIMIT)
+                    txRequest.gasLimit = gasEstimate.gte(ERC20_RECOMMENDED_DEPOSIT_GAS_LIMIT)
                         ? gasEstimate
-                        : ERC20_DEPOSIT_GAS_LIMIT;
+                        : ERC20_RECOMMENDED_DEPOSIT_GAS_LIMIT;
                     args[args.length - 1] = txRequest;
                 } catch (e) {
                     this.modifyEthersError(e);

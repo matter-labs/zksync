@@ -1,6 +1,5 @@
 use std::str::FromStr;
 // External uses
-use anyhow::Result;
 // Workspace uses
 use zksync_basic_types::Address;
 use zksync_utils::format_units;
@@ -57,7 +56,7 @@ fn test_empty_batch() {
 
 /// Checks the correctness of the message `EthBatchSignData::new()` returns.
 #[test]
-fn test_batch_message() -> Result<()> {
+fn test_batch_message() {
     let token = Token::new(TokenId(0), Default::default(), "ETH", 18);
     let transfer = get_transfer();
     let withdraw = get_withdraw();
@@ -130,6 +129,4 @@ fn test_batch_message() -> Result<()> {
 
     let message = EthBatchSignData::get_batch_sign_message(txs);
     assert_eq!(message, expected.into_bytes());
-
-    Ok(())
 }

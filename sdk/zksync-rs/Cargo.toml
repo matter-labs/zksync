@@ -1,6 +1,6 @@
 [package]
 name = "zksync"
-version = "0.2.2"
+version = "0.3.0"
 authors = ["The Matter Labs Team <hello@matterlabs.dev>"]
 edition = "2018"
 
