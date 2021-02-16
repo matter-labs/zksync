@@ -1,6 +1,6 @@
 import { Tester } from './tester';
 import { expect } from 'chai';
-import { Wallet, types, utils } from 'zksync';
+import { Wallet, types } from 'zksync';
 import { BigNumber, ethers } from 'ethers';
 import { SignedTransaction, TxEthSignature } from 'zksync/build/types';
 import { submitSignedTransactionsBatch } from 'zksync/build/wallet';
@@ -14,7 +14,6 @@ declare module './tester' {
         testMultipleBatchSigners(wallets: Wallet[], token: TokenLike, amount: BigNumber): Promise<void>;
         testMultipleWalletsWrongSignature(from: Wallet, to: Wallet, token: TokenLike, amount: BigNumber): Promise<void>;
         testBackwardCompatibleEthMessages(from: Wallet, to: Wallet, token: TokenLike, amount: BigNumber): Promise<void>;
-        testGetHashOfTx(from: Wallet, to: Wallet, token: TokenLike, amount: BigNumber): Promise<void>;
     }
 }
 
@@ -236,18 +235,4 @@ Tester.prototype.testBackwardCompatibleEthMessages = async function (
     // We only expect that API doesn't reject this batch due to Eth signature error.
     await Promise.all(handles.map((handle) => handle.awaitReceipt()));
     this.runningFee = this.runningFee.add(totalFee);
-};
-
-Tester.prototype.testGetHashOfTx = async function (from: Wallet, to: Wallet, token: TokenLike, amount: BigNumber) {
-    const signedTransfer = await from.signSyncTransfer({
-        to: to.address(),
-        token: token,
-        amount,
-        fee: amount.div(2),
-        nonce: await from.getNonce()
-    });
-    let hashFromSubmitTx = await from.provider.submitTx(signedTransfer.tx, signedTransfer.ethereumSignature);
-    let hashFromGetHash = utils.getHashOfTx(signedTransfer.tx);
-    expect(hashFromSubmitTx === hashFromGetHash, 'Hashes from submitTx and getHashOfTx functions should be equal').to.be
-        .true;
 };

@@ -254,10 +254,6 @@ describe(`ZkSync integration tests (token: ${token}, transport: ${transport})`, 
             await tester.testCreate2BatchFail(hilda, david, token, TX_AMOUNT);
         });
     });
-
-    it('should test GetHashOfTx function', async () => {
-        await tester.testGetHashOfTx(alice, bob, token, TX_AMOUNT);
-    });
 });
 
 // wBTC is chosen because it has decimals different from ETH (8 instead of 18).

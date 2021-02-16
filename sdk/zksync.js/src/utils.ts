@@ -728,7 +728,7 @@ export async function getPendingBalance(
     return zksyncContract.getPendingBalance(address, tokenAddress);
 }
 
-export function getHashOfTx(tx: Transfer | Withdraw | ChangePubKey | ForcedExit | CloseAccount): string {
+export function getTxHash(tx: Transfer | Withdraw | ChangePubKey | ForcedExit | CloseAccount): string {
     if (tx.type == 'Close') {
         throw new Error('Close operation is disabled');
     }
