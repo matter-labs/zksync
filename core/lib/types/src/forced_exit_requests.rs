@@ -12,6 +12,8 @@ use ethabi::{decode, ParamType};
 use std::convert::TryFrom;
 use zksync_basic_types::{Log, U256};
 
+use crate::tx::TxHash;
+
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq, Hash)]
 #[serde(rename_all = "camelCase")]
 pub struct ForcedExitRequest {
@@ -22,6 +24,7 @@ pub struct ForcedExitRequest {
     pub price_in_wei: BigUint,
     pub valid_until: DateTime<Utc>,
     pub created_at: DateTime<Utc>,
+    pub fulfilled_by: Option<Vec<TxHash>>,
     pub fulfilled_at: Option<DateTime<Utc>>,
 }
 
@@ -31,6 +34,7 @@ pub struct SaveForcedExitRequestQuery {
     pub tokens: Vec<TokenId>,
     #[serde(with = "BigUintSerdeAsRadix10Str")]
     pub price_in_wei: BigUint,
+    pub created_at: DateTime<Utc>,
     pub valid_until: DateTime<Utc>,
 }
 #[derive(Debug, Clone, Copy)]

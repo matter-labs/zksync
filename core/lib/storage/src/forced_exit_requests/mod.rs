@@ -11,6 +11,8 @@ use zksync_types::forced_exit_requests::{
     ForcedExitRequest, ForcedExitRequestId, SaveForcedExitRequestQuery,
 };
 
+use zksync_types::tx::TxHash;
+
 pub mod records;
 
 mod utils;
@@ -33,18 +35,19 @@ impl<'a, 'c> ForcedExitRequestsSchema<'a, 'c> {
 
         let target_str = address_to_stored_string(&request.target);
 
-        let tokens = utils::tokens_vec_to_str(request.tokens.clone());
+        let tokens = utils::vec_to_comma_list(request.tokens.clone());
 
         let stored_request: DbForcedExitRequest = sqlx::query_as!(
             DbForcedExitRequest,
             r#"
-            INSERT INTO forced_exit_requests ( target, tokens, price_in_wei, valid_until )
-            VALUES ( $1, $2, $3, $4 )
+            INSERT INTO forced_exit_requests ( target, tokens, price_in_wei, created_at, valid_until )
+            VALUES ( $1, $2, $3, $4, $5 )
             RETURNING *
             "#,
             target_str,
             &tokens,
             price_in_wei,
+            request.created_at,
             request.valid_until
         )
         .fetch_one(self.0.conn())
@@ -80,7 +83,7 @@ impl<'a, 'c> ForcedExitRequestsSchema<'a, 'c> {
         Ok(request)
     }
 
-    pub async fn fulfill_request(
+    pub async fn set_fulfilled_at(
         &mut self,
         id: ForcedExitRequestId,
         fulfilled_at: DateTime<Utc>,
@@ -99,7 +102,7 @@ impl<'a, 'c> ForcedExitRequestsSchema<'a, 'c> {
         .execute(self.0.conn())
         .await?;
 
-        metrics::histogram!("sql.forced_exit_requests.fulfill_request", start.elapsed());
+        metrics::histogram!("sql.forced_exit_requests.set_fulfilled_at", start.elapsed());
 
         Ok(())
     }
@@ -115,6 +118,7 @@ impl<'a, 'c> ForcedExitRequestsSchema<'a, 'c> {
             SELECT * FROM forced_exit_requests
             WHERE fulfilled_at IS NULL AND created_at = (
                 SELECT MIN(created_at) FROM forced_exit_requests
+                WHERE fulfilled_at IS NULL
             )
             LIMIT 1
             "#
@@ -124,10 +128,62 @@ impl<'a, 'c> ForcedExitRequestsSchema<'a, 'c> {
         .map(|r| r.into());
 
         metrics::histogram!(
-            "sql.forced_exit_requests.get_min_unfulfilled_request",
+            "sql.forced_exit_requests.get_oldest_unfulfilled_request",
             start.elapsed()
         );
 
         Ok(request)
+    }
+
+    pub async fn set_fulfilled_by(
+        &mut self,
+        id: ForcedExitRequestId,
+        tx_hashes: Vec<TxHash>,
+    ) -> QueryResult<()> {
+        let start = Instant::now();
+
+        let hash_str = utils::vec_to_comma_list(tx_hashes);
+
+        sqlx::query!(
+            r#"
+            UPDATE forced_exit_requests
+                SET fulfilled_by = $1
+                WHERE id = $2
+            "#,
+            &hash_str,
+            id
+        )
+        .execute(self.0.conn())
+        .await?;
+
+        metrics::histogram!("sql.forced_exit_requests.set_fulfilled_by", start.elapsed());
+        Ok(())
+    }
+
+    // Normally this function should not return any more
+    // than one request, but it was decided to make to more
+    // general from the start
+    pub async fn get_unconfirmed_requests(&mut self) -> QueryResult<Vec<ForcedExitRequest>> {
+        let start = Instant::now();
+
+        let requests: Vec<ForcedExitRequest> = sqlx::query_as!(
+            DbForcedExitRequest,
+            r#"
+            SELECT * FROM forced_exit_requests
+            WHERE fulfilled_at IS NULL AND fulfilled_by IS NOT NULL
+            "#
+        )
+        .fetch_all(self.0.conn())
+        .await?
+        .into_iter()
+        .map(|rec| rec.into())
+        .collect();
+
+        metrics::histogram!(
+            "sql.forced_exit_requests.get_unconfirmed_requests",
+            start.elapsed()
+        );
+
+        Ok(requests)
     }
 }

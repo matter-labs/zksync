@@ -141,13 +141,15 @@ pub async fn submit_request(
 
     let mut fe_schema = storage.forced_exit_requests_schema();
 
-    let valid_until = Utc::now().add(Duration::milliseconds(data.max_tx_interval_millisecs));
+    let created_at = Utc::now();
+    let valid_until = created_at.add(Duration::milliseconds(data.max_tx_interval_millisecs));
 
     let saved_fe_request = fe_schema
         .store_request(SaveForcedExitRequestQuery {
             target: params.target,
             tokens: params.tokens.clone(),
             price_in_wei: params.price_in_wei.clone(),
+            created_at,
             valid_until,
         })
         .await

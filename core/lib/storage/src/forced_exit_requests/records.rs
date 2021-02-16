@@ -4,6 +4,7 @@ use num::{bigint::ToBigInt, BigInt};
 use sqlx::types::BigDecimal;
 use zksync_basic_types::TokenId;
 use zksync_types::forced_exit_requests::ForcedExitRequest;
+use zksync_types::tx::TxHash;
 
 use super::utils;
 
@@ -15,6 +16,7 @@ pub struct DbForcedExitRequest {
     pub price_in_wei: BigDecimal,
     pub valid_until: DateTime<Utc>,
     pub created_at: DateTime<Utc>,
+    pub fulfilled_by: Option<String>,
     pub fulfilled_at: Option<DateTime<Utc>>,
 }
 
@@ -22,7 +24,8 @@ impl From<ForcedExitRequest> for DbForcedExitRequest {
     fn from(request: ForcedExitRequest) -> Self {
         let price_in_wei = BigDecimal::from(BigInt::from(request.price_in_wei.clone()));
 
-        let tokens = utils::tokens_vec_to_str(request.tokens.clone());
+        let tokens = utils::vec_to_comma_list(request.tokens);
+        let fulfilled_by = request.fulfilled_by.map(utils::vec_to_comma_list);
         Self {
             id: request.id,
             target: address_to_stored_string(&request.target),
@@ -31,6 +34,7 @@ impl From<ForcedExitRequest> for DbForcedExitRequest {
             valid_until: request.valid_until,
             created_at: request.created_at,
             fulfilled_at: request.fulfilled_at,
+            fulfilled_by,
         }
     }
 }
@@ -46,11 +50,8 @@ impl Into<ForcedExitRequest> for DbForcedExitRequest {
             // means that invalid data is stored in the DB
             .expect("Invalid forced exit request has been stored");
 
-        let tokens: Vec<TokenId> = self
-            .tokens
-            .split(",")
-            .map(|num_str| num_str.parse().unwrap())
-            .collect();
+        let tokens: Vec<TokenId> = utils::comma_list_to_vec(self.tokens);
+        let fulfilled_by: Option<Vec<TxHash>> = self.fulfilled_by.map(utils::comma_list_to_vec);
 
         ForcedExitRequest {
             id: self.id,
@@ -60,6 +61,7 @@ impl Into<ForcedExitRequest> for DbForcedExitRequest {
             created_at: self.created_at,
             valid_until: self.valid_until,
             fulfilled_at: self.fulfilled_at,
+            fulfilled_by,
         }
     }
 }

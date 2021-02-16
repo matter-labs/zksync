@@ -1,89 +1,93 @@
 use std::str::FromStr;
 
-use crate::forced_exit_requests::ForcedExitRequestsSchema;
 use crate::tests::db_test;
 use crate::QueryResult;
 use crate::StorageProcessor;
+use crate::{data_restore::DataRestoreSchema, forced_exit_requests::ForcedExitRequestsSchema};
 use chrono::{DateTime, Timelike, Utc};
 use num::{BigUint, FromPrimitive};
+use std::convert::From;
+use std::time::Duration;
+use tokio::time;
 use zksync_basic_types::Address;
 use zksync_types::forced_exit_requests::{ForcedExitRequest, SaveForcedExitRequestQuery};
 
+use std::ops::Add;
+
+use zksync_types::TokenId;
+
 #[db_test]
-async fn store_forced_exit_request(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
-    let now = Utc::now().with_nanosecond(0).unwrap();
+async fn get_oldest_unfulfilled_request(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
+    let mut now = Utc::now().with_nanosecond(0).unwrap();
 
-    let request = SaveForcedExitRequestQuery {
-        target: Address::from_str("c0f97CC918C9d6fA4E9fc6be61a6a06589D199b2").unwrap(),
-        tokens: vec![0],
-        price_in_wei: BigUint::from_i32(121212).unwrap(),
-        valid_until: DateTime::from(now),
-    };
+    let requests = vec![
+        SaveForcedExitRequestQuery {
+            target: Address::from_str("c0f97CC918C9d6fA4E9fc6be61a6a06589D199b2").unwrap(),
+            tokens: vec![TokenId(1)],
+            price_in_wei: BigUint::from_i32(212).unwrap(),
+            created_at: DateTime::from(now.clone()),
+            valid_until: DateTime::from(now.clone()),
+        },
+        SaveForcedExitRequestQuery {
+            target: Address::from_str("c0f97CC918C9d6fA4E9fc6be61a6a06589D199b2").unwrap(),
+            tokens: vec![TokenId(1)],
+            price_in_wei: BigUint::from_i32(1).unwrap(),
+            created_at: DateTime::from(now.clone()),
+            valid_until: DateTime::from(now.clone()),
+        },
+        SaveForcedExitRequestQuery {
+            target: Address::from_str("c0f97CC918C9d6fA4E9fc6be61a6a06589D199b2").unwrap(),
+            tokens: vec![TokenId(20)],
+            price_in_wei: BigUint::from_str("1000000000000000").unwrap(),
+            created_at: DateTime::from(now.clone()),
+            valid_until: DateTime::from(now.clone()),
+        },
+    ];
 
-    let fe_request = ForcedExitRequestsSchema(&mut storage)
-        .store_request(request)
+    let mut stored_requests: Vec<ForcedExitRequest> = vec![];
+    let interval = chrono::Duration::seconds(1);
+
+    for req in requests.into_iter() {
+        now = now.add(interval);
+        let created_at = now.clone();
+        let valid_until = now.add(chrono::Duration::hours(32));
+
+        stored_requests.push(
+            ForcedExitRequestsSchema(&mut storage)
+                .store_request(SaveForcedExitRequestQuery {
+                    created_at,
+                    valid_until,
+                    ..req
+                })
+                .await
+                .unwrap(),
+        );
+    }
+
+    ForcedExitRequestsSchema(&mut storage)
+        .set_fulfilled_at(stored_requests[0].id, Utc::now())
         .await?;
 
-    assert_eq!(fe_request.id, 1);
+    let oldest_unfulfilled_request = ForcedExitRequestsSchema(&mut storage)
+        .get_oldest_unfulfilled_request()
+        .await?
+        .unwrap();
+    // The first request has been fulfilled. Thus, the second one should be the oldest
+    assert_eq!(oldest_unfulfilled_request.id, stored_requests[1].id);
 
-    let expected_response = ForcedExitRequest {
-        id: 1,
-        target: Address::from_str("c0f97CC918C9d6fA4E9fc6be61a6a06589D199b2").unwrap(),
-        tokens: vec![0],
-        price_in_wei: BigUint::from_i32(121212).unwrap(),
-        valid_until: DateTime::from(now),
-        fulfilled_at: None,
-    };
+    // Now filling all the remaining requests
+    ForcedExitRequestsSchema(&mut storage)
+        .set_fulfilled_at(stored_requests[1].id, Utc::now())
+        .await?;
+    ForcedExitRequestsSchema(&mut storage)
+        .set_fulfilled_at(stored_requests[2].id, Utc::now())
+        .await?;
 
-    let response = ForcedExitRequestsSchema(&mut storage)
-        .get_request_by_id(fe_request.id)
-        .await
-        .expect("Failed to get forced exit by id");
+    let oldest_unfulfilled_request = ForcedExitRequestsSchema(&mut storage)
+        .get_oldest_unfulfilled_request()
+        .await?;
+    // The first request has been fulfilled. Thus, the second one should be the oldest
+    assert!(matches!(oldest_unfulfilled_request, None));
 
-    assert_eq!(expected_response, response);
     Ok(())
 }
-
-// #[db_test]
-// async fn get_max_forced_exit_used_id(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
-//     let now = Utc::now().with_nanosecond(0).unwrap();
-
-//     let requests = [
-//         ForcedExitRequest {
-//             id: 1,
-//             account_id: 1,
-//             tokens: vec!(1),
-//             price_in_wei: BigUint::from_i32(212).unwrap(),
-//             valid_until: DateTime::from(now),
-//         },
-//         ForcedExitRequest {
-//             id: 2,
-//             account_id: 12,
-//             tokens: vec!(0),
-//             price_in_wei: BigUint::from_i32(1).unwrap(),
-//             valid_until: DateTime::from(now),
-//         },
-//         ForcedExitRequest {
-//             id: 7,
-//             account_id: 3,
-//             tokens: vec!(20),
-//             price_in_wei: BigUint::from_str("1000000000000000").unwrap(),
-//             valid_until: DateTime::from(now),
-//         },
-//     ];
-
-//     for req in requests.iter() {
-//         ForcedExitRequestsSchema(&mut storage)
-//             .store_request(&req)
-//             .await?;
-//     }
-
-//     let max_id = ForcedExitRequestsSchema(&mut storage)
-//         .get_max_used_id()
-//         .await
-//         .expect("Failed to get forced exit by id");
-
-//     assert_eq!(max_id, 7);
-
-//     Ok(())
-// }

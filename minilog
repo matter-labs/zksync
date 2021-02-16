@@ -1,0 +1,4 @@
+Using localhost database:
+DATABASE_URL = postgres://postgres@localhost/plasma
+error: `cargo check` failed with status: exit code: 101
+error: `cargo check` failed with status: exit code: 101

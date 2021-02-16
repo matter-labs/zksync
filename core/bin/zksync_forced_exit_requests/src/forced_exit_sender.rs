@@ -194,7 +194,7 @@ impl ForcedExitSender {
         Ok(request)
     }
 
-    pub async fn fulfill_request<'a>(
+    pub async fn set_fulfilled_at<'a>(
         &self,
         storage: &mut StorageProcessor<'a>,
         id: i64,
@@ -202,7 +202,7 @@ impl ForcedExitSender {
         let mut fe_schema = storage.forced_exit_requests_schema();
 
         fe_schema
-            .fulfill_request(id, Utc::now())
+            .set_fulfilled_at(id, Utc::now())
             .await
             // TODO: Handle such cases gracefully, and not panic
             .expect("An error occured, while fu;lfilling the request");
@@ -295,7 +295,7 @@ impl ForcedExitSender {
             .await
             .expect("Comittment waiting failed");
 
-        self.fulfill_request(&mut storage, id)
+        self.set_fulfilled_at(&mut storage, id)
             .await
             .expect("Error while fulfulling the request");
     }
