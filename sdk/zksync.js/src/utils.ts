@@ -14,7 +14,6 @@ import {
     Withdraw,
     CloseAccount
 } from './types';
-import { sha256 } from '@ethersproject/sha2';
 
 // Max number of tokens for the current version, it is determined by the zkSync circuit implementation.
 const MAX_NUMBER_OF_TOKENS = 128;
@@ -733,5 +732,5 @@ export function getTxHash(tx: Transfer | Withdraw | ChangePubKey | ForcedExit | 
         throw new Error('Close operation is disabled');
     }
     let txBytes = serializeTx(tx);
-    return sha256(txBytes).replace('0x', 'sync-tx:');
+    return ethers.utils.sha256(txBytes).replace('0x', 'sync-tx:');
 }
