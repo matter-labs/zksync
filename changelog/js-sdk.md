@@ -10,6 +10,11 @@ All notable changes to `zksync.js` will be documented in this file.
 
 ### Deprecated
 
+- `Signer.transferSignBytes` method
+- `Signer.withdrawSignBytes` method
+- `Signer.forcedExitSignBytes` method
+- `Signer.changePubKeySignBytes` method
+
 ### Fixed
 
 ## Version 0.9.0 (15.02.2021)
