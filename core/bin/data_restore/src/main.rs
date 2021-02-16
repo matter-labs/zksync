@@ -6,6 +6,8 @@ use zksync_crypto::convert::FeConvert;
 use zksync_storage::ConnectionPool;
 use zksync_types::{Address, H256};
 
+use web3::Web3;
+use zksync_data_restore::contract::ZkSyncDeployedContract;
 use zksync_data_restore::{
     add_tokens_to_storage, data_restore_driver::DataRestoreDriver,
     database_storage_interactor::DatabaseStorageInteractor, END_ETH_BLOCKS_OFFSET, ETH_BLOCKS_STEP,
@@ -102,21 +104,17 @@ async fn main() {
         None
     };
     let storage = connection_pool.access_storage().await.unwrap();
-
+    let web3 = Web3::new(transport);
+    let contract = ZkSyncDeployedContract::version4(web3.eth(), config.contract_addr);
     let mut driver = DataRestoreDriver::new(
-        transport,
+        web3,
         config.governance_addr,
         ETH_BLOCKS_STEP,
         END_ETH_BLOCKS_OFFSET,
-        config.available_block_chunk_sizes.clone(),
         finite_mode,
         final_hash,
+        contract,
     );
-
-    driver
-        .init_contracts(config.upgrade_gatekeeper_addr, config.contract_addr)
-        .await
-        .expect("Wrong driver initialization");
 
     let mut interactor = DatabaseStorageInteractor::new(storage);
     // If genesis is argument is present - there will be fetching contracts creation transactions to get first eth block and genesis acc address

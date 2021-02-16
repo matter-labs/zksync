@@ -2,6 +2,7 @@ use web3::{Transport, Web3};
 
 use zksync_types::operations::ZkSyncOp;
 
+use crate::contract;
 use crate::eth_tx_helpers::{get_ethereum_transaction, get_input_data_from_ethereum_transaction};
 use crate::events::BlockEvent;
 use zksync_types::{AccountId, BlockNumber};
@@ -32,8 +33,13 @@ impl RollupOpsBlock {
     ) -> anyhow::Result<Vec<Self>> {
         let transaction = get_ethereum_transaction(web3, &event_data.transaction_hash).await?;
         let input_data = get_input_data_from_ethereum_transaction(&transaction)?;
-        event_data
-            .contract_version
-            .rollup_ops_blocks_from_bytes(input_data)
+        let blocks = if let Ok(block) =
+            contract::default::rollup_ops_blocks_from_bytes(input_data.clone())
+        {
+            vec![block]
+        } else {
+            contract::v4::rollup_ops_blocks_from_bytes(input_data)?
+        };
+        Ok(blocks)
     }
 }

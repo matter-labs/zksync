@@ -6107,6 +6107,7 @@ dependencies = [
  "serde",
  "serde_json",
  "sqlx",
+ "thiserror",
  "tokio 0.2.22",
  "vlog",
  "zksync_basic_types",
