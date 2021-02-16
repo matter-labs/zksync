@@ -3,6 +3,7 @@
 use chrono::{DateTime, Duration, Utc};
 use num::BigUint;
 // Workspace imports
+use zksync_basic_types::H256;
 use zksync_crypto::franklin_crypto::bellman::pairing::ff::Field;
 use zksync_crypto::Fr;
 use zksync_test_account::ZkSyncAccount;
@@ -11,7 +12,7 @@ use zksync_types::operations::{ChangePubKeyOp, ZkSyncOp};
 use zksync_types::priority_ops::PriorityOp;
 use zksync_types::{
     AccountId, Address, BlockNumber, CloseOp, Deposit, DepositOp, FullExit, FullExitOp, Token,
-    TokenId, TransferOp, TransferToNewOp, WithdrawOp, H256,
+    TokenId, TransferOp, TransferToNewOp, WithdrawOp,
 };
 // Local imports
 
@@ -88,6 +89,8 @@ impl TransactionsHistoryTestSetup {
             100,
             1_000_000.into(), // Not important
             1_500_000.into(), // Not important
+            H256::default(),
+            0,
         );
 
         self.blocks.push(block);
@@ -123,6 +126,8 @@ impl TransactionsHistoryTestSetup {
             100,
             1_000_000.into(), // Not important
             1_500_000.into(), // Not important
+            Default::default(),
+            0,
         );
 
         self.blocks.push(block);
@@ -207,6 +212,7 @@ impl TransactionsHistoryTestSetup {
                     &self.to_zksync_account.address,
                     None,
                     true,
+                    Default::default(),
                 )
                 .0,
             from: self.from_zksync_account.get_account_id().unwrap(),
@@ -238,6 +244,7 @@ impl TransactionsHistoryTestSetup {
                     &self.to_zksync_account.address,
                     None,
                     true,
+                    Default::default(),
                 )
                 .0,
             from: self.from_zksync_account.get_account_id().unwrap(),
@@ -269,6 +276,7 @@ impl TransactionsHistoryTestSetup {
                     &self.to_zksync_account.address,
                     None,
                     true,
+                    Default::default(),
                 )
                 .0,
             account_id: self.from_zksync_account.get_account_id().unwrap(),
@@ -314,6 +322,7 @@ impl TransactionsHistoryTestSetup {
                 TokenId(0),
                 Default::default(),
                 false,
+                Default::default(),
             ),
             account_id: self.from_zksync_account.get_account_id().unwrap(),
         }));

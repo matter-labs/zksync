@@ -3,6 +3,7 @@ use serde::Deserialize;
 /// Built-in uses
 use std::time::Duration;
 // Local uses
+use zksync_crypto::{convert::FeConvert, priv_key_from_fs, Fs, PrivateKey};
 use zksync_types::network::Network;
 use zksync_types::Address;
 
@@ -37,10 +38,29 @@ pub struct Circuit {
     /// Setup power needed to proof block of certain size (goes in the same order as the previous field,
     /// so both arrays can be `zip`ped together).
     pub supported_block_chunks_sizes_setup_powers: Vec<usize>,
+    /// Sizes of blocks for aggregated proofs.
+    pub supported_aggregated_proof_sizes: Vec<usize>,
+    /// Setup power needed to create an aggregated proof for blocks of certain size (goes in the same order as the
+    /// previous field, so both arrays can be `zip`ped together).
+    pub supported_aggregated_proof_sizes_setup_power2: Vec<u32>,
     /// Depth of the Account Merkle tree.
     pub account_tree_depth: usize,
     /// Depth of the Balance Merkle tree.
     pub balance_tree_depth: usize,
+}
+
+impl Circuit {
+    pub fn supported_aggregated_proof_sizes_with_setup_pow(&self) -> Vec<(usize, u32)> {
+        self.supported_aggregated_proof_sizes
+            .iter()
+            .cloned()
+            .zip(
+                self.supported_aggregated_proof_sizes_setup_power2
+                    .iter()
+                    .cloned(),
+            )
+            .collect()
+    }
 }
 
 #[derive(Debug, Deserialize, Clone, PartialEq)]
@@ -62,12 +82,45 @@ pub struct StateKeeper {
     /// Maximum amount of miniblock iterations in case of block containing a fast withdrawal request.
     pub fast_block_miniblock_iterations: u64,
     pub fee_account_addr: Address,
+    pub aggregated_proof_sizes: Vec<usize>,
+    pub max_aggregated_blocks_to_commit: usize,
+    pub max_aggregated_blocks_to_execute: usize,
+    pub block_commit_deadline: u64,
+    pub block_prove_deadline: u64,
+    pub block_execute_deadline: u64,
+    pub max_aggregated_tx_gas: usize,
+    pub last_tx_signer_used: bool,
+    pub last_tx_signer_address: Address,
+    pub last_tx_signer_private_key: String,
 }
 
 impl StateKeeper {
     /// Converts `self.miniblock_iteration_interval` into `Duration`.
     pub fn miniblock_iteration_interval(&self) -> Duration {
         Duration::from_millis(self.miniblock_iteration_interval)
+    }
+
+    pub fn block_commit_deadline(&self) -> Duration {
+        Duration::from_secs(self.block_commit_deadline)
+    }
+
+    pub fn block_prove_deadline(&self) -> Duration {
+        Duration::from_secs(self.block_prove_deadline)
+    }
+
+    pub fn block_execute_deadline(&self) -> Duration {
+        Duration::from_secs(self.block_execute_deadline)
+    }
+
+    pub fn last_tx_signer_data(&self) -> Option<(Address, PrivateKey)> {
+        if self.last_tx_signer_used {
+            let fs = Fs::from_hex(&self.last_tx_signer_private_key)
+                .expect("failed to parse private key");
+            let pk = priv_key_from_fs(fs);
+            Some((self.last_tx_signer_address, pk))
+        } else {
+            None
+        }
     }
 }
 
@@ -82,6 +135,8 @@ mod tests {
                 key_dir: "keys/plonk-975ae851".into(),
                 supported_block_chunks_sizes: vec![6, 30, 74, 150, 320, 630],
                 supported_block_chunks_sizes_setup_powers: vec![21, 22, 23, 24, 25, 26],
+                supported_aggregated_proof_sizes: vec![1, 5, 10, 20],
+                supported_aggregated_proof_sizes_setup_power2: vec![22, 24, 25, 26],
                 account_tree_depth: 32,
                 balance_tree_depth: 11,
             },
@@ -94,6 +149,16 @@ mod tests {
                 miniblock_iterations: 10,
                 fast_block_miniblock_iterations: 5,
                 fee_account_addr: addr("de03a0B5963f75f1C8485B355fF6D30f3093BDE7"),
+                aggregated_proof_sizes: vec![1, 5],
+                max_aggregated_blocks_to_commit: 3,
+                max_aggregated_blocks_to_execute: 4,
+                block_commit_deadline: 300,
+                block_prove_deadline: 3_000,
+                block_execute_deadline: 4_000,
+                max_aggregated_tx_gas: 4_000_000,
+                last_tx_signer_used: false,
+                last_tx_signer_private_key: "0xaabbeecc".into(),
+                last_tx_signer_address: addr("da03a0b5963f75f1c8485b355ff6d30f3093bde7"),
             },
         }
     }
@@ -104,6 +169,8 @@ mod tests {
 CHAIN_CIRCUIT_KEY_DIR="keys/plonk-975ae851"
 CHAIN_CIRCUIT_SUPPORTED_BLOCK_CHUNKS_SIZES="6,30,74,150,320,630"
 CHAIN_CIRCUIT_SUPPORTED_BLOCK_CHUNKS_SIZES_SETUP_POWERS="21,22,23,24,25,26"
+CHAIN_CIRCUIT_SUPPORTED_AGGREGATED_PROOF_SIZES="1,5,10,20"
+CHAIN_CIRCUIT_SUPPORTED_AGGREGATED_PROOF_SIZES_SETUP_POWER2="22,24,25,26"
 CHAIN_CIRCUIT_ACCOUNT_TREE_DEPTH="32"
 CHAIN_CIRCUIT_BALANCE_TREE_DEPTH="11"
 CHAIN_ETH_MAX_NUMBER_OF_WITHDRAWALS_PER_BLOCK="10"
@@ -113,6 +180,16 @@ CHAIN_STATE_KEEPER_MINIBLOCK_ITERATION_INTERVAL="200"
 CHAIN_STATE_KEEPER_MINIBLOCK_ITERATIONS="10"
 CHAIN_STATE_KEEPER_FAST_BLOCK_MINIBLOCK_ITERATIONS="5"
 CHAIN_STATE_KEEPER_FEE_ACCOUNT_ADDR="0xde03a0B5963f75f1C8485B355fF6D30f3093BDE7"
+CHAIN_STATE_KEEPER_AGGREGATED_PROOF_SIZES="1,5"
+CHAIN_STATE_KEEPER_MAX_AGGREGATED_BLOCKS_TO_COMMIT="3"
+CHAIN_STATE_KEEPER_MAX_AGGREGATED_BLOCKS_TO_EXECUTE="4"
+CHAIN_STATE_KEEPER_BLOCK_COMMIT_DEADLINE="300"
+CHAIN_STATE_KEEPER_BLOCK_PROVE_DEADLINE="3000"
+CHAIN_STATE_KEEPER_BLOCK_EXECUTE_DEADLINE="4000"
+CHAIN_STATE_KEEPER_MAX_AGGREGATED_TX_GAS="4000000"
+CHAIN_STATE_KEEPER_LAST_TX_SIGNER_USED="false"
+CHAIN_STATE_KEEPER_LAST_TX_SIGNER_ADDRESS="0xda03a0b5963f75f1c8485b355ff6d30f3093bde7"
+CHAIN_STATE_KEEPER_LAST_TX_SIGNER_PRIVATE_KEY="0xaabbeecc"
         "#;
         set_env(config);
 

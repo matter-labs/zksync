@@ -10,9 +10,23 @@ import {
     serializeAmountPacked,
     serializeFeePacked,
     serializeNonce,
-    serializeAmountFull
+    serializeAmountFull,
+    getCREATE2AddressAndSalt,
+    serializeTimestamp
 } from './utils';
-import { Address, EthSignerType, PubKeyHash, Transfer, Withdraw, ForcedExit, ChangePubKey } from './types';
+import {
+    Address,
+    EthSignerType,
+    PubKeyHash,
+    Transfer,
+    Withdraw,
+    ForcedExit,
+    ChangePubKey,
+    ChangePubKeyOnchain,
+    ChangePubKeyECDSA,
+    ChangePubKeyCREATE2,
+    Create2Data
+} from './types';
 
 export class Signer {
     readonly #privateKey: Uint8Array;
@@ -33,6 +47,8 @@ export class Signer {
         amount: BigNumberish;
         fee: BigNumberish;
         nonce: number;
+        validFrom: number;
+        validUntil: number;
     }): Uint8Array {
         const type = new Uint8Array([5]); // tx type
         const accountId = serializeAccountId(transfer.accountId);
@@ -42,9 +58,9 @@ export class Signer {
         const amount = serializeAmountPacked(transfer.amount);
         const fee = serializeFeePacked(transfer.fee);
         const nonce = serializeNonce(transfer.nonce);
-        const msgBytes = ethers.utils.concat([type, accountId, from, to, token, amount, fee, nonce]);
-
-        return msgBytes;
+        const validFrom = serializeTimestamp(transfer.validFrom);
+        const validUntil = serializeTimestamp(transfer.validUntil);
+        return ethers.utils.concat([type, accountId, from, to, token, amount, fee, nonce, validFrom, validUntil]);
     }
 
     async signSyncTransfer(transfer: {
@@ -55,6 +71,8 @@ export class Signer {
         amount: BigNumberish;
         fee: BigNumberish;
         nonce: number;
+        validFrom: number;
+        validUntil: number;
     }): Promise<Transfer> {
         const msgBytes = this.transferSignBytes(transfer);
         const signature = await signTransactionBytes(this.#privateKey, msgBytes);
@@ -68,6 +86,8 @@ export class Signer {
             amount: BigNumber.from(transfer.amount).toString(),
             fee: BigNumber.from(transfer.fee).toString(),
             nonce: transfer.nonce,
+            validFrom: transfer.validFrom,
+            validUntil: transfer.validUntil,
             signature
         };
     }
@@ -80,6 +100,8 @@ export class Signer {
         amount: BigNumberish;
         fee: BigNumberish;
         nonce: number;
+        validFrom: number;
+        validUntil: number;
     }): Uint8Array {
         const typeBytes = new Uint8Array([3]);
         const accountId = serializeAccountId(withdraw.accountId);
@@ -89,7 +111,9 @@ export class Signer {
         const amountBytes = serializeAmountFull(withdraw.amount);
         const feeBytes = serializeFeePacked(withdraw.fee);
         const nonceBytes = serializeNonce(withdraw.nonce);
-        const msgBytes = ethers.utils.concat([
+        const validFrom = serializeTimestamp(withdraw.validFrom);
+        const validUntil = serializeTimestamp(withdraw.validUntil);
+        return ethers.utils.concat([
             typeBytes,
             accountId,
             accountBytes,
@@ -97,10 +121,10 @@ export class Signer {
             tokenIdBytes,
             amountBytes,
             feeBytes,
-            nonceBytes
+            nonceBytes,
+            validFrom,
+            validUntil
         ]);
-
-        return msgBytes;
     }
 
     async signSyncWithdraw(withdraw: {
@@ -111,6 +135,8 @@ export class Signer {
         amount: BigNumberish;
         fee: BigNumberish;
         nonce: number;
+        validFrom: number;
+        validUntil: number;
     }): Promise<Withdraw> {
         const msgBytes = this.withdrawSignBytes(withdraw);
         const signature = await signTransactionBytes(this.#privateKey, msgBytes);
@@ -124,6 +150,8 @@ export class Signer {
             amount: BigNumber.from(withdraw.amount).toString(),
             fee: BigNumber.from(withdraw.fee).toString(),
             nonce: withdraw.nonce,
+            validFrom: withdraw.validFrom,
+            validUntil: withdraw.validUntil,
             signature
         };
     }
@@ -134,6 +162,8 @@ export class Signer {
         tokenId: number;
         fee: BigNumberish;
         nonce: number;
+        validFrom: number;
+        validUntil: number;
     }): Uint8Array {
         const typeBytes = new Uint8Array([8]);
         const initiatorAccountIdBytes = serializeAccountId(forcedExit.initiatorAccountId);
@@ -141,16 +171,18 @@ export class Signer {
         const tokenIdBytes = serializeTokenId(forcedExit.tokenId);
         const feeBytes = serializeFeePacked(forcedExit.fee);
         const nonceBytes = serializeNonce(forcedExit.nonce);
-        const msgBytes = ethers.utils.concat([
+        const validFrom = serializeTimestamp(forcedExit.validFrom);
+        const validUntil = serializeTimestamp(forcedExit.validUntil);
+        return ethers.utils.concat([
             typeBytes,
             initiatorAccountIdBytes,
             targetBytes,
             tokenIdBytes,
             feeBytes,
-            nonceBytes
+            nonceBytes,
+            validFrom,
+            validUntil
         ]);
-
-        return msgBytes;
     }
 
     async signSyncForcedExit(forcedExit: {
@@ -159,6 +191,8 @@ export class Signer {
         tokenId: number;
         fee: BigNumberish;
         nonce: number;
+        validFrom: number;
+        validUntil: number;
     }): Promise<ForcedExit> {
         const msgBytes = this.forcedExitSignBytes(forcedExit);
         const signature = await signTransactionBytes(this.#privateKey, msgBytes);
@@ -169,6 +203,8 @@ export class Signer {
             token: forcedExit.tokenId,
             fee: BigNumber.from(forcedExit.fee).toString(),
             nonce: forcedExit.nonce,
+            validFrom: forcedExit.validFrom,
+            validUntil: forcedExit.validUntil,
             signature
         };
     }
@@ -180,6 +216,8 @@ export class Signer {
         feeTokenId: number;
         fee: BigNumberish;
         nonce: number;
+        validFrom: number;
+        validUntil: number;
     }): Uint8Array {
         const typeBytes = new Uint8Array([7]); // Tx type (1 byte)
         const accountIdBytes = serializeAccountId(changePubKey.accountId);
@@ -188,17 +226,19 @@ export class Signer {
         const tokenIdBytes = serializeTokenId(changePubKey.feeTokenId);
         const feeBytes = serializeFeePacked(changePubKey.fee);
         const nonceBytes = serializeNonce(changePubKey.nonce);
-        const msgBytes = ethers.utils.concat([
+        const validFrom = serializeTimestamp(changePubKey.validFrom);
+        const validUntil = serializeTimestamp(changePubKey.validUntil);
+        return ethers.utils.concat([
             typeBytes,
             accountIdBytes,
             accountBytes,
             pubKeyHashBytes,
             tokenIdBytes,
             feeBytes,
-            nonceBytes
+            nonceBytes,
+            validFrom,
+            validUntil
         ]);
-
-        return msgBytes;
     }
 
     async signSyncChangePubKey(changePubKey: {
@@ -208,6 +248,9 @@ export class Signer {
         feeTokenId: number;
         fee: BigNumberish;
         nonce: number;
+        ethAuthData: ChangePubKeyOnchain | ChangePubKeyECDSA | ChangePubKeyCREATE2;
+        validFrom: number;
+        validUntil: number;
     }): Promise<ChangePubKey> {
         const msgBytes = this.changePubKeySignBytes(changePubKey);
         const signature = await signTransactionBytes(this.#privateKey, msgBytes);
@@ -220,7 +263,9 @@ export class Signer {
             fee: BigNumber.from(changePubKey.fee).toString(),
             nonce: changePubKey.nonce,
             signature,
-            ethSignature: null
+            ethAuthData: changePubKey.ethAuthData,
+            validFrom: changePubKey.validFrom,
+            validUntil: changePubKey.validUntil
         };
     }
 
@@ -254,5 +299,45 @@ export class Signer {
         const seed = ethers.utils.arrayify(signature);
         const signer = await Signer.fromSeed(seed);
         return { signer, ethSignatureType };
+    }
+}
+
+export class Create2WalletSigner extends ethers.Signer {
+    public readonly address: string;
+    // salt for create2 function call
+    public readonly salt: string;
+    constructor(
+        public zkSyncPubkeyHash: string,
+        public create2WalletData: Create2Data,
+        provider?: ethers.providers.Provider
+    ) {
+        super();
+        Object.defineProperty(this, 'provider', {
+            enumerable: true,
+            value: provider,
+            writable: false
+        });
+        const create2Info = getCREATE2AddressAndSalt(zkSyncPubkeyHash, create2WalletData);
+        this.address = create2Info.address;
+        this.salt = create2Info.salt;
+    }
+
+    async getAddress() {
+        return this.address;
+    }
+
+    /**
+     * This signer can't sign messages but we return zeroed signature bytes to comply with ethers API.
+     */
+    async signMessage(_message) {
+        return ethers.utils.hexlify(new Uint8Array(65));
+    }
+
+    async signTransaction(_message): Promise<string> {
+        throw new Error("Create2Wallet signer can't sign transactions");
+    }
+
+    connect(provider: ethers.providers.Provider): ethers.Signer {
+        return new Create2WalletSigner(this.zkSyncPubkeyHash, this.create2WalletData, provider);
     }
 }

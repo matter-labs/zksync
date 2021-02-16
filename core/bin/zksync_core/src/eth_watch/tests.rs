@@ -3,41 +3,14 @@ use std::collections::HashMap;
 
 use web3::types::{Address, BlockNumber};
 
-use zksync_types::{
-    ethereum::CompleteWithdrawalsTx, AccountId, Deposit, FullExit, Nonce, PriorityOp, TokenId,
-    ZkSyncPriorityOp,
-};
+use zksync_types::{AccountId, Deposit, FullExit, Nonce, PriorityOp, TokenId, ZkSyncPriorityOp};
 
-use crate::eth_watch::{client::EthClient, storage::Storage, EthWatch};
+use crate::eth_watch::{client::EthClient, EthWatch};
 use std::sync::Arc;
 use tokio::sync::RwLock;
 
-struct FakeStorage {
-    withdrawal_txs: Vec<CompleteWithdrawalsTx>,
-}
-
-impl FakeStorage {
-    fn new() -> Self {
-        Self {
-            withdrawal_txs: vec![],
-        }
-    }
-}
-
-#[async_trait::async_trait]
-impl Storage for FakeStorage {
-    async fn store_complete_withdrawals(
-        &mut self,
-        complete_withdrawals_txs: Vec<CompleteWithdrawalsTx>,
-    ) -> anyhow::Result<()> {
-        self.withdrawal_txs.extend(complete_withdrawals_txs);
-        Ok(())
-    }
-}
-
 struct FakeEthClientData {
     priority_ops: HashMap<u64, Vec<PriorityOp>>,
-    withdrawals: HashMap<u64, Vec<CompleteWithdrawalsTx>>,
     last_block_number: u64,
 }
 
@@ -45,7 +18,6 @@ impl FakeEthClientData {
     fn new() -> Self {
         Self {
             priority_ops: Default::default(),
-            withdrawals: Default::default(),
             last_block_number: 0,
         }
     }
@@ -105,22 +77,6 @@ impl EthClient for FakeEthClient {
         Ok(operations)
     }
 
-    async fn get_complete_withdrawals_event(
-        &self,
-        from: BlockNumber,
-        to: BlockNumber,
-    ) -> Result<Vec<CompleteWithdrawalsTx>, anyhow::Error> {
-        let from = self.block_to_number(&from).await;
-        let to = self.block_to_number(&to).await;
-        let mut withdrawals = vec![];
-        for number in from..=to {
-            if let Some(ops) = self.inner.read().await.withdrawals.get(&number) {
-                withdrawals.extend_from_slice(ops);
-            }
-        }
-        Ok(withdrawals)
-    }
-
     async fn block_number(&self) -> Result<u64, anyhow::Error> {
         Ok(self.inner.read().await.last_block_number)
     }
@@ -133,18 +89,17 @@ impl EthClient for FakeEthClient {
         unreachable!()
     }
 
-    async fn get_first_pending_withdrawal_index(&self) -> Result<u32, anyhow::Error> {
-        unreachable!()
-    }
-
-    async fn get_number_of_pending_withdrawals(&self) -> Result<u32, anyhow::Error> {
+    async fn get_auth_fact_reset_time(
+        &self,
+        _address: Address,
+        _nonce: Nonce,
+    ) -> Result<u64, anyhow::Error> {
         unreachable!()
     }
 }
 
-fn create_watcher<T: EthClient>(client: T) -> EthWatch<T, FakeStorage> {
-    let storage = FakeStorage::new();
-    EthWatch::new(client, storage, 1)
+fn create_watcher<T: EthClient>(client: T) -> EthWatch<T> {
+    EthWatch::new(client, 1)
 }
 
 #[tokio::test]

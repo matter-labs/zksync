@@ -47,7 +47,7 @@ pub const MAX_LIMIT: u32 = 100;
 pub struct PaginationQuery {
     before: Option<BlockNumber>,
     after: Option<BlockNumber>,
-    limit: BlockNumber,
+    limit: u32,
 }
 
 /// Pagination request parameter.
@@ -76,7 +76,7 @@ impl PaginationQueryError {
 
 impl PaginationQuery {
     /// Parses the original query into a pair `(pagination, limit)`.
-    pub fn into_inner(self) -> Result<(Pagination, BlockNumber), PaginationQueryError> {
+    pub fn into_inner(self) -> Result<(Pagination, u32), PaginationQueryError> {
         let (pagination, limit) = match self {
             Self {
                 before: Some(before),
@@ -101,13 +101,13 @@ impl PaginationQuery {
             )),
         }?;
 
-        if *limit == 0 {
+        if limit == 0 {
             return Err(PaginationQueryError::with_detail(
                 "Limit should be greater than zero".into(),
             ));
         }
 
-        if *limit > MAX_LIMIT {
+        if limit > MAX_LIMIT {
             return Err(PaginationQueryError::with_detail(format!(
                 "Limit should be lower than {}",
                 MAX_LIMIT
@@ -124,8 +124,8 @@ impl Pagination {
     /// # Panics
     ///
     /// - if limit is zero.
-    pub fn into_max(self, limit: BlockNumber) -> Result<Option<BlockNumber>, PaginationQueryError> {
-        assert!(*limit > 0, "Limit should be greater than zero");
+    pub fn into_max(self, limit: u32) -> Result<Option<BlockNumber>, PaginationQueryError> {
+        assert!(limit > 0, "Limit should be greater than zero");
 
         match self {
             Pagination::Before(before) => {
@@ -135,15 +135,15 @@ impl Pagination {
                     ));
                 }
 
-                Ok(Some(before - 1))
+                Ok(Some(BlockNumber(*before - 1)))
             }
-            Pagination::After(after) => Ok(Some(BlockNumber(*after + *limit + 1))),
+            Pagination::After(after) => Ok(Some(BlockNumber(*after + limit + 1))),
             Pagination::Last => Ok(None),
         }
     }
 
     /// Converts `(pagination, limit)` pair into the query.
-    fn into_query(self, limit: BlockNumber) -> PaginationQuery {
+    fn into_query(self, limit: u32) -> PaginationQuery {
         match self {
             Pagination::Before(before) => PaginationQuery {
                 before: Some(before),
@@ -167,7 +167,7 @@ impl Pagination {
 fn pagination_before_max_limit() {
     let pagination = Pagination::Before(BlockNumber(10));
 
-    let max = pagination.into_max(BlockNumber(10)).unwrap();
+    let max = pagination.into_max(10).unwrap();
     assert_eq!(max, Some(BlockNumber(9)))
 }
 
@@ -175,6 +175,6 @@ fn pagination_before_max_limit() {
 fn pagination_after_max_limit() {
     let pagination = Pagination::After(BlockNumber(10));
 
-    let max = pagination.into_max(BlockNumber(10)).unwrap();
+    let max = pagination.into_max(10).unwrap();
     assert_eq!(max, Some(BlockNumber(21)))
 }

@@ -59,16 +59,13 @@ impl TokenPriceAPI for CoinGeckoAPI {
 
         // If we use 2 day interval we will get hourly prices and not minute by minute which makes
         // response faster and smaller
-        let request = self
+        let market_chart = self
             .client
             .get(market_chart_url)
-            .query(&[("vs_currency", "usd"), ("days", "2")]);
-
-        let api_request_future = tokio::time::timeout(REQUEST_TIMEOUT, request.send());
-
-        let market_chart = api_request_future
+            .timeout(REQUEST_TIMEOUT)
+            .query(&[("vs_currency", "usd"), ("days", "2")])
+            .send()
             .await
-            .map_err(|_| anyhow::format_err!("CoinGecko API request timeout"))?
             .map_err(|err| anyhow::format_err!("CoinGecko API request failed: {}", err))?
             .json::<CoinGeckoMarketChart>()
             .await?;

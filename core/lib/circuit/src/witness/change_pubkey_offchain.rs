@@ -38,6 +38,8 @@ pub struct ChangePubkeyOffChainData {
     pub fee_token: u32,
     pub fee: u128,
     pub nonce: Fr,
+    pub valid_from: u64,
+    pub valid_until: u64,
 }
 
 pub struct ChangePubkeyOffChainWitness<E: RescueEngine> {
@@ -54,6 +56,11 @@ impl Witness for ChangePubkeyOffChainWitness<Bn256> {
     type CalculateOpsInput = SigDataInput;
 
     fn apply_tx(tree: &mut CircuitAccountTree, change_pubkey_offchain: &ChangePubKeyOp) -> Self {
+        let (valid_from, valid_until) = {
+            let time_range = change_pubkey_offchain.tx.time_range.unwrap_or_default();
+            (time_range.valid_from, time_range.valid_until)
+        };
+
         let change_pubkey_data = ChangePubkeyOffChainData {
             account_id: *change_pubkey_offchain.account_id,
             address: eth_address_to_fr(&change_pubkey_offchain.tx.account),
@@ -61,6 +68,8 @@ impl Witness for ChangePubkeyOffChainWitness<Bn256> {
             fee_token: *change_pubkey_offchain.tx.fee_token as u32,
             fee: change_pubkey_offchain.tx.fee.to_u128().unwrap(),
             nonce: Fr::from_str(&change_pubkey_offchain.tx.nonce.to_string()).unwrap(),
+            valid_from,
+            valid_until,
         };
 
         Self::apply_data(tree, change_pubkey_data)
@@ -106,6 +115,12 @@ impl Witness for ChangePubkeyOffChainWitness<Bn256> {
             false,
         );
         pubdata_bits
+    }
+
+    fn get_offset_commitment_data(&self) -> Vec<bool> {
+        let mut commitment = vec![false; ChangePubKeyOp::CHUNKS * 8];
+        commitment[7] = true;
+        commitment
     }
 
     fn calculate_operations(&self, input: SigDataInput) -> Vec<Operation<Bn256>> {
@@ -222,6 +237,12 @@ impl ChangePubkeyOffChainWitness<Bn256> {
                 b: Some(b),
                 pub_nonce: Some(change_pubkey_offcahin.nonce),
                 new_pub_key_hash: Some(change_pubkey_offcahin.new_pubkey_hash),
+                valid_from: Some(
+                    Fr::from_str(&change_pubkey_offcahin.valid_from.to_string()).unwrap(),
+                ),
+                valid_until: Some(
+                    Fr::from_str(&change_pubkey_offcahin.valid_until.to_string()).unwrap(),
+                ),
             },
             before_root: Some(before_root),
             after_root: Some(after_root),

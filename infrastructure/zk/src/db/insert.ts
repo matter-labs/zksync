@@ -44,9 +44,9 @@ export async function ethData() {
         }
     });
     const nonce = parseInt((await reponse.json()).result);
-    await utils.exec(`${SQL()} "INSERT INTO eth_parameters (nonce, gas_price_limit, commit_ops, verify_ops, withdraw_ops)
+    await utils.exec(`${SQL()} "INSERT INTO eth_parameters (nonce, gas_price_limit, last_committed_block, last_verified_block, last_executed_block)
                      VALUES ('${nonce}', '${process.env.ETH_SENDER_GAS_PRICE_LIMIT_DEFAULT}', 0, 0, 0)
-                     ON CONFLICT (id) DO UPDATE SET (commit_ops, verify_ops, withdraw_ops) = (0, 0, 0)"`);
+                     ON CONFLICT (id) DO UPDATE SET (nonce, last_committed_block, last_verified_block, last_executed_block) = ('${nonce}', 0, 0, 0)"`);
 }
 
 export const command = new Command('insert').description('insert pre-defined data into the database');

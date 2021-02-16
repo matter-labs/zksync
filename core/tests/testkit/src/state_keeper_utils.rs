@@ -5,7 +5,9 @@ use futures::{
 use std::thread::JoinHandle;
 use tokio::runtime::Runtime;
 use zksync_core::committer::CommitRequest;
-use zksync_core::state_keeper::{start_state_keeper, StateKeeperRequest, ZkSyncStateKeeper};
+use zksync_core::state_keeper::{
+    start_state_keeper, StateKeeperRequest, ZkSyncStateInitParams, ZkSyncStateKeeper,
+};
 use zksync_types::{
     Account, AccountId, Address, DepositOp, FullExitOp, TransferOp, TransferToNewOp, WithdrawOp,
 };
@@ -25,13 +27,14 @@ pub async fn state_keeper_get_account(
 }
 
 pub struct StateKeeperChannels {
-    pub(crate) requests: mpsc::Sender<StateKeeperRequest>,
-    pub(crate) new_blocks: mpsc::Receiver<CommitRequest>,
+    pub requests: mpsc::Sender<StateKeeperRequest>,
+    pub new_blocks: mpsc::Receiver<CommitRequest>,
 }
 
 // Thread join handle and stop channel sender.
 pub fn spawn_state_keeper(
     fee_account: &Address,
+    initial_state: ZkSyncStateInitParams,
 ) -> (JoinHandle<()>, oneshot::Sender<()>, StateKeeperChannels) {
     let (proposed_blocks_sender, proposed_blocks_receiver) = mpsc::channel(256);
     let (state_keeper_req_sender, state_keeper_req_receiver) = mpsc::channel(256);
@@ -53,13 +56,14 @@ pub fn spawn_state_keeper(
 
     let max_miniblock_iterations = *block_chunks_sizes.iter().max().unwrap();
     let state_keeper = ZkSyncStateKeeper::new(
-        super::genesis_state(fee_account),
+        initial_state,
         *fee_account,
         state_keeper_req_receiver,
         proposed_blocks_sender,
         block_chunks_sizes,
         max_miniblock_iterations,
         max_miniblock_iterations,
+        None,
     );
 
     let (stop_state_keeper_sender, stop_state_keeper_receiver) = oneshot::channel::<()>();

@@ -46,9 +46,7 @@ impl ApiBlocksData {
             return Ok(Some(block));
         }
 
-        let blocks = self
-            .blocks_range(Some(block_number), BlockNumber(1))
-            .await?;
+        let blocks = self.blocks_range(Some(block_number), 1).await?;
         if let Some(block) = blocks.into_iter().next() {
             // Check if this is exactly the requested block.
             if block.block_number != *block_number as i64 {
@@ -73,7 +71,7 @@ impl ApiBlocksData {
     async fn blocks_range(
         &self,
         max_block: Option<BlockNumber>,
-        limit: BlockNumber,
+        limit: u32,
     ) -> QueryResult<Vec<records::BlockDetails>> {
         let max_block = max_block.unwrap_or(BlockNumber(u32::MAX));
 
@@ -81,7 +79,7 @@ impl ApiBlocksData {
         storage
             .chain()
             .block_schema()
-            .load_block_range(max_block, *limit)
+            .load_block_range(max_block, limit)
             .await
     }
 
@@ -265,21 +263,16 @@ mod tests {
             client.block_by_id(BlockNumber(1)).await?.unwrap(),
             blocks[7]
         );
+        assert_eq!(client.blocks_range(Pagination::Last, 10).await?, blocks);
         assert_eq!(
             client
-                .blocks_range(Pagination::Last, BlockNumber(10))
-                .await?,
-            blocks
-        );
-        assert_eq!(
-            client
-                .blocks_range(Pagination::Before(BlockNumber(2)), BlockNumber(5))
+                .blocks_range(Pagination::Before(BlockNumber(2)), 5)
                 .await?,
             &blocks[7..8]
         );
         assert_eq!(
             client
-                .blocks_range(Pagination::After(BlockNumber(7)), BlockNumber(5))
+                .blocks_range(Pagination::After(BlockNumber(7)), 5)
                 .await?,
             &blocks[0..1]
         );

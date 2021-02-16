@@ -31,12 +31,11 @@ export class EthMessageSigner {
         nonce: number;
         accountId: number;
     }): string {
-        const humanReadableTxInfo =
-            `Transfer ${transfer.stringAmount} ${transfer.stringToken}\n` +
-            `To: ${transfer.to.toLowerCase()}\n` +
-            `Nonce: ${transfer.nonce}\n` +
-            `Fee: ${transfer.stringFee} ${transfer.stringToken}\n` +
-            `Account Id: ${transfer.accountId}`;
+        let humanReadableTxInfo = this.getTransferEthMessagePart(transfer);
+        if (humanReadableTxInfo.length != 0) {
+            humanReadableTxInfo += '\n';
+        }
+        humanReadableTxInfo += `Nonce: ${transfer.nonce}`;
 
         return humanReadableTxInfo;
     }
@@ -53,6 +52,16 @@ export class EthMessageSigner {
         return await this.getEthMessageSignature(message);
     }
 
+    async ethSignForcedExit(forcedExit: {
+        stringToken: string;
+        stringFee: string;
+        target: string;
+        nonce: number;
+    }): Promise<TxEthSignature> {
+        const message = this.getForcedExitEthSignMessage(forcedExit);
+        return await this.getEthMessageSignature(message);
+    }
+
     getWithdrawEthSignMessage(withdraw: {
         stringAmount: string;
         stringToken: string;
@@ -61,14 +70,86 @@ export class EthMessageSigner {
         nonce: number;
         accountId: number;
     }): string {
-        const humanReadableTxInfo =
-            `Withdraw ${withdraw.stringAmount} ${withdraw.stringToken}\n` +
-            `To: ${withdraw.ethAddress.toLowerCase()}\n` +
-            `Nonce: ${withdraw.nonce}\n` +
-            `Fee: ${withdraw.stringFee} ${withdraw.stringToken}\n` +
-            `Account Id: ${withdraw.accountId}`;
+        let humanReadableTxInfo = this.getWithdrawEthMessagePart(withdraw);
+        if (humanReadableTxInfo.length != 0) {
+            humanReadableTxInfo += '\n';
+        }
+        humanReadableTxInfo += `Nonce: ${withdraw.nonce}`;
 
         return humanReadableTxInfo;
+    }
+
+    getForcedExitEthSignMessage(forcedExit: {
+        stringToken: string;
+        stringFee: string;
+        target: string;
+        nonce: number;
+    }): string {
+        let humanReadableTxInfo = this.getForcedExitEthMessagePart(forcedExit);
+        humanReadableTxInfo += `\nNonce: ${forcedExit.nonce}`;
+        return humanReadableTxInfo;
+    }
+
+    getTransferEthMessagePart(tx: {
+        stringAmount: string;
+        stringToken: string;
+        stringFee: string;
+        ethAddress?: string;
+        to?: string;
+    }): string {
+        let txType: string, to: string;
+        if (tx.ethAddress != undefined) {
+            txType = 'Withdraw';
+            to = tx.ethAddress;
+        } else if (tx.to != undefined) {
+            txType = 'Transfer';
+            to = tx.to;
+        } else {
+            throw new Error('Either to or ethAddress field must be present');
+        }
+
+        let message = '';
+        if (tx.stringAmount != null) {
+            message += `${txType} ${tx.stringAmount} ${tx.stringToken} to: ${to.toLowerCase()}`;
+        }
+        if (tx.stringFee != null) {
+            if (message.length != 0) {
+                message += '\n';
+            }
+            message += `Fee: ${tx.stringFee} ${tx.stringToken}`;
+        }
+        return message;
+    }
+
+    getWithdrawEthMessagePart(tx: {
+        stringAmount: string;
+        stringToken: string;
+        stringFee: string;
+        ethAddress?: string;
+        to?: string;
+    }): string {
+        return this.getTransferEthMessagePart(tx);
+    }
+
+    getChangePubKeyEthMessagePart(changePubKey: {
+        pubKeyHash: PubKeyHash;
+        stringToken: string;
+        stringFee: string;
+    }): string {
+        let message = '';
+        message += `Set signing key: ${changePubKey.pubKeyHash.replace('sync:', '').toLowerCase()}`;
+        if (changePubKey.stringFee != null) {
+            message += `\nFee: ${changePubKey.stringFee} ${changePubKey.stringToken}`;
+        }
+        return message;
+    }
+
+    getForcedExitEthMessagePart(forcedExit: { stringToken: string; stringFee: string; target: string }): string {
+        let message = `ForcedExit ${forcedExit.stringToken} to: ${forcedExit.target.toLowerCase()}`;
+        if (forcedExit.stringFee != null) {
+            message += `\nFee: ${forcedExit.stringFee} ${forcedExit.stringToken}`;
+        }
+        return message;
     }
 
     async ethSignWithdraw(withdraw: {
@@ -83,7 +164,11 @@ export class EthMessageSigner {
         return await this.getEthMessageSignature(message);
     }
 
-    getChangePubKeyEthSignMessage(changePubKey: { pubKeyHash: PubKeyHash; nonce: number; accountId: number }): string {
+    getChangePubKeyEthSignMessage(changePubKey: {
+        pubKeyHash: PubKeyHash;
+        nonce: number;
+        accountId: number;
+    }): Uint8Array {
         return getChangePubkeyMessage(changePubKey.pubKeyHash, changePubKey.nonce, changePubKey.accountId);
     }
 

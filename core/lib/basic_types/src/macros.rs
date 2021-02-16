@@ -2,7 +2,7 @@ macro_rules! basic_type {
     ($(#[$attr:meta])* $name:ident, $type:ty) => {
         $(#[$attr])*
         #[derive(
-            Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Hash, PartialOrd, Ord, Default,
+            Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Hash, PartialOrd, Ord, Default
         )]
         pub struct $name(pub $type);
 

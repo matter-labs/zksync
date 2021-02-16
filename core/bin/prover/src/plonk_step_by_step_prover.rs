@@ -1,8 +1,16 @@
-use crate::{ApiClient, BabyProverError, ProverConfig, ProverImpl};
-use std::sync::{mpsc, Mutex};
-use std::time::Duration;
+// Built-in deps
+use std::sync::Mutex;
+// Workspace deps
+use zksync_config::ChainConfig;
+use zksync_crypto::proof::{AggregatedProof, PrecomputedSampleProofs, SingleProof};
+use zksync_crypto::Engine;
+use zksync_prover_utils::aggregated_proofs::{gen_aggregate_proof, prepare_proof_data};
+use zksync_prover_utils::api::{JobRequestData, JobResultData};
 use zksync_prover_utils::{PlonkVerificationKey, SetupForStepByStepProver};
-use zksync_utils::{get_env, parse_env};
+use zksync_utils::parse_env;
+// Local deps
+use crate::{ProverConfig, ProverImpl};
+use zksync_prover_utils::fs_utils::load_precomputed_proofs;
 
 /// We prepare some data before making proof for each block size, so we cache it in case next block
 /// would be of our size
@@ -11,113 +19,42 @@ struct PreparedComputations {
     setup: SetupForStepByStepProver,
 }
 
-pub struct PlonkStepByStepProver<C: ApiClient> {
+pub struct PlonkStepByStepProver {
     config: PlonkStepByStepProverConfig,
     prepared_computations: Mutex<Option<PreparedComputations>>,
-    api_client: C,
-    heartbeat_interval: Duration,
+    precomputed_sample_proofs: PrecomputedSampleProofs,
 }
 
 pub struct PlonkStepByStepProverConfig {
+    pub all_block_sizes: Vec<usize>,
     pub block_sizes: Vec<usize>,
     pub download_setup_from_network: bool,
+    pub aggregated_proof_sizes_with_setup_pow: Vec<(usize, u32)>,
 }
 
 impl ProverConfig for PlonkStepByStepProverConfig {
     fn from_env() -> Self {
+        let env_config = ChainConfig::from_env();
+
+        let aggregated_proof_sizes_with_setup_pow = env_config
+            .circuit
+            .supported_aggregated_proof_sizes_with_setup_pow();
+
         Self {
-            block_sizes: get_env("CHAIN_STATE_KEEPER_BLOCK_CHUNK_SIZES")
-                .split(',')
-                .map(|p| p.parse().unwrap())
-                .collect(),
             download_setup_from_network: parse_env("MISC_PROVER_DOWNLOAD_SETUP"),
+            all_block_sizes: env_config.circuit.supported_block_chunks_sizes,
+            block_sizes: env_config.state_keeper.block_chunk_sizes,
+            aggregated_proof_sizes_with_setup_pow,
         }
     }
 }
 
-impl<C: ApiClient> ProverImpl<C> for PlonkStepByStepProver<C> {
-    type Config = PlonkStepByStepProverConfig;
-
-    fn create_from_config(
-        config: PlonkStepByStepProverConfig,
-        api_client: C,
-        heartbeat_interval: Duration,
-    ) -> Self {
-        assert!(!config.block_sizes.is_empty());
-        PlonkStepByStepProver {
-            config,
-            prepared_computations: Mutex::new(None),
-            api_client,
-            heartbeat_interval,
-        }
-    }
-
-    fn next_round(
+impl PlonkStepByStepProver {
+    fn create_single_block_proof(
         &self,
-        start_heartbeats_tx: mpsc::Sender<(i32, bool)>,
-    ) -> Result<(), BabyProverError> {
-        // first we try last proved block, since we have precomputations for it
-        let block_size_idx_to_try_first =
-            if let Some(precomp) = self.prepared_computations.lock().unwrap().as_ref() {
-                self.config
-                    .block_sizes
-                    .iter()
-                    .position(|size| *size == precomp.block_size)
-                    .unwrap()
-            } else {
-                0
-            };
-
-        let (mut block, mut job_id, mut block_size) = (0, 0, 0);
-        for offset_idx in 0..self.config.block_sizes.len() {
-            let idx = (block_size_idx_to_try_first + offset_idx) % self.config.block_sizes.len();
-            let current_block_size = self.config.block_sizes[idx];
-
-            let block_to_prove =
-                self.api_client
-                    .block_to_prove(current_block_size)
-                    .map_err(|e| {
-                        let e = format!("failed to get block to prove {}", e);
-                        BabyProverError::Api(e)
-                    })?;
-
-            let (current_request_block, current_request_job_id) =
-                block_to_prove.unwrap_or_else(|| {
-                    vlog::trace!(
-                        "no block to prove from the server for size: {}",
-                        current_block_size
-                    );
-                    (0, 0)
-                });
-
-            if current_request_job_id != 0 {
-                block = current_request_block;
-                job_id = current_request_job_id;
-                block_size = current_block_size;
-                break;
-            }
-        }
-
-        // Notify heartbeat routine on new proving block job or None.
-        start_heartbeats_tx
-            .send((job_id, false))
-            .expect("failed to send new job to heartbeat routine");
-        if job_id == 0 {
-            return Ok(());
-        }
-        let instance = self.api_client.prover_data(block).map_err(|err| {
-            BabyProverError::Api(format!(
-                "could not get prover data for block {}: {}",
-                block, err
-            ))
-        })?;
-
-        vlog::info!(
-            "starting to compute proof for block {}, size: {}",
-            block,
-            block_size
-        );
-
+        witness: zksync_circuit::circuit::ZkSyncCircuit<'_, Engine>,
+        block_size: usize,
+    ) -> anyhow::Result<SingleProof> {
         // we do this way here so old precomp is dropped
         let valid_cached_precomp = {
             self.prepared_computations
@@ -130,47 +67,114 @@ impl<C: ApiClient> ProverImpl<C> for PlonkStepByStepProver<C> {
             precomp
         } else {
             let setup = SetupForStepByStepProver::prepare_setup_for_step_by_step_prover(
-                instance.clone(),
+                witness.clone(),
                 self.config.download_setup_from_network,
-            )
-            .map_err(|e| {
-                BabyProverError::Internal(format!(
-                    "Failed to prepare setup for block_size: {}, err: {}",
-                    block_size, e
-                ))
-            })?;
+            )?;
             PreparedComputations { block_size, setup }
         };
 
-        let vk = PlonkVerificationKey::read_verification_key_for_main_circuit(block_size).map_err(
-            |e| {
-                BabyProverError::Internal(format!(
-                    "Failed to read vk for block: {}, size: {}, err: {}",
-                    block, block_size, e
-                ))
-            },
-        )?;
+        let vk = PlonkVerificationKey::read_verification_key_for_main_circuit(block_size)?;
         let verified_proof = precomp
             .setup
-            .gen_step_by_step_proof_using_prepared_setup(instance, &vk)
-            .map_err(|e| {
-                BabyProverError::Internal(format!(
-                    "Failed to create verified proof for block: {}, size: {}, err: {}",
-                    block, block_size, e
-                ))
-            })?;
+            .gen_step_by_step_proof_using_prepared_setup(witness, &vk)?;
 
         *self.prepared_computations.lock().unwrap() = Some(precomp);
 
-        self.api_client
-            .publish(block, verified_proof)
-            .map_err(|e| BabyProverError::Api(format!("failed to publish proof: {}", e)))?;
-
-        vlog::info!("finished and published proof for block {}", block);
-        Ok(())
+        Ok(verified_proof)
     }
 
-    fn get_heartbeat_options(&self) -> (&C, Duration) {
-        (&self.api_client, self.heartbeat_interval)
+    fn create_aggregated_block_proof(
+        &self,
+        proofs: Vec<(SingleProof, usize)>,
+    ) -> anyhow::Result<AggregatedProof> {
+        // drop setup cache
+        {
+            self.prepared_computations.lock().unwrap().take();
+        }
+
+        let proofs_to_pad = {
+            let aggregate_size = self.config.aggregated_proof_sizes_with_setup_pow.iter().find(|(aggregate_size, _)| aggregate_size >= &proofs.len())
+                .ok_or_else(|| {
+                    anyhow::anyhow!("Failed to find aggregate proof size to fit all proofs, size: {:?}, proofs: {}", self.config.aggregated_proof_sizes_with_setup_pow, proofs.len())
+                })?.0;
+            aggregate_size
+                .checked_sub(proofs.len())
+                .expect("Aggregate size should be <= number of proofs")
+        };
+
+        if proofs_to_pad > 0 {
+            vlog::info!(
+                "Padding aggregated proofs. proofs: {}, proofs to pad: {}, aggregate_size: {}",
+                proofs.len(),
+                proofs_to_pad,
+                proofs.len() + proofs_to_pad
+            );
+        }
+
+        let padded_proofs = proofs
+            .into_iter()
+            .chain(
+                self.precomputed_sample_proofs
+                    .single_proofs
+                    .iter()
+                    .cloned()
+                    .take(proofs_to_pad),
+            )
+            .collect();
+
+        let (vks, proof_data) = prepare_proof_data(&self.config.all_block_sizes, padded_proofs);
+        gen_aggregate_proof(
+            vks,
+            proof_data,
+            &self.config.aggregated_proof_sizes_with_setup_pow,
+            self.config.download_setup_from_network,
+        )
+    }
+}
+
+impl ProverImpl for PlonkStepByStepProver {
+    type Config = PlonkStepByStepProverConfig;
+
+    fn create_proof(&self, data: JobRequestData) -> Result<JobResultData, anyhow::Error> {
+        let proof = match data {
+            JobRequestData::AggregatedBlockProof(proofs_to_aggregate) => {
+                let block_sizes = proofs_to_aggregate
+                    .iter()
+                    .map(|(_, s)| *s)
+                    .collect::<Vec<_>>();
+
+                let aggregate_proof = self.create_aggregated_block_proof(proofs_to_aggregate).map_err(|e| {
+                    anyhow::format_err!("Failed to aggregate block proofs, num proofs: {}, block sizes: {:?}, err {}", block_sizes.len(), &block_sizes, e)
+                })?;
+
+                JobResultData::AggregatedBlockProof(aggregate_proof)
+            }
+            JobRequestData::BlockProof(zksync_circuit, block_size) => {
+                let zksync_circuit = zksync_circuit.into_circuit();
+                let proof = self
+                    .create_single_block_proof(zksync_circuit, block_size)
+                    .map_err(|e| {
+                        anyhow::format_err!(
+                            "Failed to create single block proof, block size: {}, err: {}",
+                            block_size,
+                            e
+                        )
+                    })?;
+
+                JobResultData::BlockProof(proof)
+            }
+        };
+
+        Ok(proof)
+    }
+
+    fn create_from_config(config: PlonkStepByStepProverConfig) -> Self {
+        assert!(!config.block_sizes.is_empty());
+        PlonkStepByStepProver {
+            config,
+            prepared_computations: Mutex::new(None),
+            precomputed_sample_proofs: load_precomputed_proofs()
+                .expect("Failed to load precomputed sample proofs"),
+        }
     }
 }

@@ -12,6 +12,7 @@ categories = ["cryptography"]
 [dependencies]
 zksync_types = { path = "../types", version = "1.0" }
 zksync_utils = { path = "../utils", version = "1.0" }
+zksync_crypto = { path = "../crypto", version = "1.0" }
 chrono = "0.4"
 url = "2.1"
 tracing = "0.1.22"

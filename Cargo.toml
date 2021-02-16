@@ -38,3 +38,6 @@ members = [
     # SDK section
     "sdk/zksync-rs",
 ]
+
+[patch.crates-io]
+ethabi = { git = "https://github.com/dvush/ethabi.git" }

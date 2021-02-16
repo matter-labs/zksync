@@ -1,7 +1,6 @@
 import { Tester } from './tester';
 import { expect } from 'chai';
 import { Wallet, types } from 'zksync';
-import { sleep } from 'zksync/build/utils';
 
 type TokenLike = types.TokenLike;
 
@@ -20,7 +19,7 @@ Tester.prototype.testVerifiedForcedExit = async function (
     // Forced exit is defined by `Withdraw` transaction type (as it's essentially just a forced withdraw),
     // therefore, when making requests to `syncProvider`, we will use the type `Withdraw`.
 
-    const tokenId = initiatorWallet.provider.tokenSet.resolveTokenId(token);
+    const tokenAddress = initiatorWallet.provider.tokenSet.resolveTokenAddress(token);
 
     const onchainBalanceBefore = await targetWallet.getEthereumBalance(token);
     const balanceToWithdraw = await targetWallet.getBalance(token);
@@ -32,23 +31,13 @@ Tester.prototype.testVerifiedForcedExit = async function (
 
     // Checking that there are some complete withdrawals tx hash for this ForcedExit
     // we should wait some time for `completeWithdrawals` transaction to be processed
-    let withdrawalTxHash = null;
-    const polling_interval = 200; // ms
-    const polling_timeout = 35000; // ms
-    const polling_iterations = polling_timeout / polling_interval;
-    for (let i = 0; i < polling_iterations; i++) {
-        withdrawalTxHash = await this.syncProvider.getEthTxForWithdrawal(handle.txHash);
-        if (withdrawalTxHash != null) {
-            break;
-        }
-        await sleep(polling_interval);
-    }
+    const withdrawalTxHash = await this.syncProvider.getEthTxForWithdrawal(handle.txHash);
     expect(withdrawalTxHash, 'Withdrawal was not processed onchain').to.exist;
 
     await this.ethProvider.waitForTransaction(withdrawalTxHash as string);
 
     const onchainBalanceAfter = await targetWallet.getEthereumBalance(token);
-    const pendingToBeOnchain = await this.contract.getBalanceToWithdraw(targetWallet.address(), tokenId);
+    const pendingToBeOnchain = await this.contract.getPendingBalance(targetWallet.address(), tokenAddress);
 
     expect(
         onchainBalanceAfter.add(pendingToBeOnchain).sub(onchainBalanceBefore).eq(balanceToWithdraw),

@@ -1,10 +1,26 @@
-import { utils, constants, ethers, BigNumber, BigNumberish } from 'ethers';
-import { PubKeyHash, TokenAddress, TokenLike, Tokens, TokenSymbol, EthSignerType, Address, Transfer } from './types';
+import { utils, constants, ethers, BigNumber, BigNumberish, Contract } from 'ethers';
+import { Provider } from '.';
+import {
+    PubKeyHash,
+    TokenAddress,
+    TokenLike,
+    Tokens,
+    TokenSymbol,
+    EthSignerType,
+    Address,
+    Transfer,
+    ForcedExit,
+    ChangePubKey,
+    Withdraw,
+    CloseAccount
+} from './types';
 
 // Max number of tokens for the current version, it is determined by the zkSync circuit implementation.
 const MAX_NUMBER_OF_TOKENS = 128;
 // Max number of accounts for the current version, it is determined by the zkSync circuit implementation.
 const MAX_NUMBER_OF_ACCOUNTS = Math.pow(2, 24);
+
+export const MAX_TIMESTAMP = 4294967295;
 
 export const IERC20_INTERFACE = new utils.Interface(require('../abi/IERC20.json').abi);
 export const SYNC_MAIN_CONTRACT_INTERFACE = new utils.Interface(require('../abi/SyncMain.json').abi);
@@ -12,6 +28,8 @@ export const SYNC_MAIN_CONTRACT_INTERFACE = new utils.Interface(require('../abi/
 export const SYNC_GOV_CONTRACT_INTERFACE = new utils.Interface(require('../abi/SyncGov.json').abi);
 
 export const IEIP1271_INTERFACE = new utils.Interface(require('../abi/IEIP1271.json').abi);
+
+export const MULTICALL_INTERFACE = new utils.Interface(require('../abi/Multicall.json').abi);
 
 export const MAX_ERC20_APPROVE_AMOUNT = BigNumber.from(
     '115792089237316195423570985008687907853269984665640564039457584007913129639935'
@@ -21,7 +39,12 @@ export const ERC20_APPROVE_TRESHOLD = BigNumber.from(
     '57896044618658097711785492504343953926634992332820282019728792003956564819968'
 ); // 2^255
 
-export const ERC20_DEPOSIT_GAS_LIMIT = BigNumber.from('300000'); // 300k
+// Gas limit that is set for eth deposit by default. For default EOA accounts 60k should be enough, but we reserve
+// more gas for smart-contract wallets
+export const ETH_RECOMMENDED_DEPOSIT_GAS_LIMIT = BigNumber.from('90000'); // 90k
+// For normal wallet/erc20 token 90k gas for deposit should be enough, but for some tokens this can go as high as ~200k
+// we try to be safe by default
+export const ERC20_RECOMMENDED_DEPOSIT_GAS_LIMIT = BigNumber.from('300000'); // 300k
 
 const AMOUNT_EXPONENT_BIT_WIDTH = 5;
 const AMOUNT_MANTISSA_BIT_WIDTH = 35;
@@ -304,7 +327,10 @@ export class TokenSet {
         }
 
         for (const token of Object.values(this.tokensBySymbol)) {
-            if (token.address.toLocaleLowerCase() == tokenLike.toLocaleLowerCase()) {
+            if (
+                token.address.toLocaleLowerCase() === tokenLike.toLocaleLowerCase() ||
+                token.symbol.toLocaleLowerCase() === tokenLike.toLocaleLowerCase()
+            ) {
                 return token;
             }
         }
@@ -348,17 +374,17 @@ export class TokenSet {
     }
 }
 
-export function getChangePubkeyMessage(pubKeyHash: PubKeyHash, nonce: number, accountId: number): string {
-    const msgNonce = utils.hexlify(serializeNonce(nonce));
-    const msgAccId = utils.hexlify(serializeAccountId(accountId));
-    const pubKeyHashHex = pubKeyHash.replace('sync:', '').toLowerCase();
-    const message =
-        `Register zkSync pubkey:\n\n` +
-        `${pubKeyHashHex}\n` +
-        `nonce: ${msgNonce}\n` +
-        `account id: ${msgAccId}\n\n` +
-        `Only sign this message for a trusted client!`;
-    return message;
+export function getChangePubkeyMessage(
+    pubKeyHash: PubKeyHash,
+    nonce: number,
+    accountId: number,
+    batchHash?: string
+): Uint8Array {
+    const msgBatchHash = batchHash == undefined ? new Uint8Array(32).fill(0) : ethers.utils.arrayify(batchHash);
+    const msgNonce = serializeNonce(nonce);
+    const msgAccId = serializeAccountId(accountId);
+    const msgPubKeyHash = serializeAddress(pubKeyHash);
+    return ethers.utils.concat([msgPubKeyHash, msgNonce, msgAccId, msgBatchHash]);
 }
 
 export function getSignedBytesFromMessage(message: utils.BytesLike | string, addPrefix: boolean): Uint8Array {
@@ -506,6 +532,38 @@ export function serializeNonce(nonce: number): Uint8Array {
     return numberToBytesBE(nonce, 4);
 }
 
+export function serializeTimestamp(time: number): Uint8Array {
+    if (time < 0) {
+        throw new Error('Negative timestamp');
+    }
+    return ethers.utils.concat([new Uint8Array(4), numberToBytesBE(time, 4)]);
+}
+
+export function serializeWithdraw(withdraw: Withdraw): Uint8Array {
+    const type = new Uint8Array([3]);
+    const accountId = serializeAccountId(withdraw.accountId);
+    const accountBytes = serializeAddress(withdraw.from);
+    const ethAddressBytes = serializeAddress(withdraw.to);
+    const tokenIdBytes = serializeTokenId(withdraw.token);
+    const amountBytes = serializeAmountFull(withdraw.amount);
+    const feeBytes = serializeFeePacked(withdraw.fee);
+    const nonceBytes = serializeNonce(withdraw.nonce);
+    const validFrom = serializeTimestamp(withdraw.validFrom);
+    const validUntil = serializeTimestamp(withdraw.validUntil);
+    return ethers.utils.concat([
+        type,
+        accountId,
+        accountBytes,
+        ethAddressBytes,
+        tokenIdBytes,
+        amountBytes,
+        feeBytes,
+        nonceBytes,
+        validFrom,
+        validUntil
+    ]);
+}
+
 export function serializeTransfer(transfer: Transfer): Uint8Array {
     const type = new Uint8Array([5]); // tx type
     const accountId = serializeAccountId(transfer.accountId);
@@ -515,7 +573,72 @@ export function serializeTransfer(transfer: Transfer): Uint8Array {
     const amount = serializeAmountPacked(transfer.amount);
     const fee = serializeFeePacked(transfer.fee);
     const nonce = serializeNonce(transfer.nonce);
-    return ethers.utils.concat([type, accountId, from, to, token, amount, fee, nonce]);
+    const validFrom = serializeTimestamp(transfer.validFrom);
+    const validUntil = serializeTimestamp(transfer.validUntil);
+    return ethers.utils.concat([type, accountId, from, to, token, amount, fee, nonce, validFrom, validUntil]);
+}
+
+export function serializeChangePubKey(changePubKey: ChangePubKey): Uint8Array {
+    const type = new Uint8Array([7]);
+    const accountIdBytes = serializeAccountId(changePubKey.accountId);
+    const accountBytes = serializeAddress(changePubKey.account);
+    const pubKeyHashBytes = serializeAddress(changePubKey.newPkHash);
+    const tokenIdBytes = serializeTokenId(changePubKey.feeToken);
+    const feeBytes = serializeFeePacked(changePubKey.fee);
+    const nonceBytes = serializeNonce(changePubKey.nonce);
+    const validFrom = serializeTimestamp(changePubKey.validFrom);
+    const validUntil = serializeTimestamp(changePubKey.validUntil);
+    return ethers.utils.concat([
+        type,
+        accountIdBytes,
+        accountBytes,
+        pubKeyHashBytes,
+        tokenIdBytes,
+        feeBytes,
+        nonceBytes,
+        validFrom,
+        validUntil
+    ]);
+}
+
+export function serializeForcedExit(forcedExit: ForcedExit): Uint8Array {
+    const type = new Uint8Array([8]);
+    const initiatorAccountIdBytes = serializeAccountId(forcedExit.initiatorAccountId);
+    const targetBytes = serializeAddress(forcedExit.target);
+    const tokenIdBytes = serializeTokenId(forcedExit.token);
+    const feeBytes = serializeFeePacked(forcedExit.fee);
+    const nonceBytes = serializeNonce(forcedExit.nonce);
+    const validFrom = serializeTimestamp(forcedExit.validFrom);
+    const validUntil = serializeTimestamp(forcedExit.validUntil);
+    return ethers.utils.concat([
+        type,
+        initiatorAccountIdBytes,
+        targetBytes,
+        tokenIdBytes,
+        feeBytes,
+        nonceBytes,
+        validFrom,
+        validUntil
+    ]);
+}
+
+/**
+ * Encodes the transaction data as the byte sequence according to the zkSync protocol.
+ * @param tx A transaction to serialize.
+ */
+export function serializeTx(tx: Transfer | Withdraw | ChangePubKey | CloseAccount | ForcedExit): Uint8Array {
+    switch (tx.type) {
+        case 'Transfer':
+            return serializeTransfer(tx);
+        case 'Withdraw':
+            return serializeWithdraw(tx);
+        case 'ChangePubKey':
+            return serializeChangePubKey(tx);
+        case 'ForcedExit':
+            return serializeForcedExit(tx);
+        default:
+            return new Uint8Array();
+    }
 }
 
 function numberToBytesBE(number: number, bytes: number): Uint8Array {
@@ -527,6 +650,79 @@ function numberToBytesBE(number: number, bytes: number): Uint8Array {
     return result;
 }
 
-export function parseHexWithPrefix(str) {
+export function parseHexWithPrefix(str: string) {
     return Uint8Array.from(Buffer.from(str.slice(2), 'hex'));
+}
+
+export function getCREATE2AddressAndSalt(
+    syncPubkeyHash: string,
+    create2Data: {
+        creatorAddress: string;
+        saltArg: string;
+        codeHash: string;
+    }
+): { salt: string; address: string } {
+    const pubkeyHashHex = syncPubkeyHash.replace('sync:', '0x');
+
+    const additionalSaltArgument = ethers.utils.arrayify(create2Data.saltArg);
+    if (additionalSaltArgument.length !== 32) {
+        throw new Error('create2Data.saltArg should be exactly 32 bytes long');
+    }
+
+    // CREATE2 salt
+    const salt = ethers.utils.keccak256(ethers.utils.concat([additionalSaltArgument, pubkeyHashHex]));
+
+    // Address according to CREATE2 specification
+    const address =
+        '0x' +
+        ethers.utils
+            .keccak256(
+                ethers.utils.concat([
+                    ethers.utils.arrayify(0xff),
+                    ethers.utils.arrayify(create2Data.creatorAddress),
+                    salt,
+                    ethers.utils.arrayify(create2Data.codeHash)
+                ])
+            )
+            .slice(2 + 12 * 2);
+
+    return { address: address, salt: ethers.utils.hexlify(salt) };
+}
+
+export async function getEthereumBalance(
+    ethProvider: ethers.providers.Provider,
+    syncProvider: Provider,
+    address: Address,
+    token: TokenLike
+): Promise<BigNumber> {
+    let balance: BigNumber;
+    if (isTokenETH(token)) {
+        balance = await ethProvider.getBalance(address);
+    } else {
+        const erc20contract = new Contract(
+            syncProvider.tokenSet.resolveTokenAddress(token),
+            IERC20_INTERFACE,
+            ethProvider
+        );
+
+        balance = await erc20contract.balanceOf(address);
+    }
+    return balance;
+}
+
+export async function getPendingBalance(
+    ethProvider: ethers.providers.Provider,
+    syncProvider: Provider,
+    address: Address,
+    token: TokenLike
+): Promise<BigNumberish> {
+    const zksyncContract = new Contract(
+        syncProvider.contractAddress.mainContract,
+        SYNC_MAIN_CONTRACT_INTERFACE,
+        ethProvider
+    );
+
+    const tokenAddress = syncProvider.tokenSet.resolveTokenAddress(token);
+
+    return zksyncContract.getPendingBalance(address, tokenAddress);
 }

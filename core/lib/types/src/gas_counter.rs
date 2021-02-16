@@ -5,7 +5,7 @@
 // Workspace deps
 use zksync_basic_types::*;
 // Local deps
-use crate::{config::MAX_WITHDRAWALS_TO_COMPLETE_IN_A_CALL, ZkSyncOp};
+use crate::{config::MAX_WITHDRAWALS_TO_COMPLETE_IN_A_CALL, Block, ZkSyncOp};
 
 /// Amount of gas that we can afford to spend in one transaction.
 /// This value must be big enough to fit big blocks with expensive transactions,
@@ -22,14 +22,15 @@ impl CommitCost {
     // These values are estimated using the `gas_price_test` in `testkit`.
 
     // TODO: overvalued for quick fix of tx fails (ZKS-109).
-    pub const BASE_COST: u64 = 300_000;
-    pub const DEPOSIT_COST: u64 = 10_397;
-    pub const CHANGE_PUBKEY_COST_OFFCHAIN: u64 = 15_866;
-    pub const CHANGE_PUBKEY_COST_ONCHAIN: u64 = 3_929;
-    pub const TRANSFER_COST: u64 = 334;
-    pub const TRANSFER_TO_NEW_COST: u64 = 862;
-    pub const FULL_EXIT_COST: u64 = 10_165;
-    pub const WITHDRAW_COST: u64 = 2_167;
+    pub const BASE_COST: u64 = 40_000;
+    pub const DEPOSIT_COST: u64 = 7_000;
+    pub const OLD_CHANGE_PUBKEY_COST_OFFCHAIN: u64 = 15_000;
+    pub const CHANGE_PUBKEY_COST_OFFCHAIN: u64 = 11_050;
+    pub const CHANGE_PUBKEY_COST_ONCHAIN: u64 = 4_000;
+    pub const TRANSFER_COST: u64 = 250;
+    pub const TRANSFER_TO_NEW_COST: u64 = 780;
+    pub const FULL_EXIT_COST: u64 = 7_000;
+    pub const WITHDRAW_COST: u64 = 3_500;
     pub const FORCED_EXIT_COST: u64 = Self::WITHDRAW_COST; // TODO: Verify value (ZKS-109).
 
     pub fn base_cost() -> U256 {
@@ -37,11 +38,12 @@ impl CommitCost {
     }
 
     pub fn op_cost(op: &ZkSyncOp) -> U256 {
+        // let x = ChangePubKeyEthAuthDa;
         let cost = match op {
             ZkSyncOp::Noop(_) => 0,
             ZkSyncOp::Deposit(_) => Self::DEPOSIT_COST,
             ZkSyncOp::ChangePubKeyOffchain(change_pubkey) => {
-                if change_pubkey.tx.eth_signature.is_some() {
+                if change_pubkey.tx.is_ecdsa() {
                     Self::CHANGE_PUBKEY_COST_OFFCHAIN
                 } else {
                     Self::CHANGE_PUBKEY_COST_ONCHAIN
@@ -69,13 +71,13 @@ impl VerifyCost {
     // These values are estimated using the `gas_price_test` in `testkit`.
 
     // TODO: overvalued for quick fix of tx fails (ZKS-109).
-    pub const BASE_COST: u64 = 1_000_000;
-    pub const DEPOSIT_COST: u64 = 0;
+    pub const BASE_COST: u64 = 10_000;
+    pub const DEPOSIT_COST: u64 = 50;
     pub const CHANGE_PUBKEY_COST: u64 = 0;
     pub const TRANSFER_COST: u64 = 0;
     pub const TRANSFER_TO_NEW_COST: u64 = 0;
-    pub const FULL_EXIT_COST: u64 = 2_499;
-    pub const WITHDRAW_COST: u64 = 45_668;
+    pub const FULL_EXIT_COST: u64 = 30_000;
+    pub const WITHDRAW_COST: u64 = 48_000;
     pub const FORCED_EXIT_COST: u64 = Self::WITHDRAW_COST; // TODO: Verify value (ZKS-109).
 
     pub fn base_cost() -> U256 {
@@ -144,6 +146,11 @@ impl GasCounter {
     /// Some ERС20 tokens may require a lot of gas to withdrawals.
     pub const COMPLETE_WITHDRAWALS_ERC20_COST: u64 = 200_000;
 
+    /// constants for gas limit calculation of aggregated operations
+    pub const BASE_COMMIT_BLOCKS_TX_COST: usize = 450_000;
+    pub const BASE_EXECUTE_BLOCKS_TX_COST: usize = 450_000;
+    pub const BASE_PROOF_BLOCKS_TX_COST: usize = 1_500_000;
+
     pub fn new() -> Self {
         Self::default()
     }
@@ -188,6 +195,20 @@ impl GasCounter {
         Self::scale_up(approx_limit)
     }
 
+    pub fn commit_gas_limit_aggregated(blocks: &[Block]) -> U256 {
+        U256::from(Self::BASE_COMMIT_BLOCKS_TX_COST)
+            + blocks
+                .iter()
+                .fold(U256::zero(), |acc, block| acc + block.commit_gas_limit)
+    }
+
+    pub fn execute_gas_limit_aggregated(blocks: &[Block]) -> U256 {
+        U256::from(Self::BASE_EXECUTE_BLOCKS_TX_COST)
+            + blocks
+                .iter()
+                .fold(U256::zero(), |acc, block| acc + block.verify_gas_limit)
+    }
+
     /// Increases the value by 30%.
     fn scale_up(value: U256) -> U256 {
         value * U256::from(130) / U256::from(100)
@@ -216,6 +237,7 @@ mod tests {
                 TokenId(0),
                 Default::default(),
                 Default::default(),
+                Default::default(),
                 None,
                 None,
             ),
@@ -239,6 +261,7 @@ mod tests {
                 Default::default(),
                 Default::default(),
                 Nonce(0),
+                Default::default(),
                 None,
             ),
             from: AccountId(1),
@@ -253,6 +276,7 @@ mod tests {
                 Default::default(),
                 Default::default(),
                 Nonce(0),
+                Default::default(),
                 None,
             ),
             from: AccountId(1),
@@ -274,6 +298,7 @@ mod tests {
                 TokenId(0),
                 Default::default(),
                 Nonce(0),
+                Default::default(),
                 None,
             ),
             target_account_id: AccountId(1),
@@ -288,6 +313,7 @@ mod tests {
                 Default::default(),
                 Default::default(),
                 Nonce(0),
+                Default::default(),
                 None,
             ),
             account_id: AccountId(1),
@@ -354,6 +380,7 @@ mod tests {
                 Default::default(),
                 Default::default(),
                 TokenId(0),
+                Default::default(),
                 Default::default(),
                 Default::default(),
                 None,

@@ -1,4 +1,4 @@
-use std::{env, str::FromStr};
+use std::{env, iter::FromIterator, str::FromStr};
 
 /// Obtains the environment variable value.
 /// Panics if there is no environment variable with provided name set.
@@ -46,6 +46,19 @@ where
             })
         })
         .ok()
+}
+
+/// Obtains the environment comma separated variables into collection.
+pub fn parse_env_to_collection<F, I>(name: &str) -> F
+where
+    I: FromStr,
+    I::Err: std::fmt::Debug,
+    F: FromIterator<I>,
+{
+    get_env(name)
+        .split(',')
+        .map(|p| p.parse::<I>().unwrap())
+        .collect()
 }
 
 #[cfg(test)]

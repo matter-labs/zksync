@@ -48,6 +48,7 @@ fn test_print_transfer_for_protocol() {
         BigUint::from(12_340_000_000_000u64),
         BigUint::from(56_700_000_000u64),
         Nonce(rng.gen()),
+        Default::default(),
         &key,
     )
     .expect("failed to sign transfer");
@@ -71,6 +72,14 @@ fn test_print_transfer_for_protocol() {
         ("amount", pack_token_amount(&transfer.amount)),
         ("fee", pack_fee_amount(&transfer.fee)),
         ("nonce", transfer.nonce.to_be_bytes().to_vec()),
+        (
+            "time_range",
+            transfer
+                .time_range
+                .expect("no time range on transfer")
+                .to_be_bytes()
+                .to_vec(),
+        ),
     ];
     println!("Signed transaction fields:");
     let mut field_concat = Vec::new();
@@ -98,6 +107,7 @@ fn test_print_withdraw_for_protocol() {
         BigUint::from(12_340_000_000_000u64),
         BigUint::from(56_700_000_000u64),
         Nonce(rng.gen()),
+        Default::default(),
         &key,
     )
     .expect("failed to sign withdraw");
@@ -124,6 +134,14 @@ fn test_print_withdraw_for_protocol() {
         ),
         ("fee", pack_fee_amount(&withdraw.fee)),
         ("nonce", withdraw.nonce.to_be_bytes().to_vec()),
+        (
+            "time_range",
+            withdraw
+                .time_range
+                .expect("no time range on withdraw")
+                .to_be_bytes()
+                .to_vec(),
+        ),
     ];
     println!("Signed transaction fields:");
     let mut field_concat = Vec::new();

@@ -1,4 +1,6 @@
-pragma solidity ^0.5.8;
+// SPDX-License-Identifier: MIT OR Apache-2.0
+
+pragma solidity ^0.7.0;
 
 /// @title Interface of the upgradeable contract
 /// @author Matter Labs

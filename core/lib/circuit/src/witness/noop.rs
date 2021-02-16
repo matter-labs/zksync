@@ -58,6 +58,8 @@ pub fn noop_operation(tree: &CircuitAccountTree, acc_id: u32) -> Operation<Bn256
             b: Some(Fr::zero()),
             pub_nonce: Some(Fr::zero()),
             new_pub_key_hash: Some(Fr::zero()),
+            valid_from: Some(Fr::zero()),
+            valid_until: Some(Fr::from_str(&u32::MAX.to_string()).unwrap()),
         },
         lhs: OperationBranch {
             address: Some(account_address_fe),

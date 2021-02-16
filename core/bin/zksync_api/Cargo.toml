@@ -56,13 +56,14 @@ chrono = { version = "0.4", features = ["serde", "rustc-serialize"] }
 ctrlc = { version = "3.1", features = ["termination"] }
 anyhow = "1.0"
 thiserror = "1.0"
+structopt = "0.3"
 # TODO: should be removed after json rpc deps are updated is updated, current version (14.0) (ZKS-98).
 futures01 = { package = "futures", version = "0.1" }
 reqwest = { version = "0.10", features = ["blocking", "json"] }
 tiny-keccak = "1.4.2"
 async-trait = "0.1"
 jsonwebtoken = "7"
-metrics = "0.13.0-alpha.8"
+metrics = "=0.13.0-alpha.8"
 lru-cache = "0.1.2"
 once_cell = "1.4"
 regex = "1"

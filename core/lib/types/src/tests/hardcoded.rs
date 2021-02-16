@@ -17,7 +17,7 @@ use crate::{
         WithdrawOp,
     },
     priority_ops::{Deposit, FullExit},
-    tx::{ChangePubKey, ForcedExit, PackedEthSignature, Transfer, Withdraw},
+    tx::{ChangePubKey, ForcedExit, PackedEthSignature, TimeRange, Transfer, Withdraw},
     Log, PriorityOp,
 };
 use lazy_static::lazy_static;
@@ -26,6 +26,8 @@ use zksync_basic_types::{AccountId, Address, Nonce, TokenId, H256};
 #[cfg(test)]
 pub mod operations_test {
     use super::*;
+    use crate::tx::{ChangePubKeyECDSAData, ChangePubKeyEthAuthData};
+
     // Public data parameters, using them we can restore `ZkSyncOp`.
     const NOOP_PUBLIC_DATA: &str = "000000000000000000";
     const DEPOSIT_PUBLIC_DATA: &str = "010000002a002a0000000000000000000000000000002a21abaed8712072e918632259780e587698ef58da0000000000000000000000";
@@ -77,6 +79,7 @@ pub mod operations_test {
                 BigUint::from(42u32),
                 BigUint::from(42u32),
                 Nonce(42),
+                Default::default(),
                 None,
             );
             let (from, to) = (AccountId(1u32), AccountId(2u32));
@@ -112,6 +115,7 @@ pub mod operations_test {
                 BigUint::from(42u32),
                 BigUint::from(42u32),
                 Nonce(42),
+                Default::default(),
                 None,
             );
             let account_id = AccountId(42u32);
@@ -156,6 +160,7 @@ pub mod operations_test {
                 TokenId(42),
                 BigUint::from(42u32),
                 Nonce(42),
+                Default::default(),
                 None,
                 Some(PackedEthSignature::deserialize_packed(
                     &hex::decode("2a0a81e257a2f5d6ed4f07b81dbda09f107bd026dbda09f107bd026f5d6ed4f02a0a81e257a2f5d6ed4f07b81dbda09f107bd026dbda09f107bd026f5d6ed4f0d4").unwrap(),
@@ -181,6 +186,7 @@ pub mod operations_test {
                 TokenId(42),
                 BigUint::from(42u32),
                 Nonce(42),
+                Default::default(),
                 None,
             );
             let target_account_id = AccountId(42u32);
@@ -228,13 +234,16 @@ pub mod operations_test {
             ChangePubKeyOp::from_public_data(&hex::decode(CHANGE_PUBKEY_PUBLIC_DATA).unwrap())
                 .unwrap();
 
-        change_pubkey.tx.eth_signature = PackedEthSignature::deserialize_packed(
+        change_pubkey.tx.eth_auth_data = Some(ChangePubKeyEthAuthData::ECDSA(ChangePubKeyECDSAData {
+            eth_signature: PackedEthSignature::deserialize_packed(
             &hex::decode("2a0a81e257a2f5d6ed4f07b81dbda09f107bd026dbda09f107bd026f5d6ed4f02a0a81e257a2f5d6ed4f07b81dbda09f107bd026dbda09f107bd026f5d6ed4f0d4").unwrap(),
-        ).ok();
+            ).expect("Hex signature deserialization"),
+            batch_hash: H256::from([0x0u8; 32])
+        }));
 
         assert_eq!(
             hex::encode(change_pubkey.get_eth_witness()),
-            "2a0a81e257a2f5d6ed4f07b81dbda09f107bd026dbda09f107bd026f5d6ed4f02a0a81e257a2f5d6ed4f07b81dbda09f107bd026dbda09f107bd026f5d6ed4f0d4"
+            "002a0a81e257a2f5d6ed4f07b81dbda09f107bd026dbda09f107bd026f5d6ed4f02a0a81e257a2f5d6ed4f07b81dbda09f107bd026dbda09f107bd026f5d6ed4f0d4"
         );
     }
 }
@@ -247,6 +256,8 @@ pub mod tx_conversion_test {
     const ACCOUNT_ID: AccountId = AccountId(100);
     const TOKEN_ID: TokenId = TokenId(5);
     const NONCE: Nonce = Nonce(20);
+    const VALID_FROM: u64 = 0;
+    const VALID_UNTIL: u64 = 1612201680;
     lazy_static! {
         static ref ALICE: Address =
             Address::from_str("2a0a81e257a2f5d6ed4f07b81dbda09f107bd026").unwrap();
@@ -256,6 +267,7 @@ pub mod tx_conversion_test {
             PubKeyHash::from_hex("sync:3cfb9a39096d9e02b24187355f628f9a6331511b").unwrap();
         static ref AMOUNT: BigUint = BigUint::from(12345678u64);
         static ref FEE: BigUint = BigUint::from(1000000u32);
+        static ref TIME_RANGE: TimeRange = TimeRange::new(VALID_FROM, VALID_UNTIL);
     }
 
     #[test]
@@ -267,12 +279,13 @@ pub mod tx_conversion_test {
             TOKEN_ID,
             (*FEE).clone(),
             NONCE,
+            *TIME_RANGE,
             None,
             None,
         );
 
         let bytes = change_pubkey.get_bytes();
-        assert_eq!(hex::encode(bytes), "07000000642a0a81e257a2f5d6ed4f07b81dbda09f107bd0263cfb9a39096d9e02b24187355f628f9a6331511b00057d0300000014");
+        assert_eq!(hex::encode(bytes), "07000000642a0a81e257a2f5d6ed4f07b81dbda09f107bd0263cfb9a39096d9e02b24187355f628f9a6331511b00057d030000001400000000000000000000000060183ed0");
     }
 
     #[test]
@@ -285,22 +298,30 @@ pub mod tx_conversion_test {
             (*AMOUNT).clone(),
             (*FEE).clone(),
             NONCE,
+            *TIME_RANGE,
             None,
         );
 
         let bytes = transfer.get_bytes();
-        assert_eq!(hex::encode(bytes), "05000000642a0a81e257a2f5d6ed4f07b81dbda09f107bd02621abaed8712072e918632259780e587698ef58da000500178c29c07d0300000014");
+        assert_eq!(hex::encode(bytes), "05000000642a0a81e257a2f5d6ed4f07b81dbda09f107bd02621abaed8712072e918632259780e587698ef58da000500178c29c07d030000001400000000000000000000000060183ed0");
     }
 
     #[test]
     fn test_convert_to_bytes_forced_exit() {
-        let forced_exit =
-            ForcedExit::new(ACCOUNT_ID, *ALICE, TOKEN_ID, (*FEE).clone(), NONCE, None);
+        let forced_exit = ForcedExit::new(
+            ACCOUNT_ID,
+            *ALICE,
+            TOKEN_ID,
+            (*FEE).clone(),
+            NONCE,
+            *TIME_RANGE,
+            None,
+        );
 
         let bytes = forced_exit.get_bytes();
         assert_eq!(
             hex::encode(bytes),
-            "08000000642a0a81e257a2f5d6ed4f07b81dbda09f107bd02600057d0300000014"
+            "08000000642a0a81e257a2f5d6ed4f07b81dbda09f107bd02600057d030000001400000000000000000000000060183ed0"
         );
     }
 
@@ -314,11 +335,12 @@ pub mod tx_conversion_test {
             (*AMOUNT).clone(),
             (*FEE).clone(),
             NONCE,
+            *TIME_RANGE,
             None,
         );
 
         let bytes = withdraw.get_bytes();
-        assert_eq!(hex::encode(bytes), "03000000642a0a81e257a2f5d6ed4f07b81dbda09f107bd02621abaed8712072e918632259780e587698ef58da000500000000000000000000000000bc614e7d0300000014");
+        assert_eq!(hex::encode(bytes), "03000000642a0a81e257a2f5d6ed4f07b81dbda09f107bd02621abaed8712072e918632259780e587698ef58da000500000000000000000000000000bc614e7d030000001400000000000000000000000060183ed0");
     }
 }
 
@@ -326,31 +348,34 @@ pub mod tx_conversion_test {
 fn test_priority_op_from_valid_logs() {
     let valid_logs = [
         Log {
-            address: Address::from_str("bd2ea2073d4efa1a82269800a362f889545983c2").unwrap(),
+            address: Address::from_str("aBC49f8a744b7b615994e1D42058c2D146B83389").unwrap(),
             topics: vec![H256::from_str(
                 "d0943372c08b438a88d4b39d77216901079eda9ca59d45349841c099083b6830",
             )
             .unwrap()],
-            data: Bytes(vec![
-                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 54, 97, 92, 243, 73, 215, 246, 52, 72, 145,
-                177, 231, 202, 124, 114, 136, 63, 93, 192, 73, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0,
-                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                160, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                0, 0, 0, 18, 133, 59, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 42, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 108,
-                107, 147, 91, 139, 189, 64, 0, 0, 111, 183, 165, 210, 134, 53, 93, 80, 193, 119,
-                133, 131, 237, 37, 53, 35, 227, 136, 205, 12, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-            ]),
+            data: Bytes(
+                hex::decode(
+                    "000000000000000000000000a61464658afeaf65cccaafd3a5\
+                12b69a83b77618000000000000000000000000000000000000\
+                00000000000000000000000000000000000000000000000000\
+                00000000000000000000000000000000000000000100000000\
+                00000000000000000000000000000000000000000000000000\
+                0000a000000000000000000000000000000000000000000000\
+                00000000000000000078000000000000000000000000000000\
+                000000000000000000000000000000002b0100000000000100\
+                000000000000000de0b6b3a7640000a61464658afeaf65ccca\
+                afd3a512b69a83b77618000000000000000000000000000000\
+                000000000000",
+                )
+                .expect("Event data parse"),
+            ),
             block_hash: Some(
-                H256::from_str("1de24c5271c2a3ecdc8b56449b479e388a2390be481faad72d48799c93668c42")
+                H256::from_str("3a2116a8c2600a91df2ee940b94f19c29d59622ec1dafcdd0609697ffddf16d1")
                     .unwrap(),
             ),
             block_number: Some(1196475.into()),
             transaction_hash: Some(
-                H256::from_str("5319d65d7a60a1544e4b17d2272f00b5d17a68dea4a0a92e40d046f98a8ed6c5")
+                H256::from_str("52888e463aa4e8856970c783d6cf5f076f249d8e160db46f08a2edde4beb557e")
                     .unwrap(),
             ),
             transaction_index: Some(0.into()),
@@ -360,31 +385,33 @@ fn test_priority_op_from_valid_logs() {
             removed: Some(false),
         },
         Log {
-            address: Address::from_str("bd2ea2073d4efa1a82269800a362f889545983c2").unwrap(),
+            address: Address::from_str("aBC49f8a744b7b615994e1D42058c2D146B83389").unwrap(),
             topics: vec![H256::from_str(
                 "d0943372c08b438a88d4b39d77216901079eda9ca59d45349841c099083b6830",
             )
             .unwrap()],
-            data: Bytes(vec![
-                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 54, 97, 92, 243, 73, 215, 246, 52, 72, 145,
-                177, 231, 202, 124, 114, 136, 63, 93, 192, 73, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 26, 0, 0, 0, 0, 0, 0, 0,
-                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0,
-                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                160, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                0, 0, 0, 18, 133, 223, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 42, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 37,
-                184, 252, 127, 148, 119, 128, 0, 59, 187, 156, 57, 129, 3, 106, 206, 113, 189, 130,
-                135, 229, 227, 157, 236, 165, 121, 1, 164, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                0, 0, 0, 0, 0, 0, 0, 0, 0,
-            ]),
+            data: Bytes(
+                hex::decode(
+                    "000000000000000000000000a61464658afeaf65cccaafd3a5\
+                                 12b69a83b77618000000000000000000000000000000000000\
+                                 00000000000000000000000000030000000000000000000000\
+                                 00000000000000000000000000000000000000000600000000\
+                                 00000000000000000000000000000000000000000000000000\
+                                 0000a000000000000000000000000000000000000000000000\
+                                 00000000000000000087000000000000000000000000000000\
+                                 000000000000000000000000000000002b0600000001a61464\
+                                 658afeaf65cccaafd3a512b69a83b776180001000000000000\
+                                 00000000000000000000000000000000000000000000000000000000000000",
+                )
+                .expect("Event data decode"),
+            ),
             block_hash: Some(
-                H256::from_str("6054a4d29cda776d0493805cb8898e0659711532430b1af9844a48e67f5c794f")
+                H256::from_str("a9b74339d253fdee7a9569f3892f9f63a55b8f7fed8e8334bf00f53b2d67b3a6")
                     .unwrap(),
             ),
             block_number: Some(1196639.into()),
             transaction_hash: Some(
-                H256::from_str("4ab4002673c2b28853eebb00de588a2f8507d20078f29caef192d8b815acd379")
+                H256::from_str("fdc53efb32245f59009d10d7f67bfad5272a872a9aa539c2ce9cf1ed127750ad")
                     .unwrap(),
             ),
             transaction_index: Some(2.into()),

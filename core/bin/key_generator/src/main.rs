@@ -10,13 +10,22 @@
 //! and `SUPPORTED_BLOCK_CHUNKS_SIZES_SETUP_POWERS` that are read from env in config files.
 //! Before generating parameters universal setup keys should be downloaded using `zksync plonk-setup` command.
 
+mod recursive_keys;
+mod sample_proofs;
 mod verifier_contract_generator;
 mod zksync_key;
 
 use structopt::StructOpt;
 
+use crate::recursive_keys::{
+    count_gates_recursive_verification_keys, make_recursive_verification_keys,
+};
+use crate::sample_proofs::make_sample_proofs;
 use crate::verifier_contract_generator::create_verifier_contract;
-use crate::zksync_key::{make_plonk_blocks_verify_keys, make_plonk_exodus_verify_key};
+use crate::zksync_key::{
+    calculate_and_print_max_zksync_main_circuit_size, make_plonk_blocks_verify_keys,
+    make_plonk_exodus_verify_key,
+};
 use zksync_config::configs::ChainConfig;
 
 #[derive(StructOpt)]
@@ -25,6 +34,8 @@ enum Command {
     Keys,
     /// Generate verifier contract based on verification keys
     Contract,
+    /// Counts available sizes (chunks and aggregated proof size) for available setups
+    CircuitSize,
 }
 
 #[derive(StructOpt)]
@@ -43,10 +54,16 @@ fn main() {
     match opt.command {
         Command::Keys => {
             make_plonk_exodus_verify_key();
-            make_plonk_blocks_verify_keys(config);
+            make_plonk_blocks_verify_keys(config.clone());
+            make_recursive_verification_keys(config.clone());
+            make_sample_proofs(config).expect("Failed to generate sample proofs");
         }
         Command::Contract => {
             create_verifier_contract(config);
+        }
+        Command::CircuitSize => {
+            calculate_and_print_max_zksync_main_circuit_size();
+            count_gates_recursive_verification_keys();
         }
     }
 }

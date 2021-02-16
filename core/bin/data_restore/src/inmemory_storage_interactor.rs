@@ -5,8 +5,8 @@ use web3::types::Address;
 
 use zksync_types::block::Block;
 use zksync_types::{
-    Account, AccountId, AccountMap, AccountUpdate, AccountUpdates, Action, BlockNumber,
-    EncodedProofPlonk, Operation, Token, TokenGenesisListItem, TokenId,
+    Account, AccountId, AccountMap, AccountUpdate, AccountUpdates, Action, BlockNumber, Operation,
+    Token, TokenGenesisListItem, TokenId,
 };
 
 use crate::{
@@ -51,7 +51,7 @@ impl StorageInteractor for InMemoryStorageInteractor {
 
         let verify_op = Operation {
             action: Action::Verify {
-                proof: Box::new(EncodedProofPlonk::default()),
+                proof: Box::new(Default::default()),
             },
             block: block.clone(),
             id: None,

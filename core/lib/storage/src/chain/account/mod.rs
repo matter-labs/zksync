@@ -22,6 +22,53 @@ pub use self::stored_state::StoredAccountState;
 pub struct AccountSchema<'a, 'c>(pub &'a mut StorageProcessor<'c>);
 
 impl<'a, 'c> AccountSchema<'a, 'c> {
+    /// Stores account type in the databse
+    /// There are 2 types: Owned and CREATE2
+    pub async fn set_account_type(
+        &mut self,
+        account_id: AccountId,
+        account_type: EthAccountType,
+    ) -> QueryResult<()> {
+        let start = Instant::now();
+
+        sqlx::query!(
+            r#"
+            INSERT INTO eth_account_types VALUES ( $1, $2 )
+            ON CONFLICT (account_id) DO UPDATE SET account_type = $2
+            "#,
+            i64::from(*account_id),
+            account_type as EthAccountType
+        )
+        .execute(self.0.conn())
+        .await?;
+
+        metrics::histogram!("sql.chain.state.set_account_type", start.elapsed());
+        Ok(())
+    }
+
+    /// Fetches account type from the database
+    pub async fn account_type_by_id(
+        &mut self,
+        account_id: AccountId,
+    ) -> QueryResult<Option<EthAccountType>> {
+        let start = Instant::now();
+
+        let result = sqlx::query_as!(
+            StorageAccountType,
+            r#"
+            SELECT account_id, account_type as "account_type!: EthAccountType" 
+            FROM eth_account_types WHERE account_id = $1
+            "#,
+            i64::from(*account_id)
+        )
+        .fetch_optional(self.0.conn())
+        .await?;
+
+        let account_type = result.map(|record| record.account_type as EthAccountType);
+        metrics::histogram!("sql.chain.account.account_type_by_id", start.elapsed());
+        Ok(account_type)
+    }
+
     /// Obtains both committed and verified state for the account by its ID.
     pub async fn account_state_by_id(
         &mut self,

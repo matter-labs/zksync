@@ -53,10 +53,10 @@ async fn new_tx(
 #[actix_web::post("/new_txs_batch")]
 async fn new_txs_batch(
     data: web::Data<AppState>,
-    web::Json((txs, eth_signature)): web::Json<(Vec<SignedZkSyncTx>, Option<TxEthSignature>)>,
+    web::Json((txs, eth_signatures)): web::Json<(Vec<SignedZkSyncTx>, Vec<TxEthSignature>)>,
 ) -> actix_web::Result<HttpResponse> {
     let (sender, receiver) = oneshot::channel();
-    let item = MempoolTransactionRequest::NewTxsBatch(txs, eth_signature, sender);
+    let item = MempoolTransactionRequest::NewTxsBatch(txs, eth_signatures, sender);
     let mut mempool_sender = data.mempool_tx_sender.clone();
     mempool_sender
         .send(item)

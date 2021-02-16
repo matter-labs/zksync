@@ -4,11 +4,10 @@ use crate::api_server::rpc_server::types::{
 use jsonrpc_pubsub::{typed::Subscriber, SubscriptionId};
 use std::time::Instant;
 use zksync_storage::ConnectionPool;
+use zksync_types::aggregated_operations::AggregatedOperation;
 use zksync_types::tx::TxHash;
 use zksync_types::BlockNumber;
-use zksync_types::{
-    block::ExecutedOperations, AccountId, ActionType, Address, Operation, PriorityOpId,
-};
+use zksync_types::{block::ExecutedOperations, AccountId, ActionType, Address, PriorityOpId};
 
 use super::{
     state::NotifierState, sub_store::SubStorage, EventNotifierRequest, EventSubscribeRequest,
@@ -70,38 +69,48 @@ impl OperationNotifier {
     }
 
     /// Processes new block action (commit or verify), notifying the subscribers.
-    pub async fn handle_new_block(&mut self, op: Operation) -> Result<(), anyhow::Error> {
+    pub async fn handle_new_block(
+        &mut self,
+        aggregation_operation: AggregatedOperation,
+    ) -> anyhow::Result<()> {
         let start = Instant::now();
-        let action = op.action.get_type();
 
-        self.handle_executed_operations(
-            op.block.block_transactions.clone(),
-            action,
-            op.block.block_number,
-        )?;
+        let (action, blocks) = match aggregation_operation {
+            AggregatedOperation::CommitBlocks(operation) => (ActionType::COMMIT, operation.blocks),
+            AggregatedOperation::ExecuteBlocks(operation) => (ActionType::VERIFY, operation.blocks),
+            _ => return Ok(()),
+        };
 
-        let updated_accounts: Vec<AccountId> = op
-            .block
-            .block_transactions
-            .iter()
-            .flat_map(|exec_op| exec_op.get_updated_account_ids())
-            .collect();
+        for block in blocks {
+            self.handle_executed_operations(
+                block.block_transactions.clone(),
+                action,
+                block.block_number,
+            );
 
-        for id in updated_accounts {
-            if self.account_subs.subscriber_exists(id, action) {
-                let account_state = match self.state.get_account_state(id, action).await? {
-                    Some(account_state) => account_state,
-                    None => {
-                        vlog::warn!(
-                            "Account is updated but not stored in DB, id: {}, block: {:#?}",
-                            *id,
-                            op.block
-                        );
-                        continue;
-                    }
-                };
+            let updated_accounts: Vec<AccountId> = block
+                .block_transactions
+                .iter()
+                .map(|exec_op| exec_op.get_updated_account_ids())
+                .flatten()
+                .collect();
 
-                self.account_subs.notify(id, action, account_state);
+            for id in updated_accounts {
+                if self.account_subs.subscriber_exists(id, action) {
+                    let account_state = match self.state.get_account_state(id, action).await? {
+                        Some(account_state) => account_state,
+                        None => {
+                            vlog::warn!(
+                                "Account is updated but not stored in DB, id: {}, block: {:#?}",
+                                *id,
+                                block
+                            );
+                            continue;
+                        }
+                    };
+
+                    self.account_subs.notify(id, action, account_state);
+                }
             }
         }
 
@@ -115,7 +124,7 @@ impl OperationNotifier {
         ops: Vec<ExecutedOperations>,
         action: ActionType,
         block_number: BlockNumber,
-    ) -> Result<(), anyhow::Error> {
+    ) {
         let start = Instant::now();
         for tx in ops {
             match tx {
@@ -148,7 +157,6 @@ impl OperationNotifier {
             }
         }
         metrics::histogram!("api.notifier.handle_executed_operations", start.elapsed());
-        Ok(())
     }
 
     /// More convenient alias for `handle_executed_operations`.
@@ -160,7 +168,8 @@ impl OperationNotifier {
             exec_batch.operations,
             ActionType::COMMIT,
             exec_batch.block_number,
-        )
+        );
+        Ok(())
     }
 
     /// Removes provided subscription from the list.

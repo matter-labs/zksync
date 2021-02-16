@@ -14,7 +14,7 @@ use zksync_api_client::rest::v1::{
     Client, TokenPriceKind, MAX_LIMIT,
 };
 use zksync_config::test_config::TestConfig;
-use zksync_types::{Address, BlockNumber, TokenId, TokenLike};
+use zksync_types::{Address, TokenId, TokenLike};
 
 // Local uses
 use super::{ApiDataPool, ApiTestsBuilder};
@@ -267,9 +267,7 @@ pub fn wire_tests<'a>(builder: ApiTestsBuilder<'a>, monitor: &'a Monitor) -> Api
         .append("transactions/receipts", move |client, monitor| async move {
             let tx_hash = monitor.api_data_pool.read().await.random_tx_hash();
             let range = monitor.api_data_pool.read().await.random_block_range().0;
-            client
-                .tx_receipts(tx_hash, range, BlockNumber(MAX_LIMIT))
-                .await?;
+            client.tx_receipts(tx_hash, range, MAX_LIMIT).await?;
             Ok(())
         })
         .append("transactions/receipt", move |client, monitor| async move {

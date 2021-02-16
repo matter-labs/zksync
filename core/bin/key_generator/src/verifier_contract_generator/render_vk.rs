@@ -7,19 +7,93 @@ use std::path::Path;
 
 use handlebars::to_json;
 
-use zksync_crypto::bellman::plonk::domains::Domain;
-use zksync_crypto::ff::{PrimeField, PrimeFieldRepr};
-use zksync_crypto::franklin_crypto::bellman::plonk::better_cs::{
-    cs::PlonkCsWidth4WithNextStepParams, keys::VerificationKey,
+use zksync_crypto::bellman::plonk::{
+    better_better_cs::setup::VerificationKey,
+    better_cs::{
+        cs::PlonkCsWidth4WithNextStepParams, keys::VerificationKey as SingleVerificationKey,
+    },
+    domains::Domain,
 };
+use zksync_crypto::ff::{PrimeField, PrimeFieldRepr};
 use zksync_crypto::pairing::{CurveAffine, Engine};
+use zksync_crypto::recursive_aggregation_circuit::circuit::RecursiveAggregationCircuitBn256;
 use zksync_crypto::{Engine as NodeEngine, Fr};
+use zksync_prover_utils::PlonkVerificationKey;
 
 pub(crate) fn rendered_key(
     key_getter_name: &str,
     verification_key: impl AsRef<Path>,
 ) -> serde_json::Value {
-    let vk = VerificationKey::<NodeEngine, PlonkCsWidth4WithNextStepParams>::read(
+    let vk = VerificationKey::<NodeEngine, RecursiveAggregationCircuitBn256<'static>>::read(
+        File::open(verification_key).expect("Failed to open verification key file"),
+    )
+    .expect("Failed to read verification key");
+    let mut map = HashMap::new();
+
+    let domain_size = vk.n.next_power_of_two().to_string();
+    map.insert("domain_size".to_owned(), to_json(domain_size));
+
+    let num_inputs = vk.num_inputs.to_string();
+    map.insert("num_inputs".to_owned(), to_json(num_inputs));
+
+    let domain = Domain::<Fr>::new_for_size(vk.n.next_power_of_two() as u64).unwrap();
+    let omega = domain.generator;
+    map.insert("omega".to_owned(), to_json(render_scalar_to_hex(&omega)));
+
+    for (i, c) in vk.gate_setup_commitments.iter().enumerate() {
+        let rendered = render_g1_affine_to_hex::<NodeEngine>(&c);
+
+        for (j, rendered) in rendered.iter().enumerate() {
+            map.insert(
+                format!("gate_setup_commitment_{}_{}", i, j),
+                to_json(rendered),
+            );
+        }
+    }
+
+    for (i, c) in vk.gate_selectors_commitments.iter().enumerate() {
+        let rendered = render_g1_affine_to_hex::<NodeEngine>(&c);
+
+        for (j, rendered) in rendered.iter().enumerate() {
+            map.insert(
+                format!("gate_selector_commitment_{}_{}", i, j),
+                to_json(rendered),
+            );
+        }
+    }
+
+    for (i, c) in vk.permutation_commitments.iter().enumerate() {
+        let rendered = render_g1_affine_to_hex::<NodeEngine>(&c);
+
+        for (j, rendered) in rendered.iter().enumerate() {
+            map.insert(
+                format!("permutation_commitment_{}_{}", i, j),
+                to_json(rendered),
+            );
+        }
+    }
+
+    for (i, c) in vk.non_residues.into_iter().enumerate() {
+        let rendered = render_scalar_to_hex(&c);
+        map.insert(format!("permutation_non_residue_{}", i), to_json(&rendered));
+    }
+
+    let rendered = render_g2_affine_to_hex(&vk.g2_elements[1]);
+
+    map.insert("g2_x_x_c0".to_owned(), to_json(&rendered[0]));
+    map.insert("g2_x_x_c1".to_owned(), to_json(&rendered[1]));
+    map.insert("g2_x_y_c0".to_owned(), to_json(&rendered[2]));
+    map.insert("g2_x_y_c1".to_owned(), to_json(&rendered[3]));
+
+    map.insert("key_getter_name".to_string(), to_json(key_getter_name));
+    to_json(map)
+}
+
+pub(crate) fn rendered_key_single_proof(
+    key_getter_name: &str,
+    verification_key: impl AsRef<Path>,
+) -> serde_json::Value {
+    let vk = SingleVerificationKey::<NodeEngine, PlonkCsWidth4WithNextStepParams>::read(
         File::open(verification_key).expect("Failed to open verfifcation key file"),
     )
     .expect("Failed to read verification key");
@@ -72,6 +146,10 @@ pub(crate) fn rendered_key(
 
     map.insert("key_getter_name".to_string(), to_json(key_getter_name));
     to_json(map)
+}
+
+pub fn get_vk_tree_root_hash(block_chunks: &[usize]) -> String {
+    render_scalar_to_hex(&PlonkVerificationKey::get_vk_tree_root_hash(block_chunks))
 }
 
 fn render_scalar_to_hex<F: PrimeField>(el: &F) -> String {

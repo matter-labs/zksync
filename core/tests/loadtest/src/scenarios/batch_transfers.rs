@@ -7,13 +7,13 @@ use rand::{thread_rng, Rng};
 use serde::{Deserialize, Serialize};
 // Workspace uses
 use zksync::utils::closest_packable_token_amount;
-use zksync_types::{tx::PackedEthSignature, ZkSyncTx};
+use zksync_types::{tx::PackedEthSignature, TokenLike, ZkSyncTx};
 // Local uses
 use super::{Fees, Scenario, ScenarioResources};
 use crate::{
     monitor::Monitor,
-    test_wallet::TestWallet,
     utils::{foreach_failsafe, gwei_to_wei, wait_all_failsafe_chunks, DynamicChunks, CHUNK_SIZES},
+    wallet::ScenarioWallet,
 };
 
 /// Configuration options for the transfers scenario.
@@ -45,12 +45,6 @@ impl Default for BatchTransferScenarioConfig {
     }
 }
 
-impl From<BatchTransferScenarioConfig> for BatchTransferScenario {
-    fn from(cfg: BatchTransferScenarioConfig) -> Self {
-        Self::new(cfg)
-    }
-}
-
 /// Schematically, scenario will look like this:
 ///
 /// ```text
@@ -65,6 +59,7 @@ impl From<BatchTransferScenarioConfig> for BatchTransferScenario {
 /// ```
 #[derive(Debug)]
 pub struct BatchTransferScenario {
+    token_name: TokenLike,
     transfer_size: BigUint,
     transfer_rounds: u64,
     wallets: u64,
@@ -73,8 +68,9 @@ pub struct BatchTransferScenario {
 }
 
 impl BatchTransferScenario {
-    pub fn new(config: BatchTransferScenarioConfig) -> Self {
+    pub fn new(token_name: TokenLike, config: BatchTransferScenarioConfig) -> Self {
         Self {
+            token_name,
             transfer_size: gwei_to_wei(config.transfer_size),
             transfer_rounds: config.transfer_rounds,
             wallets: config.wallets_amount,
@@ -86,7 +82,7 @@ impl BatchTransferScenario {
 
 impl fmt::Display for BatchTransferScenario {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_str("batch_transfers")
+        write!(f, "batch_transfers({})", self.token_name)
     }
 }
 
@@ -99,6 +95,7 @@ impl Scenario for BatchTransferScenario {
         ScenarioResources {
             balance_per_wallet: closest_packable_token_amount(&balance_per_wallet),
             wallets_amount: self.wallets,
+            token_name: self.token_name.clone(),
             has_deposits: false,
         }
     }
@@ -107,7 +104,7 @@ impl Scenario for BatchTransferScenario {
         &mut self,
         _monitor: &Monitor,
         fees: &Fees,
-        wallets: &[TestWallet],
+        wallets: &[ScenarioWallet],
     ) -> anyhow::Result<()> {
         let transfers_number = (self.wallets * self.transfer_rounds) as usize;
 
@@ -142,17 +139,10 @@ impl Scenario for BatchTransferScenario {
         &mut self,
         monitor: Monitor,
         _fees: Fees,
-        wallets: Vec<TestWallet>,
-    ) -> anyhow::Result<Vec<TestWallet>> {
-        let max_batch_size = self.max_batch_size;
-        let batch_sizes = std::iter::repeat_with(move || match thread_rng().gen_range(0, 3) {
-            0 => 2,
-            1 => max_batch_size / 2,
-            2 => max_batch_size,
-            _ => unreachable!(),
-        });
-
+        wallets: Vec<ScenarioWallet>,
+    ) -> anyhow::Result<Vec<ScenarioWallet>> {
         let txs = self.txs.drain(..);
+        let batch_sizes = batch_sizes_iter(self.max_batch_size);
         foreach_failsafe(
             "run/batch_transfers",
             DynamicChunks::new(txs, batch_sizes).map(|txs| monitor.send_txs_batch(txs)),
@@ -166,8 +156,19 @@ impl Scenario for BatchTransferScenario {
         &mut self,
         _monitor: &Monitor,
         _fees: &Fees,
-        _wallets: &[TestWallet],
+        _wallets: &[ScenarioWallet],
     ) -> anyhow::Result<()> {
         Ok(())
     }
+}
+
+/// Returns infinite iterator over the following batch sizes:
+/// `[2, max_batch_size / 2, max_batch_size]`
+pub fn batch_sizes_iter(max_batch_size: usize) -> impl Iterator<Item = usize> {
+    std::iter::repeat_with(move || match thread_rng().gen_range(0, 3) {
+        0 => 2,
+        1 => max_batch_size / 2,
+        2 => max_batch_size,
+        _ => unreachable!(),
+    })
 }

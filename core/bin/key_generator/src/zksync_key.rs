@@ -93,6 +93,8 @@ fn zksync_circuit(block_chunks: usize) -> impl Circuit<Engine> + Clone {
             pub_nonce: None,
             new_pub_key_hash: None,
             eth_address: None,
+            valid_from: None,
+            valid_until: None,
         },
         lhs: OperationBranch {
             address: None,
@@ -131,6 +133,7 @@ fn zksync_circuit(block_chunks: usize) -> impl Circuit<Engine> + Clone {
         initial_used_subtree_root: None,
         validator_address: None,
         block_number: None,
+        block_timestamp: None,
         pub_data_commitment: None,
         validator_balances: vec![None; params::total_tokens()],
         validator_audit_path: vec![None; params::account_tree_depth()],
@@ -191,4 +194,36 @@ fn generate_verification_key<C: Circuit<Engine> + Clone, P: AsRef<Path>>(
         .expect("Failed to write verification file."); // unwrap - checked at the function entry
     vlog::info!("Verification key successfully generated");
     size_log2
+}
+
+/// Transpile zkSync circuit to get gate count and universal setup power of two
+fn gates_count_zksync_main_circuit(chunks: usize) -> (usize, u32) {
+    let (gates_count, _) =
+        transpile_with_gates_count(zksync_circuit(chunks)).expect("failed to transpile");
+    let size_log2 = gates_count.next_power_of_two().trailing_zeros();
+
+    (gates_count, size_log2)
+}
+
+/// Calculates max zkSync circuit size for universal setup power of 21..26
+pub fn calculate_and_print_max_zksync_main_circuit_size() {
+    vlog::info!("Counting max zkSync circuit size for setup");
+    let mut chunks = 6;
+    let mut setup_power = gates_count_zksync_main_circuit(chunks).1;
+    while setup_power <= 26 {
+        let new_chunks = chunks + 2;
+        let (gate_count, power_2) = gates_count_zksync_main_circuit(new_chunks);
+        if power_2 <= setup_power {
+            chunks = new_chunks;
+        } else {
+            vlog::info!(
+                "setup_size_log2: {}, chunks: {}, gate_count: {}",
+                setup_power,
+                chunks,
+                gate_count
+            );
+            setup_power += 1;
+            chunks *= 2;
+        }
+    }
 }

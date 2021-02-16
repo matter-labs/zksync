@@ -1,125 +1,83 @@
 // Built-in deps
-use std::fmt;
-use std::sync::{mpsc, Arc, Mutex};
-use std::{thread, time};
+use std::collections::HashMap;
+use std::sync::Arc;
+use std::time::Duration;
 // External deps
+use futures::{pin_mut, FutureExt};
 use num::BigUint;
-use zksync_crypto::pairing::ff::PrimeField;
+use tokio::sync::Mutex;
 // Workspace deps
 use zksync_circuit::{
-    circuit::ZkSyncCircuit,
+    serialization::ProverData,
     witness::{deposit::DepositWitness, utils::WitnessBuilder, Witness},
 };
-use zksync_config::configs::ChainConfig;
+use zksync_config::configs::{ChainConfig, ProverConfig};
 use zksync_crypto::{
     circuit::{account::CircuitAccount, CircuitAccountTree},
-    proof::EncodedProofPlonk,
-    Engine, Fr,
+    pairing::ff::PrimeField,
+    Fr,
 };
-use zksync_prover_utils::prover_data::ProverData;
+use zksync_prover::dummy_prover::{DummyProver, DummyProverConfig};
+use zksync_prover::plonk_step_by_step_prover::{
+    PlonkStepByStepProver, PlonkStepByStepProverConfig,
+};
+use zksync_prover::{ProverImpl, ShutdownRequest};
+use zksync_prover_utils::api::{
+    JobRequestData, ProverInputRequest, ProverInputResponse, ProverOutputRequest,
+};
 use zksync_types::{
     block::smallest_block_size_for_chunks, operations::DepositOp, Account, AccountId, Address,
     BlockNumber, Deposit, TokenId,
 };
-// Local deps
-use zksync_prover::{
-    plonk_step_by_step_prover::{PlonkStepByStepProver, PlonkStepByStepProverConfig},
-    ProverImpl,
-};
 
-#[test]
-#[cfg_attr(not(feature = "keys-required"), ignore)]
-fn prover_sends_heartbeat_requests_and_exits_on_stop_signal() {
-    // Testing [black box] that:
-    // - BabyProver sends `working_on` requests (heartbeat) over api client
-    // - BabyProver stops running upon receiving data over stop channel
-
-    let block_size_chunks = ChainConfig::from_env().circuit.supported_block_chunks_sizes[0];
-
-    // Create a channel to notify on provers exit.
-    let (done_tx, _done_rx) = mpsc::channel();
-    // Create channel to notify test about heartbeat requests.
-    let (heartbeat_tx, heartbeat_rx) = mpsc::channel();
-
-    // Run prover in a separate thread.
-    thread::spawn(move || {
-        // Create channel for proofs, not using in this test.
-        let (tx, _) = mpsc::channel();
-        let config = PlonkStepByStepProverConfig {
-            block_sizes: vec![block_size_chunks],
-            download_setup_from_network: false,
-        };
-        let p = PlonkStepByStepProver::create_from_config(
-            config,
-            MockApiClient {
-                block_to_prove: Mutex::new(Some((1, 1))),
-                heartbeats_tx: Arc::new(Mutex::new(heartbeat_tx)),
-                publishes_tx: Arc::new(Mutex::new(tx)),
-                prover_data_fn: || None,
-            },
-            time::Duration::from_millis(100),
-        );
-        let (tx, rx) = mpsc::channel();
-        let jh = thread::spawn(move || {
-            rx.recv().expect("on receive from exit error channel"); // mock receive exit error.
-        });
-        zksync_prover::start(p, tx, Default::default());
-        jh.join().expect("failed to join recv");
-        done_tx.send(()).expect("unexpected failure");
-    });
-
-    let timeout = time::Duration::from_secs(10);
-
-    // Must receive heartbeat requests.
-    heartbeat_rx
-        .recv_timeout(timeout)
-        .expect("heartbeat request is not received");
-    heartbeat_rx
-        .recv_timeout(timeout)
-        .expect("heartbeat request is not received");
+/// Set of different parameters needed for the prover to work
+/// Usually, these variables are taken from the environment, but the tests use standard hardcoded values.
+struct MockProverConfigs {
+    plonk_config: PlonkStepByStepProverConfig,
+    dummy_config: DummyProverConfig,
+    prover_options: ProverConfig,
+    shutdown_request: ShutdownRequest,
+    prover_name: String,
 }
 
-#[test]
-#[cfg_attr(not(feature = "keys-required"), ignore)]
-fn prover_proves_a_block_and_publishes_result() {
-    // Testing [black box] the actual proof calculation by mocking genesis and +1 block.
-    let (proof_tx, proof_rx) = mpsc::channel();
-    let prover_data = new_test_data_for_prover();
-    let block_size_chunks = prover_data.operations.len();
-
-    // Run prover in separate thread.
-    thread::spawn(move || {
-        // Work heartbeat channel, not used in this test.
-        let (tx, _) = mpsc::channel();
-        let config = PlonkStepByStepProverConfig {
-            block_sizes: vec![block_size_chunks],
+impl Default for MockProverConfigs {
+    fn default() -> Self {
+        let plonk_config = PlonkStepByStepProverConfig {
+            all_block_sizes: vec![10, 32, 72, 156, 322, 654],
+            aggregated_proof_sizes_with_setup_pow: vec![(1, 22), (4, 23), (8, 24), (18, 25)],
+            block_sizes: vec![10, 32],
             download_setup_from_network: false,
         };
-        let p = PlonkStepByStepProver::create_from_config(
-            config,
-            MockApiClient {
-                block_to_prove: Mutex::new(Some((1, 1))),
-                heartbeats_tx: Arc::new(Mutex::new(tx)),
-                publishes_tx: Arc::new(Mutex::new(proof_tx)),
-                prover_data_fn: move || Some(prover_data.clone()),
+        let dummy_config = DummyProverConfig {
+            block_sizes: vec![10, 32],
+        };
+        let prover_options = ProverConfig {
+            prover: zksync_config::configs::prover::Prover {
+                heartbeat_interval: 1000,
+                cycle_wait: 500,
+                request_timeout: 1,
             },
-            time::Duration::from_secs(1),
-        );
+            core: zksync_config::configs::prover::Core {
+                gone_timeout: 2,
+                idle_provers: 1,
+            },
+            witness_generator: zksync_config::configs::prover::WitnessGenerator {
+                prepare_data_interval: 5000,
+                witness_generators: 2,
+            },
+        };
 
-        let (tx, rx) = mpsc::channel();
-        thread::spawn(move || {
-            rx.recv().unwrap();
-        });
-        zksync_prover::start(p, tx, Default::default());
-    });
-
-    let timeout = time::Duration::from_secs(60 * 10);
-    proof_rx
-        .recv_timeout(timeout)
-        .expect("didn't receive proof"); // if proof is received - then proof is verified
+        Self {
+            plonk_config,
+            dummy_config,
+            prover_options,
+            shutdown_request: Default::default(),
+            prover_name: "Test".to_string(),
+        }
+    }
 }
 
-fn new_test_data_for_prover() -> ProverData {
+fn test_data_for_prover() -> JobRequestData {
     let mut circuit_account_tree =
         CircuitAccountTree::new(zksync_crypto::params::account_tree_depth());
     let fee_account_id = AccountId(0);
@@ -129,7 +87,7 @@ fn new_test_data_for_prover() -> ProverData {
     circuit_account_tree.insert(*fee_account_id, CircuitAccount::from(fee_account));
 
     let mut witness_accum =
-        WitnessBuilder::new(&mut circuit_account_tree, fee_account_id, BlockNumber(1));
+        WitnessBuilder::new(&mut circuit_account_tree, fee_account_id, BlockNumber(1), 0);
 
     let empty_account_id = AccountId(1);
     let empty_account_address = [7u8; 20].into();
@@ -146,8 +104,13 @@ fn new_test_data_for_prover() -> ProverData {
     let deposit_witness = DepositWitness::apply_tx(&mut witness_accum.account_tree, &deposit_op);
     let deposit_operations = deposit_witness.calculate_operations(());
     let pub_data_from_witness = deposit_witness.get_pubdata();
+    let offset_commitment = deposit_witness.get_offset_commitment_data();
 
-    witness_accum.add_operation_with_pubdata(deposit_operations, pub_data_from_witness);
+    witness_accum.add_operation_with_pubdata(
+        deposit_operations,
+        pub_data_from_witness,
+        offset_commitment,
+    );
     witness_accum.extend_pubdata_with_noops(smallest_block_size_for_chunks(
         DepositOp::CHUNKS,
         &ChainConfig::from_env().circuit.supported_block_chunks_sizes,
@@ -155,71 +118,178 @@ fn new_test_data_for_prover() -> ProverData {
     witness_accum.collect_fees(&Vec::new());
     witness_accum.calculate_pubdata_commitment();
 
-    ProverData {
+    let prover_data = ProverData {
         public_data_commitment: witness_accum.pubdata_commitment.unwrap(),
         old_root: witness_accum.initial_root_hash,
         initial_used_subtree_root: witness_accum.initial_used_subtree_root_hash,
         new_root: witness_accum.root_after_fees.unwrap(),
-        validator_address: Fr::from_str(&witness_accum.fee_account_id.to_string())
-            .expect("failed to parse"),
         operations: witness_accum.operations,
         validator_balances: witness_accum.fee_account_balances.unwrap(),
         validator_audit_path: witness_accum.fee_account_audit_path.unwrap(),
         validator_account: witness_accum.fee_account_witness.unwrap(),
-    }
+        validator_address: Fr::from_str(&witness_accum.fee_account_id.to_string())
+            .expect("failed to parse"),
+        block_timestamp: Fr::from_str(&witness_accum.timestamp.to_string())
+            .expect("failed to parse"),
+        block_number: Fr::from_str(&witness_accum.block_number.to_string())
+            .expect("failed to parse"),
+    };
+
+    JobRequestData::BlockProof(prover_data, 10)
 }
 
-struct MockApiClient<F> {
-    block_to_prove: Mutex<Option<(i64, i32)>>,
-    heartbeats_tx: Arc<Mutex<mpsc::Sender<()>>>,
-    publishes_tx: Arc<Mutex<mpsc::Sender<EncodedProofPlonk>>>,
-    prover_data_fn: F,
+#[tokio::test]
+async fn test_shutdown_request() {
+    let MockProverConfigs {
+        plonk_config,
+        dummy_config: _,
+        prover_options,
+        shutdown_request,
+        prover_name,
+    } = MockProverConfigs::default();
+
+    let prover = PlonkStepByStepProver::create_from_config(plonk_config);
+    let client = MockApiClient::default();
+
+    let prover_work_cycle = zksync_prover::prover_work_cycle(
+        prover,
+        client,
+        shutdown_request.clone(),
+        prover_options.clone(),
+        &prover_name,
+    )
+    .fuse();
+    let timeout = tokio::time::delay_for(prover_options.prover.cycle_wait()).fuse();
+
+    pin_mut!(prover_work_cycle, timeout);
+
+    shutdown_request.set();
+
+    let shutdown_requested = futures::select! {
+        _ = prover_work_cycle => true,
+        _ = timeout => false,
+    };
+
+    assert!(
+        shutdown_requested,
+        "prover did not complete work after receiving a shutdown request"
+    );
 }
 
-impl<F> fmt::Debug for MockApiClient<F> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("MockApiClient").finish()
-    }
+#[tokio::test]
+async fn test_receiving_heartbeats() {
+    let MockProverConfigs {
+        plonk_config,
+        dummy_config: _,
+        prover_options,
+        shutdown_request,
+        prover_name,
+    } = MockProverConfigs::default();
+
+    let prover = PlonkStepByStepProver::create_from_config(plonk_config);
+    let client = MockApiClient::default();
+
+    let prover_work_cycle = zksync_prover::prover_work_cycle(
+        prover,
+        client.clone(),
+        shutdown_request.clone(),
+        prover_options.clone(),
+        &prover_name,
+    )
+    .fuse();
+    let timeout = tokio::time::delay_for(Duration::from_secs(10)).fuse();
+
+    pin_mut!(prover_work_cycle, timeout);
+
+    futures::select! {
+        _ = prover_work_cycle => panic!("prover work ended too quickly"),
+        _ = timeout => {
+            shutdown_request.set();
+            assert_eq!(
+                client.working_on.lock().await.get(&0).cloned(),
+                Some("Test".to_string())
+            );
+        },
+    };
 }
 
-impl<F: Fn() -> Option<ProverData>> zksync_prover::ApiClient for MockApiClient<F> {
-    fn block_to_prove(&self, _block_size: usize) -> Result<Option<(i64, i32)>, anyhow::Error> {
-        let block_to_prove = self.block_to_prove.lock().unwrap();
-        Ok(*block_to_prove)
+#[tokio::test]
+async fn test_publishing_proof() {
+    let MockProverConfigs {
+        plonk_config: _,
+        dummy_config,
+        prover_options,
+        shutdown_request,
+        prover_name,
+    } = MockProverConfigs::default();
+
+    let prover = DummyProver::create_from_config(dummy_config);
+    let client = MockApiClient::default();
+
+    let prover_work_cycle = zksync_prover::prover_work_cycle(
+        prover,
+        client.clone(),
+        shutdown_request.clone(),
+        prover_options.clone(),
+        &prover_name,
+    )
+    .fuse();
+    let timeout = tokio::time::delay_for(Duration::from_secs(10)).fuse();
+
+    pin_mut!(prover_work_cycle, timeout);
+
+    futures::select! {
+        _ = prover_work_cycle => panic!("prover work ended too quickly"),
+        _ = timeout => {
+            shutdown_request.set();
+            assert!(
+                client.published_prof.lock().await.get(&0).cloned().is_some()
+            );
+        },
+    };
+}
+
+#[derive(Debug, Clone, Default)]
+struct MockApiClient {
+    /// All published proofs are saved by `job_id`.
+    published_prof: Arc<Mutex<HashMap<i32, ProverOutputRequest>>>,
+    /// Received heartbeats from `self.working_on()`.
+    working_on: Arc<Mutex<HashMap<i32, String>>>,
+    /// `gob_id` of the last work that has not yet been submitted.
+    last_job_id: Arc<Mutex<i32>>,
+}
+
+#[async_trait::async_trait]
+impl zksync_prover::ApiClient for MockApiClient {
+    async fn get_job(&self, _: ProverInputRequest) -> anyhow::Result<ProverInputResponse> {
+        let last_job_id = *self.last_job_id.lock().await;
+        *self.last_job_id.lock().await += 1;
+        let response = ProverInputResponse {
+            job_id: last_job_id,
+            first_block: BlockNumber(1),
+            last_block: BlockNumber(1),
+            data: Some(test_data_for_prover()),
+        };
+
+        Ok(response)
     }
 
-    fn working_on(&self, job: i32) -> Result<(), anyhow::Error> {
-        let stored = self.block_to_prove.lock().unwrap();
-        if let Some((_, stored)) = *stored {
-            if stored != job {
-                return Err(anyhow::format_err!("unexpected job id"));
-            }
-            let _ = self.heartbeats_tx.lock().unwrap().send(());
-        }
+    async fn working_on(&self, job_id: i32, prover_name: &str) -> anyhow::Result<()> {
+        self.working_on
+            .lock()
+            .await
+            .insert(job_id, prover_name.to_string());
+
         Ok(())
     }
 
-    fn prover_data(&self, block: i64) -> Result<ZkSyncCircuit<'_, Engine>, anyhow::Error> {
-        let block_to_prove = self.block_to_prove.lock().unwrap();
-        if (*block_to_prove).is_some() {
-            let v = (self.prover_data_fn)();
-            if let Some(pd) = v {
-                return Ok(pd.into_circuit(block));
-            }
-        }
-        Err(anyhow::format_err!("mock not configured"))
-    }
+    async fn publish(&self, data: ProverOutputRequest) -> anyhow::Result<()> {
+        self.published_prof.lock().await.insert(data.job_id, data);
 
-    fn publish(&self, _block: i64, p: EncodedProofPlonk) -> Result<(), anyhow::Error> {
-        // No more blocks to prove. We're only testing single rounds.
-        let mut block_to_prove = self.block_to_prove.lock().unwrap();
-        *block_to_prove = None;
-
-        let _ = self.publishes_tx.lock().unwrap().send(p);
         Ok(())
     }
 
-    fn prover_stopped(&self, _: i32) -> Result<(), anyhow::Error> {
+    async fn prover_stopped(&self, _: String) -> anyhow::Result<()> {
         Ok(())
     }
 }

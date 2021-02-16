@@ -7,6 +7,7 @@ pub mod operation;
 #[cfg(test)]
 #[cfg(feature = "playground")]
 mod playground;
+pub mod serialization;
 pub mod signature;
 pub mod utils;
 pub mod witness;

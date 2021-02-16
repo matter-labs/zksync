@@ -127,6 +127,13 @@ pub struct OngoingDeposits {
     pub estimated_deposits_approval_block: Option<u64>,
 }
 
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum ChangePubKeyFeeType {
+    Onchain,
+    ECDSA,
+    CREATE2,
+}
+
 /// Type of the fee calculation pattern.
 /// Unlike the `TxFeeTypes`, this enum represents the fee
 /// from the point of zkSync view, rather than from the users
@@ -139,10 +146,7 @@ pub enum OutputFeeType {
     TransferToNew,
     FastWithdraw,
     Withdraw,
-    ChangePubKey {
-        #[serde(rename = "onchainPubkeyAuth")]
-        onchain_pubkey_auth: bool,
-    },
+    ChangePubKey(ChangePubKeyFeeType),
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -157,6 +161,13 @@ pub struct Fee {
     pub gas_fee: BigUint,
     #[serde(with = "BigUintSerdeAsRadix10Str")]
     pub zkp_fee: BigUint,
+    #[serde(with = "BigUintSerdeAsRadix10Str")]
+    pub total_fee: BigUint,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct BatchFee {
     #[serde(with = "BigUintSerdeAsRadix10Str")]
     pub total_fee: BigUint,
 }

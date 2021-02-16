@@ -5,14 +5,15 @@ use bigdecimal::BigDecimal;
 use jsonrpc_core::{Error, Result};
 // Workspace uses
 use zksync_types::{
-    tx::{TxEthSignature, TxHash},
+    tx::{EthBatchSignatures, TxEthSignature, TxHash},
     Address, BatchFee, Fee, Token, TokenLike, TxFeeTypes, ZkSyncTx,
 };
 
 // Local uses
 use crate::{api_server::tx_sender::SubmitError, fee_ticker::TokenPriceRequestType};
 
-use super::{error::*, types::*, RpcApp};
+use super::{types::*, RpcApp};
+use crate::api_server::rpc_server::error::RpcErrorCodes;
 
 impl RpcApp {
     pub async fn _impl_account_info(self, address: Address) -> Result<AccountInfoResp> {
@@ -110,13 +111,12 @@ impl RpcApp {
     pub async fn _impl_submit_txs_batch(
         self,
         txs: Vec<TxWithSignature>,
-        eth_signature: Option<TxEthSignature>,
+        eth_signatures: Option<EthBatchSignatures>,
     ) -> Result<Vec<TxHash>> {
         let start = Instant::now();
-        let txs = txs.into_iter().map(|tx| (tx.tx, tx.signature)).collect();
         let result = self
             .tx_sender
-            .submit_txs_batch(txs, eth_signature)
+            .submit_txs_batch(txs, eth_signatures)
             .await
             .map_err(Error::from);
         metrics::histogram!("api.rpc.submit_txs_batch", start.elapsed());

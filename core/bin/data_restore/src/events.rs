@@ -1,6 +1,7 @@
 // Built-in deps
 use std::cmp::Ordering;
 // External deps
+use crate::contract::ZkSyncContractVersion;
 use web3::types::H256;
 use zksync_types::BlockNumber;
 
@@ -22,6 +23,8 @@ pub struct BlockEvent {
     pub transaction_hash: H256,
     /// Rollup block type
     pub block_type: EventType,
+    /// Version of ZkSync contract
+    pub contract_version: ZkSyncContractVersion,
 }
 
 impl PartialOrd for BlockEvent {

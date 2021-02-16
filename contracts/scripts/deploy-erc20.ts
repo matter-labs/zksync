@@ -7,6 +7,8 @@ import { web3Provider } from './utils';
 import * as fs from 'fs';
 import * as path from 'path';
 
+const DEFAULT_ERC20 = 'TestnetERC20Token';
+
 const testConfigPath = path.join(process.env.ZKSYNC_HOME as string, `etc/test_config/constant`);
 const ethTestConfig = JSON.parse(fs.readFileSync(`${testConfigPath}/eth.json`, { encoding: 'utf-8' }));
 
@@ -20,10 +22,15 @@ type Token = {
     decimals: number;
 };
 
-async function deployToken(token: Token): Promise<Token> {
+type TokenDescription = Token & {
+    implementation?: string;
+};
+
+async function deployToken(token: TokenDescription): Promise<Token> {
+    token.implementation = token.implementation || DEFAULT_ERC20;
     const erc20 = await deployContract(
         wallet,
-        readContractCode('TestnetERC20Token'),
+        readContractCode(`dev-contracts/${token.implementation}`),
         [token.name, token.symbol, token.decimals],
         { gasLimit: 5000000 }
     );
@@ -36,6 +43,11 @@ async function deployToken(token: Token): Promise<Token> {
         await erc20.mint(testWallet.address, parseEther('3000000000'));
     }
     token.address = erc20.address;
+
+    // Remove the unneeded field
+    if (token.implementation) {
+        delete token.implementation;
+    }
 
     return token;
 }
@@ -50,9 +62,16 @@ async function main() {
         .option('-n, --token-name <token_name>')
         .option('-s, --symbol <symbol>')
         .option('-d, --decimals <decimals>')
+        .option('-i --implementation <implementation>')
         .description('Adds a new token with a given fields')
         .action(async (cmd: Command) => {
-            const token: Token = { address: null, name: cmd.token_name, symbol: cmd.symbol, decimals: cmd.decimals };
+            const token: TokenDescription = {
+                address: null,
+                name: cmd.token_name,
+                symbol: cmd.symbol,
+                decimals: cmd.decimals,
+                implementation: cmd.implementation
+            };
             console.log(JSON.stringify(await deployToken(token), null, 2));
         });
 
@@ -60,7 +79,7 @@ async function main() {
         .command('add-multi <tokens_json>')
         .description('Adds a multiple tokens given in JSON format')
         .action(async (tokens_json: string) => {
-            const tokens: Array<Token> = JSON.parse(tokens_json);
+            const tokens: Array<TokenDescription> = JSON.parse(tokens_json);
             const result = [];
 
             for (const token of tokens) {

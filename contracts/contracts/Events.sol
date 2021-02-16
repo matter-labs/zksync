@@ -1,4 +1,6 @@
-pragma solidity ^0.5.8;
+// SPDX-License-Identifier: MIT OR Apache-2.0
+
+pragma solidity ^0.7.0;
 
 import "./Upgradeable.sol";
 import "./Operations.sol";
@@ -12,11 +14,11 @@ interface Events {
     /// @notice Event emitted when a block is verified
     event BlockVerification(uint32 indexed blockNumber);
 
-    /// @notice Event emitted when user send a transaction to withdraw her funds from onchain balance
-    event OnchainWithdrawal(address indexed owner, uint16 indexed tokenId, uint128 amount);
+    /// @notice Event emitted when user funds are withdrawn from the zkSync contract
+    event Withdrawal(uint16 indexed tokenId, uint128 amount);
 
-    /// @notice Event emitted when user send a transaction to deposit her funds
-    event OnchainDeposit(address indexed sender, uint16 indexed tokenId, uint128 amount, address indexed owner);
+    /// @notice Event emitted when user funds are deposited to the zkSync contract
+    event Deposit(uint16 indexed tokenId, uint128 amount);
 
     /// @notice Event emitted when user sends a authentication fact (e.g. pub-key hash)
     event FactAuth(address indexed sender, uint32 nonce, bytes fact);
@@ -53,14 +55,6 @@ interface Events {
         uint16 indexed tokenId,
         uint128 amount
     );
-
-    /// @notice Pending withdrawals index range that were added in the verifyBlock operation.
-    /// NOTE: processed indexes in the queue map are [queueStartIndex, queueEndIndex)
-    event PendingWithdrawalsAdd(uint32 queueStartIndex, uint32 queueEndIndex);
-
-    /// @notice Pending withdrawals index range that were executed in the completeWithdrawals operation.
-    /// NOTE: processed indexes in the queue map are [queueStartIndex, queueEndIndex)
-    event PendingWithdrawalsComplete(uint32 queueStartIndex, uint32 queueEndIndex);
 }
 
 /// @title Upgrade events

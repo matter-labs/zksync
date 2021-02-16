@@ -38,11 +38,13 @@ impl CloseOp {
         let account_address = Address::zero(); // From pubdata it is unknown
         let nonce = 0; // From pubdata it is unknown
         let signature = TxSignature::default(); // From pubdata it is unknown
+        let time_range = Default::default();
         Ok(Self {
             tx: Close {
                 account: account_address,
                 nonce: Nonce(nonce),
                 signature,
+                time_range,
             },
             account_id: AccountId(account_id),
         })

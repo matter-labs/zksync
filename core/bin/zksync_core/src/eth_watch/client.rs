@@ -2,7 +2,7 @@ use std::{convert::TryFrom, time::Instant};
 
 use anyhow::format_err;
 use ethabi::Hash;
-use serde::export::fmt::Debug;
+use std::fmt::Debug;
 use web3::{
     contract::Options,
     types::{BlockNumber, FilterBuilder, Log},
@@ -10,11 +10,10 @@ use web3::{
 
 use zksync_contracts::zksync_contract;
 use zksync_eth_client::ethereum_gateway::EthereumGateway;
-use zksync_types::{ethereum::CompleteWithdrawalsTx, Address, Nonce, PriorityOp, H160};
+use zksync_types::{Address, Nonce, PriorityOp, H160, U256};
 
 struct ContractTopics {
     new_priority_request: Hash,
-    complete_withdrawals_event: Hash,
 }
 
 impl ContractTopics {
@@ -22,11 +21,6 @@ impl ContractTopics {
         Self {
             new_priority_request: zksync_contract
                 .event("NewPriorityRequest")
-                .expect("main contract abi error")
-                .signature(),
-
-            complete_withdrawals_event: zksync_contract
-                .event("PendingWithdrawalsComplete")
                 .expect("main contract abi error")
                 .signature(),
         }
@@ -40,15 +34,10 @@ pub trait EthClient {
         from: BlockNumber,
         to: BlockNumber,
     ) -> anyhow::Result<Vec<PriorityOp>>;
-    async fn get_complete_withdrawals_event(
-        &self,
-        from: BlockNumber,
-        to: BlockNumber,
-    ) -> anyhow::Result<Vec<CompleteWithdrawalsTx>>;
     async fn block_number(&self) -> anyhow::Result<u64>;
     async fn get_auth_fact(&self, address: Address, nonce: Nonce) -> anyhow::Result<Vec<u8>>;
-    async fn get_first_pending_withdrawal_index(&self) -> anyhow::Result<u32>;
-    async fn get_number_of_pending_withdrawals(&self) -> anyhow::Result<u32>;
+    async fn get_auth_fact_reset_time(&self, address: Address, nonce: Nonce)
+        -> anyhow::Result<u64>;
 }
 
 pub struct EthHttpClient {
@@ -88,9 +77,14 @@ impl EthHttpClient {
             .logs(filter)
             .await?
             .into_iter()
-            .map(|event| {
-                T::try_from(event)
-                    .map_err(|e| format_err!("Failed to parse event log from ETH: {:?}", e))
+            .filter_map(|event| {
+                if let Ok(event) = T::try_from(event) {
+                    Some(Ok(event))
+                } else {
+                    None
+                }
+                // TODO: remove after update
+                // .map_err(|e| format_err!("Failed to parse event log from ETH: {:?}", e))
             })
             .collect()
     }
@@ -112,24 +106,6 @@ impl EthClient for EthHttpClient {
         result
     }
 
-    async fn get_complete_withdrawals_event(
-        &self,
-        from: BlockNumber,
-        to: BlockNumber,
-    ) -> anyhow::Result<Vec<CompleteWithdrawalsTx>> {
-        let start = Instant::now();
-
-        let result = self
-            .get_events(from, to, vec![self.topics.complete_withdrawals_event])
-            .await;
-
-        metrics::histogram!(
-            "eth_watcher.get_complete_withdrawals_event",
-            start.elapsed()
-        );
-        result
-    }
-
     async fn block_number(&self) -> anyhow::Result<u64> {
         Ok(self.client.block_number().await?.as_u64())
     }
@@ -147,34 +123,21 @@ impl EthClient for EthHttpClient {
             .map_err(|e| format_err!("Failed to query contract authFacts: {}", e))
     }
 
-    async fn get_first_pending_withdrawal_index(&self) -> anyhow::Result<u32> {
+    async fn get_auth_fact_reset_time(
+        &self,
+        address: Address,
+        nonce: Nonce,
+    ) -> anyhow::Result<u64> {
         self.client
             .call_main_contract_function(
-                "firstPendingWithdrawalIndex",
-                (),
+                "authFactsResetTimer",
+                (address, u64::from(*nonce)),
                 None,
                 Options::default(),
                 None,
             )
             .await
-            .map_err(|e| {
-                format_err!(
-                    "Failed to query contract firstPendingWithdrawalIndex: {}",
-                    e
-                )
-            })
-    }
-
-    async fn get_number_of_pending_withdrawals(&self) -> anyhow::Result<u32> {
-        self.client
-            .call_main_contract_function(
-                "numberOfPendingWithdrawals",
-                (),
-                None,
-                Options::default(),
-                None,
-            )
-            .await
-            .map_err(|e| format_err!("Failed to query contract numberOfPendingWithdrawals: {}", e))
+            .map_err(|e| format_err!("Failed to query contract authFacts: {}", e))
+            .map(|res: U256| res.as_u64())
     }
 }

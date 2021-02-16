@@ -132,6 +132,7 @@ This includes, in particular, the following claims:
 |Signature|64|LE integer|Read [transaction signature](#transaction-signature)|
 |BlockNumber|4|BE integer|Incremented number of Rollup blocks, max number is 4294967295|
 |RootHash|32|LE integer|[Merkle tree root hash](#sparse-merkle-tree)|
+|Timestamp|64|BE integer| unix timestamp |
 
 ### Amount packing
 
@@ -218,6 +219,7 @@ Rollup transactions:
 - Transfer to new
 - Withdraw (Partial exit)
 - Change pubkey
+- Forced Exit
 
 Priority operations:
 
@@ -911,24 +913,30 @@ Reads as: change pubkey, account #4, new pubkey hash 0x11036945fcc11c349c3a300f1
 #### Auth
 
 1. Transaction can be authorized by providing signature of the message
-   `pubkey_message(account_id, nonce, new_pubkey_hash)` (see definition below). Transaction will be verified on the
-   contract.
+   `pubkey_message(account_id, nonce, new_pubkey_hash, additional_data)` (see definition below). Transaction will be
+   verified on the contract.
 2. For users that can't sign messages it is possible to authorize this operation by calling `setAuthPubkeyHash` method
    of the smart contract. User should provide new pubkey hash and nonce for this transaction. After this transaction
    succeeded transaction without signature can be sent to operator.
+3. For users that want to use smart contract as a wallet and don't want to deploy it unless necessary it is possible to
+   authorize change pubkey using CREATE2-change pubkey variant where wallet address is known and is derived from
+   `new_pubkey_hash`.
+
+   We check that account address is equal to the account address derived from `new_pubkey_hash` using
+   `create2_address_zksync(creator_address, salt_arg, new_pubkey_hash, code_hash)` where all arguments are supplied by
+   user and that `account_nonce == 0`.
 
 ```typescript
-function pubkey_message(account_id, nonce: number, new_pubkey_hash): string {
-  const pubKeyHashHex = to_hex(new_pubkey_hash); // 20 bytes as a hex
-  const msgNonce = to_hex(to_be_bytes(nonce)); // nonce (4 byte BE integer) as a hex
-  const msgAccId = to_hex(to_be_bytes(account_id)); // account id (4 byte BE integer) as a hex
-  return (
-    `Register zkSync pubkey:\n\n` +
-    `${pubKeyHashHex}\n` +
-    `nonce: 0x${msgNonce}\n` +
-    `account id: 0x${msgAccId}\n\n` +
-    `Only sign this message for a trusted client!`
-  );
+function pubkey_message(account_id, nonce, new_pubkey_hash, additional_data /* arbitrary 32 bytes*/): bytes {
+  return concat(new_pubkey_hash, nonce, account_id, additional_data);
+}
+```
+
+```typescript
+function create2_address_zksync(creator_address, salt_arg /* abitrary 32 bytes */, new_pubkey_hash, code_hash): bytes {
+  const salt = keccak256(salt_arg, new_pubkey_hash);
+  // address is derrived using EIP-1014 https://eips.ethereum.org/EIPS/eip-1014
+  return CREATE2_ADDRESS(creator_address, salt, code_hash);
 }
 ```
 
@@ -1255,12 +1263,15 @@ Withdraws token from Rollup to L1 in case of exodus mode. User must provide proo
 
 ```solidity
 exit(
+    StoredBlockInfo memory _storedBlockInfo,
     uint24 _accountId,
     uint16 _tokenId,
     uint128 _amount,
-    uint256[] calldata _proof)
+    uint256[] calldata _proof
+)
 ```
 
+- `_storedBlockInfo`: Stored block data of the last verified block
 - `_accountId`: `AccountId` of the owner account.
 - `_tokenId`: Verified token id
 - `_amount`: `StateAmount` full amount of the given token that belong to `AccountId` in the last verified block.
@@ -1281,39 +1292,113 @@ cancelOutstandingDepositsForExodusMode(uint64 _number)
 
 ##### Commit block
 
-Submit committed block data. Only active validator can make it. Onchain operations will be stored on contract and
+Submit committed block data. Only active validator can make it. Onchain operations will be checked on contract and
 fulfilled on block verification.
 
 ```solidity
-commitBlock(
-    uint32 _blockNumber,
-    uint24 _feeAccount,
-    bytes32 _newRoot,
-    bytes calldata _publicData,
-    bytes calldata _ethWitness,
-    uint32[] calldata _ethWitnessSizes
-)
+struct StoredBlockInfo {
+  uint32 blockNumber;
+  uint64 priorityOperations;
+  bytes32 pendingOnchainOperationsHash;
+  uint256 timestamp;
+  bytes32 stateHash;
+  bytes32 commitment;
+}
+
+struct OnchainOperationData {
+  uint32 publicDataOffset;
+  bytes ethWitness;
+}
+
+struct CommitBlockInfo {
+  uint32 blockNumber;
+  uint32 feeAccount;
+  bytes32 newStateHash;
+  bytes publicData;
+  uint256 timestamp;
+  OnchainOperationData[] onchainOperations;
+}
+
+function commitBlocks(StoredBlockInfo memory _lastCommittedBlockData, CommitBlockInfo[] memory _newBlocksData)
+  external
+  nonReentrant;
+
 ```
 
-- `_blockNumber`: `BlockNumber`
-- `_feeAccount`: `AccountId` to collect fees
-- `_newRoot`: New tree root `RootHash`
-- `_publicData`: Operations pubdata
-- `_ethWitness` - data that can be used by smart contract for block commit that is posted outside of `_publicData` (e.g
-  ETH signatures for pubkey change verification).
-- `_ethWitnessSizes` - number of bytes from `_ethWitness` that is used for each onchain operation that needs them.
+- `_lastCommittedBlockData`: Stored info of the last committed block.
+- `_commitBlockInfo`: Data of the new committed blocks.
 
-##### Verify block
+`StoredBlockInfo` - block data that we store on Ethereum. We store hash of this struct in storage and pass it in tx
+arguments every time we need to access any of its field.
 
-Submit verified block proof. Only active validator can make it. This block onchain operations will be fulfilled.
+- `blockNumber` - rollup block number
+- `priorityOperations` - number of priority operations committed in this block
+- `pendingOnchainOperationsHash` - hash of all onchain operations that have to be processed when block is finalized
+  (executed)
+- `timestamp` - block timestamp
+- `stateHash` - root hash of the rollup account tree state
+- `commitment` - rollup block commitment.
+
+`OnchainOperationData` - data needed for the onchain operation processing.
+
+- `publicDataOffset`- offset in the public data bytes after which pubdata for the onchain operation begins
+- `ethWitness` - additional data that can be needed for the onchain operation processing (e.g. signature for change
+  pubkey operation)
+
+`CommitBlockInfo` - data needed for new block commit
+
+- `blockNumber` - rollup block number
+- `feeAccount` - id of the fee account for rollup block
+- `newStateHash` - new rollup state root hash
+- `publicData` - public data of the executed rollup operations
+- `timestamp` - rollup block timestamp
+- `onchainOperations` - list of onchain operations that needs to be processed
+
+##### Verify block commitments
+
+Verify aggregated proof of multiple block commitments.
 
 ```solidity
-verifyBlock(uint32 _blockNumber, uint256[] calldata _proof, bytes calldata _withdrawalsData)
+function verifyCommitments(
+    uint256[] memory _recursiveInput,
+    uint256[] memory _proof,
+    uint8[] memory _vkIndexes,
+    uint256[] memory _commitments,
+    uint256[16] memory _subproofsLibms
+) external {
 ```
 
-- `_blockNumber`: Block number
-- `_proof` Block proof
-- `_withdrawalsData` Withdrawals data
+- `_recursiveInput` - input of the recursive aggregated circuit
+- `_proof` - recursive proof
+- `_vkIndexes` - index of the verification keys in the aggregated verification keys tree
+- `_commitments` - block commitments to be verified
+- `_subproofsLibms` - data needed for recursive proof verification
+
+##### Execute blocks
+
+Finishes block processing after block commitments were verified onchain. Only active validator can make it. This block
+onchain operations will be fulfilled.
+
+```solidity
+struct ExecuteBlockInfo {
+  StoredBlockInfo storedBlock;
+  bytes[] pendingOnchainOpsPubdata;
+  bytes32[] commitmentsInSlot;
+  uint256 commitmentIdx;
+}
+
+function executeBlocks(ExecuteBlockInfo[] memory _blocksData) external nonReentrant;
+
+```
+
+- `_blocksData` - data needed to finish block execution
+
+`ExecuteBlockInfo`
+
+- `storedBlock` - stored block that was committed
+- `pendingOnchainOpsPubdata` - list of pubdata for onchain operations that needs to be processed
+- `commitmentsInSlot` - list of commitments that were verified with one recursive proof
+- `commitmentIdx` - index in `commitmentsInSlot` array where current block commitment is stored.
 
 #### Exodus mode trigger
 
@@ -1326,13 +1411,14 @@ triggerExodusIfNeeded() returns (bool)
 
 #### Revert blocks
 
-Revert blocks that were not verified before deadline determined by `EXPECT_VERIFICATION_IN` constant.
+Revert blocks that were not verified before deadline determined by `EXPECT_VERIFICATION_IN` constant. The caller must be
+valid operator.
 
 ```solidity
-revertBlocks(uint32 _maxBlocksToRevert)
+revertBlocks(StoredBlockInfo[] memory _blocksToRevert);
 ```
 
-- `_maxBlocksToRevert`: revert up to that number of the unverified and expired blocks.
+- `_blocksToRevert`: committed blocks to revert in reverse order starting from last committed.
 
 ### Governance contract
 
@@ -1355,6 +1441,19 @@ addToken(address _token)
 ```
 
 - `_token`: Token address
+
+#### Pause token
+
+Add token to the list of paused tokens. The caller must be current governor. Its impossible to create deposits of the
+paused tokens.
+
+```solidity
+function setTokenPaused(address _tokenAddr, bool _tokenPaused);
+
+```
+
+- `_tokenAddr`: Token address
+- `_tokenPaused`: Paused status of the token
 
 #### Set validator
 
@@ -1419,7 +1518,8 @@ transactions.
 Public inputs:
 
 - pub_data_commitment: commitment to the state transition of the block; this is a hash that includes `old_root`,
-  `new_root`, `block_number`, `validator_address`, `pub_data_rolling_hash` (see smart the contract code).
+  `new_root`, `block_number`, `validator_address`, `pub_data_rolling_hash` (see smart the contract code)., `timestamp`,
+  `onhain_ops_offset_commitment`
 
 Witness:
 
@@ -1435,7 +1535,9 @@ Witness:
 If the proof is valid (the circuit is satisfied), it means that there exists a set of transactions which transitions the
 state from the previous one (cryptographically fingerprinted by the Merkle root `old_root`) into the new one
 (cryptographically fingerprinted by the Merkle root `new_root`) such that concatenated `pub_data` of this transactions
-in the order of application is cryptographically fingerprinted by `pub_data_commitment`.
+in the order of application is cryptographically fingerprinted by `pub_data_commitment`. `oncahin_ops_offset_commitment`
+is array of bytes where one byte corresponds to each public data chunk and is set to 1 if chunk is first chunk for the
+onchain operation and 0 otherwise.
 
 ## Appendix I: Cryptographic primitives
 

@@ -35,8 +35,13 @@ impl ChangePubKeyOp {
     }
 
     pub fn get_eth_witness(&self) -> Vec<u8> {
-        if let Some(eth_signature) = &self.tx.eth_signature {
-            eth_signature.serialize_packed().to_vec()
+        if let Some(eth_auth_data) = &self.tx.eth_auth_data {
+            eth_auth_data.get_eth_witness()
+        } else if let Some(eth_signature) = &self.tx.eth_signature {
+            let mut bytes = Vec::new();
+            bytes.push(0x02);
+            bytes.extend_from_slice(&eth_signature.serialize_packed());
+            bytes
         } else {
             Vec::new()
         }
@@ -75,6 +80,7 @@ impl ChangePubKeyOp {
                 TokenId(fee_token),
                 fee,
                 Nonce(nonce),
+                Default::default(),
                 None,
                 None,
             ),

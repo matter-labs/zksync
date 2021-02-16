@@ -50,6 +50,7 @@ pub struct ContractsConfig {
     governance_addr: Address,
     genesis_tx_hash: H256,
     contract_addr: Address,
+    upgrade_gatekeeper_addr: Address,
     available_block_chunk_sizes: Vec<usize>,
 }
 
@@ -69,6 +70,7 @@ impl ContractsConfig {
             governance_addr: contracts_opts.governance_addr,
             genesis_tx_hash: contracts_opts.genesis_tx_hash,
             contract_addr: contracts_opts.contract_addr,
+            upgrade_gatekeeper_addr: contracts_opts.upgrade_gatekeeper_addr,
             available_block_chunk_sizes: chain_opts.state_keeper.block_chunk_sizes,
         }
     }
@@ -104,13 +106,17 @@ async fn main() {
     let mut driver = DataRestoreDriver::new(
         transport,
         config.governance_addr,
-        config.contract_addr,
         ETH_BLOCKS_STEP,
         END_ETH_BLOCKS_OFFSET,
         config.available_block_chunk_sizes.clone(),
         finite_mode,
         final_hash,
     );
+
+    driver
+        .init_contracts(config.upgrade_gatekeeper_addr, config.contract_addr)
+        .await
+        .expect("Wrong driver initialization");
 
     let mut interactor = DatabaseStorageInteractor::new(storage);
     // If genesis is argument is present - there will be fetching contracts creation transactions to get first eth block and genesis acc address

@@ -4,9 +4,9 @@
 //! instance of zkSync server and prover:
 //!
 //! ```bash
-//! zksync server &!
-//! zksync dummy-prover &!
-//! zksync sdk-test
+//! zk server &!
+//! zk dummy-prover run &!
+//! zk test integration rust-sdk
 //! ```
 //!
 //! Note: If tests are failing, first check the following two things:
@@ -394,8 +394,8 @@ where
         get_ethereum_balance(eth_provider, withdraw_to.address(), token).await?;
     let pending_to_be_onchain_balance_before: U256 = {
         let query = main_contract.query(
-            "getBalanceToWithdraw",
-            (withdraw_to.address(), *token.id),
+            "getPendingBalance",
+            (withdraw_to.address(), token.address),
             None,
             Options::default(),
             None,
@@ -427,8 +427,8 @@ where
 
     let pending_to_be_onchain_balance_after: U256 = {
         let query = main_contract.query(
-            "getBalanceToWithdraw",
-            (withdraw_to.address(), *token.id),
+            "getPendingBalance",
+            (withdraw_to.address(), token.address),
             None,
             Options::default(),
             None,
@@ -702,6 +702,7 @@ async fn comprehensive_test() -> Result<(), anyhow::Error> {
             total_fee,
             bob_wallet1.address(),
             nonce,
+            Default::default(),
         )
         .await?;
     *nonce += 1;
@@ -766,16 +767,30 @@ async fn batch_transfer() -> Result<(), anyhow::Error> {
     // Sign a transfer for each recipient created above
     let mut signed_transfers = Vec::with_capacity(recipients.len());
 
-    for recipient in recipients {
-        let fee = wallet
+    // Obtain total fee for this batch
+    let mut total_fee = Some(
+        wallet
             .provider
-            .get_tx_fee(TxFeeTypes::Transfer, recipient, token_like.clone())
-            .await?
-            .total_fee;
+            .get_txs_batch_fee(
+                vec![TxFeeTypes::Transfer; recipients.len()],
+                recipients.clone(),
+                token_like.clone(),
+            )
+            .await?,
+    );
 
+    for recipient in recipients {
         let (transfer, signature) = wallet
             .signer
-            .sign_transfer(token.clone(), 1_000_000u64.into(), fee, recipient, nonce)
+            .sign_transfer(
+                token.clone(),
+                1_000_000u64.into(),
+                // Set a total batch fee in the first transaction.
+                total_fee.take().unwrap_or_default(),
+                recipient,
+                nonce,
+                Default::default(),
+            )
             .await
             .expect("Transfer signing error");
 

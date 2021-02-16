@@ -92,6 +92,7 @@ fn apply_many_ops() -> ZkSyncCircuit<'static, Bn256> {
                 &account_to.account.address,
                 None,
                 true,
+                Default::default(),
             )
             .0,
         from: account.id,
@@ -113,6 +114,7 @@ fn apply_many_ops() -> ZkSyncCircuit<'static, Bn256> {
                 &account_to.account.address,
                 None,
                 true,
+                Default::default(),
             )
             .0,
         from: account.id,
@@ -134,6 +136,7 @@ fn apply_many_ops() -> ZkSyncCircuit<'static, Bn256> {
                 &Address::zero(),
                 None,
                 true,
+                Default::default(),
             )
             .0,
         account_id: account.id,
@@ -156,7 +159,7 @@ fn apply_many_ops() -> ZkSyncCircuit<'static, Bn256> {
     // Initialize Plasma and WitnessBuilder.
     let (mut plasma_state, mut circuit_account_tree) = ZkSyncStateGenerator::generate(&accounts);
     let mut witness_accum =
-        WitnessBuilder::new(&mut circuit_account_tree, FEE_ACCOUNT_ID, BlockNumber(1));
+        WitnessBuilder::new(&mut circuit_account_tree, FEE_ACCOUNT_ID, BlockNumber(1), 0);
 
     // Fees to be collected.
     let mut fees = vec![];
@@ -169,8 +172,13 @@ fn apply_many_ops() -> ZkSyncCircuit<'static, Bn256> {
         let witness = DepositWitness::apply_tx(&mut witness_accum.account_tree, &deposit_op);
         let circuit_operations = witness.calculate_operations(());
         let pub_data_from_witness = witness.get_pubdata();
+        let offset_commitment = witness.get_offset_commitment_data();
 
-        witness_accum.add_operation_with_pubdata(circuit_operations, pub_data_from_witness);
+        witness_accum.add_operation_with_pubdata(
+            circuit_operations,
+            pub_data_from_witness,
+            offset_commitment,
+        );
     }
 
     // Apply transfer op.
@@ -184,8 +192,13 @@ fn apply_many_ops() -> ZkSyncCircuit<'static, Bn256> {
     let witness = TransferWitness::apply_tx(&mut witness_accum.account_tree, &transfer_op);
     let circuit_operations = witness.calculate_operations(transfer_input);
     let pub_data_from_witness = witness.get_pubdata();
+    let offset_commitment = witness.get_offset_commitment_data();
 
-    witness_accum.add_operation_with_pubdata(circuit_operations, pub_data_from_witness);
+    witness_accum.add_operation_with_pubdata(
+        circuit_operations,
+        pub_data_from_witness,
+        offset_commitment,
+    );
 
     // Apply transfer to new op.
     let raw_op = TransferOutcome::TransferToNew(transfer_to_new_op.clone());
@@ -199,8 +212,13 @@ fn apply_many_ops() -> ZkSyncCircuit<'static, Bn256> {
         TransferToNewWitness::apply_tx(&mut witness_accum.account_tree, &transfer_to_new_op);
     let circuit_operations = witness.calculate_operations(transfer_to_new_input);
     let pub_data_from_witness = witness.get_pubdata();
+    let offset_commitment = witness.get_offset_commitment_data();
 
-    witness_accum.add_operation_with_pubdata(circuit_operations, pub_data_from_witness);
+    witness_accum.add_operation_with_pubdata(
+        circuit_operations,
+        pub_data_from_witness,
+        offset_commitment,
+    );
 
     // Apply withdraw op.
     let fee = <ZkSyncState as TxHandler<Withdraw>>::apply_op(&mut plasma_state, &withdraw_op)
@@ -212,8 +230,13 @@ fn apply_many_ops() -> ZkSyncCircuit<'static, Bn256> {
     let witness = WithdrawWitness::apply_tx(&mut witness_accum.account_tree, &withdraw_op);
     let circuit_operations = witness.calculate_operations(withdraw_input);
     let pub_data_from_witness = witness.get_pubdata();
+    let offset_commitment = witness.get_offset_commitment_data();
 
-    witness_accum.add_operation_with_pubdata(circuit_operations, pub_data_from_witness);
+    witness_accum.add_operation_with_pubdata(
+        circuit_operations,
+        pub_data_from_witness,
+        offset_commitment,
+    );
 
     // Apply full exit op.
 
@@ -226,8 +249,13 @@ fn apply_many_ops() -> ZkSyncCircuit<'static, Bn256> {
     );
     let circuit_operations = witness.calculate_operations(());
     let pub_data_from_witness = witness.get_pubdata();
+    let offset_commitment = witness.get_offset_commitment_data();
 
-    witness_accum.add_operation_with_pubdata(circuit_operations, pub_data_from_witness);
+    witness_accum.add_operation_with_pubdata(
+        circuit_operations,
+        pub_data_from_witness,
+        offset_commitment,
+    );
 
     // Collect fees.
     plasma_state.collect_fee(&fees, FEE_ACCOUNT_ID);

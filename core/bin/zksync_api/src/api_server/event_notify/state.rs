@@ -5,6 +5,7 @@ use std::time::Instant;
 use zksync_storage::chain::operations::records::StoredExecutedPriorityOperation;
 use zksync_storage::chain::operations_ext::records::TxReceiptResponse;
 use zksync_storage::ConnectionPool;
+use zksync_types::aggregated_operations::AggregatedActionType;
 use zksync_types::tx::TxHash;
 use zksync_types::BlockNumber;
 use zksync_types::{AccountId, ActionType, Address};
@@ -78,16 +79,16 @@ impl NotifierState {
                 .get_block(block_number)
                 .await?
             {
-                let verified = if let Some(block_verify) = transaction
+                let verified = transaction
                     .chain()
                     .operations_schema()
-                    .get_operation(block_number, ActionType::VERIFY)
+                    .get_stored_aggregated_operation(
+                        block_number,
+                        AggregatedActionType::ExecuteBlocks,
+                    )
                     .await
-                {
-                    block_verify.confirmed
-                } else {
-                    false
-                };
+                    .map(|operation| operation.confirmed)
+                    .unwrap_or_default();
 
                 BlockInfo {
                     block_number: i64::from(*block_with_op.block_number),

@@ -154,6 +154,7 @@ mod signatures_with_vectors {
     use zksync::{signer::Signer, WalletCredentials};
     use zksync_config::test_config::unit_vectors::TxData;
     use zksync_eth_signer::PrivateKeySigner;
+    use zksync_types::tx::{ChangePubKeyECDSAData, ChangePubKeyEthAuthData};
     use zksync_types::{network::Network, AccountId, Address, H256};
 
     async fn get_signer(
@@ -202,6 +203,7 @@ mod signatures_with_vectors {
                         transfer_tx.fee.clone(),
                         sign_data.to,
                         sign_data.nonce,
+                        transfer_tx.time_range,
                     )
                     .await
                     .expect("Transfer signing error");
@@ -214,13 +216,15 @@ mod signatures_with_vectors {
                 );
 
                 assert_eq!(
-                    transfer.get_ethereum_sign_message(&sign_data.string_token, 0),
+                    transfer
+                        .get_ethereum_sign_message(&sign_data.string_token, 0)
+                        .into_bytes(),
                     outputs.eth_sign_message.unwrap()
                 );
 
                 if let Some(expected_eth_signature) = outputs.eth_signature {
                     let eth_signature = eth_signature.unwrap().serialize_packed();
-                    assert_eq!(&eth_signature, expected_eth_signature.as_slice());
+                    assert_eq!(&eth_signature[..], expected_eth_signature.as_slice());
                 }
             }
         }
@@ -255,6 +259,7 @@ mod signatures_with_vectors {
                         withdraw_tx.fee.clone(),
                         sign_data.eth_address,
                         sign_data.nonce,
+                        withdraw_tx.time_range,
                     )
                     .await
                     .expect("Withdraw signing error");
@@ -267,13 +272,15 @@ mod signatures_with_vectors {
                 );
 
                 assert_eq!(
-                    withdraw.get_ethereum_sign_message(&sign_data.string_token, 0),
+                    withdraw
+                        .get_ethereum_sign_message(&sign_data.string_token, 0)
+                        .into_bytes(),
                     outputs.eth_sign_message.unwrap()
                 );
 
                 if let Some(expected_eth_signature) = outputs.eth_signature {
                     let eth_signature = eth_signature.unwrap().serialize_packed();
-                    assert_eq!(&eth_signature, expected_eth_signature.as_slice());
+                    assert_eq!(&eth_signature[..], expected_eth_signature.as_slice());
                 }
             }
         }
@@ -308,6 +315,7 @@ mod signatures_with_vectors {
                         false,
                         token,
                         change_pubkey_tx.fee.clone(),
+                        change_pubkey_tx.time_range,
                     )
                     .await
                     .expect("Change pub key signing error");
@@ -321,12 +329,18 @@ mod signatures_with_vectors {
 
                 assert_eq!(
                     change_pub_key.get_eth_signed_data().unwrap(),
-                    outputs.eth_sign_message.unwrap().into_bytes()
+                    outputs.eth_sign_message.unwrap()
                 );
 
                 if let Some(expected_eth_signature) = outputs.eth_signature {
-                    let eth_signature = change_pub_key.eth_signature.unwrap().serialize_packed();
-                    assert_eq!(&eth_signature, expected_eth_signature.as_slice());
+                    let eth_signature = match &change_pub_key.eth_auth_data {
+                        Some(ChangePubKeyEthAuthData::ECDSA(ChangePubKeyECDSAData {
+                            eth_signature,
+                            ..
+                        })) => eth_signature.serialize_packed(),
+                        _ => panic!("No ChangePubKey ethereum siganture"),
+                    };
+                    assert_eq!(&eth_signature[..], expected_eth_signature.as_slice());
                 }
             }
         }
@@ -350,12 +364,13 @@ mod signatures_with_vectors {
                     symbol: String::new(),
                     decimals: 0,
                 };
-                let forced_exit = signer
+                let (forced_exit, _) = signer
                     .sign_forced_exit(
                         forced_exit.target,
                         token,
                         forced_exit.fee.clone(),
                         forced_exit.nonce,
+                        forced_exit.time_range,
                     )
                     .await
                     .expect("Forced exit signing error");
@@ -474,6 +489,15 @@ mod wallet_tests {
             _address: Address,
             _token: impl Into<TokenLike> + Send + 'async_trait,
         ) -> Result<Fee, ClientError> {
+            unreachable!()
+        }
+
+        async fn get_txs_batch_fee(
+            &self,
+            _tx_types: Vec<TxFeeTypes>,
+            _addresses: Vec<Address>,
+            _token: impl Into<TokenLike> + Send + 'async_trait,
+        ) -> Result<BigUint, ClientError> {
             unreachable!()
         }
 

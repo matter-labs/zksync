@@ -1,4 +1,6 @@
-pragma solidity ^0.5.8;
+// SPDX-License-Identifier: MIT OR Apache-2.0
+
+pragma solidity ^0.7.0;
 
 import "./Ownable.sol";
 import "./Upgradeable.sol";
@@ -8,14 +10,14 @@ import "./UpgradeableMaster.sol";
 /// @dev NOTICE: Proxy must implement UpgradeableMaster interface to prevent calling some function of it not by master of proxy
 /// @author Matter Labs
 contract Proxy is Upgradeable, UpgradeableMaster, Ownable {
-    /// @notice Storage position of "target" (actual implementation address: keccak256('eip1967.proxy.implementation') - 1)
+    /// @dev Storage position of "target" (actual implementation address: keccak256('eip1967.proxy.implementation') - 1)
     bytes32 private constant targetPosition = 0x360894a13ba1a3210667c828492db98dca3e2076cc3735a920a3ca505d382bbc;
 
     /// @notice Contract constructor
     /// @dev Calls Ownable contract constructor and initialize target
     /// @param target Initial implementation address
     /// @param targetInitializationParameters Target initialization parameters
-    constructor(address target, bytes memory targetInitializationParameters) public Ownable(msg.sender) {
+    constructor(address target, bytes memory targetInitializationParameters) Ownable(msg.sender) {
         setTarget(target);
         (bool initializationSuccess, ) =
             getTarget().delegatecall(abi.encodeWithSignature("initialize(bytes)", targetInitializationParameters));
@@ -33,7 +35,7 @@ contract Proxy is Upgradeable, UpgradeableMaster, Ownable {
     }
 
     /// @notice Returns target of contract
-    /// @return Actual implementation address
+    /// @return target Actual implementation address
     function getTarget() public view returns (address target) {
         bytes32 position = targetPosition;
         assembly {
@@ -53,7 +55,7 @@ contract Proxy is Upgradeable, UpgradeableMaster, Ownable {
     /// @notice Upgrades target
     /// @param newTarget New target
     /// @param newTargetUpgradeParameters New target upgrade parameters
-    function upgradeTarget(address newTarget, bytes calldata newTargetUpgradeParameters) external {
+    function upgradeTarget(address newTarget, bytes calldata newTargetUpgradeParameters) external override {
         requireMaster(msg.sender);
 
         setTarget(newTarget);
@@ -65,17 +67,17 @@ contract Proxy is Upgradeable, UpgradeableMaster, Ownable {
     /// @notice Performs a delegatecall to the contract implementation
     /// @dev Fallback function allowing to perform a delegatecall to the given implementation
     /// This function will return whatever the implementation call returns
-    function() external payable {
+    function _fallback() internal {
         address _target = getTarget();
         assembly {
             // The pointer to the free memory slot
             let ptr := mload(0x40)
             // Copy function signature and arguments from calldata at zero position into memory at pointer position
-            calldatacopy(ptr, 0x0, calldatasize)
+            calldatacopy(ptr, 0x0, calldatasize())
             // Delegatecall method of the implementation contract, returns 0 on error
-            let result := delegatecall(gas, _target, ptr, calldatasize, 0x0, 0)
+            let result := delegatecall(gas(), _target, ptr, calldatasize(), 0x0, 0)
             // Get the size of the last return data
-            let size := returndatasize
+            let size := returndatasize()
             // Copy the size length of bytes from return data at zero position to pointer position
             returndatacopy(ptr, 0x0, size)
             // Depending on result value
@@ -91,38 +93,48 @@ contract Proxy is Upgradeable, UpgradeableMaster, Ownable {
         }
     }
 
+    /// @notice Will run when no functions matches call data
+    fallback() external payable {
+        _fallback();
+    }
+
+    /// @notice Same as fallback but called when calldata is empty
+    receive() external payable {
+        _fallback();
+    }
+
     /// UpgradeableMaster functions
 
     /// @notice Notice period before activation preparation status of upgrade mode
-    function getNoticePeriod() external returns (uint256) {
+    function getNoticePeriod() external override returns (uint256) {
         (bool success, bytes memory result) = getTarget().delegatecall(abi.encodeWithSignature("getNoticePeriod()"));
         require(success, "unp11"); // unp11 - upgradeNoticePeriod delegatecall failed
         return abi.decode(result, (uint256));
     }
 
     /// @notice Notifies proxy contract that notice period started
-    function upgradeNoticePeriodStarted() external {
+    function upgradeNoticePeriodStarted() external override {
         requireMaster(msg.sender);
         (bool success, ) = getTarget().delegatecall(abi.encodeWithSignature("upgradeNoticePeriodStarted()"));
         require(success, "nps11"); // nps11 - upgradeNoticePeriodStarted delegatecall failed
     }
 
     /// @notice Notifies proxy contract that upgrade preparation status is activated
-    function upgradePreparationStarted() external {
+    function upgradePreparationStarted() external override {
         requireMaster(msg.sender);
         (bool success, ) = getTarget().delegatecall(abi.encodeWithSignature("upgradePreparationStarted()"));
         require(success, "ups11"); // ups11 - upgradePreparationStarted delegatecall failed
     }
 
     /// @notice Notifies proxy contract that upgrade canceled
-    function upgradeCanceled() external {
+    function upgradeCanceled() external override {
         requireMaster(msg.sender);
         (bool success, ) = getTarget().delegatecall(abi.encodeWithSignature("upgradeCanceled()"));
         require(success, "puc11"); // puc11 - upgradeCanceled delegatecall failed
     }
 
     /// @notice Notifies proxy contract that upgrade finishes
-    function upgradeFinishes() external {
+    function upgradeFinishes() external override {
         requireMaster(msg.sender);
         (bool success, ) = getTarget().delegatecall(abi.encodeWithSignature("upgradeFinishes()"));
         require(success, "puf11"); // puf11 - upgradeFinishes delegatecall failed
@@ -130,7 +142,7 @@ contract Proxy is Upgradeable, UpgradeableMaster, Ownable {
 
     /// @notice Checks that contract is ready for upgrade
     /// @return bool flag indicating that contract is ready for upgrade
-    function isReadyForUpgrade() external returns (bool) {
+    function isReadyForUpgrade() external override returns (bool) {
         (bool success, bytes memory result) = getTarget().delegatecall(abi.encodeWithSignature("isReadyForUpgrade()"));
         require(success, "rfu11"); // rfu11 - readyForUpgrade delegatecall failed
         return abi.decode(result, (bool));

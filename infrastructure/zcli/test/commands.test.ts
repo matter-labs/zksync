@@ -53,7 +53,8 @@ describe('Fetching Information', () => {
         });
         await Promise.all([ethDeposit.awaitReceipt(), daiDeposit.awaitReceipt()]);
         const changePubkey = await aliceWallet.setSigningKey({
-            feeToken: 'ETH'
+            feeToken: 'ETH',
+            ethAuthType: 'ECDSA'
         });
         await changePubkey.awaitReceipt();
         const txHandle = await aliceWallet.syncTransfer({

@@ -2,19 +2,25 @@
 use std::collections::HashMap;
 // External imports
 // Workspace imports
+use zksync_types::aggregated_operations::AggregatedActionType;
 // Local imports
-use zksync_types::{ethereum::OperationType, Action, BlockNumber};
-
 use self::setup::TransactionsHistoryTestSetup;
 use crate::{
+    chain::block::BlockSchema,
+    chain::operations::OperationsSchema,
     chain::operations_ext::{
         records::{AccountOpReceiptResponse, AccountTxReceiptResponse},
         SearchDirection,
     },
-    test_data::{dummy_ethereum_tx_hash, gen_unique_operation, BLOCK_SIZE_CHUNKS},
+    test_data::{
+        dummy_ethereum_tx_hash, gen_sample_block, gen_unique_aggregated_operation,
+        BLOCK_SIZE_CHUNKS,
+    },
     tests::db_test,
     QueryResult, StorageProcessor,
 };
+use zksync_types::aggregated_operations::AggregatedOperation;
+use zksync_types::BlockNumber;
 
 mod setup;
 
@@ -40,19 +46,13 @@ async fn commit_schema_data(
 
 async fn confirm_eth_op(
     storage: &mut StorageProcessor<'_>,
-    ethereum_op_id: i64,
-    op_type: OperationType,
+    op: (i64, AggregatedOperation),
+    op_type: AggregatedActionType,
 ) -> QueryResult<()> {
-    let eth_tx_hash = dummy_ethereum_tx_hash(ethereum_op_id);
+    let eth_tx_hash = dummy_ethereum_tx_hash(op.0);
     let response = storage
         .ethereum_schema()
-        .save_new_eth_tx(
-            op_type,
-            Some(ethereum_op_id),
-            100,
-            100u32.into(),
-            Default::default(),
-        )
+        .save_new_eth_tx(op_type, Some(op), 100, 100u32.into(), Default::default())
         .await?;
     storage
         .ethereum_schema()
@@ -67,39 +67,59 @@ async fn confirm_eth_op(
 }
 
 // Make first block committed and verified.
-async fn update_blocks_status(storage: &mut StorageProcessor<'_>) -> QueryResult<()> {
+async fn update_blocks_status(mut storage: &mut StorageProcessor<'_>) -> QueryResult<()> {
     // Required since we use `EthereumSchema` in this test.
     storage.ethereum_schema().initialize_eth_data().await?;
     // Make first block committed.
-    let operation = storage
-        .chain()
-        .block_schema()
-        .execute_operation(gen_unique_operation(
+    BlockSchema(&mut storage)
+        .save_block(gen_sample_block(
             BlockNumber(1),
-            Action::Commit,
+            BLOCK_SIZE_CHUNKS,
+            Default::default(),
+        ))
+        .await?;
+    OperationsSchema(&mut storage)
+        .store_aggregated_action(gen_unique_aggregated_operation(
+            BlockNumber(1),
+            AggregatedActionType::CommitBlocks,
             BLOCK_SIZE_CHUNKS,
         ))
         .await?;
+    let (id, aggregated_op) = OperationsSchema(&mut storage)
+        .get_aggregated_op_that_affects_block(
+            AggregatedActionType::CommitBlocks,
+            BlockNumber(1_u32),
+        )
+        .await?
+        .unwrap();
     storage
         .chain()
         .state_schema()
         .commit_state_update(BlockNumber(1), &[], 0)
         .await?;
-    confirm_eth_op(storage, operation.id.unwrap() as i64, OperationType::Commit).await?;
+    confirm_eth_op(
+        storage,
+        (id, aggregated_op),
+        AggregatedActionType::CommitBlocks,
+    )
+    .await?;
 
     // Make first block verified.
-    let operation = storage
-        .chain()
-        .block_schema()
-        .execute_operation(gen_unique_operation(
+    OperationsSchema(&mut storage)
+        .store_aggregated_action(gen_unique_aggregated_operation(
             BlockNumber(1),
-            Action::Verify {
-                proof: Default::default(),
-            },
+            AggregatedActionType::ExecuteBlocks,
             BLOCK_SIZE_CHUNKS,
         ))
         .await?;
-    confirm_eth_op(storage, operation.id.unwrap() as i64, OperationType::Verify).await?;
+    let (id, op) = OperationsSchema(&mut storage)
+        .get_aggregated_op_that_affects_block(
+            AggregatedActionType::ExecuteBlocks,
+            BlockNumber(1_u32),
+        )
+        .await?
+        .unwrap();
+    confirm_eth_op(storage, (id, op), AggregatedActionType::ExecuteBlocks).await?;
 
     Ok(())
 }

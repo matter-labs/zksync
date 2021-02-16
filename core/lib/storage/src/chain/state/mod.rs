@@ -10,13 +10,7 @@ use zksync_types::{
 };
 // Local imports
 use crate::chain::{
-    account::{
-        records::{
-            StorageAccount, StorageAccountCreation, StorageAccountPubkeyUpdate,
-            StorageAccountUpdate, StorageBalance,
-        },
-        restore_account,
-    },
+    account::{records::*, restore_account},
     block::BlockSchema,
 };
 use crate::diff::StorageAccountDiff;
