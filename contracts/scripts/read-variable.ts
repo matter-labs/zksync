@@ -122,7 +122,7 @@ async function readStruct(slot: BigNumber, address: string, type: string): Promi
 }
 
 // Read array (Static or dynamic sized)
-async function readArray(slot: BigNumber, address: string, type: string): Promise<any> {
+async function readArray(slot: BigNumber, address: string, type: string): Promise<any[]> {
     let length: number;
     const baseType = types[type].base;
     if (types[type].encoding === 'dynamic_array') {
@@ -160,7 +160,7 @@ async function readVariable(slot: BigNumber, shift: number, address: string, typ
 }
 
 // Read field of struct
-async function readPartOfStruct(slot: BigNumber, address: string, type: string, params: string[]): Promise<object> {
+async function readPartOfStruct(slot: BigNumber, address: string, type: string, params: string[]): Promise<any> {
     const last = params.pop();
     const member = types[type].members.find((element) => {
         return element.label === last;
