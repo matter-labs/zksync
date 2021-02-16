@@ -1928,6 +1928,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "get_block_data"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "futures 0.3.6",
+ "tokio 0.2.22",
+ "zksync_storage",
+ "zksync_types",
+]
+
+[[package]]
 name = "getrandom"
 version = "0.1.15"
 source = "registry+https://github.com/rust-lang/crates.io-index"
