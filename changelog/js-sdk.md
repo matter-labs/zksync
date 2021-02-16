@@ -6,6 +6,8 @@ All notable changes to `zksync.js` will be documented in this file.
 
 ### Added
 
+- `getHashOfTx` function and a test for it.
+
 ### Changed
 
 ### Deprecated

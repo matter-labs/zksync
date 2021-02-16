@@ -14,6 +14,7 @@ import {
     Withdraw,
     CloseAccount
 } from './types';
+import { sha256 } from '@ethersproject/sha2';
 
 // Max number of tokens for the current version, it is determined by the zkSync circuit implementation.
 const MAX_NUMBER_OF_TOKENS = 128;
@@ -725,4 +726,12 @@ export async function getPendingBalance(
     const tokenAddress = syncProvider.tokenSet.resolveTokenAddress(token);
 
     return zksyncContract.getPendingBalance(address, tokenAddress);
+}
+
+export function getHashOfTx(tx: Transfer | Withdraw | ChangePubKey | ForcedExit | CloseAccount): string {
+    if (tx.type == 'Close') {
+        throw new Error('Close operation is disabled');
+    }
+    let txBytes = serializeTx(tx);
+    return sha256(txBytes).replace('0x', 'sync-tx:');
 }
