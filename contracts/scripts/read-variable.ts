@@ -62,8 +62,7 @@ async function readNumber(slot: BigNumber, shift: number, label: string, address
         bytes = +label.substring(4, label.length) / 8;
     }
     let data: string = await readBytes(slot, shift, bytes, address);
-    data = data.substring(2, data.length);
-    data = '0x' + data.padStart(64, '0');
+    data = ethers.utils.hexZeroPad(data, 32);
     return ethers.utils.defaultAbiCoder.decode([label], data).toString();
 }
 
