@@ -125,10 +125,13 @@ fn time_range_to_block_diff(from: DateTime<Utc>, to: DateTime<Utc>) -> u64 {
     let millis_from = from.timestamp_millis();
     let millis_to = to.timestamp_millis();
 
-    // It does not really matter to wether cail or floor the division
-    return ((millis_to - millis_from) / MILLIS_PER_BLOCK)
-        .try_into()
-        .unwrap();
+    if millis_to >= millis_from {
+        ((millis_to - millis_from) / MILLIS_PER_BLOCK)
+            .try_into()
+            .unwrap()
+    } else {
+        0u64
+    }
 }
 
 impl ForcedExitContractWatcher {
@@ -140,14 +143,9 @@ impl ForcedExitContractWatcher {
 
         let oldest_request = fe_schema.get_oldest_unfulfilled_request().await?;
 
-        let wait_confirmations: u64 = self
-            .config
-            .forced_exit_requests
-            .wait_confirmations
-            .try_into()
-            .unwrap();
+        let wait_confirmations = self.config.forced_exit_requests.wait_confirmations;
 
-        // No oldest requests means that there are no requests that were possibly ignored
+        // No oldest request means that there are no requests that were possibly ignored
         let oldest_request = match oldest_request {
             Some(r) => r,
             None => {
@@ -159,19 +157,10 @@ impl ForcedExitContractWatcher {
         let block_diff = time_range_to_block_diff(oldest_request.created_at, Utc::now());
         let max_possible_viewed_block = block - wait_confirmations;
 
+        // If the last block is too young, then we will use max_possible_viewed_block,
+        // otherwise we will use block - block_diff
         self.last_viewed_block = std::cmp::min(block - block_diff, max_possible_viewed_block);
-        /*
-        blocks = time_diff_to_blocks =
 
-        last_processed_block = block - blocks
-
-
-        comes a tx => check that it's valid
-        comes a tx => check that the id hasn't already been added to the fulfilled db
-        if everything is finve => add the tx
-
-        once the block is processed, remove everything too old and unfulfilled and move on
-        */
         Ok(())
     }
 
@@ -185,7 +174,10 @@ impl ForcedExitContractWatcher {
         self.mode = WatcherMode::Backoff(backoff_until);
         // This is needed to track how much time is spent in backoff mode
         // and trigger grafana alerts
-        metrics::histogram!("eth_watcher.enter_backoff_mode", RATE_LIMIT_DELAY);
+        metrics::histogram!(
+            "forced_exit_requests.eth_watcher.enter_backoff_mode",
+            RATE_LIMIT_DELAY
+        );
     }
 
     fn polling_allowed(&mut self) -> bool {
@@ -224,42 +216,37 @@ impl ForcedExitContractWatcher {
             return;
         }
 
-        let last_block = self.eth_client.block_number().await;
+        let last_block = match self.eth_client.block_number().await {
+            Ok(block) => block,
+            Err(error) => {
+                self.handle_infura_error(error);
+                return;
+            }
+        };
 
-        if let Err(error) = last_block {
-            self.handle_infura_error(error);
-            return;
-        }
-
-        let wait_confirmations: u64 = self
-            .config
-            .forced_exit_requests
-            .wait_confirmations
-            .try_into()
-            .unwrap();
-
-        let last_block = last_block.unwrap();
-
-        let last_confirmed_block = last_block - wait_confirmations;
-
+        let wait_confirmations = self.config.forced_exit_requests.wait_confirmations;
+        let last_confirmed_block = last_block.saturating_sub(wait_confirmations);
         if last_confirmed_block <= self.last_viewed_block {
             return;
-        }
+        };
 
         let events = self
             .eth_client
             .get_funds_received_events(self.last_viewed_block + 1, last_confirmed_block)
             .await;
 
-        if let Err(error) = events {
-            self.handle_infura_error(error);
-            return;
-        }
-        let events = events.unwrap();
+        let events = match events {
+            Ok(e) => e,
+            Err(error) => {
+                self.handle_infura_error(error);
+                return;
+            }
+        };
 
         for e in events {
-            self.forced_exit_sender
-                .process_request(e.amount as i64)
+            let processing_result = self
+                .forced_exit_sender
+                .process_request(e.amount.clone())
                 .await;
         }
 
@@ -289,6 +276,7 @@ impl ForcedExitContractWatcher {
             }
         };
 
+        // We don't expect rate limiting to happen again
         self.restore_state_from_eth(block)
             .await
             .expect("Failed to restore state for ForcedExit eth_watcher");
@@ -320,7 +308,7 @@ pub fn run_forced_exit_contract_watcher(
 
         // It is ok to unwrap here, since if fe_sender is not created, then
         // the watcher is meaningless
-        let forced_exit_sender = ForcedExitSender::new(
+        let mut forced_exit_sender = ForcedExitSender::new(
             core_api_client.clone(),
             connection_pool.clone(),
             config.clone(),
@@ -328,7 +316,12 @@ pub fn run_forced_exit_contract_watcher(
         .await
         .unwrap();
 
-        let mut contract_watcher = ForcedExitContractWatcher {
+        forced_exit_sender
+            .await_unconfirmed()
+            .await
+            .expect("Unexpected error while trying to wait for unconfirmed transactions");
+
+        let contract_watcher = ForcedExitContractWatcher {
             core_api_client,
             connection_pool,
             config,

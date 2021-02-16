@@ -20,7 +20,7 @@ struct ForcedExitRequestsInternalConfig {
     pub tx_interval_scaling_factor: f64,
     pub price_per_token: i64,
     pub digits_in_id: u8,
-    pub wait_confirmations: i64,
+    pub wait_confirmations: u64,
     pub sender_private_key: String,
     pub sender_account_address: Address,
 }
@@ -33,7 +33,7 @@ pub struct ForcedExitRequestsConfig {
     pub max_tx_interval: i64,
     pub price_per_token: i64,
     pub digits_in_id: u8,
-    pub wait_confirmations: i64,
+    pub wait_confirmations: u64,
     pub sender_private_key: String,
     pub sender_account_address: Address,
 }

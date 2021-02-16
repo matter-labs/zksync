@@ -1,28 +1,35 @@
-use std::{convert::TryFrom, time::Instant};
+use std::{
+    convert::{TryFrom, TryInto},
+    ops::{AddAssign, Sub},
+    time::Instant,
+};
 
 use anyhow::format_err;
 use ethabi::{Contract as ContractAbi, Hash};
 use fee_ticker::validator::watcher;
 use franklin_crypto::bellman::PrimeFieldRepr;
-use num::{BigUint, FromPrimitive, ToPrimitive};
+use num::{BigUint, FromPrimitive, Integer, ToPrimitive};
 use std::fmt::Debug;
-use tokio::task::JoinHandle;
+use tokio::time;
+use tokio::{stream::StreamExt, task::JoinHandle};
 use web3::{
     contract::{Contract, Options},
+    futures::TryFutureExt,
     transports::Http,
     types::{BlockNumber, FilterBuilder, Log},
     Web3,
 };
 use zksync_config::ZkSyncConfig;
+use zksync_contracts::zksync_contract;
 use zksync_storage::{
     chain::{account::AccountSchema, operations_ext::records::TxReceiptResponse},
     ConnectionPool, StorageProcessor,
 };
-
-use zksync_contracts::zksync_contract;
 use zksync_types::{
-    forced_exit_requests::ForcedExitRequest, tx::TimeRange, tx::TxHash, AccountId, Address, Nonce,
-    PriorityOp, TokenId, ZkSyncTx, H160, U256,
+    forced_exit_requests::{ForcedExitRequest, ForcedExitRequestId, SaveForcedExitRequestQuery},
+    tx::TimeRange,
+    tx::TxHash,
+    AccountId, Address, Nonce, PriorityOp, TokenId, ZkSyncTx, H160, U256,
 };
 
 use chrono::Utc;
@@ -39,14 +46,17 @@ use zksync_crypto::ff::PrimeField;
 
 use crate::eth_watch;
 
+// We try to process a request 3 times before sending warnings in the console
+const PROCESSING_ATTEMPTS: u8 = 3;
+
 pub struct ForcedExitSender {
     core_api_client: CoreApiClient,
     connection_pool: ConnectionPool,
     config: ZkSyncConfig,
-    operator_account_id: AccountId,
+    forced_exit_sender_account_id: AccountId,
     sender_private_key: PrivateKey<Engine>,
 }
-async fn get_operator_account_id(
+async fn get_forced_exit_sender_account_id(
     connection_pool: ConnectionPool,
     config: &ZkSyncConfig,
 ) -> anyhow::Result<AccountId> {
@@ -83,9 +93,10 @@ impl ForcedExitSender {
         connection_pool: ConnectionPool,
         config: ZkSyncConfig,
     ) -> anyhow::Result<Self> {
-        let operator_account_id = get_operator_account_id(connection_pool.clone(), &config)
-            .await
-            .expect("Failed to get the sender id");
+        let forced_exit_sender_account_id =
+            get_forced_exit_sender_account_id(connection_pool.clone(), &config)
+                .await
+                .expect("Failed to get the sender id");
 
         let sender_private_key =
             hex::decode(&config.clone().forced_exit_requests.sender_private_key[2..])
@@ -96,48 +107,75 @@ impl ForcedExitSender {
         Ok(Self {
             core_api_client,
             connection_pool,
-            operator_account_id,
+            forced_exit_sender_account_id,
             config,
             sender_private_key,
         })
     }
 
-    pub fn extract_id_from_amount(&self, amount: i64) -> i64 {
+    pub fn extract_id_from_amount(&self, amount: BigUint) -> (i64, BigUint) {
         let id_space_size: i64 =
             (10 as i64).pow(self.config.forced_exit_requests.digits_in_id as u32);
 
-        amount % id_space_size
+        let id_space_size = BigUint::from_i64(id_space_size).unwrap();
+
+        let one = BigUint::from_u8(1u8).unwrap();
+
+        // Taking to the power of 1 and finding mod is the only way to find mod of
+        // the BigUint
+        let id = amount.modpow(&one, &id_space_size);
+
+        // After extracting the id we need to delete it
+        // to make sure that amount is the same as in the db
+        let amount = amount.sub(&id);
+
+        (id.try_into().unwrap(), amount)
     }
 
-    pub async fn construct_forced_exit<'a>(
+    pub fn build_forced_exit<'a>(
         &self,
-        storage: &mut StorageProcessor<'a>,
-        fe_request: ForcedExitRequest,
-    ) -> anyhow::Result<SignedZkSyncTx> {
-        let mut account_schema = storage.chain().account_schema();
-
-        let operator_state = account_schema
-            .last_committed_state_for_account(self.operator_account_id)
-            .await?
-            .expect("The operator account has no committed state");
-        let operator_nonce = operator_state.nonce;
-
-        // TODO: allow batches
+        nonce: Nonce,
+        target: Address,
+        token: TokenId,
+    ) -> SignedZkSyncTx {
         let tx = ForcedExit::new_signed(
-            self.operator_account_id,
-            fe_request.target,
-            fe_request.tokens[0],
+            self.forced_exit_sender_account_id,
+            target,
+            token,
             BigUint::from(0u32),
-            operator_nonce,
+            nonce,
             TimeRange::default(),
             &self.sender_private_key,
         )
         .expect("Failed to create signed transaction from ForcedExit");
 
-        Ok(SignedZkSyncTx {
+        SignedZkSyncTx {
             tx: ZkSyncTx::ForcedExit(Box::new(tx)),
             eth_sign_data: None,
-        })
+        }
+    }
+
+    pub async fn build_transactions<'a>(
+        &self,
+        storage: &mut StorageProcessor<'a>,
+        fe_request: ForcedExitRequest,
+    ) -> anyhow::Result<Vec<SignedZkSyncTx>> {
+        let mut account_schema = storage.chain().account_schema();
+
+        let sender_state = account_schema
+            .last_committed_state_for_account(self.forced_exit_sender_account_id)
+            .await?
+            .expect("The forced exit sender account has no committed state");
+
+        let mut sender_nonce = sender_state.nonce;
+        let mut transactions: Vec<SignedZkSyncTx> = vec![];
+
+        for token in fe_request.tokens.into_iter() {
+            transactions.push(self.build_forced_exit(sender_nonce, fe_request.target, token));
+            sender_nonce.add_assign(1);
+        }
+
+        Ok(transactions)
     }
 
     // TODO: take the block timestamp into account instead of
@@ -152,27 +190,74 @@ impl ForcedExitSender {
 
     // Returns the id the request if it should be fulfilled,
     // error otherwise
-    pub fn verify_request(
-        &self,
-        amount: i64,
-        request: Option<ForcedExitRequest>,
-    ) -> anyhow::Result<ForcedExitRequest> {
+    pub fn check_request(&self, amount: BigUint, request: Option<ForcedExitRequest>) -> bool {
         let request = match request {
             Some(r) => r,
             None => {
-                return Err(anyhow::Error::msg("The request was not found"));
+                return false;
             }
         };
 
-        if self.expired(&request) {
-            return Err(anyhow::Error::msg("The request was not found"));
+        !self.expired(&request) && request.price_in_wei == amount
+    }
+
+    // Awaits until the request is complete
+    pub async fn await_unconfirmed_request<'a>(
+        &self,
+        storage: &mut StorageProcessor<'a>,
+        request: &ForcedExitRequest,
+    ) -> anyhow::Result<()> {
+        let hashes = request.fulfilled_by.clone();
+
+        if let Some(hashes) = hashes {
+            for hash in hashes.into_iter() {
+                self.wait_until_comitted(storage, hash).await?;
+                self.set_fulfilled_at(storage, request.id).await?;
+            }
+        }
+        Ok(())
+    }
+
+    pub async fn get_unconfirmed_requests<'a>(
+        &self,
+        storage: &mut StorageProcessor<'a>,
+    ) -> anyhow::Result<Vec<ForcedExitRequest>> {
+        let mut forced_exit_requests_schema = storage.forced_exit_requests_schema();
+        forced_exit_requests_schema.get_unconfirmed_requests().await
+    }
+
+    pub async fn set_fulfilled_by<'a>(
+        &self,
+        storage: &mut StorageProcessor<'a>,
+        id: ForcedExitRequestId,
+        value: Option<Vec<TxHash>>,
+    ) -> anyhow::Result<()> {
+        let mut forced_exit_requests_schema = storage.forced_exit_requests_schema();
+        forced_exit_requests_schema
+            .set_fulfilled_by(id, value)
+            .await
+    }
+
+    pub async fn await_unconfirmed(&mut self) -> anyhow::Result<()> {
+        let mut storage = self.connection_pool.access_storage().await?;
+        let unfullied_requests = self.get_unconfirmed_requests(&mut storage).await?;
+
+        for request in unfullied_requests.into_iter() {
+            let await_result = self.await_unconfirmed_request(&mut storage, &request).await;
+
+            if let Ok(_) = await_result {
+                continue;
+            }
+
+            // A transaction has failed. That is not intended.
+            // We can safely cancel such transaction, since we will re-try to
+            // send it again later
+            log::error!("A previously sent forced exit transaction has failed. Canceling the tx.");
+            self.set_fulfilled_by(&mut storage, request.id, None)
+                .await?;
         }
 
-        if request.price_in_wei != BigUint::from_i64(amount).unwrap() {
-            return Err(anyhow::Error::msg("The request was not found"));
-        }
-
-        return Ok(request);
+        Ok(())
     }
 
     pub async fn get_request_by_id<'a>(
@@ -183,14 +268,6 @@ impl ForcedExitSender {
         let mut fe_schema = storage.forced_exit_requests_schema();
 
         let request = fe_schema.get_request_by_id(id).await?;
-        // {
-        //     Ok(r) => r,
-        //     Err(e) => {
-        //         log::warn!("ForcedExitRequests: Fail to get request by id: {}", e);
-        //         return;
-        //     }
-        // };
-
         Ok(request)
     }
 
@@ -224,20 +301,44 @@ impl ForcedExitSender {
             .await
     }
 
+    pub async fn send_transactions<'a>(
+        &self,
+        storage: &mut StorageProcessor<'a>,
+        request: &ForcedExitRequest,
+        txs: Vec<SignedZkSyncTx>,
+    ) -> anyhow::Result<Vec<TxHash>> {
+        let mut db_transaction = storage.start_transaction().await?;
+        let mut schema = db_transaction.forced_exit_requests_schema();
+
+        let hashes: Vec<TxHash> = txs.iter().map(|tx| tx.hash()).collect();
+        self.core_api_client.send_txs_batch(txs, vec![]).await??;
+
+        schema
+            .set_fulfilled_by(request.id, Some(hashes.clone()))
+            .await?;
+
+        db_transaction.commit().await?;
+
+        Ok(hashes)
+    }
+
     pub async fn wait_until_comitted<'a>(
         &self,
         storage: &mut StorageProcessor<'a>,
         tx_hash: TxHash,
     ) -> anyhow::Result<()> {
-        let poll_interval: i32 = 200;
+        let timeout_millis: u64 = 120000;
+        let poll_interval_millis: u64 = 200;
+        let poll_interval = time::Duration::from_secs(poll_interval_millis);
+        let mut timer = time::interval(poll_interval);
 
-        // If there is no receipt for 20 seconds, we consider the comitment failed
-        let timeout: i32 = 60000;
-        let mut time_passed: i32 = 0;
+        let mut time_passed: u64 = 0;
 
         loop {
-            if time_passed >= timeout {
-                panic!("Comitting tx failed!");
+            if time_passed >= timeout_millis {
+                // If a transaction takes more than 2 minutes to commit we consider the server
+                // broken and panic
+                panic!("Comitting ForcedExit transaction failed!");
             }
 
             let receipt = self.get_receipt(storage, tx_hash).await?;
@@ -246,57 +347,61 @@ impl ForcedExitSender {
                 if tx_receipt.success {
                     return Ok(());
                 } else {
-                    panic!("FE Transaction failed")
+                    return Err(anyhow::Error::msg("ForcedExit transaction failed"));
                 }
             }
+
+            timer.tick().await;
+            time_passed += poll_interval_millis;
         }
     }
 
-    pub async fn process_request(&self, amount: i64) {
-        let id = self.extract_id_from_amount(amount);
-        // After extracting the id we need to delete it from the db
-        // to make sure that amount is the same as in the db
-        let amount = amount - id;
+    pub async fn try_process_request(&self, amount: BigUint) -> anyhow::Result<()> {
+        let (id, amount) = self.extract_id_from_amount(amount);
 
-        let mut storage = match self.connection_pool.access_storage().await {
-            Ok(storage) => storage,
-            Err(error) => {
-                log::warn!("Failed to acquire db connection for processing forced_exit_request, reason: {}", error);
-                return;
-            }
-        };
+        let mut storage = self.connection_pool.access_storage().await?;
 
         let fe_request = self
             .get_request_by_id(&mut storage, id)
             .await
             .expect("Failed to get request by id");
 
-        let fe_request = match self.verify_request(amount, fe_request) {
-            Ok(r) => r,
-            Err(_) => {
-                // The request was not valid, that's fine
-                return;
-            }
+        let fe_request = if self.check_request(amount, fe_request.clone()) {
+            fe_request.unwrap()
+        } else {
+            // The request was not valid, that's fine
+            return Ok(());
         };
 
-        let fe_tx = self
-            .construct_forced_exit(&mut storage, fe_request)
-            .await
-            .expect("Failed to construct ForcedExit");
-        let tx_hash = fe_tx.hash();
+        let txs = self
+            .build_transactions(&mut storage, fe_request.clone())
+            .await?;
+        let hashes = self
+            .send_transactions(&mut storage, &fe_request, txs)
+            .await?;
 
-        self.core_api_client
-            .send_tx(fe_tx)
-            .await
-            .expect("Failed to send transaction to mempool")
-            .unwrap();
+        // We wait only for the first transaction to complete since the transactions
+        // are sent in a batch
+        self.wait_until_comitted(&mut storage, hashes[0]).await?;
+        self.set_fulfilled_at(&mut storage, id).await?;
 
-        self.wait_until_comitted(&mut storage, tx_hash)
-            .await
-            .expect("Comittment waiting failed");
+        Ok(())
+    }
 
-        self.set_fulfilled_at(&mut storage, id)
-            .await
-            .expect("Error while fulfulling the request");
+    pub async fn process_request(&self, amount: BigUint) {
+        let mut attempts: u8 = 0;
+        loop {
+            let processing_attempt = self.try_process_request(amount.clone()).await;
+
+            if let Ok(_) = processing_attempt {
+                return;
+            } else {
+                attempts += 1;
+            }
+
+            if attempts >= PROCESSING_ATTEMPTS {
+                log::error!("Failed to process forced exit for the {} time", attempts);
+            }
+        }
     }
 }

@@ -10,6 +10,7 @@ pub type ForcedExitRequestId = i64;
 use anyhow::format_err;
 use ethabi::{decode, ParamType};
 use std::convert::TryFrom;
+use std::convert::TryInto;
 use zksync_basic_types::{Log, U256};
 
 use crate::tx::TxHash;
@@ -37,9 +38,9 @@ pub struct SaveForcedExitRequestQuery {
     pub created_at: DateTime<Utc>,
     pub valid_until: DateTime<Utc>,
 }
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone)]
 pub struct FundsReceivedEvent {
-    pub amount: u64,
+    pub amount: BigUint,
 }
 
 impl TryFrom<Log> for FundsReceivedEvent {
@@ -54,13 +55,11 @@ impl TryFrom<Log> for FundsReceivedEvent {
         )
         .map_err(|e| format_err!("Event data decode: {:?}", e))?;
 
+        let bytes = dec_ev.remove(0).to_bytes().unwrap();
+        let amount = u128::from_be_bytes(bytes.try_into().unwrap());
+
         Ok(FundsReceivedEvent {
-            amount: dec_ev
-                .remove(0)
-                .to_uint()
-                .as_ref()
-                .map(U256::as_u64)
-                .unwrap(),
+            amount: BigUint::from(amount),
         })
     }
 }

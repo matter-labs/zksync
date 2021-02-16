@@ -138,11 +138,11 @@ impl<'a, 'c> ForcedExitRequestsSchema<'a, 'c> {
     pub async fn set_fulfilled_by(
         &mut self,
         id: ForcedExitRequestId,
-        tx_hashes: Vec<TxHash>,
+        tx_hashes: Option<Vec<TxHash>>,
     ) -> QueryResult<()> {
         let start = Instant::now();
 
-        let hash_str = utils::vec_to_comma_list(tx_hashes);
+        let hash_str = tx_hashes.map(utils::vec_to_comma_list);
 
         sqlx::query!(
             r#"
@@ -150,7 +150,7 @@ impl<'a, 'c> ForcedExitRequestsSchema<'a, 'c> {
                 SET fulfilled_by = $1
                 WHERE id = $2
             "#,
-            &hash_str,
+            hash_str,
             id
         )
         .execute(self.0.conn())
