@@ -323,7 +323,9 @@ impl Monitor {
         await_condition!(
             Self::POLLING_INTERVAL,
             self.inner().await.running_tasks_counter == 0
-        )
+        );
+
+        vlog::debug!("All pending tasks have been finished");
     }
 
     /// Enables a collecting metrics process.
@@ -456,6 +458,8 @@ impl Monitor {
             monitor.inner().await.running_tasks_counter += 1;
             let result = task.await;
             monitor.inner().await.running_tasks_counter -= 1;
+            let remaining = monitor.inner().await.running_tasks_counter;
+            vlog::debug!("Task finished, remaining tasks {}", remaining);
 
             result
         };
