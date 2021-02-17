@@ -167,6 +167,7 @@ impl FeeTickerScenario {
             format_ether(&fee)
         );
 
+        wallet.refresh_nonce().await?;
         let (tx, eth_signature) = wallet
             .sign_transfer(
                 wallet.address(),

@@ -172,7 +172,7 @@ impl LoadtestExecutor {
         let mut deposit_ops = Vec::new();
         for (resource, fees) in resources {
             let token_name = &resource.token_name;
-            let total_fee = BigUint::from(Self::OPERATIONS_PER_WALLET) * &fees.eth;
+            let total_fee = BigUint::from(Self::OPERATIONS_PER_WALLET) * (&fees.zksync + &fees.eth);
 
             vlog::info!(
                 "For token {} zkSync fee is {}",
@@ -227,7 +227,7 @@ impl LoadtestExecutor {
 
             // Make deposit from Ethereum network to the zkSync one.
             let amount_to_deposit = closest_packable_token_amount(
-                &(&scenario_amount + BigUint::from(Self::OPERATIONS_PER_WALLET)),
+                &(&scenario_amount + BigUint::from(Self::OPERATIONS_PER_WALLET) * &fees.zksync),
             );
 
             let l1_balance = self.main_wallet.l1_balance(token_name).await?;
@@ -239,7 +239,7 @@ impl LoadtestExecutor {
             );
 
             vlog::info!(
-                "Deposit {} {} for main wallet",
+                "Deposit {} {} for scenario",
                 format_ether(&amount_to_deposit),
                 token_name,
             );
@@ -252,6 +252,22 @@ impl LoadtestExecutor {
             deposit_ops.push(priority_op);
             wallets.push((scenario_wallets, wallet_balance));
         }
+
+        // Deposit some ETH to the L2 network for the main wallet to process `ChangePubKey`
+        // transaction
+        let main_wallet_amount = &self.fees.zksync * BigUint::from(Self::OPERATIONS_PER_WALLET);
+
+        vlog::info!(
+            "Deposit {} {} for main wallet",
+            format_ether(&main_wallet_amount),
+            Self::MAIN_WALLET_FEE_TOKEN,
+        );
+
+        let priority_op = self
+            .main_wallet
+            .deposit(Self::MAIN_WALLET_FEE_TOKEN, main_wallet_amount)
+            .await?;
+        deposit_ops.push(priority_op);
 
         // Wait for pending priority operations
         for priority_op in deposit_ops {

@@ -164,6 +164,7 @@ macro_rules! await_condition {
 impl Monitor {
     const SAMPLE_INTERVAL: Duration = Duration::from_secs(1);
     const POLLING_INTERVAL: Duration = Duration::from_millis(50);
+    const CONDITION_TIMEOUT: Duration = Duration::from_secs(1800);
 
     /// Creates a new load monitor from the zkSync network provider.
     pub async fn new(provider: RpcProvider) -> Self {
@@ -250,7 +251,8 @@ impl Monitor {
                 .monitor_tx(created_at, sent_at, tx_hash, tx_variant)
                 .await;
 
-            if tx_result.is_err() {
+            if let Err(e) = tx_result.as_ref() {
+                vlog::warn!("Monitored transaction execution failed. {}", e);
                 monitor.log_event(Event::TxErrored(tx_hash)).await;
             }
 
@@ -270,7 +272,13 @@ impl Monitor {
         block_status: BlockStatus,
         tx_hash: TxHash,
     ) -> anyhow::Result<()> {
+        let start_at = Instant::now();
         await_condition!(Self::POLLING_INTERVAL, {
+            anyhow::ensure!(
+                start_at.elapsed() <= Self::CONDITION_TIMEOUT,
+                "`wait_for_tx` timeout has been reached."
+            );
+
             let info = self.provider.tx_info(tx_hash).await?;
             match block_status {
                 BlockStatus::Committed => match info.success {
@@ -298,7 +306,13 @@ impl Monitor {
         block_status: BlockStatus,
         priority_op: &PriorityOp,
     ) -> anyhow::Result<()> {
+        let start_at = Instant::now();
         await_condition!(Self::POLLING_INTERVAL, {
+            anyhow::ensure!(
+                start_at.elapsed() <= Self::CONDITION_TIMEOUT,
+                "`wait_for_priority_op` timeout has been reached."
+            );
+
             let info = self
                 .provider
                 .ethop_info(priority_op.serial_id as u32)
@@ -459,7 +473,7 @@ impl Monitor {
             let result = task.await;
             monitor.inner().await.running_tasks_counter -= 1;
             let remaining = monitor.inner().await.running_tasks_counter;
-            vlog::debug!("Task finished, remaining tasks {}", remaining);
+            vlog::trace!("Task finished, remaining tasks {}", remaining);
 
             result
         };
