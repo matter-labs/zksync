@@ -2,8 +2,8 @@ import { Tester } from './tester';
 import { expect } from 'chai';
 import fs from 'fs';
 import fetch from 'node-fetch';
-import { Wallet, types, utils } from 'zksync';
-import { BigNumber, ethers } from 'ethers';
+import { Wallet, types, utils, wallet } from 'zksync';
+import { BigNumber, BigNumberish, ethers } from 'ethers';
 import * as path from 'path';
 
 import { Address } from 'zksync/build/types';
@@ -19,11 +19,12 @@ type TokenLike = types.TokenLike;
 
 declare module './tester' {
     interface Tester {
-        testForcedExitRequestOneToken(
+        testForcedExitRequestMultipleTokens(
             from: Wallet,
-            to: ethers.Signer,
-            token: TokenLike,
-            value: BigNumber
+            payer: ethers.Signer,
+            to: Address,
+            tokens: TokenLike[],
+            value: BigNumber[]
         ): Promise<void>;
     }
 }
@@ -35,6 +36,87 @@ interface StatusResponse {
     recomended_tx_interval_millis: number;
     forced_exit_contract_address: Address;
 }
+
+Tester.prototype.testForcedExitRequestMultipleTokens = async function (
+    from: Wallet,
+    payer: ethers.Signer,
+    to: Address,
+    tokens: TokenLike[],
+    amounts: BigNumber[]
+) {
+    const tokenAddresses = tokens.map((token) => this.syncProvider.tokenSet.resolveTokenAddress(token));
+
+    const toBalancesBeforePromises = tokens.map((token, i) => {
+        return getFullOnchainBalance(this, to, tokenAddresses[i]);
+    });
+
+    let toBalancesBefore = await Promise.all(toBalancesBeforePromises);
+
+    const batchBuilder = from.batchBuilder();
+    tokens.forEach((token, i) => {
+        batchBuilder.addTransfer({
+            to,
+            token,
+            amount: amounts[i]
+        });
+    });
+    const batch = await batchBuilder.build('ETH');
+    const handles = await wallet.submitSignedTransactionsBatch(from.provider, batch.txs, [batch.signature]);
+
+    // Waiting only for the first tx since we send the transactions in batch
+    await handles[0].awaitReceipt();
+
+    const status = await getStatus();
+
+    expect(status.status).to.eq('enabled', 'Forced exit requests status is disabled');
+
+    const tokenIds = tokens.map((token) => this.syncProvider.tokenSet.resolveTokenId(token));
+
+    const requestPrice = BigNumber.from(status.request_fee).mul(tokens.length);
+    const request = await submitRequest(to, tokenIds, requestPrice.toString());
+
+    const contractAddress = status.forced_exit_contract_address;
+
+    const amountToPay = requestPrice.add(BigNumber.from(request.id));
+
+    const gasPrice = (await payer.provider?.getGasPrice()) as BigNumberish;
+
+    const txHandle = await payer.sendTransaction({
+        value: amountToPay,
+        gasPrice: gasPrice,
+        to: contractAddress
+    });
+
+    await txHandle.wait();
+
+    // We have to wait for verification and execution of the
+    // block with the forced exit, so waiting for a while is fine
+    let timeout = 120000;
+    let interval = 500;
+
+    let timePassed = 0;
+
+    let expectedToBalance = toBalancesBefore.map((balance, i) => balance.add(amounts[i]));
+    while (timePassed <= timeout) {
+        const balancesPromises = tokenAddresses.map((address) => getFullOnchainBalance(this, to, address));
+        const balances = await Promise.all(balancesPromises);
+
+        const allExpected = balances.every((bal, i) => bal.eq(expectedToBalance[i]));
+
+        if (allExpected) {
+            break;
+        }
+
+        await sleep(interval);
+        timePassed += interval;
+    }
+
+    const balancesPromises = tokenAddresses.map((address) => getFullOnchainBalance(this, to, address));
+    const balances = await Promise.all(balancesPromises);
+    const allExpected = balances.every((bal, i) => bal.eq(expectedToBalance[i]));
+
+    expect(allExpected, 'The ForcedExit has not completed').to.be.true;
+};
 
 async function getStatus() {
     const endpoint = `${apiUrl}/status`;
@@ -76,68 +158,3 @@ async function getFullOnchainBalance(tester: Tester, address: Address, tokenAddr
 
     return BigNumber.from(onchainBalance).add(BigNumber.from(pendingToBeOnchain));
 }
-
-Tester.prototype.testForcedExitRequestOneToken = async function (
-    from: Wallet,
-    to: ethers.Signer,
-    token: TokenLike,
-    amount: BigNumber
-) {
-    const toAddress = await to.getAddress();
-    const tokenAddress = await this.syncProvider.tokenSet.resolveTokenAddress(token);
-    let toBalanceBefore = await utils.getEthereumBalance(this.ethProvider, this.syncProvider, toAddress, token);
-
-    const transferHandle = await from.syncTransfer({
-        to: toAddress,
-        token,
-        amount
-    });
-    await transferHandle.awaitReceipt();
-
-    const status = await getStatus();
-
-    expect(status.status).to.eq('enabled', 'Forced exit requests status is disabled');
-
-    const tokenId = await this.syncProvider.tokenSet.resolveTokenId(token);
-    const request = await submitRequest(toAddress, [tokenId], status.request_fee);
-
-    const contractAddress = status.forced_exit_contract_address;
-
-    const amountToPay = BigNumber.from(request.priceInWei).add(BigNumber.from(request.id));
-
-    const gasPrice = (await to.provider?.getGasPrice()) as BigNumber;
-
-    const txHandle = await to.sendTransaction({
-        value: amountToPay,
-        gasPrice: gasPrice,
-        to: contractAddress
-    });
-
-    const receipt = await txHandle.wait();
-
-    // We have to wait for verification and execution of the
-    // block with the forced exit, so waiting for a while is fine
-    let timeout = 45000;
-    let interval = 500;
-
-    let timePassed = 0;
-
-    let spentOnGas = receipt.gasUsed.mul(gasPrice);
-    let spentTotal = spentOnGas.add(amountToPay);
-
-    let expectedToBalance = toBalanceBefore.add(amount).sub(spentTotal);
-    while (timePassed <= timeout) {
-        let balance = await getFullOnchainBalance(this, toAddress, tokenAddress);
-
-        if (balance.eq(expectedToBalance)) {
-            break;
-        }
-
-        await sleep(interval);
-        timePassed += interval;
-    }
-
-    let balance = await getFullOnchainBalance(this, toAddress, tokenAddress);
-
-    expect(balance.eq(expectedToBalance), 'The ForcedExit has not completed').to.be.true;
-};
