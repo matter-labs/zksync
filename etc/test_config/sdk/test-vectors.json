@@ -323,5 +323,83 @@
         }
       ]
     }
+  },
+  "txHashTest": {
+    "description": "Contains various zkSync transactions as inputs and their hashes as outputs",
+    "items": [
+      {
+        "inputs": {
+          "tx": {
+            "type": "Transfer",
+            "accountId": 123,
+            "from": "0xdddddddddddddddddddddddddddddddddddddddd",
+            "to": "0xeddddddddddddddddddddddddddddddddddddddd",
+            "token": 0,
+            "amount": 23,
+            "fee": 88,
+            "nonce": 123,
+            "validFrom": 12,
+            "validUntil": 1232321
+          }
+        },
+        "outputs": {
+          "hash": "sync-tx:9aa2460771722dfc15fc371e11d8412b63acdd0a483b888336234fc4b825b00b"
+        }
+      },
+      {
+        "inputs": {
+          "tx": {
+            "type": "Withdraw",
+            "accountId": 1,
+            "from": "0xddddddddddddddddddddddddddddddddddddddde",
+            "to": "0xadddddddddddddddddddddddddddddddddddddde",
+            "token": 12,
+            "amount": "123",
+            "fee": "897",
+            "nonce": 1,
+            "validFrom": 90809,
+            "validUntil": 873712938
+          }
+        },
+        "outputs": {
+          "hash": "sync-tx:84365ebb70259b8f6d6d9729e660f1ea9ecb2dbeeefd449bed54ac144d80a315"
+        }
+      },
+      {
+        "inputs": {
+          "tx": {
+            "type": "ChangePubKey",
+            "accountId": 2,
+            "account": "0xaddddddddddddddddddddddddddddddddddddd0e",
+            "newPkHash": "0xadddddddd1234ddddddddddddddddddddddddd0e",
+            "feeToken": 20,
+            "fee": 98,
+            "nonce": 32,
+            "validFrom": 177,
+            "validUntil": 52443
+          }
+        },
+        "outputs": {
+          "hash": "sync-tx:486629437f43e9d9383431e2d075ba194d9e549c08b03db234ca4edaebb2200f"
+        }
+      },
+      {
+        "inputs": {
+          "tx": {
+            "type": "ForcedExit",
+            "initiatorAccountId": 776,
+            "target": "0xadddddddd1234ddddd777ddddddddddddddddd0e",
+            "token": 5,
+            "fee": 123,
+            "nonce": 5,
+            "validFrom": 8978,
+            "validUntil": 57382678
+          }
+        },
+        "outputs": {
+          "hash": "sync-tx:0f5cba03550d1ab984d6f478c79aeb6f6961873df7a5876c9af4502364163d03"
+        }
+      }
+    ]
   }
 }
