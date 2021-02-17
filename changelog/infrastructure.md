@@ -11,6 +11,8 @@ components, the logs will have the following format:
 
 ### Removed
 
+- (`ci/Dockerfile`): `dockerci/Dockerfile` file with folder was removed , because it is outdated.
+
 ### Changed
 
 ### Added
