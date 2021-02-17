@@ -66,7 +66,7 @@ describe('Withdrawal helpers tests', () => {
         );
     });
 
-    it.only('forced_exit_request should recover mutiple tokens', async () => {
+    it('forced_exit_request should recover mutiple tokens', async () => {
         await tester.testForcedExitRequestMultipleTokens(
             alice,
             bob.ethSigner,

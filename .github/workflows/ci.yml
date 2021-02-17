@@ -126,6 +126,9 @@ jobs:
 
       - name: integration-rust-sdk
         run: ci_run zk test i rust-sdk
+      
+      - name: integration-withdrawal-helpers
+        run: ci_run zk test i withdrawal-helpers
 
 
   testkit:
