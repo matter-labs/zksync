@@ -135,7 +135,7 @@ export function web3Url() {
 
 export async function readZkSyncAbi() {
     const zksync = process.env.ZKSYNC_HOME;
-    const path = `${zksync}/contracts/artifacts/cache/solpp-generated-contracts/ZkSync.sol/ZkSync.json`
+    const path = `${zksync}/contracts/artifacts/cache/solpp-generated-contracts/ZkSync.sol/ZkSync.json`;
 
     const fileContent = (await fs.promises.readFile(path)).toString();
 

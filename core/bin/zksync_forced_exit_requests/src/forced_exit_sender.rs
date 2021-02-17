@@ -139,7 +139,7 @@ impl ForcedExitSender {
         Ok(transactions)
     }
 
-    // TODO: take the block timestamp into account instead of the now
+    // TODO: take the block timestamp into account instead of the now (ZKS-495)
     pub fn expired(&self, request: &ForcedExitRequest) -> bool {
         let now_millis = Utc::now().timestamp_millis();
         let created_at_millis = request.created_at.timestamp_millis();

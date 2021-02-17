@@ -12,9 +12,7 @@ use bigdecimal::{BigDecimal, FromPrimitive};
 use chrono::{Duration, Utc};
 use num::{bigint::ToBigInt, BigUint};
 use std::ops::Add;
-use std::str::FromStr;
 use std::time::Instant;
-
 // Workspace uses
 pub use zksync_api_client::rest::forced_exit_requests::{
     ForcedExitRegisterRequest, ForcedExitRequestStatus,
@@ -211,6 +209,7 @@ pub fn api_scope(
 #[cfg(test)]
 mod tests {
     use std::ops::Mul;
+    use std::str::FromStr;
 
     use num::BigUint;
 
