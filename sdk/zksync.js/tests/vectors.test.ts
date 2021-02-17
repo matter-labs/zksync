@@ -219,7 +219,7 @@ describe(txVectors['description'], function () {
 
 describe(txHashVectors['description'], function () {
     it('Transaction hash', async function () {
-        for(const item of txHashVectors.items) {
+        for (const item of txHashVectors.items) {
             const tx = item.inputs.tx;
             const expectedHash = item.outputs.hash;
             const hash = getTxHash(tx);
