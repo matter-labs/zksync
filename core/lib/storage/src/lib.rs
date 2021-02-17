@@ -101,7 +101,7 @@ mod utils;
 use forced_exit_requests::ForcedExitRequestsSchema;
 
 pub use crate::connection::ConnectionPool;
-pub type QueryResult<T> = Result<T, anyhow::Error>;
+pub type QueryResult<T, E = anyhow::Error> = Result<T, E>;
 
 /// The maximum possible block number in the storage.
 pub const MAX_BLOCK_NUMBER: BlockNumber = BlockNumber(u32::MAX);

@@ -6,12 +6,12 @@ import './change-pub-key';
 import './withdrawal-helpers';
 import './forced-exit-requests';
 
-import { loadTestConfig } from './helpers';
+import { loadTestConfig } from 'reading-tool';
 
 const TX_AMOUNT = utils.parseEther('1');
 const DEPOSIT_AMOUNT = TX_AMOUNT.mul(200);
 
-const TEST_CONFIG = loadTestConfig();
+const TEST_CONFIG = loadTestConfig(true);
 
 // The token here should have the ERC20 implementation from RevertTransferERC20.sol
 const erc20Token = 'wBTC';

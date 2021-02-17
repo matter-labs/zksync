@@ -17,4 +17,4 @@ mod executor;
 mod journal;
 mod scenarios;
 mod session;
-mod test_wallet;
+mod wallet;

@@ -111,7 +111,6 @@ pub async fn perform_basic_tests() {
 
     verify_restore(
         &testkit_config.web3_url,
-        testkit_config.available_block_chunk_sizes.clone(),
         &contracts,
         fee_account_address,
         test_setup.get_accounts_state().await,

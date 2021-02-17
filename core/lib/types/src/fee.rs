@@ -3,6 +3,7 @@ use num::BigUint;
 use serde::{Deserialize, Serialize};
 
 use crate::helpers::{closest_packable_fee_amount, pack_fee_amount, unpack_fee_amount};
+use crate::tokens::ChangePubKeyFeeTypeArg;
 use zksync_utils::{round_precision, BigUintSerdeAsRadix10Str};
 
 /// Type of the fee calculation pattern.
@@ -15,10 +16,7 @@ pub enum OutputFeeType {
     TransferToNew,
     Withdraw,
     FastWithdraw,
-    ChangePubKey {
-        #[serde(rename = "onchainPubkeyAuth")]
-        onchain_pubkey_auth: bool,
-    },
+    ChangePubKey(ChangePubKeyFeeTypeArg),
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]

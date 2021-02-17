@@ -13,6 +13,9 @@ operator_commit_eth_addr="0xde03a0B5963f75f1C8485B355fF6D30f3093BDE7"
 
 [chain.state_keeper]
 fee_account_addr="0xde03a0B5963f75f1C8485B355fF6D30f3093BDE7"
+last_tx_signer_used="false"
+last_tx_signer_address="0x36615cf349d7f6344891b1e7ca7c72883f5dc049"
+last_tx_signer_private_key="0x03c807e375d9a70fb5f21984496e018baed148dad00829b58d7ca9e557f2998c"
 
 [api.admin]
 # Secret for the authorization tokens generation
