@@ -23,13 +23,13 @@ use zksync_api::core_api_client::CoreApiClient;
 use zksync_core::eth_watch::{get_contract_events, get_web3_block_number, WatcherMode};
 use zksync_types::forced_exit_requests::FundsReceivedEvent;
 
+use super::prepare_forced_exit_sender::prepare_forced_exit_sender_account;
+
+use super::ForcedExitSender;
+
 /// As `infura` may limit the requests, upon error we need to wait for a while
 /// before repeating the request.
 const RATE_LIMIT_DELAY: Duration = Duration::from_secs(30);
-
-use crate::prepare_forced_exit_sender;
-
-use super::ForcedExitSender;
 
 struct ContractTopics {
     pub funds_received: Hash,
@@ -45,6 +45,7 @@ impl ContractTopics {
         }
     }
 }
+
 pub struct EthClient {
     web3: Web3<Http>,
     forced_exit_contract: Contract<Http>,
@@ -115,31 +116,24 @@ struct ForcedExitContractWatcher {
 
 // Usually blocks are created much slower (at rate 1 block per 10-20s),
 // but the block time falls through time, so just to double-check
-const MILLIS_PER_BLOCK: i64 = 7000;
+const MILLIS_PER_BLOCK: u64 = 7000;
 
 // Returns number of blocks that should have been created during the time
 fn time_range_to_block_diff(from: DateTime<Utc>, to: DateTime<Utc>) -> u64 {
-    let millis_from = from.timestamp_millis();
-    let millis_to = to.timestamp_millis();
+    // Timestamps should never be negative
+    let millis_from: u64 = from.timestamp_millis().try_into().unwrap();
+    let millis_to: u64 = to.timestamp_millis().try_into().unwrap();
 
-    if millis_to >= millis_from {
-        ((millis_to - millis_from) / MILLIS_PER_BLOCK)
-            .try_into()
-            .unwrap()
-    } else {
-        0u64
-    }
+    // It does not matter whether to ceil or floor the division
+    millis_to.saturating_sub(millis_from) / MILLIS_PER_BLOCK
 }
 
 impl ForcedExitContractWatcher {
     async fn restore_state_from_eth(&mut self, block: u64) -> anyhow::Result<()> {
-        //let last_block = self.eth_client.get_block_number().await.expect("Failed to restore ");
-
         let mut storage = self.connection_pool.access_storage().await?;
         let mut fe_schema = storage.forced_exit_requests_schema();
 
         let oldest_request = fe_schema.get_oldest_unfulfilled_request().await?;
-
         let wait_confirmations = self.config.forced_exit_requests.wait_confirmations;
 
         // No oldest request means that there are no requests that were possibly ignored
@@ -161,7 +155,6 @@ impl ForcedExitContractWatcher {
         Ok(())
     }
 
-    // TODO try to move it to eth client
     fn is_backoff_requested(&self, error: &anyhow::Error) -> bool {
         error.to_string().contains("429 Too Many Requests")
     }
@@ -298,11 +291,15 @@ pub fn run_forced_exit_contract_watcher(
     tokio::spawn(async move {
         // It is fine to unwrap here, since without it there is not way we
         // can be sure that the forced exit sender will work properly
-        prepare_forced_exit_sender(connection_pool.clone(), core_api_client.clone(), &config)
-            .await
-            .unwrap();
+        prepare_forced_exit_sender_account(
+            connection_pool.clone(),
+            core_api_client.clone(),
+            &config,
+        )
+        .await
+        .unwrap();
 
-        // It is ok to unwrap here, since if fe_sender is not created, then
+        // It is ok to unwrap here, since if forced_exit_sender is not created, then
         // the watcher is meaningless
         let mut forced_exit_sender = ForcedExitSender::new(
             core_api_client.clone(),
@@ -312,10 +309,11 @@ pub fn run_forced_exit_contract_watcher(
         .await
         .unwrap();
 
-        forced_exit_sender
-            .await_unconfirmed()
-            .await
-            .expect("Unexpected error while trying to wait for unconfirmed transactions");
+        // In case there were some transactions which were submitted
+        // but were not committed we will try to wait until they are committed
+        forced_exit_sender.await_unconfirmed().await.expect(
+            "Unexpected error while trying to wait for unconfirmed forced_exit transactions",
+        );
 
         let contract_watcher = ForcedExitContractWatcher {
             connection_pool,

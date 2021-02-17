@@ -14,7 +14,6 @@ use num::{bigint::ToBigInt, BigUint};
 use std::ops::Add;
 use std::str::FromStr;
 use std::time::Instant;
-use zksync_api_client::rest::forced_exit_requests::ConfigInfo;
 
 // Workspace uses
 pub use zksync_api_client::rest::forced_exit_requests::{
@@ -24,6 +23,7 @@ pub use zksync_api_client::rest::v1::{
     FastProcessingQuery, IncomingTx, IncomingTxBatch, Receipt, TxData,
 };
 
+use zksync_api_client::rest::forced_exit_requests::ConfigInfo;
 use zksync_config::ZkSyncConfig;
 use zksync_storage::ConnectionPool;
 use zksync_types::{
@@ -69,8 +69,6 @@ impl ApiForcedExitRequestsData {
     }
 }
 
-// Server implementation
-
 async fn get_status(
     data: web::Data<ApiForcedExitRequestsData>,
 ) -> JsonResult<ForcedExitRequestStatus> {
@@ -102,6 +100,12 @@ pub async fn submit_request(
         ApiError::internal("")
     })?;
 
+    if params.tokens.len() > data.max_tokens_per_request as usize {
+        return Err(ApiError::bad_request(
+            "Maximum number of tokens per FE request exceeded",
+        ));
+    }
+
     data.forced_exit_checker
         .check_forced_exit(&mut storage, params.target)
         .await
@@ -112,16 +116,10 @@ pub async fn submit_request(
 
     let user_fee = params.price_in_wei.to_bigint().unwrap();
     let user_fee = BigDecimal::from(user_fee);
-    let user_scaling_coefficient = BigDecimal::from_str("1.05").unwrap();
-    let user_scaled_fee = user_scaling_coefficient * user_fee;
 
-    if user_scaled_fee < price_of_request {
-        return Err(ApiError::bad_request("Not enough fee"));
-    }
-
-    if params.tokens.len() > data.max_tokens_per_request as usize {
+    if user_fee != price_of_request {
         return Err(ApiError::bad_request(
-            "Maximum number of tokens per FE request exceeded",
+            "The amount should be exactly the price of the supplied withdrawals",
         ));
     }
 
@@ -232,14 +230,6 @@ mod tests {
     }
 
     impl TestServer {
-        // It should be used in the test for submitting requests
-        #[allow(dead_code)]
-        async fn new() -> anyhow::Result<(Client, Self)> {
-            let cfg = TestServerConfig::default();
-
-            Self::from_config(cfg).await
-        }
-
         async fn from_config(cfg: TestServerConfig) -> anyhow::Result<(Client, Self)> {
             let pool = cfg.pool.clone();
 
@@ -388,12 +378,11 @@ mod tests {
     async fn test_forced_exit_requests_submit() -> anyhow::Result<()> {
         let price_per_token: i64 = 1000000000000000000;
         let max_tokens_per_request = 3;
-        let config = ForcedExitRequestsConfig {
+        let server_config = get_test_config_from_forced_exit_requests(ForcedExitRequestsConfig {
             max_tokens_per_request,
             price_per_token,
             ..ForcedExitRequestsConfig::from_env()
-        };
-        let server_config = get_test_config_from_forced_exit_requests(config);
+        });
 
         let (client, server) = TestServer::from_config(server_config).await?;
 

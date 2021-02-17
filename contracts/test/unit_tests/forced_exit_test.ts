@@ -1,7 +1,6 @@
-const { expect } = require('chai');
-const hardhat = require('hardhat');
-
+import { expect } from 'chai';
 import { Signer, Contract, ContractTransaction, utils, BigNumber } from 'ethers';
+import * as hardhat from 'hardhat';
 
 const TX_AMOUNT = utils.parseEther('1.0');
 
@@ -26,7 +25,6 @@ describe('ForcedExit unit tests', function () {
         await setReceiverHandle.wait();
 
         const receiverBalanceBefore = await wallet3.getBalance();
-
         const txHandle = await wallet2.sendTransaction({
             to: forcedExitContract.address,
             value: TX_AMOUNT
@@ -37,10 +35,8 @@ describe('ForcedExit unit tests', function () {
         const receivedFundsAmount: BigNumber = forcedExitContract.interface.parseLog(txReceipt.logs[0]).args[0];
 
         expect(receivedFundsAmount.eq(TX_AMOUNT), "Didn't emit the amount of sent data").to.be.true;
-
         const receiverBalanceAfter = await wallet3.getBalance();
         const diff = receiverBalanceAfter.sub(receiverBalanceBefore);
-
         expect(diff.eq(TX_AMOUNT), 'Funds were not redirected to the receiver').to.be.true;
     });
 
@@ -71,7 +67,7 @@ describe('ForcedExit unit tests', function () {
         expect(diff.eq(expectedDiff), 'Pending funds have not arrived to the account').to.be.true;
     });
 
-    it('Check redirection', async () => {
+    it('Check disabling and enabling', async () => {
         const disableHandle = await forcedExitContract.disable();
         await disableHandle.wait();
 

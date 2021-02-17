@@ -3,9 +3,10 @@ use std::{
     ops::{AddAssign, Sub},
 };
 
-use franklin_crypto::bellman::PrimeFieldRepr;
+use chrono::Utc;
 use num::{BigUint, FromPrimitive};
 use tokio::time;
+
 use zksync_config::ZkSyncConfig;
 use zksync_storage::{
     chain::operations_ext::records::TxReceiptResponse, ConnectionPool, StorageProcessor,
@@ -17,15 +18,12 @@ use zksync_types::{
     AccountId, Address, Nonce, TokenId, ZkSyncTx,
 };
 
-use chrono::Utc;
 use zksync_api::core_api_client::CoreApiClient;
 use zksync_types::ForcedExit;
 use zksync_types::SignedZkSyncTx;
 
-use super::PrivateKey;
-use super::{Engine, Fs, FsRepr};
-
-use zksync_crypto::ff::PrimeField;
+use super::utils::{Engine, PrivateKey};
+use crate::utils::read_signing_key;
 
 // We try to process a request 3 times before sending warnings in the console
 const PROCESSING_ATTEMPTS: u8 = 3;
@@ -37,6 +35,7 @@ pub struct ForcedExitSender {
     forced_exit_sender_account_id: AccountId,
     sender_private_key: PrivateKey<Engine>,
 }
+
 async fn get_forced_exit_sender_account_id(
     connection_pool: ConnectionPool,
     config: &ZkSyncConfig,
@@ -49,14 +48,6 @@ async fn get_forced_exit_sender_account_id(
         .await?;
 
     account_id.ok_or_else(|| anyhow::Error::msg("1"))
-}
-
-fn read_signing_key(private_key: &[u8]) -> anyhow::Result<PrivateKey<Engine>> {
-    let mut fs_repr = FsRepr::default();
-    fs_repr.read_be(private_key)?;
-    Ok(PrivateKey::<Engine>(
-        Fs::from_repr(fs_repr).expect("couldn't read private key from repr"),
-    ))
 }
 
 impl ForcedExitSender {
@@ -90,10 +81,9 @@ impl ForcedExitSender {
 
         let id_space_size = BigUint::from_i64(id_space_size).unwrap();
 
+        // Taking to the power of 1 and finding mod
+        // is the only way to find mod of BigUint
         let one = BigUint::from_u8(1u8).unwrap();
-
-        // Taking to the power of 1 and finding mod is the only way to find mod of
-        // the BigUint
         let id = amount.modpow(&one, &id_space_size);
 
         // After extracting the id we need to delete it
@@ -118,7 +108,7 @@ impl ForcedExitSender {
             TimeRange::default(),
             &self.sender_private_key,
         )
-        .expect("Failed to create signed transaction from ForcedExit");
+        .expect("Failed to create signed ForcedExit transaction");
 
         SignedZkSyncTx {
             tx: ZkSyncTx::ForcedExit(Box::new(tx)),
@@ -149,7 +139,6 @@ impl ForcedExitSender {
         Ok(transactions)
     }
 
-    // TODO: take the block timestamp into account instead of the now
     pub fn expired(&self, request: &ForcedExitRequest) -> bool {
         let now_millis = Utc::now().timestamp_millis();
         let created_at_millis = request.created_at.timestamp_millis();
@@ -164,12 +153,13 @@ impl ForcedExitSender {
         let request = match request {
             Some(r) => r,
             None => {
+                // The request does not exit, we should not process it
                 return false;
             }
         };
 
         if request.fulfilled_at.is_some() {
-            // We should not re-process requests that were processed before
+            // We should not re-process requests that were fulfilled before
             return false;
         }
 
@@ -253,11 +243,7 @@ impl ForcedExitSender {
     ) -> anyhow::Result<()> {
         let mut fe_schema = storage.forced_exit_requests_schema();
 
-        fe_schema
-            .set_fulfilled_at(id, Utc::now())
-            .await
-            // TODO: Handle such cases gracefully, and not panic
-            .expect("An error occured, while fu;lfilling the request");
+        fe_schema.set_fulfilled_at(id, Utc::now()).await?;
 
         vlog::info!("FE request with id {} was fulfilled", id);
 

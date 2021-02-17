@@ -77,12 +77,7 @@ pub(super) fn start_server_thread_detached(
             let _panic_sentinel = ThreadPanicNotify(panic_notify.clone());
 
             actix_rt::System::new("api-server").block_on(async move {
-                let api_v01 = ApiV01::new(
-                    connection_pool,
-                    contract_address,
-                    config.clone(),
-                    fee_ticker.clone(),
-                );
+                let api_v01 = ApiV01::new(connection_pool, contract_address, config.clone());
                 api_v01.spawn_network_status_updater(panic_notify);
 
                 start_server(api_v01, fee_ticker, sign_verifier, listen_addr).await;

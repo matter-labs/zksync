@@ -47,6 +47,9 @@ impl<'a, 'c> ForcedExitRequestsSchema<'a, 'c> {
             target_str,
             &tokens,
             price_in_wei,
+            // It is possible to generate created_at inside the db
+            // However, since the valid_until is generated outside the db (using config params)
+            // it was decided to set both values in the server for consistency
             request.created_at,
             request.valid_until
         )

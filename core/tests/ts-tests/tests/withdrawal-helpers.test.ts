@@ -1,13 +1,12 @@
-import { wallet, Wallet } from 'zksync';
+import { Wallet } from 'zksync';
 import { Tester } from './tester';
-import { ethers, utils } from 'ethers';
+import { utils } from 'ethers';
 import './priority-ops';
 import './change-pub-key';
 import './withdrawal-helpers';
 import './forced-exit-requests';
 
 import { loadTestConfig } from 'reading-tool';
-import { Address } from 'cluster';
 
 const TX_AMOUNT = utils.parseEther('0.1');
 const DEPOSIT_AMOUNT = TX_AMOUNT.mul(2000);

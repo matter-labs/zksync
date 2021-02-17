@@ -5,18 +5,14 @@ use actix_web::{web, Scope};
 
 // Workspace uses
 pub use zksync_api_client::rest::v1::{
-    Client, ClientError, Pagination, PaginationQuery, MAX_LIMIT,
+    Client, ClientError, FastProcessingQuery, IncomingTx, IncomingTxBatch, Pagination,
+    PaginationQuery, Receipt, TxData, MAX_LIMIT,
 };
 use zksync_config::ZkSyncConfig;
 use zksync_storage::ConnectionPool;
 
-pub use zksync_api_client::rest::v1::{
-    FastProcessingQuery, IncomingTx, IncomingTxBatch, Receipt, TxData,
-};
-
-use crate::api_server::forced_exit_checker::ForcedExitChecker;
-
 // Local uses
+use crate::api_server::forced_exit_checker::ForcedExitChecker;
 mod v01;
 
 pub(crate) fn api_scope(connection_pool: ConnectionPool, config: &ZkSyncConfig) -> Scope {

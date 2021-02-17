@@ -1,13 +1,11 @@
 //! Declaration of the API structure.
 
 use crate::{
-    api_server::forced_exit_checker::ForcedExitChecker,
     api_server::rest::{
         helpers::*,
         v01::{caches::Caches, network_status::SharedNetworkStatus},
     },
     core_api_client::{CoreApiClient, EthBlockId},
-    fee_ticker::TickerRequest,
 };
 use actix_web::{web, HttpResponse, Result as ActixResult};
 use futures::channel::mpsc;
@@ -26,7 +24,7 @@ use zksync_types::{block::ExecutedOperations, BlockNumber, PriorityOp, H160, H25
 ///
 /// Once a new API is designed, it will be created as `ApiV1` structure, so that
 /// each API version is encapsulated inside one type.
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct ApiV01 {
     pub(crate) caches: Caches,
     pub(crate) connection_pool: ConnectionPool,
@@ -34,8 +32,6 @@ pub struct ApiV01 {
     pub(crate) network_status: SharedNetworkStatus,
     pub(crate) contract_address: String,
     pub(crate) config: ZkSyncConfig,
-    pub(crate) forced_exit_checker: ForcedExitChecker,
-    pub(crate) ticker_request_sender: mpsc::Sender<TickerRequest>,
 }
 
 impl ApiV01 {
@@ -43,18 +39,14 @@ impl ApiV01 {
         connection_pool: ConnectionPool,
         contract_address: H160,
         config: ZkSyncConfig,
-        ticker_request_sender: mpsc::Sender<TickerRequest>,
     ) -> Self {
         let api_client = CoreApiClient::new(config.api.private.url.clone());
-
         Self {
             caches: Caches::new(config.api.common.caches_size),
             connection_pool,
             api_client,
             network_status: SharedNetworkStatus::default(),
             contract_address: format!("{:?}", contract_address),
-            forced_exit_checker: ForcedExitChecker::new(&config),
-            ticker_request_sender,
             config,
         }
     }

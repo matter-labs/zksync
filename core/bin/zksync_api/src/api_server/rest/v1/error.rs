@@ -35,6 +35,7 @@ impl Error {
         Self::with_code(StatusCode::NOT_IMPLEMENTED, title)
     }
 
+    /// Creates a new Error with the NOT_FOUND (404) status code.
     pub fn not_found(title: impl Display) -> Self {
         Self::with_code(StatusCode::NOT_FOUND, title)
     }
