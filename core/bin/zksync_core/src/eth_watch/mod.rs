@@ -31,7 +31,7 @@ use self::{
     received_ops::{sift_outdated_ops, ReceivedPriorityOp},
 };
 
-pub use client::{get_contract_events, get_web3_block_number, EthHttpClient};
+pub use client::{get_web3_block_number, EthHttpClient};
 use zksync_config::ZkSyncConfig;
 
 use zksync_eth_client::ethereum_gateway::EthereumGateway;

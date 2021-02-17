@@ -1,5 +1,5 @@
 use chrono::{DateTime, Utc};
-use ethabi::Hash;
+use ethabi::{Address, Hash};
 use std::{
     convert::TryFrom,
     time::{Duration, Instant},
@@ -10,7 +10,7 @@ use tokio::time;
 use web3::{
     contract::Contract,
     transports::Http,
-    types::{BlockNumber, Log},
+    types::{BlockNumber, FilterBuilder, Log},
     Web3,
 };
 use zksync_config::ZkSyncConfig;
@@ -20,7 +20,7 @@ use zksync_contracts::forced_exit_contract;
 use zksync_types::H160;
 
 use zksync_api::core_api_client::CoreApiClient;
-use zksync_core::eth_watch::{get_contract_events, get_web3_block_number, WatcherMode};
+use zksync_core::eth_watch::{get_web3_block_number, WatcherMode};
 use zksync_types::forced_exit_requests::FundsReceivedEvent;
 
 use super::prepare_forced_exit_sender::prepare_forced_exit_sender_account;
@@ -326,4 +326,36 @@ pub fn run_forced_exit_contract_watcher(
 
         contract_watcher.run().await;
     })
+}
+
+pub async fn get_contract_events<T>(
+    web3: &Web3<Http>,
+    contract_address: Address,
+    from: BlockNumber,
+    to: BlockNumber,
+    topics: Vec<Hash>,
+) -> anyhow::Result<Vec<T>>
+where
+    T: TryFrom<Log>,
+    T::Error: Debug,
+{
+    let filter = FilterBuilder::default()
+        .address(vec![contract_address])
+        .from_block(from)
+        .to_block(to)
+        .topics(Some(topics), None, None, None)
+        .build();
+
+    web3.eth()
+        .logs(filter)
+        .await?
+        .into_iter()
+        .filter_map(|event| {
+            if let Ok(event) = T::try_from(event) {
+                Some(Ok(event))
+            } else {
+                None
+            }
+        })
+        .collect()
 }

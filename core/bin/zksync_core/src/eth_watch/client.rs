@@ -144,40 +144,6 @@ impl EthClient for EthHttpClient {
     }
 }
 
-pub async fn get_contract_events<T>(
-    web3: &Web3<http::Http>,
-    contract_address: Address,
-    from: BlockNumber,
-    to: BlockNumber,
-    topics: Vec<Hash>,
-) -> anyhow::Result<Vec<T>>
-where
-    T: TryFrom<Log>,
-    T::Error: Debug,
-{
-    let filter = FilterBuilder::default()
-        .address(vec![contract_address])
-        .from_block(from)
-        .to_block(to)
-        .topics(Some(topics), None, None, None)
-        .build();
-
-    web3.eth()
-        .logs(filter)
-        .await?
-        .into_iter()
-        .filter_map(|event| {
-            if let Ok(event) = T::try_from(event) {
-                Some(Ok(event))
-            } else {
-                None
-            }
-            // TODO: remove after update
-            // .map_err(|e| format_err!("Failed to parse event log from ETH: {:?}", e))
-        })
-        .collect()
-}
-
 pub async fn get_web3_block_number(web3: &Web3<http::Http>) -> anyhow::Result<u64> {
     Ok(web3.eth().block_number().await?.as_u64())
 }
