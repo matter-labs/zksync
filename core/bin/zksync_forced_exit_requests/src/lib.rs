@@ -1,19 +1,7 @@
-use std::{convert::TryFrom, str::FromStr, time::Instant};
-
-use anyhow::format_err;
-use api::Accounts;
-use ethabi::{Contract as ContractAbi, Hash};
 use num::BigUint;
-use std::fmt::Debug;
+use std::str::FromStr;
 use std::time::Duration;
 use tokio::task::JoinHandle;
-use web3::{
-    api,
-    contract::{Contract, Options},
-    transports::Http,
-    types::{BlockNumber, FilterBuilder, Log},
-    Web3,
-};
 use zksync_config::ZkSyncConfig;
 use zksync_storage::{
     chain::operations_ext::records::TxReceiptResponse, ConnectionPool, StorageProcessor,
@@ -22,8 +10,8 @@ use zksync_storage::{
 use zksync_api::core_api_client::CoreApiClient;
 
 use zksync_types::{
-    tx::{EthSignData, PackedEthSignature, TimeRange, TxEthSignature, TxHash, TxSignature},
-    Account, AccountId, Address, PubKeyHash, ZkSyncTx, H256,
+    tx::{EthSignData, PackedEthSignature, TimeRange, TxEthSignature, TxHash},
+    AccountId, Address, PubKeyHash, ZkSyncTx, H256,
 };
 
 pub mod eth_watch;
@@ -47,13 +35,9 @@ pub type Fs = <Engine as JubjubEngine>::Fs;
 use zksync_crypto::ff::PrimeField;
 
 use tokio::time;
-use zksync_eth_signer::{EthereumSigner, PrivateKeySigner};
 
 use zksync_types::Nonce;
 use zksync_types::TokenId;
-
-#[macro_use]
-use vlog;
 
 #[must_use]
 pub fn run_forced_exit_requests_actors(
@@ -61,16 +45,8 @@ pub fn run_forced_exit_requests_actors(
     config: ZkSyncConfig,
 ) -> JoinHandle<()> {
     let core_api_client = CoreApiClient::new(config.api.private.url.clone());
-
-    let eth_watch_handle =
-        eth_watch::run_forced_exit_contract_watcher(core_api_client, pool, config);
-
-    eth_watch_handle
+    eth_watch::run_forced_exit_contract_watcher(core_api_client, pool, config)
 }
-
-// pub fn get_sk_from_hex(hex_string: String) -> PrivateKey<Engine> {
-
-// }
 
 // This private key is for testing purposes only and shoud not be used in production
 // The address should be 0xe1faB3eFD74A77C23B426c302D96372140FF7d0C
@@ -85,8 +61,8 @@ fn read_signing_key(private_key: &[u8]) -> anyhow::Result<PrivateKey<Engine>> {
     ))
 }
 
-pub async fn check_forced_exit_sender_prepared<'a>(
-    storage: &mut StorageProcessor<'a>,
+pub async fn check_forced_exit_sender_prepared(
+    storage: &mut StorageProcessor<'_>,
     sender_sk: &PrivateKey<Engine>,
     sender_address: Address,
 ) -> anyhow::Result<bool> {
@@ -109,8 +85,8 @@ pub async fn check_forced_exit_sender_prepared<'a>(
     }
 }
 
-pub async fn wait_for_account_id<'a>(
-    storage: &mut StorageProcessor<'a>,
+pub async fn wait_for_account_id(
+    storage: &mut StorageProcessor<'_>,
     sender_address: Address,
 ) -> anyhow::Result<AccountId> {
     vlog::info!("Forced exit sender account is not yet prepared. Waiting for account id...");
@@ -133,8 +109,8 @@ pub async fn wait_for_account_id<'a>(
     }
 }
 
-async fn get_receipt<'a>(
-    storage: &mut StorageProcessor<'a>,
+async fn get_receipt(
+    storage: &mut StorageProcessor<'_>,
     tx_hash: TxHash,
 ) -> anyhow::Result<Option<TxReceiptResponse>> {
     storage
@@ -144,8 +120,8 @@ async fn get_receipt<'a>(
         .await
 }
 
-pub async fn wait_for_change_pub_key_tx<'a>(
-    storage: &mut StorageProcessor<'a>,
+pub async fn wait_for_change_pub_key_tx(
+    storage: &mut StorageProcessor<'_>,
     tx_hash: TxHash,
 ) -> anyhow::Result<()> {
     vlog::info!(
@@ -165,7 +141,9 @@ pub async fn wait_for_change_pub_key_tx<'a>(
                     vlog::info!("Public key of the forced exit sender successfully set");
                     return Ok(());
                 } else {
-                    let fail_reason = receipt.fail_reason.unwrap_or(String::from("unknown"));
+                    let fail_reason = receipt
+                        .fail_reason
+                        .unwrap_or_else(|| String::from("unknown"));
                     panic!(
                         "Failed to set public for forced exit sedner. Reason: {}",
                         fail_reason
@@ -188,9 +166,6 @@ async fn get_verified_eth_sk(sender_address: Address) -> H256 {
 
     let pk_address = PackedEthSignature::address_from_private_key(&private_key).unwrap();
 
-    dbg!(pk_address.clone());
-    dbg!(sender_address.clone());
-
     if pk_address != sender_address {
         panic!("Private key provided does not correspond to the sender address");
     }
@@ -198,8 +173,8 @@ async fn get_verified_eth_sk(sender_address: Address) -> H256 {
     private_key
 }
 
-pub async fn register_signing_key<'a>(
-    storage: &mut StorageProcessor<'a>,
+pub async fn register_signing_key(
+    storage: &mut StorageProcessor<'_>,
     sender_id: AccountId,
     api_client: CoreApiClient,
     sender_address: Address,
@@ -211,10 +186,10 @@ pub async fn register_signing_key<'a>(
 
     // Unfortunately, currently the only way to create a CPK
     // transaction from eth_private_key is to cre
-    let mut cpk_tx = ChangePubKey::new_signed(
+    let cpk_tx = ChangePubKey::new_signed(
         sender_id,
         sender_address,
-        pub_key_hash.clone(),
+        pub_key_hash,
         TokenId::from_str("0").unwrap(),
         BigUint::from(0u8),
         Nonce::from_str("0").unwrap(),
@@ -269,8 +244,6 @@ pub async fn register_signing_key<'a>(
     Ok(())
 }
 
-fn verify_pub_key_hash() {}
-
 pub async fn prepare_forced_exit_sender(
     connection_pool: ConnectionPool,
     api_client: CoreApiClient,
@@ -307,29 +280,3 @@ pub async fn prepare_forced_exit_sender(
 
     Ok(())
 }
-
-// Inserts the forced exit sender account into db
-// should be used only for local setup/testing
-// pub fn insert_forced_exit_account(config: &ZkSyncConfig) {
-//     let pool = ConnectionPool::new(Some(1));
-
-//     vlog::info!("Inserting forced exit sender into db");
-
-//     let sender_account = Account::
-// }
-
-/*
-
-Polling like eth_watch
-
-If sees a funds_received -> extracts id
-
-Get_by_id => gets by id
-
-If sum is enough => set_fullfilled_and_send_tx
-
-
-FE requests consist of 2 (or 3 if needed actors)
-
-
-**/

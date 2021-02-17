@@ -5,7 +5,7 @@ pragma solidity ^0.7.0;
 pragma experimental ABIEncoderV2;
 
 import "./Utils.sol";
-import "./Ownable.sol"; 
+import "./Ownable.sol";
 import "./ReentrancyGuard.sol";
 
 contract ForcedExit is Ownable, ReentrancyGuard {
@@ -22,9 +22,7 @@ contract ForcedExit is Ownable, ReentrancyGuard {
         receiver = payable(_master);
     }
 
-    event FundsReceived(
-        uint256 _amount
-    );
+    event FundsReceived(uint256 _amount);
 
     function setReceiver(address payable _newReceiver) external {
         requireMaster(msg.sender);
@@ -44,25 +42,25 @@ contract ForcedExit is Ownable, ReentrancyGuard {
         enabled = true;
     }
 
-    // Withdraw funds that failed to reach zkSync due to out-of-gas 
+    // Withdraw funds that failed to reach zkSync due to out-of-gas
     function withdrawPendingFunds(address payable _to, uint128 amount) external nonReentrant {
         requireMaster(msg.sender);
 
         uint256 balance = address(this).balance;
 
         require(amount <= balance, "The balance is lower than the amount");
-        
+
         (bool success, ) = _to.call{value: amount}("");
         require(success, "d"); // ETH withdraw failed
     }
 
-    // We ave to use fallback instead of `receive` since the ethabi 
+    // We ave to use fallback instead of `receive` since the ethabi
     // library can't decode the receive function:
     // https://github.com/rust-ethereum/ethabi/issues/185
     fallback() external payable nonReentrant {
         require(enabled, "Contract is disabled");
         require(receiver != address(0), "Receiver must be non-zero");
-        
+
         (bool success, ) = receiver.call{value: msg.value}("");
         require(success, "d"); // ETH withdraw failed
 

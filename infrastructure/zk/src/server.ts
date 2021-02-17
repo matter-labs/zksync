@@ -15,6 +15,10 @@ export async function server() {
         child.kill('SIGINT');
     });
 
+    // By the time this function is run the server is most likely not be running yet
+    // However, it does not matter, since the only thing the function does is depositing
+    // to the forced exit sender account, and server should be capable of recognizing
+    // priority operaitons that happened before it was booted
     await prepareForcedExitRequestAccount();
 }
 
@@ -47,7 +51,7 @@ async function prepareForcedExitRequestAccount() {
 
     // This is the private key of the first test account
     const ethProvider = new ethers.providers.JsonRpcProvider('http://localhost:8545');
-    const ethRichWallet = new ethers.Wallet('0x7726827caac94a7f9e1b160f7ea819f172f7b6f9d2a97f992c38edeab82d4110'); 
+    const ethRichWallet = new ethers.Wallet('0x7726827caac94a7f9e1b160f7ea819f172f7b6f9d2a97f992c38edeab82d4110');
 
     const mainZkSyncContract = new ethers.Contract(
         process.env.CONTRACTS_CONTRACT_ADDR as string,
@@ -56,12 +60,12 @@ async function prepareForcedExitRequestAccount() {
     );
     const gasPrice = await ethProvider.getGasPrice();
 
-    const ethTransaction = await mainZkSyncContract.depositETH(forcedExitAccount, {
+    const ethTransaction = (await mainZkSyncContract.depositETH(forcedExitAccount, {
         // The amount to deposit does not really matter
         value: ethers.utils.parseEther('1.0'),
         gasLimit: ethers.BigNumber.from('200000'),
-        gasPrice,
-    }) as ethers.ContractTransaction;
+        gasPrice
+    })) as ethers.ContractTransaction;
 
     await ethTransaction.wait();
 

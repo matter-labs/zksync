@@ -10,8 +10,7 @@ pub type ForcedExitRequestId = i64;
 use anyhow::format_err;
 use ethabi::{decode, ParamType};
 use std::convert::TryFrom;
-use std::convert::TryInto;
-use zksync_basic_types::{Log, U256};
+use zksync_basic_types::Log;
 
 use crate::tx::TxHash;
 
@@ -55,11 +54,10 @@ impl TryFrom<Log> for FundsReceivedEvent {
         )
         .map_err(|e| format_err!("Event data decode: {:?}", e))?;
 
-        let bytes = dec_ev.remove(0).to_bytes().unwrap();
-        let amount = u128::from_be_bytes(bytes.try_into().unwrap());
+        let amount = dec_ev.remove(0).to_uint().unwrap();
 
         Ok(FundsReceivedEvent {
-            amount: BigUint::from(amount),
+            amount: BigUint::from(amount.as_u128()),
         })
     }
 }

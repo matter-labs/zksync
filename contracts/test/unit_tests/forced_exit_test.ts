@@ -1,5 +1,4 @@
 const { expect } = require('chai');
-const { getCallRevertReason } = require('./common');
 const hardhat = require('hardhat');
 
 import { Signer, Contract, ContractTransaction, utils, BigNumber } from 'ethers';
@@ -13,7 +12,7 @@ describe('ForcedExit unit tests', function () {
     let wallet1: Signer;
     let wallet2: Signer;
     let wallet3: Signer;
-    
+
     before(async () => {
         [wallet1, wallet2, wallet3] = await hardhat.ethers.getSigners();
 
@@ -32,15 +31,12 @@ describe('ForcedExit unit tests', function () {
             to: forcedExitContract.address,
             value: TX_AMOUNT
         });
-        const txReceipt = await txHandle.wait();   
+        const txReceipt = await txHandle.wait();
 
         expect(txReceipt.logs.length == 1, 'No events were emitted').to.be.true;
-        const receivedFundsAmount: BigNumber = forcedExitContract
-            .interface
-            .parseLog(txReceipt.logs[0])
-            .args[0]; 
+        const receivedFundsAmount: BigNumber = forcedExitContract.interface.parseLog(txReceipt.logs[0]).args[0];
 
-        expect(receivedFundsAmount.eq(TX_AMOUNT), 'Didn\'t emit the amount of sent data').to.be.true;
+        expect(receivedFundsAmount.eq(TX_AMOUNT), "Didn't emit the amount of sent data").to.be.true;
 
         const receiverBalanceAfter = await wallet3.getBalance();
         const diff = receiverBalanceAfter.sub(receiverBalanceBefore);
@@ -63,7 +59,10 @@ describe('ForcedExit unit tests', function () {
         await destructHandle.wait();
         const masterBalanceBefore = await wallet1.getBalance();
 
-        const withdrawHandle: ContractTransaction = await forcedExitContract.withdrawPendingFunds(wallet1.getAddress(), TX_AMOUNT);
+        const withdrawHandle: ContractTransaction = await forcedExitContract.withdrawPendingFunds(
+            wallet1.getAddress(),
+            TX_AMOUNT
+        );
         const withdrawReceipt = await withdrawHandle.wait();
         const masterBalanceAfter = await wallet1.getBalance();
 
@@ -72,7 +71,6 @@ describe('ForcedExit unit tests', function () {
         expect(diff.eq(expectedDiff), 'Pending funds have not arrived to the account').to.be.true;
     });
 
-    
     it('Check redirection', async () => {
         const disableHandle = await forcedExitContract.disable();
         await disableHandle.wait();
@@ -88,11 +86,11 @@ describe('ForcedExit unit tests', function () {
             failed1 = true;
         }
 
-        expect(failed1, "Transfer to the disabled contract does not fail").to.be.true;
+        expect(failed1, 'Transfer to the disabled contract does not fail').to.be.true;
 
         const enableHandle = await forcedExitContract.enable();
         await enableHandle.wait();
-    
+
         const txHandle = await wallet2.sendTransaction({
             to: forcedExitContract.address,
             value: TX_AMOUNT

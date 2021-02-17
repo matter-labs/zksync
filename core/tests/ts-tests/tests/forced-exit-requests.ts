@@ -6,7 +6,6 @@ import { Wallet, types, utils } from 'zksync';
 import { BigNumber, ethers } from 'ethers';
 import * as path from 'path';
 
-import { loadTestConfig } from './helpers';
 import { Address } from 'zksync/build/types';
 import { sleep } from 'zksync/build/utils';
 
@@ -20,16 +19,21 @@ type TokenLike = types.TokenLike;
 
 declare module './tester' {
     interface Tester {
-        testForcedExitRequestOneToken(from: Wallet, to: ethers.Signer, token: TokenLike, value: BigNumber): Promise<void>;
+        testForcedExitRequestOneToken(
+            from: Wallet,
+            to: ethers.Signer,
+            token: TokenLike,
+            value: BigNumber
+        ): Promise<void>;
     }
 }
 
 interface StatusResponse {
-    status: "enabled" | "disabled",
-    request_fee: string,
-    max_tokens_per_request: number,
-    recomended_tx_interval_millis: number,
-    forced_exit_contract_address: Address
+    status: 'enabled' | 'disabled';
+    request_fee: string;
+    max_tokens_per_request: number;
+    recomended_tx_interval_millis: number;
+    forced_exit_contract_address: Address;
 }
 
 async function getStatus() {
@@ -38,13 +42,9 @@ async function getStatus() {
     const response = await fetch(endpoint);
 
     return (await response.json()) as StatusResponse;
-} 
+}
 
-async function submitRequest(
-    address: string,
-    tokens: number[],
-    price_in_wei: string
-) {
+async function submitRequest(address: string, tokens: number[], price_in_wei: string) {
     const endpoint = `${apiUrl}/submit`;
 
     const data = {
@@ -56,7 +56,7 @@ async function submitRequest(
     const response = await fetch(endpoint, {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json'
+            'Content-Type': 'application/json'
         },
         redirect: 'follow',
         body: JSON.stringify(data)
@@ -65,11 +65,7 @@ async function submitRequest(
     return await response.json();
 }
 
-async function getFullOnchainBalance(
-    tester: Tester,
-    address: Address,
-    tokenAddress: Address
-) {
+async function getFullOnchainBalance(tester: Tester, address: Address, tokenAddress: Address) {
     const onchainBalance = await utils.getEthereumBalance(
         tester.ethProvider,
         tester.syncProvider,
@@ -89,17 +85,12 @@ Tester.prototype.testForcedExitRequestOneToken = async function (
 ) {
     const toAddress = await to.getAddress();
     const tokenAddress = await this.syncProvider.tokenSet.resolveTokenAddress(token);
-    let toBalanceBefore = await utils.getEthereumBalance(
-        this.ethProvider,
-        this.syncProvider,
-        toAddress,
-        token
-    );
+    let toBalanceBefore = await utils.getEthereumBalance(this.ethProvider, this.syncProvider, toAddress, token);
 
     const transferHandle = await from.syncTransfer({
         to: toAddress,
         token,
-        amount,
+        amount
     });
     await transferHandle.awaitReceipt();
 
@@ -108,17 +99,13 @@ Tester.prototype.testForcedExitRequestOneToken = async function (
     expect(status.status).to.eq('enabled', 'Forced exit requests status is disabled');
 
     const tokenId = await this.syncProvider.tokenSet.resolveTokenId(token);
-    const request = await submitRequest(
-        toAddress,
-        [tokenId],
-        status.request_fee
-    );
+    const request = await submitRequest(toAddress, [tokenId], status.request_fee);
 
     const contractAddress = status.forced_exit_contract_address;
 
     const amountToPay = BigNumber.from(request.priceInWei).add(BigNumber.from(request.id));
-    
-    const gasPrice = await to.provider?.getGasPrice() as BigNumber;
+
+    const gasPrice = (await to.provider?.getGasPrice()) as BigNumber;
 
     const txHandle = await to.sendTransaction({
         value: amountToPay,
@@ -128,7 +115,7 @@ Tester.prototype.testForcedExitRequestOneToken = async function (
 
     const receipt = await txHandle.wait();
 
-    // We have to wait for verification and execution of the 
+    // We have to wait for verification and execution of the
     // block with the forced exit, so waiting for a while is fine
     let timeout = 45000;
     let interval = 500;
@@ -139,18 +126,18 @@ Tester.prototype.testForcedExitRequestOneToken = async function (
     let spentTotal = spentOnGas.add(amountToPay);
 
     let expectedToBalance = toBalanceBefore.add(amount).sub(spentTotal);
-    while(timePassed <= timeout) {
+    while (timePassed <= timeout) {
         let balance = await getFullOnchainBalance(this, toAddress, tokenAddress);
 
-        if(balance.eq(expectedToBalance)) {
+        if (balance.eq(expectedToBalance)) {
             break;
         }
 
         await sleep(interval);
         timePassed += interval;
     }
-    
+
     let balance = await getFullOnchainBalance(this, toAddress, tokenAddress);
 
-    expect(balance.eq(expectedToBalance), "The ForcedExit has not completed").to.be.true;
+    expect(balance.eq(expectedToBalance), 'The ForcedExit has not completed').to.be.true;
 };

@@ -238,8 +238,4 @@ Tester.prototype.testBackwardCompatibleEthMessages = async function (
     this.runningFee = this.runningFee.add(totalFee);
 };
 
-Tester.prototype.testForcedExitRequests = async function (
-
-) {
-
-} 
+Tester.prototype.testForcedExitRequests = async function () {};

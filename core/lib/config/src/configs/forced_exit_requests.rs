@@ -1,7 +1,6 @@
 use crate::envy_load;
 /// External uses
 use serde::Deserialize;
-use zksync_types::AccountId;
 use zksync_types::Address;
 
 // There are two types of configs:

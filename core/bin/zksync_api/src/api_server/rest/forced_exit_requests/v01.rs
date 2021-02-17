@@ -99,7 +99,7 @@ pub async fn submit_request(
 
     let mut storage = data.connection_pool.access_storage().await.map_err(|err| {
         vlog::warn!("Internal Server Error: '{}';", err);
-        return ApiError::internal("");
+        ApiError::internal("")
     })?;
 
     data.forced_exit_checker
@@ -134,9 +134,7 @@ pub async fn submit_request(
         tokens_schema
             .get_token(TokenLike::Id(*token_id))
             .await
-            .map_err(|_| {
-                return ApiError::bad_request("One of the tokens does no exist");
-            })?;
+            .map_err(|_| ApiError::bad_request("One of the tokens does no exist"))?;
     }
 
     let mut fe_schema = storage.forced_exit_requests_schema();
@@ -153,9 +151,7 @@ pub async fn submit_request(
             valid_until,
         })
         .await
-        .map_err(|_| {
-            return ApiError::internal("");
-        })?;
+        .map_err(|_| ApiError::internal(""))?;
 
     metrics::histogram!(
         "api.forced_exit_requests.v01.submit_request",
@@ -172,7 +168,7 @@ pub async fn get_request_by_id(
 
     let mut storage = data.connection_pool.access_storage().await.map_err(|err| {
         vlog::warn!("Internal Server Error: '{}';", err);
-        return ApiError::internal("");
+        ApiError::internal("")
     })?;
 
     let mut fe_requests_schema = storage.forced_exit_requests_schema();

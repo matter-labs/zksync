@@ -6,7 +6,7 @@
 use serde::{Deserialize, Serialize};
 
 // Workspace uses
-use zksync_types::{forced_exit_requests::ForcedExitRequest, tx::TxHash, Address, TokenId};
+use zksync_types::{forced_exit_requests::ForcedExitRequest, Address, TokenId};
 use zksync_utils::BigUintSerdeAsRadix10Str;
 
 use num::BigUint;

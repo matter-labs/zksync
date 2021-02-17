@@ -1,7 +1,5 @@
-use actix_web::client;
-use anyhow::format_err;
 use chrono::{DateTime, Utc};
-use ethabi::{Contract as ContractAbi, Hash};
+use ethabi::Hash;
 use std::{
     convert::TryFrom,
     time::{Duration, Instant},
@@ -10,16 +8,16 @@ use std::{convert::TryInto, fmt::Debug};
 use tokio::task::JoinHandle;
 use tokio::time;
 use web3::{
-    contract::{Contract, Options},
+    contract::Contract,
     transports::Http,
-    types::{BlockNumber, FilterBuilder, Log},
+    types::{BlockNumber, Log},
     Web3,
 };
 use zksync_config::ZkSyncConfig;
 use zksync_storage::ConnectionPool;
 
 use zksync_contracts::forced_exit_contract;
-use zksync_types::{block::Block, Address, Nonce, PriorityOp, H160, U256};
+use zksync_types::H160;
 
 use zksync_api::core_api_client::CoreApiClient;
 use zksync_core::eth_watch::{get_contract_events, get_web3_block_number, WatcherMode};
@@ -106,7 +104,6 @@ impl EthClient {
 }
 
 struct ForcedExitContractWatcher {
-    core_api_client: CoreApiClient,
     connection_pool: ConnectionPool,
     config: ZkSyncConfig,
     eth_client: EthClient,
@@ -244,8 +241,7 @@ impl ForcedExitContractWatcher {
         };
 
         for e in events {
-            let processing_result = self
-                .forced_exit_sender
+            self.forced_exit_sender
                 .process_request(e.amount.clone())
                 .await;
         }
@@ -322,7 +318,6 @@ pub fn run_forced_exit_contract_watcher(
             .expect("Unexpected error while trying to wait for unconfirmed transactions");
 
         let contract_watcher = ForcedExitContractWatcher {
-            core_api_client,
             connection_pool,
             config,
             eth_client,

@@ -215,10 +215,15 @@ export class Deployer {
         if (this.verbose) {
             console.log('Deploying ForcedExit contract');
         }
-        const forcedExitContract = await deployContract(this.deployWallet, this.contracts.forcedExit, [this.deployWallet.address], {
-            gasLimit: 6000000,
-            ...ethTxOptions
-        });
+        const forcedExitContract = await deployContract(
+            this.deployWallet,
+            this.contracts.forcedExit,
+            [this.deployWallet.address],
+            {
+                gasLimit: 6000000,
+                ...ethTxOptions
+            }
+        );
         const zksRec = await forcedExitContract.deployTransaction.wait();
         const zksGasUsed = zksRec.gasUsed;
         const gasPrice = forcedExitContract.deployTransaction.gasPrice;

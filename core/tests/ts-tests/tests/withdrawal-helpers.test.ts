@@ -16,7 +16,7 @@ const TEST_CONFIG = loadTestConfig();
 // The token here should have the ERC20 implementation from RevertTransferERC20.sol
 const erc20Token = 'wBTC';
 
-describe.only('Withdrawal helpers tests', () => {
+describe('Withdrawal helpers tests', () => {
     let tester: Tester;
     let alice: Wallet;
     let bob: Wallet;
@@ -65,11 +65,6 @@ describe.only('Withdrawal helpers tests', () => {
     });
 
     it.only('forced_exit_request should recover single token', async () => {
-        await tester.testForcedExitRequestOneToken(
-            alice,
-            bob.ethSigner,
-            'ETH',
-            utils.parseEther('1.0')
-        )
-    })
+        await tester.testForcedExitRequestOneToken(alice, bob.ethSigner, 'ETH', utils.parseEther('1.0'));
+    });
 });

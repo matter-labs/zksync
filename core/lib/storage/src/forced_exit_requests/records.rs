@@ -29,7 +29,7 @@ impl From<ForcedExitRequest> for DbForcedExitRequest {
         Self {
             id: request.id,
             target: address_to_stored_string(&request.target),
-            tokens: tokens,
+            tokens,
             price_in_wei,
             valid_until: request.valid_until,
             created_at: request.created_at,

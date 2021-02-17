@@ -1,14 +1,11 @@
 use std::str::FromStr;
 
+use crate::forced_exit_requests::ForcedExitRequestsSchema;
 use crate::tests::db_test;
 use crate::QueryResult;
 use crate::StorageProcessor;
-use crate::{data_restore::DataRestoreSchema, forced_exit_requests::ForcedExitRequestsSchema};
-use chrono::{DateTime, Timelike, Utc};
+use chrono::{Timelike, Utc};
 use num::{BigUint, FromPrimitive};
-use std::convert::From;
-use std::time::Duration;
-use tokio::time;
 use zksync_basic_types::Address;
 use zksync_types::forced_exit_requests::{ForcedExitRequest, SaveForcedExitRequestQuery};
 
@@ -20,27 +17,29 @@ use zksync_types::TokenId;
 async fn get_oldest_unfulfilled_request(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
     let mut now = Utc::now().with_nanosecond(0).unwrap();
 
+    // The requests have dummy created_at and valid_until values
+    // They will reassigned in the future cycle
     let requests = vec![
         SaveForcedExitRequestQuery {
             target: Address::from_str("c0f97CC918C9d6fA4E9fc6be61a6a06589D199b2").unwrap(),
             tokens: vec![TokenId(1)],
             price_in_wei: BigUint::from_i32(212).unwrap(),
-            created_at: DateTime::from(now.clone()),
-            valid_until: DateTime::from(now.clone()),
+            created_at: now,
+            valid_until: now,
         },
         SaveForcedExitRequestQuery {
             target: Address::from_str("c0f97CC918C9d6fA4E9fc6be61a6a06589D199b2").unwrap(),
             tokens: vec![TokenId(1)],
             price_in_wei: BigUint::from_i32(1).unwrap(),
-            created_at: DateTime::from(now.clone()),
-            valid_until: DateTime::from(now.clone()),
+            created_at: now,
+            valid_until: now,
         },
         SaveForcedExitRequestQuery {
             target: Address::from_str("c0f97CC918C9d6fA4E9fc6be61a6a06589D199b2").unwrap(),
             tokens: vec![TokenId(20)],
             price_in_wei: BigUint::from_str("1000000000000000").unwrap(),
-            created_at: DateTime::from(now.clone()),
-            valid_until: DateTime::from(now.clone()),
+            created_at: now,
+            valid_until: now,
         },
     ];
 
@@ -49,7 +48,7 @@ async fn get_oldest_unfulfilled_request(mut storage: StorageProcessor<'_>) -> Qu
 
     for req in requests.into_iter() {
         now = now.add(interval);
-        let created_at = now.clone();
+        let created_at = now;
         let valid_until = now.add(chrono::Duration::hours(32));
 
         stored_requests.push(
