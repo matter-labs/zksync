@@ -5,7 +5,6 @@ import fs from 'fs';
 import * as db from './db/db';
 
 import { ethers } from 'ethers';
-import { utils as syncUtils } from 'zksync';
 
 export async function server() {
     let child = utils.background('cargo run --bin zksync_server --release');
@@ -55,7 +54,7 @@ async function prepareForcedExitRequestAccount() {
 
     const mainZkSyncContract = new ethers.Contract(
         process.env.CONTRACTS_CONTRACT_ADDR as string,
-        syncUtils.SYNC_MAIN_CONTRACT_INTERFACE,
+        await utils.readZkSyncAbi(),
         ethRichWallet.connect(ethProvider)
     );
     const gasPrice = await ethProvider.getGasPrice();
