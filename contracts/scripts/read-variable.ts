@@ -164,6 +164,7 @@ async function readPartOfStruct(slot: BigNumber, address: string, type: string, 
     const member = types[type].members.find((element) => {
         return element.label === last;
     });
+    if(!member) throw new Error('Invalid field name of struct');
     return readPartOfVariable(slot.add(Number.parseInt(member.slot, 10)), member.offset, address, member.type, params);
 }
 
@@ -251,6 +252,7 @@ async function readPartOfVariable(
 }
 
 // Get reverse array of indexes, struct fields and mapping keys from name
+// Field names, keys cannot contain square brackets or points
 function parseName(fullName: string): string[] {
     const firstPoint = fullName.indexOf('.');
     const firstBracket = fullName.indexOf('[');
@@ -271,20 +273,20 @@ function parseName(fullName: string): string[] {
     for (let i = first; i < fullName.length; i++) {
         if (fullName.charAt(i) === '.') {
             if (bracket) {
-                throw new Error('Invalid name');
+                throw new Error('Field names, keys cannot contain square brackets or points');
             }
             if (i !== first) result.push(str);
             str = '';
         } else if (fullName.charAt(i) === '[') {
             if (bracket) {
-                throw new Error('Invalid name');
+                throw new Error('Field names, keys cannot contain square brackets or points');
             }
             bracket = true;
             if (i !== first) result.push(str);
             str = '';
         } else if (fullName.charAt(i) === ']') {
             if (!bracket) {
-                throw new Error('Invalid name');
+                throw new Error('Field names, keys cannot contain square brackets or points');
             }
             bracket = false;
         } else {
