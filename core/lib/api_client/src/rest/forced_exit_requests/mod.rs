@@ -42,7 +42,7 @@ pub struct ForcedExitRegisterRequest {
     pub price_in_wei: BigUint,
 }
 
-const FORCED_EXIT_REQUESTS_SCOPE: &'static str = "/api/forced_exit_requests/v0.1/";
+const FORCED_EXIT_REQUESTS_SCOPE: &str = "/api/forced_exit_requests/v0.1/";
 
 impl Client {
     pub async fn get_forced_exit_requests_status(&self) -> ClientResult<ForcedExitRequestStatus> {

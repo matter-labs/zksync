@@ -52,7 +52,7 @@ pub struct Client {
     url: String,
 }
 
-const API_V1_SCOPE: &'static str = "/api/v1/";
+const API_V1_SCOPE: &str = "/api/v1/";
 
 impl Client {
     /// Creates a new REST API client with the specified Url.
