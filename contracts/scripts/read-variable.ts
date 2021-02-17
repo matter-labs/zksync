@@ -164,7 +164,7 @@ async function readPartOfStruct(slot: BigNumber, address: string, type: string, 
     const member = types[type].members.find((element) => {
         return element.label === last;
     });
-    if(!member) throw new Error('Invalid field name of struct');
+    if (!member) throw new Error('Invalid field name of struct');
     return readPartOfVariable(slot.add(Number.parseInt(member.slot, 10)), member.offset, address, member.type, params);
 }
 
