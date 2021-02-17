@@ -19,6 +19,8 @@ components, the logs will have the following format:
 
 ### Fixed
 
+- (`explorer`): Bug with 'Click to copy' button for account address.
+
 ## Release 2021-02-02
 
 ### Removed
