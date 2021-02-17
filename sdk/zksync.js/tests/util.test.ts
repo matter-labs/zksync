@@ -6,10 +6,8 @@ import {
     closestPackableTransactionFee,
     isTransactionAmountPackable,
     isTransactionFeePackable,
-    TokenSet,
-    getTxHash
+    TokenSet
 } from '../src/utils';
-import { Transfer, ChangePubKey, Withdraw, ForcedExit } from '../src/types';
 import { BigNumber } from 'ethers';
 
 describe('Packing and unpacking', function () {
