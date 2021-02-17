@@ -182,7 +182,7 @@ impl ForcedExitContractWatcher {
             WatcherMode::Working => true,
             WatcherMode::Backoff(delay_until) => {
                 if Instant::now() >= delay_until {
-                    log::info!("Exiting the backoff mode");
+                    vlog::info!("Exiting the backoff mode");
                     self.mode = WatcherMode::Working;
                     true
                 } else {
@@ -195,7 +195,7 @@ impl ForcedExitContractWatcher {
 
     fn handle_infura_error(&mut self, error: anyhow::Error) {
         if self.is_backoff_requested(&error) {
-            log::warn!(
+            vlog::warn!(
                 "Rate limit was reached, as reported by Ethereum node. \
                 Entering the backoff mode"
             );
@@ -203,7 +203,7 @@ impl ForcedExitContractWatcher {
         } else {
             // Some unexpected kind of error, we won't shutdown the node because of it,
             // but rather expect node administrators to handle the situation.
-            log::error!("Failed to process new blocks {}", error);
+            vlog::error!("Failed to process new blocks {}", error);
         }
     }
 
@@ -261,7 +261,7 @@ impl ForcedExitContractWatcher {
                     break block;
                 }
                 Err(error) => {
-                    log::warn!(
+                    vlog::warn!(
                         "Unable to fetch last block number: '{}'. Retrying again in {} seconds",
                         error,
                         RATE_LIMIT_DELAY.as_secs()

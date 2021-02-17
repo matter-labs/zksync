@@ -224,7 +224,7 @@ impl ForcedExitSender {
                 // A transaction has failed. That is not intended.
                 // We can safely cancel such transaction, since we will re-try to
                 // send it again later
-                log::error!(
+                vlog::error!(
                     "A previously sent forced exit transaction has failed. Canceling the tx."
                 );
                 self.set_fulfilled_by(&mut storage, request.id, None)
@@ -259,7 +259,7 @@ impl ForcedExitSender {
             // TODO: Handle such cases gracefully, and not panic
             .expect("An error occured, while fu;lfilling the request");
 
-        log::info!("FE request with id {} was fulfilled", id);
+        vlog::info!("FE request with id {} was fulfilled", id);
 
         Ok(())
     }
@@ -376,7 +376,7 @@ impl ForcedExitSender {
             }
 
             if attempts >= PROCESSING_ATTEMPTS {
-                log::error!("Failed to process forced exit for the {} time", attempts);
+                vlog::error!("Failed to process forced exit for the {} time", attempts);
             }
         }
     }
