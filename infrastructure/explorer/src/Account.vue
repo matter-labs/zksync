@@ -7,7 +7,7 @@
             <b-card no-body class="table-margin-hack">
                 <b-table responsive thead-class="displaynone" class="nowrap" :items="accountDataProps">
                     <template v-slot:cell(value)="data">
-                        <Entry v-if="data.item.name == 'Address'" :value="data.item.value" />
+                        <Entry class="bigger-text" v-if="data.item.name == 'Address'" :value="data.item.value" />
                         <Entry v-else-if="data.item.name == 'Account Id'" :value="data.item.value" />
                         <Entry v-else-if="data.item.name == 'Verified nonce'" :value="data.item.value" />
                         <Entry v-else-if="data.item.name == 'Committed nonce'" :value="data.item.value" />
@@ -232,10 +232,7 @@ export default {
             return dataProps;
         },
         addressEntry() {
-            return makeEntry('Address')
-                .innerHTML(`<a class="bigger-text">${this.address}</a> `)
-                .copyable()
-                .tooltipRight(true);
+            return makeEntry('Address').innerHTML(this.address).copyable().tooltipRight(true);
         },
         accountIdEntry() {
             return makeEntry('Account Id').innerHTML(this.accountId);
