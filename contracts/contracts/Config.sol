@@ -91,6 +91,12 @@ contract Config {
     /// @dev Bit mask to apply for verifier public input before verifying.
     uint256 constant INPUT_MASK = $$(~uint256(0) >> 3);
 
-    /// @dev Auth fact reset timelock
+    /// @dev Auth fact reset timelock.
     uint256 constant AUTH_FACT_RESET_TIMELOCK = 1 days;
+
+    /// @dev DAI token address.
+    address constant DAI_ADDRESS = $(DAI_ADDRESS);
+
+    /// @dev Price in DAI to collect for listing.
+    uint104 constant TOKEN_LISTING_PRICE = $(TOKEN_LISTING_PRICE);
 }

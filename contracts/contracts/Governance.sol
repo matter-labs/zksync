@@ -3,6 +3,9 @@
 pragma solidity ^0.7.0;
 
 import "./Config.sol";
+import "./Utils.sol";
+import "./SafeCast.sol";
+import "./IERC20.sol";
 
 /// @title Governance Contract
 /// @author Matter Labs
@@ -20,6 +23,12 @@ contract Governance is Config {
 
     /// @notice Address which will exercise governance over the network i.e. add tokens, change validator set, conduct upgrades
     address public networkGovernor;
+
+    /// @notice Address that can list tokens for free.
+    address public tokenLister;
+
+    /// @notice Cold storage, where to send the collected fees collected from the listing of tokens.
+    address public treasurt;
 
     /// @notice Total number of ERC20 tokens registered in the network (excluding ETH, which is hardcoded as tokenId = 0)
     uint16 public totalTokens;
@@ -62,9 +71,20 @@ contract Governance is Config {
     /// @notice Add token to the list of networks tokens
     /// @param _token Token address
     function addToken(address _token) external {
-        requireGovernor(msg.sender);
         require(tokenIds[_token] == 0, "1e"); // token exists
-        require(totalTokens < MAX_AMOUNT_OF_REGISTERED_TOKENS, "1f"); // no free identifiers for tokens
+        require(totalTokens < MAX_AMOUNT_OF_REGISTERED_TOKENS, "1f"); // no more tokens can be listed
+
+        if (address(msg.sender) != networkGovernor && address(msg.sender) != tokenLister) {
+            require(
+                Utils.transferFromERC20(
+                    IERC20(DAI_ADDRESS),
+                    msg.sender,
+                    treasurt,
+                    SafeCast.toUint128(TOKEN_LISTING_PRICE)
+                ),
+                "c"
+            ); // token transfer failed
+        }
 
         totalTokens++;
         uint16 newTokenId = totalTokens; // it is not `totalTokens - 1` because tokenId = 0 is reserved for eth

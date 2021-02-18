@@ -3,26 +3,34 @@ import '@nomiclabs/hardhat-solpp';
 import '@nomiclabs/hardhat-etherscan';
 import 'hardhat-typechain';
 import 'hardhat-contract-sizer';
+import '@nomiclabs/hardhat-ethers';
+import { BigNumber } from 'ethers';
 
 const prodConfig = {
     // UPGRADE_NOTICE_PERIOD: 0,
-    MAX_AMOUNT_OF_REGISTERED_TOKENS: 127,
+    MAX_AMOUNT_OF_REGISTERED_TOKENS: 100,
     // PRIORITY_EXPIRATION: 101,
     DUMMY_VERIFIER: false,
-    UPGRADE_FROM_V3: true
+    UPGRADE_FROM_V3: false,
+    DAI_ADDRESS: '0x6B175474E89094C44Da98b954EedeAC495271d0F',
+    TOKEN_LISTING_PRICE: BigNumber.from(10).pow(18).mul(250)
 };
 const testnetConfig = {
     UPGRADE_NOTICE_PERIOD: 0,
-    MAX_AMOUNT_OF_REGISTERED_TOKENS: 127,
+    MAX_AMOUNT_OF_REGISTERED_TOKENS: 100,
     // PRIORITY_EXPIRATION: 101,
     DUMMY_VERIFIER: false,
-    UPGRADE_FROM_V3: true
+    UPGRADE_FROM_V3: false,
+    DAI_ADDRESS: '0x6B175474E89094C44Da98b954EedeAC495271d0F',
+    TOKEN_LISTING_PRICE: BigNumber.from(10).pow(18).mul(250)
 };
 const testConfig = {
     UPGRADE_NOTICE_PERIOD: 0,
     MAX_AMOUNT_OF_REGISTERED_TOKENS: 5,
     PRIORITY_EXPIRATION: 101,
-    DUMMY_VERIFIER: true
+    DUMMY_VERIFIER: true,
+    DAI_ADDRESS: '0x6B175474E89094C44Da98b954EedeAC495271d0F',
+    TOKEN_LISTING_PRICE: BigNumber.from(10).pow(18).mul(250)
 };
 
 const localConfig = Object.assign({}, prodConfig);
@@ -31,6 +39,8 @@ localConfig.UPGRADE_NOTICE_PERIOD = 0;
 localConfig.DUMMY_VERIFIER = process.env.CONTRACTS_TEST_DUMMY_VERIFIER === 'true';
 // @ts-ignore
 localConfig.EASY_EXODUS = process.env.CONTRACTS_TEST_EASY_EXODUS === 'true';
+localConfig.DAI_ADDRESS = '0x6B175474E89094C44Da98b954EedeAC495271d0F';
+localConfig.TOKEN_LISTING_PRICE = BigNumber.from(10).pow(18).mul(250);
 
 const contractDefs = {
     rinkeby: testnetConfig,
