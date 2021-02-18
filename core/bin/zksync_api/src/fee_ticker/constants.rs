@@ -17,6 +17,10 @@ pub(crate) const BASE_TRANSFER_TO_NEW_COST: u64 = VerifyCost::TRANSFER_TO_NEW_CO
 pub(crate) const BASE_WITHDRAW_COST: u64 = VerifyCost::WITHDRAW_COST
     + CommitCost::WITHDRAW_COST
     + AMORTIZED_COST_PER_CHUNK * (WithdrawOp::CHUNKS as u64);
+pub(crate) const BASE_OLD_CHANGE_PUBKEY_OFFCHAIN_COST: u64 =
+    CommitCost::OLD_CHANGE_PUBKEY_COST_OFFCHAIN
+        + VerifyCost::CHANGE_PUBKEY_COST
+        + AMORTIZED_COST_PER_CHUNK * (ChangePubKeyOp::CHUNKS as u64);
 pub(crate) const BASE_CHANGE_PUBKEY_OFFCHAIN_COST: u64 = CommitCost::CHANGE_PUBKEY_COST_OFFCHAIN
     + VerifyCost::CHANGE_PUBKEY_COST
     + AMORTIZED_COST_PER_CHUNK * (ChangePubKeyOp::CHUNKS as u64);

@@ -5678,7 +5678,7 @@ checksum = "05f33972566adbd2d3588b0491eb94b98b43695c4ef897903470ede4f3f5a28a"
 
 [[package]]
 name = "zksync"
-version = "0.2.2"
+version = "0.3.0"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -5735,6 +5735,7 @@ dependencies = [
  "reqwest",
  "serde",
  "serde_json",
+ "structopt",
  "thiserror",
  "tiny-keccak 1.5.0",
  "tokio 0.1.22",
@@ -5809,6 +5810,7 @@ dependencies = [
  "toml",
  "tracing",
  "url 2.1.1",
+ "zksync_crypto",
  "zksync_types",
  "zksync_utils",
 ]
@@ -6105,6 +6107,7 @@ dependencies = [
  "serde",
  "serde_json",
  "sqlx",
+ "thiserror",
  "tokio 0.2.22",
  "vlog",
  "zksync_basic_types",

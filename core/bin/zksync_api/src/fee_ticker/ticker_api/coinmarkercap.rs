@@ -35,15 +35,16 @@ impl TokenPriceAPI for CoinMarketCapAPI {
             ))
             .expect("failed to join url path");
 
-        let api_request_future =
-            tokio::time::timeout(REQUEST_TIMEOUT, self.client.get(request_url).send());
-
-        let mut api_response = api_request_future
+        let mut api_response = self
+            .client
+            .get(request_url)
+            .timeout(REQUEST_TIMEOUT)
+            .send()
             .await
-            .map_err(|_| anyhow::format_err!("Coinmarketcap API request timeout"))?
             .map_err(|err| anyhow::format_err!("Coinmarketcap API request failed: {}", err))?
             .json::<CoinmarketCapResponse>()
             .await?;
+
         let mut token_info = api_response
             .data
             .remove(&TokenLike::Symbol(token_symbol.to_string()))

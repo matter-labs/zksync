@@ -81,7 +81,7 @@ export interface Transfer {
     amount: BigNumberish;
     fee: BigNumberish;
     nonce: number;
-    signature: Signature;
+    signature?: Signature;
     validFrom: number;
     validUntil: number;
 }
@@ -95,7 +95,7 @@ export interface Withdraw {
     amount: BigNumberish;
     fee: BigNumberish;
     nonce: number;
-    signature: Signature;
+    signature?: Signature;
     validFrom: number;
     validUntil: number;
 }
@@ -107,7 +107,7 @@ export interface ForcedExit {
     token: number;
     fee: BigNumberish;
     nonce: number;
-    signature: Signature;
+    signature?: Signature;
     validFrom: number;
     validUntil: number;
 }
@@ -139,7 +139,7 @@ export interface ChangePubKey {
     feeToken: number;
     fee: BigNumberish;
     nonce: number;
-    signature: Signature;
+    signature?: Signature;
     ethAuthData: ChangePubKeyOnchain | ChangePubKeyECDSA | ChangePubKeyCREATE2;
     validFrom: number;
     validUntil: number;
@@ -190,18 +190,17 @@ export interface Tokens {
     };
 }
 
-// we have to ignore this becase a bug in prettier causes this exact block
+// we have to ignore this because of a bug in prettier causes this exact block
 // to have double semicolons inside
 // prettier-ignore
 export interface ChangePubKeyFee {
     // Note: Ignore, since it just looks more intuitive if `"ChangePubKey"` is kept as a string literal)
     // prettier-ignore
-    "ChangePubKey": {
-        // Denotes how authorization of operation is performed:
-        // 'true' if it's done by sending an Ethereum transaction,
-        // 'false' if it's done by providing an Ethereum signature in zkSync transaction.
-        onchainPubkeyAuth: boolean;
-    };
+    // Denotes how authorization of operation is performed:
+    // 'Onchain' if it's done by sending an Ethereum transaction,
+    // 'ECDSA' if it's done by providing an Ethereum signature in zkSync transaction.
+    // 'CREATE2' if it's done by providing arguments to restore account ethereum address according to CREATE2 specification.
+    "ChangePubKey": ChangePubkeyTypes;
 }
 
 export interface Fee {

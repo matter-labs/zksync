@@ -294,9 +294,7 @@ impl ZkSyncTx {
                 transfer.fee.clone(),
             )),
             ZkSyncTx::ChangePubKey(change_pubkey) => Some((
-                TxFeeTypes::ChangePubKey {
-                    onchain_pubkey_auth: !change_pubkey.is_ecdsa(),
-                },
+                change_pubkey.get_fee_type(),
                 TokenLike::Id(change_pubkey.fee_token),
                 change_pubkey.account,
                 change_pubkey.fee.clone(),

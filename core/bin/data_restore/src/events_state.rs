@@ -87,7 +87,7 @@ impl EventsState {
     pub async fn update_events_state<T: Transport>(
         &mut self,
         web3: &Web3<T>,
-        zksync_contracts: &[ZkSyncDeployedContract<T>],
+        zksync_contract: &ZkSyncDeployedContract<T>,
         governance_contract: &(ethabi::Contract, Contract<T>),
         eth_blocks_step: u64,
         end_eth_blocks_offset: u64,
@@ -97,7 +97,7 @@ impl EventsState {
         let (events, token_events, to_block_number) =
             EventsState::get_new_events_and_last_watched_block(
                 web3,
-                zksync_contracts,
+                zksync_contract,
                 governance_contract,
                 self.last_watched_eth_block_number,
                 eth_blocks_step,
@@ -144,7 +144,7 @@ impl EventsState {
     #[allow(clippy::needless_lifetimes)] // Cargo clippy gives a false positive warning on needless_lifetimes there, so can be allowed.
     async fn get_new_events_and_last_watched_block<'a, T: Transport>(
         web3: &Web3<T>,
-        zksync_contracts: &'a [ZkSyncDeployedContract<T>],
+        zksync_contract: &'a ZkSyncDeployedContract<T>,
         governance_contract: &(ethabi::Contract, Contract<T>),
         last_watched_block_number: u64,
         eth_blocks_step: u64,
@@ -161,7 +161,7 @@ impl EventsState {
             return Ok((vec![], vec![], last_watched_block_number)); // No new eth blocks
         }
 
-        let mut from_block_number_u64 = last_watched_block_number + 1;
+        let from_block_number_u64 = last_watched_block_number + 1;
 
         let to_block_number_u64 =
         // if (latest eth block < last watched + delta) then choose it
@@ -179,50 +179,14 @@ impl EventsState {
         )
         .await?;
         let mut logs = vec![];
-        for zksync_contract in zksync_contracts {
-            if from_block_number_u64 > to_block_number_u64 {
-                // Stop if all necessary blocks are loaded
-                break;
-            }
-            let from_block_number = match zksync_contract.from {
-                Web3BlockNumber::Latest => panic!("Impossible in from block"),
-                Web3BlockNumber::Earliest => Web3BlockNumber::Number(from_block_number_u64.into()),
-                Web3BlockNumber::Pending => unreachable!(),
-                Web3BlockNumber::Number(n) => {
-                    if from_block_number_u64 > n.as_u64() {
-                        continue;
-                    }
-                    Web3BlockNumber::Number(from_block_number_u64.into())
-                }
-            };
-
-            let to_block_number = match zksync_contract.to {
-                Web3BlockNumber::Latest => {
-                    from_block_number_u64 = to_block_number_u64;
-                    Web3BlockNumber::Number(to_block_number_u64.into())
-                }
-                Web3BlockNumber::Earliest => panic!("Impossible in to block"),
-                Web3BlockNumber::Pending => unreachable!(),
-                Web3BlockNumber::Number(n) => {
-                    if to_block_number_u64 < n.as_u64() {
-                        from_block_number_u64 = n.as_u64();
-                        Web3BlockNumber::Number(to_block_number_u64.into())
-                    } else {
-                        from_block_number_u64 = n.as_u64();
-                        Web3BlockNumber::Number(n)
-                    }
-                }
-            };
-
-            let block_logs = EventsState::get_block_logs(
-                web3,
-                zksync_contract,
-                from_block_number,
-                to_block_number,
-            )
-            .await?;
-            logs.push((zksync_contract, block_logs));
-        }
+        let block_logs = EventsState::get_block_logs(
+            web3,
+            zksync_contract,
+            Web3BlockNumber::Number(from_block_number_u64.into()),
+            Web3BlockNumber::Number(to_block_number_u64.into()),
+        )
+        .await?;
+        logs.push((zksync_contract, block_logs));
 
         Ok((logs, token_logs, to_block_number_u64))
     }
@@ -358,7 +322,7 @@ impl EventsState {
                 const U256_SIZE: usize = 32;
                 // Fields in `BlocksRevert` are not `indexed`, thus they're located in `data`.
                 assert_eq!(log.data.0.len(), U256_SIZE * 2);
-                let total_verified = zksync_types::BlockNumber(
+                let total_executed = zksync_types::BlockNumber(
                     U256::from_big_endian(&log.data.0[..U256_SIZE]).as_u32(),
                 );
                 let total_committed = zksync_types::BlockNumber(
@@ -368,7 +332,7 @@ impl EventsState {
                 self.committed_events
                     .retain(|bl| bl.block_num <= total_committed);
                 self.verified_events
-                    .retain(|bl| bl.block_num <= total_verified);
+                    .retain(|bl| bl.block_num <= total_executed);
 
                 continue;
             }
@@ -420,18 +384,12 @@ mod test {
 
     use crate::contract::ZkSyncDeployedContract;
     use crate::tests::utils::{create_log, u32_to_32bytes, FakeTransport};
-    use web3::types::BlockNumber;
 
     #[test]
     fn event_state() {
         let mut events_state = EventsState::default();
 
-        let contract = ZkSyncDeployedContract::version4(
-            Eth::new(FakeTransport),
-            [1u8; 20].into(),
-            BlockNumber::Earliest,
-            BlockNumber::Latest,
-        );
+        let contract = ZkSyncDeployedContract::version4(Eth::new(FakeTransport), [1u8; 20].into());
 
         let block_verified_topic = contract
             .abi

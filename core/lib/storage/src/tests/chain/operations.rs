@@ -198,7 +198,7 @@ async fn duplicated_operations(mut storage: StorageProcessor<'_>) -> QueryResult
     Ok(())
 }
 
-/// Checks that sending a successfull operation after a failed one works.
+/// Checks that sending a successful operation after a failed one works.
 #[db_test]
 async fn transaction_resent(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
     const BLOCK_NUMBER: i64 = 1;

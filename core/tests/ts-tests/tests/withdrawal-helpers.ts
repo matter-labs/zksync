@@ -3,11 +3,12 @@ import { expect } from 'chai';
 import { Wallet, types, Provider, utils } from 'zksync';
 import { BigNumber, ethers } from 'ethers';
 import { Address } from 'zksync/build/types';
+import { sleep } from 'zksync/build/utils';
 
 import { RevertReceiveAccountFactory, RevertTransferERC20Factory } from '../../../../contracts/typechain';
-import { waitForOnchainWithdrawal, loadTestConfig } from './helpers';
+import { loadTestConfig } from 'reading-tool';
 
-const TEST_CONFIG = loadTestConfig();
+const TEST_CONFIG = loadTestConfig(true);
 
 type TokenLike = types.TokenLike;
 
@@ -22,6 +23,25 @@ declare module './tester' {
             amount: BigNumber[]
         ): Promise<void>;
     }
+}
+
+async function waitForOnchainWithdrawal(
+    syncProvider: Provider,
+    hash: string,
+    polling_interval: number = 200,
+    polling_timeout: number = 35000
+): Promise<string | null> {
+    let withdrawalTxHash = null;
+    const polling_iterations = polling_timeout / polling_interval;
+    for (let i = 0; i < polling_iterations; i++) {
+        withdrawalTxHash = await syncProvider.getEthTxForWithdrawal(hash);
+        if (withdrawalTxHash != null) {
+            break;
+        }
+        await sleep(polling_interval);
+    }
+
+    return withdrawalTxHash;
 }
 
 async function setRevertReceive(ethWallet: ethers.Signer, to: Address, value: boolean) {

@@ -775,6 +775,6 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
             timestamp: 0,
         };
 
-        self.save_block(block).await
+        Ok(self.save_block(block).await?)
     }
 }
