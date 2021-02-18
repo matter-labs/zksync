@@ -1,19 +1,6 @@
 import { privateKeyFromSeed, signTransactionBytes, privateKeyToPubKeyHash } from './crypto';
 import { BigNumber, BigNumberish, ethers } from 'ethers';
-import {
-    getEthSignatureType,
-    signMessagePersonalAPI,
-    getSignedBytesFromMessage,
-    serializeAccountId,
-    serializeAddress,
-    serializeTokenId,
-    serializeAmountPacked,
-    serializeFeePacked,
-    serializeNonce,
-    serializeAmountFull,
-    getCREATE2AddressAndSalt,
-    serializeTimestamp
-} from './utils';
+import * as utils from './utils';
 import {
     Address,
     EthSignerType,
@@ -39,6 +26,9 @@ export class Signer {
         return await privateKeyToPubKeyHash(this.#privateKey);
     }
 
+    /**
+     * @deprecated `Signer.*SignBytes` methods will be removed in future. Use `utils.serializeTx` instead.
+     */
     transferSignBytes(transfer: {
         accountId: number;
         from: Address;
@@ -50,17 +40,11 @@ export class Signer {
         validFrom: number;
         validUntil: number;
     }): Uint8Array {
-        const type = new Uint8Array([5]); // tx type
-        const accountId = serializeAccountId(transfer.accountId);
-        const from = serializeAddress(transfer.from);
-        const to = serializeAddress(transfer.to);
-        const token = serializeTokenId(transfer.tokenId);
-        const amount = serializeAmountPacked(transfer.amount);
-        const fee = serializeFeePacked(transfer.fee);
-        const nonce = serializeNonce(transfer.nonce);
-        const validFrom = serializeTimestamp(transfer.validFrom);
-        const validUntil = serializeTimestamp(transfer.validUntil);
-        return ethers.utils.concat([type, accountId, from, to, token, amount, fee, nonce, validFrom, validUntil]);
+        return utils.serializeTransfer({
+            ...transfer,
+            type: 'Transfer',
+            token: transfer.tokenId
+        });
     }
 
     async signSyncTransfer(transfer: {
@@ -74,24 +58,25 @@ export class Signer {
         validFrom: number;
         validUntil: number;
     }): Promise<Transfer> {
-        const msgBytes = this.transferSignBytes(transfer);
+        const tx: Transfer = {
+            ...transfer,
+            type: 'Transfer',
+            token: transfer.tokenId
+        };
+        const msgBytes = utils.serializeTransfer(tx);
         const signature = await signTransactionBytes(this.#privateKey, msgBytes);
 
         return {
-            type: 'Transfer',
-            accountId: transfer.accountId,
-            from: transfer.from,
-            to: transfer.to,
-            token: transfer.tokenId,
+            ...tx,
             amount: BigNumber.from(transfer.amount).toString(),
             fee: BigNumber.from(transfer.fee).toString(),
-            nonce: transfer.nonce,
-            validFrom: transfer.validFrom,
-            validUntil: transfer.validUntil,
             signature
         };
     }
 
+    /**
+     * @deprecated `Signer.*SignBytes` methods will be removed in future. Use `utils.serializeTx` instead.
+     */
     withdrawSignBytes(withdraw: {
         accountId: number;
         from: Address;
@@ -103,28 +88,12 @@ export class Signer {
         validFrom: number;
         validUntil: number;
     }): Uint8Array {
-        const typeBytes = new Uint8Array([3]);
-        const accountId = serializeAccountId(withdraw.accountId);
-        const accountBytes = serializeAddress(withdraw.from);
-        const ethAddressBytes = serializeAddress(withdraw.ethAddress);
-        const tokenIdBytes = serializeTokenId(withdraw.tokenId);
-        const amountBytes = serializeAmountFull(withdraw.amount);
-        const feeBytes = serializeFeePacked(withdraw.fee);
-        const nonceBytes = serializeNonce(withdraw.nonce);
-        const validFrom = serializeTimestamp(withdraw.validFrom);
-        const validUntil = serializeTimestamp(withdraw.validUntil);
-        return ethers.utils.concat([
-            typeBytes,
-            accountId,
-            accountBytes,
-            ethAddressBytes,
-            tokenIdBytes,
-            amountBytes,
-            feeBytes,
-            nonceBytes,
-            validFrom,
-            validUntil
-        ]);
+        return utils.serializeWithdraw({
+            ...withdraw,
+            type: 'Withdraw',
+            to: withdraw.ethAddress,
+            token: withdraw.tokenId
+        });
     }
 
     async signSyncWithdraw(withdraw: {
@@ -138,24 +107,26 @@ export class Signer {
         validFrom: number;
         validUntil: number;
     }): Promise<Withdraw> {
-        const msgBytes = this.withdrawSignBytes(withdraw);
+        const tx: Withdraw = {
+            ...withdraw,
+            type: 'Withdraw',
+            to: withdraw.ethAddress,
+            token: withdraw.tokenId
+        };
+        const msgBytes = utils.serializeWithdraw(tx);
         const signature = await signTransactionBytes(this.#privateKey, msgBytes);
 
         return {
-            type: 'Withdraw',
-            accountId: withdraw.accountId,
-            from: withdraw.from,
-            to: withdraw.ethAddress,
-            token: withdraw.tokenId,
+            ...tx,
             amount: BigNumber.from(withdraw.amount).toString(),
             fee: BigNumber.from(withdraw.fee).toString(),
-            nonce: withdraw.nonce,
-            validFrom: withdraw.validFrom,
-            validUntil: withdraw.validUntil,
             signature
         };
     }
 
+    /**
+     * @deprecated `Signer.*SignBytes` methods will be removed in future. Use `utils.serializeTx` instead.
+     */
     forcedExitSignBytes(forcedExit: {
         initiatorAccountId: number;
         target: Address;
@@ -165,24 +136,11 @@ export class Signer {
         validFrom: number;
         validUntil: number;
     }): Uint8Array {
-        const typeBytes = new Uint8Array([8]);
-        const initiatorAccountIdBytes = serializeAccountId(forcedExit.initiatorAccountId);
-        const targetBytes = serializeAddress(forcedExit.target);
-        const tokenIdBytes = serializeTokenId(forcedExit.tokenId);
-        const feeBytes = serializeFeePacked(forcedExit.fee);
-        const nonceBytes = serializeNonce(forcedExit.nonce);
-        const validFrom = serializeTimestamp(forcedExit.validFrom);
-        const validUntil = serializeTimestamp(forcedExit.validUntil);
-        return ethers.utils.concat([
-            typeBytes,
-            initiatorAccountIdBytes,
-            targetBytes,
-            tokenIdBytes,
-            feeBytes,
-            nonceBytes,
-            validFrom,
-            validUntil
-        ]);
+        return utils.serializeForcedExit({
+            ...forcedExit,
+            type: 'ForcedExit',
+            token: forcedExit.tokenId
+        });
     }
 
     async signSyncForcedExit(forcedExit: {
@@ -194,21 +152,23 @@ export class Signer {
         validFrom: number;
         validUntil: number;
     }): Promise<ForcedExit> {
-        const msgBytes = this.forcedExitSignBytes(forcedExit);
+        const tx: ForcedExit = {
+            ...forcedExit,
+            type: 'ForcedExit',
+            token: forcedExit.tokenId
+        };
+        const msgBytes = utils.serializeForcedExit(tx);
         const signature = await signTransactionBytes(this.#privateKey, msgBytes);
         return {
-            type: 'ForcedExit',
-            initiatorAccountId: forcedExit.initiatorAccountId,
-            target: forcedExit.target,
-            token: forcedExit.tokenId,
+            ...tx,
             fee: BigNumber.from(forcedExit.fee).toString(),
-            nonce: forcedExit.nonce,
-            validFrom: forcedExit.validFrom,
-            validUntil: forcedExit.validUntil,
             signature
         };
     }
 
+    /**
+     * @deprecated `Signer.*SignBytes` methods will be removed in future. Use `utils.serializeTx` instead.
+     */
     changePubKeySignBytes(changePubKey: {
         accountId: number;
         account: Address;
@@ -219,26 +179,13 @@ export class Signer {
         validFrom: number;
         validUntil: number;
     }): Uint8Array {
-        const typeBytes = new Uint8Array([7]); // Tx type (1 byte)
-        const accountIdBytes = serializeAccountId(changePubKey.accountId);
-        const accountBytes = serializeAddress(changePubKey.account);
-        const pubKeyHashBytes = serializeAddress(changePubKey.newPkHash);
-        const tokenIdBytes = serializeTokenId(changePubKey.feeTokenId);
-        const feeBytes = serializeFeePacked(changePubKey.fee);
-        const nonceBytes = serializeNonce(changePubKey.nonce);
-        const validFrom = serializeTimestamp(changePubKey.validFrom);
-        const validUntil = serializeTimestamp(changePubKey.validUntil);
-        return ethers.utils.concat([
-            typeBytes,
-            accountIdBytes,
-            accountBytes,
-            pubKeyHashBytes,
-            tokenIdBytes,
-            feeBytes,
-            nonceBytes,
-            validFrom,
-            validUntil
-        ]);
+        return utils.serializeChangePubKey({
+            ...changePubKey,
+            type: 'ChangePubKey',
+            feeToken: changePubKey.feeTokenId,
+            // this is not important for serialization
+            ethAuthData: { type: 'Onchain' }
+        });
     }
 
     async signSyncChangePubKey(changePubKey: {
@@ -252,20 +199,17 @@ export class Signer {
         validFrom: number;
         validUntil: number;
     }): Promise<ChangePubKey> {
-        const msgBytes = this.changePubKeySignBytes(changePubKey);
+        const tx: ChangePubKey = {
+            ...changePubKey,
+            type: 'ChangePubKey',
+            feeToken: changePubKey.feeTokenId
+        };
+        const msgBytes = utils.serializeChangePubKey(tx);
         const signature = await signTransactionBytes(this.#privateKey, msgBytes);
         return {
-            type: 'ChangePubKey',
-            accountId: changePubKey.accountId,
-            account: changePubKey.account,
-            newPkHash: changePubKey.newPkHash,
-            feeToken: changePubKey.feeTokenId,
+            ...tx,
             fee: BigNumber.from(changePubKey.fee).toString(),
-            nonce: changePubKey.nonce,
-            signature,
-            ethAuthData: changePubKey.ethAuthData,
-            validFrom: changePubKey.validFrom,
-            validUntil: changePubKey.validUntil
+            signature
         };
     }
 
@@ -292,10 +236,10 @@ export class Signer {
         if (chainID !== 1) {
             message += `\nChain ID: ${chainID}.`;
         }
-        const signedBytes = getSignedBytesFromMessage(message, false);
-        const signature = await signMessagePersonalAPI(ethSigner, signedBytes);
+        const signedBytes = utils.getSignedBytesFromMessage(message, false);
+        const signature = await utils.signMessagePersonalAPI(ethSigner, signedBytes);
         const address = await ethSigner.getAddress();
-        const ethSignatureType = await getEthSignatureType(ethSigner.provider, message, signature, address);
+        const ethSignatureType = await utils.getEthSignatureType(ethSigner.provider, message, signature, address);
         const seed = ethers.utils.arrayify(signature);
         const signer = await Signer.fromSeed(seed);
         return { signer, ethSignatureType };
@@ -317,7 +261,7 @@ export class Create2WalletSigner extends ethers.Signer {
             value: provider,
             writable: false
         });
-        const create2Info = getCREATE2AddressAndSalt(zkSyncPubkeyHash, create2WalletData);
+        const create2Info = utils.getCREATE2AddressAndSalt(zkSyncPubkeyHash, create2WalletData);
         this.address = create2Info.address;
         this.salt = create2Info.salt;
     }
