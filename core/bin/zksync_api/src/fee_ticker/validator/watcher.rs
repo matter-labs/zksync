@@ -82,7 +82,7 @@ pub struct GraphqlTokenResponse {
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct TokenResponse {
-    /// total amount swapped all time in token pair stored in USD, no minimum liquidity threshold.
+    /// Total amount swapped all time in token pair stored in USD, no minimum liquidity threshold.
     #[serde(rename = "untrackedVolumeUSD")]
     pub untracked_volume_usd: String,
 }
