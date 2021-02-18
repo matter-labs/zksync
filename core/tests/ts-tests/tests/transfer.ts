@@ -21,6 +21,7 @@ async function suppress<T>(promise: Promise<T>) {
 }
 
 Tester.prototype.testTransfer = async function (sender: Wallet, receiver: Wallet, token: TokenLike, amount: BigNumber) {
+    expect(false, 'Predicted fail');
     const fullFee = await this.syncProvider.getTransactionFee('Transfer', receiver.address(), token);
     const fee = fullFee.totalFee;
     const senderBefore = await sender.getBalance(token);
