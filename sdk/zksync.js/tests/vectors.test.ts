@@ -10,7 +10,8 @@ import {
     packAmountChecked,
     packFeeChecked,
     TokenSet,
-    parseHexWithPrefix
+    parseHexWithPrefix,
+    getTxHash
 } from '../src/utils';
 import { privateKeyFromSeed, signTransactionBytes } from '../src/crypto';
 import { loadTestVectorsConfig } from 'reading-tool';
@@ -19,6 +20,7 @@ const vectors = loadTestVectorsConfig();
 const cryptoPrimitivesVectors = vectors['cryptoPrimitivesTest'];
 const utilsVectors = vectors['utils'];
 const txVectors = vectors['txTest'];
+const txHashVectors = vectors['txHashTest'];
 
 describe(cryptoPrimitivesVectors['description'], function () {
     it('Keys and signatures', async function () {
@@ -211,6 +213,17 @@ describe(txVectors['description'], function () {
                 expect(utils.hexlify(signBytes)).to.eql(expected.signBytes, 'Sign bytes do not match');
                 expect(signature).to.eql(expected.signature, 'Signature does not match');
             }
+        }
+    });
+});
+
+describe(txHashVectors['description'], function () {
+    it('Transaction hash', async function () {
+        for (const item of txHashVectors.items) {
+            const tx = item.inputs.tx;
+            const expectedHash = item.outputs.hash;
+            const hash = getTxHash(tx);
+            expect(hash).to.eql(expectedHash, 'Hash does not match');
         }
     });
 });

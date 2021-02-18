@@ -118,14 +118,34 @@ jobs:
       - name: integration-server
         run: ci_run zk test i server
 
+      - name: Show logs
+        run: |
+          ci_run cat server.log
+          ci_run cat dummy_prover.log
+
       - name: integration-api
         run: ci_run zk test i api
+
+      - name: Show logs
+        run: |
+          ci_run cat server.log
+          ci_run cat dummy_prover.log
 
       - name: integration-zcli
         run: ci_run zk test i zcli
 
+      - name: Show logs
+        run: |
+          ci_run cat server.log
+          ci_run cat dummy_prover.log
+
       - name: integration-rust-sdk
         run: ci_run zk test i rust-sdk
+
+      - name: Show logs
+        run: |
+          ci_run cat server.log
+          ci_run cat dummy_prover.log
 
 
   testkit:
