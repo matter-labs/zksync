@@ -11,6 +11,8 @@ components, the logs will have the following format:
 
 ### Removed
 
+- (`ci/Dockerfile`): `dockerci/Dockerfile` file with folder was removed , because it is outdated.
+
 ### Changed
 
 ### Added
@@ -18,6 +20,8 @@ components, the logs will have the following format:
 - (`reading-tool`): tool for reading test config.
 
 ### Fixed
+
+- (`explorer`): Bug with 'Click to copy' button for account address.
 
 ## Release 2021-02-02
 
