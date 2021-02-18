@@ -21,6 +21,8 @@ services:
       target: /var/lib/geth/data
   dev-liquidity-token-watcher:
     image: "matterlabs/dev-liquidity-token-watcher:latest"
+    env_file:
+      - ./etc/env/docker.env
     ports:
       - "9975:9975"
     volumes:

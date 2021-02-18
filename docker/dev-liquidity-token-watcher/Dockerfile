@@ -1,5 +1,5 @@
 # syntax=docker/dockerfile:experimental
-FROM rust:1.45 as builder
+FROM rust:1.48 as builder
 RUN --mount=type=cache,target=/usr/local/cargo/registry \
     cargo install sccache
 WORKDIR /usr/src/zksync

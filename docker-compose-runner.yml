@@ -13,6 +13,8 @@ services:
 
   dev-liquidity-token-watcher:
     image: "matterlabs/dev-liquidity-token-watcher:latest"
+    env_file:
+      - ./etc/env/docker.env
     volumes:
       - ./etc/tokens/:/etc/tokens
 
