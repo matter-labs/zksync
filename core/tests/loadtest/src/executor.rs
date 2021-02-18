@@ -10,8 +10,9 @@ use serde::{Deserialize, Serialize};
 use zksync::{
     types::BlockStatus,
     utils::{closest_packable_fee_amount, closest_packable_token_amount},
-    RpcProvider,
+    Network, RpcProvider,
 };
+use zksync_types::TokenLike;
 use zksync_utils::format_ether;
 
 // Local uses
@@ -79,8 +80,10 @@ pub struct LoadtestExecutor {
     main_wallet: MainWallet,
     monitor: Monitor,
     web3_url: String,
+    network: Network,
     /// Estimated fee amount for any zkSync operation.
     fees: Fees,
+    fee_token: TokenLike,
     scenarios: Vec<ScenarioData>,
     api_tests: Option<(ApiTestsFuture, CancellationToken)>,
 }
@@ -92,8 +95,6 @@ fn fee_from_config_field(config_field: &Option<u64>, default_fee: BigUint) -> Bi
 impl LoadtestExecutor {
     /// The approximate number of extra operations for each wallet.
     const OPERATIONS_PER_WALLET: u64 = 5;
-    /// Fee token of the main wallet.
-    const MAIN_WALLET_FEE_TOKEN: &'static str = "ETH";
 
     /// Creates a new executor instance.
     pub async fn new(config: Config, web3_url: String) -> anyhow::Result<Self> {
@@ -102,16 +103,21 @@ impl LoadtestExecutor {
         vlog::info!("Creating scenarios...");
 
         // Create main account to deposit money from and to return money back later.
-        let main_wallet =
-            MainWallet::from_info(monitor.clone(), &config.main_wallet, &web3_url).await;
+        let main_wallet = MainWallet::new(
+            monitor.clone(),
+            config.network.name,
+            config.main_wallet.credentials,
+            &web3_url,
+        )
+        .await;
 
         let default_fee = main_wallet
-            .sufficient_fee(Self::MAIN_WALLET_FEE_TOKEN)
+            .sufficient_fee(&config.main_wallet.fee_token)
             .await?;
 
         let fees = Fees {
             eth: closest_packable_fee_amount(&gwei_to_wei(config.network.eth_fee)),
-            zksync: fee_from_config_field(&config.network.zksync_fee, default_fee),
+            zksync: fee_from_config_field(&config.main_wallet.zksync_fee, default_fee),
         };
 
         let scenarios = try_join_all(
@@ -132,6 +138,8 @@ impl LoadtestExecutor {
             web3_url,
             main_wallet,
             scenarios,
+            fee_token: config.main_wallet.fee_token,
+            network: config.network.name,
             fees,
             api_tests: Some(api_tests),
         })
@@ -188,8 +196,9 @@ impl LoadtestExecutor {
                 CHUNK_SIZES,
                 (0..resource.wallets_amount).map(|_| {
                     ScenarioWallet::new_random(
-                        token_name.clone(),
                         self.monitor.clone(),
+                        self.network,
+                        token_name.clone(),
                         &self.web3_url,
                     )
                 }),
@@ -260,12 +269,12 @@ impl LoadtestExecutor {
         vlog::info!(
             "Deposit {} {} for main wallet",
             format_ether(&main_wallet_amount),
-            Self::MAIN_WALLET_FEE_TOKEN,
+            self.fee_token,
         );
 
         let priority_op = self
             .main_wallet
-            .deposit(Self::MAIN_WALLET_FEE_TOKEN, main_wallet_amount)
+            .deposit(&self.fee_token, main_wallet_amount)
             .await?;
         deposit_ops.push(priority_op);
 
@@ -288,7 +297,7 @@ impl LoadtestExecutor {
         // `zkSync` account.
         let (tx, sign) = self
             .main_wallet
-            .sign_change_pubkey(Self::MAIN_WALLET_FEE_TOKEN, self.fees.zksync.clone())
+            .sign_change_pubkey(&self.fee_token, self.fees.zksync.clone())
             .await?;
         let tx_hash = self.monitor.send_tx(tx, sign).await?;
         self.monitor
