@@ -176,11 +176,11 @@ impl RpcProvider {
     }
 
     /// Creates a new `Provider` object connected to a custom address.
-    pub fn from_addr(rpc_addr: impl Into<String>) -> Self {
+    pub fn from_addr(rpc_addr: impl Into<String>, network: Network) -> Self {
         Self {
             rpc_addr: rpc_addr.into(),
             client: reqwest::Client::new(),
-            network: Network::Unknown,
+            network,
         }
     }
 
