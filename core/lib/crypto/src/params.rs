@@ -29,7 +29,7 @@ pub fn total_tokens() -> usize {
 
 /// Number of tokens that are processed by this release
 pub fn number_of_processable_tokens() -> usize {
-    let num = 128;
+    let num = 512;
 
     assert!(num <= total_tokens());
     assert!(num.is_power_of_two());
@@ -209,7 +209,7 @@ pub const RECURSIVE_CIRCUIT_NUM_INPUTS: usize = 1;
 pub const RECURSIVE_CIRCUIT_VK_TREE_DEPTH: usize = 3;
 
 /// Major version of the ZkSync
-pub const ZKSYNC_VERSION: &str = "contracts-4";
+pub const ZKSYNC_VERSION: &str = "contracts-5";
 
 lazy_static! {
     pub static ref JUBJUB_PARAMS: AltJubjubBn256 = AltJubjubBn256::new();

@@ -234,10 +234,6 @@ export class DummyTransport extends AbstractJSONRPCTransport {
             };
         }
 
-        if (method == 'get_zksync_version') {
-            return 'contracts-4';
-        }
-
         return {
             method,
             params
