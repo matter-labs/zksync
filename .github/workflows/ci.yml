@@ -119,7 +119,6 @@ jobs:
         run: ci_run zk test i server
 
       - name: Show logs
-        if: ${{ failure() }}
         run: |
           cir_run cat server.log
           cir_run cat dummy_prover.log
@@ -128,7 +127,6 @@ jobs:
         run: ci_run zk test i api
 
       - name: Show logs
-        if: ${{ failure() }}
         run: |
           cir_run cat server.log
           cir_run cat dummy_prover.log
@@ -137,7 +135,6 @@ jobs:
         run: ci_run zk test i zcli
 
       - name: Show logs
-        if: ${{ failure() }}
         run: |
           cir_run cat server.log
           cir_run cat dummy_prover.log
@@ -146,7 +143,6 @@ jobs:
         run: ci_run zk test i rust-sdk
 
       - name: Show logs
-        if: ${{ failure() }}
         run: |
           cir_run cat server.log
           cir_run cat dummy_prover.log
