@@ -15,11 +15,16 @@ components, the logs will have the following format:
 
 ### Changed
 
+- (`fee-seller`): migrating to zksync V0.9.0.
+
 ### Added
 
 - (`reading-tool`): tool for reading test config.
 
 ### Fixed
+
+- (`fee-seller`): Sends all Ethereum transactions with sequential nonce starting with the next available not finalized
+  nonce. Thereby resend stuck transactions after the next time you run the script.
 
 - (`explorer`): Bug with 'Click to copy' button for account address.
 

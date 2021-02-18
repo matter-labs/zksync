@@ -1,10 +1,8 @@
 FROM node:12
 WORKDIR /usr/src/fee-seller
-COPY infrastructure/fee-seller/package.json .
-COPY infrastructure/fee-seller/yarn.lock .
-RUN yarn install --frozen-lockfile
 
 COPY infrastructure/fee-seller/ .
+RUN yarn install
 
 # required env
 # ENV MISC_FEE_ACCOUNT_PRIVATE_KEY
