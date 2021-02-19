@@ -35,6 +35,8 @@ All notable changes to the core components will be documented in this file.
 
 ### Fixed
 
+- Bug with the assignment of new account ids in the state.
+
 ## Release 2021-02-02
 
 ### Removed
