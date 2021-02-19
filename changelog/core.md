@@ -25,6 +25,7 @@ All notable changes to the core components will be documented in this file.
 
 - Added a stressing dev fee ticker scenario to the loadtest.
 - Added a `--sloppy` mode to the `dev-fee-ticker-server` to simulate bad networks with the random delays and fails.
+- Possibility to use CREATE2 ChangePubKey and Transfer in a single batch.
 
 ### Fixed
 
