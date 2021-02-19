@@ -91,13 +91,13 @@ Tester.prototype.testForcedExitRequestMultipleTokens = async function (
 
     // We have to wait for verification and execution of the
     // block with the forced exit, so waiting for a while is fine
-    let timeout = 120000;
-    let interval = 500;
+    const timeout = 60000;
+    const interval = 500;
 
-    let timePassed = 0;
+    const iterations = timeout / interval;
 
     let expectedToBalance = toBalancesBefore.map((balance, i) => balance.add(amounts[i]));
-    while (timePassed <= timeout) {
+    for (let i = 0; i < iterations; i++) {
         const balancesPromises = tokenAddresses.map((address) => getFullOnchainBalance(this, to, address));
         const balances = await Promise.all(balancesPromises);
 
@@ -108,7 +108,6 @@ Tester.prototype.testForcedExitRequestMultipleTokens = async function (
         }
 
         await sleep(interval);
-        timePassed += interval;
     }
 
     const balancesPromises = tokenAddresses.map((address) => getFullOnchainBalance(this, to, address));

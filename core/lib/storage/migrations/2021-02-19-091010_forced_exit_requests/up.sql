@@ -7,4 +7,4 @@ CREATE TABLE forced_exit_requests (
     created_at TIMESTAMP with time zone NOT NULL,
     fulfilled_by TEXT, -- comma-separated list of the hashes of ForcedExit transactions
     fulfilled_at TIMESTAMP with time zone
-)
+);
