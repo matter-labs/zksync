@@ -11,7 +11,7 @@ categories = ["cryptography"]
 publish = false # We don't want to publish our tests.
 
 [dependencies]
-zksync = { path = "../../../sdk/zksync-rs", version = "0.2" }
+zksync = { path = "../../../sdk/zksync-rs", version = "0.3" }
 zksync_api_client = { path = "../../lib/api_client", version = "0.1" }
 zksync_config = { path = "../../lib/config", version = "1.0" }
 zksync_eth_signer = { path = "../../lib/eth_signer", version = "1.0" }
