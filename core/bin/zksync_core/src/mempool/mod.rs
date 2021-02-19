@@ -463,15 +463,9 @@ async fn store_account_type(
     tx: &ChangePubKey,
     storage: &mut StorageProcessor<'_>,
 ) -> Result<(), TxAddError> {
-    let account_type = if tx
-        .eth_auth_data
-        .as_ref()
-        .map(|auth| auth.is_create2())
-        .unwrap_or(false)
-    {
-        EthAccountType::CREATE2
-    } else {
-        EthAccountType::Owned
+    let account_type = match &tx.eth_auth_data {
+        Some(auth) if auth.is_create2() => EthAccountType::CREATE2,
+        _ => EthAccountType::Owned,
     };
     storage
         .chain()

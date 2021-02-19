@@ -5,7 +5,7 @@
   "license": "MIT",
   "dependencies": {
     "ethers": "^5.0.19",
-    "zksync": "link:../../sdk/zksync.js"
+    "zksync": "^0.9.0"
   },
   "devDependencies": {
     "@types/chai": "^4.2.14",

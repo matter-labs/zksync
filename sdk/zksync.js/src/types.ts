@@ -81,7 +81,7 @@ export interface Transfer {
     amount: BigNumberish;
     fee: BigNumberish;
     nonce: number;
-    signature: Signature;
+    signature?: Signature;
     validFrom: number;
     validUntil: number;
 }
@@ -95,7 +95,7 @@ export interface Withdraw {
     amount: BigNumberish;
     fee: BigNumberish;
     nonce: number;
-    signature: Signature;
+    signature?: Signature;
     validFrom: number;
     validUntil: number;
 }
@@ -107,7 +107,7 @@ export interface ForcedExit {
     token: number;
     fee: BigNumberish;
     nonce: number;
-    signature: Signature;
+    signature?: Signature;
     validFrom: number;
     validUntil: number;
 }
@@ -139,7 +139,7 @@ export interface ChangePubKey {
     feeToken: number;
     fee: BigNumberish;
     nonce: number;
-    signature: Signature;
+    signature?: Signature;
     ethAuthData: ChangePubKeyOnchain | ChangePubKeyECDSA | ChangePubKeyCREATE2;
     validFrom: number;
     validUntil: number;
