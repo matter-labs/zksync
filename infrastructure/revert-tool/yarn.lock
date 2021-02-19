@@ -400,7 +400,7 @@ bech32@1.1.4:
   resolved "https://registry.yarnpkg.com/bech32/-/bech32-1.1.4.tgz#e38c9f37bf179b8eb16ae3a772b40c356d4832e9"
   integrity sha512-s0IrSOzLlbvX7yp4WBfPITzpAU8sqQcpsmwXDiKwrG4r491vwCO/XpejasRNl0piBMe/DvP4Tz0mIS/X1DPJBQ==
 
-bn.js@^4.11.9, bn.js@^4.4.0:
+bn.js@^4.11.8, bn.js@^4.11.9, bn.js@^4.4.0:
   version "4.11.9"
   resolved "https://registry.yarnpkg.com/bn.js/-/bn.js-4.11.9.tgz#26d556829458f9d1e81fc48952493d0ba3507828"
   integrity sha512-E6QoYqCKZfgatHTdHzs1RRKP7ip4vvm+EyRUeE2RF0NblwVvb0p6jSVeNTOFxPn26QXN2o6SMfNxKp6kU8zQaw==
@@ -473,6 +473,11 @@ commander@^2.12.1:
   version "2.20.3"
   resolved "https://registry.yarnpkg.com/commander/-/commander-2.20.3.tgz#fd485e84c03eb4881c20722ba48035e8531aeb33"
   integrity sha512-GpVkmM8vF2vQUkj2LvZmD35JxeJOLCwJ9cUkugyk2nuhbv3+mJvpLYYt+0+USMxE+oj+ey/lJEnhZw75x/OMcQ==
+
+commander@^6.0.0:
+  version "6.2.1"
+  resolved "https://registry.yarnpkg.com/commander/-/commander-6.2.1.tgz#0792eb682dfbc325999bb2b84fddddba110ac73c"
+  integrity sha512-U7VdrJFnJgo4xjrHpTzu0yrHPGImdsmD95ZlgYSEajAn2JKzDhDTPG9kBTefmObL2w/ngeZnilk+OV9CG3d7UA==
 
 concat-map@0.0.1:
   version "0.0.1"
@@ -775,6 +780,22 @@ js-yaml@^3.13.1:
     argparse "^1.0.7"
     esprima "^4.0.0"
 
+keccak256@^1.0.2:
+  version "1.0.2"
+  resolved "https://registry.yarnpkg.com/keccak256/-/keccak256-1.0.2.tgz#ee0d38c2d5fb817f39d37c3fef842cab0164a067"
+  integrity sha512-f2EncSgmHmmQOkgxZ+/f2VaWTNkFL6f39VIrpoX+p8cEXJVyyCs/3h9GNz/ViHgwchxvv7oG5mjT2Tk4ZqInag==
+  dependencies:
+    bn.js "^4.11.8"
+    keccak "^3.0.1"
+
+keccak@^3.0.1:
+  version "3.0.1"
+  resolved "https://registry.yarnpkg.com/keccak/-/keccak-3.0.1.tgz#ae30a0e94dbe43414f741375cff6d64c8bea0bff"
+  integrity sha512-epq90L9jlFWCW7+pQa6JOnKn2Xgl2mtI664seYR6MHskvI9agt7AnDqmAlp9TqU4/caMYbA08Hi5DMZAl5zdkA==
+  dependencies:
+    node-addon-api "^2.0.0"
+    node-gyp-build "^4.2.0"
+
 make-error@^1.1.1:
   version "1.3.6"
   resolved "https://registry.yarnpkg.com/make-error/-/make-error-1.3.6.tgz#2eb2e37ea9b67c4891f684a1394799af484cf7a2"
@@ -818,6 +839,11 @@ next-tick@~1.0.0:
   version "1.0.0"
   resolved "https://registry.yarnpkg.com/next-tick/-/next-tick-1.0.0.tgz#ca86d1fe8828169b0120208e3dc8424b9db8342c"
   integrity sha1-yobR/ogoFpsBICCOPchCS524NCw=
+
+node-addon-api@^2.0.0:
+  version "2.0.2"
+  resolved "https://registry.yarnpkg.com/node-addon-api/-/node-addon-api-2.0.2.tgz#432cfa82962ce494b132e9d72a15b29f71ff5d32"
+  integrity sha512-Ntyt4AIXyaLIuMHF6IOoTakB3K+RWxwtsHNRxllEoA6vPwP9o4866g6YWDLUdnucilZhmkxiHwHr11gAENw+QA==
 
 node-gyp-build@^4.2.0:
   version "4.2.3"
@@ -945,6 +971,18 @@ ts-node@^9.0.0:
     make-error "^1.1.1"
     source-map-support "^0.5.17"
     yn "3.1.1"
+
+ts-postgres@^1.1.3:
+  version "1.1.3"
+  resolved "https://registry.yarnpkg.com/ts-postgres/-/ts-postgres-1.1.3.tgz#d848d843a9c61445cdc553af5ef8974d13bebd84"
+  integrity sha512-T7Ibw5bZ5Bpf2dH3h44Xp0tigSYnZbgl6DdvJuwQKEOxqFPiTXPZGal+KyCLCNmOgcGOP15iYdbu7J6siMdm8w==
+  dependencies:
+    ts-typed-events "^1.1.1"
+
+ts-typed-events@^1.1.1:
+  version "1.1.1"
+  resolved "https://registry.yarnpkg.com/ts-typed-events/-/ts-typed-events-1.1.1.tgz#9736c79c008cdd61fc536b98a806e85bf25053cf"
+  integrity sha512-jftubiJvjHWcHIFUgLOGB1NjybQwKpAWX1Rb9FeVGw9R6LvqjdBdkowFQUTTjcpaVmmJXXvuwjZFhDuqnr9xQQ==
 
 tslib@^1.13.0, tslib@^1.8.1:
   version "1.14.1"

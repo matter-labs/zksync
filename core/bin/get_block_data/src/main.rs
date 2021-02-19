@@ -13,6 +13,18 @@ async fn main() -> anyhow::Result<()> {
         .unwrap();
     println!("{:?}", block);
     println!("{:?}", block.get_onchain_operations_block_info().1);
+    for op in &block.block_transactions {
+        if let Some(executed_op) = op.get_executed_op() {
+            if executed_op.is_processable_onchain_operation() {
+                println!("{:?}", executed_op);
+                println!("{:?}", executed_op.public_data());
+                // processable_ops_hash =
+                //     [&processable_ops_hash, executed_op.public_data().as_slice()]
+                //         .concat()
+                //         .keccak256();
+            }
+        }
+    }
 
     Ok(())
 }
