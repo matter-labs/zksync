@@ -8,6 +8,16 @@ All notable changes to the core components will be documented in this file.
 
 ### Changed
 
+### Added
+
+### Fixed
+
+## Release 2021-02-19
+
+### Removed
+
+### Changed
+
 - The token name is now set for each scenario separately instead of the network section of the loadtest configuration.
 - Rejected transactions are now stored in the database for 2 weeks only.
 
