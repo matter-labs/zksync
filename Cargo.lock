@@ -5999,6 +5999,7 @@ dependencies = [
  "zksync_crypto",
  "zksync_eth_signer",
  "zksync_storage",
+ "zksync_test_account",
  "zksync_types",
 ]
 

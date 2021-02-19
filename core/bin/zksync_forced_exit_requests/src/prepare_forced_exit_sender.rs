@@ -1,5 +1,4 @@
 use num::BigUint;
-use std::str::FromStr;
 use std::time::Duration;
 use zksync_config::ZkSyncConfig;
 use zksync_storage::{
@@ -8,19 +7,17 @@ use zksync_storage::{
 
 use zksync_api::core_api_client::CoreApiClient;
 use zksync_types::{
-    tx::{EthSignData, PackedEthSignature, TimeRange, TxEthSignature, TxHash},
+    tx::{PackedEthSignature, TimeRange, TxHash},
     AccountId, Address, PubKeyHash, ZkSyncTx, H256,
 };
 
-use zksync_types::tx::ChangePubKey;
-use zksync_types::SignedZkSyncTx;
+use zksync_types::{Nonce, SignedZkSyncTx, TokenId};
 
 use zksync_crypto::franklin_crypto::eddsa::PrivateKey;
 
 use tokio::time;
 
-use zksync_types::Nonce;
-use zksync_types::TokenId;
+use zksync_test_account::ZkSyncAccount;
 
 use super::utils::{read_signing_key, Engine};
 
@@ -28,6 +25,43 @@ use super::utils::{read_signing_key, Engine};
 // The address should be 0xe1faB3eFD74A77C23B426c302D96372140FF7d0C
 const FORCED_EXIT_TEST_SENDER_ETH_PRIVATE_KEY: &str =
     "0x0559b9f000b4e4bbb7fe02e1374cef9623c2ab7c3791204b490e1f229191d104";
+
+pub async fn prepare_forced_exit_sender_account(
+    connection_pool: ConnectionPool,
+    api_client: CoreApiClient,
+    config: &ZkSyncConfig,
+) -> anyhow::Result<()> {
+    let mut storage = connection_pool
+        .access_storage()
+        .await
+        .expect("forced_exit_requests: Failed to get the connection to storage");
+
+    let sender_sk = hex::decode(&config.forced_exit_requests.sender_private_key[2..])
+        .expect("Failed to decode forced_exit_sender sk");
+    let sender_sk = read_signing_key(&sender_sk).expect("Failed to read forced exit sender sk");
+    let sender_address = config.forced_exit_requests.sender_account_address;
+
+    let is_sender_prepared =
+        check_forced_exit_sender_prepared(&mut storage, &sender_sk, sender_address)
+            .await
+            .expect("Failed to check if the sender is prepared");
+
+    if is_sender_prepared {
+        return Ok(());
+    }
+
+    // The sender is not prepared. This should not ever happen in production, but handling
+    // such step is vital for testing locally.
+
+    // Waiting until the sender has an id (sending funds to the account should be done by an external script)
+    let id = wait_for_account_id(&mut storage, sender_address)
+        .await
+        .expect("Failed to get account id for forced exit sender");
+
+    register_signing_key(&mut storage, id, api_client, sender_address, sender_sk).await?;
+
+    Ok(())
+}
 
 pub async fn check_forced_exit_sender_prepared(
     storage: &mut StorageProcessor<'_>,
@@ -146,61 +180,36 @@ pub async fn register_signing_key(
     sender_id: AccountId,
     api_client: CoreApiClient,
     sender_address: Address,
-    sender_sk: &PrivateKey<Engine>,
+    sender_sk: PrivateKey<Engine>,
 ) -> anyhow::Result<()> {
     let eth_sk = get_verified_eth_sk(sender_address).await;
 
-    let pub_key_hash = PubKeyHash::from_privkey(sender_sk);
-
-    // Unfortunately, currently the only way to create a CPK
-    // transaction from eth_private_key is to cre
-    let cpk_tx = ChangePubKey::new_signed(
-        sender_id,
-        sender_address,
-        pub_key_hash,
-        TokenId::from_str("0").unwrap(),
-        BigUint::from(0u8),
-        Nonce::from_str("0").unwrap(),
-        TimeRange::default(),
-        None,
+    let sender_account = ZkSyncAccount::new(
         sender_sk,
-    )
-    .expect("Failed to create unsigned cpk transaction");
-
-    let eth_sign_bytes = cpk_tx
-        .get_eth_signed_data()
-        .expect("Failed to get eth signed data");
-
-    let eth_signature =
-        PackedEthSignature::sign(&eth_sk, &eth_sign_bytes).expect("Failed to sign eth message");
-
-    let cpk_tx_signed = ChangePubKey::new_signed(
-        sender_id,
+        // The accout is changing public key for hte first time, so nonce is 0
+        Nonce(0),
         sender_address,
-        pub_key_hash,
-        TokenId::from_str("0").unwrap(),
+        eth_sk,
+    );
+    sender_account.set_account_id(Some(sender_id));
+
+    let cpk = sender_account.sign_change_pubkey_tx(
+        Some(Nonce(0)),
+        true,
+        TokenId(0),
         BigUint::from(0u8),
-        Nonce::from_str("0").unwrap(),
+        false,
         TimeRange::default(),
-        Some(eth_signature.clone()),
-        sender_sk,
-    )
-    .expect("Failed to created signed CPK transaction");
+    );
 
-    let tx = ZkSyncTx::ChangePubKey(Box::new(cpk_tx_signed));
-    let eth_sign_data = EthSignData {
-        signature: TxEthSignature::EthereumSignature(eth_signature),
-        message: eth_sign_bytes,
-    };
-
-    let tx_signed = SignedZkSyncTx {
-        tx,
-        eth_sign_data: Some(eth_sign_data),
-    };
-    let tx_hash = tx_signed.tx.hash();
+    let tx = ZkSyncTx::ChangePubKey(Box::new(cpk));
+    let tx_hash = tx.hash();
 
     api_client
-        .send_tx(tx_signed)
+        .send_tx(SignedZkSyncTx {
+            tx,
+            eth_sign_data: None,
+        })
         .await
         .expect("Failed to send CPK transaction")
         .expect("Failed to send");
@@ -208,43 +217,6 @@ pub async fn register_signing_key(
     wait_for_change_pub_key_tx(storage, tx_hash)
         .await
         .expect("Failed to wait for ChangePubKey tx");
-
-    Ok(())
-}
-
-pub async fn prepare_forced_exit_sender_account(
-    connection_pool: ConnectionPool,
-    api_client: CoreApiClient,
-    config: &ZkSyncConfig,
-) -> anyhow::Result<()> {
-    let mut storage = connection_pool
-        .access_storage()
-        .await
-        .expect("forced_exit_requests: Failed to get the connection to storage");
-
-    let sender_sk = hex::decode(&config.forced_exit_requests.sender_private_key[2..])
-        .expect("Failed to decode forced_exit_sender sk");
-    let sender_sk = read_signing_key(&sender_sk).expect("Failed to read forced exit sender sk");
-    let sender_address = config.forced_exit_requests.sender_account_address;
-
-    let is_sender_prepared =
-        check_forced_exit_sender_prepared(&mut storage, &sender_sk, sender_address)
-            .await
-            .expect("Failed to check if the sender is prepared");
-
-    if is_sender_prepared {
-        return Ok(());
-    }
-
-    // The sender is not prepared. This should not ever happen in production, but handling
-    // such step is vital for testing locally.
-
-    // Waiting until the sender has an id (sending funds to the account should be done by an external script)
-    let id = wait_for_account_id(&mut storage, sender_address)
-        .await
-        .expect("Failed to get account id for forced exit sender");
-
-    register_signing_key(&mut storage, id, api_client, sender_address, &sender_sk).await?;
 
     Ok(())
 }
