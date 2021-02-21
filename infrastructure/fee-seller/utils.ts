@@ -1,6 +1,7 @@
 import { BigNumber, BigNumberish, Contract, ethers, utils } from 'ethers';
 import Axios from 'axios';
 import * as zksync from 'zksync';
+import { EthParameters } from './types';
 
 export async function getExpectedETHSwapResult(
     tokenSymbol: string,
@@ -45,7 +46,12 @@ export function isOperationFeeAcceptable(
     return numberAsFractionInBIPs(fee, amount).lte(operationFeeThreshold * 100);
 }
 
-export async function approveTokenIfNotApproved(signer: ethers.Signer, tokenAddress: string, contractAddress: string) {
+export async function approveTokenIfNotApproved(
+    signer: ethers.Signer,
+    tokenAddress: string,
+    contractAddress: string,
+    ethParameters: EthParameters
+) {
     const MAX_ERC20_APPROVE_AMOUNT = '115792089237316195423570985008687907853269984665640564039457584007913129639935'; // 2^256 - 1
 
     const ERC20_APPROVE_TRESHOLD = '57896044618658097711785492504343953926634992332820282019728792003956564819968'; // 2^255
@@ -104,7 +110,9 @@ export async function approveTokenIfNotApproved(signer: ethers.Signer, tokenAddr
     const approved = BigNumber.from(currentAllowance).gte(ERC20_APPROVE_TRESHOLD);
     if (!approved) {
         console.log(`Approving token ${tokenAddress}`);
-        await erc20contract.approve(contractAddress, MAX_ERC20_APPROVE_AMOUNT);
+        await erc20contract.approve(contractAddress, MAX_ERC20_APPROVE_AMOUNT, {
+            nonce: ethParameters.getNextNonce()
+        });
     }
 }
 
@@ -126,6 +134,13 @@ export function fmtToken(zksProvider: zksync.Provider, token, amount: BigNumber)
 export async function fmtTokenWithETHValue(zksProvider: zksync.Provider, token, amount: BigNumber): Promise<string> {
     const tokenSymbol = zksProvider.tokenSet.resolveTokenSymbol(token);
     const tokenDecimals = zksProvider.tokenSet.resolveTokenDecimals(token);
-    const estimatedETHValue = await getExpectedETHSwapResult(tokenSymbol, tokenDecimals, amount);
-    return `${fmtToken(zksProvider, token, amount)} (${fmtToken(zksProvider, 'ETH', estimatedETHValue)})`;
+
+    try {
+        const estimatedETHValue = await getExpectedETHSwapResult(tokenSymbol, tokenDecimals, amount);
+        return `${fmtToken(zksProvider, token, amount)} (${fmtToken(zksProvider, 'ETH', estimatedETHValue)})`;
+    } catch (e) {
+        console.log("Can't get expected ETH value after swap: ", e);
+    }
+
+    return `${fmtToken(zksProvider, token, amount)}`;
 }

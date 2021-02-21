@@ -111,7 +111,7 @@ async fn handle_graphql(
     let response = GraphqlResponse {
         data: GraphqlTokenResponse {
             token: Some(TokenResponse {
-                trade_volume_usd: volume.to_string(),
+                untracked_volume_usd: volume.to_string(),
             }),
         },
     };
