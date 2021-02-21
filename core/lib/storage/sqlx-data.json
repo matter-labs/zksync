@@ -101,6 +101,24 @@
       ]
     }
   },
+  "02059619c9c4860687644d0ae45d616984243571551454f0c9e27f17bf063476": {
+    "query": "\n            SELECT max(id) as \"id!\" FROM tokens\n            ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "id!",
+          "type_info": "Int4"
+        }
+      ],
+      "parameters": {
+        "Left": []
+      },
+      "nullable": [
+        null
+      ]
+    }
+  },
   "04069d09246f16a6d03be04decaa05456556dc05b964adea34742af0eaef91aa": {
     "query": "\n                    SELECT * FROM tokens\n                    WHERE symbol = $1\n                    LIMIT 1\n                    ",
     "describe": {
@@ -1920,24 +1938,6 @@
       ]
     }
   },
-  "6e4c5231bdde779bdf1e714557b6763e244ff62edfcbcdfc7166c9f561d7f670": {
-    "query": "\n            SELECT count(*) as \"count!\" FROM tokens\n            ",
-    "describe": {
-      "columns": [
-        {
-          "ordinal": 0,
-          "name": "count!",
-          "type_info": "Int8"
-        }
-      ],
-      "parameters": {
-        "Left": []
-      },
-      "nullable": [
-        null
-      ]
-    }
-  },
   "714d10cb76076a8c10d147a14bfda609e7d809186b602406b671d4dd79a0ca8e": {
     "query": "SELECT * FROM accounts",
     "describe": {
@@ -3710,6 +3710,21 @@
         true,
         false
       ]
+    }
+  },
+  "e1241c3701415e650f8bf5e6d9074a76e8585ad405d97be13557f7b7a08a5b58": {
+    "query": "\n            INSERT INTO tokens ( id, address, symbol, decimals )\n            VALUES ( $1, $2, $3, $4 )\n            ON CONFLICT (id)\n            DO NOTHING\n            ",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "Int4",
+          "Text",
+          "Text",
+          "Int2"
+        ]
+      },
+      "nullable": []
     }
   },
   "e32e0ba9ec31e6e78de5972548dced78d2a6949ec723b71ce210627dbb92dfe4": {

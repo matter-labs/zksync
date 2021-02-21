@@ -24,8 +24,31 @@ pub(crate) const STORED_USD_PRICE_PRECISION: usize = 6;
 pub struct TokensSchema<'a, 'c>(pub &'a mut StorageProcessor<'c>);
 
 impl<'a, 'c> TokensSchema<'a, 'c> {
-    /// Persists the token in the database.
+    /// Persists the new token in the database.
     pub async fn store_token(&mut self, token: Token) -> QueryResult<()> {
+        let start = Instant::now();
+        sqlx::query!(
+            r#"
+            INSERT INTO tokens ( id, address, symbol, decimals )
+            VALUES ( $1, $2, $3, $4 )
+            ON CONFLICT (id)
+            DO NOTHING
+            "#,
+            i32::from(*token.id),
+            address_to_stored_string(&token.address),
+            token.symbol,
+            i16::from(token.decimals),
+        )
+        .execute(self.0.conn())
+        .await?;
+
+        metrics::histogram!("sql.token.store_token", start.elapsed());
+        Ok(())
+    }
+
+    /// If a token with a given ID exists, then it replaces the information about the
+    /// token with a new one, otherwise, saves the token.
+    pub async fn store_or_update_token(&mut self, token: Token) -> QueryResult<()> {
         let start = Instant::now();
         sqlx::query!(
             r#"
@@ -108,20 +131,20 @@ impl<'a, 'c> TokensSchema<'a, 'c> {
         result
     }
 
-    /// Get the number of tokens from Database
-    pub async fn get_count(&mut self) -> QueryResult<i64> {
+    /// Get last used token id from Database.
+    pub async fn get_last_token_id(&mut self) -> QueryResult<u16> {
         let start = Instant::now();
-        let tokens_count = sqlx::query!(
+        let last_token_id = sqlx::query!(
             r#"
-            SELECT count(*) as "count!" FROM tokens
+            SELECT max(id) as "id!" FROM tokens
             "#,
         )
         .fetch_one(self.0.conn())
         .await?
-        .count;
+        .id as u16;
 
-        metrics::histogram!("sql.token.get_count", start.elapsed());
-        Ok(tokens_count)
+        metrics::histogram!("sql.token.get_last_token_id", start.elapsed());
+        Ok(last_token_id)
     }
 
     /// Given the numeric token ID, symbol or address, returns token.

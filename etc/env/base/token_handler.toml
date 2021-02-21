@@ -1,0 +1,5 @@
+[token_handler]
+# The name of the trusted token list 
+token_list_name="coingecko"
+# How often (in seconds) we want to poll the Ethereum Watch module.
+poll_interval=10

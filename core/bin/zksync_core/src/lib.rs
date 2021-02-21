@@ -9,6 +9,7 @@ use crate::{
     private_api::start_private_core_api,
     rejected_tx_cleaner::run_rejected_tx_cleaner,
     state_keeper::{start_state_keeper, ZkSyncStateKeeper},
+    token_handler::run_token_handler,
 };
 use futures::{channel::mpsc, future};
 use tokio::task::JoinHandle;
@@ -25,6 +26,7 @@ pub mod mempool;
 pub mod private_api;
 pub mod rejected_tx_cleaner;
 pub mod state_keeper;
+pub mod token_handler;
 
 /// Waits for *any* of the tokio tasks to be finished.
 /// Since the main tokio tasks are used as actors which should live as long
@@ -73,9 +75,7 @@ pub async fn genesis_init(config: &ZkSyncConfig) {
             .store_token(Token {
                 id: TokenId(id as u16),
                 symbol: token.symbol,
-                address: token.address[2..]
-                    .parse()
-                    .expect("failed to parse token address"),
+                address: token.address,
                 decimals: token.decimals,
             })
             .await
@@ -153,6 +153,13 @@ pub async fn run_core(
         DEFAULT_CHANNEL_CAPACITY,
     );
 
+    // Start token handler.
+    let token_handler_task = run_token_handler(
+        connection_pool.clone(),
+        eth_watch_req_sender.clone(),
+        &config,
+    );
+
     // Start rejected transactions cleaner task.
     let rejected_tx_cleaner_task = run_rejected_tx_cleaner(&config, connection_pool.clone());
 
@@ -178,6 +185,7 @@ pub async fn run_core(
         mempool_task,
         proposer_task,
         rejected_tx_cleaner_task,
+        token_handler_task,
     ];
 
     Ok(task_futures)

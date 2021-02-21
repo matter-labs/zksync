@@ -4,7 +4,7 @@ use std::str::FromStr;
 use zksync_storage::{data_restore::records::NewBlockEvent, StorageProcessor};
 use zksync_types::{
     aggregated_operations::{BlocksCommitOperation, BlocksExecuteOperation},
-    AccountId, BlockNumber, Token, TokenGenesisListItem, TokenId,
+    AccountId, BlockNumber, Token, TokenId, TokenInfo,
     {block::Block, AccountUpdate, AccountUpdates, ZkSyncOp},
 };
 
@@ -118,15 +118,13 @@ impl StorageInteractor for DatabaseStorageInteractor<'_> {
             .expect("Unable to commit DB transaction");
     }
 
-    async fn store_token(&mut self, token: TokenGenesisListItem, token_id: TokenId) {
+    async fn store_token(&mut self, token: TokenInfo, token_id: TokenId) {
         self.storage
             .tokens_schema()
             .store_token(Token {
                 id: token_id,
                 symbol: token.symbol,
-                address: token.address[2..]
-                    .parse()
-                    .expect("failed to parse token address"),
+                address: token.address,
                 decimals: token.decimals,
             })
             .await

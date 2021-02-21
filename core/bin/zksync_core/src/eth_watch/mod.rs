@@ -22,7 +22,7 @@ use web3::types::{Address, BlockNumber};
 
 // Workspace deps
 use zksync_crypto::params::PRIORITY_EXPIRATION;
-use zksync_types::{Nonce, PriorityOp, PubKeyHash, ZkSyncPriorityOp};
+use zksync_types::{NewTokenEvent, PriorityOp, ZkSyncPriorityOp};
 
 // Local deps
 use self::{
@@ -65,12 +65,6 @@ enum WatcherMode {
 #[derive(Debug)]
 pub enum EthWatchRequest {
     PollETHNode,
-    IsPubkeyChangeAuthorized {
-        address: Address,
-        nonce: Nonce,
-        pubkey_hash: PubKeyHash,
-        resp: oneshot::Sender<bool>,
-    },
     GetPriorityQueueOps {
         op_start_id: u64,
         max_chunks: usize,
@@ -87,6 +81,10 @@ pub enum EthWatchRequest {
     GetUnconfirmedOpByHash {
         eth_hash: Vec<u8>,
         resp: oneshot::Sender<Option<PriorityOp>>,
+    },
+    GetNewTokens {
+        token_start_id: u16,
+        resp: oneshot::Sender<Vec<NewTokenEvent>>,
     },
 }
 
@@ -143,7 +141,7 @@ impl<W: EthClient> EthWatch<W> {
         let block_difference =
             last_ethereum_block.saturating_sub(self.eth_state.last_ethereum_block());
 
-        let (unconfirmed_queue, received_priority_queue) = self
+        let (unconfirmed_queue, received_priority_queue, received_new_tokens) = self
             .update_eth_state(last_ethereum_block, block_difference)
             .await?;
 
@@ -152,18 +150,33 @@ impl<W: EthClient> EthWatch<W> {
         for (serial_id, op) in received_priority_queue {
             priority_queue.insert(serial_id, op);
         }
+        // Extend the existing token events with the new ones.
+        let mut new_tokens = self.eth_state.new_tokens().clone();
+        for (token_id, token) in received_new_tokens {
+            new_tokens.insert(token_id, token);
+        }
 
-        let new_state = ETHState::new(last_ethereum_block, unconfirmed_queue, priority_queue);
+        let new_state = ETHState::new(
+            last_ethereum_block,
+            unconfirmed_queue,
+            priority_queue,
+            new_tokens,
+        );
         self.set_new_state(new_state);
         Ok(())
     }
 
     async fn restore_state_from_eth(&mut self, last_ethereum_block: u64) -> anyhow::Result<()> {
-        let (unconfirmed_queue, priority_queue) = self
+        let (unconfirmed_queue, priority_queue, new_tokens) = self
             .update_eth_state(last_ethereum_block, PRIORITY_EXPIRATION)
             .await?;
 
-        let new_state = ETHState::new(last_ethereum_block, unconfirmed_queue, priority_queue);
+        let new_state = ETHState::new(
+            last_ethereum_block,
+            unconfirmed_queue,
+            priority_queue,
+            new_tokens,
+        );
 
         self.set_new_state(new_state);
         vlog::debug!("ETH state: {:#?}", self.eth_state);
@@ -174,7 +187,11 @@ impl<W: EthClient> EthWatch<W> {
         &mut self,
         current_ethereum_block: u64,
         unprocessed_blocks_amount: u64,
-    ) -> anyhow::Result<(Vec<PriorityOp>, HashMap<u64, ReceivedPriorityOp>)> {
+    ) -> anyhow::Result<(
+        Vec<PriorityOp>,
+        HashMap<u64, ReceivedPriorityOp>,
+        HashMap<u16, NewTokenEvent>,
+    )> {
         let new_block_with_accepted_events =
             current_ethereum_block.saturating_sub(self.number_of_confirmations_for_event);
         let previous_block_with_accepted_events =
@@ -191,8 +208,30 @@ impl<W: EthClient> EthWatch<W> {
             .into_iter()
             .map(|priority_op| (priority_op.serial_id, priority_op.into()))
             .collect();
+        let new_tokens = self
+            .client
+            .get_new_tokens_events(
+                BlockNumber::Number(previous_block_with_accepted_events.into()),
+                BlockNumber::Number(new_block_with_accepted_events.into()),
+            )
+            .await?
+            .into_iter()
+            .map(|token| (token.id.0, token))
+            .collect();
 
-        Ok((unconfirmed_queue, priority_queue))
+        Ok((unconfirmed_queue, priority_queue, new_tokens))
+    }
+
+    fn get_new_tokens(&self, first_serial_id: u16) -> Vec<NewTokenEvent> {
+        let mut result = Vec::new();
+        let mut current_token_id = first_serial_id;
+
+        while let Some(token) = self.eth_state.new_tokens().get(&current_token_id) {
+            result.push(token.clone());
+            current_token_id += 1;
+        }
+
+        result
     }
 
     fn get_priority_requests(&self, first_serial_id: u64, max_chunks: usize) -> Vec<PriorityOp> {
@@ -212,20 +251,6 @@ impl<W: EthClient> EthWatch<W> {
         }
 
         result
-    }
-
-    async fn is_new_pubkey_hash_authorized(
-        &self,
-        address: Address,
-        nonce: Nonce,
-        pub_key_hash: &PubKeyHash,
-    ) -> anyhow::Result<bool> {
-        let auth_fact_reset_time = self.client.get_auth_fact_reset_time(address, nonce).await?;
-        if auth_fact_reset_time != 0 {
-            return Ok(false);
-        }
-        let auth_fact = self.client.get_auth_fact(address, nonce).await?;
-        Ok(auth_fact.as_slice() == tiny_keccak::keccak256(&pub_key_hash.data[..]))
     }
 
     fn find_ongoing_op_by_hash(&self, eth_hash: &[u8]) -> Option<PriorityOp> {
@@ -382,17 +407,11 @@ impl<W: EthClient> EthWatch<W> {
                     let unconfirmed_op = self.find_ongoing_op_by_hash(&eth_hash);
                     resp.send(unconfirmed_op).unwrap_or_default();
                 }
-                EthWatchRequest::IsPubkeyChangeAuthorized {
-                    address,
-                    nonce,
-                    pubkey_hash,
+                EthWatchRequest::GetNewTokens {
+                    token_start_id,
                     resp,
                 } => {
-                    let authorized = self
-                        .is_new_pubkey_hash_authorized(address, nonce, &pubkey_hash)
-                        .await
-                        .unwrap_or(false);
-                    resp.send(authorized).unwrap_or_default();
+                    resp.send(self.get_new_tokens(token_start_id)).ok();
                 }
             }
         }
@@ -406,7 +425,11 @@ pub fn start_eth_watch(
     eth_req_receiver: mpsc::Receiver<EthWatchRequest>,
 ) -> JoinHandle<()> {
     let client = EthereumGateway::from_config(&config_options);
-    let eth_client = EthHttpClient::new(client, config_options.contracts.contract_addr);
+    let eth_client = EthHttpClient::new(
+        client,
+        config_options.contracts.contract_addr,
+        config_options.contracts.governance_addr,
+    );
 
     let eth_watch = EthWatch::new(
         eth_client,

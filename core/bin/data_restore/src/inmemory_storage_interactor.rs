@@ -6,7 +6,7 @@ use web3::types::Address;
 use zksync_types::block::Block;
 use zksync_types::{
     Account, AccountId, AccountMap, AccountUpdate, AccountUpdates, Action, BlockNumber, Operation,
-    Token, TokenGenesisListItem, TokenId,
+    Token, TokenId, TokenInfo,
 };
 
 use crate::{
@@ -65,13 +65,11 @@ impl StorageInteractor for InMemoryStorageInteractor {
         // TODO save operations
     }
 
-    async fn store_token(&mut self, token: TokenGenesisListItem, token_id: TokenId) {
+    async fn store_token(&mut self, token: TokenInfo, token_id: TokenId) {
         let token = Token {
             id: token_id,
             symbol: token.symbol,
-            address: token.address[2..]
-                .parse()
-                .expect("failed to parse token address"),
+            address: token.address,
             decimals: token.decimals,
         };
         self.tokens.insert(token_id, token);

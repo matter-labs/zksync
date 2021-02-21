@@ -6,8 +6,8 @@ use zksync_storage::data_restore::records::{
     NewBlockEvent, StoredBlockEvent, StoredRollupOpsBlock,
 };
 use zksync_types::{
-    block::Block, AccountId, AccountMap, AccountUpdate, AccountUpdates, BlockNumber,
-    TokenGenesisListItem, TokenId,
+    block::Block, AccountId, AccountMap, AccountUpdate, AccountUpdates, BlockNumber, TokenId,
+    TokenInfo,
 };
 
 use crate::{
@@ -50,7 +50,7 @@ pub trait StorageInteractor {
     /// * `token` - Token that added when deploying contract
     /// * `token_id` - Id for token in our system
     ///
-    async fn store_token(&mut self, token: TokenGenesisListItem, token_id: TokenId);
+    async fn store_token(&mut self, token: TokenInfo, token_id: TokenId);
 
     /// Saves Rollup contract events in storage (includes block events, new tokens and last watched eth block number)
     ///

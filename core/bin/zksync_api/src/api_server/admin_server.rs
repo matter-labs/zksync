@@ -98,14 +98,20 @@ async fn add_token(
     // if id is None then set it to next available ID from server.
     let id = match token_request.id {
         Some(id) => id,
-        None => TokenId(storage.tokens_schema().get_count().await.map_err(|e| {
-            vlog::warn!(
-                "failed get number of token from database in progress request: {}",
-                e
-            );
-            actix_web::error::ErrorInternalServerError("storage layer error")
-        })? as u16),
-    };
+        None => TokenId(
+            storage
+                .tokens_schema()
+                .get_last_token_id()
+                .await
+                .map_err(|e| {
+                    vlog::warn!(
+                        "failed get number of token from database in progress request: {}",
+                        e
+                    );
+                    actix_web::error::ErrorInternalServerError("storage layer error")
+                })? as u16,
+        ),
+    } + 1;
 
     let token = tokens::Token {
         id,
@@ -116,7 +122,7 @@ async fn add_token(
 
     storage
         .tokens_schema()
-        .store_token(token.clone())
+        .store_or_update_token(token.clone())
         .await
         .map_err(|e| {
             vlog::warn!("failed add token to database in progress request: {}", e);
