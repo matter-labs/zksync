@@ -1,3 +1,8 @@
 {
-    "coingecko": "https://tokens.coingecko.com/uniswap/all.json"
+    "mainnet": {
+        "coingecko": "https://tokens.coingecko.com/uniswap/all.json"
+    },
+    "localhost": {
+        "coingecko": "https://tokens.coingecko.com/uniswap/all.json"
+    }
 }

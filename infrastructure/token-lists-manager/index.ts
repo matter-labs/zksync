@@ -11,14 +11,14 @@ const tokenListConfig = JSON.parse(
     fs.readFileSync(`${configPath}/.token-lists-sources-config.json`, { encoding: 'utf-8' })
 );
 
-function saveTokenList(name: string, tokeList: TokenInfo[]) {
-    const path = `${process.env.ZKSYNC_HOME as string}/etc/token-lists/${name}.json`;
+function saveTokenList(network: string, source: string, tokeList: TokenInfo[]) {
+    const path = `${process.env.ZKSYNC_HOME as string}/etc/token-lists/${network}/${source}.json`;
     fs.writeFileSync(path, JSON.stringify(tokeList));
 }
 
-async function loadTokenList(source: string): Promise<TokenInfo[] | null> {
+async function fetchFromSourceTokenList(network: string, source: string): Promise<TokenInfo[] | null> {
     try {
-        const link = tokenListConfig[source];
+        const link = tokenListConfig[network][source];
         const response = await fetch(link);
         const tokenList = (await response.json()).tokens as TokenInfo[];
 
@@ -29,11 +29,11 @@ async function loadTokenList(source: string): Promise<TokenInfo[] | null> {
     }
 }
 
-async function updateTokenList(source: string): Promise<boolean> {
-    console.log(`Update ${source} token list`);
+async function updateTokenList(network: string, source: string): Promise<boolean> {
+    console.log(`Update ${source} token list for ${network} network`);
 
-    const oldTokenList = getTokenList(source) as TokenInfo[];
-    const newTokenList = await loadTokenList(source);
+    const oldTokenList = getTokenList(network, source) as TokenInfo[];
+    const newTokenList = await fetchFromSourceTokenList(network, source);
 
     console.log(`diff: `, diffTokenLists(oldTokenList, newTokenList));
 
@@ -53,7 +53,7 @@ async function updateTokenList(source: string): Promise<boolean> {
         return false;
     }
 
-    saveTokenList(source, newTokenList);
+    saveTokenList(network, source, newTokenList);
     return true;
 }
 
@@ -63,15 +63,17 @@ async function main() {
     program.version('0.1.0').name('token-lists-manager');
 
     program
-        .command('update <source>')
+        .command('update')
+        .requiredOption('--network <network>')
+        .requiredOption('--source <source>')
         .description('Update token list')
-        .action(async (source: string) => {
-            let success = await updateTokenList(source);
+        .action(async (cmd: Command) => {
+            let success = await updateTokenList(cmd.network, cmd.source);
 
             if (success) {
-                console.log(`${source} token list updated successfully`);
+                console.log(`${cmd.source} token list updated successfully for ${cmd.network} network`);
             } else {
-                console.log(`Failed to update ${source} token list`);
+                console.log(`Failed to update ${cmd.source} token list for ${cmd.network} network`);
             }
         });
 
