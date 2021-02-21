@@ -18,12 +18,8 @@ impl TokenHandlerConfig {
     pub fn from_env() -> Self {
         let token_list = {
             let home = get_env("ZKSYNC_HOME");
-            let network = get_env("CHAIN_ETH_NETWORK");
             let token_list_name = get_env("TOKEN_HANDLER_TOKEN_LIST_NAME");
-            let path = format!(
-                "{}/etc/token-lists/{}/{}.json",
-                home, network, token_list_name
-            );
+            let path = format!("{}/etc/token-lists/{}.json", home, token_list_name);
 
             serde_json::from_str(&fs::read_to_string(path).expect("Invalid config path"))
                 .expect("Invalid config format")

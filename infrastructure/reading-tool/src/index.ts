@@ -54,8 +54,8 @@ export function getTokens(network: string) {
     );
 }
 
-export function getTokenList(network: string, source: string) {
-    const configPath = `${process.env.ZKSYNC_HOME}/etc/token-lists/${network}/${source}.json`;
+export function getTokenList(source: string) {
+    const configPath = `${process.env.ZKSYNC_HOME}/etc/token-lists/${source}.json`;
     console.log(configPath);
     return JSON.parse(
         fs.readFileSync(configPath, {

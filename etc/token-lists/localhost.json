@@ -1,0 +1,17 @@
+[
+    {
+        "address": "0x793f38ae147852c37071684cdffc1ff7c87f7d07",
+        "symbol": "LINK",
+        "decimals": 18
+    },
+    {
+        "address": "0x5ae45f7f17f0df0b24abe25a5522a9c9341ac04d",
+        "symbol": "OKB",
+        "decimals": 18
+    },
+    {
+        "address": "0xc865bcbe4b6ef4b58a790052f2b51b4f06f586ac",
+        "symbol": "ZRX",
+        "decimals": 18
+    }
+]
