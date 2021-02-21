@@ -124,35 +124,7 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
 
     /// @notice zkSync contract upgrade. Can be external because Proxy contract intercepts illegal calls of this function.
     /// @param upgradeParameters Encoded representation of upgrade parameters
-    function upgrade(bytes calldata upgradeParameters) external nonReentrant {
-        // #if UPGRADE_FROM_V3
-        // NOTE: this line does not have any effect in contracts-4 upgrade since we require priority queue to be empty,
-        // but this should be enabled in future upgrades.
-        activateExodusMode();
-
-        require(upgradeParameters.length == 0, "0"); // upgrade parameters should be empty
-
-        // Convert last verified block from old format to new format
-        require(totalBlocksCommitted == totalBlocksExecuted, "1"); // all blocks should be verified
-        require(numberOfPendingWithdrawals_DEPRECATED == 0, "2"); // pending withdrawal is not used anymore
-        require(totalOpenPriorityRequests == 0, "3"); // no uncommitted priority requests
-
-        Block_DEPRECATED memory lastBlock = blocks_DEPRECATED[totalBlocksExecuted];
-        require(lastBlock.priorityOperations == 0, "4"); // last block should not contain priority operations
-
-        StoredBlockInfo memory rehashedLastBlock =
-            StoredBlockInfo(
-                totalBlocksExecuted,
-                lastBlock.priorityOperations,
-                EMPTY_STRING_KECCAK,
-                0,
-                lastBlock.stateRoot,
-                lastBlock.commitment
-            );
-        storedBlockHashes[totalBlocksExecuted] = hashStoredBlockInfo(rehashedLastBlock);
-        totalBlocksProven = totalBlocksExecuted;
-        // #endif
-    }
+    function upgrade(bytes calldata upgradeParameters) external nonReentrant {}
 
     /// @notice Sends tokens
     /// @dev NOTE: will revert if transfer call fails or rollup balance difference (before and after transfer) is bigger than _maxAmount
@@ -230,7 +202,7 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
         require(Utils.transferFromERC20(_token, msg.sender, address(this), SafeCast.toUint128(_amount)), "c"); // token transfer failed deposit
         uint256 balanceAfter = _token.balanceOf(address(this));
         uint128 depositAmount = SafeCast.toUint128(balanceAfter.sub(balanceBefore));
-        require(depositAmount < type(uint104).max, "16");
+        require(depositAmount <= MAX_DEPOSIT_AMOUNT, "C");
 
         registerDeposit(tokenId, depositAmount, _zkSyncAddress);
     }

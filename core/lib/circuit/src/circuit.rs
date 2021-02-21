@@ -2521,6 +2521,14 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
         )?;
         rhs_valid_flags.push(is_address_correct);
 
+        // Check that `eth_address` corresponds to the rhs account Ethereum address.
+        let is_pubkey_empty = CircuitElement::equals(
+            cs.namespace(|| "is_pubkey_empty"),
+            &rhs.account.pub_key_hash,
+            &global_variables.explicit_zero,
+        )?;
+        rhs_valid_flags.push(is_pubkey_empty);
+
         let rhs_valid = multi_and(cs.namespace(|| "is_rhs_valid"), &rhs_valid_flags)?;
 
         // calculate new rhs balance value

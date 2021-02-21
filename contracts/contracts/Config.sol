@@ -94,9 +94,6 @@ contract Config {
     /// @dev Auth fact reset timelock.
     uint256 constant AUTH_FACT_RESET_TIMELOCK = 1 days;
 
-    /// @dev DAI token address.
-    address constant DAI_ADDRESS = $(DAI_ADDRESS);
-
-    /// @dev Price in DAI to collect for listing.
-    uint104 constant TOKEN_LISTING_PRICE = $(TOKEN_LISTING_PRICE);
+    /// @dev Max deposit of ERC20 token that is possible to deposit
+    uint128 constant MAX_DEPOSIT_AMOUNT = $$((2**104) - 1);
 }

@@ -12,6 +12,7 @@ describe('Governance unit tests', function () {
         await testContract.initialize(
             hardhat.ethers.utils.defaultAbiCoder.encode(['address'], [await testContract.signer.getAddress()])
         );
+        await testContract.changeTokenGovernance(await testContract.signer.getAddress());
     });
 
     it('checking correctness of using MAX_AMOUNT_OF_REGISTERED_TOKENS constant', async () => {
