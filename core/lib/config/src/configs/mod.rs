@@ -3,7 +3,7 @@ pub use self::{
     api::ApiConfig, chain::ChainConfig, contracts::ContractsConfig, database::DBConfig,
     dev_liquidity_token_watcher::DevLiquidityTokenWatcherConfig, eth_client::ETHClientConfig,
     eth_sender::ETHSenderConfig, eth_watch::ETHWatchConfig, misc::MiscConfig, prover::ProverConfig,
-    ticker::TickerConfig,
+    ticker::TickerConfig, token_handler::TokenHandlerConfig,
 };
 
 pub mod api;
@@ -17,6 +17,7 @@ pub mod eth_watch;
 pub mod misc;
 pub mod prover;
 pub mod ticker;
+pub mod token_handler;
 
 #[cfg(test)]
 pub(crate) mod test_utils;
