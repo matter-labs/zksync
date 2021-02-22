@@ -878,6 +878,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "block_revert"
+version = "1.0.0"
+dependencies = [
+ "anyhow",
+ "ethabi",
+ "sqlx",
+ "tokio 0.2.22",
+ "web3",
+ "zksync_config",
+ "zksync_eth_client",
+ "zksync_storage",
+ "zksync_types",
+]
+
+[[package]]
 name = "blocking"
 version = "1.0.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1925,21 +1940,6 @@ checksum = "501466ecc8a30d1d3b7fc9229b122b2ce8ed6e9d9223f1138d4babb253e51817"
 dependencies = [
  "typenum",
  "version_check 0.9.2",
-]
-
-[[package]]
-name = "get_block_data"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "ethabi",
- "sqlx",
- "tokio 0.2.22",
- "web3",
- "zksync_config",
- "zksync_eth_client",
- "zksync_storage",
- "zksync_types",
 ]
 
 [[package]]
