@@ -1932,8 +1932,12 @@ name = "get_block_data"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "futures 0.3.6",
+ "ethabi",
+ "sqlx",
  "tokio 0.2.22",
+ "web3",
+ "zksync_config",
+ "zksync_eth_client",
  "zksync_storage",
  "zksync_types",
 ]

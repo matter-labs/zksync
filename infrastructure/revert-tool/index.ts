@@ -75,7 +75,7 @@ function isProcessableOnchainOperation(type: string) {
 }
 
 function getPubData(tx: any) {
-    //console.log(tx);
+    console.log(tx);
     if (tx.type === 'Withdraw') {
         const type = new Uint8Array([3]);
         const accountId = utils.serializeAccountId(tx.accountId);
@@ -85,9 +85,22 @@ function getPubData(tx: any) {
         const to = utils.serializeAddress(tx.to);
         return ethers.utils.concat([type, accountId, token, amount, fee, to, new Uint8Array(9)]);
     } else if (tx.type === 'FullExit') {
+        const type = new Uint8Array([6]);
+        const accountId = utils.serializeAccountId(tx.priority_op.account_id);
+        const ethAddress = utils.serializeAddress(tx.priority_op.eth_address);
+        const token = utils.serializeTokenId(tx.priority_op.token);
+        const amount = utils.serializeAmountFull(tx.withdraw_amount ? tx.withdraw_amount : BigNumber.from(0));
+        return ethers.utils.concat([type, accountId, ethAddress, token, amount, new Uint8Array(11)]);
     } else if (tx.type === 'ForcedExit') {
+        const type = new Uint8Array([8]);
+        const accountId = utils.serializeAccountId(tx.initiatorAccountId);
+        //targetAccountId
+        const token = utils.serializeTokenId(tx.token);
+        
     }
-    return '';
+    else {
+        throw('Unknown operation type');
+    }
 }
 
 async function revertBlocks(blocksNumber: number) {
@@ -101,6 +114,7 @@ async function revertBlocks(blocksNumber: number) {
         const blocks = await client.query(
             `SELECT number, root_hash, unprocessed_prior_op_before, unprocessed_prior_op_after, timestamp, commitment 
             FROM blocks
+            WHERE number = 16
             ORDER BY number DESC
             LIMIT $1`,
             [blocksNumber]
@@ -109,14 +123,27 @@ async function revertBlocks(blocksNumber: number) {
             const priorityOperations = BigNumber.from(block.get('unprocessed_prior_op_after')).sub(
                 BigNumber.from(block.get('unprocessed_prior_op_before'))
             );
+            let hash = ethers.utils.keccak256(new Uint8Array());
+            const executed_p_txs = await client.query(
+                `SELECT operation 
+                FROM executed_priority_operations
+                WHERE block_number = $1`,
+                [block.get('number')]
+            );
+            for (const row of executed_p_txs) {
+                const tx = row.get('operation') as any;
+                if (isProcessableOnchainOperation(tx.type)) {
+                    hash = ethers.utils.keccak256(ethers.utils.concat([ethers.utils.arrayify(hash), getPubData(tx)]));
+                }
+            }
             const executed_txs = await client.query(
                 `SELECT tx 
                 FROM executed_transactions
                 WHERE block_number = $1`,
                 [block.get('number')]
             );
-            let hash = ethers.utils.keccak256(new Uint8Array());
-            console.log(hash);
+            // console.log(executed_txs);
+            
             for (const row of executed_txs) {
                 const tx = row.get('tx') as any;
                 if (isProcessableOnchainOperation(tx.type)) {
@@ -141,10 +168,10 @@ async function revertBlocks(blocksNumber: number) {
         console.log(totalBlocksVerified, totalBlocksCommitted);
     });
     console.log(blocksInfo);
-    let res = await contract.revertBlocks(blocksInfo, {
-        gasLimit: '10000000'
-    });
-    await res.wait();
+    // let res = await contract.revertBlocks(blocksInfo, {
+    //     gasLimit: '10000000'
+    // });
+    // await res.wait();
     await client.end();
 }
 
