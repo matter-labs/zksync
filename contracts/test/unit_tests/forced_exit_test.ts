@@ -1,13 +1,20 @@
-import { expect } from 'chai';
-import { Signer, Contract, ContractTransaction, utils, BigNumber } from 'ethers';
+import { expect, use } from 'chai';
+import { solidity } from 'ethereum-waffle';
+import { Signer, utils } from 'ethers';
+import { ForcedExit } from '../../typechain/ForcedExit';
+import { ForcedExitFactory } from '../../typechain/ForcedExitFactory';
+import { SelfDestructFactory } from '../../typechain/SelfDestructFactory';
+
 import * as hardhat from 'hardhat';
 
 const TX_AMOUNT = utils.parseEther('1.0');
 
+use(solidity);
+
 describe('ForcedExit unit tests', function () {
     this.timeout(50000);
 
-    let forcedExitContract: Contract;
+    let forcedExitContract: ForcedExit;
     let wallet1: Signer;
     let wallet2: Signer;
     let wallet3: Signer;
@@ -16,83 +23,84 @@ describe('ForcedExit unit tests', function () {
         [wallet1, wallet2, wallet3] = await hardhat.ethers.getSigners();
 
         const forcedExitContractFactory = await hardhat.ethers.getContractFactory('ForcedExit');
-        forcedExitContract = await forcedExitContractFactory.deploy(wallet1.getAddress());
-        forcedExitContract.connect(wallet1);
+        const contract = await forcedExitContractFactory.deploy(wallet1.getAddress());
+        forcedExitContract = ForcedExitFactory.connect(contract.address, wallet1);
     });
 
     it('Check redirecting funds to receiver', async () => {
-        const setReceiverHandle = await forcedExitContract.setReceiver(wallet3.getAddress());
-        await setReceiverHandle.wait();
+        // The test checks that when users send funds to the contract
+        // the funds will be redirected to the receiver address that is set
+        // by the master of the ForcedExit contract
 
-        const receiverBalanceBefore = await wallet3.getBalance();
+        // Setting receiver who will should get all the funds sent
+        // to the contract
+        await forcedExitContract.setReceiver(await wallet3.getAddress());
+
+        // Could not use nested expects because
+        // changeEtherBalance does not allow it
+
+        // User sends tranasctions
         const txHandle = await wallet2.sendTransaction({
             to: forcedExitContract.address,
             value: TX_AMOUNT
         });
-        const txReceipt = await txHandle.wait();
+        // Check that the `FundsReceived` event was emitted
+        expect(txHandle).to.emit(forcedExitContract, 'FundsReceived').withArgs(TX_AMOUNT);
 
-        expect(txReceipt.logs.length == 1, 'No events were emitted').to.be.true;
-        const receivedFundsAmount: BigNumber = forcedExitContract.interface.parseLog(txReceipt.logs[0]).args[0];
-
-        expect(receivedFundsAmount.eq(TX_AMOUNT), "Didn't emit the amount of sent data").to.be.true;
-        const receiverBalanceAfter = await wallet3.getBalance();
-        const diff = receiverBalanceAfter.sub(receiverBalanceBefore);
-        expect(diff.eq(TX_AMOUNT), 'Funds were not redirected to the receiver').to.be.true;
+        // The receiver received the balance
+        expect(txHandle).to.changeEtherBalance(wallet3, TX_AMOUNT);
     });
 
     it('Check receiving pending funds', async () => {
-        const selfDestructContractFactory = await hardhat.ethers.getContractFactory('SelfDestruct');
-        let selfDestructContract: Contract = await selfDestructContractFactory.deploy();
+        // The test checks that it is possible for the master of the contract
+        // to withdraw funds that got stuck on the contract for some unknown reason.
+        // One example is when another contract does selfdestruct and submits funds
+        // to the ForcedExit contract.
 
-        const txHandle = await wallet2.sendTransaction({
+        // Create the contract which will self-destruct itself
+        const selfDestructContractFactory = await hardhat.ethers.getContractFactory('SelfDestruct');
+        const contractDeployed = await selfDestructContractFactory.deploy();
+        const selfDestructContract = SelfDestructFactory.connect(contractDeployed.address, contractDeployed.signer);
+
+        // Supplying funds to the self-desctruct contract
+        await wallet2.sendTransaction({
             to: selfDestructContract.address,
             value: TX_AMOUNT
         });
-        await txHandle.wait();
-        selfDestructContract.connect(wallet2);
 
-        const destructHandle: ContractTransaction = await selfDestructContract.destroy(forcedExitContract.address);
-        await destructHandle.wait();
-        const masterBalanceBefore = await wallet1.getBalance();
+        // Destroying the self-destruct contract which sends TX_AMOUNT ether to the ForcedExit
+        // contract which were not redirected to the receiver
+        await selfDestructContract.connect(wallet2).destroy(forcedExitContract.address);
 
-        const withdrawHandle: ContractTransaction = await forcedExitContract.withdrawPendingFunds(
-            wallet1.getAddress(),
-            TX_AMOUNT
-        );
-        const withdrawReceipt = await withdrawHandle.wait();
-        const masterBalanceAfter = await wallet1.getBalance();
-
-        const diff = masterBalanceAfter.sub(masterBalanceBefore);
-        const expectedDiff = TX_AMOUNT.sub(withdrawReceipt.gasUsed.mul(withdrawHandle.gasPrice));
-        expect(diff.eq(expectedDiff), 'Pending funds have not arrived to the account').to.be.true;
+        // The master withdraws the funds and they should arrive to him
+        expect(
+            await forcedExitContract.withdrawPendingFunds(await wallet1.getAddress(), TX_AMOUNT)
+        ).to.changeEtherBalance(wallet1, TX_AMOUNT);
     });
 
     it('Check disabling and enabling', async () => {
-        const disableHandle = await forcedExitContract.disable();
-        await disableHandle.wait();
+        // The test checks that disabling and enabling of the ForcedExit contract works.
 
-        let failed1 = false;
-        try {
-            const txHandle = await wallet2.sendTransaction({
+        // Disabling transfers to the contract
+        await forcedExitContract.disable();
+
+        // The contract is disabled. Thus, transfering to it should fail
+        expect(
+            wallet2.sendTransaction({
                 to: forcedExitContract.address,
                 value: TX_AMOUNT
-            });
-            await txHandle.wait();
-        } catch {
-            failed1 = true;
-        }
+            })
+        ).to.be.reverted;
 
-        expect(failed1, 'Transfer to the disabled contract does not fail').to.be.true;
+        // Enabling transfers to the contract
+        await forcedExitContract.enable();
 
-        const enableHandle = await forcedExitContract.enable();
-        await enableHandle.wait();
-
-        const txHandle = await wallet2.sendTransaction({
-            to: forcedExitContract.address,
-            value: TX_AMOUNT
-        });
-        const txReceipt = await txHandle.wait();
-
-        expect(txReceipt.blockNumber, 'A transfer to the enabled account have failed').to.exist;
+        // The contract is enabled. Thus, transfering to it should not fail
+        expect(
+            wallet2.sendTransaction({
+                to: forcedExitContract.address,
+                value: TX_AMOUNT
+            })
+        ).to.not.be.reverted;
     });
 });
