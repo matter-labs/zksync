@@ -3,8 +3,6 @@ import '@nomiclabs/hardhat-solpp';
 import '@nomiclabs/hardhat-etherscan';
 import 'hardhat-typechain';
 import 'hardhat-contract-sizer';
-import '@nomiclabs/hardhat-ethers';
-import { BigNumber } from 'ethers';
 
 const prodConfig = {
     // UPGRADE_NOTICE_PERIOD: 0,
@@ -22,9 +20,7 @@ const testConfig = {
     UPGRADE_NOTICE_PERIOD: 0,
     MAX_AMOUNT_OF_REGISTERED_TOKENS: 5,
     PRIORITY_EXPIRATION: 101,
-    DUMMY_VERIFIER: true,
-    DAI_ADDRESS: '0x6B175474E89094C44Da98b954EedeAC495271d0F',
-    TOKEN_LISTING_PRICE: BigNumber.from(10).pow(18).mul(250)
+    DUMMY_VERIFIER: true
 };
 
 const localConfig = Object.assign({}, prodConfig);

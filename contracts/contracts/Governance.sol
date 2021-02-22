@@ -3,9 +3,6 @@
 pragma solidity ^0.7.0;
 
 import "./Config.sol";
-import "./Utils.sol";
-import "./SafeCast.sol";
-import "./IERC20.sol";
 
 /// @title Governance Contract
 /// @author Matter Labs
