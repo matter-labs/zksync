@@ -289,6 +289,11 @@ pub fn run_forced_exit_contract_watcher(
     let eth_client = EthClient::new(web3, config.contracts.forced_exit_addr);
 
     tokio::spawn(async move {
+        // We should not proceed if the feature is disabled
+        if !config.forced_exit_requests.enabled {
+            infinite_async_loop().await
+        }
+
         // It is fine to unwrap here, since without it there is not way we
         // can be sure that the forced exit sender will work properly
         prepare_forced_exit_sender_account(
@@ -358,4 +363,12 @@ where
             }
         })
         .collect()
+}
+
+pub async fn infinite_async_loop() {
+    // We use a 1 day interval instead of a simple loop to free the execution thread
+    let mut timer = time::interval(Duration::from_secs(60 * 60 * 24));
+    loop {
+        timer.tick().await;
+    }
 }
