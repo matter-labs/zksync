@@ -43,11 +43,11 @@ async fn tokens_storage(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
     };
 
     TokensSchema(&mut storage)
-        .store_token(token_a.clone())
+        .store_or_update_token(token_a.clone())
         .await
         .expect("Store tokens query failed");
     TokensSchema(&mut storage)
-        .store_token(token_b.clone())
+        .store_or_update_token(token_b.clone())
         .await
         .expect("Store tokens query failed");
     // The count is updated.
@@ -93,7 +93,7 @@ async fn tokens_storage(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
         decimals: 6,
     };
     TokensSchema(&mut storage)
-        .store_token(token_c.clone())
+        .store_or_update_token(token_c.clone())
         .await
         .expect("Store tokens query failed");
     // Load updated token.
