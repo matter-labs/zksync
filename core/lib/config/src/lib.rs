@@ -1,5 +1,3 @@
-use serde::Deserialize;
-
 pub use crate::configs::{
     ApiConfig, ChainConfig, ContractsConfig, DBConfig, DevLiquidityTokenWatcherConfig,
     ETHClientConfig, ETHSenderConfig, ETHWatchConfig, MiscConfig, ProverConfig, TickerConfig,
@@ -9,7 +7,7 @@ pub use crate::configs::{
 pub mod configs;
 pub mod test_config;
 
-#[derive(Debug, Deserialize, Clone)]
+#[derive(Debug, Clone)]
 pub struct ZkSyncConfig {
     pub api: ApiConfig,
     pub chain: ChainConfig,

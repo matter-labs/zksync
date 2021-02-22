@@ -2,16 +2,20 @@
 use std::fs;
 use std::time::Duration;
 // External uses
-use serde::Deserialize;
+use reqwest::Url;
 // Workspace uses
 use zksync_types::TokenInfo;
-use zksync_utils::{get_env, parse_env};
+use zksync_utils::{get_env, parse_env, parse_env_if_exists};
 
 /// Configuration for the Ethereum sender crate.
-#[derive(Debug, Deserialize, Clone)]
+#[derive(Debug, Clone)]
 pub struct TokenHandlerConfig {
-    pub poll_interval: u64,
+    /// List of trusted tokens.
     pub token_list: Vec<TokenInfo>,
+    /// The number of seconds that set the request period to EthWatcher.
+    pub poll_interval: u64,
+    /// Link to MatterMost channel for token list notification.
+    pub webhook_url: Option<Url>,
 }
 
 impl TokenHandlerConfig {
@@ -28,6 +32,7 @@ impl TokenHandlerConfig {
         Self {
             token_list,
             poll_interval: parse_env("TOKEN_HANDLER_POLL_INTERVAL"),
+            webhook_url: parse_env_if_exists("NOTIFICATION_WEBHOOK_URL"),
         }
     }
 

@@ -20,6 +20,7 @@ use zksync_types::{
     tokens::{NewTokenEvent, Token, TokenInfo},
     Address,
 };
+use zksync_utils::MatterMostNotifier;
 // Local uses
 use crate::eth_watch::EthWatchRequest;
 
@@ -29,6 +30,7 @@ struct TokenHandler {
     eth_watch_req: mpsc::Sender<EthWatchRequest>,
     token_list: HashMap<Address, TokenInfo>,
     last_token_id: u16,
+    matter_most_notifier: Option<MatterMostNotifier>,
 }
 
 impl TokenHandler {
@@ -55,12 +57,17 @@ impl TokenHandler {
 
         drop(storage);
 
+        let matter_most_notifier = config.webhook_url.map(|webhook_url| {
+            MatterMostNotifier::new("token_handler_bot".to_string(), webhook_url)
+        });
+
         Self {
             connection_pool,
             eth_watch_req,
             last_token_id,
             token_list,
             poll_interval,
+            matter_most_notifier,
         }
     }
 
@@ -119,7 +126,9 @@ impl TokenHandler {
                 })
                 .collect::<Vec<_>>();
 
-            self.last_token_id = new_tokens.iter().map(|token| token.id.0).max().unwrap_or(0);
+            // Ether is a standard token, so we can assume that at least the last token ID is zero.
+            let last_new_token_id = new_tokens.iter().map(|token| token.id.0).max().unwrap_or(0);
+            self.last_token_id = std::cmp::max(self.last_token_id, last_new_token_id);
 
             let mut storage = self
                 .connection_pool
@@ -127,9 +136,24 @@ impl TokenHandler {
                 .await
                 .expect("db connection failed for token handler");
 
-            self.save_new_tokens(&mut storage, new_tokens)
+            self.save_new_tokens(&mut storage, new_tokens.clone())
                 .await
                 .expect("failed to add tokens to the database");
+
+            // Send a notification to MatterMost bot that the token has been successfully added to the database.
+            if let Some(matter_most_notifier) = &self.matter_most_notifier {
+                for token in new_tokens {
+                    matter_most_notifier
+                        .send_notify(&format!(
+                            "New token: id = {}, address = {}, name = {}, decimals = {}",
+                            token.id, token.address, token.symbol, token.decimals
+                        ))
+                        .await
+                        .unwrap_or_else(|e| {
+                            vlog::error!("failed send notification to MatterMost: {}", e);
+                        });
+                }
+            }
         }
     }
 }
