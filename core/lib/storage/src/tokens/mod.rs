@@ -139,9 +139,10 @@ impl<'a, 'c> TokensSchema<'a, 'c> {
             SELECT max(id) as "id!" FROM tokens
             "#,
         )
-        .fetch_one(self.0.conn())
+        .fetch_optional(self.0.conn())
         .await?
-        .id as u16;
+        .map(|token| token.id as u16)
+        .unwrap_or(0);
 
         metrics::histogram!("sql.token.get_last_token_id", start.elapsed());
         Ok(last_token_id)

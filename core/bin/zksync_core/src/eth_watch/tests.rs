@@ -84,7 +84,8 @@ impl EthClient for FakeEthClient {
         _from: BlockNumber,
         _to: BlockNumber,
     ) -> anyhow::Result<Vec<NewTokenEvent>> {
-        unreachable!()
+        // Ignore NewTokens event.
+        Ok(Vec::new())
     }
 
     async fn block_number(&self) -> Result<u64, anyhow::Error> {
