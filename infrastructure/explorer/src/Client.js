@@ -268,8 +268,9 @@ export class Client {
             url: `${baseUrl()}/tokens_acceptable_for_fees`
         });
         tokens = await tokens;
-        tokens.forEach(token => {
-            token.acceptableForFees = tokensAcceptableForFees.some(element => element.id === token.id) || token.id === 0;
+        tokens.forEach((token) => {
+            token.acceptableForFees =
+                tokensAcceptableForFees.some((element) => element.id === token.id) || token.id === 0;
         });
         return tokens;
     }

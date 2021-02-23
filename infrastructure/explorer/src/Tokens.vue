@@ -24,8 +24,8 @@
                     <template v-slot:cell(id)="data"><span v-html="data.item['id']" /></template>
                     <template v-slot:cell(acceptableForFees)="data">
                         <span v-if="data.item['acceptableForFees']">
-                          <i class="far fa-credit-card fee-status green"></i>
-                          Available
+                            <i class="far fa-credit-card fee-status green"></i>
+                            Available
                         </span>
                         <span v-else>
                             <i class="fas fa-ban fee-status gray"></i>
@@ -83,8 +83,8 @@ export default {
                     label: 'Internal Id'
                 },
                 {
-                  key: 'acceptableForFees',
-                  label: 'Can be used to pay fees'
+                    key: 'acceptableForFees',
+                    label: 'Can be used to pay fees'
                 }
             ]
         };
@@ -106,20 +106,19 @@ export default {
 </script>
 
 <style>
-
 .fee-status {
     font-size: 1.25em;
     display: inline-block;
-    margin-right: 5px
+    margin-right: 5px;
 }
 .green {
-  color: rgba(5, 122, 85, 1);
+    color: rgba(5, 122, 85, 1);
 }
 .gray {
-  color: rgba(107, 114, 128, 1);
+    color: rgba(107, 114, 128, 1);
 }
 .unavailable-text {
-  opacity: 0.75;
-  color: #999 !important;
+    opacity: 0.75;
+    color: #999 !important;
 }
 </style>
