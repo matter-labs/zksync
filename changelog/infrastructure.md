@@ -16,6 +16,7 @@ components, the logs will have the following format:
 ### Added
 
 - (`reading-tool`): tool for reading test config.
+- (`explorer`): column "Can be used to pay fees" for tokens.
 
 ### Fixed
 

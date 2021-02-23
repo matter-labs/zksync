@@ -259,10 +259,19 @@ export class Client {
     }
 
     async loadTokens() {
-        return fetch({
+        let tokens = fetch({
             method: 'get',
             url: `${baseUrl()}/tokens`
         });
+        const tokensAcceptableForFees = await fetch({
+            method: 'get',
+            url: `${baseUrl()}/tokens_acceptable_for_fees`
+        });
+        tokens = await tokens;
+        tokens.forEach(token => {
+            token.acceptableForFees = tokensAcceptableForFees.some(element => element.id === token.id) || token.id === 0;
+        });
+        return tokens;
     }
 }
 
