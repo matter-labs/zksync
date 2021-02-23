@@ -641,8 +641,11 @@ mod tests {
             .map(|(tx, token)| (tx.clone(), token, tx.account()))
             .collect::<Vec<_>>();
         let batch_signature = {
+            let eth_private_key = acc
+                .try_get_eth_private_key()
+                .expect("Should have ETH private key");
             let batch_message = EthBatchSignData::get_batch_sign_message(txs);
-            let eth_sig = PackedEthSignature::sign(&acc.eth_private_key, &batch_message).unwrap();
+            let eth_sig = PackedEthSignature::sign(eth_private_key, &batch_message).unwrap();
             let single_signature = TxEthSignature::EthereumSignature(eth_sig);
 
             EthBatchSignatures::Single(single_signature)
@@ -690,7 +693,7 @@ mod tests {
         assert!(client
             .submit_tx(
                 transfer_bad_token.clone(),
-                Some(TxEthSignature::EthereumSignature(eth_sig)),
+                eth_sig.map(TxEthSignature::EthereumSignature),
                 None
             )
             .await
@@ -708,7 +711,10 @@ mod tests {
             .collect::<Vec<_>>();
         let batch_signature = {
             let batch_message = EthBatchSignData::get_batch_sign_message(txs);
-            let eth_sig = PackedEthSignature::sign(&from.eth_private_key, &batch_message).unwrap();
+            let eth_private_key = from
+                .try_get_eth_private_key()
+                .expect("should have eth private key");
+            let eth_sig = PackedEthSignature::sign(eth_private_key, &batch_message).unwrap();
             let single_signature = TxEthSignature::EthereumSignature(eth_sig);
 
             EthBatchSignatures::Single(single_signature)
@@ -757,7 +763,10 @@ mod tests {
             .collect::<Vec<_>>();
         let batch_signature = {
             let batch_message = EthBatchSignData::get_batch_sign_message(txs);
-            let eth_sig = PackedEthSignature::sign(&from.eth_private_key, &batch_message).unwrap();
+            let eth_private_key = from
+                .try_get_eth_private_key()
+                .expect("should have eth private key");
+            let eth_sig = PackedEthSignature::sign(eth_private_key, &batch_message).unwrap();
             let single_signature = TxEthSignature::EthereumSignature(eth_sig);
 
             EthBatchSignatures::Single(single_signature)
@@ -803,7 +812,7 @@ mod tests {
         client
             .submit_tx(
                 ZkSyncTx::Transfer(Box::new(tx.clone())),
-                Some(TxEthSignature::EthereumSignature(eth_sig.clone())),
+                eth_sig.clone().map(TxEthSignature::EthereumSignature),
                 Some(true),
             )
             .await
@@ -812,7 +821,7 @@ mod tests {
         client
             .submit_tx(
                 ZkSyncTx::Transfer(Box::new(tx.clone())),
-                Some(TxEthSignature::EthereumSignature(eth_sig.clone())),
+                eth_sig.clone().map(TxEthSignature::EthereumSignature),
                 Some(false),
             )
             .await?;
@@ -820,7 +829,7 @@ mod tests {
         client
             .submit_tx(
                 ZkSyncTx::Transfer(Box::new(tx)),
-                Some(TxEthSignature::EthereumSignature(eth_sig)),
+                eth_sig.clone().map(TxEthSignature::EthereumSignature),
                 None,
             )
             .await?;
@@ -839,7 +848,7 @@ mod tests {
         client
             .submit_tx(
                 ZkSyncTx::Withdraw(Box::new(tx.clone())),
-                Some(TxEthSignature::EthereumSignature(eth_sig.clone())),
+                eth_sig.clone().map(TxEthSignature::EthereumSignature),
                 Some(true),
             )
             .await?;
@@ -847,7 +856,9 @@ mod tests {
         client
             .submit_tx(
                 ZkSyncTx::Withdraw(Box::new(tx.clone())),
-                Some(TxEthSignature::EthereumSignature(eth_sig.clone())),
+                Some(TxEthSignature::EthereumSignature(
+                    eth_sig.clone().expect("should sign eth 2fa").clone(),
+                )),
                 Some(false),
             )
             .await?;
@@ -855,7 +866,7 @@ mod tests {
         client
             .submit_tx(
                 ZkSyncTx::Withdraw(Box::new(tx)),
-                Some(TxEthSignature::EthereumSignature(eth_sig.clone())),
+                eth_sig.clone().map(TxEthSignature::EthereumSignature),
                 None,
             )
             .await?;

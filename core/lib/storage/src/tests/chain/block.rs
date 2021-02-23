@@ -2,8 +2,8 @@
 // Workspace imports
 use zksync_crypto::{convert::FeConvert, rand::XorShiftRng};
 use zksync_types::{
-    aggregated_operations::AggregatedActionType, helpers::apply_updates, AccountId, AccountMap,
-    AccountUpdate, AccountUpdates, BlockNumber, TokenId, H256,
+    aggregated_operations::AggregatedActionType, helpers::apply_updates, tx::ChangePubKeyType,
+    AccountId, AccountMap, AccountUpdate, AccountUpdates, BlockNumber, TokenId, H256,
 };
 // Local imports
 use crate::{
@@ -629,7 +629,7 @@ async fn pending_block_workflow(mut storage: StorageProcessor<'_>) -> QueryResul
             false,
             TokenId(0),
             Default::default(),
-            false,
+            ChangePubKeyType::ECDSA,
             Default::default(),
         );
 

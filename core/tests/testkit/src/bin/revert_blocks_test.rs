@@ -3,6 +3,7 @@ use web3::transports::Http;
 use zksync_core::state_keeper::ZkSyncStateInitParams;
 use zksync_types::{block::Block, AccountId, AccountMap, AccountTree};
 
+use zksync_testkit::zksync_account::ZkSyncETHAccountData;
 use zksync_testkit::*;
 use zksync_testkit::{
     data_restore::verify_restore,
@@ -54,7 +55,9 @@ fn create_test_setup_state(
                 rng_zksync_key,
                 Nonce(0),
                 eth_account.address,
-                eth_account.private_key,
+                ZkSyncETHAccountData::EOA {
+                    eth_private_key: eth_account.private_key,
+                },
             )
         }));
         zksync_accounts
