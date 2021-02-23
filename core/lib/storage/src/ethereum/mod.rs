@@ -8,7 +8,7 @@ use zksync_basic_types::{H256, U256};
 // Workspace imports
 use zksync_types::aggregated_operations::{AggregatedActionType, AggregatedOperation};
 use zksync_types::ethereum::{ETHOperation, InsertedOperationResponse};
-use zksync_types::BlockNumber;
+use zksync_types::{BlockNumber, Nonce};
 // Local imports
 use self::records::{ETHParams, ETHStats, ETHTxHash, StorageETHOperation};
 use crate::{chain::operations::records::StoredAggregatedOperation, QueryResult, StorageProcessor};
@@ -615,5 +615,34 @@ impl<'a, 'c> EthereumSchema<'a, 'c> {
             .flatten();
 
         Ok(final_hash)
+    }
+
+    pub async fn update_eth_parameters(
+        &mut self,
+        last_block: BlockNumber,
+        nonce: Nonce,
+    ) -> QueryResult<()> {
+        sqlx::query!(
+            "UPDATE eth_parameters SET nonce = $1 WHERE id = true",
+            *nonce as i64
+        )
+        .execute(self.0.conn())
+        .await?;
+
+        sqlx::query!(
+            "UPDATE eth_parameters SET last_committed_block = $1 WHERE id = true",
+            *last_block as i64
+        )
+        .execute(self.0.conn())
+        .await?;
+
+        sqlx::query!(
+            "UPDATE eth_parameters SET last_verified_block = $1 WHERE id = true AND last_verified_block > $1",
+            *last_block as i64
+        )
+        .execute(self.0.conn())
+        .await?;
+
+        Ok(())
     }
 }

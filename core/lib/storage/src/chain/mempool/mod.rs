@@ -6,7 +6,7 @@ use itertools::Itertools;
 use zksync_types::{
     mempool::SignedTxVariant,
     tx::{TxEthSignature, TxHash},
-    SignedZkSyncTx,
+    BlockNumber, SignedZkSyncTx,
 };
 // Local imports
 use self::records::MempoolTx;
@@ -373,6 +373,34 @@ impl<'a, 'c> MempoolSchema<'a, 'c> {
         self.remove_txs(&tx_hashes_to_remove).await?;
 
         metrics::histogram!("sql.chain.mempool.collect_garbage", start.elapsed());
+        Ok(())
+    }
+
+    pub async fn return_executed_txs_to_mempool(
+        &mut self,
+        last_block: BlockNumber,
+    ) -> QueryResult<()> {
+        sqlx::query!(
+            r#"
+            INSERT INTO mempool_txs (tx_hash, tx, created_at, eth_sign_data, batch_id)
+            SELECT tx_hash, tx, created_at, eth_sign_data, batch_id FROM executed_transactions
+            WHERE block_number > $1
+        "#,
+            *last_block as i64
+        )
+        .execute(self.0.conn())
+        .await?;
+
+        sqlx::query!(
+            r#"
+            DELETE FROM executed_transactions
+            WHERE block_number > $1
+        "#,
+            *last_block as i64
+        )
+        .execute(self.0.conn())
+        .await?;
+
         Ok(())
     }
 }

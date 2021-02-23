@@ -777,4 +777,31 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
 
         Ok(self.save_block(block).await?)
     }
+
+    pub async fn remove_blocks(&mut self, last_block: BlockNumber) -> QueryResult<()> {
+        sqlx::query!("DELETE FROM blocks WHERE number > $1", *last_block as i64)
+            .execute(self.0.conn())
+            .await?;
+
+        Ok(())
+    }
+
+    pub async fn remove_pending_block(&mut self) -> QueryResult<()> {
+        sqlx::query!("DELETE FROM pending_block")
+            .execute(self.0.conn())
+            .await?;
+
+        Ok(())
+    }
+
+    pub async fn remove_account_tree_cache(&mut self, last_block: BlockNumber) -> QueryResult<()> {
+        sqlx::query!(
+            "DELETE FROM account_tree_cache WHERE block > $1",
+            *last_block as i64
+        )
+        .execute(self.0.conn())
+        .await?;
+
+        Ok(())
+    }
 }

@@ -1,17 +1,16 @@
 use anyhow::{ensure, format_err};
 use ethabi::Token;
-use sqlx::{Connection, PgConnection, Postgres, Transaction};
-use std::env;
+use structopt::StructOpt;
 use web3::{
     contract::Options,
     types::{TransactionReceipt, U256, U64},
 };
 use zksync_config::ZkSyncConfig;
 use zksync_eth_client::EthereumGateway;
-use zksync_storage::ConnectionPool;
-use zksync_types::{aggregated_operations::stored_block_info, BlockNumber};
+use zksync_storage::StorageProcessor;
+use zksync_types::{aggregated_operations::stored_block_info, block::Block, BlockNumber, Nonce};
 
-async fn send_raw_tx_and_wait(
+async fn send_raw_tx_and_wait_confirmation(
     client: &EthereumGateway,
     raw_tx: Vec<u8>,
 ) -> Result<TransactionReceipt, anyhow::Error> {
@@ -30,17 +29,58 @@ async fn send_raw_tx_and_wait(
     }
 }
 
+async fn revert_blocks_on_contract(
+    client: &EthereumGateway,
+    blocks: &[Block],
+) -> anyhow::Result<()> {
+    let tx_arg = Token::Array(blocks.iter().map(stored_block_info).collect());
+    let data = client.encode_tx_data("revertBlocks", tx_arg);
+    let signed_tx = client
+        .sign_prepared_tx(
+            data,
+            Options::with(|f| f.gas = Some(U256::from(9 * 10u64.pow(6)))),
+        )
+        .await
+        .map_err(|e| format_err!("Revert blocks send err: {}", e))?;
+    let receipt = send_raw_tx_and_wait_confirmation(&client, signed_tx.raw_tx).await?;
+    ensure!(receipt.status == Some(U64::from(1)), "Tx failed");
+
+    Ok(())
+}
+
+async fn get_blocks(
+    last_commited_block: BlockNumber,
+    blocks_to_revert: u32,
+    storage: &mut StorageProcessor<'_>,
+) -> Result<Vec<Block>, anyhow::Error> {
+    let mut blocks = Vec::new();
+    for block_number in ((*last_commited_block - blocks_to_revert + 1)..=*last_commited_block).rev()
+    {
+        let block = storage
+            .chain()
+            .block_schema()
+            .get_block(BlockNumber(block_number))
+            .await?
+            .unwrap();
+        blocks.push(block);
+    }
+    Ok(blocks)
+}
+
+#[derive(Debug, StructOpt)]
+struct Opt {
+    #[structopt(long)]
+    number: u32,
+}
+
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    let args: Vec<String> = env::args().collect();
-    ensure!(
-        args.len() == 2,
-        "There should be exactly one argument - count of blocks to revert"
-    );
-    let blocks_to_revert: u32 = args[1].parse()?;
+    let opt = Opt::from_args();
+    let blocks_to_revert = opt.number;
 
-    let connection_pool = ConnectionPool::new(Some(1));
-    let mut storage = connection_pool.access_storage().await?;
+    let mut storage = StorageProcessor::establish_connection().await?;
+    let config = ZkSyncConfig::from_env();
+    let client = EthereumGateway::from_config(&config);
 
     let last_commited_block = storage
         .chain()
@@ -58,188 +98,83 @@ async fn main() -> anyhow::Result<()> {
         "Some blocks to revert are already verified"
     );
 
-    let mut blocks = Vec::new();
-    for block_number in ((*last_commited_block - blocks_to_revert + 1)..=*last_commited_block).rev()
-    {
-        println!("{}", block_number);
-        let block = storage
-            .chain()
-            .block_schema()
-            .get_block(BlockNumber(block_number))
-            .await?
-            .unwrap();
-        blocks.push(block);
-    }
+    let blocks = get_blocks(last_commited_block, blocks_to_revert, &mut storage).await?;
+    revert_blocks_on_contract(&client, &blocks).await?;
 
-    let config = ZkSyncConfig::from_env();
-    let client = EthereumGateway::from_config(&config);
+    let mut transaction = storage.start_transaction().await?;
+    let last_block = BlockNumber(*last_commited_block - blocks_to_revert);
 
-    let tx_arg = Token::Array(blocks.iter().map(stored_block_info).collect());
-    let data = client.encode_tx_data("revertBlocks", tx_arg);
-    let signed_tx = client
-        .sign_prepared_tx(
-            data,
-            Options::with(|f| f.gas = Some(U256::from(9 * 10u64.pow(6)))),
-        )
-        .await
-        .map_err(|e| format_err!("Revert blocks send err: {}", e))?;
-    let receipt = send_raw_tx_and_wait(&client, signed_tx.raw_tx).await?;
-    ensure!(receipt.status == Some(U64::from(1)), "Tx failed");
-
-    let database_url = std::env::var("DATABASE_URL").expect("DATABASE_URL must be set");
-    let mut connection: PgConnection = PgConnection::connect(&database_url).await?;
-    let mut transaction: Transaction<'_, Postgres> = connection.begin().await?;
-    let last_reverted_block = (*last_commited_block - blocks_to_revert + 1) as i64;
-
-    sqlx::query!("DELETE FROM blocks WHERE number >= $1", last_reverted_block)
-        .execute(&mut transaction)
+    transaction
+        .chain()
+        .block_schema()
+        .remove_blocks(last_block)
         .await?;
-    sqlx::query!(
-        "DELETE FROM account_balance_updates WHERE block_number >= $1",
-        last_reverted_block
-    )
-    .execute(&mut transaction)
-    .await?;
-    sqlx::query!(
-        "DELETE FROM account_creates WHERE block_number >= $1",
-        last_reverted_block
-    )
-    .execute(&mut transaction)
-    .await?;
-    sqlx::query!(
-        "DELETE FROM account_pubkey_updates WHERE block_number >= $1",
-        last_reverted_block
-    )
-    .execute(&mut transaction)
-    .await?;
-    sqlx::query!(
-        "DELETE FROM block_witness WHERE block >= $1",
-        last_reverted_block
-    )
-    .execute(&mut transaction)
-    .await?;
-    sqlx::query!(
-        "DELETE FROM proofs WHERE block_number >= $1",
-        last_reverted_block
-    )
-    .execute(&mut transaction)
-    .await?;
-    sqlx::query!(
-        "DELETE FROM aggregated_proofs WHERE last_block >= $1",
-        last_reverted_block
-    )
-    .execute(&mut transaction)
-    .await?;
-    sqlx::query!("DELETE FROM pending_block")
-        .execute(&mut transaction)
+    transaction
+        .chain()
+        .block_schema()
+        .remove_pending_block()
         .await?;
-    sqlx::query!(
-        "DELETE FROM account_tree_cache WHERE block >= $1",
-        last_reverted_block
-    )
-    .execute(&mut transaction)
-    .await?;
-    sqlx::query!(
-        "DELETE FROM executed_priority_operations WHERE block_number >= $1",
-        last_reverted_block
-    )
-    .execute(&mut transaction)
-    .await?;
-
-    sqlx::query!(
-        "DELETE FROM prover_job_queue WHERE first_block >= $1",
-        last_reverted_block
-    )
-    .execute(&mut transaction)
-    .await?;
-    sqlx::query!(
-        "UPDATE prover_job_queue SET last_block = $1 WHERE last_block >= $2",
-        last_reverted_block - 1,
-        last_reverted_block
-    )
-    .execute(&mut transaction)
-    .await?;
-
-    let op_ids = sqlx::query!(
-        "SELECT id FROM aggregate_operations WHERE from_block >= $1",
-        last_reverted_block
-    )
-    .fetch_all(&mut transaction)
-    .await?;
-    for op_record in op_ids {
-        let eth_op_ids = sqlx::query!(
-            "SELECT eth_op_id FROM eth_aggregated_ops_binding WHERE op_id = $1",
-            op_record.id
-        )
-        .fetch_all(&mut transaction)
+    transaction
+        .chain()
+        .block_schema()
+        .remove_account_tree_cache(last_block)
         .await?;
-        sqlx::query!(
-            "DELETE FROM eth_aggregated_ops_binding WHERE op_id = $1",
-            op_record.id
-        )
-        .execute(&mut transaction)
+
+    transaction
+        .chain()
+        .state_schema()
+        .remove_account_balance_updates(last_block)
         .await?;
-        for eth_op_record in eth_op_ids {
-            sqlx::query!(
-                "DELETE FROM eth_tx_hashes WHERE eth_op_id = $1",
-                eth_op_record.eth_op_id
-            )
-            .execute(&mut transaction)
-            .await?;
-            sqlx::query!(
-                "DELETE FROM eth_operations WHERE id = $1",
-                eth_op_record.eth_op_id
-            )
-            .execute(&mut transaction)
-            .await?;
-        }
-    }
-    sqlx::query!(
-        "DELETE FROM aggregate_operations WHERE from_block >= $1",
-        last_reverted_block
-    )
-    .execute(&mut transaction)
-    .await?;
-    sqlx::query!(
-        "UPDATE aggregate_operations SET to_block = $1 WHERE to_block >= $2",
-        last_reverted_block - 1,
-        last_reverted_block
-    )
-    .execute(&mut transaction)
-    .await?;
+    transaction
+        .chain()
+        .state_schema()
+        .remove_account_creates(last_block)
+        .await?;
+    transaction
+        .chain()
+        .state_schema()
+        .remove_account_pubkey_updates(last_block)
+        .await?;
 
-    sqlx::query!(
-        "UPDATE eth_parameters SET nonce = $1 WHERE id = true",
-        client.current_nonce().await?.as_u64() as i64
-    )
-    .execute(&mut transaction)
-    .await?;
-    sqlx::query!(
-        "UPDATE eth_parameters SET last_committed_block = $1 WHERE id = true",
-        last_reverted_block - 1
-    )
-    .execute(&mut transaction)
-    .await?;
+    transaction
+        .chain()
+        .operations_schema()
+        .remove_executed_priority_operations(last_block)
+        .await?;
+    transaction
+        .chain()
+        .operations_schema()
+        .remove_aggregate_operations_and_bindings(last_block)
+        .await?;
 
-    sqlx::query!(
-        r#"
-        INSERT INTO mempool_txs (tx_hash, tx, created_at, eth_sign_data, batch_id)
-        SELECT tx_hash, tx, created_at, eth_sign_data, batch_id FROM executed_transactions
-        WHERE block_number >= $1
-    "#,
-        last_reverted_block
-    )
-    .execute(&mut transaction)
-    .await?;
-    sqlx::query!(
-        r#"
-        DELETE FROM executed_transactions
-        WHERE block_number >= $1
-    "#,
-        last_reverted_block
-    )
-    .execute(&mut transaction)
-    .await?;
+    transaction
+        .prover_schema()
+        .remove_witnesses(last_block)
+        .await?;
+    transaction
+        .prover_schema()
+        .remove_proofs(last_block)
+        .await?;
+    transaction
+        .prover_schema()
+        .remove_aggregated_proofs(last_block)
+        .await?;
+    transaction
+        .prover_schema()
+        .remove_prover_jobs(last_block)
+        .await?;
+
+    let nonce = client.current_nonce().await?.as_u32();
+    transaction
+        .ethereum_schema()
+        .update_eth_parameters(last_block, Nonce(nonce))
+        .await?;
+
+    transaction
+        .chain()
+        .mempool_schema()
+        .return_executed_txs_to_mempool(last_block)
+        .await?;
 
     transaction.commit().await?;
     Ok(())

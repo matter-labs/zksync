@@ -549,4 +549,43 @@ impl<'a, 'c> StateSchema<'a, 'c> {
         metrics::histogram!("sql.chain.state.load_state_diff", start.elapsed());
         result
     }
+
+    pub async fn remove_account_balance_updates(
+        &mut self,
+        last_block: BlockNumber,
+    ) -> QueryResult<()> {
+        sqlx::query!(
+            "DELETE FROM account_balance_updates WHERE block_number > $1",
+            *last_block as i64
+        )
+        .execute(self.0.conn())
+        .await?;
+
+        Ok(())
+    }
+
+    pub async fn remove_account_creates(&mut self, last_block: BlockNumber) -> QueryResult<()> {
+        sqlx::query!(
+            "DELETE FROM account_creates WHERE block_number > $1",
+            *last_block as i64
+        )
+        .execute(self.0.conn())
+        .await?;
+
+        Ok(())
+    }
+
+    pub async fn remove_account_pubkey_updates(
+        &mut self,
+        last_block: BlockNumber,
+    ) -> QueryResult<()> {
+        sqlx::query!(
+            "DELETE FROM account_pubkey_updates WHERE block_number > $1",
+            *last_block as i64
+        )
+        .execute(self.0.conn())
+        .await?;
+
+        Ok(())
+    }
 }

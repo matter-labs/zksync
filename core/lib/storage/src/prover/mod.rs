@@ -365,4 +365,55 @@ impl<'a, 'c> ProverSchema<'a, 'c> {
 
         Ok(result)
     }
+
+    pub async fn remove_witnesses(&mut self, last_block: BlockNumber) -> QueryResult<()> {
+        sqlx::query!(
+            "DELETE FROM block_witness WHERE block > $1",
+            *last_block as i64
+        )
+        .execute(self.0.conn())
+        .await?;
+
+        Ok(())
+    }
+
+    pub async fn remove_proofs(&mut self, last_block: BlockNumber) -> QueryResult<()> {
+        sqlx::query!(
+            "DELETE FROM proofs WHERE block_number > $1",
+            *last_block as i64
+        )
+        .execute(self.0.conn())
+        .await?;
+
+        Ok(())
+    }
+
+    pub async fn remove_aggregated_proofs(&mut self, last_block: BlockNumber) -> QueryResult<()> {
+        sqlx::query!(
+            "DELETE FROM aggregated_proofs WHERE last_block > $1",
+            *last_block as i64
+        )
+        .execute(self.0.conn())
+        .await?;
+
+        Ok(())
+    }
+
+    pub async fn remove_prover_jobs(&mut self, last_block: BlockNumber) -> QueryResult<()> {
+        sqlx::query!(
+            "DELETE FROM prover_job_queue WHERE first_block > $1",
+            *last_block as i64
+        )
+        .execute(self.0.conn())
+        .await?;
+
+        sqlx::query!(
+            "UPDATE prover_job_queue SET last_block = $1 WHERE last_block > $1",
+            *last_block as i64
+        )
+        .execute(self.0.conn())
+        .await?;
+
+        Ok(())
+    }
 }

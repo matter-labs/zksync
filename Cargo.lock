@@ -883,7 +883,7 @@ version = "1.0.0"
 dependencies = [
  "anyhow",
  "ethabi",
- "sqlx",
+ "structopt",
  "tokio 0.2.22",
  "web3",
  "zksync_config",

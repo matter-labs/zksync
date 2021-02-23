@@ -496,4 +496,72 @@ impl<'a, 'c> OperationsSchema<'a, 'c> {
         });
         Ok(aggregated_op)
     }
+
+    pub async fn remove_executed_priority_operations(
+        &mut self,
+        last_block: BlockNumber,
+    ) -> QueryResult<()> {
+        sqlx::query!(
+            "DELETE FROM executed_priority_operations WHERE block_number > $1",
+            *last_block as i64
+        )
+        .execute(self.0.conn())
+        .await?;
+
+        Ok(())
+    }
+
+    pub async fn remove_aggregate_operations_and_bindings(
+        &mut self,
+        last_block: BlockNumber,
+    ) -> QueryResult<()> {
+        let op_ids = sqlx::query!(
+            "SELECT id FROM aggregate_operations WHERE from_block > $1",
+            *last_block as i64
+        )
+        .fetch_all(self.0.conn())
+        .await?;
+        for op_record in op_ids {
+            let eth_op_ids = sqlx::query!(
+                "SELECT eth_op_id FROM eth_aggregated_ops_binding WHERE op_id = $1",
+                op_record.id
+            )
+            .fetch_all(self.0.conn())
+            .await?;
+            for eth_op_record in eth_op_ids {
+                sqlx::query!(
+                    "DELETE FROM eth_tx_hashes WHERE eth_op_id = $1",
+                    eth_op_record.eth_op_id
+                )
+                .execute(self.0.conn())
+                .await?;
+                sqlx::query!(
+                    "DELETE FROM eth_operations WHERE id = $1",
+                    eth_op_record.eth_op_id
+                )
+                .execute(self.0.conn())
+                .await?;
+            }
+            sqlx::query!(
+                "DELETE FROM eth_aggregated_ops_binding WHERE op_id = $1",
+                op_record.id
+            )
+            .execute(self.0.conn())
+            .await?;
+        }
+        sqlx::query!(
+            "DELETE FROM aggregate_operations WHERE from_block > $1",
+            *last_block as i64
+        )
+        .execute(self.0.conn())
+        .await?;
+        sqlx::query!(
+            "UPDATE aggregate_operations SET to_block = $1 WHERE to_block > $1",
+            *last_block as i64
+        )
+        .execute(self.0.conn())
+        .await?;
+
+        Ok(())
+    }
 }
