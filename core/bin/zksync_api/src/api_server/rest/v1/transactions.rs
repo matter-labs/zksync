@@ -340,7 +340,7 @@ mod tests {
         api_server::helpers::try_parse_tx_hash,
         core_api_client::CoreApiClient,
         fee_ticker::TickerRequest,
-        signature_checker::{VerifiedTx, VerifyTxSignatureRequest},
+        signature_checker::{VerifiedTx, VerifySignatureRequest},
     };
 
     use super::super::test_utils::{TestServerConfig, TestTransactions};
@@ -417,13 +417,13 @@ mod tests {
         sender
     }
 
-    fn dummy_sign_verifier() -> mpsc::Sender<VerifyTxSignatureRequest> {
-        let (sender, mut receiver) = mpsc::channel::<VerifyTxSignatureRequest>(10);
+    fn dummy_sign_verifier() -> mpsc::Sender<VerifySignatureRequest> {
+        let (sender, mut receiver) = mpsc::channel::<VerifySignatureRequest>(10);
 
         actix_rt::spawn(async move {
             while let Some(item) = receiver.next().await {
-                let verified = VerifiedTx::unverified(item.tx);
-                item.response
+                let verified = VerifiedTx::unverified(item.get_tx_variant().clone());
+                item.get_response()
                     .send(Ok(verified))
                     .expect("Unable to send response");
             }

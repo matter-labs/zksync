@@ -29,7 +29,7 @@ use crate::api_server::rpc_server::types::TxWithSignature;
 use crate::{
     core_api_client::CoreApiClient,
     fee_ticker::{TickerRequest, TokenPriceRequestType},
-    signature_checker::{TxVariant, VerifiedTx, VerifyTxSignatureRequest},
+    signature_checker::{TxVariant, VerifiedTx, VerifySignatureRequest},
     tx_error::TxAddError,
     utils::token_db_cache::TokenDBCache,
 };
@@ -37,7 +37,7 @@ use crate::{
 #[derive(Clone)]
 pub struct TxSender {
     pub core_api_client: CoreApiClient,
-    pub sign_verify_requests: mpsc::Sender<VerifyTxSignatureRequest>,
+    pub sign_verify_requests: mpsc::Sender<VerifySignatureRequest>,
     pub ticker_requests: mpsc::Sender<TickerRequest>,
 
     pub pool: ConnectionPool,
@@ -105,7 +105,7 @@ macro_rules! internal_error {
 impl TxSender {
     pub fn new(
         connection_pool: ConnectionPool,
-        sign_verify_request_sender: mpsc::Sender<VerifyTxSignatureRequest>,
+        sign_verify_request_sender: mpsc::Sender<VerifySignatureRequest>,
         ticker_request_sender: mpsc::Sender<TickerRequest>,
         config: &ZkSyncConfig,
     ) -> Self {
@@ -123,7 +123,7 @@ impl TxSender {
     pub(crate) fn with_client(
         core_api_client: CoreApiClient,
         connection_pool: ConnectionPool,
-        sign_verify_request_sender: mpsc::Sender<VerifyTxSignatureRequest>,
+        sign_verify_request_sender: mpsc::Sender<VerifySignatureRequest>,
         ticker_request_sender: mpsc::Sender<TickerRequest>,
         config: &ZkSyncConfig,
     ) -> Self {
@@ -668,8 +668,8 @@ impl TxSender {
 }
 
 async fn send_verify_request_and_recv(
-    request: VerifyTxSignatureRequest,
-    mut req_channel: mpsc::Sender<VerifyTxSignatureRequest>,
+    request: VerifySignatureRequest,
+    mut req_channel: mpsc::Sender<VerifySignatureRequest>,
     receiver: oneshot::Receiver<Result<VerifiedTx, TxAddError>>,
 ) -> Result<VerifiedTx, SubmitError> {
     // Send the check request.
@@ -693,7 +693,7 @@ async fn verify_tx_info_message_signature(
     account_type: EthAccountType,
     signature: Option<TxEthSignature>,
     msg_to_sign: Option<Vec<u8>>,
-    req_channel: mpsc::Sender<VerifyTxSignatureRequest>,
+    req_channel: mpsc::Sender<VerifySignatureRequest>,
 ) -> Result<VerifiedTx, SubmitError> {
     let eth_sign_data = match msg_to_sign {
         Some(message) => match account_type {
@@ -718,7 +718,7 @@ async fn verify_tx_info_message_signature(
 
     let (sender, receiever) = oneshot::channel();
 
-    let request = VerifyTxSignatureRequest {
+    let request = VerifySignatureRequest {
         tx: TxVariant::Tx(SignedZkSyncTx {
             tx: tx.clone(),
             eth_sign_data,
@@ -742,7 +742,7 @@ async fn verify_txs_batch_signature(
     sender_types: Vec<EthAccountType>,
     batch_sign_data: EthBatchSignData,
     msgs_to_sign: Vec<Option<Vec<u8>>>,
-    req_channel: mpsc::Sender<VerifyTxSignatureRequest>,
+    req_channel: mpsc::Sender<VerifySignatureRequest>,
 ) -> Result<VerifiedTx, SubmitError> {
     let mut txs = Vec::with_capacity(batch.len());
     for (tx, message, sender_type) in izip!(batch, msgs_to_sign, sender_types) {
@@ -766,7 +766,7 @@ async fn verify_txs_batch_signature(
 
     let (sender, receiver) = oneshot::channel();
 
-    let request = VerifyTxSignatureRequest {
+    let request = VerifySignatureRequest {
         tx: TxVariant::Batch(txs, batch_sign_data),
         senders,
         tokens,
