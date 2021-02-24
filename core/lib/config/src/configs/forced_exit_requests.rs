@@ -22,6 +22,7 @@ struct ForcedExitRequestsInternalConfig {
     pub wait_confirmations: u64,
     pub sender_private_key: String,
     pub sender_account_address: Address,
+    pub expiration_period: u64,
 }
 
 #[derive(Debug, Deserialize, Clone, PartialEq)]
@@ -35,6 +36,7 @@ pub struct ForcedExitRequestsConfig {
     pub wait_confirmations: u64,
     pub sender_private_key: String,
     pub sender_account_address: Address,
+    pub expiration_period: u64,
 }
 
 impl ForcedExitRequestsConfig {
@@ -55,6 +57,7 @@ impl ForcedExitRequestsConfig {
             wait_confirmations: config.wait_confirmations,
             sender_private_key: config.sender_private_key,
             sender_account_address: config.sender_account_address,
+            expiration_period: config.expiration_period,
         }
     }
 }

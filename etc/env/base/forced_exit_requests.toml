@@ -24,3 +24,6 @@ wait_confirmations=1
 
 # The account of the ForcedExit sender
 sender_account_address="0xe1faB3eFD74A77C23B426c302D96372140FF7d0C"
+
+# The time after which an invalid request is deleted in milliseconds
+expiration_period=3000

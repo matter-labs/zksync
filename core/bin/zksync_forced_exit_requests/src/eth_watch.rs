@@ -200,6 +200,23 @@ impl ForcedExitContractWatcher {
         }
     }
 
+    pub async fn delete_expired(&mut self) -> anyhow::Result<()> {
+        let mut storage = self.connection_pool.access_storage().await?;
+
+        let expiration_time = chrono::Duration::milliseconds(
+            self.config
+                .forced_exit_requests
+                .expiration_period
+                .try_into()
+                .expect("Failed to convert expiration period to i64"),
+        );
+
+        storage
+            .forced_exit_requests_schema()
+            .delete_old_unfulfilled_requests(expiration_time)
+            .await
+    }
+
     pub async fn poll(&mut self) {
         if !self.polling_allowed() {
             // Polling is currently disabled, skip it.
@@ -240,6 +257,18 @@ impl ForcedExitContractWatcher {
         }
 
         self.last_viewed_block = last_confirmed_block;
+
+        // We can delete the expired events only after the polling has been complete
+        // Since now we are sure that all the events that could have been processed already
+        // have been processed
+        if let Err(err) = self.delete_expired().await {
+            // If an error during deletion occures we should be notified, however
+            // it is not a reason to panic or revert the updates from the poll
+            log::warn!(
+                "An error occured when deleting the expired requests: {}",
+                err
+            );
+        }
     }
 
     pub async fn run(mut self) {
