@@ -103,115 +103,115 @@ describe(`ZkSync integration tests (token: ${token}, transport: ${transport})`, 
         await tester.testChangePubKey(chuck, token, false);
     });
 
-    step('should test multi-transfers', async () => {
-        if (onlyBasic) {
-            return;
-        }
-        await tester.testBatch(alice, bob, token, TX_AMOUNT);
-        await tester.testIgnoredBatch(alice, bob, token, TX_AMOUNT);
-        await tester.testRejectedBatch(alice, bob, token, TX_AMOUNT);
-    });
+    // step('should test multi-transfers', async () => {
+    //     if (onlyBasic) {
+    //         return;
+    //     }
+    //     await tester.testBatch(alice, bob, token, TX_AMOUNT);
+    //     await tester.testIgnoredBatch(alice, bob, token, TX_AMOUNT);
+    //     await tester.testRejectedBatch(alice, bob, token, TX_AMOUNT);
+    // });
 
-    step('should test batch-builder', async () => {
-        // We will pay with different token.
-        const feeToken = token == 'ETH' ? 'wBTC' : 'ETH';
-        // Add these accounts to the network.
-        await tester.testTransfer(alice, david, token, TX_AMOUNT.mul(10));
-        await tester.testTransfer(alice, judy, token, TX_AMOUNT.mul(10));
-        await tester.testTransfer(alice, frank, token, TX_AMOUNT.mul(10));
-        // Also deposit another token to pay with.
-        await tester.testDeposit(frank, feeToken, DEPOSIT_AMOUNT, true);
+    // step('should test batch-builder', async () => {
+    //     // We will pay with different token.
+    //     const feeToken = token == 'ETH' ? 'wBTC' : 'ETH';
+    //     // Add these accounts to the network.
+    //     await tester.testTransfer(alice, david, token, TX_AMOUNT.mul(10));
+    //     await tester.testTransfer(alice, judy, token, TX_AMOUNT.mul(10));
+    //     await tester.testTransfer(alice, frank, token, TX_AMOUNT.mul(10));
+    //     // Also deposit another token to pay with.
+    //     await tester.testDeposit(frank, feeToken, DEPOSIT_AMOUNT, true);
 
-        await tester.testBatchBuilderInvalidUsage(david, token);
-        await tester.testBatchBuilderChangePubKey(david, token, TX_AMOUNT, true);
-        await tester.testBatchBuilderChangePubKey(frank, token, TX_AMOUNT, false);
-        await tester.testBatchBuilderTransfers(david, frank, token, TX_AMOUNT);
-        await tester.testBatchBuilderPayInDifferentToken(frank, david, token, feeToken, TX_AMOUNT);
-        // Finally, transfer, withdraw and forced exit in a single batch.
-        await tester.testBatchBuilderGenericUsage(david, frank, judy, token, TX_AMOUNT);
-    });
+    //     await tester.testBatchBuilderInvalidUsage(david, token);
+    //     await tester.testBatchBuilderChangePubKey(david, token, TX_AMOUNT, true);
+    //     await tester.testBatchBuilderChangePubKey(frank, token, TX_AMOUNT, false);
+    //     await tester.testBatchBuilderTransfers(david, frank, token, TX_AMOUNT);
+    //     await tester.testBatchBuilderPayInDifferentToken(frank, david, token, feeToken, TX_AMOUNT);
+    //     // Finally, transfer, withdraw and forced exit in a single batch.
+    //     await tester.testBatchBuilderGenericUsage(david, frank, judy, token, TX_AMOUNT);
+    // });
 
-    step('should test multi-signers', async () => {
-        // At this point, all these wallets already have their public keys set.
-        await tester.testMultipleBatchSigners([alice, david, frank], token, TX_AMOUNT);
-        await tester.testMultipleWalletsWrongSignature(alice, david, token, TX_AMOUNT);
-    });
+    // step('should test multi-signers', async () => {
+    //     // At this point, all these wallets already have their public keys set.
+    //     await tester.testMultipleBatchSigners([alice, david, frank], token, TX_AMOUNT);
+    //     await tester.testMultipleWalletsWrongSignature(alice, david, token, TX_AMOUNT);
+    // });
 
-    step('should test backwards compatibility', async () => {
-        await tester.testBackwardCompatibleEthMessages(alice, david, token, TX_AMOUNT);
-    });
+    // step('should test backwards compatibility', async () => {
+    //     await tester.testBackwardCompatibleEthMessages(alice, david, token, TX_AMOUNT);
+    // });
 
-    step('should execute a withdrawal', async () => {
-        await tester.testVerifiedWithdraw(alice, token, TX_AMOUNT);
-    });
+    // step('should execute a withdrawal', async () => {
+    //     await tester.testVerifiedWithdraw(alice, token, TX_AMOUNT);
+    // });
 
-    step('should execute a ForcedExit', async () => {
-        if (onlyBasic) {
-            return;
-        }
-        await tester.testVerifiedForcedExit(alice, bob, token);
-    });
+    // step('should execute a ForcedExit', async () => {
+    //     if (onlyBasic) {
+    //         return;
+    //     }
+    //     await tester.testVerifiedForcedExit(alice, bob, token);
+    // });
 
-    it('should check collected fees', async () => {
-        const collectedFee = (await tester.operatorBalance(token)).sub(operatorBalance);
-        expect(collectedFee.eq(tester.runningFee), `Fee collection failed, expected: ${tester.runningFee.toString()}, got: ${collectedFee.toString()}`).to.be.true;
-    });
+    // it('should check collected fees', async () => {
+    //     const collectedFee = (await tester.operatorBalance(token)).sub(operatorBalance);
+    //     expect(collectedFee.eq(tester.runningFee), `Fee collection failed, expected: ${tester.runningFee.toString()}, got: ${collectedFee.toString()}`).to.be.true;
+    // });
 
-    it('should fail trying to send tx with wrong signature', async () => {
-        if (onlyBasic) {
-            return;
-        }
-        await tester.testWrongSignature(alice, bob, token, TX_AMOUNT);
-    });
+    // it('should fail trying to send tx with wrong signature', async () => {
+    //     if (onlyBasic) {
+    //         return;
+    //     }
+    //     await tester.testWrongSignature(alice, bob, token, TX_AMOUNT);
+    // });
 
-    describe('Full Exit tests', () => {
-        let carl: Wallet;
+    // describe('Full Exit tests', () => {
+    //     let carl: Wallet;
 
-        before('create a test wallet', async () => {
-            carl = await tester.fundedWallet('5.0');
-        });
+    //     before('create a test wallet', async () => {
+    //         carl = await tester.fundedWallet('5.0');
+    //     });
 
-        step('should execute full-exit on random wallet', async () => {
-            if (onlyBasic) {
-                return;
-            }
-            await tester.testFullExit(carl, token, 145);
-        });
+    //     step('should execute full-exit on random wallet', async () => {
+    //         if (onlyBasic) {
+    //             return;
+    //         }
+    //         await tester.testFullExit(carl, token, 145);
+    //     });
 
-        step('should fail full-exit with wrong eth-signer', async () => {
-            if (onlyBasic) {
-                return;
-            }
-            // make a deposit so that wallet is assigned an accountId
-            await tester.testDeposit(carl, token, DEPOSIT_AMOUNT, true);
+    //     step('should fail full-exit with wrong eth-signer', async () => {
+    //         if (onlyBasic) {
+    //             return;
+    //         }
+    //         // make a deposit so that wallet is assigned an accountId
+    //         await tester.testDeposit(carl, token, DEPOSIT_AMOUNT, true);
 
-            const oldSigner = carl.ethSigner;
-            carl.ethSigner = tester.ethWallet;
-            const [before, after] = await tester.testFullExit(carl, token);
-            expect(before.eq(0), 'Balance before Full Exit must be non-zero').to.be.false;
-            expect(before.eq(after), 'Balance after incorrect Full Exit should not change').to.be.true;
-            carl.ethSigner = oldSigner;
-        });
+    //         const oldSigner = carl.ethSigner;
+    //         carl.ethSigner = tester.ethWallet;
+    //         const [before, after] = await tester.testFullExit(carl, token);
+    //         expect(before.eq(0), 'Balance before Full Exit must be non-zero').to.be.false;
+    //         expect(before.eq(after), 'Balance after incorrect Full Exit should not change').to.be.true;
+    //         carl.ethSigner = oldSigner;
+    //     });
 
-        step('should execute a normal full-exit', async () => {
-            if (onlyBasic) {
-                return;
-            }
-            const [before, after] = await tester.testFullExit(carl, token);
-            expect(before.eq(0), 'Balance before Full Exit must be non-zero').to.be.false;
-            expect(after.eq(0), 'Balance after Full Exit must be zero').to.be.true;
-        });
+    //     step('should execute a normal full-exit', async () => {
+    //         if (onlyBasic) {
+    //             return;
+    //         }
+    //         const [before, after] = await tester.testFullExit(carl, token);
+    //         expect(before.eq(0), 'Balance before Full Exit must be non-zero').to.be.false;
+    //         expect(after.eq(0), 'Balance after Full Exit must be zero').to.be.true;
+    //     });
 
-        step('should execute full-exit on an empty wallet', async () => {
-            if (onlyBasic) {
-                return;
-            }
-            const [before, after] = await tester.testFullExit(carl, token);
-            expect(before.eq(0), "Balance before Full Exit must be zero (we've already withdrawn all the funds)").to
-                .be.true;
-            expect(after.eq(0), 'Balance after Full Exit must be zero').to.be.true;
-        });
-    });
+    //     step('should execute full-exit on an empty wallet', async () => {
+    //         if (onlyBasic) {
+    //             return;
+    //         }
+    //         const [before, after] = await tester.testFullExit(carl, token);
+    //         expect(before.eq(0), "Balance before Full Exit must be zero (we've already withdrawn all the funds)").to
+    //             .be.true;
+    //         expect(after.eq(0), 'Balance after Full Exit must be zero').to.be.true;
+    //     });
+    // });
 
     describe('CREATE2 tests', () => {
         let hilda: Wallet;

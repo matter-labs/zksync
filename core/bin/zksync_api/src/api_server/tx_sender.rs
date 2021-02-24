@@ -411,8 +411,7 @@ impl TxSender {
             tx_sender_types.push(self.get_tx_sender_type(&tx).await?);
         }
 
-        let mut batch_sign_data = None;
-        if !eth_signatures.is_empty() {
+        let batch_sign_data = if !eth_signatures.is_empty() {
             // User provided at least one signature for the whole batch.
             // In this case each sender cannot be CREATE2.
             if tx_sender_types
@@ -430,30 +429,9 @@ impl TxSender {
                 .map(|((tx, token), sender)| (tx.tx.clone(), token, sender))
                 .collect::<Vec<_>>();
             // Create batch signature data.
-            batch_sign_data =
-                Some(EthBatchSignData::new(_txs, eth_signatures).map_err(SubmitError::other)?);
+            Some(EthBatchSignData::new(_txs, eth_signatures).map_err(SubmitError::other)?)
         } else {
-            // In this case each tx must have own signature.
-
-            // This hashset holds addresses that have performed a CREATE2 ChangePubKey
-            // within this batch, so that we don't check ETH signatures on their transactions
-            // from this batch. We save the account type to the db later.
-            let mut create2_senders = HashSet::<H160>::new();
-            for (tx, sender, sender_type) in
-                izip!(txs.iter(), tx_senders.iter(), tx_sender_types.iter_mut())
-            {
-                if create2_senders.contains(&sender) {
-                    *sender_type = EthAccountType::CREATE2;
-                }
-
-                if let ZkSyncTx::ChangePubKey(tx) = &tx.tx {
-                    if let Some(auth_data) = &tx.eth_auth_data {
-                        if auth_data.is_create2() {
-                            create2_senders.insert(sender.clone());
-                        }
-                    }
-                }
-            }
+            None
         };
         let (verified_batch, sign_data) = verify_txs_batch_signature(
             txs,
@@ -735,9 +713,28 @@ async fn verify_txs_batch_signature(
     msgs_to_sign: Vec<Option<Vec<u8>>>,
     req_channel: mpsc::Sender<VerifySignatureRequest>,
 ) -> Result<VerifiedTx, SubmitError> {
+    // This hashset holds addresses that have performed a CREATE2 ChangePubKey
+    // within this batch, so that we don't check ETH signatures on their transactions
+    // from this batch. We save the account type to the db later.
+    let mut create2_senders = HashSet::<H160>::new();
     let mut txs = Vec::with_capacity(batch.len());
-    for (tx, message, sender_type) in izip!(batch, msgs_to_sign, sender_types) {
-        if batch_sign_data.is_none() && tx.signature.is_none() {
+    for (tx, message, sender, mut sender_type) in
+        izip!(batch, msgs_to_sign, senders.iter(), sender_types)
+    {
+        if create2_senders.contains(sender) {
+            sender_type = EthAccountType::CREATE2;
+        }
+        if let ZkSyncTx::ChangePubKey(tx) = &tx.tx {
+            if let Some(auth_data) = &tx.eth_auth_data {
+                if auth_data.is_create2() {
+                    create2_senders.insert(sender.clone());
+                }
+            }
+        }
+        if matches!(sender_type, EthAccountType::Owned)
+            && batch_sign_data.is_none()
+            && tx.signature.is_none()
+        {
             return Err(SubmitError::TxAdd(TxAddError::MissingEthSignature));
         }
         // If we have more signatures provided than required,
@@ -752,6 +749,7 @@ async fn verify_txs_batch_signature(
         } else {
             None
         };
+
         txs.push(SignedZkSyncTx {
             tx: tx.tx,
             eth_sign_data,
