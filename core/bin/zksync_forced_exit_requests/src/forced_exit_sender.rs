@@ -3,7 +3,7 @@ use std::{
     ops::{AddAssign, Sub},
 };
 
-use chrono::Utc;
+use chrono::{DateTime, Utc};
 use num::{BigUint, FromPrimitive};
 use tokio::time;
 
@@ -139,18 +139,14 @@ impl ForcedExitSender {
         Ok(transactions)
     }
 
-    // TODO: take the block timestamp into account instead of the now (ZKS-495)
-    pub fn expired(&self, request: &ForcedExitRequest) -> bool {
-        let now_millis = Utc::now().timestamp_millis();
-        let created_at_millis = request.created_at.timestamp_millis();
-
-        now_millis.saturating_sub(created_at_millis)
-            <= self.config.forced_exit_requests.max_tx_interval
-    }
-
     // Returns the id the request if it should be fulfilled,
     // error otherwise
-    pub fn check_request(&self, amount: BigUint, request: Option<ForcedExitRequest>) -> bool {
+    pub fn check_request(
+        &self,
+        amount: BigUint,
+        submission_time: DateTime<Utc>,
+        request: Option<ForcedExitRequest>,
+    ) -> bool {
         let request = match request {
             Some(r) => r,
             None => {
@@ -164,7 +160,7 @@ impl ForcedExitSender {
             return false;
         }
 
-        !self.expired(&request) && request.price_in_wei == amount
+        request.valid_until < submission_time && request.price_in_wei == amount
     }
 
     // Awaits until the request is complete
@@ -318,14 +314,18 @@ impl ForcedExitSender {
         }
     }
 
-    pub async fn try_process_request(&self, amount: BigUint) -> anyhow::Result<()> {
+    pub async fn try_process_request(
+        &self,
+        amount: BigUint,
+        submission_time: DateTime<Utc>,
+    ) -> anyhow::Result<()> {
         let (id, amount) = self.extract_id_from_amount(amount);
 
         let mut storage = self.connection_pool.access_storage().await?;
 
         let fe_request = self.get_request_by_id(&mut storage, id).await?;
 
-        let fe_request = if self.check_request(amount, fe_request.clone()) {
+        let fe_request = if self.check_request(amount, submission_time, fe_request.clone()) {
             // The self.check_request already checked that the fe_request is Some(_)
             fe_request.unwrap()
         } else {
@@ -348,13 +348,15 @@ impl ForcedExitSender {
         Ok(())
     }
 
-    pub async fn process_request(&self, amount: BigUint) {
+    pub async fn process_request(&self, amount: BigUint, submission_time: DateTime<Utc>) {
         let mut attempts: u8 = 0;
         // Typically this should not run any longer than 1 iteration
         // In case something bad happens we do not want the server crush because
         // of the forced_exit_requests component
         loop {
-            let processing_attempt = self.try_process_request(amount.clone()).await;
+            let processing_attempt = self
+                .try_process_request(amount.clone(), submission_time)
+                .await;
 
             if processing_attempt.is_ok() {
                 return;

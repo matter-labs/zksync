@@ -1,7 +1,8 @@
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, Duration as ChronoDuration, Utc};
 use ethabi::{Address, Hash};
 use std::{
     convert::TryFrom,
+    ops::Sub,
     time::{Duration, Instant},
 };
 use std::{convert::TryInto, fmt::Debug};
@@ -65,7 +66,12 @@ impl EthClient {
         }
     }
 
-    async fn get_events<T>(&self, from: u64, to: u64, topics: Vec<Hash>) -> anyhow::Result<Vec<T>>
+    async fn get_events<T>(
+        &self,
+        from: u64,
+        to: u64,
+        topics: Vec<Hash>,
+    ) -> anyhow::Result<Vec<(T, u64)>>
     where
         T: TryFrom<Log>,
         T::Error: Debug,
@@ -86,7 +92,7 @@ impl EthClient {
         &self,
         from: u64,
         to: u64,
-    ) -> anyhow::Result<Vec<FundsReceivedEvent>> {
+    ) -> anyhow::Result<Vec<(FundsReceivedEvent, u64)>> {
         let start = Instant::now();
         let result = self
             .get_events(from, to, vec![self.topics.funds_received])
@@ -116,16 +122,38 @@ struct ForcedExitContractWatcher {
 
 // Usually blocks are created much slower (at rate 1 block per 10-20s),
 // but the block time falls through time, so just to double-check
-const MILLIS_PER_BLOCK: u64 = 7000;
+const MILLIS_PER_BLOCK_LOWER: u64 = 5000;
+const MILLIS_PER_BLOCK_UPPER: u64 = 25000;
 
-// Returns number of blocks that should have been created during the time
+// Returns upper bound of the number of blocks that
+// should have been created during the time
 fn time_range_to_block_diff(from: DateTime<Utc>, to: DateTime<Utc>) -> u64 {
     // Timestamps should never be negative
     let millis_from: u64 = from.timestamp_millis().try_into().unwrap();
     let millis_to: u64 = to.timestamp_millis().try_into().unwrap();
 
     // It does not matter whether to ceil or floor the division
-    millis_to.saturating_sub(millis_from) / MILLIS_PER_BLOCK
+    millis_to.saturating_sub(millis_from) / MILLIS_PER_BLOCK_LOWER
+}
+
+// Returns the upper bound of the time that should have
+// passed between the block range
+fn block_diff_to_time_range(block_from: u64, block_to: u64) -> ChronoDuration {
+    let block_diff = block_to.saturating_sub(block_from);
+
+    ChronoDuration::milliseconds(
+        block_diff
+            .saturating_mul(MILLIS_PER_BLOCK_UPPER)
+            .try_into()
+            .unwrap(),
+    )
+}
+
+// Lower bound on the time when was the block created
+fn lower_bound_block_time(block: u64, current_block: u64) -> DateTime<Utc> {
+    let time_diff = block_diff_to_time_range(block, current_block);
+
+    Utc::now().sub(time_diff)
 }
 
 impl ForcedExitContractWatcher {
@@ -235,7 +263,7 @@ impl ForcedExitContractWatcher {
 
         for e in events {
             self.forced_exit_sender
-                .process_request(e.amount.clone())
+                .process_request(e.0.amount, lower_bound_block_time(e.1, last_block))
                 .await;
         }
 
@@ -339,7 +367,7 @@ pub async fn get_contract_events<T>(
     from: BlockNumber,
     to: BlockNumber,
     topics: Vec<Hash>,
-) -> anyhow::Result<Vec<T>>
+) -> anyhow::Result<Vec<(T, u64)>>
 where
     T: TryFrom<Log>,
     T::Error: Debug,
@@ -356,8 +384,12 @@ where
         .await?
         .into_iter()
         .filter_map(|event| {
+            let block_number = event
+                .block_number
+                .expect("Trying to access pending block")
+                .as_u64();
             if let Ok(event) = T::try_from(event) {
-                Some(Ok(event))
+                Some(Ok((event, block_number)))
             } else {
                 None
             }
