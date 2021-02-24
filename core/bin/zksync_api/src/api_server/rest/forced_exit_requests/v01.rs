@@ -93,10 +93,12 @@ pub async fn submit_request(
 ) -> JsonResult<ForcedExitRequest> {
     let start = Instant::now();
 
-    let mut storage = data.connection_pool.access_storage().await.map_err(|err| {
-        vlog::warn!("Internal Server Error: '{}';", err);
-        ApiError::internal("")
-    })?;
+    let mut storage = data
+        .connection_pool
+        .access_storage()
+        .await
+        .map_err(warn_err)
+        .map_err(ApiError::internal)?;
 
     if params.tokens.len() > data.max_tokens_per_request as usize {
         return Err(ApiError::bad_request(
@@ -162,10 +164,12 @@ pub async fn get_request_by_id(
 ) -> JsonResult<ForcedExitRequest> {
     let start = Instant::now();
 
-    let mut storage = data.connection_pool.access_storage().await.map_err(|err| {
-        vlog::warn!("Internal Server Error: '{}';", err);
-        ApiError::internal("")
-    })?;
+    let mut storage = data
+        .connection_pool
+        .access_storage()
+        .await
+        .map_err(warn_err)
+        .map_err(ApiError::internal)?;
 
     let mut fe_requests_schema = storage.forced_exit_requests_schema();
 
@@ -412,4 +416,9 @@ mod tests {
         server.stop().await;
         Ok(())
     }
+}
+
+fn warn_err<T: std::fmt::Display>(err: T) -> T {
+    vlog::warn!("Internal Server Error: '{}';", err);
+    err
 }
