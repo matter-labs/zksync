@@ -218,6 +218,26 @@
       "nullable": []
     }
   },
+  "0bdd32081fc9c8fbfb63787696884617129c30915c400e5647d2a81f882c6d4d": {
+    "query": "SELECT eth_op_id FROM eth_aggregated_ops_binding WHERE op_id = ANY($1)",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "eth_op_id",
+          "type_info": "Int8"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Int8Array"
+        ]
+      },
+      "nullable": [
+        false
+      ]
+    }
+  },
   "0c9fc29aabfefa38588a298002e7a60c0c6cf578f7a305e8e7f58695651662dc": {
     "query": "UPDATE prover_job_queue\n            SET (updated_at, updated_by) = (now(), $1)\n            WHERE id = $2",
     "describe": {
@@ -464,18 +484,6 @@
         false,
         false
       ]
-    }
-  },
-  "122a29ca887bcbc53607e4772be16747c23d0e061023561e717567e876c15d40": {
-    "query": "DELETE FROM eth_aggregated_ops_binding WHERE op_id = $1",
-    "describe": {
-      "columns": [],
-      "parameters": {
-        "Left": [
-          "Int8"
-        ]
-      },
-      "nullable": []
     }
   },
   "15faacf14edd991dedc35011ef12eefc5a04771a6b3f24a4c655f9259c9ea572": {
@@ -818,6 +826,18 @@
         false,
         false
       ]
+    }
+  },
+  "26204b0d5ff5ce98cc8ee5d483d4b5536724f7d8f17c66e19387bc5acd3e713d": {
+    "query": "DELETE FROM eth_tx_hashes WHERE eth_op_id = ANY($1)",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "Int8Array"
+        ]
+      },
+      "nullable": []
     }
   },
   "273c7371b1a13bbb03490e874b7f2eab969defa6aa9f2b416e4f9e8a135aa97c": {
@@ -1641,6 +1661,18 @@
       ]
     }
   },
+  "4d9627c05c67f50b8cf9927923e3d8a1be86cdd23e55b1ada791ebb2cc3942ca": {
+    "query": "DELETE FROM eth_aggregated_ops_binding WHERE op_id = ANY($1)",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "Int8Array"
+        ]
+      },
+      "nullable": []
+    }
+  },
   "4fc97e18f8e63d63d3a52db84ddd38243a865011e69a60061af37ebc2a8f1566": {
     "query": "SELECT * FROM complete_withdrawals_transactions\n                        WHERE pending_withdrawals_queue_start_index <= $1\n                            AND $1 < pending_withdrawals_queue_end_index\n                    LIMIT 1\n                    ",
     "describe": {
@@ -1857,18 +1889,6 @@
   },
   "5d114595ec0f4fb9c49b846b4f245e454b02a47e88fa3b800d90c50564db74f0": {
     "query": "UPDATE eth_parameters SET last_committed_block = $1 WHERE id = true",
-    "describe": {
-      "columns": [],
-      "parameters": {
-        "Left": [
-          "Int8"
-        ]
-      },
-      "nullable": []
-    }
-  },
-  "5d9c6840d46f7ec81e318510e322d831fc2373de99d96b730414bc92fc8f4b9f": {
-    "query": "DELETE FROM eth_tx_hashes WHERE eth_op_id = $1",
     "describe": {
       "columns": [],
       "parameters": {
@@ -2307,6 +2327,18 @@
       "nullable": []
     }
   },
+  "7ffe90960741dbd6cba1bb6784bfb2f91e54b153fb652e61edaee3a73c40b43c": {
+    "query": "DELETE FROM eth_operations WHERE id = ANY($1)",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "Int8Array"
+        ]
+      },
+      "nullable": []
+    }
+  },
   "80c2eb3abd0f05fb464113ca06dc2a7f1fe860bc4fcac0da805f13e980ca75a5": {
     "query": "SELECT * FROM pending_withdrawals WHERE withdrawal_hash = $1\n            LIMIT 1",
     "describe": {
@@ -2578,26 +2610,6 @@
           "Int8",
           "Numeric",
           "Bytea"
-        ]
-      },
-      "nullable": [
-        false
-      ]
-    }
-  },
-  "94065eadc144a547a01f8b6fc30eab221040379c4bbe1209f4492f83c0aca8eb": {
-    "query": "SELECT eth_op_id FROM eth_aggregated_ops_binding WHERE op_id = $1",
-    "describe": {
-      "columns": [
-        {
-          "ordinal": 0,
-          "name": "eth_op_id",
-          "type_info": "Int8"
-        }
-      ],
-      "parameters": {
-        "Left": [
-          "Int8"
         ]
       },
       "nullable": [
@@ -2897,18 +2909,6 @@
           "Int8",
           "Timestamptz",
           "Jsonb",
-          "Int8"
-        ]
-      },
-      "nullable": []
-    }
-  },
-  "a68a981502771a2bf94cc8ca25c52403efc249cf2bf58c261edec46352d9aedc": {
-    "query": "DELETE FROM eth_operations WHERE id = $1",
-    "describe": {
-      "columns": [],
-      "parameters": {
-        "Left": [
           "Int8"
         ]
       },

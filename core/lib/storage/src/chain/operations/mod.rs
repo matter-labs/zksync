@@ -515,40 +515,41 @@ impl<'a, 'c> OperationsSchema<'a, 'c> {
         &mut self,
         last_block: BlockNumber,
     ) -> QueryResult<()> {
-        let op_ids = sqlx::query!(
+        let op_ids: Vec<i64> = sqlx::query!(
             "SELECT id FROM aggregate_operations WHERE from_block > $1",
             *last_block as i64
         )
         .fetch_all(self.0.conn())
+        .await?
+        .into_iter()
+        .map(|record| record.id)
+        .collect();
+
+        let eth_op_ids: Vec<i64> = sqlx::query!(
+            "SELECT eth_op_id FROM eth_aggregated_ops_binding WHERE op_id = ANY($1)",
+            &op_ids
+        )
+        .fetch_all(self.0.conn())
+        .await?
+        .into_iter()
+        .map(|record| record.eth_op_id)
+        .collect();
+
+        sqlx::query!(
+            "DELETE FROM eth_tx_hashes WHERE eth_op_id = ANY($1)",
+            &eth_op_ids
+        )
+        .execute(self.0.conn())
         .await?;
-        for op_record in op_ids {
-            let eth_op_ids = sqlx::query!(
-                "SELECT eth_op_id FROM eth_aggregated_ops_binding WHERE op_id = $1",
-                op_record.id
-            )
-            .fetch_all(self.0.conn())
-            .await?;
-            for eth_op_record in eth_op_ids {
-                sqlx::query!(
-                    "DELETE FROM eth_tx_hashes WHERE eth_op_id = $1",
-                    eth_op_record.eth_op_id
-                )
-                .execute(self.0.conn())
-                .await?;
-                sqlx::query!(
-                    "DELETE FROM eth_operations WHERE id = $1",
-                    eth_op_record.eth_op_id
-                )
-                .execute(self.0.conn())
-                .await?;
-            }
-            sqlx::query!(
-                "DELETE FROM eth_aggregated_ops_binding WHERE op_id = $1",
-                op_record.id
-            )
+        sqlx::query!("DELETE FROM eth_operations WHERE id = ANY($1)", &eth_op_ids)
             .execute(self.0.conn())
             .await?;
-        }
+        sqlx::query!(
+            "DELETE FROM eth_aggregated_ops_binding WHERE op_id = ANY($1)",
+            &op_ids
+        )
+        .execute(self.0.conn())
+        .await?;
         sqlx::query!(
             "DELETE FROM aggregate_operations WHERE from_block > $1",
             *last_block as i64

@@ -16,6 +16,8 @@ All notable changes to the core components will be documented in this file.
   `fee_token` option into the `[main_wallet]` section to set token that is used to pay fees for the main wallet
   operations.
 
+- `block_revert` crate and some methods for deletion to storage.
+
 ### Fixed
 
 ## Release 2021-02-19
