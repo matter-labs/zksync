@@ -52,7 +52,7 @@ impl VerifiedTx {
         network: Network,
     ) -> Result<Self, TxAddError> {
         verify_eth_signature(request, eth_checker, network).await?;
-        verify_tx_correctness(request.get_tx_variant_mut())?;
+        verify_tx_correctness(&mut request.get_tx_variant())?;
 
         Ok(Self(request.get_tx_variant().clone()))
     }
@@ -86,35 +86,39 @@ async fn verify_eth_signature(
     eth_checker: &EthereumChecker,
     network: Network,
 ) -> Result<(), TxAddError> {
-    // TODO: Remove this code after Golem update [ZKS-173]
     if network == Network::Rinkeby || network == Network::Localhost {
         return Ok(());
     }
-    match request {
-        VerifySignatureRequest::Tx(request) => {
+
+    match &request.data {
+        RequestData::Tx(request) => {
+            // TODO: Remove this code after Golem update [ZKS-173]
             if request.token.symbol == "GNT" {
                 return Ok(());
             }
+            verify_eth_signature_single_tx(
+                &request.tx,
+                request.sender,
+                request.token.clone(),
+                eth_checker,
+            )
+            .await?;
         }
-        VerifySignatureRequest::Batch(request) => {
+        RequestData::Batch(request) => {
+            // TODO: Remove this code after Golem update [ZKS-173]
             if request.tokens.iter().any(|t| t.symbol == "GNT") {
                 return Ok(());
             }
-        }
-    }
-
-    match request {
-        VerifySignatureRequest::Tx(request) => {
-            verify_eth_signature_single_tx(&request.tx, request.sender, request.token, eth_checker)
-                .await?;
-        }
-        VerifySignatureRequest::Batch(request) => {
             let accounts = &request.senders;
             let tokens = &request.tokens;
+            let txs = &request.txs;
+
             if accounts.len() != request.txs.len() {
                 return Err(TxAddError::Other);
             }
-            verify_eth_signature_txs_batch(txs, accounts, batch_sign_data, eth_checker).await?;
+            if let Some(batch_sign_data) = &request.batch_sign_data {
+                verify_eth_signature_txs_batch(txs, accounts, batch_sign_data, eth_checker).await?;
+            }
             // In case there're signatures provided for some of transactions
             // we still verify them.
             for ((tx, &account), token) in
@@ -284,7 +288,7 @@ fn verify_tx_correctness(tx: &mut TxVariant) -> Result<(), TxAddError> {
 }
 
 #[derive(Debug)]
-struct TxRequest {
+pub struct TxRequest {
     pub tx: SignedZkSyncTx,
     /// Senders of transactions. This field is needed since for `ForcedExit` account affected by
     /// the transaction and actual sender can be different. Thus, we require request sender to
@@ -293,14 +297,12 @@ struct TxRequest {
     /// Resolved tokens might be used to obtain old-formatted 2-FA messages.
     /// Needed for backwards compatibility.
     pub token: Token,
-    /// Channel for sending the check response.
-    pub response: oneshot::Sender<Result<VerifiedTx, TxAddError>>,
 }
 
 #[derive(Debug)]
-struct BatchRequest {
+pub struct BatchRequest {
     pub txs: Vec<SignedZkSyncTx>,
-    pub sign_data: Option<EthBatchSignData>,
+    pub batch_sign_data: Option<EthBatchSignData>,
     /// Senders of transactions. This field is needed since for `ForcedExit` account affected by
     /// the transaction and actual sender can be different. Thus, we require request sender to
     /// perform a database query and fetch actual addresses if necessary.
@@ -308,34 +310,29 @@ struct BatchRequest {
     /// Resolved tokens might be used to obtain old-formatted 2-FA messages.
     /// Needed for backwards compatibility.
     pub tokens: Vec<Token>,
-    /// Channel for sending the check response.
-    pub response: oneshot::Sender<Result<VerifiedTx, TxAddError>>,
 }
 
 /// Request for the signature check.
 #[derive(Debug)]
-pub enum VerifySignatureRequest {
+pub struct VerifySignatureRequest {
+    pub data: RequestData,
+    /// Channel for sending the check response.
+    pub response: oneshot::Sender<Result<VerifiedTx, TxAddError>>,
+}
+
+#[derive(Debug)]
+pub enum RequestData {
     Tx(TxRequest),
     Batch(BatchRequest),
 }
 
 impl VerifySignatureRequest {
-    pub fn get_tx_variant(&self) -> &TxVariant {
-        match self {
-            Self::Tx(request) => &TxVariant::Tx(request.tx),
-            Self::Batch(request) => &TxVariant::Batch(request.txs, request.sign_data),
-        }
-    }
-    pub fn get_tx_variant_mut(&mut self) -> &mut TxVariant {
-        match self {
-            Self::Tx(request) => &mut TxVariant::Tx(request.tx),
-            Self::Batch(request) => &mut TxVariant::Batch(request.txs, request.sign_data),
-        }
-    }
-    pub fn get_response(&self) -> oneshot::Sender<Result<VerifiedTx, TxAddError>> {
-        match self {
-            Self::Tx(request) => request.response,
-            Self::Batch(request) => request.response,
+    pub fn get_tx_variant(&self) -> TxVariant {
+        match &self.data {
+            RequestData::Tx(request) => TxVariant::Tx(request.tx.clone()),
+            RequestData::Batch(request) => {
+                TxVariant::Batch(request.txs.clone(), request.batch_sign_data.clone())
+            }
         }
     }
 }
@@ -364,7 +361,7 @@ pub fn start_sign_checker_detached(
             handle.spawn(async move {
                 let resp = VerifiedTx::verify(&mut request, &eth_checker, eth_network).await;
 
-                request.get_response().send(resp).unwrap_or_default();
+                request.response.send(resp).unwrap_or_default();
             });
         }
     }
