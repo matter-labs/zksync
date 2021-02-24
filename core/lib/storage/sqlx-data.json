@@ -1887,18 +1887,6 @@
       "nullable": []
     }
   },
-  "5d114595ec0f4fb9c49b846b4f245e454b02a47e88fa3b800d90c50564db74f0": {
-    "query": "UPDATE eth_parameters SET last_committed_block = $1 WHERE id = true",
-    "describe": {
-      "columns": [],
-      "parameters": {
-        "Left": [
-          "Int8"
-        ]
-      },
-      "nullable": []
-    }
-  },
   "60cf573e253358218a6319233221e8c2ff0561fd7ffbf8339a11a4509d955442": {
     "query": "SELECT count(*) from mempool_txs\n            WHERE tx_hash = $1",
     "describe": {
@@ -2949,6 +2937,19 @@
       "parameters": {
         "Left": [
           "TextArray"
+        ]
+      },
+      "nullable": []
+    }
+  },
+  "ae86cb66402b692d167825098c5f125ce9fc5acbd0792dd9682c6a4883124c73": {
+    "query": "UPDATE eth_parameters SET nonce = $1, last_committed_block = $2 WHERE id = true",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "Int8",
+          "Int8"
         ]
       },
       "nullable": []
@@ -4642,18 +4643,6 @@
         false,
         false
       ]
-    }
-  },
-  "fd7c6f468cc5727407a6732cf8552a3a93525570ddba652d22fc792c2d0b156c": {
-    "query": "UPDATE eth_parameters SET nonce = $1 WHERE id = true",
-    "describe": {
-      "columns": [],
-      "parameters": {
-        "Left": [
-          "Int8"
-        ]
-      },
-      "nullable": []
     }
   }
 }

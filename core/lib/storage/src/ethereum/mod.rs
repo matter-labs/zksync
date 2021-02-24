@@ -623,14 +623,8 @@ impl<'a, 'c> EthereumSchema<'a, 'c> {
         nonce: Nonce,
     ) -> QueryResult<()> {
         sqlx::query!(
-            "UPDATE eth_parameters SET nonce = $1 WHERE id = true",
-            *nonce as i64
-        )
-        .execute(self.0.conn())
-        .await?;
-
-        sqlx::query!(
-            "UPDATE eth_parameters SET last_committed_block = $1 WHERE id = true",
+            "UPDATE eth_parameters SET nonce = $1, last_committed_block = $2 WHERE id = true",
+            *nonce as i64,
             *last_block as i64
         )
         .execute(self.0.conn())
