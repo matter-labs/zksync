@@ -23,6 +23,9 @@ local metrics = [
   "sql.chain.block.save_block",
   "sql.chain.block.save_block_transactions",
   "sql.chain.block.store_account_tree_cache",
+  "sql.chain.block.remove_blocks",
+  "sql.chain.block.remove_pending_block",
+  "sql.chain.block.remove_account_tree_cache",
 ];
 
 G.dashboard('sql / chain / block', metrics)

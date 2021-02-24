@@ -622,6 +622,7 @@ impl<'a, 'c> EthereumSchema<'a, 'c> {
         last_block: BlockNumber,
         nonce: Nonce,
     ) -> QueryResult<()> {
+        let start = Instant::now();
         sqlx::query!(
             "UPDATE eth_parameters SET nonce = $1, last_committed_block = $2 WHERE id = true",
             *nonce as i64,
@@ -637,6 +638,7 @@ impl<'a, 'c> EthereumSchema<'a, 'c> {
         .execute(self.0.conn())
         .await?;
 
+        metrics::histogram!("sql.ethereum.update_eth_parameters", start.elapsed());
         Ok(())
     }
 }

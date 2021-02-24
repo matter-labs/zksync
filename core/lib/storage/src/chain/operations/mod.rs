@@ -501,6 +501,7 @@ impl<'a, 'c> OperationsSchema<'a, 'c> {
         &mut self,
         last_block: BlockNumber,
     ) -> QueryResult<()> {
+        let start = Instant::now();
         sqlx::query!(
             "DELETE FROM executed_priority_operations WHERE block_number > $1",
             *last_block as i64
@@ -508,6 +509,10 @@ impl<'a, 'c> OperationsSchema<'a, 'c> {
         .execute(self.0.conn())
         .await?;
 
+        metrics::histogram!(
+            "sql.chain.operations.remove_executed_priority_operations",
+            start.elapsed()
+        );
         Ok(())
     }
 
@@ -515,6 +520,7 @@ impl<'a, 'c> OperationsSchema<'a, 'c> {
         &mut self,
         last_block: BlockNumber,
     ) -> QueryResult<()> {
+        let start = Instant::now();
         let op_ids: Vec<i64> = sqlx::query!(
             "SELECT id FROM aggregate_operations WHERE from_block > $1",
             *last_block as i64
@@ -563,6 +569,10 @@ impl<'a, 'c> OperationsSchema<'a, 'c> {
         .execute(self.0.conn())
         .await?;
 
+        metrics::histogram!(
+            "sql.chain.operations.remove_aggregate_operations_and_bindings",
+            start.elapsed()
+        );
         Ok(())
     }
 }

@@ -6,6 +6,7 @@ local metrics = [
   "sql.chain.mempool.load_txs",
   "sql.chain.mempool.remove_tx",
   "sql.chain.mempool.remove_txs",
+  "sql.chain.mempool.return_executed_txs_to_mempool",
 ];
 
 G.dashboard('sql / chain / mempool', metrics)

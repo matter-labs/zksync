@@ -6,6 +6,9 @@ local metrics = [
   "sql.chain.state.load_state_diff",
   "sql.chain.state.load_state_diff",
   "sql.chain.state.load_verified_state",
+  "sql.chain.state.remove_account_balance_updates",
+  "sql.chain.state.remove_account_creates",
+  "sql.chain.state.remove_account_pubkey_updates",
 ];
 
 G.dashboard('sql / chain / state', metrics)

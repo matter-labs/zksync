@@ -26,6 +26,8 @@ local metrics = [
   "sql.chain.operations.store_executed_priority_op",
   "sql.chain.operations.store_executed_tx",
   "sql.chain.operations.store_operation",
+  "sql.chain.operations.remove_executed_priority_operations",
+  "sql.chain.operations.remove_aggregate_operations_and_bindings",
 ];
 
 G.dashboard('sql / chain / operations', metrics)

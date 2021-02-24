@@ -17,6 +17,7 @@ local metrics = [
   "sql.ethereum.save_new_eth_tx",
   "sql.ethereum.update_eth_tx",
   "sql.ethereum.update_gas_price",
+  "sql.ethereum.update_eth_parameters",
 ];
 
 G.dashboard('sql / ethereum', metrics)

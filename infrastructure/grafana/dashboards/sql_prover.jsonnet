@@ -11,6 +11,10 @@ local metrics = [
   "sql.prover.store_proof",
   "sql.prover.store_witness",
   "sql.prover.unstarted_jobs_count",
+  "sql.prover.remove_witnesses",
+  "sql.prover.remove_proofs",
+  "sql.prover.remove_aggregated_proofs",
+  "sql.prover.remove_prover_jobs",
 ];
 
 G.dashboard('sql / prover', metrics)

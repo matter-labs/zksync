@@ -380,6 +380,7 @@ impl<'a, 'c> MempoolSchema<'a, 'c> {
         &mut self,
         last_block: BlockNumber,
     ) -> QueryResult<()> {
+        let start = Instant::now();
         sqlx::query!(
             r#"
             INSERT INTO mempool_txs (tx_hash, tx, created_at, eth_sign_data, batch_id)
@@ -401,6 +402,10 @@ impl<'a, 'c> MempoolSchema<'a, 'c> {
         .execute(self.0.conn())
         .await?;
 
+        metrics::histogram!(
+            "sql.chain.mempool.return_executed_txs_to_mempool",
+            start.elapsed()
+        );
         Ok(())
     }
 }
