@@ -54,8 +54,9 @@ async fn get_blocks(
     storage: &mut StorageProcessor<'_>,
 ) -> Result<Vec<Block>, anyhow::Error> {
     let mut blocks = Vec::new();
-    for block_number in ((*last_commited_block - blocks_to_revert + 1)..=*last_commited_block).rev()
-    {
+    let last_block_to_revert = *last_commited_block - blocks_to_revert + 1;
+    let range_to_revert = last_block_to_revert..=*last_commited_block;
+    for block_number in range_to_revert.rev() {
         let block = storage
             .chain()
             .block_schema()
