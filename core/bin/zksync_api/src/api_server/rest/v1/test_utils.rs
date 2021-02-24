@@ -28,6 +28,7 @@ use zksync_types::{
     helpers::{apply_updates, closest_packable_fee_amount, closest_packable_token_amount},
     operations::{ChangePubKeyOp, TransferToNewOp},
     prover::ProverJobType,
+    tx::ChangePubKeyType,
     AccountId, AccountMap, Address, BlockNumber, Deposit, DepositOp, ExecutedOperations,
     ExecutedPriorityOp, ExecutedTx, FullExit, FullExitOp, Nonce, PriorityOp, Token, TokenId,
     Transfer, TransferOp, ZkSyncOp, ZkSyncTx, H256,
@@ -113,7 +114,7 @@ impl TestServerConfig {
                 false,
                 TokenId(0),
                 fee.into(),
-                false,
+                ChangePubKeyType::ECDSA,
                 Default::default(),
             );
 
