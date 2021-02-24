@@ -6,12 +6,13 @@ use zksync_basic_types::{H256, U256};
 use zksync_crypto::convert::FeConvert;
 use zksync_types::{
     aggregated_operations::AggregatedActionType,
-    block::{Block, ExecutedOperations, PendingBlock},
+    block::{Block, BlockMetadata, ExecutedOperations, PendingBlock},
     AccountId, BlockNumber, Fr, ZkSyncOp,
 };
 // Local imports
 use self::records::{
-    AccountTreeCache, BlockDetails, BlockTransactionItem, StorageBlock, StoragePendingBlock,
+    AccountTreeCache, BlockDetails, BlockTransactionItem, StorageBlock, StorageBlockMetadata,
+    StoragePendingBlock,
 };
 use crate::{
     chain::operations::{
@@ -118,6 +119,31 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
         ));
 
         metrics::histogram!("sql.chain.block.get_block", start.elapsed());
+
+        Ok(result)
+    }
+
+    /// Given the block number, attempts to get metadata related to block.
+    /// Returns `None` if not found.
+    pub async fn get_block_metadata(
+        &mut self,
+        block: BlockNumber,
+    ) -> QueryResult<Option<BlockMetadata>> {
+        let start = Instant::now();
+
+        let db_result = sqlx::query_as!(
+            StorageBlockMetadata,
+            "SELECT * FROM block_metadata WHERE block_number = $1",
+            i64::from(*block)
+        )
+        .fetch_optional(self.0.conn())
+        .await?;
+
+        metrics::histogram!("sql.chain.block.get_block_metadata", start.elapsed());
+
+        let result = db_result.map(|md| BlockMetadata {
+            fast_processing: md.fast_processing,
+        });
 
         Ok(result)
     }
@@ -678,6 +704,28 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
         transaction.commit().await?;
 
         metrics::histogram!("sql.chain.block.save_block", start.elapsed());
+        Ok(())
+    }
+
+    pub async fn save_block_metadata(
+        &mut self,
+        block_number: BlockNumber,
+        block_metadata: BlockMetadata,
+    ) -> QueryResult<()> {
+        let start = Instant::now();
+
+        sqlx::query!(
+            "
+            INSERT INTO block_metadata (block_number, fast_processing)
+            VALUES ($1, $2)
+            ",
+            i64::from(*block_number),
+            block_metadata.fast_processing
+        )
+        .execute(self.0.conn())
+        .await?;
+
+        metrics::histogram!("sql.chain.block.save_block_metadata", start.elapsed());
         Ok(())
     }
 
