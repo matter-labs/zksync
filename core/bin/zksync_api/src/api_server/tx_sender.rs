@@ -411,7 +411,8 @@ impl TxSender {
             tx_sender_types.push(self.get_tx_sender_type(&tx).await?);
         }
 
-        let batch_sign_data = if !eth_signatures.is_empty() {
+        let mut batch_sign_data = None;
+        if !eth_signatures.is_empty() {
             // User provided at least one signature for the whole batch.
             // In this case each sender cannot be CREATE2.
             if tx_sender_types
@@ -429,8 +430,11 @@ impl TxSender {
                 .map(|((tx, token), sender)| (tx.tx.clone(), token, sender))
                 .collect::<Vec<_>>();
             // Create batch signature data.
-            Some(EthBatchSignData::new(_txs, eth_signatures).map_err(SubmitError::other)?)
+            batch_sign_data =
+                Some(EthBatchSignData::new(_txs, eth_signatures).map_err(SubmitError::other)?);
         } else {
+            // In this case each tx must have own signature.
+
             // This hashset holds addresses that have performed a CREATE2 ChangePubKey
             // within this batch, so that we don't check ETH signatures on their transactions
             // from this batch. We save the account type to the db later.
@@ -450,8 +454,6 @@ impl TxSender {
                     }
                 }
             }
-            // Each tx must have own signature.
-            None
         };
         let (verified_batch, sign_data) = verify_txs_batch_signature(
             txs,
@@ -712,7 +714,7 @@ async fn verify_tx_info_message_signature(
                 eth_sign_data,
             },
             sender: tx_sender,
-            token: token,
+            token,
         }),
         response: sender,
     };
