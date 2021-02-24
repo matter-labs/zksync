@@ -16,7 +16,9 @@ use zksync_types::{
 
 #[derive(Debug, Clone)]
 pub enum ZkSyncETHAccountData {
+    /// Externally Owned Account that have private key
     EOA { eth_private_key: H256 },
+    /// Smart contract accounts that can be created with CREATE2
     Create2(ChangePubKeyCREATE2Data),
 }
 

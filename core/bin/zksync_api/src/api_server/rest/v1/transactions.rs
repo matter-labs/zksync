@@ -856,9 +856,7 @@ mod tests {
         client
             .submit_tx(
                 ZkSyncTx::Withdraw(Box::new(tx.clone())),
-                Some(TxEthSignature::EthereumSignature(
-                    eth_sig.clone().expect("should sign eth 2fa").clone(),
-                )),
+                eth_sig.clone().map(TxEthSignature::EthereumSignature),
                 Some(false),
             )
             .await?;
