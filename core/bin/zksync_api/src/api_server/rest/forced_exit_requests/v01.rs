@@ -34,7 +34,7 @@ use crate::api_server::rest::v1::{Error as ApiError, JsonResult};
 
 use crate::api_server::forced_exit_checker::ForcedExitAccountAgeChecker;
 
-/// Shared data between `api/v1/transactions` endpoints.
+/// Shared data between `/api/forced_exit_requests/v0.1/` endpoints.
 pub struct ApiForcedExitRequestsData {
     pub(crate) connection_pool: ConnectionPool,
     pub(crate) forced_exit_checker: Box<dyn ForcedExitAccountAgeChecker>,

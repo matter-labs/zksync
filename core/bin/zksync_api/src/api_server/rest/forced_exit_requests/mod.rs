@@ -1,5 +1,3 @@
-//! First stable API implementation.
-
 // External uses
 use actix_web::{web, Scope};
 

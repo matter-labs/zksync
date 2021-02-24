@@ -1,1 +1,1 @@
-DROP TABLE IF EXISTS forced_exit_requests
+DROP TABLE IF EXISTS forced_exit_requests;

@@ -47,7 +47,7 @@ async fn get_forced_exit_sender_account_id(
         .account_id_by_address(config.forced_exit_requests.sender_account_address)
         .await?;
 
-    account_id.ok_or_else(|| anyhow::Error::msg("1"))
+    account_id.ok_or_else(|| anyhow::Error::msg("Failed to get the forced_exit_sender account id"))
 }
 
 impl ForcedExitSender {
