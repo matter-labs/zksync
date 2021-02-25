@@ -160,7 +160,7 @@ impl ForcedExitSender {
             return false;
         }
 
-        request.valid_until < submission_time && request.price_in_wei == amount
+        request.valid_until > submission_time && request.price_in_wei == amount
     }
 
     // Awaits until the request is complete
