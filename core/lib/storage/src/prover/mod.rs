@@ -407,18 +407,19 @@ impl<'a, 'c> ProverSchema<'a, 'c> {
 
     pub async fn remove_prover_jobs(&mut self, last_block: BlockNumber) -> QueryResult<()> {
         let start = Instant::now();
+        let mut transaction = self.0.start_transaction().await?;
         sqlx::query!(
             "DELETE FROM prover_job_queue WHERE first_block > $1",
             *last_block as i64
         )
-        .execute(self.0.conn())
+        .execute(transaction.conn())
         .await?;
 
         sqlx::query!(
             "UPDATE prover_job_queue SET last_block = $1 WHERE last_block > $1",
             *last_block as i64
         )
-        .execute(self.0.conn())
+        .execute(transaction.conn())
         .await?;
 
         metrics::histogram!("sql", start.elapsed(), "prover" => "remove_prover_jobs");

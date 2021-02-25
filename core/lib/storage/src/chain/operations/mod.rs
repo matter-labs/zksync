@@ -521,11 +521,12 @@ impl<'a, 'c> OperationsSchema<'a, 'c> {
         last_block: BlockNumber,
     ) -> QueryResult<()> {
         let start = Instant::now();
+        let mut transaction = self.0.start_transaction().await?;
         let op_ids: Vec<i64> = sqlx::query!(
             "SELECT id FROM aggregate_operations WHERE from_block > $1",
             *last_block as i64
         )
-        .fetch_all(self.0.conn())
+        .fetch_all(transaction.conn())
         .await?
         .into_iter()
         .map(|record| record.id)
@@ -535,7 +536,7 @@ impl<'a, 'c> OperationsSchema<'a, 'c> {
             "SELECT eth_op_id FROM eth_aggregated_ops_binding WHERE op_id = ANY($1)",
             &op_ids
         )
-        .fetch_all(self.0.conn())
+        .fetch_all(transaction.conn())
         .await?
         .into_iter()
         .map(|record| record.eth_op_id)
@@ -545,28 +546,28 @@ impl<'a, 'c> OperationsSchema<'a, 'c> {
             "DELETE FROM eth_tx_hashes WHERE eth_op_id = ANY($1)",
             &eth_op_ids
         )
-        .execute(self.0.conn())
+        .execute(transaction.conn())
         .await?;
         sqlx::query!("DELETE FROM eth_operations WHERE id = ANY($1)", &eth_op_ids)
-            .execute(self.0.conn())
+            .execute(transaction.conn())
             .await?;
         sqlx::query!(
             "DELETE FROM eth_aggregated_ops_binding WHERE op_id = ANY($1)",
             &op_ids
         )
-        .execute(self.0.conn())
+        .execute(transaction.conn())
         .await?;
         sqlx::query!(
             "DELETE FROM aggregate_operations WHERE from_block > $1",
             *last_block as i64
         )
-        .execute(self.0.conn())
+        .execute(transaction.conn())
         .await?;
         sqlx::query!(
             "UPDATE aggregate_operations SET to_block = $1 WHERE to_block > $1",
             *last_block as i64
         )
-        .execute(self.0.conn())
+        .execute(transaction.conn())
         .await?;
 
         metrics::histogram!(

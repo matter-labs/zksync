@@ -623,19 +623,20 @@ impl<'a, 'c> EthereumSchema<'a, 'c> {
         nonce: Nonce,
     ) -> QueryResult<()> {
         let start = Instant::now();
+        let mut transaction = self.0.start_transaction().await?;
         sqlx::query!(
             "UPDATE eth_parameters SET nonce = $1, last_committed_block = $2 WHERE id = true",
             *nonce as i64,
             *last_block as i64
         )
-        .execute(self.0.conn())
+        .execute(transaction.conn())
         .await?;
 
         sqlx::query!(
             "UPDATE eth_parameters SET last_verified_block = $1 WHERE id = true AND last_verified_block > $1",
             *last_block as i64
         )
-        .execute(self.0.conn())
+        .execute(transaction.conn())
         .await?;
 
         metrics::histogram!("sql.ethereum.update_eth_parameters", start.elapsed());
