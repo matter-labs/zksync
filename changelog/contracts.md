@@ -2,6 +2,10 @@
 
 All notable changes to the contracts will be documented in this file.
 
+## 2021-25-02
+
+**Version 5** is scheduled for upgrade.
+
 ### Added
 
 - `tokenGovernance` address is added to the `Governance` contract. `tokenGovernance` can list new tokens.
