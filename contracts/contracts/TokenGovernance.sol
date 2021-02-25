@@ -16,14 +16,14 @@ contract TokenGovernance {
     /// @notice zkSync governance contract
     Governance public governance;
 
-    /// @notice Token used to collect listing payment for addition of new token to zkSync network
-    IERC20 public listingPriceToken;
+    /// @notice Token used to collect listing fee for addition of new token to zkSync network
+    IERC20 public listingFeeToken;
 
-    /// @notice Size of the listing payment
-    uint256 public listingPrice;
+    /// @notice Size of the listing fee amount
+    uint256 public listingFee;
 
     /// @notice Max number of tokens that can be listed using this contract
-    uint16 public maxToken;
+    uint16 public listingCap;
 
     /// @notice Addresses that can list tokens without fee
     mapping(address => bool) public tokenLister;
@@ -33,15 +33,15 @@ contract TokenGovernance {
 
     constructor(
         Governance _governance,
-        IERC20 _listingPriceToken,
-        uint256 _listingPrice,
-        uint16 _maxToken,
+        IERC20 _listingFeeToken,
+        uint256 _listingFee,
+        uint16 _listingCap,
         address _treasury
     ) {
         governance = _governance;
-        listingPriceToken = _listingPriceToken;
-        listingPrice = _listingPrice;
-        maxToken = _maxToken;
+        listingFeeToken = _listingFeeToken;
+        listingFee = _listingFee;
+        listingCap = _listingCap;
         treasury = _treasury;
 
         // We add zkSync governor as a first token lister.
@@ -50,13 +50,13 @@ contract TokenGovernance {
     }
 
     /// @notice Adds new ERC20 token to zkSync network.
-    /// @notice If caller is not present in the `tokenLister` map payment of `listingPrice` in `listingPriceToken` should be made.
-    /// @notice NOTE: before calling this function make sure to approve `listingPriceToken` transfer for this contract.
+    /// @notice If caller is not present in the `tokenLister` map payment of `listingFee` in `listingFeeToken` should be made.
+    /// @notice NOTE: before calling this function make sure to approve `listingFeeToken` transfer for this contract.
     function addToken(address _token) external {
-        require(governance.totalTokens() < maxToken, "can't add more tokens"); // Impossible to add more tokens using this contract
+        require(governance.totalTokens() < listingCap, "can't add more tokens"); // Impossible to add more tokens using this contract
         if (!tokenLister[msg.sender]) {
             // Collect fees
-            bool feeTransferOk = Utils.transferFromERC20(listingPriceToken, msg.sender, treasury, listingPrice);
+            bool feeTransferOk = Utils.transferFromERC20(listingFeeToken, msg.sender, treasury, listingFee);
             require(feeTransferOk, "fee transfer failed"); // Failed to receive payment for token addition.
         }
         governance.addToken(_token);
@@ -64,19 +64,19 @@ contract TokenGovernance {
 
     /// Governance functions (this contract is governed by zkSync governor)
 
-    /// @notice Set new listing token and price
+    /// @notice Set new listing token and fee
     /// @notice Can be called only by zkSync governor
-    function setListingToken(IERC20 _newListingToken, uint256 _newListingPrice) external {
+    function setListingFeeToken(IERC20 _newListingFeeToken, uint256 _newListingFee) external {
         governance.requireGovernor(msg.sender);
-        listingPriceToken = _newListingToken;
-        listingPrice = _newListingPrice;
+        listingFeeToken = _newListingFeeToken;
+        listingFee = _newListingFee;
     }
 
-    /// @notice Set new listing price
+    /// @notice Set new listing fee
     /// @notice Can be called only by zkSync governor
-    function setListingPrice(uint256 _newListingPrice) external {
+    function setListingFee(uint256 _newListingFee) external {
         governance.requireGovernor(msg.sender);
-        listingPrice = _newListingPrice;
+        listingFee = _newListingFee;
     }
 
     /// @notice Enable or disable token lister. If enabled new tokens can be added by that address without payment
@@ -93,7 +93,7 @@ contract TokenGovernance {
     /// @notice Can be called only by zkSync governor
     function setListingCap(uint16 _newListingCap) external {
         governance.requireGovernor(msg.sender);
-        maxToken = _newListingCap;
+        listingCap = _newListingCap;
     }
 
     /// @notice Change address that collects payments for listing tokens.

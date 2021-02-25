@@ -15,12 +15,12 @@ import { solidity } from 'ethereum-waffle';
 
 use(solidity);
 
-describe('ZK priority queue ops unit tests', function () {
+describe('ZK token governance unit tests', function () {
     this.timeout(50000);
 
     const REQUIRE_ZKSYNC_GOVERNOR = '1g';
 
-    const LISTING_PRICE = 250; // payment for token addition
+    const LISTING_FEE = 250; // payment for token addition
     const MAX_TOKEN = 2; // Can add only 2 tokens using token governance
     const ERC20_ADDRESS_1 = '0x0000000000000000000000000000000000000001';
     const ERC20_ADDRESS_2 = '0x0000000000000000000000000000000000000002';
@@ -48,7 +48,7 @@ describe('ZK priority queue ops unit tests', function () {
         tokenGovernance = await tokGovFactory.deploy(
             zkSyncGovernance.address,
             paymentToken.address,
-            LISTING_PRICE,
+            LISTING_FEE,
             MAX_TOKEN,
             treasury.address
         );
@@ -77,25 +77,25 @@ describe('ZK priority queue ops unit tests', function () {
             .withArgs(ERC20_ADDRESS_1, newTokenId);
     });
 
-    it('User should pay for listing', async () => {
+    it('User should pay fee for listing', async () => {
         await expect(tokenGovernance.connect(userWallet).addToken(ERC20_ADDRESS_2)).to.be.revertedWith(
             'fee transfer failed'
         );
     });
 
     it('User can pay for listing and add token', async () => {
-        await paymentToken.mint(userWallet.address, LISTING_PRICE);
-        await paymentToken.connect(userWallet).approve(tokenGovernance.address, LISTING_PRICE);
+        await paymentToken.mint(userWallet.address, LISTING_FEE);
+        await paymentToken.connect(userWallet).approve(tokenGovernance.address, LISTING_FEE);
 
         const newTokenId = (await zkSyncGovernance.totalTokens()) + 1;
         await expect(() =>
             expect(tokenGovernance.connect(userWallet).addToken(ERC20_ADDRESS_2))
                 .to.emit(zkSyncGovernance, 'NewToken')
                 .withArgs(ERC20_ADDRESS_2, newTokenId)
-        ).to.changeTokenBalances(paymentToken, [userWallet, treasury], [-LISTING_PRICE, LISTING_PRICE]);
+        ).to.changeTokenBalances(paymentToken, [userWallet, treasury], [-LISTING_FEE, LISTING_FEE]);
     });
 
-    it('Cant add more than maxToken tokens', async () => {
+    it('Cant add more than listingCap tokens', async () => {
         await expect(tokenGovernance.connect(zkSyncGovernor).addToken(ERC20_ADDRESS_3)).to.be.revertedWith(
             "can't add more tokens"
         );
@@ -103,26 +103,24 @@ describe('ZK priority queue ops unit tests', function () {
 
     it('Set listing token', async () => {
         await expect(
-            tokenGovernance.connect(userWallet).setListingToken(ethers.constants.AddressZero, 1)
+            tokenGovernance.connect(userWallet).setListingFeeToken(ethers.constants.AddressZero, 1)
         ).to.be.revertedWith(REQUIRE_ZKSYNC_GOVERNOR);
 
-        await tokenGovernance.connect(zkSyncGovernor).setListingToken(ethers.constants.AddressZero, 1);
+        await tokenGovernance.connect(zkSyncGovernor).setListingFeeToken(ethers.constants.AddressZero, 1);
 
-        expect(await tokenGovernance.listingPrice()).to.eq(1);
-        expect(await tokenGovernance.listingPriceToken()).to.eq(ethers.constants.AddressZero);
+        expect(await tokenGovernance.listingFee()).to.eq(1);
+        expect(await tokenGovernance.listingFeeToken()).to.eq(ethers.constants.AddressZero);
 
-        await tokenGovernance.connect(zkSyncGovernor).setListingToken(paymentToken.address, LISTING_PRICE);
+        await tokenGovernance.connect(zkSyncGovernor).setListingFeeToken(paymentToken.address, LISTING_FEE);
     });
 
     it('Set listing price', async () => {
-        await expect(tokenGovernance.connect(userWallet).setListingPrice(2)).to.be.revertedWith(
-            REQUIRE_ZKSYNC_GOVERNOR
-        );
+        await expect(tokenGovernance.connect(userWallet).setListingFee(2)).to.be.revertedWith(REQUIRE_ZKSYNC_GOVERNOR);
 
-        await tokenGovernance.connect(zkSyncGovernor).setListingPrice(2);
-        expect(await tokenGovernance.listingPrice()).to.eq(2);
+        await tokenGovernance.connect(zkSyncGovernor).setListingFee(2);
+        expect(await tokenGovernance.listingFee()).to.eq(2);
 
-        await tokenGovernance.connect(zkSyncGovernor).setListingPrice(LISTING_PRICE);
+        await tokenGovernance.connect(zkSyncGovernor).setListingFee(LISTING_FEE);
     });
 
     it('Add token lister', async () => {
@@ -142,7 +140,7 @@ describe('ZK priority queue ops unit tests', function () {
 
         await tokenGovernance.connect(zkSyncGovernor).setListingCap(MAX_TOKEN + 1);
 
-        expect(await tokenGovernance.maxToken()).to.eq(MAX_TOKEN + 1);
+        expect(await tokenGovernance.listingCap()).to.eq(MAX_TOKEN + 1);
     });
 
     it('Set treasury', async () => {
