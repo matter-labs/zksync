@@ -290,11 +290,11 @@ fn verify_tx_correctness(tx: &mut TxVariant) -> Result<(), TxAddError> {
 #[derive(Debug)]
 pub struct TxRequest {
     pub tx: SignedZkSyncTx,
-    /// Senders of transactions. This field is needed since for `ForcedExit` account affected by
+    /// Sender of transaction. This field is needed since for `ForcedExit` account affected by
     /// the transaction and actual sender can be different. Thus, we require request sender to
     /// perform a database query and fetch actual addresses if necessary.
     pub sender: Address,
-    /// Resolved tokens might be used to obtain old-formatted 2-FA messages.
+    /// Resolved token might be used to obtain old-formatted 2-FA messages.
     /// Needed for backwards compatibility.
     pub token: Token,
 }

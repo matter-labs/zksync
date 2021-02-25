@@ -731,21 +731,29 @@ async fn verify_txs_batch_signature(
                 }
             }
         }
-        if matches!(sender_type, EthAccountType::Owned)
-            && batch_sign_data.is_none()
-            && tx.signature.is_none()
-        {
-            return Err(SubmitError::TxAdd(TxAddError::MissingEthSignature));
-        }
         // If we have more signatures provided than required,
         // we will verify those too.
-        let eth_sign_data = if let (Some(signature), Some(message)) = (tx.signature, message) {
-            if let EthAccountType::CREATE2 = sender_type {
-                return Err(SubmitError::IncorrectTx(
-                    "Eth signature from CREATE2 account not expected".to_string(),
-                ));
+        let eth_sign_data = if let Some(message) = message {
+            match sender_type {
+                EthAccountType::CREATE2 => {
+                    if tx.signature.is_some() {
+                        return Err(SubmitError::IncorrectTx(
+                            "Eth signature from CREATE2 account not expected".to_string(),
+                        ));
+                    }
+                    None
+                }
+                EthAccountType::Owned => {
+                    if batch_sign_data.is_none() && tx.signature.is_none() {
+                        return Err(SubmitError::TxAdd(TxAddError::MissingEthSignature));
+                    }
+                    if let Some(signature) = tx.signature {
+                        Some(EthSignData { signature, message })
+                    } else {
+                        None
+                    }
+                }
             }
-            Some(EthSignData { signature, message })
         } else {
             None
         };
