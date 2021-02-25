@@ -54,7 +54,7 @@ impl VerifiedTx {
         verify_eth_signature(request, eth_checker, network).await?;
         verify_tx_correctness(&mut request.get_tx_variant())?;
 
-        Ok(Self(request.get_tx_variant().clone()))
+        Ok(Self(request.get_tx_variant()))
     }
 
     /// Creates a verified wrapper without actually verifying the original data.

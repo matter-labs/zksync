@@ -727,7 +727,7 @@ async fn verify_txs_batch_signature(
         if let ZkSyncTx::ChangePubKey(tx) = &tx.tx {
             if let Some(auth_data) = &tx.eth_auth_data {
                 if auth_data.is_create2() {
-                    create2_senders.insert(sender.clone());
+                    create2_senders.insert(*sender);
                 }
             }
         }
