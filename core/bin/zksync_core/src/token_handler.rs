@@ -15,12 +15,12 @@ use futures::{
 use tokio::task::JoinHandle;
 // Workspace uses
 use zksync_config::{TokenHandlerConfig, ZkSyncConfig};
+use zksync_notifier::Notifier;
 use zksync_storage::{tokens::TokensSchema, ConnectionPool, StorageProcessor};
 use zksync_types::{
     tokens::{NewTokenEvent, Token, TokenInfo},
     Address,
 };
-use zksync_utils::MatterMostNotifier;
 // Local uses
 use crate::eth_watch::EthWatchRequest;
 
@@ -29,8 +29,8 @@ struct TokenHandler {
     poll_interval: std::time::Duration,
     eth_watch_req: mpsc::Sender<EthWatchRequest>,
     token_list: HashMap<Address, TokenInfo>,
-    last_token_id: u16,
-    matter_most_notifier: Option<MatterMostNotifier>,
+    last_eth_block: Option<u64>,
+    notifier: Option<Notifier>,
 }
 
 impl TokenHandler {
@@ -46,28 +46,15 @@ impl TokenHandler {
             .map(|token| (token.address, token))
             .collect::<HashMap<Address, TokenInfo>>();
 
-        let mut storage = connection_pool
-            .access_storage()
-            .await
-            .expect("db connection failed for token handler");
-        let last_token_id = TokensSchema(&mut storage)
-            .get_last_token_id()
-            .await
-            .expect("failed to load last token id");
-
-        drop(storage);
-
-        let matter_most_notifier = config.webhook_url.map(|webhook_url| {
-            MatterMostNotifier::new("token_handler_bot".to_string(), webhook_url)
-        });
+        let notifier = config.webhook_url.map(Notifier::new);
 
         Self {
             connection_pool,
             eth_watch_req,
-            last_token_id,
             token_list,
             poll_interval,
-            matter_most_notifier,
+            notifier,
+            last_eth_block: None,
         }
     }
 
@@ -76,7 +63,7 @@ impl TokenHandler {
         self.eth_watch_req
             .clone()
             .send(EthWatchRequest::GetNewTokens {
-                token_start_id: self.last_token_id + 1,
+                last_eth_block: self.last_eth_block,
                 resp: eth_watch_resp.0,
             })
             .await
@@ -105,10 +92,16 @@ impl TokenHandler {
         loop {
             timer.tick().await;
 
-            let new_tokens = self
-                .load_new_token_events()
-                .await
-                .into_iter()
+            let new_tokens_event = self.load_new_token_events().await;
+
+            // Ether is a standard token, so we can assume that at least the last token ID is zero.
+            self.last_eth_block = new_tokens_event
+                .iter()
+                .map(|token| token.eth_block_number)
+                .max();
+
+            let new_tokens = new_tokens_event
+                .iter()
                 .map(|token| {
                     // Find a token in the list of trusted tokens
                     // or use default values (name = "ERC20-{id}", decimals = 18).
@@ -126,10 +119,6 @@ impl TokenHandler {
                 })
                 .collect::<Vec<_>>();
 
-            // Ether is a standard token, so we can assume that at least the last token ID is zero.
-            let last_new_token_id = new_tokens.iter().map(|token| token.id.0).max().unwrap_or(0);
-            self.last_token_id = std::cmp::max(self.last_token_id, last_new_token_id);
-
             let mut storage = self
                 .connection_pool
                 .access_storage()
@@ -140,14 +129,11 @@ impl TokenHandler {
                 .await
                 .expect("failed to add tokens to the database");
 
-            // Send a notification to MatterMost bot that the token has been successfully added to the database.
-            if let Some(matter_most_notifier) = &self.matter_most_notifier {
+            // Send a notification that the token has been successfully added to the database.
+            if let Some(notifier) = &self.notifier {
                 for token in new_tokens {
-                    matter_most_notifier
-                        .send_notify(&format!(
-                            "New token: id = {}, address = {}, name = {}, decimals = {}",
-                            token.id, token.address, token.symbol, token.decimals
-                        ))
+                    notifier
+                        .send_new_token_notify(token)
                         .await
                         .unwrap_or_else(|e| {
                             vlog::error!("failed send notification to MatterMost: {}", e);

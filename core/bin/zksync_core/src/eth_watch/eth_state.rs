@@ -28,9 +28,8 @@ pub struct ETHState {
     /// Queue of priority operations that passed the confirmation
     /// threshold and are waiting to be executed.
     priority_queue: HashMap<u64, ReceivedPriorityOp>,
-    /// Keys in this HashMap are the token ID.
     /// List of tokens that have been added to the contract.
-    new_tokens: HashMap<u16, NewTokenEvent>,
+    new_tokens: Vec<NewTokenEvent>,
 }
 
 impl ETHState {
@@ -38,7 +37,7 @@ impl ETHState {
         last_ethereum_block: u64,
         unconfirmed_queue: Vec<PriorityOp>,
         priority_queue: HashMap<SerialId, ReceivedPriorityOp>,
-        new_tokens: HashMap<u16, NewTokenEvent>,
+        new_tokens: Vec<NewTokenEvent>,
     ) -> Self {
         Self {
             last_ethereum_block,
@@ -60,7 +59,7 @@ impl ETHState {
         &self.unconfirmed_queue
     }
 
-    pub fn new_tokens(&self) -> &HashMap<u16, NewTokenEvent> {
+    pub fn new_tokens(&self) -> &[NewTokenEvent] {
         &self.new_tokens
     }
 }

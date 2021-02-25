@@ -83,7 +83,7 @@ pub enum EthWatchRequest {
         resp: oneshot::Sender<Option<PriorityOp>>,
     },
     GetNewTokens {
-        token_start_id: u16,
+        last_eth_block: Option<u64>,
         resp: oneshot::Sender<Vec<NewTokenEvent>>,
     },
 }
@@ -151,9 +151,9 @@ impl<W: EthClient> EthWatch<W> {
             priority_queue.insert(serial_id, op);
         }
         // Extend the existing token events with the new ones.
-        let mut new_tokens = self.eth_state.new_tokens().clone();
-        for (token_id, token) in received_new_tokens {
-            new_tokens.insert(token_id, token);
+        let mut new_tokens = self.eth_state.new_tokens().to_vec();
+        for token in received_new_tokens {
+            new_tokens.push(token);
         }
 
         let new_state = ETHState::new(
@@ -190,7 +190,7 @@ impl<W: EthClient> EthWatch<W> {
     ) -> anyhow::Result<(
         Vec<PriorityOp>,
         HashMap<u64, ReceivedPriorityOp>,
-        HashMap<u16, NewTokenEvent>,
+        Vec<NewTokenEvent>,
     )> {
         let new_block_with_accepted_events =
             current_ethereum_block.saturating_sub(self.number_of_confirmations_for_event);
@@ -214,24 +214,22 @@ impl<W: EthClient> EthWatch<W> {
                 BlockNumber::Number(previous_block_with_accepted_events.into()),
                 BlockNumber::Number(new_block_with_accepted_events.into()),
             )
-            .await?
-            .into_iter()
-            .map(|token| (token.id.0, token))
-            .collect();
+            .await?;
 
         Ok((unconfirmed_queue, priority_queue, new_tokens))
     }
 
-    fn get_new_tokens(&self, first_serial_id: u16) -> Vec<NewTokenEvent> {
-        let mut result = Vec::new();
-        let mut current_token_id = first_serial_id;
-
-        while let Some(token) = self.eth_state.new_tokens().get(&current_token_id) {
-            result.push(token.clone());
-            current_token_id += 1;
+    fn get_new_tokens(&self, last_block_number: Option<u64>) -> Vec<NewTokenEvent> {
+        match last_block_number {
+            Some(last_block_number) => self
+                .eth_state
+                .new_tokens()
+                .iter()
+                .filter(|token| token.eth_block_number > last_block_number)
+                .cloned()
+                .collect(),
+            None => self.eth_state.new_tokens().to_vec(),
         }
-
-        result
     }
 
     fn get_priority_requests(&self, first_serial_id: u64, max_chunks: usize) -> Vec<PriorityOp> {
@@ -408,10 +406,10 @@ impl<W: EthClient> EthWatch<W> {
                     resp.send(unconfirmed_op).unwrap_or_default();
                 }
                 EthWatchRequest::GetNewTokens {
-                    token_start_id,
+                    last_eth_block,
                     resp,
                 } => {
-                    resp.send(self.get_new_tokens(token_start_id)).ok();
+                    resp.send(self.get_new_tokens(last_eth_block)).ok();
                 }
             }
         }

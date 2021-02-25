@@ -130,6 +130,8 @@ impl TokenInfo {
 /// Tokens that added through a contract.
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct NewTokenEvent {
+    // TODO:
+    pub eth_block_number: u64,
     pub address: Address,
     pub id: TokenId,
 }
@@ -144,7 +146,18 @@ impl TryFrom<Log> for NewTokenEvent {
                 event
             ));
         }
+        let eth_block_number = match event.block_number {
+            Some(block_number) => block_number.as_u64(),
+            None => {
+                return Err(anyhow::format_err!(
+                    "Failed to parse NewTokenEvent: {:#?}",
+                    event
+                ))
+            }
+        };
+
         Ok(NewTokenEvent {
+            eth_block_number,
             address: Address::from_slice(&event.topics[1].as_fixed_bytes()[12..]),
             id: TokenId(
                 U256::from_big_endian(&event.topics[2].as_fixed_bytes()[..]).as_u32() as u16,
