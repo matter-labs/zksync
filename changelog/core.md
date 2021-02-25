@@ -8,6 +8,22 @@ All notable changes to the core components will be documented in this file.
 
 ### Changed
 
+- (`loadtest`): `zksync_fee` has been moved to `[main_wallet]` section from the `[network]` section.
+
+### Added
+
+- (`loadtest`): Added `zksync_fee` option into the `[scenario]` section to set fee for each scenario individually, added
+  `fee_token` option into the `[main_wallet]` section to set token that is used to pay fees for the main wallet
+  operations.
+
+### Fixed
+
+## Release 2021-02-19
+
+### Removed
+
+### Changed
+
 - The token name is now set for each scenario separately instead of the network section of the loadtest configuration.
 - Rejected transactions are now stored in the database for 2 weeks only.
 
@@ -17,8 +33,11 @@ All notable changes to the core components will be documented in this file.
 - Added a `--sloppy` mode to the `dev-fee-ticker-server` to simulate bad networks with the random delays and fails.
 - Added `forced_exit_requests` functionality, which allows users to pay for ForcedExits from L1. Note that a few env
   variables were added that control the behaviour of the tool.
+- Possibility to use CREATE2 ChangePubKey and Transfer in a single batch.
 
 ### Fixed
+
+- Bug with the assignment of new account ids in the state.
 
 ## Release 2021-02-02
 

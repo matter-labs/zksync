@@ -4,7 +4,7 @@ use zksync_crypto::franklin_crypto::bellman::pairing::bn256::Bn256;
 use zksync_state::state::CollectedFee;
 use zksync_state::{handler::TxHandler, state::ZkSyncState};
 use zksync_types::{
-    tx::{ChangePubKey, TxSignature},
+    tx::{ChangePubKey, ChangePubKeyType, TxSignature},
     AccountId, ChangePubKeyOp, TokenId,
 };
 // Local deps
@@ -30,7 +30,7 @@ fn test_change_pubkey_offchain_success() {
             true,
             FEE_TOKEN,
             Default::default(),
-            false,
+            ChangePubKeyType::ECDSA,
             Default::default(),
         ),
         account_id: account.id,
@@ -68,7 +68,7 @@ fn test_change_pubkey_offchain_nonzero_fee() {
             true,
             FEE_TOKEN,
             fee,
-            false,
+            ChangePubKeyType::ECDSA,
             Default::default(),
         ),
         account_id: account.id,
@@ -113,7 +113,7 @@ fn test_incorrect_change_pubkey_account() {
             true,
             FEE_TOKEN,
             Default::default(),
-            false,
+            ChangePubKeyType::ECDSA,
             Default::default(),
         ),
         account_id: account.id,
@@ -164,7 +164,7 @@ fn test_incorrect_change_pubkey_signature() {
         true,
         FEE_TOKEN,
         Default::default(),
-        false,
+        ChangePubKeyType::ECDSA,
         Default::default(),
     );
 

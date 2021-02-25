@@ -27,6 +27,8 @@ pub struct ZkSyncState {
 
     /// Current block number
     pub block_number: BlockNumber,
+
+    next_free_id: AccountId,
 }
 
 #[derive(Debug, Clone)]
@@ -59,13 +61,22 @@ impl ZkSyncState {
             balance_tree,
             block_number: BlockNumber(0),
             account_id_by_address: HashMap::new(),
+            next_free_id: AccountId(0),
         }
     }
 
     pub fn from_acc_map(accounts: AccountMap, current_block: BlockNumber) -> Self {
         let mut empty = Self::empty();
+        let sorted_accounts = {
+            let mut sorted_accounts: Vec<_> = accounts.into_iter().collect();
+            sorted_accounts.sort_by(|a, b| a.0.cmp(&b.0));
+            sorted_accounts
+        };
+        if !sorted_accounts.is_empty() {
+            empty.next_free_id = AccountId(*sorted_accounts.last().unwrap().0 + 1);
+        }
         empty.block_number = current_block;
-        for (id, account) in accounts {
+        for (id, account) in sorted_accounts {
             empty.insert_account(id, account);
         }
         empty
@@ -76,10 +87,17 @@ impl ZkSyncState {
         account_id_by_address: HashMap<Address, AccountId>,
         current_block: BlockNumber,
     ) -> Self {
+        let next_free_id = if balance_tree.items.is_empty() {
+            AccountId(0)
+        } else {
+            AccountId(*balance_tree.items.keys().max().unwrap() as u32 + 1)
+        };
+
         Self {
             balance_tree,
             block_number: current_block,
             account_id_by_address,
+            next_free_id,
         }
     }
 
@@ -101,7 +119,11 @@ impl ZkSyncState {
     pub fn get_account(&self, account_id: AccountId) -> Option<Account> {
         let start = std::time::Instant::now();
 
-        let account = self.balance_tree.get(*account_id).cloned();
+        let account = if account_id < self.next_free_id {
+            self.balance_tree.get(*account_id).cloned()
+        } else {
+            None
+        };
 
         vlog::trace!(
             "Get account (id {}) execution time: {}ms",
@@ -268,18 +290,7 @@ impl ZkSyncState {
     }
 
     pub(crate) fn get_free_account_id(&self) -> AccountId {
-        let mut account_id = AccountId(self.balance_tree.items.len() as u32);
-
-        // In the production database it somehow appeared that one account ID in the database got missing,
-        // meaning that it was never assigned, but the next one was inserted.
-        // This led to the fact that length of the tree is not equal to the most recent ID anymore.
-        // In order to prevent similar error-proneness in the future, we scan until we find the next free ID.
-        // Amount of steps here is not expected to be high.
-        while self.get_account(account_id).is_some() {
-            *account_id += 1;
-        }
-
-        account_id
+        self.next_free_id
     }
 
     pub fn collect_fee(&mut self, fees: &[CollectedFee], fee_account: AccountId) -> AccountUpdates {
@@ -328,15 +339,23 @@ impl ZkSyncState {
 
     #[doc(hidden)] // Public for benches.
     pub fn insert_account(&mut self, id: AccountId, account: Account) {
+        assert!(id <= self.next_free_id);
+
         self.account_id_by_address.insert(account.address, id);
         self.balance_tree.insert(*id, account);
+        if id == self.next_free_id {
+            *self.next_free_id += 1;
+        }
     }
 
     #[allow(dead_code)]
     pub(crate) fn remove_account(&mut self, id: AccountId) {
+        assert_eq!(*id, *self.next_free_id - 1);
+
         if let Some(account) = self.get_account(id) {
             self.account_id_by_address.remove(&account.address);
             self.balance_tree.remove(*id);
+            *self.next_free_id -= 1;
         }
     }
 
@@ -803,14 +822,14 @@ mod tests {
         );
 
         let updates = vec![(
-            AccountId(0),
+            AccountId(1),
             AccountUpdate::Delete {
-                address: random_addresses[0],
-                nonce: Nonce(2),
+                address: random_addresses[1],
+                nonce: Nonce(0),
             },
         )];
         state.apply_account_updates(updates);
-        assert_eq!(state.get_account_by_address(&random_addresses[0]), None);
+        assert_eq!(state.get_account_by_address(&random_addresses[1]), None);
     }
 
     #[test]
@@ -825,7 +844,7 @@ mod tests {
         }
 
         // Create two accounts: 0, 1
-        // Delete 0, update balance of 1, create account 2
+        // Delete 1, update balance of 0, create account 1
         // Reverse updates
 
         let initial_plasma_state = ZkSyncState::from_acc_map(AccountMap::default(), BlockNumber(0));
@@ -847,14 +866,14 @@ mod tests {
                 },
             ));
             updates.push((
-                AccountId(0),
+                AccountId(1),
                 AccountUpdate::Delete {
-                    address: random_addresses[0],
+                    address: random_addresses[1],
                     nonce: Nonce(0),
                 },
             ));
             updates.push((
-                AccountId(1),
+                AccountId(0),
                 AccountUpdate::UpdateBalance {
                     old_nonce: Nonce(0),
                     new_nonce: Nonce(1),
@@ -862,7 +881,7 @@ mod tests {
                 },
             ));
             updates.push((
-                AccountId(2),
+                AccountId(1),
                 AccountUpdate::Create {
                     address: random_addresses[2],
                     nonce: Nonce(0),
@@ -878,7 +897,7 @@ mod tests {
         };
         assert_eq!(
             plasma_state_updated
-                .get_account(AccountId(1))
+                .get_account(AccountId(0))
                 .unwrap()
                 .get_balance(token_id),
             256u32.into()
@@ -895,5 +914,159 @@ mod tests {
             plasma_state_updated_back.root_hash(),
             initial_plasma_state.root_hash()
         );
+    }
+
+    /// Checks if next_free_id field behaves as expected after some creations and deletions of accounts.
+    #[test]
+    fn test_next_free_id() {
+        let mut rng = XorShiftRng::from_seed([1, 2, 3, 4]);
+
+        let mut random_addresses = Vec::new();
+        for _ in 0..10 {
+            random_addresses.push(Address::from(rng.gen::<[u8; 20]>()));
+        }
+
+        let mut initial_plasma_state =
+            ZkSyncState::from_acc_map(AccountMap::default(), BlockNumber(0));
+        assert_eq!(*initial_plasma_state.next_free_id, 0);
+        let updates = vec![
+            (
+                AccountId(0),
+                AccountUpdate::Create {
+                    address: random_addresses[0],
+                    nonce: Nonce(0),
+                },
+            ),
+            (
+                AccountId(1),
+                AccountUpdate::Create {
+                    address: random_addresses[1],
+                    nonce: Nonce(0),
+                },
+            ),
+            (
+                AccountId(1),
+                AccountUpdate::Delete {
+                    address: random_addresses[1],
+                    nonce: Nonce(0),
+                },
+            ),
+            (
+                AccountId(0),
+                AccountUpdate::Delete {
+                    address: random_addresses[0],
+                    nonce: Nonce(0),
+                },
+            ),
+        ];
+        let expected_ids = vec![1, 2, 1, 0];
+        for (update, expected_id) in updates.iter().zip(expected_ids.iter()) {
+            initial_plasma_state.apply_account_updates(vec![update.clone()]);
+            assert_eq!(*initial_plasma_state.next_free_id, *expected_id);
+        }
+    }
+
+    /// Checks if next_free_id is correct for state created from tree with gaps.
+    #[test]
+    fn from_tree_with_gaps() {
+        let mut rng = XorShiftRng::from_seed([1, 2, 3, 4]);
+        let mut random_addresses = Vec::new();
+        for _ in 0..10 {
+            random_addresses.push(Address::from(rng.gen::<[u8; 20]>()));
+        }
+
+        let tree_depth = params::account_tree_depth();
+        let mut balance_tree = AccountTree::new(tree_depth);
+        balance_tree.insert(0, Account::default_with_address(&random_addresses[0]));
+        balance_tree.insert(1, Account::default_with_address(&random_addresses[1]));
+        balance_tree.insert(3, Account::default_with_address(&random_addresses[2]));
+        balance_tree.insert(8, Account::default_with_address(&random_addresses[3]));
+        balance_tree.insert(9, Account::default_with_address(&random_addresses[4]));
+
+        let mut account_id_by_address = HashMap::new();
+        account_id_by_address.insert(random_addresses[0], AccountId(0));
+        account_id_by_address.insert(random_addresses[1], AccountId(1));
+        account_id_by_address.insert(random_addresses[2], AccountId(3));
+        account_id_by_address.insert(random_addresses[3], AccountId(8));
+        account_id_by_address.insert(random_addresses[4], AccountId(9));
+        let state = ZkSyncState::new(balance_tree, account_id_by_address, BlockNumber(5));
+        assert_eq!(*state.next_free_id, 10);
+    }
+
+    /// Checks if insert_account panics if account has id greater that next_free_id.
+    #[should_panic(expected = "assertion failed: id <= self.next_free_id")]
+    #[test]
+    fn insert_account_with_bigger_id() {
+        let mut rng = XorShiftRng::from_seed([1, 2, 3, 4]);
+        let mut random_addresses = Vec::new();
+        for _ in 0..10 {
+            random_addresses.push(Address::from(rng.gen::<[u8; 20]>()));
+        }
+        let mut account_map = AccountMap::default();
+        account_map.insert(
+            AccountId(0),
+            Account::default_with_address(&random_addresses[1]),
+        );
+        account_map.insert(
+            AccountId(1),
+            Account::default_with_address(&random_addresses[0]),
+        );
+        let mut plasma_state = ZkSyncState::from_acc_map(account_map, BlockNumber(0));
+        plasma_state.insert_account(
+            AccountId(3),
+            Account::default_with_address(&random_addresses[2]),
+        );
+    }
+
+    /// Checks if remove_account panics if account is not last.
+    #[should_panic(expected = "assertion failed: `(left == right)")]
+    #[test]
+    fn remove_not_last_account() {
+        let mut rng = XorShiftRng::from_seed([1, 2, 3, 4]);
+        let mut random_addresses = Vec::new();
+        for _ in 0..10 {
+            random_addresses.push(Address::from(rng.gen::<[u8; 20]>()));
+        }
+        let mut plasma_state = ZkSyncState::from_acc_map(AccountMap::default(), BlockNumber(0));
+
+        plasma_state.insert_account(
+            AccountId(0),
+            Account::default_with_address(&random_addresses[0]),
+        );
+        plasma_state.insert_account(
+            AccountId(1),
+            Account::default_with_address(&random_addresses[1]),
+        );
+        plasma_state.insert_account(
+            AccountId(2),
+            Account::default_with_address(&random_addresses[2]),
+        );
+
+        plasma_state.remove_account(AccountId(1));
+    }
+
+    /// Checks if from_acc_map works with unsorted accounts.
+    #[test]
+    fn test_from_acc_map() {
+        let mut rng = XorShiftRng::from_seed([1, 2, 3, 4]);
+        let mut random_addresses = Vec::new();
+        for _ in 0..10 {
+            random_addresses.push(Address::from(rng.gen::<[u8; 20]>()));
+        }
+        let mut account_map = AccountMap::default();
+        account_map.insert(
+            AccountId(5),
+            Account::default_with_address(&random_addresses[0]),
+        );
+        account_map.insert(
+            AccountId(0),
+            Account::default_with_address(&random_addresses[1]),
+        );
+        account_map.insert(
+            AccountId(2),
+            Account::default_with_address(&random_addresses[2]),
+        );
+        let plasma_state = ZkSyncState::from_acc_map(account_map, BlockNumber(0));
+        assert_eq!(*plasma_state.next_free_id, 6);
     }
 }
