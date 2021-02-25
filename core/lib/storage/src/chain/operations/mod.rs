@@ -569,8 +569,8 @@ impl<'a, 'c> OperationsSchema<'a, 'c> {
         )
         .execute(transaction.conn())
         .await?;
-
         transaction.commit().await?;
+
         metrics::histogram!(
             "sql.chain.operations.remove_aggregate_operations_and_bindings",
             start.elapsed()
