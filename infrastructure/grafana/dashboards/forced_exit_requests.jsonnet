@@ -5,6 +5,7 @@ local metrics = [
     'api.forced_exit_requests.v01.get_request_by_id',
     'forced_exit_requests.get_funds_received_events',
     'forced_exit_requests.eth_watcher.enter_backoff_mode',
+    'forced_exit_requests.address_space_overflow'
     'sql.forced_exit_requests.store_request',
     'sql.forced_exit_requests.get_request_by_id',
     'sql.forced_exit_requests.set_fulfilled_at',
