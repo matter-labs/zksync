@@ -435,7 +435,7 @@ pub fn check_address_space_overflow(id: i64, digits_in_id: u8) {
 
     let exceeding_rate = id.saturating_sub(address_space / 2);
     // Need this for metrics
-    let exceeding_rate: u64 = exceeding_rate.try_into().unwrap();
+    let exceeding_rate: u64 = exceeding_rate.max(0).try_into().unwrap();
 
     metrics::histogram!(
         "forced_exit_requests.address_space_overflow",
