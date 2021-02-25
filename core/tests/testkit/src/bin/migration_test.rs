@@ -4,6 +4,7 @@ use crate::zksync_account::ZkSyncAccount;
 use std::time::Instant;
 use web3::transports::Http;
 use zksync_testkit::scenarios::{perform_basic_operations, BlockProcessing};
+use zksync_testkit::zksync_account::ZkSyncETHAccountData;
 use zksync_testkit::*;
 use zksync_types::{Nonce, TokenId};
 
@@ -57,7 +58,9 @@ async fn migration_test() {
                 rng_zksync_key,
                 Nonce(0),
                 eth_account.address,
-                eth_account.private_key,
+                ZkSyncETHAccountData::EOA {
+                    eth_private_key: eth_account.private_key,
+                },
             )
         }));
         zksync_accounts

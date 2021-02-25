@@ -11,8 +11,8 @@ use zksync_types::block::{Block, ExecutedOperations, ExecutedPriorityOp, Execute
 use zksync_types::operations::{ChangePubKeyOp, ZkSyncOp};
 use zksync_types::priority_ops::PriorityOp;
 use zksync_types::{
-    AccountId, Address, BlockNumber, CloseOp, Deposit, DepositOp, FullExit, FullExitOp, Token,
-    TokenId, TransferOp, TransferToNewOp, WithdrawOp,
+    tx::ChangePubKeyType, AccountId, Address, BlockNumber, CloseOp, Deposit, DepositOp, FullExit,
+    FullExitOp, Token, TokenId, TransferOp, TransferToNewOp, WithdrawOp,
 };
 // Local imports
 
@@ -321,7 +321,7 @@ impl TransactionsHistoryTestSetup {
                 false,
                 TokenId(0),
                 Default::default(),
-                false,
+                ChangePubKeyType::ECDSA,
                 Default::default(),
             ),
             account_id: self.from_zksync_account.get_account_id().unwrap(),
