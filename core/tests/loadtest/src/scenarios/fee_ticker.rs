@@ -167,6 +167,7 @@ impl FeeTickerScenario {
             format_ether(&fee)
         );
 
+        wallet.refresh_nonce().await?;
         let (tx, eth_signature) = wallet
             .sign_transfer(
                 wallet.address(),
@@ -206,6 +207,11 @@ impl FeeTickerScenario {
                         format_ether(&total_fee)
                     );
 
+                    // Refresh wallet nonces.
+                    for wallet in &wallets {
+                        wallet.refresh_nonce().await?;
+                    }
+
                     let mut total_fee = Some(total_fee);
                     let sign_transfers_task = wallets
                         .iter()
@@ -213,7 +219,6 @@ impl FeeTickerScenario {
                             let transfer_size = self.transfer_size.clone();
                             let fee = total_fee.take().unwrap_or_default();
                             async move {
-                                wallet.refresh_nonce().await?;
                                 wallet
                                     .sign_transfer(wallet.address(), transfer_size, fee)
                                     .await
