@@ -638,6 +638,7 @@ impl<'a, 'c> EthereumSchema<'a, 'c> {
         )
         .execute(transaction.conn())
         .await?;
+        transaction.commit().await?;
 
         metrics::histogram!("sql.ethereum.update_eth_parameters", start.elapsed());
         Ok(())

@@ -402,6 +402,7 @@ impl<'a, 'c> MempoolSchema<'a, 'c> {
         )
         .execute(transaction.conn())
         .await?;
+        transaction.commit().await?;
 
         metrics::histogram!(
             "sql.chain.mempool.return_executed_txs_to_mempool",

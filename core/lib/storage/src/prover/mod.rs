@@ -421,6 +421,7 @@ impl<'a, 'c> ProverSchema<'a, 'c> {
         )
         .execute(transaction.conn())
         .await?;
+        transaction.commit().await?;
 
         metrics::histogram!("sql", start.elapsed(), "prover" => "remove_prover_jobs");
         Ok(())
