@@ -422,7 +422,7 @@ mod tests {
 
         actix_rt::spawn(async move {
             while let Some(item) = receiver.next().await {
-                let verified = VerifiedTx::unverified(item.get_tx_variant().clone());
+                let verified = VerifiedTx::unverified(item.data.get_tx_variant());
                 item.response
                     .send(Ok(verified))
                     .expect("Unable to send response");

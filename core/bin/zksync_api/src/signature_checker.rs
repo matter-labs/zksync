@@ -47,14 +47,15 @@ impl VerifiedTx {
     /// Checks the (batch of) transaction(s) correctness by verifying its
     /// Ethereum signature (if required) and `ZKSync` signature.
     pub async fn verify(
-        request: &mut VerifySignatureRequest,
+        request_data: &mut RequestData,
         eth_checker: &EthereumChecker,
         network: Network,
     ) -> Result<Self, TxAddError> {
-        verify_eth_signature(request, eth_checker, network).await?;
-        verify_tx_correctness(&mut request.get_tx_variant())?;
+        verify_eth_signature(request_data, eth_checker, network).await?;
+        let mut tx_variant = request_data.get_tx_variant();
+        verify_tx_correctness(&mut tx_variant)?;
 
-        Ok(Self(request.get_tx_variant()))
+        Ok(Self(tx_variant))
     }
 
     /// Creates a verified wrapper without actually verifying the original data.
@@ -82,11 +83,11 @@ impl VerifiedTx {
 
 /// Verifies the Ethereum signature of the (batch of) transaction(s).
 async fn verify_eth_signature(
-    request: &VerifySignatureRequest,
+    request_data: &RequestData,
     eth_checker: &EthereumChecker,
     network: Network,
 ) -> Result<(), TxAddError> {
-    match &request.data {
+    match request_data {
         RequestData::Tx(request) => {
             // TODO: Remove this code after Golem update [ZKS-173]
             if (network == Network::Rinkeby || network == Network::Localhost)
@@ -303,12 +304,7 @@ pub struct TxRequest {
 pub struct BatchRequest {
     pub txs: Vec<SignedZkSyncTx>,
     pub batch_sign_data: Option<EthBatchSignData>,
-    /// Senders of transactions. This field is needed since for `ForcedExit` account affected by
-    /// the transaction and actual sender can be different. Thus, we require request sender to
-    /// perform a database query and fetch actual addresses if necessary.
     pub senders: Vec<Address>,
-    /// Resolved tokens might be used to obtain old-formatted 2-FA messages.
-    /// Needed for backwards compatibility.
     pub tokens: Vec<Token>,
 }
 
@@ -326,9 +322,9 @@ pub enum RequestData {
     Batch(BatchRequest),
 }
 
-impl VerifySignatureRequest {
+impl RequestData {
     pub fn get_tx_variant(&self) -> TxVariant {
-        match &self.data {
+        match &self {
             RequestData::Tx(request) => TxVariant::Tx(request.tx.clone()),
             RequestData::Batch(request) => {
                 TxVariant::Batch(request.txs.clone(), request.batch_sign_data.clone())
@@ -359,7 +355,7 @@ pub fn start_sign_checker_detached(
         while let Some(mut request) = input.next().await {
             let eth_checker = eth_checker.clone();
             handle.spawn(async move {
-                let resp = VerifiedTx::verify(&mut request, &eth_checker, eth_network).await;
+                let resp = VerifiedTx::verify(&mut request.data, &eth_checker, eth_network).await;
 
                 request.response.send(resp).unwrap_or_default();
             });
