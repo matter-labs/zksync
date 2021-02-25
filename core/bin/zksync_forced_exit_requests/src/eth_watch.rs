@@ -1,4 +1,4 @@
-use chrono::{DateTime, Duration as ChronoDuration, Utc};
+use chrono::{DateTime, Utc};
 use ethabi::{Address, Hash};
 use std::{
     convert::TryFrom,
@@ -138,10 +138,10 @@ fn time_range_to_block_diff(from: DateTime<Utc>, to: DateTime<Utc>) -> u64 {
 
 // Returns the upper bound of the time that should have
 // passed between the block range
-fn block_diff_to_time_range(block_from: u64, block_to: u64) -> ChronoDuration {
+fn block_diff_to_time_range(block_from: u64, block_to: u64) -> chrono::Duration {
     let block_diff = block_to.saturating_sub(block_from);
 
-    ChronoDuration::milliseconds(
+    chrono::Duration::milliseconds(
         block_diff
             .saturating_mul(MILLIS_PER_BLOCK_UPPER)
             .try_into()
