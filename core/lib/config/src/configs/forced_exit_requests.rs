@@ -39,6 +39,22 @@ pub struct ForcedExitRequestsConfig {
     pub expiration_period: u64,
 }
 
+// Checks that in no way the price will overlap with the requests id space
+//
+// The amount that the users have to send to pay for the ForcedExit request
+// = (number of tokens) * (price_per_token) + id
+//
+// Thus we need to check that at least digits_in_id first digits
+// are equal to zeroes in price_per_token
+fn validate_price_with_id_space(price: i64, digits_in_id: u8) {
+    let id_space = (10_i64).saturating_pow(digits_in_id.into());
+
+    assert!(
+        price % id_space == 0,
+        "The price per token may overlap with request id"
+    )
+}
+
 impl ForcedExitRequestsConfig {
     pub fn from_env() -> Self {
         let config: ForcedExitRequestsInternalConfig =
@@ -46,6 +62,8 @@ impl ForcedExitRequestsConfig {
 
         let max_tx_interval: f64 =
             (config.recomended_tx_interval as f64) * config.tx_interval_scaling_factor;
+
+        validate_price_with_id_space(config.price_per_token, config.digits_in_id);
 
         ForcedExitRequestsConfig {
             enabled: config.enabled,
