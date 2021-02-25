@@ -1,7 +1,8 @@
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, TimeZone, Utc};
 use ethabi::{Address, Hash};
 use std::{
     convert::TryFrom,
+    ops::Sub,
     time::{Duration, Instant},
 };
 use std::{convert::TryInto, fmt::Debug};
@@ -112,6 +113,8 @@ struct ForcedExitContractWatcher {
     forced_exit_sender: ForcedExitSender,
 
     mode: WatcherMode,
+    db_cleanup_interval: chrono::Duration,
+    last_db_cleanup_time: DateTime<Utc>,
 }
 
 // Usually blocks are created much slower (at rate 1 block per 10-20s),
@@ -258,16 +261,17 @@ impl ForcedExitContractWatcher {
 
         self.last_viewed_block = last_confirmed_block;
 
-        // We can delete the expired events only after the polling has been complete
-        // Since now we are sure that all the events that could have been processed already
-        // have been processed
-        if let Err(err) = self.delete_expired().await {
-            // If an error during deletion occures we should be notified, however
-            // it is not a reason to panic or revert the updates from the poll
-            log::warn!(
-                "An error occured when deleting the expired requests: {}",
-                err
-            );
+        if Utc::now().sub(self.db_cleanup_interval) > self.last_db_cleanup_time {
+            if let Err(err) = self.delete_expired().await {
+                // If an error during deletion occures we should be notified, however
+                // it is not a reason to panic or revert the updates from the poll
+                log::warn!(
+                    "An error occured when deleting the expired requests: {}",
+                    err
+                );
+            } else {
+                self.last_db_cleanup_time = Utc::now();
+            }
         }
     }
 
@@ -356,6 +360,9 @@ pub fn run_forced_exit_contract_watcher(
             last_viewed_block: 0,
             forced_exit_sender,
             mode: WatcherMode::Working,
+            db_cleanup_interval: chrono::Duration::minutes(5),
+            // Zero timestamp, has never deleted anything
+            last_db_cleanup_time: Utc.timestamp(0, 0),
         };
 
         contract_watcher.run().await;

@@ -11,8 +11,8 @@ use actix_web::{
 use bigdecimal::{BigDecimal, FromPrimitive};
 use chrono::{Duration, Utc};
 use num::{bigint::ToBigInt, BigUint};
-use std::ops::Add;
 use std::time::Instant;
+use std::{convert::TryInto, ops::Add};
 // Workspace uses
 pub use zksync_api_client::rest::forced_exit_requests::{
     ForcedExitRegisterRequest, ForcedExitRequestStatus,
@@ -430,10 +430,12 @@ fn warn_err<T: std::fmt::Display>(err: T) -> T {
 // Checks if the id exceeds half of the address space
 // If it exceeds the half at all the alert should be triggerred
 // since it it a sign of a possible DoS attack
-pub fn check_address_space_overflow(id: i64, digits_in_id: u8) -> i64 {
-    let address_space = 10_i64.saturating_pow(digits_in_id as i64);
+pub fn check_address_space_overflow(id: i64, digits_in_id: u8) {
+    let address_space = 10_i64.saturating_pow(digits_in_id as u32);
 
     let exceeding_rate = id.saturating_sub(address_space / 2);
+    // Need this for metrics
+    let exceeding_rate: u64 = exceeding_rate.try_into().unwrap();
 
     metrics::histogram!(
         "forced_exit_requests.address_space_overflow",
