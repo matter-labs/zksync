@@ -73,8 +73,7 @@ export async function rust() {
     await db(true);
     await rustApi(true);
     await prover();
-    const { stdout: threads } = await utils.exec('nproc');
-    await circuit(parseInt(threads));
+    await circuit(2);
     await rustCryptoTests();
 }
 
