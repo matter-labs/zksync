@@ -14,16 +14,20 @@ use crate::zksync_account::ZkSyncAccount;
 use num::{rational::Ratio, traits::Pow, BigInt, BigUint};
 use std::str::FromStr;
 use web3::transports::Http;
-use web3::types::U256;
+use web3::types::{H256, U256};
 use zksync_crypto::params::{
     AMOUNT_EXPONENT_BIT_WIDTH, AMOUNT_MANTISSA_BIT_WIDTH, FEE_EXPONENT_BIT_WIDTH,
     FEE_MANTISSA_BIT_WIDTH,
 };
 use zksync_crypto::rand::{Rng, SeedableRng, XorShiftRng};
+use zksync_crypto::{priv_key_from_fs, rand};
+use zksync_testkit::zksync_account::ZkSyncETHAccountData;
 use zksync_testkit::*;
 use zksync_types::{
     helpers::{pack_fee_amount, pack_token_amount, unpack_fee_amount, unpack_token_amount},
-    ChangePubKeyOp, DepositOp, FullExitOp, Nonce, TokenId, TransferOp, TransferToNewOp, WithdrawOp,
+    tx::ChangePubKeyCREATE2Data,
+    Address, ChangePubKeyOp, DepositOp, FullExitOp, Nonce, PubKeyHash, TokenId, TransferOp,
+    TransferToNewOp, WithdrawOp,
 };
 use zksync_utils::UnsignedRatioSerializeAsDecimal;
 
@@ -224,7 +228,9 @@ async fn gas_price_test() {
                 rng_zksync_key,
                 Nonce(0),
                 eth_account.address,
-                eth_account.private_key,
+                ZkSyncETHAccountData::EOA {
+                    eth_private_key: eth_account.private_key,
+                },
             )
         }));
         zksync_accounts
@@ -285,6 +291,14 @@ async fn gas_price_test() {
     commit_cost_of_deposits(&mut test_setup, 50, Token(TokenId(1)), rng)
         .await
         .report(&base_cost, "deposit ERC20", true);
+
+    commit_cost_of_create2_change_pubkey(&mut test_setup, 50)
+        .await
+        .report(&base_cost, "create2 change pubkey", false);
+
+    commit_cost_of_onchain_change_pubkey(&mut test_setup, 50)
+        .await
+        .report(&base_cost, "onchain change pubkey", false);
 
     commit_cost_of_change_pubkey(&mut test_setup, 50)
         .await
@@ -643,6 +657,132 @@ async fn commit_cost_of_change_pubkey(
     for _ in 0..n_change_pubkeys {
         test_setup
             .change_pubkey_with_tx(ZKSyncAccountId(1), token, 0u32.into())
+            .await;
+    }
+    let change_pubkey_execute_result = test_setup
+        .execute_commit_and_verify_block()
+        .await
+        .expect("Block execution failed");
+    assert_eq!(
+        change_pubkey_execute_result.block_size_chunks,
+        n_change_pubkeys * ChangePubKeyOp::CHUNKS,
+        "block size mismatch"
+    );
+    CostsSample::new(
+        n_change_pubkeys,
+        U256::from(0),
+        change_pubkey_execute_result,
+    )
+}
+
+async fn commit_cost_of_onchain_change_pubkey(
+    test_setup: &mut TestSetup,
+    n_change_pubkeys: usize,
+) -> CostsSample {
+    let token = Token(TokenId(0));
+    let fee_amount = 100u32;
+    let deposit_amount = (fee_amount * (n_change_pubkeys + 1) as u32).into();
+
+    test_setup.start_block();
+    test_setup
+        .deposit(ETHAccountId(1), ZKSyncAccountId(1), token, deposit_amount)
+        .await;
+    test_setup
+        .change_pubkey_with_tx(ZKSyncAccountId(1), token, 0u32.into())
+        .await;
+    test_setup
+        .execute_commit_and_verify_block()
+        .await
+        .expect("Block execution failed");
+
+    test_setup.start_block();
+    for _ in 0..n_change_pubkeys {
+        test_setup
+            .change_pubkey_with_onchain_auth(
+                ETHAccountId(0),
+                ZKSyncAccountId(1),
+                token,
+                0u32.into(),
+            )
+            .await;
+    }
+    let change_pubkey_execute_result = test_setup
+        .execute_commit_and_verify_block()
+        .await
+        .expect("Block execution failed");
+    assert_eq!(
+        change_pubkey_execute_result.block_size_chunks,
+        n_change_pubkeys * ChangePubKeyOp::CHUNKS,
+        "block size mismatch"
+    );
+    CostsSample::new(
+        n_change_pubkeys,
+        U256::from(0),
+        change_pubkey_execute_result,
+    )
+}
+
+async fn commit_cost_of_create2_change_pubkey(
+    test_setup: &mut TestSetup,
+    n_change_pubkeys: usize,
+) -> CostsSample {
+    let rng = &mut rand::thread_rng();
+    let token = Token(TokenId(0));
+    let fee_amount = 100u32;
+    let deposit_amount = (fee_amount * (n_change_pubkeys + 1) as u32).into();
+
+    let first_new_account_id = test_setup.accounts.zksync_accounts.len();
+
+    test_setup.start_block();
+    test_setup
+        .deposit(ETHAccountId(1), ZKSyncAccountId(1), token, deposit_amount)
+        .await;
+    test_setup
+        .change_pubkey_with_tx(ZKSyncAccountId(1), token, 0u32.into())
+        .await;
+    for new_account_idx in 0..n_change_pubkeys {
+        let pk = priv_key_from_fs(rng.gen());
+        let create2_data = ChangePubKeyCREATE2Data {
+            creator_address: Address::random(),
+            code_hash: H256::random(),
+            salt_arg: H256::random(),
+        };
+        let pubkey_hash = PubKeyHash::from_privkey(&pk);
+        let address = create2_data.get_address(&pubkey_hash);
+        let zksync_account = ZkSyncAccount::new(
+            pk,
+            Nonce(0),
+            address,
+            ZkSyncETHAccountData::Create2(create2_data),
+        );
+        test_setup
+            .accounts
+            .zksync_accounts
+            .insert(first_new_account_id + new_account_idx, zksync_account);
+        test_setup
+            .transfer(
+                ZKSyncAccountId(1),
+                ZKSyncAccountId(first_new_account_id + new_account_idx),
+                token,
+                0u32.into(),
+                0u32.into(),
+                Default::default(),
+            )
+            .await;
+    }
+    test_setup
+        .execute_commit_and_verify_block()
+        .await
+        .expect("Block execution failed");
+
+    test_setup.start_block();
+    for new_account_idx in 0..n_change_pubkeys {
+        test_setup
+            .change_pubkey_with_tx(
+                ZKSyncAccountId(first_new_account_id + new_account_idx),
+                token,
+                0u32.into(),
+            )
             .await;
     }
     let change_pubkey_execute_result = test_setup

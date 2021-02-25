@@ -14,7 +14,7 @@ use serde::{Deserialize, Serialize};
 use web3::types::H256;
 // Workspace uses
 use zksync::Network;
-use zksync_types::Address;
+use zksync_types::{Address, TokenLike};
 // Local uses
 use crate::scenarios::ScenarioConfig;
 
@@ -25,22 +25,37 @@ pub struct AccountInfo {
     pub private_key: H256,
 }
 
+/// Main wallet Ethereum credentials.
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, Eq, PartialEq)]
-pub struct NetworkConfig {
-    /// Network kind used for testing.
-    pub name: Network,
-    /// Fee for the Ethereum transactions in gwei.
-    #[serde(default)]
-    pub eth_fee: Option<u64>,
+pub struct WalletCredentials {
+    pub address: Address,
+    pub private_key: H256,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
+pub struct MainWalletConfig {
+    /// Main wallet credentials.
+    #[serde(flatten)]
+    pub credentials: WalletCredentials,
+    /// The token that is used to pay fees for the main wallet operations.
+    pub fee_token: TokenLike,
     /// Fee for the zkSync transactions in gwei.
     #[serde(default)]
     pub zksync_fee: Option<u64>,
 }
 
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, Eq, PartialEq)]
+pub struct NetworkConfig {
+    /// Network kind used for testing.
+    pub name: Network,
+    /// Sufficient fee for the Ethereum transactions in gwei.
+    pub eth_fee: u64,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct Config {
     /// Information about Ethereum account.
-    pub main_wallet: AccountInfo,
+    pub main_wallet: MainWalletConfig,
     /// Network configuration.
     pub network: NetworkConfig,
     /// Loadtest scenarios.
