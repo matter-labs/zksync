@@ -1,4 +1,4 @@
-use crate::{Address, Log, TokenId, U256};
+use crate::{tx::ChangePubKeyType, Address, Log, TokenId, U256};
 use chrono::{DateTime, Utc};
 use num::{rational::Ratio, BigUint};
 use serde::{Deserialize, Serialize};
@@ -194,20 +194,13 @@ pub struct TokenMarketVolume {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, Copy, PartialEq, Hash, Eq)]
-pub enum ChangePubKeyFeeType {
-    Onchain,
-    ECDSA,
-    CREATE2,
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone, Copy, PartialEq, Hash, Eq)]
 #[serde(untagged)]
 pub enum ChangePubKeyFeeTypeArg {
     PreContracts4Version {
         #[serde(rename = "onchainPubkeyAuth")]
         onchain_pubkey_auth: bool,
     },
-    ContractsV4Version(ChangePubKeyFeeType),
+    ContractsV4Version(ChangePubKeyType),
 }
 
 /// Type of transaction fees that exist in the zkSync network.
@@ -257,7 +250,7 @@ mod tests {
         assert_eq!(
             deserialized,
             TxFeeTypes::ChangePubKey(ChangePubKeyFeeTypeArg::ContractsV4Version(
-                ChangePubKeyFeeType::Onchain
+                ChangePubKeyType::Onchain
             ))
         );
 
@@ -267,7 +260,7 @@ mod tests {
         assert_eq!(
             deserialized,
             TxFeeTypes::ChangePubKey(ChangePubKeyFeeTypeArg::ContractsV4Version(
-                ChangePubKeyFeeType::ECDSA
+                ChangePubKeyType::ECDSA
             ))
         );
 
@@ -277,7 +270,7 @@ mod tests {
         assert_eq!(
             deserialized,
             TxFeeTypes::ChangePubKey(ChangePubKeyFeeTypeArg::ContractsV4Version(
-                ChangePubKeyFeeType::CREATE2
+                ChangePubKeyType::CREATE2
             ))
         );
     }
