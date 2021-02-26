@@ -55,7 +55,7 @@ impl ForcedExitSender {
         core_api_client: CoreApiClient,
         connection_pool: ConnectionPool,
         config: ZkSyncConfig,
-    ) -> anyhow::Result<Self> {
+    ) -> Self {
         let forced_exit_sender_account_id =
             get_forced_exit_sender_account_id(connection_pool.clone(), &config)
                 .await
@@ -67,13 +67,13 @@ impl ForcedExitSender {
         let sender_private_key =
             read_signing_key(&sender_private_key).expect("Reading private key failed");
 
-        Ok(Self {
+        Self {
             core_api_client,
             connection_pool,
             forced_exit_sender_account_id,
             config,
             sender_private_key,
-        })
+        }
     }
 
     pub fn extract_id_from_amount(&self, amount: BigUint) -> (i64, BigUint) {
@@ -265,8 +265,7 @@ impl ForcedExitSender {
         request: &ForcedExitRequest,
         txs: Vec<SignedZkSyncTx>,
     ) -> anyhow::Result<Vec<TxHash>> {
-        let mut db_transaction = storage.start_transaction().await?;
-        let mut schema = db_transaction.forced_exit_requests_schema();
+        let mut schema = storage.forced_exit_requests_schema();
 
         let hashes: Vec<TxHash> = txs.iter().map(|tx| tx.hash()).collect();
         self.core_api_client.send_txs_batch(txs, vec![]).await??;
@@ -274,8 +273,6 @@ impl ForcedExitSender {
         schema
             .set_fulfilled_by(request.id, Some(hashes.clone()))
             .await?;
-
-        db_transaction.commit().await?;
 
         Ok(hashes)
     }
