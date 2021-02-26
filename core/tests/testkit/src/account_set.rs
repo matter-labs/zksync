@@ -3,10 +3,10 @@ use crate::zksync_account::ZkSyncAccount;
 use num::BigUint;
 use web3::types::{TransactionReceipt, U64};
 use zksync_crypto::rand::Rng;
+use zksync_types::tx::{ChangePubKeyType, TimeRange};
 use zksync_types::{AccountId, Address, Nonce, PriorityOp, TokenId, ZkSyncTx};
 
 use crate::types::*;
-use zksync_types::tx::TimeRange;
 
 /// Account set is used to create transactions using stored account
 /// in a convenient way
@@ -258,7 +258,7 @@ impl AccountSet {
             increment_nonce,
             fee_token,
             fee,
-            true,
+            ChangePubKeyType::Onchain,
             time_range,
         )))
     }
@@ -278,7 +278,13 @@ impl AccountSet {
             increment_nonce,
             fee_token,
             fee,
-            false,
+            if zksync_account.eth_account_data.is_eoa() {
+                ChangePubKeyType::ECDSA
+            } else if zksync_account.eth_account_data.is_create2() {
+                ChangePubKeyType::CREATE2
+            } else {
+                panic!("Not supported, use onchain change pubkey");
+            },
             time_range,
         )))
     }

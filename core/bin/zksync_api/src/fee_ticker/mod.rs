@@ -28,8 +28,8 @@ use tokio::time::Instant;
 use zksync_config::{configs::ticker::TokenPriceSource, ZkSyncConfig};
 use zksync_storage::ConnectionPool;
 use zksync_types::{
-    Address, BatchFee, ChangePubKeyOp, Fee, OutputFeeType, Token, TokenId, TokenLike, TransferOp,
-    TransferToNewOp, TxFeeTypes, WithdrawOp,
+    tokens::ChangePubKeyFeeTypeArg, tx::ChangePubKeyType, Address, BatchFee, ChangePubKeyOp, Fee,
+    OutputFeeType, Token, TokenId, TokenLike, TransferOp, TransferToNewOp, TxFeeTypes, WithdrawOp,
 };
 use zksync_utils::ratio_to_big_decimal;
 
@@ -48,7 +48,6 @@ use crate::fee_ticker::{
 };
 use crate::utils::token_db_cache::TokenDBCache;
 use zksync_core::balancer::{Balancer, BuildBalancedItem};
-use zksync_types::tokens::{ChangePubKeyFeeType, ChangePubKeyFeeTypeArg};
 
 mod constants;
 mod ticker_api;
@@ -107,21 +106,21 @@ impl GasOperationsCost {
             ),
             (
                 OutputFeeType::ChangePubKey(ChangePubKeyFeeTypeArg::ContractsV4Version(
-                    ChangePubKeyFeeType::Onchain,
+                    ChangePubKeyType::Onchain,
                 )),
                 constants::BASE_CHANGE_PUBKEY_ONCHAIN_COST.into(),
             ),
             (
                 OutputFeeType::ChangePubKey(ChangePubKeyFeeTypeArg::ContractsV4Version(
-                    ChangePubKeyFeeType::ECDSA,
+                    ChangePubKeyType::ECDSA,
                 )),
                 constants::BASE_CHANGE_PUBKEY_OFFCHAIN_COST.into(),
             ),
             (
                 OutputFeeType::ChangePubKey(ChangePubKeyFeeTypeArg::ContractsV4Version(
-                    ChangePubKeyFeeType::CREATE2,
+                    ChangePubKeyType::CREATE2,
                 )),
-                constants::BASE_CHANGE_PUBKEY_OFFCHAIN_COST.into(),
+                constants::BASE_CHANGE_PUBKEY_CREATE2_COST.into(),
             ),
         ]
         .into_iter()
@@ -158,21 +157,21 @@ impl GasOperationsCost {
             ),
             (
                 OutputFeeType::ChangePubKey(ChangePubKeyFeeTypeArg::ContractsV4Version(
-                    ChangePubKeyFeeType::Onchain,
+                    ChangePubKeyType::Onchain,
                 )),
                 constants::BASE_CHANGE_PUBKEY_ONCHAIN_COST.into(),
             ),
             (
                 OutputFeeType::ChangePubKey(ChangePubKeyFeeTypeArg::ContractsV4Version(
-                    ChangePubKeyFeeType::ECDSA,
+                    ChangePubKeyType::ECDSA,
                 )),
                 constants::SUBSIDY_CHANGE_PUBKEY_OFFCHAIN_COST.into(),
             ),
             (
                 OutputFeeType::ChangePubKey(ChangePubKeyFeeTypeArg::ContractsV4Version(
-                    ChangePubKeyFeeType::CREATE2,
+                    ChangePubKeyType::CREATE2,
                 )),
-                constants::SUBSIDY_CHANGE_PUBKEY_OFFCHAIN_COST.into(),
+                constants::SUBSIDY_CHANGE_PUBKEY_CREATE2_COST.into(),
             ),
         ]
         .into_iter()

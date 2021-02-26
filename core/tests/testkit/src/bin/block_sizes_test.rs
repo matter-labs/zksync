@@ -13,7 +13,7 @@ use zksync_prover_utils::aggregated_proofs::{gen_aggregate_proof, prepare_proof_
 use zksync_prover_utils::{PlonkVerificationKey, SetupForStepByStepProver};
 use zksync_testkit::eth_account::EthereumAccount;
 use zksync_testkit::external_commands::{deploy_contracts, get_test_accounts};
-use zksync_testkit::zksync_account::ZkSyncAccount;
+use zksync_testkit::zksync_account::{ZkSyncAccount, ZkSyncETHAccountData};
 use zksync_testkit::{
     genesis_state, spawn_state_keeper, AccountSet, ETHAccountId, TestSetup, TestkitConfig, Token,
     ZKSyncAccountId,
@@ -138,7 +138,9 @@ async fn main() {
                 rng_zksync_key,
                 Nonce(0),
                 eth_account.address,
-                eth_account.private_key,
+                ZkSyncETHAccountData::EOA {
+                    eth_private_key: eth_account.private_key,
+                },
             )
         }));
         zksync_accounts
