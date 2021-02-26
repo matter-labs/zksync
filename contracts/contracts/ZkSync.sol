@@ -523,10 +523,14 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
     /// @dev of existed priority requests expiration block number.
     /// @return bool flag that is true if the Exodus mode must be entered.
     function activateExodusMode() public returns (bool) {
+        // #if EASY_EXODUS
+        bool trigger = true;
+        // #else
         bool trigger =
             block.number >= priorityRequests[firstPriorityRequestId].expirationBlock &&
                 priorityRequests[firstPriorityRequestId].expirationBlock != 0;
-        if ($$(EASY_EXODUS) || trigger) {
+        // #endif
+        if (trigger) {
             if (!exodusMode) {
                 exodusMode = true;
                 emit ExodusMode();

@@ -2,6 +2,24 @@
 
 All notable changes to the contracts will be documented in this file.
 
+## 2021-25-02
+
+**Version 5** is scheduled for upgrade.
+
+### Added
+
+- `tokenGovernance` address is added to the `Governance` contract. `tokenGovernance` can list new tokens.
+- `TokenGovernance` contract is added to allow anybody to pay fee and list new tokens.
+
+### Changed
+
+- Maximum amount of tokens that can be used to pay tx fee is increased to 512.
+- Circuit now enforces that `ForcedExit` target account pubkey hash is empty.
+
+## 2021-09-02
+
+**Version 4** is released.
+
 ## 2021-14-01
 
 **Version 4** is scheduled for upgrade.
