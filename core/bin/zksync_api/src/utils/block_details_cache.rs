@@ -3,9 +3,7 @@
 // External uses
 
 // Workspace uses
-use zksync_storage::{
-    chain::block::records::BlockDetails, ConnectionPool, QueryResult, StorageProcessor,
-};
+use zksync_storage::{chain::block::records::BlockDetails, ConnectionPool, QueryResult};
 use zksync_types::BlockNumber;
 
 // Local uses
@@ -21,14 +19,14 @@ impl BlockDetailsCache {
 
     pub async fn get<'a>(
         &self,
-        access_storage: impl Into<AccessStorage<'a>>,
+        pool: &ConnectionPool,
         block_number: BlockNumber,
     ) -> QueryResult<Option<BlockDetails>> {
         if let Some(block) = self.0.get(&block_number).await {
             return Ok(Some(block));
         }
 
-        let mut storage = access_storage.into().access_storage().await?;
+        let mut storage = pool.access_storage().await?;
         let blocks = storage
             .chain()
             .block_schema()
@@ -49,33 +47,5 @@ impl BlockDetailsCache {
         } else {
             Ok(None)
         }
-    }
-}
-
-#[allow(clippy::clippy::large_enum_variant)]
-#[derive(Debug)]
-pub enum AccessStorage<'a> {
-    Pooled(&'a ConnectionPool),
-    Processor(StorageProcessor<'a>),
-}
-
-impl<'a> AccessStorage<'a> {
-    pub async fn access_storage(self) -> QueryResult<StorageProcessor<'a>> {
-        match self {
-            AccessStorage::Pooled(pool) => pool.access_storage().await.map_err(From::from),
-            AccessStorage::Processor(storage) => Ok(storage),
-        }
-    }
-}
-
-impl<'a> From<&'a ConnectionPool> for AccessStorage<'a> {
-    fn from(pool: &'a ConnectionPool) -> Self {
-        Self::Pooled(pool)
-    }
-}
-
-impl<'a> From<StorageProcessor<'a>> for AccessStorage<'a> {
-    fn from(processor: StorageProcessor<'a>) -> Self {
-        Self::Processor(processor)
     }
 }
