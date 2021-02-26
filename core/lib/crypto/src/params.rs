@@ -123,7 +123,7 @@ pub const LEAF_DATA_BIT_WIDTH: usize =
     NONCE_BIT_WIDTH + NEW_PUBKEY_HASH_WIDTH + FR_BIT_WIDTH_PADDED + ETH_ADDRESS_BIT_WIDTH;
 
 /// Priority op should be executed for this number of eth blocks.
-pub const PRIORITY_EXPIRATION: u64 = 35000;
+pub const PRIORITY_EXPIRATION: u64 = 35000; // TODO: Check that in the future this constant cannot cause unexpected behavior (ZKS-520).
 pub const FR_ADDRESS_LEN: usize = 20;
 
 pub const PAD_MSG_BEFORE_HASH_BITS_LEN: usize = 736;

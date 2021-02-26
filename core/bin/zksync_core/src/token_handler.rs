@@ -54,7 +54,7 @@ impl TokenHandler {
             token_list,
             poll_interval,
             notifier,
-            last_eth_block: None,
+            last_eth_block: None, // TODO: Maybe load last viewed Ethereum block number for TokenHandler from DB (ZKS-518).
         }
     }
 
