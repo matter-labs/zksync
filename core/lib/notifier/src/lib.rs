@@ -9,7 +9,7 @@ pub struct Notifier {
 }
 
 impl Notifier {
-    pub fn new(webhook_url: Url) -> Self {
+    pub fn with_mattermost(webhook_url: Url) -> Self {
         Self {
             matter_most_notifier: MatterMostNotifier::new(webhook_url),
         }

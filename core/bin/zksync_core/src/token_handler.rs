@@ -46,7 +46,7 @@ impl TokenHandler {
             .map(|token| (token.address, token))
             .collect::<HashMap<Address, TokenInfo>>();
 
-        let notifier = config.webhook_url.map(Notifier::new);
+        let notifier = config.webhook_url.map(Notifier::with_mattermost);
 
         Self {
             connection_pool,
@@ -59,17 +59,17 @@ impl TokenHandler {
     }
 
     async fn load_new_token_events(&self) -> Vec<NewTokenEvent> {
-        let eth_watch_resp = oneshot::channel();
+        let (sender, receiver) = oneshot::channel();
         self.eth_watch_req
             .clone()
             .send(EthWatchRequest::GetNewTokens {
                 last_eth_block: self.last_eth_block,
-                resp: eth_watch_resp.0,
+                resp: sender,
             })
             .await
             .expect("ETH watch req receiver dropped");
 
-        eth_watch_resp.1.await.expect("Err response from eth watch")
+        receiver.await.expect("Err response from eth watch")
     }
 
     async fn save_new_tokens(
@@ -136,7 +136,7 @@ impl TokenHandler {
                         .send_new_token_notify(token)
                         .await
                         .unwrap_or_else(|e| {
-                            vlog::error!("failed send notification to MatterMost: {}", e);
+                            vlog::error!("failed send notification: {}", e);
                         });
                 }
             }
