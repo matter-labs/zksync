@@ -9,8 +9,8 @@ use web3::{
     },
     transports::Http,
     types::{
-        Address, BlockId, BlockNumber, Bytes, Filter, Log, TransactionReceipt, H160, H256, U256,
-        U64,
+        Address, BlockId, BlockNumber, Bytes, Filter, Log, Transaction, TransactionId,
+        TransactionReceipt, H160, H256, U256, U64,
     },
     Web3,
 };
@@ -33,9 +33,7 @@ pub struct ETHDirectClient<S: EthereumSigner> {
     contract: ethabi::Contract,
     pub chain_id: u8,
     pub gas_price_factor: f64,
-    // It's public only for testkit
-    // TODO avoid public (ZKS-376)
-    pub web3: Web3<Http>,
+    web3: Web3<Http>,
 }
 
 impl<S: EthereumSigner> fmt::Debug for ETHDirectClient<S> {
@@ -78,6 +76,10 @@ impl<S: EthereumSigner> ETHDirectClient<S> {
 
     pub fn main_contract(&self) -> Contract<Http> {
         self.main_contract_with_address(self.contract_addr)
+    }
+
+    pub fn create_contract(&self, address: Address, contract: ethabi::Contract) -> Contract<Http> {
+        Contract::new(self.web3.eth(), address, contract)
     }
 
     pub async fn pending_nonce(&self) -> Result<U256, anyhow::Error> {
@@ -392,5 +394,13 @@ impl<S: EthereumSigner> ETHDirectClient<S> {
 
         f.encode_input(&params.into_tokens())
             .expect("failed to encode parameters")
+    }
+
+    pub fn get_web3_transport(&self) -> &Http {
+        self.web3.transport()
+    }
+
+    pub async fn get_tx(&self, hash: H256) -> Result<Option<Transaction>, web3::Error> {
+        self.web3.eth().transaction(TransactionId::Hash(hash)).await
     }
 }
