@@ -130,7 +130,6 @@ impl TokenInfo {
 /// Tokens that added through a contract.
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct NewTokenEvent {
-    // TODO:
     pub eth_block_number: u64,
     pub address: Address,
     pub id: TokenId,
