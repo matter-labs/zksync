@@ -146,6 +146,6 @@ impl EthClient for EthHttpClient {
 
 pub async fn get_web3_block_number(web3: &Web3<http::Http>) -> anyhow::Result<u64> {
     let block_number = web3.eth().block_number().await?.as_u64();
-    
+
     Ok(block_number)
 }
