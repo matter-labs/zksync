@@ -328,7 +328,7 @@ impl<S: EthereumSigner> EthereumProvider<S> {
 
         let data = self
             .eth_client
-            .encode_tx_data("fullExit", (account_id, token.address));
+            .encode_tx_data("requestFullExit", (account_id, token.address));
         let signed_tx = self
             .eth_client
             .sign_prepared_tx(data, options)

@@ -344,8 +344,7 @@ pub fn run_forced_exit_contract_watcher(
             connection_pool.clone(),
             config.clone(),
         )
-        .await
-        .unwrap();
+        .await;
 
         // In case there were some transactions which were submitted
         // but were not committed we will try to wait until they are committed

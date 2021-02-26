@@ -7,7 +7,7 @@ use zksync_storage::{
 
 use zksync_api::core_api_client::CoreApiClient;
 use zksync_types::{
-    tx::{PackedEthSignature, TimeRange, TxHash},
+    tx::{ChangePubKeyType, PackedEthSignature, TimeRange, TxHash},
     AccountId, Address, PubKeyHash, ZkSyncTx, H256,
 };
 
@@ -17,7 +17,7 @@ use zksync_crypto::franklin_crypto::eddsa::PrivateKey;
 
 use tokio::time;
 
-use zksync_test_account::ZkSyncAccount;
+use zksync_test_account::{ZkSyncAccount, ZkSyncETHAccountData};
 
 use super::utils::{read_signing_key, Engine};
 
@@ -184,12 +184,16 @@ pub async fn register_signing_key(
 ) -> anyhow::Result<()> {
     let eth_sk = get_verified_eth_sk(sender_address).await;
 
+    let eth_account_data = ZkSyncETHAccountData::EOA {
+        eth_private_key: eth_sk,
+    };
+
     let sender_account = ZkSyncAccount::new(
         sender_sk,
         // The accout is changing public key for hte first time, so nonce is 0
         Nonce(0),
         sender_address,
-        eth_sk,
+        eth_account_data,
     );
     sender_account.set_account_id(Some(sender_id));
 
@@ -198,7 +202,7 @@ pub async fn register_signing_key(
         true,
         TokenId(0),
         BigUint::from(0u8),
-        false,
+        ChangePubKeyType::ECDSA,
         TimeRange::default(),
     );
 
