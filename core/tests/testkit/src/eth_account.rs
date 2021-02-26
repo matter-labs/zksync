@@ -549,7 +549,7 @@ async fn send_raw_tx_wait_confirmation(
     raw_tx: Vec<u8>,
 ) -> Result<TransactionReceipt, anyhow::Error> {
     let tx_hash = client
-        .send_raw_tx(raw_tx.into())
+        .send_raw_tx(raw_tx)
         .await
         .map_err(|e| format_err!("Failed to send raw tx: {}", e))?;
     loop {
