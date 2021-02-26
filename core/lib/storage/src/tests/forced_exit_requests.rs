@@ -156,7 +156,7 @@ async fn delete_old_requests(mut storage: StorageProcessor<'_>) -> QueryResult<(
             tokens: vec![TokenId(20)],
             price_in_wei: BigUint::from_str("1000000000000000").unwrap(),
             created_at: now.sub(day.mul(5)).add(minute.mul(5)),
-            // Is valid => should no be deleted
+            // Is valid => should not be deleted
             valid_until: now.sub(day.mul(3)).add(minute.mul(5)),
         },
     ];
