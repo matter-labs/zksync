@@ -66,12 +66,7 @@ impl EthClient {
         }
     }
 
-    async fn get_events<T>(
-        &self,
-        from: u64,
-        to: u64,
-        topics: Vec<Hash>,
-    ) -> anyhow::Result<Vec<(T, u64)>>
+    async fn get_events<T>(&self, from: u64, to: u64, topics: Vec<Hash>) -> anyhow::Result<Vec<T>>
     where
         T: TryFrom<Log>,
         T::Error: Debug,
@@ -92,7 +87,7 @@ impl EthClient {
         &self,
         from: u64,
         to: u64,
-    ) -> anyhow::Result<Vec<(FundsReceivedEvent, u64)>> {
+    ) -> anyhow::Result<Vec<FundsReceivedEvent>> {
         let start = Instant::now();
         let result = self
             .get_events(from, to, vec![self.topics.funds_received])
@@ -263,7 +258,7 @@ impl ForcedExitContractWatcher {
 
         for e in events {
             self.forced_exit_sender
-                .process_request(e.0.amount, lower_bound_block_time(e.1, last_block))
+                .process_request(e.amount, lower_bound_block_time(e.block_number, last_block))
                 .await;
         }
 
@@ -366,7 +361,7 @@ pub async fn get_contract_events<T>(
     from: BlockNumber,
     to: BlockNumber,
     topics: Vec<Hash>,
-) -> anyhow::Result<Vec<(T, u64)>>
+) -> anyhow::Result<Vec<T>>
 where
     T: TryFrom<Log>,
     T::Error: Debug,
@@ -383,12 +378,8 @@ where
         .await?
         .into_iter()
         .filter_map(|event| {
-            let block_number = event
-                .block_number
-                .expect("Trying to access pending block")
-                .as_u64();
             if let Ok(event) = T::try_from(event) {
-                Some(Ok((event, block_number)))
+                Some(Ok(event))
             } else {
                 None
             }
