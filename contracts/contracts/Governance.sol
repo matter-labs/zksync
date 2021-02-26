@@ -24,12 +24,6 @@ contract Governance is Config {
     /// @notice Address which will exercise governance over the network i.e. add tokens, change validator set, conduct upgrades
     address public networkGovernor;
 
-    /// @notice Address that can list tokens for free.
-    address public tokenLister;
-
-    /// @notice Cold storage, where to send the collected fees collected from the listing of tokens.
-    address public treasurt;
-
     /// @notice Total number of ERC20 tokens registered in the network (excluding ETH, which is hardcoded as tokenId = 0)
     uint16 public totalTokens;
 
@@ -86,7 +80,7 @@ contract Governance is Config {
     function addToken(address _token) external {
         require(msg.sender == tokenGovernance, "1E");
         require(tokenIds[_token] == 0, "1e"); // token exists
-        require(totalTokens < MAX_AMOUNT_OF_REGISTERED_TOKENS, "1f"); // no more tokens can be listed
+        require(totalTokens < MAX_AMOUNT_OF_REGISTERED_TOKENS, "1f"); // no free identifiers for tokens
 
         totalTokens++;
         uint16 newTokenId = totalTokens; // it is not `totalTokens - 1` because tokenId = 0 is reserved for eth
