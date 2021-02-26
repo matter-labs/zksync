@@ -27,7 +27,7 @@ describe('Proxy unit tests', function () {
     it('check delegatecall', async () => {
         const dummyFactory = await hardhat.ethers.getContractFactory('DummyFirst');
         const proxyDummyInterface = dummyFactory.attach(proxyTestContract.address);
-        expect(await proxyDummyInterface.get_DUMMY_INDEX()).to.equal(1);
+        expect(await proxyDummyInterface.getDummyIndex()).to.equal(1);
     });
 
     it('checking that requireMaster calls present', async () => {
