@@ -72,6 +72,7 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
 
     /// @notice Notification that upgrade notice period started
     /// @dev Can be external because Proxy contract intercepts illegal calls of this function
+    // solhint-disable-next-line no-empty-blocks
     function upgradeNoticePeriodStarted() external override {}
 
     /// @notice Notification that upgrade preparation status is activated
@@ -124,6 +125,7 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
 
     /// @notice zkSync contract upgrade. Can be external because Proxy contract intercepts illegal calls of this function.
     /// @param upgradeParameters Encoded representation of upgrade parameters
+    // solhint-disable-next-line no-empty-blocks
     function upgrade(bytes calldata upgradeParameters) external nonReentrant {}
 
     /// @notice Sends tokens
@@ -574,12 +576,12 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
     /// @notice New pubkey hash can be reset, to do that user should send two transactions:
     ///         1) First `setAuthPubkeyHash` transaction for already used `_nonce` will set timer.
     ///         2) After `AUTH_FACT_RESET_TIMELOCK` time is passed second `setAuthPubkeyHash` transaction will reset pubkey hash for `_nonce`.
-    /// @param _pubkey_hash New pubkey hash
+    /// @param _pubkeyHash New pubkey hash
     /// @param _nonce Nonce of the change pubkey L2 transaction
-    function setAuthPubkeyHash(bytes calldata _pubkey_hash, uint32 _nonce) external {
-        require(_pubkey_hash.length == PUBKEY_HASH_BYTES, "y"); // PubKeyHash should be 20 bytes.
+    function setAuthPubkeyHash(bytes calldata _pubkeyHash, uint32 _nonce) external {
+        require(_pubkeyHash.length == PUBKEY_HASH_BYTES, "y"); // PubKeyHash should be 20 bytes.
         if (authFacts[msg.sender][_nonce] == bytes32(0)) {
-            authFacts[msg.sender][_nonce] = keccak256(_pubkey_hash);
+            authFacts[msg.sender][_nonce] = keccak256(_pubkeyHash);
         } else {
             uint256 currentResetTimer = authFactsResetTimer[msg.sender][_nonce];
             if (currentResetTimer == 0) {
@@ -587,7 +589,7 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
             } else {
                 require(block.timestamp.sub(currentResetTimer) >= AUTH_FACT_RESET_TIMELOCK, "z");
                 authFactsResetTimer[msg.sender][_nonce] = 0;
-                authFacts[msg.sender][_nonce] = keccak256(_pubkey_hash);
+                authFacts[msg.sender][_nonce] = keccak256(_pubkeyHash);
             }
         }
     }

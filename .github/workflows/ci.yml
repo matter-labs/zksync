@@ -37,6 +37,7 @@ jobs:
           ci_run zk lint rust --check
           ci_run zk lint js --check
           ci_run zk lint ts --check
+          ci_run zk lint sol --check
           ci_run zk lint md --check
 
   unit-tests:

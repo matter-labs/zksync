@@ -27,28 +27,19 @@ library Operations {
 
     // Byte lengths
 
-    uint8 constant OP_TYPE_BYTES = 1;
-
-    uint8 constant TOKEN_BYTES = 2;
-
-    uint8 constant PUBKEY_BYTES = 32;
-
-    uint8 constant NONCE_BYTES = 4;
-
-    uint8 constant PUBKEY_HASH_BYTES = 20;
-
-    uint8 constant ADDRESS_BYTES = 20;
-
+    uint8 internal constant OP_TYPE_BYTES = 1;
+    uint8 internal constant TOKEN_BYTES = 2;
+    uint8 internal constant PUBKEY_BYTES = 32;
+    uint8 internal constant NONCE_BYTES = 4;
+    uint8 internal constant PUBKEY_HASH_BYTES = 20;
+    uint8 internal constant ADDRESS_BYTES = 20;
     /// @dev Packed fee bytes lengths
-    uint8 constant FEE_BYTES = 2;
-
+    uint8 internal constant FEE_BYTES = 2;
     /// @dev zkSync account id bytes lengths
-    uint8 constant ACCOUNT_ID_BYTES = 4;
-
-    uint8 constant AMOUNT_BYTES = 16;
-
+    uint8 internal constant ACCOUNT_ID_BYTES = 4;
+    uint8 internal constant AMOUNT_BYTES = 16;
     /// @dev Signature (for example full exit signature) bytes length
-    uint8 constant SIGNATURE_BYTES = 64;
+    uint8 internal constant SIGNATURE_BYTES = 64;
 
     // Deposit pubdata
     struct Deposit {
@@ -59,7 +50,7 @@ library Operations {
         address owner;
     }
 
-    uint256 public constant PACKED_DEPOSIT_PUBDATA_BYTES =
+    uint256 internal constant PACKED_DEPOSIT_PUBDATA_BYTES =
         OP_TYPE_BYTES + ACCOUNT_ID_BYTES + TOKEN_BYTES + AMOUNT_BYTES + ADDRESS_BYTES;
 
     /// Deserialize deposit pubdata
