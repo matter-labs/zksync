@@ -47,11 +47,11 @@ impl VerifiedTx {
     /// Checks the (batch of) transaction(s) correctness by verifying its
     /// Ethereum signature (if required) and `ZKSync` signature.
     pub async fn verify(
-        request_data: &mut RequestData,
+        request_data: RequestData,
         eth_checker: &EthereumChecker,
         network: Network,
     ) -> Result<Self, TxAddError> {
-        verify_eth_signature(request_data, eth_checker, network).await?;
+        verify_eth_signature(&request_data, eth_checker, network).await?;
         let mut tx_variant = request_data.get_tx_variant();
         verify_tx_correctness(&mut tx_variant)?;
 
@@ -352,12 +352,12 @@ pub fn start_sign_checker_detached(
         eth_checker: EthereumChecker,
         eth_network: Network,
     ) {
-        while let Some(mut request) = input.next().await {
+        while let Some(VerifySignatureRequest { data, response }) = input.next().await {
             let eth_checker = eth_checker.clone();
             handle.spawn(async move {
-                let resp = VerifiedTx::verify(&mut request.data, &eth_checker, eth_network).await;
+                let resp = VerifiedTx::verify(data, &eth_checker, eth_network).await;
 
-                request.response.send(resp).unwrap_or_default();
+                response.send(resp).unwrap_or_default();
             });
         }
     }
