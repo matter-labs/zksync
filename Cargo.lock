@@ -5745,6 +5745,7 @@ dependencies = [
  "zksync_api_client",
  "zksync_config",
  "zksync_contracts",
+ "zksync_core",
  "zksync_crypto",
  "zksync_eth_client",
  "zksync_eth_signer",

@@ -9,6 +9,7 @@ All notable changes to the core components will be documented in this file.
 ### Changed
 
 - (`loadtest`): `zksync_fee` has been moved to `[main_wallet]` section from the `[network]` section.
+- A special balancer for FeeTicker was replaced for a generic balancer.
 
 ### Added
 
