@@ -29,7 +29,7 @@ use crate::api_server::rpc_server::types::TxWithSignature;
 use crate::{
     core_api_client::CoreApiClient,
     fee_ticker::{TickerRequest, TokenPriceRequestType},
-    signature_checker::{TxVariant, VerifiedTx, VerifyTxSignatureRequest},
+    signature_checker::{BatchRequest, RequestData, TxRequest, VerifiedTx, VerifySignatureRequest},
     tx_error::TxAddError,
     utils::token_db_cache::TokenDBCache,
 };
@@ -37,7 +37,7 @@ use crate::{
 #[derive(Clone)]
 pub struct TxSender {
     pub core_api_client: CoreApiClient,
-    pub sign_verify_requests: mpsc::Sender<VerifyTxSignatureRequest>,
+    pub sign_verify_requests: mpsc::Sender<VerifySignatureRequest>,
     pub ticker_requests: mpsc::Sender<TickerRequest>,
 
     pub pool: ConnectionPool,
@@ -105,7 +105,7 @@ macro_rules! internal_error {
 impl TxSender {
     pub fn new(
         connection_pool: ConnectionPool,
-        sign_verify_request_sender: mpsc::Sender<VerifyTxSignatureRequest>,
+        sign_verify_request_sender: mpsc::Sender<VerifySignatureRequest>,
         ticker_request_sender: mpsc::Sender<TickerRequest>,
         config: &ZkSyncConfig,
     ) -> Self {
@@ -123,7 +123,7 @@ impl TxSender {
     pub(crate) fn with_client(
         core_api_client: CoreApiClient,
         connection_pool: ConnectionPool,
-        sign_verify_request_sender: mpsc::Sender<VerifyTxSignatureRequest>,
+        sign_verify_request_sender: mpsc::Sender<VerifySignatureRequest>,
         ticker_request_sender: mpsc::Sender<TickerRequest>,
         config: &ZkSyncConfig,
     ) -> Self {
@@ -411,7 +411,7 @@ impl TxSender {
             tx_sender_types.push(self.get_tx_sender_type(&tx).await?);
         }
 
-        if !eth_signatures.is_empty() {
+        let batch_sign_data = if !eth_signatures.is_empty() {
             // User provided at least one signature for the whole batch.
             // In this case each sender cannot be CREATE2.
             if tx_sender_types
@@ -429,59 +429,26 @@ impl TxSender {
                 .map(|((tx, token), sender)| (tx.tx.clone(), token, sender))
                 .collect::<Vec<_>>();
             // Create batch signature data.
-            let batch_sign_data =
-                EthBatchSignData::new(_txs, eth_signatures).map_err(SubmitError::other)?;
-            let (verified_batch, sign_data) = verify_txs_batch_signature(
-                txs,
-                tx_senders,
-                tokens,
-                tx_sender_types,
-                batch_sign_data,
-                messages_to_sign,
-                self.sign_verify_requests.clone(),
-            )
-            .await?
-            .unwrap_batch();
-
-            verified_signatures.extend(sign_data.signatures.into_iter());
-            verified_txs.extend(verified_batch.into_iter());
+            Some(EthBatchSignData::new(_txs, eth_signatures).map_err(SubmitError::other)?)
         } else {
-            // Otherwise, we process every transaction in turn.
-
-            // This hashset holds addresses that have performed a CREATE2 ChangePubKey
-            // within this batch, so that we don't check ETH signatures on their transactions
-            // from this batch. We save the account type to the db later.
-            let mut create2_senders = HashSet::<H160>::new();
-
-            for (tx, sender, token, mut sender_type, msg_to_sign) in
-                izip!(txs, tx_senders, tokens, tx_sender_types, messages_to_sign)
-            {
-                if create2_senders.contains(&sender) {
-                    sender_type = EthAccountType::CREATE2;
-                }
-                let verified_tx = verify_tx_info_message_signature(
-                    &tx.tx,
-                    sender,
-                    token,
-                    sender_type,
-                    tx.signature.clone(),
-                    msg_to_sign,
-                    self.sign_verify_requests.clone(),
-                )
-                .await?
-                .unwrap_tx();
-
-                if let ZkSyncTx::ChangePubKey(tx) = tx.tx {
-                    if let Some(auth_data) = tx.eth_auth_data {
-                        if auth_data.is_create2() {
-                            create2_senders.insert(sender);
-                        }
-                    }
-                }
-
-                verified_txs.push(verified_tx);
-            }
+            None
+        };
+        let (verified_batch, sign_data) = verify_txs_batch_signature(
+            txs,
+            tx_senders,
+            tokens,
+            tx_sender_types,
+            batch_sign_data,
+            messages_to_sign,
+            self.sign_verify_requests.clone(),
+        )
+        .await?
+        .unwrap_batch();
+        if let Some(sign_data) = sign_data {
+            verified_signatures.extend(sign_data.signatures.into_iter());
         }
+        verified_txs.extend(verified_batch.into_iter());
+
         let tx_hashes: Vec<TxHash> = verified_txs.iter().map(|tx| tx.tx.hash()).collect();
         // Send verified transactions to the mempool.
         self.core_api_client
@@ -668,8 +635,8 @@ impl TxSender {
 }
 
 async fn send_verify_request_and_recv(
-    request: VerifyTxSignatureRequest,
-    mut req_channel: mpsc::Sender<VerifyTxSignatureRequest>,
+    request: VerifySignatureRequest,
+    mut req_channel: mpsc::Sender<VerifySignatureRequest>,
     receiver: oneshot::Receiver<Result<VerifiedTx, TxAddError>>,
 ) -> Result<VerifiedTx, SubmitError> {
     // Send the check request.
@@ -693,7 +660,7 @@ async fn verify_tx_info_message_signature(
     account_type: EthAccountType,
     signature: Option<TxEthSignature>,
     msg_to_sign: Option<Vec<u8>>,
-    req_channel: mpsc::Sender<VerifyTxSignatureRequest>,
+    req_channel: mpsc::Sender<VerifySignatureRequest>,
 ) -> Result<VerifiedTx, SubmitError> {
     let eth_sign_data = match msg_to_sign {
         Some(message) => match account_type {
@@ -718,13 +685,15 @@ async fn verify_tx_info_message_signature(
 
     let (sender, receiever) = oneshot::channel();
 
-    let request = VerifyTxSignatureRequest {
-        tx: TxVariant::Tx(SignedZkSyncTx {
-            tx: tx.clone(),
-            eth_sign_data,
+    let request = VerifySignatureRequest {
+        data: RequestData::Tx(TxRequest {
+            tx: SignedZkSyncTx {
+                tx: tx.clone(),
+                eth_sign_data,
+            },
+            sender: tx_sender,
+            token,
         }),
-        senders: vec![tx_sender],
-        tokens: vec![token],
         response: sender,
     };
 
@@ -740,24 +709,55 @@ async fn verify_txs_batch_signature(
     senders: Vec<Address>,
     tokens: Vec<Token>,
     sender_types: Vec<EthAccountType>,
-    batch_sign_data: EthBatchSignData,
+    batch_sign_data: Option<EthBatchSignData>,
     msgs_to_sign: Vec<Option<Vec<u8>>>,
-    req_channel: mpsc::Sender<VerifyTxSignatureRequest>,
+    req_channel: mpsc::Sender<VerifySignatureRequest>,
 ) -> Result<VerifiedTx, SubmitError> {
+    // This hashset holds addresses that have performed a CREATE2 ChangePubKey
+    // within this batch, so that we don't check ETH signatures on their transactions
+    // from this batch. We save the account type to the db later.
+    let mut create2_senders = HashSet::<H160>::new();
     let mut txs = Vec::with_capacity(batch.len());
-    for (tx, message, sender_type) in izip!(batch, msgs_to_sign, sender_types) {
+    for (tx, message, sender, mut sender_type) in
+        izip!(batch, msgs_to_sign, senders.iter(), sender_types)
+    {
+        if create2_senders.contains(sender) {
+            sender_type = EthAccountType::CREATE2;
+        }
+        if let ZkSyncTx::ChangePubKey(tx) = &tx.tx {
+            if let Some(auth_data) = &tx.eth_auth_data {
+                if auth_data.is_create2() {
+                    create2_senders.insert(*sender);
+                }
+            }
+        }
         // If we have more signatures provided than required,
         // we will verify those too.
-        let eth_sign_data = if let (Some(signature), Some(message)) = (tx.signature, message) {
-            if let EthAccountType::CREATE2 = sender_type {
-                return Err(SubmitError::IncorrectTx(
-                    "Eth signature from CREATE2 account not expected".to_string(),
-                ));
+        let eth_sign_data = if let Some(message) = message {
+            match sender_type {
+                EthAccountType::CREATE2 => {
+                    if tx.signature.is_some() {
+                        return Err(SubmitError::IncorrectTx(
+                            "Eth signature from CREATE2 account not expected".to_string(),
+                        ));
+                    }
+                    None
+                }
+                EthAccountType::Owned => {
+                    if batch_sign_data.is_none() && tx.signature.is_none() {
+                        return Err(SubmitError::TxAdd(TxAddError::MissingEthSignature));
+                    }
+                    if let Some(signature) = tx.signature {
+                        Some(EthSignData { signature, message })
+                    } else {
+                        None
+                    }
+                }
             }
-            Some(EthSignData { signature, message })
         } else {
             None
         };
+
         txs.push(SignedZkSyncTx {
             tx: tx.tx,
             eth_sign_data,
@@ -766,10 +766,13 @@ async fn verify_txs_batch_signature(
 
     let (sender, receiver) = oneshot::channel();
 
-    let request = VerifyTxSignatureRequest {
-        tx: TxVariant::Batch(txs, batch_sign_data),
-        senders,
-        tokens,
+    let request = VerifySignatureRequest {
+        data: RequestData::Batch(BatchRequest {
+            txs,
+            batch_sign_data,
+            senders,
+            tokens,
+        }),
         response: sender,
     };
 

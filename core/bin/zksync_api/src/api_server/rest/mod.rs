@@ -8,7 +8,7 @@ use zksync_types::H160;
 use zksync_utils::panic_notify::ThreadPanicNotify;
 
 use self::v01::api_decl::ApiV01;
-use crate::{fee_ticker::TickerRequest, signature_checker::VerifyTxSignatureRequest};
+use crate::{fee_ticker::TickerRequest, signature_checker::VerifySignatureRequest};
 
 use super::tx_sender::TxSender;
 use zksync_config::ZkSyncConfig;
@@ -20,7 +20,7 @@ pub mod v1;
 async fn start_server(
     api_v01: ApiV01,
     fee_ticker: mpsc::Sender<TickerRequest>,
-    sign_verifier: mpsc::Sender<VerifyTxSignatureRequest>,
+    sign_verifier: mpsc::Sender<VerifySignatureRequest>,
     bind_to: SocketAddr,
 ) {
     HttpServer::new(move || {
@@ -63,7 +63,7 @@ pub(super) fn start_server_thread_detached(
     contract_address: H160,
     panic_notify: mpsc::Sender<bool>,
     fee_ticker: mpsc::Sender<TickerRequest>,
-    sign_verifier: mpsc::Sender<VerifyTxSignatureRequest>,
+    sign_verifier: mpsc::Sender<VerifySignatureRequest>,
     config: ZkSyncConfig,
 ) {
     std::thread::Builder::new()
