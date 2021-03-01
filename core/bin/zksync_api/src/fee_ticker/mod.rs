@@ -25,6 +25,7 @@ use tokio::task::JoinHandle;
 use tokio::time::Instant;
 
 // Workspace deps
+use zksync_balancer::{Balancer, BuildBalancedItem};
 use zksync_config::{configs::ticker::TokenPriceSource, ZkSyncConfig};
 use zksync_storage::ConnectionPool;
 use zksync_types::{
@@ -47,7 +48,6 @@ use crate::fee_ticker::{
     },
 };
 use crate::utils::token_db_cache::TokenDBCache;
-use zksync_core::balancer::{Balancer, BuildBalancedItem};
 
 mod constants;
 mod ticker_api;

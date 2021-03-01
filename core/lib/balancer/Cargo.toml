@@ -1,0 +1,15 @@
+[package]
+name = "zksync_balancer"
+version = "1.0.0"
+edition = "2018"
+authors = ["The Matter Labs Team <hello@matterlabs.dev>"]
+homepage = "https://zksync.io/"
+repository = "https://github.com/matter-labs/zksync"
+license = "Apache-2.0"
+keywords = ["blockchain", "zksync"]
+categories = ["cryptography"]
+
+[dependencies]
+futures = "0.3"
+metrics = "=0.13.0-alpha.8"
+tokio = { version = "0.2", features = ["full"] }
