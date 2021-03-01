@@ -400,7 +400,12 @@ impl<S: EthereumSigner> ETHDirectClient<S> {
         self.web3.transport()
     }
 
-    pub async fn get_tx(&self, hash: H256) -> Result<Option<Transaction>, web3::Error> {
-        self.web3.eth().transaction(TransactionId::Hash(hash)).await
+    pub async fn get_tx(&self, hash: H256) -> Result<Option<Transaction>, anyhow::Error> {
+        let tx = self
+            .web3
+            .eth()
+            .transaction(TransactionId::Hash(hash))
+            .await?;
+        Ok(tx)
     }
 }
