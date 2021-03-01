@@ -110,6 +110,7 @@ describe(`ZkSync integration tests (token: ${token}, transport: ${transport})`, 
         await tester.testBatch(alice, bob, token, TX_AMOUNT);
         await tester.testIgnoredBatch(alice, bob, token, TX_AMOUNT);
         await tester.testRejectedBatch(alice, bob, token, TX_AMOUNT);
+        await tester.testInvalidFeeBatch(alice, bob, token, TX_AMOUNT);
     });
 
     step('should test batch-builder', async () => {
