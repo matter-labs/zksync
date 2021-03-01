@@ -17,6 +17,8 @@ All notable changes to the core components will be documented in this file.
 - (`loadtest`): Added `zksync_fee` option into the `[scenario]` section to set fee for each scenario individually, added
   `fee_token` option into the `[main_wallet]` section to set token that is used to pay fees for the main wallet
   operations.
+- (`eth_client`): Added `get_tx`, `create_contract` methods to `EthereumGateway`, `get_web3_transport` method to
+  ETHDirectClient.
 
 ### Fixed
 
