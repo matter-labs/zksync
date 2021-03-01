@@ -1,7 +1,8 @@
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, TimeZone, Utc};
 use ethabi::{Address, Hash};
 use std::{
     convert::TryFrom,
+    ops::Sub,
     time::{Duration, Instant},
 };
 use std::{convert::TryInto, fmt::Debug};
@@ -112,6 +113,8 @@ struct ForcedExitContractWatcher {
     forced_exit_sender: ForcedExitSender,
 
     mode: WatcherMode,
+    db_cleanup_interval: chrono::Duration,
+    last_db_cleanup_time: DateTime<Utc>,
 }
 
 // Usually blocks are created much slower (at rate 1 block per 10-20s),
@@ -200,6 +203,23 @@ impl ForcedExitContractWatcher {
         }
     }
 
+    pub async fn delete_expired(&mut self) -> anyhow::Result<()> {
+        let mut storage = self.connection_pool.access_storage().await?;
+
+        let expiration_time = chrono::Duration::milliseconds(
+            self.config
+                .forced_exit_requests
+                .expiration_period
+                .try_into()
+                .expect("Failed to convert expiration period to i64"),
+        );
+
+        storage
+            .forced_exit_requests_schema()
+            .delete_old_unfulfilled_requests(expiration_time)
+            .await
+    }
+
     pub async fn poll(&mut self) {
         if !self.polling_allowed() {
             // Polling is currently disabled, skip it.
@@ -240,6 +260,19 @@ impl ForcedExitContractWatcher {
         }
 
         self.last_viewed_block = last_confirmed_block;
+
+        if Utc::now().sub(self.db_cleanup_interval) > self.last_db_cleanup_time {
+            if let Err(err) = self.delete_expired().await {
+                // If an error during deletion occures we should be notified, however
+                // it is not a reason to panic or revert the updates from the poll
+                log::warn!(
+                    "An error occured when deleting the expired requests: {}",
+                    err
+                );
+            } else {
+                self.last_db_cleanup_time = Utc::now();
+            }
+        }
     }
 
     pub async fn run(mut self) {
@@ -326,6 +359,9 @@ pub fn run_forced_exit_contract_watcher(
             last_viewed_block: 0,
             forced_exit_sender,
             mode: WatcherMode::Working,
+            db_cleanup_interval: chrono::Duration::minutes(5),
+            // Zero timestamp, has never deleted anything
+            last_db_cleanup_time: Utc.timestamp(0, 0),
         };
 
         contract_watcher.run().await;

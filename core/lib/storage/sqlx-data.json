@@ -2659,6 +2659,18 @@
       "nullable": []
     }
   },
+  "963cad1979935b50bc5c2bbe174f5d94fbd5c38ea752d304f987229c89e6070a": {
+    "query": "\n            DELETE FROM forced_exit_requests\n            WHERE fulfilled_by IS NULL AND valid_until < $1\n            ",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "Timestamptz"
+        ]
+      },
+      "nullable": []
+    }
+  },
   "98f87793202531586603307eab53987f75f4e07614af8706e6180413f808a1b4": {
     "query": "INSERT INTO txs_batches_signatures VALUES($1, $2)",
     "describe": {

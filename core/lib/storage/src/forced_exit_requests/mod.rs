@@ -2,7 +2,7 @@ use chrono::{DateTime, Utc};
 // Built-in deps
 use num::BigInt;
 use sqlx::types::BigDecimal;
-use std::time::Instant;
+use std::{ops::Sub, time::Instant};
 // External imports
 // Workspace imports
 // Local imports
@@ -188,5 +188,33 @@ impl<'a, 'c> ForcedExitRequestsSchema<'a, 'c> {
         );
 
         Ok(requests)
+    }
+
+    pub async fn delete_old_unfulfilled_requests(
+        &mut self,
+        // The time that has to be passed since the
+        // request has been considered invalid to delete it
+        deleting_threshold: chrono::Duration,
+    ) -> QueryResult<()> {
+        let start = Instant::now();
+
+        let oldest_allowed = Utc::now().sub(deleting_threshold);
+
+        sqlx::query!(
+            r#"
+            DELETE FROM forced_exit_requests
+            WHERE fulfilled_by IS NULL AND valid_until < $1
+            "#,
+            oldest_allowed
+        )
+        .execute(self.0.conn())
+        .await?;
+
+        metrics::histogram!(
+            "sql.forced_exit_requests.delete_old_unfulfilled_requests",
+            start.elapsed()
+        );
+
+        Ok(())
     }
 }

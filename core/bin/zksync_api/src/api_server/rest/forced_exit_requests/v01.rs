@@ -11,8 +11,8 @@ use actix_web::{
 use bigdecimal::{BigDecimal, FromPrimitive};
 use chrono::{Duration, Utc};
 use num::{bigint::ToBigInt, BigUint};
-use std::ops::Add;
 use std::time::Instant;
+use std::{convert::TryInto, ops::Add};
 // Workspace uses
 pub use zksync_api_client::rest::forced_exit_requests::{
     ForcedExitRegisterRequest, ForcedExitRequestStatus,
@@ -41,6 +41,7 @@ pub struct ApiForcedExitRequestsData {
 
     pub(crate) is_enabled: bool,
     pub(crate) max_tokens_per_request: u8,
+    pub(crate) digits_in_id: u8,
     pub(crate) recomended_tx_interval_millisecs: i64,
     pub(crate) max_tx_interval_millisecs: i64,
     pub(crate) price_per_token: i64,
@@ -63,6 +64,7 @@ impl ApiForcedExitRequestsData {
             recomended_tx_interval_millisecs: config.forced_exit_requests.recomended_tx_interval,
             max_tx_interval_millisecs: config.forced_exit_requests.max_tx_interval,
             forced_exit_contract_address: config.contracts.forced_exit_addr,
+            digits_in_id: config.forced_exit_requests.digits_in_id,
         }
     }
 }
@@ -150,6 +152,8 @@ pub async fn submit_request(
         })
         .await
         .map_err(|_| ApiError::internal(""))?;
+
+    check_address_space_overflow(saved_fe_request.id, data.digits_in_id);
 
     metrics::histogram!(
         "api.forced_exit_requests.v01.submit_request",
@@ -421,4 +425,20 @@ mod tests {
 fn warn_err<T: std::fmt::Display>(err: T) -> T {
     vlog::warn!("Internal Server Error: '{}';", err);
     err
+}
+
+// Checks if the id exceeds half of the address space
+// If it exceeds the half at all the alert should be triggerred
+// since it it a sign of a possible DoS attack
+pub fn check_address_space_overflow(id: i64, digits_in_id: u8) {
+    let address_space = 10_i64.saturating_pow(digits_in_id as u32);
+
+    let exceeding_rate = id.saturating_sub(address_space / 2);
+    // Need this for metrics
+    let exceeding_rate: u64 = exceeding_rate.max(0).try_into().unwrap();
+
+    metrics::histogram!(
+        "forced_exit_requests.address_space_overflow",
+        exceeding_rate
+    );
 }
