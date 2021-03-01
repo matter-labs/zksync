@@ -40,6 +40,7 @@ pub struct SaveForcedExitRequestQuery {
 #[derive(Debug, Clone)]
 pub struct FundsReceivedEvent {
     pub amount: BigUint,
+    pub block_number: u64,
 }
 
 impl TryFrom<Log> for FundsReceivedEvent {
@@ -55,9 +56,14 @@ impl TryFrom<Log> for FundsReceivedEvent {
         .map_err(|e| format_err!("Event data decode: {:?}", e))?;
 
         let amount = dec_ev.remove(0).to_uint().unwrap();
+        let block_number = event
+            .block_number
+            .expect("Trying to access pending block")
+            .as_u64();
 
         Ok(FundsReceivedEvent {
             amount: BigUint::from(amount.as_u128()),
+            block_number,
         })
     }
 }

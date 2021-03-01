@@ -119,16 +119,38 @@ struct ForcedExitContractWatcher {
 
 // Usually blocks are created much slower (at rate 1 block per 10-20s),
 // but the block time falls through time, so just to double-check
-const MILLIS_PER_BLOCK: u64 = 7000;
+const MILLIS_PER_BLOCK_LOWER: u64 = 5000;
+const MILLIS_PER_BLOCK_UPPER: u64 = 25000;
 
-// Returns number of blocks that should have been created during the time
+// Returns upper bound of the number of blocks that
+// should have been created during the time
 fn time_range_to_block_diff(from: DateTime<Utc>, to: DateTime<Utc>) -> u64 {
     // Timestamps should never be negative
     let millis_from: u64 = from.timestamp_millis().try_into().unwrap();
     let millis_to: u64 = to.timestamp_millis().try_into().unwrap();
 
     // It does not matter whether to ceil or floor the division
-    millis_to.saturating_sub(millis_from) / MILLIS_PER_BLOCK
+    millis_to.saturating_sub(millis_from) / MILLIS_PER_BLOCK_LOWER
+}
+
+// Returns the upper bound of the time that should have
+// passed between the block range
+fn block_diff_to_time_range(block_from: u64, block_to: u64) -> chrono::Duration {
+    let block_diff = block_to.saturating_sub(block_from);
+
+    chrono::Duration::milliseconds(
+        block_diff
+            .saturating_mul(MILLIS_PER_BLOCK_UPPER)
+            .try_into()
+            .unwrap(),
+    )
+}
+
+// Lower bound on the time when was the block created
+fn lower_bound_block_time(block: u64, current_block: u64) -> DateTime<Utc> {
+    let time_diff = block_diff_to_time_range(block, current_block);
+
+    Utc::now().sub(time_diff)
 }
 
 impl ForcedExitContractWatcher {
@@ -255,7 +277,7 @@ impl ForcedExitContractWatcher {
 
         for e in events {
             self.forced_exit_sender
-                .process_request(e.amount.clone())
+                .process_request(e.amount, lower_bound_block_time(e.block_number, last_block))
                 .await;
         }
 
