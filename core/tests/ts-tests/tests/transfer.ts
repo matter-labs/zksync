@@ -154,22 +154,28 @@ Tester.prototype.testInvalidFeeBatch = async function (
     // Ignore the second transfer.
     const fee = await this.syncProvider.getTransactionsBatchFee(['Transfer'], [receiver.address()], token);
 
-    const tx_with_fee = {
+    const txWithFee = {
         to: receiver.address(),
         token,
         amount,
         fee
     };
-    const tx_without_fee = {
+    const txWithoutFee = {
         to: receiver.address(),
         token,
         amount,
         fee: 0
     };
 
+    const multiTransfer = [];
+    for (let i = 0; i < 10; ++i) {
+        multiTransfer.push(txWithoutFee);
+    }
+    multiTransfer.push(txWithFee);
+
     let thrown = true;
     try {
-        const handles = await sender.syncMultiTransfer([tx_without_fee, tx_with_fee]);
+        const handles = await sender.syncMultiTransfer(multiTransfer);
         for (const handle of handles) {
             await handle.awaitVerifyReceipt();
         }
