@@ -322,14 +322,16 @@ impl TxSender {
             let tx_fee_info = tx.tx.get_fee_info();
 
             if let Some((tx_type, token, address, provided_fee)) = tx_fee_info {
+                // Save the transaction type before moving on to the next one, otherwise
+                // the total fee won't get affected by it.
+                transaction_types.push((tx_type, address));
+
                 if provided_fee == BigUint::zero() {
                     continue;
                 }
                 let fee_allowed =
                     Self::token_allowed_for_fees(self.ticker_requests.clone(), token.clone())
                         .await?;
-
-                transaction_types.push((tx_type, address));
 
                 // In batches, transactions with non-popular token are allowed to be included, but should not
                 // used to pay fees. Fees must be covered by some more common token.
