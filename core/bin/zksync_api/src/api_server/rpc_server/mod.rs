@@ -23,7 +23,7 @@ use zksync_types::{tx::TxHash, Address, BatchFee, BlockNumber, Fee, TokenLike, T
 // Local uses
 use crate::{
     fee_ticker::{TickerRequest, TokenPriceRequestType},
-    signature_checker::VerifyTxSignatureRequest,
+    signature_checker::VerifySignatureRequest,
     utils::shared_lru_cache::SharedLruCache,
 };
 use bigdecimal::BigDecimal;
@@ -55,7 +55,7 @@ pub struct RpcApp {
 impl RpcApp {
     pub fn new(
         connection_pool: ConnectionPool,
-        sign_verify_request_sender: mpsc::Sender<VerifyTxSignatureRequest>,
+        sign_verify_request_sender: mpsc::Sender<VerifySignatureRequest>,
         ticker_request_sender: mpsc::Sender<TickerRequest>,
         config: &ZkSyncConfig,
     ) -> Self {
@@ -412,7 +412,7 @@ impl RpcApp {
 #[allow(clippy::too_many_arguments)]
 pub fn start_rpc_server(
     connection_pool: ConnectionPool,
-    sign_verify_request_sender: mpsc::Sender<VerifyTxSignatureRequest>,
+    sign_verify_request_sender: mpsc::Sender<VerifySignatureRequest>,
     ticker_request_sender: mpsc::Sender<TickerRequest>,
     panic_notify: mpsc::Sender<bool>,
     config: &ZkSyncConfig,
