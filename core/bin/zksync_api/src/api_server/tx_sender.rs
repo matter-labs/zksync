@@ -322,6 +322,8 @@ impl TxSender {
             let tx_fee_info = tx.tx.get_fee_info();
 
             if let Some((tx_type, token, address, provided_fee)) = tx_fee_info {
+                // Save the transaction type before moving on to the next one, otherwise
+                // the total fee won't get affected by it.
                 transaction_types.push((tx_type, address));
 
                 if provided_fee == BigUint::zero() {
