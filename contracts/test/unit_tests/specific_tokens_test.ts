@@ -112,7 +112,7 @@ describe('zkSync process tokens which have no return value in `transfer` and `tr
         expect(balanceBefore).eq(balanceAfter);
     });
 
-    it('Withdraw ERC20 success', async () => {
+    it('payoutAmount success', async () => {
         zksyncContract.connect(wallet);
         const withdrawAmount = parseEther('1.0');
 
@@ -192,9 +192,9 @@ describe('zkSync process tokens which take fee from sender', function () {
         await deployer.deployAll({ gasLimit: 6500000 });
         zksyncContract = ZkSyncWithdrawalUnitTestFactory.connect(deployer.addresses.ZkSync, wallet);
 
-        const tokenContractDeployFactory = await hardhat.ethers.getContractFactory('MintableERC20FeeAndDividendsTest');
+        const tokenContractDeployFactory = await hardhat.ethers.getContractFactory('MintableERC20FeeAndPayoutTest');
         tokenContract = await tokenContractDeployFactory.deploy(true, true);
-        FEE_AMOUNT = BigNumber.from(await tokenContract.FEE_AMOUNT_AS_VALUE());
+        FEE_AMOUNT = BigNumber.from(await tokenContract.feeAmount());
         await tokenContract.mint(wallet.address, parseEther('1000000'));
 
         const govContract = deployer.governanceContract(wallet);
@@ -333,7 +333,7 @@ describe('zkSync process tokens which take fee from recipient', function () {
         await deployer.deployAll({ gasLimit: 6500000 });
         zksyncContract = ZkSyncWithdrawalUnitTestFactory.connect(deployer.addresses.ZkSync, wallet);
 
-        const tokenContractDeployFactory = await hardhat.ethers.getContractFactory('MintableERC20FeeAndDividendsTest');
+        const tokenContractDeployFactory = await hardhat.ethers.getContractFactory('MintableERC20FeeAndPayoutTest');
         tokenContract = await tokenContractDeployFactory.deploy(true, false);
         await tokenContract.mint(wallet.address, parseEther('1000000'));
 
@@ -350,7 +350,7 @@ describe('zkSync process tokens which take fee from recipient', function () {
     });
 });
 
-describe('zkSync process tokens which adds dividends to recipient', function () {
+describe('zkSync process tokens which adds payout to the recipient', function () {
     this.timeout(50000);
 
     let zksyncContract;
@@ -364,7 +364,7 @@ describe('zkSync process tokens which adds dividends to recipient', function () 
         await deployer.deployAll({ gasLimit: 6500000 });
         zksyncContract = ZkSyncWithdrawalUnitTestFactory.connect(deployer.addresses.ZkSync, wallet);
 
-        const tokenContractDeployFactory = await hardhat.ethers.getContractFactory('MintableERC20FeeAndDividendsTest');
+        const tokenContractDeployFactory = await hardhat.ethers.getContractFactory('MintableERC20FeeAndPayoutTest');
         tokenContract = await tokenContractDeployFactory.deploy(false, false);
         await tokenContract.mint(wallet.address, parseEther('1000000'));
 
@@ -372,7 +372,7 @@ describe('zkSync process tokens which adds dividends to recipient', function () 
         await govContract.addToken(tokenContract.address);
     });
 
-    it('Make a deposit of tokens that should adds dividends to the recipient', async () => {
+    it('Make a deposit of tokens that should adds payout to the recipient', async () => {
         zksyncContract.connect(wallet);
         const depositAmount = parseEther('1.0');
         await tokenContract.approve(zksyncContract.address, depositAmount);
