@@ -1,6 +1,7 @@
 use web3::contract::tokens::{Detokenize, Tokenize};
-use web3::contract::Options;
-use web3::types::{Address, BlockId, Filter, Log, U64};
+use web3::contract::{Contract, Options};
+use web3::transports::Http;
+use web3::types::{Address, BlockId, Filter, Log, Transaction, U64};
 
 use std::fmt::Debug;
 use zksync_config::ZkSyncConfig;
@@ -248,6 +249,18 @@ impl EthereumGateway {
             EthereumGateway::Direct(c) => c.encode_tx_data(func, params),
             EthereumGateway::Mock(c) => c.encode_tx_data(func, params),
         }
+    }
+
+    pub fn create_contract(&self, address: Address, contract: ethabi::Contract) -> Contract<Http> {
+        match self {
+            EthereumGateway::Multiplexed(c) => c.create_contract(address, contract),
+            EthereumGateway::Direct(c) => c.create_contract(address, contract),
+            EthereumGateway::Mock(c) => c.create_contract(address, contract),
+        }
+    }
+
+    pub async fn get_tx(&self, hash: H256) -> anyhow::Result<Option<Transaction>> {
+        delegate_call!(self.get_tx(hash))
     }
 
     pub fn get_mut_mock(&mut self) -> Option<&mut MockEthereum> {
