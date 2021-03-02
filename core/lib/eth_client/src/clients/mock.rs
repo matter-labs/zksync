@@ -6,7 +6,8 @@ use std::collections::{HashMap, HashSet};
 use tokio::sync::RwLock;
 use web3::contract::tokens::{Detokenize, Tokenize};
 use web3::contract::Options;
-use web3::types::{BlockId, Filter, Log, U64};
+use web3::transports::Http;
+use web3::types::{BlockId, Filter, Log, Transaction, U64};
 
 use zksync_types::{TransactionReceipt, H160, H256, U256};
 
@@ -231,5 +232,17 @@ impl MockEthereum {
         P: Tokenize,
     {
         todo!()
+    }
+
+    pub fn create_contract(
+        &self,
+        _address: Address,
+        _contract: ethabi::Contract,
+    ) -> web3::contract::Contract<Http> {
+        unreachable!()
+    }
+
+    pub async fn get_tx(&self, _hash: H256) -> Result<Option<Transaction>, anyhow::Error> {
+        unreachable!()
     }
 }

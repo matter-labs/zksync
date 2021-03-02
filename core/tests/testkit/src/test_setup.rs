@@ -292,7 +292,7 @@ impl TestSetup {
 
         for r in &receipts {
             let current_fee =
-                get_executed_tx_fee(self.commit_account.main_contract_eth_client.web3.eth(), &r)
+                get_executed_tx_fee(&self.commit_account.main_contract_eth_client, &r)
                     .await
                     .expect("Failed to get transaction fee");
 
@@ -377,7 +377,7 @@ impl TestSetup {
 
         for r in &receipts {
             let current_fee =
-                get_executed_tx_fee(self.commit_account.main_contract_eth_client.web3.eth(), &r)
+                get_executed_tx_fee(&self.commit_account.main_contract_eth_client, &r)
                     .await
                     .expect("Failed to get transaction fee");
 
@@ -480,12 +480,9 @@ impl TestSetup {
             .full_exit(post_by, token_address, account_id)
             .await;
 
-        let gas_fee = get_executed_tx_fee(
-            self.commit_account.main_contract_eth_client.web3.eth(),
-            &receipt,
-        )
-        .await
-        .expect("Failed to get transaction fee");
+        let gas_fee = get_executed_tx_fee(&self.commit_account.main_contract_eth_client, &receipt)
+            .await
+            .expect("Failed to get transaction fee");
 
         transfers.push(AccountTransfer::EthAccountTransfer(EthAccountTransfer {
             account_id: post_by,
