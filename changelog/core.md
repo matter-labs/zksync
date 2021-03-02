@@ -9,6 +9,7 @@ All notable changes to the core components will be documented in this file.
 ### Changed
 
 - (`loadtest`): `zksync_fee` has been moved to `[main_wallet]` section from the `[network]` section.
+- A special balancer for FeeTicker was replaced with a generic balancer.
 - (`eth_client`): `web3` field was made private in `ETHDirectClient`. `testkit` and `loadtest` don't use it directly
   now.
 - (`api_server`): Make `submit_txs_batch` send only one signature request.
