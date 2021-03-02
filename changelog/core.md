@@ -11,6 +11,7 @@ All notable changes to the core components will be documented in this file.
 - (`loadtest`): `zksync_fee` has been moved to `[main_wallet]` section from the `[network]` section.
 - (`eth_client`): `web3` field was made private in `ETHDirectClient`. `testkit` and `loadtest` don't use it directly
   now.
+- (`api_server`): Make `submit_txs_batch` send only one signature request.
 
 ### Added
 
