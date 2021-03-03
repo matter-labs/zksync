@@ -147,7 +147,7 @@ pub async fn wait_for_change_pub_key_tx(
                         .fail_reason
                         .unwrap_or_else(|| String::from("unknown"));
                     panic!(
-                        "Failed to set public for forced exit sedner. Reason: {}",
+                        "Failed to set public key for forced exit sedner. Reason: {}",
                         fail_reason
                     );
                 }
@@ -190,7 +190,7 @@ pub async fn register_signing_key(
 
     let sender_account = ZkSyncAccount::new(
         sender_sk,
-        // The accout is changing public key for hte first time, so nonce is 0
+        // The account is changing public key for the first time, so nonce is 0
         Nonce(0),
         sender_address,
         eth_account_data,
