@@ -5838,6 +5838,7 @@ dependencies = [
  "itertools 0.9.0",
  "metrics",
  "num",
+ "pin-project-lite 0.2.4",
  "serde",
  "serde_json",
  "thiserror",

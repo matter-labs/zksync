@@ -5,6 +5,7 @@ use crate::{
     block_proposer::run_block_proposer_task,
     committer::run_committer,
     eth_watch::start_eth_watch,
+    gateway_watcher::run_gateway_watcher,
     mempool::run_mempool_tasks,
     private_api::start_private_core_api,
     rejected_tx_cleaner::run_rejected_tx_cleaner,
@@ -21,10 +22,31 @@ pub mod balancer;
 pub mod block_proposer;
 pub mod committer;
 pub mod eth_watch;
+pub mod gateway_watcher;
 pub mod mempool;
 pub mod private_api;
 pub mod rejected_tx_cleaner;
 pub mod state_keeper;
+
+#[macro_export]
+macro_rules! retry_opt_fut {
+    ($fut: expr, $err: expr, $delay: expr) => {
+        async {
+            loop {
+                if let Some(val) = $fut.await {
+                    break val;
+                } else {
+                    $err;
+                    time::delay_for($delay.into()).await;
+                }
+            }
+        }
+    };
+
+    ($fut: expr, $err: expr, $delay: expr, $timeout: expr) => {
+        tokio::time::timeout($timeout, retry_opt_fut!($fut, $err, $delay))
+    };
+}
 
 /// Waits for *any* of the tokio tasks to be finished.
 /// Since the main tokio tasks are used as actors which should live as long
@@ -153,6 +175,8 @@ pub async fn run_core(
         DEFAULT_CHANNEL_CAPACITY,
     );
 
+    let gateway_watcher_task = run_gateway_watcher(&config);
+
     // Start rejected transactions cleaner task.
     let rejected_tx_cleaner_task = run_rejected_tx_cleaner(&config, connection_pool.clone());
 
@@ -177,6 +201,7 @@ pub async fn run_core(
         committer_task,
         mempool_task,
         proposer_task,
+        gateway_watcher_task,
         rejected_tx_cleaner_task,
     ];
 
