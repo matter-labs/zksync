@@ -182,4 +182,10 @@ impl MultiplexerEthereumClient {
         let (_, client) = self.clients.first().expect("Should be exactly one client");
         client.encode_tx_data(func, params)
     }
+
+    pub fn clients(&self) -> impl Iterator<Item = (&str, &ETHDirectClient<PrivateKeySigner>)> {
+        self.clients
+            .iter()
+            .map(|(name, client)| (name.as_str(), client))
+    }
 }

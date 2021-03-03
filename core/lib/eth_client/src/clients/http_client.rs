@@ -102,6 +102,16 @@ impl<S: EthereumSigner> ETHDirectClient<S> {
         Ok(nonce)
     }
 
+    pub async fn block(
+        &self,
+        id: BlockId,
+    ) -> Result<Option<web3::types::Block<H256>>, anyhow::Error> {
+        let start = Instant::now();
+        let block = self.web3.eth().block(id).await?;
+        metrics::histogram!("eth_client.direct.block", start.elapsed());
+        Ok(block)
+    }
+
     pub async fn block_number(&self) -> Result<U64, anyhow::Error> {
         let start = Instant::now();
         let block_number = self.web3.eth().block_number().await?;
