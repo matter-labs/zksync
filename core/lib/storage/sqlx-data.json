@@ -3694,18 +3694,6 @@
       ]
     }
   },
-  "c8a71d5d2634e3e094e2df4f54d17d02a0b82fe04ef476d33e31d7523f2bef2b": {
-    "query": "\n            INSERT INTO mempool_txs (tx_hash, tx, created_at, eth_sign_data)\n            SELECT tx_hash, tx, created_at, eth_sign_data FROM executed_transactions\n            WHERE block_number > $1\n        ",
-    "describe": {
-      "columns": [],
-      "parameters": {
-        "Left": [
-          "Int8"
-        ]
-      },
-      "nullable": []
-    }
-  },
   "cb492484bab6e66f89a4d80649d3559566a681db153152a52449acf931a1d039": {
     "query": "SELECT * FROM block_witness WHERE block = $1",
     "describe": {
@@ -4272,6 +4260,18 @@
       "columns": [],
       "parameters": {
         "Left": []
+      },
+      "nullable": []
+    }
+  },
+  "f02021c46f5edc171f22c16e29bb028353eb0519aec1555c066fdd8dfe1d61e5": {
+    "query": "\n            INSERT INTO mempool_txs (tx_hash, tx, created_at, eth_sign_data, batch_id)\n            SELECT tx_hash, tx, created_at, eth_sign_data, COALESCE(batch_id, 0) FROM executed_transactions\n            WHERE block_number > $1\n        ",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "Int8"
+        ]
       },
       "nullable": []
     }
