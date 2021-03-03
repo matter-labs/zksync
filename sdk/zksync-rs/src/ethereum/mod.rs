@@ -89,7 +89,7 @@ impl<S: EthereumSigner> EthereumProvider<S> {
             eth_client,
             erc20_abi,
             tokens_cache,
-            confirmation_timeout: Duration::from_secs(10),
+            confirmation_timeout: Duration::from_secs(30),
         })
     }
 
@@ -345,14 +345,14 @@ impl<S: EthereumSigner> EthereumProvider<S> {
     }
 
     /// Sets the timeout to wait for transactions to appear in the Ethereum network.
-    /// By default it is set to 10 seconds.
+    /// By default it is set to 30 seconds.
     pub fn set_confirmation_timeout(&mut self, timeout: Duration) {
         self.confirmation_timeout = timeout;
     }
 
     /// Waits until the transaction is confirmed by the Ethereum blockchain.
     pub async fn wait_for_tx(&self, tx_hash: H256) -> Result<TransactionReceipt, ClientError> {
-        let mut poller = tokio::time::interval(Duration::from_millis(100));
+        let mut poller = tokio::time::interval(Duration::from_millis(1000));
 
         let start = Instant::now();
         loop {
