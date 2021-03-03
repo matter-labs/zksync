@@ -29,81 +29,12 @@ async fn send_raw_tx_and_wait_confirmation(
     }
 }
 
-async fn revert_blocks_on_contract(
+async fn revert_blocks_in_storage(
     client: &EthereumGateway,
-    blocks: &[Block],
-) -> anyhow::Result<()> {
-    let tx_arg = Token::Array(blocks.iter().map(stored_block_info).collect());
-    let data = client.encode_tx_data("revertBlocks", tx_arg);
-    let signed_tx = client
-        .sign_prepared_tx(
-            data,
-            Options::with(|f| f.gas = Some(U256::from(9 * 10u64.pow(6)))),
-        )
-        .await
-        .map_err(|e| format_err!("Revert blocks send err: {}", e))?;
-    let receipt = send_raw_tx_and_wait_confirmation(&client, signed_tx.raw_tx).await?;
-    ensure!(receipt.status == Some(U64::from(1)), "Tx failed");
-
-    Ok(())
-}
-
-async fn get_blocks(
-    last_commited_block: BlockNumber,
-    blocks_to_revert: u32,
     storage: &mut StorageProcessor<'_>,
-) -> Result<Vec<Block>, anyhow::Error> {
-    let mut blocks = Vec::new();
-    let last_block_to_revert = *last_commited_block - blocks_to_revert + 1;
-    let range_to_revert = last_block_to_revert..=*last_commited_block;
-    for block_number in range_to_revert.rev() {
-        let block = storage
-            .chain()
-            .block_schema()
-            .get_block(BlockNumber(block_number))
-            .await?
-            .unwrap();
-        blocks.push(block);
-    }
-    Ok(blocks)
-}
-
-#[derive(Debug, StructOpt)]
-struct Opt {
-    #[structopt(long)]
-    number: u32,
-}
-
-#[tokio::main]
-async fn main() -> anyhow::Result<()> {
-    let opt = Opt::from_args();
-    let blocks_to_revert = opt.number;
-
-    let mut storage = StorageProcessor::establish_connection().await?;
-    let config = ZkSyncConfig::from_env();
-    let client = EthereumGateway::from_config(&config);
-
-    let last_commited_block = storage
-        .chain()
-        .block_schema()
-        .get_last_committed_block()
-        .await?;
-    let last_verified_block = storage
-        .chain()
-        .block_schema()
-        .get_last_verified_confirmed_block()
-        .await?;
-
-    ensure!(
-        last_verified_block + blocks_to_revert <= last_commited_block,
-        "Some blocks to revert are already verified"
-    );
-
-    let blocks = get_blocks(last_commited_block, blocks_to_revert, &mut storage).await?;
-    revert_blocks_on_contract(&client, &blocks).await?;
-
+    last_block: BlockNumber,
+) -> anyhow::Result<()> {
     let mut transaction = storage.start_transaction().await?;
-    let last_block = BlockNumber(*last_commited_block - blocks_to_revert);
 
     transaction
         .chain()
@@ -178,5 +109,85 @@ async fn main() -> anyhow::Result<()> {
         .await?;
 
     transaction.commit().await?;
+
+    Ok(())
+}
+
+async fn revert_blocks_on_contract(
+    client: &EthereumGateway,
+    blocks: &[Block],
+) -> anyhow::Result<()> {
+    let tx_arg = Token::Array(blocks.iter().map(stored_block_info).collect());
+    let data = client.encode_tx_data("revertBlocks", tx_arg);
+    let signed_tx = client
+        .sign_prepared_tx(
+            data,
+            Options::with(|f| f.gas = Some(U256::from(9 * 10u64.pow(6)))),
+        )
+        .await
+        .map_err(|e| format_err!("Revert blocks send err: {}", e))?;
+    let receipt = send_raw_tx_and_wait_confirmation(&client, signed_tx.raw_tx).await?;
+    ensure!(receipt.status == Some(U64::from(1)), "Tx failed");
+
+    Ok(())
+}
+
+async fn get_blocks(
+    last_commited_block: BlockNumber,
+    blocks_to_revert: u32,
+    storage: &mut StorageProcessor<'_>,
+) -> Result<Vec<Block>, anyhow::Error> {
+    let mut blocks = Vec::new();
+    let last_block_to_revert = *last_commited_block - blocks_to_revert + 1;
+    let range_to_revert = last_block_to_revert..=*last_commited_block;
+    for block_number in range_to_revert.rev() {
+        let block = storage
+            .chain()
+            .block_schema()
+            .get_block(BlockNumber(block_number))
+            .await?
+            .unwrap();
+        blocks.push(block);
+    }
+    Ok(blocks)
+}
+
+#[derive(Debug, StructOpt)]
+struct Opt {
+    #[structopt(long)]
+    number: u32,
+}
+
+#[tokio::main]
+async fn main() -> anyhow::Result<()> {
+    let opt = Opt::from_args();
+    let blocks_to_revert = opt.number;
+
+    let mut storage = StorageProcessor::establish_connection().await?;
+    let config = ZkSyncConfig::from_env();
+    let client = EthereumGateway::from_config(&config);
+
+    let last_commited_block = storage
+        .chain()
+        .block_schema()
+        .get_last_committed_block()
+        .await?;
+    let last_verified_block = storage
+        .chain()
+        .block_schema()
+        .get_last_verified_confirmed_block()
+        .await?;
+
+    ensure!(
+        last_verified_block + blocks_to_revert <= last_commited_block,
+        "Some blocks to revert are already verified"
+    );
+
+    let blocks = get_blocks(last_commited_block, blocks_to_revert, &mut storage).await?;
+    revert_blocks_on_contract(&client, &blocks).await?;
+
+    let last_block = BlockNumber(*last_commited_block - blocks_to_revert);
+    revert_blocks_in_storage(&client, &mut storage, last_block).await?;
+
     Ok(())
 }

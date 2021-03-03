@@ -384,8 +384,8 @@ impl<'a, 'c> MempoolSchema<'a, 'c> {
         let mut transaction = self.0.start_transaction().await?;
         sqlx::query!(
             r#"
-            INSERT INTO mempool_txs (tx_hash, tx, created_at, eth_sign_data, batch_id)
-            SELECT tx_hash, tx, created_at, eth_sign_data, batch_id FROM executed_transactions
+            INSERT INTO mempool_txs (tx_hash, tx, created_at, eth_sign_data)
+            SELECT tx_hash, tx, created_at, eth_sign_data FROM executed_transactions
             WHERE block_number > $1
         "#,
             *last_block as i64

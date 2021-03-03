@@ -616,18 +616,6 @@
       "nullable": []
     }
   },
-  "194322a2270eb8e002f0563c412fb71d925ad45375d4bb2c71af908e07357114": {
-    "query": "\n            INSERT INTO mempool_txs (tx_hash, tx, created_at, eth_sign_data, batch_id)\n            SELECT tx_hash, tx, created_at, eth_sign_data, batch_id FROM executed_transactions\n            WHERE block_number > $1\n        ",
-    "describe": {
-      "columns": [],
-      "parameters": {
-        "Left": [
-          "Int8"
-        ]
-      },
-      "nullable": []
-    }
-  },
   "19b2670f1ac5f960611e9ed59ec49ee1395d0a0193f317276cdaa675023945af": {
     "query": "UPDATE eth_parameters SET last_verified_block = $1 WHERE id = true AND last_verified_block > $1",
     "describe": {
@@ -3704,6 +3692,18 @@
         true,
         true
       ]
+    }
+  },
+  "c8a71d5d2634e3e094e2df4f54d17d02a0b82fe04ef476d33e31d7523f2bef2b": {
+    "query": "\n            INSERT INTO mempool_txs (tx_hash, tx, created_at, eth_sign_data)\n            SELECT tx_hash, tx, created_at, eth_sign_data FROM executed_transactions\n            WHERE block_number > $1\n        ",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "Int8"
+        ]
+      },
+      "nullable": []
     }
   },
   "cb492484bab6e66f89a4d80649d3559566a681db153152a52449acf931a1d039": {

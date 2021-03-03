@@ -548,15 +548,15 @@ impl<'a, 'c> OperationsSchema<'a, 'c> {
         )
         .execute(transaction.conn())
         .await?;
-        sqlx::query!("DELETE FROM eth_operations WHERE id = ANY($1)", &eth_op_ids)
-            .execute(transaction.conn())
-            .await?;
         sqlx::query!(
             "DELETE FROM eth_aggregated_ops_binding WHERE op_id = ANY($1)",
             &op_ids
         )
         .execute(transaction.conn())
         .await?;
+        sqlx::query!("DELETE FROM eth_operations WHERE id = ANY($1)", &eth_op_ids)
+            .execute(transaction.conn())
+            .await?;
         sqlx::query!(
             "DELETE FROM aggregate_operations WHERE from_block > $1",
             *last_block as i64
