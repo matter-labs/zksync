@@ -56,7 +56,7 @@ impl<R> Balancer<R> {
 
 #[cfg(test)]
 mod tests {
-    use crate::balancer::{Balancer, BuildBalancedItem};
+    use crate::{Balancer, BuildBalancedItem};
     use futures::channel::mpsc;
     use futures::channel::mpsc::Receiver;
     use futures::{SinkExt, StreamExt};
