@@ -10,13 +10,13 @@ use zksync_config::ZkSyncConfig;
 use zksync_eth_client::EthereumGateway;
 
 macro_rules! retry_fut {
-    ($fut: expr, $err_expr: expr, $delay_ms: expr) => {
+    ($fut: expr, $err: expr, $delay_ms: expr) => {
         async {
             loop {
                 if let Ok(val) = $fut.await {
                     break val;
                 } else {
-                    $err_expr;
+                    $err;
                     time::delay_for(Duration::from_millis($delay_ms)).await;
                 }
             }
@@ -44,26 +44,26 @@ async fn eth_web3_gateway_watcher(client: &MultiplexerEthereumClient) {
         }
     }
 
-    let clients_latest_block = stream::iter(client.clients())
+    let client_latest_blocks = stream::iter(client.clients())
         .map(get_latest_block)
         .buffer_unordered(10)
         .filter_map(ready)
         .collect::<Vec<_>>()
         .await;
 
-    if let Some((latest_parent_hash, latest_hash, latest_num)) = clients_latest_block
+    if let Some((latest_parent_hash, latest_hash, latest_num)) = client_latest_blocks
         .iter()
         .map(|(_, block)| block)
         .max_by(|block1, block2| block1.number.cmp(&block2.number))
-        .map(|last_block| {
+        .map(|latest_block| {
             (
-                last_block.parent_hash,
-                last_block.hash.expect("Invalid block"),
-                last_block.number.expect("Invalid block"),
+                latest_block.parent_hash,
+                latest_block.hash.expect("Invalid block"),
+                latest_block.number.expect("Invalid block"),
             )
         })
     {
-        for (key, block) in &clients_latest_block {
+        for (key, block) in &client_latest_blocks {
             let (hash, num) = (
                 block.hash.expect("Invalid block"),
                 block.number.expect("Invalid block"),
