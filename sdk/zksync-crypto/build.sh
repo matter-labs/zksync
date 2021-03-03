@@ -2,10 +2,19 @@
 
 set -e
 
+ASM=dist/zksync-crypto-bundler_bg_asm.js
+
 which wasm-pack || cargo install wasm-pack
 
 # pack for bundler (!note this verion is used in the pkg.browser field)
 wasm-pack build --release --target=bundler --out-name=zksync-crypto-bundler --out-dir=dist
+
+# convert the bundler build into JS in case the environment doesn't support WebAssembly
+wasm2js ./dist/zksync-crypto-bundler_bg.wasm -o $ASM
+
+# fix the import
+sed -i "s/^import.*/\
+let wasm = require('.\/zksync-crypto-bundler_bg_asm.js');/" ./dist/zksync-crypto-bundler.js
 
 # pack for browser
 wasm-pack build --release --target=web --out-name=zksync-crypto-web --out-dir=dist

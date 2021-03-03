@@ -184,6 +184,14 @@ brew install solidity@5
 
 drone cli used to create promotion jobs [described here](docs/promote.md) <https://docs.drone.io/cli/install/>
 
+## `binaryen`
+
+Provides `wasm2js` utility which is required to build the `zksync-crypto`.
+
+```sh
+sudo apt-get install binaryen
+```
+
 ## Environment
 
 Edit the lines below and add them to your shell profile file (e.g. `~/.bash_profile`):

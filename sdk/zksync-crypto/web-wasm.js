@@ -3,6 +3,8 @@ const fs = require('fs');
 const wasmFile = './dist/zksync-crypto-web_bg.wasm';
 const jsFile = './dist/zksync-crypto-web.js';
 
+const bundlerJsFile = './zksync-crypto-bundler.js';
+
 const wasmData = fs.readFileSync(wasmFile);
 
 // Strings that are inserted automatically by wasm-pack, but
@@ -47,6 +49,10 @@ const wasmResponseInit = {
 };
 
 export async function loadZkSyncCrypto(wasmFileUrl) {
+  if (!global.WebAssembly) {
+    // Use the bundler build.
+    return require(\'${bundlerJsFile}\');
+  }
   if (!wasmFileUrl) {
     const wasmResponse = new Response(wasmBytes, wasmResponseInit);
     await init(wasmResponse);
