@@ -7,6 +7,7 @@ All notable changes to `zksync.js` will be documented in this file.
 ### Added
 
 - Method for calculation of transaction hash.
+- Support for environments without WebAssembly.
 
 ### Changed
 

@@ -2,7 +2,8 @@ use ethabi::Contract;
 use web3::{
     contract::tokens::{Detokenize, Tokenize},
     contract::Options,
-    types::{Address, BlockId, Filter, Log, U64},
+    transports::Http,
+    types::{Address, BlockId, Filter, Log, Transaction, U64},
 };
 
 use std::convert::identity;
@@ -59,6 +60,15 @@ impl MultiplexerEthereumClient {
         } else {
             false
         }
+    }
+
+    pub fn create_contract(
+        &self,
+        address: Address,
+        contract: ethabi::Contract,
+    ) -> web3::contract::Contract<Http> {
+        let client = self.clients.first().expect("Should be at least one client");
+        client.1.create_contract(address, contract)
     }
 
     pub async fn pending_nonce(&self) -> Result<U256, anyhow::Error> {
@@ -186,7 +196,7 @@ impl MultiplexerEthereumClient {
     }
 
     pub fn encode_tx_data<P: Tokenize + Clone>(&self, func: &str, params: P) -> Vec<u8> {
-        let (_, client) = self.clients.first().expect("Should be exactly one client");
+        let (_, client) = self.clients.first().expect("Should be at least one client");
         client.encode_tx_data(func, params)
     }
 
@@ -194,5 +204,9 @@ impl MultiplexerEthereumClient {
         self.clients
             .iter()
             .map(|(name, client)| (name.as_str(), client))
+    }
+
+    pub async fn get_tx(&self, hash: H256) -> Result<Option<Transaction>, anyhow::Error> {
+        multiple_call!(self, get_tx(hash));
     }
 }

@@ -7,6 +7,7 @@
 use std::collections::{HashMap, HashSet};
 use std::convert::TryFrom;
 use std::iter::FromIterator;
+use std::sync::Arc;
 // External deps
 use bigdecimal::BigDecimal;
 use futures::{
@@ -19,10 +20,12 @@ use num::{
     BigUint, Zero,
 };
 use serde::{Deserialize, Serialize};
+use tokio::sync::Mutex;
 use tokio::task::JoinHandle;
 use tokio::time::Instant;
 
 // Workspace deps
+use zksync_balancer::{Balancer, BuildBalancedItem};
 use zksync_config::{configs::ticker::TokenPriceSource, ZkSyncConfig};
 use zksync_storage::ConnectionPool;
 use zksync_types::{
@@ -32,7 +35,6 @@ use zksync_types::{
 use zksync_utils::ratio_to_big_decimal;
 
 // Local deps
-use crate::fee_ticker::balancer::TickerBalancer;
 use crate::fee_ticker::ticker_info::{FeeTickerInfo, TickerInfo};
 use crate::fee_ticker::validator::MarketUpdater;
 use crate::fee_ticker::{
@@ -52,9 +54,10 @@ mod ticker_api;
 mod ticker_info;
 pub mod validator;
 
-mod balancer;
 #[cfg(test)]
 mod tests;
+
+static TICKER_CHANNEL_SIZE: usize = 32000;
 
 /// Contains cost of zkSync operations in Wei.
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -227,6 +230,31 @@ struct FeeTicker<API, INFO, WATCHER> {
     validator: FeeTokenValidator<WATCHER>,
 }
 
+struct FeeTickerBuilder<API, INFO, WATCHER> {
+    api: API,
+    info: INFO,
+    config: TickerConfig,
+    validator: FeeTokenValidator<WATCHER>,
+}
+
+impl<API: Clone, INFO: Clone, WATCHER: Clone>
+    BuildBalancedItem<TickerRequest, FeeTicker<API, INFO, WATCHER>>
+    for FeeTickerBuilder<API, INFO, WATCHER>
+{
+    fn build_with_receiver(
+        &self,
+        receiver: Receiver<TickerRequest>,
+    ) -> FeeTicker<API, INFO, WATCHER> {
+        FeeTicker {
+            api: self.api.clone(),
+            info: self.info.clone(),
+            requests: receiver,
+            config: self.config.clone(),
+            validator: self.validator.clone(),
+        }
+    }
+}
+
 #[must_use]
 pub fn run_ticker_task(
     db_pool: ConnectionPool,
@@ -282,16 +310,28 @@ pub fn run_ticker_task(
                     .expect("failed to init CoinGecko client");
             let ticker_info = TickerInfo::new(db_pool.clone());
 
-            let mut ticker_balancer = TickerBalancer::new(
-                token_price_api,
-                ticker_info,
-                ticker_config,
-                validator,
+            let token_db_cache = TokenDBCache::new();
+            let price_cache = Arc::new(Mutex::new(HashMap::new()));
+            let gas_price_cache = Arc::new(Mutex::new(None));
+            let ticker_api = TickerApi::new(db_pool, token_price_api)
+                .with_token_db_cache(token_db_cache)
+                .with_price_cache(price_cache)
+                .with_gas_price_cache(gas_price_cache);
+
+            let (ticker_balancer, tickers) = Balancer::new(
+                FeeTickerBuilder {
+                    api: ticker_api,
+                    info: ticker_info,
+                    config: ticker_config,
+                    validator,
+                },
                 tricker_requests,
-                db_pool,
                 config.ticker.number_of_ticker_actors,
+                TICKER_CHANNEL_SIZE,
             );
-            ticker_balancer.spawn_tickers();
+            for ticker in tickers.into_iter() {
+                tokio::spawn(ticker.run());
+            }
             tokio::spawn(ticker_balancer.run())
         }
     }

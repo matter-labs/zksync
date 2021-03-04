@@ -72,7 +72,7 @@ impl TokenCacheEntry {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub(super) struct TickerApi<T: TokenPriceAPI> {
     db_pool: ConnectionPool,
 
