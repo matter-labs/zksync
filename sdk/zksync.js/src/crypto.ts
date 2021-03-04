@@ -48,17 +48,18 @@ export async function loadZkSyncCrypto(wasmFileUrl?: string) {
         return;
     }
     // Only runs in the browser
-    if ((zks as any).loadZkSyncCrypto) {
-        if (!global.WebAssembly) {
+    const _zks = zks as any;
+    if (_zks.loadZkSyncCrypto) {
+        if (!_zks.wasmSupported()) {
             // Load the asm.js build which will be used instead.
             // wasmFileUrl will be ignored.
-            asmJs = await (zks as any).loadZkSyncCrypto(wasmFileUrl);
+            asmJs = await _zks.loadZkSyncCrypto(wasmFileUrl);
         } else {
             // It is ok if wasmFileUrl is not specified.
             // Actually, typically it should not be specified,
             // since the content of the `.wasm` file is read
             // from the `.js` file itself.
-            await (zks as any).loadZkSyncCrypto(wasmFileUrl);
+            await _zks.loadZkSyncCrypto(wasmFileUrl);
         }
         zksyncCryptoLoaded = true;
     }

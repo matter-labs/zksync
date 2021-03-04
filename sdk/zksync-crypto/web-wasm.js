@@ -48,8 +48,18 @@ const wasmResponseInit = {
   }
 };
 
+export function wasmSupported() {
+  try {
+    if (typeof WebAssembly === 'object') {
+      return true;
+    }
+  } catch (e) {
+  }
+  return false;
+}
+
 export async function loadZkSyncCrypto(wasmFileUrl) {
-  if (!global.WebAssembly) {
+  if (!wasmSupported()) {
     // Use the bundler build.
     return require(\'${asmJsFile}\');
   }
