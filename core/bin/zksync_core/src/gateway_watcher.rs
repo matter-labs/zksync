@@ -66,18 +66,18 @@ impl GatewayWatcher<EthereumGateway> {
             ($block: expr, $opt: ident) => {
                 $block
                     .$opt
-                    .ok_or_else(|| BlockVerificationError::InvalidBlock(Box::new($block.clone())))
+                    .ok_or_else(|| BlockVerificationError::InvalidBlock(Box::new($block.clone())))?
             };
         }
 
         let (lat_phash, lat_hash, lat_num) = (
             latest_block.parent_hash,
-            block_opt!(latest_block, hash)?,
-            block_opt!(latest_block, number)?,
+            block_opt!(latest_block, hash),
+            block_opt!(latest_block, number),
         );
         let (hash, num) = (
-            block_opt!(block_to_check, hash)?,
-            block_opt!(block_to_check, number)?,
+            block_opt!(block_to_check, hash),
+            block_opt!(block_to_check, number),
         );
 
         if lat_num == num {

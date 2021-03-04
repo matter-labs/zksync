@@ -50,7 +50,6 @@ impl MultiplexerEthereumClient {
 
     pub fn clients(&self) -> impl Iterator<Item = (&str, &ETHDirectClient<PrivateKeySigner>)> {
         let preferred = self.preferred.load(Ordering::Relaxed);
-
         self.clients
             .get(preferred)
             .into_iter()
