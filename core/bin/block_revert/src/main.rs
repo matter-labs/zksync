@@ -1,5 +1,6 @@
 use anyhow::{ensure, format_err};
 use ethabi::Token;
+use std::{thread, time};
 use structopt::StructOpt;
 use web3::{
     contract::Options,
@@ -10,32 +11,11 @@ use zksync_eth_client::EthereumGateway;
 use zksync_storage::StorageProcessor;
 use zksync_types::{aggregated_operations::stored_block_info, block::Block, BlockNumber, Nonce};
 
-async fn send_raw_tx_and_wait_confirmation(
-    client: &EthereumGateway,
-    raw_tx: Vec<u8>,
-) -> Result<TransactionReceipt, anyhow::Error> {
-    let tx_hash = client
-        .send_raw_tx(raw_tx)
-        .await
-        .map_err(|e| format_err!("Failed to send raw tx: {}", e))?;
-    loop {
-        if let Some(receipt) = client
-            .tx_receipt(tx_hash)
-            .await
-            .map_err(|e| format_err!("Failed to get receipt from eth node: {}", e))?
-        {
-            return Ok(receipt);
-        }
-    }
-}
-
 async fn revert_blocks_in_storage(
     client: &EthereumGateway,
-    storage: &mut StorageProcessor<'_>,
+    transaction: &mut StorageProcessor<'_>,
     last_block: BlockNumber,
 ) -> anyhow::Result<()> {
-    let mut transaction = storage.start_transaction().await?;
-
     transaction
         .chain()
         .block_schema()
@@ -108,26 +88,47 @@ async fn revert_blocks_in_storage(
         .return_executed_txs_to_mempool(last_block)
         .await?;
 
-    transaction.commit().await?;
-
     Ok(())
+}
+
+async fn send_raw_tx_and_wait_confirmation(
+    client: &EthereumGateway,
+    raw_tx: Vec<u8>,
+) -> Result<TransactionReceipt, anyhow::Error> {
+    let tx_hash = client
+        .send_raw_tx(raw_tx)
+        .await
+        .map_err(|e| format_err!("Failed to send raw tx: {}", e))?;
+
+    let sec = time::Duration::from_secs(1);
+    loop {
+        thread::sleep(sec);
+        if let Some(receipt) = client
+            .tx_receipt(tx_hash)
+            .await
+            .map_err(|e| format_err!("Failed to get receipt from eth node: {}", e))?
+        {
+            return Ok(receipt);
+        }
+    }
 }
 
 async fn revert_blocks_on_contract(
     client: &EthereumGateway,
     blocks: &[Block],
+    gas_limit: u32,
 ) -> anyhow::Result<()> {
     let tx_arg = Token::Array(blocks.iter().map(stored_block_info).collect());
     let data = client.encode_tx_data("revertBlocks", tx_arg);
     let signed_tx = client
-        .sign_prepared_tx(
-            data,
-            Options::with(|f| f.gas = Some(U256::from(9 * 10u64.pow(6)))),
-        )
+        .sign_prepared_tx(data, Options::with(|f| f.gas = Some(U256::from(gas_limit))))
         .await
         .map_err(|e| format_err!("Revert blocks send err: {}", e))?;
     let receipt = send_raw_tx_and_wait_confirmation(&client, signed_tx.raw_tx).await?;
-    ensure!(receipt.status == Some(U64::from(1)), "Tx failed");
+    ensure!(
+        receipt.status == Some(U64::from(1)),
+        "Tx to contract failed"
+    );
 
     Ok(())
 }
@@ -156,6 +157,7 @@ async fn get_blocks(
 struct Opt {
     #[structopt(long)]
     number: u32,
+    gas_limit: u32,
 }
 
 #[tokio::main]
@@ -184,10 +186,12 @@ async fn main() -> anyhow::Result<()> {
     );
 
     let blocks = get_blocks(last_commited_block, blocks_to_revert, &mut storage).await?;
-    revert_blocks_on_contract(&client, &blocks).await?;
-
     let last_block = BlockNumber(*last_commited_block - blocks_to_revert);
-    revert_blocks_in_storage(&client, &mut storage, last_block).await?;
+    let mut transaction = storage.start_transaction().await?;
 
+    revert_blocks_in_storage(&client, &mut transaction, last_block).await?;
+    revert_blocks_on_contract(&client, &blocks, opt.gas_limit).await?;
+
+    transaction.commit().await?;
     Ok(())
 }
