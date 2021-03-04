@@ -1,7 +1,7 @@
 use anyhow::{ensure, format_err};
 use ethabi::Token;
-use std::{thread, time};
 use structopt::StructOpt;
+use tokio::time::{sleep, Duration};
 use web3::{
     contract::Options,
     types::{TransactionReceipt, U256, U64},
@@ -100,9 +100,9 @@ async fn send_raw_tx_and_wait_confirmation(
         .await
         .map_err(|e| format_err!("Failed to send raw tx: {}", e))?;
 
-    let sec = time::Duration::from_secs(1);
+    let sec = Duration::from_secs(1);
     loop {
-        thread::sleep(sec);
+        sleep(sec).await;
         if let Some(receipt) = client
             .tx_receipt(tx_hash)
             .await
