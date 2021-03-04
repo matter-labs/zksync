@@ -24,9 +24,9 @@ pub struct GatewayWatcher<T> {
 #[derive(Error, Debug, PartialEq)]
 enum BlockVerificationError {
     #[error("Hash verification failed: {0:?} != {1:?}")]
-    InvalidHash(H256, H256),
+    IncorrectHash(H256, H256),
     #[error("Difference between block numbers is greater than 1: {0:?} > {1:?}")]
-    InvalidNumDiff(U64, U64),
+    LargeNumDiff(U64, U64),
     #[error("Invalid block: {0:?}")]
     InvalidBlock(Block<H256>),
 }
@@ -82,14 +82,14 @@ impl GatewayWatcher<EthereumGateway> {
 
         if lat_num == num {
             if lat_hash != hash {
-                Err(BlockVerificationError::InvalidHash(lat_hash, hash))
+                Err(BlockVerificationError::IncorrectHash(lat_hash, hash))
             } else {
                 Ok(())
             }
         } else if lat_num - num > U64::from(1u64) {
-            Err(BlockVerificationError::InvalidNumDiff(lat_num, num))
+            Err(BlockVerificationError::LargeNumDiff(lat_num, num))
         } else if lat_phash != hash {
-            Err(BlockVerificationError::InvalidHash(lat_phash, hash))
+            Err(BlockVerificationError::IncorrectHash(lat_phash, hash))
         } else {
             Ok(())
         }
@@ -191,7 +191,7 @@ mod tests {
         b2.hash = Some(h2);
         assert_eq!(
             GatewayWatcher::verify_blocks(&b1, &b2),
-            Err(BlockVerificationError::InvalidHash(h1, h2))
+            Err(BlockVerificationError::IncorrectHash(h1, h2))
         );
     }
 
@@ -212,7 +212,7 @@ mod tests {
         b2.hash = Some(h1);
         assert_eq!(
             GatewayWatcher::verify_blocks(&b1, &b2),
-            Err(BlockVerificationError::InvalidHash(h2, h1))
+            Err(BlockVerificationError::IncorrectHash(h2, h1))
         );
     }
 
@@ -230,7 +230,7 @@ mod tests {
         b2.number = Some(U64::from(0u64));
         assert_eq!(
             GatewayWatcher::verify_blocks(&b1, &b2),
-            Err(BlockVerificationError::InvalidNumDiff(
+            Err(BlockVerificationError::LargeNumDiff(
                 U64::from(2u64),
                 U64::from(0u64)
             ))
