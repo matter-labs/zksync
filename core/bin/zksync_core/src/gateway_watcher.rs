@@ -23,9 +23,9 @@ pub struct GatewayWatcher<T> {
 
 #[derive(Error, Debug, PartialEq)]
 enum BlockVerificationError {
-    #[error("Hash verification failed: {0} != {1}")]
+    #[error("Hash verification failed: {0:?} != {1:?}")]
     InvalidHash(H256, H256),
-    #[error("Difference between block numbers is greater than 1: {0} > {1}")]
+    #[error("Difference between block numbers is greater than 1: {0:?} > {1:?}")]
     InvalidNumDiff(U64, U64),
     #[error("Invalid block: {0:?}")]
     InvalidBlock(Block<H256>),
@@ -151,7 +151,7 @@ impl GatewayWatcher<EthereumGateway> {
             client.prioritize_client(preferred_key);
             for (key, block) in &client_latest_blocks {
                 if let Err(err) = Self::verify_blocks(latest_block, block) {
-                    vlog::error!("Ethereum Gateway `{}` - check failed: {:?}", key, err);
+                    vlog::error!("Ethereum Gateway `{}` - check failed: {}", key, err);
                 }
             }
         }

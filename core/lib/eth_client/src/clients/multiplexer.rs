@@ -22,7 +22,17 @@ pub struct MultiplexerEthereumClient {
 macro_rules! multiple_call {
     ($self:expr, $func:ident($($attr:expr),*)) => {
         let preferred = $self.preferred.load(Ordering::Relaxed);
-        for (name, client) in iter::once($self.clients.get(preferred)).chain($self.clients.iter().enumerate().filter(|v| v.0 != preferred).map(|v| Some(v.1))).filter_map(identity) {
+        for (name, client) in
+            iter::once($self.clients.get(preferred))
+                .chain(
+                    $self
+                        .clients
+                        .iter()
+                        .enumerate()
+                        .filter(|v| v.0 != preferred)
+                        .map(|v| Some(v.1))
+                )
+                .filter_map(identity) {
             match client.$func($($attr.clone()),*).await {
                 Ok(res) => return Ok(res),
                 Err(err) => vlog::error!("Error in interface: {}, {} ", name, err),
