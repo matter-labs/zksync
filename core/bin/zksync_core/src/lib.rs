@@ -14,6 +14,7 @@ use crate::{
 use futures::{channel::mpsc, future};
 use tokio::task::JoinHandle;
 use zksync_config::ZkSyncConfig;
+use zksync_eth_client::EthereumGateway;
 use zksync_storage::ConnectionPool;
 
 const DEFAULT_CHANNEL_CAPACITY: usize = 32_768;
@@ -114,6 +115,7 @@ pub async fn genesis_init(config: &ZkSyncConfig) {
 /// - committer, module to store pending and completed blocks into the database.
 /// - private Core API server.
 pub async fn run_core(
+    eth_gateway: EthereumGateway,
     connection_pool: ConnectionPool,
     panic_notify: mpsc::Sender<bool>,
     config: &ZkSyncConfig,
@@ -130,9 +132,10 @@ pub async fn run_core(
 
     // Start Ethereum Watcher.
     let eth_watch_task = start_eth_watch(
-        &config,
         eth_watch_req_sender.clone(),
         eth_watch_req_receiver,
+        eth_gateway.clone(),
+        &config,
     );
 
     // Insert pending withdrawals into database (if required)
@@ -175,7 +178,7 @@ pub async fn run_core(
         DEFAULT_CHANNEL_CAPACITY,
     );
 
-    let gateway_watcher_task = run_gateway_watcher(&config);
+    let gateway_watcher_task = run_gateway_watcher(eth_gateway.clone(), &config);
 
     // Start rejected transactions cleaner task.
     let rejected_tx_cleaner_task = run_rejected_tx_cleaner(&config, connection_pool.clone());

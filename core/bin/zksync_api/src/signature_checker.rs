@@ -337,10 +337,10 @@ impl RequestData {
 /// See the module documentation for details.
 pub fn start_sign_checker_detached(
     config: ZkSyncConfig,
+    client: EthereumGateway,
     input: mpsc::Receiver<VerifySignatureRequest>,
     panic_notify: mpsc::Sender<bool>,
 ) {
-    let client = EthereumGateway::from_config(&config);
     let eth_checker = EthereumChecker::new(client);
 
     /// Main signature check requests handler.

@@ -5,37 +5,25 @@ use web3::{
     types::{Address, BlockId, Filter, Log, U64},
 };
 
+use std::convert::identity;
+use std::iter;
+use std::sync::atomic::{AtomicUsize, Ordering};
 use zksync_eth_signer::PrivateKeySigner;
 use zksync_types::{TransactionReceipt, H160, H256, U256};
 
 use crate::ethereum_gateway::{ExecutedTxStatus, FailureInfo, SignedCallResult};
 use crate::ETHDirectClient;
-
-#[derive(Debug, Clone)]
+#[derive(Debug, Default)]
 pub struct MultiplexerEthereumClient {
     clients: Vec<(String, ETHDirectClient<PrivateKeySigner>)>,
-}
-
-impl Default for MultiplexerEthereumClient {
-    fn default() -> Self {
-        Self::new()
-    }
+    preferred: AtomicUsize,
 }
 
 macro_rules! multiple_call {
-    ($self:expr, $func:ident($($attr:expr),+)) => {
-        for (name, client) in $self.clients.iter() {
-            match client.$func($($attr.clone()),+).await {
-                Ok(res) => return Ok(res),
-                Err(err) => vlog::error!("Error in interface: {}, {} ", name, err),
-            }
-        }
-        anyhow::bail!("All interfaces was wrong please try again")
-    };
-
-    ($self:expr, $func:ident()) => {
-        for (name, client) in $self.clients.iter() {
-            match client.$func().await {
+    ($self:expr, $func:ident($($attr:expr),*)) => {
+        let preferred = $self.preferred.load(Ordering::Relaxed);
+        for (name, client) in iter::once($self.clients.get(preferred)).chain($self.clients.iter().enumerate().filter(|v| v.0 != preferred).map(|v| Some(v.1))).filter_map(identity) {
+            match client.$func($($attr.clone()),*).await {
                 Ok(res) => return Ok(res),
                 Err(err) => vlog::error!("Error in interface: {}, {} ", name, err),
             }
@@ -46,12 +34,21 @@ macro_rules! multiple_call {
 
 impl MultiplexerEthereumClient {
     pub fn new() -> Self {
-        Self { clients: vec![] }
+        Self::default()
     }
 
     pub fn add_client(mut self, name: String, client: ETHDirectClient<PrivateKeySigner>) -> Self {
         self.clients.push((name, client));
         self
+    }
+
+    pub fn prioritize_client(&self, name: &str) -> bool {
+        if let Some(idx) = self.clients.iter().position(|(key, _)| key == name) {
+            self.preferred.store(idx, Ordering::Relaxed);
+            true
+        } else {
+            false
+        }
     }
 
     pub async fn pending_nonce(&self) -> Result<U256, anyhow::Error> {

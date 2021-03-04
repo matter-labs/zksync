@@ -11,6 +11,7 @@ pub use rest::v1;
 use futures::channel::mpsc;
 // Workspace uses
 use zksync_config::ZkSyncConfig;
+use zksync_eth_client::EthereumGateway;
 use zksync_storage::ConnectionPool;
 // Local uses
 use crate::fee_ticker::TickerRequest;
@@ -31,6 +32,7 @@ const THREADS_PER_SERVER: usize = 128;
 pub fn start_api_server(
     connection_pool: ConnectionPool,
     panic_notify: mpsc::Sender<bool>,
+    eth_gateway: EthereumGateway,
     ticker_request_sender: mpsc::Sender<TickerRequest>,
     config: &ZkSyncConfig,
 ) {
@@ -38,6 +40,7 @@ pub fn start_api_server(
 
     signature_checker::start_sign_checker_detached(
         config.clone(),
+        eth_gateway,
         sign_check_receiver,
         panic_notify.clone(),
     );

@@ -1,4 +1,5 @@
 use futures::{channel::mpsc, executor::block_on, SinkExt, StreamExt};
+use zksync_eth_client::EthereumGateway;
 use std::cell::RefCell;
 use zksync_config::ZkSyncConfig;
 use zksync_core::{run_core, wait_for_tasks};
@@ -10,6 +11,7 @@ async fn main() -> anyhow::Result<()> {
     vlog::init();
     // handle ctrl+c
     let config = ZkSyncConfig::from_env();
+    let eth_gateway = EthereumGateway::from_config(&config);
     let (stop_signal_sender, mut stop_signal_receiver) = mpsc::channel(256);
     {
         let stop_signal_sender = RefCell::new(stop_signal_sender.clone());
@@ -25,7 +27,7 @@ async fn main() -> anyhow::Result<()> {
     let (prometheus_task_handle, counter_task_handle) =
         run_prometheus_exporter(connection_pool.clone(), config.api.prometheus.port, true);
 
-    let task_handles = run_core(connection_pool, stop_signal_sender, &config)
+    let task_handles = run_core(eth_gateway, connection_pool, stop_signal_sender, &config)
         .await
         .expect("Unable to start Core actors");
 

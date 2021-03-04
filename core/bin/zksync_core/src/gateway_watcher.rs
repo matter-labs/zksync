@@ -51,13 +51,14 @@ impl GatewayWatcher<EthereumGateway> {
     }
 
     pub async fn run(self) {
-        vlog::info!("Gateway Watcher started");
+        vlog::info!("Ethereum Gateway Watcher started");
+
         time::interval(self.interval)
-            .for_each_concurrent(self.task_limit, |_| self.verify_multiplexer_gateways())
+            .for_each_concurrent(self.task_limit, |_| self.check_multiplexer_gateways())
             .await
     }
 
-    fn check_blocks(
+    fn verify_blocks(
         latest_block: &Block<H256>,
         block_to_check: &Block<H256>,
     ) -> Result<(), BlockVerificationError> {
@@ -94,7 +95,7 @@ impl GatewayWatcher<EthereumGateway> {
         }
     }
 
-    async fn verify_multiplexer_gateways(&self) {
+    async fn check_multiplexer_gateways(&self) {
         let client = match self.client {
             EthereumGateway::Multiplexed(ref client) => client,
             _ => {
@@ -104,7 +105,7 @@ impl GatewayWatcher<EthereumGateway> {
 
         async fn get_latest_client_block<'a>(
             ((key, client), (retry_delay, timeout)): (
-                (&'a str, &'a ETHDirectClient<PrivateKeySigner>),
+                (&'a str, &ETHDirectClient<PrivateKeySigner>),
                 (Duration, Duration),
             ),
         ) -> Option<(&'a str, Block<H256>)> {
@@ -116,7 +117,7 @@ impl GatewayWatcher<EthereumGateway> {
                         .ok()
                         .flatten()
                 },
-                vlog::error!("Request to Gateway `{}` failed", key),
+                vlog::error!("Request to Ethereum Gateway `{}` failed", key),
                 retry_delay,
                 timeout
             }
@@ -125,7 +126,7 @@ impl GatewayWatcher<EthereumGateway> {
                 Some((key, block))
             } else {
                 vlog::error!(
-                    "Failed to get latest block from Gateway `{}` within specified timeout",
+                    "Failed to get latest block from Ethereum Gateway `{}` within specified timeout",
                     key
                 );
                 None
@@ -143,34 +144,32 @@ impl GatewayWatcher<EthereumGateway> {
         .collect::<Vec<_>>()
         .await;
 
-        if let Some(latest_block) = client_latest_blocks
+        if let Some((preferred_key, latest_block)) = client_latest_blocks
             .iter()
-            .map(|(_, block)| block)
-            .max_by(|block1, block2| block1.number.cmp(&block2.number))
+            .max_by(|(_, block1), (_, block2)| block1.number.cmp(&block2.number))
         {
+            client.prioritize_client(preferred_key);
             for (key, block) in &client_latest_blocks {
-                if let Err(err) = Self::check_blocks(latest_block, block) {
-                    vlog::error!("Gateway `{}` - check failed: {:?}", key, err);
+                if let Err(err) = Self::verify_blocks(latest_block, block) {
+                    vlog::error!("Ethereum Gateway `{}` - check failed: {:?}", key, err);
                 }
             }
         }
     }
-
-    pub fn from_config(config: &ZkSyncConfig) -> Self {
-        Self::new(
-            EthereumGateway::from_config(config),
-            config.gateway_watcher.request_per_task_limit(),
-            config.gateway_watcher.task_limit(),
-            config.gateway_watcher.check_interval(),
-            config.gateway_watcher.request_timeout(),
-            config.gateway_watcher.retry_delay(),
-        )
-    }
 }
 
 #[must_use]
-pub fn run_gateway_watcher(config: &ZkSyncConfig) -> JoinHandle<()> {
-    tokio::spawn(GatewayWatcher::from_config(config).run())
+pub fn run_gateway_watcher(eth_gateway: EthereumGateway, config: &ZkSyncConfig) -> JoinHandle<()> {
+    let gateway_watcher = GatewayWatcher::new(
+        eth_gateway,
+        config.gateway_watcher.request_per_task_limit(),
+        config.gateway_watcher.task_limit(),
+        config.gateway_watcher.check_interval(),
+        config.gateway_watcher.request_timeout(),
+        config.gateway_watcher.retry_delay(),
+    );
+
+    tokio::spawn(gateway_watcher.run())
 }
 
 #[cfg(test)]
@@ -188,10 +187,10 @@ mod tests {
         b2.hash = Some(h1);
         b1.number = Some(U64::from(1u64));
         b2.number = Some(U64::from(1u64));
-        assert_eq!(GatewayWatcher::check_blocks(&b1, &b2), Ok(()));
+        assert_eq!(GatewayWatcher::verify_blocks(&b1, &b2), Ok(()));
         b2.hash = Some(h2);
         assert_eq!(
-            GatewayWatcher::check_blocks(&b1, &b2),
+            GatewayWatcher::verify_blocks(&b1, &b2),
             Err(BlockVerificationError::InvalidHash(h1, h2))
         );
     }
@@ -209,10 +208,10 @@ mod tests {
 
         b1.number = Some(U64::from(1u64));
         b2.number = Some(U64::from(0u64));
-        assert_eq!(GatewayWatcher::check_blocks(&b1, &b2), Ok(()));
+        assert_eq!(GatewayWatcher::verify_blocks(&b1, &b2), Ok(()));
         b2.hash = Some(h1);
         assert_eq!(
-            GatewayWatcher::check_blocks(&b1, &b2),
+            GatewayWatcher::verify_blocks(&b1, &b2),
             Err(BlockVerificationError::InvalidHash(h2, h1))
         );
     }
@@ -230,7 +229,7 @@ mod tests {
         b1.number = Some(U64::from(2u64));
         b2.number = Some(U64::from(0u64));
         assert_eq!(
-            GatewayWatcher::check_blocks(&b1, &b2),
+            GatewayWatcher::verify_blocks(&b1, &b2),
             Err(BlockVerificationError::InvalidNumDiff(
                 U64::from(2u64),
                 U64::from(0u64)
