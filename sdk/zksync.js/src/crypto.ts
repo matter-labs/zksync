@@ -3,6 +3,16 @@ import { Signature } from './types';
 import * as zks from 'zksync-crypto';
 import { utils } from 'ethers';
 
+/**
+ * This variable stores the zksync-crypto module compiled into
+ * asm.js for environments without WebAssembly support (e.g. React Native).
+ * It's either loaded once or left to be undefined, so whenever
+ * we are using the crypto package, we do it in the following way:
+ * ```
+ * const _zks = asmJs || zks;
+ * const signature = _zks.sign_musig(privKey, bytes);
+ * ```
+ */
 let asmJs = undefined;
 
 export async function privateKeyFromSeed(seed: Uint8Array): Promise<Uint8Array> {
