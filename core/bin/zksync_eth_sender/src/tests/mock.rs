@@ -3,6 +3,7 @@
 // Built-in deps
 use std::collections::VecDeque;
 use std::convert::TryFrom;
+use std::sync::Arc;
 // External uses
 use tokio::sync::RwLock;
 use web3::contract::Options;
@@ -418,7 +419,7 @@ async fn build_eth_sender(
     unprocessed_operations: Vec<(i64, AggregatedOperation)>,
     eth_parameters: ETHParams,
 ) -> ETHSender<MockDatabase> {
-    let ethereum = EthereumGateway::Mock(MockEthereum::default());
+    let ethereum = EthereumGateway::Mock(Arc::new(MockEthereum::default()));
     let db = MockDatabase::with_restorable_state(
         eth_operations,
         aggregated_operations,

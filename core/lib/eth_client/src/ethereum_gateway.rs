@@ -46,7 +46,7 @@ pub struct FailureInfo {
 pub enum EthereumGateway {
     Direct(Arc<ETHDirectClient<PrivateKeySigner>>),
     Multiplexed(Arc<MultiplexerEthereumClient>),
-    Mock(MockEthereum),
+    Mock(Arc<MockEthereum>),
 }
 
 impl EthereumGateway {
@@ -266,14 +266,14 @@ impl EthereumGateway {
 
     pub fn get_mut_mock(&mut self) -> Option<&mut MockEthereum> {
         match self {
-            EthereumGateway::Mock(m) => Some(m),
+            EthereumGateway::Mock(m) => Arc::get_mut(m),
             _ => None,
         }
     }
 
     pub fn get_mock(&self) -> Option<&MockEthereum> {
         match self {
-            EthereumGateway::Mock(m) => Some(m),
+            EthereumGateway::Mock(m) => Some(&*m),
             _ => None,
         }
     }
