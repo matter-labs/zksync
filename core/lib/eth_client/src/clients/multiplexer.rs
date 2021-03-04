@@ -1,14 +1,11 @@
 use ethabi::Contract;
+use std::sync::atomic::{AtomicUsize, Ordering};
 use web3::{
     contract::tokens::{Detokenize, Tokenize},
     contract::Options,
     transports::Http,
     types::{Address, BlockId, Filter, Log, Transaction, U64},
 };
-
-use std::convert::identity;
-use std::iter;
-use std::sync::atomic::{AtomicUsize, Ordering};
 use zksync_eth_signer::PrivateKeySigner;
 use zksync_types::{TransactionReceipt, H160, H256, U256};
 
@@ -22,18 +19,7 @@ pub struct MultiplexerEthereumClient {
 
 macro_rules! multiple_call {
     ($self:expr, $func:ident($($attr:expr),*)) => {
-        let preferred = $self.preferred.load(Ordering::Relaxed);
-        for (name, client) in
-            iter::once($self.clients.get(preferred))
-                .chain(
-                    $self
-                        .clients
-                        .iter()
-                        .enumerate()
-                        .filter(|v| v.0 != preferred)
-                        .map(|v| Some(v.1))
-                )
-                .filter_map(identity) {
+        for (name, client) in $self.clients() {
             match client.$func($($attr.clone()),*).await {
                 Ok(res) => return Ok(res),
                 Err(err) => vlog::error!("Error in interface: {}, {} ", name, err),
@@ -62,12 +48,26 @@ impl MultiplexerEthereumClient {
         }
     }
 
+    pub fn clients(&self) -> impl Iterator<Item = (&str, &ETHDirectClient<PrivateKeySigner>)> {
+        let preferred = self.preferred.load(Ordering::Relaxed);
+
+        self.clients
+            .get(preferred)
+            .into_iter()
+            .chain(self.clients.get(..preferred).unwrap_or(&[]).iter())
+            .chain(self.clients.get(1 + preferred..).unwrap_or(&[]).iter())
+            .map(|(name, client)| (name.as_str(), client))
+    }
+
     pub fn create_contract(
         &self,
         address: Address,
         contract: ethabi::Contract,
     ) -> web3::contract::Contract<Http> {
-        let client = self.clients.first().expect("Should be at least one client");
+        let client = self
+            .clients()
+            .next()
+            .expect("Should be at least one client");
         client.1.create_contract(address, contract)
     }
 
@@ -196,14 +196,11 @@ impl MultiplexerEthereumClient {
     }
 
     pub fn encode_tx_data<P: Tokenize + Clone>(&self, func: &str, params: P) -> Vec<u8> {
-        let (_, client) = self.clients.first().expect("Should be at least one client");
+        let (_, client) = self
+            .clients()
+            .next()
+            .expect("Should be at least one client");
         client.encode_tx_data(func, params)
-    }
-
-    pub fn clients(&self) -> impl Iterator<Item = (&str, &ETHDirectClient<PrivateKeySigner>)> {
-        self.clients
-            .iter()
-            .map(|(name, client)| (name.as_str(), client))
     }
 
     pub async fn get_tx(&self, hash: H256) -> Result<Option<Transaction>, anyhow::Error> {
