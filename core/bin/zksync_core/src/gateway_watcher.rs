@@ -28,7 +28,7 @@ enum BlockVerificationError {
     #[error("Difference between block numbers is greater than 1: {0:?} > {1:?}")]
     LargeNumDiff(U64, U64),
     #[error("Invalid block: {0:?}")]
-    InvalidBlock(Block<H256>),
+    InvalidBlock(Box<Block<H256>>),
 }
 
 impl GatewayWatcher<EthereumGateway> {
@@ -66,7 +66,7 @@ impl GatewayWatcher<EthereumGateway> {
             ($block: expr, $opt: ident) => {
                 $block
                     .$opt
-                    .ok_or_else(|| BlockVerificationError::InvalidBlock($block.clone()))
+                    .ok_or_else(|| BlockVerificationError::InvalidBlock(Box::new($block.clone())))
             };
         }
 
@@ -105,7 +105,7 @@ impl GatewayWatcher<EthereumGateway> {
 
         async fn get_latest_client_block<'a>(
             ((key, client), (retry_delay, timeout)): (
-                (&'a str, &ETHDirectClient<PrivateKeySigner>),
+                (&'a str, &'a ETHDirectClient<PrivateKeySigner>),
                 (Duration, Duration),
             ),
         ) -> Option<(&'a str, Block<H256>)> {
@@ -139,7 +139,7 @@ impl GatewayWatcher<EthereumGateway> {
                 .zip(iter::repeat((self.retry_delay, self.req_timeout))),
         )
         .map(get_latest_client_block)
-        .buffer_unordered(self.req_per_task_limit.unwrap_or_default())
+        .buffer_unordered(self.req_per_task_limit.unwrap_or(usize::MAX))
         .filter_map(ready)
         .collect::<Vec<_>>()
         .await;
