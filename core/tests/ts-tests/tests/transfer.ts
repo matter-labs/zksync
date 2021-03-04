@@ -11,6 +11,7 @@ declare module './tester' {
         testBatch(from: Wallet, to: Wallet, token: TokenLike, amount: BigNumber): Promise<void>;
         testIgnoredBatch(from: Wallet, to: Wallet, token: TokenLike, amount: BigNumber): Promise<void>;
         testRejectedBatch(from: Wallet, to: Wallet, token: TokenLike, amount: BigNumber): Promise<void>;
+        testInvalidFeeBatch(from: Wallet, to: Wallet, token: TokenLike, amount: BigNumber): Promise<void>;
     }
 }
 
@@ -132,6 +133,49 @@ Tester.prototype.testRejectedBatch = async function (
     let thrown = true;
     try {
         const handles = await sender.syncMultiTransfer([{ ...tx }, { ...tx }]);
+        for (const handle of handles) {
+            await handle.awaitVerifyReceipt();
+        }
+        thrown = false; // this line should be unreachable
+    } catch (e) {
+        expect(e.jrpcError.message).to.equal('Transactions batch summary fee is too low');
+    }
+    expect(thrown, 'Batch should have failed').to.be.true;
+};
+
+// Checks that the server takes into account all transactions from the batch when calculating
+// the fee.
+Tester.prototype.testInvalidFeeBatch = async function (
+    sender: Wallet,
+    receiver: Wallet,
+    token: types.TokenLike,
+    amount: BigNumber
+) {
+    // Ignore the second transfer.
+    const fee = await this.syncProvider.getTransactionsBatchFee(['Transfer'], [receiver.address()], token);
+
+    const txWithFee = {
+        to: receiver.address(),
+        token,
+        amount,
+        fee
+    };
+    const txWithoutFee = {
+        to: receiver.address(),
+        token,
+        amount,
+        fee: 0
+    };
+
+    const multiTransfer = [];
+    for (let i = 0; i < 10; ++i) {
+        multiTransfer.push(txWithoutFee);
+    }
+    multiTransfer.push(txWithFee);
+
+    let thrown = true;
+    try {
+        const handles = await sender.syncMultiTransfer(multiTransfer);
         for (const handle of handles) {
             await handle.awaitVerifyReceipt();
         }
