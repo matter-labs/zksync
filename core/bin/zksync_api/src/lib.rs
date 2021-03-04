@@ -26,7 +26,13 @@ pub fn run_api(
 
     let ticker_task = run_ticker_task(connection_pool.clone(), ticker_request_receiver, config);
 
-    start_api_server(connection_pool, panic_notify, eth_gateway, ticker_request_sender, config);
+    start_api_server(
+        connection_pool,
+        panic_notify,
+        eth_gateway,
+        ticker_request_sender,
+        config,
+    );
 
     ticker_task
 }

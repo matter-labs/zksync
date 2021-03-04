@@ -1,8 +1,8 @@
 use futures::{channel::mpsc, executor::block_on, SinkExt, StreamExt};
-use zksync_eth_client::EthereumGateway;
 use std::cell::RefCell;
 use zksync_config::ZkSyncConfig;
 use zksync_core::{run_core, wait_for_tasks};
+use zksync_eth_client::EthereumGateway;
 use zksync_prometheus_exporter::run_prometheus_exporter;
 use zksync_storage::ConnectionPool;
 

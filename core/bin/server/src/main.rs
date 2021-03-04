@@ -2,7 +2,7 @@ use futures::{channel::mpsc, executor::block_on, SinkExt, StreamExt};
 use std::cell::RefCell;
 use structopt::StructOpt;
 use zksync_api::run_api;
-use zksync_core::{genesis_init, run_core, wait_for_tasks, gateway_watcher::run_gateway_watcher};
+use zksync_core::{gateway_watcher::run_gateway_watcher, genesis_init, run_core, wait_for_tasks};
 use zksync_eth_client::EthereumGateway;
 use zksync_eth_sender::run_eth_sender;
 use zksync_prometheus_exporter::run_prometheus_exporter;
