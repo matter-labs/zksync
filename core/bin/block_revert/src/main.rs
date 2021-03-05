@@ -1,7 +1,7 @@
 use anyhow::{ensure, format_err};
 use ethabi::Token;
 use structopt::StructOpt;
-use tokio::time::{sleep, Duration};
+use tokio::time::{delay_for, Duration};
 use web3::{
     contract::Options,
     types::{TransactionReceipt, U256, U64},
@@ -102,7 +102,7 @@ async fn send_raw_tx_and_wait_confirmation(
 
     let sec = Duration::from_secs(1);
     loop {
-        sleep(sec).await;
+        delay_for(sec).await;
         if let Some(receipt) = client
             .tx_receipt(tx_hash)
             .await
