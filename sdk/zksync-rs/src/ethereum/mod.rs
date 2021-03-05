@@ -1,6 +1,7 @@
 //! Utilities for the on-chain operations, such as `Deposit` and `FullExit`.
 
 use num::BigUint;
+use serde_json::{Map, Value};
 use std::{convert::TryFrom, time::Duration};
 use std::{str::FromStr, time::Instant};
 use web3::contract::tokens::Tokenize;
@@ -18,6 +19,7 @@ use crate::{
 
 const IERC20_INTERFACE: &str = include_str!("abi/IERC20.json");
 const ZKSYNC_INTERFACE: &str = include_str!("abi/ZkSync.json");
+const RAW_ERC20_DEPOSIT_GAS_LIMIT: &str = include_str!("DepositERC20GasLimit.json");
 
 fn load_contract(raw_abi_string: &str) -> ethabi::Contract {
     let abi_string = serde_json::Value::from_str(raw_abi_string)
@@ -286,8 +288,19 @@ impl<S: EthereumSigner> EthereumProvider<S> {
                 .await
                 .map_err(|_| ClientError::IncorrectCredentials)?
         } else {
+            let gas_limits: Map<String, Value> = serde_json::from_str(RAW_ERC20_DEPOSIT_GAS_LIMIT)
+                .map_err(|_| ClientError::Other)?;
+            let gas_limit = if gas_limits.contains_key(&token_info.symbol) {
+                gas_limits
+                    .get(&token_info.symbol)
+                    .ok_or(ClientError::Other)?
+                    .as_u64()
+                    .ok_or(ClientError::Other)?
+            } else {
+                300000u64
+            };
             let options = Options {
-                gas: Some(300_000.into()),
+                gas: Some(gas_limit.into()),
                 ..Default::default()
             };
             let params = (token_info.address, amount, sync_address);

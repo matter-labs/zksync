@@ -11,6 +11,8 @@ All notable changes to `zksync.js` will be documented in this file.
 
 ### Changed
 
+- Hardcode gas limit for `depositERC20` for each token.
+
 ### Deprecated
 
 - `Signer.transferSignBytes` method
