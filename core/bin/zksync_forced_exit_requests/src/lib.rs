@@ -6,10 +6,14 @@ use zksync_api::core_api_client::CoreApiClient;
 
 use forced_exit_sender::ForcedExitSender;
 
+mod core_interaction_wrapper;
 pub mod eth_watch;
 pub mod forced_exit_sender;
 pub mod prepare_forced_exit_sender;
 mod utils;
+
+#[cfg(test)]
+pub mod test;
 
 #[must_use]
 pub fn run_forced_exit_requests_actors(

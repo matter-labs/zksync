@@ -25,6 +25,10 @@ use zksync_core::eth_watch::{get_web3_block_number, WatcherMode};
 use zksync_types::forced_exit_requests::FundsReceivedEvent;
 
 use super::prepare_forced_exit_sender::prepare_forced_exit_sender_account;
+use crate::{
+    core_interaction_wrapper::{CoreInteractionWrapper, MempoolCoreInteractionWrapper},
+    forced_exit_sender::MempoolForcedExitSender,
+};
 
 use super::ForcedExitSender;
 
@@ -47,13 +51,23 @@ impl ContractTopics {
     }
 }
 
-pub struct EthClient {
+#[async_trait::async_trait]
+pub trait EthClient {
+    async fn get_funds_received_events(
+        &self,
+        from: u64,
+        to: u64,
+    ) -> anyhow::Result<Vec<FundsReceivedEvent>>;
+    async fn block_number(&self) -> anyhow::Result<u64>;
+}
+
+pub struct EthHttpClient {
     web3: Web3<Http>,
     forced_exit_contract: Contract<Http>,
     topics: ContractTopics,
 }
 
-impl EthClient {
+impl EthHttpClient {
     pub fn new(web3: Web3<Http>, zksync_contract_addr: H160) -> Self {
         let forced_exit_contract =
             Contract::new(web3.eth(), zksync_contract_addr, forced_exit_contract());
@@ -82,7 +96,10 @@ impl EthClient {
         )
         .await
     }
+}
 
+#[async_trait::async_trait]
+impl EthClient for EthHttpClient {
     async fn get_funds_received_events(
         &self,
         from: u64,
@@ -105,12 +122,12 @@ impl EthClient {
     }
 }
 
-struct ForcedExitContractWatcher {
-    connection_pool: ConnectionPool,
+struct ForcedExitContractWatcher<T: ForcedExitSender, C: EthClient, K: CoreInteractionWrapper> {
+    core_interaction_wrapper: K,
     config: ZkSyncConfig,
-    eth_client: EthClient,
+    eth_client: C,
     last_viewed_block: u64,
-    forced_exit_sender: ForcedExitSender,
+    forced_exit_sender: T,
 
     mode: WatcherMode,
     db_cleanup_interval: chrono::Duration,
@@ -122,7 +139,7 @@ struct ForcedExitContractWatcher {
 const MILLIS_PER_BLOCK_LOWER: u64 = 5000;
 const MILLIS_PER_BLOCK_UPPER: u64 = 25000;
 
-// Returns upper bound of the number of blocks that
+// Returns the upper bound of the number of blocks that
 // should have been created during the time
 fn time_range_to_block_diff(from: DateTime<Utc>, to: DateTime<Utc>) -> u64 {
     // Timestamps should never be negative
@@ -153,12 +170,35 @@ fn lower_bound_block_time(block: u64, current_block: u64) -> DateTime<Utc> {
     Utc::now().sub(time_diff)
 }
 
-impl ForcedExitContractWatcher {
-    async fn restore_state_from_eth(&mut self, block: u64) -> anyhow::Result<()> {
-        let mut storage = self.connection_pool.access_storage().await?;
-        let mut fe_schema = storage.forced_exit_requests_schema();
+impl<T: ForcedExitSender, C: EthClient, K: CoreInteractionWrapper>
+    ForcedExitContractWatcher<T, C, K>
+{
+    pub fn new(
+        core_interaction_wrapper: K,
+        config: ZkSyncConfig,
+        eth_client: C,
+        forced_exit_sender: T,
+        db_cleanup_interval: chrono::Duration,
+    ) -> Self {
+        Self {
+            core_interaction_wrapper,
+            config,
+            eth_client,
+            forced_exit_sender,
 
-        let oldest_request = fe_schema.get_oldest_unfulfilled_request().await?;
+            last_viewed_block: 0,
+            mode: WatcherMode::Working,
+            db_cleanup_interval,
+            // Zero timestamp, has never deleted anything
+            last_db_cleanup_time: Utc.timestamp(0, 0),
+        }
+    }
+
+    pub async fn restore_state_from_eth(&mut self, block: u64) -> anyhow::Result<()> {
+        let oldest_request = self
+            .core_interaction_wrapper
+            .get_oldest_unfulfilled_request()
+            .await?;
         let wait_confirmations = self.config.forced_exit_requests.wait_confirmations;
 
         // No oldest request means that there are no requests that were possibly ignored
@@ -226,8 +266,6 @@ impl ForcedExitContractWatcher {
     }
 
     pub async fn delete_expired(&mut self) -> anyhow::Result<()> {
-        let mut storage = self.connection_pool.access_storage().await?;
-
         let expiration_time = chrono::Duration::milliseconds(
             self.config
                 .forced_exit_requests
@@ -236,8 +274,7 @@ impl ForcedExitContractWatcher {
                 .expect("Failed to convert expiration period to i64"),
         );
 
-        storage
-            .forced_exit_requests_schema()
+        self.core_interaction_wrapper
             .delete_old_unfulfilled_requests(expiration_time)
             .await
     }
@@ -341,7 +378,7 @@ pub fn run_forced_exit_contract_watcher(
 ) -> JoinHandle<()> {
     let transport = web3::transports::Http::new(&config.eth_client.web3_url[0]).unwrap();
     let web3 = web3::Web3::new(transport);
-    let eth_client = EthClient::new(web3, config.contracts.forced_exit_addr);
+    let eth_client = EthHttpClient::new(web3, config.contracts.forced_exit_addr);
 
     tokio::spawn(async move {
         // We should not proceed if the feature is disabled
@@ -351,7 +388,7 @@ pub fn run_forced_exit_contract_watcher(
 
         // It is fine to unwrap here, since without it there is not way we
         // can be sure that the forced exit sender will work properly
-        prepare_forced_exit_sender_account(
+        let id = prepare_forced_exit_sender_account(
             connection_pool.clone(),
             core_api_client.clone(),
             &config,
@@ -359,14 +396,12 @@ pub fn run_forced_exit_contract_watcher(
         .await
         .unwrap();
 
+        let core_interaction_wrapper =
+            MempoolCoreInteractionWrapper::new(core_api_client, connection_pool.clone());
         // It is ok to unwrap here, since if forced_exit_sender is not created, then
         // the watcher is meaningless
-        let mut forced_exit_sender = ForcedExitSender::new(
-            core_api_client.clone(),
-            connection_pool.clone(),
-            config.clone(),
-        )
-        .await;
+        let mut forced_exit_sender =
+            MempoolForcedExitSender::new(core_interaction_wrapper.clone(), config.clone(), id);
 
         // In case there were some transactions which were submitted
         // but were not committed we will try to wait until they are committed
@@ -374,17 +409,13 @@ pub fn run_forced_exit_contract_watcher(
             "Unexpected error while trying to wait for unconfirmed forced_exit transactions",
         );
 
-        let contract_watcher = ForcedExitContractWatcher {
-            connection_pool,
+        let contract_watcher = ForcedExitContractWatcher::new(
+            core_interaction_wrapper,
             config,
             eth_client,
-            last_viewed_block: 0,
             forced_exit_sender,
-            mode: WatcherMode::Working,
-            db_cleanup_interval: chrono::Duration::minutes(5),
-            // Zero timestamp, has never deleted anything
-            last_db_cleanup_time: Utc.timestamp(0, 0),
-        };
+            chrono::Duration::minutes(5),
+        );
 
         contract_watcher.run().await;
     })
@@ -427,5 +458,260 @@ pub async fn infinite_async_loop() {
     let mut timer = time::interval(Duration::from_secs(60 * 60 * 24));
     loop {
         timer.tick().await;
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use num::{BigUint, FromPrimitive};
+    use std::{str::FromStr, sync::Mutex};
+    use zksync_config::ZkSyncConfig;
+    use zksync_types::{forced_exit_requests::ForcedExitRequest, Address, TokenId};
+
+    use super::*;
+    use crate::test::{add_request, MockCoreInteractionWrapper};
+
+    const TEST_FIRST_CURRENT_BLOCK: u64 = 10000000;
+    struct MockEthClient {
+        pub events: Vec<FundsReceivedEvent>,
+        pub current_block_number: u64,
+    }
+
+    #[async_trait::async_trait]
+    impl EthClient for MockEthClient {
+        async fn get_funds_received_events(
+            &self,
+            from: u64,
+            to: u64,
+        ) -> anyhow::Result<Vec<FundsReceivedEvent>> {
+            let events = self
+                .events
+                .iter()
+                .filter(|&x| x.block_number >= from && x.block_number <= to)
+                .cloned()
+                .collect();
+            Ok(events)
+        }
+
+        async fn block_number(&self) -> anyhow::Result<u64> {
+            Ok(self.current_block_number)
+        }
+    }
+    struct DummyForcedExitSender {
+        pub processed_requests: Mutex<Vec<(BigUint, DateTime<Utc>)>>,
+    }
+
+    impl DummyForcedExitSender {
+        pub fn new() -> Self {
+            Self {
+                processed_requests: Mutex::new(vec![]),
+            }
+        }
+    }
+
+    #[async_trait::async_trait]
+    impl ForcedExitSender for DummyForcedExitSender {
+        async fn process_request(&self, amount: BigUint, submission_time: DateTime<Utc>) {
+            let mut write_lock = self
+                .processed_requests
+                .lock()
+                .expect("Failed to get write lock for processed_requests");
+            (*write_lock).push((amount, submission_time));
+        }
+    }
+
+    type TestForcedExitContractWatcher =
+        ForcedExitContractWatcher<DummyForcedExitSender, MockEthClient, MockCoreInteractionWrapper>;
+
+    fn get_test_forced_exit_contract_watcher() -> TestForcedExitContractWatcher {
+        let core_interaction_wrapper = MockCoreInteractionWrapper::default();
+        let config = ZkSyncConfig::from_env();
+        let eth_client = MockEthClient {
+            events: vec![],
+            current_block_number: TEST_FIRST_CURRENT_BLOCK,
+        };
+        let forced_exit_sender = DummyForcedExitSender::new();
+
+        ForcedExitContractWatcher::new(
+            core_interaction_wrapper,
+            config,
+            eth_client,
+            forced_exit_sender,
+            chrono::Duration::minutes(5),
+        )
+    }
+
+    #[tokio::test]
+    async fn test_watcher_deleting_old_requests() {
+        let week = chrono::Duration::weeks(1);
+        let three_days = chrono::Duration::days(3);
+
+        let mut watcher = get_test_forced_exit_contract_watcher();
+
+        let old_request = ForcedExitRequest {
+            id: 1,
+            target: Address::random(),
+            tokens: vec![TokenId(0)],
+            price_in_wei: BigUint::from_i64(12).unwrap(),
+            valid_until: Utc::now().sub(week),
+            // Outdated by far
+            created_at: Utc::now().sub(week).sub(three_days),
+            fulfilled_at: None,
+            fulfilled_by: None,
+        };
+
+        add_request(
+            &watcher.core_interaction_wrapper.requests,
+            old_request.clone(),
+        );
+
+        watcher
+            .restore_state_from_eth(TEST_FIRST_CURRENT_BLOCK)
+            .await
+            .expect("Failed to restore state from eth");
+
+        watcher.poll().await;
+
+        let requests_lock = watcher.core_interaction_wrapper.requests.lock().unwrap();
+        // The old request should have been deleted
+        assert_eq!(requests_lock.len(), 0);
+        // Need to do this to drop mutex
+        drop(requests_lock);
+
+        add_request(&watcher.core_interaction_wrapper.requests, old_request);
+        watcher.poll().await;
+
+        let requests_lock = watcher.core_interaction_wrapper.requests.lock().unwrap();
+        // Not enough time has passed. The request should not be deleted
+        assert_eq!(requests_lock.len(), 1);
+    }
+
+    #[tokio::test]
+    async fn test_watcher_restore_state() {
+        // This test should not depend on the constants or the way
+        // that the last calculated block works. This test is more of a sanity check:
+        // that both wait_confirmations and the time of creation of the oldest unfulfilled request
+        // is taken into account
+
+        let confirmations_time = ZkSyncConfig::from_env()
+            .forced_exit_requests
+            .wait_confirmations;
+
+        // Case 1. No requests => choose the youngest stable block
+        let mut watcher = get_test_forced_exit_contract_watcher();
+
+        watcher
+            .restore_state_from_eth(TEST_FIRST_CURRENT_BLOCK)
+            .await
+            .expect("Failed to restore state from ethereum");
+
+        assert_eq!(
+            watcher.last_viewed_block,
+            TEST_FIRST_CURRENT_BLOCK - confirmations_time
+        );
+
+        // Case 2. Very young requests => choose the youngest stable block
+        let mut watcher = get_test_forced_exit_contract_watcher();
+        watcher.core_interaction_wrapper.requests = Mutex::new(vec![ForcedExitRequest {
+            id: 1,
+            target: Address::random(),
+            tokens: vec![TokenId(0)],
+            price_in_wei: BigUint::from_i64(12).unwrap(),
+            // does not matter in these tests
+            valid_until: Utc::now(),
+            // millisecond ago is quite young
+            created_at: Utc::now().sub(chrono::Duration::milliseconds(1)),
+            fulfilled_at: None,
+            fulfilled_by: None,
+        }]);
+
+        watcher
+            .restore_state_from_eth(TEST_FIRST_CURRENT_BLOCK)
+            .await
+            .expect("Failed to restore state from ethereum");
+
+        assert_eq!(
+            watcher.last_viewed_block,
+            TEST_FIRST_CURRENT_BLOCK - confirmations_time
+        );
+
+        // Case 3. Very old requests => choose the old stable block
+        let mut watcher = get_test_forced_exit_contract_watcher();
+        watcher.core_interaction_wrapper.requests = Mutex::new(vec![ForcedExitRequest {
+            id: 1,
+            target: Address::random(),
+            tokens: vec![TokenId(0)],
+            price_in_wei: BigUint::from_i64(12).unwrap(),
+            // does not matter in these tests
+            valid_until: Utc::now(),
+            // 1 week ago is quite old
+            created_at: Utc::now().sub(chrono::Duration::weeks(1)),
+            fulfilled_at: None,
+            fulfilled_by: None,
+        }]);
+
+        watcher
+            .restore_state_from_eth(TEST_FIRST_CURRENT_BLOCK)
+            .await
+            .expect("Failed to restore state from ethereum");
+
+        assert!(watcher.last_viewed_block < TEST_FIRST_CURRENT_BLOCK - confirmations_time);
+    }
+
+    #[tokio::test]
+    async fn test_watcher_processing_requests() {
+        // Here we have to test that events are processed
+
+        let mut watcher = get_test_forced_exit_contract_watcher();
+
+        let wait_confirmations = 5;
+        watcher.config.forced_exit_requests.wait_confirmations = wait_confirmations;
+
+        watcher.eth_client.events = vec![
+            FundsReceivedEvent {
+                // Should be processed
+                amount: BigUint::from_str("1000000001").unwrap(),
+                block_number: TEST_FIRST_CURRENT_BLOCK - 2 * wait_confirmations,
+            },
+            FundsReceivedEvent {
+                amount: BigUint::from_str("1000000002").unwrap(),
+                // Should be processed
+                block_number: TEST_FIRST_CURRENT_BLOCK - wait_confirmations - 1,
+            },
+            FundsReceivedEvent {
+                amount: BigUint::from_str("1000000003").unwrap(),
+                // Should not be processed
+                block_number: TEST_FIRST_CURRENT_BLOCK - 1,
+            },
+        ];
+
+        // 100 is just some small block number
+        watcher
+            .restore_state_from_eth(100)
+            .await
+            .expect("Failed to restore state from eth");
+
+        // Now it seems like a lot of new blocks have been created
+        watcher.eth_client.current_block_number = TEST_FIRST_CURRENT_BLOCK;
+
+        watcher.poll().await;
+
+        let processed_requests = watcher
+            .forced_exit_sender
+            .processed_requests
+            .lock()
+            .unwrap();
+
+        // The order does not really matter, but it is how it works in production
+        // and it is easier to test this way
+        assert_eq!(processed_requests.len(), 2);
+        assert_eq!(
+            processed_requests[0].0,
+            BigUint::from_str("1000000001").unwrap()
+        );
+        assert_eq!(
+            processed_requests[1].0,
+            BigUint::from_str("1000000002").unwrap()
+        );
     }
 }
