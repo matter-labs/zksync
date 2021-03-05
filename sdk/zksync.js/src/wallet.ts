@@ -37,7 +37,8 @@ import {
     getChangePubkeyMessage,
     MAX_TIMESTAMP,
     getEthereumBalance,
-    ETH_RECOMMENDED_DEPOSIT_GAS_LIMIT
+    ETH_RECOMMENDED_DEPOSIT_GAS_LIMIT,
+    ERC20_DEPOSIT_GAS_LIMIT
 } from './utils';
 
 const EthersErrorCode = ErrorCode;
@@ -859,9 +860,10 @@ export class Wallet {
                         (estimate) => estimate,
                         () => BigNumber.from('0')
                     );
-                    txRequest.gasLimit = gasEstimate.gte(ERC20_RECOMMENDED_DEPOSIT_GAS_LIMIT)
-                        ? gasEstimate
+                    let recommendedGasLimit = ERC20_DEPOSIT_GAS_LIMIT[deposit.token]
+                        ? BigNumber.from(ERC20_DEPOSIT_GAS_LIMIT[deposit.token])
                         : ERC20_RECOMMENDED_DEPOSIT_GAS_LIMIT;
+                    txRequest.gasLimit = gasEstimate.gte(recommendedGasLimit) ? gasEstimate : recommendedGasLimit;
                     args[args.length - 1] = txRequest;
                 } catch (e) {
                     this.modifyEthersError(e);
