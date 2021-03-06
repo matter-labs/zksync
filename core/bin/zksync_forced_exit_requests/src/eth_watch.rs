@@ -572,18 +572,18 @@ mod test {
 
         watcher.poll().await;
 
-        let requests_lock = watcher.core_interaction_wrapper.requests.lock().unwrap();
+        let requests_lock_deleted = watcher.core_interaction_wrapper.requests.lock().unwrap();
         // The old request should have been deleted
-        assert_eq!(requests_lock.len(), 0);
+        assert_eq!(requests_lock_deleted.len(), 0);
         // Need to do this to drop mutex
-        drop(requests_lock);
+        drop(requests_lock_deleted);
 
         add_request(&watcher.core_interaction_wrapper.requests, old_request);
         watcher.poll().await;
 
-        let requests_lock = watcher.core_interaction_wrapper.requests.lock().unwrap();
+        let requests_lock_stored = watcher.core_interaction_wrapper.requests.lock().unwrap();
         // Not enough time has passed. The request should not be deleted
-        assert_eq!(requests_lock.len(), 1);
+        assert_eq!(requests_lock_stored.len(), 1);
     }
 
     #[tokio::test]
