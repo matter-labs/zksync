@@ -540,7 +540,10 @@ mod test {
             chrono::Duration::minutes(5),
         )
     }
-
+    // Unfortunately, I had to forcefully silence clippy due to
+    // https://github.com/rust-lang/rust-clippy/issues/6446
+    // The mutexes are used only in testing, so it does not undermine unit-testing.
+    #[allow(clippy::await_holding_lock)]
     #[tokio::test]
     async fn test_watcher_deleting_old_requests() {
         let week = chrono::Duration::weeks(1);
