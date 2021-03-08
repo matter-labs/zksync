@@ -36,6 +36,7 @@ pub trait CoreInteractionWrapper {
         deleting_threshold: chrono::Duration,
     ) -> anyhow::Result<()>;
 }
+
 #[derive(Clone)]
 pub struct MempoolCoreInteractionWrapper {
     core_api_client: CoreApiClient,
