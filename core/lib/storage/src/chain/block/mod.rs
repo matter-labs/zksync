@@ -14,6 +14,7 @@ use self::records::{
     AccountTreeCache, BlockDetails, BlockTransactionItem, StorageBlock, StoragePendingBlock,
 };
 use crate::{
+    chain::account::{records::EthAccountType, AccountSchema},
     chain::operations::{
         records::{
             NewExecutedPriorityOperation, NewExecutedTransaction, StoredExecutedPriorityOperation,
@@ -45,6 +46,18 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
         for block_tx in operations.into_iter() {
             match block_tx {
                 ExecutedOperations::Tx(tx) => {
+                    // Update account type
+                    if let Some(ZkSyncOp::ChangePubKeyOffchain(tx)) = &tx.op {
+                        let account_type = if matches!(&tx.tx.eth_auth_data, Some(auth) if auth.is_create2())
+                        {
+                            EthAccountType::CREATE2
+                        } else {
+                            EthAccountType::Owned
+                        };
+                        AccountSchema(self.0)
+                            .set_account_type(tx.account_id, account_type)
+                            .await?;
+                    }
                     // Store the executed operation in the corresponding schema.
                     let new_tx = NewExecutedTransaction::prepare_stored_tx(*tx, block_number);
                     OperationsSchema(self.0).store_executed_tx(new_tx).await?;
