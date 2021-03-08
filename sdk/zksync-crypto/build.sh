@@ -32,4 +32,4 @@ wasm-pack build --release --target=web --out-name=zksync-crypto-web --out-dir=di
 
 # pack for node.js
 wasm-pack build --release --target=nodejs --out-name=zksync-crypto-node --out-dir=dist
-rm dist/package.json
+rm dist/package.json dist/.gitignore

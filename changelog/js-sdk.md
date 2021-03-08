@@ -6,6 +6,16 @@ All notable changes to `zksync.js` will be documented in this file.
 
 ### Added
 
+### Changed
+
+### Deprecated
+
+### Fixed
+
+## Version 0.10.4 (08.03.2021)
+
+### Added
+
 - Method for calculation of transaction hash.
 - Support for environments without WebAssembly.
 
