@@ -68,7 +68,11 @@ impl CoreInteractionWrapper for MempoolCoreInteractionWrapper {
     async fn get_unconfirmed_requests(&self) -> anyhow::Result<Vec<ForcedExitRequest>> {
         let mut storage = self.connection_pool.access_storage().await?;
         let mut forced_exit_requests_schema = storage.forced_exit_requests_schema();
-        forced_exit_requests_schema.get_unconfirmed_requests().await
+        let requests = forced_exit_requests_schema
+            .get_unconfirmed_requests()
+            .await?;
+
+        Ok(requests)
     }
 
     async fn set_fulfilled_at(&self, id: i64) -> anyhow::Result<()> {
@@ -91,16 +95,20 @@ impl CoreInteractionWrapper for MempoolCoreInteractionWrapper {
         let mut forced_exit_requests_schema = storage.forced_exit_requests_schema();
         forced_exit_requests_schema
             .set_fulfilled_by(id, value)
-            .await
+            .await?;
+
+        Ok(())
     }
 
     async fn get_receipt(&self, tx_hash: TxHash) -> anyhow::Result<Option<TxReceiptResponse>> {
         let mut storage = self.connection_pool.access_storage().await?;
-        storage
+        let receipt = storage
             .chain()
             .operations_ext_schema()
             .tx_receipt(tx_hash.as_ref())
-            .await
+            .await?;
+
+        Ok(receipt)
     }
 
     async fn get_request_by_id(&self, id: i64) -> anyhow::Result<Option<ForcedExitRequest>> {
@@ -131,10 +139,12 @@ impl CoreInteractionWrapper for MempoolCoreInteractionWrapper {
 
     async fn get_oldest_unfulfilled_request(&self) -> anyhow::Result<Option<ForcedExitRequest>> {
         let mut storage = self.connection_pool.access_storage().await?;
-        storage
+        let request = storage
             .forced_exit_requests_schema()
             .get_oldest_unfulfilled_request()
-            .await
+            .await?;
+
+        Ok(request)
     }
 
     async fn delete_old_unfulfilled_requests(
@@ -145,6 +155,8 @@ impl CoreInteractionWrapper for MempoolCoreInteractionWrapper {
         storage
             .forced_exit_requests_schema()
             .delete_old_unfulfilled_requests(deleting_threshold)
-            .await
+            .await?;
+
+        Ok(())
     }
 }

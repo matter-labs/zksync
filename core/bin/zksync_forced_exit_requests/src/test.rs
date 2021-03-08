@@ -113,9 +113,11 @@ impl CoreInteractionWrapper for MockCoreInteractionWrapper {
             Err(_) => Ok(None),
         }
     }
+
     async fn get_receipt(&self, _tx_hash: TxHash) -> anyhow::Result<Option<TxReceiptResponse>> {
         Ok(self.tx_receipt.clone())
     }
+
     async fn send_and_save_txs_batch(
         &self,
         request: &ForcedExitRequest,
