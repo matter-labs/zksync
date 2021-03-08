@@ -10,7 +10,14 @@ which wasm-pack || cargo install wasm-pack
 wasm-pack build --release --target=bundler --out-name=zksync-crypto-bundler --out-dir=dist
 
 # convert the bundler build into JS in case the environment doesn't support WebAssembly
-wasm2js ./dist/zksync-crypto-bundler_bg.wasm -o $ASM
+# build wasm2js first if needed
+
+if [[ ! -d ../binaryen/bin ]]
+then
+    ../binaryen.sh
+fi
+
+../binaryen/bin/wasm2js ./dist/zksync-crypto-bundler_bg.wasm -o $ASM
 
 # save another copy for bg_asm import
 cp ./dist/zksync-crypto-bundler.js ./dist/zksync-crypto-bundler_asm.js
