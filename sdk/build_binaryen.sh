@@ -7,7 +7,7 @@ set -e
 # path to binaryen
 BINARYEN=$ZKSYNC_HOME/sdk/binaryen
 # number of workers for make -j
-CORES=$(grep -c ^processor /proc/cpuinfo 2>/dev/null || sysctl -n hw.ncpu 2>/devnull || psrinfo -p)
+CORES=$(grep -c ^processor /proc/cpuinfo || sysctl -n hw.ncpu || psrinfo -p)
 # flags for cmake
 CMAKE_FLAGS=-DCMAKE_BUILD_TYPE=Debug
 
