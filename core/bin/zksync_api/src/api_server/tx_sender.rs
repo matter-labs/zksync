@@ -1,6 +1,7 @@
 //! Helper module to submit transactions into the zkSync Network.
 
 // Built-in uses
+use std::iter::FromIterator;
 use std::{collections::HashSet, fmt::Display, str::FromStr};
 
 // External uses
@@ -21,7 +22,7 @@ use zksync_types::{
     tx::{
         EthBatchSignData, EthBatchSignatures, EthSignData, SignedZkSyncTx, TxEthSignature, TxHash,
     },
-    Address, BatchFee, Fee, Token, TokenId, TokenLike, TxFeeTypes, ZkSyncTx, H160,
+    AccountId, Address, BatchFee, Fee, Token, TokenId, TokenLike, TxFeeTypes, ZkSyncTx, H160,
 };
 
 // Local uses
@@ -44,6 +45,8 @@ pub struct TxSender {
     pub tokens: TokenDBCache,
     /// Mimimum age of the account for `ForcedExit` operations to be allowed.
     pub forced_exit_minimum_account_age: chrono::Duration,
+    /// List of account ids that are not paying fees on operations.
+    pub fee_free_accounts: HashSet<AccountId>,
     pub enforce_pubkey_change_fee: bool,
     // Limit the number of both transactions and Ethereum signatures per batch.
     pub max_number_of_transactions_per_batch: usize,
@@ -145,6 +148,7 @@ impl TxSender {
 
             enforce_pubkey_change_fee: config.api.common.enforce_pubkey_change_fee,
             forced_exit_minimum_account_age,
+            fee_free_accounts: HashSet::from_iter(config.api.common.fee_free_accounts.clone()),
             max_number_of_transactions_per_batch,
             max_number_of_authors_per_batch,
         }
@@ -227,26 +231,32 @@ impl TxSender {
         let ticker_request_sender = self.ticker_requests.clone();
 
         if let Some((tx_type, token, address, provided_fee)) = tx_fee_info {
-            let should_enforce_fee = !matches!(tx_type, TxFeeTypes::ChangePubKey { .. })
-                || self.enforce_pubkey_change_fee;
+            let is_whitelisted_initiator = self
+                .fee_free_accounts
+                .contains(&tx.get_initiator_account_id());
 
-            let fee_allowed =
-                Self::token_allowed_for_fees(ticker_request_sender.clone(), token.clone()).await?;
+            if !is_whitelisted_initiator {
+                let should_enforce_fee = !matches!(tx_type, TxFeeTypes::ChangePubKey { .. })
+                    || self.enforce_pubkey_change_fee;
 
-            if !fee_allowed {
-                return Err(SubmitError::InappropriateFeeToken);
-            }
+                let fee_allowed =
+                    Self::token_allowed_for_fees(ticker_request_sender.clone(), token.clone())
+                        .await?;
 
-            let required_fee =
-                Self::ticker_request(ticker_request_sender, tx_type, address, token.clone())
-                    .await?;
-            // Converting `BitUint` to `BigInt` is safe.
-            let required_fee: BigDecimal = required_fee.total_fee.to_bigint().unwrap().into();
-            let provided_fee: BigDecimal = provided_fee.to_bigint().unwrap().into();
-            // Scaling the fee required since the price may change between signing the transaction and sending it to the server.
-            let scaled_provided_fee = scale_user_fee_up(provided_fee.clone());
-            if required_fee >= scaled_provided_fee && should_enforce_fee {
-                vlog::error!(
+                if !fee_allowed {
+                    return Err(SubmitError::InappropriateFeeToken);
+                }
+
+                let required_fee =
+                    Self::ticker_request(ticker_request_sender, tx_type, address, token.clone())
+                        .await?;
+                // Converting `BitUint` to `BigInt` is safe.
+                let required_fee: BigDecimal = required_fee.total_fee.to_bigint().unwrap().into();
+                let provided_fee: BigDecimal = provided_fee.to_bigint().unwrap().into();
+                // Scaling the fee required since the price may change between signing the transaction and sending it to the server.
+                let scaled_provided_fee = scale_user_fee_up(provided_fee.clone());
+                if required_fee >= scaled_provided_fee && should_enforce_fee {
+                    vlog::error!(
                     "User provided fee is too low, required: {}, provided: {} (scaled: {}); difference {}, token: {:?}",
                     required_fee.to_string(),
                     provided_fee.to_string(),
@@ -255,7 +265,8 @@ impl TxSender {
                     token
                 );
 
-                return Err(SubmitError::TxAdd(TxAddError::TxFeeTooLow));
+                    return Err(SubmitError::TxAdd(TxAddError::TxFeeTooLow));
+                }
             }
         }
 
