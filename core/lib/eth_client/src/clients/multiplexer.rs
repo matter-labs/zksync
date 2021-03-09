@@ -8,13 +8,20 @@ use web3::{
 };
 use zksync_eth_signer::PrivateKeySigner;
 use zksync_types::{TransactionReceipt, H160, H256, U256};
+use std::sync::Arc;
 
 use crate::ethereum_gateway::{ExecutedTxStatus, FailureInfo, SignedCallResult};
 use crate::ETHDirectClient;
+
 #[derive(Debug, Default)]
-pub struct MultiplexerEthereumClient {
+struct MultiplexerEthereumInnerClient {
     clients: Vec<(String, ETHDirectClient<PrivateKeySigner>)>,
     preferred: AtomicUsize,
+}
+
+#[derive(Debug, Default, Clone)]
+pub struct MultiplexerEthereumClient {
+    inner: Arc<MultiplexerEthereumInnerClient>
 }
 
 macro_rules! multiple_call {
@@ -35,13 +42,13 @@ impl MultiplexerEthereumClient {
     }
 
     pub fn add_client(mut self, name: String, client: ETHDirectClient<PrivateKeySigner>) -> Self {
-        self.clients.push((name, client));
+        Arc::get_mut(&mut self.inner).unwrap().clients.push((name, client));
         self
     }
 
     pub fn prioritize_client(&self, name: &str) -> bool {
-        if let Some(idx) = self.clients.iter().position(|(key, _)| key == name) {
-            self.preferred.store(idx, Ordering::Relaxed);
+        if let Some(idx) = self.inner.clients.iter().position(|(key, _)| key == name) {
+            self.inner.preferred.store(idx, Ordering::Relaxed);
             true
         } else {
             false
@@ -49,12 +56,12 @@ impl MultiplexerEthereumClient {
     }
 
     pub fn clients(&self) -> impl Iterator<Item = (&str, &ETHDirectClient<PrivateKeySigner>)> {
-        let preferred = self.preferred.load(Ordering::Relaxed);
-        self.clients
+        let preferred = self.inner.preferred.load(Ordering::Relaxed);
+        self.inner.clients
             .get(preferred)
             .into_iter()
-            .chain(self.clients.get(..preferred).unwrap_or(&[]).iter())
-            .chain(self.clients.get(1 + preferred..).unwrap_or(&[]).iter())
+            .chain(self.inner.clients.get(..preferred).unwrap_or(&[]).iter())
+            .chain(self.inner.clients.get(1 + preferred..).unwrap_or(&[]).iter())
             .map(|(name, client)| (name.as_str(), client))
     }
 

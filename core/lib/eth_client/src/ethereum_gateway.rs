@@ -1,4 +1,3 @@
-use std::sync::Arc;
 use web3::contract::tokens::{Detokenize, Tokenize};
 use web3::contract::{Contract, Options};
 use web3::transports::Http;
@@ -44,9 +43,9 @@ pub struct FailureInfo {
 
 #[derive(Debug, Clone)]
 pub enum EthereumGateway {
-    Direct(Arc<ETHDirectClient<PrivateKeySigner>>),
-    Multiplexed(Arc<MultiplexerEthereumClient>),
-    Mock(Arc<MockEthereum>),
+    Direct(ETHDirectClient<PrivateKeySigner>),
+    Multiplexed(MultiplexerEthereumClient),
+    Mock(MockEthereum),
 }
 
 impl EthereumGateway {
@@ -54,7 +53,7 @@ impl EthereumGateway {
         if config.eth_client.web3_url.len() == 1 {
             let transport = web3::transports::Http::new(&config.eth_client.web3_url()).unwrap();
 
-            EthereumGateway::Direct(Arc::new(ETHDirectClient::new(
+            EthereumGateway::Direct(ETHDirectClient::new(
                 transport,
                 zksync_contract(),
                 config.eth_sender.sender.operator_commit_eth_addr,
@@ -62,7 +61,7 @@ impl EthereumGateway {
                 config.contracts.contract_addr,
                 config.eth_client.chain_id,
                 config.eth_client.gas_price_factor,
-            )))
+            ))
         } else {
             let mut client = MultiplexerEthereumClient::new();
 
@@ -82,7 +81,7 @@ impl EthereumGateway {
                     ),
                 );
             }
-            EthereumGateway::Multiplexed(Arc::new(client))
+            EthereumGateway::Multiplexed(client)
         }
     }
 }
@@ -266,14 +265,14 @@ impl EthereumGateway {
 
     pub fn get_mut_mock(&mut self) -> Option<&mut MockEthereum> {
         match self {
-            EthereumGateway::Mock(m) => Arc::get_mut(m),
+            EthereumGateway::Mock(ref mut m) => Some(m),
             _ => None,
         }
     }
 
     pub fn get_mock(&self) -> Option<&MockEthereum> {
         match self {
-            EthereumGateway::Mock(m) => Some(&*m),
+            EthereumGateway::Mock(m) => Some(&m),
             _ => None,
         }
     }

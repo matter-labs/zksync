@@ -93,7 +93,6 @@ impl EthereumChecker {
 mod tests {
     use super::EthereumChecker;
     use std::str::FromStr;
-    use std::sync::Arc;
     use zksync_config::test_config::TestConfig;
     use zksync_contracts::zksync_contract;
     use zksync_eth_client::ethereum_gateway::EthereumGateway;
@@ -121,7 +120,7 @@ mod tests {
         let transport =
             web3::transports::Http::new(web3_urls.first().expect("At least one should exist"))
                 .unwrap();
-        let client = EthereumGateway::Direct(Arc::new(ETHDirectClient::new(
+        let client = EthereumGateway::Direct(ETHDirectClient::new(
             transport,
             zksync_contract(),
             Default::default(),
@@ -129,7 +128,7 @@ mod tests {
             Default::default(),
             0,
             1.0,
-        )));
+        ));
 
         let eth_checker = EthereumChecker::new(client);
 

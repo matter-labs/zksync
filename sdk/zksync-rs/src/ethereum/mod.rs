@@ -100,12 +100,12 @@ impl<S: EthereumSigner> EthereumProvider<S> {
 
     /// Returns the zkSync contract address.
     pub fn contract_address(&self) -> H160 {
-        self.eth_client.contract_addr
+        self.client().contract_addr()
     }
 
     /// Returns the Ethereum account balance.
     pub async fn balance(&self) -> Result<BigUint, ClientError> {
-        self.eth_client
+        self.client()
             .sender_eth_balance()
             .await
             .map_err(|err| ClientError::NetworkError(err.to_string()))
@@ -114,7 +114,7 @@ impl<S: EthereumSigner> EthereumProvider<S> {
 
     /// Returns the pending nonce for the Ethereum account.
     pub async fn nonce(&self) -> Result<U256, ClientError> {
-        self.eth_client
+        self.client()
             .pending_nonce()
             .await
             .map_err(|err| ClientError::NetworkError(err.to_string()))
@@ -142,7 +142,7 @@ impl<S: EthereumSigner> EthereumProvider<S> {
             .ok_or(ClientError::UnknownToken)?;
 
         let current_allowance = self
-            .eth_client
+            .client()
             .allowance(token.address, self.erc20_abi.clone())
             .await
             .map_err(|err| ClientError::NetworkError(err.to_string()))?;
@@ -182,7 +182,7 @@ impl<S: EthereumSigner> EthereumProvider<S> {
             .expect("failed to encode parameters");
 
         let signed_tx = self
-            .eth_client
+            .client()
             .sign_prepared_tx_for_addr(
                 data,
                 token.address,
@@ -195,7 +195,7 @@ impl<S: EthereumSigner> EthereumProvider<S> {
             .map_err(|_| ClientError::IncorrectCredentials)?;
 
         let transaction_hash = self
-            .eth_client
+            .client()
             .send_raw_tx(signed_tx.raw_tx)
             .await
             .map_err(|err| ClientError::NetworkError(err.to_string()))?;
@@ -223,7 +223,7 @@ impl<S: EthereumSigner> EthereumProvider<S> {
                 gas: Some(300_000.into()),
                 ..Default::default()
             };
-            self.eth_client
+            self.client()
                 .sign_prepared_tx_for_addr(Vec::new(), to, options)
                 .await
                 .map_err(|_| ClientError::IncorrectCredentials)?
@@ -237,7 +237,7 @@ impl<S: EthereumSigner> EthereumProvider<S> {
                 .encode_input(&params.into_tokens())
                 .expect("failed to encode parameters");
 
-            self.eth_client
+            self.client()
                 .sign_prepared_tx_for_addr(
                     data,
                     token_info.address,
@@ -251,7 +251,7 @@ impl<S: EthereumSigner> EthereumProvider<S> {
         };
 
         let transaction_hash = self
-            .eth_client
+            .client()
             .send_raw_tx(signed_tx.raw_tx)
             .await
             .map_err(|err| ClientError::NetworkError(err.to_string()))?;
@@ -279,9 +279,9 @@ impl<S: EthereumSigner> EthereumProvider<S> {
                 gas: Some(200_000.into()),
                 ..Default::default()
             };
-            let data = self.eth_client.encode_tx_data("depositETH", sync_address);
+            let data = self.client().encode_tx_data("depositETH", sync_address);
 
-            self.eth_client
+            self.client()
                 .sign_prepared_tx(data, options)
                 .await
                 .map_err(|_| ClientError::IncorrectCredentials)?
@@ -291,16 +291,16 @@ impl<S: EthereumSigner> EthereumProvider<S> {
                 ..Default::default()
             };
             let params = (token_info.address, amount, sync_address);
-            let data = self.eth_client.encode_tx_data("depositERC20", params);
+            let data = self.client().encode_tx_data("depositERC20", params);
 
-            self.eth_client
+            self.client()
                 .sign_prepared_tx(data, options)
                 .await
                 .map_err(|_| ClientError::IncorrectCredentials)?
         };
 
         let transaction_hash = self
-            .eth_client
+            .client()
             .send_raw_tx(signed_tx.raw_tx)
             .await
             .map_err(|err| ClientError::NetworkError(err.to_string()))?;
@@ -327,16 +327,16 @@ impl<S: EthereumSigner> EthereumProvider<S> {
         };
 
         let data = self
-            .eth_client
+            .client()
             .encode_tx_data("requestFullExit", (account_id, token.address));
         let signed_tx = self
-            .eth_client
+            .client()
             .sign_prepared_tx(data, options)
             .await
             .map_err(|_| ClientError::IncorrectCredentials)?;
 
         let transaction_hash = self
-            .eth_client
+            .client()
             .send_raw_tx(signed_tx.raw_tx)
             .await
             .map_err(|err| ClientError::NetworkError(err.to_string()))?;
@@ -357,7 +357,7 @@ impl<S: EthereumSigner> EthereumProvider<S> {
         let start = Instant::now();
         loop {
             if let Some(receipt) = self
-                .eth_client
+                .client()
                 .tx_receipt(tx_hash)
                 .await
                 .map_err(|err| ClientError::NetworkError(err.to_string()))?
