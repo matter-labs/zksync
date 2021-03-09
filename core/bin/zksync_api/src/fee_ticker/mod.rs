@@ -232,11 +232,11 @@ pub enum PriceError {
 }
 
 impl PriceError {
-    fn internal(msg: impl Display) -> Self {
+    pub fn internal(msg: impl Display) -> Self {
         Self::Internal(msg.to_string())
     }
 
-    fn invalid_params(msg: impl Display) -> Self {
+    pub fn invalid_params(msg: impl Display) -> Self {
         Self::InvalidParams(msg.to_string())
     }
 }

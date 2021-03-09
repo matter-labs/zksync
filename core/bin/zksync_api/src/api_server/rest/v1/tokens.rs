@@ -170,7 +170,10 @@ mod tests {
                             Ok(price.clone())
                         } else {
                             // To provide compatibility with the `token_price_usd` hack.
-                            Err(anyhow::format_err!("Token not found: {:?}", token))
+                            Err(PriceError::invalid_params(format!(
+                                "Token not found: {:?}",
+                                token
+                            )))
                         };
 
                         response.send(msg).expect("Unable to send response");

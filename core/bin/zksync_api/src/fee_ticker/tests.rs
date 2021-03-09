@@ -111,7 +111,7 @@ fn get_test_ticker_config() -> TickerConfig {
 struct MockApiProvider;
 #[async_trait]
 impl FeeTickerAPI for MockApiProvider {
-    async fn get_last_quote(&self, token: TokenLike) -> Result<TokenPrice, anyhow::Error> {
+    async fn get_last_quote(&self, token: TokenLike) -> Result<TokenPrice, PriceError> {
         for test_token in TestToken::all_tokens() {
             if TokenLike::Id(test_token.id) == token {
                 let token_price = TokenPrice {
@@ -182,8 +182,8 @@ struct ErrorTickerApi;
 
 #[async_trait::async_trait]
 impl TokenPriceAPI for ErrorTickerApi {
-    async fn get_price(&self, _token_symbol: &str) -> anyhow::Result<TokenPrice> {
-        anyhow::bail!("Wrong token")
+    async fn get_price(&self, _token_symbol: &str) -> Result<TokenPrice, PriceError> {
+        Err(PriceError::invalid_params("Wrong token"))
     }
 }
 
