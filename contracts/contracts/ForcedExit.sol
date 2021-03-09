@@ -30,42 +30,19 @@ contract ForcedExit is Ownable, ReentrancyGuard {
         receiver = _newReceiver;
     }
 
-    function disable() external {
-        requireMaster(msg.sender);
-
-        enabled = false;
-    }
-
-    function enable() external {
-        requireMaster(msg.sender);
-
-        enabled = true;
-    }
-
-    // Withdraw funds that failed to reach zkSync due to out-of-gas
-    // We don't require the contract to be enabled to call this function since
-    // only the master can use it.
-    function withdrawPendingFunds(address payable _to, uint128 amount) external nonReentrant {
-        requireMaster(msg.sender);
+    function withdrawPendingFunds(address payable _to) external nonReentrant {
+        require(msg.sender == receiver || msg.sender == getMaster(), "1"); // Only the receiver or master can withdraw funds from the smart contract
 
         uint256 balance = address(this).balance;
 
-        require(amount <= balance, "The balance is lower than the amount");
-
-        (bool success, ) = _to.call{value: amount}("");
-        require(success, "ETH withdraw failed");
+        (bool success, ) = _to.call{value: balance}("");
+        require(success, "2"); // ETH withdraw failed
     }
 
     // We have to use fallback instead of `receive` since the ethabi
     // library can't decode the receive function:
     // https://github.com/rust-ethereum/ethabi/issues/185
-    fallback() external payable nonReentrant {
-        require(enabled, "Contract is disabled");
-        require(receiver != address(0), "Receiver must be non-zero");
-
-        (bool success, ) = receiver.call{value: msg.value}("");
-        require(success, "ETH withdraw failed");
-
+    fallback() external payable {
         emit FundsReceived(msg.value);
     }
 }
