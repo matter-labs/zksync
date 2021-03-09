@@ -303,20 +303,6 @@ impl ZkSyncTx {
         }
     }
 
-    /// Returns the transaction initiator's account id.
-    ///
-    /// Returns `None` if transaction initiator's account id is unknown.
-    /// For example, `Close` operation.
-    pub fn get_initiator_account_id(&self) -> AccountId {
-        match self {
-            ZkSyncTx::Transfer(tx) => tx.account_id,
-            ZkSyncTx::Withdraw(tx) => tx.account_id,
-            ZkSyncTx::Close(_) => unreachable!(),
-            ZkSyncTx::ChangePubKey(tx) => tx.account_id,
-            ZkSyncTx::ForcedExit(tx) => tx.initiator_account_id,
-        }
-    }
-
     /// Returns the unix format timestamp of the first moment when transaction execution is valid.
     pub fn valid_from(&self) -> u64 {
         match self {

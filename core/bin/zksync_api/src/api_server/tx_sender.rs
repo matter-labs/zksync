@@ -231,9 +231,10 @@ impl TxSender {
         let ticker_request_sender = self.ticker_requests.clone();
 
         if let Some((tx_type, token, address, provided_fee)) = tx_fee_info {
-            let is_whitelisted_initiator = self
-                .fee_free_accounts
-                .contains(&tx.get_initiator_account_id());
+            let is_whitelisted_initiator = tx
+                .account_id()
+                .map(|account_id| self.fee_free_accounts.contains(&account_id))
+                .unwrap_or_default();
 
             if !is_whitelisted_initiator {
                 let should_enforce_fee = !matches!(tx_type, TxFeeTypes::ChangePubKey { .. })
@@ -257,13 +258,13 @@ impl TxSender {
                 let scaled_provided_fee = scale_user_fee_up(provided_fee.clone());
                 if required_fee >= scaled_provided_fee && should_enforce_fee {
                     vlog::error!(
-                    "User provided fee is too low, required: {}, provided: {} (scaled: {}); difference {}, token: {:?}",
-                    required_fee.to_string(),
-                    provided_fee.to_string(),
-                    scaled_provided_fee.to_string(),
-                    (&required_fee - &scaled_provided_fee).to_string(),
-                    token
-                );
+                        "User provided fee is too low, required: {}, provided: {} (scaled: {}); difference {}, token: {:?}",
+                        required_fee.to_string(),
+                        provided_fee.to_string(),
+                        scaled_provided_fee.to_string(),
+                        (&required_fee - &scaled_provided_fee).to_string(),
+                        token
+                    );
 
                     return Err(SubmitError::TxAdd(TxAddError::TxFeeTooLow));
                 }

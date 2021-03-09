@@ -481,6 +481,19 @@ mod tests {
         not(feature = "api_test"),
         ignore = "Use `zk test rust-api` command to perform this test"
     )]
+    async fn test_rust_api() -> anyhow::Result<()> {
+        test_transactions_scope().await?;
+        test_bad_fee_token().await?;
+        test_fast_processing_flag().await?;
+        test_fee_free_account().await?;
+        Ok(())
+    }
+
+    #[actix_rt::test]
+    #[cfg_attr(
+        not(feature = "api_test"),
+        ignore = "Use `zk test rust-api` command to perform this test"
+    )]
     async fn test_submit_txs_loopback() -> anyhow::Result<()> {
         let (core_client, core_server) = submit_txs_loopback();
 
@@ -498,11 +511,6 @@ mod tests {
         Ok(())
     }
 
-    #[actix_rt::test]
-    #[cfg_attr(
-        not(feature = "api_test"),
-        ignore = "Use `zk test rust-api` command to perform this test"
-    )]
     async fn test_transactions_scope() -> anyhow::Result<()> {
         let (client, server) = TestServer::new().await?;
 
@@ -665,11 +673,6 @@ mod tests {
     /// - Attempt to pay fees in an inappropriate token fails for single txs.
     /// - Attempt to pay fees in an inappropriate token fails for single batch.
     /// - Batch with an inappropriate token still can be processed if the fee is covered with a common token.
-    #[actix_rt::test]
-    #[cfg_attr(
-        not(feature = "api_test"),
-        ignore = "Use `zk test rust-api` command to perform this test"
-    )]
     async fn test_bad_fee_token() -> anyhow::Result<()> {
         let (client, server) = TestServer::new().await?;
 
@@ -781,16 +784,46 @@ mod tests {
         Ok(())
     }
 
+    /// This test checks the following:
+    ///
+    /// Attempt by fee free account to pay zero fee in single tx or txs batch.
+    async fn test_fee_free_account() -> anyhow::Result<()> {
+        let (client, server) = TestServer::new().await?;
+
+        let from = ZkSyncAccount::rand();
+        from.set_account_id(Some(AccountId(0xfee)));
+        let to = ZkSyncAccount::rand();
+
+        // Submit transaction with a zero fee by the fee free account
+        let (tx, eth_sig) = from.sign_transfer(
+            TokenId(0),
+            "ETH",
+            0u64.into(),
+            0u64.into(),
+            &to.address,
+            Some(Nonce(0)),
+            false,
+            Default::default(),
+        );
+        let transfer = ZkSyncTx::Transfer(Box::new(tx));
+        client
+            .submit_tx(
+                transfer.clone(),
+                eth_sig.map(TxEthSignature::EthereumSignature),
+                None,
+            )
+            .await
+            .unwrap();
+
+        server.stop().await;
+        Ok(())
+    }
+
     /// This test checks the following criteria:
     ///
     /// - Attempt to submit non-withdraw transaction with the enabled fast-processing.
     /// - Attempt to submit non-withdraw transaction with the disabled fast-processing.
     /// - Attempt to submit withdraw transaction with the enabled fast-processing.
-    #[actix_rt::test]
-    #[cfg_attr(
-        not(feature = "api_test"),
-        ignore = "Use `zk test rust-api` command to perform this test"
-    )]
     async fn test_fast_processing_flag() -> anyhow::Result<()> {
         let (client, server) = TestServer::new().await?;
 
