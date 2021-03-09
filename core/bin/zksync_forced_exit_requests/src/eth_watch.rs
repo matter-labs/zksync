@@ -122,17 +122,17 @@ impl EthClient for EthHttpClient {
     }
 }
 
-struct ForcedExitContractWatcher<SENDER, CLIENT, INTERACTOR>
+struct ForcedExitContractWatcher<Sender, Client, Interactor>
 where
-    SENDER: ForcedExitSender,
-    CLIENT: EthClient,
-    INTERACTOR: CoreInteractionWrapper,
+    Sender: ForcedExitSender,
+    Client: EthClient,
+    Interactor: CoreInteractionWrapper,
 {
-    core_interaction_wrapper: INTERACTOR,
+    core_interaction_wrapper: Interactor,
     config: ZkSyncConfig,
-    eth_client: CLIENT,
+    eth_client: Client,
     last_viewed_block: u64,
-    forced_exit_sender: SENDER,
+    forced_exit_sender: Sender,
 
     mode: WatcherMode,
     db_cleanup_interval: chrono::Duration,
@@ -175,17 +175,17 @@ fn lower_bound_block_time(block: u64, current_block: u64) -> DateTime<Utc> {
     Utc::now().sub(time_diff)
 }
 
-impl<SENDER, CLIENT, INTERACTOR> ForcedExitContractWatcher<SENDER, CLIENT, INTERACTOR>
+impl<Sender, Client, Interactor> ForcedExitContractWatcher<Sender, Client, Interactor>
 where
-    SENDER: ForcedExitSender,
-    CLIENT: EthClient,
-    INTERACTOR: CoreInteractionWrapper,
+    Sender: ForcedExitSender,
+    Client: EthClient,
+    Interactor: CoreInteractionWrapper,
 {
     pub fn new(
-        core_interaction_wrapper: INTERACTOR,
+        core_interaction_wrapper: Interactor,
         config: ZkSyncConfig,
-        eth_client: CLIENT,
-        forced_exit_sender: SENDER,
+        eth_client: Client,
+        forced_exit_sender: Sender,
         db_cleanup_interval: chrono::Duration,
     ) -> Self {
         Self {
