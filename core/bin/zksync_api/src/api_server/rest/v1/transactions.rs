@@ -323,6 +323,7 @@ mod tests {
     use actix_web::App;
     use bigdecimal::BigDecimal;
     use futures::{channel::mpsc, StreamExt};
+    use num::rational::Ratio;
     use num::BigUint;
 
     use zksync_api_client::rest::v1::Client;
@@ -339,7 +340,7 @@ mod tests {
     use crate::{
         api_server::helpers::try_parse_tx_hash,
         core_api_client::CoreApiClient,
-        fee_ticker::TickerRequest,
+        fee_ticker::{ResponseBatchFee, ResponseFee, TickerRequest},
         signature_checker::{VerifiedTx, VerifySignatureRequest},
     };
 
@@ -375,15 +376,23 @@ mod tests {
             while let Some(item) = receiver.next().await {
                 match item {
                     TickerRequest::GetTxFee { response, .. } => {
-                        let fee = Ok(Fee::new(
+                        let normal_fee = Fee::new(
                             Withdraw,
                             BigUint::from(1_u64).into(),
                             BigUint::from(1_u64).into(),
                             1_u64.into(),
                             1_u64.into(),
-                        ));
+                        );
 
-                        response.send(fee).expect("Unable to send response");
+                        let subsidy_fee = normal_fee.clone();
+
+                        let res = Ok(ResponseFee {
+                            normal_fee,
+                            subsidy_fee,
+                            subsidy_size_usd: Ratio::from_integer(0u32.into()),
+                        });
+
+                        response.send(res).expect("Unable to send response");
                     }
                     TickerRequest::GetTokenPrice { response, .. } => {
                         let price = Ok(BigDecimal::from(1_u64));
@@ -404,11 +413,18 @@ mod tests {
                         transactions,
                         ..
                     } => {
-                        let fee = BatchFee {
+                        let normal_fee = BatchFee {
                             total_fee: BigUint::from(transactions.len()),
                         };
+                        let subsidy_fee = normal_fee.clone();
 
-                        response.send(Ok(fee)).expect("Unable to send response");
+                        let res = Ok(ResponseBatchFee {
+                            normal_fee,
+                            subsidy_fee,
+                            subsidy_size_usd: Ratio::from_integer(0u32.into()),
+                        });
+
+                        response.send(res).expect("Unable to send response");
                     }
                 }
             }
