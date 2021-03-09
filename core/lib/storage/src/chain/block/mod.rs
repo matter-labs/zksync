@@ -14,7 +14,7 @@ use self::records::{
     AccountTreeCache, BlockDetails, BlockTransactionItem, StorageBlock, StoragePendingBlock,
 };
 use crate::{
-    chain::account::{records::EthAccountType, AccountSchema},
+    chain::account::records::EthAccountType,
     chain::operations::{
         records::{
             NewExecutedPriorityOperation, NewExecutedTransaction, StoredExecutedPriorityOperation,
@@ -43,10 +43,15 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
         operations: Vec<ExecutedOperations>,
     ) -> QueryResult<()> {
         let start = Instant::now();
+        let mut transaction = self.0.start_transaction().await?;
+
         for block_tx in operations.into_iter() {
             match block_tx {
                 ExecutedOperations::Tx(tx) => {
                     // Update account type
+                    // This method is called in the committer, so account type update takes effect
+                    // starting the next miniblock. If the user wishes to send ChangePubKey + another Tx from
+                    // CREATE2 account in the same miniblock, they will have to do it in a batch
                     if let Some(ZkSyncOp::ChangePubKeyOffchain(tx)) = &tx.op {
                         let account_type = if matches!(&tx.tx.eth_auth_data, Some(auth) if auth.is_create2())
                         {
@@ -54,13 +59,19 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
                         } else {
                             EthAccountType::Owned
                         };
-                        AccountSchema(self.0)
+                        transaction
+                            .chain()
+                            .account_schema()
                             .set_account_type(tx.account_id, account_type)
                             .await?;
                     }
                     // Store the executed operation in the corresponding schema.
                     let new_tx = NewExecutedTransaction::prepare_stored_tx(*tx, block_number);
-                    OperationsSchema(self.0).store_executed_tx(new_tx).await?;
+                    transaction
+                        .chain()
+                        .operations_schema()
+                        .store_executed_tx(new_tx)
+                        .await?;
                 }
                 ExecutedOperations::PriorityOp(prior_op) => {
                     // For priority operation we should only store it in the Operations schema.
@@ -68,12 +79,16 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
                         *prior_op,
                         block_number,
                     );
-                    OperationsSchema(self.0)
+                    transaction
+                        .chain()
+                        .operations_schema()
                         .store_executed_priority_op(new_priority_op)
                         .await?;
                 }
             }
         }
+
+        transaction.commit().await?;
         metrics::histogram!("sql.chain.block.save_block_transactions", start.elapsed());
         Ok(())
     }
