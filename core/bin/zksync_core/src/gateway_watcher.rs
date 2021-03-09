@@ -2,6 +2,8 @@ use super::retry_opt_fut;
 use futures::{future::ready, stream, StreamExt};
 use std::iter;
 use std::time::Duration;
+use std::cmp::Ordering;
+use std::collections::HashMap;
 use thiserror::Error;
 use tokio::{task::JoinHandle, time};
 
@@ -144,9 +146,22 @@ impl GatewayWatcher<EthereumGateway> {
         .collect::<Vec<_>>()
         .await;
 
+        let hash_counts = client_latest_blocks.iter().fold(HashMap::new(), |mut map, (_, cur)| {
+            map.entry(&cur.hash).and_modify(|val| *val += 1).or_insert(1);
+            map
+        });
+
         if let Some((preferred_key, latest_block)) = client_latest_blocks
             .iter()
-            .max_by(|(_, block1), (_, block2)| block1.number.cmp(&block2.number))
+            .rev()
+            .max_by(|(_, block1), (_, block2)| match block1.number.cmp(&block2.number) {
+                Ordering::Equal => {
+                    hash_counts.get(&block1.hash).cmp(&hash_counts.get(&block2.hash))
+                }
+                other => {
+                    other
+                }
+            })
         {
             client.prioritize_client(preferred_key);
             for (key, block) in &client_latest_blocks {
