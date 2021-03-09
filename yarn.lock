@@ -14740,18 +14740,8 @@ zksync-crypto@^0.4.2:
   resolved "https://registry.yarnpkg.com/zksync-crypto/-/zksync-crypto-0.4.5.tgz#2941ea8dbada9178390afdcc3c93430f31b00784"
   integrity sha512-XhhnNhc85BgfmLEAmA7YqrblUltfykrPxlbayGe0dQowroco+1ply3VEZbs0tSEDW5ssBwJHzRSYm3+dOCnzxQ==
 
-zksync@^0.9.0:
-  version "0.9.0"
-  resolved "https://registry.yarnpkg.com/zksync/-/zksync-0.9.0.tgz#7550f81a193e124464582e33062a03625a5e9b7f"
-  integrity sha512-5pRSsml/0fTNgkcmvTWi+Ar9+XFtdbpa6GSzx/DCCoHKvNLUUwEYIVYi5azTNnm7R1DEsJY1cWHyBhlyqI2RvA==
-  dependencies:
-    axios "^0.21.1"
-    websocket "^1.0.30"
-    websocket-as-promised "^1.1.0"
-    zksync-crypto "^0.4.2"
-
 "zksync@link:sdk/zksync.js":
-  version "0.10.0"
+  version "0.9.0"
   dependencies:
     axios "^0.21.1"
     websocket "^1.0.30"
