@@ -11,6 +11,8 @@ CORES=$(grep -c ^processor /proc/cpuinfo 2> /dev/null || sysctl -n hw.ncpu 2> /d
 # flags for cmake
 CMAKE_FLAGS=-DCMAKE_BUILD_TYPE=Debug
 
+git submodule update --init --recursive
+
 if command -v clang &> /dev/null
 then
     CMAKE_FLAGS=$CMAKE_FLAGS\ -DCMAKE_C_COMPILER=clang\ -DCMAKE_CXX_COMPILER=clang++
