@@ -158,7 +158,7 @@ mod tests {
                 enforce_pubkey_change_fee: true,
                 max_number_of_transactions_per_batch: 200,
                 max_number_of_authors_per_batch: 10,
-                fee_free_accounts: vec![4078],
+                fee_free_accounts: vec![AccountId(4078)],
             },
             admin: AdminApi {
                 port: 8080,
