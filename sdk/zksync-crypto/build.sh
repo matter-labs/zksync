@@ -17,13 +17,15 @@ wasm-pack build --release --target=bundler --out-name=zksync-crypto-bundler --ou
 cp ./dist/zksync-crypto-bundler.js ./dist/zksync-crypto-bundler_asm.js
 
 # fix imports for asm
-sed -i "s/^import.*/\
+sed -i.backup "s/^import.*/\
 let wasm = require('.\/zksync-crypto-bundler_bg_asm.js');/" ./dist/zksync-crypto-bundler_asm.js
-sed -i "s/\.js/_asm\.js/g" $ASM
+sed -i.backup "s/\.js/_asm\.js/g" $ASM
 
 # pack for browser
 wasm-pack build --release --target=web --out-name=zksync-crypto-web --out-dir=dist
 
 # pack for node.js
 wasm-pack build --release --target=nodejs --out-name=zksync-crypto-node --out-dir=dist
+
 rm dist/package.json dist/.gitignore
+rm dist/*.backup
