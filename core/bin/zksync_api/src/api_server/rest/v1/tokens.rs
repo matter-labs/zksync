@@ -217,12 +217,10 @@ mod tests {
                 "Price does not match"
             );
         }
-        assert_eq!(
-            client
-                .token_price(&TokenLike::Id(TokenId(2)), TokenPriceKind::Currency)
-                .await?,
-            None
-        );
+        client
+            .token_price(&TokenLike::Id(TokenId(2)), TokenPriceKind::Currency)
+            .await
+            .unwrap_err();
         // TODO Check error (ZKS-125)
         client
             .token_price(&TokenLike::Id(TokenId(2)), TokenPriceKind::Token)
