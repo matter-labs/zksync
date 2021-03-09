@@ -24,6 +24,8 @@ All notable changes to the core components will be documented in this file.
 
 ### Fixed
 
+- (`zksync_api`): Internal error with tokens not listed on CoinGecko.
+
 ## Release 2021-02-19
 
 ### Removed

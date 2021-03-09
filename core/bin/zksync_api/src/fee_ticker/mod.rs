@@ -6,6 +6,7 @@
 // Built-in deps
 use std::collections::{HashMap, HashSet};
 use std::convert::TryFrom;
+use std::fmt::Display;
 use std::iter::FromIterator;
 use std::sync::Arc;
 // External deps
@@ -20,10 +21,10 @@ use num::{
     BigUint, Zero,
 };
 use serde::{Deserialize, Serialize};
+use thiserror::Error;
 use tokio::sync::Mutex;
 use tokio::task::JoinHandle;
 use tokio::time::Instant;
-
 // Workspace deps
 use zksync_balancer::{Balancer, BuildBalancedItem};
 use zksync_config::{configs::ticker::TokenPriceSource, ZkSyncConfig};
@@ -213,13 +214,31 @@ pub enum TickerRequest {
     },
     GetTokenPrice {
         token: TokenLike,
-        response: oneshot::Sender<Result<BigDecimal, anyhow::Error>>,
+        response: oneshot::Sender<Result<BigDecimal, PriceError>>,
         req_type: TokenPriceRequestType,
     },
     IsTokenAllowed {
         token: TokenLike,
         response: oneshot::Sender<Result<bool, anyhow::Error>>,
     },
+}
+
+#[derive(Debug, Error)]
+pub enum PriceError {
+    #[error("Invalid params: {0}.")]
+    InvalidParams(String),
+    #[error("Internal error.")]
+    Internal(String),
+}
+
+impl PriceError {
+    fn internal(msg: impl Display) -> Self {
+        Self::Internal(msg.to_string())
+    }
+
+    fn invalid_params(msg: impl Display) -> Self {
+        Self::InvalidParams(msg.to_string())
+    }
 }
 
 struct FeeTicker<API, INFO, WATCHER> {
@@ -408,10 +427,15 @@ impl<API: FeeTickerAPI, INFO: FeeTickerInfo, WATCHER: TokenWatcher> FeeTicker<AP
         &self,
         token: TokenLike,
         request_type: TokenPriceRequestType,
-    ) -> Result<BigDecimal, anyhow::Error> {
+    ) -> Result<BigDecimal, PriceError> {
         let factor = match request_type {
             TokenPriceRequestType::USDForOneWei => {
-                let token_decimals = self.api.get_token(token.clone()).await?.decimals;
+                let token_decimals = self
+                    .api
+                    .get_token(token.clone())
+                    .await
+                    .map_err(PriceError::internal)?
+                    .decimals;
                 BigUint::from(10u32).pow(u32::from(token_decimals))
             }
             TokenPriceRequestType::USDForOneToken => BigUint::from(1u32),

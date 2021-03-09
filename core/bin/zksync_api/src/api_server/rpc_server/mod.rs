@@ -22,7 +22,7 @@ use zksync_types::{tx::TxHash, Address, BatchFee, BlockNumber, Fee, TokenLike, T
 
 // Local uses
 use crate::{
-    fee_ticker::{TickerRequest, TokenPriceRequestType},
+    fee_ticker::{PriceError, TickerRequest, TokenPriceRequestType},
     signature_checker::VerifySignatureRequest,
     utils::shared_lru_cache::SharedLruCache,
 };
@@ -331,8 +331,13 @@ impl RpcApp {
             .expect("ticker receiver dropped");
         let resp = req.1.await.expect("ticker answer sender dropped");
         resp.map_err(|err| {
-            vlog::warn!("Internal Server Error: '{}'; input: {:?}", err, token);
-            Error::internal_error()
+            return match err {
+                PriceError::InvalidParams(msg) => Error::invalid_params(msg),
+                _ => {
+                    vlog::warn!("Internal Server Error: '{}'; input: {:?}", err, token);
+                    Error::internal_error()
+                }
+            };
         })
     }
 

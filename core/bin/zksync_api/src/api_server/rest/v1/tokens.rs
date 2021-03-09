@@ -19,7 +19,7 @@ use zksync_storage::{ConnectionPool, QueryResult};
 use zksync_types::{Token, TokenLike};
 
 use crate::{
-    fee_ticker::{TickerRequest, TokenPriceRequestType},
+    fee_ticker::{PriceError, TickerRequest, TokenPriceRequestType},
     utils::token_db_cache::TokenDBCache,
 };
 
@@ -79,14 +79,8 @@ impl ApiTokensData {
         // Ugly hack to distinguish real error from missing token.
         match price_receiver.await? {
             Ok(price) => Ok(Some(price)),
-            Err(err) => {
-                // TODO: Improve ticker API to remove this terrible code snippet. (task number ????)
-                if err.to_string().contains("Token not found") {
-                    Ok(None)
-                } else {
-                    Err(err)
-                }
-            }
+            Err(PriceError::InvalidParams(err)) => Err(anyhow::format_err!(err)),
+            Err(PriceError::Internal(err)) => Err(anyhow::format_err!(err)),
         }
     }
 }
