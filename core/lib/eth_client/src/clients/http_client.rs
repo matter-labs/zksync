@@ -1,6 +1,6 @@
 // Built-in deps
-use std::{fmt, time::Instant};
 use std::sync::Arc;
+use std::{fmt, time::Instant};
 
 // External uses
 use web3::{
@@ -38,7 +38,7 @@ struct ETHDirectClientInner<S: EthereumSigner> {
 
 #[derive(Clone)]
 pub struct ETHDirectClient<S: EthereumSigner> {
-    inner: Arc<ETHDirectClientInner<S>>
+    inner: Arc<ETHDirectClientInner<S>>,
 }
 
 impl<S: EthereumSigner> fmt::Debug for ETHDirectClient<S> {
@@ -73,7 +73,7 @@ impl<S: EthereumSigner> ETHDirectClient<S> {
                 contract,
                 gas_price_factor,
                 web3: Web3::new(transport),
-            })
+            }),
         }
     }
 
@@ -92,8 +92,8 @@ impl<S: EthereumSigner> ETHDirectClient<S> {
     pub async fn pending_nonce(&self) -> Result<U256, anyhow::Error> {
         let start = Instant::now();
         let count = self
-            .inner    
-        .web3
+            .inner
+            .web3
             .eth()
             .transaction_count(self.inner.sender_account, Some(BlockNumber::Pending))
             .await?;
@@ -104,8 +104,8 @@ impl<S: EthereumSigner> ETHDirectClient<S> {
     pub async fn current_nonce(&self) -> Result<U256, anyhow::Error> {
         let start = Instant::now();
         let nonce = self
-            .inner    
-        .web3
+            .inner
+            .web3
             .eth()
             .transaction_count(self.inner.sender_account, Some(BlockNumber::Latest))
             .await?;
@@ -133,7 +133,8 @@ impl<S: EthereumSigner> ETHDirectClient<S> {
     pub async fn get_gas_price(&self) -> Result<U256, anyhow::Error> {
         let start = Instant::now();
         let mut network_gas_price = self.inner.web3.eth().gas_price().await?;
-        let percent_gas_price_factor = U256::from((self.inner.gas_price_factor * 100.0).round() as u64);
+        let percent_gas_price_factor =
+            U256::from((self.inner.gas_price_factor * 100.0).round() as u64);
         network_gas_price = (network_gas_price * percent_gas_price_factor) / U256::from(100);
         metrics::histogram!("eth_client.direct.get_gas_price", start.elapsed());
         Ok(network_gas_price)
@@ -194,7 +195,12 @@ impl<S: EthereumSigner> ETHDirectClient<S> {
         };
 
         let signed_tx = self.inner.eth_signer.sign_transaction(tx).await?;
-        let hash = self.inner.web3.web3().sha3(Bytes(signed_tx.clone())).await?;
+        let hash = self
+            .inner
+            .web3
+            .web3()
+            .sha3(Bytes(signed_tx.clone()))
+            .await?;
 
         metrics::histogram!(
             "eth_client.direct.sign_prepared_tx_for_addr",
@@ -210,7 +216,12 @@ impl<S: EthereumSigner> ETHDirectClient<S> {
 
     pub async fn send_raw_tx(&self, tx: Vec<u8>) -> Result<H256, anyhow::Error> {
         let start = Instant::now();
-        let tx = self.inner.web3.eth().send_raw_transaction(Bytes(tx)).await?;
+        let tx = self
+            .inner
+            .web3
+            .eth()
+            .send_raw_transaction(Bytes(tx))
+            .await?;
         metrics::histogram!("eth_client.direct.send_raw_tx", start.elapsed());
         Ok(tx)
     }
@@ -230,8 +241,20 @@ impl<S: EthereumSigner> ETHDirectClient<S> {
         tx_hash: H256,
     ) -> Result<Option<FailureInfo>, anyhow::Error> {
         let start = Instant::now();
-        let transaction = self.inner.web3.eth().transaction(tx_hash.into()).await?.unwrap();
-        let receipt = self.inner.web3.eth().transaction_receipt(tx_hash).await?.unwrap();
+        let transaction = self
+            .inner
+            .web3
+            .eth()
+            .transaction(tx_hash.into())
+            .await?
+            .unwrap();
+        let receipt = self
+            .inner
+            .web3
+            .eth()
+            .transaction_receipt(tx_hash)
+            .await?
+            .unwrap();
 
         let gas_limit = transaction.gas;
         let gas_used = receipt.gas_used;
@@ -246,8 +269,8 @@ impl<S: EthereumSigner> ETHDirectClient<S> {
         };
 
         let encoded_revert_reason = self
-            .inner    
-        .web3
+            .inner
+            .web3
             .eth()
             .call(call_request, receipt.block_number.map(Into::into))
             .await?;
@@ -434,8 +457,8 @@ impl<S: EthereumSigner> ETHDirectClient<S> {
 
     pub async fn get_tx(&self, hash: H256) -> Result<Option<Transaction>, anyhow::Error> {
         let tx = self
-            .inner    
-        .web3
+            .inner
+            .web3
             .eth()
             .transaction(TransactionId::Hash(hash))
             .await?;

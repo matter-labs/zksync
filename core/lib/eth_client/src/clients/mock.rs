@@ -27,7 +27,7 @@ struct MockEthereumInner {
 /// Mock Ethereum client is capable of recording all the incoming requests for the further analysis.
 #[derive(Debug, Default, Clone)]
 pub struct MockEthereum {
-    inner: Arc<MockEthereumInner>
+    inner: Arc<MockEthereumInner>,
 }
 
 impl Default for MockEthereumInner {
@@ -66,7 +66,11 @@ impl MockEthereum {
 
     /// Adds an response for the sent transaction for `ETHSender` to receive.
     pub async fn add_execution(&mut self, hash: &H256, status: &ExecutedTxStatus) {
-        self.inner.tx_statuses.write().await.insert(*hash, status.clone());
+        self.inner
+            .tx_statuses
+            .write()
+            .await
+            .insert(*hash, status.clone());
     }
 
     /// Increments the blocks by a provided `confirmations` and marks the sent transaction

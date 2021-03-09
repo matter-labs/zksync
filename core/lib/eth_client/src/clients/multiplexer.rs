@@ -1,5 +1,6 @@
 use ethabi::Contract;
 use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::Arc;
 use web3::{
     contract::tokens::{Detokenize, Tokenize},
     contract::Options,
@@ -8,7 +9,6 @@ use web3::{
 };
 use zksync_eth_signer::PrivateKeySigner;
 use zksync_types::{TransactionReceipt, H160, H256, U256};
-use std::sync::Arc;
 
 use crate::ethereum_gateway::{ExecutedTxStatus, FailureInfo, SignedCallResult};
 use crate::ETHDirectClient;
@@ -21,7 +21,7 @@ struct MultiplexerEthereumInnerClient {
 
 #[derive(Debug, Default, Clone)]
 pub struct MultiplexerEthereumClient {
-    inner: Arc<MultiplexerEthereumInnerClient>
+    inner: Arc<MultiplexerEthereumInnerClient>,
 }
 
 macro_rules! multiple_call {
@@ -42,7 +42,10 @@ impl MultiplexerEthereumClient {
     }
 
     pub fn add_client(mut self, name: String, client: ETHDirectClient<PrivateKeySigner>) -> Self {
-        Arc::get_mut(&mut self.inner).unwrap().clients.push((name, client));
+        Arc::get_mut(&mut self.inner)
+            .unwrap()
+            .clients
+            .push((name, client));
         self
     }
 
@@ -57,11 +60,18 @@ impl MultiplexerEthereumClient {
 
     pub fn clients(&self) -> impl Iterator<Item = (&str, &ETHDirectClient<PrivateKeySigner>)> {
         let preferred = self.inner.preferred.load(Ordering::Relaxed);
-        self.inner.clients
+        self.inner
+            .clients
             .get(preferred)
             .into_iter()
             .chain(self.inner.clients.get(..preferred).unwrap_or(&[]).iter())
-            .chain(self.inner.clients.get(1 + preferred..).unwrap_or(&[]).iter())
+            .chain(
+                self.inner
+                    .clients
+                    .get(1 + preferred..)
+                    .unwrap_or(&[])
+                    .iter(),
+            )
             .map(|(name, client)| (name.as_str(), client))
     }
 
