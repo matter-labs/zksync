@@ -290,9 +290,10 @@ impl<S: EthereumSigner> EthereumProvider<S> {
         } else {
             let gas_limits: Map<String, Value> = serde_json::from_str(RAW_ERC20_DEPOSIT_GAS_LIMIT)
                 .map_err(|_| ClientError::Other)?;
-            let gas_limit = if gas_limits.contains_key(&token_info.symbol) {
+            let address_str = format!("{:?}", token_info.address);
+            let gas_limit = if gas_limits.contains_key(&address_str) {
                 gas_limits
-                    .get(&token_info.symbol)
+                    .get(&address_str)
                     .ok_or(ClientError::Other)?
                     .as_u64()
                     .ok_or(ClientError::Other)?
