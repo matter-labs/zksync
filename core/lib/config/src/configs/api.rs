@@ -158,7 +158,7 @@ mod tests {
                 enforce_pubkey_change_fee: true,
                 max_number_of_transactions_per_batch: 200,
                 max_number_of_authors_per_batch: 10,
-                fee_free_accounts: vec![],
+                fee_free_accounts: vec![AccountId(4078), AccountId(387)],
             },
             admin: AdminApi {
                 port: 8080,
@@ -193,7 +193,7 @@ mod tests {
         let config = r#"
 API_COMMON_CACHES_SIZE="10000"
 API_COMMON_FORCED_EXIT_MINIMUM_ACCOUNT_AGE_SECS="0"
-API_COMMON_FEE_FREE_ACCOUNTS=
+API_COMMON_FEE_FREE_ACCOUNTS=4078,387
 API_COMMON_ENFORCE_PUBKEY_CHANGE_FEE=true
 API_COMMON_MAX_NUMBER_OF_TRANSACTIONS_PER_BATCH=200
 API_COMMON_MAX_NUMBER_OF_AUTHORS_PER_BATCH=10
