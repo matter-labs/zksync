@@ -40,6 +40,7 @@ import {
     ETH_RECOMMENDED_DEPOSIT_GAS_LIMIT,
     getChangePubkeyLegacyMessage
 } from './utils';
+import { pubKeyHash } from 'zksync-crypto';
 
 const EthersErrorCode = ErrorCode;
 
@@ -569,8 +570,6 @@ export class Wallet {
         changePubkeyTxUnsigned.validFrom = changePubKey.validFrom || 0;
         changePubkeyTxUnsigned.validUntil = changePubKey.validUntil || MAX_TIMESTAMP;
         const changePubKeyTx = await this.getChangePubKey(changePubkeyTxUnsigned as any);
-
-        console.log(changePubKeyTx);
 
         return {
             tx: changePubKeyTx

@@ -157,7 +157,9 @@ export class BatchBuilder {
         fee?: BigNumberish;
         validFrom?: number;
         validUntil?: number;
-        alreadySigned?: boolean
+        alreadySigned?: boolean;
+        nonce?: number;
+        pubKeyHash?: string;
     }): BatchBuilder {
         const _changePubKey = {
             feeToken: changePubKey.feeToken,
@@ -173,7 +175,7 @@ export class BatchBuilder {
         };
         this.txs.push({
             type: 'ChangePubKey',
-            tx: _changePubKey,
+            tx: changePubKey.alreadySigned ? changePubKey : _changePubKey,
             feeType,
             address: this.wallet.address(),
             token: _changePubKey.feeToken,
@@ -229,6 +231,12 @@ export class BatchBuilder {
                     processedTxs.push(transfer);
                     break;
                 case 'ChangePubKey':
+                    if (tx.alreadySigned) {
+                        tx.tx.pubKeyHash = tx.tx.newPkHash;
+                        processedTxs.push({tx: tx.tx});
+                        messages.push(this.wallet.getChangePubKeyEthMessagePart(tx.tx));
+                        break;
+                    }
                     const changePubKey = tx.alreadySigned ? tx.tx : await this.wallet.signSetSigningKey(tx.tx);
                     tx.tx.pubKeyHash = (changePubKey.tx as ChangePubKey).newPkHash;
                     const currentPubKeyHash = await this.wallet.getCurrentPubKeyHash();

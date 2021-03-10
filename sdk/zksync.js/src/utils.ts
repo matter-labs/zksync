@@ -317,59 +317,67 @@ export function isTokenETH(token: TokenLike): boolean {
     return token === 'ETH' || token === constants.AddressZero;
 }
 
+
+type TokenOrId = TokenLike|number;
+
 export class TokenSet {
     // TODO: handle stale entries, edge case when we rename token after adding it (ZKS-120).
     constructor(private tokensBySymbol: Tokens) {}
 
-    private resolveTokenObject(tokenLike: TokenLike) {
+    private resolveTokenObject(tokenLike: TokenOrId) {
         if (this.tokensBySymbol[tokenLike]) {
             return this.tokensBySymbol[tokenLike];
         }
 
         for (const token of Object.values(this.tokensBySymbol)) {
-            if (
+            if (typeof tokenLike === 'number') {
+                if (token.id === tokenLike) {
+                    return token;
+                }
+            } else if (
                 token.address.toLocaleLowerCase() === tokenLike.toLocaleLowerCase() ||
                 token.symbol.toLocaleLowerCase() === tokenLike.toLocaleLowerCase()
             ) {
                 return token;
             }
         }
+
         throw new Error(`Token ${tokenLike} is not supported`);
     }
 
-    public isTokenTransferAmountPackable(tokenLike: TokenLike, amount: string): boolean {
+    public isTokenTransferAmountPackable(tokenLike: TokenOrId, amount: string): boolean {
         const parsedAmount = this.parseToken(tokenLike, amount);
         return isTransactionAmountPackable(parsedAmount);
     }
 
-    public isTokenTransactionFeePackable(tokenLike: TokenLike, amount: string): boolean {
+    public isTokenTransactionFeePackable(tokenLike: TokenOrId, amount: string): boolean {
         const parsedAmount = this.parseToken(tokenLike, amount);
         return isTransactionFeePackable(parsedAmount);
     }
 
-    public formatToken(tokenLike: TokenLike, amount: BigNumberish): string {
+    public formatToken(tokenLike: TokenOrId, amount: BigNumberish): string {
         const decimals = this.resolveTokenDecimals(tokenLike);
         return utils.formatUnits(amount, decimals);
     }
 
-    public parseToken(tokenLike: TokenLike, amount: string): BigNumber {
+    public parseToken(tokenLike: TokenOrId, amount: string): BigNumber {
         const decimals = this.resolveTokenDecimals(tokenLike);
         return utils.parseUnits(amount, decimals);
     }
 
-    public resolveTokenDecimals(tokenLike: TokenLike): number {
+    public resolveTokenDecimals(tokenLike: TokenOrId): number {
         return this.resolveTokenObject(tokenLike).decimals;
     }
 
-    public resolveTokenId(tokenLike: TokenLike): number {
+    public resolveTokenId(tokenLike: TokenOrId): number {
         return this.resolveTokenObject(tokenLike).id;
     }
 
-    public resolveTokenAddress(tokenLike: TokenLike): TokenAddress {
+    public resolveTokenAddress(tokenLike: TokenOrId): TokenAddress {
         return this.resolveTokenObject(tokenLike).address;
     }
 
-    public resolveTokenSymbol(tokenLike: TokenLike): TokenSymbol {
+    public resolveTokenSymbol(tokenLike: TokenOrId): TokenSymbol {
         return this.resolveTokenObject(tokenLike).symbol;
     }
 }
