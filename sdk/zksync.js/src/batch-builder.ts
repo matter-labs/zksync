@@ -21,6 +21,9 @@ interface InternalTx {
     feeType: 'Withdraw' | 'Transfer' | 'FastWithdraw' | ChangePubKeyFee;
     address: Address;
     token: TokenLike;
+    // Whether or not the tx has been signed. 
+    // Considered false by default
+    alreadySigned?: boolean;
 }
 
 type TotalFee = Map<TokenLike, BigNumber>;
@@ -154,6 +157,7 @@ export class BatchBuilder {
         fee?: BigNumberish;
         validFrom?: number;
         validUntil?: number;
+        alreadySigned?: boolean
     }): BatchBuilder {
         const _changePubKey = {
             feeToken: changePubKey.feeToken,
@@ -172,7 +176,8 @@ export class BatchBuilder {
             tx: _changePubKey,
             feeType,
             address: this.wallet.address(),
-            token: _changePubKey.feeToken
+            token: _changePubKey.feeToken,
+            alreadySigned: changePubKey.alreadySigned
         });
         return this;
     }
@@ -224,7 +229,7 @@ export class BatchBuilder {
                     processedTxs.push(transfer);
                     break;
                 case 'ChangePubKey':
-                    const changePubKey = await this.wallet.signSetSigningKey(tx.tx);
+                    const changePubKey = tx.alreadySigned ? tx.tx : await this.wallet.signSetSigningKey(tx.tx);
                     tx.tx.pubKeyHash = (changePubKey.tx as ChangePubKey).newPkHash;
                     const currentPubKeyHash = await this.wallet.getCurrentPubKeyHash();
                     if (currentPubKeyHash === tx.tx.pubKeyHash) {
