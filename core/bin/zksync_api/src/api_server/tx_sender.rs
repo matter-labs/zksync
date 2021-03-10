@@ -58,9 +58,12 @@ pub struct TxSender {
     pub subsidy_accumulator: SubsidyAccumulator,
 }
 
+/// Used to store paid subsidy and daily limit
 #[derive(Debug)]
 pub struct SubsidyAccumulator {
+    /// Subsidy limit for token address in USD (e.g. 1 -> 1 USD)
     daily_limits: HashMap<Address, Ratio<BigUint>>,
+    /// Paid subsidy per token, dated by time when first subsidy is paid
     #[allow(clippy::type_complexity)]
     limit_used: Arc<RwLock<HashMap<Address, (Ratio<BigUint>, chrono::DateTime<Utc>)>>>,
 }
@@ -95,6 +98,13 @@ impl SubsidyAccumulator {
             .unwrap_or_else(|| Ratio::from_integer(0u32.into()));
         limit
             .checked_sub(&subsidy_used)
+            .unwrap_or_else(|| Ratio::from_integer(0u32.into()))
+    }
+
+    pub fn get_total_paid_subsidy(&self, token_address: &Address) -> Ratio<BigUint> {
+        let used = self.limit_used.read().expect("subsidy counter rlock");
+        used.get(token_address)
+            .map(|(subs, _)| subs.clone())
             .unwrap_or_else(|| Ratio::from_integer(0u32.into()))
     }
 
@@ -322,20 +332,9 @@ impl TxSender {
             // Scaling the fee required since the price may change between signing the transaction and sending it to the server.
             let scaled_provided_fee = scale_user_fee_up(provided_fee.clone());
             if required_fee >= scaled_provided_fee && should_enforce_fee {
-                let max_subsidy = {
-                    if allowed_subsidy > required_fee_data.subsidy_size_usd {
-                        BigDecimal::from(
-                            (&required_fee_data.normal_fee.total_fee
-                                - &required_fee_data.subsidy_fee.total_fee)
-                                .to_bigint()
-                                .unwrap(),
-                        )
-                    } else {
-                        BigDecimal::from(0)
-                    }
-                };
+                let max_subsidy = required_fee_data.get_max_subsidy(&allowed_subsidy);
 
-                if max_subsidy >= &required_fee - &provided_fee {
+                if max_subsidy >= &required_fee - &scaled_provided_fee {
                     paid_subsidy += required_fee_data.subsidy_size_usd
                 } else {
                     vlog::error!(
@@ -369,6 +368,7 @@ impl TxSender {
         .await?
         .unwrap_tx();
 
+        let tx_hash = verified_tx.tx.hash();
         // Send verified transactions to the mempool.
         self.core_api_client
             .send_tx(verified_tx)
@@ -377,11 +377,19 @@ impl TxSender {
             .map_err(SubmitError::TxAdd)?;
         // if everything is OK, return the transactions hashes.
         if paid_subsidy > Ratio::from_integer(0u32.into()) {
-            let paid_subsidy_str = ratio_to_big_decimal(&paid_subsidy, 6).to_string();
+            let paid_subsidy_dec = ratio_to_big_decimal(&paid_subsidy, 6).to_string();
+            let total_paid_subsidy = ratio_to_big_decimal(
+                &self
+                    .subsidy_accumulator
+                    .get_total_paid_subsidy(&token.address),
+                6,
+            );
             vlog::info!(
-                "Paid subsidy for batch: token: {}, amount: {} USD",
+                "Paid subsidy for tx, tx: {}, token: {}, subsidy_tx: {} USD, subsidy_token_total: {} USD",
+                tx_hash.to_string(),
                 &token.address,
-                paid_subsidy_str
+                paid_subsidy_dec,
+                total_paid_subsidy
             );
             self.subsidy_accumulator
                 .add_used_subsidy(&token.address, paid_subsidy);
@@ -487,21 +495,9 @@ impl TxSender {
                 BigDecimal::from(batch_token_fee.normal_fee.total_fee.to_bigint().unwrap());
 
             // Not enough fee
-            if user_provided_fee < required_normal_fee {
-                let max_subsidy = {
-                    let allowed_subsidy =
-                        self.subsidy_accumulator.get_allowed_subsidy(&batch_token);
-                    if allowed_subsidy > batch_token_fee.subsidy_size_usd {
-                        BigDecimal::from(
-                            (&batch_token_fee.normal_fee.total_fee
-                                - &batch_token_fee.subsidy_fee.total_fee)
-                                .to_bigint()
-                                .unwrap(),
-                        )
-                    } else {
-                        BigDecimal::from(0)
-                    }
-                };
+            if required_normal_fee >= user_provided_fee {
+                let allowed_subsidy = self.subsidy_accumulator.get_allowed_subsidy(&batch_token);
+                let max_subsidy = batch_token_fee.get_max_subsidy(&allowed_subsidy);
                 let required_subsidy = &required_normal_fee - &user_provided_fee;
                 // check if subsidy can be used
                 if max_subsidy >= required_subsidy {
@@ -611,11 +607,19 @@ impl TxSender {
         verified_txs.extend(verified_batch.into_iter());
 
         if let Some((subsidy_token, subsidy_paid)) = subsidy_paid {
-            let paid_subsidy_str = ratio_to_big_decimal(&subsidy_paid, 6);
+            let paid_subsidy_dec = ratio_to_big_decimal(&subsidy_paid, 6);
+            let total_paid_subsidy = ratio_to_big_decimal(
+                &self
+                    .subsidy_accumulator
+                    .get_total_paid_subsidy(&subsidy_token),
+                6,
+            );
+
             vlog::info!(
-                "Paid subsidy for batch: token: {}, amount: {} USD",
+                "Paid subsidy for batch: token: {}, , subsidy_tx: {} USD, subsidy_token_total: {} USD",
                 subsidy_token,
-                paid_subsidy_str.to_string()
+                paid_subsidy_dec,
+                total_paid_subsidy
             );
             self.subsidy_accumulator
                 .add_used_subsidy(&subsidy_token, subsidy_paid);

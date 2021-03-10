@@ -17,7 +17,7 @@ use futures::{
 use num::{
     rational::Ratio,
     traits::{Inv, Pow},
-    BigUint, Zero,
+    BigUint, CheckedSub, Zero,
 };
 use serde::{Deserialize, Serialize};
 use tokio::sync::Mutex;
@@ -48,6 +48,7 @@ use crate::fee_ticker::{
     },
 };
 use crate::utils::token_db_cache::TokenDBCache;
+use num::bigint::ToBigInt;
 
 mod constants;
 mod ticker_api;
@@ -147,19 +148,19 @@ impl GasOperationsCost {
                 OutputFeeType::ChangePubKey(ChangePubKeyFeeTypeArg::PreContracts4Version {
                     onchain_pubkey_auth: false,
                 }),
-                constants::SUBSIDY_CHANGE_PUBKEY_OFFCHAIN_COST.into(),
+                constants::SUBSIDY_OLD_CHANGE_PUBKEY_OFFCHAIN_COST.into(),
             ),
             (
                 OutputFeeType::ChangePubKey(ChangePubKeyFeeTypeArg::PreContracts4Version {
                     onchain_pubkey_auth: true,
                 }),
-                constants::SUBSIDY_CHANGE_PUBKEY_OFFCHAIN_COST.into(),
+                constants::SUBSIDY_CHANGE_PUBKEY_ONCHAIN_COST.into(),
             ),
             (
                 OutputFeeType::ChangePubKey(ChangePubKeyFeeTypeArg::ContractsV4Version(
                     ChangePubKeyType::Onchain,
                 )),
-                constants::BASE_CHANGE_PUBKEY_ONCHAIN_COST.into(),
+                constants::SUBSIDY_CHANGE_PUBKEY_ONCHAIN_COST.into(),
             ),
             (
                 OutputFeeType::ChangePubKey(ChangePubKeyFeeTypeArg::ContractsV4Version(
@@ -205,11 +206,61 @@ pub struct ResponseFee {
     pub subsidy_size_usd: Ratio<BigUint>,
 }
 
+fn get_max_subsidy(
+    max_subsidy_usd: &Ratio<BigUint>,
+    subsidy_usd: &Ratio<BigUint>,
+    normal_fee_token: &BigUint,
+    subsidy_fee_token: &BigUint,
+) -> BigDecimal {
+    if max_subsidy_usd > subsidy_usd {
+        let subsidy_uint = normal_fee_token
+            .checked_sub(subsidy_fee_token)
+            .unwrap_or_else(|| {
+                vlog::error!(
+                    "Subisdy fee is bigger then normal fee, subsidy: {:?}, noraml_fee: {:?}",
+                    subsidy_fee_token,
+                    normal_fee_token
+                );
+                0u32.into()
+            });
+
+        BigDecimal::from(
+            subsidy_uint
+                .to_bigint()
+                .expect("biguint should convert to bigint"),
+        )
+    } else {
+        BigDecimal::from(0)
+    }
+}
+
+impl ResponseFee {
+    pub fn get_max_subsidy(&self, allowed_subsidy: &Ratio<BigUint>) -> BigDecimal {
+        get_max_subsidy(
+            allowed_subsidy,
+            &self.subsidy_size_usd,
+            &self.normal_fee.total_fee,
+            &self.subsidy_fee.total_fee,
+        )
+    }
+}
+
 #[derive(Debug)]
 pub struct ResponseBatchFee {
     pub normal_fee: BatchFee,
     pub subsidy_fee: BatchFee,
     pub subsidy_size_usd: Ratio<BigUint>,
+}
+
+impl ResponseBatchFee {
+    pub fn get_max_subsidy(&self, allowed_subsidy: &Ratio<BigUint>) -> BigDecimal {
+        get_max_subsidy(
+            allowed_subsidy,
+            &self.subsidy_size_usd,
+            &self.normal_fee.total_fee,
+            &self.subsidy_fee.total_fee,
+        )
+    }
 }
 
 #[derive(Debug)]
