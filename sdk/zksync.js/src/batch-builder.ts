@@ -21,7 +21,7 @@ interface InternalTx {
     feeType: 'Withdraw' | 'Transfer' | 'FastWithdraw' | ChangePubKeyFee;
     address: Address;
     token: TokenLike;
-    // Whether or not the tx has been signed. 
+    // Whether or not the tx has been signed.
     // Considered false by default
     alreadySigned?: boolean;
 }
@@ -233,7 +233,7 @@ export class BatchBuilder {
                 case 'ChangePubKey':
                     if (tx.alreadySigned) {
                         tx.tx.pubKeyHash = tx.tx.newPkHash;
-                        processedTxs.push({tx: tx.tx});
+                        processedTxs.push({ tx: tx.tx });
                         messages.push(this.wallet.getChangePubKeyEthMessagePart(tx.tx));
                         break;
                     }

@@ -317,8 +317,7 @@ export function isTokenETH(token: TokenLike): boolean {
     return token === 'ETH' || token === constants.AddressZero;
 }
 
-
-type TokenOrId = TokenLike|number;
+type TokenOrId = TokenLike | number;
 
 export class TokenSet {
     // TODO: handle stale entries, edge case when we rename token after adding it (ZKS-120).

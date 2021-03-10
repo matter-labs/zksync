@@ -40,7 +40,6 @@ import {
     ETH_RECOMMENDED_DEPOSIT_GAS_LIMIT,
     getChangePubkeyLegacyMessage
 } from './utils';
-import { pubKeyHash } from 'zksync-crypto';
 
 const EthersErrorCode = ErrorCode;
 
