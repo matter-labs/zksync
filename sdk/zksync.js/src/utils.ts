@@ -387,6 +387,19 @@ export function getChangePubkeyMessage(
     return ethers.utils.concat([msgPubKeyHash, msgNonce, msgAccId, msgBatchHash]);
 }
 
+export function getChangePubkeyLegacyMessage(pubKeyHash: PubKeyHash, nonce: number, accountId: number): Uint8Array {
+    const msgNonce = utils.hexlify(serializeNonce(nonce));
+    const msgAccId = utils.hexlify(serializeAccountId(accountId));
+    const msgPubKeyHash = utils.hexlify(serializeAddress(pubKeyHash)).substr(2);
+    const message =
+        `Register zkSync pubkey:\n\n` +
+        `${msgPubKeyHash}\n` +
+        `nonce: ${msgNonce}\n` +
+        `account id: ${msgAccId}\n\n` +
+        `Only sign this message for a trusted client!`;
+    return utils.toUtf8Bytes(message);
+}
+
 export function getSignedBytesFromMessage(message: utils.BytesLike | string, addPrefix: boolean): Uint8Array {
     let messageBytes = typeof message === 'string' ? utils.toUtf8Bytes(message) : utils.arrayify(message);
     if (addPrefix) {
