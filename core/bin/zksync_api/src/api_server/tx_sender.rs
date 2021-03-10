@@ -225,49 +225,50 @@ impl TxSender {
             .get_ethereum_sign_message(token.clone())
             .map(String::into_bytes);
 
-        let tx_fee_info = tx.get_fee_info();
+        let is_whitelisted_initiator = tx
+            .account_id()
+            .map(|account_id| self.fee_free_accounts.contains(&account_id))
+            .unwrap_or_default();
+
+        let tx_fee_info = if !is_whitelisted_initiator {
+            tx.get_fee_info()
+        } else {
+            None
+        };
 
         let sign_verify_channel = self.sign_verify_requests.clone();
         let ticker_request_sender = self.ticker_requests.clone();
 
         if let Some((tx_type, token, address, provided_fee)) = tx_fee_info {
-            let is_whitelisted_initiator = tx
-                .account_id()
-                .map(|account_id| self.fee_free_accounts.contains(&account_id))
-                .unwrap_or_default();
+            let should_enforce_fee = !matches!(tx_type, TxFeeTypes::ChangePubKey { .. })
+                || self.enforce_pubkey_change_fee;
 
-            if !is_whitelisted_initiator {
-                let should_enforce_fee = !matches!(tx_type, TxFeeTypes::ChangePubKey { .. })
-                    || self.enforce_pubkey_change_fee;
+            let fee_allowed =
+                Self::token_allowed_for_fees(ticker_request_sender.clone(), token.clone()).await?;
 
-                let fee_allowed =
-                    Self::token_allowed_for_fees(ticker_request_sender.clone(), token.clone())
-                        .await?;
+            if !fee_allowed {
+                return Err(SubmitError::InappropriateFeeToken);
+            }
 
-                if !fee_allowed {
-                    return Err(SubmitError::InappropriateFeeToken);
-                }
+            let required_fee =
+                Self::ticker_request(ticker_request_sender, tx_type, address, token.clone())
+                    .await?;
+            // Converting `BitUint` to `BigInt` is safe.
+            let required_fee: BigDecimal = required_fee.total_fee.to_bigint().unwrap().into();
+            let provided_fee: BigDecimal = provided_fee.to_bigint().unwrap().into();
+            // Scaling the fee required since the price may change between signing the transaction and sending it to the server.
+            let scaled_provided_fee = scale_user_fee_up(provided_fee.clone());
+            if required_fee >= scaled_provided_fee && should_enforce_fee {
+                vlog::error!(
+                    "User provided fee is too low, required: {}, provided: {} (scaled: {}); difference {}, token: {:?}",
+                    required_fee.to_string(),
+                    provided_fee.to_string(),
+                    scaled_provided_fee.to_string(),
+                    (&required_fee - &scaled_provided_fee).to_string(),
+                    token
+                );
 
-                let required_fee =
-                    Self::ticker_request(ticker_request_sender, tx_type, address, token.clone())
-                        .await?;
-                // Converting `BitUint` to `BigInt` is safe.
-                let required_fee: BigDecimal = required_fee.total_fee.to_bigint().unwrap().into();
-                let provided_fee: BigDecimal = provided_fee.to_bigint().unwrap().into();
-                // Scaling the fee required since the price may change between signing the transaction and sending it to the server.
-                let scaled_provided_fee = scale_user_fee_up(provided_fee.clone());
-                if required_fee >= scaled_provided_fee && should_enforce_fee {
-                    vlog::error!(
-                        "User provided fee is too low, required: {}, provided: {} (scaled: {}); difference {}, token: {:?}",
-                        required_fee.to_string(),
-                        provided_fee.to_string(),
-                        scaled_provided_fee.to_string(),
-                        (&required_fee - &scaled_provided_fee).to_string(),
-                        token
-                    );
-
-                    return Err(SubmitError::TxAdd(TxAddError::TxFeeTooLow));
-                }
+                return Err(SubmitError::TxAdd(TxAddError::TxFeeTooLow));
             }
         }
 

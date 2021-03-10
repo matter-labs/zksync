@@ -10,7 +10,7 @@ caches_size=10000
 # Type of value is seconds.
 forced_exit_minimum_account_age_secs=0
 # List of account ids that are not paying fees on operations.
-fee_free_accounts=[4078]
+fee_free_accounts=[]
 
 # Ability to perform change pub key with zero fee
 enforce_pubkey_change_fee=true

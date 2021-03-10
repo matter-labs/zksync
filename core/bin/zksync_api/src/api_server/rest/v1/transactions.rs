@@ -443,7 +443,12 @@ mod tests {
         async fn new() -> anyhow::Result<(Client, Self)> {
             let (core_client, core_server) = submit_txs_loopback();
 
-            let cfg = TestServerConfig::default();
+            let mut cfg = TestServerConfig::default();
+            cfg.config
+                .api
+                .common
+                .fee_free_accounts
+                .push(AccountId(0xfee));
             let pool = cfg.pool.clone();
             cfg.fill_database().await?;
 
