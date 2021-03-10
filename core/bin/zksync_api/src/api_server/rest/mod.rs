@@ -1,5 +1,8 @@
 use actix_cors::Cors;
-use actix_web::{web, App, HttpResponse, HttpServer};
+use actix_web::{
+    dev::{Body, ResponseBody, Service, ServiceRequest, ServiceResponse, Transform},
+    web, App, Error, HttpResponse, HttpServer,
+};
 use futures::channel::mpsc;
 use std::net::SocketAddr;
 use zksync_storage::ConnectionPool;
@@ -11,12 +14,92 @@ use self::v01::api_decl::ApiV01;
 use crate::{fee_ticker::TickerRequest, signature_checker::VerifySignatureRequest};
 
 use super::tx_sender::TxSender;
+use futures::future::{ok, Ready};
+use futures::Future;
+use std::pin::Pin;
+use std::task::{Context, Poll};
 use zksync_config::ZkSyncConfig;
 
 mod helpers;
 mod v01;
 pub mod v02;
 pub mod v1;
+
+pub struct SayHi;
+
+// Middleware factory is `Transform` trait from actix-service crate
+// `S` - type of the next service
+// `B` - type of response's body
+impl<S, B> Transform<S> for SayHi
+where
+    S: Service<Request = ServiceRequest, Response = ServiceResponse<B>, Error = Error>,
+    S::Future: 'static,
+    B: 'static,
+{
+    type Request = ServiceRequest;
+    type Response = ServiceResponse<B>;
+    type Error = Error;
+    type InitError = ();
+    type Transform = SayHiMiddleware<S>;
+    type Future = Ready<Result<Self::Transform, Self::InitError>>;
+
+    fn new_transform(&self, service: S) -> Self::Future {
+        ok(SayHiMiddleware { service })
+    }
+}
+
+pub struct SayHiMiddleware<S> {
+    service: S,
+}
+
+impl<S, B> Service for SayHiMiddleware<S>
+where
+    S: Service<Request = ServiceRequest, Response = ServiceResponse<B>, Error = Error>,
+    S::Future: 'static,
+    B: 'static,
+{
+    type Request = ServiceRequest;
+    type Response = ServiceResponse<B>;
+    type Error = Error;
+    type Future = Pin<Box<dyn Future<Output = Result<Self::Response, Self::Error>>>>;
+
+    fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        self.service.poll_ready(cx)
+    }
+
+    fn call(&mut self, req: ServiceRequest) -> Self::Future {
+        println!("Hi from start. You requested: {}", req.path());
+
+        let fut = self.service.call(req);
+
+        Box::pin(async move {
+            let mut res = fut.await?;
+            let body = res.take_body();
+            match body {
+                ResponseBody::Other(b) => {
+                    match b {
+                        Body::Message(_message) => {
+                            //
+                        }
+                        _ => {
+                            panic!("not message");
+                        }
+                    }
+                }
+                _ => {
+                    panic!("not other");
+                }
+            };
+
+            let new_res = ServiceResponse::new(
+                res.request().clone(),
+                HttpResponse::Ok().body("fredbob").into_body(),
+            );
+
+            Ok(new_res)
+        })
+    }
+}
 
 async fn start_server(
     api_v01: ApiV01,
@@ -46,12 +129,11 @@ async fn start_server(
             );
             v02::api_scope(tx_sender, &api_v01.config)
         };
-
         App::new()
             .wrap(Cors::new().send_wildcard().max_age(3600).finish())
             .service(api_v01.into_scope())
             .service(api_v1_scope)
-            .service(api_v02_scope)
+            .service(api_v02_scope.wrap(SayHi))
             // Endpoint needed for js isReachable
             .route(
                 "/favicon.ico",
