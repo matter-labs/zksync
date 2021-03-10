@@ -5,10 +5,7 @@
 // Workspace deps
 use zksync_basic_types::*;
 // Local deps
-use crate::{
-    config::MAX_WITHDRAWALS_TO_COMPLETE_IN_A_CALL, tokens::ChangePubKeyFeeTypeArg,
-    tx::ChangePubKeyType, Block, ZkSyncOp,
-};
+use crate::{config::MAX_WITHDRAWALS_TO_COMPLETE_IN_A_CALL, Block, ZkSyncOp};
 
 /// Amount of gas that we can afford to spend in one transaction.
 /// This value must be big enough to fit big blocks with expensive transactions,
@@ -27,7 +24,8 @@ impl CommitCost {
     // TODO: overvalued for quick fix of tx fails (ZKS-109).
     pub const BASE_COST: u64 = 40_000;
     pub const DEPOSIT_COST: u64 = 7_000;
-    pub const OLD_CHANGE_PUBKEY_COST_OFFCHAIN: u64 = 15_000;
+    // TODO: estimate after changepubkey gas cost estimation is fixed [ZKS-554]
+    pub const OLD_CHANGE_PUBKEY_COST_OFFCHAIN: u64 = 25_000;
     pub const CHANGE_PUBKEY_COST_OFFCHAIN: u64 = 11_050;
     pub const CHANGE_PUBKEY_COST_ONCHAIN: u64 = 5_530;
     pub const CHANGE_PUBKEY_COST_CREATE2: u64 = 7_330;
@@ -42,26 +40,27 @@ impl CommitCost {
     }
 
     pub fn op_cost(op: &ZkSyncOp) -> U256 {
-        // let x = ChangePubKeyEthAuthDa;
         let cost = match op {
             ZkSyncOp::Noop(_) => 0,
             ZkSyncOp::Deposit(_) => Self::DEPOSIT_COST,
-            ZkSyncOp::ChangePubKeyOffchain(change_pubkey) => {
-                match change_pubkey.tx.get_change_pubkey_fee_type() {
-                    ChangePubKeyFeeTypeArg::ContractsV4Version(ChangePubKeyType::ECDSA) => {
-                        Self::CHANGE_PUBKEY_COST_OFFCHAIN
-                    }
-                    ChangePubKeyFeeTypeArg::ContractsV4Version(ChangePubKeyType::Onchain)
-                    | ChangePubKeyFeeTypeArg::PreContracts4Version {
-                        onchain_pubkey_auth: true,
-                    } => Self::CHANGE_PUBKEY_COST_ONCHAIN,
-                    ChangePubKeyFeeTypeArg::ContractsV4Version(ChangePubKeyType::CREATE2) => {
-                        Self::CHANGE_PUBKEY_COST_CREATE2
-                    }
-                    ChangePubKeyFeeTypeArg::PreContracts4Version {
-                        onchain_pubkey_auth: false,
-                    } => Self::OLD_CHANGE_PUBKEY_COST_OFFCHAIN,
-                }
+            ZkSyncOp::ChangePubKeyOffchain(_change_pubkey) => {
+                Self::OLD_CHANGE_PUBKEY_COST_OFFCHAIN
+                // TODO: Restore when we figure out why this failed [ZKS-554]
+                // match change_pubkey.tx.get_change_pubkey_fee_type() {
+                //     ChangePubKeyFeeTypeArg::ContractsV4Version(ChangePubKeyType::ECDSA) => {
+                //         Self::CHANGE_PUBKEY_COST_OFFCHAIN
+                //     }
+                //     ChangePubKeyFeeTypeArg::ContractsV4Version(ChangePubKeyType::Onchain)
+                //     | ChangePubKeyFeeTypeArg::PreContracts4Version {
+                //         onchain_pubkey_auth: true,
+                //     } => Self::CHANGE_PUBKEY_COST_ONCHAIN,
+                //     ChangePubKeyFeeTypeArg::ContractsV4Version(ChangePubKeyType::CREATE2) => {
+                //         Self::CHANGE_PUBKEY_COST_CREATE2
+                //     }
+                //     ChangePubKeyFeeTypeArg::PreContracts4Version {
+                //         onchain_pubkey_auth: false,
+                //     } => Self::OLD_CHANGE_PUBKEY_COST_OFFCHAIN,
+                // }
             }
             ZkSyncOp::Transfer(_) => Self::TRANSFER_COST,
             ZkSyncOp::TransferToNew(_) => Self::TRANSFER_TO_NEW_COST,
