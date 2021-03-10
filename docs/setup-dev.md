@@ -184,13 +184,9 @@ brew install solidity@5
 
 drone cli used to create promotion jobs [described here](docs/promote.md) <https://docs.drone.io/cli/install/>
 
-## `binaryen`
+## `cmake`
 
-Provides `wasm2js` utility which is required to build the `zksync-crypto`.
-
-```sh
-sudo apt-get install binaryen
-```
+Required by `binaryen` to build C++ sources. In order to speed it up, you might want to install `clang` and `lld` too.
 
 ## Environment
 
