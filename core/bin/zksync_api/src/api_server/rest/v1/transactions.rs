@@ -786,7 +786,7 @@ mod tests {
 
     /// This test checks the following:
     ///
-    /// Attempt by fee free account to pay zero fee in single tx or txs batch.
+    /// Attempt by fee free account to pay zero fee in single tx.
     async fn test_fee_free_account() -> anyhow::Result<()> {
         let (client, server) = TestServer::new().await?;
 
