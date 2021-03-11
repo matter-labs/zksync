@@ -87,7 +87,6 @@ impl TokenHandler {
             if token_event.id.0 <= last_token_id {
                 continue;
             }
-            last_token_id += 1;
 
             // Find a token in the list of trusted tokens
             // or use default values (name = "ERC20-{id}", decimals = 18).
