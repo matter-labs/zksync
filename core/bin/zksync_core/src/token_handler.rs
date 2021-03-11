@@ -16,7 +16,7 @@ use tokio::task::JoinHandle;
 // Workspace uses
 use zksync_config::{TokenHandlerConfig, ZkSyncConfig};
 use zksync_notifier::Notifier;
-use zksync_storage::{tokens::TokensSchema, ConnectionPool, StorageProcessor};
+use zksync_storage::{ConnectionPool, StorageProcessor};
 use zksync_types::{
     tokens::{NewTokenEvent, Token, TokenInfo},
     Address,
@@ -75,16 +75,82 @@ impl TokenHandler {
     async fn save_new_tokens(
         &self,
         storage: &mut StorageProcessor<'_>,
-        tokens: Vec<Token>,
-    ) -> anyhow::Result<()> {
+        tokens: Vec<NewTokenEvent>,
+    ) -> anyhow::Result<Vec<Token>> {
         let mut transaction = storage.start_transaction().await?;
+        let mut token_schema = transaction.tokens_schema();
 
-        for token in tokens {
-            TokensSchema(&mut transaction).store_token(token).await?;
+        let mut last_token_id = token_schema.get_last_token_id().await?;
+        let mut new_tokens = Vec::new();
+
+        for token_event in tokens {
+            if token_event.id.0 <= last_token_id {
+                continue;
+            }
+            last_token_id += 1;
+
+            // Find a token in the list of trusted tokens
+            // or use default values (name = "ERC20-{id}", decimals = 18).
+            let default_symbol = format!("ERC20-{}", token_event.id);
+            let default_decimals = 18;
+
+            let token_from_list = {
+                let token_info = self.token_list.get(&token_event.address).cloned();
+
+                if let Some(token_info) = token_info {
+                    Some(Token::new(
+                        token_event.id,
+                        token_info.address,
+                        &token_info.symbol,
+                        token_info.decimals,
+                    ))
+                } else {
+                    None
+                }
+            };
+
+            let (token, is_token_inserted) = match token_from_list {
+                Some(token_from_list) => {
+                    let is_token_inserted =
+                        token_schema.store_token(token_from_list.clone()).await?;
+
+                    if is_token_inserted {
+                        (token_from_list, true)
+                    } else {
+                        // Try insert token with other symbol.
+                        let token = Token::new(
+                            token_from_list.id,
+                            token_from_list.address,
+                            &default_symbol,
+                            token_from_list.decimals,
+                        );
+                        let is_token_inserted = token_schema.store_token(token.clone()).await?;
+
+                        (token, is_token_inserted)
+                    }
+                }
+                None => {
+                    // Token with default parameters.
+                    let token = Token::new(
+                        token_event.id,
+                        token_event.address,
+                        &default_symbol,
+                        default_decimals,
+                    );
+                    let is_token_inserted = token_schema.store_token(token.clone()).await?;
+
+                    (token, is_token_inserted)
+                }
+            };
+
+            if !is_token_inserted {
+                anyhow::bail!("{:?} is not inserted to database", token);
+            }
+            new_tokens.push(token);
         }
 
         transaction.commit().await?;
-        Ok(())
+        Ok(new_tokens)
     }
 
     async fn run(&mut self) {
@@ -92,32 +158,14 @@ impl TokenHandler {
         loop {
             timer.tick().await;
 
-            let new_tokens_event = self.load_new_token_events().await;
+            let new_tokens_events = self.load_new_token_events().await;
 
             // Ether is a standard token, so we can assume that at least the last token ID is zero.
-            self.last_eth_block = new_tokens_event
+            self.last_eth_block = new_tokens_events
                 .iter()
                 .map(|token| token.eth_block_number)
-                .max();
-
-            let new_tokens = new_tokens_event
-                .iter()
-                .map(|token| {
-                    // Find a token in the list of trusted tokens
-                    // or use default values (name = "ERC20-{id}", decimals = 18).
-                    let (symbol, decimals) = {
-                        let token_from_list = self.token_list.get(&token.address).cloned();
-
-                        if let Some(token) = token_from_list {
-                            (token.symbol, token.decimals)
-                        } else {
-                            (format!("ERC20-{}", token.id), 18)
-                        }
-                    };
-
-                    Token::new(token.id, token.address, &symbol, decimals)
-                })
-                .collect::<Vec<_>>();
+                .max()
+                .or(self.last_eth_block);
 
             let mut storage = self
                 .connection_pool
@@ -125,7 +173,8 @@ impl TokenHandler {
                 .await
                 .expect("db connection failed for token handler");
 
-            self.save_new_tokens(&mut storage, new_tokens.clone())
+            let new_tokens = self
+                .save_new_tokens(&mut storage, new_tokens_events)
                 .await
                 .expect("failed to add tokens to the database");
 

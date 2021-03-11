@@ -1797,6 +1797,21 @@
       ]
     }
   },
+  "60de7f3494fac09157d367c869037917c26dba18996d4d5bc426a72ee0c15d59": {
+    "query": "\n            INSERT INTO tokens ( id, address, symbol, decimals )\n            VALUES ( $1, $2, $3, $4 )\n            ",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "Int4",
+          "Text",
+          "Text",
+          "Int2"
+        ]
+      },
+      "nullable": []
+    }
+  },
   "62304acbc93efab5117766689c6413d152dc0104c49c6f305e26b245b6ff7cde": {
     "query": "SELECT * FROM executed_priority_operations WHERE eth_hash = $1",
     "describe": {
@@ -2336,6 +2351,20 @@
         false,
         false
       ]
+    }
+  },
+  "8e7c2353b94fe9c53e0447eeee63057812906ebb59d45fd21d67c6673338bde3": {
+    "query": "\n            SELECT FROM tokens *\n            WHERE id = $1 OR address = $2 OR symbol = $3\n            ",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "Int4",
+          "Text",
+          "Text"
+        ]
+      },
+      "nullable": []
     }
   },
   "8f703c1371cfad6b11cb022ef8edcd1e3068ce3d7c82251a92a4dd1797fe299f": {
@@ -3710,21 +3739,6 @@
         true,
         false
       ]
-    }
-  },
-  "e1241c3701415e650f8bf5e6d9074a76e8585ad405d97be13557f7b7a08a5b58": {
-    "query": "\n            INSERT INTO tokens ( id, address, symbol, decimals )\n            VALUES ( $1, $2, $3, $4 )\n            ON CONFLICT (id)\n            DO NOTHING\n            ",
-    "describe": {
-      "columns": [],
-      "parameters": {
-        "Left": [
-          "Int4",
-          "Text",
-          "Text",
-          "Int2"
-        ]
-      },
-      "nullable": []
     }
   },
   "e32e0ba9ec31e6e78de5972548dced78d2a6949ec723b71ce210627dbb92dfe4": {

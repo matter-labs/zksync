@@ -25,14 +25,31 @@ pub struct TokensSchema<'a, 'c>(pub &'a mut StorageProcessor<'c>);
 
 impl<'a, 'c> TokensSchema<'a, 'c> {
     /// Persists the new token in the database.
-    pub async fn store_token(&mut self, token: Token) -> QueryResult<()> {
+    pub async fn store_token(&mut self, token: Token) -> QueryResult<bool> {
         let start = Instant::now();
+
+        let is_token_exists = sqlx::query_as!(
+            DbToken,
+            r#"
+            SELECT FROM tokens *
+            WHERE id = $1 OR address = $2 OR symbol = $3
+            "#,
+            i32::from(*token.id),
+            address_to_stored_string(&token.address),
+            token.symbol,
+        )
+        .fetch_optional(self.0.conn())
+        .await?
+        .is_some();
+
+        if is_token_exists {
+            return Ok(false);
+        }
+
         sqlx::query!(
             r#"
             INSERT INTO tokens ( id, address, symbol, decimals )
             VALUES ( $1, $2, $3, $4 )
-            ON CONFLICT (id)
-            DO NOTHING
             "#,
             i32::from(*token.id),
             address_to_stored_string(&token.address),
@@ -43,7 +60,7 @@ impl<'a, 'c> TokensSchema<'a, 'c> {
         .await?;
 
         metrics::histogram!("sql.token.store_token", start.elapsed());
-        Ok(())
+        Ok(true)
     }
 
     /// If a token with a given ID exists, then it replaces the information about the
@@ -85,16 +102,16 @@ impl<'a, 'c> TokensSchema<'a, 'c> {
         .fetch_all(self.0.conn())
         .await?;
 
-        let result = Ok(tokens
+        let result = tokens
             .into_iter()
             .map(|t| {
                 let token: Token = t.into();
                 (token.id, token)
             })
-            .collect());
+            .collect();
 
         metrics::histogram!("sql.token.load_tokens", start.elapsed());
-        result
+        Ok(result)
     }
 
     /// Loads all the stored tokens, which have market_volume (ticker_market_volume table)

@@ -197,7 +197,12 @@ impl<'a, 'c> DataRestoreSchema<'a, 'c> {
             // that may or may not (in most cases, may not) be there, so we just assume it to be 18
             let decimals = 18;
             let token = Token::new(id, address, &format!("ERC20-{}", *id), decimals);
-            TokensSchema(&mut transaction).store_token(token).await?;
+            let is_token_inserted = TokensSchema(&mut transaction)
+                .store_token(token.clone())
+                .await?;
+            if !is_token_inserted {
+                anyhow::bail!("{:?} is not inserted to database", token);
+            }
         }
 
         DataRestoreSchema(&mut transaction)

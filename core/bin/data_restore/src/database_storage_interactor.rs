@@ -119,7 +119,8 @@ impl StorageInteractor for DatabaseStorageInteractor<'_> {
     }
 
     async fn store_token(&mut self, token: TokenInfo, token_id: TokenId) {
-        self.storage
+        let is_token_inserted = self
+            .storage
             .tokens_schema()
             .store_token(Token {
                 id: token_id,
@@ -129,6 +130,7 @@ impl StorageInteractor for DatabaseStorageInteractor<'_> {
             })
             .await
             .expect("failed to store token");
+        assert!(is_token_inserted, "failed to store token");
     }
 
     async fn save_events_state(

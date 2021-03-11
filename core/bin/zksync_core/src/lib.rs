@@ -1,5 +1,3 @@
-use zksync_types::{tokens::get_genesis_token_list, Token, TokenId};
-
 use crate::state_keeper::ZkSyncStateInitParams;
 use crate::{
     block_proposer::run_block_proposer_task,
@@ -44,42 +42,6 @@ pub async fn wait_for_tasks(task_futures: Vec<JoinHandle<()>>) {
                 std::panic::resume_unwind(error.into_panic());
             }
         }
-    }
-}
-
-/// Inserts the initial information about zkSync tokens into the database.
-pub async fn genesis_init(config: &ZkSyncConfig) {
-    let pool = ConnectionPool::new(Some(1));
-
-    vlog::info!("Generating genesis block.");
-    ZkSyncStateKeeper::create_genesis_block(
-        pool.clone(),
-        &config.chain.state_keeper.fee_account_addr,
-    )
-    .await;
-    vlog::info!("Adding initial tokens to db");
-    let genesis_tokens = get_genesis_token_list(&config.chain.eth.network.to_string())
-        .expect("Initial token list not found");
-    for (id, token) in (1..).zip(genesis_tokens) {
-        vlog::info!(
-            "Adding token: {}, id:{}, address: {}, decimals: {}",
-            token.symbol,
-            id,
-            token.address,
-            token.decimals
-        );
-        pool.access_storage()
-            .await
-            .expect("failed to access db")
-            .tokens_schema()
-            .store_token(Token {
-                id: TokenId(id as u16),
-                symbol: token.symbol,
-                address: token.address,
-                decimals: token.decimals,
-            })
-            .await
-            .expect("failed to store token");
     }
 }
 
