@@ -184,7 +184,7 @@ impl TokenHandler {
                         .send_new_token_notify(token)
                         .await
                         .unwrap_or_else(|e| {
-                            vlog::error!("failed send notification: {}", e);
+                            vlog::error!("Failed to send a token insertion notification: {}", e);
                         });
                 }
             }
