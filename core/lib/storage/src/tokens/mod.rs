@@ -148,7 +148,7 @@ impl<'a, 'c> TokensSchema<'a, 'c> {
         result
     }
 
-    /// Get last used token id from Database.
+    /// Gets the last used token ID from Database.
     pub async fn get_last_token_id(&mut self) -> QueryResult<u16> {
         let start = Instant::now();
         let last_token_id = sqlx::query!(
