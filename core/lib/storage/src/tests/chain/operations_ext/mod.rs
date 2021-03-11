@@ -30,10 +30,7 @@ async fn commit_schema_data(
     setup: &TransactionsHistoryTestSetup,
 ) -> QueryResult<()> {
     for token in &setup.tokens {
-        storage
-            .tokens_schema()
-            .store_or_update_token(token.clone())
-            .await?;
+        storage.tokens_schema().store_token(token.clone()).await?;
     }
 
     for block in &setup.blocks {

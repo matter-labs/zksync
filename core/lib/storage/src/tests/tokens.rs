@@ -43,11 +43,11 @@ async fn tokens_storage(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
     };
 
     TokensSchema(&mut storage)
-        .store_or_update_token(token_a.clone())
+        .store_token(token_a.clone())
         .await
         .expect("Store tokens query failed");
     TokensSchema(&mut storage)
-        .store_or_update_token(token_b.clone())
+        .store_token(token_b.clone())
         .await
         .expect("Store tokens query failed");
     // The count is updated.
@@ -84,25 +84,6 @@ async fn tokens_storage(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
         .expect("get token query failed")
         .expect("token by symbol not found");
     assert_eq!(token_b, token_b_by_symbol);
-
-    // Now check that storing the token that already exists is the same as updating it.
-    let token_c = Token {
-        id: TokenId(2),
-        address: "0000000000000000000000000000000000000008".parse().unwrap(),
-        symbol: "BAT".into(),
-        decimals: 6,
-    };
-    TokensSchema(&mut storage)
-        .store_or_update_token(token_c.clone())
-        .await
-        .expect("Store tokens query failed");
-    // Load updated token.
-    let token_c_by_id = TokensSchema(&mut storage)
-        .get_token(TokenLike::Id(token_c.id))
-        .await
-        .expect("get token query failed")
-        .expect("token by id not found");
-    assert_eq!(token_c, token_c_by_id);
 
     Ok(())
 }

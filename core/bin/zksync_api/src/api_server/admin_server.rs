@@ -122,7 +122,7 @@ async fn add_token(
 
     storage
         .tokens_schema()
-        .store_or_update_token(token.clone())
+        .store_token(token.clone())
         .await
         .map_err(|e| {
             vlog::warn!("failed add token to database in progress request: {}", e);
