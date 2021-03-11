@@ -80,7 +80,7 @@ impl TokenHandler {
         let mut transaction = storage.start_transaction().await?;
         let mut token_schema = transaction.tokens_schema();
 
-        let mut last_token_id = token_schema.get_last_token_id().await?;
+        let last_token_id = token_schema.get_last_token_id().await?;
         let mut new_tokens = Vec::new();
 
         for token_event in tokens {
