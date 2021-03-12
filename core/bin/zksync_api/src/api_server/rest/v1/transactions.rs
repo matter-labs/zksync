@@ -491,7 +491,7 @@ mod tests {
         test_transactions_scope().await?;
         test_bad_fee_token().await?;
         test_fast_processing_flag().await?;
-        test_fee_free_account().await?;
+        test_fee_free_accounts().await?;
         Ok(())
     }
 
@@ -792,34 +792,62 @@ mod tests {
 
     /// This test checks the following:
     ///
-    /// Attempt by fee free account to pay zero fee in single tx.
-    async fn test_fee_free_account() -> anyhow::Result<()> {
+    /// Fee free account can pay zero fee in single tx.
+    /// Not a fee free account can't pay zero fee in single tx.
+    async fn test_fee_free_accounts() -> anyhow::Result<()> {
         let (client, server) = TestServer::new().await?;
 
-        let from = ZkSyncAccount::rand();
-        from.set_account_id(Some(AccountId(0xfee)));
-        let to = ZkSyncAccount::rand();
+        let from1 = ZkSyncAccount::rand();
+        from1.set_account_id(Some(AccountId(0xfee)));
+        let to1 = ZkSyncAccount::rand();
 
         // Submit transaction with a zero fee by the fee free account
-        let (tx, eth_sig) = from.sign_transfer(
+        let (tx1, eth_sig1) = from1.sign_transfer(
             TokenId(0),
             "ETH",
             0u64.into(),
             0u64.into(),
-            &to.address,
+            &to1.address,
             Some(Nonce(0)),
             false,
             Default::default(),
         );
-        let transfer = ZkSyncTx::Transfer(Box::new(tx));
+        let transfer1 = ZkSyncTx::Transfer(Box::new(tx1));
         client
             .submit_tx(
-                transfer.clone(),
-                eth_sig.map(TxEthSignature::EthereumSignature),
+                transfer1.clone(),
+                eth_sig1.map(TxEthSignature::EthereumSignature),
                 None,
             )
             .await
-            .unwrap();
+            .expect("fee free account transaction fails");
+
+        let from2 = ZkSyncAccount::rand();
+        from2.set_account_id(Some(AccountId(0xbee)));
+        let to2 = ZkSyncAccount::rand();
+
+        // Submit transaction with a zero fee not by the fee free account
+        let (tx2, eth_sig2) = from2.sign_transfer(
+            TokenId(0),
+            "ETH",
+            0u64.into(),
+            0u64.into(),
+            &to2.address,
+            Some(Nonce(0)),
+            false,
+            Default::default(),
+        );
+        let transfer2 = ZkSyncTx::Transfer(Box::new(tx2));
+        client
+            .submit_tx(
+                transfer2.clone(),
+                eth_sig2.map(TxEthSignature::EthereumSignature),
+                None,
+            )
+            .await
+            .unwrap_err()
+            .to_string()
+            .contains("Transaction fee is too low");
 
         server.stop().await;
         Ok(())
