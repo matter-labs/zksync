@@ -228,7 +228,7 @@ impl TxSender {
         let is_whitelisted_initiator = tx
             .account_id()
             .map(|account_id| self.fee_free_accounts.contains(&account_id))
-            .unwrap_or_default();
+            .unwrap_or(false);
 
         let tx_fee_info = if !is_whitelisted_initiator {
             tx.get_fee_info()
