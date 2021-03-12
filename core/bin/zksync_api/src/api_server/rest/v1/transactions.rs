@@ -487,6 +487,7 @@ mod tests {
         ignore = "Use `zk test rust-api` command to perform this test"
     )]
     async fn test_rust_api() -> anyhow::Result<()> {
+        // TODO: ZKS-561
         test_transactions_scope().await?;
         test_bad_fee_token().await?;
         test_fast_processing_flag().await?;
