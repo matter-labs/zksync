@@ -231,20 +231,23 @@ export class BatchBuilder {
                     processedTxs.push(transfer);
                     break;
                 case 'ChangePubKey':
-                    if (tx.alreadySigned) {
-                        tx.tx.pubKeyHash = tx.tx.newPkHash;
-                        processedTxs.push({ tx: tx.tx });
-                        messages.push(this.wallet.getChangePubKeyEthMessagePart(tx.tx));
-                        break;
-                    }
-                    const changePubKey = tx.alreadySigned ? tx.tx : await this.wallet.signSetSigningKey(tx.tx);
-                    tx.tx.pubKeyHash = (changePubKey.tx as ChangePubKey).newPkHash;
+                    // ChangePubKey requires its own Ethereum signature, we either expect
+                    // it to be signed already or do it here.
+                    const changePubKey: ChangePubKey = tx.alreadySigned
+                        ? tx.tx
+                        : (await this.wallet.signSetSigningKey(tx.tx)).tx;
                     const currentPubKeyHash = await this.wallet.getCurrentPubKeyHash();
-                    if (currentPubKeyHash === tx.tx.pubKeyHash) {
+                    if (currentPubKeyHash === changePubKey.newPkHash) {
                         throw new Error('Current signing key is already set');
                     }
-                    messages.push(this.wallet.getChangePubKeyEthMessagePart(tx.tx));
-                    processedTxs.push(changePubKey);
+                    messages.push(
+                        this.wallet.getChangePubKeyEthMessagePart({
+                            pubKeyHash: changePubKey.newPkHash,
+                            feeToken: tx.token,
+                            fee: changePubKey.fee
+                        })
+                    );
+                    processedTxs.push({ tx: changePubKey });
                     break;
                 case 'ForcedExit':
                     messages.push(this.wallet.getForcedExitEthMessagePart(tx.tx));
