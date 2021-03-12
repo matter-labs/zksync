@@ -295,7 +295,7 @@ impl<S: EthereumSigner> EthereumProvider<S> {
             let gas_limit = if is_mainnet && gas_limits.contains_key(&address_str) {
                 gas_limits
                     .get(&address_str)
-                    .ok_or(ClientError::Other)?
+                    .unwrap()
                     .as_u64()
                     .ok_or(ClientError::Other)?
             } else {
