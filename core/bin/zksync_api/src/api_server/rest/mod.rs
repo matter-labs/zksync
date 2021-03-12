@@ -1,7 +1,6 @@
 use actix_cors::Cors;
 use actix_web::{
-    dev::{Body, ResponseBody, Service, ServiceRequest, ServiceResponse, Transform},
-    web, App, Error, HttpResponse, HttpServer,
+    web, App, HttpResponse, HttpServer,
 };
 use futures::channel::mpsc;
 use std::net::SocketAddr;
@@ -13,7 +12,7 @@ use zksync_utils::panic_notify::ThreadPanicNotify;
 use self::v01::api_decl::ApiV01;
 use crate::{fee_ticker::TickerRequest, signature_checker::VerifySignatureRequest};
 
-use self::v02::middleware::SayHi;
+use self::v02::middleware::ResponseTransform;
 use super::tx_sender::TxSender;
 use zksync_config::ZkSyncConfig;
 
@@ -54,7 +53,7 @@ async fn start_server(
             .wrap(Cors::new().send_wildcard().max_age(3600).finish())
             .service(api_v01.into_scope())
             .service(api_v1_scope)
-            .service(api_v02_scope.wrap(SayHi))
+            .service(api_v02_scope.wrap(ResponseTransform))
             // Endpoint needed for js isReachable
             .route(
                 "/favicon.ico",

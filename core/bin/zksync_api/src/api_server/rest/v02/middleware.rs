@@ -14,13 +14,10 @@ use std::task::{Context, Poll};
 
 #[async_trait(?Send)]
 pub trait ParseResponse {
-    /// Extracts a response body of type T from `input`
-    /// Example:
-    ///
-    /// let result: MyContractType = resp.parse().await.unwrap();
     async fn parse<T: DeserializeOwned>(&mut self) -> Result<T, Box<dyn std::error::Error>>;
 }
 
+// TODO: Try to make response middleware without double convertation (ZKS-560)
 #[async_trait(?Send)]
 impl ParseResponse for ServiceResponse<Body> {
     async fn parse<T>(&mut self) -> Result<T, Box<dyn std::error::Error>>
@@ -37,38 +34,33 @@ impl ParseResponse for ServiceResponse<Body> {
     }
 }
 
-pub struct SayHi;
+pub struct ResponseTransform;
 
-// Middleware factory is `Transform` trait from actix-service crate
-// `S` - type of the next service
-// `B` - type of response's body
-impl<S> Transform<S> for SayHi
+impl<S> Transform<S> for ResponseTransform
 where
     S: Service<Request = ServiceRequest, Response = ServiceResponse<Body>, Error = Error>,
     S::Future: 'static,
-    // B: 'static,
 {
     type Request = ServiceRequest;
     type Response = ServiceResponse<Body>;
     type Error = Error;
     type InitError = ();
-    type Transform = SayHiMiddleware<S>;
+    type Transform = ResponseMiddleware<S>;
     type Future = Ready<Result<Self::Transform, Self::InitError>>;
 
     fn new_transform(&self, service: S) -> Self::Future {
-        ok(SayHiMiddleware { service })
+        ok(ResponseMiddleware { service })
     }
 }
 
-pub struct SayHiMiddleware<S> {
+pub struct ResponseMiddleware<S> {
     service: S,
 }
 
-impl<S> Service for SayHiMiddleware<S>
+impl<S> Service for ResponseMiddleware<S>
 where
     S: Service<Request = ServiceRequest, Response = ServiceResponse<Body>, Error = Error>,
     S::Future: 'static,
-    // B: 'static,
 {
     type Request = ServiceRequest;
     type Response = ServiceResponse<Body>;
@@ -86,6 +78,7 @@ where
         Box::pin(async move {
             let mut raw_response = fut.await?;
             let result: serde_json::Value = raw_response.parse().await.unwrap();
+            
             let response = json!(
             {
                 "request": {
