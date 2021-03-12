@@ -45,7 +45,7 @@ pub struct TxSender {
     pub tokens: TokenDBCache,
     /// Mimimum age of the account for `ForcedExit` operations to be allowed.
     pub forced_exit_minimum_account_age: chrono::Duration,
-    /// List of account ids that are not paying fees on operations.
+    /// List of account IDs that do not have to pay fees for operations.
     pub fee_free_accounts: HashSet<AccountId>,
     pub enforce_pubkey_change_fee: bool,
     // Limit the number of both transactions and Ethereum signatures per batch.
