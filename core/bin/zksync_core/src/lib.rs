@@ -28,26 +28,6 @@ pub mod private_api;
 pub mod rejected_tx_cleaner;
 pub mod state_keeper;
 
-#[macro_export]
-macro_rules! retry_opt_fut {
-    ($fut: expr, $err: expr, $delay: expr) => {
-        async {
-            loop {
-                if let Some(val) = $fut.await {
-                    break val;
-                } else {
-                    $err;
-                    time::delay_for($delay.into()).await;
-                }
-            }
-        }
-    };
-
-    ($fut: expr, $err: expr, $delay: expr, $timeout: expr) => {
-        tokio::time::timeout($timeout, retry_opt_fut!($fut, $err, $delay))
-    };
-}
-
 /// Waits for *any* of the tokio tasks to be finished.
 /// Since the main tokio tasks are used as actors which should live as long
 /// as application runs, any possible outcome (either `Ok` or `Err`) is considered

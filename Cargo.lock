@@ -6207,6 +6207,7 @@ dependencies = [
  "num",
  "serde",
  "serde_json",
+ "tokio 0.2.22",
 ]
 
 [[package]]

@@ -1,4 +1,3 @@
-use super::retry_opt_fut;
 use futures::{future::ready, stream, StreamExt};
 use std::cmp::Ordering;
 use std::collections::HashMap;
@@ -6,6 +5,7 @@ use std::iter;
 use std::time::Duration;
 use thiserror::Error;
 use tokio::{task::JoinHandle, time};
+use zksync_utils::retry_opt;
 
 use zksync_config::ZkSyncConfig;
 use zksync_eth_client::EthereumGateway;
@@ -14,12 +14,21 @@ use web3::types::{Block, BlockId, BlockNumber, H256, U64};
 use zksync_eth_client::ETHDirectClient;
 use zksync_eth_signer::PrivateKeySigner;
 
+///
+/// Watcher which checks client once within specified timeout.
+///
 pub struct GatewayWatcher<T> {
+    /// Any kind of client to be verified.
     client: T,
+    /// How many requests are allowed to be done within single task.
     req_per_task_limit: Option<usize>,
+    /// How many tasks are allowed to simulateneously make requests.
     task_limit: Option<usize>,
+    /// How often client will be checked. In milliseconds.
     interval: Duration,
+    /// Max request timeout. In milliseconds.
     req_timeout: Duration,
+    /// Time to wait before request again in case of unsuccessful request. In milliseconds.
     retry_delay: Duration,
 }
 
@@ -32,6 +41,8 @@ enum BlockVerificationError {
     #[error("Invalid block: {0:?}")]
     InvalidBlock(Box<Block<H256>>),
 }
+
+const MAX_BLOCK_NUMBER_DIFFERENCE: u64 = 1;
 
 impl GatewayWatcher<EthereumGateway> {
     pub fn new(
@@ -72,7 +83,7 @@ impl GatewayWatcher<EthereumGateway> {
             };
         }
 
-        let (lat_phash, lat_hash, lat_num) = (
+        let (last_parent_hash, last_hash, last_num) = (
             latest_block.parent_hash,
             block_opt!(latest_block, hash),
             block_opt!(latest_block, number),
@@ -82,49 +93,39 @@ impl GatewayWatcher<EthereumGateway> {
             block_opt!(block_to_check, number),
         );
 
-        if lat_num == num {
-            if lat_hash != hash {
-                Err(BlockVerificationError::IncorrectHash(lat_hash, hash))
-            } else {
-                Ok(())
-            }
-        } else if lat_num - num > U64::from(1u64) {
-            Err(BlockVerificationError::LargeNumDiff(lat_num, num))
-        } else if lat_phash != hash {
-            Err(BlockVerificationError::IncorrectHash(lat_phash, hash))
+        if last_num - num > U64::from(MAX_BLOCK_NUMBER_DIFFERENCE) {
+            Err(BlockVerificationError::LargeNumDiff(last_num, num))
+        } else if last_num == num && last_hash != hash {
+            Err(BlockVerificationError::IncorrectHash(last_hash, hash))
+        } else if last_num == num + U64::one() && last_parent_hash != hash {
+            Err(BlockVerificationError::IncorrectHash(
+                last_parent_hash,
+                hash,
+            ))
         } else {
             Ok(())
         }
     }
 
     async fn check_multiplexer_gateways(&self) {
-        let client = match self.client {
-            EthereumGateway::Multiplexed(ref client) => client,
-            _ => {
-                return;
-            }
-        };
-
         async fn get_latest_client_block<'a>(
             ((key, client), (retry_delay, timeout)): (
                 (&'a str, &'a ETHDirectClient<PrivateKeySigner>),
                 (Duration, Duration),
             ),
         ) -> Option<(&'a str, Block<H256>)> {
-            if let Ok(block) = retry_opt_fut! {
-                async {
-                    client
-                        .block(BlockId::from(BlockNumber::Latest))
-                        .await
-                        .ok()
-                        .flatten()
-                },
+            let block_fut = retry_opt! {
+                client
+                    .block(BlockId::from(BlockNumber::Latest))
+                    .await
+                    .ok()
+                    .flatten(),
                 vlog::error!("Request to Ethereum Gateway `{}` failed", key),
                 retry_delay,
                 timeout
-            }
-            .await
-            {
+            };
+
+            if let Ok(block) = block_fut.await {
                 Some((key, block))
             } else {
                 vlog::error!(
@@ -134,7 +135,17 @@ impl GatewayWatcher<EthereumGateway> {
                 None
             }
         }
+        let client = match self.client {
+            EthereumGateway::Multiplexed(ref client) => client,
+            _ => {
+                return;
+            }
+        };
 
+        //
+        // Fetch latest block for each client concurrently.
+        // Result vector contains (client key, client latest block) pairs.
+        //
         let client_latest_blocks = stream::iter(
             client
                 .clients()
@@ -146,6 +157,9 @@ impl GatewayWatcher<EthereumGateway> {
         .collect::<Vec<_>>()
         .await;
 
+        //
+        // Latest hash distribution across all clients.
+        //
         let hash_counts = client_latest_blocks
             .iter()
             .fold(HashMap::new(), |mut map, (_, cur)| {
@@ -155,6 +169,10 @@ impl GatewayWatcher<EthereumGateway> {
                 map
             });
 
+        //
+        // Preferred client must have longest chain with the most frequent hash and
+        // have lowest latency in its category.
+        //
         if let Some((preferred_key, latest_block)) =
             client_latest_blocks
                 .iter()
