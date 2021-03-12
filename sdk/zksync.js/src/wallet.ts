@@ -860,7 +860,8 @@ export class Wallet {
                         (estimate) => estimate,
                         () => BigNumber.from('0')
                     );
-                    let recommendedGasLimit = ERC20_DEPOSIT_GAS_LIMIT[tokenAddress]
+                    const isMainnet = (await this.ethSigner.getChainId()) == 1;
+                    let recommendedGasLimit = (isMainnet && ERC20_DEPOSIT_GAS_LIMIT[tokenAddress])
                         ? BigNumber.from(ERC20_DEPOSIT_GAS_LIMIT[tokenAddress])
                         : ERC20_RECOMMENDED_DEPOSIT_GAS_LIMIT;
                     txRequest.gasLimit = gasEstimate.gte(recommendedGasLimit) ? gasEstimate : recommendedGasLimit;
