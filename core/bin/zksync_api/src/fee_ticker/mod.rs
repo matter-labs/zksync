@@ -225,8 +225,8 @@ pub enum TickerRequest {
 
 #[derive(Debug, Error)]
 pub enum PriceError {
-    #[error("Invalid params: {0}.")]
-    InvalidParams(String),
+    #[error("Token not found error: {0}.")]
+    TokenNotFound(String),
     #[error("Internal error.")]
     Internal(String),
 }
@@ -236,8 +236,8 @@ impl PriceError {
         Self::Internal(msg.to_string())
     }
 
-    pub fn invalid_params(msg: impl Display) -> Self {
-        Self::InvalidParams(msg.to_string())
+    pub fn token_not_found(msg: impl Display) -> Self {
+        Self::TokenNotFound(msg.to_string())
     }
 }
 

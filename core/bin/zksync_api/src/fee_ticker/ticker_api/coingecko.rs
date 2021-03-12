@@ -49,7 +49,7 @@ impl TokenPriceAPI for CoinGeckoAPI {
             .get(&token_symbol.to_lowercase())
             .or_else(|| self.token_ids.get(token_symbol))
             .ok_or_else(|| {
-                PriceError::invalid_params(format!(
+                PriceError::token_not_found(format!(
                     "Token '{}' is not listed on CoinGecko",
                     token_symbol
                 ))

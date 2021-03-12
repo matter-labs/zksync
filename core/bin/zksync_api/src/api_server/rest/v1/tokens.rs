@@ -76,10 +76,9 @@ impl ApiTokensData {
             })
             .await?;
 
-        // Ugly hack to distinguish real error from missing token.
         match price_receiver.await? {
             Ok(price) => Ok(Some(price)),
-            Err(PriceError::InvalidParams(err)) => Err(anyhow::format_err!(err)),
+            Err(PriceError::TokenNotFound(_)) => Ok(None),
             Err(PriceError::Internal(err)) => Err(anyhow::format_err!(err)),
         }
     }

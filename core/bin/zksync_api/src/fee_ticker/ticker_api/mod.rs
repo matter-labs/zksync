@@ -216,7 +216,7 @@ impl<T: TokenPriceAPI + Send + Sync> FeeTickerAPI for TickerApi<T> {
             )
             .await
             .map_err(PriceError::internal)?
-            .ok_or_else(|| PriceError::invalid_params(format!("Token not found: {:?}", token)))?;
+            .ok_or_else(|| PriceError::token_not_found(format!("Token not found: {:?}", token)))?;
 
         // TODO: remove hardcode for Matter Labs Trial Token (ZKS-63).
         if token.symbol == "MLTT" {
@@ -232,16 +232,7 @@ impl<T: TokenPriceAPI + Send + Sync> FeeTickerAPI for TickerApi<T> {
             return Ok(cached_value);
         }
 
-        let api_price = self
-            .token_price_api
-            .get_price(&token.symbol)
-            .await
-            /*.map_err(|e| vlog::warn!("Failed to get price: {}", e));
-        if let Ok(api_price) = api_price {
-            self.update_stored_value(token.id, api_price.clone(), false)
-                .await;
-            metrics::histogram!("ticker.get_last_quote", start.elapsed());
-            return Ok(api_price)}*/;
+        let api_price = self.token_price_api.get_price(&token.symbol).await;
 
         match api_price {
             Ok(api_price) => {
@@ -251,7 +242,7 @@ impl<T: TokenPriceAPI + Send + Sync> FeeTickerAPI for TickerApi<T> {
                 return Ok(api_price);
             }
             // Database contain this token, but it not listed in CoinGecko(CoinMarketCap)
-            Err(PriceError::InvalidParams(_)) => {
+            Err(PriceError::TokenNotFound(_)) => {
                 return Ok(TokenPrice {
                     usd_price: Ratio::from_integer(0u32.into()),
                     last_updated: Utc::now(),
