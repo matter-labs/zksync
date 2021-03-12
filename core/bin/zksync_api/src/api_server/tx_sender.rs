@@ -148,7 +148,7 @@ impl TxSender {
 
             enforce_pubkey_change_fee: config.api.common.enforce_pubkey_change_fee,
             forced_exit_minimum_account_age,
-            fee_free_accounts: HashSet::from_iter(config.api.common.fee_free_accounts.clone()),
+            fee_free_accounts: HashSet::from_iter(config.api.common.fee_free_accounts),
             max_number_of_transactions_per_batch,
             max_number_of_authors_per_batch,
         }
