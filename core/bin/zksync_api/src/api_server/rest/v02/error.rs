@@ -2,11 +2,12 @@ use serde::Serialize;
 
 #[derive(Serialize)]
 #[serde(untagged)]
+#[serde(rename_all = "snake_case")]
 pub enum ErrorType {
     InvalidRequestError,
     ApiError,
     IdempotencyError,
-    RateLimitError    
+    RateLimitError,
 }
 /// Error object in a response
 #[derive(Serialize)]
@@ -19,6 +20,7 @@ pub struct Error {
 /// Trait that can be used to map custom errors to the object.
 pub trait ApiError: std::fmt::Display {
     fn error_type(&self) -> ErrorType;
+
     fn code(&self) -> u16;
 
     fn message(&self) -> String {

@@ -78,7 +78,7 @@ where
         Box::pin(async move {
             let mut raw_response = fut.await?;
             let result: serde_json::Value = raw_response.parse().await.unwrap();
-            
+
             let response = json!(
             {
                 "request": {

@@ -1,7 +1,5 @@
 use actix_cors::Cors;
-use actix_web::{
-    web, App, HttpResponse, HttpServer,
-};
+use actix_web::{web, App, HttpResponse, HttpServer};
 use futures::channel::mpsc;
 use std::net::SocketAddr;
 use zksync_storage::ConnectionPool;
