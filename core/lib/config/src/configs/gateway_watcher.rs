@@ -16,9 +16,9 @@ pub struct MultiplexedGatewayWatcherConfig {
     pub gateway_check_retry_delay: u64,
     /// Max request timeout. In milliseconds.
     pub gateway_check_request_timeout: u64,
-    /// How many requests are allowed to be done within single task.
+    /// How many requests are allowed to be done within a single task.
     pub gateway_check_request_per_task_limit: usize,
-    /// How many tasks are allowed to simulateneously make requests.
+    /// How many tasks are allowed to simultaneously make requests.
     pub gateway_check_task_limit: usize,
 }
 
@@ -69,8 +69,6 @@ mod tests {
     #[test]
     fn from_env() {
         let config = r#"
-GATEWAY_WATCHER_GATEWAY_CHECK_INTERVAL="1000"
-GATEWAY_WATCHER_GATEWAY_CHECK_RETRY_DELAY="0"
 GATEWAY_WATCHER_GATEWAY_CHECK_INTERVAL="1000"
 GATEWAY_WATCHER_GATEWAY_CHECK_RETRY_DELAY="200"
 GATEWAY_WATCHER_GATEWAY_CHECK_REQUEST_PER_TASK_LIMIT="10"

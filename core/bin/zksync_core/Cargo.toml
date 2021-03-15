@@ -34,7 +34,7 @@ itertools = "0.9.0"
 
 vlog = { path = "../../lib/vlog", version = "1.0" }
 
-tokio = { version = "0.2", features = ["full"] }
+tokio = { version = "0.2", features = ["time"] }
 futures = "0.3"
 actix-rt = "1.1.1"
 actix-web = "3.0.0"

@@ -4,12 +4,11 @@ use std::collections::HashMap;
 use std::time::Duration;
 use thiserror::Error;
 use tokio::{task::JoinHandle, time};
-use zksync_utils::retry_opt;
+use web3::types::{Block, BlockId, BlockNumber, H256, U64};
 
+use zksync_utils::retry_opt;
 use zksync_config::ZkSyncConfig;
 use zksync_eth_client::{EthereumGateway, MultiplexerEthereumClient};
-
-use web3::types::{Block, BlockId, BlockNumber, H256, U64};
 
 /// Watcher which checks multiplexed client once within specified timeout.
 pub struct MultiplexedGatewayWatcher {
@@ -21,9 +20,9 @@ pub struct MultiplexedGatewayWatcher {
     retry_delay: Duration,
     /// Max request timeout. In milliseconds.
     req_timeout: Duration,
-    /// How many requests are allowed to be done within single task.
+    /// How many requests are allowed to be done within a single task.
     req_per_task_limit: Option<usize>,
-    /// How many tasks are allowed to simulateneously make requests.
+    /// How many tasks are allowed to simultaneously make requests.
     task_limit: Option<usize>,
 }
 
@@ -160,10 +159,8 @@ impl MultiplexedGatewayWatcher {
                 map
             });
 
-        //
         // Preferred client must have longest chain with the most frequent hash and
-        // have lowest latency in its category.
-        //
+        // lowest latency in its category.
         let preferred_client =
             client_latest_blocks
                 .iter()
@@ -178,7 +175,9 @@ impl MultiplexedGatewayWatcher {
                 );
 
         if let Some((preferred_client_name, latest_block)) = preferred_client {
-            self.client.prioritize_client(preferred_client_name);
+            if self.client.prioritize_client(preferred_client_name) {
+                vlog::info!("Prioritized Ethereum Gateway: `{}`", preferred_client_name);
+            }
             for (key, block) in &client_latest_blocks {
                 if let Err(err) = Self::verify_blocks(latest_block, block) {
                     vlog::error!("Ethereum Gateway `{}` - check failed: {}", key, err);
@@ -213,15 +212,18 @@ mod tests {
     fn test_same_depth_block_hash_check() {
         let h1 = H256::random();
         let h2 = H256::random();
-
         let mut b1 = Block::default();
         let mut b2 = Block::default();
+
         b1.hash = Some(h1);
         b2.hash = Some(h1);
         b1.number = Some(U64::from(1u64));
         b2.number = Some(U64::from(1u64));
+
         assert_eq!(MultiplexedGatewayWatcher::verify_blocks(&b1, &b2), Ok(()));
+
         b2.hash = Some(h2);
+
         assert_eq!(
             MultiplexedGatewayWatcher::verify_blocks(&b1, &b2),
             Err(BlockVerificationError::IncorrectHash(h1, h2))
@@ -240,9 +242,11 @@ mod tests {
         b2.hash = Some(h2);
         b1.number = Some(U64::from(1u64));
         b2.number = Some(U64::from(0u64));
+
         assert_eq!(MultiplexedGatewayWatcher::verify_blocks(&b1, &b2), Ok(()));
 
         b2.hash = Some(h1);
+
         assert_eq!(
             MultiplexedGatewayWatcher::verify_blocks(&b1, &b2),
             Err(BlockVerificationError::IncorrectHash(h2, h1))
@@ -260,6 +264,7 @@ mod tests {
         b2.hash = Some(h2);
         b1.number = Some(U64::from(2u64));
         b2.number = Some(U64::from(0u64));
+
         assert_eq!(
             MultiplexedGatewayWatcher::verify_blocks(&b1, &b2),
             Err(BlockVerificationError::LargeNumDiff(

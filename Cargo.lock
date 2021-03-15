@@ -5960,7 +5960,6 @@ dependencies = [
  "zksync_basic_types",
  "zksync_config",
  "zksync_contracts",
- "zksync_core",
  "zksync_eth_client",
  "zksync_eth_signer",
  "zksync_gateway_watcher",
@@ -5994,9 +5993,7 @@ dependencies = [
 name = "zksync_gateway_watcher"
 version = "1.0.0"
 dependencies = [
- "anyhow",
  "futures 0.3.6",
- "hex",
  "thiserror",
  "tokio 0.2.22",
  "vlog",

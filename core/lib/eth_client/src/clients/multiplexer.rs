@@ -14,14 +14,14 @@ use crate::ethereum_gateway::{ExecutedTxStatus, FailureInfo, SignedCallResult};
 use crate::ETHDirectClient;
 
 #[derive(Debug, Default)]
-struct MultiplexerEthereumInnerClient {
+struct MultiplexerEthereumClientInner {
     clients: Vec<(String, ETHDirectClient<PrivateKeySigner>)>,
     preferred: AtomicUsize,
 }
 
 #[derive(Debug, Default, Clone)]
 pub struct MultiplexerEthereumClient {
-    inner: Arc<MultiplexerEthereumInnerClient>,
+    inner: Arc<MultiplexerEthereumClientInner>,
 }
 
 macro_rules! multiple_call {
@@ -41,7 +41,7 @@ impl MultiplexerEthereumClient {
         Self::default()
     }
 
-    pub fn add_client(mut self, name: String, client: ETHDirectClient<PrivateKeySigner>) -> Self {
+    pub fn add_client(&mut self, name: String, client: ETHDirectClient<PrivateKeySigner>) -> &mut Self {
         Arc::get_mut(&mut self.inner)
             .unwrap()
             .clients
@@ -51,8 +51,7 @@ impl MultiplexerEthereumClient {
 
     pub fn prioritize_client(&self, name: &str) -> bool {
         if let Some(idx) = self.inner.clients.iter().position(|(key, _)| key == name) {
-            self.inner.preferred.store(idx, Ordering::Relaxed);
-            true
+            self.inner.preferred.swap(idx, Ordering::Acquire) != idx
         } else {
             false
         }

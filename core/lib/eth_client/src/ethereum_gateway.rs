@@ -68,7 +68,7 @@ impl EthereumGateway {
             let contract = zksync_contract();
             for web3_url in config.eth_client.web3_url.iter() {
                 let transport = web3::transports::Http::new(web3_url).unwrap();
-                client = client.add_client(
+                client.add_client(
                     web3_url.clone(),
                     ETHDirectClient::new(
                         transport,
