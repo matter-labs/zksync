@@ -25,13 +25,13 @@ use zksync_types::{
 };
 
 // Local uses
-use crate::api_server::rpc_server::types::TxWithSignature;
 use crate::{
+    api_server::rpc_server::types::TxWithSignature,
     core_api_client::CoreApiClient,
     fee_ticker::{TickerRequest, TokenPriceRequestType},
     signature_checker::{BatchRequest, RequestData, TxRequest, VerifiedTx, VerifySignatureRequest},
     tx_error::TxAddError,
-    utils::token_db_cache::TokenDBCache,
+    utils::{block_details_cache::BlockDetailsCache, token_db_cache::TokenDBCache},
 };
 
 #[derive(Clone)]
@@ -42,6 +42,7 @@ pub struct TxSender {
 
     pub pool: ConnectionPool,
     pub tokens: TokenDBCache,
+    pub blocks: BlockDetailsCache,
     /// Mimimum age of the account for `ForcedExit` operations to be allowed.
     pub forced_exit_minimum_account_age: chrono::Duration,
     pub enforce_pubkey_change_fee: bool,
@@ -142,6 +143,7 @@ impl TxSender {
             sign_verify_requests: sign_verify_request_sender,
             ticker_requests: ticker_request_sender,
             tokens: TokenDBCache::new(),
+            blocks: BlockDetailsCache::new(config.api.common.caches_size),
 
             enforce_pubkey_change_fee: config.api.common.enforce_pubkey_change_fee,
             forced_exit_minimum_account_age,

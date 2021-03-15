@@ -24,6 +24,8 @@ All notable changes to the core components will be documented in this file.
 
 ### Fixed
 
+- Fix wrong block info cache behavior in the `api_server`.
+
 ## Release 2021-02-19
 
 ### Removed
