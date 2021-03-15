@@ -1,6 +1,5 @@
-///
-/// Returns future which retries given `Option` with delay and optional timeout until it resolves with `Some(_)`.
-///
+/// Returns future which retries given `Option` with delay and optional timeout
+/// until it resolves to `Some(_)` or timeout expires.
 #[macro_export]
 macro_rules! retry_opt {
     ($fut: expr, $err: expr, $delay: expr) => {

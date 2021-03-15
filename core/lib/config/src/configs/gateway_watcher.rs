@@ -7,7 +7,7 @@ use crate::envy_load;
 
 /// Configuration of the Gateway Watch.
 #[derive(Debug, Deserialize, Clone, PartialEq)]
-pub struct MultiplexedGatewayWatcherConfig {
+pub struct GatewayWatcherConfig {
     /// How often all gateways will be checked.
     /// Value in milliseconds.
     pub gateway_check_interval: u64,
@@ -22,7 +22,7 @@ pub struct MultiplexedGatewayWatcherConfig {
     pub gateway_check_task_limit: usize,
 }
 
-impl MultiplexedGatewayWatcherConfig {
+impl GatewayWatcherConfig {
     pub fn from_env() -> Self {
         envy_load!("gateway_watcher", "GATEWAY_WATCHER_")
     }
@@ -56,8 +56,8 @@ mod tests {
     use super::*;
     use crate::configs::test_utils::set_env;
 
-    fn expected_config() -> MultiplexedGatewayWatcherConfig {
-        MultiplexedGatewayWatcherConfig {
+    fn expected_config() -> GatewayWatcherConfig {
+        GatewayWatcherConfig {
             gateway_check_interval: 1000,
             gateway_check_retry_delay: 200,
             gateway_check_request_per_task_limit: 10,
@@ -77,7 +77,7 @@ GATEWAY_WATCHER_GATEWAY_CHECK_REQUEST_TIMEOUT="1000"
         "#;
         set_env(config);
 
-        let actual = MultiplexedGatewayWatcherConfig::from_env();
+        let actual = GatewayWatcherConfig::from_env();
         assert_eq!(actual, expected_config());
     }
 }

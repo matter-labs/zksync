@@ -10,9 +10,9 @@ use zksync_config::ZkSyncConfig;
 use zksync_eth_client::{EthereumGateway, MultiplexerEthereumClient};
 use zksync_utils::retry_opt;
 
-/// Watcher which checks multiplexed client once within specified timeout.
+/// Watcher which checks multiplexed client's gateways once within specified timeout.
 pub struct MultiplexedGatewayWatcher {
-    /// Any kind of client to be verified.
+    /// Multiplexed client to be verified.
     client: MultiplexerEthereumClient,
     /// How often client will be checked. In milliseconds.
     interval: Duration,
