@@ -167,13 +167,16 @@ export class BatchBuilder {
                   validFrom?: number;
                   validUntil?: number;
               }
-            | ChangePubKey
+            | SignedTransaction
     ): BatchBuilder {
-        if ('type' in changePubKey) {
+        if ('tx' in changePubKey) {
+            if (changePubKey.tx.type !== 'ChangePubKey') {
+                throw new Error('Invalid transaction type, expected ChangePubKey');
+            }
             // Already signed.
             this.txs.push({
                 type: 'ChangePubKey',
-                tx: changePubKey,
+                tx: changePubKey.tx,
                 feeType: null, // Not needed.
                 address: this.wallet.address(),
                 token: null, // Will be resolved later.
