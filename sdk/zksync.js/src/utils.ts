@@ -31,6 +31,8 @@ export const IEIP1271_INTERFACE = new utils.Interface(require('../abi/IEIP1271.j
 
 export const MULTICALL_INTERFACE = new utils.Interface(require('../abi/Multicall.json').abi);
 
+export const ERC20_DEPOSIT_GAS_LIMIT = require('../misc/DepositERC20GasLimit.json');
+
 export const MAX_ERC20_APPROVE_AMOUNT = BigNumber.from(
     '115792089237316195423570985008687907853269984665640564039457584007913129639935'
 ); // 2^256 - 1
