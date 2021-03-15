@@ -29,8 +29,8 @@ pub fn run_api(
     start_api_server(
         connection_pool,
         panic_notify,
-        eth_gateway,
         ticker_request_sender,
+        eth_gateway,
         config,
     );
 

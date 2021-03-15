@@ -7,24 +7,24 @@ use tokio::{task::JoinHandle, time};
 use zksync_utils::retry_opt;
 
 use zksync_config::ZkSyncConfig;
-use zksync_eth_client::EthereumGateway;
+use zksync_eth_client::{EthereumGateway, MultiplexerEthereumClient};
 
 use web3::types::{Block, BlockId, BlockNumber, H256, U64};
 
-/// Watcher which checks client once within specified timeout.
-pub struct GatewayWatcher {
+/// Watcher which checks multiplexed client once within specified timeout.
+pub struct MultiplexedGatewayWatcher {
     /// Any kind of client to be verified.
-    client: EthereumGateway,
+    client: MultiplexerEthereumClient,
+    /// How often client will be checked. In milliseconds.
+    interval: Duration,
+    /// Time to wait before request again in case of unsuccessful request. In milliseconds.
+    retry_delay: Duration,
+    /// Max request timeout. In milliseconds.
+    req_timeout: Duration,
     /// How many requests are allowed to be done within single task.
     req_per_task_limit: Option<usize>,
     /// How many tasks are allowed to simulateneously make requests.
     task_limit: Option<usize>,
-    /// How often client will be checked. In milliseconds.
-    interval: Duration,
-    /// Max request timeout. In milliseconds.
-    req_timeout: Duration,
-    /// Time to wait before request again in case of unsuccessful request. In milliseconds.
-    retry_delay: Duration,
 }
 
 #[derive(Error, Debug, PartialEq)]
@@ -39,22 +39,32 @@ enum BlockVerificationError {
 
 const MAX_BLOCK_NUMBER_DIFFERENCE: u64 = 1;
 
-impl GatewayWatcher {
+impl MultiplexedGatewayWatcher {
+    /// Instantiates `MultiplexedGatewayWatcher` for provided multiplexed ethereum gateway.
+    ///
+    /// # Panics
+    ///
+    /// If given ethereum gateway is not `Multiplexed`.
     pub fn new(
-        client: EthereumGateway,
+        gateway: EthereumGateway,
+        interval: Duration,
+        retry_delay: Duration,
+        req_timeout: Duration,
         req_per_task_limit: Option<usize>,
         task_limit: Option<usize>,
-        interval: Duration,
-        req_timeout: Duration,
-        retry_delay: Duration,
     ) -> Self {
         Self {
-            client,
-            req_per_task_limit,
-            task_limit,
+            client: match gateway {
+                EthereumGateway::Multiplexed(client) => client,
+                _ => {
+                    panic!("Ethereum Gateway Watcher: Multiplexed client expected")
+                }
+            },
             interval,
             retry_delay,
             req_timeout,
+            req_per_task_limit,
+            task_limit,
         }
     }
 
@@ -62,7 +72,7 @@ impl GatewayWatcher {
         vlog::info!("Ethereum Gateway Watcher started");
 
         time::interval(self.interval)
-            .for_each_concurrent(self.task_limit, |_| self.check_multiplexer_gateways())
+            .for_each_concurrent(self.task_limit, |_| self.check_client_gateways())
             .await
     }
 
@@ -102,16 +112,11 @@ impl GatewayWatcher {
         }
     }
 
-    async fn check_multiplexer_gateways(&self) {
-        let client = match self.client {
-            EthereumGateway::Multiplexed(ref client) => client,
-            _ => {
-                return;
-            }
-        };
-
+    async fn check_client_gateways(&self) {
+        // Fetch latest block for each client.
+        // Each request will resolve to (client key, client latest block) pair.
         let latest_block_reqs: Vec<_> =
-            client
+            self.client
                 .clients()
                 .map(|(key, client)| async move {
                     let block_fut = retry_opt! {
@@ -136,19 +141,16 @@ impl GatewayWatcher {
                     }
                 })
                 .collect();
-        //
-        // Fetch latest block for each client concurrently.
-        // Result vector contains (client key, client latest block) pairs.
-        //
+
+        // Execute all requests concurrently.
+        // Max amount of concurrent tasks is limited by `req_per_task_limit`.
         let client_latest_blocks = stream::iter(latest_block_reqs.into_iter())
             .buffer_unordered(self.req_per_task_limit.unwrap_or(usize::MAX))
             .filter_map(ready)
             .collect::<Vec<_>>()
             .await;
 
-        //
         // Latest hash distribution across all clients.
-        //
         let hash_counts = client_latest_blocks
             .iter()
             .fold(HashMap::new(), |mut map, (_, cur)| {
@@ -175,8 +177,8 @@ impl GatewayWatcher {
                     },
                 );
 
-        if let Some((preferred_key, latest_block)) = preferred_client {
-            client.prioritize_client(preferred_key);
+        if let Some((preferred_client_name, latest_block)) = preferred_client {
+            self.client.prioritize_client(preferred_client_name);
             for (key, block) in &client_latest_blocks {
                 if let Err(err) = Self::verify_blocks(latest_block, block) {
                     vlog::error!("Ethereum Gateway `{}` - check failed: {}", key, err);
@@ -187,14 +189,17 @@ impl GatewayWatcher {
 }
 
 #[must_use]
-pub fn run_gateway_watcher(eth_gateway: EthereumGateway, config: &ZkSyncConfig) -> JoinHandle<()> {
-    let gateway_watcher = GatewayWatcher::new(
+pub fn run_multiplexed_gateway_watcher(
+    eth_gateway: EthereumGateway,
+    config: &ZkSyncConfig,
+) -> JoinHandle<()> {
+    let gateway_watcher = MultiplexedGatewayWatcher::new(
         eth_gateway,
+        config.gateway_watcher.check_interval(),
+        config.gateway_watcher.retry_delay(),
+        config.gateway_watcher.request_timeout(),
         Some(config.gateway_watcher.request_per_task_limit()),
         Some(config.gateway_watcher.task_limit()),
-        config.gateway_watcher.check_interval(),
-        config.gateway_watcher.request_timeout(),
-        config.gateway_watcher.retry_delay(),
     );
 
     tokio::spawn(gateway_watcher.run())
@@ -215,10 +220,10 @@ mod tests {
         b2.hash = Some(h1);
         b1.number = Some(U64::from(1u64));
         b2.number = Some(U64::from(1u64));
-        assert_eq!(GatewayWatcher::verify_blocks(&b1, &b2), Ok(()));
+        assert_eq!(MultiplexedGatewayWatcher::verify_blocks(&b1, &b2), Ok(()));
         b2.hash = Some(h2);
         assert_eq!(
-            GatewayWatcher::verify_blocks(&b1, &b2),
+            MultiplexedGatewayWatcher::verify_blocks(&b1, &b2),
             Err(BlockVerificationError::IncorrectHash(h1, h2))
         );
     }
@@ -227,19 +232,19 @@ mod tests {
     fn test_different_depth_block_hash_check() {
         let h1 = H256::random();
         let h2 = H256::random();
-
         let mut b1 = Block::default();
         let mut b2 = Block::default();
+
         b1.hash = Some(h1);
         b1.parent_hash = h2;
         b2.hash = Some(h2);
-
         b1.number = Some(U64::from(1u64));
         b2.number = Some(U64::from(0u64));
-        assert_eq!(GatewayWatcher::verify_blocks(&b1, &b2), Ok(()));
+        assert_eq!(MultiplexedGatewayWatcher::verify_blocks(&b1, &b2), Ok(()));
+
         b2.hash = Some(h1);
         assert_eq!(
-            GatewayWatcher::verify_blocks(&b1, &b2),
+            MultiplexedGatewayWatcher::verify_blocks(&b1, &b2),
             Err(BlockVerificationError::IncorrectHash(h2, h1))
         );
     }
@@ -248,16 +253,15 @@ mod tests {
     fn test_block_incorrect_depth_check() {
         let h1 = H256::random();
         let h2 = H256::random();
-
         let mut b1 = Block::default();
         let mut b2 = Block::default();
+
         b1.hash = Some(h1);
         b2.hash = Some(h2);
-
         b1.number = Some(U64::from(2u64));
         b2.number = Some(U64::from(0u64));
         assert_eq!(
-            GatewayWatcher::verify_blocks(&b1, &b2),
+            MultiplexedGatewayWatcher::verify_blocks(&b1, &b2),
             Err(BlockVerificationError::LargeNumDiff(
                 U64::from(2u64),
                 U64::from(0u64)

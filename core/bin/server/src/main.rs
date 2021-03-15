@@ -2,9 +2,10 @@ use futures::{channel::mpsc, executor::block_on, SinkExt, StreamExt};
 use std::cell::RefCell;
 use structopt::StructOpt;
 use zksync_api::run_api;
-use zksync_core::{gateway_watcher::run_gateway_watcher, genesis_init, run_core, wait_for_tasks};
+use zksync_core::{genesis_init, run_core, wait_for_tasks};
 use zksync_eth_client::EthereumGateway;
 use zksync_eth_sender::run_eth_sender;
+use zksync_gateway_watcher::run_multiplexed_gateway_watcher;
 use zksync_prometheus_exporter::run_prometheus_exporter;
 use zksync_witness_generator::run_prover_server;
 
@@ -48,7 +49,7 @@ async fn main() -> anyhow::Result<()> {
     let connection_pool = ConnectionPool::new(None);
     let eth_gateway = EthereumGateway::from_config(&config);
 
-    let gateway_watcher_task = run_gateway_watcher(eth_gateway.clone(), &config);
+    let gateway_watcher_task = run_multiplexed_gateway_watcher(eth_gateway.clone(), &config);
 
     // Handle Ctrl+C
     let (stop_signal_sender, mut stop_signal_receiver) = mpsc::channel(256);
@@ -68,9 +69,9 @@ async fn main() -> anyhow::Result<()> {
     // Run core actors.
     vlog::info!("Starting the Core actors");
     let core_task_handles = run_core(
-        eth_gateway.clone(),
         connection_pool.clone(),
         stop_signal_sender.clone(),
+        eth_gateway.clone(),
         &config,
     )
     .await

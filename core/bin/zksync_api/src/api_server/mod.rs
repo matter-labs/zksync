@@ -32,8 +32,8 @@ const THREADS_PER_SERVER: usize = 128;
 pub fn start_api_server(
     connection_pool: ConnectionPool,
     panic_notify: mpsc::Sender<bool>,
-    eth_gateway: EthereumGateway,
     ticker_request_sender: mpsc::Sender<TickerRequest>,
+    eth_gateway: EthereumGateway,
     config: &ZkSyncConfig,
 ) {
     let (sign_check_sender, sign_check_receiver) = mpsc::channel(32768);

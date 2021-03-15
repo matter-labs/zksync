@@ -2,8 +2,9 @@
 pub use self::{
     api::ApiConfig, chain::ChainConfig, contracts::ContractsConfig, database::DBConfig,
     dev_liquidity_token_watcher::DevLiquidityTokenWatcherConfig, eth_client::ETHClientConfig,
-    eth_sender::ETHSenderConfig, eth_watch::ETHWatchConfig, gateway_watcher::GatewayWatcherConfig,
-    misc::MiscConfig, prover::ProverConfig, ticker::TickerConfig,
+    eth_sender::ETHSenderConfig, eth_watch::ETHWatchConfig,
+    gateway_watcher::MultiplexedGatewayWatcherConfig, misc::MiscConfig, prover::ProverConfig,
+    ticker::TickerConfig,
 };
 
 pub mod api;

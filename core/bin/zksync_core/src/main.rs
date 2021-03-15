@@ -27,7 +27,7 @@ async fn main() -> anyhow::Result<()> {
     let (prometheus_task_handle, counter_task_handle) =
         run_prometheus_exporter(connection_pool.clone(), config.api.prometheus.port, true);
 
-    let task_handles = run_core(eth_gateway, connection_pool, stop_signal_sender, &config)
+    let task_handles = run_core(connection_pool, stop_signal_sender, eth_gateway, &config)
         .await
         .expect("Unable to start Core actors");
 

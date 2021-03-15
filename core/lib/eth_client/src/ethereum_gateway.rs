@@ -263,6 +263,10 @@ impl EthereumGateway {
         delegate_call!(self.get_tx(hash))
     }
 
+    pub fn is_multiplexed(&self) -> bool {
+        matches!(self, EthereumGateway::Multiplexed(_))
+    }
+
     pub fn get_mut_mock(&mut self) -> Option<&mut MockEthereum> {
         match self {
             EthereumGateway::Mock(ref mut m) => Some(m),

@@ -1,9 +1,9 @@
 use futures::{channel::mpsc, executor::block_on, SinkExt, StreamExt};
 use std::cell::RefCell;
 use zksync_config::ZkSyncConfig;
-use zksync_core::gateway_watcher::run_gateway_watcher;
 use zksync_eth_client::EthereumGateway;
 use zksync_eth_sender::run_eth_sender;
+use zksync_gateway_watcher::run_multiplexed_gateway_watcher;
 use zksync_prometheus_exporter::run_prometheus_exporter;
 use zksync_storage::ConnectionPool;
 
@@ -28,7 +28,7 @@ async fn main() -> anyhow::Result<()> {
     let pool = ConnectionPool::new(Some(ETH_SENDER_CONNECTION_POOL_SIZE));
     let config = ZkSyncConfig::from_env();
     let eth_gateway = EthereumGateway::from_config(&config);
-    let gateway_watcher_task = run_gateway_watcher(eth_gateway.clone(), &config);
+    let gateway_watcher_task = run_multiplexed_gateway_watcher(eth_gateway.clone(), &config);
 
     // Run prometheus data exporter.
     let (prometheus_task_handle, _) =

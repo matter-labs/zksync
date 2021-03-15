@@ -69,7 +69,7 @@ mod tests {
         }
         .await;
 
-        assert!(err_count >= 9);
+        assert!((9..11).contains(&err_count));
         assert!(val.is_err());
     }
 }

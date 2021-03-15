@@ -5,7 +5,6 @@ use crate::{
     block_proposer::run_block_proposer_task,
     committer::run_committer,
     eth_watch::start_eth_watch,
-    gateway_watcher::run_gateway_watcher,
     mempool::run_mempool_tasks,
     private_api::start_private_core_api,
     rejected_tx_cleaner::run_rejected_tx_cleaner,
@@ -15,6 +14,7 @@ use futures::{channel::mpsc, future};
 use tokio::task::JoinHandle;
 use zksync_config::ZkSyncConfig;
 use zksync_eth_client::EthereumGateway;
+use zksync_gateway_watcher::run_multiplexed_gateway_watcher;
 use zksync_storage::ConnectionPool;
 
 const DEFAULT_CHANNEL_CAPACITY: usize = 32_768;
@@ -22,7 +22,6 @@ const DEFAULT_CHANNEL_CAPACITY: usize = 32_768;
 pub mod block_proposer;
 pub mod committer;
 pub mod eth_watch;
-pub mod gateway_watcher;
 pub mod mempool;
 pub mod private_api;
 pub mod rejected_tx_cleaner;
@@ -94,9 +93,9 @@ pub async fn genesis_init(config: &ZkSyncConfig) {
 /// - committer, module to store pending and completed blocks into the database.
 /// - private Core API server.
 pub async fn run_core(
-    eth_gateway: EthereumGateway,
     connection_pool: ConnectionPool,
     panic_notify: mpsc::Sender<bool>,
+    eth_gateway: EthereumGateway,
     config: &ZkSyncConfig,
 ) -> anyhow::Result<Vec<JoinHandle<()>>> {
     let (proposed_blocks_sender, proposed_blocks_receiver) =
@@ -157,7 +156,7 @@ pub async fn run_core(
         DEFAULT_CHANNEL_CAPACITY,
     );
 
-    let gateway_watcher_task = run_gateway_watcher(eth_gateway.clone(), &config);
+    let gateway_watcher_task = run_multiplexed_gateway_watcher(eth_gateway.clone(), &config);
 
     // Start rejected transactions cleaner task.
     let rejected_tx_cleaner_task = run_rejected_tx_cleaner(&config, connection_pool.clone());
