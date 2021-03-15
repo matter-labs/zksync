@@ -1,7 +1,6 @@
 use futures::{future::ready, stream, StreamExt};
 use std::cmp::Ordering;
 use std::collections::HashMap;
-use std::iter;
 use std::time::Duration;
 use thiserror::Error;
 use tokio::{task::JoinHandle, time};
@@ -11,15 +10,11 @@ use zksync_config::ZkSyncConfig;
 use zksync_eth_client::EthereumGateway;
 
 use web3::types::{Block, BlockId, BlockNumber, H256, U64};
-use zksync_eth_client::ETHDirectClient;
-use zksync_eth_signer::PrivateKeySigner;
 
-///
 /// Watcher which checks client once within specified timeout.
-///
-pub struct GatewayWatcher<T> {
+pub struct GatewayWatcher {
     /// Any kind of client to be verified.
-    client: T,
+    client: EthereumGateway,
     /// How many requests are allowed to be done within single task.
     req_per_task_limit: Option<usize>,
     /// How many tasks are allowed to simulateneously make requests.
@@ -44,19 +39,19 @@ enum BlockVerificationError {
 
 const MAX_BLOCK_NUMBER_DIFFERENCE: u64 = 1;
 
-impl GatewayWatcher<EthereumGateway> {
+impl GatewayWatcher {
     pub fn new(
         client: EthereumGateway,
-        req_per_task_limit: impl Into<Option<usize>>,
-        task_limit: impl Into<Option<usize>>,
+        req_per_task_limit: Option<usize>,
+        task_limit: Option<usize>,
         interval: Duration,
         req_timeout: Duration,
         retry_delay: Duration,
     ) -> Self {
         Self {
             client,
-            req_per_task_limit: req_per_task_limit.into(),
-            task_limit: task_limit.into(),
+            req_per_task_limit,
+            task_limit,
             interval,
             retry_delay,
             req_timeout,
@@ -108,33 +103,6 @@ impl GatewayWatcher<EthereumGateway> {
     }
 
     async fn check_multiplexer_gateways(&self) {
-        async fn get_latest_client_block<'a>(
-            ((key, client), (retry_delay, timeout)): (
-                (&'a str, &'a ETHDirectClient<PrivateKeySigner>),
-                (Duration, Duration),
-            ),
-        ) -> Option<(&'a str, Block<H256>)> {
-            let block_fut = retry_opt! {
-                client
-                    .block(BlockId::from(BlockNumber::Latest))
-                    .await
-                    .ok()
-                    .flatten(),
-                vlog::error!("Request to Ethereum Gateway `{}` failed", key),
-                retry_delay,
-                timeout
-            };
-
-            if let Ok(block) = block_fut.await {
-                Some((key, block))
-            } else {
-                vlog::error!(
-                    "Failed to get latest block from Ethereum Gateway `{}` within specified timeout",
-                    key
-                );
-                None
-            }
-        }
         let client = match self.client {
             EthereumGateway::Multiplexed(ref client) => client,
             _ => {
@@ -142,20 +110,41 @@ impl GatewayWatcher<EthereumGateway> {
             }
         };
 
+        let latest_block_reqs: Vec<_> =
+            client
+                .clients()
+                .map(|(key, client)| async move {
+                    let block_fut = retry_opt! {
+                        client
+                            .block(BlockId::from(BlockNumber::Latest))
+                            .await
+                            .ok()
+                            .flatten(),
+                        vlog::error!("Request to Ethereum Gateway `{}` failed", key),
+                        self.retry_delay,
+                        self.req_timeout
+                    };
+
+                    if let Ok(block) = block_fut.await {
+                        Some((key, block))
+                    } else {
+                        vlog::error!(
+                            "Failed to get latest block from Ethereum Gateway `{}` within specified timeout",
+                            key
+                        );
+                        None
+                    }
+                })
+                .collect();
         //
         // Fetch latest block for each client concurrently.
         // Result vector contains (client key, client latest block) pairs.
         //
-        let client_latest_blocks = stream::iter(
-            client
-                .clients()
-                .zip(iter::repeat((self.retry_delay, self.req_timeout))),
-        )
-        .map(get_latest_client_block)
-        .buffer_unordered(self.req_per_task_limit.unwrap_or(usize::MAX))
-        .filter_map(ready)
-        .collect::<Vec<_>>()
-        .await;
+        let client_latest_blocks = stream::iter(latest_block_reqs.into_iter())
+            .buffer_unordered(self.req_per_task_limit.unwrap_or(usize::MAX))
+            .filter_map(ready)
+            .collect::<Vec<_>>()
+            .await;
 
         //
         // Latest hash distribution across all clients.
@@ -173,7 +162,7 @@ impl GatewayWatcher<EthereumGateway> {
         // Preferred client must have longest chain with the most frequent hash and
         // have lowest latency in its category.
         //
-        if let Some((preferred_key, latest_block)) =
+        let preferred_client =
             client_latest_blocks
                 .iter()
                 .rev()
@@ -184,8 +173,9 @@ impl GatewayWatcher<EthereumGateway> {
                             .cmp(&hash_counts.get(&block2.hash)),
                         other => other,
                     },
-                )
-        {
+                );
+
+        if let Some((preferred_key, latest_block)) = preferred_client {
             client.prioritize_client(preferred_key);
             for (key, block) in &client_latest_blocks {
                 if let Err(err) = Self::verify_blocks(latest_block, block) {
@@ -200,8 +190,8 @@ impl GatewayWatcher<EthereumGateway> {
 pub fn run_gateway_watcher(eth_gateway: EthereumGateway, config: &ZkSyncConfig) -> JoinHandle<()> {
     let gateway_watcher = GatewayWatcher::new(
         eth_gateway,
-        config.gateway_watcher.request_per_task_limit(),
-        config.gateway_watcher.task_limit(),
+        Some(config.gateway_watcher.request_per_task_limit()),
+        Some(config.gateway_watcher.task_limit()),
         config.gateway_watcher.check_interval(),
         config.gateway_watcher.request_timeout(),
         config.gateway_watcher.retry_delay(),

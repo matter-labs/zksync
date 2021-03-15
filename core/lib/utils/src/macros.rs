@@ -1,5 +1,5 @@
 ///
-/// Retries given `Option` future with delay and optional timeout until it resolves with `Some(_)`.
+/// Returns future which retries given `Option` with delay and optional timeout until it resolves with `Some(_)`.
 ///
 #[macro_export]
 macro_rules! retry_opt {

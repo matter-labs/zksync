@@ -9,8 +9,8 @@ async fn main() {
 
     GatewayWatcher::new(
         EthereumGateway::from_config(&config),
-        config.gateway_watcher.request_per_task_limit(),
-        config.gateway_watcher.task_limit(),
+        Some(config.gateway_watcher.request_per_task_limit()),
+        Some(config.gateway_watcher.task_limit()),
         config.gateway_watcher.check_interval(),
         config.gateway_watcher.request_timeout(),
         config.gateway_watcher.retry_delay(),
