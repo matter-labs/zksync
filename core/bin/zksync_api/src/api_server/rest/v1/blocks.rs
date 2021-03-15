@@ -10,28 +10,29 @@ use actix_web::{
 
 // Workspace uses
 pub use zksync_api_client::rest::v1::{BlockInfo, TransactionInfo};
-use zksync_config::ZkSyncConfig;
 use zksync_crypto::{convert::FeConvert, Fr};
 use zksync_storage::{chain::block::records, ConnectionPool, QueryResult};
 use zksync_types::{tx::TxHash, BlockNumber};
 
 // Local uses
 use super::{Error as ApiError, JsonResult, Pagination, PaginationQuery};
-use crate::{api_server::helpers::try_parse_tx_hash, utils::shared_lru_cache::AsyncLruCache};
+use crate::{
+    api_server::helpers::try_parse_tx_hash, utils::block_details_cache::BlockDetailsCache,
+};
 
 /// Shared data between `api/v1/blocks` endpoints.
 #[derive(Debug, Clone)]
 struct ApiBlocksData {
     pool: ConnectionPool,
     /// Verified blocks cache.
-    verified_blocks: AsyncLruCache<BlockNumber, records::BlockDetails>,
+    verified_blocks: BlockDetailsCache,
 }
 
 impl ApiBlocksData {
-    fn new(pool: ConnectionPool, capacity: usize) -> Self {
+    fn new(pool: ConnectionPool, verified_blocks: BlockDetailsCache) -> Self {
         Self {
             pool,
-            verified_blocks: AsyncLruCache::new(capacity),
+            verified_blocks,
         }
     }
 
@@ -42,27 +43,7 @@ impl ApiBlocksData {
         &self,
         block_number: BlockNumber,
     ) -> QueryResult<Option<records::BlockDetails>> {
-        if let Some(block) = self.verified_blocks.get(&block_number).await {
-            return Ok(Some(block));
-        }
-
-        let blocks = self.blocks_range(Some(block_number), 1).await?;
-        if let Some(block) = blocks.into_iter().next() {
-            // Check if this is exactly the requested block.
-            if block.block_number != *block_number as i64 {
-                return Ok(None);
-            }
-
-            // It makes sense to store in cache only fully verified blocks.
-            if block.is_verified() {
-                self.verified_blocks
-                    .insert(block_number, block.clone())
-                    .await;
-            }
-            Ok(Some(block))
-        } else {
-            Ok(None)
-        }
+        self.verified_blocks.get(&self.pool, block_number).await
     }
 
     /// Returns the block range up to the given block number.
@@ -218,8 +199,8 @@ async fn blocks_range(
     Ok(Json(range))
 }
 
-pub fn api_scope(config: &ZkSyncConfig, pool: ConnectionPool) -> Scope {
-    let data = ApiBlocksData::new(pool, config.api.common.caches_size);
+pub fn api_scope(pool: ConnectionPool, cache: BlockDetailsCache) -> Scope {
+    let data = ApiBlocksData::new(pool, cache);
 
     web::scope("blocks")
         .data(data)
@@ -241,7 +222,8 @@ mod tests {
         let cfg = TestServerConfig::default();
         cfg.fill_database().await?;
 
-        let (client, server) = cfg.start_server(|cfg| api_scope(&cfg.config, cfg.pool.clone()));
+        let (client, server) =
+            cfg.start_server(|cfg| api_scope(cfg.pool.clone(), BlockDetailsCache::new(10)));
 
         // Block requests part
         let blocks: Vec<BlockInfo> = {

@@ -6,9 +6,9 @@ use thiserror::Error;
 use tokio::{task::JoinHandle, time};
 use web3::types::{Block, BlockId, BlockNumber, H256, U64};
 
-use zksync_utils::retry_opt;
 use zksync_config::ZkSyncConfig;
 use zksync_eth_client::{EthereumGateway, MultiplexerEthereumClient};
+use zksync_utils::retry_opt;
 
 /// Watcher which checks multiplexed client once within specified timeout.
 pub struct MultiplexedGatewayWatcher {

@@ -41,7 +41,11 @@ impl MultiplexerEthereumClient {
         Self::default()
     }
 
-    pub fn add_client(&mut self, name: String, client: ETHDirectClient<PrivateKeySigner>) -> &mut Self {
+    pub fn add_client(
+        &mut self,
+        name: String,
+        client: ETHDirectClient<PrivateKeySigner>,
+    ) -> &mut Self {
         Arc::get_mut(&mut self.inner)
             .unwrap()
             .clients

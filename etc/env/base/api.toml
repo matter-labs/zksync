@@ -9,6 +9,8 @@ caches_size=10000
 # value at least 24 hours for production.
 # Type of value is seconds.
 forced_exit_minimum_account_age_secs=0
+# List of account IDs that do not have to pay fees for operations.
+fee_free_accounts=[]
 
 # Ability to perform change pub key with zero fee
 enforce_pubkey_change_fee=true
