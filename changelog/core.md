@@ -21,6 +21,7 @@ All notable changes to the core components will be documented in this file.
   operations.
 - (`eth_client`): Added `get_tx`, `create_contract` methods to `EthereumGateway`, `get_web3_transport` method to
   ETHDirectClient.
+- (`api_server`): Support for accounts that don't have to pay fees (e.g. network service accounts) was added.
 
 ### Fixed
 
