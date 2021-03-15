@@ -1,3 +1,4 @@
+use serde::export::Formatter;
 use serde::Serialize;
 
 #[derive(Serialize)]
@@ -38,5 +39,23 @@ where
             code: t.code(),
             message: t.message(),
         }
+    }
+}
+
+pub struct UnreachableError;
+
+impl std::fmt::Display for UnreachableError {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "Unreachable error")
+    }
+}
+
+impl ApiError for UnreachableError {
+    fn error_type(&self) -> ErrorType {
+        ErrorType::ApiError
+    }
+
+    fn code(&self) -> u16 {
+        0
     }
 }

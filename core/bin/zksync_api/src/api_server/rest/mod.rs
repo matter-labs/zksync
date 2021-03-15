@@ -10,7 +10,6 @@ use zksync_utils::panic_notify::ThreadPanicNotify;
 use self::v01::api_decl::ApiV01;
 use crate::{fee_ticker::TickerRequest, signature_checker::VerifySignatureRequest};
 
-use self::v02::middleware::ResponseTransform;
 use super::tx_sender::TxSender;
 use zksync_config::ZkSyncConfig;
 
@@ -51,7 +50,7 @@ async fn start_server(
             .wrap(Cors::new().send_wildcard().max_age(3600).finish())
             .service(api_v01.into_scope())
             .service(api_v1_scope)
-            .service(api_v02_scope.wrap(ResponseTransform))
+            .service(api_v02_scope)
             // Endpoint needed for js isReachable
             .route(
                 "/favicon.ico",

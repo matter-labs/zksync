@@ -6,11 +6,12 @@
 use actix_web::{web, Scope};
 
 // Workspace uses
+use serde::Serialize;
 use zksync_config::ZkSyncConfig;
 use zksync_types::network::Network;
 
 // Local uses
-use super::Json;
+use super::response::ApiResult;
 
 /// Shared data between `api/v0.2/foo` endpoints.
 #[derive(Debug, Clone)]
@@ -27,8 +28,8 @@ impl ApiFooData {
 }
 
 // Server implementation
-async fn network(data: web::Data<ApiFooData>) -> Json<Network> {
-    Json(data.network)
+async fn network(data: web::Data<ApiFooData>) -> ApiResult<Network> {
+    data.network.into()
 }
 
 pub fn api_scope(config: &ZkSyncConfig) -> Scope {
