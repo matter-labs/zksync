@@ -30,7 +30,7 @@ pub async fn prepare_forced_exit_sender_account(
     connection_pool: ConnectionPool,
     api_client: CoreApiClient,
     config: &ZkSyncConfig,
-) -> anyhow::Result<()> {
+) -> anyhow::Result<AccountId> {
     let mut storage = connection_pool
         .access_storage()
         .await
@@ -46,8 +46,8 @@ pub async fn prepare_forced_exit_sender_account(
             .await
             .expect("Failed to check if the sender is prepared");
 
-    if is_sender_prepared {
-        return Ok(());
+    if let Some(id) = is_sender_prepared {
+        return Ok(id);
     }
 
     // The sender is not prepared. This should not ever happen in production, but handling
@@ -60,14 +60,14 @@ pub async fn prepare_forced_exit_sender_account(
 
     register_signing_key(&mut storage, id, api_client, sender_address, sender_sk).await?;
 
-    Ok(())
+    Ok(id)
 }
 
 pub async fn check_forced_exit_sender_prepared(
     storage: &mut StorageProcessor<'_>,
     sender_sk: &PrivateKey<Engine>,
     sender_address: Address,
-) -> anyhow::Result<bool> {
+) -> anyhow::Result<Option<AccountId>> {
     let mut accounts_schema = storage.chain().account_schema();
 
     let state = accounts_schema
@@ -81,9 +81,13 @@ pub async fn check_forced_exit_sender_prepared(
 
             let sk_pub_key_hash = PubKeyHash::from_privkey(sender_sk);
 
-            Ok(pk_hash == sk_pub_key_hash)
+            if pk_hash == sk_pub_key_hash {
+                Ok(Some(account_state.0))
+            } else {
+                Ok(None)
+            }
         }
-        None => Ok(false),
+        None => Ok(None),
     }
 }
 
