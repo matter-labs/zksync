@@ -32,6 +32,7 @@ use tokio::sync::RwLock;
 use tokio::task::JoinHandle;
 
 // Workspace uses
+use zksync_balancer::{Balancer, BuildBalancedItem};
 use zksync_config::ZkSyncConfig;
 use zksync_storage::{chain::account::records::EthAccountType, ConnectionPool, StorageProcessor};
 use zksync_types::{
@@ -43,11 +44,7 @@ use zksync_types::{
 
 // Local uses
 use crate::mempool::mempool_transactions_queue::MempoolTransactionsQueue;
-use crate::{
-    balancer::{Balancer, BuildBalancedItem},
-    eth_watch::EthWatchRequest,
-    wait_for_tasks,
-};
+use crate::{eth_watch::EthWatchRequest, wait_for_tasks};
 
 mod mempool_transactions_queue;
 

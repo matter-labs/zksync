@@ -54,7 +54,7 @@ pub struct RpcApp {
 impl RpcApp {
     pub fn new(
         connection_pool: ConnectionPool,
-        sign_verify_request_sender: mpsc::Sender<VerifyTxSignatureRequest>,
+        sign_verify_request_sender: mpsc::Sender<VerifySignatureRequest>,
         ticker_request_sender: mpsc::Sender<TickerRequest>,
         config: &ZkSyncConfig,
     ) -> Self {
@@ -400,7 +400,7 @@ impl RpcApp {
 #[allow(clippy::too_many_arguments)]
 pub fn start_rpc_server(
     connection_pool: ConnectionPool,
-    sign_verify_request_sender: mpsc::Sender<VerifyTxSignatureRequest>,
+    sign_verify_request_sender: mpsc::Sender<VerifySignatureRequest>,
     ticker_request_sender: mpsc::Sender<TickerRequest>,
     panic_notify: mpsc::Sender<bool>,
     config: &ZkSyncConfig,

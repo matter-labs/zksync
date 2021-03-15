@@ -40,8 +40,10 @@ pub fn init() {
     match log_format.as_str() {
         "plain" => tracing_subscriber::fmt::init(),
         "json" => {
+            let timer = tracing_subscriber::fmt::time::ChronoUtc::rfc3339();
             tracing_subscriber::fmt::Subscriber::builder()
                 .with_env_filter(tracing_subscriber::EnvFilter::from_default_env())
+                .with_timer(timer)
                 .json()
                 .init();
         }
