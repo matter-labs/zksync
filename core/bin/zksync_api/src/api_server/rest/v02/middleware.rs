@@ -1,16 +1,20 @@
+use super::SharedData;
 use actix_web::{
     dev::{Body, Service, ServiceRequest, ServiceResponse, Transform},
+    web::Data,
     Error, HttpResponse,
 };
 use async_trait::async_trait;
-use chrono::prelude::Utc;
+use chrono::prelude::{DateTime, Utc};
 use futures::future::{ok, Ready};
 use futures::Future;
 use futures::TryStreamExt;
 use serde::de::DeserializeOwned;
-use serde_json::json;
+use serde::Serialize;
+use serde_json::Value;
 use std::pin::Pin;
 use std::task::{Context, Poll};
+use zksync_types::network::Network;
 
 #[async_trait(?Send)]
 pub trait ParseResponse {
@@ -29,8 +33,9 @@ impl ParseResponse for ServiceResponse<Body> {
             .try_fold(Vec::new(), |mut acc, chunk| async {
                 acc.extend(chunk);
                 Ok(acc)
-            });
-        Ok(serde_json::from_slice(&bytes.await?)?)
+            })
+            .await?;
+        Ok(serde_json::from_slice(&bytes)?)
     }
 }
 
@@ -53,6 +58,23 @@ where
     }
 }
 
+#[derive(Serialize)]
+struct Request {
+    network: Network,
+    api_version: String,
+    resource: String,
+    args: Option<Value>,
+    timestamp: DateTime<Utc>,
+}
+
+#[derive(Serialize)]
+struct Response {
+    request: Request,
+    status: String,
+    error: Option<Value>,
+    result: Option<Value>,
+}
+
 pub struct ResponseMiddleware<S> {
     service: S,
 }
@@ -72,27 +94,26 @@ where
     }
 
     fn call(&mut self, req: ServiceRequest) -> Self::Future {
-        println!("Hi from start. You requested: {}", req.path());
-
         let fut = self.service.call(req);
         Box::pin(async move {
             let mut raw_response = fut.await?;
+            let req = raw_response.request().clone();
+            let data = req.app_data::<Data<SharedData>>().unwrap();
             let result: serde_json::Value = raw_response.parse().await.unwrap();
 
-            let response = json!(
-            {
-                "request": {
-                    "network": "localhost", //TODO
-                    "api_version": "v0.2",
-                    "resource": raw_response.request().path(),
-                    "args": {
-                        //TODO
-                    },
-                    "timestamp": Utc::now(),
-                },
-                "status": "success", // TODO
-                "result": result
-            });
+            let request = Request {
+                network: data.net,
+                api_version: String::from("v0.2"),
+                resource: String::from(req.path()),
+                args: None,
+                timestamp: Utc::now(),
+            };
+            let response = Response {
+                request,
+                status: String::from("success"),
+                result: Some(result),
+                error: None,
+            };
             let new_res = ServiceResponse::new(
                 raw_response.request().clone(),
                 HttpResponse::Ok().json(response).into_body(),
