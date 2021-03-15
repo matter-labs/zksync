@@ -1,5 +1,4 @@
 import { BigNumber, BigNumberish } from 'ethers';
-import { assert } from 'node:console';
 import {
     Address,
     TokenLike,
