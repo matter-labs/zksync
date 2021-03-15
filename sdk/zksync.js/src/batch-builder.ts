@@ -1,4 +1,5 @@
 import { BigNumber, BigNumberish } from 'ethers';
+import { assert } from 'node:console';
 import {
     Address,
     TokenLike,
@@ -58,6 +59,10 @@ export class BatchBuilder {
         const totalFee: TotalFee = new Map();
         for (const tx of this.txs) {
             const fee = tx.tx.fee;
+            // Signed transactions store token ids instead of symbols.
+            if (tx.alreadySigned) {
+                tx.token = this.wallet.provider.tokenSet.resolveTokenSymbol(tx.tx.feeToken);
+            }
             const token = tx.token;
             const curr: BigNumber = totalFee.get(token) || BigNumber.from(0);
             totalFee.set(token, curr.add(fee));
@@ -75,8 +80,10 @@ export class BatchBuilder {
     }
 
     private async setFeeToken(feeToken: TokenLike) {
-        // If user specified a token he wants to pay with, we expect all fees to be zero.
-        if (this.txs.find((tx) => !BigNumber.from(tx.tx.fee).isZero()) != undefined) {
+        // If user specified a token he wants to pay with, we expect all fees to be zero
+        // and no signed transactions in the batch. Changing their fees would
+        // invalidate multi-signatures.
+        if (this.txs.find((tx) => tx.alreadySigned || !BigNumber.from(tx.tx.fee).isZero()) != undefined) {
             throw new Error('Fees are expected to be zero');
         }
         let txWithFeeToken = this.txs.find((tx) => tx.token == feeToken);
@@ -151,35 +158,46 @@ export class BatchBuilder {
         return this;
     }
 
-    addChangePubKey(changePubKey: {
-        feeToken: TokenLike;
-        ethAuthType: ChangePubkeyTypes;
-        fee?: BigNumberish;
-        validFrom?: number;
-        validUntil?: number;
-        alreadySigned?: boolean;
-        nonce?: number;
-        pubKeyHash?: string;
-    }): BatchBuilder {
+    addChangePubKey(
+        changePubKey:
+            | {
+                  feeToken: TokenLike;
+                  ethAuthType: ChangePubkeyTypes;
+                  fee?: BigNumberish;
+                  validFrom?: number;
+                  validUntil?: number;
+              }
+            | ChangePubKey
+    ): BatchBuilder {
+        if ('type' in changePubKey) {
+            // Already signed.
+            this.txs.push({
+                type: 'ChangePubKey',
+                tx: changePubKey,
+                feeType: null, // Not needed.
+                address: this.wallet.address(),
+                token: null, // Will be resolved later.
+                alreadySigned: true
+            });
+            return this;
+        }
         const _changePubKey = {
             feeToken: changePubKey.feeToken,
             fee: changePubKey.fee || 0,
             nonce: null,
             ethAuthType: changePubKey.ethAuthType,
             validFrom: changePubKey.validFrom || 0,
-            validUntil: changePubKey.validUntil || MAX_TIMESTAMP,
-            pubKeyHash: null
+            validUntil: changePubKey.validUntil || MAX_TIMESTAMP
         };
         const feeType = {
             ChangePubKey: changePubKey.ethAuthType
         };
         this.txs.push({
             type: 'ChangePubKey',
-            tx: changePubKey.alreadySigned ? changePubKey : _changePubKey,
+            tx: _changePubKey,
             feeType,
             address: this.wallet.address(),
-            token: _changePubKey.feeToken,
-            alreadySigned: changePubKey.alreadySigned
+            token: _changePubKey.feeToken
         });
         return this;
     }
