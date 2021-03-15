@@ -188,6 +188,7 @@ impl<W: EthClient> EthWatch<W> {
         current_ethereum_block: u64,
         unprocessed_blocks_amount: u64,
     ) -> anyhow::Result<(
+        // TODO: Now this tuple looks too complex. Maybe introduce a type for that? (ZKS-563)
         Vec<PriorityOp>,
         HashMap<u64, ReceivedPriorityOp>,
         Vec<NewTokenEvent>,
@@ -230,6 +231,8 @@ impl<W: EthClient> EthWatch<W> {
                 .collect(),
             None => self.eth_state.new_tokens().to_vec(),
         }
+        // TODO: Call self.eth_state.new_tokens() in both branches, so we can bind it to a separate variable,
+        // which will make this chain shorter and more readable. (ZKS-563)
     }
 
     fn get_priority_requests(&self, first_serial_id: u64, max_chunks: usize) -> Vec<PriorityOp> {

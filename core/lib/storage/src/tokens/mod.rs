@@ -26,9 +26,11 @@ pub struct TokensSchema<'a, 'c>(pub &'a mut StorageProcessor<'c>);
 impl<'a, 'c> TokensSchema<'a, 'c> {
     /// Persists the new token in the database.
     pub async fn store_token(&mut self, token: Token) -> QueryResult<bool> {
+        // TODO: This is an interface misuse, the right way is to generalize the return type to be anyhow::Error,
+        // and to make the case when the token was not stored an error. (ZKS-563)
         let start = Instant::now();
 
-        let is_token_exists = sqlx::query_as!(
+        let token_exists = sqlx::query_as!(
             DbToken,
             r#"
             SELECT FROM tokens *
@@ -42,7 +44,7 @@ impl<'a, 'c> TokensSchema<'a, 'c> {
         .await?
         .is_some();
 
-        if is_token_exists {
+        if token_exists {
             return Ok(false);
         }
 
@@ -150,6 +152,7 @@ impl<'a, 'c> TokensSchema<'a, 'c> {
 
     /// Get last used token id from Database.
     pub async fn get_last_token_id(&mut self) -> QueryResult<u16> {
+        // TODO: Use `TokenId` type. (ZKS-563)
         let start = Instant::now();
         let last_token_id = sqlx::query!(
             r#"

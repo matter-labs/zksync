@@ -140,6 +140,7 @@ impl TryFrom<Log> for NewTokenEvent {
 
     fn try_from(event: Log) -> Result<NewTokenEvent, anyhow::Error> {
         if event.topics.len() != 3 {
+            // TODO: Magic number. (ZKS-563)
             return Err(anyhow::format_err!(
                 "Failed to parse NewTokenEvent: {:#?}",
                 event

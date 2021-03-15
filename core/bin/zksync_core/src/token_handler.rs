@@ -117,6 +117,7 @@ impl TokenHandler {
                         (token_from_list, true)
                     } else {
                         // Try insert token with other symbol.
+                        // TODO: An explanation of why would we want to do that will be nice to have. (ZKS-563)
                         let token = Token::new(
                             token_from_list.id,
                             token_from_list.address,
@@ -143,7 +144,8 @@ impl TokenHandler {
             };
 
             if !is_token_inserted {
-                anyhow::bail!("{:?} is not inserted to database", token);
+                vlog::warn!("{:?} is not inserted to database", token);
+                // TODO: This error is not helpful, e.g. it does not provide any context. (ZKS-563)
             }
             new_tokens.push(token);
         }

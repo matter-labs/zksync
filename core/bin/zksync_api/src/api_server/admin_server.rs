@@ -98,8 +98,8 @@ async fn add_token(
     // if id is None then set it to next available ID from server.
     let id = match token_request.id {
         Some(id) => id,
-        None => TokenId(
-            storage
+        None => {
+            let last_token_id = storage
                 .tokens_schema()
                 .get_last_token_id()
                 .await
@@ -109,9 +109,12 @@ async fn add_token(
                         e
                     );
                     actix_web::error::ErrorInternalServerError("storage layer error")
-                })? as u16,
-        ),
-    } + 1;
+                })? as u16;
+            let next_available_id = last_token_id + 1;
+
+            TokenId(next_available_id)
+        }
+    };
 
     let token = tokens::Token {
         id,
