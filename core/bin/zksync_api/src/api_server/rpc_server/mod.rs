@@ -23,7 +23,7 @@ use zksync_types::{tx::TxHash, Address, BatchFee, BlockNumber, Fee, TokenLike, T
 // Local uses
 use crate::{
     fee_ticker::{TickerRequest, TokenPriceRequestType},
-    signature_checker::VerifyTxSignatureRequest,
+    signature_checker::VerifySignatureRequest,
     utils::shared_lru_cache::AsyncLruCache,
 };
 use bigdecimal::BigDecimal;
