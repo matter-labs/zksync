@@ -42,6 +42,7 @@ jsonrpc-pubsub = "14.0.3"
 jsonrpc-ws-server = "14.0.3"
 jsonrpc-http-server = "14.0.3"
 jsonrpc-derive = "14.0.3"
+qstring = "0.7.2"
 
 tokio = { version = "0.2", features = ["full"] }
 tokio_old = { package = "tokio", version = "0.1.22" }

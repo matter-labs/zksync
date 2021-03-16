@@ -6,11 +6,11 @@
 use actix_web::{web, Scope};
 
 // Workspace uses
-use serde::Serialize;
 use zksync_config::ZkSyncConfig;
 use zksync_types::network::Network;
 
 // Local uses
+use super::error::UnreachableError;
 use super::response::ApiResult;
 
 /// Shared data between `api/v0.2/foo` endpoints.
@@ -32,10 +32,20 @@ async fn network(data: web::Data<ApiFooData>) -> ApiResult<Network> {
     data.network.into()
 }
 
+async fn err(data: web::Data<ApiFooData>) -> ApiResult<Network> {
+    ApiResult::Error(UnreachableError {})
+}
+
+async fn test_arg(data: web::Data<ApiFooData>, web::Path(id): web::Path<u32>) -> ApiResult<u32> {
+    id.into()
+}
+
 pub fn api_scope(config: &ZkSyncConfig) -> Scope {
     let data = ApiFooData::new(config);
 
     web::scope("foo")
         .data(data)
         .route("network", web::get().to(network))
+        .route("err", web::get().to(err))
+        .route("test_arg/{id}", web::get().to(test_arg))
 }

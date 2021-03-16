@@ -2,7 +2,6 @@ use serde::export::Formatter;
 use serde::Serialize;
 
 #[derive(Serialize)]
-#[serde(untagged)]
 #[serde(rename_all = "snake_case")]
 pub enum ErrorType {
     InvalidRequestError,

@@ -1,5 +1,3 @@
-//! First stable API implementation.
-
 // External uses
 use actix_web::{
     web::{self},
@@ -13,11 +11,13 @@ use zksync_types::network::Network;
 
 // Local uses
 use crate::api_server::tx_sender::TxSender;
+
 mod error;
 mod foo;
 mod response;
 
 #[derive(Serialize, Clone, Copy)]
+#[serde(rename_all = "snake_case")]
 pub enum ApiVersion {
     V02,
 }
