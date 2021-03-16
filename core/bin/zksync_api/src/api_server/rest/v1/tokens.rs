@@ -79,7 +79,8 @@ impl ApiTokensData {
         match price_receiver.await? {
             Ok(price) => Ok(Some(price)),
             Err(PriceError::TokenNotFound(_)) => Ok(None),
-            Err(PriceError::Internal(err)) => Err(anyhow::format_err!(err)),
+            Err(PriceError::DBError(err)) => Err(anyhow::format_err!(err)),
+            Err(PriceError::ApiError(err)) => Err(anyhow::format_err!(err)),
         }
     }
 }
@@ -169,7 +170,7 @@ mod tests {
                             Ok(price.clone())
                         } else {
                             // To provide compatibility with the `token_price_usd` hack.
-                            Err(PriceError::invalid_params(format!(
+                            Err(PriceError::token_not_found(format!(
                                 "Token not found: {:?}",
                                 token
                             )))
@@ -216,10 +217,12 @@ mod tests {
                 "Price does not match"
             );
         }
-        client
-            .token_price(&TokenLike::Id(TokenId(2)), TokenPriceKind::Currency)
-            .await
-            .unwrap_err();
+        assert_eq!(
+            client
+                .token_price(&TokenLike::Id(TokenId(2)), TokenPriceKind::Currency)
+                .await?,
+            None
+        );
         // TODO Check error (ZKS-125)
         client
             .token_price(&TokenLike::Id(TokenId(2)), TokenPriceKind::Token)

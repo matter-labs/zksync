@@ -225,19 +225,25 @@ pub enum TickerRequest {
 
 #[derive(Debug, Error)]
 pub enum PriceError {
-    #[error("Token not found error: {0}.")]
+    #[error("Token not found: {0}")]
     TokenNotFound(String),
-    #[error("Internal error.")]
-    Internal(String),
+    #[error("Api error: {0}")]
+    ApiError(String),
+    #[error("Database error: {0}")]
+    DBError(String),
 }
 
 impl PriceError {
-    pub fn internal(msg: impl Display) -> Self {
-        Self::Internal(msg.to_string())
-    }
-
     pub fn token_not_found(msg: impl Display) -> Self {
         Self::TokenNotFound(msg.to_string())
+    }
+
+    pub fn api_error(msg: impl Display) -> Self {
+        Self::ApiError(msg.to_string())
+    }
+
+    pub fn db_error(msg: impl Display) -> Self {
+        Self::DBError(msg.to_string())
     }
 }
 
@@ -434,7 +440,7 @@ impl<API: FeeTickerAPI, INFO: FeeTickerInfo, WATCHER: TokenWatcher> FeeTicker<AP
                     .api
                     .get_token(token.clone())
                     .await
-                    .map_err(PriceError::internal)?
+                    .map_err(PriceError::db_error)?
                     .decimals;
                 BigUint::from(10u32).pow(u32::from(token_decimals))
             }

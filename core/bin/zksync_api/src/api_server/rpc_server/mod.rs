@@ -330,14 +330,12 @@ impl RpcApp {
             .await
             .expect("ticker receiver dropped");
         let resp = req.1.await.expect("ticker answer sender dropped");
-        resp.map_err(|err| {
-            return match err {
-                PriceError::TokenNotFound(msg) => Error::invalid_params(msg),
-                _ => {
-                    vlog::warn!("Internal Server Error: '{}'; input: {:?}", err, token);
-                    Error::internal_error()
-                }
-            };
+        resp.map_err(|err| match err {
+            PriceError::TokenNotFound(msg) => Error::invalid_params(msg),
+            _ => {
+                vlog::warn!("Internal Server Error: '{}'; input: {:?}", err, token);
+                Error::internal_error()
+            }
         })
     }
 

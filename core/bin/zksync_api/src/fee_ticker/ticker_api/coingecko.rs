@@ -69,15 +69,15 @@ impl TokenPriceAPI for CoinGeckoAPI {
             .query(&[("vs_currency", "usd"), ("days", "2")])
             .send()
             .await
-            .map_err(|err| PriceError::internal(format!("CoinGecko API request failed: {}", err)))?
+            .map_err(|err| PriceError::api_error(format!("CoinGecko API request failed: {}", err)))?
             .json::<CoinGeckoMarketChart>()
             .await
-            .map_err(PriceError::internal)?;
+            .map_err(PriceError::api_error)?;
 
         let last_updated_timestamp_ms = market_chart
             .prices
             .last()
-            .ok_or_else(|| PriceError::internal("CoinGecko returned empty price data"))?
+            .ok_or_else(|| PriceError::api_error("CoinGecko returned empty price data"))?
             .0;
 
         let usd_prices = market_chart
@@ -95,8 +95,8 @@ impl TokenPriceAPI for CoinGeckoAPI {
         } else {
             usd_prices.min()
         };
-        let usd_price =
-            usd_price.ok_or_else(|| PriceError::internal("CoinGecko returned empty price data"))?;
+        let usd_price = usd_price
+            .ok_or_else(|| PriceError::api_error("CoinGecko returned empty price data"))?;
 
         let naive_last_updated = NaiveDateTime::from_timestamp(
             last_updated_timestamp_ms / 1_000,                      // ms to s

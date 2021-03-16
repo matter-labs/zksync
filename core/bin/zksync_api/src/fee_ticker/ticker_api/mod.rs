@@ -211,11 +211,11 @@ impl<T: TokenPriceAPI + Send + Sync> FeeTickerAPI for TickerApi<T> {
                     .db_pool
                     .access_storage()
                     .await
-                    .map_err(PriceError::internal)?,
+                    .map_err(PriceError::db_error)?,
                 token.clone(),
             )
             .await
-            .map_err(PriceError::internal)?
+            .map_err(PriceError::db_error)?
             .ok_or_else(|| PriceError::token_not_found(format!("Token not found: {:?}", token)))?;
 
         // TODO: remove hardcode for Matter Labs Trial Token (ZKS-63).
@@ -265,7 +265,7 @@ impl<T: TokenPriceAPI + Send + Sync> FeeTickerAPI for TickerApi<T> {
             return Ok(historical_price);
         }
 
-        Err(PriceError::internal(
+        Err(PriceError::api_error(
             "Token price api is not available right now.",
         ))
     }

@@ -42,20 +42,20 @@ impl TokenPriceAPI for CoinMarketCapAPI {
             .send()
             .await
             .map_err(|err| {
-                PriceError::internal(format!("Coinmarketcap API request failed: {}", err))
+                PriceError::api_error(format!("Coinmarketcap API request failed: {}", err))
             })?
             .json::<CoinmarketCapResponse>()
             .await
-            .map_err(PriceError::internal)?;
+            .map_err(PriceError::api_error)?;
 
         let mut token_info = api_response
             .data
             .remove(&TokenLike::Symbol(token_symbol.to_string()))
-            .ok_or_else(|| PriceError::internal("Could not found token in response"))?;
+            .ok_or_else(|| PriceError::token_not_found("Could not found token in response"))?;
         let usd_quote = token_info
             .quote
             .remove(&TokenLike::Symbol("USD".to_string()))
-            .ok_or_else(|| PriceError::internal("Could not found usd quote in response"))?;
+            .ok_or_else(|| PriceError::api_error("Could not found usd quote in response"))?;
         Ok(TokenPrice {
             usd_price: usd_quote.price,
             last_updated: usd_quote.last_updated,

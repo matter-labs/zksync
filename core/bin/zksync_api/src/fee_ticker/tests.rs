@@ -183,7 +183,7 @@ struct ErrorTickerApi;
 #[async_trait::async_trait]
 impl TokenPriceAPI for ErrorTickerApi {
     async fn get_price(&self, _token_symbol: &str) -> Result<TokenPrice, PriceError> {
-        Err(PriceError::invalid_params("Wrong token"))
+        Err(PriceError::token_not_found("Wrong token"))
     }
 }
 
