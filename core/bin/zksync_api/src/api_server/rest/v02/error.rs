@@ -3,6 +3,7 @@ use serde::Serialize;
 
 #[derive(Serialize)]
 #[serde(rename_all = "snake_case")]
+#[allow(dead_code)]
 pub enum ErrorType {
     InvalidRequestError,
     ApiError,

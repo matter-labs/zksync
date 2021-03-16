@@ -30,7 +30,7 @@ pub struct SharedData {
 pub(crate) fn api_scope(_tx_sender: TxSender, zk_config: &ZkSyncConfig) -> Scope {
     web::scope("/api/v0.2")
         .data(SharedData {
-            net: zk_config.chain.eth.network.clone(),
+            net: zk_config.chain.eth.network,
             api_version: ApiVersion::V02,
         })
         .service(config::api_scope(&zk_config))

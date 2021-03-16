@@ -39,6 +39,7 @@ struct Response {
     result: Option<Value>,
 }
 
+#[allow(dead_code)]
 pub enum ApiResult<R: Serialize, E: error::ApiError = UnreachableError> {
     Ok(R),
     Error(E),
