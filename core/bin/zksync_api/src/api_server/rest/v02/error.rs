@@ -1,5 +1,6 @@
 use serde::export::Formatter;
 use serde::Serialize;
+use serde_repr::Serialize_repr;
 
 #[derive(Serialize)]
 #[serde(rename_all = "snake_case")]
@@ -10,11 +11,17 @@ pub enum ErrorType {
     IdempotencyError,
     RateLimitError,
 }
+#[derive(Serialize_repr)]
+#[repr(u8)]
+pub enum ErrorCode {
+    Unreacheable = 0,
+}
+
 /// Error object in a response
 #[derive(Serialize)]
 pub struct Error {
     error_type: ErrorType,
-    code: u16,
+    code: ErrorCode,
     message: String,
 }
 
@@ -22,7 +29,7 @@ pub struct Error {
 pub trait ApiError: std::fmt::Display {
     fn error_type(&self) -> ErrorType;
 
-    fn code(&self) -> u16;
+    fn code(&self) -> ErrorCode;
 
     fn message(&self) -> String {
         self.to_string()
@@ -45,8 +52,8 @@ where
 pub struct UnreachableError;
 
 impl std::fmt::Display for UnreachableError {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "Unreachable error")
+    fn fmt(&self, _f: &mut Formatter<'_>) -> std::fmt::Result {
+        unreachable!()
     }
 }
 
@@ -55,7 +62,7 @@ impl ApiError for UnreachableError {
         ErrorType::ApiError
     }
 
-    fn code(&self) -> u16 {
-        0
+    fn code(&self) -> ErrorCode {
+        ErrorCode::Unreacheable
     }
 }

@@ -26,7 +26,7 @@ struct ApiConfigData {
     gov_contract: Address,
     deposit_confirmations: u64,
     zksync_version: ZksyncVersion,
-    // server_version
+    // TODO: server_version
 }
 
 impl ApiConfigData {
@@ -37,7 +37,6 @@ impl ApiConfigData {
             gov_contract: config.contracts.governance_addr,
             deposit_confirmations: config.eth_watch.confirmations_for_eth_event,
             zksync_version: ZksyncVersion::ContractV4,
-            // server_version
         }
     }
 }
