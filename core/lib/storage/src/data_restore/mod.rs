@@ -200,9 +200,9 @@ impl<'a, 'c> DataRestoreSchema<'a, 'c> {
             // that may or may not (in most cases, may not) be there, so we just assume it to be 18
             let decimals = 18;
             let token = Token::new(id, address, &format!("ERC20-{}", *id), decimals);
-            let try_store_token = TokensSchema(&mut transaction).store_token(token).await;
+            let try_insert_token = TokensSchema(&mut transaction).store_token(token).await;
 
-            match try_store_token {
+            match try_insert_token {
                 Err(StoreTokenError::TokenAlreadyExistsError(err)) => {
                     anyhow::bail!("failed to insert token to database: {}", err)
                 }
