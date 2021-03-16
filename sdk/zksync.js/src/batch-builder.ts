@@ -21,6 +21,9 @@ interface InternalTx {
     feeType: 'Withdraw' | 'Transfer' | 'FastWithdraw' | ChangePubKeyFee;
     address: Address;
     token: TokenLike;
+    // Whether or not the tx has been signed.
+    // Considered false by default
+    alreadySigned?: boolean;
 }
 
 type TotalFee = Map<TokenLike, BigNumber>;
@@ -55,6 +58,10 @@ export class BatchBuilder {
         const totalFee: TotalFee = new Map();
         for (const tx of this.txs) {
             const fee = tx.tx.fee;
+            // Signed transactions store token ids instead of symbols.
+            if (tx.alreadySigned) {
+                tx.token = this.wallet.provider.tokenSet.resolveTokenSymbol(tx.tx.feeToken);
+            }
             const token = tx.token;
             const curr: BigNumber = totalFee.get(token) || BigNumber.from(0);
             totalFee.set(token, curr.add(fee));
@@ -72,8 +79,10 @@ export class BatchBuilder {
     }
 
     private async setFeeToken(feeToken: TokenLike) {
-        // If user specified a token he wants to pay with, we expect all fees to be zero.
-        if (this.txs.find((tx) => !BigNumber.from(tx.tx.fee).isZero()) != undefined) {
+        // If user specified a token he wants to pay with, we expect all fees to be zero
+        // and no signed transactions in the batch. Changing their fees would
+        // invalidate multi-signatures.
+        if (this.txs.find((tx) => tx.alreadySigned || !BigNumber.from(tx.tx.fee).isZero()) != undefined) {
             throw new Error('Fees are expected to be zero');
         }
         let txWithFeeToken = this.txs.find((tx) => tx.token == feeToken);
@@ -148,21 +157,39 @@ export class BatchBuilder {
         return this;
     }
 
-    addChangePubKey(changePubKey: {
-        feeToken: TokenLike;
-        ethAuthType: ChangePubkeyTypes;
-        fee?: BigNumberish;
-        validFrom?: number;
-        validUntil?: number;
-    }): BatchBuilder {
+    addChangePubKey(
+        changePubKey:
+            | {
+                  feeToken: TokenLike;
+                  ethAuthType: ChangePubkeyTypes;
+                  fee?: BigNumberish;
+                  validFrom?: number;
+                  validUntil?: number;
+              }
+            | SignedTransaction
+    ): BatchBuilder {
+        if ('tx' in changePubKey) {
+            if (changePubKey.tx.type !== 'ChangePubKey') {
+                throw new Error('Invalid transaction type, expected ChangePubKey');
+            }
+            // Already signed.
+            this.txs.push({
+                type: 'ChangePubKey',
+                tx: changePubKey.tx,
+                feeType: null, // Not needed.
+                address: this.wallet.address(),
+                token: null, // Will be resolved later.
+                alreadySigned: true
+            });
+            return this;
+        }
         const _changePubKey = {
             feeToken: changePubKey.feeToken,
             fee: changePubKey.fee || 0,
             nonce: null,
             ethAuthType: changePubKey.ethAuthType,
             validFrom: changePubKey.validFrom || 0,
-            validUntil: changePubKey.validUntil || MAX_TIMESTAMP,
-            pubKeyHash: null
+            validUntil: changePubKey.validUntil || MAX_TIMESTAMP
         };
         const feeType = {
             ChangePubKey: changePubKey.ethAuthType
@@ -224,14 +251,23 @@ export class BatchBuilder {
                     processedTxs.push(transfer);
                     break;
                 case 'ChangePubKey':
-                    const changePubKey = await this.wallet.signSetSigningKey(tx.tx);
-                    tx.tx.pubKeyHash = (changePubKey.tx as ChangePubKey).newPkHash;
+                    // ChangePubKey requires its own Ethereum signature, we either expect
+                    // it to be signed already or do it here.
+                    const changePubKey: ChangePubKey = tx.alreadySigned
+                        ? tx.tx
+                        : (await this.wallet.signSetSigningKey(tx.tx)).tx;
                     const currentPubKeyHash = await this.wallet.getCurrentPubKeyHash();
-                    if (currentPubKeyHash === tx.tx.pubKeyHash) {
+                    if (currentPubKeyHash === changePubKey.newPkHash) {
                         throw new Error('Current signing key is already set');
                     }
-                    messages.push(this.wallet.getChangePubKeyEthMessagePart(tx.tx));
-                    processedTxs.push(changePubKey);
+                    messages.push(
+                        this.wallet.getChangePubKeyEthMessagePart({
+                            pubKeyHash: changePubKey.newPkHash,
+                            feeToken: tx.token,
+                            fee: changePubKey.fee
+                        })
+                    );
+                    processedTxs.push({ tx: changePubKey });
                     break;
                 case 'ForcedExit':
                     messages.push(this.wallet.getForcedExitEthMessagePart(tx.tx));
