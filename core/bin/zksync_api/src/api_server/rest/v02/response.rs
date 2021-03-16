@@ -5,6 +5,7 @@ use futures::future::{ready, Ready};
 use qstring::QString;
 use serde::Serialize;
 use serde_json::Value;
+use std::collections::HashMap;
 
 use zksync_types::network::Network;
 
@@ -23,8 +24,8 @@ struct Request {
     network: Network,
     api_version: ApiVersion,
     resource: String,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    args: Option<Value>,
+    #[serde(skip_serializing_if = "HashMap::is_empty")]
+    args: HashMap<String, String>,
     timestamp: DateTime<Utc>,
 }
 
@@ -51,18 +52,14 @@ impl<R: Serialize, E: error::ApiError> Responder for ApiResult<R, E> {
         let data = req
             .app_data::<Data<SharedData>>()
             .expect("Wrong app data type");
-        let mut args = serde_json::json!({});
-        let obj = args.as_object_mut().unwrap();
-        for arg in req.match_info().iter() {
-            obj.insert(arg.0.to_string(), arg.1.to_string().into());
+        let mut args = HashMap::new();
+        for (name, value) in req.match_info().iter() {
+            args.insert(name.to_string(), value.to_string());
         }
         let query_string = QString::from(req.query_string());
-        for arg in query_string {
-            if !obj.contains_key(&arg.0) {
-                obj.insert(arg.0, arg.1.into());
-            }
+        for (name, value) in query_string {
+            args.insert(name, value);
         }
-        let args = if obj.is_empty() { None } else { Some(args) };
 
         let request = Request {
             network: data.net,
