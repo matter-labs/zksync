@@ -469,9 +469,7 @@ mod wallet_tests {
                 .map(|(id, token)| Token {
                     id: TokenId(id),
                     symbol: token.symbol.clone(),
-                    address: token.address[2..]
-                        .parse()
-                        .expect("failed to parse token address"),
+                    address: token.address,
                     decimals: token.decimals,
                 })
                 .map(|token| (token.symbol.clone(), token))

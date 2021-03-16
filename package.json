@@ -15,6 +15,7 @@
       "infrastructure/zk",
       "infrastructure/eth_transfer",
       "infrastructure/reading-tool",
+      "infrastructure/token-lists-manager",
       "core/tests/ts-tests"
     ],
     "nohoist": [

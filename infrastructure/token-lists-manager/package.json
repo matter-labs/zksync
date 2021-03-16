@@ -1,0 +1,14 @@
+{
+  "name": "token-lists-manager",
+  "version": "1.0.0",
+  "license": "MIT",
+  "main": "index.ts",
+  "dependencies": {
+    "@uniswap/token-lists": "^1.0.0-beta.19",
+    "node-fetch": "^2.6.1",
+    "commander": "^6.2.0"
+  },
+  "scripts": {
+    "start": "ts-node index.ts"
+  }
+}

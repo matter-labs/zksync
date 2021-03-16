@@ -91,7 +91,7 @@ contract Config {
     /// @dev Bit mask to apply for verifier public input before verifying.
     uint256 internal constant INPUT_MASK = $$(~uint256(0) >> 3);
 
-    /// @dev Auth fact reset timelock
+    /// @dev Auth fact reset timelock.
     uint256 internal constant AUTH_FACT_RESET_TIMELOCK = 1 days;
 
     /// @dev Max deposit of ERC20 token that is possible to deposit

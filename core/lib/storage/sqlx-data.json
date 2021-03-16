@@ -101,6 +101,24 @@
       ]
     }
   },
+  "02059619c9c4860687644d0ae45d616984243571551454f0c9e27f17bf063476": {
+    "query": "\n            SELECT max(id) as \"id!\" FROM tokens\n            ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "id!",
+          "type_info": "Int4"
+        }
+      ],
+      "parameters": {
+        "Left": []
+      },
+      "nullable": [
+        null
+      ]
+    }
+  },
   "04069d09246f16a6d03be04decaa05456556dc05b964adea34742af0eaef91aa": {
     "query": "\n                    SELECT * FROM tokens\n                    WHERE symbol = $1\n                    LIMIT 1\n                    ",
     "describe": {
@@ -741,6 +759,46 @@
         false,
         false,
         false,
+        false,
+        false,
+        false,
+        false
+      ]
+    }
+  },
+  "263931af0450d194a1369bb58e1f8584bf7706f5fba29bd58a8d9b31e2cb675e": {
+    "query": "\n            SELECT * FROM tokens\n            WHERE id = $1 OR address = $2 OR symbol = $3\n            LIMIT 1\n            ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "id",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 1,
+          "name": "address",
+          "type_info": "Text"
+        },
+        {
+          "ordinal": 2,
+          "name": "symbol",
+          "type_info": "Text"
+        },
+        {
+          "ordinal": 3,
+          "name": "decimals",
+          "type_info": "Int2"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Int4",
+          "Text",
+          "Text"
+        ]
+      },
+      "nullable": [
         false,
         false,
         false,
@@ -1779,6 +1837,21 @@
       ]
     }
   },
+  "60de7f3494fac09157d367c869037917c26dba18996d4d5bc426a72ee0c15d59": {
+    "query": "\n            INSERT INTO tokens ( id, address, symbol, decimals )\n            VALUES ( $1, $2, $3, $4 )\n            ",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "Int4",
+          "Text",
+          "Text",
+          "Int2"
+        ]
+      },
+      "nullable": []
+    }
+  },
   "62304acbc93efab5117766689c6413d152dc0104c49c6f305e26b245b6ff7cde": {
     "query": "SELECT * FROM executed_priority_operations WHERE eth_hash = $1",
     "describe": {
@@ -1909,24 +1982,6 @@
         {
           "ordinal": 0,
           "name": "max",
-          "type_info": "Int8"
-        }
-      ],
-      "parameters": {
-        "Left": []
-      },
-      "nullable": [
-        null
-      ]
-    }
-  },
-  "6e4c5231bdde779bdf1e714557b6763e244ff62edfcbcdfc7166c9f561d7f670": {
-    "query": "\n            SELECT count(*) as \"count!\" FROM tokens\n            ",
-    "describe": {
-      "columns": [
-        {
-          "ordinal": 0,
-          "name": "count!",
           "type_info": "Int8"
         }
       ],

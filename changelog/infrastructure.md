@@ -15,6 +15,8 @@ components, the logs will have the following format:
 
 ### Added
 
+- (`token_list_manager`): CLI for updating to new version of a previously saved list of trusted tokens.
+
 ### Fixed
 
 ## Release 2021-02-19
