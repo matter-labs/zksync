@@ -195,7 +195,8 @@ export class Signer {
         feeTokenId: number;
         fee: BigNumberish;
         nonce: number;
-        ethAuthData: ChangePubKeyOnchain | ChangePubKeyECDSA | ChangePubKeyCREATE2;
+        ethAuthData?: ChangePubKeyOnchain | ChangePubKeyECDSA | ChangePubKeyCREATE2;
+        ethSignature?: string;
         validFrom: number;
         validUntil: number;
     }): Promise<ChangePubKey> {
