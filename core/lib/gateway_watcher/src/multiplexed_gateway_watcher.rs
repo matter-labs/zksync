@@ -10,7 +10,7 @@ use zksync_config::ZkSyncConfig;
 use zksync_eth_client::{EthereumGateway, MultiplexerEthereumClient};
 use zksync_utils::retry_opt;
 
-/// Watcher which checks multiplexed client's gateways once within specified timeout.
+/// Watcher which checks multiplexed client's gateways once within specified interval.
 pub struct MultiplexedGatewayWatcher {
     /// Multiplexed client to be verified.
     client: MultiplexerEthereumClient,
@@ -26,6 +26,8 @@ pub struct MultiplexedGatewayWatcher {
     task_limit: Option<usize>,
 }
 
+const MAX_BLOCK_NUMBER_DIFFERENCE: u64 = 1;
+
 #[derive(Error, Debug, PartialEq)]
 enum BlockVerificationError {
     #[error("Hash verification failed: {0:?} != {1:?}")]
@@ -35,8 +37,6 @@ enum BlockVerificationError {
     #[error("Invalid block: {0:?}")]
     InvalidBlock(Box<Block<H256>>),
 }
-
-const MAX_BLOCK_NUMBER_DIFFERENCE: u64 = 1;
 
 impl MultiplexedGatewayWatcher {
     /// Instantiates `MultiplexedGatewayWatcher` for provided multiplexed ethereum gateway.
@@ -67,6 +67,7 @@ impl MultiplexedGatewayWatcher {
         }
     }
 
+    /// Starts actor.
     pub async fn run(self) {
         vlog::info!("Ethereum Gateway Watcher started");
 
@@ -75,6 +76,8 @@ impl MultiplexedGatewayWatcher {
             .await
     }
 
+    /// Checks if either blocks are equal by hash and number or `block_to_check` is a valid parent of
+    /// `latest_block`.
     fn verify_blocks(
         latest_block: &Block<H256>,
         block_to_check: &Block<H256>,
@@ -111,6 +114,8 @@ impl MultiplexedGatewayWatcher {
         }
     }
 
+    /// Checks multiplexed client gateways and prioritizes one with the longest chain and
+    /// the most frequent hash of its depth.
     async fn check_client_gateways(&self) {
         // Fetch latest block for each client.
         // Each request will resolve to (client key, client latest block) pair.
@@ -143,10 +148,10 @@ impl MultiplexedGatewayWatcher {
 
         // Execute all requests concurrently.
         // Max amount of concurrent tasks is limited by `req_per_task_limit`.
-        let client_latest_blocks = stream::iter(latest_block_reqs.into_iter())
+        let client_latest_blocks: Vec<_> = stream::iter(latest_block_reqs.into_iter())
             .buffer_unordered(self.req_per_task_limit.unwrap_or(usize::MAX))
             .filter_map(ready)
-            .collect::<Vec<_>>()
+            .collect()
             .await;
 
         // Latest hash distribution across all clients.
@@ -159,8 +164,7 @@ impl MultiplexedGatewayWatcher {
                 map
             });
 
-        // Preferred client must have longest chain with the most frequent hash and
-        // lowest latency in its category.
+        // Preferred client must have longest chain with the most frequent hash.
         let preferred_client =
             client_latest_blocks
                 .iter()
@@ -174,9 +178,9 @@ impl MultiplexedGatewayWatcher {
                     },
                 );
 
-        if let Some((preferred_client_name, latest_block)) = preferred_client {
-            if self.client.prioritize_client(preferred_client_name) {
-                vlog::info!("Prioritized Ethereum Gateway: `{}`", preferred_client_name);
+        if let Some((preferred_client_key, latest_block)) = preferred_client {
+            if self.client.prioritize_client(preferred_client_key) {
+                vlog::info!("Prioritized Ethereum Gateway: `{}`", preferred_client_key);
             }
             for (key, block) in &client_latest_blocks {
                 if let Err(err) = Self::verify_blocks(latest_block, block) {
@@ -187,6 +191,11 @@ impl MultiplexedGatewayWatcher {
     }
 }
 
+/// Runs `MultiplexedGatewayWatcher` as a tokio task for provided multiplexed ethereum gateway.
+///
+/// # Panics
+///
+/// If given ethereum gateway is not `Multiplexed`.
 #[must_use]
 pub fn run_multiplexed_gateway_watcher(
     eth_gateway: EthereumGateway,

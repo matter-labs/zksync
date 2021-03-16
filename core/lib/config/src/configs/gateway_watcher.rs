@@ -59,7 +59,7 @@ mod tests {
     fn expected_config() -> GatewayWatcherConfig {
         GatewayWatcherConfig {
             gateway_check_interval: 1000,
-            gateway_check_retry_delay: 200,
+            gateway_check_retry_delay: 500,
             gateway_check_request_per_task_limit: 10,
             gateway_check_task_limit: 1,
             gateway_check_request_timeout: 1000,
@@ -70,7 +70,7 @@ mod tests {
     fn from_env() {
         let config = r#"
 GATEWAY_WATCHER_GATEWAY_CHECK_INTERVAL="1000"
-GATEWAY_WATCHER_GATEWAY_CHECK_RETRY_DELAY="200"
+GATEWAY_WATCHER_GATEWAY_CHECK_RETRY_DELAY="500"
 GATEWAY_WATCHER_GATEWAY_CHECK_REQUEST_PER_TASK_LIMIT="10"
 GATEWAY_WATCHER_GATEWAY_CHECK_TASK_LIMIT="1"
 GATEWAY_WATCHER_GATEWAY_CHECK_REQUEST_TIMEOUT="1000"

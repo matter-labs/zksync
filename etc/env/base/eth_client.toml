@@ -4,4 +4,4 @@ chain_id=9
 # with the gas adjuster in eth sender). However, it can be increased to speed up the transaction mining time.
 gas_price_factor=1
 # Addresses of the Ethereum node API, separated by comma
-web3_url="http://127.0.0.1:8545,http://127.0.0.1:8546"
+web3_url="http://127.0.0.1:8545,http://127.0.0.1:8545"
