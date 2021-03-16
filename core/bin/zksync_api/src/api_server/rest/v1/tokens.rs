@@ -148,6 +148,8 @@ mod tests {
 
     use super::{super::test_utils::TestServerConfig, *};
 
+    use zksync_api_client::rest::v1::ClientError;
+
     fn dummy_fee_ticker(prices: &[(TokenLike, BigDecimal)]) -> mpsc::Sender<TickerRequest> {
         let (sender, mut receiver) = mpsc::channel(10);
 
@@ -223,12 +225,17 @@ mod tests {
                 .await?,
             None
         );
-        // TODO Check error (ZKS-125)
-        client
+        let error = client
             .token_price(&TokenLike::Id(TokenId(2)), TokenPriceKind::Token)
             .await
             .unwrap_err();
-
+        assert!(
+            matches!(error, ClientError::BadRequest{ .. }),
+            format!(
+                "Incorrect error type: got {:?} instead of BadRequest",
+                error
+            )
+        );
         // Tokens requests
         let expected_tokens = {
             let mut storage = cfg.pool.access_storage().await?;
