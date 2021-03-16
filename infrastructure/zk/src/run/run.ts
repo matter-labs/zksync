@@ -18,7 +18,7 @@ export async function deployERC20(command: 'dev' | 'new', name?: string, symbol?
                 { "name": "BAT",  "symbol": "BAT",  "decimals": 18 },
                 { "name": "GNT",  "symbol": "GNT",  "decimals": 18 },
                 { "name": "MLTT", "symbol": "MLTT", "decimals": 18 }
-            ]' | tee ./etc/tokens/localhost.json ./etc/token-lists/localhost.json`);
+            ]' > ./etc/tokens/localhost.json`);
         if (!process.env.CI) {
             await docker.restart('dev-liquidity-token-watcher');
         }

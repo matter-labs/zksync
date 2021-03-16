@@ -2,7 +2,7 @@ use futures::{channel::mpsc, executor::block_on, SinkExt, StreamExt};
 use std::cell::RefCell;
 use structopt::StructOpt;
 use zksync_api::run_api;
-use zksync_core::{run_core, state_keeper, wait_for_tasks};
+use zksync_core::{genesis_init, run_core, wait_for_tasks};
 use zksync_eth_sender::run_eth_sender;
 use zksync_prometheus_exporter::run_prometheus_exporter;
 use zksync_witness_generator::run_prover_server;
@@ -37,14 +37,7 @@ async fn main() -> anyhow::Result<()> {
 
     if let ServerCommand::Genesis = server_mode {
         vlog::info!("Performing the server genesis initialization",);
-        let pool = ConnectionPool::new(Some(1));
-
-        vlog::info!("Generating genesis block.");
-        state_keeper::ZkSyncStateKeeper::create_genesis_block(
-            pool.clone(),
-            &config.chain.state_keeper.fee_account_addr,
-        )
-        .await;
+        genesis_init(&config).await;
         return Ok(());
     }
 

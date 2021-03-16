@@ -29,7 +29,6 @@ Cargo.lock
 !/etc/env/ci.env
 !/etc/env/base
 /etc/tokens/localhost.json
-/etc/token-lists/localhost.json
 !/keys
 /keys/*
 !/keys/packed
