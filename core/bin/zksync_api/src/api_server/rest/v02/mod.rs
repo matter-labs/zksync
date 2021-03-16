@@ -12,8 +12,8 @@ use zksync_types::network::Network;
 // Local uses
 use crate::api_server::tx_sender::TxSender;
 
+mod config;
 mod error;
-mod foo;
 mod response;
 
 #[derive(Serialize, Clone, Copy)]
@@ -33,5 +33,5 @@ pub(crate) fn api_scope(_tx_sender: TxSender, zk_config: &ZkSyncConfig) -> Scope
             net: zk_config.chain.eth.network.clone(),
             api_version: ApiVersion::V02,
         })
-        .service(foo::api_scope(&zk_config))
+        .service(config::api_scope(&zk_config))
 }
