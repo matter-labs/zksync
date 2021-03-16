@@ -38,6 +38,7 @@ import {
     MAX_TIMESTAMP,
     getEthereumBalance,
     ETH_RECOMMENDED_DEPOSIT_GAS_LIMIT,
+    getChangePubkeyLegacyMessage,
     ERC20_DEPOSIT_GAS_LIMIT
 } from './utils';
 
@@ -484,7 +485,8 @@ export class Wallet {
         feeToken: TokenLike;
         fee: BigNumberish;
         nonce: number;
-        ethAuthData: ChangePubKeyOnchain | ChangePubKeyECDSA | ChangePubKeyCREATE2;
+        ethAuthData?: ChangePubKeyOnchain | ChangePubKeyECDSA | ChangePubKeyCREATE2;
+        ethSignature?: string;
         validFrom: number;
         validUntil: number;
     }): Promise<ChangePubKey> {
@@ -505,6 +507,7 @@ export class Wallet {
             feeTokenId,
             fee: BigNumber.from(changePubKey.fee).toString(),
             ethAuthData: changePubKey.ethAuthData,
+            ethSignature: changePubKey.ethSignature,
             validFrom: changePubKey.validFrom,
             validUntil: changePubKey.validUntil
         });
@@ -524,6 +527,7 @@ export class Wallet {
         const newPubKeyHash = await this.signer.pubKeyHash();
 
         let ethAuthData;
+        let ethSignature;
         if (changePubKey.ethAuthType === 'Onchain') {
             ethAuthData = {
                 type: 'Onchain'
@@ -554,11 +558,15 @@ export class Wallet {
             } else {
                 throw new Error('CREATE2 wallet authentication is only available for CREATE2 wallets');
             }
+        } else if (changePubKey.ethAuthType === 'ECDSALegacyMessage') {
+            await this.setRequiredAccountIdFromServer('ChangePubKey authorized by ECDSALegacyMessage.');
+            const changePubKeyMessage = getChangePubkeyLegacyMessage(newPubKeyHash, changePubKey.nonce, this.accountId);
+            ethSignature = (await this.getEthMessageSignature(changePubKeyMessage)).signature;
         } else {
             throw new Error('Unsupported SetSigningKey type');
         }
 
-        const changePubkeyTxUnsigned = Object.assign(changePubKey, { ethAuthData });
+        const changePubkeyTxUnsigned = Object.assign(changePubKey, { ethAuthData, ethSignature });
         changePubkeyTxUnsigned.validFrom = changePubKey.validFrom || 0;
         changePubkeyTxUnsigned.validUntil = changePubKey.validUntil || MAX_TIMESTAMP;
         const changePubKeyTx = await this.getChangePubKey(changePubkeyTxUnsigned as any);
@@ -582,11 +590,21 @@ export class Wallet {
         if (changePubKey.fee == null) {
             changePubKey.fee = 0;
 
-            const feeType = {
-                ChangePubKey: changePubKey.ethAuthType
-            };
-            const fullFee = await this.provider.getTransactionFee(feeType, this.address(), changePubKey.feeToken);
-            changePubKey.fee = fullFee.totalFee;
+            if (changePubKey.ethAuthType === 'ECDSALegacyMessage') {
+                const feeType = {
+                    ChangePubKey: {
+                        onchainPubkeyAuth: true
+                    }
+                };
+                const fullFee = await this.provider.getTransactionFee(feeType, this.address(), changePubKey.feeToken);
+                changePubKey.fee = fullFee.totalFee;
+            } else {
+                const feeType = {
+                    ChangePubKey: changePubKey.ethAuthType
+                };
+                const fullFee = await this.provider.getTransactionFee(feeType, this.address(), changePubKey.feeToken);
+                changePubKey.fee = fullFee.totalFee;
+            }
         }
 
         const txData = await this.signSetSigningKey(changePubKey as any);
