@@ -9,10 +9,7 @@ use zksync::{
     provider::Provider,
     types::BlockStatus,
     utils::{biguint_to_u256, closest_packable_fee_amount, u256_to_biguint},
-    web3::{
-        contract::{Contract, Options},
-        types::H256,
-    },
+    web3::{contract::Options, types::H256},
     EthereumProvider, Network, RpcProvider, Wallet,
 };
 use zksync_eth_signer::PrivateKeySigner;
@@ -172,11 +169,10 @@ impl MainWallet {
             .resolve(token_name.into())
             .ok_or(ClientError::UnknownToken)?;
 
-        let contract = Contract::new(
-            self.eth_provider.client().web3.eth(),
-            token.address,
-            ierc20_contract(),
-        );
+        let contract = self
+            .eth_provider
+            .client()
+            .create_contract(token.address, ierc20_contract());
 
         let balance = contract
             .query("balanceOf", self.address(), None, Options::default(), None)

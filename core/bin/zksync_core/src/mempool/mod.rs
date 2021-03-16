@@ -13,7 +13,6 @@
 //!
 //! Communication with db:
 //! on restart mempool restores nonces of the accounts that are stored in the account tree.
-//! on accepting ChangePubKey tx saves account type - Owned or CREATE2
 
 // Built-in deps
 use std::{collections::HashMap, sync::Arc};
@@ -32,22 +31,19 @@ use tokio::sync::RwLock;
 use tokio::task::JoinHandle;
 
 // Workspace uses
+use zksync_balancer::{Balancer, BuildBalancedItem};
 use zksync_config::ZkSyncConfig;
-use zksync_storage::{chain::account::records::EthAccountType, ConnectionPool, StorageProcessor};
+use zksync_storage::ConnectionPool;
 use zksync_types::{
     mempool::{SignedTxVariant, SignedTxsBatch},
-    tx::{ChangePubKey, TxEthSignature},
+    tx::TxEthSignature,
     AccountId, AccountUpdate, AccountUpdates, Address, Nonce, PriorityOp, SignedZkSyncTx,
     TransferOp, TransferToNewOp, ZkSyncTx,
 };
 
 // Local uses
 use crate::mempool::mempool_transactions_queue::MempoolTransactionsQueue;
-use crate::{
-    balancer::{Balancer, BuildBalancedItem},
-    eth_watch::EthWatchRequest,
-    wait_for_tasks,
-};
+use crate::{eth_watch::EthWatchRequest, wait_for_tasks};
 
 mod mempool_transactions_queue;
 
@@ -459,22 +455,6 @@ impl BuildBalancedItem<MempoolTransactionRequest, MempoolTransactionsHandler>
     }
 }
 
-async fn store_account_type(
-    tx: &ChangePubKey,
-    storage: &mut StorageProcessor<'_>,
-) -> Result<(), TxAddError> {
-    let account_type = match &tx.eth_auth_data {
-        Some(auth) if auth.is_create2() => EthAccountType::CREATE2,
-        _ => EthAccountType::Owned,
-    };
-    storage
-        .chain()
-        .account_schema()
-        .set_account_type(tx.account_id, account_type)
-        .await
-        .map_err(|_| TxAddError::DbError)
-}
-
 impl MempoolTransactionsHandler {
     async fn add_tx(&mut self, tx: SignedZkSyncTx) -> Result<(), TxAddError> {
         let mut storage = self.db_pool.access_storage().await.map_err(|err| {
@@ -495,12 +475,6 @@ impl MempoolTransactionsHandler {
                 vlog::warn!("Mempool storage access error: {}", err);
                 TxAddError::DbError
             })?;
-
-        // FIXME: we are saving account type in mempool, this presents
-        // a possibility for users to spam our database using lots of invalid txs (ZKS-429)
-        if let ZkSyncTx::ChangePubKey(tx) = &tx.tx {
-            store_account_type(&tx, &mut transaction).await?;
-        }
 
         transaction.commit().await.map_err(|err| {
             vlog::warn!("Mempool storage access error: {}", err);
@@ -534,11 +508,6 @@ impl MempoolTransactionsHandler {
             vlog::warn!("Mempool storage access error: {}", err);
             TxAddError::DbError
         })?;
-        for tx in txs {
-            if let ZkSyncTx::ChangePubKey(tx) = &tx.tx {
-                store_account_type(&tx, &mut transaction).await?;
-            }
-        }
         let batch_id = transaction
             .chain()
             .mempool_schema()

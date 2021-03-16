@@ -16,7 +16,7 @@ use crate::fee_ticker::TickerRequest;
 use crate::{
     api_server::event_notify::{start_sub_notifier, EventNotifierRequest, EventSubscribeRequest},
     api_server::rpc_server::types::{ETHOpInfoResp, ResponseAccountState, TransactionInfoResp},
-    signature_checker::VerifyTxSignatureRequest,
+    signature_checker::VerifySignatureRequest,
 };
 use zksync_config::ZkSyncConfig;
 use zksync_utils::panic_notify::ThreadPanicNotify;
@@ -176,7 +176,7 @@ struct RpcSubApp {
 #[allow(clippy::too_many_arguments)]
 pub fn start_ws_server(
     db_pool: ConnectionPool,
-    sign_verify_request_sender: mpsc::Sender<VerifyTxSignatureRequest>,
+    sign_verify_request_sender: mpsc::Sender<VerifySignatureRequest>,
     ticker_request_sender: mpsc::Sender<TickerRequest>,
     panic_notify: mpsc::Sender<bool>,
     config: &ZkSyncConfig,

@@ -5754,6 +5754,7 @@ dependencies = [
  "vlog",
  "web3",
  "zksync_api_client",
+ "zksync_balancer",
  "zksync_config",
  "zksync_contracts",
  "zksync_crypto",
@@ -5781,6 +5782,15 @@ dependencies = [
  "zksync_crypto",
  "zksync_types",
  "zksync_utils",
+]
+
+[[package]]
+name = "zksync_balancer"
+version = "1.0.0"
+dependencies = [
+ "futures 0.3.6",
+ "metrics",
+ "tokio 0.2.22",
 ]
 
 [[package]]
@@ -5858,6 +5868,7 @@ dependencies = [
  "tokio 0.2.22",
  "vlog",
  "web3",
+ "zksync_balancer",
  "zksync_config",
  "zksync_contracts",
  "zksync_crypto",

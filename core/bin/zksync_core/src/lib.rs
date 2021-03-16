@@ -17,7 +17,6 @@ use zksync_types::{tokens::get_genesis_token_list, Token, TokenId};
 
 const DEFAULT_CHANNEL_CAPACITY: usize = 32_768;
 
-pub mod balancer;
 pub mod block_proposer;
 pub mod committer;
 pub mod eth_watch;
