@@ -3,30 +3,30 @@
     "name": "DAI",
     "symbol": "DAI",
     "decimals": 18,
-    "address": "0x4DE1cc5Fd10B14a8818132E205A6ff04eEe14bc9"
+    "address": "0x6E22565a3eAf3eE2DF4820CD9c8E1B004BfbaD63"
   },
   {
     "name": "wBTC",
     "symbol": "wBTC",
     "decimals": 8,
-    "address": "0xFbaC387cc610d0a674f959E723c49bd9D28a4b91"
+    "address": "0xA39ce2b77b4770a1119038D31893cdF907D9b7DA"
   },
   {
     "name": "BAT",
     "symbol": "BAT",
     "decimals": 18,
-    "address": "0xBA4c5a17C7fBb8d427d0aE52E5A377EC1E4352e1"
+    "address": "0x390CCE457878C8695661ecDC0f0c770A3E66735C"
   },
   {
     "name": "GNT",
     "symbol": "GNT",
     "decimals": 18,
-    "address": "0x70464d23772D2B419C016d4Ac990D7Db5aD42D52"
+    "address": "0x4668d9eD1898D24b7bFc9a484555EE48DB9cb15D"
   },
   {
     "name": "MLTT",
     "symbol": "MLTT",
     "decimals": 18,
-    "address": "0x29fD02e3b2B75DF88721FbF3801DDA2D2000492d"
+    "address": "0x138a282A3b79FF68Cbc25EAaEaeC3f54Ff09e854"
   }
 ]

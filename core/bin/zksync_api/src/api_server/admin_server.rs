@@ -109,8 +109,8 @@ async fn add_token(
                         e
                     );
                     actix_web::error::ErrorInternalServerError("storage layer error")
-                })? as u16;
-            let next_available_id = last_token_id + 1;
+                })?;
+            let next_available_id = last_token_id.0 + 1;
 
             TokenId(next_available_id)
         }

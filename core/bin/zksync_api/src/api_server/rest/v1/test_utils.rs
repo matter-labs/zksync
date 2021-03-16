@@ -282,7 +282,7 @@ impl TestServerConfig {
         storage.ethereum_schema().initialize_eth_data().await?;
 
         // Insert PHNX token
-        let is_token_inserted = storage
+        storage
             .tokens_schema()
             .store_token(Token::new(
                 TokenId(1),
@@ -291,9 +291,8 @@ impl TestServerConfig {
                 18,
             ))
             .await?;
-        assert!(is_token_inserted);
         // Insert Golem token with old symbol (from rinkeby).
-        let is_token_inserted = storage
+        storage
             .tokens_schema()
             .store_token(Token::new(
                 TokenId(16),
@@ -302,7 +301,6 @@ impl TestServerConfig {
                 18,
             ))
             .await?;
-        assert!(is_token_inserted);
 
         let mut accounts = AccountMap::default();
 

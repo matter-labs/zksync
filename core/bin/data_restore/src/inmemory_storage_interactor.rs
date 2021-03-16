@@ -5,14 +5,14 @@ use web3::types::Address;
 
 use zksync_types::block::Block;
 use zksync_types::{
-    Account, AccountId, AccountMap, AccountUpdate, AccountUpdates, Action, BlockNumber, Operation,
-    Token, TokenId, TokenInfo,
+    Account, AccountId, AccountMap, AccountUpdate, AccountUpdates, Action, BlockNumber,
+    NewTokenEvent, Operation, Token, TokenId, TokenInfo,
 };
 
 use crate::{
     data_restore_driver::StorageUpdateState,
     events::{BlockEvent, EventType},
-    events_state::{EventsState, NewTokenEvent},
+    events_state::EventsState,
     rollup_ops::RollupOpsBlock,
     storage_interactor::StorageInteractor,
     storage_interactor::StoredTreeState,
@@ -83,7 +83,12 @@ impl StorageInteractor for InMemoryStorageInteractor {
     ) {
         self.events_state = block_events.to_vec();
 
-        for &NewTokenEvent { id, address } in tokens {
+        for &NewTokenEvent {
+            id,
+            address,
+            eth_block_number: _,
+        } in tokens
+        {
             self.tokens.insert(
                 id,
                 Token {

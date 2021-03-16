@@ -5850,6 +5850,7 @@ dependencies = [
  "itertools 0.9.0",
  "metrics",
  "num",
+ "reqwest",
  "serde",
  "serde_json",
  "thiserror",

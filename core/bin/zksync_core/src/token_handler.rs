@@ -16,7 +16,7 @@ use tokio::task::JoinHandle;
 // Workspace uses
 use zksync_config::{TokenHandlerConfig, ZkSyncConfig};
 use zksync_notifier::Notifier;
-use zksync_storage::{ConnectionPool, StorageProcessor};
+use zksync_storage::{tokens::StoreTokenError, ConnectionPool, StorageProcessor};
 use zksync_types::{
     tokens::{NewTokenEvent, Token, TokenInfo},
     Address,
@@ -41,12 +41,13 @@ impl TokenHandler {
     ) -> Self {
         let poll_interval = config.poll_interval();
         let token_list = config
-            .token_list
+            .token_list()
             .into_iter()
             .map(|token| (token.address, token))
             .collect::<HashMap<Address, TokenInfo>>();
 
-        let notifier = config.webhook_url.map(Notifier::with_mattermost);
+        let webhook_url = reqwest::Url::parse(&config.webhook_url).ok();
+        let notifier = webhook_url.map(Notifier::with_mattermost);
 
         Self {
             connection_pool,
@@ -84,7 +85,7 @@ impl TokenHandler {
         let mut new_tokens = Vec::new();
 
         for token_event in tokens {
-            if token_event.id.0 <= last_token_id {
+            if token_event.id.0 <= last_token_id.0 {
                 continue;
             }
 
@@ -108,25 +109,33 @@ impl TokenHandler {
                 }
             };
 
-            let (token, is_token_inserted) = match token_from_list {
+            let token = match token_from_list {
                 Some(token_from_list) => {
-                    let is_token_inserted =
-                        token_schema.store_token(token_from_list.clone()).await?;
+                    let try_insert_token = token_schema.store_token(token_from_list.clone()).await;
 
-                    if is_token_inserted {
-                        (token_from_list, true)
-                    } else {
-                        // Try insert token with other symbol.
-                        // TODO: An explanation of why would we want to do that will be nice to have. (ZKS-563)
-                        let token = Token::new(
-                            token_from_list.id,
-                            token_from_list.address,
-                            &default_symbol,
-                            token_from_list.decimals,
-                        );
-                        let is_token_inserted = token_schema.store_token(token.clone()).await?;
+                    match try_insert_token {
+                        Ok(..) => token_from_list,
+                        Err(StoreTokenError::TokenAlreadyExistsError(..)) => {
+                            // If a token with such parameters already exists in the database
+                            // then try insert token with other symbol.
+                            let token = Token::new(
+                                token_from_list.id,
+                                token_from_list.address,
+                                &default_symbol,
+                                token_from_list.decimals,
+                            );
+                            let try_insert_token = token_schema.store_token(token.clone()).await;
+                            match try_insert_token {
+                                Ok(..) => (),
+                                Err(StoreTokenError::Other(anyhow_err)) => return Err(anyhow_err),
+                                Err(StoreTokenError::TokenAlreadyExistsError(err)) => {
+                                    vlog::warn!("failed to store token in database: {}", err)
+                                }
+                            }
 
-                        (token, is_token_inserted)
+                            token
+                        }
+                        Err(StoreTokenError::Other(anyhow_err)) => return Err(anyhow_err),
                     }
                 }
                 None => {
@@ -137,16 +146,19 @@ impl TokenHandler {
                         &default_symbol,
                         default_decimals,
                     );
-                    let is_token_inserted = token_schema.store_token(token.clone()).await?;
+                    let try_insert_token = token_schema.store_token(token.clone()).await;
+                    match try_insert_token {
+                        Ok(..) => (),
+                        Err(StoreTokenError::Other(anyhow_err)) => return Err(anyhow_err),
+                        Err(StoreTokenError::TokenAlreadyExistsError(err)) => {
+                            vlog::warn!("failed to store token in database: {}", err)
+                        }
+                    }
 
-                    (token, is_token_inserted)
+                    token
                 }
             };
 
-            if !is_token_inserted {
-                vlog::warn!("{:?} is not inserted to database", token);
-                // TODO: This error is not helpful, e.g. it does not provide any context. (ZKS-563)
-            }
             new_tokens.push(token);
         }
 

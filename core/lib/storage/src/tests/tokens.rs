@@ -14,7 +14,7 @@ use crate::{
 #[db_test]
 async fn tokens_storage(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
     // There should be only Ethereum main token by default.
-    assert_eq!(storage.tokens_schema().get_last_token_id().await?, 0);
+    assert_eq!(storage.tokens_schema().get_last_token_id().await?.0, 0);
     let tokens = TokensSchema(&mut storage)
         .load_tokens()
         .await
@@ -51,7 +51,7 @@ async fn tokens_storage(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
         .await
         .expect("Store tokens query failed");
     // The count is updated.
-    assert_eq!(storage.tokens_schema().get_last_token_id().await?, 2);
+    assert_eq!(storage.tokens_schema().get_last_token_id().await?.0, 2);
 
     // Load tokens again.
     let tokens = TokensSchema(&mut storage)

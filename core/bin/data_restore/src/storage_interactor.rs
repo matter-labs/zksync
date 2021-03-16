@@ -6,15 +6,15 @@ use zksync_storage::data_restore::records::{
     NewBlockEvent, StoredBlockEvent, StoredRollupOpsBlock,
 };
 use zksync_types::{
-    block::Block, AccountId, AccountMap, AccountUpdate, AccountUpdates, BlockNumber, TokenId,
-    TokenInfo,
+    block::Block, AccountId, AccountMap, AccountUpdate, AccountUpdates, BlockNumber, NewTokenEvent,
+    TokenId, TokenInfo,
 };
 
 use crate::{
     contract::ZkSyncContractVersion,
     data_restore_driver::StorageUpdateState,
     events::{BlockEvent, EventType},
-    events_state::{EventsState, NewTokenEvent},
+    events_state::EventsState,
     rollup_ops::RollupOpsBlock,
 };
 

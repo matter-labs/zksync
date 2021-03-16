@@ -6,10 +6,7 @@
 //! Number of confirmations is configured using the `CONFIRMATIONS_FOR_ETH_EVENT` environment variable.
 
 // Built-in deps
-use std::{
-    collections::HashMap,
-    time::{Duration, Instant},
-};
+use std::time::{Duration, Instant};
 
 // External uses
 use futures::{
@@ -25,11 +22,7 @@ use zksync_crypto::params::PRIORITY_EXPIRATION;
 use zksync_types::{NewTokenEvent, PriorityOp, ZkSyncPriorityOp};
 
 // Local deps
-use self::{
-    client::EthClient,
-    eth_state::ETHState,
-    received_ops::{sift_outdated_ops, ReceivedPriorityOp},
-};
+use self::{client::EthClient, eth_state::ETHState, received_ops::sift_outdated_ops};
 
 pub use client::EthHttpClient;
 use zksync_config::ZkSyncConfig;
@@ -141,24 +134,27 @@ impl<W: EthClient> EthWatch<W> {
         let block_difference =
             last_ethereum_block.saturating_sub(self.eth_state.last_ethereum_block());
 
-        let (unconfirmed_queue, received_priority_queue, received_new_tokens) = self
+        let updated_state = self
             .update_eth_state(last_ethereum_block, block_difference)
             .await?;
 
         // Extend the existing priority operations with the new ones.
         let mut priority_queue = sift_outdated_ops(self.eth_state.priority_queue());
-        for (serial_id, op) in received_priority_queue {
-            priority_queue.insert(serial_id, op);
+        for (serial_id, op) in updated_state.priority_queue() {
+            priority_queue.insert(*serial_id, op.clone());
         }
         // Extend the existing token events with the new ones.
         let mut new_tokens = self.eth_state.new_tokens().to_vec();
-        for token in received_new_tokens {
-            new_tokens.push(token);
+        for token in updated_state.new_tokens() {
+            new_tokens.push(token.clone());
         }
+        // Remove duplicates.
+        new_tokens.sort_by_key(|token_event| token_event.id.0);
+        new_tokens.dedup_by_key(|token_event| token_event.id.0);
 
         let new_state = ETHState::new(
             last_ethereum_block,
-            unconfirmed_queue,
+            updated_state.unconfirmed_queue().to_vec(),
             priority_queue,
             new_tokens,
         );
@@ -167,19 +163,13 @@ impl<W: EthClient> EthWatch<W> {
     }
 
     async fn restore_state_from_eth(&mut self, last_ethereum_block: u64) -> anyhow::Result<()> {
-        let (unconfirmed_queue, priority_queue, new_tokens) = self
+        let new_state = self
             .update_eth_state(last_ethereum_block, PRIORITY_EXPIRATION)
             .await?;
-
-        let new_state = ETHState::new(
-            last_ethereum_block,
-            unconfirmed_queue,
-            priority_queue,
-            new_tokens,
-        );
-
         self.set_new_state(new_state);
+
         vlog::debug!("ETH state: {:#?}", self.eth_state);
+
         Ok(())
     }
 
@@ -187,12 +177,7 @@ impl<W: EthClient> EthWatch<W> {
         &mut self,
         current_ethereum_block: u64,
         unprocessed_blocks_amount: u64,
-    ) -> anyhow::Result<(
-        // TODO: Now this tuple looks too complex. Maybe introduce a type for that? (ZKS-563)
-        Vec<PriorityOp>,
-        HashMap<u64, ReceivedPriorityOp>,
-        Vec<NewTokenEvent>,
-    )> {
+    ) -> anyhow::Result<ETHState> {
         let new_block_with_accepted_events =
             current_ethereum_block.saturating_sub(self.number_of_confirmations_for_event);
         let previous_block_with_accepted_events =
@@ -217,22 +202,28 @@ impl<W: EthClient> EthWatch<W> {
             )
             .await?;
 
-        Ok((unconfirmed_queue, priority_queue, new_tokens))
+        let new_state = ETHState::new(
+            current_ethereum_block,
+            unconfirmed_queue,
+            priority_queue,
+            new_tokens,
+        );
+
+        Ok(new_state)
     }
 
     fn get_new_tokens(&self, last_block_number: Option<u64>) -> Vec<NewTokenEvent> {
-        match last_block_number {
-            Some(last_block_number) => self
-                .eth_state
-                .new_tokens()
+        let mut new_tokens = self.eth_state.new_tokens().to_vec();
+
+        if let Some(last_block_number) = last_block_number {
+            new_tokens = new_tokens
                 .iter()
                 .filter(|token| token.eth_block_number > last_block_number)
                 .cloned()
-                .collect(),
-            None => self.eth_state.new_tokens().to_vec(),
+                .collect();
         }
-        // TODO: Call self.eth_state.new_tokens() in both branches, so we can bind it to a separate variable,
-        // which will make this chain shorter and more readable. (ZKS-563)
+
+        new_tokens
     }
 
     fn get_priority_requests(&self, first_serial_id: u64, max_chunks: usize) -> Vec<PriorityOp> {

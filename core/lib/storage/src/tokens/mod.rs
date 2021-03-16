@@ -3,6 +3,8 @@ use std::collections::HashMap;
 use std::time::Instant;
 // External imports
 use num::{rational::Ratio, BigUint};
+
+use thiserror::Error;
 // Workspace imports
 use zksync_types::{Token, TokenId, TokenLike, TokenPrice};
 use zksync_utils::ratio_to_big_decimal;
@@ -23,29 +25,54 @@ pub(crate) const STORED_USD_PRICE_PRECISION: usize = 6;
 #[derive(Debug)]
 pub struct TokensSchema<'a, 'c>(pub &'a mut StorageProcessor<'c>);
 
+#[derive(Debug, Error)]
+pub enum StoreTokenError {
+    #[error("{0}")]
+    TokenAlreadyExistsError(String),
+    #[error("{0}")]
+    Other(anyhow::Error),
+}
+
 impl<'a, 'c> TokensSchema<'a, 'c> {
     /// Persists the new token in the database.
-    pub async fn store_token(&mut self, token: Token) -> QueryResult<bool> {
-        // TODO: This is an interface misuse, the right way is to generalize the return type to be anyhow::Error,
-        // and to make the case when the token was not stored an error. (ZKS-563)
+    pub async fn store_token(&mut self, token: Token) -> Result<(), StoreTokenError> {
         let start = Instant::now();
 
-        let token_exists = sqlx::query_as!(
+        let token_from_db: Option<Token> = sqlx::query_as!(
             DbToken,
             r#"
-            SELECT FROM tokens *
+            SELECT * FROM tokens
             WHERE id = $1 OR address = $2 OR symbol = $3
+            LIMIT 1
             "#,
             i32::from(*token.id),
             address_to_stored_string(&token.address),
             token.symbol,
         )
         .fetch_optional(self.0.conn())
-        .await?
-        .is_some();
+        .await
+        .map_err(|err| StoreTokenError::Other(err.into()))?
+        .map(|db_token| db_token.into());
 
-        if token_exists {
-            return Ok(false);
+        if let Some(token_from_db) = token_from_db {
+            let mut matched_parameters = Vec::new();
+
+            if token_from_db.id == token.id {
+                matched_parameters.push(format!("id = {}", token.id));
+            }
+            if token_from_db.symbol == token.symbol {
+                matched_parameters.push(format!("symbol = {}", token.symbol));
+            }
+            if token_from_db.address == token.address {
+                matched_parameters.push(format!("address = {}", token.address));
+            }
+
+            let error_message = format!(
+                "tokens with such parameters already exist: {:#?}",
+                matched_parameters
+            );
+
+            return Err(StoreTokenError::TokenAlreadyExistsError(error_message));
         }
 
         sqlx::query!(
@@ -59,10 +86,11 @@ impl<'a, 'c> TokensSchema<'a, 'c> {
             i16::from(token.decimals),
         )
         .execute(self.0.conn())
-        .await?;
+        .await
+        .map_err(|err| StoreTokenError::Other(err.into()))?;
 
         metrics::histogram!("sql.token.store_token", start.elapsed());
-        Ok(true)
+        Ok(())
     }
 
     /// If a token with a given ID exists, then it replaces the information about the
@@ -151,8 +179,7 @@ impl<'a, 'c> TokensSchema<'a, 'c> {
     }
 
     /// Gets the last used token ID from Database.
-    pub async fn get_last_token_id(&mut self) -> QueryResult<u16> {
-        // TODO: Use `TokenId` type. (ZKS-563)
+    pub async fn get_last_token_id(&mut self) -> QueryResult<TokenId> {
         let start = Instant::now();
         let last_token_id = sqlx::query!(
             r#"
@@ -165,7 +192,7 @@ impl<'a, 'c> TokensSchema<'a, 'c> {
         .unwrap_or(0);
 
         metrics::histogram!("sql.token.get_last_token_id", start.elapsed());
-        Ok(last_token_id)
+        Ok(TokenId(last_token_id))
     }
 
     /// Given the numeric token ID, symbol or address, returns token.

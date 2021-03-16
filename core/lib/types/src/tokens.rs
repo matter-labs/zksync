@@ -139,13 +139,15 @@ impl TryFrom<Log> for NewTokenEvent {
     type Error = anyhow::Error;
 
     fn try_from(event: Log) -> Result<NewTokenEvent, anyhow::Error> {
+        // `event NewToken(address indexed token, uint16 indexed tokenId)`
+        //  Event has such a signature, so let's check that the number of topics is equal to the number of parameters + 1.
         if event.topics.len() != 3 {
-            // TODO: Magic number. (ZKS-563)
             return Err(anyhow::format_err!(
                 "Failed to parse NewTokenEvent: {:#?}",
                 event
             ));
         }
+
         let eth_block_number = match event.block_number {
             Some(block_number) => block_number.as_u64(),
             None => {
