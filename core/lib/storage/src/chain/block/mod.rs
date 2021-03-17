@@ -6,14 +6,16 @@ use zksync_basic_types::{H256, U256};
 use zksync_crypto::convert::FeConvert;
 use zksync_types::{
     aggregated_operations::AggregatedActionType,
-    block::{Block, ExecutedOperations, PendingBlock},
+    block::{Block, BlockMetadata, ExecutedOperations, PendingBlock},
     AccountId, BlockNumber, Fr, ZkSyncOp,
 };
 // Local imports
 use self::records::{
-    AccountTreeCache, BlockDetails, BlockTransactionItem, StorageBlock, StoragePendingBlock,
+    AccountTreeCache, BlockDetails, BlockTransactionItem, StorageBlock, StorageBlockMetadata,
+    StoragePendingBlock,
 };
 use crate::{
+    chain::account::records::EthAccountType,
     chain::operations::{
         records::{
             NewExecutedPriorityOperation, NewExecutedTransaction, StoredExecutedPriorityOperation,
@@ -42,12 +44,35 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
         operations: Vec<ExecutedOperations>,
     ) -> QueryResult<()> {
         let start = Instant::now();
+        let mut transaction = self.0.start_transaction().await?;
+
         for block_tx in operations.into_iter() {
             match block_tx {
                 ExecutedOperations::Tx(tx) => {
+                    // Update account type
+                    // This method is called in the committer, so account type update takes effect
+                    // starting the next miniblock. If the user wishes to send ChangePubKey + another Tx from
+                    // CREATE2 account in the same miniblock, they will have to do it in a batch
+                    if let Some(ZkSyncOp::ChangePubKeyOffchain(tx)) = &tx.op {
+                        let account_type = if matches!(&tx.tx.eth_auth_data, Some(auth) if auth.is_create2())
+                        {
+                            EthAccountType::CREATE2
+                        } else {
+                            EthAccountType::Owned
+                        };
+                        transaction
+                            .chain()
+                            .account_schema()
+                            .set_account_type(tx.account_id, account_type)
+                            .await?;
+                    }
                     // Store the executed operation in the corresponding schema.
                     let new_tx = NewExecutedTransaction::prepare_stored_tx(*tx, block_number);
-                    OperationsSchema(self.0).store_executed_tx(new_tx).await?;
+                    transaction
+                        .chain()
+                        .operations_schema()
+                        .store_executed_tx(new_tx)
+                        .await?;
                 }
                 ExecutedOperations::PriorityOp(prior_op) => {
                     // For priority operation we should only store it in the Operations schema.
@@ -55,12 +80,16 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
                         *prior_op,
                         block_number,
                     );
-                    OperationsSchema(self.0)
+                    transaction
+                        .chain()
+                        .operations_schema()
                         .store_executed_priority_op(new_priority_op)
                         .await?;
                 }
             }
         }
+
+        transaction.commit().await?;
         metrics::histogram!("sql.chain.block.save_block_transactions", start.elapsed());
         Ok(())
     }
@@ -118,6 +147,31 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
         ));
 
         metrics::histogram!("sql.chain.block.get_block", start.elapsed());
+
+        Ok(result)
+    }
+
+    /// Given the block number, attempts to get metadata related to block.
+    /// Returns `None` if not found.
+    pub async fn get_block_metadata(
+        &mut self,
+        block: BlockNumber,
+    ) -> QueryResult<Option<BlockMetadata>> {
+        let start = Instant::now();
+
+        let db_result = sqlx::query_as!(
+            StorageBlockMetadata,
+            "SELECT * FROM block_metadata WHERE block_number = $1",
+            i64::from(*block)
+        )
+        .fetch_optional(self.0.conn())
+        .await?;
+
+        metrics::histogram!("sql.chain.block.get_block_metadata", start.elapsed());
+
+        let result = db_result.map(|md| BlockMetadata {
+            fast_processing: md.fast_processing,
+        });
 
         Ok(result)
     }
@@ -678,6 +732,28 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
         transaction.commit().await?;
 
         metrics::histogram!("sql.chain.block.save_block", start.elapsed());
+        Ok(())
+    }
+
+    pub async fn save_block_metadata(
+        &mut self,
+        block_number: BlockNumber,
+        block_metadata: BlockMetadata,
+    ) -> QueryResult<()> {
+        let start = Instant::now();
+
+        sqlx::query!(
+            "
+            INSERT INTO block_metadata (block_number, fast_processing)
+            VALUES ($1, $2)
+            ",
+            i64::from(*block_number),
+            block_metadata.fast_processing
+        )
+        .execute(self.0.conn())
+        .await?;
+
+        metrics::histogram!("sql.chain.block.save_block_metadata", start.elapsed());
         Ok(())
     }
 

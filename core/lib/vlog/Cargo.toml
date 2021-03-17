@@ -12,4 +12,4 @@ publish = false # This is an utility crate, not to be used by libraries.
 
 [dependencies]
 tracing = {version= "0.1.22", features = ["log"]}
-tracing-subscriber = "0.2.15"
+tracing-subscriber = {version="0.2.15", features = ["fmt", "chrono"]}

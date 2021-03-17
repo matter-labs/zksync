@@ -3,13 +3,14 @@ use zksync_eth_signer::EthereumSigner;
 use zksync_types::{
     helpers::{closest_packable_fee_amount, is_fee_amount_packable},
     tokens::TxFeeTypes,
+    tx::ChangePubKeyType,
     Nonce, Token, TokenLike, ZkSyncTx,
 };
 
 use crate::{
     error::ClientError, operations::SyncTransactionHandle, provider::Provider, wallet::Wallet,
 };
-use zksync_types::tokens::{ChangePubKeyFeeType, ChangePubKeyFeeTypeArg};
+use zksync_types::tokens::ChangePubKeyFeeTypeArg;
 
 #[derive(Debug)]
 pub struct ChangePubKeyBuilder<'a, S: EthereumSigner, P: Provider> {
@@ -55,11 +56,11 @@ where
                     .get_tx_fee(
                         if self.onchain_auth {
                             TxFeeTypes::ChangePubKey(ChangePubKeyFeeTypeArg::ContractsV4Version(
-                                ChangePubKeyFeeType::Onchain,
+                                ChangePubKeyType::Onchain,
                             ))
                         } else {
                             TxFeeTypes::ChangePubKey(ChangePubKeyFeeTypeArg::ContractsV4Version(
-                                ChangePubKeyFeeType::ECDSA,
+                                ChangePubKeyType::ECDSA,
                             ))
                         },
                         self.wallet.address(),

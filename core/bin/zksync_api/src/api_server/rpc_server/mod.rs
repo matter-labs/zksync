@@ -18,13 +18,13 @@ use zksync_storage::{
     },
     ConnectionPool, StorageProcessor,
 };
-use zksync_types::{tx::TxHash, Address, BatchFee, BlockNumber, Fee, TokenLike, TxFeeTypes};
+use zksync_types::{tx::TxHash, Address, BlockNumber, TokenLike, TxFeeTypes};
 
 // Local uses
 use crate::{
-    fee_ticker::{TickerRequest, TokenPriceRequestType},
-    signature_checker::VerifyTxSignatureRequest,
-    utils::shared_lru_cache::SharedLruCache,
+    fee_ticker::{PriceError, ResponseBatchFee, ResponseFee, TickerRequest, TokenPriceRequestType},
+    signature_checker::VerifySignatureRequest,
+    utils::shared_lru_cache::AsyncLruCache,
 };
 use bigdecimal::BigDecimal;
 use zksync_utils::panic_notify::ThreadPanicNotify;
@@ -42,10 +42,9 @@ use super::tx_sender::TxSender;
 pub struct RpcApp {
     runtime_handle: tokio::runtime::Handle,
 
-    cache_of_executed_priority_operations: SharedLruCache<u32, StoredExecutedPriorityOperation>,
-    cache_of_blocks_info: SharedLruCache<i64, BlockDetails>,
-    cache_of_transaction_receipts: SharedLruCache<Vec<u8>, TxReceiptResponse>,
-    cache_of_complete_withdrawal_tx_hashes: SharedLruCache<TxHash, String>,
+    cache_of_executed_priority_operations: AsyncLruCache<u32, StoredExecutedPriorityOperation>,
+    cache_of_transaction_receipts: AsyncLruCache<Vec<u8>, TxReceiptResponse>,
+    cache_of_complete_withdrawal_tx_hashes: AsyncLruCache<TxHash, String>,
 
     pub confirmations_for_eth_event: u64,
 
@@ -55,7 +54,7 @@ pub struct RpcApp {
 impl RpcApp {
     pub fn new(
         connection_pool: ConnectionPool,
-        sign_verify_request_sender: mpsc::Sender<VerifyTxSignatureRequest>,
+        sign_verify_request_sender: mpsc::Sender<VerifySignatureRequest>,
         ticker_request_sender: mpsc::Sender<TickerRequest>,
         config: &ZkSyncConfig,
     ) -> Self {
@@ -75,10 +74,9 @@ impl RpcApp {
         RpcApp {
             runtime_handle,
 
-            cache_of_executed_priority_operations: SharedLruCache::new(api_requests_caches_size),
-            cache_of_blocks_info: SharedLruCache::new(api_requests_caches_size),
-            cache_of_transaction_receipts: SharedLruCache::new(api_requests_caches_size),
-            cache_of_complete_withdrawal_tx_hashes: SharedLruCache::new(api_requests_caches_size),
+            cache_of_executed_priority_operations: AsyncLruCache::new(api_requests_caches_size),
+            cache_of_transaction_receipts: AsyncLruCache::new(api_requests_caches_size),
+            cache_of_complete_withdrawal_tx_hashes: AsyncLruCache::new(api_requests_caches_size),
 
             confirmations_for_eth_event,
 
@@ -151,28 +149,32 @@ impl RpcApp {
         serial_id: u32,
     ) -> Result<Option<StoredExecutedPriorityOperation>> {
         let start = Instant::now();
-        let res =
-            if let Some(executed_op) = self.cache_of_executed_priority_operations.get(&serial_id) {
-                Some(executed_op)
-            } else {
-                let mut storage = self.access_storage().await?;
-                let executed_op = storage
-                    .chain()
-                    .operations_schema()
-                    .get_executed_priority_operation(serial_id)
-                    .await
-                    .map_err(|err| {
-                        vlog::warn!("Internal Server Error: '{}'; input: {}", err, serial_id);
-                        Error::internal_error()
-                    })?;
+        let res = if let Some(executed_op) = self
+            .cache_of_executed_priority_operations
+            .get(&serial_id)
+            .await
+        {
+            Some(executed_op)
+        } else {
+            let mut storage = self.access_storage().await?;
+            let executed_op = storage
+                .chain()
+                .operations_schema()
+                .get_executed_priority_operation(serial_id)
+                .await
+                .map_err(|err| {
+                    vlog::warn!("Internal Server Error: '{}'; input: {}", err, serial_id);
+                    Error::internal_error()
+                })?;
 
-                if let Some(executed_op) = executed_op.clone() {
-                    self.cache_of_executed_priority_operations
-                        .insert(serial_id, executed_op);
-                }
+            if let Some(executed_op) = executed_op.clone() {
+                self.cache_of_executed_priority_operations
+                    .insert(serial_id, executed_op)
+                    .await;
+            }
 
-                executed_op
-            };
+            executed_op
+        };
 
         metrics::histogram!("api.rpc.get_executed_priority_operation", start.elapsed());
         Ok(res)
@@ -180,30 +182,12 @@ impl RpcApp {
 
     async fn get_block_info(&self, block_number: i64) -> Result<Option<BlockDetails>> {
         let start = Instant::now();
-        let res = if let Some(block) = self.cache_of_blocks_info.get(&block_number) {
-            Some(block)
-        } else {
-            let mut storage = self.access_storage().await?;
-            let blocks = storage
-                .chain()
-                .block_schema()
-                .load_block_range(BlockNumber(block_number as u32), 1)
-                .await
-                .unwrap_or_default();
-
-            if !blocks.is_empty() && blocks[0].block_number == block_number {
-                // Unverified blocks can still change, so we can't cache them.
-                self.cache_of_blocks_info
-                    .insert(block_number, blocks[0].clone());
-            }
-
-            if !blocks.is_empty() {
-                Some(blocks[0].clone())
-            } else {
-                None
-            }
-        };
-
+        let res = self
+            .tx_sender
+            .blocks
+            .get(&self.tx_sender.pool, BlockNumber(block_number as u32))
+            .await
+            .map_err(|_| Error::internal_error())?;
         metrics::histogram!("api.rpc.get_block_info", start.elapsed());
         Ok(res)
     }
@@ -213,6 +197,7 @@ impl RpcApp {
         let res = if let Some(tx_receipt) = self
             .cache_of_transaction_receipts
             .get(&tx_hash.as_ref().to_vec())
+            .await
         {
             Some(tx_receipt)
         } else {
@@ -234,7 +219,8 @@ impl RpcApp {
             if let Some(tx_receipt) = tx_receipt.clone() {
                 if tx_receipt.verified {
                     self.cache_of_transaction_receipts
-                        .insert(tx_hash.as_ref().to_vec(), tx_receipt);
+                        .insert(tx_hash.as_ref().to_vec(), tx_receipt)
+                        .await;
                 }
             }
 
@@ -270,7 +256,7 @@ impl RpcApp {
         mut ticker_request_sender: mpsc::Sender<TickerRequest>,
         transactions: Vec<(TxFeeTypes, Address)>,
         token: TokenLike,
-    ) -> Result<BatchFee> {
+    ) -> Result<ResponseBatchFee> {
         let req = oneshot::channel();
         ticker_request_sender
             .send(TickerRequest::GetBatchTxFee {
@@ -292,7 +278,7 @@ impl RpcApp {
         tx_type: TxFeeTypes,
         address: Address,
         token: TokenLike,
-    ) -> Result<Fee> {
+    ) -> Result<ResponseFee> {
         let req = oneshot::channel();
         ticker_request_sender
             .send(TickerRequest::GetTxFee {
@@ -330,9 +316,12 @@ impl RpcApp {
             .await
             .expect("ticker receiver dropped");
         let resp = req.1.await.expect("ticker answer sender dropped");
-        resp.map_err(|err| {
-            vlog::warn!("Internal Server Error: '{}'; input: {:?}", err, token);
-            Error::internal_error()
+        resp.map_err(|err| match err {
+            PriceError::TokenNotFound(msg) => Error::invalid_params(msg),
+            _ => {
+                vlog::warn!("Internal Server Error: '{}'; input: {:?}", err, token);
+                Error::internal_error()
+            }
         })
     }
 
@@ -379,6 +368,7 @@ impl RpcApp {
         let res = if let Some(complete_withdrawals_tx_hash) = self
             .cache_of_complete_withdrawal_tx_hashes
             .get(&withdrawal_hash)
+            .await
         {
             Some(complete_withdrawals_tx_hash)
         } else {
@@ -400,7 +390,8 @@ impl RpcApp {
 
             if let Some(complete_withdrawals_tx_hash) = complete_withdrawals_tx_hash.clone() {
                 self.cache_of_complete_withdrawal_tx_hashes
-                    .insert(withdrawal_hash, complete_withdrawals_tx_hash);
+                    .insert(withdrawal_hash, complete_withdrawals_tx_hash)
+                    .await;
             }
 
             complete_withdrawals_tx_hash
@@ -412,7 +403,7 @@ impl RpcApp {
 #[allow(clippy::too_many_arguments)]
 pub fn start_rpc_server(
     connection_pool: ConnectionPool,
-    sign_verify_request_sender: mpsc::Sender<VerifyTxSignatureRequest>,
+    sign_verify_request_sender: mpsc::Sender<VerifySignatureRequest>,
     ticker_request_sender: mpsc::Sender<TickerRequest>,
     panic_notify: mpsc::Sender<bool>,
     config: &ZkSyncConfig,
