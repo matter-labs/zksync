@@ -1,6 +1,6 @@
 import { BigNumber, ethers } from 'ethers';
 import { getZkSyncApiAddress } from './utils';
-import fetch from 'node-fetch'; 
+import fetch from 'node-fetch';
 
 const ForcedExitContractAbi = require('./forced-exit-abi.json');
 
@@ -17,18 +17,15 @@ async function shouldWithdrawForcedExitFee(
 ): Promise<boolean> {
     const costOfGas = gasPrice.mul(requiredGasLimit);
     const contractBalance = await ethProvider.getBalance(contractAddress);
-    
+
     const profit = contractBalance.sub(costOfGas);
     const threshold = BigNumber.from(WITHDRAWAL_THRESHOLD);
 
     return profit.gte(threshold);
-}   
+}
 
 // Used to withdraw the fee from the ForcedExit requests feature
-export async function withdrawForcedExitFee(
-    ethProvider: ethers.providers.Provider,
-    ethNetwork: string
-) {
+export async function withdrawForcedExitFee(ethProvider: ethers.providers.Provider, ethNetwork: string) {
     const gasPrice = await ethProvider.getGasPrice();
     const featureStatus = await getStatus(ethNetwork);
 
@@ -48,7 +45,7 @@ export async function withdrawForcedExitFee(
         return;
     }
 
-    const ethWallet = (new ethers.Wallet(SENDER_PRIVATE_KEY)).connect(ethProvider);
+    const ethWallet = new ethers.Wallet(SENDER_PRIVATE_KEY).connect(ethProvider);
     const forcedExitContract = new ethers.Contract(
         featureStatus.forced_exit_contract_address,
         ForcedExitContractAbi,
@@ -57,25 +54,24 @@ export async function withdrawForcedExitFee(
 
     try {
         console.log('Withdrawing funds from the forced exit smart contract');
-        const tx = await forcedExitContract.withdrawPendingFunds(FEE_RECEIVER, {
+        const tx = (await forcedExitContract.withdrawPendingFunds(FEE_RECEIVER, {
             gasPrice,
             gasLimit: requiredGasLimit
-        }) as ethers.ContractTransaction;
+        })) as ethers.ContractTransaction;
 
         const receipt = await tx.wait();
 
         console.log('Tx hash:', receipt.transactionHash);
-    } catch(e) {
+    } catch (e) {
         console.error('Failed to withdraw funds from the forced exit smart contract: ', e);
         // Even though we try to keep the forced exit requests functionality
         // as distant from the rest of the code as possible, if the script to withdraw the funds
-        // fails, we might run into risk of the operator running out of money, so not terminating 
+        // fails, we might run into risk of the operator running out of money, so not terminating
         // here would be a security issue
         process.exit(1);
     } finally {
         console.log('The process of withdrawing forced exit withdrawal fee is complete.');
-    }   
-
+    }
 }
 
 interface StatusResponse {
@@ -86,9 +82,7 @@ interface StatusResponse {
     forced_exit_contract_address: string;
 }
 
-async function getStatus(
-    network: string
-) {
+async function getStatus(network: string) {
     const apiUrl = `${getZkSyncApiAddress(network)}/api/forced_exit_requests/v0.1`;
     const endpoint = `${apiUrl}/status`;
 

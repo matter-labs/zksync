@@ -147,16 +147,16 @@ export async function fmtTokenWithETHValue(zksProvider: zksync.Provider, token, 
 
 export function getZkSyncApiAddress(network: string): string {
     const apiDictionary = {
-        'localhost': 'http://localhost:3001',
-        'stage': 'https://stage-api.zksync.dev',
-        'rinkeby': 'https://rinkeby-api.zksync.io',
-        'ropsten': 'https://ropsten-api.zksync.io',
+        localhost: 'http://localhost:3001',
+        stage: 'https://stage-api.zksync.dev',
+        rinkeby: 'https://rinkeby-api.zksync.io',
+        ropsten: 'https://ropsten-api.zksync.io',
         'rinkeby-beta': 'https://rinkeby-beta-api.zksync.io',
         'ropsten-beta': 'https://ropsten-beta-api.zksync.io',
-        'mainnet': 'https://api.zksync.io',
-        'dev': 'https://dev-api.zksync.dev',
-        'breaking': 'https://breaking-api.zksync.dev'
+        mainnet: 'https://api.zksync.io',
+        dev: 'https://dev-api.zksync.dev',
+        breaking: 'https://breaking-api.zksync.dev'
     };
-    
+
     return apiDictionary[network];
 }

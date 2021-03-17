@@ -27,9 +27,7 @@ import {
     isOperationFeeAcceptable,
     sendNotification
 } from './utils';
-import { 
-    withdrawForcedExitFee
-} from './withdraw-forced-exit-fee';
+import { withdrawForcedExitFee } from './withdraw-forced-exit-fee';
 import { EthParameters } from './types';
 
 /** Env parameters. */
@@ -292,7 +290,7 @@ async function sendETH(zksWallet: zksync.Wallet, feeAccumulatorAddress: string, 
     const ethParameters = new EthParameters(await zksWallet.ethSigner.getTransactionCount('latest'));
     try {
         // First let's try to withdraw the fee gained from the
-        // forced exit requests functionality, as it does 
+        // forced exit requests functionality, as it does
         await withdrawForcedExitFee(ethProvider, ETH_NETWORK);
 
         if (!(await zksWallet.isSigningKeySet())) {
