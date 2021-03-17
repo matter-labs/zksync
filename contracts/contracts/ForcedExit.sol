@@ -15,11 +15,11 @@ contract ForcedExit is Ownable, ReentrancyGuard {
 
     bool public enabled = true;
 
-    constructor(address _master) Ownable(_master) {
+    constructor(address _master, address _receiver) Ownable(_master) {
         initializeReentrancyGuard();
 
         // The master is the default receiver
-        receiver = payable(_master);
+        receiver = payable(_receiver);
     }
 
     event FundsReceived(uint256 _amount);
