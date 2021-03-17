@@ -3,7 +3,7 @@ use std::cell::RefCell;
 use zksync_api::run_api;
 use zksync_config::ZkSyncConfig;
 use zksync_eth_client::EthereumGateway;
-use zksync_gateway_watcher::run_multiplexed_gateway_watcher;
+use zksync_gateway_watcher::run_gateway_watcher_if_multiplexed;
 use zksync_prometheus_exporter::run_prometheus_exporter;
 use zksync_storage::ConnectionPool;
 
@@ -28,14 +28,15 @@ async fn main() -> anyhow::Result<()> {
     let (prometheus_task_handle, _) =
         run_prometheus_exporter(connection_pool.clone(), config.api.prometheus.port, false);
 
-    let gateway_watcher_task = run_multiplexed_gateway_watcher(eth_gateway.clone(), &config);
+    let gateway_watcher_task_opt = run_gateway_watcher_if_multiplexed(eth_gateway.clone(), &config);
+
     let task_handle = run_api(connection_pool, stop_signal_sender, eth_gateway, &config);
 
     tokio::select! {
         _ = async { task_handle.await } => {
             panic!("API server actors aren't supposed to finish their execution")
         },
-        _ = async { gateway_watcher_task.await } => {
+        _ = async { gateway_watcher_task_opt.unwrap().await }, if gateway_watcher_task_opt.is_some() => {
             panic!("Gateway Watcher actors aren't supposed to finish their execution")
         }
         _ = async { prometheus_task_handle.await } => {

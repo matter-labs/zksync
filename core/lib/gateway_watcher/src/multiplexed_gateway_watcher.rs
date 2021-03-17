@@ -56,7 +56,7 @@ impl MultiplexedGatewayWatcher {
             client: match gateway {
                 EthereumGateway::Multiplexed(client) => client,
                 _ => {
-                    panic!("Ethereum Gateway Watcher: Multiplexed client expected")
+                    panic!("Ethereum Gateway Watcher: multiplexed client expected")
                 }
             },
             interval,
@@ -219,6 +219,19 @@ pub fn run_multiplexed_gateway_watcher(
     );
 
     tokio::spawn(gateway_watcher.run())
+}
+
+/// Runs `MultiplexedGatewayWatcher` as a tokio task for provided ethereum gateway if it's multiplexed.
+#[must_use]
+pub fn run_gateway_watcher_if_multiplexed(
+    eth_gateway: EthereumGateway,
+    config: &ZkSyncConfig,
+) -> Option<JoinHandle<()>> {
+    if eth_gateway.is_multiplexed() {
+        Some(run_multiplexed_gateway_watcher(eth_gateway, config))
+    } else {
+        None
+    }
 }
 
 #[cfg(test)]

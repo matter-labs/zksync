@@ -14,7 +14,7 @@ use futures::{channel::mpsc, future};
 use tokio::task::JoinHandle;
 use zksync_config::ZkSyncConfig;
 use zksync_eth_client::EthereumGateway;
-use zksync_gateway_watcher::run_multiplexed_gateway_watcher;
+use zksync_gateway_watcher::run_gateway_watcher_if_multiplexed;
 use zksync_storage::ConnectionPool;
 
 const DEFAULT_CHANNEL_CAPACITY: usize = 32_768;
@@ -156,7 +156,7 @@ pub async fn run_core(
         DEFAULT_CHANNEL_CAPACITY,
     );
 
-    let gateway_watcher_task = run_multiplexed_gateway_watcher(eth_gateway.clone(), &config);
+    let gateway_watcher_task_opt = run_gateway_watcher_if_multiplexed(eth_gateway.clone(), &config);
 
     // Start rejected transactions cleaner task.
     let rejected_tx_cleaner_task = run_rejected_tx_cleaner(&config, connection_pool.clone());
@@ -176,15 +176,18 @@ pub async fn run_core(
         config.api.private.clone(),
     );
 
-    let task_futures = vec![
+    let mut task_futures = vec![
         eth_watch_task,
         state_keeper_task,
         committer_task,
         mempool_task,
         proposer_task,
-        gateway_watcher_task,
         rejected_tx_cleaner_task,
     ];
+
+    if let Some(task) = gateway_watcher_task_opt {
+        task_futures.push(task);
+    }
 
     Ok(task_futures)
 }
