@@ -453,3 +453,9 @@ pub struct OnchainOperationsBlockInfo {
     pub public_data_offset: u32,
     pub eth_witness: Vec<u8>,
 }
+
+/// Additional data attached to block that is not related to the core protocol
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct BlockMetadata {
+    pub fast_processing: bool,
+}

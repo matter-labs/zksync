@@ -229,7 +229,7 @@ mod tests {
             .await
             .unwrap_err();
         assert!(
-            matches!(error, ClientError::BadRequest{ .. }),
+            matches!(error, ClientError::BadRequest { .. }),
             format!(
                 "Incorrect error type: got {:?} instead of BadRequest",
                 error

@@ -19,7 +19,8 @@ async function main() {
         json?: string,
         amount?: string,
         token?: string,
-        recipient?: string
+        recipient?: string,
+        fastProcessing?: boolean
     ) => {
         if (json && (amount || token || recipient)) {
             throw new Error('--json option and positional arguments are mutually exclusive');
@@ -35,7 +36,8 @@ async function main() {
             privkey: config.wallets[config.defaultWallet as any],
             to: recipient,
             amount,
-            token
+            token,
+            fastProcessing,
         };
         const hash = await commands.submitTx(operation, txDetails, fast, program.network);
         print(fast ? hash : await commands.txInfo(hash, program.network));
@@ -84,8 +86,9 @@ async function main() {
         .description('make a withdraw')
         .option('--json <string>', 'supply transfer info as json string')
         .option('--fast', 'do not wait for transaction commitment')
+        .option('--fastWithdrawal', 'requests block with tx to be executed as fast as possible')
         .action(async (amount, token, recipient, cmd) => {
-            await handler('withdraw', cmd.fast, cmd.json, amount, token, recipient);
+            await handler('withdraw', cmd.fast, cmd.json, amount, token, recipient, cmd.fastWithdrawal);
         });
 
     program
