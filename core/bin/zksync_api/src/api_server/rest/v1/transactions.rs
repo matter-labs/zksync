@@ -459,7 +459,12 @@ mod tests {
         async fn new() -> anyhow::Result<(Client, Self)> {
             let (core_client, core_server) = submit_txs_loopback();
 
-            let cfg = TestServerConfig::default();
+            let mut cfg = TestServerConfig::default();
+            cfg.config
+                .api
+                .common
+                .fee_free_accounts
+                .push(AccountId(0xfee));
             let pool = cfg.pool.clone();
             cfg.fill_database().await?;
 
@@ -497,6 +502,20 @@ mod tests {
         not(feature = "api_test"),
         ignore = "Use `zk test rust-api` command to perform this test"
     )]
+    async fn test_rust_api() -> anyhow::Result<()> {
+        // TODO: ZKS-561
+        test_transactions_scope().await?;
+        test_bad_fee_token().await?;
+        test_fast_processing_flag().await?;
+        test_fee_free_accounts().await?;
+        Ok(())
+    }
+
+    #[actix_rt::test]
+    #[cfg_attr(
+        not(feature = "api_test"),
+        ignore = "Use `zk test rust-api` command to perform this test"
+    )]
     async fn test_submit_txs_loopback() -> anyhow::Result<()> {
         let (core_client, core_server) = submit_txs_loopback();
 
@@ -514,11 +533,6 @@ mod tests {
         Ok(())
     }
 
-    #[actix_rt::test]
-    #[cfg_attr(
-        not(feature = "api_test"),
-        ignore = "Use `zk test rust-api` command to perform this test"
-    )]
     async fn test_transactions_scope() -> anyhow::Result<()> {
         let (client, server) = TestServer::new().await?;
 
@@ -681,11 +695,6 @@ mod tests {
     /// - Attempt to pay fees in an inappropriate token fails for single txs.
     /// - Attempt to pay fees in an inappropriate token fails for single batch.
     /// - Batch with an inappropriate token still can be processed if the fee is covered with a common token.
-    #[actix_rt::test]
-    #[cfg_attr(
-        not(feature = "api_test"),
-        ignore = "Use `zk test rust-api` command to perform this test"
-    )]
     async fn test_bad_fee_token() -> anyhow::Result<()> {
         let (client, server) = TestServer::new().await?;
 
@@ -797,16 +806,74 @@ mod tests {
         Ok(())
     }
 
+    /// This test checks the following:
+    ///
+    /// Fee free account can pay zero fee in single tx.
+    /// Not a fee free account can't pay zero fee in single tx.
+    async fn test_fee_free_accounts() -> anyhow::Result<()> {
+        let (client, server) = TestServer::new().await?;
+
+        let from1 = ZkSyncAccount::rand();
+        from1.set_account_id(Some(AccountId(0xfee)));
+        let to1 = ZkSyncAccount::rand();
+
+        // Submit transaction with a zero fee by the fee free account
+        let (tx1, eth_sig1) = from1.sign_transfer(
+            TokenId(0),
+            "ETH",
+            0u64.into(),
+            0u64.into(),
+            &to1.address,
+            Some(Nonce(0)),
+            false,
+            Default::default(),
+        );
+        let transfer1 = ZkSyncTx::Transfer(Box::new(tx1));
+        client
+            .submit_tx(
+                transfer1.clone(),
+                eth_sig1.map(TxEthSignature::EthereumSignature),
+                None,
+            )
+            .await
+            .expect("fee free account transaction fails");
+
+        let from2 = ZkSyncAccount::rand();
+        from2.set_account_id(Some(AccountId(0xbee)));
+        let to2 = ZkSyncAccount::rand();
+
+        // Submit transaction with a zero fee not by the fee free account
+        let (tx2, eth_sig2) = from2.sign_transfer(
+            TokenId(0),
+            "ETH",
+            0u64.into(),
+            0u64.into(),
+            &to2.address,
+            Some(Nonce(0)),
+            false,
+            Default::default(),
+        );
+        let transfer2 = ZkSyncTx::Transfer(Box::new(tx2));
+        client
+            .submit_tx(
+                transfer2.clone(),
+                eth_sig2.map(TxEthSignature::EthereumSignature),
+                None,
+            )
+            .await
+            .unwrap_err()
+            .to_string()
+            .contains("Transaction fee is too low");
+
+        server.stop().await;
+        Ok(())
+    }
+
     /// This test checks the following criteria:
     ///
     /// - Attempt to submit non-withdraw transaction with the enabled fast-processing.
     /// - Attempt to submit non-withdraw transaction with the disabled fast-processing.
     /// - Attempt to submit withdraw transaction with the enabled fast-processing.
-    #[actix_rt::test]
-    #[cfg_attr(
-        not(feature = "api_test"),
-        ignore = "Use `zk test rust-api` command to perform this test"
-    )]
     async fn test_fast_processing_flag() -> anyhow::Result<()> {
         let (client, server) = TestServer::new().await?;
 

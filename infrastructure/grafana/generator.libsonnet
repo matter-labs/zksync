@@ -20,8 +20,9 @@
   samples(metric, span = '1h')::
     local formatted = std.strReplace(metric, '.', '_');
     $.grafana.graphPanel.new(
-      title = metric + '[count]',
+      title = metric + ' [COUNT]',
       datasource = 'Prometheus',
+      format = 'RPS',
     ).addTarget(
       $.grafana.prometheus.target(
         'rate(%s_count[%s])' % [formatted, span],

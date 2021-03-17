@@ -21,8 +21,12 @@ All notable changes to the core components will be documented in this file.
   operations.
 - (`eth_client`): Added `get_tx`, `create_contract` methods to `EthereumGateway`, `get_web3_transport` method to
   ETHDirectClient.
+- (`api_server`): Support for accounts that don't have to pay fees (e.g. network service accounts) was added.
 
 ### Fixed
+
+- (`zksync_api`): Internal error with tokens not listed on CoinGecko.
+- Fix wrong block info cache behavior in the `api_server`.
 
 ## Release 2021-02-19
 
