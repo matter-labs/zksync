@@ -1,7 +1,7 @@
 use crate::envy_load;
 /// External uses
 use serde::Deserialize;
-use zksync_types::{Address, H256, U256};
+use zksync_types::{Address, H256};
 
 // There are two types of configs:
 // The original one (with tx_interval_scaling_factor)
@@ -24,8 +24,6 @@ struct ForcedExitRequestsInternalConfig {
     pub sender_eth_private_key: H256,
     pub sender_account_address: Address,
     pub expiration_period: u64,
-    pub withdrawal_threshold: u64,
-    pub fee_receiver: Address,
 }
 
 #[derive(Debug, Deserialize, Clone, PartialEq)]
@@ -41,8 +39,6 @@ pub struct ForcedExitRequestsConfig {
     pub sender_eth_private_key: H256,
     pub sender_account_address: Address,
     pub expiration_period: u64,
-    pub withdrawal_threshold: U256,
-    pub fee_receiver: Address,
 }
 
 // Checks that in no way the price will overlap with the requests id space
@@ -83,8 +79,6 @@ impl ForcedExitRequestsConfig {
             sender_eth_private_key: config.sender_eth_private_key,
             sender_account_address: config.sender_account_address,
             expiration_period: config.expiration_period,
-            withdrawal_threshold: U256::from(config.withdrawal_threshold),
-            fee_receiver: config.fee_receiver,
         }
     }
 }

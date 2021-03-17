@@ -6,8 +6,8 @@ const ForcedExitContractAbi = require('./forced-exit-abi.json');
 
 const requiredGasLimit = 40000;
 
-const SENDER_PRIVATE_KEY = process.env.FORCED_EXIT_REQUESTS_SENDER_ETH_PRIVATE_KEY as string;
-const WITHDRAWAL_THRESHOLD = process.env.FORCED_EXIT_REQUESTS_WITHDRAWAL_THRESHOLD as string;
+const SENDER_PRIVATE_KEY = process.env.FORCED_EXIT_REQUESTS_SENDER_ETH_PRIVATE_KEY;
+const WITHDRAWAL_THRESHOLD = process.env.FORCED_EXIT_REQUESTS_WITHDRAWAL_THRESHOLD;
 const FEE_RECEIVER = process.env.FORCED_EXIT_REQUESTS_FEE_RECEIVER;
 
 async function shouldWithdrawForcedExitFee(
@@ -24,22 +24,19 @@ async function shouldWithdrawForcedExitFee(
     return profit.gte(threshold);
 }
 
-// Used to withdraw the fee from the ForcedExit requests feature
+// Withdraws the fee from the ForcedExit requests feature
 export async function withdrawForcedExitFee(ethProvider: ethers.providers.Provider, ethNetwork: string) {
     const gasPrice = await ethProvider.getGasPrice();
     const featureStatus = await getStatus(ethNetwork);
 
     if (featureStatus.status === 'disabled') {
         console.log('Forced exit requests feature is disabled');
-        // No need to proceed if the feature is disabled
         return;
     }
 
     const contractAddress = featureStatus.forced_exit_contract_address;
-
     const shouldWithdraw = await shouldWithdrawForcedExitFee(ethProvider, contractAddress, gasPrice);
-    // The algorithm should terminate if there is no point in withdrawing funds
-    // from the contract
+
     if (!shouldWithdraw) {
         console.log('It is not feasible to withdraw Forced Exit requests fee');
         return;

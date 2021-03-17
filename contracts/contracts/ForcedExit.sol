@@ -31,12 +31,15 @@ contract ForcedExit is Ownable, ReentrancyGuard {
     }
 
     function withdrawPendingFunds(address payable _to) external nonReentrant {
-        require(msg.sender == receiver || msg.sender == getMaster(), "1"); // Only the receiver or master can withdraw funds from the smart contract
+        require(
+            msg.sender == receiver || msg.sender == getMaster(),
+            "Only the receiver or master can withdraw funds from the smart contract"
+        );
 
         uint256 balance = address(this).balance;
 
         (bool success, ) = _to.call{value: balance}("");
-        require(success, "2"); // ETH withdraw failed
+        require(success, "ETH withdraw failed");
     }
 
     // We have to use fallback instead of `receive` since the ethabi
