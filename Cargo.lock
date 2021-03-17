@@ -5984,7 +5984,6 @@ dependencies = [
  "async-trait",
  "chrono",
  "ethabi",
- "franklin-crypto",
  "hex",
  "log 0.4.11",
  "metrics",
