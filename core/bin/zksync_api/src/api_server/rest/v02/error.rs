@@ -2,15 +2,6 @@ use serde::export::Formatter;
 use serde::Serialize;
 use serde_repr::Serialize_repr;
 
-#[derive(Serialize)]
-#[serde(rename_all = "snake_case")]
-#[allow(dead_code)]
-pub enum ErrorType {
-    InvalidRequestError,
-    ApiError,
-    IdempotencyError,
-    RateLimitError,
-}
 #[derive(Serialize_repr)]
 #[repr(u8)]
 pub enum ErrorCode {
@@ -20,14 +11,14 @@ pub enum ErrorCode {
 /// Error object in a response
 #[derive(Serialize)]
 pub struct Error {
-    error_type: ErrorType,
+    error_type: String,
     code: ErrorCode,
     message: String,
 }
 
 /// Trait that can be used to map custom errors to the object.
 pub trait ApiError: std::fmt::Display {
-    fn error_type(&self) -> ErrorType;
+    fn error_type(&self) -> String;
 
     fn code(&self) -> ErrorCode;
 
@@ -58,8 +49,8 @@ impl std::fmt::Display for UnreachableError {
 }
 
 impl ApiError for UnreachableError {
-    fn error_type(&self) -> ErrorType {
-        ErrorType::ApiError
+    fn error_type(&self) -> String {
+        String::from("api_error")
     }
 
     fn code(&self) -> ErrorCode {
