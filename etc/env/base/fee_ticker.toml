@@ -26,3 +26,6 @@ not_subsidized_tokens=[
     "0x2b591e99afe9f32eaa6214f7b7629768c40eeb39", # HEX
     "0x34083bbd70d394110487feaa087da875a54624ec"  # Some sample token
 ]
+
+subsidized_tokens=[]
+subsidized_tokens_limits=[]
