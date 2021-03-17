@@ -250,7 +250,7 @@ impl ZkSyncTx {
         matches!(self, ZkSyncTx::Withdraw(_) | ZkSyncTx::ForcedExit(_))
     }
 
-    /// Returns `true` if transaction is `ZkSyncTx::Withdraw`.
+    /// Returns `true` if transaction is `ZkSyncTx::Close`.
     #[doc(hidden)]
     pub fn is_close(&self) -> bool {
         matches!(self, ZkSyncTx::Close(_))

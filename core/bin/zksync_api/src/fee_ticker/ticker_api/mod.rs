@@ -1,3 +1,4 @@
+use super::PriceError;
 use crate::utils::token_db_cache::TokenDBCache;
 use anyhow::format_err;
 use async_trait::async_trait;
@@ -24,14 +25,14 @@ pub const CONNECTION_TIMEOUT: Duration = Duration::from_millis(700);
 
 #[async_trait]
 pub trait TokenPriceAPI {
-    async fn get_price(&self, token_symbol: &str) -> Result<TokenPrice, anyhow::Error>;
+    async fn get_price(&self, token_symbol: &str) -> Result<TokenPrice, PriceError>;
 }
 
 /// Api responsible for querying for TokenPrices
 #[async_trait]
 pub trait FeeTickerAPI {
     /// Get last price from ticker
-    async fn get_last_quote(&self, token: TokenLike) -> Result<TokenPrice, anyhow::Error>;
+    async fn get_last_quote(&self, token: TokenLike) -> Result<TokenPrice, PriceError>;
 
     /// Get current gas price in ETH
     async fn get_gas_price_wei(&self) -> Result<BigUint, anyhow::Error>;
@@ -72,7 +73,7 @@ impl TokenCacheEntry {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub(super) struct TickerApi<T: TokenPriceAPI> {
     db_pool: ConnectionPool,
 
@@ -201,13 +202,21 @@ impl<T: TokenPriceAPI> TickerApi<T> {
 #[async_trait]
 impl<T: TokenPriceAPI + Send + Sync> FeeTickerAPI for TickerApi<T> {
     /// Get last price from ticker
-    async fn get_last_quote(&self, token: TokenLike) -> Result<TokenPrice, anyhow::Error> {
+    async fn get_last_quote(&self, token: TokenLike) -> Result<TokenPrice, PriceError> {
         let start = Instant::now();
         let token = self
             .token_db_cache
-            .get_token(&mut self.db_pool.access_storage().await?, token.clone())
-            .await?
-            .ok_or_else(|| format_err!("Token not found: {:?}", token))?;
+            .get_token(
+                &mut self
+                    .db_pool
+                    .access_storage()
+                    .await
+                    .map_err(PriceError::db_error)?,
+                token.clone(),
+            )
+            .await
+            .map_err(PriceError::db_error)?
+            .ok_or_else(|| PriceError::token_not_found(format!("Token not found: {:?}", token)))?;
 
         // TODO: remove hardcode for Matter Labs Trial Token (ZKS-63).
         if token.symbol == "MLTT" {
@@ -223,16 +232,25 @@ impl<T: TokenPriceAPI + Send + Sync> FeeTickerAPI for TickerApi<T> {
             return Ok(cached_value);
         }
 
-        let api_price = self
-            .token_price_api
-            .get_price(&token.symbol)
-            .await
-            .map_err(|e| vlog::warn!("Failed to get price: {}", e));
-        if let Ok(api_price) = api_price {
-            self.update_stored_value(token.id, api_price.clone(), false)
-                .await;
-            metrics::histogram!("ticker.get_last_quote", start.elapsed());
-            return Ok(api_price);
+        let api_price = self.token_price_api.get_price(&token.symbol).await;
+
+        match api_price {
+            Ok(api_price) => {
+                self.update_stored_value(token.id, api_price.clone(), false)
+                    .await;
+                metrics::histogram!("ticker.get_last_quote", start.elapsed());
+                return Ok(api_price);
+            }
+            // Database contain this token, but it not listed in CoinGecko(CoinMarketCap)
+            Err(PriceError::TokenNotFound(_)) => {
+                return Ok(TokenPrice {
+                    usd_price: Ratio::from_integer(0u32.into()),
+                    last_updated: Utc::now(),
+                });
+            }
+            Err(e) => {
+                vlog::warn!("Failed to get price: {}", e);
+            }
         }
 
         let historical_price = self
@@ -247,7 +265,9 @@ impl<T: TokenPriceAPI + Send + Sync> FeeTickerAPI for TickerApi<T> {
             return Ok(historical_price);
         }
 
-        anyhow::bail!("Token price api is not available right now.")
+        Err(PriceError::api_error(
+            "Token price api is not available right now.",
+        ))
     }
 
     /// Get current gas price in ETH

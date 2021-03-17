@@ -8,6 +8,8 @@ All notable changes to `zksync_rs` will be documented in this file.
 
 ### Changed
 
+- Hardcode gas limit for `depositERC20` for each token.
+
 ### Deprecated
 
 ### Fixed

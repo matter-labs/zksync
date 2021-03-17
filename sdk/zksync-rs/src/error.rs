@@ -37,4 +37,7 @@ pub enum ClientError {
 
     #[error("Provided value is not packable")]
     NotPackableValue,
+
+    #[error("Other")]
+    Other,
 }

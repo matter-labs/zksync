@@ -5,7 +5,10 @@
 // Workspace deps
 use zksync_basic_types::*;
 // Local deps
-use crate::{config::MAX_WITHDRAWALS_TO_COMPLETE_IN_A_CALL, Block, ZkSyncOp};
+use crate::{
+    config::MAX_WITHDRAWALS_TO_COMPLETE_IN_A_CALL, tokens::ChangePubKeyFeeTypeArg,
+    tx::ChangePubKeyType, Block, ZkSyncOp,
+};
 
 /// Amount of gas that we can afford to spend in one transaction.
 /// This value must be big enough to fit big blocks with expensive transactions,
@@ -26,7 +29,8 @@ impl CommitCost {
     pub const DEPOSIT_COST: u64 = 7_000;
     pub const OLD_CHANGE_PUBKEY_COST_OFFCHAIN: u64 = 15_000;
     pub const CHANGE_PUBKEY_COST_OFFCHAIN: u64 = 11_050;
-    pub const CHANGE_PUBKEY_COST_ONCHAIN: u64 = 4_000;
+    pub const CHANGE_PUBKEY_COST_ONCHAIN: u64 = 5_530;
+    pub const CHANGE_PUBKEY_COST_CREATE2: u64 = 7_330;
     pub const TRANSFER_COST: u64 = 250;
     pub const TRANSFER_TO_NEW_COST: u64 = 780;
     pub const FULL_EXIT_COST: u64 = 7_000;
@@ -43,10 +47,20 @@ impl CommitCost {
             ZkSyncOp::Noop(_) => 0,
             ZkSyncOp::Deposit(_) => Self::DEPOSIT_COST,
             ZkSyncOp::ChangePubKeyOffchain(change_pubkey) => {
-                if change_pubkey.tx.is_ecdsa() {
-                    Self::CHANGE_PUBKEY_COST_OFFCHAIN
-                } else {
-                    Self::CHANGE_PUBKEY_COST_ONCHAIN
+                match change_pubkey.tx.get_change_pubkey_fee_type() {
+                    ChangePubKeyFeeTypeArg::ContractsV4Version(ChangePubKeyType::ECDSA) => {
+                        Self::CHANGE_PUBKEY_COST_OFFCHAIN
+                    }
+                    ChangePubKeyFeeTypeArg::ContractsV4Version(ChangePubKeyType::Onchain)
+                    | ChangePubKeyFeeTypeArg::PreContracts4Version {
+                        onchain_pubkey_auth: true,
+                    } => Self::CHANGE_PUBKEY_COST_ONCHAIN,
+                    ChangePubKeyFeeTypeArg::ContractsV4Version(ChangePubKeyType::CREATE2) => {
+                        Self::CHANGE_PUBKEY_COST_CREATE2
+                    }
+                    ChangePubKeyFeeTypeArg::PreContracts4Version {
+                        onchain_pubkey_auth: false,
+                    } => Self::OLD_CHANGE_PUBKEY_COST_OFFCHAIN,
                 }
             }
             ZkSyncOp::Transfer(_) => Self::TRANSFER_COST,

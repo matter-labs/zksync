@@ -17,6 +17,7 @@ pub use self::close::Close;
 pub use self::{
     change_pubkey::{
         ChangePubKey, ChangePubKeyCREATE2Data, ChangePubKeyECDSAData, ChangePubKeyEthAuthData,
+        ChangePubKeyType,
     },
     forced_exit::ForcedExit,
     transfer::Transfer,
