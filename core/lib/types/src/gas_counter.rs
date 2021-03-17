@@ -335,7 +335,7 @@ mod tests {
         let test_vector_commit = vec![
             (
                 ZkSyncOp::from(change_pubkey_op.clone()),
-                CommitCost::CHANGE_PUBKEY_COST_ONCHAIN,
+                CommitCost::OLD_CHANGE_PUBKEY_COST_OFFCHAIN, // restore after [ZKS-554]
             ),
             (ZkSyncOp::from(deposit_op.clone()), CommitCost::DEPOSIT_COST),
             (
@@ -411,7 +411,7 @@ mod tests {
         // Verify cost is 0, thus amount of operations is determined by the commit cost.
         let amount_ops_in_block = (U256::from(TX_GAS_LIMIT)
             - GasCounter::scale_up(gas_counter.commit_cost))
-            / GasCounter::scale_up(U256::from(CommitCost::CHANGE_PUBKEY_COST_ONCHAIN));
+            / GasCounter::scale_up(U256::from(CommitCost::OLD_CHANGE_PUBKEY_COST_OFFCHAIN)); // restore after [ZKS-554]
 
         for _ in 0..amount_ops_in_block.as_u64() {
             gas_counter
@@ -421,7 +421,7 @@ mod tests {
 
         // Expected gas limit is (base_cost + n_ops * op_cost) * 1.3
         let expected_commit_limit = (U256::from(CommitCost::BASE_COST)
-            + amount_ops_in_block * U256::from(CommitCost::CHANGE_PUBKEY_COST_ONCHAIN))
+            + amount_ops_in_block * U256::from(CommitCost::OLD_CHANGE_PUBKEY_COST_OFFCHAIN)) // restore after [ZKS-554]
             * U256::from(130)
             / U256::from(100);
         let expected_verify_limit = (U256::from(VerifyCost::BASE_COST)
