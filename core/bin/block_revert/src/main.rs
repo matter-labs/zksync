@@ -13,9 +13,11 @@ use zksync_types::{aggregated_operations::stored_block_info, block::Block, Block
 
 async fn revert_blocks_in_storage(
     client: &EthereumGateway,
-    transaction: &mut StorageProcessor<'_>,
+    storage: &mut StorageProcessor<'_>,
     last_block: BlockNumber,
 ) -> anyhow::Result<()> {
+    let mut transaction = storage.start_transaction().await?;
+
     transaction
         .chain()
         .block_schema()
@@ -88,6 +90,7 @@ async fn revert_blocks_in_storage(
         .return_executed_txs_to_mempool(last_block)
         .await?;
 
+    transaction.commit().await?;
     Ok(())
 }
 
