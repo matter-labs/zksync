@@ -241,63 +241,56 @@ impl<S: EthereumSigner> ETHDirectClient<S> {
         tx_hash: H256,
     ) -> Result<Option<FailureInfo>, anyhow::Error> {
         let start = Instant::now();
-        let transaction = self
-            .inner
-            .web3
-            .eth()
-            .transaction(tx_hash.into())
-            .await?
-            .unwrap();
-        let receipt = self
-            .inner
-            .web3
-            .eth()
-            .transaction_receipt(tx_hash)
-            .await?
-            .unwrap();
+        let transaction = self.inner.web3.eth().transaction(tx_hash.into()).await?;
+        let receipt = self.inner.web3.eth().transaction_receipt(tx_hash).await?;
 
-        let gas_limit = transaction.gas;
-        let gas_used = receipt.gas_used;
+        match (transaction, receipt) {
+            (Some(transaction), Some(receipt)) => {
+                let gas_limit = transaction.gas;
+                let gas_used = receipt.gas_used;
 
-        let call_request = web3::types::CallRequest {
-            from: Some(transaction.from),
-            to: transaction.to,
-            gas: Some(transaction.gas),
-            gas_price: Some(transaction.gas_price),
-            value: Some(transaction.value),
-            data: Some(transaction.input),
-        };
+                let call_request = web3::types::CallRequest {
+                    from: Some(transaction.from),
+                    to: transaction.to,
+                    gas: Some(transaction.gas),
+                    gas_price: Some(transaction.gas_price),
+                    value: Some(transaction.value),
+                    data: Some(transaction.input),
+                };
 
-        let encoded_revert_reason = self
-            .inner
-            .web3
-            .eth()
-            .call(call_request, receipt.block_number.map(Into::into))
-            .await?;
-        let revert_code = hex::encode(&encoded_revert_reason.0);
-        let revert_reason = if encoded_revert_reason.0.len() >= 4 {
-            let encoded_string_without_function_hash = &encoded_revert_reason.0[4..];
+                let encoded_revert_reason = self
+                    .inner
+                    .web3
+                    .eth()
+                    .call(call_request, receipt.block_number.map(Into::into))
+                    .await?;
+                let revert_code = hex::encode(&encoded_revert_reason.0);
+                let revert_reason = if encoded_revert_reason.0.len() >= 4 {
+                    let encoded_string_without_function_hash = &encoded_revert_reason.0[4..];
 
-            ethabi::decode(
-                &[ethabi::ParamType::String],
-                encoded_string_without_function_hash,
-            )?
-            .into_iter()
-            .next()
-            .unwrap()
-            .to_string()
-            .unwrap()
-        } else {
-            "unknown".to_string()
-        };
+                    ethabi::decode(
+                        &[ethabi::ParamType::String],
+                        encoded_string_without_function_hash,
+                    )?
+                    .into_iter()
+                    .next()
+                    .unwrap()
+                    .to_string()
+                    .unwrap()
+                } else {
+                    "unknown".to_string()
+                };
 
-        metrics::histogram!("eth_client.direct.failure_reason", start.elapsed());
-        Ok(Some(FailureInfo {
-            gas_limit,
-            gas_used,
-            revert_code,
-            revert_reason,
-        }))
+                metrics::histogram!("eth_client.direct.failure_reason", start.elapsed());
+                Ok(Some(FailureInfo {
+                    gas_limit,
+                    gas_used,
+                    revert_code,
+                    revert_reason,
+                }))
+            }
+            _ => Ok(None),
+        }
     }
 
     pub async fn eth_balance(&self, address: Address) -> Result<U256, anyhow::Error> {

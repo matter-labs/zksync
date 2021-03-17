@@ -5994,6 +5994,7 @@ name = "zksync_gateway_watcher"
 version = "1.0.0"
 dependencies = [
  "futures 0.3.6",
+ "metrics",
  "thiserror",
  "tokio 0.2.22",
  "vlog",

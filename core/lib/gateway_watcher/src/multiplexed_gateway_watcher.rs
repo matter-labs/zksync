@@ -1,7 +1,7 @@
 use futures::{future::ready, stream, StreamExt};
 use std::cmp::Ordering;
 use std::collections::HashMap;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 use thiserror::Error;
 use tokio::{task::JoinHandle, time};
 use web3::types::{Block, BlockId, BlockNumber, H256, U64};
@@ -114,8 +114,8 @@ impl MultiplexedGatewayWatcher {
         }
     }
 
-    /// Checks multiplexed client gateways and prioritizes one with the longest chain and
-    /// the most frequent hash of its depth.
+    /// Checks multiplexed client gateways and prioritizes one with longest chain,
+    /// most frequent hash and lowest latency.
     async fn check_client_gateways(&self) {
         // Fetch latest block for each client.
         // Each request will resolve to (client key, client latest block) pair.
@@ -123,6 +123,7 @@ impl MultiplexedGatewayWatcher {
             self.client
                 .clients()
                 .map(|(key, client)| async move {
+                    let start = Instant::now();
                     let block_fut = retry_opt! {
                         client
                             .block(BlockId::from(BlockNumber::Latest))
@@ -135,7 +136,10 @@ impl MultiplexedGatewayWatcher {
                     };
 
                     if let Ok(block) = block_fut.await {
-                        Some((key, block))
+                        let req_time = start.elapsed();
+                        metrics::histogram!("eth_client.multiplexed.block", req_time, &[("address", key.to_owned())]);
+
+                        Some((key, block, req_time))
                     } else {
                         vlog::error!(
                             "Failed to get latest block from Ethereum Gateway `{}` within specified timeout",
@@ -155,34 +159,38 @@ impl MultiplexedGatewayWatcher {
             .await;
 
         // Latest hash distribution across all clients.
-        let hash_counts = client_latest_blocks
-            .iter()
-            .fold(HashMap::new(), |mut map, (_, cur)| {
-                map.entry(&cur.hash)
-                    .and_modify(|val| *val += 1)
-                    .or_insert(1);
-                map
-            });
+        let hash_counts =
+            client_latest_blocks
+                .iter()
+                .fold(HashMap::new(), |mut map, (_, cur, _)| {
+                    map.entry(&cur.hash)
+                        .and_modify(|val| *val += 1)
+                        .or_insert(1);
+                    map
+                });
 
-        // Preferred client must have longest chain with the most frequent hash.
+        // Preferred client must have longest chain with most frequent hash and lowest latency.
         let preferred_client =
             client_latest_blocks
                 .iter()
-                .rev()
-                .max_by(
-                    |(_, block1), (_, block2)| match block1.number.cmp(&block2.number) {
-                        Ordering::Equal => hash_counts
+                .max_by(|(_, block1, lat1), (_, block2, lat2)| {
+                    match block1.number.cmp(&block2.number) {
+                        Ordering::Equal => match hash_counts
                             .get(&block1.hash)
-                            .cmp(&hash_counts.get(&block2.hash)),
+                            .cmp(&hash_counts.get(&block2.hash))
+                        {
+                            Ordering::Equal => lat2.cmp(&lat1),
+                            other => other,
+                        },
                         other => other,
-                    },
-                );
+                    }
+                });
 
-        if let Some((preferred_client_key, latest_block)) = preferred_client {
+        if let Some((preferred_client_key, latest_block, _)) = preferred_client {
             if self.client.prioritize_client(preferred_client_key) {
                 vlog::info!("Prioritized Ethereum Gateway: `{}`", preferred_client_key);
             }
-            for (key, block) in &client_latest_blocks {
+            for (key, block, _) in &client_latest_blocks {
                 if let Err(err) = Self::verify_blocks(latest_block, block) {
                     vlog::error!("Ethereum Gateway `{}` - check failed: {}", key, err);
                 }
