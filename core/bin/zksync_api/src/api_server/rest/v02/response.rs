@@ -39,6 +39,7 @@ struct Response {
     result: Option<Value>,
 }
 
+// TODO: remove #[allow(dead_code)] after adding endpoint that can return an error.
 #[allow(dead_code)]
 pub enum ApiResult<R: Serialize, E: error::ApiError = UnreachableError> {
     Ok(R),

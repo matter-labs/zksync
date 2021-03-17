@@ -43,8 +43,12 @@ where
 pub struct UnreachableError;
 
 impl std::fmt::Display for UnreachableError {
-    fn fmt(&self, _f: &mut Formatter<'_>) -> std::fmt::Result {
-        unreachable!()
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "Unreachable error; you should never see this message, \
+            please contact us at https://github.com/matter-labs/zksync with a report"
+        )
     }
 }
 
