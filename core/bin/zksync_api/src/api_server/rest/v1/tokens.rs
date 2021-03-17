@@ -171,7 +171,6 @@ mod tests {
                         let msg = if let Some(price) = prices.get(&token) {
                             Ok(price.clone())
                         } else {
-                            // To provide compatibility with the `token_price_usd` hack.
                             Err(PriceError::token_not_found(format!(
                                 "Token not found: {:?}",
                                 token
