@@ -385,7 +385,7 @@ fn test_zero_price_token_fee() {
     // If token allowed for fee and price is zero, it should return error
     block_on(ticker.get_fee_from_ticker_in_wei(
         TxFeeTypes::Transfer,
-        token.clone().id.into(),
+        token.id.into(),
         Address::default(),
     ))
     .unwrap_err();
