@@ -7,6 +7,10 @@
 //! The format of the logs in stdout can be `plain` or` json` and is set by the `MISC_LOG_FORMAT` env variable.
 //!
 //! Full documentation for the `tracing` crate here https://docs.rs/tracing/
+use std::{borrow::Cow, str::FromStr};
+
+pub use sentry;
+use sentry::{types::Dsn, ClientInitGuard};
 
 pub use tracing as __tracing;
 pub use tracing::{debug, info, log, trace};
@@ -35,7 +39,7 @@ macro_rules! error {
     };
 }
 
-pub fn init() {
+pub fn init() -> Option<ClientInitGuard> {
     let log_format = std::env::var("MISC_LOG_FORMAT").unwrap_or_else(|_| "plain".to_string());
     match log_format.as_str() {
         "plain" => tracing_subscriber::fmt::init(),
@@ -49,4 +53,25 @@ pub fn init() {
         }
         _ => panic!("MISC_LOG_FORMAT has an unexpected value {}", log_format),
     };
+    if let Ok(sentry_url) = std::env::var("MISC_SENTRY_URL") {
+        if let Ok(sentry_url) = Dsn::from_str(sentry_url.as_str()) {
+            return Some(sentry::init((
+                sentry_url,
+                sentry::ClientOptions {
+                    release: sentry::release_name!(),
+                    environment: Some(Cow::from(
+                        std::env::var("CHAIN_ETH_NETWORK").expect("Must be set"),
+                    )),
+                    attach_stacktrace: true,
+                    ..Default::default()
+                },
+            )));
+        }
+    }
+    None
+}
+
+#[cfg(feature = "actix")]
+pub fn actix_middleware() -> sentry_actix::Sentry {
+    sentry_actix::Sentry::new()
 }

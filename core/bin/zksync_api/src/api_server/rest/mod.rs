@@ -48,6 +48,7 @@ async fn start_server(
         };
         App::new()
             .wrap(Cors::new().send_wildcard().max_age(3600).finish())
+            .wrap(vlog::actix_middleware())
             .service(api_v01.into_scope())
             .service(api_v1_scope)
             .service(api_v02_scope)

@@ -25,3 +25,5 @@ established_assets_for_withdrawing_through_zksync="ETH,DAI,USDC"
 
 # Format of logs in stdout could be "plain" for development purposes and "json" for production
 log_format="plain"
+
+sentry_url="unset"
