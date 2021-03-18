@@ -3,7 +3,6 @@ import { solidity } from 'ethereum-waffle';
 import { Signer, utils } from 'ethers';
 import { ForcedExit } from '../../typechain/ForcedExit';
 import { ForcedExitFactory } from '../../typechain/ForcedExitFactory';
-import { SelfDestructFactory } from '../../typechain/SelfDestructFactory';
 
 import * as hardhat from 'hardhat';
 
@@ -25,7 +24,7 @@ describe('ForcedExit unit tests', function () {
 
         const forcedExitContractFactory = await hardhat.ethers.getContractFactory('ForcedExit');
         const contract = await forcedExitContractFactory.deploy(wallet1.getAddress(), wallet2.getAddress());
-        // Connecting the wallet to a potential receiver, who can withdraw the funds 
+        // Connecting the wallet to a potential receiver, who can withdraw the funds
         // on the master's behalf
         forcedExitContract = ForcedExitFactory.connect(contract.address, wallet2);
     });
@@ -46,9 +45,7 @@ describe('ForcedExit unit tests', function () {
         expect(transferTxHandle).to.emit(forcedExitContract, 'FundsReceived').withArgs(TX_AMOUNT);
 
         // Withdrawing the funds from the contract to the wallet4
-        const withdrawTxHandle = await forcedExitContract.withdrawPendingFunds(
-            await wallet4.getAddress()
-        );
+        const withdrawTxHandle = await forcedExitContract.withdrawPendingFunds(await wallet4.getAddress());
 
         // The pending funds have been received
         expect(withdrawTxHandle).to.changeEtherBalance(wallet4, TX_AMOUNT);
