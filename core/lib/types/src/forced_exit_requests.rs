@@ -37,6 +37,7 @@ pub struct SaveForcedExitRequestQuery {
     pub created_at: DateTime<Utc>,
     pub valid_until: DateTime<Utc>,
 }
+
 #[derive(Debug, Clone)]
 pub struct FundsReceivedEvent {
     pub amount: BigUint,

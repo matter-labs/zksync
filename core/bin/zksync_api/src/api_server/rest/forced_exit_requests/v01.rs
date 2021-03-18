@@ -193,6 +193,27 @@ pub async fn get_request_by_id(
     }
 }
 
+// Checks if the account is eligible for forced_exit in terms of
+// existing enough time
+pub async fn check_account(
+    data: web::Data<ApiForcedExitRequestsData>,
+    web::Path(account): web::Path<Address>,
+) -> JsonResult<()> {
+    let mut storage = data
+        .connection_pool
+        .access_storage()
+        .await
+        .map_err(warn_err)
+        .map_err(ApiError::internal)?;
+
+    data.forced_exit_checker
+        .check_forced_exit(&mut storage, account)
+        .await
+        .map_err(ApiError::from)?;
+
+    Ok(Json(()))
+}
+
 pub fn api_scope(
     connection_pool: ConnectionPool,
     config: &ZkSyncConfig,
@@ -209,6 +230,7 @@ pub fn api_scope(
         scope
             .route("/submit", web::post().to(submit_request))
             .route("/requests/{id}", web::get().to(get_request_by_id))
+            .route("/check_account", web::post().to(check_account))
     } else {
         scope
     }
