@@ -230,7 +230,7 @@ pub fn api_scope(
         scope
             .route("/submit", web::post().to(submit_request))
             .route("/requests/{id}", web::get().to(get_request_by_id))
-            .route("/check_account", web::post().to(check_account))
+            .route("/check_account/{account}", web::get().to(check_account))
     } else {
         scope
     }
