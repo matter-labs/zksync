@@ -1,6 +1,7 @@
 //! Block part of API implementation.
 
 // Built-in uses
+use std::str::FromStr;
 
 // External uses
 use actix_web::{web, Scope};
@@ -18,13 +19,13 @@ use crate::utils::block_details_cache::BlockDetailsCache;
 
 /// Shared data between `api/v02/block` endpoints.
 #[derive(Debug, Clone)]
-struct ApiBlocksData {
+struct ApiBlockData {
     pool: ConnectionPool,
     /// Verified blocks cache.
     cache: BlockDetailsCache,
 }
 
-impl ApiBlocksData {
+impl ApiBlockData {
     fn new(pool: ConnectionPool, cache: BlockDetailsCache) -> Self {
         Self { pool, cache }
     }
@@ -93,11 +94,11 @@ pub(super) mod convert {
 // Server implementation
 
 async fn block_by_number(
-    data: web::Data<ApiBlocksData>,
+    data: web::Data<ApiBlockData>,
     web::Path(block_position): web::Path<String>,
 ) -> ApiResult<Option<BlockInfo>, InternalError> {
     // TODO: take block_position as enum
-    let block_number = if let Ok(number) = block_position.parse::<u32>() {
+    let block_number = if let Ok(number) = u32::from_str(&block_position) {
         Ok(BlockNumber(number))
     } else {
         match block_position.as_str() {
@@ -120,7 +121,7 @@ async fn block_by_number(
 }
 
 pub fn api_scope(pool: ConnectionPool, cache: BlockDetailsCache) -> Scope {
-    let data = ApiBlocksData::new(pool, cache);
+    let data = ApiBlockData::new(pool, cache);
 
     web::scope("block")
         .data(data)

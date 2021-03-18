@@ -16,6 +16,7 @@ mod block;
 mod config;
 mod error;
 mod response;
+mod token;
 
 #[derive(Serialize, Clone, Copy)]
 #[serde(rename_all = "snake_case")]
@@ -38,5 +39,11 @@ pub(crate) fn api_scope(tx_sender: TxSender, zk_config: &ZkSyncConfig) -> Scope 
         .service(block::api_scope(
             tx_sender.pool.clone(),
             tx_sender.blocks.clone(),
+        ))
+        .service(token::api_scope(
+            &zk_config,
+            tx_sender.pool.clone(),
+            tx_sender.tokens,
+            tx_sender.ticker_requests,
         ))
 }
