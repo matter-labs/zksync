@@ -34,7 +34,7 @@ export async function withdrawForcedExitFee(ethProvider: ethers.providers.Provid
         return;
     }
 
-    const contractAddress = featureStatus.forced_exit_contract_address;
+    const contractAddress = featureStatus.forcedExitContractAddress;
     const shouldWithdraw = await shouldWithdrawForcedExitFee(ethProvider, contractAddress, gasPrice);
 
     if (!shouldWithdraw) {
@@ -43,11 +43,7 @@ export async function withdrawForcedExitFee(ethProvider: ethers.providers.Provid
     }
 
     const ethWallet = new ethers.Wallet(SENDER_PRIVATE_KEY).connect(ethProvider);
-    const forcedExitContract = new ethers.Contract(
-        featureStatus.forced_exit_contract_address,
-        ForcedExitContractAbi,
-        ethWallet
-    );
+    const forcedExitContract = new ethers.Contract(contractAddress, ForcedExitContractAbi, ethWallet);
 
     try {
         console.log('Withdrawing funds from the forced exit smart contract');
@@ -73,10 +69,10 @@ export async function withdrawForcedExitFee(ethProvider: ethers.providers.Provid
 
 interface StatusResponse {
     status: 'enabled' | 'disabled';
-    request_fee: string;
-    max_tokens_per_request: number;
-    recomended_tx_interval_millis: number;
-    forced_exit_contract_address: string;
+    requestFee: string;
+    maxTokensPerRequest: number;
+    recomendedTxIntervalMillis: number;
+    forcedExitContractAddress: string;
 }
 
 async function getStatus(network: string) {
