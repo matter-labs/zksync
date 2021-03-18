@@ -17,6 +17,7 @@ use crate::rest::v1::ClientResult;
 
 // Data transfer objects.
 #[derive(Serialize, Deserialize, PartialEq, Debug)]
+#[serde(rename_all = "camelCase")]
 pub struct ConfigInfo {
     #[serde(with = "BigUintSerdeAsRadix10Str")]
     pub request_fee: BigUint,
