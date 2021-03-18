@@ -1,12 +1,12 @@
 // Built-in deps
-use std::{env, fmt, time::Instant};
+use std::{fmt, time::Instant};
 // External imports
 use async_trait::async_trait;
 use deadpool::managed::{Manager, PoolConfig, RecycleResult, Timeouts};
 use sqlx::{Connection, Error as SqlxError, PgConnection};
 // Local imports
 // use self::recoverable_connection::RecoverableConnection;
-use crate::StorageProcessor;
+use crate::{get_database_url, StorageProcessor};
 use zksync_utils::parse_env;
 
 pub mod holder;
@@ -61,7 +61,7 @@ impl ConnectionPool {
     /// creates a new `ConnectionPool` object.
     /// pool_max_size - number of connections in pool, if not set env variable "DATABASE_POOL_SIZE" is going to be used.
     pub fn new(pool_max_size: Option<u32>) -> Self {
-        let database_url = Self::get_database_url();
+        let database_url = get_database_url();
         let max_size = pool_max_size.unwrap_or_else(|| parse_env("DATABASE_POOL_SIZE"));
 
         let pool = DbPool::create(database_url, max_size as usize);
@@ -83,10 +83,5 @@ impl ConnectionPool {
         metrics::histogram!("sql.connection_acquire", start.elapsed());
 
         Ok(StorageProcessor::from_pool(connection))
-    }
-
-    /// Obtains the database URL from the environment variable.
-    fn get_database_url() -> String {
-        env::var("DATABASE_URL").expect("DATABASE_URL must be set")
     }
 }
