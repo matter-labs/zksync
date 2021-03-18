@@ -11,10 +11,7 @@ pub mod notification;
 /// A connection to the database that's capable of listening for notifications.
 /// In its current implementation uses PostgreSQL LISTEN/NOTIFY protocol.
 pub struct StorageListener {
-    /// An underlying connection to the database. 
-    // Even though `PgListener` implements `Executor` trait and can be 
-    // used to interact with the storage, it doesn't implement 
-    // `Connection` and isn't able to start and commit database transactions.
+    /// An underlying connection to the database.
     conn: PgListener,
 }
 
@@ -53,7 +50,7 @@ impl StorageListener {
     }
 
     /// Receives the next notification available from any of the subscribed channels.
-    /// Unlike the `recv()`, returns `None` if the connection was aborted. 
+    /// Unlike the `recv()`, returns `None` if the connection was aborted.
     ///
     /// Any notifications received while the connection was lost cannot be recovered.
     pub async fn try_recv(&mut self) -> QueryResult<Option<StorageNotification>> {
@@ -62,5 +59,43 @@ impl StorageListener {
             .try_recv()
             .await?
             .map(|notification| StorageNotification::from(notification)))
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    use crate::get_database_url;
+    use sqlx::{Connection, PgConnection};
+    use tokio::time::{timeout, Duration};
+
+    async fn send_notification(channel: &str, message: &str) -> QueryResult<()> {
+        let database_url = get_database_url();
+        let mut conn = PgConnection::connect(&database_url).await?;
+
+        sqlx::query!("SELECT pg_notify($1, $2)", channel, message)
+            .execute(&mut conn)
+            .await?;
+        Ok(())
+    }
+
+    #[cfg_attr(not(feature = "db_test"), ignore)]
+    #[tokio::test]
+    async fn test_listen_notify() -> anyhow::Result<()> {
+        const CHANNEL: &str = "channel";
+        const MESSAGE: &str = "message";
+        const TIMEOUT_SECS: u64 = 10;
+
+        let mut listener = StorageListener::connect().await?;
+        listener.listen(CHANNEL).await?;
+
+        send_notification(CHANNEL, MESSAGE).await?;
+
+        let recv = listener.recv();
+        // Fail the test if it takes too much time.
+        let notification = timeout(Duration::from_secs(TIMEOUT_SECS), recv).await??;
+        let message = notification.payload();
+        assert_eq!(&message, MESSAGE);
+        Ok(())
     }
 }
