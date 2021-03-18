@@ -31,10 +31,10 @@ declare module './tester' {
 
 interface StatusResponse {
     status: 'enabled' | 'disabled';
-    request_fee: string;
-    max_tokens_per_request: number;
-    recomended_tx_interval_millis: number;
-    forced_exit_contract_address: Address;
+    requestFee: string;
+    maxTokensPerRequest: number;
+    recomendedTxIntervalMillis: number;
+    forcedExitContractAddress: Address;
 }
 
 Tester.prototype.testForcedExitRequestMultipleTokens = async function (
@@ -72,10 +72,10 @@ Tester.prototype.testForcedExitRequestMultipleTokens = async function (
 
     const tokenIds = tokens.map((token) => this.syncProvider.tokenSet.resolveTokenId(token));
 
-    const requestPrice = BigNumber.from(status.request_fee).mul(tokens.length);
+    const requestPrice = BigNumber.from(status.requestFee).mul(tokens.length);
     const request = await submitRequest(to, tokenIds, requestPrice.toString());
 
-    const contractAddress = status.forced_exit_contract_address;
+    const contractAddress = status.forcedExitContractAddress;
 
     const amountToPay = requestPrice.add(BigNumber.from(request.id));
 

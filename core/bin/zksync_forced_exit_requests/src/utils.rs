@@ -5,7 +5,7 @@ use num::FromPrimitive;
 use zksync_crypto::ff::PrimeField;
 pub use zksync_crypto::franklin_crypto::{eddsa::PrivateKey, jubjub::JubjubEngine};
 
-pub use franklin_crypto::{
+pub use zksync_crypto::franklin_crypto::{
     alt_babyjubjub::fs::FsRepr,
     bellman::{pairing::bn256, PrimeFieldRepr},
 };

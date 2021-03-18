@@ -14,7 +14,6 @@ declare module './tester' {
         testMultipleBatchSigners(wallets: Wallet[], token: TokenLike, amount: BigNumber): Promise<void>;
         testMultipleWalletsWrongSignature(from: Wallet, to: Wallet, token: TokenLike, amount: BigNumber): Promise<void>;
         testBackwardCompatibleEthMessages(from: Wallet, to: Wallet, token: TokenLike, amount: BigNumber): Promise<void>;
-        testForcedExitRequests(from: Wallet, to: Wallet, token: TokenLike, amount: BigNumber): Promise<void>;
     }
 }
 
@@ -237,5 +236,3 @@ Tester.prototype.testBackwardCompatibleEthMessages = async function (
     await Promise.all(handles.map((handle) => handle.awaitReceipt()));
     this.runningFee = this.runningFee.add(totalFee);
 };
-
-Tester.prototype.testForcedExitRequests = async function () {};

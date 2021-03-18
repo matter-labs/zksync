@@ -23,8 +23,6 @@ zksync_test_account = { path = "../../tests/test_account", version = "1.0" }
 
 vlog = { path = "../../lib/vlog", version = "1.0" }
 
-franklin_crypto = { package = "franklin-crypto", version = "0.0.5", git = "https://github.com/matter-labs/franklin-crypto.git", branch="beta", features = ["multicore", "plonk"]}
-
 zksync_core = { path = "../zksync_core", version = "1.0" }
 zksync_api = { path = "../zksync_api", version = "1.0" }
 actix-web = "3.0.0"
