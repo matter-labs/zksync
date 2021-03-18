@@ -71,6 +71,10 @@ impl TestToken {
         Self::new(TokenId(3), 173_134.192_3, Some(0.9), 18)
     }
 
+    fn zero_price() -> Self {
+        Self::new(TokenId(4), 0.0, Some(0.9), 18)
+    }
+
     fn subsidized_tokens() -> Vec<Self> {
         vec![Self::eth(), Self::cheap(), Self::expensive()]
     }
@@ -121,6 +125,15 @@ impl FeeTickerAPI for MockApiProvider {
                 return Ok(token_price);
             }
         }
+        //Temporary for zero-price token
+        let zero_price_token = TestToken::zero_price();
+        if TokenLike::Id(zero_price_token.id) == token {
+            let token_price = TokenPrice {
+                usd_price: zero_price_token.price_usd,
+                last_updated: Utc::now(),
+            };
+            return Ok(token_price);
+        }
         unreachable!("incorrect token input")
     }
 
@@ -149,6 +162,16 @@ impl FeeTickerAPI for MockApiProvider {
                     test_token.precision,
                 ));
             }
+        }
+        //Temporary for zero-price token
+        let zero_price_token = TestToken::zero_price();
+        if TokenLike::Id(zero_price_token.id) == token {
+            return Ok(Token::new(
+                zero_price_token.id,
+                Address::default(),
+                "",
+                zero_price_token.precision,
+            ));
         }
         unreachable!("incorrect token input")
     }
@@ -335,6 +358,43 @@ fn test_ticker_formula() {
             "Fast withdraw fee must be greater than usual withdraw fee"
         );
     }
+}
+
+// It's temporary solution while zero-price tokens marked as allowed for fee
+#[test]
+fn test_zero_price_token_fee() {
+    let validator = FeeTokenValidator::new(
+        TokenInMemoryCache::new(),
+        chrono::Duration::seconds(100),
+        BigDecimal::from(100),
+        Default::default(),
+        FakeTokenWatcher,
+    );
+
+    let config = get_test_ticker_config();
+    let mut ticker = FeeTicker::new(
+        MockApiProvider,
+        MockTickerInfo,
+        mpsc::channel(1).1,
+        config,
+        validator,
+    );
+
+    let token = TestToken::zero_price();
+
+    // If token allowed for fee and price is zero, it should return error
+    block_on(ticker.get_fee_from_ticker_in_wei(
+        TxFeeTypes::Transfer,
+        token.clone().id.into(),
+        Address::default(),
+    ))
+    .unwrap_err();
+
+    block_on(ticker.get_batch_from_ticker_in_wei(
+        token.id.into(),
+        vec![(TxFeeTypes::Transfer, Address::default())],
+    ))
+    .unwrap_err();
 }
 
 #[actix_rt::test]
