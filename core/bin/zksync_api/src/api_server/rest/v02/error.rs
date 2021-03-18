@@ -1,11 +1,13 @@
 use serde::export::Formatter;
 use serde::Serialize;
 use serde_repr::Serialize_repr;
+use std::fmt::Display;
 
 #[derive(Serialize_repr)]
-#[repr(u8)]
+#[repr(u16)]
 pub enum ErrorCode {
     Unreacheable = 0,
+    Internal = 500,
 }
 
 /// Error object in a response
@@ -42,7 +44,7 @@ where
 
 pub struct UnreachableError;
 
-impl std::fmt::Display for UnreachableError {
+impl Display for UnreachableError {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
@@ -59,5 +61,31 @@ impl ApiError for UnreachableError {
 
     fn code(&self) -> ErrorCode {
         ErrorCode::Unreacheable
+    }
+}
+
+pub struct InternalError(String);
+
+impl InternalError {
+    pub fn new(title: impl Display) -> Self {
+        Self {
+            0: title.to_string(),
+        }
+    }
+}
+
+impl Display for InternalError {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+
+impl ApiError for InternalError {
+    fn error_type(&self) -> String {
+        String::from("Internal Server Error")
+    }
+
+    fn code(&self) -> ErrorCode {
+        ErrorCode::Internal
     }
 }

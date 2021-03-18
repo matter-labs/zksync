@@ -6,11 +6,14 @@ use qstring::QString;
 use serde::Serialize;
 use serde_json::Value;
 use std::collections::HashMap;
+use std::convert::From;
 
 use zksync_types::network::Network;
 
-use crate::api_server::rest::v02::error::UnreachableError;
-use crate::api_server::rest::v02::{error, ApiVersion, SharedData};
+use crate::api_server::rest::v02::{
+    error::{self, ApiError, UnreachableError},
+    ApiVersion, SharedData,
+};
 
 #[derive(Serialize)]
 #[serde(rename_all = "snake_case")]
@@ -41,12 +44,12 @@ struct Response {
 
 // TODO: remove #[allow(dead_code)] after adding endpoint that can return an error. (ZKS-572)
 #[allow(dead_code)]
-pub enum ApiResult<R: Serialize, E: error::ApiError = UnreachableError> {
+pub enum ApiResult<R: Serialize, E: ApiError = UnreachableError> {
     Ok(R),
     Error(E),
 }
 
-impl<R: Serialize, E: error::ApiError> Responder for ApiResult<R, E> {
+impl<R: Serialize, E: ApiError> Responder for ApiResult<R, E> {
     type Error = Error;
     type Future = Ready<Result<HttpResponse, Error>>;
 
@@ -97,5 +100,20 @@ impl<R: Serialize, E: error::ApiError> Responder for ApiResult<R, E> {
 impl<R: Serialize> From<R> for ApiResult<R, UnreachableError> {
     fn from(res: R) -> Self {
         Self::Ok(res)
+    }
+}
+
+impl<R: Serialize, E: ApiError> From<E> for ApiResult<R, E> {
+    fn from(err: E) -> Self {
+        Self::Error(err)
+    }
+}
+
+impl<R: Serialize, E: ApiError> From<Result<R, E>> for ApiResult<R, E> {
+    fn from(result: Result<R, E>) -> Self {
+        match result {
+            Ok(ok) => Self::Ok(ok),
+            Err(err) => Self::Error(err),
+        }
     }
 }

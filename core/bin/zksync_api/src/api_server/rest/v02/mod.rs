@@ -12,6 +12,7 @@ use zksync_types::network::Network;
 // Local uses
 use crate::api_server::tx_sender::TxSender;
 
+mod block;
 mod config;
 mod error;
 mod response;
@@ -27,11 +28,15 @@ pub struct SharedData {
     pub api_version: ApiVersion,
 }
 
-pub(crate) fn api_scope(_tx_sender: TxSender, zk_config: &ZkSyncConfig) -> Scope {
+pub(crate) fn api_scope(tx_sender: TxSender, zk_config: &ZkSyncConfig) -> Scope {
     web::scope("/api/v0.2")
         .data(SharedData {
             net: zk_config.chain.eth.network,
             api_version: ApiVersion::V02,
         })
         .service(config::api_scope(&zk_config))
+        .service(block::api_scope(
+            tx_sender.pool.clone(),
+            tx_sender.blocks.clone(),
+        ))
 }
