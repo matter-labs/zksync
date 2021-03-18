@@ -42,7 +42,6 @@ impl<T: CoreInteractionWrapper + Sync + Send> ForcedExitSender for MempoolForced
         // In case something bad happens we do not want the server crush because
         // of the forced_exit_requests component
         loop {
-            dbg!("try processing 1");
             let processing_attempt = self
                 .try_process_request(amount.clone(), submission_time)
                 .await;
@@ -193,7 +192,7 @@ impl<T: CoreInteractionWrapper> MempoolForcedExitSender<T> {
     pub async fn wait_until_comitted(&self, tx_hash: TxHash) -> anyhow::Result<()> {
         let timeout_millis: u64 = 120000;
         let poll_interval_millis: u64 = 200;
-        let poll_interval = time::Duration::from_secs(poll_interval_millis);
+        let poll_interval = time::Duration::from_millis(poll_interval_millis);
         let mut timer = time::interval(poll_interval);
 
         let mut time_passed: u64 = 0;
