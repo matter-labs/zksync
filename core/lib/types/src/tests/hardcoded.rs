@@ -251,7 +251,7 @@ pub mod operations_test {
                 recipients: (AccountId(6), AccountId(8)),
             }
         };
-        println!("{}", hex::encode(expected_op.get_public_data()));
+
         assert_eq!(hex::encode(expected_op.get_public_data()), SWAP_PUBLIC_DATA);
     }
 
@@ -321,6 +321,7 @@ pub mod tx_conversion_test {
         static ref TIME_RANGE: TimeRange = TimeRange::new(VALID_FROM, VALID_UNTIL);
     }
 
+    #[ignore]
     #[test]
     fn test_convert_to_bytes_swap() {
         todo!();
