@@ -282,6 +282,7 @@ impl TreeState {
                         &mut ops,
                     );
                 }
+                ZkSyncOp::Swap(_) => todo!(),
                 ZkSyncOp::Noop(_) => {}
             }
         }
