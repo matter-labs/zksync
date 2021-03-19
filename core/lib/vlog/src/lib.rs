@@ -55,7 +55,7 @@ fn get_sentry_url() -> Option<Dsn> {
 
 /// Initialize logging with tracing and set up log format
 ///
-/// If sentry URL is provided initialize sentry
+/// If the sentry URL is provided via an environment variable, this function will also initialize sentry.
 /// Returns a sentry client guard. The full description can be found in the official documentation:
 /// https://docs.sentry.io/platforms/rust/#configure
 pub fn init() -> Option<ClientInitGuard> {
