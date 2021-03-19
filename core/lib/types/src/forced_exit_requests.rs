@@ -37,10 +37,16 @@ pub struct SaveForcedExitRequestQuery {
     pub created_at: DateTime<Utc>,
     pub valid_until: DateTime<Utc>,
 }
+
 #[derive(Debug, Clone)]
 pub struct FundsReceivedEvent {
     pub amount: BigUint,
     pub block_number: u64,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct ForcedExitEligibilityResponse {
+    pub eligible: bool,
 }
 
 impl TryFrom<Log> for FundsReceivedEvent {

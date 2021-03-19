@@ -25,7 +25,10 @@ use zksync_api_client::rest::forced_exit_requests::ConfigInfo;
 use zksync_config::ZkSyncConfig;
 use zksync_storage::ConnectionPool;
 use zksync_types::{
-    forced_exit_requests::{ForcedExitRequest, ForcedExitRequestId, SaveForcedExitRequestQuery},
+    forced_exit_requests::{
+        ForcedExitEligibilityResponse, ForcedExitRequest, ForcedExitRequestId,
+        SaveForcedExitRequestQuery,
+    },
     Address, TokenLike,
 };
 
@@ -109,7 +112,7 @@ pub async fn submit_request(
     }
 
     data.forced_exit_checker
-        .check_forced_exit(&mut storage, params.target)
+        .validate_forced_exit(&mut storage, params.target)
         .await
         .map_err(ApiError::from)?;
 
@@ -193,6 +196,30 @@ pub async fn get_request_by_id(
     }
 }
 
+// Checks if the account is eligible for forced_exit in terms of
+// existing enough time
+pub async fn check_account_eligibility(
+    data: web::Data<ApiForcedExitRequestsData>,
+    web::Path(account): web::Path<Address>,
+) -> JsonResult<ForcedExitEligibilityResponse> {
+    let mut storage = data
+        .connection_pool
+        .access_storage()
+        .await
+        .map_err(warn_err)
+        .map_err(ApiError::internal)?;
+
+    let eligible = data
+        .forced_exit_checker
+        .check_forced_exit(&mut storage, account)
+        .await
+        .map_err(ApiError::from)?;
+
+    let result = ForcedExitEligibilityResponse { eligible };
+
+    Ok(Json(result))
+}
+
 pub fn api_scope(
     connection_pool: ConnectionPool,
     config: &ZkSyncConfig,
@@ -209,6 +236,10 @@ pub fn api_scope(
         scope
             .route("/submit", web::post().to(submit_request))
             .route("/requests/{id}", web::get().to(get_request_by_id))
+            .route(
+                "/checks/eligibility/{account}",
+                web::get().to(check_account_eligibility),
+            )
     } else {
         scope
     }
