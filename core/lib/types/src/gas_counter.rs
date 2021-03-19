@@ -226,9 +226,9 @@ impl GasCounter {
         Self::scale_up(approx_limit)
     }
 
-    /// Increases the value by 35%.
+    /// Increases the value by 30%.
     fn scale_up(value: U256) -> U256 {
-        value * U256::from(135) / U256::from(100)
+        value * U256::from(130) / U256::from(100)
     }
 }
 
