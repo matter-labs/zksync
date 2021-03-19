@@ -29,10 +29,17 @@ struct TestToken {
     price_usd: Ratio<BigUint>,
     risk_factor: Option<Ratio<BigUint>>,
     precision: u8,
+    address: Address,
 }
 
 impl TestToken {
-    fn new(id: TokenId, price_usd: f64, risk_factor: Option<f64>, precision: u8) -> Self {
+    fn new(
+        id: TokenId,
+        price_usd: f64,
+        risk_factor: Option<f64>,
+        precision: u8,
+        address: Address,
+    ) -> Self {
         Self {
             id,
             price_usd: UnsignedRatioSerializeAsDecimal::deserialize_from_str_with_dot(
@@ -46,6 +53,7 @@ impl TestToken {
                 .unwrap()
             }),
             precision,
+            address,
         }
     }
 
@@ -56,23 +64,35 @@ impl TestToken {
     }
 
     fn eth() -> Self {
-        Self::new(TokenId(0), 182.0, None, 18)
+        Self::new(TokenId(0), 182.0, None, 18, Address::default())
     }
 
     fn hex() -> Self {
-        Self::new(TokenId(1), 1.0, Some(2.5), 6)
+        Self::new(
+            TokenId(1),
+            1.0,
+            Some(2.5),
+            6,
+            Address::from_str("34083bbd70d394110487feaa087da875a54624ec").unwrap(),
+        )
     }
 
     fn cheap() -> Self {
-        Self::new(TokenId(2), 1.0, Some(2.5), 6)
+        Self::new(TokenId(2), 1.0, Some(2.5), 6, Address::default())
     }
 
     fn expensive() -> Self {
-        Self::new(TokenId(3), 173_134.192_3, Some(0.9), 18)
+        Self::new(TokenId(3), 173_134.192_3, Some(0.9), 18, Address::default())
     }
 
     fn zero_price() -> Self {
-        Self::new(TokenId(4), 0.0, Some(0.9), 18)
+        Self::new(
+            TokenId(4),
+            0.0,
+            Some(0.9),
+            18,
+            Address::from_str("34083bbd70d394110487feaa087da875a54624ec").unwrap(),
+        )
     }
 
     fn subsidized_tokens() -> Vec<Self> {
@@ -80,7 +100,7 @@ impl TestToken {
     }
 
     fn unsubsidized_tokens() -> Vec<Self> {
-        vec![Self::hex()]
+        vec![Self::hex(), Self::zero_price()]
     }
 
     fn all_tokens() -> Vec<Self> {
@@ -125,15 +145,6 @@ impl FeeTickerAPI for MockApiProvider {
                 return Ok(token_price);
             }
         }
-        //Temporary for zero-price token
-        let zero_price_token = TestToken::zero_price();
-        if TokenLike::Id(zero_price_token.id) == token {
-            let token_price = TokenPrice {
-                usd_price: zero_price_token.price_usd,
-                last_updated: Utc::now(),
-            };
-            return Ok(token_price);
-        }
         unreachable!("incorrect token input")
     }
 
@@ -143,35 +154,15 @@ impl FeeTickerAPI for MockApiProvider {
     }
 
     async fn get_token(&self, token: TokenLike) -> Result<Token, anyhow::Error> {
-        for test_token in TestToken::subsidized_tokens() {
+        for test_token in TestToken::all_tokens() {
             if TokenLike::Id(test_token.id) == token {
                 return Ok(Token::new(
                     test_token.id,
-                    Address::default(),
+                    test_token.address,
                     "",
                     test_token.precision,
                 ));
             }
-        }
-        for test_token in TestToken::unsubsidized_tokens() {
-            if TokenLike::Id(test_token.id) == token {
-                return Ok(Token::new(
-                    test_token.id,
-                    Address::from_str("34083bbd70d394110487feaa087da875a54624ec").unwrap(),
-                    "",
-                    test_token.precision,
-                ));
-            }
-        }
-        //Temporary for zero-price token
-        let zero_price_token = TestToken::zero_price();
-        if TokenLike::Id(zero_price_token.id) == token {
-            return Ok(Token::new(
-                zero_price_token.id,
-                Address::default(),
-                "",
-                zero_price_token.precision,
-            ));
         }
         unreachable!("incorrect token input")
     }
