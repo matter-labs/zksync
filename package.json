@@ -7,13 +7,9 @@
     "packages": [
       "sdk/zksync.js",
       "contracts",
-      "infrastructure/analytics",
-      "infrastructure/fee-seller",
-      "infrastructure/sdk-test-vector-generator",
       "infrastructure/zcli",
       "infrastructure/explorer",
       "infrastructure/zk",
-      "infrastructure/eth_transfer",
       "infrastructure/reading-tool",
       "core/tests/ts-tests"
     ],
@@ -29,8 +25,6 @@
   "scripts": {
     "zksync": "yarn workspace zksync",
     "contracts": "yarn workspace franklin-contracts",
-    "analytics": "yarn workspace analytics",
-    "fee-seller": "yarn workspace fee-seller",
     "zcli": "yarn workspace zcli",
     "ts-tests": "yarn workspace ts-tests",
     "explorer": "yarn workspace sync-explorer",
