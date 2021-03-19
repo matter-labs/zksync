@@ -1,13 +1,19 @@
 //! Tokens part of API implementation.
 
 // Built-in uses
+use std::str::FromStr;
 
 // External uses
 use actix_web::{
     web::{self},
     Scope,
 };
-use futures::channel::mpsc;
+use bigdecimal::{BigDecimal, Zero};
+use futures::{
+    channel::{mpsc, oneshot},
+    prelude::*,
+};
+
 use num::{rational::Ratio, BigUint, FromPrimitive};
 use serde::{Deserialize, Serialize};
 
@@ -16,10 +22,12 @@ use zksync_config::ZkSyncConfig;
 use zksync_storage::{ConnectionPool, QueryResult};
 use zksync_types::{Address, TokenId, TokenLike};
 
-use crate::{fee_ticker::TickerRequest, utils::token_db_cache::TokenDBCache};
-
 // Local uses
 use super::{error::InternalError, response::ApiResult};
+use crate::{
+    fee_ticker::{PriceError, TickerRequest, TokenPriceRequestType},
+    utils::token_db_cache::TokenDBCache,
+};
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 struct ApiToken {
@@ -81,6 +89,25 @@ impl ApiTokenData {
             Ok(None)
         }
     }
+
+    async fn token_price_usd(&self, token: TokenLike) -> QueryResult<Option<BigDecimal>> {
+        let (price_sender, price_receiver) = oneshot::channel();
+        self.fee_ticker
+            .clone()
+            .send(TickerRequest::GetTokenPrice {
+                token,
+                response: price_sender,
+                req_type: TokenPriceRequestType::USDForOneToken,
+            })
+            .await?;
+
+        match price_receiver.await? {
+            Ok(price) => Ok(Some(price)),
+            Err(PriceError::TokenNotFound(_)) => Ok(None),
+            Err(PriceError::DBError(err)) => Err(anyhow::format_err!(err)),
+            Err(PriceError::ApiError(err)) => Err(anyhow::format_err!(err)),
+        }
+    }
 }
 
 // Server implementation
@@ -89,12 +116,59 @@ async fn token_by_id(
     data: web::Data<ApiTokenData>,
     web::Path(token_like): web::Path<String>,
 ) -> ApiResult<Option<ApiToken>, InternalError> {
-    let token_like = TokenLike::parse(&token_like);
+    let token_result = TokenLike::parse_without_symbol(&token_like);
+    let token_like;
+    if let Err(err) = token_result {
+        return InternalError::new(err).into();
+    } else {
+        token_like = token_result.unwrap();
+    }
 
     data.token(token_like)
         .await
         .map_err(InternalError::new)
         .into()
+}
+
+async fn token_price(
+    data: web::Data<ApiTokenData>,
+    web::Path((token_like, currency)): web::Path<(String, String)>,
+) -> ApiResult<Option<BigDecimal>, InternalError> {
+    let token_result = TokenLike::parse_without_symbol(&token_like);
+    let first_token;
+    if let Err(err) = token_result {
+        return InternalError::new(err).into();
+    } else {
+        first_token = token_result.unwrap();
+    }
+
+    if let Ok(second_token_id) = u16::from_str(&currency) {
+        let second_token = TokenLike::from(TokenId(second_token_id));
+        let first_usd_price = data.token_price_usd(first_token).await;
+        let second_usd_price = data.token_price_usd(second_token).await;
+        if first_usd_price.is_ok() && second_usd_price.is_ok() {
+            match (first_usd_price.unwrap(), second_usd_price.unwrap()) {
+                (None, _) => Ok(None).into(),
+                (_, None) => Ok(None).into(),
+                (Some(first_usd_price), Some(second_usd_price)) => {
+                    if second_usd_price.is_zero() {
+                        InternalError::new("Price of token in which the price is indicated is zero")
+                            .into()
+                    } else {
+                        Ok(Some(first_usd_price / second_usd_price)).into()
+                    }
+                }
+            }
+        } else {
+            InternalError::new("Error getting token usd price").into()
+        }
+    } else {
+        let usd_price = match currency.as_str() {
+            "usd" => data.token_price_usd(first_token).await,
+            _ => Err(anyhow::anyhow!("There are only {token_id} and usd options")),
+        };
+        usd_price.map_err(InternalError::new).into()
+    }
 }
 
 pub fn api_scope(
@@ -108,4 +182,5 @@ pub fn api_scope(
     web::scope("token")
         .data(data)
         .route("{token_id}", web::get().to(token_by_id))
+        .route("{token_id}/price_in/{currency}", web::get().to(token_price))
 }

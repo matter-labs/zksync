@@ -105,7 +105,7 @@ async fn block_by_number(
             "last_committed" => data.get_last_committed_block_number().await,
             "last_finalized" => data.get_last_finalized_block_number().await,
             _ => Err(anyhow::anyhow!(
-                "There are only last_committed and last_finalized options"
+                "There are only {block_number}, last_committed, last_finalized options"
             )),
         }
     };
