@@ -12,6 +12,7 @@ mod deposit_op;
 mod forced_exit;
 mod full_exit_op;
 mod noop_op;
+mod swap_op;
 mod transfer_op;
 mod transfer_to_new_op;
 mod withdraw_op;
@@ -20,7 +21,7 @@ mod withdraw_op;
 pub use self::close_op::CloseOp;
 pub use self::{
     change_pubkey_op::ChangePubKeyOp, deposit_op::DepositOp, forced_exit::ForcedExitOp,
-    full_exit_op::FullExitOp, noop_op::NoopOp, transfer_op::TransferOp,
+    full_exit_op::FullExitOp, noop_op::NoopOp, swap_op::SwapOp, transfer_op::TransferOp,
     transfer_to_new_op::TransferToNewOp, withdraw_op::WithdrawOp,
 };
 use zksync_basic_types::AccountId;
@@ -43,6 +44,7 @@ pub enum ZkSyncOp {
     ForcedExit(Box<ForcedExitOp>),
     /// `NoOp` operation cannot be directly created, but it's used to fill the block capacity.
     Noop(NoopOp),
+    Swap(Box<SwapOp>),
 }
 
 impl ZkSyncOp {
@@ -58,6 +60,7 @@ impl ZkSyncOp {
             ZkSyncOp::FullExit(_) => FullExitOp::CHUNKS,
             ZkSyncOp::ChangePubKeyOffchain(_) => ChangePubKeyOp::CHUNKS,
             ZkSyncOp::ForcedExit(_) => ForcedExitOp::CHUNKS,
+            ZkSyncOp::Swap(_) => SwapOp::CHUNKS,
         }
     }
 
@@ -73,6 +76,7 @@ impl ZkSyncOp {
             ZkSyncOp::FullExit(op) => op.get_public_data(),
             ZkSyncOp::ChangePubKeyOffchain(op) => op.get_public_data(),
             ZkSyncOp::ForcedExit(op) => op.get_public_data(),
+            ZkSyncOp::Swap(op) => op.get_public_data(),
         }
     }
 
@@ -134,6 +138,7 @@ impl ZkSyncOp {
             ForcedExitOp::OP_CODE => Ok(ZkSyncOp::ForcedExit(Box::new(
                 ForcedExitOp::from_public_data(&bytes)?,
             ))),
+            SwapOp::OP_CODE => Ok(ZkSyncOp::Swap(Box::new(SwapOp::from_public_data(&bytes)?))),
             _ => Err(format_err!("Wrong operation type: {}", &op_type)),
         }
     }
@@ -150,6 +155,7 @@ impl ZkSyncOp {
             FullExitOp::OP_CODE => Ok(FullExitOp::CHUNKS),
             ChangePubKeyOp::OP_CODE => Ok(ChangePubKeyOp::CHUNKS),
             ForcedExitOp::OP_CODE => Ok(ForcedExitOp::CHUNKS),
+            SwapOp::OP_CODE => Ok(SwapOp::CHUNKS),
             _ => Err(format_err!("Wrong operation type: {}", &op_type)),
         }
         .map(|chunks| chunks * CHUNK_BYTES)
@@ -166,6 +172,7 @@ impl ZkSyncOp {
                 Ok(ZkSyncTx::ChangePubKey(Box::new(op.tx.clone())))
             }
             ZkSyncOp::ForcedExit(op) => Ok(ZkSyncTx::ForcedExit(Box::new(op.tx.clone()))),
+            ZkSyncOp::Swap(op) => Ok(ZkSyncTx::Swap(Box::new(op.tx.clone()))),
             _ => Err(format_err!("Wrong tx type")),
         }
     }
@@ -191,6 +198,7 @@ impl ZkSyncOp {
             ZkSyncOp::FullExit(op) => op.get_updated_account_ids(),
             ZkSyncOp::ChangePubKeyOffchain(op) => op.get_updated_account_ids(),
             ZkSyncOp::ForcedExit(op) => op.get_updated_account_ids(),
+            ZkSyncOp::Swap(op) => op.get_updated_account_ids(),
         }
     }
 
@@ -268,5 +276,11 @@ impl From<ChangePubKeyOp> for ZkSyncOp {
 impl From<ForcedExitOp> for ZkSyncOp {
     fn from(op: ForcedExitOp) -> Self {
         Self::ForcedExit(Box::new(op))
+    }
+}
+
+impl From<SwapOp> for ZkSyncOp {
+    fn from(op: SwapOp) -> Self {
+        Self::Swap(Box::new(op))
     }
 }
