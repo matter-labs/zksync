@@ -165,6 +165,8 @@ pub enum TxFeeTypes {
     Transfer,
     /// Fee for the `ChangePubKey` operation.
     ChangePubKey(ChangePubKeyFeeTypeArg),
+    /// Fee for the `Swap` operation
+    Swap,
 }
 
 #[cfg(test)]

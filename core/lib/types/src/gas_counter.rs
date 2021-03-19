@@ -34,6 +34,7 @@ impl CommitCost {
     pub const FULL_EXIT_COST: u64 = 7_000;
     pub const WITHDRAW_COST: u64 = 3_500;
     pub const FORCED_EXIT_COST: u64 = Self::WITHDRAW_COST; // TODO: Verify value (ZKS-109).
+    pub const SWAP_COST: u64 = 800; // TODO verify value
 
     pub fn base_cost() -> U256 {
         U256::from(Self::BASE_COST)
@@ -67,6 +68,7 @@ impl CommitCost {
             ZkSyncOp::FullExit(_) => Self::FULL_EXIT_COST,
             ZkSyncOp::Withdraw(_) => Self::WITHDRAW_COST,
             ZkSyncOp::ForcedExit(_) => Self::FORCED_EXIT_COST,
+            ZkSyncOp::Swap(_) => Self::SWAP_COST,
             ZkSyncOp::Close(_) => unreachable!("Close operations are disabled"),
         };
 
@@ -89,6 +91,7 @@ impl VerifyCost {
     pub const CHANGE_PUBKEY_COST: u64 = 0;
     pub const TRANSFER_COST: u64 = 0;
     pub const TRANSFER_TO_NEW_COST: u64 = 0;
+    pub const SWAP_COST: u64 = 0;
     pub const FULL_EXIT_COST: u64 = 30_000;
     pub const WITHDRAW_COST: u64 = 48_000;
     pub const FORCED_EXIT_COST: u64 = Self::WITHDRAW_COST; // TODO: Verify value (ZKS-109).
@@ -107,6 +110,7 @@ impl VerifyCost {
             ZkSyncOp::FullExit(_) => Self::FULL_EXIT_COST,
             ZkSyncOp::Withdraw(_) => Self::WITHDRAW_COST,
             ZkSyncOp::ForcedExit(_) => Self::FORCED_EXIT_COST,
+            ZkSyncOp::Swap(_) => Self::SWAP_COST,
             ZkSyncOp::Close(_) => unreachable!("Close operations are disabled"),
         };
 
