@@ -491,7 +491,7 @@ impl TxSender {
             .map_err(SubmitError::internal)?;
 
         self.forced_exit_checker
-            .check_forced_exit(&mut storage, forced_exit.target)
+            .validate_forced_exit(&mut storage, forced_exit.target)
             .await
     }
 

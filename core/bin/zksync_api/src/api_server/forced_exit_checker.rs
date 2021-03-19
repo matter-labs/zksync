@@ -13,6 +13,12 @@ pub trait ForcedExitAccountAgeChecker {
         &self,
         storage: &mut StorageProcessor<'a>,
         target_account_address: Address,
+    ) -> Result<bool, SubmitError>;
+
+    async fn validate_forced_exit<'a>(
+        &self,
+        storage: &mut StorageProcessor<'a>,
+        target_account_address: Address,
     ) -> Result<(), SubmitError>;
 }
 
@@ -40,7 +46,7 @@ impl ForcedExitAccountAgeChecker for ForcedExitChecker {
         &self,
         storage: &mut StorageProcessor<'a>,
         target_account_address: Address,
-    ) -> Result<(), SubmitError> {
+    ) -> Result<bool, SubmitError> {
         let account_age = storage
             .chain()
             .operations_ext_schema()
@@ -49,17 +55,31 @@ impl ForcedExitAccountAgeChecker for ForcedExitChecker {
             .map_err(|err| internal_error!(err, target_account_address))?;
 
         match account_age {
-            Some(age) if Utc::now() - age < self.forced_exit_minimum_account_age => {
-                let msg = format!(
-                    "Target account exists less than required minimum amount ({} hours)",
-                    self.forced_exit_minimum_account_age.num_hours()
-                );
-
-                Err(SubmitError::InvalidParams(msg))
-            }
+            Some(age) if Utc::now() - age < self.forced_exit_minimum_account_age => Ok(false),
             None => Err(SubmitError::invalid_params("Target account does not exist")),
 
-            Some(..) => Ok(()),
+            Some(..) => Ok(true),
+        }
+    }
+
+    async fn validate_forced_exit<'a>(
+        &self,
+        storage: &mut StorageProcessor<'a>,
+        target_account_address: Address,
+    ) -> Result<(), SubmitError> {
+        let result = self
+            .check_forced_exit(storage, target_account_address)
+            .await?;
+
+        if result {
+            Ok(())
+        } else {
+            let msg = format!(
+                "Target account exists less than required minimum amount ({} hours)",
+                self.forced_exit_minimum_account_age.num_hours()
+            );
+
+            Err(SubmitError::InvalidParams(msg))
         }
     }
 }
@@ -69,6 +89,14 @@ pub struct DummyForcedExitChecker;
 #[async_trait::async_trait]
 impl ForcedExitAccountAgeChecker for DummyForcedExitChecker {
     async fn check_forced_exit<'a>(
+        &self,
+        _storage: &mut StorageProcessor<'a>,
+        _target_account_address: Address,
+    ) -> Result<bool, SubmitError> {
+        Ok(true)
+    }
+
+    async fn validate_forced_exit<'a>(
         &self,
         _storage: &mut StorageProcessor<'a>,
         _target_account_address: Address,

@@ -44,6 +44,11 @@ pub struct FundsReceivedEvent {
     pub block_number: u64,
 }
 
+#[derive(Serialize, Deserialize)]
+pub struct ForcedExitEligibilityResponse {
+    pub eligible: bool,
+}
+
 impl TryFrom<Log> for FundsReceivedEvent {
     type Error = anyhow::Error;
 

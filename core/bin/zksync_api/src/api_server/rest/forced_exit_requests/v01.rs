@@ -25,7 +25,10 @@ use zksync_api_client::rest::forced_exit_requests::ConfigInfo;
 use zksync_config::ZkSyncConfig;
 use zksync_storage::ConnectionPool;
 use zksync_types::{
-    forced_exit_requests::{ForcedExitRequest, ForcedExitRequestId, SaveForcedExitRequestQuery},
+    forced_exit_requests::{
+        ForcedExitEligibilityResponse, ForcedExitRequest, ForcedExitRequestId,
+        SaveForcedExitRequestQuery,
+    },
     Address, TokenLike,
 };
 
@@ -109,7 +112,7 @@ pub async fn submit_request(
     }
 
     data.forced_exit_checker
-        .check_forced_exit(&mut storage, params.target)
+        .validate_forced_exit(&mut storage, params.target)
         .await
         .map_err(ApiError::from)?;
 
@@ -195,10 +198,10 @@ pub async fn get_request_by_id(
 
 // Checks if the account is eligible for forced_exit in terms of
 // existing enough time
-pub async fn check_account(
+pub async fn check_account_eligibility(
     data: web::Data<ApiForcedExitRequestsData>,
     web::Path(account): web::Path<Address>,
-) -> JsonResult<()> {
+) -> JsonResult<ForcedExitEligibilityResponse> {
     let mut storage = data
         .connection_pool
         .access_storage()
@@ -206,12 +209,17 @@ pub async fn check_account(
         .map_err(warn_err)
         .map_err(ApiError::internal)?;
 
-    data.forced_exit_checker
+    let is_eligible = data
+        .forced_exit_checker
         .check_forced_exit(&mut storage, account)
         .await
         .map_err(ApiError::from)?;
 
-    Ok(Json(()))
+    let result = ForcedExitEligibilityResponse {
+        eligible: is_eligible,
+    };
+
+    Ok(Json(result))
 }
 
 pub fn api_scope(
@@ -230,7 +238,10 @@ pub fn api_scope(
         scope
             .route("/submit", web::post().to(submit_request))
             .route("/requests/{id}", web::get().to(get_request_by_id))
-            .route("/check_account/{account}", web::get().to(check_account))
+            .route(
+                "/checks/eligibility/{account}",
+                web::get().to(check_account_eligibility),
+            )
     } else {
         scope
     }
