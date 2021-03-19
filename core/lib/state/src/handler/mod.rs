@@ -6,6 +6,7 @@ mod close;
 mod deposit;
 mod forced_exit;
 mod full_exit;
+mod swap;
 mod transfer;
 mod withdraw;
 

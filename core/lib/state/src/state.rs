@@ -286,6 +286,7 @@ impl ZkSyncState {
             ZkSyncTx::Close(tx) => self.apply_tx(*tx),
             ZkSyncTx::ChangePubKey(tx) => self.apply_tx(*tx),
             ZkSyncTx::ForcedExit(tx) => self.apply_tx(*tx),
+            ZkSyncTx::Swap(tx) => self.apply_tx(*tx),
         }
     }
 
@@ -367,6 +368,7 @@ impl ZkSyncState {
             ZkSyncTx::ChangePubKey(tx) => self.create_op(*tx).map(Into::into),
             ZkSyncTx::Close(_) => anyhow::bail!("Close op is disabled"),
             ZkSyncTx::ForcedExit(tx) => self.create_op(*tx).map(Into::into),
+            ZkSyncTx::Swap(tx) => self.create_op(*tx).map(Into::into),
         }
     }
 
