@@ -9,15 +9,15 @@ use chrono::Utc;
 
 #[async_trait::async_trait]
 pub trait ForcedExitAccountAgeChecker {
-    async fn check_forced_exit<'a>(
+    async fn check_forced_exit(
         &self,
-        storage: &mut StorageProcessor<'a>,
+        storage: &mut StorageProcessor<'_>,
         target_account_address: Address,
     ) -> Result<bool, SubmitError>;
 
-    async fn validate_forced_exit<'a>(
+    async fn validate_forced_exit(
         &self,
-        storage: &mut StorageProcessor<'a>,
+        storage: &mut StorageProcessor<'_>,
         target_account_address: Address,
     ) -> Result<(), SubmitError>;
 }
@@ -42,9 +42,9 @@ impl ForcedExitChecker {
 
 #[async_trait::async_trait]
 impl ForcedExitAccountAgeChecker for ForcedExitChecker {
-    async fn check_forced_exit<'a>(
+    async fn check_forced_exit(
         &self,
-        storage: &mut StorageProcessor<'a>,
+        storage: &mut StorageProcessor<'_>,
         target_account_address: Address,
     ) -> Result<bool, SubmitError> {
         let account_age = storage
@@ -62,16 +62,16 @@ impl ForcedExitAccountAgeChecker for ForcedExitChecker {
         }
     }
 
-    async fn validate_forced_exit<'a>(
+    async fn validate_forced_exit(
         &self,
-        storage: &mut StorageProcessor<'a>,
+        storage: &mut StorageProcessor<'_>,
         target_account_address: Address,
     ) -> Result<(), SubmitError> {
-        let result = self
+        let eligible = self
             .check_forced_exit(storage, target_account_address)
             .await?;
 
-        if result {
+        if eligible {
             Ok(())
         } else {
             let msg = format!(
@@ -88,17 +88,17 @@ pub struct DummyForcedExitChecker;
 
 #[async_trait::async_trait]
 impl ForcedExitAccountAgeChecker for DummyForcedExitChecker {
-    async fn check_forced_exit<'a>(
+    async fn check_forced_exit(
         &self,
-        _storage: &mut StorageProcessor<'a>,
+        _storage: &mut StorageProcessor<'_>,
         _target_account_address: Address,
     ) -> Result<bool, SubmitError> {
         Ok(true)
     }
 
-    async fn validate_forced_exit<'a>(
+    async fn validate_forced_exit(
         &self,
-        _storage: &mut StorageProcessor<'a>,
+        _storage: &mut StorageProcessor<'_>,
         _target_account_address: Address,
     ) -> Result<(), SubmitError> {
         Ok(())

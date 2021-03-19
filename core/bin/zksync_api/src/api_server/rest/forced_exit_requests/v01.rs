@@ -209,15 +209,13 @@ pub async fn check_account_eligibility(
         .map_err(warn_err)
         .map_err(ApiError::internal)?;
 
-    let is_eligible = data
+    let eligible = data
         .forced_exit_checker
         .check_forced_exit(&mut storage, account)
         .await
         .map_err(ApiError::from)?;
 
-    let result = ForcedExitEligibilityResponse {
-        eligible: is_eligible,
-    };
+    let result = ForcedExitEligibilityResponse { eligible };
 
     Ok(Json(result))
 }
