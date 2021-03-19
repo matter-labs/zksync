@@ -289,10 +289,6 @@ async function sendETH(zksWallet: zksync.Wallet, feeAccumulatorAddress: string, 
     const zksWallet = await zksync.Wallet.fromEthSigner(ethWallet, zksProvider);
     const ethParameters = new EthParameters(await zksWallet.ethSigner.getTransactionCount('latest'));
     try {
-        // First let's try to withdraw the fee gained from the
-        // forced exit requests functionality, as it does
-        await withdrawForcedExitFee(ethProvider, ETH_NETWORK);
-
         if (!(await zksWallet.isSigningKeySet())) {
             console.log('Changing fee account signing key');
             const signingKeyTx = await zksWallet.setSigningKey({ feeToken: 'ETH', ethAuthType: 'ECDSA' });
@@ -345,6 +341,14 @@ async function sendETH(zksWallet: zksync.Wallet, feeAccumulatorAddress: string, 
         process.exit(1);
     } finally {
         await zksProvider.disconnect();
+    }
+
+    try {
+        console.log('Withdrawing fee for the ForcedExit requests');
+        await withdrawForcedExitFee(ethProvider, ETH_NETWORK);
         process.exit(0);
+    } catch (e) {
+        console.error('Failed to withdraw funds from the forced exit smart contract: ', e);
+        process.exit(1);
     }
 })();

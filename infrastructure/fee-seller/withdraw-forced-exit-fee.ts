@@ -45,26 +45,15 @@ export async function withdrawForcedExitFee(ethProvider: ethers.providers.Provid
     const ethWallet = new ethers.Wallet(SENDER_PRIVATE_KEY).connect(ethProvider);
     const forcedExitContract = new ethers.Contract(contractAddress, ForcedExitContractAbi, ethWallet);
 
-    try {
-        console.log('Withdrawing funds from the forced exit smart contract');
-        const tx = (await forcedExitContract.withdrawPendingFunds(FEE_RECEIVER, {
-            gasPrice,
-            gasLimit: requiredGasLimit
-        })) as ethers.ContractTransaction;
+    console.log('Withdrawing funds from the forced exit smart contract');
+    const tx = (await forcedExitContract.withdrawPendingFunds(FEE_RECEIVER, {
+        gasPrice,
+        gasLimit: requiredGasLimit
+    })) as ethers.ContractTransaction;
 
-        const receipt = await tx.wait();
+    const receipt = await tx.wait();
 
-        console.log('Tx hash:', receipt.transactionHash);
-    } catch (e) {
-        console.error('Failed to withdraw funds from the forced exit smart contract: ', e);
-        // Even though we try to keep the forced exit requests functionality
-        // as distant from the rest of the code as possible, if the script to withdraw the funds
-        // fails, we might run into risk of the operator running out of money, so not terminating
-        // here would be a security issue
-        process.exit(1);
-    } finally {
-        console.log('The process of withdrawing forced exit withdrawal fee is complete.');
-    }
+    console.log('Tx hash:', receipt.transactionHash);
 }
 
 interface StatusResponse {
