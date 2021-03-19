@@ -68,6 +68,42 @@ impl BigUintSerdeAsRadix10Str {
     }
 }
 
+/// Used to serialize BigUint as radix 10 string.
+#[derive(Clone, Debug)]
+pub struct BigUintPairSerdeAsRadix10Str;
+
+impl BigUintPairSerdeAsRadix10Str {
+    pub fn serialize<S>(pair: &(BigUint, BigUint), serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        <(BigDecimal, BigDecimal)>::serialize(
+            &(
+                BigDecimal::from(pair.0.to_bigint().unwrap()),
+                BigDecimal::from(pair.1.to_bigint().unwrap()),
+            ),
+            serializer,
+        )
+    }
+
+    pub fn deserialize<'de, D>(deserializer: D) -> Result<(BigUint, BigUint), D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        use serde::de::Error;
+        let convert = |bigdecimal: BigDecimal| {
+            Ok(bigdecimal
+                .to_bigint()
+                .ok_or_else(|| Error::custom("Expected integer value"))?
+                .to_biguint()
+                .ok_or_else(|| Error::custom("Expected positive value"))?)
+        };
+
+        <(BigDecimal, BigDecimal)>::deserialize(deserializer)
+            .and_then(|(a, b)| Ok((convert(a)?, convert(b)?)))
+    }
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize, Default, Ord, PartialOrd, Eq, PartialEq, Hash)]
 pub struct BigUintSerdeWrapper(#[serde(with = "BigUintSerdeAsRadix10Str")] pub BigUint);
 
