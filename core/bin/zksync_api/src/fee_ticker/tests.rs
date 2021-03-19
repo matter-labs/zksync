@@ -86,13 +86,7 @@ impl TestToken {
     }
 
     fn zero_price() -> Self {
-        Self::new(
-            TokenId(4),
-            0.0,
-            Some(0.9),
-            18,
-            Address::from_str("34083bbd70d394110487feaa087da875a54624ec").unwrap(),
-        )
+        Self::new(TokenId(4), 0.0, Some(0.9), 18, Address::default())
     }
 
     fn subsidized_tokens() -> Vec<Self> {
