@@ -5987,6 +5987,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "zksync_event_listener"
+version = "1.0.0"
+dependencies = [
+ "anyhow",
+ "tokio 0.2.22",
+ "zksync_config",
+ "zksync_storage",
+]
+
+[[package]]
 name = "zksync_prometheus_exporter"
 version = "1.0.0"
 dependencies = [
