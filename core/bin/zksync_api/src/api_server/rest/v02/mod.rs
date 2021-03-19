@@ -15,6 +15,7 @@ use crate::api_server::tx_sender::TxSender;
 mod block;
 mod config;
 mod error;
+mod fee;
 mod response;
 mod token;
 
@@ -35,11 +36,12 @@ pub(crate) fn api_scope(tx_sender: TxSender, zk_config: &ZkSyncConfig) -> Scope 
             net: zk_config.chain.eth.network,
             api_version: ApiVersion::V02,
         })
-        .service(config::api_scope(&zk_config))
         .service(block::api_scope(
             tx_sender.pool.clone(),
             tx_sender.blocks.clone(),
         ))
+        .service(config::api_scope(&zk_config))
+        .service(fee::api_scope(tx_sender.clone()))
         .service(token::api_scope(
             &zk_config,
             tx_sender.pool.clone(),

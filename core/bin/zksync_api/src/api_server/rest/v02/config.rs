@@ -18,7 +18,7 @@ enum ZksyncVersion {
     ContractV4,
 }
 
-/// Shared data between `api/v02/config` endpoints.
+/// Shared data between `api/v0.2/config` endpoints.
 #[derive(Serialize, Debug, Clone, Copy)]
 struct ApiConfigData {
     network: Network,

@@ -1,3 +1,4 @@
+use crate::api_server::tx_sender::SubmitError;
 use serde::export::Formatter;
 use serde::Serialize;
 use serde_repr::Serialize_repr;
@@ -8,6 +9,7 @@ use std::fmt::Display;
 pub enum ErrorCode {
     Unreacheable = 0,
     Internal = 500,
+    Submit = 501,
 }
 
 /// Error object in a response
@@ -82,10 +84,20 @@ impl Display for InternalError {
 
 impl ApiError for InternalError {
     fn error_type(&self) -> String {
-        String::from("Internal Server Error")
+        String::from("internal_error")
     }
 
     fn code(&self) -> ErrorCode {
         ErrorCode::Internal
+    }
+}
+
+impl ApiError for SubmitError {
+    fn error_type(&self) -> String {
+        String::from("submit_error")
+    }
+
+    fn code(&self) -> ErrorCode {
+        ErrorCode::Submit
     }
 }

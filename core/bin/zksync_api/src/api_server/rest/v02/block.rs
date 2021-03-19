@@ -17,7 +17,7 @@ use super::error::InternalError;
 use super::response::ApiResult;
 use crate::utils::block_details_cache::BlockDetailsCache;
 
-/// Shared data between `api/v02/block` endpoints.
+/// Shared data between `api/v0.2/block` endpoints.
 #[derive(Debug, Clone)]
 struct ApiBlockData {
     pool: ConnectionPool,

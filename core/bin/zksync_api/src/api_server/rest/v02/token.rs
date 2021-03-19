@@ -38,7 +38,7 @@ struct ApiToken {
     pub enabled_for_fees: bool,
 }
 
-/// Shared data between `api/v02/tokens` endpoints.
+/// Shared data between `api/v0.2/tokens` endpoints.
 #[derive(Clone)]
 struct ApiTokenData {
     min_market_volume: Ratio<BigUint>,
