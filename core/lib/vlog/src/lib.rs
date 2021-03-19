@@ -7,6 +7,11 @@
 //! The format of the logs in stdout can be `plain` or` json` and is set by the `MISC_LOG_FORMAT` env variable.
 //!
 //! Full documentation for the `tracing` crate here https://docs.rs/tracing/
+//!
+//! Integration with sentry for catching errors and react on them immediately
+//! https://docs.sentry.io/platforms/rust/
+//!
+
 use std::{borrow::Cow, str::FromStr};
 
 pub use sentry;
@@ -39,6 +44,20 @@ macro_rules! error {
     };
 }
 
+fn get_sentry_url() -> Option<Dsn> {
+    if let Ok(sentry_url) = std::env::var("MISC_SENTRY_URL") {
+        if let Ok(sentry_url) = Dsn::from_str(sentry_url.as_str()) {
+            return Some(sentry_url);
+        }
+    }
+    None
+}
+
+/// Initialize logging with tracing and set up log format
+///
+/// If sentry URL is provided initialize sentry
+/// Return sentry client guard. The full description is in the official documentation
+/// https://docs.sentry.io/platforms/rust/#configure
 pub fn init() -> Option<ClientInitGuard> {
     let log_format = std::env::var("MISC_LOG_FORMAT").unwrap_or_else(|_| "plain".to_string());
     match log_format.as_str() {
@@ -53,22 +72,20 @@ pub fn init() -> Option<ClientInitGuard> {
         }
         _ => panic!("MISC_LOG_FORMAT has an unexpected value {}", log_format),
     };
-    if let Ok(sentry_url) = std::env::var("MISC_SENTRY_URL") {
-        if let Ok(sentry_url) = Dsn::from_str(sentry_url.as_str()) {
-            return Some(sentry::init((
-                sentry_url,
-                sentry::ClientOptions {
-                    release: sentry::release_name!(),
-                    environment: Some(Cow::from(
-                        std::env::var("CHAIN_ETH_NETWORK").expect("Must be set"),
-                    )),
-                    attach_stacktrace: true,
-                    ..Default::default()
-                },
-            )));
-        }
-    }
-    None
+
+    get_sentry_url().map(|sentry_url| {
+        sentry::init((
+            sentry_url,
+            sentry::ClientOptions {
+                release: sentry::release_name!(),
+                environment: Some(Cow::from(
+                    std::env::var("CHAIN_ETH_NETWORK").expect("Must be set"),
+                )),
+                attach_stacktrace: true,
+                ..Default::default()
+            },
+        ))
+    })
 }
 
 #[cfg(feature = "actix")]
