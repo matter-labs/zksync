@@ -163,6 +163,7 @@ impl NewExecutedTransaction {
                     serde_json::from_value(tx["target"].clone()).unwrap(),
                     serde_json::from_value(tx["target"].clone()).unwrap(),
                 ),
+                ZkSyncTx::Swap(_) => todo!(),
             };
 
         let from_account: Vec<u8> = hex::decode(cut_prefix(&from_account_hex)).unwrap();
