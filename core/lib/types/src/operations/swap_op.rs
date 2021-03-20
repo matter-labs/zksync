@@ -5,7 +5,7 @@ use crate::{
 };
 use crate::{AccountId, Nonce, TokenId};
 use anyhow::{ensure, format_err};
-use num::BigUint;
+use num::{BigUint, Zero};
 use serde::{Deserialize, Serialize};
 use zksync_crypto::params::{
     ACCOUNT_ID_BIT_WIDTH, AMOUNT_EXPONENT_BIT_WIDTH, AMOUNT_MANTISSA_BIT_WIDTH, CHUNK_BYTES,
@@ -78,22 +78,22 @@ impl SwapOp {
 
         let fee = unpack_fee_amount(&bytes[fee_offset..fee_offset + FEE_BIT_WIDTH / 8])
             .ok_or_else(|| format_err!("Cant get fee from swap pubdata"))?;
-        let account_id_1 = AccountId(read_account(accounts_offset)?);
-        let recipient_id_1 = AccountId(read_account(accounts_offset + ACCOUNT_ID_BIT_WIDTH / 8)?);
-        let account_id_2 = AccountId(read_account(
+        let account_id_0 = AccountId(read_account(accounts_offset)?);
+        let recipient_id_0 = AccountId(read_account(accounts_offset + ACCOUNT_ID_BIT_WIDTH / 8)?);
+        let account_id_1 = AccountId(read_account(
             accounts_offset + ACCOUNT_ID_BIT_WIDTH * 2 / 8,
         )?);
-        let recipient_id_2 = AccountId(read_account(
+        let recipient_id_1 = AccountId(read_account(
             accounts_offset + ACCOUNT_ID_BIT_WIDTH * 3 / 8,
         )?);
         let submitter_id = AccountId(read_account(
             accounts_offset + ACCOUNT_ID_BIT_WIDTH * 4 / 8,
         )?);
-        let token_1 = TokenId(read_token(tokens_offset)?);
-        let token_2 = TokenId(read_token(tokens_offset + TOKEN_BIT_WIDTH / 8)?);
+        let token_0 = TokenId(read_token(tokens_offset)?);
+        let token_1 = TokenId(read_token(tokens_offset + TOKEN_BIT_WIDTH / 8)?);
         let fee_token = TokenId(read_token(tokens_offset + TOKEN_BIT_WIDTH * 2 / 8)?);
-        let amount_1 = read_amount(amounts_offset)?;
-        let amount_2 = read_amount(amounts_offset + AMOUNT_BIT_WIDTH / 8)?;
+        let amount_0 = read_amount(amounts_offset)?;
+        let amount_1 = read_amount(amounts_offset + AMOUNT_BIT_WIDTH / 8)?;
         let nonce = Nonce(0); // It is unknown from pubdata
         let nonce_mask = bytes[fee_offset + FEE_BIT_WIDTH / 8];
 
@@ -104,44 +104,44 @@ impl SwapOp {
                 nonce,
                 (
                     Order {
+                        account_id: account_id_0,
+                        nonce,
+                        recipient_id: recipient_id_0,
+                        amount: if nonce_mask & 1 == 0 {
+                            BigUint::zero()
+                        } else {
+                            amount_0.clone()
+                        },
+                        token_buy: token_1,
+                        token_sell: token_0,
+                        time_range: Default::default(),
+                        signature: Default::default(),
+                        price: (amount_0.clone(), amount_1.clone()),
+                    },
+                    Order {
                         account_id: account_id_1,
                         nonce,
                         recipient_id: recipient_id_1,
-                        amount: if nonce_mask & 1 == 0 {
-                            BigUint::from(0u8)
+                        amount: if nonce_mask & 2 == 0 {
+                            BigUint::zero()
                         } else {
                             amount_1.clone()
                         },
-                        token_buy: token_2,
+                        token_buy: token_0,
                         token_sell: token_1,
                         time_range: Default::default(),
                         signature: Default::default(),
-                        price: (amount_1.clone(), amount_2.clone()),
-                    },
-                    Order {
-                        account_id: account_id_2,
-                        nonce,
-                        recipient_id: recipient_id_2,
-                        amount: if nonce_mask & 2 == 0 {
-                            BigUint::from(0u8)
-                        } else {
-                            amount_2.clone()
-                        },
-                        token_buy: token_1,
-                        token_sell: token_2,
-                        time_range: Default::default(),
-                        signature: Default::default(),
-                        price: (amount_2.clone(), amount_1.clone()),
+                        price: (amount_1.clone(), amount_0.clone()),
                     },
                 ),
-                (amount_1, amount_2),
+                (amount_0, amount_1),
                 fee,
                 fee_token,
                 None,
             ),
             submitter: submitter_id,
-            accounts: (account_id_1, account_id_2),
-            recipients: (recipient_id_1, recipient_id_2),
+            accounts: (account_id_0, account_id_1),
+            recipients: (recipient_id_0, recipient_id_1),
         })
     }
 
