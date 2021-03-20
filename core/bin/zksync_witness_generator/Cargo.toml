@@ -22,7 +22,7 @@ zksync_utils = { path = "../../lib/utils", version = "1.0" }
 zksync_prover_utils = { path = "../../lib/prover_utils", version = "1.0" }
 zksync_prometheus_exporter = { path = "../../lib/prometheus_exporter", version = "1.0" }
 
-vlog = { path = "../../lib/vlog", version = "1.0" }
+vlog = { path = "../../lib/vlog", version = "1.0" , features=['actix']}
 tracing = "0.1.22"
 
 serde = "1.0.90"

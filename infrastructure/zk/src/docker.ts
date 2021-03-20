@@ -10,7 +10,6 @@ const IMAGES = [
     'dev-ticker',
     'keybase',
     'ci',
-    'fee-seller',
     'exit-tool',
     'dev-liquidity-token-watcher',
     'ci-integration-test'

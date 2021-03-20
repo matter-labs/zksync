@@ -15,6 +15,7 @@ use zksync_config::ZkSyncConfig;
 
 mod helpers;
 mod v01;
+pub mod v02;
 pub mod v1;
 
 async fn start_server(
@@ -36,10 +37,21 @@ async fn start_server(
             v1::api_scope(tx_sender, &api_v01.config)
         };
 
+        let api_v02_scope = {
+            let tx_sender = TxSender::new(
+                api_v01.connection_pool.clone(),
+                sign_verifier.clone(),
+                fee_ticker.clone(),
+                &api_v01.config,
+            );
+            v02::api_scope(tx_sender, &api_v01.config)
+        };
         App::new()
             .wrap(Cors::new().send_wildcard().max_age(3600).finish())
+            .wrap(vlog::actix_middleware())
             .service(api_v01.into_scope())
             .service(api_v1_scope)
+            .service(api_v02_scope)
             // Endpoint needed for js isReachable
             .route(
                 "/favicon.ico",

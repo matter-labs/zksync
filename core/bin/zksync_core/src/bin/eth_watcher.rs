@@ -10,7 +10,7 @@ use zksync_eth_client::EthereumGateway;
 fn main() {
     let mut main_runtime = Runtime::new().expect("main runtime start");
 
-    vlog::init();
+    let _sentry_guard = vlog::init();
     vlog::info!("ETH watcher started");
 
     let config = ZkSyncConfig::from_env();

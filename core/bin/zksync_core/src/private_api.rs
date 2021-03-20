@@ -167,6 +167,7 @@ pub fn start_private_core_api(
                     // `Arc` wrapping of the object.
                     App::new()
                         .wrap(actix_web::middleware::Logger::default())
+                        .wrap(vlog::actix_middleware())
                         .app_data(web::Data::new(app_state))
                         .service(new_tx)
                         .service(new_txs_batch)

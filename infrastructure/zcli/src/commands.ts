@@ -203,7 +203,7 @@ class TxSubmitter {
     }
 
     private async withdraw(txDetails: TxDetails, fast: boolean) {
-        const { to: ethAddress, token, amount } = txDetails;
+        const { to: ethAddress, token, amount, fastProcessing } = txDetails;
         if (!(await this.syncWallet.isSigningKeySet())) {
             const changePubkey = await this.syncWallet.setSigningKey({
                 feeToken: token,
@@ -214,7 +214,8 @@ class TxSubmitter {
         const txHandle = await this.syncWallet.withdrawFromSyncToEthereum({
             ethAddress,
             token,
-            amount: this.syncProvider.tokenSet.parseToken(token, amount)
+            amount: this.syncProvider.tokenSet.parseToken(token, amount),
+            fastProcessing
         });
         if (!fast) await txHandle.awaitReceipt();
         return txHandle.txHash;

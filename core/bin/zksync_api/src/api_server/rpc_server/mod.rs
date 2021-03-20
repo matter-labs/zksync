@@ -18,11 +18,11 @@ use zksync_storage::{
     },
     ConnectionPool, StorageProcessor,
 };
-use zksync_types::{tx::TxHash, Address, BatchFee, BlockNumber, Fee, TokenLike, TxFeeTypes};
+use zksync_types::{tx::TxHash, Address, BlockNumber, TokenLike, TxFeeTypes};
 
 // Local uses
 use crate::{
-    fee_ticker::{TickerRequest, TokenPriceRequestType},
+    fee_ticker::{PriceError, ResponseBatchFee, ResponseFee, TickerRequest, TokenPriceRequestType},
     signature_checker::VerifySignatureRequest,
     utils::shared_lru_cache::AsyncLruCache,
 };
@@ -256,7 +256,7 @@ impl RpcApp {
         mut ticker_request_sender: mpsc::Sender<TickerRequest>,
         transactions: Vec<(TxFeeTypes, Address)>,
         token: TokenLike,
-    ) -> Result<BatchFee> {
+    ) -> Result<ResponseBatchFee> {
         let req = oneshot::channel();
         ticker_request_sender
             .send(TickerRequest::GetBatchTxFee {
@@ -278,7 +278,7 @@ impl RpcApp {
         tx_type: TxFeeTypes,
         address: Address,
         token: TokenLike,
-    ) -> Result<Fee> {
+    ) -> Result<ResponseFee> {
         let req = oneshot::channel();
         ticker_request_sender
             .send(TickerRequest::GetTxFee {
@@ -316,9 +316,12 @@ impl RpcApp {
             .await
             .expect("ticker receiver dropped");
         let resp = req.1.await.expect("ticker answer sender dropped");
-        resp.map_err(|err| {
-            vlog::warn!("Internal Server Error: '{}'; input: {:?}", err, token);
-            Error::internal_error()
+        resp.map_err(|err| match err {
+            PriceError::TokenNotFound(msg) => Error::invalid_params(msg),
+            _ => {
+                vlog::warn!("Internal Server Error: '{}'; input: {:?}", err, token);
+                Error::internal_error()
+            }
         })
     }
 

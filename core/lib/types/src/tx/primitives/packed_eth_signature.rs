@@ -46,7 +46,7 @@ impl PackedEthSignature {
     }
 
     /// Signs message using ethereum private key, results are identical to signature created
-    /// using `geth`, `ethers.js`, etc. No hashing and prefixes required.
+    /// using `geth`, `ethecore/lib/types/src/gas_counter.rsrs.js`, etc. No hashing and prefixes required.
     pub fn sign(private_key: &H256, msg: &[u8]) -> Result<PackedEthSignature, anyhow::Error> {
         let secret_key = (*private_key).into();
         let signed_bytes = Self::message_to_signed_bytes(msg);

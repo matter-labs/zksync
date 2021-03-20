@@ -35,7 +35,7 @@ struct Opt {
 
 #[tokio::main]
 async fn main() {
-    vlog::init();
+    let _sentry_guard = vlog::init();
 
     let opt = Opt::from_args();
 

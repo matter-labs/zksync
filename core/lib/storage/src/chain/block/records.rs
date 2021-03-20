@@ -77,3 +77,9 @@ impl BlockDetails {
         self.verified_at.is_some() && self.verify_tx_hash.is_some()
     }
 }
+
+#[derive(Debug, FromRow)]
+pub struct StorageBlockMetadata {
+    pub block_number: i64,
+    pub fast_processing: bool,
+}

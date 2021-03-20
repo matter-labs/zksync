@@ -59,7 +59,6 @@ export async function witness_generator() {
 
 export async function js() {
     await utils.spawn('yarn zksync tests');
-    await utils.spawn('yarn fee-seller tests');
 }
 
 async function rustCryptoTests() {

@@ -206,10 +206,21 @@ impl RpcApp {
         if !token_allowed {
             return Err(SubmitError::InappropriateFeeToken.into());
         }
+        let result = Self::ticker_request(ticker.clone(), tx_type, address, token.clone()).await?;
 
-        let result = Self::ticker_request(ticker.clone(), tx_type, address, token).await;
+        let token = self.tx_sender.token_info_from_id(token).await?;
+        let allowed_subsidy = self
+            .tx_sender
+            .subsidy_accumulator
+            .get_allowed_subsidy(&token.address);
+        let fee = if allowed_subsidy >= result.subsidy_size_usd {
+            result.subsidy_fee
+        } else {
+            result.normal_fee
+        };
+
         metrics::histogram!("api.rpc.get_tx_fee", start.elapsed());
-        result
+        Ok(fee)
     }
 
     pub async fn _impl_get_txs_batch_fee_in_wei(
@@ -235,10 +246,21 @@ impl RpcApp {
 
         let transactions: Vec<(TxFeeTypes, Address)> =
             (tx_types.iter().cloned().zip(addresses.iter().cloned())).collect();
-        let total_fee = Self::ticker_batch_fee_request(ticker, transactions, token.clone()).await?;
+        let result = Self::ticker_batch_fee_request(ticker, transactions, token.clone()).await?;
+
+        let token = self.tx_sender.token_info_from_id(token).await?;
+        let allowed_subsidy = self
+            .tx_sender
+            .subsidy_accumulator
+            .get_allowed_subsidy(&token.address);
+        let fee = if allowed_subsidy >= result.subsidy_size_usd {
+            result.subsidy_fee
+        } else {
+            result.normal_fee
+        };
 
         metrics::histogram!("api.rpc.get_txs_batch_fee_in_wei", start.elapsed());
-        Ok(total_fee)
+        Ok(fee)
     }
 
     pub async fn _impl_get_token_price(self, token: TokenLike) -> Result<BigDecimal> {

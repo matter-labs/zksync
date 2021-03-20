@@ -19,7 +19,7 @@ use zksync_storage::{ConnectionPool, QueryResult};
 use zksync_types::{Token, TokenLike};
 
 use crate::{
-    fee_ticker::{TickerRequest, TokenPriceRequestType},
+    fee_ticker::{PriceError, TickerRequest, TokenPriceRequestType},
     utils::token_db_cache::TokenDBCache,
 };
 
@@ -76,17 +76,11 @@ impl ApiTokensData {
             })
             .await?;
 
-        // Ugly hack to distinguish real error from missing token.
         match price_receiver.await? {
             Ok(price) => Ok(Some(price)),
-            Err(err) => {
-                // TODO: Improve ticker API to remove this terrible code snippet. (task number ????)
-                if err.to_string().contains("Token not found") {
-                    Ok(None)
-                } else {
-                    Err(err)
-                }
-            }
+            Err(PriceError::TokenNotFound(_)) => Ok(None),
+            Err(PriceError::DBError(err)) => Err(anyhow::format_err!(err)),
+            Err(PriceError::ApiError(err)) => Err(anyhow::format_err!(err)),
         }
     }
 }
@@ -154,6 +148,8 @@ mod tests {
 
     use super::{super::test_utils::TestServerConfig, *};
 
+    use zksync_api_client::rest::v1::ClientError;
+
     fn dummy_fee_ticker(prices: &[(TokenLike, BigDecimal)]) -> mpsc::Sender<TickerRequest> {
         let (sender, mut receiver) = mpsc::channel(10);
 
@@ -175,8 +171,10 @@ mod tests {
                         let msg = if let Some(price) = prices.get(&token) {
                             Ok(price.clone())
                         } else {
-                            // To provide compatibility with the `token_price_usd` hack.
-                            Err(anyhow::format_err!("Token not found: {:?}", token))
+                            Err(PriceError::token_not_found(format!(
+                                "Token not found: {:?}",
+                                token
+                            )))
                         };
 
                         response.send(msg).expect("Unable to send response");
@@ -226,12 +224,17 @@ mod tests {
                 .await?,
             None
         );
-        // TODO Check error (ZKS-125)
-        client
+        let error = client
             .token_price(&TokenLike::Id(TokenId(2)), TokenPriceKind::Token)
             .await
             .unwrap_err();
-
+        assert!(
+            matches!(error, ClientError::BadRequest { .. }),
+            format!(
+                "Incorrect error type: got {:?} instead of BadRequest",
+                error
+            )
+        );
         // Tokens requests
         let expected_tokens = {
             let mut storage = cfg.pool.access_storage().await?;
