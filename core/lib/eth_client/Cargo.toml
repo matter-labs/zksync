@@ -24,4 +24,4 @@ hex = "0.4"
 
 anyhow = "1.0"
 tokio = { version = "0.2", features = ["full"] }
-metrics = "=0.13.0-alpha.8"
+metrics = "=0.14.2"
