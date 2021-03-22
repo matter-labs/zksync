@@ -14,6 +14,12 @@ jobs:
       -
         id: print
         run: echo "::set-output name=shortRev::$(git rev-parse --short HEAD)"
+      - 
+        uses: actions-ecosystem/action-regex-match@v2
+        id: regex-match
+        with:
+          text: ${{ github.ref }}
+          regex: '^refs\/tags\/(v[0-9]+\.[0-9]+\.[0-9](-?\w*)?)$'
       -
         name: Map runtime environment data
         uses: kanga333/variable-mapper@v0.2.0
@@ -43,11 +49,13 @@ jobs:
       shortRev: ${{ steps.print.outputs.shortRev }}
       kubeConf: ${{ env.KUBECONF }}
       hfEnv: ${{ env.HFENV }}
+      isTag: ${{ steps.regex-match.outputs.group1 != '' }}
 
   build-images:
     name: Build and Push Docker Images
     runs-on: [self-hosted, MAIN]
     needs: pre
+    if: ${{ needs.pre.outputs.isTag == 'true' }}
 
     # Required services
     services:
