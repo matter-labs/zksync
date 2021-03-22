@@ -161,7 +161,7 @@ impl RpcApp {
             Error::internal_error()
         })?;
 
-        let mut result: HashMap<_, _> = tokens
+        let result: HashMap<_, _> = tokens
             .drain()
             .map(|(id, token)| {
                 if *id == 0 {
