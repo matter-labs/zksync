@@ -7,7 +7,7 @@ use zksync_storage::{
 
 use zksync_api::core_api_client::CoreApiClient;
 use zksync_types::{
-    tx::{ChangePubKeyType, PackedEthSignature, TimeRange, TxHash},
+    tx::{ChangePubKeyType, TimeRange, TxHash},
     AccountId, Address, PubKeyHash, ZkSyncTx, H256,
 };
 
@@ -20,11 +20,6 @@ use tokio::time;
 use zksync_test_account::{ZkSyncAccount, ZkSyncETHAccountData};
 
 use super::utils::{read_signing_key, Engine};
-
-// This private key is for testing purposes only and shoud not be used in production
-// The address should be 0xe1faB3eFD74A77C23B426c302D96372140FF7d0C
-const FORCED_EXIT_TEST_SENDER_ETH_PRIVATE_KEY: &str =
-    "0x0559b9f000b4e4bbb7fe02e1374cef9623c2ab7c3791204b490e1f229191d104";
 
 pub async fn prepare_forced_exit_sender_account(
     connection_pool: ConnectionPool,
@@ -40,6 +35,7 @@ pub async fn prepare_forced_exit_sender_account(
         .expect("Failed to decode forced_exit_sender sk");
     let sender_sk = read_signing_key(&sender_sk).expect("Failed to read forced exit sender sk");
     let sender_address = config.forced_exit_requests.sender_account_address;
+    let sender_eth_private_key = config.forced_exit_requests.sender_eth_private_key;
 
     let is_sender_prepared =
         check_forced_exit_sender_prepared(&mut storage, &sender_sk, sender_address)
@@ -58,7 +54,15 @@ pub async fn prepare_forced_exit_sender_account(
         .await
         .expect("Failed to get account id for forced exit sender");
 
-    register_signing_key(&mut storage, id, api_client, sender_address, sender_sk).await?;
+    register_signing_key(
+        &mut storage,
+        id,
+        api_client,
+        sender_address,
+        sender_eth_private_key,
+        sender_sk,
+    )
+    .await?;
 
     Ok(id)
 }
@@ -163,33 +167,16 @@ pub async fn wait_for_change_pub_key_tx(
     }
 }
 
-// Use PackedEthSignature::address_from_private_key
-async fn get_verified_eth_sk(sender_address: Address) -> H256 {
-    let eth_sk = hex::decode(&FORCED_EXIT_TEST_SENDER_ETH_PRIVATE_KEY[2..])
-        .expect("Failed to parse eth signing key of the forced exit account");
-
-    let private_key = H256::from_slice(&eth_sk);
-
-    let pk_address = PackedEthSignature::address_from_private_key(&private_key).unwrap();
-
-    if pk_address != sender_address {
-        panic!("Private key provided does not correspond to the sender address");
-    }
-
-    private_key
-}
-
 pub async fn register_signing_key(
     storage: &mut StorageProcessor<'_>,
     sender_id: AccountId,
     api_client: CoreApiClient,
     sender_address: Address,
+    sender_eth_private_key: H256,
     sender_sk: PrivateKey<Engine>,
 ) -> anyhow::Result<()> {
-    let eth_sk = get_verified_eth_sk(sender_address).await;
-
     let eth_account_data = ZkSyncETHAccountData::EOA {
-        eth_private_key: eth_sk,
+        eth_private_key: sender_eth_private_key,
     };
 
     let sender_account = ZkSyncAccount::new(

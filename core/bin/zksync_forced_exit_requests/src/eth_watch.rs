@@ -404,8 +404,11 @@ pub fn run_forced_exit_contract_watcher(
         .await
         .unwrap();
 
-        let core_interaction_wrapper =
-            MempoolCoreInteractionWrapper::new(core_api_client, connection_pool.clone());
+        let core_interaction_wrapper = MempoolCoreInteractionWrapper::new(
+            config.clone(),
+            core_api_client,
+            connection_pool.clone(),
+        );
         // It is ok to unwrap here, since if forced_exit_sender is not created, then
         // the watcher is meaningless
         let mut forced_exit_sender =

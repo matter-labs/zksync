@@ -1,7 +1,7 @@
 use crate::envy_load;
 /// External uses
 use serde::Deserialize;
-use zksync_types::Address;
+use zksync_types::{Address, H256};
 
 // There are two types of configs:
 // The original one (with tx_interval_scaling_factor)
@@ -21,6 +21,7 @@ struct ForcedExitRequestsInternalConfig {
     pub digits_in_id: u8,
     pub wait_confirmations: u64,
     pub sender_private_key: String,
+    pub sender_eth_private_key: H256,
     pub sender_account_address: Address,
     pub expiration_period: u64,
 }
@@ -35,6 +36,7 @@ pub struct ForcedExitRequestsConfig {
     pub digits_in_id: u8,
     pub wait_confirmations: u64,
     pub sender_private_key: String,
+    pub sender_eth_private_key: H256,
     pub sender_account_address: Address,
     pub expiration_period: u64,
 }
@@ -74,6 +76,7 @@ impl ForcedExitRequestsConfig {
             price_per_token: config.price_per_token,
             wait_confirmations: config.wait_confirmations,
             sender_private_key: config.sender_private_key,
+            sender_eth_private_key: config.sender_eth_private_key,
             sender_account_address: config.sender_account_address,
             expiration_period: config.expiration_period,
         }

@@ -27,6 +27,7 @@ import {
     isOperationFeeAcceptable,
     sendNotification
 } from './utils';
+import { withdrawForcedExitFee } from './withdraw-forced-exit-fee';
 import { EthParameters } from './types';
 
 /** Env parameters. */
@@ -340,6 +341,14 @@ async function sendETH(zksWallet: zksync.Wallet, feeAccumulatorAddress: string, 
         process.exit(1);
     } finally {
         await zksProvider.disconnect();
+    }
+
+    try {
+        console.log('Withdrawing fee for the ForcedExit requests');
+        await withdrawForcedExitFee(ethProvider, ETH_NETWORK);
         process.exit(0);
+    } catch (e) {
+        console.error('Failed to withdraw funds from the forced exit smart contract: ', e);
+        process.exit(1);
     }
 })();

@@ -50,23 +50,37 @@ async function prepareForcedExitRequestAccount() {
 
     // This is the private key of the first test account
     const ethProvider = new ethers.providers.JsonRpcProvider(process.env.ETH_CLIENT_WEB3_URL);
-    const ethRichWallet = new ethers.Wallet('0x7726827caac94a7f9e1b160f7ea819f172f7b6f9d2a97f992c38edeab82d4110');
+    const ethRichWallet = new ethers.Wallet(
+        '0x7726827caac94a7f9e1b160f7ea819f172f7b6f9d2a97f992c38edeab82d4110'
+    ).connect(ethProvider);
+
+    const gasPrice = await ethProvider.getGasPrice();
+
+    const topupTransaction = await ethRichWallet.sendTransaction({
+        to: forcedExitAccount,
+        // The amount for deposit should be enough to send at least
+        // one transaction to retrieve the funds form the forced exit smart contract
+        value: ethers.utils.parseEther('100.0'),
+        gasPrice
+    });
+
+    await topupTransaction.wait();
 
     const mainZkSyncContract = new ethers.Contract(
         process.env.CONTRACTS_CONTRACT_ADDR as string,
         await utils.readZkSyncAbi(),
-        ethRichWallet.connect(ethProvider)
+        ethRichWallet
     );
-    const gasPrice = await ethProvider.getGasPrice();
 
-    const ethTransaction = (await mainZkSyncContract.depositETH(forcedExitAccount, {
-        // The amount to deposit does not really matter
+    const depositTransaction = (await mainZkSyncContract.depositETH(forcedExitAccount, {
+        // Here the amount to deposit does not really matter, as it is done purely
+        // to guarantee that the account exists in the network
         value: ethers.utils.parseEther('1.0'),
         gasLimit: ethers.BigNumber.from('200000'),
         gasPrice
     })) as ethers.ContractTransaction;
 
-    await ethTransaction.wait();
+    await depositTransaction.wait();
 
     console.log('Deposit to the forced exit sender account has been successfully completed');
 }

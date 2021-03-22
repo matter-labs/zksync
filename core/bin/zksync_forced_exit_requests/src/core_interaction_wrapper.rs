@@ -1,4 +1,6 @@
 use chrono::Utc;
+use num::Zero;
+use zksync_config::ZkSyncConfig;
 use zksync_storage::{chain::operations_ext::records::TxReceiptResponse, ConnectionPool};
 use zksync_types::{
     forced_exit_requests::{ForcedExitRequest, ForcedExitRequestId},
@@ -6,7 +8,10 @@ use zksync_types::{
     AccountId, Nonce,
 };
 
-use zksync_api::core_api_client::CoreApiClient;
+use zksync_api::{
+    api_server::forced_exit_checker::{ForcedExitAccountAgeChecker, ForcedExitChecker},
+    core_api_client::CoreApiClient,
+};
 use zksync_types::SignedZkSyncTx;
 
 // We could use `db reset` and test the db the same way as in rust_api
@@ -35,19 +40,27 @@ pub trait CoreInteractionWrapper {
         &self,
         deleting_threshold: chrono::Duration,
     ) -> anyhow::Result<()>;
+    async fn check_forced_exit_request(&self, request: &ForcedExitRequest) -> anyhow::Result<bool>;
 }
 
 #[derive(Clone)]
 pub struct MempoolCoreInteractionWrapper {
     core_api_client: CoreApiClient,
     connection_pool: ConnectionPool,
+    forced_exit_checker: ForcedExitChecker,
 }
 
 impl MempoolCoreInteractionWrapper {
-    pub fn new(core_api_client: CoreApiClient, connection_pool: ConnectionPool) -> Self {
+    pub fn new(
+        config: ZkSyncConfig,
+        core_api_client: CoreApiClient,
+        connection_pool: ConnectionPool,
+    ) -> Self {
+        let forced_exit_checker = ForcedExitChecker::new(&config);
         Self {
             core_api_client,
             connection_pool,
+            forced_exit_checker,
         }
     }
 }
@@ -158,5 +171,30 @@ impl CoreInteractionWrapper for MempoolCoreInteractionWrapper {
             .await?;
 
         Ok(())
+    }
+
+    async fn check_forced_exit_request(&self, request: &ForcedExitRequest) -> anyhow::Result<bool> {
+        let mut storage = self.connection_pool.access_storage().await?;
+        let target = request.target;
+        let eligible = self
+            .forced_exit_checker
+            .check_forced_exit(&mut storage, target)
+            .await?;
+
+        let mut account_schema = storage.chain().account_schema();
+
+        let target_state = account_schema.account_state_by_address(target).await?;
+        let target_nonce = target_state.committed.map(|state| state.1.nonce);
+
+        if let Some(nonce) = target_nonce {
+            // The forced exit is possible is the account is eligile (existed for long enough)
+            // and its nonce is zero
+            let possible = nonce.is_zero() && eligible;
+            Ok(possible)
+        } else {
+            // The account does exist. The ForcedExit can not be applied to account
+            // which does not exist in the network
+            Ok(false)
+        }
     }
 }

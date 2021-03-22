@@ -42,7 +42,6 @@ impl<T: CoreInteractionWrapper + Sync + Send> ForcedExitSender for MempoolForced
         // In case something bad happens we do not want the server crush because
         // of the forced_exit_requests component
         loop {
-            dbg!("try processing 1");
             let processing_attempt = self
                 .try_process_request(amount.clone(), submission_time)
                 .await;
@@ -54,7 +53,8 @@ impl<T: CoreInteractionWrapper + Sync + Send> ForcedExitSender for MempoolForced
             }
 
             if attempts >= PROCESSING_ATTEMPTS {
-                vlog::error!("Failed to process forced exit for the {} time", attempts);
+                // We should not get stuck processing requests that possibly could never be processed
+                break;
             }
         }
     }
@@ -193,7 +193,7 @@ impl<T: CoreInteractionWrapper> MempoolForcedExitSender<T> {
     pub async fn wait_until_comitted(&self, tx_hash: TxHash) -> anyhow::Result<()> {
         let timeout_millis: u64 = 120000;
         let poll_interval_millis: u64 = 200;
-        let poll_interval = time::Duration::from_secs(poll_interval_millis);
+        let poll_interval = time::Duration::from_millis(poll_interval_millis);
         let mut timer = time::interval(poll_interval);
 
         let mut time_passed: u64 = 0;
@@ -241,6 +241,16 @@ impl<T: CoreInteractionWrapper> MempoolForcedExitSender<T> {
         };
 
         let txs = self.build_transactions(fe_request.clone()).await?;
+
+        // Right before sending the transactions we must check if the request is possible at all
+        let is_request_possible = self
+            .core_interaction_wrapper
+            .check_forced_exit_request(&fe_request)
+            .await?;
+        if !is_request_possible {
+            // If not possible at all, return without sending any transactions
+            return Ok(());
+        }
         let hashes = self
             .core_interaction_wrapper
             .send_and_save_txs_batch(&fe_request, txs)

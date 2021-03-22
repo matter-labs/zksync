@@ -215,10 +215,15 @@ export class Deployer {
         if (this.verbose) {
             console.log('Deploying ForcedExit contract');
         }
+
+        // Choose the this.deployWallet.address as the default receiver if the
+        // FORCED_EXIT_REQUESTS_SENDER_ACCOUNT_ADDRESS is not present
+        const receiver = process.env.FORCED_EXIT_REQUESTS_SENDER_ACCOUNT_ADDRESS || this.deployWallet.address;
+
         const forcedExitContract = await deployContract(
             this.deployWallet,
             this.contracts.forcedExit,
-            [this.deployWallet.address],
+            [this.deployWallet.address, receiver],
             {
                 gasLimit: 6000000,
                 ...ethTxOptions
