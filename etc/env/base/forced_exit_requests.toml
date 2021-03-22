@@ -1,6 +1,6 @@
 # Options for L1-based ForcedExit utility
 [forced_exit_requests]
-# Whether the feature is enabled. Used to be able to quickly stop serving FE requests
+# Whether the feature is enabled. Used to be able to quickly stop serving ForcedExit requests
 # in times of attacks or upgrages  
 enabled=true
 

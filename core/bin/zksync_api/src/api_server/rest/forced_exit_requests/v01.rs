@@ -107,7 +107,7 @@ pub async fn submit_request(
 
     if params.tokens.len() > data.max_tokens_per_request as usize {
         return Err(ApiError::bad_request(
-            "Maximum number of tokens per FE request exceeded",
+            "Maximum number of tokens per ForcedExit request exceeded",
         ));
     }
 

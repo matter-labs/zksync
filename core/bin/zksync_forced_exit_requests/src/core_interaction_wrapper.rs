@@ -94,7 +94,7 @@ impl CoreInteractionWrapper for MempoolCoreInteractionWrapper {
 
         fe_schema.set_fulfilled_at(id, Utc::now()).await?;
 
-        vlog::info!("FE request with id {} was fulfilled", id);
+        vlog::info!("ForcedExit request with id {} was fulfilled", id);
 
         Ok(())
     }
