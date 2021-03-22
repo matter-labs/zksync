@@ -57,6 +57,7 @@ async fn handle_coinmarketcap_token_price_query(
         "wBTC" => BigDecimal::from(9000),
         "BAT" => BigDecimal::try_from(0.2).unwrap(),
         "DAI" => BigDecimal::from(1),
+        "tGLM" => BigDecimal::from(1),
         _ => BigDecimal::from(0),
     };
     let random_multiplier = thread_rng().gen_range(0.9, 1.1);
@@ -84,6 +85,7 @@ async fn handle_coingecko_token_list(_req: HttpRequest) -> Result<HttpResponse> 
     let resp = json!([
         {"id": "ethereum", "symbol": "eth", "name": "Ethereum"},
         {"id": "dai", "symbol":"dai", "name": "Dai"},
+        {"id": "glm", "symbol":"glm", "name": "Golem"},
         {"id": "gnt", "symbol":"gnt", "name": "Golem"},
         {"id": "basic-attention-token", "symbol": "bat", "name": "Basic Attention Token"},
         {"id": "wrapped-bitcoin", "symbol": "wbtc", "name": "Wrapped Bitcoin"},
@@ -100,6 +102,7 @@ async fn handle_coingecko_token_price_query(req: HttpRequest) -> Result<HttpResp
         Some("basic-attention-token") => BigDecimal::try_from(0.2).unwrap(),
         Some("dai") => BigDecimal::from(1),
         Some("gnt") => BigDecimal::from(1),
+        Some("glm") => BigDecimal::from(1),
         _ => BigDecimal::from(0),
     };
     let random_multiplier = thread_rng().gen_range(0.9, 1.1);
