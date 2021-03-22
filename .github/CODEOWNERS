@@ -1,19 +1,5 @@
 # about codeowners:
 # https://help.github.com/articles/about-codeowners/
 
-# notify about changes in codeowners file
-/.github/       @dvush @pozpxc
-
-# notify about any circuit, prover and server changes
-/core/circuit/ @alexander-movchan
-/core @dvush @popzxc
-
-# dev tools
-/bin @dvush @popzxc
-/Makefile @dvush @popzxc
-
-# js
-/infrastructure/ @dvush @popzxc
-
-# notify dvush about contracts changes
-/contracts/     @dvush @popzxc
+# Changes in smart contracts
+/contracts/contracts     @dvush @popzxc

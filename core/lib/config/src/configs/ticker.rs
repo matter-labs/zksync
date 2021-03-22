@@ -1,5 +1,8 @@
 // Built-in uses
+use std::collections::HashMap;
 // External uses
+use num::rational::Ratio;
+use num::BigUint;
 use serde::Deserialize;
 // Workspace uses
 use zksync_types::Address;
@@ -35,8 +38,11 @@ pub struct TickerConfig {
     pub token_market_update_time: u64,
     /// Number of tickers for load balancing.
     pub number_of_ticker_actors: u8,
-    /// List of tokens for which subsidions are disabled.
+    /// List of tokens for which subsidies are disabled.
     pub not_subsidized_tokens: Vec<Address>,
+    /// List of tokens for which subsidies are disabled.
+    subsidized_tokens: Vec<Address>,
+    subsidized_tokens_limits: Vec<BigUint>,
 }
 
 impl TickerConfig {
@@ -52,6 +58,25 @@ impl TickerConfig {
         };
 
         (self.token_price_source, url)
+    }
+
+    pub fn get_subsidy_limits(&self) -> HashMap<Address, Ratio<BigUint>> {
+        assert_eq!(
+            self.subsidized_tokens.len(),
+            self.subsidized_tokens_limits.len(),
+            "Number of subsidized tokens and limits shoult be equal"
+        );
+
+        self.subsidized_tokens
+            .iter()
+            .cloned()
+            .zip(
+                self.subsidized_tokens_limits
+                    .iter()
+                    .cloned()
+                    .map(Ratio::from_integer),
+            )
+            .collect()
     }
 }
 
@@ -76,6 +101,8 @@ mod tests {
                 addr("2b591e99afe9f32eaa6214f7b7629768c40eeb39"),
                 addr("34083bbd70d394110487feaa087da875a54624ec"),
             ],
+            subsidized_tokens: vec![addr("0bc529c00c6401aef6d220be8c6ea1667f6ad93e")],
+            subsidized_tokens_limits: vec![156u32.into()],
         }
     }
 
@@ -93,6 +120,8 @@ FEE_TICKER_TOKEN_MARKET_UPDATE_TIME=120
 FEE_TICKER_UNCONDITIONALLY_VALID_TOKENS="0x0000000000000000000000000000000000000000"
 FEE_TICKER_LIQUIDITY_VOLUME=100
 FEE_TICKER_NUMBER_OF_TICKER_ACTORS="4"
+FEE_TICKER_SUBSIDIZED_TOKENS="0x0bc529c00c6401aef6d220be8c6ea1667f6ad93e"
+FEE_TICKER_SUBSIDIZED_TOKENS_LIMITS=156
         "#;
         set_env(config);
 

@@ -75,18 +75,21 @@ impl EthHttpClient {
             .topics(Some(topics), None, None, None)
             .build();
 
-        self.client
-            .logs(filter)
-            .await?
-            .into_iter()
-            .filter_map(|event| {
-                if let Ok(event) = T::try_from(event) {
-                    Some(Ok(event))
-                } else {
-                    None
-                }
-                // TODO: remove after update
-                // .map_err(|e| format_err!("Failed to parse event log from ETH: {:?}", e))
+        let mut logs = self.client.logs(filter).await?;
+        let is_possible_to_sort_logs = logs.iter().all(|log| log.log_index.is_some());
+        if is_possible_to_sort_logs {
+            logs.sort_by_key(|log| {
+                log.log_index
+                    .expect("all logs log_index should have values")
+            });
+        } else {
+            vlog::warn!("Some of the log entries does not have log_index, we rely on the provided logs order");
+        }
+
+        logs.into_iter()
+            .map(|event| {
+                T::try_from(event)
+                    .map_err(|e| format_err!("Failed to parse event log from ETH: {:?}", e))
             })
             .collect()
     }

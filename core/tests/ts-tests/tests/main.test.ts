@@ -28,6 +28,7 @@ describe(`ZkSync integration tests (token: ${token}, transport: ${transport})`, 
     let david: Wallet;
     let frank: Wallet;
     let judy: Wallet;
+    let chris: Wallet;
     let operatorBalance: BigNumber;
 
     before('create tester and test wallets', async () => {
@@ -38,6 +39,7 @@ describe(`ZkSync integration tests (token: ${token}, transport: ${transport})`, 
         david = await tester.fundedWallet('1.0');
         frank = await tester.fundedWallet('1.0');
         judy = await tester.emptyWallet();
+        chris = await tester.emptyWallet();
         operatorBalance = await tester.operatorBalance(token);
     });
 
@@ -120,11 +122,13 @@ describe(`ZkSync integration tests (token: ${token}, transport: ${transport})`, 
         await tester.testTransfer(alice, david, token, TX_AMOUNT.mul(10));
         await tester.testTransfer(alice, judy, token, TX_AMOUNT.mul(10));
         await tester.testTransfer(alice, frank, token, TX_AMOUNT.mul(10));
+        await tester.testTransfer(alice, chris, token, TX_AMOUNT.mul(10));
         // Also deposit another token to pay with.
         await tester.testDeposit(frank, feeToken, DEPOSIT_AMOUNT, true);
 
-        await tester.testBatchBuilderInvalidUsage(david, token);
+        await tester.testBatchBuilderInvalidUsage(david, alice, token);
         await tester.testBatchBuilderChangePubKey(david, token, TX_AMOUNT, true);
+        await tester.testBatchBuilderSignedChangePubKey(chris, token, TX_AMOUNT);
         await tester.testBatchBuilderChangePubKey(frank, token, TX_AMOUNT, false);
         await tester.testBatchBuilderTransfers(david, frank, token, TX_AMOUNT);
         await tester.testBatchBuilderPayInDifferentToken(frank, david, token, feeToken, TX_AMOUNT);

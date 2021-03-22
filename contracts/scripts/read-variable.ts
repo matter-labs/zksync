@@ -1,9 +1,8 @@
 import { Command } from 'commander';
 import { web3Provider } from './utils';
 import { BigNumber } from 'ethers';
-import * as fs from 'fs';
 import { ethers } from 'ethers';
-import * as solc from 'solc';
+import * as hre from 'hardhat';
 
 const provider = web3Provider();
 
@@ -312,36 +311,26 @@ function getVariableName(fullName: string): string {
     return variableName;
 }
 
-function compileAndGetStorage(file: string, contractName): any {
-    const contractCode = fs.readFileSync(file, {
-        encoding: 'utf-8'
+async function getValue(address: string, contractName: string, name: string): Promise<any> {
+    // Mapping from Contract name to fully qualified name known to hardhat
+    // e.g ZkSync => cache/solpp-generated-contracts/ZkSync.sol
+    const contractMap = {};
+    const allContracts = await hre.artifacts.getAllFullyQualifiedNames();
+    allContracts.forEach((fullName) => {
+        const [file, contract] = fullName.split(':');
+        contractMap[contract] = {
+            fullName,
+            file
+        };
     });
-    const sourceFiles = {};
-    sourceFiles[`${contractName}.sol`] = { content: contractCode };
-    const input = {
-        language: 'Solidity',
-        sources: sourceFiles,
-        settings: {
-            outputSelection: {
-                '*': {
-                    '*': ['storageLayout']
-                }
-            }
-        }
-    };
-    const output = JSON.parse(solc.compile(JSON.stringify(input)));
-    if (output.contracts === undefined) {
-        throw new Error(JSON.stringify(output.errors));
+    if (!(contractName in contractMap)) {
+        throw new Error(`Unknown contract name, available contracts: ${Object.keys(contractMap)}`);
     }
-    types = output.contracts[`${contractName}.sol`][contractName].storageLayout.types;
-    return output.contracts[`${contractName}.sol`][contractName].storageLayout.storage;
-}
-
-async function getValue(address: string, contractName: string, name: string, file?: string): Promise<any> {
-    if (file === undefined) {
-        file = `${process.env.ZKSYNC_HOME}/contracts/contracts/${contractName}.sol`;
-    }
-    const storage = compileAndGetStorage(file, contractName);
+    const buildInfo = await hre.artifacts.getBuildInfo(contractMap[contractName].fullName);
+    // @ts-ignore
+    const layout = buildInfo.output.contracts[contractMap[contractName].file][contractName].storageLayout;
+    types = layout.types;
+    const storage = layout.storage;
 
     const variableName = getVariableName(name);
     const params = parseName(name);
@@ -365,8 +354,8 @@ async function main() {
         .command('read <address> <contractName> <variableName>')
         .option('-f, --file <file>')
         .description('Reads value of variable')
-        .action(async (address: string, contractName: string, variableName: string, cmd: Command) => {
-            console.log(JSON.stringify(await getValue(address, contractName, variableName, cmd.file), null, 4));
+        .action(async (address: string, contractName: string, variableName: string) => {
+            console.log(JSON.stringify(await getValue(address, contractName, variableName), null, 4));
         });
 
     await program.parseAsync(process.argv);

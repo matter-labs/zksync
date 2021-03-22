@@ -18,7 +18,8 @@ const IGNORED_DIRS = [
     'lint-config',
     'cache',
     'artifacts',
-    'typechain'
+    'typechain',
+    'binaryen'
 ];
 const IGNORED_FILES = ['KeysWithPlonkVerifier.sol', 'TokenInit.sol', '.tslintrc.js'];
 

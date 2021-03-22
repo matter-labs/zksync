@@ -20,7 +20,7 @@ use zksync_state::state::{CollectedFee, OpSuccess, ZkSyncState};
 use zksync_storage::ConnectionPool;
 use zksync_types::{
     block::{
-        Block, ExecutedOperations, ExecutedPriorityOp, ExecutedTx,
+        Block, BlockMetadata, ExecutedOperations, ExecutedPriorityOp, ExecutedTx,
         PendingBlock as SendablePendingBlock,
     },
     gas_counter::GasCounter,
@@ -1004,8 +1004,13 @@ impl ZkSyncStateKeeper {
 
         self.pending_block.previous_block_root_hash = block.get_eth_encoded_root();
 
+        let block_metadata = BlockMetadata {
+            fast_processing: pending_block.fast_processing_required,
+        };
+
         let block_commit_request = BlockCommitRequest {
             block,
+            block_metadata,
             accounts_updated: pending_block.account_updates.clone(),
         };
         let first_update_order_id = pending_block.stored_account_updates;

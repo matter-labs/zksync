@@ -20,6 +20,7 @@ fn create_new_commit_operation(
     max_blocks_to_commit: usize,
     block_commit_deadline: Duration,
     max_gas_for_tx: U256,
+    fast_processing: bool,
 ) -> Option<BlocksCommitOperation> {
     let new_blocks = new_blocks
         .iter()
@@ -45,7 +46,8 @@ fn create_new_commit_operation(
 
     let should_commit_blocks = any_block_commit_deadline_triggered
         || gas_limit_reached_for_blocks
-        || new_blocks.len() == max_blocks_to_commit;
+        || new_blocks.len() == max_blocks_to_commit
+        || fast_processing;
     if !should_commit_blocks {
         return None;
     }
@@ -73,6 +75,7 @@ fn create_new_create_proof_operation(
     current_time: DateTime<Utc>,
     block_verify_deadline: Duration,
     _max_gas_for_tx: U256,
+    fast_processing: bool,
 ) -> Option<BlocksCreateProofOperation> {
     let max_aggregate_size = available_aggregate_proof_sizes
         .last()
@@ -98,7 +101,7 @@ fn create_new_create_proof_operation(
     let can_create_max_aggregate_proof = new_blocks_with_proofs.len() >= max_aggregate_size;
 
     let should_create_aggregate_proof =
-        any_block_verify_deadline_triggered || can_create_max_aggregate_proof;
+        any_block_verify_deadline_triggered || can_create_max_aggregate_proof || fast_processing;
 
     if !should_create_aggregate_proof {
         return None;
@@ -146,6 +149,7 @@ fn create_execute_blocks_operation(
     max_blocks_to_execute: usize,
     block_execute_deadline: Duration,
     max_gas_for_tx: U256,
+    fast_processing: bool,
 ) -> Option<BlocksExecuteOperation> {
     let proven_non_executed_block = proven_non_executed_block
         .iter()
@@ -170,7 +174,8 @@ fn create_execute_blocks_operation(
 
     let should_execute_blocks = any_block_execute_deadline_triggered
         || gas_limit_reached_for_blocks
-        || proven_non_executed_block.len() == max_blocks_to_execute;
+        || proven_non_executed_block.len() == max_blocks_to_execute
+        || fast_processing;
     if !should_execute_blocks {
         return None;
     }
@@ -189,6 +194,27 @@ fn create_execute_blocks_operation(
     Some(BlocksExecuteOperation {
         blocks: blocks_to_execute,
     })
+}
+
+/// Checks if fast processing is required for any `Block`
+async fn is_fast_processing_requested(
+    storage: &mut StorageProcessor<'_>,
+    blocks: &[Block],
+) -> anyhow::Result<bool> {
+    let mut fast_processing = false;
+    for block in blocks {
+        let fast_processing_for_current_block_requested = BlockSchema(storage)
+            .get_block_metadata(block.block_number)
+            .await?
+            .map(|mdat| mdat.fast_processing)
+            .unwrap_or(false);
+
+        fast_processing = fast_processing || fast_processing_for_current_block_requested;
+        if fast_processing {
+            break;
+        }
+    }
+    return Ok(fast_processing);
 }
 
 async fn create_aggregated_commits_storage(
@@ -211,6 +237,8 @@ async fn create_aggregated_commits_storage(
         block_number.0 += 1;
     }
 
+    let fast_processing_requested = is_fast_processing_requested(storage, &new_blocks).await?;
+
     let commit_operation = create_new_commit_operation(
         &old_committed_block,
         &new_blocks,
@@ -218,6 +246,7 @@ async fn create_aggregated_commits_storage(
         config.chain.state_keeper.max_aggregated_blocks_to_commit,
         config.chain.state_keeper.block_commit_deadline(),
         config.chain.state_keeper.max_aggregated_tx_gas.into(),
+        fast_processing_requested,
     );
 
     if let Some(commit_operation) = commit_operation {
@@ -264,12 +293,16 @@ async fn create_aggregated_prover_task_storage(
         }
     }
 
+    let fast_processing_requested =
+        is_fast_processing_requested(storage, &blocks_with_proofs).await?;
+
     let create_proof_operation = create_new_create_proof_operation(
         &blocks_with_proofs,
         &config.chain.state_keeper.aggregated_proof_sizes,
         Utc::now(),
         config.chain.state_keeper.block_prove_deadline(),
         config.chain.state_keeper.max_aggregated_tx_gas.into(),
+        fast_processing_requested,
     );
     if let Some(operation) = create_proof_operation {
         let aggregated_op = operation.into();
@@ -374,12 +407,15 @@ async fn create_aggregated_execute_operation_storage(
         blocks.push(block);
     }
 
+    let fast_processing_requested = is_fast_processing_requested(storage, &blocks).await?;
+
     let execute_operation = create_execute_blocks_operation(
         &blocks,
         Utc::now(),
         config.chain.state_keeper.max_aggregated_blocks_to_execute,
         config.chain.state_keeper.block_execute_deadline(),
         config.chain.state_keeper.max_aggregated_tx_gas.into(),
+        fast_processing_requested,
     );
 
     if let Some(operation) = execute_operation {

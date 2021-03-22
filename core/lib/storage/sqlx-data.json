@@ -1378,6 +1378,32 @@
       ]
     }
   },
+  "47dd80567908f3b37161e4f92a97654e7af4a5e921145bdedbc446a653926b88": {
+    "query": "SELECT * FROM block_metadata WHERE block_number = $1",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "block_number",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 1,
+          "name": "fast_processing",
+          "type_info": "Bool"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Int8"
+        ]
+      },
+      "nullable": [
+        false,
+        false
+      ]
+    }
+  },
   "47e6a9e74f9281ef8f9373829fd8500920226c4a9ef3546b2d01fb0dfb20d686": {
     "query": "\n                SELECT aggregate_operations.* FROM eth_aggregated_ops_binding\n                LEFT JOIN aggregate_operations ON aggregate_operations.id = op_id\n                WHERE eth_op_id = $1\n                ",
     "describe": {
@@ -2111,6 +2137,19 @@
         false,
         false
       ]
+    }
+  },
+  "73eedd4444ef5bfbfd526c319f97d75609a65517d63e88add0a864a9f7141a02": {
+    "query": "\n            INSERT INTO block_metadata (block_number, fast_processing)\n            VALUES ($1, $2)\n            ",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "Int8",
+          "Bool"
+        ]
+      },
+      "nullable": []
     }
   },
   "74a5cc4affa23433b5b7834df6dfa1a7a2c5a65f23289de3de5a4f1b93f89c06": {

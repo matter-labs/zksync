@@ -29,10 +29,11 @@ struct Opt {
 async fn main() -> anyhow::Result<()> {
     let opt = Opt::from_args();
     let config = ZkSyncConfig::from_env();
+    let mut _sentry_guard = None;
     let server_mode = if opt.genesis {
         ServerCommand::Genesis
     } else {
-        vlog::init();
+        _sentry_guard = vlog::init();
         ServerCommand::Launch
     };
 
