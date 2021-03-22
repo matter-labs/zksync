@@ -603,6 +603,11 @@ async fn comprehensive_test() -> Result<(), anyhow::Error> {
         .resolve("DAI".into())
         .ok_or_else(|| anyhow::anyhow!("Error resolve token"))?;
 
+    let token_tglm = sync_depositor_wallet
+        .tokens
+        .resolve("tGLM".into())
+        .ok_or_else(|| anyhow::anyhow!("Error resolve token"))?;
+
     let dai_deposit_amount = U256::from(10).pow(18.into()) * 10000; // 10000 DAI
 
     // Move ETH to wallets so they will have some funds for L1 transactions.
@@ -640,11 +645,6 @@ async fn comprehensive_test() -> Result<(), anyhow::Error> {
     transfer_to("tGLM", tglm_deposit_amount, sync_depositor_wallet.address()).await?;
 
     assert_eq!(
-        get_ethereum_balance(&ethereum, sync_depositor_wallet.address(), &token_gnt).await?,
-        tglm_deposit_amount
-    );
-
-    assert_eq!(
         get_ethereum_balance(&ethereum, sync_depositor_wallet.address(), &token_tglm).await?,
         tglm_deposit_amount
     );
@@ -654,7 +654,7 @@ async fn comprehensive_test() -> Result<(), anyhow::Error> {
     test_deposit(
         &sync_depositor_wallet,
         &mut alice_wallet2,
-        &token_gnt,
+        &token_tglm,
         200_000_000_000_000_000_000u128,
     )
     .await?;
