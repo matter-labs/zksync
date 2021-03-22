@@ -161,20 +161,10 @@ impl RpcApp {
             Error::internal_error()
         })?;
 
-        // HACK: Special case for the Golem:
-        //
-        // Currently, their token on Rinkeby is called GNT, but it's being renamed to the tGLM.
-        //
-        // TODO: Remove this case after Golem update [ZKS-173]
         let mut has_gnt = None;
         let mut result: HashMap<_, _> = tokens
             .drain()
             .map(|(id, token)| {
-                // TODO: Remove this case after Golem update [ZKS-173]
-                if token.symbol == "GNT" {
-                    has_gnt = Some(token.clone());
-                }
-
                 if *id == 0 {
                     ("ETH".to_string(), token)
                 } else {
@@ -182,13 +172,6 @@ impl RpcApp {
                 }
             })
             .collect();
-
-        // So if we have `GNT` token in response we should also add `GLM` alias.
-        // TODO: Remove this case after Golem update [ZKS-173]
-        if let Some(mut token) = has_gnt {
-            token.symbol = "tGLM".to_string();
-            result.insert(token.symbol.clone(), token);
-        }
 
         metrics::histogram!("api.rpc.tokens", start.elapsed());
         Ok(result)

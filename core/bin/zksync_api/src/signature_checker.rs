@@ -89,12 +89,6 @@ async fn verify_eth_signature(
 ) -> Result<(), TxAddError> {
     match request_data {
         RequestData::Tx(request) => {
-            // TODO: Remove this code after Golem update [ZKS-173]
-            if (network == Network::Rinkeby || network == Network::Localhost)
-                && request.token.symbol == "GNT"
-            {
-                return Ok(());
-            }
             verify_eth_signature_single_tx(
                 &request.tx,
                 request.sender,
@@ -104,12 +98,6 @@ async fn verify_eth_signature(
             .await?;
         }
         RequestData::Batch(request) => {
-            // TODO: Remove this code after Golem update [ZKS-173]
-            if (network == Network::Rinkeby || network == Network::Localhost)
-                && request.tokens.iter().any(|t| t.symbol == "GNT")
-            {
-                return Ok(());
-            }
             let accounts = &request.senders;
             let tokens = &request.tokens;
             let txs = &request.txs;
