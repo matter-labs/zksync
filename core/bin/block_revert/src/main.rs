@@ -78,10 +78,13 @@ async fn revert_blocks_in_storage(
         .remove_prover_jobs(last_block)
         .await?;
 
-    let nonce = client.current_nonce().await?.as_u32();
+    // Nonce after reverting on the contract will be current plus one
+    // because the operator will send exactly one transaction to call revertBlocks.
+    let nonce_after_revert_on_contract = client.current_nonce().await?.as_u32() + 1;
+
     transaction
         .ethereum_schema()
-        .update_eth_parameters(last_block, Nonce(nonce))
+        .update_eth_parameters(last_block, Nonce(nonce_after_revert_on_contract))
         .await?;
 
     transaction
@@ -167,6 +170,7 @@ async fn get_blocks(
 struct Opt {
     #[structopt(long)]
     number: u32,
+    #[structopt(long)]
     gas_limit: u32,
 }
 
@@ -199,6 +203,8 @@ async fn main() -> anyhow::Result<()> {
     let last_block = BlockNumber(*last_commited_block - blocks_to_revert);
     let mut transaction = storage.start_transaction().await?;
 
+    // 1. Try to revert blocks in storage, if it fails return error.
+    // 2. Try to revert blocks on contract, if it fails changes in storage will revert.
     revert_blocks_in_storage(&client, &mut transaction, last_block).await?;
     revert_blocks_on_contract(&client, &blocks, opt.gas_limit).await?;
 
