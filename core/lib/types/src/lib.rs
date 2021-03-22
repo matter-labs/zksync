@@ -65,7 +65,7 @@ pub use self::operations::{
 };
 pub use self::priority_ops::{Deposit, FullExit, PriorityOp, ZkSyncPriorityOp};
 pub use self::tokens::{Token, TokenGenesisListItem, TokenLike, TokenPrice, TxFeeTypes};
-pub use self::tx::{ForcedExit, SignedZkSyncTx, Swap, Transfer, Withdraw, ZkSyncTx};
+pub use self::tx::{ForcedExit, Order, SignedZkSyncTx, Swap, Transfer, Withdraw, ZkSyncTx};
 
 #[doc(hidden)]
 pub use self::{operations::CloseOp, tx::Close};

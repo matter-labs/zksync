@@ -1,3 +1,5 @@
+use crate::account::PubKeyHash;
+use crate::Engine;
 use crate::{
     helpers::{
         is_fee_amount_packable, is_token_amount_packable, pack_fee_amount, pack_token_amount,
@@ -6,9 +8,6 @@ use crate::{
     AccountId, Nonce, TokenId,
 };
 use num::{BigUint, Zero};
-
-use crate::account::PubKeyHash;
-use crate::Engine;
 use serde::{Deserialize, Serialize};
 use zksync_basic_types::Address;
 use zksync_crypto::franklin_crypto::eddsa::PrivateKey;
@@ -69,6 +68,16 @@ impl Order {
         self.signature
             .verify_musig(&self.get_bytes())
             .map(|pub_key| PubKeyHash::from_pubkey(&pub_key))
+    }
+
+    pub fn check_correctness(&self) -> bool {
+        self.price.0 <= BigUint::from(u128::max_value())
+            && self.price.1 <= BigUint::from(u128::max_value())
+            && self.account_id <= max_account_id()
+            && self.recipient_id <= max_account_id()
+            && self.token_buy <= max_token_id()
+            && self.token_sell <= max_token_id()
+            && self.time_range.check_correctness()
     }
 }
 
@@ -154,29 +163,26 @@ impl Swap {
         out
     }
 
-    /// Verifies the transaction correctness:
-    pub fn check_correctness(&mut self) -> bool {
-        let mut valid = self.amounts.0 <= BigUint::from(u128::max_value())
+    fn check_amounts(&self) -> bool {
+        self.amounts.0 <= BigUint::from(u128::max_value())
             && self.amounts.1 <= BigUint::from(u128::max_value())
-            && self.orders.0.price.0 <= BigUint::from(u128::max_value())
-            && self.orders.0.price.1 <= BigUint::from(u128::max_value())
-            && self.orders.1.price.0 <= BigUint::from(u128::max_value())
-            && self.orders.1.price.1 <= BigUint::from(u128::max_value())
             && is_token_amount_packable(&self.amounts.0)
             && is_token_amount_packable(&self.amounts.1)
             && is_fee_amount_packable(&self.fee)
-            && self.orders.0.account_id <= max_account_id()
-            && self.orders.1.account_id <= max_account_id()
-            && self.orders.0.recipient_id <= max_account_id()
-            && self.orders.1.recipient_id <= max_account_id()
+    }
+
+    /// Verifies the transaction correctness:
+    pub fn check_correctness(&mut self) -> bool {
+        let mut valid = self.check_amounts()
             && self.submitter_id <= max_account_id()
-            && self.orders.0.token_buy <= max_token_id()
-            && self.orders.1.token_buy <= max_token_id()
             && self.fee_token <= max_token_id()
-            && self.orders.0.time_range.check_correctness()
-            && self.orders.1.time_range.check_correctness()
-            && self.orders.0.time_range.valid_until >= self.orders.1.time_range.valid_from
-            && self.orders.1.time_range.valid_until >= self.orders.0.time_range.valid_from;
+            && self.orders.0.check_correctness()
+            && self.orders.1.check_correctness()
+            && self
+                .orders
+                .0
+                .time_range
+                .intersects(self.orders.1.time_range);
         if valid {
             let signer = self.verify_signature();
             valid = valid && signer.is_some();

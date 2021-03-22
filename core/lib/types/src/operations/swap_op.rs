@@ -5,7 +5,7 @@ use crate::{
 };
 use crate::{AccountId, Nonce, TokenId};
 use anyhow::{ensure, format_err};
-use num::{BigUint, Zero};
+use num::Zero;
 use serde::{Deserialize, Serialize};
 use zksync_crypto::params::{
     ACCOUNT_ID_BIT_WIDTH, AMOUNT_EXPONENT_BIT_WIDTH, AMOUNT_MANTISSA_BIT_WIDTH, CHUNK_BYTES,
@@ -34,14 +34,14 @@ impl SwapOp {
         data.extend_from_slice(&self.tx.orders.1.account_id.to_be_bytes());
         data.extend_from_slice(&self.tx.orders.1.recipient_id.to_be_bytes());
         data.extend_from_slice(&self.tx.submitter_id.to_be_bytes());
-        data.extend_from_slice(&self.tx.orders.0.token_buy.to_be_bytes());
-        data.extend_from_slice(&self.tx.orders.1.token_buy.to_be_bytes());
+        data.extend_from_slice(&self.tx.orders.0.token_sell.to_be_bytes());
+        data.extend_from_slice(&self.tx.orders.1.token_sell.to_be_bytes());
         data.extend_from_slice(&self.tx.fee_token.to_be_bytes());
         data.extend_from_slice(&pack_token_amount(&self.tx.amounts.0));
         data.extend_from_slice(&pack_token_amount(&self.tx.amounts.1));
         data.extend_from_slice(&pack_fee_amount(&self.tx.fee));
-        let nonce_mask = (self.tx.orders.0.amount != BigUint::from(0u8)) as u8
-            + (self.tx.orders.1.amount != BigUint::from(0u8)) as u8 * 2;
+        let nonce_mask = (!self.tx.orders.0.amount.is_zero() as u8)
+            + (!self.tx.orders.1.amount.is_zero() as u8) * 2;
         data.push(nonce_mask);
         data.resize(Self::CHUNKS * CHUNK_BYTES, 0x00);
         data
@@ -97,43 +97,39 @@ impl SwapOp {
         let nonce = Nonce(0); // It is unknown from pubdata
         let nonce_mask = bytes[fee_offset + FEE_BIT_WIDTH / 8];
 
+        let order_a = Order {
+            account_id: account_id_0,
+            nonce,
+            recipient_id: recipient_id_0,
+            // first bit indicates if this amount is 0 or not
+            amount: amount_0.clone() * (nonce_mask & 1),
+            token_buy: token_1,
+            token_sell: token_0,
+            time_range: Default::default(),
+            signature: Default::default(),
+            price: (amount_0.clone(), amount_1.clone()),
+        };
+
+        let order_b = Order {
+            account_id: account_id_1,
+            nonce,
+            recipient_id: recipient_id_1,
+            // second bit indicates if this amount is 0 or not,
+            // there only 2 bits total
+            amount: amount_1.clone() * (nonce_mask >> 1),
+            token_buy: token_0,
+            token_sell: token_1,
+            time_range: Default::default(),
+            signature: Default::default(),
+            price: (amount_1.clone(), amount_0.clone()),
+        };
+
         Ok(Self {
             tx: Swap::new(
                 submitter_id,
-                Default::default(),
+                Default::default(), // Address is unknown from pubdata
                 nonce,
-                (
-                    Order {
-                        account_id: account_id_0,
-                        nonce,
-                        recipient_id: recipient_id_0,
-                        amount: if nonce_mask & 1 == 0 {
-                            BigUint::zero()
-                        } else {
-                            amount_0.clone()
-                        },
-                        token_buy: token_1,
-                        token_sell: token_0,
-                        time_range: Default::default(),
-                        signature: Default::default(),
-                        price: (amount_0.clone(), amount_1.clone()),
-                    },
-                    Order {
-                        account_id: account_id_1,
-                        nonce,
-                        recipient_id: recipient_id_1,
-                        amount: if nonce_mask & 2 == 0 {
-                            BigUint::zero()
-                        } else {
-                            amount_1.clone()
-                        },
-                        token_buy: token_0,
-                        token_sell: token_1,
-                        time_range: Default::default(),
-                        signature: Default::default(),
-                        price: (amount_1.clone(), amount_0.clone()),
-                    },
-                ),
+                (order_a, order_b),
                 (amount_0, amount_1),
                 fee,
                 fee_token,
