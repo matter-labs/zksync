@@ -23,7 +23,6 @@ use zksync_types::{
 use crate::{eth_checker::EthereumChecker, tx_error::TxAddError};
 use zksync_config::ZkSyncConfig;
 use zksync_eth_client::EthereumGateway;
-use zksync_types::network::Network;
 use zksync_utils::panic_notify::ThreadPanicNotify;
 
 /// `TxVariant` is used to form a verify request. It is possible to wrap
