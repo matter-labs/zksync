@@ -42,7 +42,7 @@ describe('UpgradeGatekeeper unit tests', function () {
         );
 
         // check initial dummy index and storage
-        expect(await proxyDummyInterface.get_DUMMY_INDEX()).to.equal(1);
+        expect(await proxyDummyInterface.getDummyIndex()).to.equal(1);
 
         expect(parseInt(await provider.getStorageAt(proxyTestContract.address, 1))).to.equal(bytes[0]);
         expect(parseInt(await provider.getStorageAt(proxyTestContract.address, 2))).to.equal(bytes[1]);
@@ -107,7 +107,7 @@ describe('UpgradeGatekeeper unit tests', function () {
         const activated_time = performance.now();
 
         // wait and activate preparation status
-        const notice_period = parseInt(await dummyFirst.get_UPGRADE_NOTICE_PERIOD());
+        const notice_period = parseInt(await dummyFirst.getNoticePeriod());
         for (let step = 1; step <= 3; step++) {
             if (step != 3) {
                 while (performance.now() - start_time < Math.round((notice_period * 1000.0 * step) / 10.0 + 10)) {
@@ -147,7 +147,7 @@ describe('UpgradeGatekeeper unit tests', function () {
         await expect(await proxyTestContract.getTarget()).to.equal(dummySecond.address);
 
         // check dummy index and updated storage
-        expect(await proxyDummyInterface.get_DUMMY_INDEX()).to.equal(2);
+        expect(await proxyDummyInterface.getDummyIndex()).to.equal(2);
 
         expect(parseInt(await provider.getStorageAt(proxyTestContract.address, 1))).to.equal(bytes[0]);
         expect(parseInt(await provider.getStorageAt(proxyTestContract.address, 2))).to.equal(bytes[2]);

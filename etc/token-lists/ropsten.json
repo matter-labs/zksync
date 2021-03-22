@@ -1,0 +1,67 @@
+[
+    {
+        "address": "0x0000000000000000000000000000000000000000",
+        "symbol": "ETH",
+        "decimals": 18
+    },
+    {
+        "address": "0x351714df444b8213f2c46aaa28829fc5a8921304",
+        "symbol": "DAI",
+        "decimals": 18
+    },
+    {
+        "address": "0x793f38ae147852c37071684cdffc1ff7c87f7d07",
+        "symbol": "LINK",
+        "decimals": 18
+    },
+    {
+        "address": "0x5ae45f7f17f0df0b24abe25a5522a9c9341ac04d",
+        "symbol": "OKB",
+        "decimals": 18
+    },
+    {
+        "address": "0x7e317ceaa15fe7d5474349043332319c5f28cc11",
+        "symbol": "FSN",
+        "decimals": 18
+    },
+    {
+        "address": "0x16c550a97ad2ae12c0c8cf1cc3f8db4e0c45238f",
+        "symbol": "BUSD",
+        "decimals": 18
+    },
+    {
+        "address": "0x6856ec11f56267e3326f536d0e9f36ec7f7d1498",
+        "symbol": "TUSD",
+        "decimals": 18
+    },
+    {
+        "address": "0xc865bcbe4b6ef4b58a790052f2b51b4f06f586ac",
+        "symbol": "ZRX",
+        "decimals": 18
+    },
+    {
+        "address": "0x1b46bd2fc40030b6959a2d407f7d16f66afadd52",
+        "symbol": "BAT",
+        "decimals": 18
+    },
+    {
+        "address": "0xb36b2e278f5f1980631ad10f693ab3e1bebd9f70",
+        "symbol": "MLTT",
+        "decimals": 18
+    },
+    {
+        "address": "0x7c07c42973047223f80c4a69bb62d5195460eb5f",
+        "symbol": "TBTC",
+        "decimals": 18
+    },
+    {
+        "address": "0x2db6a31f973ec26f5e17895f0741bb5965d5ae15",
+        "symbol": "AUSDC",
+        "decimals": 6
+    },
+    {
+        "address": "0x07865c6e87b9f70255377e024ace6630c1eaa37f",
+        "symbol": "USDC",
+        "decimals": 6
+    }
+]

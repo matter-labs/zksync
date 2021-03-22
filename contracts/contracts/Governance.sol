@@ -13,6 +13,9 @@ contract Governance is Config {
     /// @notice Governor changed
     event NewGovernor(address newGovernor);
 
+    /// @notice Token Governance changed
+    event NewTokenGovernance(address newTokenGovernance);
+
     /// @notice Validator's status changed
     event ValidatorStatusUpdate(address indexed validatorAddress, bool isActive);
 
@@ -36,6 +39,9 @@ contract Governance is Config {
     /// @notice Paused tokens list, deposits are impossible to create for paused tokens
     mapping(uint16 => bool) public pausedTokens;
 
+    /// @notice Address that is authorized to add tokens to the Governance.
+    address public tokenGovernance;
+
     /// @notice Governance contract initialization. Can be external because Proxy contract intercepts illegal calls of this function.
     /// @param initializationParameters Encoded representation of initialization parameters:
     ///     _networkGovernor The address of network governor
@@ -47,6 +53,7 @@ contract Governance is Config {
 
     /// @notice Governance contract upgrade. Can be external because Proxy contract intercepts illegal calls of this function.
     /// @param upgradeParameters Encoded representation of upgrade parameters
+    // solhint-disable-next-line no-empty-blocks
     function upgrade(bytes calldata upgradeParameters) external {}
 
     /// @notice Change current governor
@@ -59,10 +66,20 @@ contract Governance is Config {
         }
     }
 
+    /// @notice Change current token governance
+    /// @param _newTokenGovernance Address of the new token governor
+    function changeTokenGovernance(address _newTokenGovernance) external {
+        requireGovernor(msg.sender);
+        if (tokenGovernance != _newTokenGovernance) {
+            tokenGovernance = _newTokenGovernance;
+            emit NewTokenGovernance(_newTokenGovernance);
+        }
+    }
+
     /// @notice Add token to the list of networks tokens
     /// @param _token Token address
     function addToken(address _token) external {
-        requireGovernor(msg.sender);
+        require(msg.sender == tokenGovernance, "1E");
         require(tokenIds[_token] == 0, "1e"); // token exists
         require(totalTokens < MAX_AMOUNT_OF_REGISTERED_TOKENS, "1f"); // no free identifiers for tokens
 

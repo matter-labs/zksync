@@ -1,0 +1,24 @@
+[package]
+name = "zksync_notifier"
+version = "1.0.0"
+edition = "2018"
+authors = ["The Matter Labs Team <hello@matterlabs.dev>"]
+homepage = "https://zksync.io/"
+repository = "https://github.com/matter-labs/zksync"
+license = "Apache-2.0"
+keywords = ["blockchain", "zksync"]
+categories = ["cryptography"]
+
+[dependencies]
+zksync_types = { path = "../types", version = "1.0" }
+num = { version = "0.3.1", features = ["serde"] }
+bigdecimal = { version = "0.2.0", features = ["serde"]}
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0.0"
+anyhow = "1.0"
+futures = "0.3"
+hex = "0.4"
+reqwest = { version = "0.10", features = ["blocking", "json"] }
+
+[dev-dependencies]
+serde_json = "1.0.0"

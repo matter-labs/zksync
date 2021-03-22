@@ -213,17 +213,21 @@ impl GasCounter {
     }
 
     pub fn commit_gas_limit_aggregated(blocks: &[Block]) -> U256 {
-        U256::from(Self::BASE_COMMIT_BLOCKS_TX_COST)
+        let approx_limit = U256::from(Self::BASE_COMMIT_BLOCKS_TX_COST)
             + blocks
                 .iter()
-                .fold(U256::zero(), |acc, block| acc + block.commit_gas_limit)
+                .fold(U256::zero(), |acc, block| acc + block.commit_gas_limit);
+
+        Self::scale_up(approx_limit)
     }
 
     pub fn execute_gas_limit_aggregated(blocks: &[Block]) -> U256 {
-        U256::from(Self::BASE_EXECUTE_BLOCKS_TX_COST)
+        let approx_limit = U256::from(Self::BASE_EXECUTE_BLOCKS_TX_COST)
             + blocks
                 .iter()
-                .fold(U256::zero(), |acc, block| acc + block.verify_gas_limit)
+                .fold(U256::zero(), |acc, block| acc + block.verify_gas_limit);
+
+        Self::scale_up(approx_limit)
     }
 
     /// Increases the value by 30%.

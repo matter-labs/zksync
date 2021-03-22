@@ -17,7 +17,7 @@ describe('Bytes unit tests', function () {
     it('should read bytes', async () => {
         let r = await bytesTestContract.read('0x0102030405060708', 4, 2);
         expect(r.data).equal('0x0506');
-        expect(r.new_offset).equal(BigNumber.from(6));
+        expect(r.newOffset).equal(BigNumber.from(6));
     });
 
     it('should fail to read bytes beyond range', async () => {

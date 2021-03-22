@@ -1,0 +1,107 @@
+[
+    {
+        "address": "0x0000000000000000000000000000000000000000",
+        "symbol": "ETH",
+        "decimals": 18
+    },
+    {
+        "address": "0x3b00ef435fa4fcff5c209a37d1f3dcff37c705ad",
+        "symbol": "USDT",
+        "decimals": 6
+    },
+    {
+        "address": "0xeb8f08a975ab53e34d8a0330e0d34de942c95926",
+        "symbol": "USDC",
+        "decimals": 6
+    },
+    {
+        "address": "0x4da8d0795830f75be471f072a034d42c369b5d0a",
+        "symbol": "LINK",
+        "decimals": 18
+    },
+    {
+        "address": "0xd2255612f9b045e9c81244bb874abb413ca139a3",
+        "symbol": "TUSD",
+        "decimals": 18
+    },
+    {
+        "address": "0x14700cae8b2943bad34c70bb76ae27ecf5bc5013",
+        "symbol": "HT",
+        "decimals": 18
+    },
+    {
+        "address": "0x2b203de02ad6109521e09985b3af9b8c62541cd6",
+        "symbol": "OMG",
+        "decimals": 18
+    },
+    {
+        "address": "0x2655f3a9eeb7f960be83098457144813ffad07a4",
+        "symbol": "TRB",
+        "decimals": 18
+    },
+    {
+        "address": "0xdb7f2b9f6a0cb35fe5d236e5ed871d3ad4184290",
+        "symbol": "ZRX",
+        "decimals": 18
+    },
+    {
+        "address": "0xd2084ea2ae4bbe1424e4fe3cde25b713632fb988",
+        "symbol": "BAT",
+        "decimals": 18
+    },
+    {
+        "address": "0x9cac8508b9ff26501439590a24893d80e7e84d21",
+        "symbol": "REP",
+        "decimals": 18
+    },
+    {
+        "address": "0x8098165d982765097e4aa17138816e5b95f9fdb5",
+        "symbol": "STORJ",
+        "decimals": 8
+    },
+    {
+        "address": "0x02d01f0835b7fdfa5d801a8f5f74c37f2bb1ae6a",
+        "symbol": "NEXO",
+        "decimals": 18
+    },
+    {
+        "address": "0xd93addb2921b8061b697c2ab055979bbefe2b7ac",
+        "symbol": "MCO",
+        "decimals": 8
+    },
+    {
+        "address": "0x290eba6ec56ecc9ff81c72e8eccc77d2c2bf63eb",
+        "symbol": "KNC",
+        "decimals": 18
+    },
+    {
+        "address": "0x9ecec4d48efdd96ae377af3ab868f99de865cff8",
+        "symbol": "LAMB",
+        "decimals": 18
+    },
+    {
+        "address": "0xd94e3dc39d4cad1dad634e7eb585a57a19dc7efe",
+        "symbol": "GNT",
+        "decimals": 18
+    },
+    {
+        "address": "0x690f4886c6911d81beb8130db30c825c27281f22",
+        "symbol": "MLTT",
+        "decimals": 18
+    },
+    {
+        "address": "0xc3904a7c3a95bc265066bb5bfc4d6664b2174774",
+        "symbol": "XEM",
+        "decimals": 0
+    },
+    {
+        "address": "0x2e055eee18284513b993db7568a592679ab13188",
+        "symbol": "DAI",
+        "decimals": 18
+    },
+    {
+        "address": "0xfe1b6abc39e46cec54d275efb4b29b33be176c2a",
+        "symbol": "PHNX",
+        "decimals": 18
+    }
+]

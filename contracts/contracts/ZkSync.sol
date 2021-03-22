@@ -72,6 +72,7 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
 
     /// @notice Notification that upgrade notice period started
     /// @dev Can be external because Proxy contract intercepts illegal calls of this function
+    // solhint-disable-next-line no-empty-blocks
     function upgradeNoticePeriodStarted() external override {}
 
     /// @notice Notification that upgrade preparation status is activated
@@ -124,35 +125,8 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
 
     /// @notice zkSync contract upgrade. Can be external because Proxy contract intercepts illegal calls of this function.
     /// @param upgradeParameters Encoded representation of upgrade parameters
-    function upgrade(bytes calldata upgradeParameters) external nonReentrant {
-        // #if UPGRADE_FROM_V3
-        // NOTE: this line does not have any effect in contracts-4 upgrade since we require priority queue to be empty,
-        // but this should be enabled in future upgrades.
-        activateExodusMode();
-
-        require(upgradeParameters.length == 0, "0"); // upgrade parameters should be empty
-
-        // Convert last verified block from old format to new format
-        require(totalBlocksCommitted == totalBlocksExecuted, "1"); // all blocks should be verified
-        require(numberOfPendingWithdrawals_DEPRECATED == 0, "2"); // pending withdrawal is not used anymore
-        require(totalOpenPriorityRequests == 0, "3"); // no uncommitted priority requests
-
-        Block_DEPRECATED memory lastBlock = blocks_DEPRECATED[totalBlocksExecuted];
-        require(lastBlock.priorityOperations == 0, "4"); // last block should not contain priority operations
-
-        StoredBlockInfo memory rehashedLastBlock =
-            StoredBlockInfo(
-                totalBlocksExecuted,
-                lastBlock.priorityOperations,
-                EMPTY_STRING_KECCAK,
-                0,
-                lastBlock.stateRoot,
-                lastBlock.commitment
-            );
-        storedBlockHashes[totalBlocksExecuted] = hashStoredBlockInfo(rehashedLastBlock);
-        totalBlocksProven = totalBlocksExecuted;
-        // #endif
-    }
+    // solhint-disable-next-line no-empty-blocks
+    function upgrade(bytes calldata upgradeParameters) external nonReentrant {}
 
     /// @notice Sends tokens
     /// @dev NOTE: will revert if transfer call fails or rollup balance difference (before and after transfer) is bigger than _maxAmount
@@ -230,6 +204,7 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
         require(Utils.transferFromERC20(_token, msg.sender, address(this), SafeCast.toUint128(_amount)), "c"); // token transfer failed deposit
         uint256 balanceAfter = _token.balanceOf(address(this));
         uint128 depositAmount = SafeCast.toUint128(balanceAfter.sub(balanceBefore));
+        require(depositAmount <= MAX_DEPOSIT_AMOUNT, "C");
 
         registerDeposit(tokenId, depositAmount, _zkSyncAddress);
     }
@@ -550,10 +525,14 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
     /// @dev of existed priority requests expiration block number.
     /// @return bool flag that is true if the Exodus mode must be entered.
     function activateExodusMode() public returns (bool) {
+        // #if EASY_EXODUS
+        bool trigger = true;
+        // #else
         bool trigger =
             block.number >= priorityRequests[firstPriorityRequestId].expirationBlock &&
                 priorityRequests[firstPriorityRequestId].expirationBlock != 0;
-        if ($$(EASY_EXODUS) || trigger) {
+        // #endif
+        if (trigger) {
             if (!exodusMode) {
                 exodusMode = true;
                 emit ExodusMode();
@@ -597,12 +576,12 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
     /// @notice New pubkey hash can be reset, to do that user should send two transactions:
     ///         1) First `setAuthPubkeyHash` transaction for already used `_nonce` will set timer.
     ///         2) After `AUTH_FACT_RESET_TIMELOCK` time is passed second `setAuthPubkeyHash` transaction will reset pubkey hash for `_nonce`.
-    /// @param _pubkey_hash New pubkey hash
+    /// @param _pubkeyHash New pubkey hash
     /// @param _nonce Nonce of the change pubkey L2 transaction
-    function setAuthPubkeyHash(bytes calldata _pubkey_hash, uint32 _nonce) external {
-        require(_pubkey_hash.length == PUBKEY_HASH_BYTES, "y"); // PubKeyHash should be 20 bytes.
+    function setAuthPubkeyHash(bytes calldata _pubkeyHash, uint32 _nonce) external {
+        require(_pubkeyHash.length == PUBKEY_HASH_BYTES, "y"); // PubKeyHash should be 20 bytes.
         if (authFacts[msg.sender][_nonce] == bytes32(0)) {
-            authFacts[msg.sender][_nonce] = keccak256(_pubkey_hash);
+            authFacts[msg.sender][_nonce] = keccak256(_pubkeyHash);
         } else {
             uint256 currentResetTimer = authFactsResetTimer[msg.sender][_nonce];
             if (currentResetTimer == 0) {
@@ -610,7 +589,7 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
             } else {
                 require(block.timestamp.sub(currentResetTimer) >= AUTH_FACT_RESET_TIMELOCK, "z");
                 authFactsResetTimer[msg.sender][_nonce] = 0;
-                authFacts[msg.sender][_nonce] = keccak256(_pubkey_hash);
+                authFacts[msg.sender][_nonce] = keccak256(_pubkeyHash);
             }
         }
     }

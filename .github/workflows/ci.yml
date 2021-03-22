@@ -34,10 +34,7 @@ jobs:
         run: |
           ci_run zk
           ci_run zk fmt --check
-          ci_run zk lint rust --check
-          ci_run zk lint js --check
-          ci_run zk lint ts --check
-          ci_run zk lint md --check
+          ci_run zk lint --check
 
   unit-tests:
     runs-on: [self-hosted, CI-worker]

@@ -2,7 +2,7 @@
 use std::collections::HashMap;
 // External uses
 // Workspace deps
-use zksync_types::{PriorityOp, SerialId};
+use zksync_types::{NewTokenEvent, PriorityOp, SerialId};
 // Local deps
 use super::received_ops::ReceivedPriorityOp;
 
@@ -23,12 +23,13 @@ pub struct ETHState {
     ///
     /// Note that since these operations do not have enough confirmations,
     /// they may be not executed in the future, so this list is approximate.
-    ///
     unconfirmed_queue: Vec<PriorityOp>,
     /// Keys in this HashMap are numbers of blocks with `PriorityOp`.
     /// Queue of priority operations that passed the confirmation
     /// threshold and are waiting to be executed.
     priority_queue: HashMap<u64, ReceivedPriorityOp>,
+    /// List of tokens that have been added to the contract.
+    new_tokens: Vec<NewTokenEvent>,
 }
 
 impl ETHState {
@@ -36,11 +37,13 @@ impl ETHState {
         last_ethereum_block: u64,
         unconfirmed_queue: Vec<PriorityOp>,
         priority_queue: HashMap<SerialId, ReceivedPriorityOp>,
+        new_tokens: Vec<NewTokenEvent>,
     ) -> Self {
         Self {
             last_ethereum_block,
             unconfirmed_queue,
             priority_queue,
+            new_tokens,
         }
     }
 
@@ -54,5 +57,9 @@ impl ETHState {
 
     pub fn unconfirmed_queue(&self) -> &[PriorityOp] {
         &self.unconfirmed_queue
+    }
+
+    pub fn new_tokens(&self) -> &[NewTokenEvent] {
+        &self.new_tokens
     }
 }
