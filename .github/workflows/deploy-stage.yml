@@ -54,7 +54,6 @@ jobs:
         docker login -u ${{ secrets.DOCKER_USER }} -p ${{ secrets.DOCKER_PASSWORD }}
         zk docker push rust
         zk docker push nginx
-        echo IMAGE_TAG=$(git rev-parse --short HEAD) >> $GITHUB_ENV
 
   deploy:
     name: Deploy to the Stage enviroment
@@ -67,6 +66,7 @@ jobs:
     env:
       KUBECONF: ${{ secrets.STAGE_KUBECONF }}
       HFENV: zksync-stage
+      IMAGE_TAG: ${{ needs.pre.outputs.shortRev }}
 
     steps:
       -
