@@ -603,11 +603,6 @@ async fn comprehensive_test() -> Result<(), anyhow::Error> {
         .resolve("DAI".into())
         .ok_or_else(|| anyhow::anyhow!("Error resolve token"))?;
 
-    let token_tglm = sync_depositor_wallet
-        .tokens
-        .resolve("tGLM".into())
-        .ok_or_else(|| anyhow::anyhow!("Error resolve token"))?;
-
     let dai_deposit_amount = U256::from(10).pow(18.into()) * 10000; // 10000 DAI
 
     // Move ETH to wallets so they will have some funds for L1 transactions.
@@ -640,70 +635,6 @@ async fn comprehensive_test() -> Result<(), anyhow::Error> {
         200_000_000_000_000_000_000u128,
     )
     .await?;
-
-    let tglm_deposit_amount = U256::from(10).pow(18.into()) * 10000; // 10000 tGLM
-    transfer_to("tGLM", tglm_deposit_amount, sync_depositor_wallet.address()).await?;
-
-    assert_eq!(
-        get_ethereum_balance(&ethereum, sync_depositor_wallet.address(), &token_tglm).await?,
-        tglm_deposit_amount
-    );
-
-    let mut alice_wallet2 = make_wallet(provider.clone(), eth_random_account_credentials()).await?;
-
-    test_deposit(
-        &sync_depositor_wallet,
-        &mut alice_wallet2,
-        &token_tglm,
-        200_000_000_000_000_000_000u128,
-    )
-    .await?;
-    test_change_pubkey(&alice_wallet2, "GNT").await?;
-    // Check that sending transaction using tGLM token name works and transaction gets processed by server.
-    test_transfer(
-        &alice_wallet2,
-        &bob_wallet1,
-        "tGLM",
-        20_000_000_000_000_000_000u128,
-    )
-    .await?;
-
-    // Test batch with single transaction
-    let total_fee = alice_wallet2
-        .provider
-        .get_tx_fee(TxFeeTypes::Transfer, bob_wallet1.address(), "tGLM")
-        .await?
-        .total_fee;
-
-    let mut nonce = alice_wallet2.account_info().await?.committed.nonce;
-    let (transfer, signature) = alice_wallet2
-        .signer
-        .sign_transfer(
-            token_tglm.clone(),
-            20_000_000_000_000_000_000u128.into(),
-            total_fee,
-            bob_wallet1.address(),
-            nonce,
-            Default::default(),
-        )
-        .await?;
-    *nonce += 1;
-
-    let signed_transfers = vec![(
-        ZkSyncTx::Transfer(Box::new(transfer.clone())),
-        signature.clone(),
-    )];
-
-    let tx_hashes = alice_wallet2
-        .provider
-        .send_txs_batch(signed_transfers, None)
-        .await?;
-    let batch_handle = SyncTransactionHandle::new(tx_hashes[0], alice_wallet2.provider.clone());
-
-    batch_handle
-        .commit_timeout(Duration::from_secs(180))
-        .wait_for_commit()
-        .await?;
 
     Ok(())
 }
