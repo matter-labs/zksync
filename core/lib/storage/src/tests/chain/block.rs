@@ -613,7 +613,7 @@ async fn pending_block_workflow(mut storage: StorageProcessor<'_>) -> QueryResul
         operations::{ChangePubKeyOp, TransferToNewOp},
         ExecutedOperations, ExecutedTx, ZkSyncOp, ZkSyncTx,
     };
-    vlog::init();
+    let _sentry_guard = vlog::init();
 
     let from_account_id = AccountId(0xbabe);
     let from_zksync_account = ZkSyncAccount::rand();
