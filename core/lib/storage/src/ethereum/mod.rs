@@ -617,6 +617,8 @@ impl<'a, 'c> EthereumSchema<'a, 'c> {
         Ok(final_hash)
     }
 
+    // Updates eth_parameters with given nonce and last block.
+    // It updates last_verified_block only if it is greater than given last block.
     pub async fn update_eth_parameters(
         &mut self,
         last_block: BlockNumber,

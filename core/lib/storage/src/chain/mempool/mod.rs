@@ -376,6 +376,7 @@ impl<'a, 'c> MempoolSchema<'a, 'c> {
         Ok(())
     }
 
+    // Returns executed txs back to mempool for blocks with number greater than `last_block`
     pub async fn return_executed_txs_to_mempool(
         &mut self,
         last_block: BlockNumber,

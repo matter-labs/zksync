@@ -366,6 +366,7 @@ impl<'a, 'c> ProverSchema<'a, 'c> {
         Ok(result)
     }
 
+    // Removes witnesses for blocks with number greater than `last_block`
     pub async fn remove_witnesses(&mut self, last_block: BlockNumber) -> QueryResult<()> {
         let start = Instant::now();
         sqlx::query!(
@@ -379,6 +380,7 @@ impl<'a, 'c> ProverSchema<'a, 'c> {
         Ok(())
     }
 
+    // Removes proofs for blocks with number greater than `last_block`
     pub async fn remove_proofs(&mut self, last_block: BlockNumber) -> QueryResult<()> {
         let start = Instant::now();
         sqlx::query!(
@@ -392,6 +394,7 @@ impl<'a, 'c> ProverSchema<'a, 'c> {
         Ok(())
     }
 
+    // Removes aggregated proofs for blocks with number greater than `last_block`
     pub async fn remove_aggregated_proofs(&mut self, last_block: BlockNumber) -> QueryResult<()> {
         let start = Instant::now();
         sqlx::query!(
@@ -405,6 +408,7 @@ impl<'a, 'c> ProverSchema<'a, 'c> {
         Ok(())
     }
 
+    // Removes blocks with number greater than `last_block` from prover job queue
     pub async fn remove_prover_jobs(&mut self, last_block: BlockNumber) -> QueryResult<()> {
         let start = Instant::now();
         let mut transaction = self.0.start_transaction().await?;

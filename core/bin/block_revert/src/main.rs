@@ -11,6 +11,7 @@ use zksync_eth_client::EthereumGateway;
 use zksync_storage::StorageProcessor;
 use zksync_types::{aggregated_operations::stored_block_info, block::Block, BlockNumber, Nonce};
 
+// TODO: don't use anyhow (ZKS-588)
 async fn revert_blocks_in_storage(
     client: &EthereumGateway,
     storage: &mut StorageProcessor<'_>,
@@ -97,6 +98,7 @@ async fn revert_blocks_in_storage(
     Ok(())
 }
 
+// TODO: don't use anyhow (ZKS-588)
 async fn send_raw_tx_and_wait_confirmation(
     client: &EthereumGateway,
     raw_tx: Vec<u8>,
@@ -126,6 +128,7 @@ async fn send_raw_tx_and_wait_confirmation(
     }
 }
 
+// TODO: don't use anyhow (ZKS-588)
 async fn revert_blocks_on_contract(
     client: &EthereumGateway,
     blocks: &[Block],
@@ -146,6 +149,7 @@ async fn revert_blocks_on_contract(
     Ok(())
 }
 
+// TODO: don't use anyhow (ZKS-588)
 async fn get_blocks(
     last_commited_block: BlockNumber,
     blocks_to_revert: u32,
@@ -174,6 +178,7 @@ struct Opt {
     gas_limit: u32,
 }
 
+// TODO: don't use anyhow (ZKS-588)
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     let opt = Opt::from_args();

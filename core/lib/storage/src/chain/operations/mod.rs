@@ -497,6 +497,7 @@ impl<'a, 'c> OperationsSchema<'a, 'c> {
         Ok(aggregated_op)
     }
 
+    // Removes executed priority operations for blocks with number greater than `last_block`
     pub async fn remove_executed_priority_operations(
         &mut self,
         last_block: BlockNumber,
@@ -516,6 +517,7 @@ impl<'a, 'c> OperationsSchema<'a, 'c> {
         Ok(())
     }
 
+    // Removes aggregate operations and bindings for blocks with number greater than `last_block`
     pub async fn remove_aggregate_operations_and_bindings(
         &mut self,
         last_block: BlockNumber,

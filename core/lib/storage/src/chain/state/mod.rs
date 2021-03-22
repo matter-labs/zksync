@@ -550,6 +550,7 @@ impl<'a, 'c> StateSchema<'a, 'c> {
         result
     }
 
+    // Removes account balance updates for blocks with number greater than `last_block`
     pub async fn remove_account_balance_updates(
         &mut self,
         last_block: BlockNumber,
@@ -569,6 +570,7 @@ impl<'a, 'c> StateSchema<'a, 'c> {
         Ok(())
     }
 
+    // Removes account creates for blocks with number greater than `last_block`
     pub async fn remove_account_creates(&mut self, last_block: BlockNumber) -> QueryResult<()> {
         let start = Instant::now();
         sqlx::query!(
@@ -582,6 +584,7 @@ impl<'a, 'c> StateSchema<'a, 'c> {
         Ok(())
     }
 
+    // Removes account pubkey updates for blocks with number greater than `last_block`
     pub async fn remove_account_pubkey_updates(
         &mut self,
         last_block: BlockNumber,

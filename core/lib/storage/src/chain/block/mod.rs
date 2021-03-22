@@ -854,6 +854,7 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
         Ok(self.save_block(block).await?)
     }
 
+    // Removes blocks with number greater than `last_block`
     pub async fn remove_blocks(&mut self, last_block: BlockNumber) -> QueryResult<()> {
         let start = Instant::now();
         sqlx::query!("DELETE FROM blocks WHERE number > $1", *last_block as i64)
@@ -864,6 +865,7 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
         Ok(())
     }
 
+    // Removes pending block
     pub async fn remove_pending_block(&mut self) -> QueryResult<()> {
         let start = Instant::now();
         sqlx::query!("DELETE FROM pending_block")
@@ -874,6 +876,7 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
         Ok(())
     }
 
+    // Removes account tree cache for blocks with number greater than `last_block`
     pub async fn remove_account_tree_cache(&mut self, last_block: BlockNumber) -> QueryResult<()> {
         let start = Instant::now();
         sqlx::query!(
