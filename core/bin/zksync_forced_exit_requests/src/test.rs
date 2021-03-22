@@ -160,6 +160,14 @@ impl CoreInteractionWrapper for MockCoreInteractionWrapper {
         deleted_requests.append(&mut to_delete);
         Ok(())
     }
+
+    async fn check_forced_exit_request(
+        &self,
+        _request: &ForcedExitRequest,
+    ) -> anyhow::Result<bool> {
+        // For tests it is better to just return true all the time
+        Ok(true)
+    }
 }
 
 pub fn add_request(requests: &Mutex<Vec<ForcedExitRequest>>, new_request: ForcedExitRequest) {

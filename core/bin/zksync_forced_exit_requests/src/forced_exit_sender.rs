@@ -53,7 +53,8 @@ impl<T: CoreInteractionWrapper + Sync + Send> ForcedExitSender for MempoolForced
             }
 
             if attempts >= PROCESSING_ATTEMPTS {
-                vlog::error!("Failed to process forced exit for the {} time", attempts);
+                // We should not get stuck processing requests that possibly could never be processed
+                break;
             }
         }
     }
@@ -240,6 +241,16 @@ impl<T: CoreInteractionWrapper> MempoolForcedExitSender<T> {
         };
 
         let txs = self.build_transactions(fe_request.clone()).await?;
+
+        // Right before sending the transactions we must check if the request is possible at all
+        let is_request_possible = self
+            .core_interaction_wrapper
+            .check_forced_exit_request(&fe_request)
+            .await?;
+        if !is_request_possible {
+            // If not possible at all, return without sending any transactions
+            return Ok(());
+        }
         let hashes = self
             .core_interaction_wrapper
             .send_and_save_txs_batch(&fe_request, txs)
