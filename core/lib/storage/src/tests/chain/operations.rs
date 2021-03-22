@@ -370,3 +370,41 @@ async fn remove_rejected_transactions(mut storage: StorageProcessor<'_>) -> Quer
 
     Ok(())
 }
+
+/// Checks if executed_priority_operations are removed correctly.
+#[db_test]
+async fn test_remove_executed_priority_operations(
+    mut storage: StorageProcessor<'_>,
+) -> QueryResult<()> {
+    for block_number in 1..=5 {
+        let executed_priority_op = NewExecutedPriorityOperation {
+            block_number,
+            block_index: 1,
+            operation: Default::default(),
+            from_account: Default::default(),
+            to_account: Default::default(),
+            priority_op_serialid: block_number,
+            deadline_block: 100,
+            eth_hash: vec![0xDE, 0xAD, 0xBE, 0xEF],
+            eth_block: 10,
+            created_at: chrono::Utc::now(),
+        };
+        OperationsSchema(&mut storage)
+            .store_executed_priority_op(executed_priority_op)
+            .await?;
+    }
+    OperationsSchema(&mut storage)
+        .remove_executed_priority_operations(BlockNumber(3))
+        .await?;
+    let block3_txs = BlockSchema(&mut storage)
+        .get_block_transactions(BlockNumber(3))
+        .await?;
+    assert!(!block3_txs.is_empty());
+
+    let block4_txs = BlockSchema(&mut storage)
+        .get_block_transactions(BlockNumber(4))
+        .await?;
+    assert!(block4_txs.is_empty());
+
+    Ok(())
+}

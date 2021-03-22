@@ -6,7 +6,7 @@ use zksync_basic_types::{H256, U256};
 use zksync_types::{
     aggregated_operations::{AggregatedActionType, AggregatedOperation},
     ethereum::ETHOperation,
-    BlockNumber,
+    BlockNumber, Nonce,
 };
 // Local imports
 use crate::test_data::{gen_unique_aggregated_operation, BLOCK_SIZE_CHUNKS};
@@ -19,12 +19,12 @@ use num::BigUint;
 /// Parameters for `EthereumSchema::save_operation_eth_tx` method.
 #[derive(Debug)]
 pub struct EthereumTxParams {
-    op_type: String,
-    op: Option<(i64, AggregatedOperation)>,
-    hash: H256,
-    deadline_block: u64,
-    gas_price: BigUint,
-    raw_tx: Vec<u8>,
+    pub op_type: String,
+    pub op: Option<(i64, AggregatedOperation)>,
+    pub hash: H256,
+    pub deadline_block: u64,
+    pub gas_price: BigUint,
+    pub raw_tx: Vec<u8>,
 }
 
 impl EthereumTxParams {
@@ -386,6 +386,24 @@ async fn ethereum_gas_update(mut storage: StorageProcessor<'_>) -> QueryResult<(
 
     assert_eq!(new_price_limit, old_price_limit + 1i32);
     assert_eq!(new_average_price, Some(old_price_limit - 1i32));
+
+    Ok(())
+}
+
+/// Check update eth parameters
+#[db_test]
+async fn test_update_eth_parameters(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
+    storage.ethereum_schema().initialize_eth_data().await?;
+    storage
+        .ethereum_schema()
+        .update_eth_parameters(BlockNumber(5), Nonce(3))
+        .await?;
+
+    let stats = storage.ethereum_schema().load_stats().await?;
+    assert_eq!(stats.last_committed_block, 5);
+    assert_eq!(stats.last_verified_block, 0);
+    assert_eq!(stats.last_executed_block, 0);
+    assert_eq!(storage.ethereum_schema().get_next_nonce().await?, 3);
 
     Ok(())
 }

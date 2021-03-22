@@ -4,7 +4,7 @@ use zksync_crypto::rand::{Rng, SeedableRng, XorShiftRng};
 use zksync_types::{
     mempool::SignedTxVariant,
     tx::{ChangePubKey, Transfer, Withdraw},
-    AccountId, Address, Nonce, SignedZkSyncTx, TokenId, ZkSyncTx,
+    AccountId, Address, BlockNumber, Nonce, SignedZkSyncTx, TokenId, ZkSyncTx,
 };
 // Local imports
 use crate::test_data::gen_eth_sign_data;
@@ -343,6 +343,54 @@ async fn contains_and_get_tx(mut storage: StorageProcessor<'_>) -> QueryResult<(
                 .hash(),
             tx_hash,
         );
+    }
+
+    Ok(())
+}
+
+/// Checks that returning executed txs to mempool works correctly.
+#[db_test]
+async fn test_return_executed_txs_to_mempool(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
+    let mut tx_hash: [u8; 32] = Default::default();
+    for block_number in 1..=5 {
+        tx_hash[0] = block_number as u8;
+        let executed_tx = NewExecutedTransaction {
+            block_number,
+            tx_hash: tx_hash.to_vec(),
+            tx: Default::default(),
+            operation: Default::default(),
+            from_account: Default::default(),
+            to_account: None,
+            success: true,
+            fail_reason: None,
+            block_index: None,
+            primary_account_address: Default::default(),
+            nonce: Default::default(),
+            created_at: chrono::Utc::now(),
+            eth_sign_data: None,
+            batch_id: Some(10),
+        };
+
+        OperationsSchema(&mut storage)
+            .store_executed_tx(executed_tx)
+            .await?;
+    }
+
+    MempoolSchema(&mut storage)
+        .return_executed_txs_to_mempool(BlockNumber(3))
+        .await?;
+    // assert_eq!(MempoolSchema(&mut storage).load_txs().await?.len(), 2);
+
+    for block_number in 1..=5 {
+        tx_hash[0] = block_number as u8;
+        let tx_in_executed = OperationsSchema(&mut storage)
+            .get_executed_operation(&tx_hash)
+            .await?;
+        if block_number <= 3 {
+            assert!(tx_in_executed.is_some());
+        } else {
+            assert!(tx_in_executed.is_none());
+        }
     }
 
     Ok(())
