@@ -49,6 +49,7 @@ pub struct ApiForcedExitRequestsData {
     pub(crate) max_tx_interval_millisecs: i64,
     pub(crate) price_per_token: i64,
     pub(crate) forced_exit_contract_address: Address,
+    pub(crate) wait_confirmations: u64,
 }
 
 impl ApiForcedExitRequestsData {
@@ -68,6 +69,7 @@ impl ApiForcedExitRequestsData {
             max_tx_interval_millisecs: config.forced_exit_requests.max_tx_interval,
             forced_exit_contract_address: config.contracts.forced_exit_addr,
             digits_in_id: config.forced_exit_requests.digits_in_id,
+            wait_confirmations: config.forced_exit_requests.wait_confirmations,
         }
     }
 }
@@ -83,6 +85,7 @@ async fn get_status(
             max_tokens_per_request: data.max_tokens_per_request,
             recomended_tx_interval_millis: data.recomended_tx_interval_millisecs,
             forced_exit_contract_address: data.forced_exit_contract_address,
+            wait_confirmations: data.wait_confirmations,
         })
     } else {
         ForcedExitRequestStatus::Disabled

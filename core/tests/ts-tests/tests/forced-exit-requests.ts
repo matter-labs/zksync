@@ -35,6 +35,7 @@ interface StatusResponse {
     maxTokensPerRequest: number;
     recomendedTxIntervalMillis: number;
     forcedExitContractAddress: Address;
+    waitConfirmations: number;
 }
 
 Tester.prototype.testForcedExitRequestMultipleTokens = async function (

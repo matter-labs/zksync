@@ -24,6 +24,7 @@ pub struct ConfigInfo {
     pub max_tokens_per_request: u8,
     pub recomended_tx_interval_millis: i64,
     pub forced_exit_contract_address: Address,
+    pub wait_confirmations: u64,
 }
 
 #[derive(Serialize, Deserialize, PartialEq, Debug)]
