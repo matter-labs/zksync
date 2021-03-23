@@ -102,11 +102,7 @@ async fn handle_coingecko_token_price_query(req: HttpRequest) -> Result<HttpResp
         Some("ethereum") => BigDecimal::from(200),
         Some("wrapped-bitcoin") => BigDecimal::from(9000),
         Some("basic-attention-token") => BigDecimal::try_from(0.2).unwrap(),
-        Some("dai") => BigDecimal::from(1),
-        Some("gnt") => BigDecimal::from(1),
-        Some("glm") => BigDecimal::from(1),
-        Some("tglm") => BigDecimal::from(1),
-        _ => BigDecimal::from(0),
+        _ => BigDecimal::from(1),
     };
     let random_multiplier = thread_rng().gen_range(0.9, 1.1);
     let price = base_price * BigDecimal::try_from(random_multiplier).unwrap();
