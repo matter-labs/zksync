@@ -1,0 +1,91 @@
+name: Deploy Stage
+
+on:
+  push:
+    branches:
+      - dev
+
+env:
+  DEPLOY_APPS: -l name=server -l name=prover -l name=explorer
+
+jobs:
+  pre:
+    runs-on: [k8s, stage]
+    steps:
+      - uses: actions/checkout@v2
+      - id: print
+        run: |
+          echo "::set-output name=shortRev::$(git rev-parse --short HEAD)"
+
+    outputs:
+      shortRev: ${{ steps.print.outputs.shortRev }}
+
+  build-images:
+    name: Build and Push Docker Images
+    runs-on: [self-hosted, MAIN]
+    needs: pre
+
+    ## Required services
+    services:
+      postgres:
+        image: postgres:10.4
+        ports:
+          - 5432:5432
+
+    steps:
+    - run: echo 'Building image'
+    - uses: actions/checkout@v2
+
+    - name: setup-env
+      run: |
+        echo ZKSYNC_HOME=$(pwd) >> $GITHUB_ENV
+        echo CI=1 >> $GITHUB_ENV
+        echo $(pwd)/bin >> $GITHUB_PATH
+    - name: init
+      run: |
+        cargo sqlx --version || cargo install --version=0.2.0 sqlx-cli
+        zk
+        zk run yarn
+        cp etc/tokens/{test,localhost}.json
+        zk run verify-keys unpack
+        zk db basic-setup
+    - name: update-images
+      run: |
+        docker login -u ${{ secrets.DOCKER_USER }} -p ${{ secrets.DOCKER_PASSWORD }}
+        zk docker push rust
+        zk docker push nginx
+
+  deploy:
+    name: Deploy to the Stage enviroment
+    runs-on: [k8s, deployer, stage]
+    needs: build-images
+
+    container:
+      image: dysnix/kubectl:v1.16-gcloud
+
+    env:
+      KUBECONF: ${{ secrets.STAGE_KUBECONF }}
+      HFENV: zksync-stage
+      IMAGE_TAG: ${{ needs.pre.outputs.shortRev }}
+
+    steps:
+      -
+        name: Create ~/.kube/config
+        run: mkdir -p ~/.kube && echo $KUBECONF | base64 -d > ~/.kube/config
+      -
+        name: Clone helm-infra
+        uses: actions/checkout@v2
+        with:
+          repository: matter-labs/helm-infra
+          path: helm-infra
+          ref: master
+          token: ${{ secrets.GH_TOKEN }}
+      -
+        name: Deploy apps
+        working-directory: helm-infra
+        run: |
+          ## copy helm plugins over (from dysnix/kubectl, don't forget)!!!
+          cp -r /dysnix/kubectl/.local /dysnix/kubectl/.cache ~
+
+          UPDATE_REPOS=y helmfile -e $HFENV repos
+          helmfile -e $HFENV $DEPLOY_APPS apply --args "timeout 180s"
