@@ -2,7 +2,7 @@ use anyhow::{ensure, format_err};
 use num::{BigUint, Zero};
 use std::time::Instant;
 use zksync_crypto::params::{max_account_id, max_token_id};
-use zksync_types::{AccountUpdate, AccountUpdates, Order, PubKeyHash, Swap, SwapOp};
+use zksync_types::{AccountUpdates, Order, PubKeyHash, Swap, SwapOp};
 
 use crate::{
     handler::TxHandler,

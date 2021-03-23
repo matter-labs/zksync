@@ -324,7 +324,7 @@ pub mod tx_conversion_test {
     #[ignore]
     #[test]
     fn test_convert_to_bytes_swap() {
-        todo!();
+        todo!(); // Part of (ZKS-593)
     }
 
     #[test]

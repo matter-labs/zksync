@@ -726,16 +726,7 @@ impl ZkSyncStateKeeper {
             ZkSyncTx::ForcedExit(tx) => tx.time_range,
             ZkSyncTx::ChangePubKey(tx) => tx.time_range.unwrap_or_default(),
             ZkSyncTx::Close(tx) => tx.time_range,
-            ZkSyncTx::Swap(tx) => TimeRange::new(
-                std::cmp::max(
-                    tx.orders.0.time_range.valid_from,
-                    tx.orders.1.time_range.valid_from,
-                ),
-                std::cmp::min(
-                    tx.orders.0.time_range.valid_until,
-                    tx.orders.1.time_range.valid_until,
-                ),
-            ),
+            ZkSyncTx::Swap(tx) => tx.time_range(),
         };
         ensure!(
             time_range.is_valid(block_timestamp),
