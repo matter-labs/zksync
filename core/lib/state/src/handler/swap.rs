@@ -163,33 +163,6 @@ impl ZkSyncState {
         self.verify_swap(&op.tx)?;
         self.verify_swap_accounts(&op.tx)?;
 
-        let mut updates = Vec::new();
-
-        let mut update_account = |account_id, token, amount, nonce_inc, add| {
-            let mut account = self.get_account(account_id).unwrap();
-            let old_balance = account.get_balance(token);
-
-            if add {
-                account.add_balance(token, amount);
-            } else {
-                account.sub_balance(token, amount);
-            }
-
-            let new_balance = account.get_balance(token);
-            let old_nonce = account.nonce;
-            *account.nonce += nonce_inc;
-            self.insert_account(account_id, account);
-
-            updates.push((
-                account_id,
-                AccountUpdate::UpdateBalance {
-                    balance_update: (token, old_balance, new_balance),
-                    old_nonce,
-                    new_nonce: old_nonce + nonce_inc,
-                },
-            ));
-        };
-
         let increment_0 =
             (!op.tx.orders.0.amount.is_zero() && op.accounts.0 != op.submitter) as u32;
         let increment_1 =
@@ -197,11 +170,15 @@ impl ZkSyncState {
         let token_0 = op.tx.orders.0.token_sell;
         let token_1 = op.tx.orders.1.token_sell;
 
-        update_account(op.submitter, op.tx.fee_token, &op.tx.fee, 1, false);
-        update_account(op.accounts.0, token_0, &op.tx.amounts.0, increment_0, false);
-        update_account(op.accounts.1, token_1, &op.tx.amounts.1, increment_1, false);
-        update_account(op.recipients.0, token_1, &op.tx.amounts.1, 0, true);
-        update_account(op.recipients.1, token_0, &op.tx.amounts.0, 0, true);
+        use crate::state::BalanceUpdate::*;
+
+        let updates = vec![
+            self.update_account(op.submitter, op.tx.fee_token, &Sub(op.tx.fee), 1),
+            self.update_account(op.accounts.0, token_0, &Sub(op.tx.amounts.0), increment_0),
+            self.update_account(op.accounts.1, token_1, &Sub(op.tx.amounts.1), increment_1),
+            self.update_account(op.recipients.0, token_1, &Add(op.tx.amounts.1), 0),
+            self.update_account(op.recipients.1, token_0, &Add(op.tx.amounts.0), 0),
+        ];
 
         let fee = CollectedFee {
             token: op.tx.fee_token,

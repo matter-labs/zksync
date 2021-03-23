@@ -44,6 +44,12 @@ pub enum TransferOutcome {
     TransferToNew(TransferToNewOp),
 }
 
+#[derive(Debug, Clone)]
+pub enum BalanceUpdate {
+    Add(BigUint),
+    Sub(BigUint),
+}
+
 impl TransferOutcome {
     pub fn into_franklin_op(self) -> ZkSyncOp {
         match self {
@@ -132,6 +138,37 @@ impl ZkSyncState {
         );
 
         account
+    }
+
+    pub fn update_account(
+        &mut self,
+        account_id: AccountId,
+        token: TokenId,
+        update: &BalanceUpdate,
+        nonce_update: u32,
+    ) -> (AccountId, AccountUpdate) {
+        let mut account = self.get_account(account_id).unwrap();
+        let old_balance = account.get_balance(token);
+
+        match update {
+            BalanceUpdate::Add(amount) => account.add_balance(token, amount),
+            BalanceUpdate::Sub(amount) => account.sub_balance(token, amount),
+        }
+
+        let new_balance = account.get_balance(token);
+        let old_nonce = account.nonce;
+        *account.nonce += nonce_update;
+        let new_nonce = account.nonce;
+        self.insert_account(account_id, account);
+
+        (
+            account_id,
+            AccountUpdate::UpdateBalance {
+                balance_update: (token, old_balance, new_balance),
+                old_nonce,
+                new_nonce,
+            },
+        )
     }
 
     pub fn chunks_for_batch(&self, txs: &[SignedZkSyncTx]) -> usize {
