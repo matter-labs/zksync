@@ -126,6 +126,7 @@ impl ApiTokenData {
 }
 
 // Server implementation
+
 async fn token_pagination(
     data: web::Data<ApiTokenData>,
     web::Query(query): web::Query<PaginationQuery<TokenId>>,

@@ -92,8 +92,8 @@ impl<'a, 'c> TokensSchema<'a, 'c> {
                     ORDER BY id ASC
                     LIMIT $2
                     "#,
-                    i32::from(*(query.from)),
-                    i64::from(query.limit)
+                    *(query.from) as i32,
+                    query.limit as i64
                 )
                 .fetch_all(self.0.conn())
                 .await?

@@ -19,6 +19,7 @@ mod fee;
 mod paginate;
 mod response;
 mod token;
+mod transaction;
 
 #[derive(Serialize, Clone, Copy)]
 #[serde(rename_all = "snake_case")]
@@ -46,7 +47,8 @@ pub(crate) fn api_scope(tx_sender: TxSender, zk_config: &ZkSyncConfig) -> Scope 
         .service(token::api_scope(
             &zk_config,
             tx_sender.pool.clone(),
-            tx_sender.tokens,
-            tx_sender.ticker_requests,
+            tx_sender.tokens.clone(),
+            tx_sender.ticker_requests.clone(),
         ))
+        .service(transaction::api_scope(tx_sender))
 }

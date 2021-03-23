@@ -93,6 +93,13 @@ pub(super) mod convert {
 
 // Server implementation
 
+// async fn block_pagination(
+//     data: web::Data<ApiBlockData>,
+//     web::Query(query): web::Query<PaginationQuery<BlockNumber>>,
+// ) -> ApiResult<Vec<BlockInfo>, InternalError> {
+
+// }
+
 async fn block_by_number(
     data: web::Data<ApiBlockData>,
     web::Path(block_position): web::Path<String>,
@@ -125,5 +132,6 @@ pub fn api_scope(pool: ConnectionPool, cache: BlockDetailsCache) -> Scope {
 
     web::scope("block")
         .data(data)
+        // .route("", web::get().to(block_pagination))
         .route("{block_number}", web::get().to(block_by_number))
 }
