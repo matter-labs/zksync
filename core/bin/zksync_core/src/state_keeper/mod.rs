@@ -26,7 +26,7 @@ use zksync_types::{
     gas_counter::GasCounter,
     helpers::reverse_updates,
     mempool::SignedTxVariant,
-    tx::{TimeRange, TxHash, ZkSyncTx},
+    tx::{TxHash, ZkSyncTx},
     Account, AccountId, AccountTree, AccountUpdate, AccountUpdates, Address, BlockNumber,
     PriorityOp, SignedZkSyncTx, Transfer, TransferOp, H256,
 };
