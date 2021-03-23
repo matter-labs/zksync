@@ -20,10 +20,13 @@ use serde::{Deserialize, Serialize};
 use zksync_config::ZkSyncConfig;
 // Workspace uses
 use zksync_storage::{ConnectionPool, QueryResult};
-use zksync_types::{Address, TokenId, TokenLike};
+use zksync_types::{
+    pagination::{Paginated, PaginationQuery},
+    Address, Token, TokenId, TokenLike,
+};
 
 // Local uses
-use super::{error::InternalError, response::ApiResult};
+use super::{error::InternalError, paginate::Paginate, response::ApiResult};
 use crate::{
     fee_ticker::{PriceError, TickerRequest, TokenPriceRequestType},
     utils::token_db_cache::TokenDBCache,
@@ -63,6 +66,18 @@ impl ApiTokenData {
             tokens,
             fee_ticker,
         }
+    }
+
+    async fn token_page(
+        &self,
+        query: PaginationQuery<TokenId>,
+    ) -> Result<Paginated<Token, TokenId>, InternalError> {
+        let mut storage = self
+            .pool
+            .access_storage()
+            .await
+            .map_err(InternalError::new)?;
+        storage.paginate(query).await
     }
 
     async fn token(&self, token_like: TokenLike) -> QueryResult<Option<ApiToken>> {
@@ -111,6 +126,12 @@ impl ApiTokenData {
 }
 
 // Server implementation
+async fn token_pagination(
+    data: web::Data<ApiTokenData>,
+    web::Query(query): web::Query<PaginationQuery<TokenId>>,
+) -> ApiResult<Paginated<Token, TokenId>, InternalError> {
+    data.token_page(query).await.into()
+}
 
 async fn token_by_id(
     data: web::Data<ApiTokenData>,
@@ -181,6 +202,7 @@ pub fn api_scope(
 
     web::scope("token")
         .data(data)
+        .route("", web::get().to(token_pagination))
         .route("{token_id}", web::get().to(token_by_id))
         .route("{token_id}/price_in/{currency}", web::get().to(token_price))
 }

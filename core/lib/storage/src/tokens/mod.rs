@@ -4,7 +4,10 @@ use std::time::Instant;
 // External imports
 use num::{rational::Ratio, BigUint};
 // Workspace imports
-use zksync_types::{Token, TokenId, TokenLike, TokenPrice};
+use zksync_types::{
+    pagination::{PaginationDirection, PaginationQuery},
+    Token, TokenId, TokenLike, TokenPrice,
+};
 use zksync_utils::ratio_to_big_decimal;
 // Local imports
 use self::records::{DBMarketVolume, DbTickerPrice, DbToken};
@@ -71,6 +74,50 @@ impl<'a, 'c> TokensSchema<'a, 'c> {
             .collect());
 
         metrics::histogram!("sql.token.load_tokens", start.elapsed());
+        result
+    }
+
+    pub async fn load_token_page(
+        &mut self,
+        query: &PaginationQuery<TokenId>,
+    ) -> QueryResult<Vec<Token>> {
+        let start = Instant::now();
+        let tokens = match query.direction {
+            PaginationDirection::Newer => {
+                sqlx::query_as!(
+                    DbToken,
+                    r#"
+                    SELECT * FROM tokens
+                    WHERE id >= $1
+                    ORDER BY id ASC
+                    LIMIT $2
+                    "#,
+                    i32::from(*(query.from)),
+                    i64::from(query.limit)
+                )
+                .fetch_all(self.0.conn())
+                .await?
+            }
+            PaginationDirection::Older => {
+                sqlx::query_as!(
+                    DbToken,
+                    r#"
+                    SELECT * FROM tokens
+                    WHERE id <= $1
+                    ORDER BY id DESC
+                    LIMIT $2
+                    "#,
+                    i32::from(*(query.from)),
+                    i64::from(query.limit)
+                )
+                .fetch_all(self.0.conn())
+                .await?
+            }
+        };
+
+        let result = Ok(tokens.into_iter().map(|t| t.into()).collect());
+
+        metrics::histogram!("sql.token.load_token_page", start.elapsed());
         result
     }
 

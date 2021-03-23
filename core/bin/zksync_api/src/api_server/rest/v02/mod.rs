@@ -16,6 +16,7 @@ mod block;
 mod config;
 mod error;
 mod fee;
+mod paginate;
 mod response;
 mod token;
 

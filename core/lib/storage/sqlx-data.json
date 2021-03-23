@@ -406,6 +406,45 @@
       ]
     }
   },
+  "0e899c700b8da512bade7d9d4ce4b805d33b9ba5e47db1ae503fa9defc1e9a42": {
+    "query": "\n                    SELECT * FROM tokens\n                    WHERE id <= $1\n                    ORDER BY id DESC\n                    LIMIT $2\n                    ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "id",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 1,
+          "name": "address",
+          "type_info": "Text"
+        },
+        {
+          "ordinal": 2,
+          "name": "symbol",
+          "type_info": "Text"
+        },
+        {
+          "ordinal": 3,
+          "name": "decimals",
+          "type_info": "Int2"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Int4",
+          "Int8"
+        ]
+      },
+      "nullable": [
+        false,
+        false,
+        false,
+        false
+      ]
+    }
+  },
   "0fbc25e0f2aab2b56acf7e09d75690a78f7c2df7cec0644a8e45461ee9aab75b": {
     "query": "SELECT * FROM data_restore_rollup_ops\n            ORDER BY id ASC",
     "describe": {
@@ -1568,6 +1607,45 @@
       },
       "nullable": [
         null
+      ]
+    }
+  },
+  "4c8e60d4a459c93a9e87435c8216fe85cf6ae0f94d2aeddde02e82143b0dffcc": {
+    "query": "\n                    SELECT * FROM tokens\n                    WHERE id >= $1\n                    ORDER BY id ASC\n                    LIMIT $2\n                    ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "id",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 1,
+          "name": "address",
+          "type_info": "Text"
+        },
+        {
+          "ordinal": 2,
+          "name": "symbol",
+          "type_info": "Text"
+        },
+        {
+          "ordinal": 3,
+          "name": "decimals",
+          "type_info": "Int2"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Int4",
+          "Int8"
+        ]
+      },
+      "nullable": [
+        false,
+        false,
+        false,
+        false
       ]
     }
   },
