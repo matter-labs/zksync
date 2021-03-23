@@ -329,10 +329,7 @@ impl ZkSyncTx {
             ZkSyncTx::ChangePubKey(tx) => tx.time_range.unwrap_or_default().valid_from,
             ZkSyncTx::ForcedExit(tx) => tx.time_range.valid_from,
             ZkSyncTx::Close(tx) => tx.time_range.valid_from,
-            ZkSyncTx::Swap(tx) => std::cmp::max(
-                tx.orders.0.time_range.valid_from,
-                tx.orders.1.time_range.valid_from,
-            ),
+            ZkSyncTx::Swap(tx) => tx.valid_from(),
         }
     }
 }

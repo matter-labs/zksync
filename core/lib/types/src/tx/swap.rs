@@ -171,6 +171,24 @@ impl Swap {
             && is_fee_amount_packable(&self.fee)
     }
 
+    pub fn valid_from(&self) -> u64 {
+        std::cmp::max(
+            self.orders.0.time_range.valid_from,
+            self.orders.1.time_range.valid_from,
+        )
+    }
+
+    pub fn valid_until(&self) -> u64 {
+        std::cmp::min(
+            self.orders.0.time_range.valid_until,
+            self.orders.1.time_range.valid_until,
+        )
+    }
+
+    pub fn time_range(&self) -> TimeRange {
+        TimeRange::new(self.valid_from(), self.valid_until())
+    }
+
     /// Verifies the transaction correctness:
     pub fn check_correctness(&mut self) -> bool {
         let mut valid = self.check_amounts()
@@ -178,11 +196,7 @@ impl Swap {
             && self.fee_token <= max_token_id()
             && self.orders.0.check_correctness()
             && self.orders.1.check_correctness()
-            && self
-                .orders
-                .0
-                .time_range
-                .intersects(self.orders.1.time_range);
+            && self.time_range().check_correctness();
         if valid {
             let signer = self.verify_signature();
             valid = valid && signer.is_some();
