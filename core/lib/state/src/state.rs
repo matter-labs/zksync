@@ -144,15 +144,15 @@ impl ZkSyncState {
         &mut self,
         account_id: AccountId,
         token: TokenId,
-        update: &BalanceUpdate,
+        update: BalanceUpdate,
         nonce_update: u32,
     ) -> (AccountId, AccountUpdate) {
         let mut account = self.get_account(account_id).unwrap();
         let old_balance = account.get_balance(token);
 
         match update {
-            BalanceUpdate::Add(amount) => account.add_balance(token, amount),
-            BalanceUpdate::Sub(amount) => account.sub_balance(token, amount),
+            BalanceUpdate::Add(amount) => account.add_balance(token, &amount),
+            BalanceUpdate::Sub(amount) => account.sub_balance(token, &amount),
         }
 
         let new_balance = account.get_balance(token);
