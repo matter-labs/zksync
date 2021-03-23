@@ -44,12 +44,12 @@ impl CoinGeckoAPI {
 impl TokenPriceAPI for CoinGeckoAPI {
     async fn get_price(&self, token_symbol: &str) -> Result<TokenPrice, PriceError> {
         let start = Instant::now();
-        let toke_low_symbol = token_symbol.to_lowercase();
+        let token_lowercase_symbol = token_symbol.to_lowercase();
         let token_id = self
             .token_ids
-            .get(&toke_low_symbol)
+            .get(&token_lowercase_symbol)
             .or_else(|| self.token_ids.get(token_symbol))
-            .unwrap_or_else(|| &toke_low_symbol);
+            .unwrap_or(&token_lowercase_symbol);
         // TODO ZKS-595. Uncomment this code
         // .ok_or_else(|| {
         //     PriceError::token_not_found(format!(
