@@ -54,7 +54,6 @@ jobs:
         docker login -u ${{ secrets.DOCKER_USER }} -p ${{ secrets.DOCKER_PASSWORD }}
         zk docker push rust
         zk docker push nginx
-        echo IMAGE_TAG=$(git rev-parse --short HEAD) >> $GITHUB_ENV
 
   deploy:
     name: Deploy to the Stage enviroment
@@ -67,6 +66,7 @@ jobs:
     env:
       KUBECONF: ${{ secrets.STAGE_KUBECONF }}
       HFENV: zksync-stage
+      IMAGE_TAG: ${{ needs.pre.outputs.shortRev }}
 
     steps:
       -
@@ -82,6 +82,10 @@ jobs:
           token: ${{ secrets.GH_TOKEN }}
       -
         name: Deploy apps
+        working-directory: helm-infra
         run: |
+          ## copy helm plugins over (from dysnix/kubectl, don't forget)!!!
+          cp -r /dysnix/kubectl/.local /dysnix/kubectl/.cache ~
+
           UPDATE_REPOS=y helmfile -e $HFENV repos
           helmfile -e $HFENV $DEPLOY_APPS apply --args "timeout 180s"
