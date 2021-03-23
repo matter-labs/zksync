@@ -351,13 +351,13 @@ async fn contains_and_get_tx(mut storage: StorageProcessor<'_>) -> QueryResult<(
 /// Checks that returning executed txs to mempool works correctly.
 #[db_test]
 async fn test_return_executed_txs_to_mempool(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
-    let mut tx_hash: [u8; 32] = Default::default();
+    let txs = gen_transfers(5);
     for block_number in 1..=5 {
-        tx_hash[0] = block_number as u8;
+        let tx_data = txs.get(block_number - 1).unwrap();
         let executed_tx = NewExecutedTransaction {
-            block_number,
-            tx_hash: tx_hash.to_vec(),
-            tx: Default::default(),
+            block_number: block_number as i64,
+            tx_hash: tx_data.hash().as_ref().to_vec(),
+            tx: serde_json::to_value(&tx_data.tx).unwrap(),
             operation: Default::default(),
             from_account: Default::default(),
             to_account: None,
@@ -368,7 +368,7 @@ async fn test_return_executed_txs_to_mempool(mut storage: StorageProcessor<'_>) 
             nonce: Default::default(),
             created_at: chrono::Utc::now(),
             eth_sign_data: None,
-            batch_id: Some(10),
+            batch_id: None,
         };
 
         OperationsSchema(&mut storage)
@@ -379,17 +379,23 @@ async fn test_return_executed_txs_to_mempool(mut storage: StorageProcessor<'_>) 
     MempoolSchema(&mut storage)
         .return_executed_txs_to_mempool(BlockNumber(3))
         .await?;
-    // assert_eq!(MempoolSchema(&mut storage).load_txs().await?.len(), 2);
+    assert_eq!(MempoolSchema(&mut storage).load_txs().await?.len(), 2);
 
     for block_number in 1..=5 {
-        tx_hash[0] = block_number as u8;
+        let tx_hash = txs.get(block_number - 1).unwrap().hash();
         let tx_in_executed = OperationsSchema(&mut storage)
-            .get_executed_operation(&tx_hash)
-            .await?;
+            .get_executed_operation(tx_hash.as_ref())
+            .await?
+            .is_some();
+        // let tx_in_mempool = MempoolSchema(&mut storage)
+        //     .get_tx(tx_hash)
+        //     .await?.is_some();
         if block_number <= 3 {
-            assert!(tx_in_executed.is_some());
+            assert!(tx_in_executed);
+        // assert!(!tx_in_mempool);
         } else {
-            assert!(tx_in_executed.is_none());
+            assert!(!tx_in_executed);
+            // assert!(tx_in_mempool);
         }
     }
 

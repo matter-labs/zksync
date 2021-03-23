@@ -264,7 +264,7 @@ async fn test_store_witness(mut storage: StorageProcessor<'_>) -> QueryResult<()
     Ok(())
 }
 
-/// Checks that block witnesses are removing correctly.
+/// Checks that block witnesses are removed correctly.
 #[db_test]
 async fn test_remove_witnesses(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
     for block_number in 1..=5 {
@@ -302,7 +302,7 @@ async fn test_remove_witnesses(mut storage: StorageProcessor<'_>) -> QueryResult
     Ok(())
 }
 
-/// Checks that block proofs are removing correctly.
+/// Checks that block proofs are removed correctly.
 #[db_test]
 async fn test_remove_proofs(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
     let proof = get_sample_single_proof();
@@ -382,7 +382,7 @@ async fn test_remove_proofs(mut storage: StorageProcessor<'_>) -> QueryResult<()
     Ok(())
 }
 
-/// Checks that prover jobs are removing correctly.
+/// Checks that prover jobs are removed correctly.
 #[db_test]
 async fn test_remove_prover_jobs(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
     let job_data = serde_json::Value::default();

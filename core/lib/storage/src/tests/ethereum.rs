@@ -19,12 +19,12 @@ use num::BigUint;
 /// Parameters for `EthereumSchema::save_operation_eth_tx` method.
 #[derive(Debug)]
 pub struct EthereumTxParams {
-    pub op_type: String,
-    pub op: Option<(i64, AggregatedOperation)>,
-    pub hash: H256,
-    pub deadline_block: u64,
-    pub gas_price: BigUint,
-    pub raw_tx: Vec<u8>,
+    op_type: String,
+    op: Option<(i64, AggregatedOperation)>,
+    hash: H256,
+    deadline_block: u64,
+    gas_price: BigUint,
+    raw_tx: Vec<u8>,
 }
 
 impl EthereumTxParams {
