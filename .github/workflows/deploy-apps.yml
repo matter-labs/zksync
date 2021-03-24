@@ -1,9 +1,7 @@
-name: Deploy Stage
+name: Deploy Apps
 
 on:
-  push:
-    branches:
-      - dev
+  deployment:
 
 env:
   DEPLOY_APPS: -l name=server -l name=prover -l name=explorer
@@ -13,18 +11,53 @@ jobs:
     runs-on: [k8s, stage]
     steps:
       - uses: actions/checkout@v2
-      - id: print
+      -
+        id: print
         run: echo "::set-output name=shortRev::$(git rev-parse --short HEAD)"
+      - 
+        uses: actions-ecosystem/action-regex-match@v2
+        id: regex-match
+        with:
+          text: ${{ github.ref }}
+          regex: '^refs\/tags\/(v[0-9]+\.[0-9]+\.[0-9](-?\w*)?)$'
+      -
+        name: Map runtime environment data
+        uses: kanga333/variable-mapper@v0.2.0
+        with:
+          key: "${{ github.event.deployment.environment }}"
+          map: |
+            {
+              "mainnet": {
+                "KUBECONF": "KUBECONF_MAINNET",
+                "HFENV": "zksync-prod"
+              },
+              "rinkeby": {
+                "KUBECONF": "$KUBECONF_TESTNET",
+                "HFENV": "zksync-${{ github.event.deployment.environment }}"
+              },
+              "ropsten": {
+                "KUBECONF": "$KUBECONF_TESTNET",
+                "HFENV": "zksync-${{ github.event.deployment.environment }}"
+              },
+              ".*": {
+                "KUBECONF": "KUBECONF_STAGE",
+                "HFENV": "zksync-${{ github.event.deployment.environment }}"
+              }
+            }
 
     outputs:
       shortRev: ${{ steps.print.outputs.shortRev }}
+      kubeConf: ${{ env.KUBECONF }}
+      hfEnv: ${{ env.HFENV }}
+      isTag: ${{ steps.regex-match.outputs.group1 != '' }}
 
   build-images:
     name: Build and Push Docker Images
     runs-on: [self-hosted, MAIN]
     needs: pre
+    if: ${{ needs.pre.outputs.isTag == 'true' }}
 
-    ## Required services
+    # Required services
     services:
       postgres:
         image: postgres:10.4
@@ -54,17 +87,17 @@ jobs:
         zk docker push nginx
 
   deploy:
-    name: Deploy to the Stage enviroment
-    runs-on: [k8s, deployer, stage]
+    name: Deploy Apps
+    runs-on: [k8s, deployer, "${{ github.event.deployment.environment }}"]
     needs: [pre, build-images]
 
     container:
       image: dysnix/kubectl:v1.16-gcloud
 
     env:
-      KUBECONF: ${{ secrets.KUBECONF_STAGE }}
       IMAGE_TAG: ${{ needs.pre.outputs.shortRev }}
-      HFENV: zksync-stage
+      KUBECONF: ${{ secrets[needs.pre.outputs.kubeConf] }}
+      HFENV: ${{ needs.pre.outputs.hfEnv }}
 
     steps:
       -
