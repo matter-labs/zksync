@@ -20,7 +20,7 @@ pub enum OutputFeeType {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
-// #[serde(rename_all = "camelCase")]
+#[serde(rename_all = "camelCase")]
 pub struct Fee {
     pub fee_type: OutputFeeType,
     #[serde(with = "BigUintSerdeAsRadix10Str")]
@@ -36,7 +36,7 @@ pub struct Fee {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
-// #[serde(rename_all = "camelCase")]
+#[serde(rename_all = "camelCase")]
 pub struct BatchFee {
     #[serde(with = "BigUintSerdeAsRadix10Str")]
     pub total_fee: BigUint,

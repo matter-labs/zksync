@@ -47,7 +47,7 @@ pub struct IncomingTx {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
-#[serde(rename_all = "snake_case")]
+#[serde(rename_all = "camelCase")]
 pub struct IncomingTxForFee {
     pub tx_type: TxFeeTypes,
     pub address: Address,

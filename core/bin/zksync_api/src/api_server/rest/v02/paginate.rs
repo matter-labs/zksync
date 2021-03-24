@@ -8,12 +8,21 @@ use zksync_types::{
 };
 
 #[async_trait::async_trait]
-pub trait Paginate<T: Serialize, F: Serialize, E: ApiError> {
-    async fn paginate(&mut self, query: PaginationQuery<F>) -> Result<Paginated<T, F>, E>;
+pub trait Paginate<T: Serialize> {
+    type F: Serialize;
+    type E: ApiError;
+
+    async fn paginate(
+        &mut self,
+        query: PaginationQuery<Self::F>,
+    ) -> Result<Paginated<T, Self::F>, Self::E>;
 }
 
 #[async_trait::async_trait]
-impl Paginate<Token, TokenId, InternalError> for StorageProcessor<'_> {
+impl Paginate<Token> for StorageProcessor<'_> {
+    type F = TokenId;
+    type E = InternalError;
+
     async fn paginate(
         &mut self,
         query: PaginationQuery<TokenId>,

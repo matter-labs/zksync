@@ -326,6 +326,25 @@ impl<'a, 'c> MempoolSchema<'a, 'c> {
             .map_err(anyhow::Error::from)
     }
 
+    /// Returns mempool transaction
+    pub async fn get_mempool_tx(&mut self, tx_hash: TxHash) -> QueryResult<Option<MempoolTx>> {
+        let start = Instant::now();
+
+        let tx_hash = hex::encode(tx_hash.as_ref());
+
+        let mempool_tx = sqlx::query_as!(
+            MempoolTx,
+            "SELECT * from mempool_txs
+            WHERE tx_hash = $1",
+            &tx_hash
+        )
+        .fetch_optional(self.0.conn())
+        .await?;
+
+        metrics::histogram!("sql.chain", start.elapsed(), "mempool" => "get_tx");
+        Ok(mempool_tx)
+    }
+
     /// Removes transactions that are already committed.
     /// Though it's unlikely that mempool schema will ever contain a committed
     /// transaction, it's better to ensure that we won't process the same transaction
