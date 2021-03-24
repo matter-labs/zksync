@@ -29,19 +29,23 @@ jobs:
             {
               "mainnet": {
                 "KUBECONF": "KUBECONF_MAINNET",
-                "HFENV": "zksync-prod"
+                "HFENV": "zksync-prod",
+                "RUNNER": "mainnet"
               },
               "rinkeby": {
                 "KUBECONF": "$KUBECONF_TESTNET",
-                "HFENV": "zksync-${{ github.event.deployment.environment }}"
+                "HFENV": "zksync-${{ github.event.deployment.environment }}",
+                "RUNNER": "testnet"
               },
               "ropsten": {
                 "KUBECONF": "$KUBECONF_TESTNET",
-                "HFENV": "zksync-${{ github.event.deployment.environment }}"
+                "HFENV": "zksync-${{ github.event.deployment.environment }}",
+                "RUNNER": "testnet"
               },
               ".*": {
                 "KUBECONF": "KUBECONF_STAGE",
-                "HFENV": "zksync-${{ github.event.deployment.environment }}"
+                "HFENV": "zksync-${{ github.event.deployment.environment }}",
+                "RUNNER": "stage"
               }
             }
 
@@ -49,6 +53,7 @@ jobs:
       shortRev: ${{ steps.print.outputs.shortRev }}
       kubeConf: ${{ env.KUBECONF }}
       hfEnv: ${{ env.HFENV }}
+      runner: ${{ env.RUNNER }}
       isTag: ${{ steps.regex-match.outputs.group1 != '' }}
 
   build-images:
@@ -88,7 +93,7 @@ jobs:
 
   deploy:
     name: Deploy Apps
-    runs-on: [k8s, deployer, "${{ github.event.deployment.environment }}"]
+    runs-on: [k8s, deployer, "${{ needs.pre.outputs.runner }}"]
     needs: [pre, build-images]
 
     container:
