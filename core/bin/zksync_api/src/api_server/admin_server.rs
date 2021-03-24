@@ -141,6 +141,7 @@ async fn run_server(app_state: AppState, bind_to: SocketAddr) {
 
         App::new()
             .wrap(auth)
+            .wrap(vlog::actix_middleware())
             .app_data(web::Data::new(app_state.clone()))
             .route("/tokens", web::post().to(add_token))
     })

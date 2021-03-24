@@ -18,7 +18,7 @@ use futures::{
 use num::{
     rational::Ratio,
     traits::{Inv, Pow},
-    BigUint, CheckedSub, Zero,
+    BigUint, CheckedDiv, CheckedSub, Zero,
 };
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
@@ -633,7 +633,10 @@ impl<API: FeeTickerAPI, INFO: FeeTickerInfo, WATCHER: TokenWatcher> FeeTicker<AP
             .await?
             .usd_price
             / BigUint::from(10u32).pow(u32::from(token.decimals));
-        Ok(token_risk_factor / token_price_usd)
+        // TODO Check tokens fee allowance by non-zero price (ZKS-580)
+        token_risk_factor
+            .checked_div(&token_price_usd)
+            .ok_or_else(|| anyhow::format_err!("Token is not acceptable for fee"))
     }
 
     /// Returns `true` if account does not yet exist in the zkSync network.

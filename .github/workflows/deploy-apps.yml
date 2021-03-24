@@ -1,0 +1,138 @@
+name: Deploy Apps
+
+on:
+  deployment:
+
+env:
+  DEPLOY_APPS: -l name=server -l name=prover -l name=explorer
+
+jobs:
+  pre:
+    runs-on: [k8s, stage]
+    steps:
+      - uses: actions/checkout@v2
+      -
+        id: print
+        run: echo "::set-output name=shortRev::$(git rev-parse --short HEAD)"
+      - 
+        uses: actions-ecosystem/action-regex-match@v2
+        id: regex-match
+        with:
+          text: ${{ github.ref }}
+          regex: '^refs\/tags\/(v[0-9]+\.[0-9]+\.[0-9](-?\w*)?)$'
+      -
+        name: Map runtime environment data
+        uses: kanga333/variable-mapper@v0.2.0
+        with:
+          key: "${{ github.event.deployment.environment }}"
+          map: |
+            {
+              "mainnet": {
+                "KUBECONF": "KUBECONF_MAINNET",
+                "HFENV": "zksync-prod"
+              },
+              "rinkeby": {
+                "KUBECONF": "$KUBECONF_TESTNET",
+                "HFENV": "zksync-${{ github.event.deployment.environment }}"
+              },
+              "ropsten": {
+                "KUBECONF": "$KUBECONF_TESTNET",
+                "HFENV": "zksync-${{ github.event.deployment.environment }}"
+              },
+              ".*": {
+                "KUBECONF": "KUBECONF_STAGE",
+                "HFENV": "zksync-${{ github.event.deployment.environment }}"
+              }
+            }
+
+    outputs:
+      shortRev: ${{ steps.print.outputs.shortRev }}
+      kubeConf: ${{ env.KUBECONF }}
+      hfEnv: ${{ env.HFENV }}
+      isTag: ${{ steps.regex-match.outputs.group1 != '' }}
+
+  build-images:
+    name: Build and Push Docker Images
+    runs-on: [self-hosted, MAIN]
+    needs: pre
+    if: ${{ needs.pre.outputs.isTag == 'true' }}
+
+    # Required services
+    services:
+      postgres:
+        image: postgres:10.4
+        ports:
+          - 5432:5432
+
+    steps:
+    - uses: actions/checkout@v2
+
+    - name: setup-env
+      run: |
+        echo ZKSYNC_HOME=$(pwd) >> $GITHUB_ENV
+        echo CI=1 >> $GITHUB_ENV
+        echo $(pwd)/bin >> $GITHUB_PATH
+    - name: init
+      run: |
+        cargo sqlx --version || cargo install --version=0.2.0 sqlx-cli
+        zk
+        zk run yarn
+        cp etc/tokens/{test,localhost}.json
+        zk run verify-keys unpack
+        zk db basic-setup
+    - name: update-images
+      run: |
+        docker login -u ${{ secrets.DOCKER_USER }} -p ${{ secrets.DOCKER_PASSWORD }}
+        zk docker push rust
+        zk docker push nginx
+
+  deploy:
+    name: Deploy Apps
+    runs-on: [k8s, deployer, "${{ github.event.deployment.environment }}"]
+    needs: [pre, build-images]
+
+    container:
+      image: dysnix/kubectl:v1.16-gcloud
+
+    env:
+      IMAGE_TAG: ${{ needs.pre.outputs.shortRev }}
+      KUBECONF: ${{ secrets[needs.pre.outputs.kubeConf] }}
+      HFENV: ${{ needs.pre.outputs.hfEnv }}
+
+    steps:
+      -
+        name: Create ~/.kube/config
+        run: mkdir -p ~/.kube && echo "$KUBECONF" | base64 -d > ~/.kube/config
+      -
+        name: Clone helm-infra
+        uses: actions/checkout@v2
+        with:
+          repository: matter-labs/helm-infra
+          path: helm-infra
+          ref: master
+          token: ${{ secrets.GH_TOKEN }}
+      -
+        name: Deploy apps
+        working-directory: helm-infra
+        run: |
+          ## copy helm plugins over (from dysnix/kubectl, don't forget)!!!
+          cp -r /dysnix/kubectl/.local /dysnix/kubectl/.cache ~
+
+          UPDATE_REPOS=y helmfile -e $HFENV repos
+          helmfile -e $HFENV $DEPLOY_APPS apply --args "timeout 180s"
+      -
+        name: Update deployment status (success)
+        if: success()
+        uses: chrnorm/deployment-status@releases/v1
+        with:
+          token: ${{ github.token }}
+          state: success
+          deployment_id: ${{ github.event.deployment.id }}
+      -
+        name: Update deployment status (failure)
+        if: failure()
+        uses: chrnorm/deployment-status@releases/v1
+        with:
+          token: ${{ github.token }}
+          state: failure
+          deployment_id: ${{ github.event.deployment.id }}
