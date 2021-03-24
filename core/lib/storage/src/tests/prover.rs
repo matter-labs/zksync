@@ -302,85 +302,85 @@ async fn test_remove_witnesses(mut storage: StorageProcessor<'_>) -> QueryResult
     Ok(())
 }
 
-/// Checks that block proofs are removed correctly.
-#[db_test]
-async fn test_remove_proofs(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
-    let proof = get_sample_single_proof();
-    let job_data = serde_json::Value::default();
-    for block_number in 1..=5 {
-        ProverSchema(&mut storage)
-            .add_prover_job_to_job_queue(
-                BlockNumber(block_number),
-                BlockNumber(block_number),
-                job_data.clone(),
-                0,
-                ProverJobType::SingleProof,
-            )
-            .await?;
-        let job_id = get_idle_job_from_queue(&mut storage).await?.job_id;
-        ProverSchema(&mut storage)
-            .store_proof(job_id, BlockNumber(block_number), &proof)
-            .await?;
-    }
+// /// Checks that block proofs are removed correctly.
+// #[db_test]
+// async fn test_remove_proofs(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
+//     let proof = get_sample_single_proof();
+//     let job_data = serde_json::Value::default();
+//     for block_number in 1..=5 {
+//         ProverSchema(&mut storage)
+//             .add_prover_job_to_job_queue(
+//                 BlockNumber(block_number),
+//                 BlockNumber(block_number),
+//                 job_data.clone(),
+//                 0,
+//                 ProverJobType::SingleProof,
+//             )
+//             .await?;
+//         let job_id = get_idle_job_from_queue(&mut storage).await?.job_id;
+//         ProverSchema(&mut storage)
+//             .store_proof(job_id, BlockNumber(block_number), &proof)
+//             .await?;
+//     }
 
-    ProverSchema(&mut storage)
-        .remove_proofs(BlockNumber(3))
-        .await?;
+//     ProverSchema(&mut storage)
+//         .remove_proofs(BlockNumber(3))
+//         .await?;
 
-    assert!(ProverSchema(&mut storage)
-        .load_proof(BlockNumber(3))
-        .await?
-        .is_some());
-    assert!(ProverSchema(&mut storage)
-        .load_proof(BlockNumber(4))
-        .await?
-        .is_none());
+//     assert!(ProverSchema(&mut storage)
+//         .load_proof(BlockNumber(3))
+//         .await?
+//         .is_some());
+//     assert!(ProverSchema(&mut storage)
+//         .load_proof(BlockNumber(4))
+//         .await?
+//         .is_none());
 
-    let aggregated_proof = get_sample_aggregated_proof();
+//     let aggregated_proof = get_sample_aggregated_proof();
 
-    ProverSchema(&mut storage)
-        .add_prover_job_to_job_queue(
-            BlockNumber(1),
-            BlockNumber(2),
-            job_data.clone(),
-            1,
-            ProverJobType::AggregatedProof,
-        )
-        .await?;
-    let job_id = get_idle_job_from_queue(&mut storage).await?.job_id;
-    ProverSchema(&mut storage)
-        .store_aggregated_proof(job_id, BlockNumber(1), BlockNumber(2), &aggregated_proof)
-        .await?;
+//     ProverSchema(&mut storage)
+//         .add_prover_job_to_job_queue(
+//             BlockNumber(1),
+//             BlockNumber(2),
+//             job_data.clone(),
+//             1,
+//             ProverJobType::AggregatedProof,
+//         )
+//         .await?;
+//     let job_id = get_idle_job_from_queue(&mut storage).await?.job_id;
+//     ProverSchema(&mut storage)
+//         .store_aggregated_proof(job_id, BlockNumber(1), BlockNumber(2), &aggregated_proof)
+//         .await?;
 
-    ProverSchema(&mut storage)
-        .add_prover_job_to_job_queue(
-            BlockNumber(3),
-            BlockNumber(5),
-            job_data.clone(),
-            1,
-            ProverJobType::AggregatedProof,
-        )
-        .await?;
-    let job_id = get_idle_job_from_queue(&mut storage).await?.job_id;
-    ProverSchema(&mut storage)
-        .store_aggregated_proof(job_id, BlockNumber(3), BlockNumber(5), &aggregated_proof)
-        .await?;
+//     ProverSchema(&mut storage)
+//         .add_prover_job_to_job_queue(
+//             BlockNumber(3),
+//             BlockNumber(5),
+//             job_data.clone(),
+//             1,
+//             ProverJobType::AggregatedProof,
+//         )
+//         .await?;
+//     let job_id = get_idle_job_from_queue(&mut storage).await?.job_id;
+//     ProverSchema(&mut storage)
+//         .store_aggregated_proof(job_id, BlockNumber(3), BlockNumber(5), &aggregated_proof)
+//         .await?;
 
-    ProverSchema(&mut storage)
-        .remove_aggregated_proofs(BlockNumber(3))
-        .await?;
+//     ProverSchema(&mut storage)
+//         .remove_aggregated_proofs(BlockNumber(3))
+//         .await?;
 
-    assert!(ProverSchema(&mut storage)
-        .load_aggregated_proof(BlockNumber(1), BlockNumber(2))
-        .await?
-        .is_some());
-    assert!(ProverSchema(&mut storage)
-        .load_aggregated_proof(BlockNumber(3), BlockNumber(5))
-        .await?
-        .is_none());
+//     assert!(ProverSchema(&mut storage)
+//         .load_aggregated_proof(BlockNumber(1), BlockNumber(2))
+//         .await?
+//         .is_some());
+//     assert!(ProverSchema(&mut storage)
+//         .load_aggregated_proof(BlockNumber(3), BlockNumber(5))
+//         .await?
+//         .is_none());
 
-    Ok(())
-}
+//     Ok(())
+// }
 
 /// Checks that prover jobs are removed correctly.
 #[db_test]
