@@ -14,12 +14,12 @@ jobs:
       -
         id: print
         run: echo "::set-output name=shortRev::$(git rev-parse --short HEAD)"
-      - 
+      -
         uses: actions-ecosystem/action-regex-match@v2
         id: regex-match
         with:
           text: ${{ github.ref }}
-          regex: '^refs\/tags\/(v[0-9]+\.[0-9]+\.[0-9](-?\w*)?)$'
+          regex: '^refs\/tags\/(v[0-9]+\.[0-9]+\.[0-9](-?.*)?)$'
       -
         name: Map runtime environment data
         uses: kanga333/variable-mapper@v0.2.0
@@ -48,6 +48,14 @@ jobs:
                 "RUNNER": "stage"
               }
             }
+      -
+        name: Cancel deployment (deployment tag missmatch)
+        if: ${{ steps.regex-match.outputs.group1 == '' }}
+        uses: chrnorm/deployment-status@releases/v1
+        with:
+          token: ${{ github.token }}
+          state: failure
+          deployment_id: ${{ github.event.deployment.id }}
 
     outputs:
       shortRev: ${{ steps.print.outputs.shortRev }}
