@@ -258,4 +258,25 @@ mod test {
             serde_json::from_value(value).expect("cannot deserialize BigUintSerdeWrapper");
         assert_eq!(uint.0, expected);
     }
+
+    /// Tests that `BigUintPair` serializer works correctly.
+    #[test]
+    fn test_serde_big_uint_pair() {
+        #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+        struct Wrapper {
+            #[serde(with = "BigUintPairSerdeAsRadix10Str")]
+            pair: (BigUint, BigUint),
+        }
+
+        let wrapper = Wrapper {
+            pair: (BigUint::from(u64::MAX), BigUint::from(u64::MAX)),
+        };
+
+        let serialized =
+            serde_json::to_value(wrapper.clone()).expect("cannot serialize BigUintSerdeWrapper");
+        let deserialized: Wrapper =
+            serde_json::from_value(serialized).expect("cannot deserialize BigUintSerdeWrapper");
+
+        assert_eq!(wrapper, deserialized);
+    }
 }

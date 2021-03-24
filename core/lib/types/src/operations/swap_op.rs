@@ -101,7 +101,7 @@ impl SwapOp {
             account_id: account_id_0,
             nonce,
             recipient_id: recipient_id_0,
-            // first bit indicates if this amount is 0 or not
+            // First bit indicates whether this amount is 0 or not.
             amount: amount_0.clone() * (nonce_mask & 1),
             token_buy: token_1,
             token_sell: token_0,
@@ -114,8 +114,8 @@ impl SwapOp {
             account_id: account_id_1,
             nonce,
             recipient_id: recipient_id_1,
-            // second bit indicates if this amount is 0 or not,
-            // there only 2 bits total
+            // Second bit indicates whether this amount is 0 or not,
+            // there're only 2 bits in total.
             amount: amount_1.clone() * (nonce_mask >> 1),
             token_buy: token_0,
             token_sell: token_1,
