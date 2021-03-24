@@ -79,6 +79,13 @@ jobs:
           ref: master
           token: ${{ secrets.GH_TOKEN }}
       -
+        uses: chrnorm/deployment-action@releases/v1
+        name: Create GitHub deployment
+        id: deployment
+        with:
+          token: "${{ github.token }}"
+          environment: stage
+      -
         name: Deploy apps
         working-directory: helm-infra
         run: |
@@ -94,7 +101,7 @@ jobs:
         with:
           token: ${{ github.token }}
           state: success
-          deployment_id: ${{ github.event.deployment.id }}
+          deployment_id: ${{ steps.deployment.outputs.deployment_id }}
       -
         name: Update deployment status (failure)
         if: failure()
@@ -102,4 +109,4 @@ jobs:
         with:
           token: ${{ github.token }}
           state: failure
-          deployment_id: ${{ github.event.deployment.id }}
+          deployment_id: ${{ steps.deployment.outputs.deployment_id }}
