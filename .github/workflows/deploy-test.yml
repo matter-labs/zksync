@@ -1,0 +1,12 @@
+name: Deploy Test
+
+on:
+  push:
+    branches:
+      - ci-test-wf
+
+jobs:
+  pre:
+    runs-on: [k8s, stage]
+    steps:
+      - run: /bin/false
