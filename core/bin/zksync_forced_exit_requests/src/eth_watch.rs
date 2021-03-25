@@ -309,7 +309,7 @@ where
 
         let block_to_watch_from = self
             .last_viewed_block
-            .sub(self.config.forced_exit_requests.blocks_check_amount);
+            .saturating_sub(self.config.forced_exit_requests.blocks_check_amount);
 
         let events = self
             .eth_client
