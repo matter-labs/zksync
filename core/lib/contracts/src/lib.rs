@@ -17,6 +17,8 @@ const IEIP1271_CONTRACT_FILE: &str =
     "contracts/artifacts/cache/solpp-generated-contracts/dev-contracts/IEIP1271.sol/IEIP1271.json";
 const UPGRADE_GATEKEEPER_CONTRACT_FILE: &str =
     "contracts/artifacts/cache/solpp-generated-contracts/UpgradeGatekeeper.sol/UpgradeGatekeeper.json";
+const FORCED_EXIT_CONTRACT_FILE: &str =
+    "contracts/artifacts/cache/solpp-generated-contracts/ForcedExit.sol/ForcedExit.json";
 
 fn read_file_to_json_value(path: &str) -> io::Result<serde_json::Value> {
     let zksync_home = std::env::var("ZKSYNC_HOME").unwrap_or_else(|_| ".".into());
@@ -104,4 +106,13 @@ pub fn upgrade_gatekeeper() -> Contract {
         .expect("couldn't get abi from UPGRADE_GATEKEEPER_CONTRACT_FILE")
         .to_string();
     Contract::load(abi_string.as_bytes()).expect("gatekeeper contract abi")
+}
+
+pub fn forced_exit_contract() -> Contract {
+    let abi_string = read_file_to_json_value(FORCED_EXIT_CONTRACT_FILE)
+        .expect("couldn't read FORCED_EXIT_CONTRACT_FILE")
+        .get("abi")
+        .expect("couldn't get abi from FORCED_EXIT_CONTRACT_FILE")
+        .to_string();
+    Contract::load(abi_string.as_bytes()).expect("forced_exit contract abi")
 }

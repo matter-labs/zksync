@@ -18,7 +18,8 @@ const CONFIG_FILES = [
     'dev_liquidity_token_watcher.toml',
     'prover.toml',
     'rust.toml',
-    'private.toml'
+    'private.toml',
+    'forced_exit_requests.toml'
 ];
 
 async function getEnvironment(): Promise<string> {

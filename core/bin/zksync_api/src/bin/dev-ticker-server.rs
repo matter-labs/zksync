@@ -57,6 +57,8 @@ async fn handle_coinmarketcap_token_price_query(
         "wBTC" => BigDecimal::from(9000),
         "BAT" => BigDecimal::try_from(0.2).unwrap(),
         "DAI" => BigDecimal::from(1),
+        "tGLM" => BigDecimal::from(1),
+        "GLM" => BigDecimal::from(1),
         _ => BigDecimal::from(0),
     };
     let random_multiplier = thread_rng().gen_range(0.9, 1.1);
@@ -84,7 +86,24 @@ async fn handle_coingecko_token_list(_req: HttpRequest) -> Result<HttpResponse> 
     let resp = json!([
         {"id": "ethereum", "symbol": "eth", "name": "Ethereum"},
         {"id": "dai", "symbol":"dai", "name": "Dai"},
-        {"id": "gnt", "symbol":"gnt", "name": "Golem"},
+        {"id": "glm", "symbol":"glm", "name": "Golem"},
+        {"id": "tglm", "symbol":"tglm", "name": "Golem"},
+        {"id": "usdc", "symbol":"usdc", "name": "usdc"},
+        {"id": "usdt", "symbol":"usdt", "name": "usdt"},
+        {"id": "tusd", "symbol":"tusd", "name": "tusd"},
+        {"id": "link", "symbol":"link", "name": "link"},
+        {"id": "ht", "symbol":"ht", "name": "ht"},
+        {"id": "omg", "symbol":"omg", "name": "omg"},
+        {"id": "trb", "symbol":"trb", "name": "trb"},
+        {"id": "zrx", "symbol":"zrx", "name": "zrx"},
+        {"id": "rep", "symbol":"rep", "name": "rep"},
+        {"id": "storj", "symbol":"storj", "name": "storj"},
+        {"id": "nexo", "symbol":"nexo", "name": "nexo"},
+        {"id": "mco", "symbol":"mco", "name": "mco"},
+        {"id": "knc", "symbol":"knc", "name": "knc"},
+        {"id": "lamb", "symbol":"lamb", "name": "lamb"},
+        {"id": "xem", "symbol":"xem", "name": "xem"},
+        {"id": "phnx", "symbol":"phnx", "name": "Golem"},
         {"id": "basic-attention-token", "symbol": "bat", "name": "Basic Attention Token"},
         {"id": "wrapped-bitcoin", "symbol": "wbtc", "name": "Wrapped Bitcoin"},
     ]);
@@ -98,9 +117,7 @@ async fn handle_coingecko_token_price_query(req: HttpRequest) -> Result<HttpResp
         Some("ethereum") => BigDecimal::from(200),
         Some("wrapped-bitcoin") => BigDecimal::from(9000),
         Some("basic-attention-token") => BigDecimal::try_from(0.2).unwrap(),
-        Some("dai") => BigDecimal::from(1),
-        Some("gnt") => BigDecimal::from(1),
-        _ => BigDecimal::from(0),
+        _ => BigDecimal::from(1),
     };
     let random_multiplier = thread_rng().gen_range(0.9, 1.1);
     let price = base_price * BigDecimal::try_from(random_multiplier).unwrap();

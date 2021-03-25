@@ -4,11 +4,12 @@ import { utils } from 'ethers';
 import './priority-ops';
 import './change-pub-key';
 import './withdrawal-helpers';
+import './forced-exit-requests';
 
 import { loadTestConfig } from 'reading-tool';
 
-const TX_AMOUNT = utils.parseEther('1');
-const DEPOSIT_AMOUNT = TX_AMOUNT.mul(200);
+const TX_AMOUNT = utils.parseEther('0.1');
+const DEPOSIT_AMOUNT = TX_AMOUNT.mul(2000);
 
 const TEST_CONFIG = loadTestConfig(true);
 
@@ -18,10 +19,14 @@ const erc20Token = 'wBTC';
 describe('Withdrawal helpers tests', () => {
     let tester: Tester;
     let alice: Wallet;
+    let bob: Wallet;
+    let chuck: Wallet;
 
     before('create tester and test wallets', async () => {
         tester = await Tester.init('localhost', 'HTTP');
         alice = await tester.fundedWallet('10.0');
+        bob = await tester.fundedWallet('10.0');
+        chuck = await tester.emptyWallet();
 
         for (const token of ['ETH', erc20Token]) {
             await tester.testDeposit(alice, token, DEPOSIT_AMOUNT, true);
@@ -58,6 +63,16 @@ describe('Withdrawal helpers tests', () => {
             ],
             ['ETH', erc20Token],
             [TX_AMOUNT, TX_AMOUNT]
+        );
+    });
+
+    it('forced_exit_request should recover mutiple tokens', async () => {
+        await tester.testForcedExitRequestMultipleTokens(
+            alice,
+            bob.ethSigner,
+            chuck.address(),
+            ['ETH', erc20Token],
+            [TX_AMOUNT, TX_AMOUNT.mul(2)]
         );
     });
 });
