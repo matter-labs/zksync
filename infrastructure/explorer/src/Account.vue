@@ -22,6 +22,10 @@
                     <template v-slot:cell(value)="data"><span v-html="data.item.value" /></template>
                 </b-table>
             </b-card>
+            <div class="alternativeWithdrawMsg" v-if="eligibleForForcedExit">
+                Funds from this account can be moved to L1 using the
+                <outter-link :to="alternativeWithdrawAddressLink" innerHTML="Alternative Withdraw"></outter-link>
+            </div>
             <h5 class="mt-3 mb-2">Account transactions</h5>
             <img src="./assets/loading.gif" width="100" height="100" v-if="loading" />
             <div v-else-if="transactions.length == 0">No transactions yet.</div>
@@ -68,10 +72,12 @@
 <script>
 import timeConstants from './timeConstants';
 import { clientPromise } from './Client';
+import OutterLink from './links/OutterLink';
 import SearchField from './SearchField.vue';
 import CopyableAddress from './CopyableAddress.vue';
-import { accountStateToBalances, makeEntry } from './utils';
+import { accountStateToBalances, makeEntry, isEligibleForForcedExit } from './utils';
 import Navbar from './Navbar.vue';
+import store from './store';
 
 import Entry from './links/Entry.vue';
 
@@ -81,7 +87,8 @@ const components = {
     SearchField,
     CopyableAddress,
     Navbar,
-    Entry
+    Entry,
+    OutterLink
 };
 
 export default {
@@ -96,6 +103,7 @@ export default {
         totalRows: 0,
 
         loading: true,
+        eligibleForForcedExit: false,
 
         intervalHandle: null,
         client: null,
@@ -111,6 +119,7 @@ export default {
         async nextAddress() {
             this.loading = true;
             this.totalRows = 0;
+            this.eligibleForForcedExit = false;
             this.pagesOfTransactions = {};
 
             this.client = await clientPromise;
@@ -151,6 +160,10 @@ export default {
         clearInterval(this.intervalHandle);
     },
     methods: {
+        async checkForcedExitEligiblity() {
+            const isEligible = await isEligibleForForcedExit(this.address);
+            return isEligible;
+        },
         onRowClicked(item) {
             this.$parent.$router.push('/transactions/' + item.hash);
         },
@@ -180,6 +193,8 @@ export default {
                     limit
                 );
             }
+
+            this.eligibleForForcedExit = await this.checkForcedExitEligiblity();
 
             let nextPageLoaded = false;
             let numNextPageTransactions;
@@ -219,6 +234,18 @@ export default {
         }
     },
     computed: {
+        alternativeWithdrawUrl() {
+            if (store.network === 'rinkeby' || store.network === 'ropsten') {
+                return `https://withdraw-${store.network}.zksync.dev`;
+            } else {
+                return `https://withdraw.zksync.io`;
+            }
+        },
+        alternativeWithdrawAddressLink() {
+            let baseUrl = this.alternativeWithdrawUrl;
+
+            return `${baseUrl}?address=${this.address}`;
+        },
         address() {
             return this.$route.params.address;
         },
@@ -304,5 +331,10 @@ export default {
 }
 .brown {
     color: #aa935d;
+}
+
+.alternativeWithdrawMsg {
+    padding-top: 20px;
+    font-size: 15px;
 }
 </style>
