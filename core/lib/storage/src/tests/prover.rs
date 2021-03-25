@@ -6,8 +6,8 @@ use zksync_types::prover::{ProverJob, ProverJobType};
 use crate::test_data::{gen_sample_block, get_sample_aggregated_proof, get_sample_single_proof};
 use crate::tests::db_test;
 use crate::{prover::ProverSchema, QueryResult, StorageProcessor};
+use async_std::sync::Mutex;
 use lazy_static::lazy_static;
-use std::sync::Mutex;
 use zksync_types::BlockNumber;
 
 lazy_static! {
@@ -16,7 +16,7 @@ lazy_static! {
 
 async fn get_idle_job_from_queue(mut storage: &mut StorageProcessor<'_>) -> QueryResult<ProverJob> {
     // Lock to prevent database deadlock
-    let _lock = MUTEX.lock().unwrap();
+    let _lock = MUTEX.lock().await;
 
     let job = ProverSchema(&mut storage)
         .get_idle_prover_job_from_job_queue()
