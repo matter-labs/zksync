@@ -37,7 +37,12 @@ withdrawal_threshold=1000000000000000000
 # to set the same account as the one that sends the txs for retrieving the fees from the smart contract 
 fee_receiver="0x1963917ba0b44A879cf6248387C1d51A0F11669d"
 
+
 # The amount of blocks we look into beyound the waiting confirmations
 # Basically this ensures that we do not skip a transaction that has become too old due to a 
 # reorg
 blocks_check_amount=10
+
+# How often we want to poll the Ethereum node (in milliseconds).
+eth_node_poll_interval=300
+

@@ -374,7 +374,7 @@ where
             .await
             .expect("Failed to restore state for ForcedExit eth_watcher");
 
-        let mut timer = time::interval(Duration::from_secs(1));
+        let mut timer = time::interval(self.config.forced_exit_requests.poll_interval());
 
         loop {
             timer.tick().await;

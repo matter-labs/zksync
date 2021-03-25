@@ -1,3 +1,5 @@
+use std::time::Duration;
+
 use crate::envy_load;
 /// External uses
 use serde::Deserialize;
@@ -25,6 +27,7 @@ struct ForcedExitRequestsInternalConfig {
     pub sender_account_address: Address,
     pub expiration_period: u64,
     pub blocks_check_amount: u64,
+    pub eth_node_poll_interval: u64,
 }
 
 #[derive(Debug, Deserialize, Clone, PartialEq)]
@@ -41,6 +44,7 @@ pub struct ForcedExitRequestsConfig {
     pub sender_account_address: Address,
     pub expiration_period: u64,
     pub blocks_check_amount: u64,
+    pub eth_node_poll_interval: u64,
 }
 
 // Checks that in no way the price will overlap with the requests id space
@@ -82,6 +86,11 @@ impl ForcedExitRequestsConfig {
             sender_account_address: config.sender_account_address,
             expiration_period: config.expiration_period,
             blocks_check_amount: config.blocks_check_amount,
+            eth_node_poll_interval: config.eth_node_poll_interval,
         }
+    }
+
+    pub fn poll_interval(&self) -> Duration {
+        Duration::from_millis(self.eth_node_poll_interval)
     }
 }
