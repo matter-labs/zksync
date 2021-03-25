@@ -36,3 +36,8 @@ withdrawal_threshold=1000000000000000000
 # Here it is set for some random account for the purpose of testing, but usually it is preferred
 # to set the same account as the one that sends the txs for retrieving the fees from the smart contract 
 fee_receiver="0x1963917ba0b44A879cf6248387C1d51A0F11669d"
+
+# The amount of blocks we look into beyound the waiting confirmations
+# Basically this ensures that we do not skip a transaction that has become too old due to a 
+# reorg
+blocks_check_amount=10

@@ -307,9 +307,13 @@ where
             return;
         };
 
+        let block_to_watch_from = self
+            .last_viewed_block
+            .sub(self.config.forced_exit_requests.blocks_check_amount);
+
         let events = self
             .eth_client
-            .get_funds_received_events(self.last_viewed_block + 1, last_confirmed_block)
+            .get_funds_received_events(block_to_watch_from, last_confirmed_block)
             .await;
 
         let events = match events {
