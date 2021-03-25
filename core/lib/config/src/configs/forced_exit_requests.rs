@@ -26,6 +26,7 @@ struct ForcedExitRequestsInternalConfig {
     pub sender_eth_private_key: H256,
     pub sender_account_address: Address,
     pub expiration_period: u64,
+    pub blocks_check_amount: u64,
     pub eth_node_poll_interval: u64,
 }
 
@@ -42,6 +43,7 @@ pub struct ForcedExitRequestsConfig {
     pub sender_eth_private_key: H256,
     pub sender_account_address: Address,
     pub expiration_period: u64,
+    pub blocks_check_amount: u64,
     pub eth_node_poll_interval: u64,
 }
 
@@ -83,6 +85,7 @@ impl ForcedExitRequestsConfig {
             sender_eth_private_key: config.sender_eth_private_key,
             sender_account_address: config.sender_account_address,
             expiration_period: config.expiration_period,
+            blocks_check_amount: config.blocks_check_amount,
             eth_node_poll_interval: config.eth_node_poll_interval,
         }
     }
