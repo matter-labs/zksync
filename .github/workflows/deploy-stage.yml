@@ -85,15 +85,16 @@ jobs:
         with:
           token: "${{ github.token }}"
           environment: stage
-      -
-        name: Deploy apps
-        working-directory: helm-infra
-        run: |
-          ## copy helm plugins over (from dysnix/kubectl, don't forget)!!!
-          cp -r /dysnix/kubectl/.local /dysnix/kubectl/.cache ~
-
-          UPDATE_REPOS=y helmfile -e $HFENV repos
-          helmfile -e $HFENV $DEPLOY_APPS apply --args "timeout 180s"
+# TODO fix stage and resume deploy to stage
+#      -
+#        name: Deploy apps
+#        working-directory: helm-infra
+#        run: |
+          # copy helm plugins over (from dysnix/kubectl, don't forget)!!!
+#          cp -r /dysnix/kubectl/.local /dysnix/kubectl/.cache ~
+#
+#          UPDATE_REPOS=y helmfile -e $HFENV repos
+#          helmfile -e $HFENV $DEPLOY_APPS apply --args "timeout 180s"
       -
         name: Update deployment status (success)
         if: success()
