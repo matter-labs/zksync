@@ -7,14 +7,11 @@ use std::str::FromStr;
 use actix_web::{web, Scope};
 
 // Workspace uses
-pub use zksync_api_client::rest::v1::{BlockInfo, TransactionInfo};
-use zksync_crypto::{convert::FeConvert, Fr};
 use zksync_storage::{chain::block::records::BlockDetails, ConnectionPool, QueryResult};
-use zksync_types::{tx::TxHash, BlockNumber};
+use zksync_types::BlockNumber;
 
 // Local uses
-use super::error::InternalError;
-use super::response::ApiResult;
+use super::{error::Error, response::ApiResult, types::BlockInfo};
 use crate::utils::block_details_cache::BlockDetailsCache;
 
 /// Shared data between `api/v0.2/block` endpoints.
@@ -56,41 +53,6 @@ impl ApiBlockData {
     }
 }
 
-pub(super) mod convert {
-    use super::*;
-
-    pub fn block_info_from_details(inner: BlockDetails) -> BlockInfo {
-        BlockInfo {
-                block_number: BlockNumber(inner.block_number as u32),
-                new_state_root: Fr::from_bytes(&inner.new_state_root).unwrap_or_else(|err| {
-                    panic!(
-                        "Database provided an incorrect new_state_root field: {:?}, an error occurred {}",
-                        inner.new_state_root, err
-                    )
-                }),
-                block_size: inner.block_size as u64,
-                commit_tx_hash: inner.commit_tx_hash.map(|bytes| {
-                    TxHash::from_slice(&bytes).unwrap_or_else(|| {
-                        panic!(
-                            "Database provided an incorrect commit_tx_hash field: {:?}",
-                            hex::encode(bytes)
-                        )
-                    })
-                }),
-                verify_tx_hash: inner.verify_tx_hash.map(|bytes| {
-                    TxHash::from_slice(&bytes).unwrap_or_else(|| {
-                        panic!(
-                            "Database provided an incorrect verify_tx_hash field: {:?}",
-                            hex::encode(bytes)
-                        )
-                    })
-                }),
-                committed_at: inner.committed_at,
-                verified_at: inner.verified_at,
-            }
-    }
-}
-
 // Server implementation
 
 // async fn block_pagination(
@@ -103,28 +65,42 @@ pub(super) mod convert {
 async fn block_by_number(
     data: web::Data<ApiBlockData>,
     web::Path(block_position): web::Path<String>,
-) -> ApiResult<Option<BlockInfo>, InternalError> {
+) -> ApiResult<Option<BlockInfo>> {
     // TODO: take block_position as enum
-    let block_number = if let Ok(number) = u32::from_str(&block_position) {
-        Ok(BlockNumber(number))
+    let block_number: BlockNumber;
+    if let Ok(number) = u32::from_str(&block_position) {
+        block_number = BlockNumber(number);
     } else {
         match block_position.as_str() {
-            "last_committed" => data.get_last_committed_block_number().await,
-            "last_finalized" => data.get_last_finalized_block_number().await,
-            _ => Err(anyhow::anyhow!(
-                "There are only {block_number}, last_committed, last_finalized options"
-            )),
+            "last_committed" => match data.get_last_committed_block_number().await {
+                Ok(number) => {
+                    block_number = number;
+                }
+                Err(err) => {
+                    return Error::internal(err).into();
+                }
+            },
+            "last_finalized" => match data.get_last_finalized_block_number().await {
+                Ok(number) => {
+                    block_number = number;
+                }
+                Err(err) => {
+                    return Error::internal(err).into();
+                }
+            },
+            _ => {
+                return Error::invalid_data(
+                    "There are only {block_number}, last_committed, last_finalized options",
+                )
+                .into();
+            }
         }
     };
-    match block_number {
-        Ok(block_number) => data
-            .block_info(block_number)
-            .await
-            .map_err(InternalError::new)
-            .map(|details| details.map(convert::block_info_from_details))
-            .into(),
-        Err(err) => InternalError::new(err).into(),
-    }
+    data.block_info(block_number)
+        .await
+        .map_err(Error::internal)
+        .map(|details| details.map(BlockInfo::from))
+        .into()
 }
 
 pub fn api_scope(pool: ConnectionPool, cache: BlockDetailsCache) -> Scope {

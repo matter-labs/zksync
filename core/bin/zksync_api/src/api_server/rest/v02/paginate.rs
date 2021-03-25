@@ -1,6 +1,5 @@
-use super::error::{ApiError, InternalError};
+use super::error::Error;
 use serde::Serialize;
-use std::convert::TryFrom;
 use zksync_storage::StorageProcessor;
 use zksync_types::{
     pagination::{Paginated, PaginationQuery},
@@ -10,34 +9,31 @@ use zksync_types::{
 #[async_trait::async_trait]
 pub trait Paginate<T: Serialize> {
     type F: Serialize;
-    type E: ApiError;
 
     async fn paginate(
         &mut self,
         query: PaginationQuery<Self::F>,
-    ) -> Result<Paginated<T, Self::F>, Self::E>;
+    ) -> Result<Paginated<T, Self::F>, Error>;
 }
 
 #[async_trait::async_trait]
 impl Paginate<Token> for StorageProcessor<'_> {
     type F = TokenId;
-    type E = InternalError;
 
     async fn paginate(
         &mut self,
         query: PaginationQuery<TokenId>,
-    ) -> Result<Paginated<Token, TokenId>, InternalError> {
+    ) -> Result<Paginated<Token, TokenId>, Error> {
         let tokens = self
             .tokens_schema()
             .load_token_page(&query)
             .await
-            .map_err(InternalError::new)?;
+            .map_err(Error::internal)?;
         let count = self
             .tokens_schema()
             .get_count()
             .await
-            .map_err(InternalError::new)?;
-        let count = u32::try_from(count).map_err(InternalError::new)?;
+            .map_err(Error::internal)? as u32;
         Ok(Paginated::new(
             tokens,
             query.from,

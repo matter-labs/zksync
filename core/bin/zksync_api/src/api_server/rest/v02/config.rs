@@ -43,7 +43,7 @@ impl ApiConfigData {
 
 // Server implementation
 async fn config_endpoint(data: web::Data<ApiConfigData>) -> ApiResult<ApiConfigData> {
-    (*data.into_inner()).into()
+    ApiResult::Ok(*data.into_inner())
 }
 
 pub fn api_scope(config: &ZkSyncConfig) -> Scope {

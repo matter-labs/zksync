@@ -20,6 +20,7 @@ mod paginate;
 mod response;
 mod token;
 mod transaction;
+mod types;
 
 #[derive(Serialize, Clone, Copy)]
 #[serde(rename_all = "snake_case")]

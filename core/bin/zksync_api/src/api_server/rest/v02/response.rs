@@ -1,5 +1,5 @@
 use actix_web::web::Data;
-use actix_web::{Error, HttpRequest, HttpResponse, Responder};
+use actix_web::{HttpRequest, HttpResponse, Responder};
 use chrono::{DateTime, Utc};
 use futures::future::{ready, Ready};
 use qstring::QString;
@@ -10,10 +10,9 @@ use std::convert::From;
 
 use zksync_types::network::Network;
 
-use crate::api_server::rest::v02::{
-    error::{self, ApiError, UnreachableError},
-    ApiVersion, SharedData,
-};
+use super::{error::Error, ApiVersion, SharedData};
+
+use actix_web::Error as ActixError;
 
 #[derive(Serialize)]
 #[serde(rename_all = "snake_case")]
@@ -37,21 +36,19 @@ struct Response {
     request: Request,
     status: ResultStatus,
     #[serde(skip_serializing_if = "Option::is_none")]
-    error: Option<error::Error>,
+    error: Option<Error>,
     #[serde(skip_serializing_if = "Option::is_none")]
     result: Option<Value>,
 }
 
-// TODO: remove #[allow(dead_code)] after adding endpoint that can return an error. (ZKS-572)
-#[allow(dead_code)]
-pub enum ApiResult<R: Serialize, E: ApiError = UnreachableError> {
+pub enum ApiResult<R: Serialize> {
     Ok(R),
-    Error(E),
+    Error(Error),
 }
 
-impl<R: Serialize, E: ApiError> Responder for ApiResult<R, E> {
-    type Error = Error;
-    type Future = Ready<Result<HttpResponse, Error>>;
+impl<R: Serialize> Responder for ApiResult<R> {
+    type Error = ActixError;
+    type Future = Ready<Result<HttpResponse, ActixError>>;
 
     fn respond_to(self, req: &HttpRequest) -> Self::Future {
         let data = req
@@ -97,20 +94,14 @@ impl<R: Serialize, E: ApiError> Responder for ApiResult<R, E> {
     }
 }
 
-impl<R: Serialize> From<R> for ApiResult<R, UnreachableError> {
-    fn from(res: R) -> Self {
-        Self::Ok(res)
-    }
-}
-
-impl<R: Serialize, E: ApiError> From<E> for ApiResult<R, E> {
-    fn from(err: E) -> Self {
+impl<R: Serialize> From<Error> for ApiResult<R> {
+    fn from(err: Error) -> Self {
         Self::Error(err)
     }
 }
 
-impl<R: Serialize, E: ApiError> From<Result<R, E>> for ApiResult<R, E> {
-    fn from(result: Result<R, E>) -> Self {
+impl<R: Serialize> From<Result<R, Error>> for ApiResult<R> {
+    fn from(result: Result<R, Error>) -> Self {
         match result {
             Ok(ok) => Self::Ok(ok),
             Err(err) => Self::Error(err),

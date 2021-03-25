@@ -1,4 +1,5 @@
 use crate::api_server::tx_sender::SubmitError;
+use crate::fee_ticker::PriceError;
 use serde::export::Formatter;
 use serde::Serialize;
 use serde_repr::Serialize_repr;
@@ -8,8 +9,10 @@ use std::fmt::Display;
 #[repr(u16)]
 pub enum ErrorCode {
     Unreacheable = 0,
+    Submit = 100,
+    InvalidData = 200,
+    Price = 300,
     Internal = 500,
-    Submit = 501,
 }
 
 /// Error object in a response
@@ -44,6 +47,16 @@ where
     }
 }
 
+impl Error {
+    pub fn internal(err: impl Display) -> Error {
+        Error::from(InternalError::new(err))
+    }
+
+    pub fn invalid_data(err: impl Display) -> Error {
+        Error::from(InvalidDataError::new(err))
+    }
+}
+
 pub struct UnreachableError;
 
 impl Display for UnreachableError {
@@ -67,6 +80,7 @@ impl ApiError for UnreachableError {
 }
 
 pub struct InternalError(String);
+pub struct InvalidDataError(String);
 
 impl InternalError {
     pub fn new(title: impl Display) -> Self {
@@ -92,6 +106,30 @@ impl ApiError for InternalError {
     }
 }
 
+impl InvalidDataError {
+    pub fn new(title: impl Display) -> Self {
+        Self {
+            0: title.to_string(),
+        }
+    }
+}
+
+impl Display for InvalidDataError {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+
+impl ApiError for InvalidDataError {
+    fn error_type(&self) -> String {
+        String::from("invalid_data_error")
+    }
+
+    fn code(&self) -> ErrorCode {
+        ErrorCode::InvalidData
+    }
+}
+
 impl ApiError for SubmitError {
     fn error_type(&self) -> String {
         String::from("submit_error")
@@ -99,5 +137,15 @@ impl ApiError for SubmitError {
 
     fn code(&self) -> ErrorCode {
         ErrorCode::Submit
+    }
+}
+
+impl ApiError for PriceError {
+    fn error_type(&self) -> String {
+        String::from("price_error")
+    }
+
+    fn code(&self) -> ErrorCode {
+        ErrorCode::Price
     }
 }

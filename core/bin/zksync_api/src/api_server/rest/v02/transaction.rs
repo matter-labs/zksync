@@ -18,7 +18,7 @@ use zksync_types::{
     BlockNumber, EthBlockId, PriorityOpId,
 };
 // Local uses
-use super::{error::InternalError, response::ApiResult};
+use super::{error::Error, response::ApiResult};
 use crate::api_server::tx_sender::TxSender;
 
 /// Shared data between `api/v0.2/transaction` endpoints.
@@ -336,7 +336,7 @@ impl ApiTransactionData {
 async fn tx_status(
     data: web::Data<ApiTransactionData>,
     web::Path(tx_hash): web::Path<String>,
-) -> ApiResult<Option<Receipt>, InternalError> {
+) -> ApiResult<Option<Receipt>> {
     let decode_result = data.decode_hash(tx_hash);
     match decode_result {
         Ok(tx_hash) => {
@@ -344,19 +344,19 @@ async fn tx_status(
             match tx_hash_result {
                 Ok(tx_hash) => {
                     let tx_status = data.tx_status(&tx_hash).await;
-                    tx_status.map_err(InternalError::new).into()
+                    tx_status.map_err(Error::internal).into()
                 }
-                Err(_) => InternalError::new("Incorrect tx_hash length").into(),
+                Err(_) => Error::invalid_data("Incorrect tx_hash length").into(),
             }
         }
-        Err(err) => InternalError::new(err).into(),
+        Err(err) => Error::invalid_data(err).into(),
     }
 }
 
 async fn tx_data(
     data: web::Data<ApiTransactionData>,
     web::Path(tx_hash): web::Path<String>,
-) -> ApiResult<Option<TxData>, InternalError> {
+) -> ApiResult<Option<TxData>> {
     let decode_result = data.decode_hash(tx_hash);
     match decode_result {
         Ok(tx_hash) => {
@@ -364,12 +364,12 @@ async fn tx_data(
             match tx_hash_result {
                 Ok(tx_hash) => {
                     let tx_data = data.tx_data(&tx_hash).await;
-                    tx_data.map_err(InternalError::new).into()
+                    tx_data.map_err(Error::internal).into()
                 }
-                Err(_) => InternalError::new("Incorrect tx_hash length").into(),
+                Err(_) => Error::invalid_data("Incorrect tx_hash length").into(),
             }
         }
-        Err(err) => InternalError::new(err).into(),
+        Err(err) => Error::invalid_data(err).into(),
     }
 }
 

@@ -86,7 +86,7 @@ impl TokenLike {
         if let Ok(address) = Address::from_str(maybe_address) {
             Ok(Self::Address(address))
         } else {
-            anyhow::bail!("Can't parse TokenLike as id or address")
+            anyhow::bail!("Token parse error")
         }
     }
 
