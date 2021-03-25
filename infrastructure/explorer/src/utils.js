@@ -148,7 +148,7 @@ export async function isEligibleForForcedExit(address) {
     }
 
     if (state.committed.nonce) {
-        // The account has done any txs before
+        // The account has done some txs before
         return false;
     }
 
