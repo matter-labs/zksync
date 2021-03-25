@@ -933,6 +933,7 @@ async fn test_operations_counter(mut storage: StorageProcessor<'_>) -> QueryResu
 /// Check that blocks are removed correctly.
 #[db_test]
 async fn test_remove_blocks(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
+    // Insert 5 blocks.
     for block_number in 1..=5 {
         BlockSchema(&mut storage)
             .save_block(gen_sample_block(
@@ -949,9 +950,12 @@ async fn test_remove_blocks(mut storage: StorageProcessor<'_>) -> QueryResult<()
             ))
             .await?;
     }
+    // Remove blocks with numbers greater than 2.
     BlockSchema(&mut storage)
         .remove_blocks(BlockNumber(2))
         .await?;
+
+    // Check if the 2nd block is present, and the 3rd is not.
     assert!(BlockSchema(&mut storage)
         .get_block(BlockNumber(2))
         .await?
@@ -979,6 +983,7 @@ async fn test_remove_pending_block(mut storage: StorageProcessor<'_>) -> QueryRe
         previous_block_root_hash: H256::default(),
         timestamp: 0,
     };
+
     BlockSchema(&mut storage)
         .save_pending_block(pending_block_1.clone())
         .await?;
@@ -991,6 +996,7 @@ async fn test_remove_pending_block(mut storage: StorageProcessor<'_>) -> QueryRe
 /// Check that account tree cache is removed correctly.
 #[db_test]
 async fn test_remove_account_tree_cache(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
+    // Insert account tree cache for 5 blocks.
     for block_number in 1..=5 {
         BlockSchema(&mut storage)
             .save_block(gen_sample_block(
@@ -1004,10 +1010,12 @@ async fn test_remove_account_tree_cache(mut storage: StorageProcessor<'_>) -> Qu
             .await?;
     }
 
+    // Remove account tree cache for blocks with numbers greater than 2.
     BlockSchema(&mut storage)
         .remove_account_tree_cache(BlockNumber(2))
         .await?;
 
+    // Check if account tree cache for the 2nd block is present, and for the 3rd is not.
     assert!(BlockSchema(&mut storage)
         .get_account_tree_cache_block(BlockNumber(2))
         .await?

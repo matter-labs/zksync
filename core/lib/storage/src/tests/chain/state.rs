@@ -228,6 +228,7 @@ async fn test_remove_account_updates(mut storage: StorageProcessor<'_>) -> Query
     let (_accounts_block_3, updates_block_3) =
         apply_random_updates(accounts_block_2.clone(), &mut rng);
 
+    // Commit updates for 3 blocks.
     StateSchema(&mut storage)
         .commit_state_update(BlockNumber(1), &updates_block_1, 0)
         .await?;
@@ -238,6 +239,7 @@ async fn test_remove_account_updates(mut storage: StorageProcessor<'_>) -> Query
         .commit_state_update(BlockNumber(3), &updates_block_3, 0)
         .await?;
 
+    // Remove updates for blocks with number greater than 2.
     StateSchema(&mut storage)
         .remove_account_balance_updates(BlockNumber(2))
         .await?;
@@ -257,6 +259,8 @@ async fn test_remove_account_updates(mut storage: StorageProcessor<'_>) -> Query
     let diff3 = StateSchema(&mut storage)
         .load_state_diff(BlockNumber(0), Some(BlockNumber(3)))
         .await?;
+
+    // Check that there are updates for the 2nd block and there are not for the 3rd by comparing diffs.
     assert_ne!(diff1, diff2);
     assert_eq!(diff2, diff3);
     Ok(())

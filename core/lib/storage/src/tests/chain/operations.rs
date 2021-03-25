@@ -376,6 +376,7 @@ async fn remove_rejected_transactions(mut storage: StorageProcessor<'_>) -> Quer
 async fn test_remove_executed_priority_operations(
     mut storage: StorageProcessor<'_>,
 ) -> QueryResult<()> {
+    // Insert 5 priority operations.
     for block_number in 1..=5 {
         let executed_priority_op = NewExecutedPriorityOperation {
             block_number,
@@ -393,9 +394,13 @@ async fn test_remove_executed_priority_operations(
             .store_executed_priority_op(executed_priority_op)
             .await?;
     }
+
+    // Remove priority operation with block numbers greater than 3.
     OperationsSchema(&mut storage)
         .remove_executed_priority_operations(BlockNumber(3))
         .await?;
+
+    // Check that priority operation from the 3rd block is present and from the 4th is not.
     let block3_txs = BlockSchema(&mut storage)
         .get_block_transactions(BlockNumber(3))
         .await?;

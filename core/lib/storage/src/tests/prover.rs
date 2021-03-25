@@ -6,9 +6,18 @@ use zksync_types::prover::{ProverJob, ProverJobType};
 use crate::test_data::{gen_sample_block, get_sample_aggregated_proof, get_sample_single_proof};
 use crate::tests::db_test;
 use crate::{prover::ProverSchema, QueryResult, StorageProcessor};
+use lazy_static::lazy_static;
+use std::sync::Mutex;
 use zksync_types::BlockNumber;
 
+lazy_static! {
+    static ref MUTEX: Mutex<()> = Mutex::new(());
+}
+
 async fn get_idle_job_from_queue(mut storage: &mut StorageProcessor<'_>) -> QueryResult<ProverJob> {
+    // Lock to prevent database deadlock
+    let _lock = MUTEX.lock().unwrap();
+
     let job = ProverSchema(&mut storage)
         .get_idle_prover_job_from_job_queue()
         .await?;
@@ -267,6 +276,7 @@ async fn test_store_witness(mut storage: StorageProcessor<'_>) -> QueryResult<()
 /// Checks that block witnesses are removed correctly.
 #[db_test]
 async fn test_remove_witnesses(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
+    // Insert 5 blocks and witnesses for them.
     for block_number in 1..=5 {
         storage
             .chain()
@@ -283,16 +293,18 @@ async fn test_remove_witnesses(mut storage: StorageProcessor<'_>) -> QueryResult
             .store_witness(BlockNumber(block_number), witness)
             .await?;
     }
+    // Remove witnesses for the 4th and 5th blocks.
     storage
         .prover_schema()
         .remove_witnesses(BlockNumber(3))
         .await?;
+
+    // Check that there is a witness for the 3rd block and no witness for the 4th.
     assert!(storage
         .prover_schema()
         .get_witness(BlockNumber(3))
         .await?
         .is_some());
-
     assert!(storage
         .prover_schema()
         .get_witness(BlockNumber(4))
@@ -302,90 +314,99 @@ async fn test_remove_witnesses(mut storage: StorageProcessor<'_>) -> QueryResult
     Ok(())
 }
 
-// /// Checks that block proofs are removed correctly.
-// #[db_test]
-// async fn test_remove_proofs(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
-//     let proof = get_sample_single_proof();
-//     let job_data = serde_json::Value::default();
-//     for block_number in 1..=5 {
-//         ProverSchema(&mut storage)
-//             .add_prover_job_to_job_queue(
-//                 BlockNumber(block_number),
-//                 BlockNumber(block_number),
-//                 job_data.clone(),
-//                 0,
-//                 ProverJobType::SingleProof,
-//             )
-//             .await?;
-//         let job_id = get_idle_job_from_queue(&mut storage).await?.job_id;
-//         ProverSchema(&mut storage)
-//             .store_proof(job_id, BlockNumber(block_number), &proof)
-//             .await?;
-//     }
+/// Checks that block proofs are removed correctly.
+#[db_test]
+async fn test_remove_proofs(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
+    let proof = get_sample_single_proof();
+    let job_data = serde_json::Value::default();
 
-//     ProverSchema(&mut storage)
-//         .remove_proofs(BlockNumber(3))
-//         .await?;
+    // Insert proofs for 5 blocks.
+    for block_number in 1..=5 {
+        ProverSchema(&mut storage)
+            .add_prover_job_to_job_queue(
+                BlockNumber(block_number),
+                BlockNumber(block_number),
+                job_data.clone(),
+                0,
+                ProverJobType::SingleProof,
+            )
+            .await?;
+        let job_id = get_idle_job_from_queue(&mut storage).await?.job_id;
+        ProverSchema(&mut storage)
+            .store_proof(job_id, BlockNumber(block_number), &proof)
+            .await?;
+    }
 
-//     assert!(ProverSchema(&mut storage)
-//         .load_proof(BlockNumber(3))
-//         .await?
-//         .is_some());
-//     assert!(ProverSchema(&mut storage)
-//         .load_proof(BlockNumber(4))
-//         .await?
-//         .is_none());
+    // Remove proofs for the 4th and 5th blocks.
+    ProverSchema(&mut storage)
+        .remove_proofs(BlockNumber(3))
+        .await?;
 
-//     let aggregated_proof = get_sample_aggregated_proof();
+    // Check that there is a proof for the 3rd block and no proof for the 4th.
+    assert!(ProverSchema(&mut storage)
+        .load_proof(BlockNumber(3))
+        .await?
+        .is_some());
+    assert!(ProverSchema(&mut storage)
+        .load_proof(BlockNumber(4))
+        .await?
+        .is_none());
 
-//     ProverSchema(&mut storage)
-//         .add_prover_job_to_job_queue(
-//             BlockNumber(1),
-//             BlockNumber(2),
-//             job_data.clone(),
-//             1,
-//             ProverJobType::AggregatedProof,
-//         )
-//         .await?;
-//     let job_id = get_idle_job_from_queue(&mut storage).await?.job_id;
-//     ProverSchema(&mut storage)
-//         .store_aggregated_proof(job_id, BlockNumber(1), BlockNumber(2), &aggregated_proof)
-//         .await?;
+    let aggregated_proof = get_sample_aggregated_proof();
 
-//     ProverSchema(&mut storage)
-//         .add_prover_job_to_job_queue(
-//             BlockNumber(3),
-//             BlockNumber(5),
-//             job_data.clone(),
-//             1,
-//             ProverJobType::AggregatedProof,
-//         )
-//         .await?;
-//     let job_id = get_idle_job_from_queue(&mut storage).await?.job_id;
-//     ProverSchema(&mut storage)
-//         .store_aggregated_proof(job_id, BlockNumber(3), BlockNumber(5), &aggregated_proof)
-//         .await?;
+    // Insert arregated proofs for 1-2 blocks and 3-5 blocks.
+    ProverSchema(&mut storage)
+        .add_prover_job_to_job_queue(
+            BlockNumber(1),
+            BlockNumber(2),
+            job_data.clone(),
+            1,
+            ProverJobType::AggregatedProof,
+        )
+        .await?;
+    let job_id = get_idle_job_from_queue(&mut storage).await?.job_id;
+    ProverSchema(&mut storage)
+        .store_aggregated_proof(job_id, BlockNumber(1), BlockNumber(2), &aggregated_proof)
+        .await?;
 
-//     ProverSchema(&mut storage)
-//         .remove_aggregated_proofs(BlockNumber(3))
-//         .await?;
+    ProverSchema(&mut storage)
+        .add_prover_job_to_job_queue(
+            BlockNumber(3),
+            BlockNumber(5),
+            job_data.clone(),
+            1,
+            ProverJobType::AggregatedProof,
+        )
+        .await?;
+    let job_id = get_idle_job_from_queue(&mut storage).await?.job_id;
+    ProverSchema(&mut storage)
+        .store_aggregated_proof(job_id, BlockNumber(3), BlockNumber(5), &aggregated_proof)
+        .await?;
 
-//     assert!(ProverSchema(&mut storage)
-//         .load_aggregated_proof(BlockNumber(1), BlockNumber(2))
-//         .await?
-//         .is_some());
-//     assert!(ProverSchema(&mut storage)
-//         .load_aggregated_proof(BlockNumber(3), BlockNumber(5))
-//         .await?
-//         .is_none());
+    // Remove aggregated proofs for blocks with numbers greater than 3. It means that proof for 3-5 blocks should be deleted.
+    ProverSchema(&mut storage)
+        .remove_aggregated_proofs(BlockNumber(3))
+        .await?;
 
-//     Ok(())
-// }
+    // Check that proof 1-2 is present and 3-5 is not.
+    assert!(ProverSchema(&mut storage)
+        .load_aggregated_proof(BlockNumber(1), BlockNumber(2))
+        .await?
+        .is_some());
+    assert!(ProverSchema(&mut storage)
+        .load_aggregated_proof(BlockNumber(3), BlockNumber(5))
+        .await?
+        .is_none());
+
+    Ok(())
+}
 
 /// Checks that prover jobs are removed correctly.
 #[db_test]
 async fn test_remove_prover_jobs(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
     let job_data = serde_json::Value::default();
+
+    // Insert jobs for blocks 1-3 and 4-5.
     ProverSchema(&mut storage)
         .add_prover_job_to_job_queue(
             BlockNumber(1),
@@ -405,6 +426,7 @@ async fn test_remove_prover_jobs(mut storage: StorageProcessor<'_>) -> QueryResu
         )
         .await?;
 
+    // Remove prover_jobs for blocks with numbers greater than 2. After that only one job for 1-2 blocks should left.
     ProverSchema(&mut storage)
         .remove_prover_jobs(BlockNumber(2))
         .await?;
