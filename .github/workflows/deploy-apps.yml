@@ -64,45 +64,11 @@ jobs:
       runner: ${{ env.RUNNER }}
       isTag: ${{ steps.regex-match.outputs.group1 != '' }}
 
-  build-images:
-    name: Build and Push Docker Images
-    runs-on: [self-hosted, MAIN]
-    needs: pre
-    if: ${{ needs.pre.outputs.isTag == 'true' }}
-
-    # Required services
-    services:
-      postgres:
-        image: postgres:10.4
-        ports:
-          - 5432:5432
-
-    steps:
-    - uses: actions/checkout@v2
-
-    - name: setup-env
-      run: |
-        echo ZKSYNC_HOME=$(pwd) >> $GITHUB_ENV
-        echo CI=1 >> $GITHUB_ENV
-        echo $(pwd)/bin >> $GITHUB_PATH
-    - name: init
-      run: |
-        cargo sqlx --version || cargo install --version=0.2.0 sqlx-cli
-        zk
-        zk run yarn
-        cp etc/tokens/{test,localhost}.json
-        zk run verify-keys unpack
-        zk db basic-setup
-    - name: update-images
-      run: |
-        docker login -u ${{ secrets.DOCKER_USER }} -p ${{ secrets.DOCKER_PASSWORD }}
-        zk docker push rust
-        zk docker push nginx
-
   deploy:
     name: Deploy Apps
     runs-on: [k8s, deployer, "${{ needs.pre.outputs.runner }}"]
-    needs: [pre, build-images]
+    needs: pre
+    if: ${{ needs.pre.outputs.isTag == 'true' }}
 
     container:
       image: dysnix/kubectl:v1.16-gcloud
