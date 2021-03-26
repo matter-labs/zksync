@@ -15,9 +15,6 @@ lazy_static! {
 }
 
 async fn get_idle_job_from_queue(mut storage: &mut StorageProcessor<'_>) -> QueryResult<ProverJob> {
-    // Lock to prevent database deadlock
-    let _lock = MUTEX.lock().await;
-
     let job = ProverSchema(&mut storage)
         .get_idle_prover_job_from_job_queue()
         .await?;
@@ -29,6 +26,9 @@ async fn get_idle_job_from_queue(mut storage: &mut StorageProcessor<'_>) -> Quer
 /// `prover_job_queue` table is locked when accessed, so it cannot be accessed simultaneously.
 #[db_test]
 async fn test_prover_job_queue(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
+    // Lock to prevent database deadlock
+    let _lock = MUTEX.lock().await;
+
     test_store_proof(&mut storage).await?;
     pending_jobs_count(&mut storage).await?;
 
@@ -317,6 +317,9 @@ async fn test_remove_witnesses(mut storage: StorageProcessor<'_>) -> QueryResult
 /// Checks that block proofs are removed correctly.
 #[db_test]
 async fn test_remove_proofs(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
+    // Lock to prevent database deadlock
+    let _lock = MUTEX.lock().await;
+
     let proof = get_sample_single_proof();
     let job_data = serde_json::Value::default();
 
