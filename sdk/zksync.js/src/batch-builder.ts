@@ -80,21 +80,21 @@ export class BatchBuilder {
 
     private async setFeeToken(feeToken: TokenLike) {
         // If user specified a token he wants to pay with, we expect all fees to be zero
-        // and no signed transactions in the batch. Changing their fees would
-        // invalidate multi-signatures.
+        // and no signed transactions in the batch.
         if (this.txs.find((tx) => tx.alreadySigned || !BigNumber.from(tx.tx.fee).isZero()) != undefined) {
-            throw new Error('Fees are expected to be zero');
+            throw new Error('All transactions are expected to be unsigned with zero fees');
         }
-        let txWithFeeToken = this.txs.find((tx) => tx.token == feeToken);
-        // If there's no transaction with the given token, create dummy transfer.
-        if (txWithFeeToken == undefined) {
+        // We use the last transaction in the batch for paying fees.
+        // If it uses different token, create dummy transfer to self.
+        if (this.txs[this.txs.length - 1].token !== feeToken) {
             this.addTransfer({
                 to: this.wallet.address(),
                 token: feeToken,
                 amount: 0
             });
-            txWithFeeToken = this.txs[this.txs.length - 1];
         }
+        const txWithFeeToken = this.txs[this.txs.length - 1];
+
         const txTypes = this.txs.map((tx) => tx.feeType);
         const addresses = this.txs.map((tx) => tx.address);
 
@@ -170,7 +170,7 @@ export class BatchBuilder {
     ): BatchBuilder {
         if ('tx' in changePubKey) {
             if (changePubKey.tx.type !== 'ChangePubKey') {
-                throw new Error('Invalid transaction type, expected ChangePubKey');
+                throw new Error('Invalid transaction type: expected ChangePubKey');
             }
             // Already signed.
             this.txs.push({

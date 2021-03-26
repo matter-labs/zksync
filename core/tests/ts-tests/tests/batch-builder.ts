@@ -47,7 +47,7 @@ Tester.prototype.testBatchBuilderInvalidUsage = async function (
             .addChangePubKey({ feeToken, ethAuthType: 'ECDSA' })
             .addTransfer({ to: wallet.address(), token: feeToken, amount: 0, fee: 999 })
             .build(feeToken),
-        'Fees are expected to be zero'
+        'All transactions are expected to be unsigned with zero fees'
     );
     await expectThrow(
         unlockedWallet.batchBuilder().addChangePubKey({ feeToken, ethAuthType: 'ECDSA' }).build(feeToken),
@@ -116,13 +116,13 @@ Tester.prototype.testBatchBuilderSignedChangePubKey = async function (
         .addChangePubKey(signedTx)
         .addTransfer({ to: sender.address(), token, amount });
     // Should throw if we try to set a fee token with a signed transaction.
-    await expectThrow(batchBuilder.build(token), 'Fees are expected to be zero');
+    await expectThrow(batchBuilder.build(token), 'All transactions are expected to be unsigned with zero fees');
     // Transfer to self to pay the fee.
     batchBuilder.addTransfer({ to: sender.address(), token, amount, fee });
 
     const batch = await batchBuilder.build();
     const totalFee = batch.totalFee.get(token)!;
-    // Should be the equal.
+    // Should be equal.
     expect(fee.eq(totalFee), 'Wrong caclucated fee').to.be.true;
 
     const balanceBefore = await sender.getBalance(token);
