@@ -94,7 +94,7 @@ jobs:
       - name: start-services
         run: |
           docker-compose -f docker-compose-runner.yml down
-          docker-compose pull
+          docker-compose -f docker-compose-runner.yml pull
           docker-compose -f docker-compose-runner.yml up --build -d geth postgres zk
           ci_run sccache --start-server
 
@@ -152,7 +152,7 @@ jobs:
       - name: start-services
         run: |
           docker-compose -f docker-compose-runner.yml down
-          docker-compose pull
+          docker-compose -f docker-compose-runner.yml pull
           docker-compose -f docker-compose-runner.yml up --build -d zk
           ci_run sccache --start-server
 
