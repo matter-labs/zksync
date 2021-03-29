@@ -82,7 +82,7 @@ impl<R: Serialize> Responder for ApiResult<R> {
                 request,
                 status: ResultStatus::Error,
                 result: None,
-                error: Some(err.into()),
+                error: Some(err),
             },
         };
 
