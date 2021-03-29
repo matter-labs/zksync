@@ -264,6 +264,7 @@ impl TxSender {
             .unwrap_or(EthAccountType::Owned))
     }
 
+    // TODO: remove fast_processing parameter
     pub async fn submit_tx(
         &self,
         mut tx: ZkSyncTx,

@@ -1,9 +1,12 @@
+// Built-in uses
 use std::str::FromStr;
+
 // External uses
 use chrono::{DateTime, Utc};
 use num::BigUint;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+
 // Workspace uses
 use zksync_crypto::{convert::FeConvert, serialization::FrSerde, Fr};
 use zksync_storage::chain::block::records::{BlockDetails, BlockTransactionItem};
@@ -60,7 +63,7 @@ impl From<BlockDetails> for BlockInfo {
 
 // TODO: remove `fee_type`, `gas_tx_amount`, `gas_price_wei`
 #[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct Fee {
+pub struct ApiFee {
     pub fee_type: OutputFeeType,
     #[serde(with = "BigUintSerdeAsRadix10Str")]
     pub gas_tx_amount: BigUint,
@@ -76,14 +79,14 @@ pub struct Fee {
 
 // TODO: add `zkp_fee` and `gas_fee`
 #[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct BatchFee {
+pub struct ApiBatchFee {
     #[serde(with = "BigUintSerdeAsRadix10Str")]
     pub total_fee: BigUint,
 }
 
-impl From<zksync_types::Fee> for Fee {
+impl From<zksync_types::Fee> for ApiFee {
     fn from(fee: zksync_types::Fee) -> Self {
-        Fee {
+        ApiFee {
             fee_type: fee.fee_type,
             gas_tx_amount: fee.gas_tx_amount,
             gas_price_wei: fee.gas_price_wei,
@@ -94,9 +97,9 @@ impl From<zksync_types::Fee> for Fee {
     }
 }
 
-impl From<zksync_types::BatchFee> for BatchFee {
+impl From<zksync_types::BatchFee> for ApiBatchFee {
     fn from(fee: zksync_types::BatchFee) -> Self {
-        BatchFee {
+        ApiBatchFee {
             total_fee: fee.total_fee,
         }
     }
@@ -115,11 +118,6 @@ pub struct ApiToken {
 pub struct IncomingTxBatch {
     pub txs: Vec<ZkSyncTx>,
     pub signature: EthBatchSignatures,
-}
-
-#[derive(Debug, Serialize, Deserialize, PartialEq, Clone, Copy)]
-pub struct FastProcessingQuery {
-    pub fast_processing: Option<bool>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]

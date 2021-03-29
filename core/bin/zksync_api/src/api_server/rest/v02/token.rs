@@ -1,6 +1,7 @@
 //! Tokens part of API implementation.
 
 // Built-in uses
+
 // External uses
 use actix_web::{
     web::{self},
@@ -11,11 +12,10 @@ use futures::{
     channel::{mpsc, oneshot},
     prelude::*,
 };
-
 use num::{rational::Ratio, BigUint, FromPrimitive};
 
-use zksync_config::ZkSyncConfig;
 // Workspace uses
+use zksync_config::ZkSyncConfig;
 use zksync_storage::ConnectionPool;
 use zksync_types::{
     pagination::{Paginated, PaginationQuery},
@@ -24,7 +24,7 @@ use zksync_types::{
 
 // Local uses
 use super::{
-    error::Error,
+    error::{Error, TokenError},
     paginate::Paginate,
     response::ApiResult,
     types::{ApiToken, TokenIdOrUsd, Usd},
@@ -148,8 +148,8 @@ async fn token_price(
 ) -> ApiResult<BigDecimal> {
     let token_result = TokenLike::parse_without_symbol(&token_like);
     let first_token;
-    if let Err(err) = token_result {
-        return Error::from(PriceError::TokenNotFound(err.to_string())).into();
+    if let Err(_) = token_result {
+        return Error::from(TokenError::TokenNotFound).into();
     } else {
         first_token = token_result.unwrap();
     }
@@ -162,10 +162,7 @@ async fn token_price(
             match (first_usd_price, second_usd_price) {
                 (Ok(first_usd_price), Ok(second_usd_price)) => {
                     if second_usd_price.is_zero() {
-                        Error::invalid_data(
-                            "Price of token in which the price is indicated is zero",
-                        )
-                        .into()
+                        Error::from(TokenError::ZeroPrice).into()
                     } else {
                         Ok(first_usd_price / second_usd_price).into()
                     }

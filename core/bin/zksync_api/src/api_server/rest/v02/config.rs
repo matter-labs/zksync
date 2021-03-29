@@ -5,6 +5,7 @@
 // External uses
 use actix_web::{web, Scope};
 use serde::Serialize;
+
 // Workspace uses
 use zksync_config::ZkSyncConfig;
 use zksync_types::{network::Network, Address};
@@ -42,6 +43,7 @@ impl ApiConfigData {
 }
 
 // Server implementation
+
 async fn config_endpoint(data: web::Data<ApiConfigData>) -> ApiResult<ApiConfigData> {
     ApiResult::Ok(*data.into_inner())
 }

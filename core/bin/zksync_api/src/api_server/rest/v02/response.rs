@@ -1,18 +1,21 @@
-use actix_web::web::Data;
-use actix_web::{HttpRequest, HttpResponse, Responder};
+// Built-in uses
+use std::collections::HashMap;
+use std::convert::From;
+
+// External uses
+use actix_web::Error as ActixError;
+use actix_web::{web::Data, HttpRequest, HttpResponse, Responder};
 use chrono::{DateTime, Utc};
 use futures::future::{ready, Ready};
 use qstring::QString;
 use serde::Serialize;
 use serde_json::Value;
-use std::collections::HashMap;
-use std::convert::From;
 
+// Workspace uses
 use zksync_types::network::Network;
 
+// Local uses
 use super::{error::Error, ApiVersion, SharedData};
-
-use actix_web::Error as ActixError;
 
 #[derive(Serialize)]
 #[serde(rename_all = "snake_case")]

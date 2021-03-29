@@ -3,21 +3,20 @@
 // Built-in uses
 
 // External uses
-
 use actix_web::{
     web::{self, Json},
     Scope,
 };
 use serde::{Deserialize, Serialize};
-// Workspace uses
 
+// Workspace uses
 use zksync_types::{Address, TokenLike, TxFeeTypes};
 
 // Local uses
 use super::{
     error::Error,
     response::ApiResult,
-    types::{BatchFee, Fee},
+    types::{ApiBatchFee, ApiFee},
 };
 use crate::api_server::tx_sender::TxSender;
 
@@ -53,19 +52,22 @@ impl ApiFeeData {
     }
 }
 
-async fn get_tx_fee(data: web::Data<ApiFeeData>, Json(body): Json<TxFeeRequest>) -> ApiResult<Fee> {
+async fn get_tx_fee(
+    data: web::Data<ApiFeeData>,
+    Json(body): Json<TxFeeRequest>,
+) -> ApiResult<ApiFee> {
     data.tx_sender
         .get_txs_fee_in_wei(body.tx_type, body.address, body.token_like)
         .await
         .map_err(Error::from)
-        .map(Fee::from)
+        .map(ApiFee::from)
         .into()
 }
 
 async fn get_batch_fee(
     data: web::Data<ApiFeeData>,
     Json(body): Json<BatchFeeRequest>,
-) -> ApiResult<BatchFee> {
+) -> ApiResult<ApiBatchFee> {
     let mut txs = Vec::new();
     for tx in body.transactions {
         txs.push((tx.tx_type, tx.address));
@@ -74,7 +76,7 @@ async fn get_batch_fee(
         .get_txs_batch_fee_in_wei(txs, body.token_like)
         .await
         .map_err(Error::from)
-        .map(BatchFee::from)
+        .map(ApiBatchFee::from)
         .into()
 }
 

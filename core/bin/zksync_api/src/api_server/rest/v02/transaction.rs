@@ -2,25 +2,28 @@
 
 // Built-in uses
 use std::convert::TryInto;
+
 // External uses
 use actix_web::{
     web::{self, Json},
     Scope,
 };
 use hex::FromHexError;
+
 // Workspace uses
 use zksync_storage::{QueryResult, StorageProcessor};
 use zksync_types::{
     aggregated_operations::AggregatedActionType, tx::EthSignData, tx::TxEthSignature, tx::TxHash,
     BlockNumber, EthBlockId, PriorityOpId,
 };
+
 // Local uses
 use super::{
-    error::Error,
+    error::{Error, TxError},
     response::ApiResult,
     types::{
-        FastProcessingQuery, IncomingTx, IncomingTxBatch, L1Receipt, L1Status, L2Receipt, L2Status,
-        Receipt, Transaction, TxData,
+        IncomingTx, IncomingTxBatch, L1Receipt, L1Status, L2Receipt, L2Status, Receipt,
+        Transaction, TxData,
     },
 };
 use crate::api_server::rpc_server::types::TxWithSignature;
@@ -286,10 +289,10 @@ async fn tx_status(
                     let tx_status = data.tx_status(&tx_hash).await;
                     tx_status.map_err(Error::internal).into()
                 }
-                Err(_) => Error::invalid_data("Incorrect tx_hash length").into(),
+                Err(_) => Error::from(TxError::IncorrectHash).into(),
             }
         }
-        Err(err) => Error::invalid_data(err).into(),
+        Err(err) => Error::from(err).into(),
     }
 }
 
@@ -306,21 +309,20 @@ async fn tx_data(
                     let tx_data = data.tx_data(&tx_hash).await;
                     tx_data.map_err(Error::internal).into()
                 }
-                Err(_) => Error::invalid_data("Incorrect tx_hash length").into(),
+                Err(_) => Error::from(TxError::IncorrectHash).into(),
             }
         }
-        Err(err) => Error::invalid_data(err).into(),
+        Err(err) => Error::from(err).into(),
     }
 }
 
 async fn submit_tx(
     data: web::Data<ApiTransactionData>,
     Json(body): Json<IncomingTx>,
-    web::Query(query): web::Query<FastProcessingQuery>,
 ) -> ApiResult<TxHash> {
     let tx_hash = data
         .tx_sender
-        .submit_tx(body.tx, body.signature, query.fast_processing)
+        .submit_tx(body.tx, body.signature, None)
         .await
         .map_err(Error::from);
 

@@ -1,13 +1,20 @@
-use super::{
-    error::Error,
-    types::{BlockInfo, Transaction},
-};
+// Built-in uses
+
+// External uses
 use serde::Serialize;
+
+// Workspace uses
 use zksync_storage::StorageProcessor;
 use zksync_types::{
     aggregated_operations::AggregatedActionType,
     pagination::{BlockAndTxHash, Paginated, PaginationQuery},
     BlockNumber, Token, TokenId,
+};
+
+// Local uses
+use super::{
+    error::{Error, TxError},
+    types::{BlockInfo, Transaction},
 };
 
 #[async_trait::async_trait]
@@ -32,12 +39,12 @@ impl Paginate<Token> for StorageProcessor<'_> {
             .tokens_schema()
             .load_token_page(&query)
             .await
-            .map_err(Error::internal)?;
+            .map_err(Error::storage)?;
         let count = self
             .tokens_schema()
             .get_count()
             .await
-            .map_err(Error::internal)? as u32;
+            .map_err(Error::storage)? as u32;
         Ok(Paginated::new(
             tokens,
             query.from,
@@ -61,14 +68,14 @@ impl Paginate<BlockInfo> for StorageProcessor<'_> {
             .block_schema()
             .load_block_page(&query)
             .await
-            .map_err(Error::internal)?;
+            .map_err(Error::storage)?;
         let blocks: Vec<BlockInfo> = blocks.into_iter().map(BlockInfo::from).collect();
         let count = *self
             .chain()
             .block_schema()
             .get_last_committed_block()
             .await
-            .map_err(Error::internal)?;
+            .map_err(Error::storage)?;
         Ok(Paginated::new(
             blocks,
             query.from,
@@ -92,14 +99,10 @@ impl Paginate<Transaction> for StorageProcessor<'_> {
             .block_schema()
             .get_block_transactions_page(&query)
             .await
-            .map_err(Error::internal)?;
+            .map_err(Error::storage)?;
         let txs: Vec<Transaction>;
         if raw_txs.is_none() {
-            return Err(Error::invalid_data(format!(
-                "No tx with hash {} in block {}",
-                query.from.tx_hash.to_string(),
-                query.from.block_number
-            )));
+            return Err(Error::from(TxError::TransactionNotFound));
         } else {
             let is_block_finalized = self
                 .chain()
@@ -122,7 +125,7 @@ impl Paginate<Transaction> for StorageProcessor<'_> {
             .block_schema()
             .get_block_transactions_count(query.from.block_number)
             .await
-            .map_err(Error::internal)?;
+            .map_err(Error::storage)?;
         Ok(Paginated::new(
             txs,
             query.from,

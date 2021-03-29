@@ -1,9 +1,11 @@
 use crate::api_server::tx_sender::SubmitError;
 use crate::fee_ticker::PriceError;
+use hex::FromHexError;
 use serde::export::Formatter;
 use serde::Serialize;
 use serde_repr::Serialize_repr;
 use std::fmt::Display;
+use thiserror::Error;
 
 #[derive(Serialize_repr)]
 #[repr(u16)]
@@ -12,7 +14,10 @@ pub enum ErrorCode {
     Submit = 100,
     InvalidData = 200,
     Price = 300,
+    Storage = 400,
     Internal = 500,
+    FromHex = 600,
+    Token = 700,
 }
 
 /// Error object in a response
@@ -52,8 +57,8 @@ impl Error {
         Error::from(InternalError::new(err))
     }
 
-    pub fn invalid_data(err: impl Display) -> Error {
-        Error::from(InvalidDataError::new(err))
+    pub fn storage(err: impl Display) -> Error {
+        Error::from(StorageError::new(err))
     }
 }
 
@@ -80,7 +85,24 @@ impl ApiError for UnreachableError {
 }
 
 pub struct InternalError(String);
-pub struct InvalidDataError(String);
+
+#[derive(Error, Debug)]
+pub enum TxError {
+    #[error("Transaction is not found")]
+    TransactionNotFound,
+    #[error("Incorrect transaction hash")]
+    IncorrectHash,
+}
+
+#[derive(Error, Debug)]
+pub enum TokenError {
+    #[error("Token is not found")]
+    TokenNotFound,
+    #[error("Token price is zero")]
+    ZeroPrice,
+}
+
+pub struct StorageError(String);
 
 impl InternalError {
     pub fn new(title: impl Display) -> Self {
@@ -106,7 +128,17 @@ impl ApiError for InternalError {
     }
 }
 
-impl InvalidDataError {
+impl ApiError for TxError {
+    fn error_type(&self) -> String {
+        String::from("invalid_data_error")
+    }
+
+    fn code(&self) -> ErrorCode {
+        ErrorCode::InvalidData
+    }
+}
+
+impl StorageError {
     pub fn new(title: impl Display) -> Self {
         Self {
             0: title.to_string(),
@@ -114,19 +146,19 @@ impl InvalidDataError {
     }
 }
 
-impl Display for InvalidDataError {
+impl Display for StorageError {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.0)
     }
 }
 
-impl ApiError for InvalidDataError {
+impl ApiError for StorageError {
     fn error_type(&self) -> String {
-        String::from("invalid_data_error")
+        String::from("storage_error")
     }
 
     fn code(&self) -> ErrorCode {
-        ErrorCode::InvalidData
+        ErrorCode::Storage
     }
 }
 
@@ -147,5 +179,25 @@ impl ApiError for PriceError {
 
     fn code(&self) -> ErrorCode {
         ErrorCode::Price
+    }
+}
+
+impl ApiError for FromHexError {
+    fn error_type(&self) -> String {
+        String::from("from_hex_error")
+    }
+
+    fn code(&self) -> ErrorCode {
+        ErrorCode::FromHex
+    }
+}
+
+impl ApiError for TokenError {
+    fn error_type(&self) -> String {
+        String::from("token_error")
+    }
+
+    fn code(&self) -> ErrorCode {
+        ErrorCode::Token
     }
 }

@@ -1,6 +1,7 @@
 //! Block part of API implementation.
 
 // Built-in uses
+
 // External uses
 use actix_web::{web, Scope};
 
@@ -11,6 +12,7 @@ use zksync_types::{
     tx::TxHash,
     BlockNumber,
 };
+
 // Local uses
 use super::{
     error::Error,
@@ -36,8 +38,11 @@ impl ApiBlockData {
     /// Returns information about block with the specified number.
     ///
     /// This method caches some of the verified blocks.
-    async fn block_info(&self, block_number: BlockNumber) -> QueryResult<Option<BlockDetails>> {
-        self.cache.get(&self.pool, block_number).await
+    async fn block_info(&self, block_number: BlockNumber) -> Result<Option<BlockDetails>, Error> {
+        self.cache
+            .get(&self.pool, block_number)
+            .await
+            .map_err(Error::storage)
     }
 
     async fn get_block_number_by_position(
@@ -49,13 +54,13 @@ impl ApiBlockData {
             BlockPosition::Variant(LastVariant::LastCommitted) => {
                 match self.get_last_committed_block_number().await {
                     Ok(number) => Ok(number),
-                    Err(err) => Err(Error::internal(err)),
+                    Err(err) => Err(Error::storage(err)),
                 }
             }
             BlockPosition::Variant(LastVariant::LastFinalized) => {
                 match self.get_last_finalized_block_number().await {
                     Ok(number) => Ok(number),
-                    Err(err) => Err(Error::internal(err)),
+                    Err(err) => Err(Error::storage(err)),
                 }
             }
         }
@@ -65,7 +70,7 @@ impl ApiBlockData {
         &self,
         query: PaginationQuery<BlockNumber>,
     ) -> Result<Paginated<BlockInfo, BlockNumber>, Error> {
-        let mut storage = self.pool.access_storage().await.map_err(Error::internal)?;
+        let mut storage = self.pool.access_storage().await.map_err(Error::storage)?;
         storage.paginate(query).await
     }
 
@@ -74,7 +79,7 @@ impl ApiBlockData {
         block_number: BlockNumber,
         query: PaginationQuery<TxHash>,
     ) -> Result<Paginated<Transaction, BlockAndTxHash>, Error> {
-        let mut storage = self.pool.access_storage().await.map_err(Error::internal)?;
+        let mut storage = self.pool.access_storage().await.map_err(Error::storage)?;
 
         let new_query = PaginationQuery {
             from: BlockAndTxHash {
@@ -113,7 +118,7 @@ async fn block_pagination(
     data: web::Data<ApiBlockData>,
     web::Query(query): web::Query<PaginationQuery<BlockNumber>>,
 ) -> ApiResult<Paginated<BlockInfo, BlockNumber>> {
-    data.block_page(query).await.map_err(Error::from).into()
+    data.block_page(query).await.into()
 }
 
 async fn block_by_number(
@@ -133,7 +138,6 @@ async fn block_by_number(
 
     data.block_info(block_number)
         .await
-        .map_err(Error::internal)
         .map(|details| details.map(BlockInfo::from))
         .into()
 }
@@ -154,10 +158,7 @@ async fn block_transactions(
         }
     }
 
-    data.transaction_page(block_number, query)
-        .await
-        .map_err(Error::from)
-        .into()
+    data.transaction_page(block_number, query).await.into()
 }
 
 pub fn api_scope(pool: ConnectionPool, cache: BlockDetailsCache) -> Scope {
