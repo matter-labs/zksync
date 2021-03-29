@@ -211,3 +211,17 @@ impl From<BlockTransactionItem> for Transaction {
         }
     }
 }
+
+#[derive(Serialize, Deserialize, Debug)]
+#[serde(rename_all = "snake_case")]
+pub enum LastVariant {
+    LastCommitted,
+    LastFinalized,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+#[serde(untagged)]
+pub enum BlockPosition {
+    Variant(LastVariant),
+    Number(BlockNumber),
+}

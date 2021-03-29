@@ -1,8 +1,6 @@
 //! Block part of API implementation.
 
 // Built-in uses
-use std::str::FromStr;
-
 // External uses
 use actix_web::{web, Scope};
 
@@ -18,7 +16,7 @@ use super::{
     error::Error,
     paginate::Paginate,
     response::ApiResult,
-    types::{BlockInfo, Transaction},
+    types::{BlockInfo, BlockPosition, LastVariant, Transaction},
 };
 use crate::utils::block_details_cache::BlockDetailsCache;
 
@@ -40,6 +38,27 @@ impl ApiBlockData {
     /// This method caches some of the verified blocks.
     async fn block_info(&self, block_number: BlockNumber) -> QueryResult<Option<BlockDetails>> {
         self.cache.get(&self.pool, block_number).await
+    }
+
+    async fn get_block_number_by_position(
+        &self,
+        block_position: BlockPosition,
+    ) -> Result<BlockNumber, Error> {
+        match block_position {
+            BlockPosition::Number(number) => Ok(number),
+            BlockPosition::Variant(LastVariant::LastCommitted) => {
+                match self.get_last_committed_block_number().await {
+                    Ok(number) => Ok(number),
+                    Err(err) => Err(Error::internal(err)),
+                }
+            }
+            BlockPosition::Variant(LastVariant::LastFinalized) => {
+                match self.get_last_finalized_block_number().await {
+                    Ok(number) => Ok(number),
+                    Err(err) => Err(Error::internal(err)),
+                }
+            }
+        }
     }
 
     async fn block_page(
@@ -99,38 +118,19 @@ async fn block_pagination(
 
 async fn block_by_number(
     data: web::Data<ApiBlockData>,
-    web::Path(block_position): web::Path<String>,
+    web::Path(block_position): web::Path<BlockPosition>,
 ) -> ApiResult<Option<BlockInfo>> {
-    // TODO: take block_position as enum
     let block_number: BlockNumber;
-    if let Ok(number) = u32::from_str(&block_position) {
-        block_number = BlockNumber(number);
-    } else {
-        match block_position.as_str() {
-            "last_committed" => match data.get_last_committed_block_number().await {
-                Ok(number) => {
-                    block_number = number;
-                }
-                Err(err) => {
-                    return Error::internal(err).into();
-                }
-            },
-            "last_finalized" => match data.get_last_finalized_block_number().await {
-                Ok(number) => {
-                    block_number = number;
-                }
-                Err(err) => {
-                    return Error::internal(err).into();
-                }
-            },
-            _ => {
-                return Error::invalid_data(
-                    "There are only {block_number}, last_committed, last_finalized options",
-                )
-                .into();
-            }
+
+    match data.get_block_number_by_position(block_position).await {
+        Ok(number) => {
+            block_number = number;
         }
-    };
+        Err(err) => {
+            return err.into();
+        }
+    }
+
     data.block_info(block_number)
         .await
         .map_err(Error::internal)
@@ -140,39 +140,19 @@ async fn block_by_number(
 
 async fn block_transactions(
     data: web::Data<ApiBlockData>,
-    web::Path(block_position): web::Path<String>,
+    web::Path(block_position): web::Path<BlockPosition>,
     web::Query(query): web::Query<PaginationQuery<TxHash>>,
 ) -> ApiResult<Paginated<Transaction, BlockAndTxHash>> {
-    // TODO: take block_position as enum
     let block_number: BlockNumber;
-    if let Ok(number) = u32::from_str(&block_position) {
-        block_number = BlockNumber(number);
-    } else {
-        match block_position.as_str() {
-            "last_committed" => match data.get_last_committed_block_number().await {
-                Ok(number) => {
-                    block_number = number;
-                }
-                Err(err) => {
-                    return Error::internal(err).into();
-                }
-            },
-            "last_finalized" => match data.get_last_finalized_block_number().await {
-                Ok(number) => {
-                    block_number = number;
-                }
-                Err(err) => {
-                    return Error::internal(err).into();
-                }
-            },
-            _ => {
-                return Error::invalid_data(
-                    "There are only {block_number}, last_committed, last_finalized options",
-                )
-                .into();
-            }
+
+    match data.get_block_number_by_position(block_position).await {
+        Ok(number) => {
+            block_number = number;
         }
-    };
+        Err(err) => {
+            return err.into();
+        }
+    }
 
     data.transaction_page(block_number, query)
         .await
