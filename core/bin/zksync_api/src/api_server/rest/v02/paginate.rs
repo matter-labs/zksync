@@ -119,8 +119,9 @@ impl Paginate<Transaction> for StorageProcessor<'_> {
         let txs: Vec<Transaction>;
         if raw_txs.is_none() {
             return Err(Error::invalid_data(format!(
-                "No tx with hash {:?} in block {}",
-                query.from.tx_hash, query.from.block_number
+                "No tx with hash {} in block {}",
+                query.from.tx_hash.to_string(),
+                query.from.block_number
             )));
         } else {
             let is_block_finalized = self
