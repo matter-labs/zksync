@@ -1,14 +1,12 @@
 use super::{
     error::Error,
-    types::{BlockInfo, L2Status, Transaction},
+    types::{BlockInfo, Transaction},
 };
 use serde::Serialize;
-use std::str::FromStr;
-use zksync_storage::{chain::block::records::BlockTransactionItem, StorageProcessor};
+use zksync_storage::StorageProcessor;
 use zksync_types::{
     aggregated_operations::AggregatedActionType,
     pagination::{BlockAndTxHash, Paginated, PaginationQuery},
-    tx::TxHash,
     BlockNumber, Token, TokenId,
 };
 
@@ -64,7 +62,7 @@ impl Paginate<BlockInfo> for StorageProcessor<'_> {
             .load_block_page(&query)
             .await
             .map_err(Error::internal)?;
-        let blocks = blocks.into_iter().map(BlockInfo::from).collect::<Vec<_>>();
+        let blocks: Vec<BlockInfo> = blocks.into_iter().map(BlockInfo::from).collect();
         let count = *self
             .chain()
             .block_schema()
@@ -78,27 +76,6 @@ impl Paginate<BlockInfo> for StorageProcessor<'_> {
             query.limit,
             query.direction,
         ))
-    }
-}
-
-fn transaction_from_items(item: BlockTransactionItem, is_block_finalized: bool) -> Transaction {
-    let tx_hash = TxHash::from_str(item.tx_hash.replace("0x", "sync-tx:").as_str()).unwrap();
-    let status = if item.success.unwrap_or_default() {
-        if is_block_finalized {
-            L2Status::Finalized
-        } else {
-            L2Status::Committed
-        }
-    } else {
-        L2Status::Rejected
-    };
-    Transaction {
-        tx_hash,
-        block_number: Some(BlockNumber(item.block_number as u32)),
-        op: item.op,
-        status,
-        fail_reason: item.fail_reason,
-        created_at: item.created_at,
     }
 }
 
@@ -137,7 +114,7 @@ impl Paginate<Transaction> for StorageProcessor<'_> {
             txs = raw_txs
                 .unwrap()
                 .into_iter()
-                .map(|tx| transaction_from_items(tx, is_block_finalized))
+                .map(|tx| Transaction::from((tx, is_block_finalized)))
                 .collect();
         }
         let count = self

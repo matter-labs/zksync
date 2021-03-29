@@ -193,21 +193,25 @@ pub struct Transaction {
     pub created_at: DateTime<Utc>,
 }
 
-impl From<BlockTransactionItem> for Transaction {
-    fn from(item: BlockTransactionItem) -> Self {
-        let tx_hash = TxHash::from_str(item.tx_hash.replace("0x", "sync-tx:").as_str()).unwrap();
-        let status = if item.success.unwrap_or_default() {
-            L2Status::Committed //TODO
+impl From<(BlockTransactionItem, bool)> for Transaction {
+    fn from(item: (BlockTransactionItem, bool)) -> Self {
+        let tx_hash = TxHash::from_str(item.0.tx_hash.replace("0x", "sync-tx:").as_str()).unwrap();
+        let status = if item.0.success.unwrap_or_default() {
+            if item.1 {
+                L2Status::Finalized
+            } else {
+                L2Status::Committed
+            }
         } else {
             L2Status::Rejected
         };
         Self {
             tx_hash,
-            block_number: Some(BlockNumber(item.block_number as u32)),
-            op: item.op,
+            block_number: Some(BlockNumber(item.0.block_number as u32)),
+            op: item.0.op,
             status,
-            fail_reason: item.fail_reason,
-            created_at: item.created_at,
+            fail_reason: item.0.fail_reason,
+            created_at: item.0.created_at,
         }
     }
 }
@@ -222,6 +226,19 @@ pub enum LastVariant {
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(untagged)]
 pub enum BlockPosition {
-    Variant(LastVariant),
     Number(BlockNumber),
+    Variant(LastVariant),
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+#[serde(rename_all = "snake_case")]
+pub enum Usd {
+    Usd,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+#[serde(untagged)]
+pub enum TokenIdOrUsd {
+    Id(TokenId),
+    Usd(Usd),
 }
