@@ -92,11 +92,11 @@ impl BigUintPairSerdeAsRadix10Str {
     {
         use serde::de::Error;
         let convert = |bigdecimal: BigDecimal| {
-            Ok(bigdecimal
+            bigdecimal
                 .to_bigint()
                 .ok_or_else(|| Error::custom("Expected integer value"))?
                 .to_biguint()
-                .ok_or_else(|| Error::custom("Expected positive value"))?)
+                .ok_or_else(|| Error::custom("Expected positive value"))
         };
 
         <(BigDecimal, BigDecimal)>::deserialize(deserializer)

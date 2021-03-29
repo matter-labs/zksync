@@ -27,8 +27,7 @@ impl SwapOp {
     pub const OP_CODE: u8 = 0x0a;
 
     pub(crate) fn get_public_data(&self) -> Vec<u8> {
-        let mut data = Vec::new();
-        data.push(Self::OP_CODE); // opcode
+        let mut data = vec![Self::OP_CODE]; // opcode
         data.extend_from_slice(&self.tx.orders.0.account_id.to_be_bytes());
         data.extend_from_slice(&self.tx.orders.0.recipient_id.to_be_bytes());
         data.extend_from_slice(&self.tx.orders.1.account_id.to_be_bytes());
