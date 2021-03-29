@@ -21,9 +21,7 @@ fn gen_pk_and_msg() -> (PrivateKey<Engine>, Vec<Vec<u8>>) {
 
     let pk = PrivateKey(rng.gen());
 
-    let mut messages = Vec::new();
-    messages.push(Vec::<u8>::new());
-    messages.push(b"hello world".to_vec());
+    let messages = vec![Vec::<u8>::new(), b"hello world".to_vec()];
 
     (pk, messages)
 }

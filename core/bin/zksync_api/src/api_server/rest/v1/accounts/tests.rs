@@ -50,7 +50,7 @@ fn get_unconfirmed_ops_loopback(
         _path: web::Path<String>,
     ) -> Json<serde_json::Value> {
         Json(data.lock().await.clone())
-    };
+    }
 
     let server = actix_web::test::start(move || {
         let ops_handle = ops_handle.clone();

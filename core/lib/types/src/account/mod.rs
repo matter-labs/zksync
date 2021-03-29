@@ -203,7 +203,7 @@ mod test {
     use super::*;
     use crate::{
         helpers::{apply_updates, reverse_updates},
-        AccountMap, AccountUpdates,
+        AccountMap,
     };
 
     #[test]
@@ -308,32 +308,30 @@ mod test {
             map
         };
 
-        let updates = {
-            let mut updates = AccountUpdates::new();
-            updates.push((
+        let updates = vec![
+            (
                 AccountId(0),
                 AccountUpdate::Delete {
                     address: Address::default(),
                     nonce: Nonce(8),
                 },
-            ));
-            updates.push((
+            ),
+            (
                 AccountId(1),
                 AccountUpdate::UpdateBalance {
                     old_nonce: Nonce(16),
                     new_nonce: Nonce(17),
                     balance_update: (TokenId(0), 0u32.into(), 256u32.into()),
                 },
-            ));
-            updates.push((
+            ),
+            (
                 AccountId(2),
                 AccountUpdate::Create {
                     address: Address::default(),
                     nonce: Nonce(36),
                 },
-            ));
-            updates
-        };
+            ),
+        ];
 
         let account_map_updated = {
             let mut map = account_map_initial.clone();

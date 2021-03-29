@@ -36,8 +36,7 @@ impl ForcedExitOp {
     }
 
     pub fn get_public_data(&self) -> Vec<u8> {
-        let mut data = Vec::new();
-        data.push(Self::OP_CODE); // opcode
+        let mut data = vec![Self::OP_CODE];
         data.extend_from_slice(&self.tx.initiator_account_id.to_be_bytes());
         data.extend_from_slice(&self.target_account_id.to_be_bytes());
         data.extend_from_slice(&self.tx.token.to_be_bytes());
