@@ -10,6 +10,8 @@ RUN --mount=type=cache,target=/usr/local/cargo/registry \
     cargo build --release
 
 FROM debian:buster-slim
+RUN apt update
+RUN apt install openssl -y
 EXPOSE 9876
 ENV RUST_LOG info
 COPY --from=builder /usr/src/zksync/target/release/dev-ticker-server /bin/

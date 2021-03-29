@@ -22,8 +22,7 @@ impl ChangePubKeyOp {
     pub const OP_CODE: u8 = 0x07;
 
     pub fn get_public_data(&self) -> Vec<u8> {
-        let mut data = Vec::new();
-        data.push(Self::OP_CODE); // opcode
+        let mut data = vec![Self::OP_CODE];
         data.extend_from_slice(&self.account_id.to_be_bytes());
         data.extend_from_slice(&self.tx.new_pk_hash.data);
         data.extend_from_slice(&self.tx.account.as_bytes());
@@ -38,8 +37,7 @@ impl ChangePubKeyOp {
         if let Some(eth_auth_data) = &self.tx.eth_auth_data {
             eth_auth_data.get_eth_witness()
         } else if let Some(eth_signature) = &self.tx.eth_signature {
-            let mut bytes = Vec::new();
-            bytes.push(0x02);
+            let mut bytes = vec![0x02];
             bytes.extend_from_slice(&eth_signature.serialize_packed());
             bytes
         } else {

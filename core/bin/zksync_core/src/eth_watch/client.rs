@@ -5,7 +5,9 @@ use ethabi::Hash;
 use std::fmt::Debug;
 use web3::{
     contract::Options,
+    transports::http,
     types::{BlockNumber, FilterBuilder, Log},
+    Web3,
 };
 
 use zksync_contracts::{governance_contract, zksync_contract};
@@ -174,4 +176,10 @@ impl EthClient for EthHttpClient {
             .map_err(|e| format_err!("Failed to query contract authFacts: {}", e))
             .map(|res: U256| res.as_u64())
     }
+}
+
+pub async fn get_web3_block_number(web3: &Web3<http::Http>) -> anyhow::Result<u64> {
+    let block_number = web3.eth().block_number().await?.as_u64();
+
+    Ok(block_number)
 }

@@ -27,9 +27,9 @@ impl TryFrom<u32> for ZkSyncContractVersion {
         }
     }
 }
-impl Into<i32> for ZkSyncContractVersion {
-    fn into(self) -> i32 {
-        match self {
+impl From<ZkSyncContractVersion> for i32 {
+    fn from(val: ZkSyncContractVersion) -> Self {
+        match val {
             ZkSyncContractVersion::V0 => 0,
             ZkSyncContractVersion::V1 => 1,
             ZkSyncContractVersion::V2 => 2,

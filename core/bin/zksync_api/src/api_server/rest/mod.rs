@@ -13,6 +13,7 @@ use crate::{fee_ticker::TickerRequest, signature_checker::VerifySignatureRequest
 use super::tx_sender::TxSender;
 use zksync_config::ZkSyncConfig;
 
+mod forced_exit_requests;
 mod helpers;
 mod v01;
 pub mod v02;
@@ -37,6 +38,9 @@ async fn start_server(
             v1::api_scope(tx_sender, &api_v01.config)
         };
 
+        let forced_exit_requests_api_scope =
+            forced_exit_requests::api_scope(api_v01.connection_pool.clone(), &api_v01.config);
+
         let api_v02_scope = {
             let tx_sender = TxSender::new(
                 api_v01.connection_pool.clone(),
@@ -51,6 +55,7 @@ async fn start_server(
             .wrap(vlog::actix_middleware())
             .service(api_v01.into_scope())
             .service(api_v1_scope)
+            .service(forced_exit_requests_api_scope)
             .service(api_v02_scope)
             // Endpoint needed for js isReachable
             .route(

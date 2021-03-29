@@ -42,6 +42,7 @@ pub mod block;
 pub mod config;
 pub mod ethereum;
 pub mod fee;
+pub mod forced_exit_requests;
 pub mod gas_counter;
 pub mod helpers;
 pub mod mempool;

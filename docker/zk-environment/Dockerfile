@@ -31,7 +31,3 @@ ENV CI=1
 RUN cargo install sccache
 ENV RUSTC_WRAPPER=/usr/local/cargo/bin/sccache
 ENV SCCACHE_DIR=/usr/src/cache/sccache
-COPY docker/zk/entrypoint.sh /usr/local/bin/entrypoint.sh
-
-
-#ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]

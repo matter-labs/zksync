@@ -1,7 +1,7 @@
 pub use crate::configs::{
     ApiConfig, ChainConfig, ContractsConfig, DBConfig, DevLiquidityTokenWatcherConfig,
-    ETHClientConfig, ETHSenderConfig, ETHWatchConfig, MiscConfig, ProverConfig, TickerConfig,
-    TokenHandlerConfig,
+    ETHClientConfig, ETHSenderConfig, ETHWatchConfig, ForcedExitRequestsConfig, MiscConfig,
+    ProverConfig, TickerConfig, TokenHandlerConfig,
 };
 
 pub mod configs;
@@ -19,6 +19,7 @@ pub struct ZkSyncConfig {
     pub token_handler: TokenHandlerConfig,
     pub prover: ProverConfig,
     pub ticker: TickerConfig,
+    pub forced_exit_requests: ForcedExitRequestsConfig,
 }
 
 impl ZkSyncConfig {
@@ -34,6 +35,7 @@ impl ZkSyncConfig {
             token_handler: TokenHandlerConfig::from_env(),
             prover: ProverConfig::from_env(),
             ticker: TickerConfig::from_env(),
+            forced_exit_requests: ForcedExitRequestsConfig::from_env(),
         }
     }
 }
