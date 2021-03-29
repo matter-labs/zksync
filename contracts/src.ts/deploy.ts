@@ -16,7 +16,9 @@ import {
     Verifier,
     VerifierFactory,
     ZkSync,
-    ZkSyncFactory
+    ZkSyncFactory,
+    ForcedExit,
+    ForcedExitFactory
 } from '../typechain';
 
 export interface Contracts {
@@ -25,6 +27,7 @@ export interface Contracts {
     verifier;
     proxy;
     upgradeGatekeeper;
+    forcedExit;
 }
 
 export interface DeployedAddresses {
@@ -36,6 +39,7 @@ export interface DeployedAddresses {
     ZkSync: string;
     ZkSyncTarget: string;
     DeployFactory: string;
+    ForcedExit: string;
 }
 
 export interface DeployerConfig {
@@ -58,17 +62,8 @@ export function readProductionContracts(): Contracts {
         zkSync: readContractCode('ZkSync'),
         verifier: readContractCode('Verifier'),
         proxy: readContractCode('Proxy'),
-        upgradeGatekeeper: readContractCode('UpgradeGatekeeper')
-    };
-}
-
-export function readTestContracts(): Contracts {
-    return {
-        governance: readContractCode('GovernanceTest'),
-        zkSync: readContractCode('ZkSyncTest'),
-        verifier: readContractCode('VerifierTest'),
-        proxy: readContractCode('Proxy'),
-        upgradeGatekeeper: readContractCode('UpgradeGatekeeperTest')
+        upgradeGatekeeper: readContractCode('UpgradeGatekeeper'),
+        forcedExit: readContractCode('ForcedExit')
     };
 }
 
@@ -81,7 +76,8 @@ export function deployedAddressesFromEnv(): DeployedAddresses {
         Verifier: process.env.CONTRACTS_VERIFIER_ADDR,
         VerifierTarget: process.env.CONTRACTS_VERIFIER_TARGET_ADDR,
         ZkSync: process.env.CONTRACTS_CONTRACT_ADDR,
-        ZkSyncTarget: process.env.CONTRACTS_CONTRACT_TARGET_ADDR
+        ZkSyncTarget: process.env.CONTRACTS_CONTRACT_TARGET_ADDR,
+        ForcedExit: process.env.CONTRACTS_FORCED_EXIT_ADDR
     };
 }
 
@@ -215,6 +211,38 @@ export class Deployer {
         }
     }
 
+    public async deployForcedExit(ethTxOptions?: ethers.providers.TransactionRequest) {
+        if (this.verbose) {
+            console.log('Deploying ForcedExit contract');
+        }
+
+        // Choose the this.deployWallet.address as the default receiver if the
+        // FORCED_EXIT_REQUESTS_SENDER_ACCOUNT_ADDRESS is not present
+        const receiver = process.env.FORCED_EXIT_REQUESTS_SENDER_ACCOUNT_ADDRESS || this.deployWallet.address;
+
+        const forcedExitContract = await deployContract(
+            this.deployWallet,
+            this.contracts.forcedExit,
+            [this.deployWallet.address, receiver],
+            {
+                gasLimit: 6000000,
+                ...ethTxOptions
+            }
+        );
+        const zksRec = await forcedExitContract.deployTransaction.wait();
+        const zksGasUsed = zksRec.gasUsed;
+        const gasPrice = forcedExitContract.deployTransaction.gasPrice;
+        if (this.verbose) {
+            console.log(`CONTRACTS_FORCED_EXIT_ADDR=${forcedExitContract.address}`);
+            console.log(
+                `ForcedExit contract deployed, gasUsed: ${zksGasUsed.toString()}, eth spent: ${formatEther(
+                    zksGasUsed.mul(gasPrice)
+                )}`
+            );
+        }
+        this.addresses.ForcedExit = forcedExitContract.address;
+    }
+
     public async publishSourcesToTesseracts() {
         console.log('Publishing ABI for UpgradeGatekeeper');
         await publishAbiToTesseracts(this.addresses.UpgradeGatekeeper, this.contracts.upgradeGatekeeper);
@@ -224,6 +252,8 @@ export class Deployer {
         await publishAbiToTesseracts(this.addresses.Verifier, this.contracts.verifier);
         console.log('Publishing ABI for Governance (proxy)');
         await publishAbiToTesseracts(this.addresses.Governance, this.contracts.governance);
+        console.log('Publishing ABI for ForcedExit');
+        await publishAbiToTesseracts(this.addresses.ForcedExit, this.contracts.forcedExit);
     }
 
     public async publishSourcesToEtherscan() {
@@ -271,6 +301,9 @@ export class Deployer {
                 ['address']
             )
         );
+
+        console.log('Publishing sourcecode for ForcedExit', this.addresses.ForcedExit);
+        await publishSourceCodeToEtherscan(this.addresses.ForcedExit, 'ForcedExit', '');
     }
 
     public async deployAll(ethTxOptions?: ethers.providers.TransactionRequest) {
@@ -278,6 +311,7 @@ export class Deployer {
         await this.deployGovernanceTarget(ethTxOptions);
         await this.deployVerifierTarget(ethTxOptions);
         await this.deployProxiesAndGatekeeper(ethTxOptions);
+        await this.deployForcedExit(ethTxOptions);
     }
 
     public governanceContract(signerOrProvider: Signer | providers.Provider): Governance {
@@ -294,5 +328,9 @@ export class Deployer {
 
     public upgradeGatekeeperContract(signerOrProvider: Signer | providers.Provider): UpgradeGatekeeper {
         return UpgradeGatekeeperFactory.connect(this.addresses.UpgradeGatekeeper, signerOrProvider);
+    }
+
+    public forcedExitContract(signerOrProvider: Signer | providers.Provider): ForcedExit {
+        return ForcedExitFactory.connect(this.addresses.ForcedExit, signerOrProvider);
     }
 }

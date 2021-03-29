@@ -21,9 +21,7 @@ services:
       - ./etc/tokens/:/etc/tokens
 
   zk:
-    build:
-      context: .
-      dockerfile: docker/zk/Dockerfile
+    image: "matterlabs/zk-environment:latest"
     depends_on:
       - postgres
       - geth

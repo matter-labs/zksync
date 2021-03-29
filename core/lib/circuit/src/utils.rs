@@ -129,8 +129,8 @@ where
         false,
     );
     signature_r_y_be_bits.reverse();
-    let mut sig_r_packed_bits = vec![];
-    sig_r_packed_bits.push(signature_r_x_be_bits[franklin_constants::FR_BIT_WIDTH_PADDED - 1]);
+    let mut sig_r_packed_bits =
+        vec![signature_r_x_be_bits[franklin_constants::FR_BIT_WIDTH_PADDED - 1]];
     sig_r_packed_bits.extend(signature_r_y_be_bits[1..].iter());
     let sig_r_packed_bits = reverse_bytes(&sig_r_packed_bits);
 

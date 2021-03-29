@@ -66,6 +66,10 @@ async function main() {
     if (args.contract === 'Proxies' || args.contract == null) {
         await deployer.deployProxiesAndGatekeeper({ gasPrice, nonce: args.nonce });
     }
+
+    if (args.contract === 'ForcedExit' || args.contract == null) {
+        await deployer.deployForcedExit({ gasPrice, nonce: args.nonce });
+    }
 }
 
 main()

@@ -19,6 +19,7 @@ const CONFIG_FILES = [
     'prover.toml',
     'rust.toml',
     'private.toml',
+    'forced_exit_requests.toml',
     'token_handler.toml'
 ];
 

@@ -47,6 +47,8 @@ All notable changes to the core components will be documented in this file.
 
 - Added a stressing dev fee ticker scenario to the loadtest.
 - Added a `--sloppy` mode to the `dev-fee-ticker-server` to simulate bad networks with the random delays and fails.
+- Added `forced_exit_requests` functionality, which allows users to pay for ForcedExits from L1. Note that a few env
+  variables were added that control the behaviour of the tool.
 - Possibility to use CREATE2 ChangePubKey and Transfer in a single batch.
 
 ### Fixed

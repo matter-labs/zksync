@@ -4297,7 +4297,7 @@ dependencies = [
  "serde",
  "serde_json",
  "thiserror",
- "url 2.1.1",
+ "url 2.2.1",
  "uuid",
 ]
 
@@ -6188,6 +6188,33 @@ dependencies = [
 ]
 
 [[package]]
+name = "zksync_forced_exit_requests"
+version = "1.0.0"
+dependencies = [
+ "actix-web",
+ "anyhow",
+ "async-trait",
+ "chrono",
+ "ethabi",
+ "hex",
+ "log 0.4.11",
+ "metrics",
+ "num",
+ "tokio 0.2.22",
+ "vlog",
+ "web3",
+ "zksync_api",
+ "zksync_config",
+ "zksync_contracts",
+ "zksync_core",
+ "zksync_crypto",
+ "zksync_eth_signer",
+ "zksync_storage",
+ "zksync_test_account",
+ "zksync_types",
+]
+
+[[package]]
 name = "zksync_notifier"
 version = "1.0.0"
 dependencies = [
@@ -6292,6 +6319,7 @@ dependencies = [
  "zksync_core",
  "zksync_crypto",
  "zksync_eth_sender",
+ "zksync_forced_exit_requests",
  "zksync_prometheus_exporter",
  "zksync_prover",
  "zksync_storage",

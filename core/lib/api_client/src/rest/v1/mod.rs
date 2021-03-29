@@ -9,7 +9,7 @@ use zksync_types::BlockNumber;
 // Public uses
 pub use self::{
     blocks::{BlockInfo, TransactionInfo},
-    client::{Client, ClientError},
+    client::{Client, ClientError, Result as ClientResult},
     config::Contracts,
     error::ErrorBody,
     operations::{PriorityOpData, PriorityOpQuery, PriorityOpQueryError, PriorityOpReceipt},

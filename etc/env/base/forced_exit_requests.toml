@@ -1,0 +1,48 @@
+# Options for L1-based ForcedExit utility
+[forced_exit_requests]
+# Whether the feature is enabled. Used to be able to quickly stop serving ForcedExit requests
+# in times of attacks or upgrages  
+enabled=true
+
+max_tokens_per_request=10
+
+# Recommended interval to send the transaction in milliseconds
+recomended_tx_interval=300
+
+# How many times the maximum acceptable interval will be longer 
+# than the recommended interval
+tx_interval_scaling_factor=1.5
+
+# Number of digits in id
+digits_in_id=13
+
+# Price per exit in wei (currently it's 0.03 ETH)
+price_per_token=30000000000000000
+
+# Wait confirmations
+wait_confirmations=1
+
+# The account of the ForcedExit sender
+sender_account_address="0xe1faB3eFD74A77C23B426c302D96372140FF7d0C"
+
+# The time after which an invalid request is deleted in milliseconds
+expiration_period=3000
+
+# The minimum amount of ETH in wei that needs to be stored on the forced exit smart contract 
+# until it is ok to withdraw the funds from it
+withdrawal_threshold=1000000000000000000
+
+# The address which will receive the fees from ForcedExit automation
+# Here it is set for some random account for the purpose of testing, but usually it is preferred
+# to set the same account as the one that sends the txs for retrieving the fees from the smart contract 
+fee_receiver="0x1963917ba0b44A879cf6248387C1d51A0F11669d"
+
+
+# The amount of blocks we look into beyound the waiting confirmations
+# Basically this ensures that we do not skip a transaction that has become too old due to a 
+# reorg
+blocks_check_amount=10
+
+# How often we want to poll the Ethereum node (in milliseconds).
+eth_node_poll_interval=300
+

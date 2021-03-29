@@ -22,30 +22,7 @@ impl TokenDBCache {
         storage: &mut StorageProcessor<'_>,
         token_query: impl Into<TokenLike>,
     ) -> anyhow::Result<Option<Token>> {
-        let token_query = token_query.into();
-        // HACK: Special case for the Golem:
-        //
-        // Currently, their token on Rinkeby is called GNT, but it's being renamed to the GLM.
-        // So, for some period of time, we should consider GLM token name as an alias to the GNT token.
-        //
-        // TODO: Remove this case after Golem update [ZKS-173]
-        match token_query {
-            TokenLike::Symbol(symbol) if symbol == "tGLM" => {
-                // Try to lookup Golem token as "tGLM".
-                if let Some(token) = self
-                    .get_token_impl(storage, TokenLike::Symbol(symbol))
-                    .await?
-                {
-                    // If such token exists, use it.
-                    Ok(Some(token))
-                } else {
-                    // Otherwise to lookup Golem token as "GNT".
-                    self.get_token_impl(storage, TokenLike::Symbol("GNT".to_string()))
-                        .await
-                }
-            }
-            other => self.get_token_impl(storage, other).await,
-        }
+        self.get_token_impl(storage, token_query.into()).await
     }
 
     async fn get_token_impl(

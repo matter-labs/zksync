@@ -33,6 +33,7 @@ use zksync_utils::ratio_to_big_decimal;
 
 // Local uses
 use crate::{
+    api_server::forced_exit_checker::{ForcedExitAccountAgeChecker, ForcedExitChecker},
     api_server::rpc_server::types::TxWithSignature,
     core_api_client::CoreApiClient,
     fee_ticker::{ResponseBatchFee, ResponseFee, TickerRequest, TokenPriceRequestType},
@@ -49,9 +50,9 @@ pub struct TxSender {
 
     pub pool: ConnectionPool,
     pub tokens: TokenDBCache,
+
+    pub forced_exit_checker: ForcedExitChecker,
     pub blocks: BlockDetailsCache,
-    /// Mimimum age of the account for `ForcedExit` operations to be allowed.
-    pub forced_exit_minimum_account_age: chrono::Duration,
     /// List of account IDs that do not have to pay fees for operations.
     pub fee_free_accounts: HashSet<AccountId>,
     pub enforce_pubkey_change_fee: bool,
@@ -153,23 +154,24 @@ pub enum SubmitError {
 }
 
 impl SubmitError {
-    fn internal(inner: impl Into<anyhow::Error>) -> Self {
+    pub fn internal(inner: impl Into<anyhow::Error>) -> Self {
         Self::Internal(inner.into())
     }
 
-    fn other(msg: impl Display) -> Self {
+    pub fn other(msg: impl Display) -> Self {
         Self::Other(msg.to_string())
     }
 
-    fn communication_core_server(msg: impl Display) -> Self {
+    pub fn communication_core_server(msg: impl Display) -> Self {
         Self::CommunicationCoreServer(msg.to_string())
     }
 
-    fn invalid_params(msg: impl Display) -> Self {
+    pub fn invalid_params(msg: impl Display) -> Self {
         Self::InvalidParams(msg.to_string())
     }
 }
 
+#[macro_export]
 macro_rules! internal_error {
     ($err:tt, $input:tt) => {{
         vlog::warn!("Internal Server error: {}, input: {:?}", $err, $input);
@@ -206,10 +208,6 @@ impl TxSender {
         ticker_request_sender: mpsc::Sender<TickerRequest>,
         config: &ZkSyncConfig,
     ) -> Self {
-        let forced_exit_minimum_account_age = chrono::Duration::seconds(
-            config.api.common.forced_exit_minimum_account_age_secs as i64,
-        );
-
         let max_number_of_transactions_per_batch =
             config.api.common.max_number_of_transactions_per_batch as usize;
         let max_number_of_authors_per_batch =
@@ -223,10 +221,10 @@ impl TxSender {
             sign_verify_requests: sign_verify_request_sender,
             ticker_requests: ticker_request_sender,
             tokens: TokenDBCache::new(),
+            forced_exit_checker: ForcedExitChecker::new(config),
+            enforce_pubkey_change_fee: config.api.common.enforce_pubkey_change_fee,
             blocks: BlockDetailsCache::new(config.api.common.caches_size),
 
-            enforce_pubkey_change_fee: config.api.common.enforce_pubkey_change_fee,
-            forced_exit_minimum_account_age,
             fee_free_accounts: HashSet::from_iter(config.api.common.fee_free_accounts.clone()),
             max_number_of_transactions_per_batch,
             max_number_of_authors_per_batch,
@@ -720,28 +718,9 @@ impl TxSender {
             .await
             .map_err(SubmitError::internal)?;
 
-        let target_account_address = forced_exit.target;
-
-        let account_age = storage
-            .chain()
-            .operations_ext_schema()
-            .account_created_on(&target_account_address)
+        self.forced_exit_checker
+            .validate_forced_exit(&mut storage, forced_exit.target)
             .await
-            .map_err(|err| internal_error!(err, forced_exit))?;
-
-        match account_age {
-            Some(age) if Utc::now() - age < self.forced_exit_minimum_account_age => {
-                let msg = format!(
-                    "Target account exists less than required minimum amount ({} hours)",
-                    self.forced_exit_minimum_account_age.num_hours()
-                );
-
-                Err(SubmitError::InvalidParams(msg))
-            }
-            None => Err(SubmitError::invalid_params("Target account does not exist")),
-
-            Some(..) => Ok(()),
-        }
     }
 
     /// Returns a message that user has to sign to send the transaction.
@@ -828,7 +807,7 @@ impl TxSender {
         resp.map_err(|err| internal_error!(err))
     }
 
-    async fn token_allowed_for_fees(
+    pub async fn token_allowed_for_fees(
         mut ticker_request_sender: mpsc::Sender<TickerRequest>,
         token: TokenLike,
     ) -> Result<bool, SubmitError> {
@@ -846,7 +825,7 @@ impl TxSender {
             .map_err(SubmitError::internal)
     }
 
-    async fn ticker_price_request(
+    pub async fn ticker_price_request(
         mut ticker_request_sender: mpsc::Sender<TickerRequest>,
         token: TokenLike,
         req_type: TokenPriceRequestType,

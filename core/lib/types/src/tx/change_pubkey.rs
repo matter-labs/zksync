@@ -50,8 +50,7 @@ impl ChangePubKeyCREATE2Data {
             bytes.keccak256()
         };
 
-        let mut bytes = Vec::new();
-        bytes.push(0xff);
+        let mut bytes = vec![0xff];
         bytes.extend_from_slice(self.creator_address.as_bytes());
         bytes.extend_from_slice(&salt);
         bytes.extend_from_slice(self.code_hash.as_bytes());
@@ -84,8 +83,7 @@ impl ChangePubKeyEthAuthData {
         match self {
             ChangePubKeyEthAuthData::Onchain => Vec::new(),
             ChangePubKeyEthAuthData::ECDSA(ChangePubKeyECDSAData { eth_signature, .. }) => {
-                let mut bytes = Vec::new();
-                bytes.push(0x00);
+                let mut bytes = vec![0x00];
                 bytes.extend_from_slice(&eth_signature.serialize_packed());
                 // bytes.extend_from_slice(batch_hash.as_bytes());
                 bytes
@@ -95,8 +93,7 @@ impl ChangePubKeyEthAuthData {
                 salt_arg,
                 code_hash,
             }) => {
-                let mut bytes = Vec::new();
-                bytes.push(0x01);
+                let mut bytes = vec![0x01];
                 bytes.extend_from_slice(creator_address.as_bytes());
                 bytes.extend_from_slice(salt_arg.as_bytes());
                 bytes.extend_from_slice(code_hash.as_bytes());

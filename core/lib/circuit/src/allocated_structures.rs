@@ -35,7 +35,7 @@ impl<E: RescueEngine> AllocatedOperationBranch<E> {
     ) -> Result<AllocatedOperationBranch<E>, SynthesisError> {
         let account_address = CircuitElement::from_fe_with_known_length(
             cs.namespace(|| "account_address"),
-            || Ok(operation_branch.address.grab()?),
+            || operation_branch.address.grab(),
             franklin_constants::account_tree_depth(),
         )?;
         let account_address = account_address.pad(franklin_constants::ACCOUNT_ID_BIT_WIDTH);
@@ -56,13 +56,13 @@ impl<E: RescueEngine> AllocatedOperationBranch<E> {
 
         let balance = CircuitElement::from_fe_with_known_length(
             cs.namespace(|| "balance"),
-            || Ok(operation_branch.witness.balance_value.grab()?),
+            || operation_branch.witness.balance_value.grab(),
             franklin_constants::BALANCE_BIT_WIDTH,
         )?;
 
         let token = CircuitElement::from_fe_with_known_length(
             cs.namespace(|| "token"),
-            || Ok(operation_branch.token.grab()?),
+            || operation_branch.token.grab(),
             franklin_constants::balance_tree_depth(),
         )?;
         let token = token.pad(franklin_constants::TOKEN_BIT_WIDTH);

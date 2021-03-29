@@ -52,6 +52,8 @@ pub struct Client {
     url: String,
 }
 
+const API_V1_SCOPE: &str = "/api/v1/";
+
 impl Client {
     /// Creates a new REST API client with the specified Url.
     pub fn new(url: String) -> Self {
@@ -61,13 +63,21 @@ impl Client {
         }
     }
 
-    fn endpoint(&self, method: &str) -> String {
-        [&self.url, "/api/v1/", method].concat()
+    fn endpoint(&self, scope: &str, method: &str) -> String {
+        [&self.url, scope, method].concat()
     }
 
     /// Constructs GET request for the specified method.
     pub(crate) fn get(&self, method: impl AsRef<str>) -> ClientRequestBuilder {
-        let url = self.endpoint(method.as_ref());
+        self.get_with_scope(API_V1_SCOPE, method)
+    }
+
+    pub(crate) fn get_with_scope(
+        &self,
+        scope: impl AsRef<str>,
+        method: impl AsRef<str>,
+    ) -> ClientRequestBuilder {
+        let url = self.endpoint(scope.as_ref(), method.as_ref());
         ClientRequestBuilder {
             inner: self.inner.get(&url),
             url,
@@ -76,7 +86,15 @@ impl Client {
 
     /// Constructs POST request for the specified method.
     pub(crate) fn post(&self, method: impl AsRef<str>) -> ClientRequestBuilder {
-        let url = self.endpoint(method.as_ref());
+        self.post_with_scope(API_V1_SCOPE, method)
+    }
+
+    pub(crate) fn post_with_scope(
+        &self,
+        scope: impl AsRef<str>,
+        method: impl AsRef<str>,
+    ) -> ClientRequestBuilder {
+        let url = self.endpoint(scope.as_ref(), method.as_ref());
         ClientRequestBuilder {
             inner: self.inner.post(&url),
             url,

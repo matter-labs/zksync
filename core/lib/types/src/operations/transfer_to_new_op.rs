@@ -24,8 +24,7 @@ impl TransferToNewOp {
     pub const OP_CODE: u8 = 0x02;
 
     pub(crate) fn get_public_data(&self) -> Vec<u8> {
-        let mut data = Vec::new();
-        data.push(Self::OP_CODE); // opcode
+        let mut data = vec![Self::OP_CODE];
         data.extend_from_slice(&self.from.to_be_bytes());
         data.extend_from_slice(&self.tx.token.to_be_bytes());
         data.extend_from_slice(&pack_token_amount(&self.tx.amount));
