@@ -92,9 +92,13 @@ pub mod connection;
 pub mod data_restore;
 pub mod diff;
 pub mod ethereum;
+pub mod forced_exit_requests;
 pub mod prover;
 pub mod test_data;
 pub mod tokens;
+mod utils;
+
+use forced_exit_requests::ForcedExitRequestsSchema;
 
 pub use crate::connection::ConnectionPool;
 pub type QueryResult<T, E = anyhow::Error> = Result<T, E>;
@@ -210,6 +214,10 @@ impl<'a> StorageProcessor<'a> {
     /// Gains access to the `Tokens` schema.
     pub fn tokens_schema(&mut self) -> tokens::TokensSchema<'_, 'a> {
         tokens::TokensSchema(self)
+    }
+
+    pub fn forced_exit_requests_schema(&mut self) -> ForcedExitRequestsSchema<'_, 'a> {
+        ForcedExitRequestsSchema(self)
     }
 
     fn conn(&mut self) -> &mut PgConnection {

@@ -230,10 +230,8 @@ mod tests {
             .unwrap_err();
         assert!(
             matches!(error, ClientError::BadRequest { .. }),
-            format!(
-                "Incorrect error type: got {:?} instead of BadRequest",
-                error
-            )
+            "Incorrect error type: got {:?} instead of BadRequest",
+            error
         );
         // Tokens requests
         let expected_tokens = {

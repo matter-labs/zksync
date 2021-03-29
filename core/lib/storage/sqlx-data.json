@@ -406,6 +406,66 @@
       ]
     }
   },
+  "0e43c955bab97c4e3c2d8566c1c32c8448e27f658db0dea9540679b903dcdfd7": {
+    "query": "\n            SELECT * FROM forced_exit_requests\n            WHERE fulfilled_at IS NULL AND fulfilled_by IS NOT NULL\n            ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "id",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 1,
+          "name": "target",
+          "type_info": "Text"
+        },
+        {
+          "ordinal": 2,
+          "name": "tokens",
+          "type_info": "Text"
+        },
+        {
+          "ordinal": 3,
+          "name": "price_in_wei",
+          "type_info": "Numeric"
+        },
+        {
+          "ordinal": 4,
+          "name": "valid_until",
+          "type_info": "Timestamptz"
+        },
+        {
+          "ordinal": 5,
+          "name": "created_at",
+          "type_info": "Timestamptz"
+        },
+        {
+          "ordinal": 6,
+          "name": "fulfilled_by",
+          "type_info": "Text"
+        },
+        {
+          "ordinal": 7,
+          "name": "fulfilled_at",
+          "type_info": "Timestamptz"
+        }
+      ],
+      "parameters": {
+        "Left": []
+      },
+      "nullable": [
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        true,
+        true
+      ]
+    }
+  },
   "0e899c700b8da512bade7d9d4ce4b805d33b9ba5e47db1ae503fa9defc1e9a42": {
     "query": "\n                    SELECT * FROM tokens\n                    WHERE id <= $1\n                    ORDER BY id DESC\n                    LIMIT $2\n                    ",
     "describe": {
@@ -679,6 +739,19 @@
           "TextArray",
           "JsonbArray",
           "JsonbArray",
+          "Timestamptz",
+          "Int8"
+        ]
+      },
+      "nullable": []
+    }
+  },
+  "1e491f4afb54c10a9e4f2ea467bd7f219e7a32bdf741691cb6f350d50caae417": {
+    "query": "\n            UPDATE forced_exit_requests\n                SET fulfilled_at = $1\n                WHERE id = $2\n            ",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
           "Timestamptz",
           "Int8"
         ]
@@ -1681,6 +1754,66 @@
       ]
     }
   },
+  "502e94a5b03c686539721f133998c66fa53f50a620167666d2e1b6084d3832b9": {
+    "query": "\n            SELECT * FROM forced_exit_requests\n            WHERE fulfilled_at IS NULL AND created_at = (\n                SELECT MIN(created_at) FROM forced_exit_requests\n                WHERE fulfilled_at IS NULL\n            )\n            LIMIT 1\n            ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "id",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 1,
+          "name": "target",
+          "type_info": "Text"
+        },
+        {
+          "ordinal": 2,
+          "name": "tokens",
+          "type_info": "Text"
+        },
+        {
+          "ordinal": 3,
+          "name": "price_in_wei",
+          "type_info": "Numeric"
+        },
+        {
+          "ordinal": 4,
+          "name": "valid_until",
+          "type_info": "Timestamptz"
+        },
+        {
+          "ordinal": 5,
+          "name": "created_at",
+          "type_info": "Timestamptz"
+        },
+        {
+          "ordinal": 6,
+          "name": "fulfilled_by",
+          "type_info": "Text"
+        },
+        {
+          "ordinal": 7,
+          "name": "fulfilled_at",
+          "type_info": "Timestamptz"
+        }
+      ],
+      "parameters": {
+        "Left": []
+      },
+      "nullable": [
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        true,
+        true
+      ]
+    }
+  },
   "5093f5abc255568702a850d4301419b03d4edba1a48b9c7ccb3e03b575f2ba90": {
     "query": "\n                            WITH transactions AS (\n                                SELECT\n                                    '0x' || encode(tx_hash, 'hex') as tx_hash,\n                                    tx as op,\n                                    block_number,\n                                    success,\n                                    fail_reason,\n                                    created_at\n                                FROM executed_transactions\n                                WHERE block_number = $1 AND created_at >= $2\n                            ), priority_ops AS (\n                                SELECT\n                                    '0x' || encode(eth_hash, 'hex') as tx_hash,\n                                    operation as op,\n                                    block_number,\n                                    true as success,\n                                    Null as fail_reason,\n                                    created_at\n                                FROM executed_priority_operations\n                                WHERE block_number = $1 AND created_at >= $2\n                            ), everything AS (\n                                SELECT * FROM transactions\n                                UNION ALL\n                                SELECT * FROM priority_ops\n                            )\n                            SELECT\n                                tx_hash as \"tx_hash!\",\n                                block_number as \"block_number!\",\n                                op as \"op!\",\n                                success as \"success?\",\n                                fail_reason as \"fail_reason?\",\n                                created_at as \"created_at!\"\n                            FROM everything\n                            ORDER BY created_at ASC\n                            LIMIT $3\n                        ",
     "describe": {
@@ -2324,6 +2457,19 @@
       ]
     }
   },
+  "7bc4a6d9e909dce159213d0826726c10c7ec4008db2a4f05cbe613aa849e8a40": {
+    "query": "\n            UPDATE forced_exit_requests\n                SET fulfilled_by = $1\n                WHERE id = $2\n            ",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "Text",
+          "Int8"
+        ]
+      },
+      "nullable": []
+    }
+  },
   "7c51337430beeb0ed6e1f244da727797194ab44b5049b15cd2bcba4fc4642fb9": {
     "query": "SELECT * FROM server_config",
     "describe": {
@@ -2386,6 +2532,68 @@
         ]
       },
       "nullable": []
+    }
+  },
+  "7dfa76c3e12c301dc3d7fbf820ecf0be45e0b1c5f01ce13f7cdc1a82880804c1": {
+    "query": "\n            SELECT * FROM forced_exit_requests\n            WHERE id = $1\n            LIMIT 1\n            ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "id",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 1,
+          "name": "target",
+          "type_info": "Text"
+        },
+        {
+          "ordinal": 2,
+          "name": "tokens",
+          "type_info": "Text"
+        },
+        {
+          "ordinal": 3,
+          "name": "price_in_wei",
+          "type_info": "Numeric"
+        },
+        {
+          "ordinal": 4,
+          "name": "valid_until",
+          "type_info": "Timestamptz"
+        },
+        {
+          "ordinal": 5,
+          "name": "created_at",
+          "type_info": "Timestamptz"
+        },
+        {
+          "ordinal": 6,
+          "name": "fulfilled_by",
+          "type_info": "Text"
+        },
+        {
+          "ordinal": 7,
+          "name": "fulfilled_at",
+          "type_info": "Timestamptz"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Int8"
+        ]
+      },
+      "nullable": [
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        true,
+        true
+      ]
     }
   },
   "7ff98a4fddc441ea83f72a4a75a7caf53b9661c37f26a90984a349bfa5aeab70": {
@@ -2673,6 +2881,18 @@
       "columns": [],
       "parameters": {
         "Left": []
+      },
+      "nullable": []
+    }
+  },
+  "963cad1979935b50bc5c2bbe174f5d94fbd5c38ea752d304f987229c89e6070a": {
+    "query": "\n            DELETE FROM forced_exit_requests\n            WHERE fulfilled_by IS NULL AND valid_until < $1\n            ",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "Timestamptz"
+        ]
       },
       "nullable": []
     }
@@ -3964,6 +4184,72 @@
         ]
       },
       "nullable": []
+    }
+  },
+  "dbd7cc6b289ab3a15781dac965f9e6f026c8e647b480b5dd0c3820948d6ba4ed": {
+    "query": "\n            INSERT INTO forced_exit_requests ( target, tokens, price_in_wei, created_at, valid_until )\n            VALUES ( $1, $2, $3, $4, $5 )\n            RETURNING *\n            ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "id",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 1,
+          "name": "target",
+          "type_info": "Text"
+        },
+        {
+          "ordinal": 2,
+          "name": "tokens",
+          "type_info": "Text"
+        },
+        {
+          "ordinal": 3,
+          "name": "price_in_wei",
+          "type_info": "Numeric"
+        },
+        {
+          "ordinal": 4,
+          "name": "valid_until",
+          "type_info": "Timestamptz"
+        },
+        {
+          "ordinal": 5,
+          "name": "created_at",
+          "type_info": "Timestamptz"
+        },
+        {
+          "ordinal": 6,
+          "name": "fulfilled_by",
+          "type_info": "Text"
+        },
+        {
+          "ordinal": 7,
+          "name": "fulfilled_at",
+          "type_info": "Timestamptz"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Text",
+          "Text",
+          "Numeric",
+          "Timestamptz",
+          "Timestamptz"
+        ]
+      },
+      "nullable": [
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        true,
+        true
+      ]
     }
   },
   "dd1f1dfd729436b72b657ca997c1cce83de77cc2975abe5c6818f4c55beb4236": {
