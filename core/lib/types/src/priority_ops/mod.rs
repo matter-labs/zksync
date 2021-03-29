@@ -206,8 +206,7 @@ impl ZkSyncPriorityOp {
             n += 1;
             if let Some(deposit) = queue_entry.try_get_deposit() {
                 // Deposit pubdata for priority queue
-                let mut data = Vec::new();
-                data.push(DepositOp::OP_CODE);
+                let mut data = vec![DepositOp::OP_CODE];
                 data.extend_from_slice(&[0u8; 4]);
                 data.extend_from_slice(&deposit.token.to_be_bytes());
                 data.extend_from_slice(&deposit.amount.to_u128().unwrap().to_be_bytes());

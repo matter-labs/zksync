@@ -48,9 +48,9 @@ impl From<StorageAccountPubkeyUpdate> for StorageAccountDiff {
     }
 }
 
-impl Into<(AccountId, AccountUpdate)> for StorageAccountDiff {
-    fn into(self) -> (AccountId, AccountUpdate) {
-        match self {
+impl From<StorageAccountDiff> for (AccountId, AccountUpdate) {
+    fn from(val: StorageAccountDiff) -> Self {
+        match val {
             StorageAccountDiff::BalanceUpdate(upd) => {
                 let old_balance = upd.old_balance.to_bigint().unwrap();
                 let old_balance = old_balance.to_biguint().unwrap();
