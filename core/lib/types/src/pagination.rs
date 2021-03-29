@@ -1,4 +1,6 @@
+use crate::{tx::TxHash, BlockNumber};
 use serde::{Deserialize, Serialize};
+
 #[derive(Debug, Deserialize, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum PaginationDirection {
@@ -38,4 +40,10 @@ impl<T: Sized + Serialize, F: Serialize> Paginated<T, F> {
             direction,
         }
     }
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct BlockAndTxHash {
+    pub block_number: BlockNumber,
+    pub tx_hash: TxHash,
 }

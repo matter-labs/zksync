@@ -1,12 +1,16 @@
+use std::str::FromStr;
 // External uses
 use chrono::{DateTime, Utc};
 use num::BigUint;
 use serde::{Deserialize, Serialize};
-
+use serde_json::Value;
 // Workspace uses
 use zksync_crypto::{convert::FeConvert, serialization::FrSerde, Fr};
-use zksync_storage::chain::block::records::BlockDetails;
-use zksync_types::{tx::TxHash, Address, BlockNumber, OutputFeeType, TokenId};
+use zksync_storage::chain::block::records::{BlockDetails, BlockTransactionItem};
+use zksync_types::{
+    tx::{EthBatchSignatures, TxEthSignature, TxHash},
+    Address, BlockNumber, EthBlockId, OutputFeeType, PriorityOpId, TokenId, ZkSyncTx,
+};
 use zksync_utils::BigUintSerdeAsRadix10Str;
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Clone)]
@@ -54,6 +58,7 @@ impl From<BlockDetails> for BlockInfo {
     }
 }
 
+// TODO: remove `fee_type`, `gas_tx_amount`, `gas_price_wei`
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Fee {
     pub fee_type: OutputFeeType,
@@ -69,6 +74,7 @@ pub struct Fee {
     pub total_fee: BigUint,
 }
 
+// TODO: add `zkp_fee` and `gas_fee`
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct BatchFee {
     #[serde(with = "BigUintSerdeAsRadix10Str")]
@@ -103,4 +109,105 @@ pub struct ApiToken {
     pub symbol: String,
     pub decimals: u8,
     pub enabled_for_fees: bool,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct IncomingTxBatch {
+    pub txs: Vec<ZkSyncTx>,
+    pub signature: EthBatchSignatures,
+}
+
+#[derive(Debug, Serialize, Deserialize, PartialEq, Clone, Copy)]
+pub struct FastProcessingQuery {
+    pub fast_processing: Option<bool>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct IncomingTx {
+    pub tx: ZkSyncTx,
+    pub signature: Option<TxEthSignature>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct TxData {
+    pub tx: Transaction,
+    pub eth_signature: Option<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum L1Status {
+    //Pending,
+    Committed,
+    Finalized,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum L2Status {
+    Queued,
+    Committed,
+    Finalized,
+    Rejected,
+}
+
+impl From<L1Status> for L2Status {
+    fn from(status: L1Status) -> Self {
+        match status {
+            L1Status::Committed => L2Status::Committed,
+            L1Status::Finalized => L2Status::Finalized,
+        }
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct L1Receipt {
+    pub status: L1Status,
+    pub eth_block: EthBlockId,
+    pub rollup_block: Option<BlockNumber>,
+    pub id: PriorityOpId,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct L2Receipt {
+    pub tx_hash: TxHash,
+    pub rollup_block: Option<BlockNumber>,
+    pub status: L2Status,
+    pub fail_reason: Option<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum Receipt {
+    L1(L1Receipt),
+    L2(L2Receipt),
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct Transaction {
+    pub tx_hash: TxHash,
+    pub block_number: Option<BlockNumber>,
+    pub op: Value,
+    pub status: L2Status,
+    pub fail_reason: Option<String>,
+    pub created_at: DateTime<Utc>,
+}
+
+impl From<BlockTransactionItem> for Transaction {
+    fn from(item: BlockTransactionItem) -> Self {
+        let tx_hash = TxHash::from_str(item.tx_hash.replace("0x", "sync-tx:").as_str()).unwrap();
+        let status = if item.success.unwrap_or_default() {
+            L2Status::Committed //TODO
+        } else {
+            L2Status::Rejected
+        };
+        Self {
+            tx_hash,
+            block_number: Some(BlockNumber(item.block_number as u32)),
+            op: item.op,
+            status,
+            fail_reason: item.fail_reason,
+            created_at: item.created_at,
+        }
+    }
 }

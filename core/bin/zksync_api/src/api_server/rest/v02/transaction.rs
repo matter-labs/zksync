@@ -4,13 +4,10 @@
 use std::convert::TryInto;
 // External uses
 use actix_web::{
-    web::{self},
+    web::{self, Json},
     Scope,
 };
-use chrono::{DateTime, Utc};
 use hex::FromHexError;
-use serde::{Deserialize, Serialize};
-use serde_json::Value;
 // Workspace uses
 use zksync_storage::{QueryResult, StorageProcessor};
 use zksync_types::{
@@ -18,78 +15,21 @@ use zksync_types::{
     BlockNumber, EthBlockId, PriorityOpId,
 };
 // Local uses
-use super::{error::Error, response::ApiResult};
+use super::{
+    error::Error,
+    response::ApiResult,
+    types::{
+        FastProcessingQuery, IncomingTx, IncomingTxBatch, L1Receipt, L1Status, L2Receipt, L2Status,
+        Receipt, Transaction, TxData,
+    },
+};
+use crate::api_server::rpc_server::types::TxWithSignature;
 use crate::api_server::tx_sender::TxSender;
 
 /// Shared data between `api/v0.2/transaction` endpoints.
 #[derive(Clone)]
 struct ApiTransactionData {
     tx_sender: TxSender,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-enum L1Status {
-    //Pending,
-    Committed,
-    Finalized,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-enum L2Status {
-    Queued,
-    Committed,
-    Finalized,
-    Rejected,
-}
-
-impl From<L1Status> for L2Status {
-    fn from(status: L1Status) -> Self {
-        match status {
-            L1Status::Committed => L2Status::Committed,
-            L1Status::Finalized => L2Status::Finalized,
-        }
-    }
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-struct L1Receipt {
-    pub status: L1Status,
-    pub eth_block: EthBlockId,
-    pub rollup_block: Option<BlockNumber>,
-    pub id: PriorityOpId,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-struct L2Receipt {
-    pub tx_hash: TxHash,
-    pub rollup_block: Option<BlockNumber>,
-    pub status: L2Status,
-    pub fail_reason: Option<String>,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-#[serde(untagged)]
-enum Receipt {
-    L1(L1Receipt),
-    L2(L2Receipt),
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-struct TxData {
-    tx: Transaction,
-    eth_signature: Option<String>,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-struct Transaction {
-    tx_hash: TxHash,
-    block_number: Option<BlockNumber>,
-    op: Value,
-    status: L2Status,
-    fail_reason: Option<String>,
-    created_at: DateTime<Utc>,
 }
 
 impl ApiTransactionData {
@@ -373,11 +313,50 @@ async fn tx_data(
     }
 }
 
+async fn submit_tx(
+    data: web::Data<ApiTransactionData>,
+    Json(body): Json<IncomingTx>,
+    web::Query(query): web::Query<FastProcessingQuery>,
+) -> ApiResult<TxHash> {
+    let tx_hash = data
+        .tx_sender
+        .submit_tx(body.tx, body.signature, query.fast_processing)
+        .await
+        .map_err(Error::from);
+
+    tx_hash.into()
+}
+
+async fn submit_batch(
+    data: web::Data<ApiTransactionData>,
+    Json(body): Json<IncomingTxBatch>,
+) -> ApiResult<Vec<TxHash>> {
+    let txs = body
+        .txs
+        .into_iter()
+        .map(|tx| TxWithSignature {
+            tx,
+            signature: None,
+        })
+        .collect();
+
+    let signatures = body.signature;
+    let tx_hashes = data
+        .tx_sender
+        .submit_txs_batch(txs, Some(signatures))
+        .await
+        .map_err(Error::from);
+
+    tx_hashes.into()
+}
+
 pub fn api_scope(tx_sender: TxSender) -> Scope {
     let data = ApiTransactionData::new(tx_sender);
 
     web::scope("transaction")
         .data(data)
+        .route("", web::get().to(submit_tx))
         .route("{tx_hash}", web::get().to(tx_status))
         .route("{tx_hash}/data", web::get().to(tx_data))
+        .route("/batches", web::post().to(submit_batch))
 }
