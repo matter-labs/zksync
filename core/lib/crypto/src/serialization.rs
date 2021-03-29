@@ -226,7 +226,7 @@ impl SingleProofSerde {
         let bytes = base64::decode(&deserialized_string).map_err(de::Error::custom)?;
 
         // Then, parse hexadecimal string to obtain `SingleProof`.
-        Ok(OldProof::read(&*bytes).map_err(de::Error::custom)?)
+        OldProof::read(&*bytes).map_err(de::Error::custom)
     }
 }
 
@@ -261,7 +261,7 @@ impl AggregatedProofSerde {
         let bytes = base64::decode(&deserialized_string).map_err(de::Error::custom)?;
 
         // Then, parse hexadecimal string to obtain `SingleProof`.
-        Ok(NewProof::read(&*bytes).map_err(de::Error::custom)?)
+        NewProof::read(&*bytes).map_err(de::Error::custom)
     }
 }
 

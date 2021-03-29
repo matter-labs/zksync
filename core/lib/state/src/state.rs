@@ -754,10 +754,10 @@ mod tests {
     #[should_panic(expected = "assertion failed: self.get_account_by_address(&address).is_none()")]
     fn create_two_accounts_with_same_addresses() {
         let mut rng = XorShiftRng::from_seed([1, 2, 3, 4]);
-        let mut random_addresses = Vec::new();
-        random_addresses.push(Address::from(rng.gen::<[u8; 20]>()));
-        random_addresses.push(Address::from(rng.gen::<[u8; 20]>()));
-
+        let random_addresses = vec![
+            Address::from(rng.gen::<[u8; 20]>()),
+            Address::from(rng.gen::<[u8; 20]>()),
+        ];
         let mut state = ZkSyncState::empty();
         let updates = vec![
             (
@@ -782,11 +782,11 @@ mod tests {
     #[test]
     fn apply_account_updates_success() {
         let mut rng = XorShiftRng::from_seed([1, 2, 3, 4]);
-        let mut random_addresses = Vec::new();
         let token_id = TokenId(0);
-        random_addresses.push(Address::from(rng.gen::<[u8; 20]>()));
-        random_addresses.push(Address::from(rng.gen::<[u8; 20]>()));
-
+        let random_addresses = vec![
+            Address::from(rng.gen::<[u8; 20]>()),
+            Address::from(rng.gen::<[u8; 20]>()),
+        ];
         let mut state = ZkSyncState::empty();
 
         let updates = vec![
@@ -888,46 +888,44 @@ mod tests {
 
         let initial_plasma_state = ZkSyncState::from_acc_map(AccountMap::default(), BlockNumber(0));
 
-        let updates = {
-            let mut updates = AccountUpdates::new();
-            updates.push((
+        let updates = vec![
+            (
                 AccountId(0),
                 AccountUpdate::Create {
                     address: random_addresses[0],
                     nonce: Nonce(0),
                 },
-            ));
-            updates.push((
+            ),
+            (
                 AccountId(1),
                 AccountUpdate::Create {
                     address: random_addresses[1],
                     nonce: Nonce(0),
                 },
-            ));
-            updates.push((
+            ),
+            (
                 AccountId(1),
                 AccountUpdate::Delete {
                     address: random_addresses[1],
                     nonce: Nonce(0),
                 },
-            ));
-            updates.push((
+            ),
+            (
                 AccountId(0),
                 AccountUpdate::UpdateBalance {
                     old_nonce: Nonce(0),
                     new_nonce: Nonce(1),
                     balance_update: (token_id, 0u32.into(), 256u32.into()),
                 },
-            ));
-            updates.push((
+            ),
+            (
                 AccountId(1),
                 AccountUpdate::Create {
                     address: random_addresses[2],
                     nonce: Nonce(0),
                 },
-            ));
-            updates
-        };
+            ),
+        ];
 
         let plasma_state_updated = {
             let mut plasma_state = initial_plasma_state.clone();

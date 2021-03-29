@@ -43,9 +43,9 @@ impl From<TxAddError> for RpcErrorCodes {
     }
 }
 
-impl Into<ErrorCode> for RpcErrorCodes {
-    fn into(self) -> ErrorCode {
-        (self as i64).into()
+impl From<RpcErrorCodes> for ErrorCode {
+    fn from(val: RpcErrorCodes) -> Self {
+        (val as i64).into()
     }
 }
 
