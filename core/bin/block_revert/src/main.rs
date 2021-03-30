@@ -180,7 +180,7 @@ async fn get_blocks(
             .block_schema()
             .get_block(BlockNumber(block_number))
             .await?
-            .expect(format!("No block {} in storage", block_number).as_str());
+            .unwrap_or_else(|| panic!("No block {} in storage", block_number));
         blocks.push(block);
     }
     Ok(blocks)
