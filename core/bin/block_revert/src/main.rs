@@ -1,5 +1,16 @@
+//! This is a CLI tool for reverting blocks on contract or in storage.
+//!
+//! There are 3 parameters:
+//! `number` - number of blocks to revert
+//! 'storage' - include this flag if you want to revert blocks in storage
+//! 'contract' - include this flag if you want to revert blocks on contract
+//!
+//! Pass private key of account from which you want to send ethereum transaction
+//! in `REVERT_TOOL_OPERATOR_PRIVATE_KEY` env variable.
+
 use anyhow::{bail, ensure, format_err};
 use ethabi::Token;
+use serde::Deserialize;
 use structopt::StructOpt;
 use tokio::time::Duration;
 use web3::{
@@ -9,7 +20,9 @@ use web3::{
 use zksync_config::ZkSyncConfig;
 use zksync_eth_client::EthereumGateway;
 use zksync_storage::StorageProcessor;
-use zksync_types::{aggregated_operations::stored_block_info, block::Block, BlockNumber, Nonce};
+use zksync_types::{
+    aggregated_operations::stored_block_info, block::Block, BlockNumber, Nonce, H256,
+};
 
 // TODO: don't use anyhow (ZKS-588)
 async fn revert_blocks_in_storage(
@@ -95,6 +108,8 @@ async fn revert_blocks_in_storage(
         .await?;
 
     transaction.commit().await?;
+
+    println!("Blocks were reverted in storage");
     Ok(())
 }
 
@@ -132,10 +147,10 @@ async fn send_raw_tx_and_wait_confirmation(
 async fn revert_blocks_on_contract(
     client: &EthereumGateway,
     blocks: &[Block],
-    gas_limit: u32,
 ) -> anyhow::Result<()> {
     let tx_arg = Token::Array(blocks.iter().map(stored_block_info).collect());
     let data = client.encode_tx_data("revertBlocks", tx_arg);
+    let gas_limit = 80000 + 5000 * blocks.len();
     let signed_tx = client
         .sign_prepared_tx(data, Options::with(|f| f.gas = Some(U256::from(gas_limit))))
         .await
@@ -146,6 +161,7 @@ async fn revert_blocks_on_contract(
         "Tx to contract failed"
     );
 
+    println!("Blocks were reverted on contract");
     Ok(())
 }
 
@@ -164,7 +180,7 @@ async fn get_blocks(
             .block_schema()
             .get_block(BlockNumber(block_number))
             .await?
-            .unwrap();
+            .expect(format!("No block {} in storage", block_number).as_str());
         blocks.push(block);
     }
     Ok(blocks)
@@ -172,10 +188,20 @@ async fn get_blocks(
 
 #[derive(Debug, StructOpt)]
 struct Opt {
+    /// Number of blocks to revert
     #[structopt(long)]
     number: u32,
+    /// Reverts blocks on contract
     #[structopt(long)]
-    gas_limit: u32,
+    contract: bool,
+    /// Reverts blocks in storage
+    #[structopt(long)]
+    storage: bool,
+}
+
+#[derive(Debug, Deserialize)]
+struct OperatorPrivateKey {
+    pub operator_private_key: H256,
 }
 
 // TODO: don't use anyhow (ZKS-588)
@@ -184,8 +210,13 @@ async fn main() -> anyhow::Result<()> {
     let opt = Opt::from_args();
     let blocks_to_revert = opt.number;
 
+    let operator_private_key: OperatorPrivateKey = envy::prefixed("REVERT_TOOL_")
+        .from_env()
+        .expect("Cannot load operator private key");
+    let mut config = ZkSyncConfig::from_env();
+    config.eth_sender.sender.operator_private_key = operator_private_key.operator_private_key;
+
     let mut storage = StorageProcessor::establish_connection().await?;
-    let config = ZkSyncConfig::from_env();
     let client = EthereumGateway::from_config(&config);
 
     let last_commited_block = storage
@@ -204,15 +235,19 @@ async fn main() -> anyhow::Result<()> {
         "Some blocks to revert are already verified"
     );
 
-    let blocks = get_blocks(last_commited_block, blocks_to_revert, &mut storage).await?;
-    let last_block = BlockNumber(*last_commited_block - blocks_to_revert);
-    let mut transaction = storage.start_transaction().await?;
-
-    // 1. Try to revert blocks in storage, if it fails return error.
-    // 2. Try to revert blocks on contract, if it fails changes in storage will revert.
-    revert_blocks_in_storage(&client, &mut transaction, last_block).await?;
-    revert_blocks_on_contract(&client, &blocks, opt.gas_limit).await?;
-
-    transaction.commit().await?;
+    if opt.contract && opt.storage {
+        let blocks = get_blocks(last_commited_block, blocks_to_revert, &mut storage).await?;
+        let last_block = BlockNumber(*last_commited_block - blocks_to_revert);
+        revert_blocks_on_contract(&client, &blocks).await?;
+        revert_blocks_in_storage(&client, &mut storage, last_block).await?;
+    } else if opt.contract {
+        let blocks = get_blocks(last_commited_block, blocks_to_revert, &mut storage).await?;
+        revert_blocks_on_contract(&client, &blocks).await?;
+    } else if opt.storage {
+        let last_block = BlockNumber(*last_commited_block - blocks_to_revert);
+        revert_blocks_in_storage(&client, &mut storage, last_block).await?;
+    } else {
+        panic!("It isn't specified where to revert blocks");
+    }
     Ok(())
 }

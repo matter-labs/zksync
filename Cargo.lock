@@ -903,7 +903,9 @@ name = "block_revert"
 version = "1.0.0"
 dependencies = [
  "anyhow",
+ "envy",
  "ethabi",
+ "serde",
  "structopt",
  "tokio 0.2.22",
  "web3",
