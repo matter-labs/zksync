@@ -66,10 +66,9 @@ pub struct UnreachableError;
 
 impl Display for UnreachableError {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f,
+        f.write_str(
             "Unreachable error; you should never see this message, \
-            please contact us at https://github.com/matter-labs/zksync with a report"
+            please contact us at https://github.com/matter-labs/zksync with a report",
         )
     }
 }
@@ -84,7 +83,11 @@ impl ApiError for UnreachableError {
     }
 }
 
+#[derive(Debug)]
 pub struct InternalError(String);
+
+#[derive(Debug)]
+pub struct StorageError(String);
 
 #[derive(Error, Debug)]
 pub enum TxError {
@@ -102,19 +105,15 @@ pub enum TokenError {
     ZeroPrice,
 }
 
-pub struct StorageError(String);
-
 impl InternalError {
     pub fn new(title: impl Display) -> Self {
-        Self {
-            0: title.to_string(),
-        }
+        Self(title.to_string())
     }
 }
 
 impl Display for InternalError {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.0)
+        f.write_str(&self.0)
     }
 }
 
@@ -140,15 +139,13 @@ impl ApiError for TxError {
 
 impl StorageError {
     pub fn new(title: impl Display) -> Self {
-        Self {
-            0: title.to_string(),
-        }
+        Self(title.to_string())
     }
 }
 
 impl Display for StorageError {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.0)
+        f.write_str(&self.0)
     }
 }
 

@@ -19,17 +19,17 @@ use super::{
 
 #[async_trait::async_trait]
 pub trait Paginate<T: Serialize> {
-    type F: Serialize;
+    type Index: Serialize;
 
     async fn paginate(
         &mut self,
-        query: PaginationQuery<Self::F>,
-    ) -> Result<Paginated<T, Self::F>, Error>;
+        query: PaginationQuery<Self::Index>,
+    ) -> Result<Paginated<T, Self::Index>, Error>;
 }
 
 #[async_trait::async_trait]
 impl Paginate<Token> for StorageProcessor<'_> {
-    type F = TokenId;
+    type Index = TokenId;
 
     async fn paginate(
         &mut self,
@@ -57,7 +57,7 @@ impl Paginate<Token> for StorageProcessor<'_> {
 
 #[async_trait::async_trait]
 impl Paginate<BlockInfo> for StorageProcessor<'_> {
-    type F = BlockNumber;
+    type Index = BlockNumber;
 
     async fn paginate(
         &mut self,
@@ -88,7 +88,7 @@ impl Paginate<BlockInfo> for StorageProcessor<'_> {
 
 #[async_trait::async_trait]
 impl Paginate<Transaction> for StorageProcessor<'_> {
-    type F = BlockAndTxHash;
+    type Index = BlockAndTxHash;
 
     async fn paginate(
         &mut self,
@@ -99,27 +99,22 @@ impl Paginate<Transaction> for StorageProcessor<'_> {
             .block_schema()
             .get_block_transactions_page(&query)
             .await
-            .map_err(Error::storage)?;
-        let txs: Vec<Transaction>;
-        if raw_txs.is_none() {
-            return Err(Error::from(TxError::TransactionNotFound));
-        } else {
-            let is_block_finalized = self
-                .chain()
-                .operations_schema()
-                .get_stored_aggregated_operation(
-                    query.from.block_number,
-                    AggregatedActionType::ExecuteBlocks,
-                )
-                .await
-                .map(|operation| operation.confirmed)
-                .unwrap_or_default();
-            txs = raw_txs
-                .unwrap()
-                .into_iter()
-                .map(|tx| Transaction::from((tx, is_block_finalized)))
-                .collect();
-        }
+            .map_err(Error::storage)?
+            .ok_or_else(|| Error::from(TxError::TransactionNotFound))?;
+        let is_block_finalized = self
+            .chain()
+            .operations_schema()
+            .get_stored_aggregated_operation(
+                query.from.block_number,
+                AggregatedActionType::ExecuteBlocks,
+            )
+            .await
+            .map(|operation| operation.confirmed)
+            .unwrap_or(false);
+        let txs = raw_txs
+            .into_iter()
+            .map(|tx| Transaction::from((tx, is_block_finalized)))
+            .collect();
         let count = self
             .chain()
             .block_schema()

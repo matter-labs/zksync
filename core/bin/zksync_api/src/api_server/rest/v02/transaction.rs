@@ -58,7 +58,7 @@ impl ApiTransactionData {
             .get_stored_aggregated_operation(block_number, AggregatedActionType::ExecuteBlocks)
             .await
             .map(|operation| operation.confirmed)
-            .unwrap_or_default()
+            .unwrap_or(false)
     }
 
     async fn get_l1_receipt(

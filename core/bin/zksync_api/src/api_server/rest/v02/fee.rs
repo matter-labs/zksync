@@ -21,7 +21,6 @@ use super::{
 use crate::api_server::tx_sender::TxSender;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
-#[serde(rename_all = "snake_case")]
 pub struct TxFeeRequest {
     pub tx_type: TxFeeTypes,
     pub address: Address,

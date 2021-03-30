@@ -12,7 +12,7 @@ use zksync_crypto::{convert::FeConvert, serialization::FrSerde, Fr};
 use zksync_storage::chain::{
     block::records::{BlockDetails, BlockTransactionItem},
     operations::records::StoredExecutedPriorityOperation,
-    operations_ext::records::TxReceiptResponse
+    operations_ext::records::TxReceiptResponse,
 };
 use zksync_types::{
     tx::{EthBatchSignatures, TxEthSignature, TxHash},
