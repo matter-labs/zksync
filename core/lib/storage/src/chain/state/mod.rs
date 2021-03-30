@@ -151,6 +151,11 @@ impl<'a, 'c> StateSchema<'a, 'c> {
                     .await?;
                 }
             }
+
+            transaction
+                .event_schema()
+                .store_state_committed_event(*id, upd)
+                .await?;
         }
 
         transaction.commit().await?;
@@ -228,6 +233,11 @@ impl<'a, 'c> StateSchema<'a, 'c> {
 
         // Then go through the collected list of changes and apply them by one.
         for acc_update in account_updates.into_iter() {
+            transaction
+                .event_schema()
+                .store_state_verified_event(&acc_update)
+                .await?;
+
             match acc_update {
                 StorageAccountDiff::BalanceUpdate(upd) => {
                     sqlx::query!(

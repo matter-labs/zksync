@@ -92,6 +92,7 @@ pub mod connection;
 pub mod data_restore;
 pub mod diff;
 pub mod ethereum;
+pub mod event;
 pub mod forced_exit_requests;
 pub mod listener;
 pub mod prover;
@@ -224,6 +225,10 @@ impl<'a> StorageProcessor<'a> {
 
     pub fn forced_exit_requests_schema(&mut self) -> ForcedExitRequestsSchema<'_, 'a> {
         ForcedExitRequestsSchema(self)
+    }
+
+    pub fn event_schema(&mut self) -> event::EventSchema<'_, 'a> {
+        event::EventSchema(self)
     }
 
     fn conn(&mut self) -> &mut PgConnection {
