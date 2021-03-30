@@ -34,8 +34,7 @@ pub struct AllocatedSignatureData<E: JubjubEngine> {
 
 impl<E: JubjubEngine> AllocatedSignatureData<E> {
     pub fn get_packed_r(&self) -> Vec<Boolean> {
-        let mut r_packed_bits = vec![];
-        r_packed_bits.push(self.sig_r_x_bit.clone());
+        let mut r_packed_bits = vec![self.sig_r_x_bit.clone()];
         r_packed_bits.extend(self.sig_r_y_bits.clone());
         reverse_bytes(&r_packed_bits)
     }
@@ -438,10 +437,10 @@ where
         Expression::from(rhs_y),
         Expression::from(sb_y),
     )?);
-    Ok(multi_and(
+    multi_and(
         cs.namespace(|| "is signature correct"),
         &[r_is_not_small_order, is_x_correct, is_y_correct],
-    )?)
+    )
 }
 
 pub fn is_not_small_order<CS, E>(

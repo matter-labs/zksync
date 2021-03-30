@@ -20,8 +20,7 @@ impl DepositOp {
     pub const OP_CODE: u8 = 0x01;
 
     pub fn get_public_data(&self) -> Vec<u8> {
-        let mut data = Vec::new();
-        data.push(Self::OP_CODE); // opcode
+        let mut data = vec![Self::OP_CODE];
         data.extend_from_slice(&self.account_id.to_be_bytes());
         data.extend_from_slice(&self.priority_op.token.to_be_bytes());
         data.extend_from_slice(&self.priority_op.amount.to_u128().unwrap().to_be_bytes());

@@ -17,8 +17,7 @@ impl CloseOp {
     pub const OP_CODE: u8 = 0x04;
 
     pub(crate) fn get_public_data(&self) -> Vec<u8> {
-        let mut data = Vec::new();
-        data.push(Self::OP_CODE); // opcode
+        let mut data = vec![Self::OP_CODE];
         data.extend_from_slice(&self.account_id.to_be_bytes());
         data.resize(Self::CHUNKS * CHUNK_BYTES, 0x00);
         data

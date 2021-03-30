@@ -39,9 +39,9 @@ impl From<ForcedExitRequest> for DbForcedExitRequest {
     }
 }
 
-impl Into<ForcedExitRequest> for DbForcedExitRequest {
-    fn into(self) -> ForcedExitRequest {
-        let price_in_wei = self
+impl From<DbForcedExitRequest> for ForcedExitRequest {
+    fn from(val: DbForcedExitRequest) -> Self {
+        let price_in_wei = val
             .price_in_wei
             .to_bigint()
             .map(|int| int.to_biguint())
@@ -50,17 +50,17 @@ impl Into<ForcedExitRequest> for DbForcedExitRequest {
             // means that invalid data is stored in the DB
             .expect("Invalid forced exit request has been stored");
 
-        let tokens: Vec<TokenId> = utils::comma_list_to_vec(self.tokens);
-        let fulfilled_by: Option<Vec<TxHash>> = self.fulfilled_by.map(utils::comma_list_to_vec);
+        let tokens: Vec<TokenId> = utils::comma_list_to_vec(val.tokens);
+        let fulfilled_by: Option<Vec<TxHash>> = val.fulfilled_by.map(utils::comma_list_to_vec);
 
         ForcedExitRequest {
-            id: self.id,
-            target: stored_str_address_to_address(&self.target),
+            id: val.id,
+            target: stored_str_address_to_address(&val.target),
             tokens,
             price_in_wei,
-            created_at: self.created_at,
-            valid_until: self.valid_until,
-            fulfilled_at: self.fulfilled_at,
+            created_at: val.created_at,
+            valid_until: val.valid_until,
+            fulfilled_at: val.fulfilled_at,
             fulfilled_by,
         }
     }

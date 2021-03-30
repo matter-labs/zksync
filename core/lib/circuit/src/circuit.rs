@@ -756,52 +756,53 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
             AllocatedOperationData::from_witness(cs.namespace(|| "allocated_operation_data"), op)?;
         // ensure op_data is equal to previous
         {
-            let mut is_op_data_correct_flags = vec![];
-            is_op_data_correct_flags.push(CircuitElement::equals(
-                cs.namespace(|| "is a equal to previous"),
-                &op_data.a,
-                &prev.op_data.a,
-            )?);
-            is_op_data_correct_flags.push(CircuitElement::equals(
-                cs.namespace(|| "is b equal to previous"),
-                &op_data.b,
-                &prev.op_data.b,
-            )?);
-            is_op_data_correct_flags.push(CircuitElement::equals(
-                cs.namespace(|| "is amount_packed equal to previous"),
-                &op_data.amount_packed,
-                &prev.op_data.amount_packed,
-            )?);
-            is_op_data_correct_flags.push(CircuitElement::equals(
-                cs.namespace(|| "is fee_packed equal to previous"),
-                &op_data.fee_packed,
-                &prev.op_data.fee_packed,
-            )?);
-            is_op_data_correct_flags.push(CircuitElement::equals(
-                cs.namespace(|| "is eth_address equal to previous"),
-                &op_data.eth_address,
-                &prev.op_data.eth_address,
-            )?);
-            is_op_data_correct_flags.push(CircuitElement::equals(
-                cs.namespace(|| "is new_pubkey_hash equal to previous"),
-                &op_data.new_pubkey_hash,
-                &prev.op_data.new_pubkey_hash,
-            )?);
-            is_op_data_correct_flags.push(CircuitElement::equals(
-                cs.namespace(|| "is full_amount equal to previous"),
-                &op_data.full_amount,
-                &prev.op_data.full_amount,
-            )?);
-            is_op_data_correct_flags.push(CircuitElement::equals(
-                cs.namespace(|| "is valid_from equal to previous"),
-                &op_data.valid_from,
-                &prev.op_data.valid_from,
-            )?);
-            is_op_data_correct_flags.push(CircuitElement::equals(
-                cs.namespace(|| "is valid_until equal to previous"),
-                &op_data.valid_until,
-                &prev.op_data.valid_until,
-            )?);
+            let is_op_data_correct_flags = vec![
+                CircuitElement::equals(
+                    cs.namespace(|| "is a equal to previous"),
+                    &op_data.a,
+                    &prev.op_data.a,
+                )?,
+                CircuitElement::equals(
+                    cs.namespace(|| "is b equal to previous"),
+                    &op_data.b,
+                    &prev.op_data.b,
+                )?,
+                CircuitElement::equals(
+                    cs.namespace(|| "is amount_packed equal to previous"),
+                    &op_data.amount_packed,
+                    &prev.op_data.amount_packed,
+                )?,
+                CircuitElement::equals(
+                    cs.namespace(|| "is fee_packed equal to previous"),
+                    &op_data.fee_packed,
+                    &prev.op_data.fee_packed,
+                )?,
+                CircuitElement::equals(
+                    cs.namespace(|| "is eth_address equal to previous"),
+                    &op_data.eth_address,
+                    &prev.op_data.eth_address,
+                )?,
+                CircuitElement::equals(
+                    cs.namespace(|| "is new_pubkey_hash equal to previous"),
+                    &op_data.new_pubkey_hash,
+                    &prev.op_data.new_pubkey_hash,
+                )?,
+                CircuitElement::equals(
+                    cs.namespace(|| "is full_amount equal to previous"),
+                    &op_data.full_amount,
+                    &prev.op_data.full_amount,
+                )?,
+                CircuitElement::equals(
+                    cs.namespace(|| "is valid_from equal to previous"),
+                    &op_data.valid_from,
+                    &prev.op_data.valid_from,
+                )?,
+                CircuitElement::equals(
+                    cs.namespace(|| "is valid_until equal to previous"),
+                    &op_data.valid_until,
+                    &prev.op_data.valid_until,
+                )?,
+            ];
 
             let is_op_data_equal_to_previous = multi_and(
                 cs.namespace(|| "is_op_data_equal_to_previous"),
@@ -861,113 +862,114 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
             &global_variables,
         )?;
 
-        let mut op_flags = vec![];
-        op_flags.push(self.deposit(
-            cs.namespace(|| "deposit"),
-            &mut cur,
-            global_variables,
-            &is_account_empty,
-            &op_data,
-            &ext_pubdata_chunk,
-            &mut previous_pubdatas[DepositOp::OP_CODE as usize],
-        )?);
-        op_flags.push(self.transfer(
-            cs.namespace(|| "transfer"),
-            &mut cur,
-            &lhs,
-            &rhs,
-            global_variables,
-            &is_a_geq_b,
-            &is_account_empty,
-            &op_data,
-            &signer_key,
-            &ext_pubdata_chunk,
-            &is_valid_timestamp,
-            &signature_data.is_verified,
-            &mut previous_pubdatas[TransferOp::OP_CODE as usize],
-        )?);
-        op_flags.push(self.transfer_to_new(
-            cs.namespace(|| "transfer_to_new"),
-            &mut cur,
-            &lhs,
-            &rhs,
-            global_variables,
-            &is_a_geq_b,
-            &is_account_empty,
-            &op_data,
-            &signer_key,
-            &ext_pubdata_chunk,
-            &is_valid_timestamp,
-            &signature_data.is_verified,
-            &mut previous_pubdatas[TransferToNewOp::OP_CODE as usize],
-        )?);
-        op_flags.push(self.withdraw(
-            cs.namespace(|| "withdraw"),
-            &mut cur,
-            global_variables,
-            &is_a_geq_b,
-            &op_data,
-            &signer_key,
-            &ext_pubdata_chunk,
-            &is_valid_timestamp,
-            &signature_data.is_verified,
-            &mut previous_pubdatas[WithdrawOp::OP_CODE as usize],
-        )?);
-        // Close disable.
-        //  op_flags.push(self.close_account(
-        //      cs.namespace(|| "close_account"),
-        //      &mut cur,
-        //      &chunk_data,
-        //      &ext_pubdata_chunk,
-        //      &op_data,
-        //      &signer_key,
-        //      &subtree_root,
-        //      &is_valid_timestamp,
-        //      &signature_data.is_verified,
-        //  )?);
-        op_flags.push(self.full_exit(
-            cs.namespace(|| "full_exit"),
-            &mut cur,
-            global_variables,
-            &op_data,
-            &ext_pubdata_chunk,
-            &mut previous_pubdatas[FullExitOp::OP_CODE as usize],
-        )?);
-        op_flags.push(self.change_pubkey_offchain(
-            cs.namespace(|| "change_pubkey_offchain"),
-            &lhs,
-            &mut cur,
-            global_variables,
-            &op_data,
-            &ext_pubdata_chunk,
-            &is_valid_timestamp,
-            &mut previous_pubdatas[ChangePubKeyOp::OP_CODE as usize],
-            &is_a_geq_b,
-            &signature_data.is_verified,
-            &signer_key,
-        )?);
-        op_flags.push(self.noop(
-            cs.namespace(|| "noop"),
-            global_variables,
-            &ext_pubdata_chunk,
-            &op_data,
-            &mut previous_pubdatas[NoopOp::OP_CODE as usize],
-        )?);
-        op_flags.push(self.forced_exit(
-            cs.namespace(|| "forced_exit"),
-            &mut cur,
-            &lhs,
-            &rhs,
-            global_variables,
-            &is_a_geq_b,
-            &is_account_empty,
-            &op_data,
-            &signer_key,
-            &ext_pubdata_chunk,
-            &is_valid_timestamp,
-            &signature_data.is_verified,
-            &mut previous_pubdatas[ForcedExitOp::OP_CODE as usize],
-        )?);
+        let op_flags = vec![
+            self.deposit(
+                cs.namespace(|| "deposit"),
+                &mut cur,
+                global_variables,
+                &is_account_empty,
+                &op_data,
+                &ext_pubdata_chunk,
+                &mut previous_pubdatas[DepositOp::OP_CODE as usize],
+            )?,
+            self.transfer(
+                cs.namespace(|| "transfer"),
+                &mut cur,
+                &lhs,
+                &rhs,
+                global_variables,
+                &is_a_geq_b,
+                &is_account_empty,
+                &op_data,
+                &signer_key,
+                &ext_pubdata_chunk,
+                &is_valid_timestamp,
+                &signature_data.is_verified,
+                &mut previous_pubdatas[TransferOp::OP_CODE as usize],
+            )?,
+            self.transfer_to_new(
+                cs.namespace(|| "transfer_to_new"),
+                &mut cur,
+                &lhs,
+                &rhs,
+                global_variables,
+                &is_a_geq_b,
+                &is_account_empty,
+                &op_data,
+                &signer_key,
+                &ext_pubdata_chunk,
+                &is_valid_timestamp,
+                &signature_data.is_verified,
+                &mut previous_pubdatas[TransferToNewOp::OP_CODE as usize],
+            )?,
+            self.withdraw(
+                cs.namespace(|| "withdraw"),
+                &mut cur,
+                global_variables,
+                &is_a_geq_b,
+                &op_data,
+                &signer_key,
+                &ext_pubdata_chunk,
+                &is_valid_timestamp,
+                &signature_data.is_verified,
+                &mut previous_pubdatas[WithdrawOp::OP_CODE as usize],
+            )?,
+            // Close disable.
+            //  op_flags.push(self.close_account(
+            //      cs.namespace(|| "close_account"),
+            //      &mut cur,
+            //      &chunk_data,
+            //      &ext_pubdata_chunk,
+            //      &op_data,
+            //      &signer_key,
+            //      &subtree_root,
+            //      &is_valid_timestamp,
+            //      &signature_data.is_verified,
+            //  )?);
+            self.full_exit(
+                cs.namespace(|| "full_exit"),
+                &mut cur,
+                global_variables,
+                &op_data,
+                &ext_pubdata_chunk,
+                &mut previous_pubdatas[FullExitOp::OP_CODE as usize],
+            )?,
+            self.change_pubkey_offchain(
+                cs.namespace(|| "change_pubkey_offchain"),
+                &lhs,
+                &mut cur,
+                global_variables,
+                &op_data,
+                &ext_pubdata_chunk,
+                &is_valid_timestamp,
+                &mut previous_pubdatas[ChangePubKeyOp::OP_CODE as usize],
+                &is_a_geq_b,
+                &signature_data.is_verified,
+                &signer_key,
+            )?,
+            self.noop(
+                cs.namespace(|| "noop"),
+                global_variables,
+                &ext_pubdata_chunk,
+                &op_data,
+                &mut previous_pubdatas[NoopOp::OP_CODE as usize],
+            )?,
+            self.forced_exit(
+                cs.namespace(|| "forced_exit"),
+                &mut cur,
+                &lhs,
+                &rhs,
+                global_variables,
+                &is_a_geq_b,
+                &is_account_empty,
+                &op_data,
+                &signer_key,
+                &ext_pubdata_chunk,
+                &is_valid_timestamp,
+                &signature_data.is_verified,
+                &mut previous_pubdatas[ForcedExitOp::OP_CODE as usize],
+            )?,
+        ];
 
         assert_eq!(DIFFERENT_TRANSACTIONS_TYPE_NUMBER - 1, op_flags.len());
 
@@ -1172,10 +1174,7 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
         // base_valid_flags.push(_is_signer_valid);
         let is_base_valid = multi_and(cs.namespace(|| "valid base withdraw"), &base_valid_flags)?;
 
-        let mut lhs_valid_flags = vec![];
-        lhs_valid_flags.push(is_first_chunk.clone());
-
-        lhs_valid_flags.push(is_base_valid.clone());
+        let mut lhs_valid_flags = vec![is_first_chunk.clone(), is_base_valid.clone()];
 
         // check operation arguments
         let is_a_correct =
@@ -1202,9 +1201,7 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
         let lhs_valid = multi_and(cs.namespace(|| "is_lhs_valid"), &lhs_valid_flags)?;
         vlog::debug!("lhs_valid_withdraw_end");
 
-        let mut ohs_valid_flags = vec![];
-        ohs_valid_flags.push(is_base_valid);
-        ohs_valid_flags.push(is_first_chunk.not());
+        let ohs_valid_flags = vec![is_base_valid, is_first_chunk.not()];
         let is_ohs_valid = multi_and(cs.namespace(|| "is_ohs_valid"), &ohs_valid_flags)?;
 
         let tx_valid = multi_or(
@@ -1359,14 +1356,15 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
 
         // MUST be true for correct op. First chunk is correct and tree update can be executed.
         let first_chunk_valid = {
-            let mut flags = Vec::new();
-            flags.push(is_first_chunk.clone());
-            flags.push(is_base_valid.clone());
-            flags.push(no_nonce_overflow(
-                cs.namespace(|| "no nonce overflow"),
-                &cur.account.nonce.get_number(),
-            )?);
-            flags.push(is_pubdata_amount_valid);
+            let flags = vec![
+                is_first_chunk.clone(),
+                is_base_valid.clone(),
+                no_nonce_overflow(
+                    cs.namespace(|| "no nonce overflow"),
+                    &cur.account.nonce.get_number(),
+                )?,
+                is_pubdata_amount_valid,
+            ];
             multi_and(cs.namespace(|| "first_chunk_valid"), &flags)?
         };
 
@@ -1386,9 +1384,7 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
 
         // Check other chunks
         let other_chunks_valid = {
-            let mut flags = Vec::new();
-            flags.push(is_base_valid);
-            flags.push(is_first_chunk.not());
+            let flags = vec![is_base_valid, is_first_chunk.not()];
             multi_and(cs.namespace(|| "other_chunks_valid"), &flags)?
         };
 
@@ -1923,8 +1919,7 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
             ext_pubdata_chunk,
         )?);
 
-        let mut lhs_valid_flags = vec![];
-        lhs_valid_flags.push(is_pubdata_chunk_correct.clone());
+        let mut lhs_valid_flags = vec![is_pubdata_chunk_correct.clone()];
 
         let is_transfer = Boolean::from(Expression::equals(
             cs.namespace(|| "is_transfer"),
@@ -2051,20 +2046,19 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
             &lhs_valid,
         )?;
 
-        let mut rhs_valid_flags = vec![];
-
         let is_second_chunk = Boolean::from(Expression::equals(
             cs.namespace(|| "is_second_chunk"),
             &global_variables.chunk_data.chunk_number,
             Expression::u64::<CS>(1),
         )?);
-        rhs_valid_flags.push(is_pubdata_chunk_correct.clone());
-        rhs_valid_flags.push(is_second_chunk.clone());
-        rhs_valid_flags.push(is_transfer.clone());
-        rhs_valid_flags.push(is_valid_timestamp.clone());
-        rhs_valid_flags.push(is_account_empty.clone());
-        rhs_valid_flags.push(pubdata_properly_copied.clone());
-
+        let rhs_valid_flags = vec![
+            is_pubdata_chunk_correct.clone(),
+            is_second_chunk.clone(),
+            is_transfer.clone(),
+            is_valid_timestamp.clone(),
+            is_account_empty.clone(),
+            pubdata_properly_copied.clone(),
+        ];
         let rhs_valid = multi_and(cs.namespace(|| "rhs_valid"), &rhs_valid_flags)?;
 
         cur.balance = CircuitElement::conditionally_select(
@@ -2083,13 +2077,14 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
             &rhs_valid,
         )?;
 
-        let mut ohs_valid_flags = vec![];
-        ohs_valid_flags.push(is_pubdata_chunk_correct);
-        ohs_valid_flags.push(is_first_chunk.not());
-        ohs_valid_flags.push(is_second_chunk.not());
-        ohs_valid_flags.push(is_transfer);
-        ohs_valid_flags.push(pubdata_properly_copied);
-        ohs_valid_flags.push(is_valid_timestamp.clone());
+        let ohs_valid_flags = vec![
+            is_pubdata_chunk_correct,
+            is_first_chunk.not(),
+            is_second_chunk.not(),
+            is_transfer,
+            pubdata_properly_copied,
+            is_valid_timestamp.clone(),
+        ];
 
         let is_ohs_valid = multi_and(cs.namespace(|| "is_ohs_valid"), &ohs_valid_flags)?;
 
@@ -2193,12 +2188,11 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
             Expression::u64::<CS>(u64::from(TransferOp::OP_CODE)), // transfer tx_type
         )?);
 
-        let mut lhs_valid_flags = vec![];
-
-        lhs_valid_flags.push(is_pubdata_chunk_correct.clone());
-        lhs_valid_flags.push(is_transfer.clone());
-        lhs_valid_flags.push(is_valid_timestamp.clone());
-
+        let mut lhs_valid_flags = vec![
+            is_pubdata_chunk_correct.clone(),
+            is_transfer.clone(),
+            is_valid_timestamp.clone(),
+        ];
         let is_first_chunk = Boolean::from(Expression::equals(
             cs.namespace(|| "is_first_chunk"),
             &global_variables.chunk_data.chunk_number,
@@ -2289,11 +2283,11 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
         )?;
 
         // rhs
-        let mut rhs_valid_flags = vec![];
-        rhs_valid_flags.push(pubdata_properly_copied);
-        rhs_valid_flags.push(is_transfer);
-        rhs_valid_flags.push(is_valid_timestamp.clone());
-
+        let mut rhs_valid_flags = vec![
+            pubdata_properly_copied,
+            is_transfer,
+            is_valid_timestamp.clone(),
+        ];
         let is_chunk_second = Boolean::from(Expression::equals(
             cs.namespace(|| "is_chunk_second"),
             &global_variables.chunk_data.chunk_number,
@@ -2407,12 +2401,11 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
             Expression::u64::<CS>(u64::from(ForcedExitOp::OP_CODE)),
         )?);
 
-        let mut lhs_valid_flags = vec![];
-
-        lhs_valid_flags.push(is_pubdata_chunk_correct.clone());
-        lhs_valid_flags.push(is_forced_exit.clone());
-        lhs_valid_flags.push(is_valid_timestamp.clone());
-
+        let mut lhs_valid_flags = vec![
+            is_pubdata_chunk_correct.clone(),
+            is_forced_exit.clone(),
+            is_valid_timestamp.clone(),
+        ];
         let is_first_chunk = Boolean::from(Expression::equals(
             cs.namespace(|| "is_first_chunk"),
             &global_variables.chunk_data.chunk_number,
@@ -2490,11 +2483,11 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
         )?;
 
         // rhs
-        let mut rhs_valid_flags = vec![];
-        rhs_valid_flags.push(pubdata_properly_copied.clone());
-        rhs_valid_flags.push(is_forced_exit.clone());
-        rhs_valid_flags.push(is_valid_timestamp.clone());
-
+        let mut rhs_valid_flags = vec![
+            pubdata_properly_copied.clone(),
+            is_forced_exit.clone(),
+            is_valid_timestamp.clone(),
+        ];
         let is_second_chunk = Boolean::from(Expression::equals(
             cs.namespace(|| "is_chunk_second"),
             &global_variables.chunk_data.chunk_number,
@@ -2536,13 +2529,14 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
         )?;
 
         // Remaining chunks
-        let mut ohs_valid_flags = vec![];
-        ohs_valid_flags.push(is_pubdata_chunk_correct);
-        ohs_valid_flags.push(is_first_chunk.not());
-        ohs_valid_flags.push(is_second_chunk.not());
-        ohs_valid_flags.push(is_forced_exit);
-        ohs_valid_flags.push(is_valid_timestamp.clone());
-        ohs_valid_flags.push(pubdata_properly_copied);
+        let ohs_valid_flags = vec![
+            is_pubdata_chunk_correct,
+            is_first_chunk.not(),
+            is_second_chunk.not(),
+            is_forced_exit,
+            is_valid_timestamp.clone(),
+            pubdata_properly_copied,
+        ];
 
         let is_ohs_valid = multi_and(cs.namespace(|| "is_ohs_valid"), &ohs_valid_flags)?;
 
@@ -2985,18 +2979,17 @@ fn generate_maxchunk_polynomial<E: JubjubEngine>() -> Vec<E::Fr> {
         (x, y)
     };
 
-    let mut points: Vec<(E::Fr, E::Fr)> = vec![];
-
-    points.push(get_xy(NoopOp::OP_CODE, NoopOp::CHUNKS));
-    points.push(get_xy(CloseOp::OP_CODE, CloseOp::CHUNKS));
-    points.push(get_xy(TransferOp::OP_CODE, TransferOp::CHUNKS));
-    points.push(get_xy(DepositOp::OP_CODE, DepositOp::CHUNKS));
-    points.push(get_xy(WithdrawOp::OP_CODE, WithdrawOp::CHUNKS));
-    points.push(get_xy(TransferToNewOp::OP_CODE, TransferToNewOp::CHUNKS));
-    points.push(get_xy(FullExitOp::OP_CODE, FullExitOp::CHUNKS));
-    points.push(get_xy(ChangePubKeyOp::OP_CODE, ChangePubKeyOp::CHUNKS));
-    points.push(get_xy(ForcedExitOp::OP_CODE, ForcedExitOp::CHUNKS));
-
+    let points: Vec<(E::Fr, E::Fr)> = vec![
+        get_xy(NoopOp::OP_CODE, NoopOp::CHUNKS),
+        get_xy(CloseOp::OP_CODE, CloseOp::CHUNKS),
+        get_xy(TransferOp::OP_CODE, TransferOp::CHUNKS),
+        get_xy(DepositOp::OP_CODE, DepositOp::CHUNKS),
+        get_xy(WithdrawOp::OP_CODE, WithdrawOp::CHUNKS),
+        get_xy(TransferToNewOp::OP_CODE, TransferToNewOp::CHUNKS),
+        get_xy(FullExitOp::OP_CODE, FullExitOp::CHUNKS),
+        get_xy(ChangePubKeyOp::OP_CODE, ChangePubKeyOp::CHUNKS),
+        get_xy(ForcedExitOp::OP_CODE, ForcedExitOp::CHUNKS),
+    ];
     let interpolation = interpolate::<E>(&points[..]).expect("must interpolate");
     assert_eq!(interpolation.len(), DIFFERENT_TRANSACTIONS_TYPE_NUMBER);
 

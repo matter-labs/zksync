@@ -94,7 +94,7 @@ fn privkey_to_pubkey_internal(private_key: &[u8]) -> Result<PublicKey<Engine>, J
 #[wasm_bindgen(js_name = pubKeyHash)]
 pub fn pub_key_hash(pubkey: &[u8]) -> Result<Vec<u8>, JsValue> {
     let pubkey = JUBJUB_PARAMS
-        .with(|params| PublicKey::read(&pubkey[..], params))
+        .with(|params| PublicKey::read(pubkey, params))
         .map_err(|_| JsValue::from_str("couldn't read public key"))?;
     Ok(utils::pub_key_hash(&pubkey))
 }

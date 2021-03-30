@@ -53,7 +53,7 @@ jobs:
       - name: start-services
         run: |
           docker-compose -f docker-compose-runner.yml down
-          docker-compose pull
+          docker-compose -f docker-compose-runner.yml pull
           docker-compose -f docker-compose-runner.yml up --build -d geth postgres zk
           ci_run sccache --start-server
 
@@ -94,7 +94,7 @@ jobs:
       - name: start-services
         run: |
           docker-compose -f docker-compose-runner.yml down
-          docker-compose pull
+          docker-compose -f docker-compose-runner.yml pull
           docker-compose -f docker-compose-runner.yml up --build -d geth postgres zk
           ci_run sccache --start-server
 
@@ -118,26 +118,11 @@ jobs:
       - name: integration-server
         run: ci_run zk test i server
 
-      - name: Show logs
-        run: |
-          ci_run cat server.log
-          ci_run cat dummy_prover.log
-
       - name: integration-api
         run: ci_run zk test i api
 
-      - name: Show logs
-        run: |
-          ci_run cat server.log
-          ci_run cat dummy_prover.log
-
       - name: integration-zcli
         run: ci_run zk test i zcli
-
-      - name: Show logs
-        run: |
-          ci_run cat server.log
-          ci_run cat dummy_prover.log
 
       - name: integration-rust-sdk
         run: ci_run zk test i rust-sdk
@@ -146,6 +131,7 @@ jobs:
         run: ci_run zk test i withdrawal-helpers
 
       - name: Show logs
+        if: always()
         run: |
           ci_run cat server.log
           ci_run cat dummy_prover.log
@@ -166,7 +152,7 @@ jobs:
       - name: start-services
         run: |
           docker-compose -f docker-compose-runner.yml down
-          docker-compose pull
+          docker-compose -f docker-compose-runner.yml pull
           docker-compose -f docker-compose-runner.yml up --build -d zk
           ci_run sccache --start-server
 
