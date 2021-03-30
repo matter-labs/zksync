@@ -6,9 +6,10 @@ use zksync_basic_types::{AccountId, Address};
 
 use crate::{
     operations::ChangePubKeyOp,
-    tx::{ChangePubKey, Close, ForcedExit, Transfer, TxEthSignature, TxHash, Withdraw},
+    tx::{ChangePubKey, Close, ForcedExit, Swap, Transfer, TxEthSignature, TxHash, Withdraw},
     utils::deserialize_eth_message,
-    CloseOp, ForcedExitOp, Nonce, Token, TokenId, TokenLike, TransferOp, TxFeeTypes, WithdrawOp,
+    CloseOp, ForcedExitOp, Nonce, SwapOp, Token, TokenId, TokenLike, TransferOp, TxFeeTypes,
+    WithdrawOp,
 };
 use zksync_crypto::params::ETH_TOKEN_ID;
 
@@ -40,11 +41,18 @@ pub enum ZkSyncTx {
     Close(Box<Close>),
     ChangePubKey(Box<ChangePubKey>),
     ForcedExit(Box<ForcedExit>),
+    Swap(Box<Swap>),
 }
 
 impl From<Transfer> for ZkSyncTx {
     fn from(transfer: Transfer) -> Self {
         Self::Transfer(Box::new(transfer))
+    }
+}
+
+impl From<Swap> for ZkSyncTx {
+    fn from(swap: Swap) -> Self {
+        Self::Swap(Box::new(swap))
     }
 }
 
@@ -92,14 +100,7 @@ impl std::ops::Deref for SignedZkSyncTx {
 impl ZkSyncTx {
     /// Returns the hash of the transaction.
     pub fn hash(&self) -> TxHash {
-        let bytes = match self {
-            ZkSyncTx::Transfer(tx) => tx.get_bytes(),
-            ZkSyncTx::Withdraw(tx) => tx.get_bytes(),
-            ZkSyncTx::Close(tx) => tx.get_bytes(),
-            ZkSyncTx::ChangePubKey(tx) => tx.get_bytes(),
-            ZkSyncTx::ForcedExit(tx) => tx.get_bytes(),
-        };
-
+        let bytes = self.get_bytes();
         let hash = sha256(&bytes);
         let mut out = [0u8; 32];
         out.copy_from_slice(&hash);
@@ -114,6 +115,7 @@ impl ZkSyncTx {
             ZkSyncTx::Close(tx) => tx.account,
             ZkSyncTx::ChangePubKey(tx) => tx.account,
             ZkSyncTx::ForcedExit(tx) => tx.target,
+            ZkSyncTx::Swap(tx) => tx.submitter_address,
         }
     }
 
@@ -123,6 +125,7 @@ impl ZkSyncTx {
             ZkSyncTx::Withdraw(tx) => Ok(tx.account_id),
             ZkSyncTx::ChangePubKey(tx) => Ok(tx.account_id),
             ZkSyncTx::ForcedExit(tx) => Ok(tx.initiator_account_id),
+            ZkSyncTx::Swap(tx) => Ok(tx.submitter_id),
             ZkSyncTx::Close(_) => Err(anyhow::anyhow!("Close operations are disabled")),
         }
     }
@@ -135,6 +138,7 @@ impl ZkSyncTx {
             ZkSyncTx::Close(tx) => tx.nonce,
             ZkSyncTx::ChangePubKey(tx) => tx.nonce,
             ZkSyncTx::ForcedExit(tx) => tx.nonce,
+            ZkSyncTx::Swap(tx) => tx.nonce,
         }
     }
 
@@ -149,6 +153,7 @@ impl ZkSyncTx {
             ZkSyncTx::Close(_) => ETH_TOKEN_ID,
             ZkSyncTx::ChangePubKey(tx) => tx.fee_token,
             ZkSyncTx::ForcedExit(tx) => tx.token,
+            ZkSyncTx::Swap(tx) => tx.fee_token,
         }
     }
 
@@ -163,6 +168,7 @@ impl ZkSyncTx {
             ZkSyncTx::Close(tx) => tx.check_correctness(),
             ZkSyncTx::ChangePubKey(tx) => tx.check_correctness(),
             ZkSyncTx::ForcedExit(tx) => tx.check_correctness(),
+            ZkSyncTx::Swap(tx) => tx.check_correctness(),
         }
     }
 
@@ -181,6 +187,7 @@ impl ZkSyncTx {
             ZkSyncTx::ForcedExit(tx) => {
                 Some(tx.get_ethereum_sign_message(&token.symbol, token.decimals))
             }
+            ZkSyncTx::Swap(tx) => Some(tx.get_ethereum_sign_message(&token.symbol, token.decimals)),
             _ => None,
         }
     }
@@ -217,6 +224,9 @@ impl ZkSyncTx {
             ZkSyncTx::ForcedExit(tx) => {
                 Some(tx.get_ethereum_sign_message_part(&token.symbol, token.decimals))
             }
+            ZkSyncTx::Swap(tx) => {
+                Some(tx.get_ethereum_sign_message_part(&token.symbol, token.decimals))
+            }
             _ => None,
         }
     }
@@ -229,6 +239,7 @@ impl ZkSyncTx {
             ZkSyncTx::Close(tx) => tx.get_bytes(),
             ZkSyncTx::ChangePubKey(tx) => tx.get_bytes(),
             ZkSyncTx::ForcedExit(tx) => tx.get_bytes(),
+            ZkSyncTx::Swap(tx) => tx.get_bytes(),
         }
     }
 
@@ -242,6 +253,7 @@ impl ZkSyncTx {
             ZkSyncTx::Close(_) => CloseOp::CHUNKS,
             ZkSyncTx::ChangePubKey(_) => ChangePubKeyOp::CHUNKS,
             ZkSyncTx::ForcedExit(_) => ForcedExitOp::CHUNKS,
+            ZkSyncTx::Swap(_) => SwapOp::CHUNKS,
         }
     }
 
@@ -299,6 +311,12 @@ impl ZkSyncTx {
                 change_pubkey.account,
                 change_pubkey.fee.clone(),
             )),
+            ZkSyncTx::Swap(swap) => Some((
+                TxFeeTypes::Swap,
+                TokenLike::Id(swap.fee_token),
+                swap.submitter_address,
+                swap.fee.clone(),
+            )),
             _ => None,
         }
     }
@@ -311,6 +329,7 @@ impl ZkSyncTx {
             ZkSyncTx::ChangePubKey(tx) => tx.time_range.unwrap_or_default().valid_from,
             ZkSyncTx::ForcedExit(tx) => tx.time_range.valid_from,
             ZkSyncTx::Close(tx) => tx.time_range.valid_from,
+            ZkSyncTx::Swap(tx) => tx.valid_from(),
         }
     }
 }

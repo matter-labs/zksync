@@ -22,7 +22,8 @@ library Operations {
         FullExit,
         ChangePubKey,
         ForcedExit,
-        TransferFrom
+        TransferFrom,
+        Swap
     }
 
     // Byte lengths

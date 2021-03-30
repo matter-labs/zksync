@@ -4,6 +4,7 @@ mod change_pubkey;
 mod close;
 mod forced_exit;
 mod primitives;
+mod swap;
 mod transfer;
 mod withdraw;
 mod zksync_tx;
@@ -20,6 +21,7 @@ pub use self::{
         ChangePubKeyType,
     },
     forced_exit::ForcedExit,
+    swap::{Order, Swap},
     transfer::Transfer,
     withdraw::Withdraw,
     zksync_tx::{EthSignData, SignedZkSyncTx, ZkSyncTx},
