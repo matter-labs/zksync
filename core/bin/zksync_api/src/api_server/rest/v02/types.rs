@@ -9,7 +9,11 @@ use serde_json::Value;
 
 // Workspace uses
 use zksync_crypto::{convert::FeConvert, serialization::FrSerde, Fr};
-use zksync_storage::chain::block::records::{BlockDetails, BlockTransactionItem};
+use zksync_storage::chain::{
+    block::records::{BlockDetails, BlockTransactionItem},
+    operations::records::StoredExecutedPriorityOperation,
+    operations_ext::records::TxReceiptResponse
+};
 use zksync_types::{
     tx::{EthBatchSignatures, TxEthSignature, TxHash},
     Address, BlockNumber, EthBlockId, OutputFeeType, PriorityOpId, TokenId, ZkSyncTx,
@@ -166,6 +170,29 @@ pub struct L1Receipt {
     pub id: PriorityOpId,
 }
 
+impl From<(StoredExecutedPriorityOperation, bool)> for L1Receipt {
+    fn from(op: (StoredExecutedPriorityOperation, bool)) -> L1Receipt {
+        let eth_block = EthBlockId(op.0.eth_block as u64);
+        let rollup_block = Some(BlockNumber(op.0.block_number as u32));
+        let id = PriorityOpId(op.0.priority_op_serialid as u64);
+
+        let finalized = op.1;
+
+        let status = if finalized {
+            L1Status::Finalized
+        } else {
+            L1Status::Committed
+        };
+
+        L1Receipt {
+            status,
+            eth_block,
+            rollup_block,
+            id,
+        }
+    }
+}
+
 #[derive(Debug, Serialize, Deserialize)]
 pub struct L2Receipt {
     pub tx_hash: TxHash,
@@ -174,6 +201,30 @@ pub struct L2Receipt {
     pub fail_reason: Option<String>,
 }
 
+impl From<TxReceiptResponse> for L2Receipt {
+    fn from(receipt: TxReceiptResponse) -> L2Receipt {
+        let mut tx_hash_with_prefix = "sync-tx:".to_string();
+        tx_hash_with_prefix.push_str(&receipt.tx_hash);
+        let tx_hash = TxHash::from_str(&tx_hash_with_prefix).unwrap();
+        let rollup_block = Some(BlockNumber(receipt.block_number as u32));
+        let fail_reason = receipt.fail_reason;
+        let status = if receipt.success {
+            if receipt.verified {
+                L2Status::Finalized
+            } else {
+                L2Status::Committed
+            }
+        } else {
+            L2Status::Rejected
+        };
+        L2Receipt {
+            tx_hash,
+            rollup_block,
+            status,
+            fail_reason,
+        }
+    }
+}
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(untagged)]
 pub enum Receipt {

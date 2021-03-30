@@ -14,7 +14,7 @@ use hex::FromHexError;
 use zksync_storage::{QueryResult, StorageProcessor};
 use zksync_types::{
     aggregated_operations::AggregatedActionType, tx::EthSignData, tx::TxEthSignature, tx::TxHash,
-    BlockNumber, EthBlockId, PriorityOpId,
+    BlockNumber,
 };
 
 // Local uses
@@ -22,8 +22,7 @@ use super::{
     error::{Error, TxError},
     response::ApiResult,
     types::{
-        IncomingTx, IncomingTxBatch, L1Receipt, L1Status, L2Receipt, L2Status, Receipt,
-        Transaction, TxData,
+        IncomingTx, IncomingTxBatch, L1Receipt, L2Receipt, L2Status, Receipt, Transaction, TxData,
     },
 };
 use crate::api_server::rpc_server::types::TxWithSignature;
@@ -66,30 +65,15 @@ impl ApiTransactionData {
         storage: &mut StorageProcessor<'_>,
         eth_hash: &[u8],
     ) -> QueryResult<Option<L1Receipt>> {
-        if let Some(receipt) = storage
+        if let Some(op) = storage
             .chain()
             .operations_schema()
             .get_executed_priority_operation_by_hash(eth_hash)
             .await?
         {
-            let eth_block = EthBlockId(receipt.eth_block as u64);
-            let rollup_block = Some(BlockNumber(receipt.block_number as u32));
-            let id = PriorityOpId(receipt.priority_op_serialid as u64);
-
             let finalized =
-                Self::is_block_finalized(storage, BlockNumber(receipt.block_number as u32)).await;
-
-            let status = if finalized {
-                L1Status::Finalized
-            } else {
-                L1Status::Committed
-            };
-            Ok(Some(L1Receipt {
-                status,
-                eth_block,
-                rollup_block,
-                id,
-            }))
+                Self::is_block_finalized(storage, BlockNumber(op.block_number as u32)).await;
+            Ok(Some(L1Receipt::from((op, finalized))))
         } else {
             Ok(None)
         }
@@ -105,23 +89,7 @@ impl ApiTransactionData {
             .tx_receipt(tx_hash.as_ref())
             .await?
         {
-            let rollup_block = Some(BlockNumber(receipt.block_number as u32));
-            let fail_reason = receipt.fail_reason;
-            let status = if receipt.success {
-                if receipt.verified {
-                    L2Status::Finalized
-                } else {
-                    L2Status::Committed
-                }
-            } else {
-                L2Status::Rejected
-            };
-            Ok(Some(L2Receipt {
-                tx_hash,
-                rollup_block,
-                status,
-                fail_reason,
-            }))
+            Ok(Some(L2Receipt::from(receipt)))
         } else if storage
             .chain()
             .mempool_schema()

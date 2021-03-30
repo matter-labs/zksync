@@ -148,7 +148,7 @@ async fn token_price(
 ) -> ApiResult<BigDecimal> {
     let token_result = TokenLike::parse_without_symbol(&token_like);
     let first_token;
-    if let Err(_) = token_result {
+    if token_result.is_err() {
         return Error::from(TokenError::TokenNotFound).into();
     } else {
         first_token = token_result.unwrap();
