@@ -1,9 +1,12 @@
 //! This is a CLI tool for reverting blocks on contract or in storage.
 //!
-//! There are 3 parameters:
+//! There are 1 parameter:
 //! `number` - number of blocks to revert
-//! 'storage' - include this flag if you want to revert blocks in storage
-//! 'contract' - include this flag if you want to revert blocks on contract
+//!
+//! There are 3 subcommands:
+//! `all' - if you want to revert blocks on contract and in storage
+//! `contract` - if you want to revert blocks on contract
+//! `storage` - if you want to revert blocks in storage
 //!
 //! Pass private key of account from which you want to send ethereum transaction
 //! in `REVERT_TOOL_OPERATOR_PRIVATE_KEY` env variable.
@@ -187,16 +190,22 @@ async fn get_blocks(
 }
 
 #[derive(Debug, StructOpt)]
+enum Command {
+    /// Reverts blocks on contract and in storage
+    All,
+    /// Reverts blocks on contract
+    Contract,
+    /// Reverts blocks in storage
+    Storage,
+}
+
+#[derive(Debug, StructOpt)]
 struct Opt {
     /// Number of blocks to revert
     #[structopt(long)]
     number: u32,
-    /// Reverts blocks on contract
-    #[structopt(long)]
-    contract: bool,
-    /// Reverts blocks in storage
-    #[structopt(long)]
-    storage: bool,
+    #[structopt(subcommand)]
+    command: Command,
 }
 
 #[derive(Debug, Deserialize)]
@@ -235,19 +244,22 @@ async fn main() -> anyhow::Result<()> {
         "Some blocks to revert are already verified"
     );
 
-    if opt.contract && opt.storage {
-        let blocks = get_blocks(last_commited_block, blocks_to_revert, &mut storage).await?;
-        let last_block = BlockNumber(*last_commited_block - blocks_to_revert);
-        revert_blocks_on_contract(&client, &blocks).await?;
-        revert_blocks_in_storage(&client, &mut storage, last_block).await?;
-    } else if opt.contract {
-        let blocks = get_blocks(last_commited_block, blocks_to_revert, &mut storage).await?;
-        revert_blocks_on_contract(&client, &blocks).await?;
-    } else if opt.storage {
-        let last_block = BlockNumber(*last_commited_block - blocks_to_revert);
-        revert_blocks_in_storage(&client, &mut storage, last_block).await?;
-    } else {
-        panic!("It isn't specified where to revert blocks");
+    match opt.command {
+        Command::All => {
+            let blocks = get_blocks(last_commited_block, blocks_to_revert, &mut storage).await?;
+            let last_block = BlockNumber(*last_commited_block - blocks_to_revert);
+            revert_blocks_on_contract(&client, &blocks).await?;
+            revert_blocks_in_storage(&client, &mut storage, last_block).await?;
+        }
+        Command::Contract => {
+            let blocks = get_blocks(last_commited_block, blocks_to_revert, &mut storage).await?;
+            revert_blocks_on_contract(&client, &blocks).await?;
+        }
+        Command::Storage => {
+            let last_block = BlockNumber(*last_commited_block - blocks_to_revert);
+            revert_blocks_in_storage(&client, &mut storage, last_block).await?;
+        }
     }
+
     Ok(())
 }
