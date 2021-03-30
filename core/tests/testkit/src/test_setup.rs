@@ -259,21 +259,18 @@ impl TestSetup {
         token: Token,
         amount: BigUint,
     ) -> (Vec<TransactionReceipt>, PriorityOp, Vec<AccountTransfer>) {
-        let mut transfers = vec![];
-
-        transfers.push(AccountTransfer::EthAccountTransfer(EthAccountTransfer {
-            account_id: from,
-            token_id: token.0,
-            amount: BigInt::from_biguint(Sign::Minus, amount.clone()),
-        }));
-
-        transfers.push(AccountTransfer::ZkSyncAccountTransfer(
-            ZkSyncAccountTransfer {
+        let mut transfers = vec![
+            AccountTransfer::EthAccountTransfer(EthAccountTransfer {
+                account_id: from,
+                token_id: token.0,
+                amount: BigInt::from_biguint(Sign::Minus, amount.clone()),
+            }),
+            AccountTransfer::ZkSyncAccountTransfer(ZkSyncAccountTransfer {
                 account_id: to,
                 token_id: token.0,
                 amount: BigInt::from_biguint(Sign::Plus, amount.clone()),
-            },
-        ));
+            }),
+        ];
 
         let token_address = if token.0 == TokenId(0) {
             None
@@ -349,13 +346,11 @@ impl TestSetup {
         amount: BigUint,
         rng: &mut impl Rng,
     ) -> (Vec<TransactionReceipt>, Vec<AccountTransfer>) {
-        let mut transfers = vec![];
-
-        transfers.push(AccountTransfer::EthAccountTransfer(EthAccountTransfer {
+        let mut transfers = vec![AccountTransfer::EthAccountTransfer(EthAccountTransfer {
             account_id: from,
             token_id: token.0,
             amount: BigInt::from_biguint(Sign::Minus, amount.clone()),
-        }));
+        })];
 
         let token_address = if token.0 == TokenId(0) {
             None

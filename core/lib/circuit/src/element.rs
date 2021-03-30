@@ -217,11 +217,11 @@ impl<E: Engine> CircuitElement<E> {
             &y.get_number(),
         )?;
 
-        Ok(CircuitElement::from_number_with_known_length(
+        CircuitElement::from_number_with_known_length(
             cs.namespace(|| "chosen nonce"),
             selected_number,
             x.length,
-        )?)
+        )
     }
 
     // doesn't enforce length by design, though applied to both strict values will give strict result
@@ -241,11 +241,11 @@ impl<E: Engine> CircuitElement<E> {
             &condition,
         )?;
 
-        Ok(CircuitElement::from_number_with_known_length(
+        CircuitElement::from_number_with_known_length(
             cs.namespace(|| "chosen number as ce"),
             selected_number,
             x.length,
-        )?)
+        )
     }
 
     // doesn't enforce length by design, though applied to both strict values will give strict result
@@ -265,11 +265,11 @@ impl<E: Engine> CircuitElement<E> {
             &condition,
         )?;
 
-        Ok(CircuitElement::from_number_with_known_length(
+        CircuitElement::from_number_with_known_length(
             cs.namespace(|| "chosen number as ce"),
             selected_number,
             y.length,
-        )?)
+        )
     }
 
     pub fn equals<CS: ConstraintSystem<E>>(
@@ -393,8 +393,7 @@ impl<E: RescueEngine + JubjubEngine> CircuitPubkey<E> {
         self.hash.clone()
     }
     pub fn get_external_packing(&self) -> Vec<Boolean> {
-        let mut ext_bits = vec![];
-        ext_bits.push(self.get_x().get_bits_le()[0].clone());
+        let mut ext_bits = vec![self.get_x().get_bits_le()[0].clone()];
         ext_bits.extend(self.get_y().get_bits_be()[1..].to_vec());
         reverse_bytes(&ext_bits)
     }

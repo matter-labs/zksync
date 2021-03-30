@@ -164,13 +164,12 @@ where
         assert!(tree_depth > 1);
         let hasher = H::default();
         let items = FnvHashMap::default();
-        let mut nodes = Vec::new();
-        nodes.push(Node {
+        let nodes = vec![Node {
             index: NodeIndex(1),
             depth: 0,
             left: None,
             right: None,
-        });
+        }];
 
         let mut prehashed = Vec::with_capacity(tree_depth);
         let mut cur = hasher.hash_bits(T::default().get_bits_le());

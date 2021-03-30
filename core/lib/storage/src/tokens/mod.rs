@@ -8,12 +8,11 @@ use zksync_types::{Token, TokenId, TokenLike, TokenPrice};
 use zksync_utils::ratio_to_big_decimal;
 // Local imports
 use self::records::{DBMarketVolume, DbTickerPrice, DbToken};
-use crate::tokens::utils::address_to_stored_string;
+use crate::utils::address_to_stored_string;
 use crate::{QueryResult, StorageProcessor};
 use zksync_types::tokens::TokenMarketVolume;
 
 pub mod records;
-mod utils;
 
 /// Precision of the USD price per token
 pub(crate) const STORED_USD_PRICE_PRECISION: usize = 6;

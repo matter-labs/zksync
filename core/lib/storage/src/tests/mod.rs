@@ -32,6 +32,7 @@ pub(crate) mod chain;
 mod config;
 mod data_restore;
 mod ethereum;
+mod forced_exit_requests;
 mod prover;
 mod tokens;
 

@@ -79,14 +79,22 @@ jobs:
           ref: master
           token: ${{ secrets.GH_TOKEN }}
       -
-        name: Deploy apps
-        working-directory: helm-infra
-        run: |
-          ## copy helm plugins over (from dysnix/kubectl, don't forget)!!!
-          cp -r /dysnix/kubectl/.local /dysnix/kubectl/.cache ~
-
-          UPDATE_REPOS=y helmfile -e $HFENV repos
-          helmfile -e $HFENV $DEPLOY_APPS apply --args "timeout 180s"
+        uses: chrnorm/deployment-action@releases/v1
+        name: Create GitHub deployment
+        id: deployment
+        with:
+          token: "${{ github.token }}"
+          environment: stage
+# TODO fix stage and resume deploy to stage
+#      -
+#        name: Deploy apps
+#        working-directory: helm-infra
+#        run: |
+          # copy helm plugins over (from dysnix/kubectl, don't forget)!!!
+#          cp -r /dysnix/kubectl/.local /dysnix/kubectl/.cache ~
+#
+#          UPDATE_REPOS=y helmfile -e $HFENV repos
+#          helmfile -e $HFENV $DEPLOY_APPS apply --args "timeout 180s"
       -
         name: Update deployment status (success)
         if: success()
@@ -94,7 +102,7 @@ jobs:
         with:
           token: ${{ github.token }}
           state: success
-          deployment_id: ${{ github.event.deployment.id }}
+          deployment_id: ${{ steps.deployment.outputs.deployment_id }}
       -
         name: Update deployment status (failure)
         if: failure()
@@ -102,4 +110,4 @@ jobs:
         with:
           token: ${{ github.token }}
           state: failure
-          deployment_id: ${{ github.event.deployment.id }}
+          deployment_id: ${{ steps.deployment.outputs.deployment_id }}

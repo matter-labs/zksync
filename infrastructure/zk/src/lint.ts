@@ -36,11 +36,11 @@ async function clippy() {
     // We don't want clippy to require running database.
     process.env.SQLX_OFFLINE = 'true';
     process.chdir(process.env.ZKSYNC_HOME as string);
-    await utils.spawn('cargo clippy --all --tests --benches -- -D warnings');
+    await utils.spawn('cargo clippy  --all --tests --benches -- -D warnings -A clippy::upper-case-acronyms');
     delete process.env.SQLX_OFFLINE;
 
     process.chdir('sdk/zksync-crypto');
-    await utils.spawn('cargo clippy --all --tests --benches -- -D warnings');
+    await utils.spawn('cargo clippy  --all --tests --benches -- -D warnings -A clippy::upper-case-acronyms');
     process.chdir(process.env.ZKSYNC_HOME as string);
 }
 
