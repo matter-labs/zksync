@@ -99,19 +99,7 @@ impl<'a, 'c> EventSchema<'a, 'c> {
                 new_nonce,
             } => {
                 account_update_details.nonce = i64::from(**new_nonce);
-                account_update_details.pub_key_hash = new_pub_key_hash.clone();
-            }
-        }
-
-        if !matches!(account_update, AccountUpdate::ChangePubKeyHash { .. }) {
-            let account = self
-                .0
-                .chain()
-                .account_schema()
-                .last_committed_state_for_account(account_id)
-                .await?;
-            if let Some(account) = account {
-                account_update_details.pub_key_hash = account.pub_key_hash;
+                account_update_details.new_pub_key_hash = Some(new_pub_key_hash.clone());
             }
         }
 
@@ -137,21 +125,7 @@ impl<'a, 'c> EventSchema<'a, 'c> {
         &mut self,
         account_diff: &StorageAccountDiff,
     ) -> QueryResult<()> {
-        let mut account_update_details = AccountUpdateDetails::from(account_diff);
-
-        if !matches!(account_diff, StorageAccountDiff::ChangePubKey(_)) {
-            let account = self
-                .0
-                .chain()
-                .account_schema()
-                .last_verified_state_for_account(AccountId(
-                    account_update_details.account_id as u32,
-                ))
-                .await?;
-            if let Some(account) = account {
-                account_update_details.pub_key_hash = account.pub_key_hash;
-            }
-        }
+        let account_update_details = AccountUpdateDetails::from(account_diff);
 
         let update_type = AccountStateChangeType::from(account_diff);
         let status = AccountStateChangeStatus::Finalized;

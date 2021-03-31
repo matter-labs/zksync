@@ -36,7 +36,7 @@ pub struct AccountEvent {
 pub struct AccountUpdateDetails {
     pub account_id: i64,
     pub nonce: i64,
-    pub pub_key_hash: PubKeyHash,
+    pub new_pub_key_hash: Option<PubKeyHash>,
     pub token_id: Option<i32>,
     pub new_balance: Option<BigDecimal>,
 }
@@ -46,7 +46,7 @@ impl AccountUpdateDetails {
         AccountUpdateDetails {
             account_id: i64::from(*account_id),
             nonce: 0,
-            pub_key_hash: PubKeyHash::zero(),
+            new_pub_key_hash: None,
             token_id: None,
             new_balance: None,
         }
@@ -81,28 +81,30 @@ impl From<&StorageAccountDiff> for AccountUpdateDetails {
             StorageAccountDiff::BalanceUpdate(update) => Self {
                 account_id: update.account_id,
                 nonce: update.new_nonce,
-                pub_key_hash: PubKeyHash::zero(),
+                new_pub_key_hash: None,
                 token_id: Some(update.coin_id),
                 new_balance: Some(update.new_balance.clone()),
             },
             StorageAccountDiff::Create(update) => Self {
                 account_id: update.account_id,
                 nonce: update.nonce,
-                pub_key_hash: PubKeyHash::zero(),
+                new_pub_key_hash: None,
                 token_id: None,
                 new_balance: None,
             },
             StorageAccountDiff::Delete(update) => Self {
                 account_id: update.account_id,
                 nonce: update.nonce,
-                pub_key_hash: PubKeyHash::zero(),
+                new_pub_key_hash: None,
                 token_id: None,
                 new_balance: None,
             },
             StorageAccountDiff::ChangePubKey(update) => Self {
                 account_id: update.account_id,
                 nonce: update.new_nonce,
-                pub_key_hash: PubKeyHash::from_bytes(update.new_pubkey_hash.as_slice()).unwrap(),
+                new_pub_key_hash: Some(
+                    PubKeyHash::from_bytes(update.new_pubkey_hash.as_slice()).unwrap(),
+                ),
                 token_id: None,
                 new_balance: None,
             },
