@@ -187,17 +187,16 @@ enum Command {
 }
 
 #[derive(Debug, StructOpt)]
+#[structopt(name = "zkSync block revert tool", author = "Matter Labs")]
+#[structopt(about = "Tool to revert blocks in zkSync network on contract and/or in storage")]
 struct Opt {
     /// Number of blocks to revert
     #[structopt(long)]
     number: u32,
     #[structopt(subcommand)]
     command: Command,
-    #[structopt(
-        long = "key",
-        env = "REVERT_TOOL_OPERATOR_PRIVATE_KEY",
-        hide_env_values = true
-    )]
+    /// Private key of operator which will call the contract function.
+    #[structopt(long = "key", env = "REVERT_TOOL_OPERATOR_PRIVATE_KEY")]
     operator_private_key: String,
 }
 
