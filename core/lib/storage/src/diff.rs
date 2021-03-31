@@ -63,7 +63,7 @@ impl From<StorageAccountDiff> for (AccountId, AccountUpdate) {
                     AccountUpdate::UpdateBalance {
                         old_nonce: Nonce(upd.old_nonce as u32),
                         new_nonce: Nonce(upd.new_nonce as u32),
-                        balance_update: (TokenId(upd.coin_id as u16), old_balance, new_balance),
+                        balance_update: (TokenId(upd.coin_id as u32), old_balance, new_balance),
                     },
                 )
             }

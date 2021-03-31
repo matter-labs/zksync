@@ -58,7 +58,7 @@ pub fn max_account_id() -> AccountId {
 
 /// Max token id, based on the number of processable tokens
 pub fn max_token_id() -> TokenId {
-    TokenId(number_of_processable_tokens() as u16 - 1)
+    TokenId(number_of_processable_tokens() as u32 - 1)
 }
 
 pub const ETH_TOKEN_ID: TokenId = TokenId(0);
@@ -79,6 +79,12 @@ pub const TX_TYPE_BIT_WIDTH: usize = 8;
 /// Account subtree hash width
 pub const SUBTREE_HASH_WIDTH: usize = 254; //seems to be equal to Bn256::NUM_BITS could be replaced
 pub const SUBTREE_HASH_WIDTH_PADDED: usize = 256;
+
+/// Serial id
+pub const SERIAL_ID_BIT_WIDTH: usize = 32;
+// Content hash size
+
+pub const CONTENT_HASH_WIDTH: usize = FR_ADDRESS_LEN * 8;
 
 /// balance bit width
 pub const BALANCE_BIT_WIDTH: usize = 128;

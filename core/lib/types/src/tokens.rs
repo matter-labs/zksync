@@ -1,4 +1,4 @@
-use crate::{tx::ChangePubKeyType, Address, TokenId};
+use crate::{tx::ChangePubKeyType, AccountId, Address, TokenId, H256};
 use chrono::{DateTime, Utc};
 use num::{rational::Ratio, BigUint};
 use serde::{Deserialize, Serialize};
@@ -56,7 +56,7 @@ impl fmt::Display for TokenLike {
 impl TokenLike {
     pub fn parse(value: &str) -> Self {
         // Try to interpret an address as the token ID.
-        if let Ok(id) = u16::from_str(value) {
+        if let Ok(id) = u32::from_str(value) {
             return Self::Id(TokenId(id));
         }
         // Try to interpret a token as the token address with or without a prefix.
@@ -165,6 +165,52 @@ pub enum TxFeeTypes {
     Transfer,
     /// Fee for the `ChangePubKey` operation.
     ChangePubKey(ChangePubKeyFeeTypeArg),
+}
+
+/// Token supported in zkSync protocol
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
+pub struct NFT {
+    /// id is used for tx signature and serialization
+    pub id: TokenId,
+    /// id is used for calculating address, make it unique, must be the same as id
+    pub account_id: AccountId,
+    pub serial_id: u32,
+    /// id of nft creator
+    pub creator_id: AccountId,
+    /// L2 token address
+    pub address: Address,
+    /// Token symbol
+    pub symbol: String,
+    /// hash of data in nft token
+    pub content_hash: H256,
+}
+
+// TODO make an error
+impl NFT {
+    pub fn new(
+        token_id: TokenId,
+        account_id: AccountId,
+        serial_id: u32,
+        creator_id: AccountId,
+        address: Address,
+        symbol: Option<String>,
+        content_hash: H256,
+    ) -> Result<Self, anyhow::Error> {
+        let symbol = symbol.unwrap_or_else(|| format!("NFT-{}", token_id));
+        if token_id.0 != account_id.0 {
+            //TODO fix it
+            return Err(anyhow::format_err!("TokenId and AccountId mismatched"));
+        }
+        Ok(Self {
+            id: token_id,
+            account_id,
+            serial_id,
+            creator_id,
+            address,
+            symbol,
+            content_hash,
+        })
+    }
 }
 
 #[cfg(test)]

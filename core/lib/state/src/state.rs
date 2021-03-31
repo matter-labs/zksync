@@ -180,6 +180,9 @@ impl ZkSyncState {
             ZkSyncPriorityOp::FullExit(op) => self
                 .apply_tx(op)
                 .expect("Priority operation execution failed"),
+            ZkSyncPriorityOp::MintNFT(op) => self
+                .apply_tx(op)
+                .expect("Priority operation execution failed"),
         }
     }
 
@@ -375,6 +378,7 @@ impl ZkSyncState {
         match op {
             ZkSyncPriorityOp::Deposit(op) => self.create_op(op).unwrap().into(),
             ZkSyncPriorityOp::FullExit(op) => self.create_op(op).unwrap().into(),
+            ZkSyncPriorityOp::MintNFT(op) => self.create_op(op).unwrap().into(),
         }
     }
 

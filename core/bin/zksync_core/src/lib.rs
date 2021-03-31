@@ -70,7 +70,7 @@ pub async fn genesis_init(config: &ZkSyncConfig) {
             .expect("failed to access db")
             .tokens_schema()
             .store_token(Token {
-                id: TokenId(id as u16),
+                id: TokenId(id as u32),
                 symbol: token.symbol,
                 address: token.address[2..]
                     .parse()

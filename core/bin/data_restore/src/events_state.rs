@@ -26,9 +26,7 @@ impl TryFrom<Log> for NewTokenEvent {
         }
         Ok(NewTokenEvent {
             address: Address::from_slice(&event.topics[1].as_fixed_bytes()[12..]),
-            id: TokenId(
-                U256::from_big_endian(&event.topics[2].as_fixed_bytes()[..]).as_u32() as u16,
-            ),
+            id: TokenId(U256::from_big_endian(&event.topics[2].as_fixed_bytes()[..]).as_u32()),
         })
     }
 }

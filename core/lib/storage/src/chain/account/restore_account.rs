@@ -17,7 +17,7 @@ pub(crate) fn restore_account(
         assert_eq!(b.account_id, stored_account.id);
         let balance_bigint = b.balance.to_bigint().unwrap();
         let balance = balance_bigint.to_biguint().unwrap();
-        account.set_balance(TokenId(b.coin_id as u16), balance);
+        account.set_balance(TokenId(b.coin_id as u32), balance);
     }
     account.nonce = Nonce(stored_account.nonce as u32);
     account.address = Address::from_slice(&stored_account.address);

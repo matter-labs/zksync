@@ -475,7 +475,7 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
 
                 if let Some(tok_val) = tx_info.get_mut("token") {
                     if let Some(token_id) = tok_val.as_u64() {
-                        let token_id = TokenId(token_id as u16);
+                        let token_id = TokenId(token_id as u32);
                         let token_symbol = tokens
                             .get(&token_id)
                             .map(|t| t.symbol.clone())
@@ -653,7 +653,7 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
 
                 if let Some(tok_val) = tx_info.get_mut("token") {
                     if let Some(token_id) = tok_val.as_u64() {
-                        let token_id = TokenId(token_id as u16);
+                        let token_id = TokenId(token_id as u32);
                         let token_symbol = tokens
                             .get(&token_id)
                             .map(|t| t.symbol.clone())

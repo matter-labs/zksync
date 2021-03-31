@@ -104,7 +104,7 @@ async fn add_token(
                 e
             );
             actix_web::error::ErrorInternalServerError("storage layer error")
-        })? as u16),
+        })? as u32),
     };
 
     let token = tokens::Token {

@@ -261,6 +261,7 @@ impl<W: EthClient> EthWatch<W> {
                     deposit.from == address
                 }
                 ZkSyncPriorityOp::FullExit(full_exit) => full_exit.eth_address == address,
+                ZkSyncPriorityOp::MintNFT(nft) => nft.address == address,
             })
             .cloned()
             .collect()

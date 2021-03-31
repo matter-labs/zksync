@@ -32,7 +32,7 @@ impl TxHandler<Close> for ZkSyncState {
         let account = self.get_account(op.account_id).unwrap();
 
         for token in 0..params::total_tokens() {
-            if account.get_balance(TokenId(token as u16)) != BigUint::from(0u32) {
+            if account.get_balance(TokenId(token as u32)) != BigUint::from(0u32) {
                 bail!("Account is not empty, token id: {}", token);
             }
         }

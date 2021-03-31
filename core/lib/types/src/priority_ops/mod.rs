@@ -13,7 +13,7 @@ use zksync_crypto::params::{
 use zksync_utils::BigUintSerdeAsRadix10Str;
 
 use super::{
-    operations::{DepositOp, FullExitOp},
+    operations::{DepositOp, FullExitOp, MintNFTOp},
     utils::h256_as_vec,
     AccountId, SerialId, TokenId,
 };
@@ -38,6 +38,25 @@ pub struct Deposit {
     pub to: Address,
 }
 
+/// Deposit priority operation transfers funds from the L1 account to the desired L2 account.
+/// If the target L2 account didn't exist at the moment of the operation execution, a new
+/// account will be created.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MintNFT {
+    /// id
+    pub id: TokenId,
+    /// id is used for calculating address, make it unique, must be the same as id
+    pub account_id: AccountId,
+    pub serial_id: u32,
+    /// id of nft creator
+    pub creator_id: AccountId,
+    /// L2 token address
+    pub address: Address,
+    /// hash of data in nft token
+    pub content_hash: H256,
+    /// recipient account
+    pub recipient_account_id: AccountId,
+}
 /// Performs a withdrawal of funds without direct interaction with the L2 network.
 /// All the balance of the desired token will be withdrawn to the provided L1 address.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -53,6 +72,7 @@ pub struct FullExit {
 pub enum ZkSyncPriorityOp {
     Deposit(Deposit),
     FullExit(FullExit),
+    MintNFT(MintNFT),
 }
 
 impl ZkSyncPriorityOp {
@@ -96,7 +116,7 @@ impl ZkSyncPriorityOp {
                         "PubData length mismatch"
                     );
                     let (token, left) = pub_data_left.split_at(TOKEN_BIT_WIDTH / 8);
-                    (u16::from_be_bytes(token.try_into().unwrap()), left)
+                    (u32::from_be_bytes(token.try_into().unwrap()), left)
                 };
 
                 // amount
@@ -166,7 +186,7 @@ impl ZkSyncPriorityOp {
                         "PubData length mismatch"
                     );
                     let (token, left) = pub_data_left.split_at(TOKEN_BIT_WIDTH / 8);
-                    (u16::from_be_bytes(token.try_into().unwrap()), left)
+                    (u32::from_be_bytes(token.try_into().unwrap()), left)
                 };
 
                 // amount
@@ -193,6 +213,7 @@ impl ZkSyncPriorityOp {
         match self {
             Self::Deposit(_) => DepositOp::CHUNKS,
             Self::FullExit(_) => FullExitOp::CHUNKS,
+            Self::MintNFT(_) => MintNFTOp::CHUNKS,
         }
     }
 

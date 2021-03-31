@@ -77,7 +77,7 @@ impl ForcedExitOp {
                 })?;
         let target_account_id = u32::from_bytes(&bytes[target_account_id_offset..token_id_offset])
             .ok_or_else(|| format_err!("Cant get target account id from forced exit pubdata"))?;
-        let token = u16::from_bytes(&bytes[token_id_offset..amount_offset])
+        let token = u32::from_bytes(&bytes[token_id_offset..amount_offset])
             .ok_or_else(|| format_err!("Cant get token id from forced exit pubdata"))?;
         let amount = BigUint::from_u128(
             u128::from_bytes(&bytes[amount_offset..amount_offset + BALANCE_BIT_WIDTH / 8])

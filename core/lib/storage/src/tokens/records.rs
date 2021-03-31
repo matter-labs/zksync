@@ -31,7 +31,7 @@ impl From<Token> for DbToken {
 impl From<DbToken> for Token {
     fn from(val: DbToken) -> Token {
         Token {
-            id: TokenId(val.id as u16),
+            id: TokenId(val.id as u32),
             address: stored_str_address_to_address(&val.address),
             symbol: val.symbol,
             decimals: val.decimals as u8,

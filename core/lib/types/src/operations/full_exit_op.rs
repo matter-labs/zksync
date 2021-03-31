@@ -71,7 +71,7 @@ impl FullExitOp {
         let account_id = u32::from_bytes(&bytes[account_id_offset..eth_address_offset])
             .ok_or_else(|| format_err!("Cant get account id from full exit pubdata"))?;
         let eth_address = Address::from_slice(&bytes[eth_address_offset..token_offset]);
-        let token = u16::from_bytes(&bytes[token_offset..amount_offset])
+        let token = u32::from_bytes(&bytes[token_offset..amount_offset])
             .ok_or_else(|| format_err!("Cant get token id from full exit pubdata"))?;
         let amount = BigUint::from_u128(
             u128::from_bytes(&bytes[amount_offset..amount_offset + BALANCE_BIT_WIDTH / 8])

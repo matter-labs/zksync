@@ -4,6 +4,7 @@ use super::ZkSyncTx;
 use crate::ZkSyncPriorityOp;
 use anyhow::format_err;
 use serde::{Deserialize, Serialize};
+use zksync_basic_types::AccountId;
 use zksync_crypto::params::CHUNK_BYTES;
 
 mod change_pubkey_op;
@@ -11,6 +12,7 @@ mod close_op;
 mod deposit_op;
 mod forced_exit;
 mod full_exit_op;
+mod mint_nft_op;
 mod noop_op;
 mod transfer_op;
 mod transfer_to_new_op;
@@ -20,10 +22,9 @@ mod withdraw_op;
 pub use self::close_op::CloseOp;
 pub use self::{
     change_pubkey_op::ChangePubKeyOp, deposit_op::DepositOp, forced_exit::ForcedExitOp,
-    full_exit_op::FullExitOp, noop_op::NoopOp, transfer_op::TransferOp,
+    full_exit_op::FullExitOp, mint_nft_op::MintNFTOp, noop_op::NoopOp, transfer_op::TransferOp,
     transfer_to_new_op::TransferToNewOp, withdraw_op::WithdrawOp,
 };
-use zksync_basic_types::AccountId;
 
 /// zkSync network operation.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -41,6 +42,7 @@ pub enum ZkSyncOp {
     FullExit(Box<FullExitOp>),
     ChangePubKeyOffchain(Box<ChangePubKeyOp>),
     ForcedExit(Box<ForcedExitOp>),
+    MintNFTOp(Box<MintNFTOp>),
     /// `NoOp` operation cannot be directly created, but it's used to fill the block capacity.
     Noop(NoopOp),
 }
@@ -58,6 +60,7 @@ impl ZkSyncOp {
             ZkSyncOp::FullExit(_) => FullExitOp::CHUNKS,
             ZkSyncOp::ChangePubKeyOffchain(_) => ChangePubKeyOp::CHUNKS,
             ZkSyncOp::ForcedExit(_) => ForcedExitOp::CHUNKS,
+            ZkSyncOp::MintNFTOp(_) => MintNFTOp::CHUNKS,
         }
     }
 
@@ -73,6 +76,7 @@ impl ZkSyncOp {
             ZkSyncOp::FullExit(op) => op.get_public_data(),
             ZkSyncOp::ChangePubKeyOffchain(op) => op.get_public_data(),
             ZkSyncOp::ForcedExit(op) => op.get_public_data(),
+            ZkSyncOp::MintNFTOp(op) => op.get_public_data(),
         }
     }
 
@@ -134,6 +138,9 @@ impl ZkSyncOp {
             ForcedExitOp::OP_CODE => Ok(ZkSyncOp::ForcedExit(Box::new(
                 ForcedExitOp::from_public_data(&bytes)?,
             ))),
+            MintNFTOp::OP_CODE => Ok(ZkSyncOp::MintNFTOp(Box::new(MintNFTOp::from_public_data(
+                &bytes,
+            )?))),
             _ => Err(format_err!("Wrong operation type: {}", &op_type)),
         }
     }
@@ -150,6 +157,7 @@ impl ZkSyncOp {
             FullExitOp::OP_CODE => Ok(FullExitOp::CHUNKS),
             ChangePubKeyOp::OP_CODE => Ok(ChangePubKeyOp::CHUNKS),
             ForcedExitOp::OP_CODE => Ok(ForcedExitOp::CHUNKS),
+            MintNFTOp::OP_CODE => Ok(MintNFTOp::CHUNKS),
             _ => Err(format_err!("Wrong operation type: {}", &op_type)),
         }
         .map(|chunks| chunks * CHUNK_BYTES)
@@ -175,6 +183,7 @@ impl ZkSyncOp {
         match self {
             ZkSyncOp::Deposit(op) => Ok(ZkSyncPriorityOp::Deposit(op.priority_op.clone())),
             ZkSyncOp::FullExit(op) => Ok(ZkSyncPriorityOp::FullExit(op.priority_op.clone())),
+            ZkSyncOp::MintNFTOp(op) => Ok(ZkSyncPriorityOp::MintNFT(op.priority_op.clone())),
             _ => Err(format_err!("Wrong operation type")),
         }
     }
@@ -191,6 +200,7 @@ impl ZkSyncOp {
             ZkSyncOp::FullExit(op) => op.get_updated_account_ids(),
             ZkSyncOp::ChangePubKeyOffchain(op) => op.get_updated_account_ids(),
             ZkSyncOp::ForcedExit(op) => op.get_updated_account_ids(),
+            ZkSyncOp::MintNFTOp(op) => op.get_updated_account_ids(),
         }
     }
 
@@ -213,7 +223,10 @@ impl ZkSyncOp {
     }
 
     pub fn is_priority_op(&self) -> bool {
-        matches!(self, &ZkSyncOp::Deposit(_) | &ZkSyncOp::FullExit(_))
+        matches!(
+            self,
+            &ZkSyncOp::Deposit(_) | &ZkSyncOp::FullExit(_) | &ZkSyncOp::MintNFTOp(_)
+        )
     }
 }
 
@@ -268,5 +281,10 @@ impl From<ChangePubKeyOp> for ZkSyncOp {
 impl From<ForcedExitOp> for ZkSyncOp {
     fn from(op: ForcedExitOp) -> Self {
         Self::ForcedExit(Box::new(op))
+    }
+}
+impl From<MintNFTOp> for ZkSyncOp {
+    fn from(op: MintNFTOp) -> Self {
+        Self::MintNFTOp(Box::new(op))
     }
 }

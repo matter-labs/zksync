@@ -772,6 +772,9 @@ pub fn build_block_witness<'a>(
                 offset_commitment.extend(forced_exit_witness.get_offset_commitment_data())
             }
             ZkSyncOp::Noop(_) => {} // Noops are handled below
+            ZkSyncOp::MintNFTOp(_) => {
+                todo!()
+            }
         }
     }
 

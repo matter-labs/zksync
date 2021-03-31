@@ -283,6 +283,9 @@ impl TreeState {
                     );
                 }
                 ZkSyncOp::Noop(_) => {}
+                ZkSyncOp::MintNFTOp(_) => {
+                    todo!()
+                }
             }
         }
 
