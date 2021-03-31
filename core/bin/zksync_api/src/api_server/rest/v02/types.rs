@@ -16,7 +16,7 @@ use zksync_storage::chain::{
 };
 use zksync_types::{
     tx::{EthBatchSignatures, TxEthSignature, TxHash},
-    Address, BlockNumber, EthBlockId, OutputFeeType, PriorityOpId, TokenId, ZkSyncTx,
+    Address, BlockNumber, EthBlockId, OutputFeeType, PriorityOpId, Token, TokenId, ZkSyncTx,
 };
 use zksync_utils::BigUintSerdeAsRadix10Str;
 
@@ -116,6 +116,18 @@ pub struct ApiToken {
     pub symbol: String,
     pub decimals: u8,
     pub enabled_for_fees: bool,
+}
+
+impl From<(Token, bool)> for ApiToken {
+    fn from(token: (Token, bool)) -> Self {
+        ApiToken {
+            id: token.0.id,
+            address: token.0.address,
+            symbol: token.0.symbol,
+            decimals: token.0.decimals,
+            enabled_for_fees: token.1,
+        }
+    }
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]

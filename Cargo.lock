@@ -5956,6 +5956,7 @@ dependencies = [
  "serde_json",
  "thiserror",
  "zksync_crypto",
+ "zksync_storage",
  "zksync_types",
  "zksync_utils",
 ]

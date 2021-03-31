@@ -42,6 +42,8 @@ impl ApiTransactionData {
     fn decode_hash(&self, tx_hash: String) -> Result<Vec<u8>, FromHexError> {
         let tx_hash: &str = if let Some(value) = (&tx_hash).strip_prefix("0x") {
             value
+        } else if let Some(value) = (&tx_hash).strip_prefix("sync-tx:") {
+            value
         } else {
             &tx_hash
         };

@@ -61,12 +61,49 @@ impl ApiTokenData {
         }
     }
 
+    async fn is_token_enabled_for_fees(&self, token_id: TokenId) -> Result<bool, Error> {
+        let mut storage = self.pool.access_storage().await.map_err(Error::storage)?;
+        let market_volume = TokenDBCache::get_token_market_volume(&mut storage, token_id)
+            .await
+            .map_err(Error::storage)?;
+        Ok(market_volume
+            .map(|volume| volume.market_volume.ge(&self.min_market_volume))
+            .unwrap_or(false))
+    }
+
     async fn token_page(
         &self,
         query: PaginationQuery<TokenId>,
-    ) -> Result<Paginated<Token, TokenId>, Error> {
+    ) -> Result<Paginated<ApiToken, TokenId>, Error> {
         let mut storage = self.pool.access_storage().await.map_err(Error::storage)?;
-        storage.paginate(query).await
+        let paginated_tokens: Result<Paginated<Token, TokenId>, Error> =
+            storage.paginate(query).await;
+        match paginated_tokens {
+            Ok(paginated_tokens) => {
+                let mut list = Vec::new();
+                for token in paginated_tokens.list {
+                    let enabled_for_fees_result = self.is_token_enabled_for_fees(token.id).await;
+                    let enabled_for_fees;
+                    match enabled_for_fees_result {
+                        Ok(enabled_for_fees_result) => {
+                            enabled_for_fees = enabled_for_fees_result;
+                        }
+                        Err(err) => {
+                            return Err(err);
+                        }
+                    }
+                    list.push(ApiToken::from((token, enabled_for_fees)));
+                }
+                Ok(Paginated {
+                    list,
+                    from: paginated_tokens.from,
+                    count: paginated_tokens.count,
+                    limit: paginated_tokens.limit,
+                    direction: paginated_tokens.direction,
+                })
+            }
+            Err(err) => Err(err),
+        }
     }
 
     async fn token(&self, token_like: TokenLike) -> Result<ApiToken, Error> {
@@ -78,22 +115,8 @@ impl ApiTokenData {
             .await
             .map_err(Error::storage)?;
         if let Some(token) = token {
-            let market_volume = TokenDBCache::get_token_market_volume(&mut storage, token.id)
-                .await
-                .map_err(Error::storage)?;
-            let mut api_token = ApiToken {
-                id: token.id,
-                address: token.address,
-                symbol: token.symbol,
-                decimals: token.decimals,
-                enabled_for_fees: false,
-            };
-            if let Some(market_volume) = market_volume {
-                if market_volume.market_volume.ge(&self.min_market_volume) {
-                    api_token.enabled_for_fees = true;
-                }
-            }
-            Ok(api_token)
+            let enabled_for_fees = self.is_token_enabled_for_fees(token.id).await?;
+            Ok(ApiToken::from((token, enabled_for_fees)))
         } else {
             Err(Error::from(PriceError::token_not_found(
                 "Token not found in storage",
@@ -123,7 +146,7 @@ impl ApiTokenData {
 async fn token_pagination(
     data: web::Data<ApiTokenData>,
     web::Query(query): web::Query<PaginationQuery<TokenId>>,
-) -> ApiResult<Paginated<Token, TokenId>> {
+) -> ApiResult<Paginated<ApiToken, TokenId>> {
     data.token_page(query).await.map_err(Error::from).into()
 }
 
