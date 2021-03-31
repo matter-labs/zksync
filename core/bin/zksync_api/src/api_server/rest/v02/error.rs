@@ -10,14 +10,25 @@ use thiserror::Error;
 #[derive(Serialize_repr)]
 #[repr(u16)]
 pub enum ErrorCode {
-    Unreacheable = 0,
-    Submit = 100,
-    InvalidData = 200,
-    Price = 300,
-    Storage = 400,
-    Internal = 500,
-    FromHex = 600,
-    Token = 700,
+    UnreacheableError = 0,
+    TokenZeroPriceError = 200,
+    TransactionNotFound = 300,
+    IncorrectTxHash = 301,
+    StorageError = 400,
+    InvalidHexCharacter = 500,
+    HexStringOddLength = 501,
+    InvalidHexStringLength = 502,
+    TokenNotFound = 600,
+    ExternalApiError = 601,
+    InternalError = 700,
+    AccountCloseDisabled = 701,
+    InvalidParams = 702,
+    UnsupportedFastProcessing = 703,
+    IncorrectTx = 704,
+    TxAddError = 705,
+    InappropriateFeeToken = 706,
+    CommunicationCoreServer = 707,
+    Other = 708,
 }
 
 /// Error object in a response
@@ -53,10 +64,6 @@ where
 }
 
 impl Error {
-    pub fn internal(err: impl Display) -> Error {
-        Error::from(InternalError::new(err))
-    }
-
     pub fn storage(err: impl Display) -> Error {
         Error::from(StorageError::new(err))
     }
@@ -79,63 +86,51 @@ impl ApiError for UnreachableError {
     }
 
     fn code(&self) -> ErrorCode {
-        ErrorCode::Unreacheable
+        ErrorCode::UnreacheableError
     }
 }
-
-#[derive(Debug)]
-pub struct InternalError(String);
-
-#[derive(Debug)]
-pub struct StorageError(String);
 
 #[derive(Error, Debug)]
 pub enum TxError {
     #[error("Transaction is not found")]
     TransactionNotFound,
     #[error("Incorrect transaction hash")]
-    IncorrectHash,
-}
-
-#[derive(Error, Debug)]
-pub enum TokenError {
-    #[error("Token is not found")]
-    TokenNotFound,
-    #[error("Token price is zero")]
-    ZeroPrice,
-}
-
-impl InternalError {
-    pub fn new(title: impl Display) -> Self {
-        Self(title.to_string())
-    }
-}
-
-impl Display for InternalError {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        f.write_str(&self.0)
-    }
-}
-
-impl ApiError for InternalError {
-    fn error_type(&self) -> String {
-        String::from("internal_error")
-    }
-
-    fn code(&self) -> ErrorCode {
-        ErrorCode::Internal
-    }
+    IncorrectTxHash,
 }
 
 impl ApiError for TxError {
+    fn error_type(&self) -> String {
+        String::from("tx_error")
+    }
+
+    fn code(&self) -> ErrorCode {
+        match self {
+            Self::TransactionNotFound => ErrorCode::TransactionNotFound,
+            Self::IncorrectTxHash => ErrorCode::IncorrectTxHash,
+        }
+    }
+}
+
+#[derive(Error, Debug)]
+pub enum InvalidDataError {
+    #[error("Cannot show price in zero price token")]
+    TokenZeroPriceError,
+}
+
+impl ApiError for InvalidDataError {
     fn error_type(&self) -> String {
         String::from("invalid_data_error")
     }
 
     fn code(&self) -> ErrorCode {
-        ErrorCode::InvalidData
+        match self {
+            Self::TokenZeroPriceError => ErrorCode::TokenZeroPriceError,
+        }
     }
 }
+
+#[derive(Debug)]
+pub struct StorageError(String);
 
 impl StorageError {
     pub fn new(title: impl Display) -> Self {
@@ -155,7 +150,7 @@ impl ApiError for StorageError {
     }
 
     fn code(&self) -> ErrorCode {
-        ErrorCode::Storage
+        ErrorCode::StorageError
     }
 }
 
@@ -165,36 +160,44 @@ impl ApiError for SubmitError {
     }
 
     fn code(&self) -> ErrorCode {
-        ErrorCode::Submit
+        match self {
+            Self::AccountCloseDisabled => ErrorCode::AccountCloseDisabled,
+            Self::InvalidParams(_) => ErrorCode::InvalidParams,
+            Self::UnsupportedFastProcessing => ErrorCode::UnsupportedFastProcessing,
+            Self::IncorrectTx(_) => ErrorCode::IncorrectTx,
+            Self::TxAdd(_) => ErrorCode::TxAddError,
+            Self::InappropriateFeeToken => ErrorCode::InappropriateFeeToken,
+            Self::CommunicationCoreServer(_) => ErrorCode::CommunicationCoreServer,
+            Self::Internal(_) => ErrorCode::InternalError,
+            Self::Other(_) => ErrorCode::Other,
+        }
     }
 }
 
 impl ApiError for PriceError {
     fn error_type(&self) -> String {
-        String::from("price_error")
+        String::from("token_error")
     }
 
     fn code(&self) -> ErrorCode {
-        ErrorCode::Price
+        match self {
+            Self::TokenNotFound(_) => ErrorCode::TokenNotFound,
+            Self::ApiError(_) => ErrorCode::ExternalApiError,
+            Self::DBError(_) => ErrorCode::StorageError,
+        }
     }
 }
 
 impl ApiError for FromHexError {
     fn error_type(&self) -> String {
-        String::from("from_hex_error")
+        String::from("parse_hex_string_error")
     }
 
     fn code(&self) -> ErrorCode {
-        ErrorCode::FromHex
-    }
-}
-
-impl ApiError for TokenError {
-    fn error_type(&self) -> String {
-        String::from("token_error")
-    }
-
-    fn code(&self) -> ErrorCode {
-        ErrorCode::Token
+        match self {
+            Self::InvalidHexCharacter { .. } => ErrorCode::InvalidHexCharacter,
+            Self::OddLength => ErrorCode::HexStringOddLength,
+            Self::InvalidStringLength => ErrorCode::InvalidHexStringLength,
+        }
     }
 }

@@ -24,7 +24,7 @@ use zksync_types::{
 
 // Local uses
 use super::{
-    error::{Error, TokenError},
+    error::{Error, InvalidDataError},
     paginate::Paginate,
     response::ApiResult,
     types::{ApiToken, TokenIdOrUsd, Usd},
@@ -65,22 +65,22 @@ impl ApiTokenData {
         &self,
         query: PaginationQuery<TokenId>,
     ) -> Result<Paginated<Token, TokenId>, Error> {
-        let mut storage = self.pool.access_storage().await.map_err(Error::internal)?;
+        let mut storage = self.pool.access_storage().await.map_err(Error::storage)?;
         storage.paginate(query).await
     }
 
     async fn token(&self, token_like: TokenLike) -> Result<ApiToken, Error> {
-        let mut storage = self.pool.access_storage().await.map_err(Error::internal)?;
+        let mut storage = self.pool.access_storage().await.map_err(Error::storage)?;
 
         let token = self
             .tokens
             .get_token(&mut storage, token_like)
             .await
-            .map_err(Error::internal)?;
+            .map_err(Error::storage)?;
         if let Some(token) = token {
             let market_volume = TokenDBCache::get_token_market_volume(&mut storage, token.id)
                 .await
-                .map_err(Error::internal)?;
+                .map_err(Error::storage)?;
             let mut api_token = ApiToken {
                 id: token.id,
                 address: token.address,
@@ -95,9 +95,9 @@ impl ApiTokenData {
             }
             Ok(api_token)
         } else {
-            Err(Error::from(PriceError::TokenNotFound(String::from(
-                "Token not found",
-            ))))
+            Err(Error::from(PriceError::token_not_found(
+                "Token not found in storage",
+            )))
         }
     }
 
@@ -111,9 +111,9 @@ impl ApiTokenData {
                 req_type: TokenPriceRequestType::USDForOneToken,
             })
             .await
-            .map_err(Error::internal)?;
+            .map_err(Error::storage)?;
 
-        let price_result = price_receiver.await.map_err(Error::internal)?;
+        let price_result = price_receiver.await.map_err(Error::storage)?;
         price_result.map_err(Error::from)
     }
 }
@@ -134,7 +134,7 @@ async fn token_by_id(
     let token_result = TokenLike::parse_without_symbol(&token_like);
     let token_like;
     if let Err(err) = token_result {
-        return Error::from(PriceError::TokenNotFound(err.to_string())).into();
+        return Error::from(PriceError::token_not_found(err)).into();
     } else {
         token_like = token_result.unwrap();
     }
@@ -148,8 +148,8 @@ async fn token_price(
 ) -> ApiResult<BigDecimal> {
     let token_result = TokenLike::parse_without_symbol(&token_like);
     let first_token;
-    if token_result.is_err() {
-        return Error::from(TokenError::TokenNotFound).into();
+    if let Err(err) = token_result {
+        return Error::from(PriceError::token_not_found(err)).into();
     } else {
         first_token = token_result.unwrap();
     }
@@ -162,7 +162,7 @@ async fn token_price(
             match (first_usd_price, second_usd_price) {
                 (Ok(first_usd_price), Ok(second_usd_price)) => {
                     if second_usd_price.is_zero() {
-                        Error::from(TokenError::ZeroPrice).into()
+                        Error::from(InvalidDataError::TokenZeroPriceError).into()
                     } else {
                         Ok(first_usd_price / second_usd_price).into()
                     }

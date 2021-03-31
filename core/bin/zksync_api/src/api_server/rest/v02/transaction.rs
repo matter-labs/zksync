@@ -255,9 +255,9 @@ async fn tx_status(
             match tx_hash_result {
                 Ok(tx_hash) => {
                     let tx_status = data.tx_status(&tx_hash).await;
-                    tx_status.map_err(Error::internal).into()
+                    tx_status.map_err(Error::storage).into()
                 }
-                Err(_) => Error::from(TxError::IncorrectHash).into(),
+                Err(_) => Error::from(TxError::IncorrectTxHash).into(),
             }
         }
         Err(err) => Error::from(err).into(),
@@ -275,9 +275,9 @@ async fn tx_data(
             match tx_hash_result {
                 Ok(tx_hash) => {
                     let tx_data = data.tx_data(&tx_hash).await;
-                    tx_data.map_err(Error::internal).into()
+                    tx_data.map_err(Error::storage).into()
                 }
-                Err(_) => Error::from(TxError::IncorrectHash).into(),
+                Err(_) => Error::from(TxError::IncorrectTxHash).into(),
             }
         }
         Err(err) => Error::from(err).into(),
