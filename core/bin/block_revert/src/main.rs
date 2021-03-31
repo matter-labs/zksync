@@ -1,19 +1,6 @@
-//! This is a CLI tool for reverting blocks on contract or in storage.
-//!
-//! There are 1 parameter:
-//! `number` - number of blocks to revert
-//!
-//! There are 3 subcommands:
-//! `all' - if you want to revert blocks on contract and in storage
-//! `contract` - if you want to revert blocks on contract
-//! `storage` - if you want to revert blocks in storage
-//!
-//! Pass private key of account from which you want to send ethereum transaction
-//! in `REVERT_TOOL_OPERATOR_PRIVATE_KEY` env variable.
-
 use anyhow::{bail, ensure, format_err};
 use ethabi::Token;
-use serde::Deserialize;
+use std::str::FromStr;
 use structopt::StructOpt;
 use tokio::time::Duration;
 use web3::{
@@ -206,11 +193,12 @@ struct Opt {
     number: u32,
     #[structopt(subcommand)]
     command: Command,
-}
-
-#[derive(Debug, Deserialize)]
-struct OperatorPrivateKey {
-    pub operator_private_key: H256,
+    #[structopt(
+        long = "key",
+        env = "REVERT_TOOL_OPERATOR_PRIVATE_KEY",
+        hide_env_values = true
+    )]
+    operator_private_key: String,
 }
 
 // TODO: don't use anyhow (ZKS-588)
@@ -218,12 +206,15 @@ struct OperatorPrivateKey {
 async fn main() -> anyhow::Result<()> {
     let opt = Opt::from_args();
     let blocks_to_revert = opt.number;
-
-    let operator_private_key: OperatorPrivateKey = envy::prefixed("REVERT_TOOL_")
-        .from_env()
-        .expect("Cannot load operator private key");
     let mut config = ZkSyncConfig::from_env();
-    config.eth_sender.sender.operator_private_key = operator_private_key.operator_private_key;
+
+    let key_without_prefix = opt
+        .operator_private_key
+        .strip_prefix("0x")
+        .unwrap_or(opt.operator_private_key.as_str());
+
+    config.eth_sender.sender.operator_private_key =
+        H256::from_str(key_without_prefix).expect("Cannot deserialize private key");
 
     let mut storage = StorageProcessor::establish_connection().await?;
     let client = EthereumGateway::from_config(&config);
