@@ -211,7 +211,7 @@ async fn main() -> anyhow::Result<()> {
     let key_without_prefix = opt
         .operator_private_key
         .strip_prefix("0x")
-        .unwrap_or(opt.operator_private_key.as_str());
+        .unwrap_or_else(|| opt.operator_private_key.as_str());
 
     config.eth_sender.sender.operator_private_key =
         H256::from_str(key_without_prefix).expect("Cannot deserialize private key");
