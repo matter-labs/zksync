@@ -1,4 +1,4 @@
-use serde::export::Formatter;
+use std::fmt::Formatter;
 use serde::Serialize;
 use serde_repr::Serialize_repr;
 
