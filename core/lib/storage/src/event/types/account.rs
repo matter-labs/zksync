@@ -32,6 +32,7 @@ pub struct AccountEvent {
     pub account_update_details: AccountUpdateDetails,
 }
 
+#[serde_with::skip_serializing_none]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AccountUpdateDetails {
     pub account_id: i64,
