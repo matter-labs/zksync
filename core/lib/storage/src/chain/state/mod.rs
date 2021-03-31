@@ -61,6 +61,12 @@ impl<'a, 'c> StateSchema<'a, 'c> {
                 **id,
                 *block_number
             );
+
+            transaction
+                .event_schema()
+                .store_state_committed_event(*id, upd)
+                .await?;
+
             match *upd {
                 AccountUpdate::Create { ref address, nonce } => {
                     let account_id = i64::from(**id);
@@ -151,11 +157,6 @@ impl<'a, 'c> StateSchema<'a, 'c> {
                     .await?;
                 }
             }
-
-            transaction
-                .event_schema()
-                .store_state_committed_event(*id, upd)
-                .await?;
         }
 
         transaction.commit().await?;

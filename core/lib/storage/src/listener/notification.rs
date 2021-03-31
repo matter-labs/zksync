@@ -12,8 +12,8 @@ pub struct StorageNotification {
 
 impl StorageNotification {
     /// Obtain the message from the notification.
-    pub fn payload(&self) -> String {
-        String::from(self.notification.payload())
+    pub fn payload(&self) -> &str {
+        self.notification.payload()
     }
 }
 

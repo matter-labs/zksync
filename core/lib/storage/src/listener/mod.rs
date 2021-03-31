@@ -42,11 +42,7 @@ impl StorageListener {
     ///
     /// Any notifications received while the connection was lost cannot be recovered.
     pub async fn recv(&mut self) -> QueryResult<StorageNotification> {
-        Ok(self
-            .conn
-            .recv()
-            .await
-            .map(|notification| StorageNotification::from(notification))?)
+        Ok(self.conn.recv().await.map(StorageNotification::from)?)
     }
 
     /// Receives the next notification available from any of the subscribed channels.
@@ -54,11 +50,7 @@ impl StorageListener {
     ///
     /// Any notifications received while the connection was lost cannot be recovered.
     pub async fn try_recv(&mut self) -> QueryResult<Option<StorageNotification>> {
-        Ok(self
-            .conn
-            .try_recv()
-            .await?
-            .map(|notification| StorageNotification::from(notification)))
+        Ok(self.conn.try_recv().await?.map(StorageNotification::from))
     }
 }
 
@@ -95,7 +87,7 @@ mod test {
         // Fail the test if it takes too much time.
         let notification = timeout(Duration::from_secs(TIMEOUT_SECS), recv).await??;
         let message = notification.payload();
-        assert_eq!(&message, MESSAGE);
+        assert_eq!(message, MESSAGE);
         Ok(())
     }
 }

@@ -1,8 +1,6 @@
 // Built-in uses
 // External uses
-use num::BigInt;
 use serde_json::Value;
-use sqlx::types::BigDecimal;
 // Workspace uses
 use zksync_basic_types::{AccountId, BlockNumber};
 use zksync_types::account::AccountUpdate;
@@ -45,8 +43,9 @@ impl<'a, 'c> EventSchema<'a, 'c> {
         status: BlockStatus,
         block_number: BlockNumber,
     ) -> QueryResult<()> {
-        let block_details = self
-            .0
+        let mut transaction = self.0.start_transaction().await?;
+
+        let block_details = transaction
             .chain()
             .block_schema()
             .load_block_range(block_number, 1)
@@ -64,7 +63,11 @@ impl<'a, 'c> EventSchema<'a, 'c> {
 
         let event_data = serde_json::to_value(block_event).expect("couldn't serialize block event");
 
-        self.store_event_data(EventType::Block, event_data).await?;
+        transaction
+            .event_schema()
+            .store_event_data(EventType::Block, event_data)
+            .await?;
+        transaction.commit().await?;
 
         Ok(())
     }
@@ -74,34 +77,8 @@ impl<'a, 'c> EventSchema<'a, 'c> {
         account_id: AccountId,
         account_update: &AccountUpdate,
     ) -> QueryResult<()> {
-        let mut account_update_details = AccountUpdateDetails::new(account_id);
-        match account_update {
-            AccountUpdate::Create { address: _, nonce } => {
-                account_update_details.nonce = i64::from(**nonce);
-            }
-            AccountUpdate::Delete { address: _, nonce } => {
-                account_update_details.nonce = i64::from(**nonce);
-            }
-            AccountUpdate::UpdateBalance {
-                old_nonce: _,
-                new_nonce,
-                balance_update,
-            } => {
-                account_update_details.nonce = i64::from(**new_nonce);
-                account_update_details.token_id = Some(i32::from(*balance_update.0));
-                let new_balance = BigDecimal::from(BigInt::from(balance_update.2.clone()));
-                account_update_details.new_balance = Some(new_balance);
-            }
-            AccountUpdate::ChangePubKeyHash {
-                old_pub_key_hash: _,
-                new_pub_key_hash,
-                old_nonce: _,
-                new_nonce,
-            } => {
-                account_update_details.nonce = i64::from(**new_nonce);
-                account_update_details.new_pub_key_hash = Some(new_pub_key_hash.clone());
-            }
-        }
+        let account_update_details =
+            AccountUpdateDetails::from_account_update(account_id, account_update);
 
         let update_type = AccountStateChangeType::from(account_update);
         let status = AccountStateChangeStatus::Committed;
