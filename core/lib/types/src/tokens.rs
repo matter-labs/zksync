@@ -72,10 +72,10 @@ impl TokenLike {
         Self::Symbol(value.to_string())
     }
 
-    pub fn parse_without_symbol(value: &str) -> Result<Self, anyhow::Error> {
+    pub fn parse_without_symbol(value: &str) -> Option<Self> {
         // Try to interpret an address as the token ID.
         if let Ok(id) = u16::from_str(value) {
-            return Ok(Self::Id(TokenId(id)));
+            return Some(Self::Id(TokenId(id)));
         }
         // Try to interpret a token as the token address with or without a prefix.
         let maybe_address = if let Some(value) = value.strip_prefix("0x") {
@@ -84,9 +84,9 @@ impl TokenLike {
             value
         };
         if let Ok(address) = Address::from_str(maybe_address) {
-            Ok(Self::Address(address))
+            Some(Self::Address(address))
         } else {
-            anyhow::bail!("Token parse error")
+            None
         }
     }
 

@@ -133,8 +133,8 @@ async fn token_by_id(
 ) -> ApiResult<ApiToken> {
     let token_result = TokenLike::parse_without_symbol(&token_like);
     let token_like;
-    if let Err(err) = token_result {
-        return Error::from(PriceError::token_not_found(err)).into();
+    if token_result.is_none() {
+        return Error::from(PriceError::token_not_found("Cannot parse token")).into();
     } else {
         token_like = token_result.unwrap();
     }
@@ -148,8 +148,8 @@ async fn token_price(
 ) -> ApiResult<BigDecimal> {
     let token_result = TokenLike::parse_without_symbol(&token_like);
     let first_token;
-    if let Err(err) = token_result {
-        return Error::from(PriceError::token_not_found(err)).into();
+    if token_result.is_none() {
+        return Error::from(PriceError::token_not_found("Cannot parse token")).into();
     } else {
         first_token = token_result.unwrap();
     }
