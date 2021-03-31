@@ -7,10 +7,8 @@ use std::{fmt::Display, str::FromStr};
 use serde::{Deserialize, Serialize};
 
 // Local uses
-use super::{
-    client::{Client, ClientError},
-    transactions::Receipt,
-};
+use super::transactions::Receipt;
+use crate::rest::client::{Client, ClientError};
 
 // Workspace uses
 use zksync_types::{ZkSyncOp, H256};

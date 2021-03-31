@@ -12,7 +12,8 @@ use zksync_types::{
 };
 
 // Local uses
-use super::{client::Client, client::ClientError, Pagination};
+use super::Pagination;
+use crate::rest::client::{Client, ClientError};
 
 // Data transfer objects.
 

@@ -12,10 +12,8 @@ use zksync_crypto::{serialization::FrSerde, Fr};
 use zksync_types::{tx::TxHash, BlockNumber};
 
 // Local uses
-use super::{
-    client::{self, Client},
-    Pagination,
-};
+use super::Pagination;
+use crate::rest::client::{self, Client};
 
 // Data transfer objects.
 

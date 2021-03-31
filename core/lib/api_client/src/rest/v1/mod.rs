@@ -9,7 +9,6 @@ use zksync_types::BlockNumber;
 // Public uses
 pub use self::{
     blocks::{BlockInfo, TransactionInfo},
-    client::{Client, ClientError, Result as ClientResult},
     config::Contracts,
     error::ErrorBody,
     operations::{PriorityOpData, PriorityOpQuery, PriorityOpQueryError, PriorityOpReceipt},
@@ -20,17 +19,17 @@ pub use self::{
         Receipt, TxData,
     },
 };
+pub use crate::rest::client::{Client, ClientError, Result as ClientResult};
 
 // Local uses
 pub mod accounts;
-mod blocks;
-mod client;
-mod config;
-mod error;
-mod operations;
-mod search;
-mod tokens;
-mod transactions;
+pub(crate) mod blocks;
+pub(crate) mod config;
+pub(crate) mod error;
+pub(crate) mod operations;
+pub(crate) mod search;
+pub(crate) mod tokens;
+pub(crate) mod transactions;
 
 /// Maximum limit value in the requests.
 pub const MAX_LIMIT: u32 = 100;
