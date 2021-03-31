@@ -6347,7 +6347,6 @@ name = "zksync_storage"
 version = "1.0.0"
 dependencies = [
  "anyhow",
- "async-std",
  "async-trait",
  "chrono",
  "db_test_macro",
