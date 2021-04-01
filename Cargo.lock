@@ -2651,6 +2651,36 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8dd5a6d5999d9907cda8ed67bbd137d3af8085216c2ac62de5be860bd41f304a"
 
 [[package]]
+name = "loadnext"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "chrono",
+ "colored",
+ "futures 0.3.6",
+ "hex",
+ "num",
+ "once_cell",
+ "rand 0.4.6",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "structopt",
+ "tokio 0.2.22",
+ "toml",
+ "vlog",
+ "web3",
+ "zksync",
+ "zksync_api_client",
+ "zksync_config",
+ "zksync_crypto",
+ "zksync_eth_signer",
+ "zksync_types",
+ "zksync_utils",
+]
+
+[[package]]
 name = "loadtest"
 version = "1.0.0"
 dependencies = [
