@@ -1,26 +1,26 @@
 use std::todo;
 
+use zksync::{RpcProvider, Wallet};
+use zksync_eth_signer::PrivateKeySigner;
 use zksync_types::{AccountId, Address, H256};
 
-use crate::{command::Command, config::LoadtestConfig, rng::LoadtestRNG};
+use crate::{command::Command, config::LoadtestConfig};
 
-#[derive(Debug, Copy, Clone)]
-pub enum AccountState {
-    Uninitialized,
-    Initialized(AccountId),
-}
-
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct AccountLifespan {
     pub commands: Vec<Command>,
-    pub eth_private_key: H256,
-    pub address: Address,
-    pub nonce: u64,
-    pub state: AccountState,
+    pub wallet: Wallet<PrivateKeySigner, RpcProvider>,
 }
 
 impl AccountLifespan {
-    pub fn new(config: &LoadtestConfig, rng: impl LoadtestRNG) -> Self {
-        todo!()
+    pub fn new(config: &LoadtestConfig, wallet: Wallet<PrivateKeySigner, RpcProvider>) -> Self {
+        Self {
+            commands: vec![],
+            wallet,
+        }
+    }
+
+    pub async fn run(mut self) -> anyhow::Result<()> {
+        Ok(())
     }
 }

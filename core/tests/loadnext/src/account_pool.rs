@@ -1,4 +1,4 @@
-use std::str::FromStr;
+use std::{collections::VecDeque, str::FromStr};
 
 use zksync::{utils::private_key_from_seed, RpcProvider, Wallet, WalletCredentials};
 use zksync_eth_signer::PrivateKeySigner;
@@ -26,7 +26,8 @@ impl AccountCredentials {
 #[derive(Debug)]
 pub struct AccountPool {
     pub master_wallet: Wallet<PrivateKeySigner, RpcProvider>,
-    pub accounts: Vec<Wallet<PrivateKeySigner, RpcProvider>>,
+    pub accounts: VecDeque<Wallet<PrivateKeySigner, RpcProvider>>,
+    pub addresses: Vec<Address>,
 }
 
 impl AccountPool {
@@ -47,7 +48,8 @@ impl AccountPool {
                 .expect("Can't create a wallet")
         };
 
-        let mut accounts = Vec::new();
+        let mut accounts = VecDeque::new();
+        let mut addresses = Vec::new();
 
         for _ in 0..config.accounts_amount {
             let eth_credentials = AccountCredentials::rand();
@@ -63,12 +65,14 @@ impl AccountPool {
                 .await
                 .expect("Can't create a wallet");
 
-            accounts.push(wallet);
+            addresses.push(wallet.address());
+            accounts.push_back(wallet);
         }
 
         Self {
             master_wallet,
             accounts,
+            addresses,
         }
     }
 }

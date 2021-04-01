@@ -3,7 +3,7 @@ use std::time::Duration;
 use zksync::{ethereum::PriorityOpHolder, operations::SyncTransactionHandle, provider::Provider};
 use zksync_types::{TransactionReceipt, TxFeeTypes, U256};
 
-use crate::{account_pool::AccountPool, config::LoadtestConfig};
+use crate::{account::AccountLifespan, account_pool::AccountPool, config::LoadtestConfig};
 
 const ETH_CONFIRMATION_TIMEOUT: Duration = Duration::from_secs(60);
 const COMMIT_TIMEOUT: Duration = Duration::from_secs(600);
@@ -166,15 +166,16 @@ impl Executor {
     async fn send_initial_transfers(&mut self) -> anyhow::Result<()> {
         vlog::info!("Master Account: Sending initial transfers");
         // 40 is a safe limit for now.
-        const MAX_TXS_PER_BATCH: usize = 40;
+        const MAX_TXS_PER_BATCH: usize = 20;
         // How many times we will resend a batch.
         const MAX_RETRIES: usize = 3;
 
         let account_balance = self.amount_to_deposit();
 
+        let config = &self.config;
         let master_wallet = &mut self.pool.master_wallet;
-        let accounts_amount = self.config.accounts_amount;
-        let token = &self.config.main_token;
+        let accounts_amount = config.accounts_amount;
+        let token = &config.main_token;
 
         let for_fees = u64::max_value() >> 24; // Leave some spare funds on the master account for fees.
         let funds_to_distribute = account_balance - u128::from(for_fees);
@@ -197,7 +198,7 @@ impl Executor {
             let mut batch_fee_types = Vec::new();
             let mut batch_addresses = Vec::new();
 
-            for account_number in accounts_processed..(accounts_processed + accounts_to_process) {
+            for account_number in 0..accounts_to_process {
                 let target_address = self.pool.accounts[account_number].address();
                 let (tx, signature) = master_wallet
                     .start_transfer()
@@ -291,8 +292,23 @@ impl Executor {
                 accounts_processed,
                 accounts_amount
             );
+
+            // Spawn each account lifespan.
+            let _account_futures: Vec<_> = self
+                .pool
+                .accounts
+                .drain(..accounts_to_process)
+                .map(|wallet| {
+                    let account = AccountLifespan::new(config, wallet);
+                    tokio::spawn(account.run())
+                })
+                .collect();
         }
 
+        assert!(
+            self.pool.accounts.is_empty(),
+            "Some accounts were not drained"
+        );
         vlog::info!("All the initial transfers are completed");
 
         Ok(())
