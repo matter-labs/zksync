@@ -115,7 +115,7 @@ async fn send_raw_tx_and_wait_confirmation(
 
     let mut poller = tokio::time::interval(Duration::from_millis(100));
     let start = std::time::Instant::now();
-    let confirmation_timeout = Duration::from_secs(10);
+    let confirmation_timeout = Duration::from_secs(1000);
 
     loop {
         if let Some(receipt) = client
@@ -229,6 +229,10 @@ async fn main() -> anyhow::Result<()> {
         .get_last_verified_confirmed_block()
         .await?;
 
+    println!(
+        "Last committed block {} verified {}",
+        &last_commited_block, &last_verified_block
+    );
     ensure!(
         last_verified_block + blocks_to_revert <= last_commited_block,
         "Some blocks to revert are already verified"
@@ -236,16 +240,20 @@ async fn main() -> anyhow::Result<()> {
 
     match opt.command {
         Command::All => {
+            println!("Start reverting blocks in database and in contract");
             let blocks = get_blocks(last_commited_block, blocks_to_revert, &mut storage).await?;
             let last_block = BlockNumber(*last_commited_block - blocks_to_revert);
+            println!("Last block for revert {}", &last_block);
             revert_blocks_on_contract(&client, &blocks).await?;
             revert_blocks_in_storage(&client, &mut storage, last_block).await?;
         }
         Command::Contract => {
+            println!("Start reverting blocks in contract");
             let blocks = get_blocks(last_commited_block, blocks_to_revert, &mut storage).await?;
             revert_blocks_on_contract(&client, &blocks).await?;
         }
         Command::Storage => {
+            println!("Start reverting blocks in database");
             let last_block = BlockNumber(*last_commited_block - blocks_to_revert);
             revert_blocks_in_storage(&client, &mut storage, last_block).await?;
         }
