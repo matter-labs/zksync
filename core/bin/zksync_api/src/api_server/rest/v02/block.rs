@@ -6,6 +6,10 @@
 use actix_web::{web, Scope};
 
 // Workspace uses
+use zksync_api_client::rest::v02::{
+    block::{BlockInfo, BlockPosition, LastVariant},
+    transaction::Transaction,
+};
 use zksync_storage::{chain::block::records::BlockDetails, ConnectionPool, QueryResult};
 use zksync_types::{
     pagination::{BlockAndTxHash, Paginated, PaginationQuery},
@@ -14,12 +18,7 @@ use zksync_types::{
 };
 
 // Local uses
-use super::{
-    error::Error,
-    paginate::Paginate,
-    response::ApiResult,
-    types::{BlockInfo, BlockPosition, LastVariant, Transaction},
-};
+use super::{error::Error, paginate::Paginate, response::ApiResult};
 use crate::utils::block_details_cache::BlockDetailsCache;
 
 /// Shared data between `api/v0.2/block` endpoints.
@@ -172,4 +171,84 @@ pub fn api_scope(pool: ConnectionPool, cache: BlockDetailsCache) -> Scope {
             "{block_number}/transaction",
             web::get().to(block_transactions),
         )
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{super::test_utils::TestServerConfig, *};
+    use zksync_types::pagination::PaginationDirection;
+
+    #[actix_rt::test]
+    #[cfg_attr(
+        not(feature = "api_test"),
+        ignore = "Use `zk test rust-api` command to perform this test"
+    )]
+    async fn test_blocks_scope() -> anyhow::Result<()> {
+        let cfg = TestServerConfig::default();
+        cfg.fill_database().await?;
+
+        let (client, server) =
+            cfg.start_server(|cfg| api_scope(cfg.pool.clone(), BlockDetailsCache::new(10)));
+
+        // Block requests part
+        let blocks: Vec<BlockInfo> = {
+            let mut storage = cfg.pool.access_storage().await?;
+
+            let query = PaginationQuery {
+                from: BlockNumber(1),
+                limit: 3,
+                direction: PaginationDirection::Newer,
+            };
+
+            let blocks = storage
+                .chain()
+                .block_schema()
+                .load_block_page(&query)
+                .await?;
+
+            blocks.into_iter().map(BlockInfo::from).collect()
+        };
+
+        assert_eq!(
+            client.block_by_id(BlockNumber(2)).await?.unwrap(),
+            blocks[1]
+        );
+        assert_eq!(client.blocks_range(Pagination::Last, 10).await?, blocks);
+        assert_eq!(
+            client
+                .blocks_range(Pagination::Before(BlockNumber(2)), 5)
+                .await?,
+            &blocks[7..8]
+        );
+        assert_eq!(
+            client
+                .blocks_range(Pagination::After(BlockNumber(7)), 5)
+                .await?,
+            &blocks[0..1]
+        );
+
+        // Transaction requests part.
+        let expected_txs: Vec<TransactionInfo> = {
+            let mut storage = cfg.pool.access_storage().await?;
+
+            let transactions = storage
+                .chain()
+                .block_schema()
+                .get_block_transactions(BlockNumber(1))
+                .await?;
+
+            transactions
+                .into_iter()
+                .map(convert::transaction_info_from_transaction_item)
+                .collect()
+        };
+        assert_eq!(
+            client.block_transactions(BlockNumber(1)).await?,
+            expected_txs
+        );
+        assert_eq!(client.block_transactions(BlockNumber(6)).await?, vec![]);
+
+        server.stop().await;
+        Ok(())
+    }
 }

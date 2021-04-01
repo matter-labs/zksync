@@ -18,9 +18,10 @@ mod error;
 mod fee;
 mod paginate;
 mod response;
+#[cfg(test)]
+pub mod test_utils;
 mod token;
 mod transaction;
-mod types;
 
 #[derive(Serialize, Clone, Copy)]
 #[serde(rename_all = "snake_case")]

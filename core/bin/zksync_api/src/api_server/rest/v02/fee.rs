@@ -13,31 +13,8 @@ use serde::{Deserialize, Serialize};
 use zksync_types::{Address, TokenLike, TxFeeTypes};
 
 // Local uses
-use super::{
-    error::Error,
-    response::ApiResult,
-    types::{ApiBatchFee, ApiFee},
-};
+use super::{error::Error, response::ApiResult};
 use crate::api_server::tx_sender::TxSender;
-
-#[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct TxFeeRequest {
-    pub tx_type: TxFeeTypes,
-    pub address: Address,
-    pub token_like: TokenLike,
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct TxInBatchFeeRequest {
-    pub tx_type: TxFeeTypes,
-    pub address: Address,
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct BatchFeeRequest {
-    pub transactions: Vec<TxInBatchFeeRequest>,
-    pub token_like: TokenLike,
-}
 
 /// Shared data between `api/v0.2/fee` endpoints.
 #[derive(Clone)]
