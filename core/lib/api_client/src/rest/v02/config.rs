@@ -4,6 +4,7 @@
 use serde::{Deserialize, Serialize};
 
 // Workspace uses
+use zksync_config::ZkSyncConfig;
 use zksync_types::{network::Network, Address};
 
 // Local uses
@@ -23,6 +24,18 @@ pub struct ApiConfigData {
     deposit_confirmations: u64,
     zksync_version: ZksyncVersion,
     // TODO: server_version
+}
+
+impl ApiConfigData {
+    pub fn new(config: &ZkSyncConfig) -> Self {
+        Self {
+            network: config.chain.eth.network,
+            contract: config.contracts.contract_addr,
+            gov_contract: config.contracts.governance_addr,
+            deposit_confirmations: config.eth_watch.confirmations_for_eth_event,
+            zksync_version: ZksyncVersion::ContractV4,
+        }
+    }
 }
 
 /// Configuration API part.

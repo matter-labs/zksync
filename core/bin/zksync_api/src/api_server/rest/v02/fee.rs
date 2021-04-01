@@ -7,10 +7,9 @@ use actix_web::{
     web::{self, Json},
     Scope,
 };
-use serde::{Deserialize, Serialize};
 
 // Workspace uses
-use zksync_types::{Address, TokenLike, TxFeeTypes};
+use zksync_api_client::rest::v02::fee::{ApiBatchFee, ApiFee, BatchFeeRequest, TxFeeRequest};
 
 // Local uses
 use super::{error::Error, response::ApiResult};

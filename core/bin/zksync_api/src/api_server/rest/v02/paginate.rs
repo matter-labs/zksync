@@ -4,6 +4,7 @@
 use serde::Serialize;
 
 // Workspace uses
+use zksync_api_client::rest::v02::{block::BlockInfo, transaction::Transaction};
 use zksync_storage::StorageProcessor;
 use zksync_types::{
     aggregated_operations::AggregatedActionType,
@@ -12,10 +13,7 @@ use zksync_types::{
 };
 
 // Local uses
-use super::{
-    error::{Error, TxError},
-    types::{BlockInfo, Transaction},
-};
+use super::error::{Error, TxError};
 
 #[async_trait::async_trait]
 pub trait Paginate<T: Serialize> {

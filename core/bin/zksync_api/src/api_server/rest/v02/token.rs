@@ -15,6 +15,7 @@ use futures::{
 use num::{rational::Ratio, BigUint, FromPrimitive};
 
 // Workspace uses
+use zksync_api_client::rest::v02::token::{ApiToken, TokenIdOrUsd, Usd};
 use zksync_config::ZkSyncConfig;
 use zksync_storage::ConnectionPool;
 use zksync_types::{
@@ -27,7 +28,6 @@ use super::{
     error::{Error, InvalidDataError},
     paginate::Paginate,
     response::ApiResult,
-    types::{ApiToken, TokenIdOrUsd, Usd},
 };
 use crate::{
     fee_ticker::{PriceError, TickerRequest, TokenPriceRequestType},
