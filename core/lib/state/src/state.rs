@@ -448,6 +448,8 @@ impl ZkSyncState {
 
                     self.insert_account(*account_id, account);
                 }
+                AccountUpdate::MintNFT { .. } => {}
+                AccountUpdate::RemoveToken { .. } => {}
             }
         }
     }

@@ -31,7 +31,7 @@ fn gen_account_id<T: Rng>(rng: &mut T) -> AccountId {
 }
 
 fn gen_token_id<T: Rng>(rng: &mut T) -> TokenId {
-    TokenId(rng.gen::<u16>().min(*max_token_id()))
+    TokenId(rng.gen::<u32>().min(*max_token_id()))
 }
 
 #[test]

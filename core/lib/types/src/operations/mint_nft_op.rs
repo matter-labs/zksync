@@ -1,11 +1,11 @@
 use crate::{AccountId, Address, TokenId};
 use crate::{MintNFT, H256};
-use num::{BigUint, ToPrimitive};
+
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use zksync_crypto::params::{
-    ACCOUNT_ID_BIT_WIDTH, ADDRESS_WIDTH, BALANCE_BIT_WIDTH, CHUNK_BYTES, CONTENT_HASH_WIDTH,
-    FR_ADDRESS_LEN, SERIAL_ID_BIT_WIDTH, TOKEN_BIT_WIDTH,
+    ACCOUNT_ID_BIT_WIDTH, ADDRESS_WIDTH, CHUNK_BYTES, CONTENT_HASH_WIDTH, SERIAL_ID_BIT_WIDTH,
+    TOKEN_BIT_WIDTH,
 };
 use zksync_crypto::primitives::FromBytes;
 

@@ -6,7 +6,6 @@ use zksync_basic_types::Address;
 
 use super::PubKeyHash;
 use crate::tokens::NFT;
-use crate::AccountId;
 
 /// Atomic change in the account state.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]

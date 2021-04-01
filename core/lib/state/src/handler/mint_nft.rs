@@ -1,9 +1,8 @@
-use anyhow::{bail, ensure, format_err};
+use anyhow::{bail, format_err};
 use std::time::Instant;
 use zksync_crypto::params;
 use zksync_types::{
-    operations::MintNFTOp, Account, AccountUpdate, AccountUpdates, Deposit, DepositOp, MintNFT,
-    ZkSyncOp,
+    operations::MintNFTOp, Account, AccountUpdate, AccountUpdates, MintNFT, ZkSyncOp,
 };
 
 use crate::{
