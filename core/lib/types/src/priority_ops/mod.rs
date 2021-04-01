@@ -202,6 +202,9 @@ impl ZkSyncPriorityOp {
                     token: TokenId(token),
                 }))
             }
+            MintNFTOp::OP_CODE => Ok(Self::MintNFT(
+                MintNFTOp::from_public_data(pub_data)?.priority_op,
+            )),
             _ => {
                 bail!("Unsupported priority op type");
             }

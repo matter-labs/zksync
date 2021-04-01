@@ -4,10 +4,11 @@ use std::cmp::Ordering;
 use num::bigint::ToBigInt;
 use zksync_basic_types::Address;
 // Workspace imports
-use zksync_types::PubKeyHash;
 use zksync_types::{AccountId, AccountUpdate, Nonce, TokenId};
+use zksync_types::{PubKeyHash, H256};
 // Local imports
 use crate::chain::account::records::*;
+use zksync_types::tokens::NFT;
 
 /// `StorageAccoundDiff` is a enum that combines all the possible
 /// changes that can be applied to account, which includes:
@@ -24,11 +25,18 @@ pub enum StorageAccountDiff {
     Create(StorageAccountCreation),
     Delete(StorageAccountCreation),
     ChangePubKey(StorageAccountPubkeyUpdate),
+    MintNFT(StorageMintNFTUpdate),
 }
 
 impl From<StorageAccountUpdate> for StorageAccountDiff {
     fn from(update: StorageAccountUpdate) -> Self {
         StorageAccountDiff::BalanceUpdate(update)
+    }
+}
+
+impl From<StorageMintNFTUpdate> for StorageAccountDiff {
+    fn from(mint_nft: StorageMintNFTUpdate) -> Self {
+        Self::MintNFT(mint_nft)
     }
 }
 
@@ -92,6 +100,21 @@ impl From<StorageAccountDiff> for (AccountId, AccountUpdate) {
                         .expect("PubkeyHash update from db deserialize"),
                 },
             ),
+            StorageAccountDiff::MintNFT(upd) => (
+                AccountId(upd.creator_account_id as u32),
+                AccountUpdate::MintNFT {
+                    token: NFT::new(
+                        TokenId(upd.token_id as u32),
+                        AccountId(upd.account_id as u32),
+                        upd.serial_id as u32,
+                        AccountId(upd.creator_account_id as u32),
+                        Address::from_slice(&upd.address.as_slice()),
+                        None,
+                        H256::from_slice(&upd.content_hash.as_slice()),
+                    )
+                    .expect("Token in database should be correct"),
+                },
+            ),
         }
     }
 }
@@ -120,6 +143,9 @@ impl StorageAccountDiff {
                 update_order_id,
                 ..
             }) => *update_order_id,
+            StorageAccountDiff::MintNFT(StorageMintNFTUpdate {
+                update_order_id, ..
+            }) => *update_order_id,
         }
     }
 
@@ -134,6 +160,7 @@ impl StorageAccountDiff {
             StorageAccountDiff::ChangePubKey(StorageAccountPubkeyUpdate {
                 block_number, ..
             }) => block_number,
+            StorageAccountDiff::MintNFT(StorageMintNFTUpdate { block_number, .. }) => block_number,
         }
     }
 }

@@ -61,6 +61,20 @@ impl TxHandler<MintNFT> for ZkSyncState {
         } else {
             bail!("Token account is already exists");
         };
+        updates.push((
+            op.priority_op.account_id,
+            AccountUpdate::MintNFT {
+                token: NFT::new(
+                    op.priority_op.id,
+                    op.priority_op.account_id,
+                    op.priority_op.serial_id,
+                    op.priority_op.creator_id,
+                    op.priority_op.address,
+                    None,
+                    op.priority_op.content_hash,
+                )?,
+            },
+        ));
 
         let old_amount = recipient_account.get_balance(op.priority_op.id);
         if old_amount != BigUint::zero() {

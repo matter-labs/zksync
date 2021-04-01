@@ -418,6 +418,13 @@ impl MempoolBlocksHandler {
                                     }
                                 }
                             }
+                            AccountUpdate::MintNFT { .. } => {
+                                // Minting nft affects only tokens, mempool doesn't contain them
+                            }
+                            AccountUpdate::RemoveToken { .. } => {
+
+                                // Minting nft affects only tokens, mempool doesn't contain them
+                            }
                         }
                     }
                 }

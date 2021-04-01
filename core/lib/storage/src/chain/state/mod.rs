@@ -14,8 +14,10 @@ use crate::chain::{
     block::BlockSchema,
 };
 use crate::diff::StorageAccountDiff;
+use crate::utils::address_to_stored_string;
 // use crate::schema::*;
 use crate::{QueryResult, StorageProcessor};
+use zksync_basic_types::Address;
 
 /// State schema is capable of managing... well, the state of the chain.
 ///
@@ -150,6 +152,41 @@ impl<'a, 'c> StateSchema<'a, 'c> {
                     .execute(transaction.conn())
                     .await?;
                 }
+                AccountUpdate::MintNFT { ref token } => {
+                    let update_order_id = update_order_id as i32;
+                    let token_id = token.id.0 as i32;
+                    let account_id = token.account_id.0 as i32;
+                    let creator_account_id = token.creator_id.0 as i32;
+                    let serial_id = token.serial_id as i32;
+                    let address = token.address.as_bytes().to_vec();
+                    let content_hash = token.content_hash.as_bytes().to_vec();
+                    let block_number = i64::from(*block_number);
+                    sqlx::query!(
+                        r#"
+                        INSERT INTO mint_nft_updates ( token_id, account_id, creator_account_id, serial_id, address, content_hash, block_number, update_order_id )
+                        VALUES ( $1, $2, $3, $4, $5, $6, $7, $8 )
+                        "#,
+                        token_id, account_id, creator_account_id, serial_id, address, content_hash, block_number, update_order_id
+                    )
+                        .execute(transaction.conn())
+                        .await?;
+                }
+                AccountUpdate::RemoveToken { ref token } => {
+                    let token_id = token.id.0 as i32;
+                    let account_id = token.account_id.0 as i32;
+                    let block_number = i64::from(*block_number);
+                    sqlx::query!(
+                        r#"
+                        DELETE FROM mint_nft_updates
+                        WHERE token_id = $1 and account_id = $2 and block_number = $3
+                        "#,
+                        token_id,
+                        account_id,
+                        block_number
+                    )
+                    .execute(transaction.conn())
+                    .await?;
+                }
             }
         }
 
@@ -202,6 +239,17 @@ impl<'a, 'c> StateSchema<'a, 'c> {
         .fetch_all(transaction.conn())
         .await?;
 
+        let mint_nft_updates_diff = sqlx::query_as!(
+            StorageMintNFTUpdate,
+            "
+                SELECT * FROM mint_nft_updates
+                WHERE block_number = $1
+            ",
+            i64::from(*block_number)
+        )
+        .fetch_all(transaction.conn())
+        .await?;
+
         // Collect the updates into one list of `StorageAccountDiff`.
         let account_updates: Vec<StorageAccountDiff> = {
             let mut account_diff = Vec::new();
@@ -217,6 +265,11 @@ impl<'a, 'c> StateSchema<'a, 'c> {
             );
             account_diff.extend(
                 account_change_pubkey_diff
+                    .into_iter()
+                    .map(StorageAccountDiff::from),
+            );
+            account_diff.extend(
+                mint_nft_updates_diff
                     .into_iter()
                     .map(StorageAccountDiff::from),
             );
@@ -299,6 +352,41 @@ impl<'a, 'c> StateSchema<'a, 'c> {
                     )
                     .execute(transaction.conn())
                     .await?;
+                }
+                StorageAccountDiff::MintNFT(upd) => {
+                    let symbol = format!("NFT-{}", upd.token_id);
+                    let address = address_to_stored_string(&Address::from_slice(&upd.address));
+                    // TODO get symbol somewhere else
+                    sqlx::query!(
+                        r#"
+                        INSERT INTO tokens ( id, address, symbol, decimals )
+                        VALUES ( $1, $2, $3, $4 )
+                        ON CONFLICT (id)
+                        DO
+                          UPDATE SET address = $2, symbol = $3, decimals = $4
+                        "#,
+                        upd.token_id,
+                        address,
+                        symbol,
+                        1
+                    )
+                    .execute(transaction.conn())
+                    .await?;
+
+                    sqlx::query!(
+                        r#"
+                        INSERT INTO nft ( token_id, account_id, creator_account_id, serial_id, address, content_hash )
+                        VALUES ( $1, $2, $3, $4, $5, $6 )
+                        "#,
+                        upd.token_id,
+                        upd.account_id,
+                        upd.creator_account_id,
+                        upd.serial_id,
+                        upd.address,
+                        upd.content_hash,
+                    )
+                        .execute(transaction.conn())
+                        .await?;
                 }
             }
         }

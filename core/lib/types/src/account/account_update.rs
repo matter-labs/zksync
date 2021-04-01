@@ -12,11 +12,17 @@ use crate::AccountId;
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum AccountUpdate {
     /// Create a new account.
-    Create { address: Address, nonce: Nonce },
+    Create {
+        address: Address,
+        nonce: Nonce,
+    },
     /// Delete an existing account.
     /// Note: Currently this kind of update is not used directly in the network.
     /// However, it's used to revert made operation (e.g. to restore state back in time from the last verified block).
-    Delete { address: Address, nonce: Nonce },
+    Delete {
+        address: Address,
+        nonce: Nonce,
+    },
     /// Change the account balance.
     UpdateBalance {
         old_nonce: Nonce,
@@ -30,6 +36,12 @@ pub enum AccountUpdate {
         new_pub_key_hash: PubKeyHash,
         old_nonce: Nonce,
         new_nonce: Nonce,
+    },
+    MintNFT {
+        token: NFT,
+    },
+    RemoveToken {
+        token: NFT,
     },
 }
 
@@ -68,6 +80,12 @@ impl AccountUpdate {
                 new_pub_key_hash: *old_pub_key_hash,
                 old_nonce: *new_nonce,
                 new_nonce: *old_nonce,
+            },
+            AccountUpdate::MintNFT { token } => AccountUpdate::RemoveToken {
+                token: token.clone(),
+            },
+            AccountUpdate::RemoveToken { token } => AccountUpdate::MintNFT {
+                token: token.clone(),
             },
         }
     }

@@ -691,6 +691,24 @@
       ]
     }
   },
+  "1ca8ba6b18151ef9ae510f31d8bd7c2aeb0db620f000baef6e998d200faf9b89": {
+    "query": "\n                        INSERT INTO mint_nft_updates ( token_id, account_id, creator_account_id, serial_id, address, content_hash, block_number )\n                        VALUES ( $1, $2, $3, $4, $5, $6, $7 )\n                        ",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "Int4",
+          "Int4",
+          "Int4",
+          "Int4",
+          "Bytea",
+          "Bytea",
+          "Int8"
+        ]
+      },
+      "nullable": []
+    }
+  },
   "1ce3fbb6c510621c830b0b4679d51fb2ac4379a474d7ee7074500d786102fcd3": {
     "query": "INSERT INTO mempool_txs (tx_hash, tx, eth_sign_data, created_at, batch_id)\n            SELECT u.tx_hash, u.tx, u.eth_sign_data, $4, $5\n                FROM UNNEST ($1::text[], $2::jsonb[], $3::jsonb[])\n                AS u(tx_hash, tx, eth_sign_data)",
     "describe": {
@@ -1900,6 +1918,20 @@
           "Int8",
           "Int8",
           "Bytea",
+          "Int8"
+        ]
+      },
+      "nullable": []
+    }
+  },
+  "5abdbe249ac5d9e4aecb3183c17a75ed89642bfa2b0715a2f3c32cb7248b7ac2": {
+    "query": "\n                        DELETE FROM mint_nft_updates\n                        WHERE token_id = $1 and account_id = $2 and block_number = $3\n                        ",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "Int4",
+          "Int4",
           "Int8"
         ]
       },

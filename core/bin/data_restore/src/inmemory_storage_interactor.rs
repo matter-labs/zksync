@@ -237,6 +237,8 @@ impl InMemoryStorageInteractor {
                     account.nonce = max(account.nonce, *new_nonce);
                     account.pub_key_hash = *new_pub_key_hash;
                 }
+                AccountUpdate::MintNFT { .. } => todo!(),
+                AccountUpdate::RemoveToken { .. } => todo!(),
             }
         }
     }
