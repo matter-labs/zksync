@@ -21,7 +21,7 @@ pub trait Paginate<T: Serialize> {
 
     async fn paginate(
         &mut self,
-        query: PaginationQuery<Self::Index>,
+        query: &PaginationQuery<Self::Index>,
     ) -> Result<Paginated<T, Self::Index>, Error>;
 }
 
@@ -31,11 +31,11 @@ impl Paginate<Token> for StorageProcessor<'_> {
 
     async fn paginate(
         &mut self,
-        query: PaginationQuery<TokenId>,
+        query: &PaginationQuery<TokenId>,
     ) -> Result<Paginated<Token, TokenId>, Error> {
         let tokens = self
             .tokens_schema()
-            .load_token_page(&query)
+            .load_token_page(query)
             .await
             .map_err(Error::storage)?;
         let count = self
@@ -59,12 +59,12 @@ impl Paginate<BlockInfo> for StorageProcessor<'_> {
 
     async fn paginate(
         &mut self,
-        query: PaginationQuery<BlockNumber>,
+        query: &PaginationQuery<BlockNumber>,
     ) -> Result<Paginated<BlockInfo, BlockNumber>, Error> {
         let blocks = self
             .chain()
             .block_schema()
-            .load_block_page(&query)
+            .load_block_page(query)
             .await
             .map_err(Error::storage)?;
         let blocks: Vec<BlockInfo> = blocks.into_iter().map(BlockInfo::from).collect();
@@ -90,12 +90,12 @@ impl Paginate<Transaction> for StorageProcessor<'_> {
 
     async fn paginate(
         &mut self,
-        query: PaginationQuery<BlockAndTxHash>,
+        query: &PaginationQuery<BlockAndTxHash>,
     ) -> Result<Paginated<Transaction, BlockAndTxHash>, Error> {
         let raw_txs = self
             .chain()
             .block_schema()
-            .get_block_transactions_page(&query)
+            .get_block_transactions_page(query)
             .await
             .map_err(Error::storage)?
             .ok_or_else(|| Error::from(TxError::TransactionNotFound))?;

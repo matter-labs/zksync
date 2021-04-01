@@ -1,7 +1,7 @@
 use crate::{tx::TxHash, BlockNumber};
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone, Copy)]
 #[serde(rename_all = "snake_case")]
 pub enum PaginationDirection {
     Newer,
@@ -15,7 +15,7 @@ pub struct PaginationQuery<Id> {
     pub direction: PaginationDirection,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub struct Paginated<T: Sized + Serialize, F: Serialize> {
     pub list: Vec<T>,
     pub from: F,
@@ -42,7 +42,7 @@ impl<T: Sized + Serialize, F: Serialize> Paginated<T, F> {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone, Copy)]
 pub struct BlockAndTxHash {
     pub block_number: BlockNumber,
     pub tx_hash: TxHash,

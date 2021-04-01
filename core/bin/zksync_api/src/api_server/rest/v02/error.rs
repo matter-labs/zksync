@@ -34,9 +34,9 @@ pub enum ErrorCode {
 /// Error object in a response
 #[derive(Serialize)]
 pub struct Error {
-    error_type: String,
-    code: ErrorCode,
-    message: String,
+    pub error_type: String,
+    pub code: ErrorCode,
+    pub message: String,
 }
 
 /// Trait that can be used to map custom errors to the object.

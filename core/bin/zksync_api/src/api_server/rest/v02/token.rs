@@ -77,7 +77,7 @@ impl ApiTokenData {
     ) -> Result<Paginated<ApiToken, TokenId>, Error> {
         let mut storage = self.pool.access_storage().await.map_err(Error::storage)?;
         let paginated_tokens: Result<Paginated<Token, TokenId>, Error> =
-            storage.paginate(query).await;
+            storage.paginate(&query).await;
         match paginated_tokens {
             Ok(paginated_tokens) => {
                 let mut list = Vec::new();

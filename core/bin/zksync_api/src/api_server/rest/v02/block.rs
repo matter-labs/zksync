@@ -70,7 +70,7 @@ impl ApiBlockData {
         query: PaginationQuery<BlockNumber>,
     ) -> Result<Paginated<BlockInfo, BlockNumber>, Error> {
         let mut storage = self.pool.access_storage().await.map_err(Error::storage)?;
-        storage.paginate(query).await
+        storage.paginate(&query).await
     }
 
     async fn transaction_page(
@@ -89,7 +89,7 @@ impl ApiBlockData {
             direction: query.direction,
         };
 
-        storage.paginate(new_query).await
+        storage.paginate(&new_query).await
     }
 
     async fn get_last_committed_block_number(&self) -> QueryResult<BlockNumber> {
@@ -183,7 +183,7 @@ mod tests {
         not(feature = "api_test"),
         ignore = "Use `zk test rust-api` command to perform this test"
     )]
-    async fn test_blocks_scope() -> anyhow::Result<()> {
+    async fn v02_test_blocks_scope() -> anyhow::Result<()> {
         let cfg = TestServerConfig::default();
         cfg.fill_database().await?;
 
@@ -197,50 +197,26 @@ mod tests {
             limit: 3,
             direction: PaginationDirection::Newer,
         };
-        let blocks: Vec<BlockInfo> = {
-            let mut storage = cfg.pool.access_storage().await?;
+        let mut storage = cfg.pool.access_storage().await?;
+        let expected_blocks: Paginated<BlockInfo, BlockNumber> = storage
+            .paginate(&query)
+            .await
+            .map_err(|err| anyhow::anyhow!(err.message))?;
 
-            let blocks = storage
-                .chain()
-                .block_schema()
-                .load_block_page(&query)
-                .await?;
+        // assert_eq!(
+        //     client.block_by_number_v02(BlockNumber(2)).await?.as_ref(),
+        //     Some(&expected_blocks.list[1])
+        // );
 
-            blocks.into_iter().map(BlockInfo::from).collect()
-        };
-
-        assert_eq!(
-            client.block_by_number_v02(BlockNumber(2)).await?,
-            Some(blocks[1])
-        );
-
-        let pagination = client.block_pagination_v02(&query).await?;
-        assert_eq!(pagination.from, BlockNumber(1));
-        assert_eq!(pagination.count, 8);
-        assert_eq!(pagination.limit, 3);
-        assert_eq!(pagination.direction, PaginationDirection::Newer);
-        assert_eq!(pagination.list, blocks[0..3]);
+        let blocks = client.block_pagination_v02(&query).await?;
+        assert_eq!(blocks, expected_blocks);
 
         // Transaction requests part.
-        let expected_txs: Vec<TransactionInfo> = {
-            let mut storage = cfg.pool.access_storage().await?;
-
-            let transactions = storage
-                .chain()
-                .block_schema()
-                .get_block_transactions(BlockNumber(1))
-                .await?;
-
-            transactions
-                .into_iter()
-                .map(convert::transaction_info_from_transaction_item)
-                .collect()
-        };
-        assert_eq!(
-            client.block_transactions(BlockNumber(1)).await?,
-            expected_txs
-        );
-        assert_eq!(client.block_transactions(BlockNumber(6)).await?, vec![]);
+        // let query = PaginationQuery {
+        //     from: tx_hash,
+        //     limit: 5,
+        //     direction: PaginationDirection::Older,
+        // };
 
         server.stop().await;
         Ok(())
