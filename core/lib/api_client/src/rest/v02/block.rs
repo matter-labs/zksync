@@ -101,8 +101,8 @@ impl Client {
     /// Returns information about several blocks in a range.
     pub async fn block_pagination_v02(
         &self,
-        pagination_query: PaginationQuery<BlockNumber>,
+        pagination_query: &PaginationQuery<BlockNumber>,
     ) -> client::Result<Paginated<BlockInfo, BlockNumber>> {
-        self.get("block").query(&pagination_query).send().await
+        self.get("block").query(pagination_query).send().await
     }
 }

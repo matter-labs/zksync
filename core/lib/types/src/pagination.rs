@@ -1,7 +1,7 @@
 use crate::{tx::TxHash, BlockNumber};
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum PaginationDirection {
     Newer,

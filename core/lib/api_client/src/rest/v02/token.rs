@@ -9,7 +9,7 @@ use serde::{Deserialize, Serialize};
 
 use zksync_types::{
     pagination::{Paginated, PaginationQuery},
-    Address, TokenId, TokenLike,
+    Address, Token, TokenId, TokenLike,
 };
 
 // Local uses
@@ -22,6 +22,18 @@ pub struct ApiToken {
     pub symbol: String,
     pub decimals: u8,
     pub enabled_for_fees: bool,
+}
+
+impl From<(Token, bool)> for ApiToken {
+    fn from(token: (Token, bool)) -> Self {
+        ApiToken {
+            id: token.0.id,
+            address: token.0.address,
+            symbol: token.0.symbol,
+            decimals: token.0.decimals,
+            enabled_for_fees: token.1,
+        }
+    }
 }
 
 #[derive(Serialize, Deserialize, Debug)]

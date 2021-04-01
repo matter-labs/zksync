@@ -191,14 +191,14 @@ mod tests {
             cfg.start_server(|cfg| api_scope(cfg.pool.clone(), BlockDetailsCache::new(10)));
 
         // Block requests part
+
+        let query = PaginationQuery {
+            from: BlockNumber(1),
+            limit: 3,
+            direction: PaginationDirection::Newer,
+        };
         let blocks: Vec<BlockInfo> = {
             let mut storage = cfg.pool.access_storage().await?;
-
-            let query = PaginationQuery {
-                from: BlockNumber(1),
-                limit: 3,
-                direction: PaginationDirection::Newer,
-            };
 
             let blocks = storage
                 .chain()
@@ -210,22 +210,16 @@ mod tests {
         };
 
         assert_eq!(
-            client.block_by_id(BlockNumber(2)).await?.unwrap(),
-            blocks[1]
+            client.block_by_number_v02(BlockNumber(2)).await?,
+            Some(blocks[1])
         );
-        assert_eq!(client.blocks_range(Pagination::Last, 10).await?, blocks);
-        assert_eq!(
-            client
-                .blocks_range(Pagination::Before(BlockNumber(2)), 5)
-                .await?,
-            &blocks[7..8]
-        );
-        assert_eq!(
-            client
-                .blocks_range(Pagination::After(BlockNumber(7)), 5)
-                .await?,
-            &blocks[0..1]
-        );
+
+        let pagination = client.block_pagination_v02(&query).await?;
+        assert_eq!(pagination.from, BlockNumber(1));
+        assert_eq!(pagination.count, 8);
+        assert_eq!(pagination.limit, 3);
+        assert_eq!(pagination.direction, PaginationDirection::Newer);
+        assert_eq!(pagination.list, blocks[0..3]);
 
         // Transaction requests part.
         let expected_txs: Vec<TransactionInfo> = {
