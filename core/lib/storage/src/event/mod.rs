@@ -3,7 +3,9 @@
 use serde_json::Value;
 // Workspace uses
 use zksync_basic_types::{AccountId, BlockNumber};
-use zksync_types::account::AccountUpdate;
+use zksync_types::{
+    account::AccountUpdate, block::ExecutedOperations, priority_ops::ZkSyncPriorityOp,
+};
 // Local uses
 use crate::{diff::StorageAccountDiff, QueryResult, StorageProcessor};
 use records::EventType;
@@ -12,6 +14,7 @@ use types::{
         AccountEvent, AccountStateChangeStatus, AccountStateChangeType, AccountUpdateDetails,
     },
     block::{BlockEvent, BlockStatus},
+    transaction::TransactionEvent,
 };
 
 pub mod records;
@@ -118,6 +121,44 @@ impl<'a, 'c> EventSchema<'a, 'c> {
 
         self.store_event_data(EventType::Account, event_data)
             .await?;
+
+        Ok(())
+    }
+
+    pub async fn store_transaction_event(
+        &mut self,
+        executed_operation: &ExecutedOperations,
+        block: BlockNumber,
+    ) -> QueryResult<()> {
+        let mut transaction = self.0.start_transaction().await?;
+
+        // TODO: Ignore the error.
+        let mut transaction_event =
+            TransactionEvent::from_executed_operation(executed_operation, block)?;
+        // Account id for `Deposit` should be already present in the committed state.
+        if let ExecutedOperations::PriorityOp(priority_op) = executed_operation {
+            if let ZkSyncPriorityOp::Deposit(deposit) = &priority_op.priority_op.data {
+                let account_id = transaction
+                    .chain()
+                    .account_schema()
+                    .account_id_by_address(deposit.to)
+                    .await?;
+                let account_id = match account_id {
+                    Some(id) => id,
+                    None => return Ok(()),
+                };
+                transaction_event.account_id = i64::from(*account_id);
+            }
+        }
+
+        let event_data =
+            serde_json::to_value(transaction_event).expect("couldn't serialize account event");
+
+        transaction
+            .event_schema()
+            .store_event_data(EventType::Transaction, event_data)
+            .await?;
+        transaction.commit().await?;
 
         Ok(())
     }
