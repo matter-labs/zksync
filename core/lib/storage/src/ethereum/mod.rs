@@ -8,7 +8,7 @@ use zksync_basic_types::{H256, U256};
 // Workspace imports
 use zksync_types::aggregated_operations::{AggregatedActionType, AggregatedOperation};
 use zksync_types::ethereum::{ETHOperation, InsertedOperationResponse};
-use zksync_types::{BlockNumber, Nonce};
+use zksync_types::BlockNumber;
 // Local imports
 use self::records::{ETHParams, ETHStats, ETHTxHash, StorageETHOperation};
 use crate::{chain::operations::records::StoredAggregatedOperation, QueryResult, StorageProcessor};
@@ -525,7 +525,8 @@ impl<'a, 'c> EthereumSchema<'a, 'c> {
     /// This method expects the database to be initially prepared with inserting the actual
     /// nonce value. Currently the script `db-insert-eth-data.sh` is responsible for that
     /// and it's invoked within `db-reset` subcommand.
-    pub(crate) async fn get_next_nonce(&mut self) -> QueryResult<i64> {
+    #[doc = "hidden"]
+    pub async fn get_next_nonce(&mut self) -> QueryResult<i64> {
         let start = Instant::now();
         let mut transaction = self.0.start_transaction().await?;
 
@@ -619,16 +620,11 @@ impl<'a, 'c> EthereumSchema<'a, 'c> {
 
     // Updates eth_parameters with given nonce and last block.
     // It updates last_verified_block only if it is greater than given last block.
-    pub async fn update_eth_parameters(
-        &mut self,
-        last_block: BlockNumber,
-        nonce: Nonce,
-    ) -> QueryResult<()> {
+    pub async fn update_eth_parameters(&mut self, last_block: BlockNumber) -> QueryResult<()> {
         let start = Instant::now();
         let mut transaction = self.0.start_transaction().await?;
         sqlx::query!(
-            "UPDATE eth_parameters SET nonce = $1, last_committed_block = $2 WHERE id = true",
-            *nonce as i64,
+            "UPDATE eth_parameters SET last_committed_block = $1 WHERE id = true",
             *last_block as i64
         )
         .execute(transaction.conn())

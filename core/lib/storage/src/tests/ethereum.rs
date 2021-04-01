@@ -6,7 +6,7 @@ use zksync_basic_types::{H256, U256};
 use zksync_types::{
     aggregated_operations::{AggregatedActionType, AggregatedOperation},
     ethereum::ETHOperation,
-    BlockNumber, Nonce,
+    BlockNumber,
 };
 // Local imports
 use crate::test_data::{gen_unique_aggregated_operation, BLOCK_SIZE_CHUNKS};
@@ -398,14 +398,13 @@ async fn test_update_eth_parameters(mut storage: StorageProcessor<'_>) -> QueryR
     // Updates eth parameters and checks if they were really saved.
     storage
         .ethereum_schema()
-        .update_eth_parameters(BlockNumber(5), Nonce(3))
+        .update_eth_parameters(BlockNumber(5))
         .await?;
 
     let stats = storage.ethereum_schema().load_stats().await?;
     assert_eq!(stats.last_committed_block, 5);
     assert_eq!(stats.last_verified_block, 0);
     assert_eq!(stats.last_executed_block, 0);
-    assert_eq!(storage.ethereum_schema().get_next_nonce().await?, 3);
 
     Ok(())
 }

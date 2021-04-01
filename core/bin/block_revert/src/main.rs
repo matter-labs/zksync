@@ -10,13 +10,10 @@ use web3::{
 use zksync_config::ZkSyncConfig;
 use zksync_eth_client::EthereumGateway;
 use zksync_storage::StorageProcessor;
-use zksync_types::{
-    aggregated_operations::stored_block_info, block::Block, BlockNumber, Nonce, H256,
-};
+use zksync_types::{aggregated_operations::stored_block_info, block::Block, BlockNumber, H256};
 
 // TODO: don't use anyhow (ZKS-588)
 async fn revert_blocks_in_storage(
-    client: &EthereumGateway,
     storage: &mut StorageProcessor<'_>,
     last_block: BlockNumber,
 ) -> anyhow::Result<()> {
@@ -82,13 +79,9 @@ async fn revert_blocks_in_storage(
         .remove_prover_jobs(last_block)
         .await?;
 
-    // Nonce after reverting on the contract will be current plus one
-    // because the operator will send exactly one transaction to call revertBlocks.
-    let nonce_after_revert_on_contract = client.current_nonce().await?.as_u32() + 1;
-
     transaction
         .ethereum_schema()
-        .update_eth_parameters(last_block, Nonce(nonce_after_revert_on_contract))
+        .update_eth_parameters(last_block)
         .await?;
 
     transaction
@@ -135,6 +128,7 @@ async fn send_raw_tx_and_wait_confirmation(
 
 // TODO: don't use anyhow (ZKS-588)
 async fn revert_blocks_on_contract(
+    storage: &mut StorageProcessor<'_>,
     client: &EthereumGateway,
     blocks: &[Block],
 ) -> anyhow::Result<()> {
@@ -146,6 +140,8 @@ async fn revert_blocks_on_contract(
         .await
         .map_err(|e| format_err!("Revert blocks send err: {}", e))?;
     let receipt = send_raw_tx_and_wait_confirmation(&client, signed_tx.raw_tx).await?;
+    storage.ethereum_schema().get_next_nonce().await
+        .expect("Ethereum tx has been sent but updating operator nonce in storage has failed. You need to update it manually");
     ensure!(
         receipt.status == Some(U64::from(1)),
         "Tx to contract failed"
@@ -244,18 +240,18 @@ async fn main() -> anyhow::Result<()> {
             let blocks = get_blocks(last_commited_block, blocks_to_revert, &mut storage).await?;
             let last_block = BlockNumber(*last_commited_block - blocks_to_revert);
             println!("Last block for revert {}", &last_block);
-            revert_blocks_on_contract(&client, &blocks).await?;
-            revert_blocks_in_storage(&client, &mut storage, last_block).await?;
+            revert_blocks_on_contract(&mut storage, &client, &blocks).await?;
+            revert_blocks_in_storage(&mut storage, last_block).await?;
         }
         Command::Contract => {
             println!("Start reverting blocks in contract");
             let blocks = get_blocks(last_commited_block, blocks_to_revert, &mut storage).await?;
-            revert_blocks_on_contract(&client, &blocks).await?;
+            revert_blocks_on_contract(&mut storage, &client, &blocks).await?;
         }
         Command::Storage => {
             println!("Start reverting blocks in database");
             let last_block = BlockNumber(*last_commited_block - blocks_to_revert);
-            revert_blocks_in_storage(&client, &mut storage, last_block).await?;
+            revert_blocks_in_storage(&mut storage, last_block).await?;
         }
     }
 
