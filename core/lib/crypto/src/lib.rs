@@ -21,6 +21,7 @@ pub use crypto_exports::*;
 
 pub mod circuit;
 pub mod convert;
+pub mod error;
 pub mod merkle_tree;
 pub mod params;
 pub mod primitives;

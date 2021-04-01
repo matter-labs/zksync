@@ -6059,7 +6059,6 @@ dependencies = [
 name = "zksync_crypto"
 version = "1.0.0"
 dependencies = [
- "anyhow",
  "base64 0.13.0",
  "ethabi",
  "fnv",
@@ -6072,6 +6071,7 @@ dependencies = [
  "recursive_aggregation_circuit",
  "serde",
  "serde_json",
+ "thiserror",
  "zksync_basic_types",
 ]
 

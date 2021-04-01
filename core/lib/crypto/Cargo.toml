@@ -20,7 +20,7 @@ zksync_basic_types = { path = "../basic_types", version = "1.0" }
 ethabi = "12.0.0"
 
 serde = "1.0"
-anyhow = "1.0"
+thiserror = "1.0"
 lazy_static = "1.2.0"
 fnv = "1.0.3"
 rayon = "1.0.3"
