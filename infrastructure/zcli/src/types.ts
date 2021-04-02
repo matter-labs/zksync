@@ -41,4 +41,5 @@ export interface TxDetails {
     to: string;
     token: string;
     amount: string;
+    fastProcessing?: boolean;
 }

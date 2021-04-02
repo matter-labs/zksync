@@ -161,20 +161,9 @@ impl RpcApp {
             Error::internal_error()
         })?;
 
-        // HACK: Special case for the Golem:
-        //
-        // Currently, their token on Rinkeby is called GNT, but it's being renamed to the tGLM.
-        //
-        // TODO: Remove this case after Golem update [ZKS-173]
-        let mut has_gnt = None;
-        let mut result: HashMap<_, _> = tokens
+        let result: HashMap<_, _> = tokens
             .drain()
             .map(|(id, token)| {
-                // TODO: Remove this case after Golem update [ZKS-173]
-                if token.symbol == "GNT" {
-                    has_gnt = Some(token.clone());
-                }
-
                 if *id == 0 {
                     ("ETH".to_string(), token)
                 } else {
@@ -182,13 +171,6 @@ impl RpcApp {
                 }
             })
             .collect();
-
-        // So if we have `GNT` token in response we should also add `GLM` alias.
-        // TODO: Remove this case after Golem update [ZKS-173]
-        if let Some(mut token) = has_gnt {
-            token.symbol = "tGLM".to_string();
-            result.insert(token.symbol.clone(), token);
-        }
 
         metrics::histogram!("api.rpc.tokens", start.elapsed());
         Ok(result)
@@ -206,10 +188,21 @@ impl RpcApp {
         if !token_allowed {
             return Err(SubmitError::InappropriateFeeToken.into());
         }
+        let result = Self::ticker_request(ticker.clone(), tx_type, address, token.clone()).await?;
 
-        let result = Self::ticker_request(ticker.clone(), tx_type, address, token).await;
+        let token = self.tx_sender.token_info_from_id(token).await?;
+        let allowed_subsidy = self
+            .tx_sender
+            .subsidy_accumulator
+            .get_allowed_subsidy(&token.address);
+        let fee = if allowed_subsidy >= result.subsidy_size_usd {
+            result.subsidy_fee
+        } else {
+            result.normal_fee
+        };
+
         metrics::histogram!("api.rpc.get_tx_fee", start.elapsed());
-        result
+        Ok(fee)
     }
 
     pub async fn _impl_get_txs_batch_fee_in_wei(
@@ -235,10 +228,21 @@ impl RpcApp {
 
         let transactions: Vec<(TxFeeTypes, Address)> =
             (tx_types.iter().cloned().zip(addresses.iter().cloned())).collect();
-        let total_fee = Self::ticker_batch_fee_request(ticker, transactions, token.clone()).await?;
+        let result = Self::ticker_batch_fee_request(ticker, transactions, token.clone()).await?;
+
+        let token = self.tx_sender.token_info_from_id(token).await?;
+        let allowed_subsidy = self
+            .tx_sender
+            .subsidy_accumulator
+            .get_allowed_subsidy(&token.address);
+        let fee = if allowed_subsidy >= result.subsidy_size_usd {
+            result.subsidy_fee
+        } else {
+            result.normal_fee
+        };
 
         metrics::histogram!("api.rpc.get_txs_batch_fee_in_wei", start.elapsed());
-        Ok(total_fee)
+        Ok(fee)
     }
 
     pub async fn _impl_get_token_price(self, token: TokenLike) -> Result<BigDecimal> {

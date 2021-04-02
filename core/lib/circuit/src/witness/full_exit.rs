@@ -118,8 +118,7 @@ impl Witness for FullExitWitness<Bn256> {
             r_packed: vec![Some(false); 256],
             s: vec![Some(false); 256],
         };
-        let mut operations = vec![];
-        operations.push(Operation {
+        let mut operations = vec![Operation {
             new_root: self.after_root,
             tx_type: self.tx_type,
             chunk: Some(Fr::from_str("0").unwrap()),
@@ -132,7 +131,7 @@ impl Witness for FullExitWitness<Bn256> {
             lhs: self.before.clone(),
             rhs: self.before.clone(),
             signature_data: empty_sig_data.clone(),
-        });
+        }];
 
         for (i, pubdata_chunk) in pubdata_chunks.iter().cloned().enumerate().take(6).skip(1) {
             operations.push(Operation {

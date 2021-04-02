@@ -19,6 +19,7 @@ use crate::signature_checker;
 
 mod admin_server;
 mod event_notify;
+pub mod forced_exit_checker;
 mod helpers;
 mod rest;
 pub mod rpc_server;
@@ -39,7 +40,6 @@ pub fn start_api_server(
     let (sign_check_sender, sign_check_receiver) = mpsc::channel(32768);
 
     signature_checker::start_sign_checker_detached(
-        config.clone(),
         eth_gateway,
         sign_check_receiver,
         panic_notify.clone(),

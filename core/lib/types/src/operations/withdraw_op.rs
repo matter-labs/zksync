@@ -25,8 +25,7 @@ impl WithdrawOp {
     pub const WITHDRAW_DATA_PREFIX: [u8; 1] = [1];
 
     pub(crate) fn get_public_data(&self) -> Vec<u8> {
-        let mut data = Vec::new();
-        data.push(Self::OP_CODE); // opcode
+        let mut data = vec![Self::OP_CODE];
         data.extend_from_slice(&self.account_id.to_be_bytes());
         data.extend_from_slice(&self.tx.token.to_be_bytes());
         data.extend_from_slice(&self.tx.amount.to_u128().unwrap().to_be_bytes());

@@ -2,7 +2,12 @@
 
 // Built-in uses
 use std::iter::FromIterator;
-use std::{collections::HashSet, fmt::Display, str::FromStr};
+use std::sync::{Arc, RwLock};
+use std::{
+    collections::{HashMap, HashSet},
+    fmt::Display,
+    str::FromStr,
+};
 
 // External uses
 use bigdecimal::BigDecimal;
@@ -12,7 +17,7 @@ use futures::{
     prelude::*,
 };
 use itertools::izip;
-use num::{bigint::ToBigInt, BigUint, Zero};
+use num::{bigint::ToBigInt, rational::Ratio, BigUint, CheckedSub, Zero};
 use thiserror::Error;
 
 // Workspace uses
@@ -24,12 +29,14 @@ use zksync_types::{
     },
     AccountId, Address, BatchFee, Fee, Token, TokenId, TokenLike, TxFeeTypes, ZkSyncTx, H160,
 };
+use zksync_utils::ratio_to_big_decimal;
 
 // Local uses
 use crate::{
+    api_server::forced_exit_checker::{ForcedExitAccountAgeChecker, ForcedExitChecker},
     api_server::rpc_server::types::TxWithSignature,
     core_api_client::CoreApiClient,
-    fee_ticker::{TickerRequest, TokenPriceRequestType},
+    fee_ticker::{ResponseBatchFee, ResponseFee, TickerRequest, TokenPriceRequestType},
     signature_checker::{BatchRequest, RequestData, TxRequest, VerifiedTx, VerifySignatureRequest},
     tx_error::TxAddError,
     utils::{block_details_cache::BlockDetailsCache, token_db_cache::TokenDBCache},
@@ -43,15 +50,84 @@ pub struct TxSender {
 
     pub pool: ConnectionPool,
     pub tokens: TokenDBCache,
+
+    pub forced_exit_checker: ForcedExitChecker,
     pub blocks: BlockDetailsCache,
-    /// Mimimum age of the account for `ForcedExit` operations to be allowed.
-    pub forced_exit_minimum_account_age: chrono::Duration,
     /// List of account IDs that do not have to pay fees for operations.
     pub fee_free_accounts: HashSet<AccountId>,
     pub enforce_pubkey_change_fee: bool,
     // Limit the number of both transactions and Ethereum signatures per batch.
     pub max_number_of_transactions_per_batch: usize,
     pub max_number_of_authors_per_batch: usize,
+
+    pub subsidy_accumulator: SubsidyAccumulator,
+}
+
+/// Used to store paid subsidy and daily limit
+#[derive(Debug)]
+pub struct SubsidyAccumulator {
+    /// Subsidy limit for token address in USD (e.g. 1 -> 1 USD)
+    daily_limits: HashMap<Address, Ratio<BigUint>>,
+    /// Paid subsidy per token, dated by time when first subsidy is paid
+    #[allow(clippy::type_complexity)]
+    limit_used: Arc<RwLock<HashMap<Address, (Ratio<BigUint>, chrono::DateTime<Utc>)>>>,
+}
+
+impl Clone for SubsidyAccumulator {
+    fn clone(&self) -> Self {
+        Self {
+            daily_limits: self.daily_limits.clone(),
+            limit_used: Arc::clone(&self.limit_used),
+        }
+    }
+}
+
+impl SubsidyAccumulator {
+    pub fn new(daily_limits: HashMap<Address, Ratio<BigUint>>) -> Self {
+        Self {
+            daily_limits,
+            limit_used: Arc::new(RwLock::new(HashMap::new())),
+        }
+    }
+
+    pub fn get_allowed_subsidy(&self, token_address: &Address) -> Ratio<BigUint> {
+        let limit = self
+            .daily_limits
+            .get(token_address)
+            .cloned()
+            .unwrap_or_else(|| Ratio::from_integer(0u32.into()));
+        let used = self.limit_used.read().expect("subsidy counter rlock");
+        let subsidy_used = used
+            .get(token_address)
+            .map(|(subs, _)| subs.clone())
+            .unwrap_or_else(|| Ratio::from_integer(0u32.into()));
+        limit
+            .checked_sub(&subsidy_used)
+            .unwrap_or_else(|| Ratio::from_integer(0u32.into()))
+    }
+
+    pub fn get_total_paid_subsidy(&self, token_address: &Address) -> Ratio<BigUint> {
+        let used = self.limit_used.read().expect("subsidy counter rlock");
+        used.get(token_address)
+            .map(|(subs, _)| subs.clone())
+            .unwrap_or_else(|| Ratio::from_integer(0u32.into()))
+    }
+
+    pub fn add_used_subsidy(&self, token_address: &Address, subsidy_amount: Ratio<BigUint>) {
+        let mut used = self.limit_used.write().expect("subsidy counter wlock");
+        let new_value = if let Some((mut old_amount, creation_time)) = used.remove(token_address) {
+            if Utc::now().signed_duration_since(creation_time) >= chrono::Duration::days(1) {
+                (Ratio::from_integer(0u32.into()), Utc::now())
+            } else {
+                old_amount += subsidy_amount;
+                (old_amount, creation_time)
+            }
+        } else {
+            (Ratio::from_integer(0u32.into()), Utc::now())
+        };
+
+        used.insert(*token_address, new_value);
+    }
 }
 
 #[derive(Debug, Error)]
@@ -78,23 +154,24 @@ pub enum SubmitError {
 }
 
 impl SubmitError {
-    fn internal(inner: impl Into<anyhow::Error>) -> Self {
+    pub fn internal(inner: impl Into<anyhow::Error>) -> Self {
         Self::Internal(inner.into())
     }
 
-    fn other(msg: impl Display) -> Self {
+    pub fn other(msg: impl Display) -> Self {
         Self::Other(msg.to_string())
     }
 
-    fn communication_core_server(msg: impl Display) -> Self {
+    pub fn communication_core_server(msg: impl Display) -> Self {
         Self::CommunicationCoreServer(msg.to_string())
     }
 
-    fn invalid_params(msg: impl Display) -> Self {
+    pub fn invalid_params(msg: impl Display) -> Self {
         Self::InvalidParams(msg.to_string())
     }
 }
 
+#[macro_export]
 macro_rules! internal_error {
     ($err:tt, $input:tt) => {{
         vlog::warn!("Internal Server error: {}, input: {:?}", $err, $input);
@@ -131,14 +208,12 @@ impl TxSender {
         ticker_request_sender: mpsc::Sender<TickerRequest>,
         config: &ZkSyncConfig,
     ) -> Self {
-        let forced_exit_minimum_account_age = chrono::Duration::seconds(
-            config.api.common.forced_exit_minimum_account_age_secs as i64,
-        );
-
         let max_number_of_transactions_per_batch =
             config.api.common.max_number_of_transactions_per_batch as usize;
         let max_number_of_authors_per_batch =
             config.api.common.max_number_of_authors_per_batch as usize;
+
+        let subsidy_accumulator = SubsidyAccumulator::new(config.ticker.get_subsidy_limits());
 
         Self {
             core_api_client,
@@ -146,13 +221,14 @@ impl TxSender {
             sign_verify_requests: sign_verify_request_sender,
             ticker_requests: ticker_request_sender,
             tokens: TokenDBCache::new(),
+            forced_exit_checker: ForcedExitChecker::new(config),
+            enforce_pubkey_change_fee: config.api.common.enforce_pubkey_change_fee,
             blocks: BlockDetailsCache::new(config.api.common.caches_size),
 
-            enforce_pubkey_change_fee: config.api.common.enforce_pubkey_change_fee,
-            forced_exit_minimum_account_age,
             fee_free_accounts: HashSet::from_iter(config.api.common.fee_free_accounts.clone()),
             max_number_of_transactions_per_batch,
             max_number_of_authors_per_batch,
+            subsidy_accumulator,
         }
     }
 
@@ -223,6 +299,8 @@ impl TxSender {
 
         // Resolve the token.
         let token = self.token_info_from_id(tx.token_id()).await?;
+        let allowed_subsidy = self.subsidy_accumulator.get_allowed_subsidy(&token.address);
+        let mut paid_subsidy = Ratio::from_integer(0u32.into());
         let msg_to_sign = tx
             .get_ethereum_sign_message(token.clone())
             .map(String::into_bytes);
@@ -252,25 +330,37 @@ impl TxSender {
                 return Err(SubmitError::InappropriateFeeToken);
             }
 
-            let required_fee =
+            let required_fee_data =
                 Self::ticker_request(ticker_request_sender, tx_type, address, token.clone())
                     .await?;
+
             // Converting `BitUint` to `BigInt` is safe.
-            let required_fee: BigDecimal = required_fee.total_fee.to_bigint().unwrap().into();
+            let required_fee: BigDecimal = required_fee_data
+                .normal_fee
+                .total_fee
+                .to_bigint()
+                .unwrap()
+                .into();
             let provided_fee: BigDecimal = provided_fee.to_bigint().unwrap().into();
             // Scaling the fee required since the price may change between signing the transaction and sending it to the server.
             let scaled_provided_fee = scale_user_fee_up(provided_fee.clone());
             if required_fee >= scaled_provided_fee && should_enforce_fee {
-                vlog::error!(
-                    "User provided fee is too low, required: {}, provided: {} (scaled: {}); difference {}, token: {:?}",
-                    required_fee.to_string(),
-                    provided_fee.to_string(),
-                    scaled_provided_fee.to_string(),
-                    (&required_fee - &scaled_provided_fee).to_string(),
-                    token
-                );
+                let max_subsidy = required_fee_data.get_max_subsidy(&allowed_subsidy);
 
-                return Err(SubmitError::TxAdd(TxAddError::TxFeeTooLow));
+                if max_subsidy >= &required_fee - &scaled_provided_fee {
+                    paid_subsidy += required_fee_data.subsidy_size_usd
+                } else {
+                    vlog::error!(
+                        "User provided fee is too low, required: {}, provided: {} (scaled: {}); difference {}, token: {:?}",
+                        required_fee.to_string(),
+                        provided_fee.to_string(),
+                        scaled_provided_fee.to_string(),
+                        (&required_fee - &scaled_provided_fee).to_string(),
+                        token
+                    );
+
+                    return Err(SubmitError::TxAdd(TxAddError::TxFeeTooLow));
+                }
             }
         }
 
@@ -282,7 +372,7 @@ impl TxSender {
         let verified_tx = verify_tx_info_message_signature(
             &tx,
             tx_sender,
-            token,
+            token.clone(),
             self.get_tx_sender_type(&tx).await?,
             signature.clone(),
             msg_to_sign,
@@ -291,6 +381,7 @@ impl TxSender {
         .await?
         .unwrap_tx();
 
+        let tx_hash = verified_tx.tx.hash();
         // Send verified transactions to the mempool.
         self.core_api_client
             .send_tx(verified_tx)
@@ -298,6 +389,24 @@ impl TxSender {
             .map_err(SubmitError::communication_core_server)?
             .map_err(SubmitError::TxAdd)?;
         // if everything is OK, return the transactions hashes.
+        if paid_subsidy > Ratio::from_integer(0u32.into()) {
+            let paid_subsidy_dec = ratio_to_big_decimal(&paid_subsidy, 6).to_string();
+            let total_paid_subsidy = ratio_to_big_decimal(
+                &self
+                    .subsidy_accumulator
+                    .get_total_paid_subsidy(&token.address),
+                6,
+            );
+            vlog::info!(
+                "Paid subsidy for tx, tx: {}, token: {}, subsidy_tx: {} USD, subsidy_token_total: {} USD",
+                tx_hash.to_string(),
+                &token.address,
+                paid_subsidy_dec,
+                total_paid_subsidy
+            );
+            self.subsidy_accumulator
+                .add_used_subsidy(&token.address, paid_subsidy);
+        }
         Ok(tx.hash())
     }
 
@@ -332,6 +441,8 @@ impl TxSender {
         let mut transaction_types = vec![];
 
         let eth_token = TokenLike::Id(TokenId(0));
+
+        let mut token_fees = HashMap::<Address, BigUint>::new();
 
         for tx in &txs {
             let tx_fee_info = tx.tx.get_fee_info();
@@ -370,41 +481,83 @@ impl TxSender {
                 )
                 .await?;
 
+                let token_data = self.token_info_from_id(token).await?;
+                let mut token_fee = token_fees.remove(&token_data.address).unwrap_or_default();
+                token_fee += &provided_fee;
+                token_fees.insert(token_data.address, token_fee);
+
                 provided_total_usd_fee +=
                     BigDecimal::from(provided_fee.clone().to_bigint().unwrap())
                         * &token_price_in_usd;
             }
         }
 
-        // Calculate required fee for ethereum token
-        let required_eth_fee = Self::ticker_batch_fee_request(
-            self.ticker_requests.clone(),
-            transaction_types,
-            eth_token.clone(),
-        )
-        .await?;
+        let mut subsidy_paid = None;
+        // Only one token in batch
+        if token_fees.len() == 1 {
+            let (batch_token, fee_paid) = token_fees.into_iter().next().unwrap();
+            let batch_token_fee = Self::ticker_batch_fee_request(
+                self.ticker_requests.clone(),
+                transaction_types.clone(),
+                batch_token.into(),
+            )
+            .await?;
+            let user_provided_fee =
+                scale_user_fee_up(BigDecimal::from(fee_paid.to_bigint().unwrap()));
+            let required_normal_fee =
+                BigDecimal::from(batch_token_fee.normal_fee.total_fee.to_bigint().unwrap());
 
-        let eth_price_in_usd = Self::ticker_price_request(
-            self.ticker_requests.clone(),
-            eth_token,
-            TokenPriceRequestType::USDForOneWei,
-        )
-        .await?;
+            // Not enough fee
+            if required_normal_fee >= user_provided_fee {
+                let allowed_subsidy = self.subsidy_accumulator.get_allowed_subsidy(&batch_token);
+                let max_subsidy = batch_token_fee.get_max_subsidy(&allowed_subsidy);
+                let required_subsidy = &required_normal_fee - &user_provided_fee;
+                // check if subsidy can be used
+                if max_subsidy >= required_subsidy {
+                    subsidy_paid = Some((batch_token, batch_token_fee.subsidy_size_usd));
+                } else {
+                    vlog::error!(
+                        "User provided batch fee in token is too low, required: {}, provided (scaled): {} (subsidy: {})",
+                        required_normal_fee.to_string(),
+                        user_provided_fee.to_string(),
+                        max_subsidy.to_string(),
+                    );
+                    return Err(SubmitError::TxAdd(TxAddError::TxBatchFeeTooLow));
+                }
+            }
+        } else {
+            // Calculate required fee for ethereum token
+            let required_eth_fee = Self::ticker_batch_fee_request(
+                self.ticker_requests.clone(),
+                transaction_types,
+                eth_token.clone(),
+            )
+            .await?
+            .normal_fee;
 
-        let required_total_usd_fee =
-            BigDecimal::from(required_eth_fee.total_fee.to_bigint().unwrap()) * &eth_price_in_usd;
+            let eth_price_in_usd = Self::ticker_price_request(
+                self.ticker_requests.clone(),
+                eth_token,
+                TokenPriceRequestType::USDForOneWei,
+            )
+            .await?;
 
-        // Scaling the fee required since the price may change between signing the transaction and sending it to the server.
-        let scaled_provided_fee_in_usd = scale_user_fee_up(provided_total_usd_fee.clone());
-        if required_total_usd_fee >= scaled_provided_fee_in_usd {
-            vlog::error!(
-                "User provided batch fee is too low, required: {}, provided: {} (scaled: {}); difference {}",
-                required_total_usd_fee.to_string(),
-                provided_total_usd_fee.to_string(),
-                scaled_provided_fee_in_usd.to_string(),
-                (required_total_usd_fee.clone() - scaled_provided_fee_in_usd.clone()).to_string(),
-            );
-            return Err(SubmitError::TxAdd(TxAddError::TxBatchFeeTooLow));
+            let required_total_usd_fee =
+                BigDecimal::from(required_eth_fee.total_fee.to_bigint().unwrap())
+                    * &eth_price_in_usd;
+
+            // Scaling the fee required since the price may change between signing the transaction and sending it to the server.
+            let scaled_provided_fee_in_usd = scale_user_fee_up(provided_total_usd_fee.clone());
+            if required_total_usd_fee >= scaled_provided_fee_in_usd {
+                vlog::error!(
+                    "User provided batch fee is too low, required: {}, provided: {} (scaled: {}); difference {}",
+                    &required_total_usd_fee,
+                    provided_total_usd_fee.to_string(),
+                    scaled_provided_fee_in_usd.to_string(),
+                    (&required_total_usd_fee - &scaled_provided_fee_in_usd).to_string(),
+                );
+                return Err(SubmitError::TxAdd(TxAddError::TxBatchFeeTooLow));
+            }
         }
 
         let mut verified_txs = Vec::with_capacity(txs.len());
@@ -466,6 +619,25 @@ impl TxSender {
         }
         verified_txs.extend(verified_batch.into_iter());
 
+        if let Some((subsidy_token, subsidy_paid)) = subsidy_paid {
+            let paid_subsidy_dec = ratio_to_big_decimal(&subsidy_paid, 6);
+            let total_paid_subsidy = ratio_to_big_decimal(
+                &self
+                    .subsidy_accumulator
+                    .get_total_paid_subsidy(&subsidy_token),
+                6,
+            );
+
+            vlog::info!(
+                "Paid subsidy for batch: token: {}, , subsidy_tx: {} USD, subsidy_token_total: {} USD",
+                subsidy_token,
+                paid_subsidy_dec,
+                total_paid_subsidy
+            );
+            self.subsidy_accumulator
+                .add_used_subsidy(&subsidy_token, subsidy_paid);
+        }
+
         let tx_hashes: Vec<TxHash> = verified_txs.iter().map(|tx| tx.tx.hash()).collect();
         // Send verified transactions to the mempool.
         self.core_api_client
@@ -483,7 +655,26 @@ impl TxSender {
         address: Address,
         token: TokenLike,
     ) -> Result<Fee, SubmitError> {
-        Self::ticker_request(self.ticker_requests.clone(), tx_type, address, token).await
+        let resp_fee = Self::ticker_request(
+            self.ticker_requests.clone(),
+            tx_type,
+            address,
+            token.clone(),
+        )
+        .await?;
+
+        if resp_fee.subsidy_fee.total_fee == resp_fee.normal_fee.total_fee {
+            return Ok(resp_fee.normal_fee);
+        }
+
+        let token = self.token_info_from_id(token).await?;
+
+        let allowed_subsidy = self.subsidy_accumulator.get_allowed_subsidy(&token.address);
+        if allowed_subsidy >= resp_fee.subsidy_size_usd {
+            Ok(resp_fee.subsidy_fee)
+        } else {
+            Ok(resp_fee.normal_fee)
+        }
     }
 
     pub async fn get_txs_batch_fee_in_wei(
@@ -491,7 +682,25 @@ impl TxSender {
         transactions: Vec<(TxFeeTypes, Address)>,
         token: TokenLike,
     ) -> Result<BatchFee, SubmitError> {
-        Self::ticker_batch_fee_request(self.ticker_requests.clone(), transactions, token).await
+        let resp_fee = Self::ticker_batch_fee_request(
+            self.ticker_requests.clone(),
+            transactions,
+            token.clone(),
+        )
+        .await?;
+
+        if resp_fee.normal_fee.total_fee == resp_fee.subsidy_fee.total_fee {
+            return Ok(resp_fee.normal_fee);
+        }
+
+        let token = self.token_info_from_id(token).await?;
+
+        let allowed_subsidy = self.subsidy_accumulator.get_allowed_subsidy(&token.address);
+        if allowed_subsidy >= resp_fee.subsidy_size_usd {
+            Ok(resp_fee.subsidy_fee)
+        } else {
+            Ok(resp_fee.normal_fee)
+        }
     }
 
     /// For forced exits, we must check that target account exists for more
@@ -509,28 +718,9 @@ impl TxSender {
             .await
             .map_err(SubmitError::internal)?;
 
-        let target_account_address = forced_exit.target;
-
-        let account_age = storage
-            .chain()
-            .operations_ext_schema()
-            .account_created_on(&target_account_address)
+        self.forced_exit_checker
+            .validate_forced_exit(&mut storage, forced_exit.target)
             .await
-            .map_err(|err| internal_error!(err, forced_exit))?;
-
-        match account_age {
-            Some(age) if Utc::now() - age < self.forced_exit_minimum_account_age => {
-                let msg = format!(
-                    "Target account exists less than required minimum amount ({} hours)",
-                    self.forced_exit_minimum_account_age.num_hours()
-                );
-
-                Err(SubmitError::InvalidParams(msg))
-            }
-            None => Err(SubmitError::invalid_params("Target account does not exist")),
-
-            Some(..) => Ok(()),
-        }
     }
 
     /// Returns a message that user has to sign to send the transaction.
@@ -560,7 +750,10 @@ impl TxSender {
     }
 
     /// Resolves the token from the database.
-    async fn token_info_from_id(&self, token_id: TokenId) -> Result<Token, SubmitError> {
+    pub(crate) async fn token_info_from_id(
+        &self,
+        token_id: impl Into<TokenLike>,
+    ) -> Result<Token, SubmitError> {
         let mut storage = self
             .pool
             .access_storage()
@@ -579,7 +772,7 @@ impl TxSender {
         mut ticker_request_sender: mpsc::Sender<TickerRequest>,
         transactions: Vec<(TxFeeTypes, Address)>,
         token: TokenLike,
-    ) -> Result<BatchFee, SubmitError> {
+    ) -> Result<ResponseBatchFee, SubmitError> {
         let req = oneshot::channel();
         ticker_request_sender
             .send(TickerRequest::GetBatchTxFee {
@@ -598,7 +791,7 @@ impl TxSender {
         tx_type: TxFeeTypes,
         address: Address,
         token: TokenLike,
-    ) -> Result<Fee, SubmitError> {
+    ) -> Result<ResponseFee, SubmitError> {
         let req = oneshot::channel();
         ticker_request_sender
             .send(TickerRequest::GetTxFee {
@@ -614,7 +807,7 @@ impl TxSender {
         resp.map_err(|err| internal_error!(err))
     }
 
-    async fn token_allowed_for_fees(
+    pub async fn token_allowed_for_fees(
         mut ticker_request_sender: mpsc::Sender<TickerRequest>,
         token: TokenLike,
     ) -> Result<bool, SubmitError> {
@@ -632,7 +825,7 @@ impl TxSender {
             .map_err(SubmitError::internal)
     }
 
-    async fn ticker_price_request(
+    pub async fn ticker_price_request(
         mut ticker_request_sender: mpsc::Sender<TickerRequest>,
         token: TokenLike,
         req_type: TokenPriceRequestType,

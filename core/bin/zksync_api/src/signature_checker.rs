@@ -21,9 +21,7 @@ use zksync_types::{
 };
 // Local uses
 use crate::{eth_checker::EthereumChecker, tx_error::TxAddError};
-use zksync_config::ZkSyncConfig;
 use zksync_eth_client::EthereumGateway;
-use zksync_types::network::Network;
 use zksync_utils::panic_notify::ThreadPanicNotify;
 
 /// `TxVariant` is used to form a verify request. It is possible to wrap
@@ -49,9 +47,8 @@ impl VerifiedTx {
     pub async fn verify(
         request_data: RequestData,
         eth_checker: &EthereumChecker,
-        network: Network,
     ) -> Result<Self, TxAddError> {
-        verify_eth_signature(&request_data, eth_checker, network).await?;
+        verify_eth_signature(&request_data, eth_checker).await?;
         let mut tx_variant = request_data.get_tx_variant();
         verify_tx_correctness(&mut tx_variant)?;
 
@@ -85,16 +82,9 @@ impl VerifiedTx {
 async fn verify_eth_signature(
     request_data: &RequestData,
     eth_checker: &EthereumChecker,
-    network: Network,
 ) -> Result<(), TxAddError> {
     match request_data {
         RequestData::Tx(request) => {
-            // TODO: Remove this code after Golem update [ZKS-173]
-            if (network == Network::Rinkeby || network == Network::Localhost)
-                && request.token.symbol == "GNT"
-            {
-                return Ok(());
-            }
             verify_eth_signature_single_tx(
                 &request.tx,
                 request.sender,
@@ -104,12 +94,6 @@ async fn verify_eth_signature(
             .await?;
         }
         RequestData::Batch(request) => {
-            // TODO: Remove this code after Golem update [ZKS-173]
-            if (network == Network::Rinkeby || network == Network::Localhost)
-                && request.tokens.iter().any(|t| t.symbol == "GNT")
-            {
-                return Ok(());
-            }
             let accounts = &request.senders;
             let tokens = &request.tokens;
             let txs = &request.txs;
@@ -336,7 +320,6 @@ impl RequestData {
 /// Main routine of the concurrent signature checker.
 /// See the module documentation for details.
 pub fn start_sign_checker_detached(
-    config: ZkSyncConfig,
     client: EthereumGateway,
     input: mpsc::Receiver<VerifySignatureRequest>,
     panic_notify: mpsc::Sender<bool>,
@@ -350,12 +333,11 @@ pub fn start_sign_checker_detached(
         handle: Handle,
         mut input: mpsc::Receiver<VerifySignatureRequest>,
         eth_checker: EthereumChecker,
-        eth_network: Network,
     ) {
         while let Some(VerifySignatureRequest { data, response }) = input.next().await {
             let eth_checker = eth_checker.clone();
             handle.spawn(async move {
-                let resp = VerifiedTx::verify(data, &eth_checker, eth_network).await;
+                let resp = VerifiedTx::verify(data, &eth_checker).await;
 
                 response.send(resp).unwrap_or_default();
             });
@@ -373,12 +355,7 @@ pub fn start_sign_checker_detached(
                 .build()
                 .expect("failed to build runtime for signature processor");
             let handle = runtime.handle().clone();
-            runtime.block_on(checker_routine(
-                handle,
-                input,
-                eth_checker,
-                config.chain.eth.network,
-            ));
+            runtime.block_on(checker_routine(handle, input, eth_checker));
         })
         .expect("failed to start signature checker thread");
 }

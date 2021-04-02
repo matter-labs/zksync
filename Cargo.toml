@@ -12,11 +12,13 @@ members = [
     "core/bin/zksync_core",
     "core/bin/zksync_eth_sender",
     "core/bin/zksync_witness_generator",
+    "core/bin/zksync_forced_exit_requests",
 
     # Libraries
     "core/lib/circuit",
     "core/lib/eth_client",
     "core/lib/eth_signer",
+    "core/lib/gateway_watcher",
     "core/lib/prometheus_exporter",
     "core/lib/types",
     "core/lib/state",

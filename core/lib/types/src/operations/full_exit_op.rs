@@ -23,8 +23,7 @@ impl FullExitOp {
     pub const WITHDRAW_DATA_PREFIX: [u8; 1] = [0];
 
     pub(crate) fn get_public_data(&self) -> Vec<u8> {
-        let mut data = Vec::new();
-        data.push(Self::OP_CODE); // opcode
+        let mut data = vec![Self::OP_CODE];
         data.extend_from_slice(&self.priority_op.account_id.to_be_bytes());
         data.extend_from_slice(self.priority_op.eth_address.as_bytes());
         data.extend_from_slice(&self.priority_op.token.to_be_bytes());

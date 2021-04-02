@@ -45,12 +45,7 @@ impl ResponseAccountState {
 
         // Old code used `HashMap` as well and didn't rely on the particular order,
         // so here we use `HashMap` as well for the consistency.
-        let mut balances: HashMap<_, _> = inner.balances.into_iter().collect();
-
-        // TODO: Remove this code after Golem update [ZKS-173]
-        if let Some(balance) = balances.get("GNT").cloned() {
-            balances.insert("tGLM".to_string(), balance);
-        }
+        let balances: HashMap<_, _> = inner.balances.into_iter().collect();
 
         Ok(Self {
             balances,
@@ -103,15 +98,6 @@ impl DepositingAccountBalances {
 
             let expected_accept_block =
                 op.received_on_block + pending_ops.confirmations_for_eth_event;
-
-            // TODO: Remove this code after Golem update [ZKS-173]
-            if token_symbol == "GNT" {
-                let balance = balances
-                    .entry("tGLM".to_string())
-                    .or_insert_with(DepositingFunds::default);
-
-                balance.amount += BigUint::from(op.amount);
-            }
 
             let balance = balances
                 .entry(token_symbol)

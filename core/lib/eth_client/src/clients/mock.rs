@@ -60,7 +60,8 @@ impl MockEthereum {
     pub async fn assert_sent(&self, tx: &[u8]) {
         assert!(
             self.inner.sent_txs.read().await.contains(tx),
-            format!("Transaction {:?} was not sent", tx),
+            "Transaction {:?} was not sent",
+            tx
         );
     }
 

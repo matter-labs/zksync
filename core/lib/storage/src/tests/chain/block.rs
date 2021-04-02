@@ -164,10 +164,10 @@ async fn test_find_block_by_height_or_hash(mut storage: StorageProcessor<'_>) ->
                 .find_block_by_height_or_hash(query.clone())
                 .await
                 .unwrap_or_else(|| {
-                    panic!(format!(
+                    panic!(
                         "Can't load the existing block with the index {} using query {}",
                         expected_block_detail.block_number, query
-                    ))
+                    )
                 });
             assert_eq!(
                 actual_block_detail.block_number,
@@ -352,10 +352,10 @@ async fn test_block_range(mut storage: StorageProcessor<'_>) -> QueryResult<()> 
                 .find_block_by_height_or_hash(block_number.to_string())
                 .await
                 .unwrap_or_else(|| {
-                    panic!(format!(
+                    panic!(
                         "Can't load the existing block with the index {}",
                         block_number
-                    ))
+                    )
                 });
             let got = &block_range[idx];
             assert_eq!(got, &expected);
@@ -613,7 +613,7 @@ async fn pending_block_workflow(mut storage: StorageProcessor<'_>) -> QueryResul
         operations::{ChangePubKeyOp, TransferToNewOp},
         ExecutedOperations, ExecutedTx, ZkSyncOp, ZkSyncTx,
     };
-    vlog::init();
+    let _sentry_guard = vlog::init();
 
     let from_account_id = AccountId(0xbabe);
     let from_zksync_account = ZkSyncAccount::rand();

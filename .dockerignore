@@ -20,6 +20,5 @@
 !contracts/artifacts
 !infrastructure/explorer/index.html
 !infrastructure/explorer/dist
-!infrastructure/fee-seller
 !infrastructure/zk
 !sdk/zksync-rs

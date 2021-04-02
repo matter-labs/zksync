@@ -113,10 +113,8 @@ lazy_static! {
 pub fn commit_blocks_operation(idx: usize) -> (i64, AggregatedOperation) {
     assert!(
         idx < COMMIT_BLOCKS_OPERATIONS.len(),
-        format!(
-            "Index {} is out of bounds for commit blocks operations",
-            idx
-        )
+        "Index {} is out of bounds for commit blocks operations",
+        idx
     );
 
     COMMIT_BLOCKS_OPERATIONS[idx].clone()
@@ -125,10 +123,8 @@ pub fn commit_blocks_operation(idx: usize) -> (i64, AggregatedOperation) {
 pub fn publish_proof_blocks_onchain_operations(idx: usize) -> (i64, AggregatedOperation) {
     assert!(
         idx < PUBLISH_PROOF_BLOCKS_ONCHAIN_OPERATIONS.len(),
-        format!(
-            "Index {} is out of bounds for publish proof blocks onchain operations",
-            idx
-        )
+        "Index {} is out of bounds for publish proof blocks onchain operations",
+        idx
     );
 
     PUBLISH_PROOF_BLOCKS_ONCHAIN_OPERATIONS[idx].clone()
@@ -137,10 +133,8 @@ pub fn publish_proof_blocks_onchain_operations(idx: usize) -> (i64, AggregatedOp
 pub fn execute_blocks_operations(idx: usize) -> (i64, AggregatedOperation) {
     assert!(
         idx < EXECUTE_BLOCKS_OPERATIONS.len(),
-        format!(
-            "Index {} is out of bounds for execute blocks onchain operations",
-            idx
-        )
+        "Index {} is out of bounds for execute blocks onchain operations",
+        idx
     );
 
     EXECUTE_BLOCKS_OPERATIONS[idx].clone()

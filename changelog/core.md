@@ -13,6 +13,7 @@ All notable changes to the core components will be documented in this file.
 - (`eth_client`): `web3` field was made private in `ETHDirectClient`. `testkit` and `loadtest` don't use it directly
   now.
 - (`api_server`): Make `submit_txs_batch` send only one signature request.
+- Fast withdrawals now can trigger aggregated block execution.
 
 ### Added
 
@@ -22,9 +23,11 @@ All notable changes to the core components will be documented in this file.
 - (`eth_client`): Added `get_tx`, `create_contract` methods to `EthereumGateway`, `get_web3_transport` method to
   ETHDirectClient.
 - (`api_server`): Support for accounts that don't have to pay fees (e.g. network service accounts) was added.
+- Added `BlockMetadata` structure and corresponding table to track block data that is not related to protocol.
 
 ### Fixed
 
+- (`zksync_api`): Internal error with tokens not listed on CoinGecko.
 - Fix wrong block info cache behavior in the `api_server`.
 
 ## Release 2021-02-19
@@ -40,6 +43,8 @@ All notable changes to the core components will be documented in this file.
 
 - Added a stressing dev fee ticker scenario to the loadtest.
 - Added a `--sloppy` mode to the `dev-fee-ticker-server` to simulate bad networks with the random delays and fails.
+- Added `forced_exit_requests` functionality, which allows users to pay for ForcedExits from L1. Note that a few env
+  variables were added that control the behaviour of the tool.
 - Possibility to use CREATE2 ChangePubKey and Transfer in a single batch.
 
 ### Fixed
