@@ -87,21 +87,13 @@ impl EthereumGateway {
 }
 
 macro_rules! delegate_call {
-    ($self:ident.$method:ident($($args:ident),+)) => {
+    ($self:ident.$method:ident($($args:ident),*)) => {
         match $self {
-            Self::Direct(d) => d.$method($($args),+).await,
-            Self::Multiplexed(d) => d.$method($($args),+).await,
-            Self::Mock(d) => d.$method($($args),+).await,
-        }
-    };
-    ($self:ident.$method:ident()) => {
-        match $self {
-            Self::Direct(d) => d.$method().await,
-            Self::Multiplexed(m) => m.$method().await,
-            Self::Mock(d) => d.$method().await,
+            Self::Direct(d) => d.$method($($args),*).await,
+            Self::Multiplexed(d) => d.$method($($args),*).await,
+            Self::Mock(d) => d.$method($($args),*).await,
         }
     }
-
 }
 
 impl EthereumGateway {
@@ -189,9 +181,11 @@ impl EthereumGateway {
     ) -> Result<U256, anyhow::Error> {
         delegate_call!(self.allowance(token_address, erc20_abi))
     }
+
     pub async fn get_tx_status(&self, hash: H256) -> anyhow::Result<Option<ExecutedTxStatus>> {
         delegate_call!(self.get_tx_status(hash))
     }
+
     /// Encodes the transaction data (smart contract method and its input) to the bytes
     /// without creating an actual transaction.
     pub async fn call_main_contract_function<R, A, B, P>(
