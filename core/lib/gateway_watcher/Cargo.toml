@@ -1,0 +1,22 @@
+[package]
+name = "zksync_gateway_watcher"
+version = "1.0.0"
+edition = "2018"
+authors = ["The Matter Labs Team <hello@matterlabs.dev>"]
+homepage = "https://zksync.io/"
+repository = "https://github.com/matter-labs/zksync"
+license = "Apache-2.0"
+keywords = ["blockchain", "zksync"]
+categories = ["cryptography"]
+
+[dependencies]
+zksync_config = { path = "../../lib/config", version = "1.0" }
+zksync_eth_client = { path = "../../lib/eth_client", version = "1.0" }
+zksync_utils = { path = "../../lib/utils", version = "1.0" }
+
+thiserror = "1.0"
+futures = "0.3"
+vlog = { path = "../../lib/vlog", version = "1.0" }
+web3 = "0.13.0"
+tokio = { version = "0.2", features = ["rt-core"] }
+metrics = "=0.13.0-alpha.8"
