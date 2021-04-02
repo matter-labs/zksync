@@ -34,7 +34,9 @@ pub enum MintNFTParsingError {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MintNFTOp {
     pub tx: MintNFT,
-    pub account_id: AccountId,
+    pub creator_account_id: AccountId,
+    pub recipient_account_id: AccountId,
+    pub token_account_id: AccountId,
 }
 
 impl MintNFTOp {
@@ -43,13 +45,10 @@ impl MintNFTOp {
 
     pub fn get_public_data(&self) -> Vec<u8> {
         let mut data = vec![Self::OP_CODE];
-        data.extend_from_slice(&self.account_id.to_be_bytes()); // Creator account id
-        data.extend_from_slice(&self.tx.id.to_be_bytes());
-        data.extend_from_slice(&self.tx.account_id.to_be_bytes());
-        data.extend_from_slice(&self.tx.serial_id.to_be_bytes());
-        data.extend_from_slice(&self.tx.address.as_bytes());
+        data.extend_from_slice(&self.tx.creator_id.to_be_bytes());
+        data.extend_from_slice(&self.tx.creator_address.as_bytes());
         data.extend_from_slice(&self.tx.content_hash.as_bytes());
-        data.extend_from_slice(&self.tx.recipient_account_id.to_be_bytes());
+        data.extend_from_slice(&self.tx.recipient.as_bytes());
         data.resize(Self::CHUNKS * CHUNK_BYTES, 0x00);
         data
     }
@@ -106,31 +105,28 @@ impl MintNFTOp {
                 .ok_or(MintNFTParsingError::FeeTokenId)?;
         let nonce = 0; // It is unknown from pubdata
 
-        let time_range = Default::default();
-        Ok(Self {
-            tx: MintNFT::new(
-                TokenId(token_id),
-                AccountId(token_account_id),
-                serial_id,
-                AccountId(creator_account_id),
-                token_address,
-                content_hash,
-                AccountId(recipient_account_id),
-                fee,
-                TokenId(fee_token_id),
-                Nonce(nonce),
-                time_range,
-                None,
-            ),
-            account_id: AccountId(creator_account_id),
-        })
+        todo!()
+        // let time_range = Default::default();
+        // Ok(Self {
+        //     tx: MintNFT::new(
+        //         AccountId(token_account_id),
+        //         serial_id,
+        //         AccountId(creator_account_id),
+        //         token_address,
+        //         content_hash,
+        //         AccountId(recipient_account_id),
+        //         fee,
+        //         TokenId(fee_token_id),
+        //         Nonce(nonce),
+        //         time_range,
+        //         None,
+        //     ),
+        //     creator_account_id: AccountId(creator_account_id),
+        //     recipient_account_id: AccountId(recipient_account_id),
+        // })
     }
 
     pub fn get_updated_account_ids(&self) -> Vec<AccountId> {
-        vec![
-            self.account_id,
-            self.tx.account_id,
-            self.tx.recipient_account_id,
-        ]
+        vec![self.recipient_account_id, self.creator_account_id]
     }
 }

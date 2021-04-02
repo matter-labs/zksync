@@ -123,7 +123,7 @@ impl ZkSyncTx {
             ZkSyncTx::Close(tx) => tx.account,
             ZkSyncTx::ChangePubKey(tx) => tx.account,
             ZkSyncTx::ForcedExit(tx) => tx.target,
-            ZkSyncTx::MintNFT(tx) => todo!(),
+            ZkSyncTx::MintNFT(tx) => tx.creator_address,
         }
     }
 
@@ -325,7 +325,7 @@ impl ZkSyncTx {
             ZkSyncTx::MintNFT(mint_nft) => Some((
                 TxFeeTypes::MintNFT,
                 TokenLike::Id(mint_nft.fee_token),
-                Default::default(), // TODO verify necessary of address in fee
+                mint_nft.creator_address,
                 mint_nft.fee.clone(),
             )),
         }

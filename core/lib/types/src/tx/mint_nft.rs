@@ -17,19 +17,13 @@ use crate::{
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MintNFT {
-    /// id
-    pub id: TokenId,
-    /// id is used for calculating address, make it unique, must be the same as id
-    pub account_id: AccountId,
-    pub serial_id: u32,
-    /// id of nft creator
     pub creator_id: AccountId,
-    /// L2 token address
-    pub address: Address,
+    /// id of nft creator
+    pub creator_address: Address,
     /// hash of data in nft token
     pub content_hash: H256,
     /// recipient account
-    pub recipient_account_id: AccountId,
+    pub recipient: Address,
     #[serde(with = "BigUintSerdeAsRadix10Str")]
     pub fee: BigUint,
     /// Token to be used for fee.
@@ -56,13 +50,10 @@ impl MintNFT {
     /// in some cases (e.g. when restoring the network state from the L1 contract data).
     #[allow(clippy::too_many_arguments)]
     pub fn new(
-        id: TokenId,
-        account_id: AccountId,
-        serial_id: u32,
         creator_id: AccountId,
-        address: Address,
+        creator_address: Address,
         content_hash: H256,
-        recipient_account_id: AccountId,
+        recipient: Address,
         fee: BigUint,
         fee_token: TokenId,
         nonce: Nonce,
@@ -70,13 +61,10 @@ impl MintNFT {
         signature: Option<TxSignature>,
     ) -> Self {
         let mut tx = Self {
-            id,
-            account_id,
-            serial_id,
             creator_id,
-            address,
+            creator_address,
             content_hash,
-            recipient_account_id,
+            recipient,
             fee,
             fee_token,
             nonce,
@@ -94,13 +82,10 @@ impl MintNFT {
     /// checks for the transaction correcteness.
     #[allow(clippy::too_many_arguments)]
     pub fn new_signed(
-        id: TokenId,
-        account_id: AccountId,
-        serial_id: u32,
         creator_id: AccountId,
-        address: Address,
+        creator_address: Address,
         content_hash: H256,
-        recipient_account_id: AccountId,
+        recipient: Address,
         fee: BigUint,
         fee_token: TokenId,
         nonce: Nonce,
@@ -108,13 +93,10 @@ impl MintNFT {
         private_key: &PrivateKey<Engine>,
     ) -> Result<Self, anyhow::Error> {
         let mut tx = Self::new(
-            id,
-            account_id,
-            serial_id,
             creator_id,
-            address,
+            creator_address,
             content_hash,
-            recipient_account_id,
+            recipient,
             fee,
             fee_token,
             nonce,
@@ -132,13 +114,10 @@ impl MintNFT {
     pub fn get_bytes(&self) -> Vec<u8> {
         let mut out = Vec::new();
         out.extend_from_slice(&[Self::TX_TYPE]);
-        out.extend_from_slice(&self.id.to_be_bytes());
-        out.extend_from_slice(&self.account_id.to_be_bytes());
-        out.extend_from_slice(&self.serial_id.to_be_bytes());
         out.extend_from_slice(&self.creator_id.to_be_bytes());
-        out.extend_from_slice(&self.address.as_bytes());
+        out.extend_from_slice(&self.creator_address.as_bytes());
         out.extend_from_slice(&self.content_hash.as_bytes());
-        out.extend_from_slice(&self.recipient_account_id.to_be_bytes());
+        out.extend_from_slice(&self.recipient.as_bytes());
         out.extend_from_slice(&pack_fee_amount(&self.fee));
         out.extend_from_slice(&self.fee_token.to_be_bytes());
         out.extend_from_slice(&self.nonce.to_be_bytes());
@@ -157,10 +136,7 @@ impl MintNFT {
     pub fn check_correctness(&mut self) -> bool {
         let mut valid = self.fee <= BigUint::from(u128::max_value())
             && is_fee_amount_packable(&self.fee)
-            && self.account_id <= max_account_id()
             && self.creator_id <= max_account_id()
-            && self.recipient_account_id <= max_account_id()
-            && self.id <= max_token_id()
             && self.fee_token <= max_token_id()
             && self.time_range.check_correctness();
         if valid {
@@ -189,7 +165,7 @@ impl MintNFT {
         let mut message = format!(
             "MintNFT {content} for: {recipient}",
             content = self.content_hash,
-            recipient = self.recipient_account_id
+            recipient = self.recipient
         );
         if !self.fee.is_zero() {
             message.push('\n');
@@ -213,5 +189,9 @@ impl MintNFT {
         }
         message.push_str(format!("Nonce: {}", self.nonce).as_str());
         message
+    }
+
+    pub fn calculate_address(&self, serial_id: u32) -> Address {
+        todo!()
     }
 }
