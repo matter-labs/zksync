@@ -3,11 +3,8 @@ use std::time::Duration;
 use zksync::{ethereum::PriorityOpHolder, operations::SyncTransactionHandle, provider::Provider};
 use zksync_types::{TransactionReceipt, TxFeeTypes, U256};
 
+use crate::constants::*;
 use crate::{account::AccountLifespan, account_pool::AccountPool, config::LoadtestConfig};
-
-const ETH_CONFIRMATION_TIMEOUT: Duration = Duration::from_secs(60);
-const COMMIT_TIMEOUT: Duration = Duration::from_secs(600);
-const POLLING_INTERVAL: Duration = Duration::from_secs(3);
 
 #[derive(Debug)]
 pub struct Executor {
@@ -176,6 +173,7 @@ impl Executor {
         let master_wallet = &mut self.pool.master_wallet;
         let accounts_amount = config.accounts_amount;
         let token = &config.main_token;
+        let addresses = self.pool.addresses.clone();
 
         let for_fees = u64::max_value() >> 24; // Leave some spare funds on the master account for fees.
         let funds_to_distribute = account_balance - u128::from(for_fees);
@@ -299,7 +297,7 @@ impl Executor {
                 .accounts
                 .drain(..accounts_to_process)
                 .map(|wallet| {
-                    let account = AccountLifespan::new(config, wallet);
+                    let account = AccountLifespan::new(config, addresses.clone(), wallet);
                     tokio::spawn(account.run())
                 })
                 .collect();

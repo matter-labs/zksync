@@ -1,10 +1,38 @@
-use std::{collections::VecDeque, str::FromStr};
+use std::{
+    collections::VecDeque,
+    str::FromStr,
+    sync::{Arc, RwLock},
+};
+
+use rand::{thread_rng, Rng};
 
 use zksync::{utils::private_key_from_seed, RpcProvider, Wallet, WalletCredentials};
 use zksync_eth_signer::PrivateKeySigner;
 use zksync_types::{tx::PackedEthSignature, Address, H256};
 
 use crate::config::LoadtestConfig;
+
+#[derive(Debug, Clone)]
+pub struct AddressPool {
+    pub addresses: Arc<RwLock<Vec<Address>>>,
+}
+
+impl AddressPool {
+    pub fn new(addresses: Vec<Address>) -> Self {
+        Self {
+            addresses: Arc::new(RwLock::new(addresses)),
+        }
+    }
+
+    pub fn random_address(&self) -> Address {
+        let rng = &mut thread_rng();
+
+        let addresses = self.addresses.read().unwrap();
+        let index = rng.gen_range(0, addresses.len());
+
+        addresses[index]
+    }
+}
 
 /// Credentials for a test account.
 /// Currently we support only EOA accounts.
@@ -27,7 +55,7 @@ impl AccountCredentials {
 pub struct AccountPool {
     pub master_wallet: Wallet<PrivateKeySigner, RpcProvider>,
     pub accounts: VecDeque<Wallet<PrivateKeySigner, RpcProvider>>,
-    pub addresses: Vec<Address>,
+    pub addresses: AddressPool,
 }
 
 impl AccountPool {
@@ -72,7 +100,7 @@ impl AccountPool {
         Self {
             master_wallet,
             accounts,
-            addresses,
+            addresses: AddressPool::new(addresses),
         }
     }
 }
