@@ -183,7 +183,6 @@ impl ZkSyncOp {
         match self {
             ZkSyncOp::Deposit(op) => Ok(ZkSyncPriorityOp::Deposit(op.priority_op.clone())),
             ZkSyncOp::FullExit(op) => Ok(ZkSyncPriorityOp::FullExit(op.priority_op.clone())),
-            ZkSyncOp::MintNFTOp(op) => Ok(ZkSyncPriorityOp::MintNFT(op.priority_op.clone())),
             _ => Err(format_err!("Wrong operation type")),
         }
     }
@@ -223,10 +222,7 @@ impl ZkSyncOp {
     }
 
     pub fn is_priority_op(&self) -> bool {
-        matches!(
-            self,
-            &ZkSyncOp::Deposit(_) | &ZkSyncOp::FullExit(_) | &ZkSyncOp::MintNFTOp(_)
-        )
+        matches!(self, &ZkSyncOp::Deposit(_) | &ZkSyncOp::FullExit(_))
     }
 }
 

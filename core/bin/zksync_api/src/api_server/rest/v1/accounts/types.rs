@@ -73,9 +73,6 @@ pub(super) mod convert {
                 ZkSyncPriorityOp::FullExit(other) => {
                     panic!("Incorrect input for DepositingBalances: {:?}", other);
                 }
-                ZkSyncPriorityOp::MintNFT(other) => {
-                    panic!("Incorrect input for DepositingBalances: {:?}", other);
-                }
             };
 
             let token_symbol = tokens

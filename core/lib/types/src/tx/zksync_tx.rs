@@ -4,9 +4,10 @@ use serde::{Deserialize, Serialize};
 
 use zksync_basic_types::{AccountId, Address};
 
+use crate::operations::MintNFTOp;
 use crate::{
     operations::ChangePubKeyOp,
-    tx::{ChangePubKey, Close, ForcedExit, Transfer, TxEthSignature, TxHash, Withdraw},
+    tx::{ChangePubKey, Close, ForcedExit, MintNFT, Transfer, TxEthSignature, TxHash, Withdraw},
     utils::deserialize_eth_message,
     CloseOp, ForcedExitOp, Nonce, Token, TokenId, TokenLike, TransferOp, TxFeeTypes, WithdrawOp,
 };
@@ -40,6 +41,7 @@ pub enum ZkSyncTx {
     Close(Box<Close>),
     ChangePubKey(Box<ChangePubKey>),
     ForcedExit(Box<ForcedExit>),
+    MintNFT(Box<MintNFT>),
 }
 
 impl From<Transfer> for ZkSyncTx {
@@ -51,6 +53,12 @@ impl From<Transfer> for ZkSyncTx {
 impl From<Withdraw> for ZkSyncTx {
     fn from(withdraw: Withdraw) -> Self {
         Self::Withdraw(Box::new(withdraw))
+    }
+}
+
+impl From<MintNFT> for ZkSyncTx {
+    fn from(mint_nft: MintNFT) -> Self {
+        Self::MintNFT(Box::new(mint_nft))
     }
 }
 
@@ -98,6 +106,7 @@ impl ZkSyncTx {
             ZkSyncTx::Close(tx) => tx.get_bytes(),
             ZkSyncTx::ChangePubKey(tx) => tx.get_bytes(),
             ZkSyncTx::ForcedExit(tx) => tx.get_bytes(),
+            ZkSyncTx::MintNFT(tx) => tx.get_bytes(),
         };
 
         let hash = sha256(&bytes);
@@ -114,6 +123,7 @@ impl ZkSyncTx {
             ZkSyncTx::Close(tx) => tx.account,
             ZkSyncTx::ChangePubKey(tx) => tx.account,
             ZkSyncTx::ForcedExit(tx) => tx.target,
+            ZkSyncTx::MintNFT(tx) => todo!(),
         }
     }
 
@@ -123,6 +133,7 @@ impl ZkSyncTx {
             ZkSyncTx::Withdraw(tx) => Ok(tx.account_id),
             ZkSyncTx::ChangePubKey(tx) => Ok(tx.account_id),
             ZkSyncTx::ForcedExit(tx) => Ok(tx.initiator_account_id),
+            ZkSyncTx::MintNFT(tx) => Ok(tx.creator_id),
             ZkSyncTx::Close(_) => Err(anyhow::anyhow!("Close operations are disabled")),
         }
     }
@@ -135,6 +146,7 @@ impl ZkSyncTx {
             ZkSyncTx::Close(tx) => tx.nonce,
             ZkSyncTx::ChangePubKey(tx) => tx.nonce,
             ZkSyncTx::ForcedExit(tx) => tx.nonce,
+            ZkSyncTx::MintNFT(tx) => tx.nonce,
         }
     }
 
@@ -149,6 +161,7 @@ impl ZkSyncTx {
             ZkSyncTx::Close(_) => ETH_TOKEN_ID,
             ZkSyncTx::ChangePubKey(tx) => tx.fee_token,
             ZkSyncTx::ForcedExit(tx) => tx.token,
+            ZkSyncTx::MintNFT(tx) => tx.fee_token,
         }
     }
 
@@ -163,6 +176,7 @@ impl ZkSyncTx {
             ZkSyncTx::Close(tx) => tx.check_correctness(),
             ZkSyncTx::ChangePubKey(tx) => tx.check_correctness(),
             ZkSyncTx::ForcedExit(tx) => tx.check_correctness(),
+            ZkSyncTx::MintNFT(tx) => tx.check_correctness(),
         }
     }
 
@@ -179,6 +193,9 @@ impl ZkSyncTx {
                 Some(tx.get_ethereum_sign_message(&token.symbol, token.decimals))
             }
             ZkSyncTx::ForcedExit(tx) => {
+                Some(tx.get_ethereum_sign_message(&token.symbol, token.decimals))
+            }
+            ZkSyncTx::MintNFT(tx) => {
                 Some(tx.get_ethereum_sign_message(&token.symbol, token.decimals))
             }
             _ => None,
@@ -217,6 +234,9 @@ impl ZkSyncTx {
             ZkSyncTx::ForcedExit(tx) => {
                 Some(tx.get_ethereum_sign_message_part(&token.symbol, token.decimals))
             }
+            ZkSyncTx::MintNFT(tx) => {
+                Some(tx.get_ethereum_sign_message_part(&token.symbol, token.decimals))
+            }
             _ => None,
         }
     }
@@ -229,6 +249,7 @@ impl ZkSyncTx {
             ZkSyncTx::Close(tx) => tx.get_bytes(),
             ZkSyncTx::ChangePubKey(tx) => tx.get_bytes(),
             ZkSyncTx::ForcedExit(tx) => tx.get_bytes(),
+            ZkSyncTx::MintNFT(tx) => tx.get_bytes(),
         }
     }
 
@@ -242,6 +263,7 @@ impl ZkSyncTx {
             ZkSyncTx::Close(_) => CloseOp::CHUNKS,
             ZkSyncTx::ChangePubKey(_) => ChangePubKeyOp::CHUNKS,
             ZkSyncTx::ForcedExit(_) => ForcedExitOp::CHUNKS,
+            ZkSyncTx::MintNFT(_) => MintNFTOp::CHUNKS,
         }
     }
 
@@ -299,7 +321,13 @@ impl ZkSyncTx {
                 change_pubkey.account,
                 change_pubkey.fee.clone(),
             )),
-            _ => None,
+            ZkSyncTx::Close(_) => None,
+            ZkSyncTx::MintNFT(mint_nft) => Some((
+                TxFeeTypes::MintNFT,
+                TokenLike::Id(mint_nft.fee_token),
+                Default::default(), // TODO verify necessary of address in fee
+                mint_nft.fee.clone(),
+            )),
         }
     }
 
@@ -311,6 +339,7 @@ impl ZkSyncTx {
             ZkSyncTx::ChangePubKey(tx) => tx.time_range.unwrap_or_default().valid_from,
             ZkSyncTx::ForcedExit(tx) => tx.time_range.valid_from,
             ZkSyncTx::Close(tx) => tx.time_range.valid_from,
+            ZkSyncTx::MintNFT(tx) => tx.time_range.valid_from,
         }
     }
 }

@@ -180,9 +180,6 @@ impl ZkSyncState {
             ZkSyncPriorityOp::FullExit(op) => self
                 .apply_tx(op)
                 .expect("Priority operation execution failed"),
-            ZkSyncPriorityOp::MintNFT(op) => self
-                .apply_tx(op)
-                .expect("Priority operation execution failed"),
         }
     }
 
@@ -238,11 +235,8 @@ impl ZkSyncState {
                     account.nonce = new_nonce;
                     self.insert_account(account_id, account);
                 }
-                AccountUpdate::MintNFT { .. } => {
-                    todo!()
-                }
-                AccountUpdate::RemoveToken { .. } => {
-                    todo!()
+                AccountUpdate::MintNFT | AccountUpdate::RemoveToken => {
+                    // There are no changes in state
                 }
             }
         }
@@ -295,6 +289,7 @@ impl ZkSyncState {
             ZkSyncTx::Close(tx) => self.apply_tx(*tx),
             ZkSyncTx::ChangePubKey(tx) => self.apply_tx(*tx),
             ZkSyncTx::ForcedExit(tx) => self.apply_tx(*tx),
+            ZkSyncTx::MintNFT(tx) => self.apply_tx(*tx),
         }
     }
 
@@ -376,6 +371,7 @@ impl ZkSyncState {
             ZkSyncTx::ChangePubKey(tx) => self.create_op(*tx).map(Into::into),
             ZkSyncTx::Close(_) => anyhow::bail!("Close op is disabled"),
             ZkSyncTx::ForcedExit(tx) => self.create_op(*tx).map(Into::into),
+            ZkSyncTx::MintNFT(tx) => self.create_op(*tx).map(Into::into),
         }
     }
 
@@ -384,7 +380,6 @@ impl ZkSyncState {
         match op {
             ZkSyncPriorityOp::Deposit(op) => self.create_op(op).unwrap().into(),
             ZkSyncPriorityOp::FullExit(op) => self.create_op(op).unwrap().into(),
-            ZkSyncPriorityOp::MintNFT(op) => self.create_op(op).unwrap().into(),
         }
     }
 

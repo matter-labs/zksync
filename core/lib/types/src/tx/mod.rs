@@ -8,6 +8,7 @@ mod transfer;
 mod withdraw;
 mod zksync_tx;
 
+mod mint_nft;
 #[cfg(test)]
 mod tests;
 
@@ -20,6 +21,7 @@ pub use self::{
         ChangePubKeyType,
     },
     forced_exit::ForcedExit,
+    mint_nft::MintNFT,
     transfer::Transfer,
     withdraw::Withdraw,
     zksync_tx::{EthSignData, SignedZkSyncTx, ZkSyncTx},

@@ -745,6 +745,15 @@ impl TxSender {
                     .into_bytes();
                 Some(msg)
             }
+
+            ZkSyncTx::MintNFT(tx) => {
+                let token = self.token_info_from_id(tx.fee_token).await?;
+
+                let msg = tx
+                    .get_ethereum_sign_message(&token.symbol, token.decimals)
+                    .into_bytes();
+                Some(msg)
+            }
             _ => None,
         })
     }

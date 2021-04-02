@@ -1,3 +1,4 @@
+use zksync_types::operations::MintNFTOp;
 use zksync_types::{
     gas_counter::{CommitCost, VerifyCost},
     ChangePubKeyOp, TransferOp, TransferToNewOp, WithdrawOp,
@@ -30,6 +31,9 @@ pub(crate) const BASE_CHANGE_PUBKEY_CREATE2_COST: u64 = CommitCost::CHANGE_PUBKE
 pub(crate) const BASE_CHANGE_PUBKEY_ONCHAIN_COST: u64 = CommitCost::CHANGE_PUBKEY_COST_ONCHAIN
     + VerifyCost::CHANGE_PUBKEY_COST
     + AMORTIZED_COST_PER_CHUNK * (ChangePubKeyOp::CHUNKS as u64);
+pub(crate) const BASE_MINT_NFT_COST: u64 = VerifyCost::MINT_NFT_COST
+    + CommitCost::MINT_TOKEN_COST
+    + AMORTIZED_COST_PER_CHUNK * (MintNFTOp::CHUNKS as u64); // TODO Verify this constant
 
 // The Subsidized cost of operations.
 // Represent the cost of performing operations after recursion is introduced to mainnet.

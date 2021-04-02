@@ -1,11 +1,12 @@
-use crate::{AccountId, Address, TokenId};
+use crate::{AccountId, Address, Nonce, TokenId};
 use crate::{MintNFT, H256};
 
+use crate::helpers::unpack_fee_amount;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use zksync_crypto::params::{
-    ACCOUNT_ID_BIT_WIDTH, ADDRESS_WIDTH, CHUNK_BYTES, CONTENT_HASH_WIDTH, SERIAL_ID_BIT_WIDTH,
-    TOKEN_BIT_WIDTH,
+    ACCOUNT_ID_BIT_WIDTH, ADDRESS_WIDTH, CHUNK_BYTES, CONTENT_HASH_WIDTH, FEE_EXPONENT_BIT_WIDTH,
+    FEE_MANTISSA_BIT_WIDTH, SERIAL_ID_BIT_WIDTH, TOKEN_BIT_WIDTH,
 };
 use zksync_crypto::primitives::FromBytes;
 
@@ -17,18 +18,22 @@ pub enum MintNFTParsingError {
     CreatorAccountId,
     #[error("Cannot parse token id")]
     TokenId,
+    #[error("Cannot parse fee token id")]
+    FeeTokenId,
     #[error("Cannot parse token account id")]
     AccountId,
     #[error("Cannot parse serial id")]
     SerialId,
     #[error("Cannot parse recipient account id")]
     RecipientAccountId,
+    #[error("Cannot parse fee")]
+    Fee,
 }
 
 /// Deposit operation. For details, see the documentation of [`ZkSyncOp`](./operations/enum.ZkSyncOp.html).
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MintNFTOp {
-    pub priority_op: MintNFT,
+    pub tx: MintNFT,
     pub account_id: AccountId,
 }
 
@@ -39,12 +44,12 @@ impl MintNFTOp {
     pub fn get_public_data(&self) -> Vec<u8> {
         let mut data = vec![Self::OP_CODE];
         data.extend_from_slice(&self.account_id.to_be_bytes()); // Creator account id
-        data.extend_from_slice(&self.priority_op.id.to_be_bytes());
-        data.extend_from_slice(&self.priority_op.account_id.to_be_bytes());
-        data.extend_from_slice(&self.priority_op.serial_id.to_be_bytes());
-        data.extend_from_slice(&self.priority_op.address.as_bytes());
-        data.extend_from_slice(&self.priority_op.content_hash.as_bytes());
-        data.extend_from_slice(&self.priority_op.recipient_account_id.to_be_bytes());
+        data.extend_from_slice(&self.tx.id.to_be_bytes());
+        data.extend_from_slice(&self.tx.account_id.to_be_bytes());
+        data.extend_from_slice(&self.tx.serial_id.to_be_bytes());
+        data.extend_from_slice(&self.tx.address.as_bytes());
+        data.extend_from_slice(&self.tx.content_hash.as_bytes());
+        data.extend_from_slice(&self.tx.recipient_account_id.to_be_bytes());
         data.resize(Self::CHUNKS * CHUNK_BYTES, 0x00);
         data
     }
@@ -61,6 +66,8 @@ impl MintNFTOp {
         let address_offset = serial_id_offset + SERIAL_ID_BIT_WIDTH / 8;
         let content_hash_offset = address_offset + ADDRESS_WIDTH / 8;
         let recipient_account_id_offset = content_hash_offset + CONTENT_HASH_WIDTH / 8;
+        let fee_offset = recipient_account_id_offset + ACCOUNT_ID_BIT_WIDTH / 8;
+        let fee_token_offset = fee_offset + (FEE_EXPONENT_BIT_WIDTH + FEE_MANTISSA_BIT_WIDTH) / 8;
 
         let creator_account_id = u32::from_bytes(
             &bytes[account_id_offset..account_id_offset + ACCOUNT_ID_BIT_WIDTH / 8],
@@ -90,16 +97,31 @@ impl MintNFTOp {
         )
         .ok_or(MintNFTParsingError::RecipientAccountId)?;
 
+        let fee = unpack_fee_amount(
+            &bytes[fee_offset..fee_offset + (FEE_EXPONENT_BIT_WIDTH + FEE_MANTISSA_BIT_WIDTH) / 8],
+        )
+        .ok_or(MintNFTParsingError::Fee)?;
+        let fee_token_id =
+            u32::from_bytes(&bytes[fee_token_offset..fee_token_offset + TOKEN_BIT_WIDTH / 8])
+                .ok_or(MintNFTParsingError::FeeTokenId)?;
+        let nonce = 0; // It is unknown from pubdata
+
+        let time_range = Default::default();
         Ok(Self {
-            priority_op: MintNFT {
-                id: TokenId(token_id),
-                account_id: AccountId(token_account_id),
+            tx: MintNFT::new(
+                TokenId(token_id),
+                AccountId(token_account_id),
                 serial_id,
-                creator_id: AccountId(creator_account_id),
-                address: token_address,
+                AccountId(creator_account_id),
+                token_address,
                 content_hash,
-                recipient_account_id: AccountId(recipient_account_id),
-            },
+                AccountId(recipient_account_id),
+                fee,
+                TokenId(fee_token_id),
+                Nonce(nonce),
+                time_range,
+                None,
+            ),
             account_id: AccountId(creator_account_id),
         })
     }
@@ -107,8 +129,8 @@ impl MintNFTOp {
     pub fn get_updated_account_ids(&self) -> Vec<AccountId> {
         vec![
             self.account_id,
-            self.priority_op.account_id,
-            self.priority_op.recipient_account_id,
+            self.tx.account_id,
+            self.tx.recipient_account_id,
         ]
     }
 }

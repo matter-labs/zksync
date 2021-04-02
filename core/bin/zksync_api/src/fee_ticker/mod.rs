@@ -50,6 +50,7 @@ use crate::fee_ticker::{
 };
 use crate::utils::token_db_cache::TokenDBCache;
 use num::bigint::ToBigInt;
+use zksync_types::operations::MintNFTOp;
 
 mod constants;
 mod ticker_api;
@@ -82,6 +83,7 @@ impl GasOperationsCost {
                 OutputFeeType::Transfer,
                 constants::BASE_TRANSFER_COST.into(),
             ),
+            (OutputFeeType::MintNFT, constants::BASE_MINT_NFT_COST.into()),
             (
                 OutputFeeType::TransferToNew,
                 constants::BASE_TRANSFER_TO_NEW_COST.into(),
@@ -662,6 +664,7 @@ impl<API: FeeTickerAPI, INFO: FeeTickerInfo, WATCHER: TokenWatcher> FeeTicker<AP
             TxFeeTypes::ChangePubKey(arg) => {
                 (OutputFeeType::ChangePubKey(arg), ChangePubKeyOp::CHUNKS)
             }
+            TxFeeTypes::MintNFT => (OutputFeeType::MintNFT, MintNFTOp::CHUNKS),
         };
         // Convert chunks amount to `BigUint`.
         let op_chunks = BigUint::from(op_chunks);
