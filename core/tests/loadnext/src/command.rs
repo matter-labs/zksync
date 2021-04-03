@@ -1,5 +1,6 @@
+use num::BigUint;
 use rand::{thread_rng, Rng};
-use zksync_types::{Address, U256};
+use zksync_types::Address;
 
 use crate::account_pool::AddressPool;
 
@@ -130,12 +131,12 @@ impl IncorrectnessModifier {
     }
 }
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Clone)]
 pub struct TxCommand {
     pub command_type: TxType,
     pub modifier: IncorrectnessModifier,
     pub to: Address,
-    pub amount: U256,
+    pub amount: BigUint,
 }
 
 impl TxCommand {
@@ -148,7 +149,7 @@ impl TxCommand {
         }
     }
 
-    pub fn random(addresses: &AddressPool) -> Self {
+    pub fn random(own_address: Address, addresses: &AddressPool) -> Self {
         let mut command = Self {
             command_type: TxType::random(),
             modifier: IncorrectnessModifier::random(),
@@ -156,9 +157,28 @@ impl TxCommand {
             amount: Self::random_amount(),
         };
 
+        // Check whether we should use a non-existent address.
+        if matches!(command.command_type, TxType::TransferToNew) {
+            command.to = Address::random();
+        }
+
+        // Check whether we should use a self as an target.
+        if matches!(
+            command.command_type,
+            TxType::WithdrawToSelf | TxType::FullExitToSelf
+        ) {
+            command.to = own_address;
+        }
+
         // `ChangePubKey` does not have a 2FA signature.
         let cpk_incorrect_signature = command.command_type == TxType::ChangePubKey
             && command.modifier == IncorrectnessModifier::IncorrectEthSignature;
+        // Transactions that have no amount field.
+        let no_amount_field = matches!(command.command_type, TxType::ChangePubKey)
+            && matches!(
+                command.modifier,
+                IncorrectnessModifier::TooBigAmount | IncorrectnessModifier::NotPackableAmount
+            );
         // It doesn't make sense to fail contract-based functions.
         let incorrect_priority_op = matches!(
             command.command_type,
@@ -166,14 +186,14 @@ impl TxCommand {
         );
 
         // Check whether generator modifier does not make sense.
-        if cpk_incorrect_signature || incorrect_priority_op {
+        if cpk_incorrect_signature || no_amount_field || incorrect_priority_op {
             command.modifier = IncorrectnessModifier::None;
         }
 
         command
     }
 
-    fn random_amount() -> U256 {
+    fn random_amount() -> BigUint {
         let rng = &mut thread_rng();
         rng.gen_range(0u64, 2u64.pow(18)).into()
     }

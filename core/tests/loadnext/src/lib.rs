@@ -5,3 +5,4 @@ pub mod config;
 pub mod constants;
 pub mod corrupted_tx;
 pub mod executor;
+pub mod report;

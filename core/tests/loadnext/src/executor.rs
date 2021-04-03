@@ -1,10 +1,14 @@
 use std::time::Duration;
 
+use futures::channel::mpsc;
+
 use zksync::{ethereum::PriorityOpHolder, operations::SyncTransactionHandle, provider::Provider};
 use zksync_types::{TransactionReceipt, TxFeeTypes, U256};
 
 use crate::constants::*;
-use crate::{account::AccountLifespan, account_pool::AccountPool, config::LoadtestConfig};
+use crate::{
+    account::AccountLifespan, account_pool::AccountPool, config::LoadtestConfig, report::Report,
+};
 
 #[derive(Debug)]
 pub struct Executor {
@@ -167,6 +171,9 @@ impl Executor {
         // How many times we will resend a batch.
         const MAX_RETRIES: usize = 3;
 
+        // Prepare channels for the report collector.
+        let (report_sender, _report_receiver) = mpsc::channel(65535);
+
         let account_balance = self.amount_to_deposit();
 
         let config = &self.config;
@@ -297,7 +304,12 @@ impl Executor {
                 .accounts
                 .drain(..accounts_to_process)
                 .map(|wallet| {
-                    let account = AccountLifespan::new(config, addresses.clone(), wallet);
+                    let account = AccountLifespan::new(
+                        config,
+                        addresses.clone(),
+                        wallet,
+                        report_sender.clone(),
+                    );
                     tokio::spawn(account.run())
                 })
                 .collect();
