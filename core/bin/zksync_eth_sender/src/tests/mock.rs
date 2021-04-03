@@ -87,6 +87,13 @@ impl MockDatabase {
 
         assert!(is_confirmed);
     }
+
+    /// Returns the stored average gas price.
+    pub async fn average_gas_price(&self) -> U256 {
+        let eth_parameters = self.eth_parameters.read().await;
+
+        U256::from(eth_parameters.average_gas_price.unwrap_or_default() as u64)
+    }
 }
 
 #[async_trait::async_trait]

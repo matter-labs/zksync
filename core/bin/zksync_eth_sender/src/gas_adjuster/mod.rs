@@ -178,7 +178,7 @@ pub(super) struct GasStatistics {
 
 impl GasStatistics {
     /// Amount of entries in the gas price statistics pool.
-    const GAS_PRICE_SAMPLES_AMOUNT: usize = 10;
+    pub(crate) const GAS_PRICE_SAMPLES_AMOUNT: usize = 10;
 
     pub fn new(initial_max_price: U256) -> Self {
         Self {
