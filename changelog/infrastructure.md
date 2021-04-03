@@ -15,6 +15,8 @@ components, the logs will have the following format:
 
 ### Added
 
+- `loadnext` crate, a new implementation of the loadtest for zkSync.
+
 ### Fixed
 
 ## Release 2021-02-19
