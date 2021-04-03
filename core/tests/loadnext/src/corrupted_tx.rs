@@ -135,7 +135,7 @@ impl Corrupted for (ZkSyncTx, Option<PackedEthSignature>) {
     }
 
     fn not_packable_amount(mut self, eth_pk: H256, token_symbol: &str, decimals: u8) -> Self {
-        let bad_amount = BigUint::from(10u64.pow(10)) + BigUint::from(1u64);
+        let bad_amount = BigUint::from(10u64.pow(18)) + BigUint::from(1u64);
         match &mut self.0 {
             ZkSyncTx::ChangePubKey(_tx) => unreachable!("CPK doesn't have amount"),
             ZkSyncTx::ForcedExit(_tx) => unreachable!("ForcedExit doesn't have amount"),
@@ -153,7 +153,7 @@ impl Corrupted for (ZkSyncTx, Option<PackedEthSignature>) {
     }
 
     fn not_packable_fee(mut self, eth_pk: H256, token_symbol: &str, decimals: u8) -> Self {
-        let bad_fee = BigUint::from(10u64.pow(10)) + BigUint::from(1u64);
+        let bad_fee = BigUint::from(10u64.pow(18)) + BigUint::from(1u64);
         match &mut self.0 {
             ZkSyncTx::ChangePubKey(tx) => {
                 tx.fee = bad_fee;

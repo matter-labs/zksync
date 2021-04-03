@@ -175,12 +175,17 @@ impl Executor {
         let (report_sender, _report_receiver) = mpsc::channel(65535);
 
         let account_balance = self.amount_to_deposit();
+        let eth_to_distribute = self.eth_amount_to_distribute().await?;
 
         let config = &self.config;
         let master_wallet = &mut self.pool.master_wallet;
         let accounts_amount = config.accounts_amount;
         let token = &config.main_token;
         let addresses = self.pool.addresses.clone();
+        let ethereum = master_wallet
+            .ethereum(&self.config.web3_url)
+            .await
+            .expect("Can't get Ethereum client");
 
         let for_fees = u64::max_value() >> 24; // Leave some spare funds on the master account for fees.
         let funds_to_distribute = account_balance - u128::from(for_fees);
@@ -207,6 +212,17 @@ impl Executor {
 
             for account_number in 0..accounts_to_process {
                 let target_address = self.pool.accounts[account_number].0.address();
+
+                // Prior to sending funds in L2, we will send funds in L1 for accounts
+                // to be able to perform priority operations.
+                // We don't actually care whether transactions will be successful or not; at worst we will not use
+                // priority operations in test.
+                ethereum
+                    .transfer("ETH", eth_to_distribute, target_address)
+                    .await
+                    .unwrap_or_default();
+
+                // And then we will prepare an L2 transaction.
                 let (tx, signature) = master_wallet
                     .start_transfer()
                     .to(target_address)
@@ -293,12 +309,12 @@ impl Executor {
 
             // All is OK, batch was processed.
             retry_counter = 0;
-            accounts_processed += accounts_to_process;
             vlog::info!(
                 "[{}/{}] Batch succeeded",
                 accounts_processed,
                 accounts_amount
             );
+            accounts_processed += accounts_to_process;
 
             // Spawn each account lifespan.
             let new_account_futures =
@@ -325,6 +341,29 @@ impl Executor {
         vlog::info!("All the initial transfers are completed");
 
         Ok(account_futures)
+    }
+
+    /// Calculated amount of ETH to be distributed per account in order to make them
+    /// able to perform priority operations.
+    async fn eth_amount_to_distribute(&self) -> anyhow::Result<U256> {
+        let ethereum = self
+            .pool
+            .master_wallet
+            .ethereum(&self.config.web3_url)
+            .await
+            .expect("Can't get Ethereum client");
+
+        // Assuming that gas prices on testnets are somewhat stable, we will consider it a constant.
+        let average_gas_price = ethereum.client().get_gas_price().await?;
+
+        // Amount of gas required per priority operation at max.
+        let gas_per_priority_op = 120_000u64;
+
+        // Amount of priority operations expected to be made by account.
+        // We assume that 10% of operations made by account will be priority operations.
+        let priority_ops_per_account = self.config.operations_per_account / 10;
+
+        Ok(average_gas_price * gas_per_priority_op * priority_ops_per_account)
     }
 
     async fn wait_account_routines(&self, account_futures: Vec<JoinHandle<()>>) {
