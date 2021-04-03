@@ -6,8 +6,8 @@ use tokio::task::JoinHandle;
 use zksync::{ethereum::PriorityOpHolder, operations::SyncTransactionHandle, provider::Provider};
 use zksync_types::{TransactionReceipt, TxFeeTypes, U256};
 
-use crate::constants::*;
 use crate::{account::AccountLifespan, account_pool::AccountPool, config::LoadtestConfig};
+use crate::{constants::*, report_collector::ReportCollector};
 
 #[derive(Debug)]
 pub struct Executor {
@@ -172,7 +172,10 @@ impl Executor {
         const MAX_RETRIES: usize = 3;
 
         // Prepare channels for the report collector.
-        let (report_sender, _report_receiver) = mpsc::channel(65535);
+        let (report_sender, report_receiver) = mpsc::channel(65535);
+
+        let report_collector = ReportCollector::new(report_receiver);
+        tokio::spawn(report_collector.run());
 
         let account_balance = self.amount_to_deposit();
         let eth_to_distribute = self.eth_amount_to_distribute().await?;
