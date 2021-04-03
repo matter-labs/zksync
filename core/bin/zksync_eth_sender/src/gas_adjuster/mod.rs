@@ -125,11 +125,20 @@ impl<DB: DatabaseInterface> GasAdjuster<DB> {
                     return;
                 }
             };
+
+            let average_gas_price = match self.statistics.get_average_price() {
+                Some(price) => price,
+                None => {
+                    // Not enough data to update anything yet.
+                    return;
+                }
+            };
+
             let result = db
                 .update_gas_price_params(
                     &mut connection,
                     self.statistics.get_limit(),
-                    self.get_average_gas_price(),
+                    average_gas_price,
                 )
                 .await;
 
@@ -155,14 +164,6 @@ impl<DB: DatabaseInterface> GasAdjuster<DB> {
     /// Returns current max gas price that can be used to send transactions.
     pub fn get_current_max_price(&self) -> U256 {
         self.statistics.get_limit()
-    }
-
-    /// Get estimate of the average gas prices used for past transactions based on the current gas_limit.
-    pub fn get_average_gas_price(&self) -> U256 {
-        let scale_factor = parameters::limit_scale_factor();
-        let divider = U256::from((scale_factor * 100.0f64).round() as u64);
-        let multiplier = U256::from(100);
-        self.statistics.get_limit() * multiplier / divider
     }
 }
 
