@@ -11,8 +11,7 @@ pub enum TxType {
     TransferToExisting,
     WithdrawToSelf,
     WithdrawToOther,
-    FullExitToSelf,
-    FullExitToOther,
+    FullExit,
     ChangePubKey,
 }
 
@@ -25,8 +24,7 @@ impl TxType {
             Self::TransferToExisting,
             Self::WithdrawToSelf,
             Self::WithdrawToOther,
-            Self::FullExitToSelf,
-            Self::FullExitToOther,
+            Self::FullExit,
             Self::ChangePubKey,
         ];
 
@@ -165,7 +163,7 @@ impl TxCommand {
         // Check whether we should use a self as an target.
         if matches!(
             command.command_type,
-            TxType::WithdrawToSelf | TxType::FullExitToSelf
+            TxType::WithdrawToSelf | TxType::FullExit
         ) {
             command.to = own_address;
         }
@@ -180,10 +178,8 @@ impl TxCommand {
                 IncorrectnessModifier::TooBigAmount | IncorrectnessModifier::NotPackableAmount
             );
         // It doesn't make sense to fail contract-based functions.
-        let incorrect_priority_op = matches!(
-            command.command_type,
-            TxType::Deposit | TxType::FullExitToOther | TxType::FullExitToSelf
-        );
+        let incorrect_priority_op =
+            matches!(command.command_type, TxType::Deposit | TxType::FullExit);
 
         // Check whether generator modifier does not make sense.
         if cpk_incorrect_signature || no_amount_field || incorrect_priority_op {

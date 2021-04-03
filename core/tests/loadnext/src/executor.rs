@@ -6,9 +6,7 @@ use zksync::{ethereum::PriorityOpHolder, operations::SyncTransactionHandle, prov
 use zksync_types::{TransactionReceipt, TxFeeTypes, U256};
 
 use crate::constants::*;
-use crate::{
-    account::AccountLifespan, account_pool::AccountPool, config::LoadtestConfig, report::Report,
-};
+use crate::{account::AccountLifespan, account_pool::AccountPool, config::LoadtestConfig};
 
 #[derive(Debug)]
 pub struct Executor {

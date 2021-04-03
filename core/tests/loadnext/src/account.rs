@@ -1,13 +1,14 @@
-use std::time::Instant;
+use std::{convert::TryInto, time::Instant};
 
 use futures::{channel::mpsc::Sender, SinkExt};
 
 use num::BigUint;
 use zksync::{
-    error::ClientError, operations::SyncTransactionHandle, provider::Provider, RpcProvider, Wallet,
+    error::ClientError, ethereum::PriorityOpHolder, operations::SyncTransactionHandle,
+    provider::Provider, RpcProvider, Wallet,
 };
 use zksync_eth_signer::PrivateKeySigner;
-use zksync_types::{tx::PackedEthSignature, Token, ZkSyncTx, H256, U256};
+use zksync_types::{tx::PackedEthSignature, Token, TokenId, ZkSyncTx, H256};
 
 use crate::{
     account_pool::AddressPool,
@@ -88,9 +89,8 @@ impl AccountLifespan {
                 TxType::WithdrawToOther | TxType::WithdrawToSelf => {
                     self.execute_withdraw(&command).await
                 }
-                _ => {
-                    todo!()
-                }
+                TxType::Deposit => self.execute_deposit(&command).await,
+                TxType::FullExit => self.execute_full_exit().await,
             };
 
             match result {
@@ -175,14 +175,89 @@ impl AccountLifespan {
     /// Returns the balances for ETH and the main token on the L1.
     /// This function is used to check whether the L1 operation can be performed or should be
     /// skipped.
-    async fn l1_balances(&self) -> Result<(BigUint, U256), ClientError> {
+    async fn l1_balances(&self) -> Result<(BigUint, BigUint), ClientError> {
         let ethereum = self.wallet.ethereum(&self.config.web3_url).await?;
         let eth_balance = ethereum.balance().await?;
         let erc20_balance = ethereum
             .erc20_balance(self.wallet.address(), self.main_token.id)
             .await?;
 
+        // Casting via `low_u128` is safe here, since we don't use numbers higher than `u128::max_value()`.
+        let erc20_balance = erc20_balance.low_u128().into();
         Ok((eth_balance, erc20_balance))
+    }
+
+    async fn execute_deposit(&self, command: &TxCommand) -> Result<ReportLabel, ClientError> {
+        let balances = self.l1_balances().await?;
+        if balances.0 == 0u64.into() || balances.1 < command.amount {
+            // We don't have either funds in L1 to pay for tx or to deposit.
+            // It's not a problem with the server, thus we mark this operation as skipped.
+            return Ok(ReportLabel::skipped("No L1 balance"));
+        }
+
+        let ethereum = self.wallet.ethereum(&self.config.web3_url).await?;
+        // Convert BigUint into U256. We won't ever use values above `u128::max_value()`, but just in case we'll ever
+        // met such a value, we'll truncate it to the limit.
+        let amount = command
+            .amount
+            .clone()
+            .try_into()
+            .unwrap_or_else(|_| u128::max_value())
+            .into();
+        let eth_tx_hash = ethereum
+            .deposit(self.main_token.id, amount, self.wallet.address())
+            .await?;
+
+        self.handle_priority_op(eth_tx_hash).await
+    }
+
+    async fn execute_full_exit(&self) -> Result<ReportLabel, ClientError> {
+        let balances = self.l1_balances().await?;
+        if balances.0 == 0u64.into() {
+            // We don't have either funds in L1 to pay for tx.
+            return Ok(ReportLabel::skipped("No L1 balance"));
+        }
+
+        // We always call full exit for the ETH, since we don't want to leave the wallet without main token.
+        let exit_token_id = TokenId(0);
+
+        let account_id = match self.wallet.account_id() {
+            Some(id) => id,
+            None => {
+                return Ok(ReportLabel::skipped("L2 account was not initialized yet"));
+            }
+        };
+
+        let ethereum = self.wallet.ethereum(&self.config.web3_url).await?;
+        let eth_tx_hash = ethereum.full_exit(exit_token_id, account_id).await?;
+
+        self.handle_priority_op(eth_tx_hash).await
+    }
+
+    async fn handle_priority_op(&self, eth_tx_hash: H256) -> Result<ReportLabel, ClientError> {
+        let ethereum = self.wallet.ethereum(&self.config.web3_url).await?;
+        let receipt = ethereum.wait_for_tx(eth_tx_hash).await?;
+
+        let mut priority_op_handle = match receipt.priority_op_handle(self.wallet.provider.clone())
+        {
+            Some(handle) => handle,
+            None => {
+                // Probably we did something wrong, no big deal.
+                return Ok(ReportLabel::skipped(
+                    "Ethereum transaction for deposit failed",
+                ));
+            }
+        };
+
+        priority_op_handle
+            .polling_interval(POLLING_INTERVAL)
+            .unwrap();
+        priority_op_handle
+            .commit_timeout(COMMIT_TIMEOUT)
+            .wait_for_commit()
+            .await?;
+
+        Ok(ReportLabel::done())
     }
 
     async fn execute_change_pubkey(&self, command: &TxCommand) -> Result<ReportLabel, ClientError> {

@@ -45,7 +45,7 @@ impl From<TxType> for TxActionType {
             TxType::Deposit => Self::Deposit,
             TxType::TransferToNew | TxType::TransferToExisting => Self::Transfer,
             TxType::WithdrawToSelf | TxType::WithdrawToOther => Self::Withdraw,
-            TxType::FullExitToSelf | TxType::FullExitToOther => Self::FullExit,
+            TxType::FullExit => Self::FullExit,
             TxType::ChangePubKey => Self::ChangePubKey,
         }
     }
