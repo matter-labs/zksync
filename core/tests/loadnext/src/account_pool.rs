@@ -54,7 +54,7 @@ impl AccountCredentials {
 #[derive(Debug)]
 pub struct AccountPool {
     pub master_wallet: Wallet<PrivateKeySigner, RpcProvider>,
-    pub accounts: VecDeque<Wallet<PrivateKeySigner, RpcProvider>>,
+    pub accounts: VecDeque<(Wallet<PrivateKeySigner, RpcProvider>, H256)>,
     pub addresses: AddressPool,
 }
 
@@ -94,7 +94,7 @@ impl AccountPool {
                 .expect("Can't create a wallet");
 
             addresses.push(wallet.address());
-            accounts.push_back(wallet);
+            accounts.push_back((wallet, eth_credentials.eth_pk));
         }
 
         Self {

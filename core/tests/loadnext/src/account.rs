@@ -1,35 +1,44 @@
-use std::todo;
-
 use zksync::{
     error::ClientError, operations::SyncTransactionHandle, provider::Provider, RpcProvider, Wallet,
 };
 use zksync_eth_signer::PrivateKeySigner;
-use zksync_types::{tx::PackedEthSignature, ZkSyncTx};
+use zksync_types::{tx::PackedEthSignature, Token, ZkSyncTx, H256};
 
 use crate::{
     account_pool::AddressPool,
     command::{ExpectedOutcome, IncorrectnessModifier, TxCommand, TxType},
     config::LoadtestConfig,
     constants::{COMMIT_TIMEOUT, POLLING_INTERVAL},
+    corrupted_tx::Corrupted,
 };
 
 #[derive(Debug)]
 pub struct AccountLifespan {
     pub wallet: Wallet<PrivateKeySigner, RpcProvider>,
+    eth_pk: H256,
     config: LoadtestConfig,
     addresses: AddressPool,
+
+    main_token: Token,
 }
 
 impl AccountLifespan {
     pub fn new(
         config: &LoadtestConfig,
         addresses: AddressPool,
-        wallet: Wallet<PrivateKeySigner, RpcProvider>,
+        (wallet, eth_pk): (Wallet<PrivateKeySigner, RpcProvider>, H256),
     ) -> Self {
+        let main_token = wallet
+            .tokens
+            .resolve(config.main_token.as_str().into())
+            .unwrap();
+
         Self {
             wallet,
+            eth_pk,
             config: config.clone(),
             addresses,
+            main_token,
         }
     }
 
@@ -72,23 +81,42 @@ impl AccountLifespan {
         }
     }
 
+    fn tx_creation_error(err: ClientError) -> ClientError {
+        // Translate network errors (so operation will be retried), but don't accept other ones.
+        // For example, we will retry operation if fee ticker returned an error,
+        // but will panic if transaction cannot be signed.
+        match err {
+            ClientError::NetworkError(_) | ClientError::RpcError(_) => err,
+            _ => panic!("Transaction should be correct"),
+        }
+    }
+
+    fn apply_modifier(
+        &self,
+        tx: ZkSyncTx,
+        eth_signature: Option<PackedEthSignature>,
+        modifier: IncorrectnessModifier,
+    ) -> (ZkSyncTx, Option<PackedEthSignature>) {
+        (tx, eth_signature).apply_modifier(
+            modifier,
+            self.eth_pk,
+            self.main_token.symbol.as_ref(),
+            self.main_token.decimals,
+        )
+    }
+
     async fn execute_change_pubkey(&self, command: TxCommand) -> Result<(), ClientError> {
-        let mut builder = self.wallet.start_change_pubkey();
+        let tx = self
+            .wallet
+            .start_change_pubkey()
+            .fee_token(self.config.main_token.as_str())
+            .unwrap()
+            .tx()
+            .await
+            .map_err(Self::tx_creation_error)?;
 
-        let tx = match command.modifier {
-            IncorrectnessModifier::None => {
-                builder = builder.fee_token(self.config.main_token.as_str()).unwrap();
-
-                builder
-                    .tx()
-                    .await
-                    .expect("Transaction can't fail at the creation time")
-            }
-            _ => {
-                todo!()
-            }
-        };
-        let eth_signature = None;
+        // Apply modifier
+        let (tx, eth_signature) = self.apply_modifier(tx, None, command.modifier);
 
         self.handle_transaction(command, tx, eth_signature).await?;
 

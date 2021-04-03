@@ -197,7 +197,7 @@ impl Executor {
             let mut batch_addresses = Vec::new();
 
             for account_number in 0..accounts_to_process {
-                let target_address = self.pool.accounts[account_number].address();
+                let target_address = self.pool.accounts[account_number].0.address();
                 let (tx, signature) = master_wallet
                     .start_transfer()
                     .to(target_address)
