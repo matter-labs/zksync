@@ -217,6 +217,17 @@ impl AccountLifespan {
         }
 
         let ethereum = self.wallet.ethereum(&self.config.web3_url).await?;
+
+        // We should check whether we've previously approved ERC-20 deposits.
+        let deposits_allowed = ethereum
+            .is_erc20_deposit_approved(self.main_token.id)
+            .await?;
+        if !deposits_allowed {
+            ethereum
+                .approve_erc20_token_deposits(self.main_token.id)
+                .await?;
+        }
+
         // Convert BigUint into U256. We won't ever use values above `u128::max_value()`, but just in case we'll ever
         // met such a value, we'll truncate it to the limit.
         let amount = command
