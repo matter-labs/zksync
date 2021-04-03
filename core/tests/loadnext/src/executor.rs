@@ -1,7 +1,8 @@
 use std::time::Duration;
 
-use futures::channel::mpsc;
+use futures::{channel::mpsc, future::join_all};
 
+use tokio::task::JoinHandle;
 use zksync::{ethereum::PriorityOpHolder, operations::SyncTransactionHandle, provider::Provider};
 use zksync_types::{TransactionReceipt, TxFeeTypes, U256};
 
@@ -28,7 +29,8 @@ impl Executor {
         self.mint().await?;
         self.deposit_to_master().await?;
         self.set_signing_key().await?;
-        self.send_initial_transfers().await?;
+        let account_futures = self.send_initial_transfers().await?;
+        self.wait_account_routines(account_futures).await;
 
         Ok(())
     }
@@ -162,7 +164,7 @@ impl Executor {
         Ok(())
     }
 
-    async fn send_initial_transfers(&mut self) -> anyhow::Result<()> {
+    async fn send_initial_transfers(&mut self) -> anyhow::Result<Vec<JoinHandle<()>>> {
         vlog::info!("Master Account: Sending initial transfers");
         // 40 is a safe limit for now.
         const MAX_TXS_PER_BATCH: usize = 20;
@@ -186,6 +188,8 @@ impl Executor {
 
         let mut retry_counter = 0;
         let mut accounts_processed = 0;
+
+        let mut account_futures = Vec::new();
         while accounts_processed != accounts_amount {
             if retry_counter > MAX_RETRIES {
                 anyhow::bail!("Reached max amount of retries when sending a batch");
@@ -297,20 +301,21 @@ impl Executor {
             );
 
             // Spawn each account lifespan.
-            let _account_futures: Vec<_> = self
-                .pool
-                .accounts
-                .drain(..accounts_to_process)
-                .map(|wallet| {
-                    let account = AccountLifespan::new(
-                        config,
-                        addresses.clone(),
-                        wallet,
-                        report_sender.clone(),
-                    );
-                    tokio::spawn(account.run())
-                })
-                .collect();
+            let new_account_futures =
+                self.pool
+                    .accounts
+                    .drain(..accounts_to_process)
+                    .map(|wallet| {
+                        let account = AccountLifespan::new(
+                            config,
+                            addresses.clone(),
+                            wallet,
+                            report_sender.clone(),
+                        );
+                        tokio::spawn(account.run())
+                    });
+
+            account_futures.extend(new_account_futures);
         }
 
         assert!(
@@ -319,7 +324,13 @@ impl Executor {
         );
         vlog::info!("All the initial transfers are completed");
 
-        Ok(())
+        Ok(account_futures)
+    }
+
+    async fn wait_account_routines(&self, account_futures: Vec<JoinHandle<()>>) {
+        vlog::info!("Waiting for the account futures to be completed...");
+        join_all(account_futures).await;
+        vlog::info!("All the spawned tasks are completed");
     }
 
     fn amount_to_deposit(&self) -> u128 {
