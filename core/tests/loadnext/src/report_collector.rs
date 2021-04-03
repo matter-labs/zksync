@@ -40,17 +40,17 @@ impl TimeHistogram {
         Self { ranges, histogram }
     }
 
-    pub fn add_metric(&mut self, duration: Duration) {
-        let range = self.range_for(duration);
+    pub fn add_metric(&mut self, time: Duration) {
+        let range = self.range_for(time);
 
         self.histogram.entry(range).and_modify(|count| *count += 1);
     }
 
     /// Returns the histogram entry key for the provided duration.
-    fn range_for(&self, duration: Duration) -> u64 {
+    fn range_for(&self, time: Duration) -> u64 {
         debug_assert!(self.ranges[0].0 == 0, "Ranges don't start at 0");
 
-        let duration_millis = duration.as_millis() as u64;
+        let duration_millis = time.as_millis() as u64;
         for &(range_start, _) in self.ranges.iter().rev() {
             if duration_millis >= range_start {
                 return range_start;
@@ -83,24 +83,40 @@ impl Default for MetricsCollector {
 impl MetricsCollector {
     pub fn new() -> Self {
         Self {
-            action_stats: HashMap::new(),
+            action_stats: ActionType::all()
+                .into_iter()
+                .map(|action| (action, TimeHistogram::new()))
+                .collect(),
         }
+    }
+
+    pub fn add_metric(&mut self, action: ActionType, time: Duration) {
+        self.action_stats
+            .entry(action)
+            .and_modify(|hist| hist.add_metric(time));
     }
 }
 
 #[derive(Debug)]
 pub struct ReportCollector {
     reports_stream: Receiver<Report>,
+    metrics_collector: MetricsCollector,
 }
 
 impl ReportCollector {
     pub fn new(reports_stream: Receiver<Report>) -> Self {
-        Self { reports_stream }
+        Self {
+            reports_stream,
+            metrics_collector: MetricsCollector::new(),
+        }
     }
 
     pub async fn run(mut self) {
         while let Some(report) = self.reports_stream.next().await {
             vlog::trace!("Report: {:?}", &report);
+
+            self.metrics_collector
+                .add_metric(report.action, report.time);
 
             todo!()
         }

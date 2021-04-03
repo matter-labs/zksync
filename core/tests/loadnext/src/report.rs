@@ -29,7 +29,7 @@ impl ReportLabel {
     }
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum TxActionType {
     Transfer,
     Withdraw,
@@ -37,6 +37,21 @@ pub enum TxActionType {
     ChangePubKey,
     FullExit,
     Deposit,
+}
+
+impl TxActionType {
+    pub fn all() -> &'static [Self] {
+        const ALL: &[TxActionType] = &[
+            TxActionType::Transfer,
+            TxActionType::Withdraw,
+            TxActionType::ForcedExit,
+            TxActionType::ChangePubKey,
+            TxActionType::FullExit,
+            TxActionType::Deposit,
+        ];
+
+        ALL
+    }
 }
 
 impl From<TxType> for TxActionType {
@@ -51,10 +66,18 @@ impl From<TxType> for TxActionType {
     }
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum ApiActionType {}
 
-#[derive(Debug, Clone, Copy)]
+impl ApiActionType {
+    pub fn all() -> &'static [Self] {
+        const ALL: &[ApiActionType] = &[];
+
+        ALL
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum ActionType {
     Tx(TxActionType),
     Api(ApiActionType),
@@ -69,6 +92,17 @@ impl From<TxActionType> for ActionType {
 impl From<ApiActionType> for ActionType {
     fn from(action: ApiActionType) -> Self {
         Self::Api(action)
+    }
+}
+
+impl ActionType {
+    pub fn all() -> Vec<Self> {
+        TxActionType::all()
+            .iter()
+            .copied()
+            .map(Self::from)
+            .chain(ApiActionType::all().iter().copied().map(Self::from))
+            .collect()
     }
 }
 
