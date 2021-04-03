@@ -1,4 +1,7 @@
-use std::{convert::TryInto, time::Instant};
+use std::{
+    convert::TryInto,
+    time::{Duration, Instant},
+};
 
 use futures::{channel::mpsc::Sender, SinkExt};
 
@@ -55,8 +58,26 @@ impl AccountLifespan {
     }
 
     pub async fn run(mut self) {
-        let command_sequence = self.generate_commands();
+        // We assume that account is initialized after the transfer to it is executed,
+        // thus we can start from obtaining the account ID.
+        let retry_attempts = 3;
+        for attempt in 0..3 {
+            if self.wallet.update_account_id().await.is_err() {
+                if attempt == retry_attempts - 1 {
+                    // We were not able to obtain the account ID.
+                    // Without it, the whole flow cannot be done.
+                    vlog::warn!(
+                        "Unable to set account ID for account {}",
+                        self.wallet.address()
+                    );
+                    return;
+                }
+                // We will wait and try again.
+                tokio::time::delay_for(Duration::from_secs(1)).await;
+            }
+        }
 
+        let command_sequence = self.generate_commands();
         for command in command_sequence {
             self.execute_command(command).await;
         }
