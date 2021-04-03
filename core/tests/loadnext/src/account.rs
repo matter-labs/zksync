@@ -2,11 +2,12 @@ use std::time::Instant;
 
 use futures::{channel::mpsc::Sender, SinkExt};
 
+use num::BigUint;
 use zksync::{
     error::ClientError, operations::SyncTransactionHandle, provider::Provider, RpcProvider, Wallet,
 };
 use zksync_eth_signer::PrivateKeySigner;
-use zksync_types::{tx::PackedEthSignature, Token, ZkSyncTx, H256};
+use zksync_types::{tx::PackedEthSignature, Token, ZkSyncTx, H256, U256};
 
 use crate::{
     account_pool::AddressPool,
@@ -93,9 +94,9 @@ impl AccountLifespan {
             };
 
             match result {
-                Ok(()) => {
+                Ok(label) => {
                     let report = ReportBuilder::new()
-                        .label(ReportLabel::ActionDone)
+                        .label(label)
                         .reporter(self.wallet.address())
                         .time(start.elapsed())
                         .retries(attempt)
@@ -150,7 +151,9 @@ impl AccountLifespan {
         // For example, we will retry operation if fee ticker returned an error,
         // but will panic if transaction cannot be signed.
         match err {
-            ClientError::NetworkError(_) | ClientError::RpcError(_) => err,
+            ClientError::NetworkError(_)
+            | ClientError::RpcError(_)
+            | ClientError::MalformedResponse(_) => err,
             _ => panic!("Transaction should be correct"),
         }
     }
@@ -169,7 +172,20 @@ impl AccountLifespan {
         )
     }
 
-    async fn execute_change_pubkey(&self, command: &TxCommand) -> Result<(), ClientError> {
+    /// Returns the balances for ETH and the main token on the L1.
+    /// This function is used to check whether the L1 operation can be performed or should be
+    /// skipped.
+    async fn l1_balances(&self) -> Result<(BigUint, U256), ClientError> {
+        let ethereum = self.wallet.ethereum(&self.config.web3_url).await?;
+        let eth_balance = ethereum.balance().await?;
+        let erc20_balance = ethereum
+            .erc20_balance(self.wallet.address(), self.main_token.id)
+            .await?;
+
+        Ok((eth_balance, erc20_balance))
+    }
+
+    async fn execute_change_pubkey(&self, command: &TxCommand) -> Result<ReportLabel, ClientError> {
         let tx = self
             .wallet
             .start_change_pubkey()
@@ -183,10 +199,10 @@ impl AccountLifespan {
 
         self.handle_transaction(command, tx, eth_signature).await?;
 
-        Ok(())
+        Ok(ReportLabel::done())
     }
 
-    async fn execute_transfer(&self, command: &TxCommand) -> Result<(), ClientError> {
+    async fn execute_transfer(&self, command: &TxCommand) -> Result<ReportLabel, ClientError> {
         let (tx, eth_signature) = self
             .wallet
             .start_transfer()
@@ -202,10 +218,10 @@ impl AccountLifespan {
 
         self.handle_transaction(command, tx, eth_signature).await?;
 
-        Ok(())
+        Ok(ReportLabel::done())
     }
 
-    async fn execute_withdraw(&self, command: &TxCommand) -> Result<(), ClientError> {
+    async fn execute_withdraw(&self, command: &TxCommand) -> Result<ReportLabel, ClientError> {
         let (tx, eth_signature) = self
             .wallet
             .start_withdraw()
@@ -221,7 +237,7 @@ impl AccountLifespan {
 
         self.handle_transaction(command, tx, eth_signature).await?;
 
-        Ok(())
+        Ok(ReportLabel::done())
     }
 
     async fn handle_transaction(
@@ -229,29 +245,30 @@ impl AccountLifespan {
         command: &TxCommand,
         tx: ZkSyncTx,
         eth_signature: Option<PackedEthSignature>,
-    ) -> Result<(), ClientError> {
+    ) -> Result<ReportLabel, ClientError> {
         let expected_outcome = command.modifier.expected_outcome();
 
-        let mut handle = match (
-            expected_outcome,
-            self.wallet
-                .provider
-                .send_tx(tx, eth_signature)
-                .await
-                .map(|hash| SyncTransactionHandle::new(hash, self.wallet.provider.clone())),
-        ) {
+        let send_result = self
+            .wallet
+            .provider
+            .send_tx(tx.clone(), eth_signature)
+            .await
+            .map(|hash| SyncTransactionHandle::new(hash, self.wallet.provider.clone()));
+        let mut handle = match (expected_outcome, send_result) {
             (ExpectedOutcome::ApiRequestFailed, Ok(_handle)) => {
                 // Transaction got accepted, but should have not been.
-                todo!()
+                let error = format!("Transaction was accepted, but should have not been: {:#?}. Used modifier: {:?}", tx, command.modifier);
+                return Ok(ReportLabel::failed(&error));
             }
             (_, Ok(handle)) => handle,
             (ExpectedOutcome::ApiRequestFailed, Err(_error)) => {
                 // Transaction was expected to be rejected and it was.
-                todo!()
+                return Ok(ReportLabel::done());
             }
             (_, Err(_error)) => {
                 // Transaction was expected to be accepted, but was rejected.
-                todo!()
+                let error = format!("Transaction should have been accepted, but got rejected: {:#?}. Used modifier: {:?}", tx, command.modifier);
+                return Ok(ReportLabel::failed(&error));
             }
         };
 
@@ -264,17 +281,24 @@ impl AccountLifespan {
         match expected_outcome {
             ExpectedOutcome::TxSucceed if transaction_receipt.fail_reason.is_none() => {
                 // Transaction succeed and it should have.
+                Ok(ReportLabel::done())
             }
             ExpectedOutcome::TxRejected if transaction_receipt.fail_reason.is_some() => {
                 // Transaction failed and it should have.
+                Ok(ReportLabel::done())
             }
-            _ => {
+            other => {
                 // Transaction status didn't match expected one.
-                todo!()
+                let error = format!(
+                    "Unexpected transaction status: expected {:#?}, receipt {:#?}. Tx: {:#?}. Used modifier: {:?}",
+                    other,
+                    transaction_receipt,
+                    tx,
+                    command.modifier
+                );
+                Ok(ReportLabel::failed(&error))
             }
         }
-
-        Ok(())
     }
 
     pub fn generate_commands(&self) -> Vec<TxCommand> {
