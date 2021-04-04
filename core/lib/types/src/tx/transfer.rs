@@ -17,6 +17,7 @@ use zksync_crypto::params::{max_account_id, max_token_id};
 use zksync_utils::{format_units, BigUintSerdeAsRadix10Str};
 
 use super::{TxSignature, VerifiedSignatureCache};
+use crate::tx::error::TransactionSignatureError;
 
 /// `Transfer` transaction performs a move of funds from one zkSync account to another.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -99,13 +100,13 @@ impl Transfer {
         nonce: Nonce,
         time_range: TimeRange,
         private_key: &PrivateKey<Engine>,
-    ) -> Result<Self, anyhow::Error> {
+    ) -> Result<Self, TransactionSignatureError> {
         let mut tx = Self::new(
             account_id, from, to, token, amount, fee, nonce, time_range, None,
         );
         tx.signature = TxSignature::sign_musig(private_key, &tx.get_bytes());
         if !tx.check_correctness() {
-            anyhow::bail!(crate::tx::TRANSACTION_SIGNATURE_ERROR);
+            return Err(TransactionSignatureError());
         }
         Ok(tx)
     }

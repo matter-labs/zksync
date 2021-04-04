@@ -6,6 +6,7 @@ use ethabi::{decode, ParamType};
 use serde::{Deserialize, Serialize};
 // Local uses
 use crate::aggregated_operations::{AggregatedActionType, AggregatedOperation};
+use crate::error::{LogToCompleteWithdrawalsTxError, UnknownOperationType};
 use zksync_basic_types::{Log, H256, U256};
 
 /// Numerical identifier of the Ethereum operation.
@@ -33,14 +34,14 @@ impl fmt::Display for OperationType {
 }
 
 impl FromStr for OperationType {
-    type Err = anyhow::Error;
+    type Err = UnknownOperationType;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let op = match s {
             "commit" => Self::Commit,
             "verify" => Self::Verify,
             "withdraw" => Self::Withdraw,
-            _ => anyhow::bail!("Unknown type of operation: {}", s),
+            _ => return Err(UnknownOperationType(String::from(s))),
         };
 
         Ok(op)
@@ -124,34 +125,35 @@ pub struct CompleteWithdrawalsTx {
 }
 
 impl TryFrom<Log> for CompleteWithdrawalsTx {
-    type Error = anyhow::Error;
+    type Error = LogToCompleteWithdrawalsTxError;
 
-    fn try_from(event: Log) -> Result<CompleteWithdrawalsTx, anyhow::Error> {
+    fn try_from(event: Log) -> Result<CompleteWithdrawalsTx, LogToCompleteWithdrawalsTxError> {
         let mut decoded_event = decode(
             &[
                 ParamType::Uint(32), // queueStartIndex
                 ParamType::Uint(32), // queueEndIndex
             ],
             &event.data.0,
-        )
-        .map_err(|e| anyhow::format_err!("Event data decode: {:?}", e))?;
+        )?;
 
         Ok(CompleteWithdrawalsTx {
             tx_hash: event
                 .transaction_hash
-                .expect("complete withdrawals transaction should have hash"),
+                .ok_or(LogToCompleteWithdrawalsTxError::TransactionHashMissing)?,
             pending_withdrawals_queue_start_index: decoded_event
                 .remove(0)
                 .to_uint()
                 .as_ref()
                 .map(U256::as_u32)
-                .expect("pending_withdrawals_queue_start_index value conversion failed"),
+                .ok_or(
+                    LogToCompleteWithdrawalsTxError::CannotConvertPendingWithdrawalsQueueStart,
+                )?,
             pending_withdrawals_queue_end_index: decoded_event
                 .remove(0)
                 .to_uint()
                 .as_ref()
                 .map(U256::as_u32)
-                .expect("pending_withdrawals_queue_end_index value conversion failed"),
+                .ok_or(LogToCompleteWithdrawalsTxError::CannotConvertPendingWithdrawalsQueueEnd)?,
         })
     }
 }

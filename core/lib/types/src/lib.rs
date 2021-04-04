@@ -54,6 +54,7 @@ pub mod tokens;
 pub mod tx;
 mod utils;
 
+mod error;
 #[cfg(test)]
 mod tests;
 

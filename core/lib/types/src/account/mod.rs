@@ -16,6 +16,7 @@ use zksync_crypto::circuit::utils::eth_address_to_fr;
 pub use self::{account_update::AccountUpdate, pubkey_hash::PubKeyHash};
 
 mod account_update;
+pub mod error;
 mod pubkey_hash;
 
 /// zkSync network account.

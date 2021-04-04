@@ -1,3 +1,4 @@
+use crate::error::GetGenesisTokenListError;
 use crate::{tx::ChangePubKeyType, Address, TokenId};
 use chrono::{DateTime, Utc};
 use num::{rational::Ratio, BigUint};
@@ -119,7 +120,9 @@ impl Token {
 
 // Hidden as it relies on the filesystem structure, which can be different for reverse dependencies.
 #[doc(hidden)]
-pub fn get_genesis_token_list(network: &str) -> Result<Vec<TokenGenesisListItem>, anyhow::Error> {
+pub fn get_genesis_token_list(
+    network: &str,
+) -> Result<Vec<TokenGenesisListItem>, GetGenesisTokenListError> {
     let mut file_path = parse_env::<PathBuf>("ZKSYNC_HOME");
     file_path.push("etc");
     file_path.push("tokens");

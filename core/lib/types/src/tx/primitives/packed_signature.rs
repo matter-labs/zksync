@@ -1,5 +1,5 @@
+use crate::tx::primitives::error::DeserializePackedSignatureError;
 use crate::Engine;
-use anyhow::{ensure, format_err};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use zksync_crypto::franklin_crypto::{
     alt_babyjubjub::{
@@ -25,20 +25,22 @@ impl PackedSignature {
         Ok(packed_signature.to_vec())
     }
 
-    pub fn deserialize_packed(bytes: &[u8]) -> Result<Self, anyhow::Error> {
-        ensure!(bytes.len() == 64, "Signature size mismatch");
+    pub fn deserialize_packed(bytes: &[u8]) -> Result<Self, DeserializePackedSignatureError> {
+        if bytes.len() != 64 {
+            return Err(DeserializePackedSignatureError::IncorrectSignatureLength);
+        }
         let (r_bar, s_bar) = bytes.split_at(32);
 
         let r = edwards::Point::read(r_bar, &JUBJUB_PARAMS as &AltJubjubBn256)
-            .map_err(|e| format_err!("Failed to restore R point from R_bar: {}", e.to_string()))?;
+            .map_err(DeserializePackedSignatureError::CannotRestoreRPoint)?;
 
         let mut s_repr = FsRepr::default();
         s_repr
             .read_le(s_bar)
-            .map_err(|e| format_err!("s read err: {}", e.to_string()))?;
+            .map_err(DeserializePackedSignatureError::CannotReadS)?;
 
         let s = <Engine as JubjubEngine>::Fs::from_repr(s_repr)
-            .map_err(|e| format_err!("Failed to restore s scalar from s_bar: {}", e.to_string()))?;
+            .map_err(DeserializePackedSignatureError::CannotRestoreS)?;
 
         Ok(Self(Signature { r, s }))
     }

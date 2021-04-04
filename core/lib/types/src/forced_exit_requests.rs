@@ -7,11 +7,11 @@ use serde::{Deserialize, Serialize};
 
 pub type ForcedExitRequestId = i64;
 
-use anyhow::format_err;
 use ethabi::{decode, ParamType};
 use std::convert::TryFrom;
 use zksync_basic_types::Log;
 
+use crate::error::LogToFundsReceivedEventError;
 use crate::tx::TxHash;
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq, Hash)]
@@ -50,21 +50,20 @@ pub struct ForcedExitEligibilityResponse {
 }
 
 impl TryFrom<Log> for FundsReceivedEvent {
-    type Error = anyhow::Error;
+    type Error = LogToFundsReceivedEventError;
 
-    fn try_from(event: Log) -> Result<FundsReceivedEvent, anyhow::Error> {
+    fn try_from(event: Log) -> Result<FundsReceivedEvent, LogToFundsReceivedEventError> {
         let mut dec_ev = decode(
             &[
                 ParamType::Uint(256), // amount
             ],
             &event.data.0,
-        )
-        .map_err(|e| format_err!("Event data decode: {:?}", e))?;
+        )?;
 
         let amount = dec_ev.remove(0).to_uint().unwrap();
         let block_number = event
             .block_number
-            .expect("Trying to access pending block")
+            .ok_or(LogToFundsReceivedEventError::UnfinalizedBlockAccess)?
             .as_u64();
 
         Ok(FundsReceivedEvent {

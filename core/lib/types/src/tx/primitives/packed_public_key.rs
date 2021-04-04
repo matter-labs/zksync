@@ -1,4 +1,4 @@
-use anyhow::{ensure, format_err};
+use crate::tx::primitives::error::DeserializePackedPublicKeyError;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use zksync_crypto::franklin_crypto::{
     alt_babyjubjub::{edwards, AltJubjubBn256},
@@ -17,12 +17,13 @@ impl PackedPublicKey {
         Ok(packed_point.to_vec())
     }
 
-    pub fn deserialize_packed(bytes: &[u8]) -> Result<Self, anyhow::Error> {
-        ensure!(bytes.len() == 32, "PublicKey size mismatch");
-
+    pub fn deserialize_packed(bytes: &[u8]) -> Result<Self, DeserializePackedPublicKeyError> {
+        if bytes.len() != 32 {
+            return Err(DeserializePackedPublicKeyError::IncorrectPublicKeyLength);
+        }
         Ok(PackedPublicKey(PublicKey::<Engine>(
             edwards::Point::read(&*bytes, &JUBJUB_PARAMS as &AltJubjubBn256)
-                .map_err(|e| format_err!("Failed to restore point: {}", e.to_string()))?,
+                .map_err(DeserializePackedPublicKeyError::CannotRestoreCurvePoint)?,
         )))
     }
 }

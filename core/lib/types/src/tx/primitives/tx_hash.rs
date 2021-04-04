@@ -1,3 +1,4 @@
+use crate::tx::primitives::error::TxHashDecodeError;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::{convert::TryInto, str::FromStr};
 
@@ -37,15 +38,16 @@ impl ToString for TxHash {
 }
 
 impl FromStr for TxHash {
-    type Err = anyhow::Error;
+    type Err = TxHashDecodeError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        anyhow::ensure!(
-            s.starts_with("sync-tx:"),
-            "TxHash should start with sync-tx:"
-        );
+        if !s.starts_with("sync-tx:") {
+            return Err(TxHashDecodeError::PrefixError);
+        }
         let bytes = hex::decode(&s[8..])?;
-        anyhow::ensure!(bytes.len() == 32, "Size mismatch");
+        if bytes.len() != 32 {
+            return Err(TxHashDecodeError::IncorrectHashLength);
+        }
         Ok(TxHash {
             data: bytes.as_slice().try_into().unwrap(),
         })

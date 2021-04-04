@@ -13,6 +13,7 @@ use zksync_crypto::params::{max_account_id, max_token_id};
 use zksync_utils::{format_units, BigUintSerdeAsRadix10Str};
 
 use super::{TxSignature, VerifiedSignatureCache};
+use crate::tx::error::TransactionSignatureError;
 use crate::tx::TimeRange;
 
 /// `ForcedExit` transaction is used to withdraw funds from an unowned
@@ -92,7 +93,7 @@ impl ForcedExit {
         nonce: Nonce,
         time_range: TimeRange,
         private_key: &PrivateKey<Engine>,
-    ) -> Result<Self, anyhow::Error> {
+    ) -> Result<Self, TransactionSignatureError> {
         let mut tx = Self::new(
             initiator_account_id,
             target,
@@ -104,7 +105,7 @@ impl ForcedExit {
         );
         tx.signature = TxSignature::sign_musig(private_key, &tx.get_bytes());
         if !tx.check_correctness() {
-            anyhow::bail!(crate::tx::TRANSACTION_SIGNATURE_ERROR);
+            return Err(TransactionSignatureError());
         }
         Ok(tx)
     }
