@@ -78,6 +78,10 @@ impl AccountLifespan {
         }
     }
 
+    /// Executes a command with support of retries:
+    /// If command fails due to the network/API error, it will be retried multiple times
+    /// before considering it completely failed. Such an approach makes us a bit more resilient to
+    /// volatile errors such as random connection drop or insufficient fee error.
     async fn execute_command(&mut self, command: Command) {
         // We consider API errors to be somewhat likely, thus we will retry the operation if it fails
         // due to connection issues.
@@ -124,6 +128,7 @@ impl AccountLifespan {
         }
     }
 
+    /// Builds a report and sends it.
     async fn report(
         &mut self,
         label: ReportLabel,
@@ -139,10 +144,6 @@ impl AccountLifespan {
             .action(command)
             .finish();
 
-        self.send_report(report).await;
-    }
-
-    async fn send_report(&mut self, report: Report) {
         self.report_sink
             .send(report)
             .await
@@ -217,7 +218,8 @@ impl AccountLifespan {
         }
     }
 
-    pub fn generate_commands(&self) -> Vec<Command> {
+    /// Prepares a list of random operations to be executed by an account.
+    fn generate_commands(&self) -> Vec<Command> {
         // We start with a CPK just to unlock accounts.
         let mut commands = vec![Command::SingleTx(TxCommand::change_pubkey(
             self.wallet.address(),
