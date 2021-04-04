@@ -16,7 +16,7 @@ zksync_types = { path = "../types", version = "1.0" }
 
 num = { version = "0.3.1", features = ["serde"] }
 vlog = { path = "../../lib/vlog", version = "1.0" }
-anyhow = "1.0"
+thiserror = "1.0"
 metrics = "=0.13.0-alpha.8"
 serde_json = "1.0"
 

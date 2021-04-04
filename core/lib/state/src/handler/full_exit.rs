@@ -4,6 +4,7 @@ use zksync_crypto::params;
 use zksync_types::{AccountUpdate, AccountUpdates, FullExit, FullExitOp, ZkSyncOp};
 use zksync_utils::BigUintSerdeWrapper;
 
+use crate::handler::error::FullExitOpError;
 use crate::{
     handler::TxHandler,
     state::{CollectedFee, OpSuccess, ZkSyncState},
@@ -12,7 +13,9 @@ use crate::{
 impl TxHandler<FullExit> for ZkSyncState {
     type Op = FullExitOp;
 
-    fn create_op(&self, priority_op: FullExit) -> Result<Self::Op, anyhow::Error> {
+    type OpError = FullExitOpError;
+
+    fn create_op(&self, priority_op: FullExit) -> Result<Self::Op, FullExitOpError> {
         // NOTE: Authorization of the FullExit is verified on the contract.
         assert!(
             priority_op.token <= params::max_token_id(),
@@ -34,7 +37,7 @@ impl TxHandler<FullExit> for ZkSyncState {
         Ok(op)
     }
 
-    fn apply_tx(&mut self, priority_op: FullExit) -> Result<OpSuccess, anyhow::Error> {
+    fn apply_tx(&mut self, priority_op: FullExit) -> Result<OpSuccess, FullExitOpError> {
         let op = self.create_op(priority_op)?;
 
         let (fee, updates) = <Self as TxHandler<FullExit>>::apply_op(self, &op)?;
@@ -50,7 +53,7 @@ impl TxHandler<FullExit> for ZkSyncState {
     fn apply_op(
         &mut self,
         op: &Self::Op,
-    ) -> Result<(Option<CollectedFee>, AccountUpdates), anyhow::Error> {
+    ) -> Result<(Option<CollectedFee>, AccountUpdates), FullExitOpError> {
         let start = Instant::now();
         let mut updates = Vec::new();
         let amount = if let Some(amount) = &op.withdraw_amount {
@@ -61,10 +64,10 @@ impl TxHandler<FullExit> for ZkSyncState {
 
         let account_id = op.priority_op.account_id;
 
-        // expect is ok since account since existence was verified before
+        // expect is ok since account's existence was verified before
         let mut account = self
             .get_account(account_id)
-            .expect("Full exit account not found");
+            .ok_or(FullExitOpError::AccountNotFound)?;
 
         let old_balance = account.get_balance(op.priority_op.token);
         let old_nonce = account.nonce;
@@ -72,11 +75,9 @@ impl TxHandler<FullExit> for ZkSyncState {
         account.sub_balance(op.priority_op.token, &amount.0);
 
         let new_balance = account.get_balance(op.priority_op.token);
-        assert_eq!(
-            new_balance,
-            BigUint::from(0u32),
-            "Full exit amount is incorrect"
-        );
+        if new_balance != BigUint::from(0u32) {
+            return Err(FullExitOpError::IncorrectAmount);
+        }
         let new_nonce = account.nonce;
 
         self.insert_account(account_id, account);

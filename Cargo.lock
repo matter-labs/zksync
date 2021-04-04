@@ -6303,11 +6303,11 @@ dependencies = [
 name = "zksync_state"
 version = "1.0.0"
 dependencies = [
- "anyhow",
  "criterion",
  "metrics",
  "num",
  "serde_json",
+ "thiserror",
  "vlog",
  "web3",
  "zksync_crypto",

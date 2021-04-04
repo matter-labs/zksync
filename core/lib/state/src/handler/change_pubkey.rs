@@ -1,4 +1,3 @@
-use anyhow::{ensure, format_err};
 use std::time::Instant;
 use zksync_crypto::params;
 use zksync_types::{
@@ -7,6 +6,7 @@ use zksync_types::{
     AccountUpdate, AccountUpdates,
 };
 
+use crate::handler::error::ChangePubKeyOpError;
 use crate::{
     handler::TxHandler,
     state::{CollectedFee, OpSuccess, ZkSyncState},
@@ -14,37 +14,33 @@ use crate::{
 
 impl TxHandler<ChangePubKey> for ZkSyncState {
     type Op = ChangePubKeyOp;
+    type OpError = ChangePubKeyOpError;
 
-    fn create_op(&self, tx: ChangePubKey) -> Result<Self::Op, anyhow::Error> {
+    fn create_op(&self, tx: ChangePubKey) -> Result<Self::Op, ChangePubKeyOpError> {
         let (account_id, account) = self
             .get_account_by_address(&tx.account)
-            .ok_or_else(|| format_err!("Account does not exist"))?;
-        ensure!(
-            tx.account == account.address,
-            "ChangePubKey account address is incorrect"
-        );
-        ensure!(
-            tx.is_eth_auth_data_valid(),
-            "ChangePubKey Ethereum auth data is incorrect"
-        );
-        ensure!(
-            tx.verify_signature() == Some(tx.new_pk_hash),
-            "ChangePubKey zkSync signature is incorrect"
-        );
-        ensure!(
-            account_id == tx.account_id,
-            "ChangePubKey account id is incorrect"
-        );
-        ensure!(
-            account_id <= params::max_account_id(),
-            "ChangePubKey account id is bigger than max supported"
-        );
+            .ok_or(ChangePubKeyOpError::AccountNotFound)?;
+        if tx.account != account.address {
+            return Err(ChangePubKeyOpError::InvalidAccountAddress);
+        }
+        if !tx.is_eth_auth_data_valid() {
+            return Err(ChangePubKeyOpError::InvalidAuthData);
+        }
+        if tx.verify_signature() != Some(tx.new_pk_hash) {
+            return Err(ChangePubKeyOpError::InvalidZksyncSignature);
+        }
+        if account_id != tx.account_id {
+            return Err(ChangePubKeyOpError::InvalidAccountId);
+        }
+        if account_id > params::max_account_id() {
+            return Err(ChangePubKeyOpError::AccountIdTooBig);
+        }
         let change_pk_op = ChangePubKeyOp { tx, account_id };
 
         Ok(change_pk_op)
     }
 
-    fn apply_tx(&mut self, tx: ChangePubKey) -> Result<OpSuccess, anyhow::Error> {
+    fn apply_tx(&mut self, tx: ChangePubKey) -> Result<OpSuccess, ChangePubKeyOpError> {
         let op = self.create_op(tx)?;
 
         let (fee, updates) = <Self as TxHandler<ChangePubKey>>::apply_op(self, &op)?;
@@ -58,7 +54,7 @@ impl TxHandler<ChangePubKey> for ZkSyncState {
     fn apply_op(
         &mut self,
         op: &Self::Op,
-    ) -> Result<(Option<CollectedFee>, AccountUpdates), anyhow::Error> {
+    ) -> Result<(Option<CollectedFee>, AccountUpdates), ChangePubKeyOpError> {
         let start = Instant::now();
         let mut updates = Vec::new();
         let mut account = self.get_account(op.account_id).unwrap();
@@ -69,14 +65,18 @@ impl TxHandler<ChangePubKey> for ZkSyncState {
         let old_nonce = account.nonce;
 
         // Update nonce.
-        ensure!(op.tx.nonce == account.nonce, "Nonce mismatch");
+        if op.tx.nonce != account.nonce {
+            return Err(ChangePubKeyOpError::NonceMismatch);
+        }
         *account.nonce += 1;
 
         // Update pubkey hash.
         account.pub_key_hash = op.tx.new_pk_hash;
 
         // Subract fees.
-        ensure!(old_balance >= op.tx.fee, "Not enough balance");
+        if old_balance < op.tx.fee {
+            return Err(ChangePubKeyOpError::InsufficientBalance);
+        }
         account.sub_balance(op.tx.fee_token, &op.tx.fee);
 
         let new_pub_key_hash = account.pub_key_hash;

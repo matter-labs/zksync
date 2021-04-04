@@ -1,4 +1,3 @@
-use anyhow::{ensure, format_err};
 use std::time::Instant;
 use zksync_crypto::params::{self, max_account_id};
 use zksync_types::{
@@ -6,6 +5,7 @@ use zksync_types::{
     TransferToNewOp,
 };
 
+use crate::handler::error::TransferOpError;
 use crate::{
     handler::TxHandler,
     state::{CollectedFee, OpSuccess, TransferOutcome, ZkSyncState},
@@ -14,27 +14,27 @@ use crate::{
 impl TxHandler<Transfer> for ZkSyncState {
     type Op = TransferOutcome;
 
-    fn create_op(&self, tx: Transfer) -> Result<Self::Op, anyhow::Error> {
-        ensure!(
-            tx.token <= params::max_token_id(),
-            "Token id is not supported"
-        );
-        ensure!(
-            tx.to != Address::zero(),
-            "Transfer to Account with address 0 is not allowed"
-        );
+    type OpError = TransferOpError;
+
+    fn create_op(&self, tx: Transfer) -> Result<Self::Op, TransferOpError> {
+        if tx.token > params::max_token_id() {
+            return Err(TransferOpError::InvalidTokenId);
+        }
+        if tx.to == Address::zero() {
+            return Err(TransferOpError::TargetAccountZero);
+        }
         let (from, from_account) = self
             .get_account_by_address(&tx.from)
-            .ok_or_else(|| format_err!("From account does not exist"))?;
-        ensure!(
-            from_account.pub_key_hash != PubKeyHash::default(),
-            "Account is locked"
-        );
-        ensure!(
-            tx.verify_signature() == Some(from_account.pub_key_hash),
-            "Transfer signature is incorrect"
-        );
-        ensure!(from == tx.account_id, "Transfer account id is incorrect");
+            .ok_or(TransferOpError::FromAccountNotFound)?;
+        if from_account.pub_key_hash == PubKeyHash::default() {
+            return Err(TransferOpError::FromAccountLocked);
+        }
+        if tx.verify_signature() != Some(from_account.pub_key_hash) {
+            return Err(TransferOpError::InvalidSignature);
+        }
+        if from != tx.account_id {
+            return Err(TransferOpError::TransferAccountIncorrect);
+        }
 
         let outcome = if let Some((to, _)) = self.get_account_by_address(&tx.to) {
             let transfer_op = TransferOp { tx, from, to };
@@ -50,7 +50,7 @@ impl TxHandler<Transfer> for ZkSyncState {
         Ok(outcome)
     }
 
-    fn apply_tx(&mut self, tx: Transfer) -> Result<OpSuccess, anyhow::Error> {
+    fn apply_tx(&mut self, tx: Transfer) -> Result<OpSuccess, TransferOpError> {
         let op = self.create_op(tx)?;
 
         let (fee, updates) = <Self as TxHandler<Transfer>>::apply_op(self, &op)?;
@@ -64,7 +64,7 @@ impl TxHandler<Transfer> for ZkSyncState {
     fn apply_op(
         &mut self,
         op: &Self::Op,
-    ) -> Result<(Option<CollectedFee>, AccountUpdates), anyhow::Error> {
+    ) -> Result<(Option<CollectedFee>, AccountUpdates), TransferOpError> {
         match op {
             TransferOutcome::Transfer(transfer_op) => self.apply_transfer_op(&transfer_op),
             TransferOutcome::TransferToNew(transfer_to_new_op) => {
@@ -78,16 +78,14 @@ impl ZkSyncState {
     fn apply_transfer_op(
         &mut self,
         op: &TransferOp,
-    ) -> Result<(Option<CollectedFee>, AccountUpdates), anyhow::Error> {
+    ) -> Result<(Option<CollectedFee>, AccountUpdates), TransferOpError> {
         let start = Instant::now();
-        ensure!(
-            op.from <= max_account_id(),
-            "Transfer from account id is bigger than max supported"
-        );
-        ensure!(
-            op.to <= max_account_id(),
-            "Transfer to account id is bigger than max supported"
-        );
+        if op.from > max_account_id() {
+            return Err(TransferOpError::SourceAccountIncorrect);
+        }
+        if op.to > max_account_id() {
+            return Err(TransferOpError::TargetAccountIncorrect);
+        }
 
         if op.from == op.to {
             return self.apply_transfer_op_to_self(op);
@@ -100,11 +98,12 @@ impl ZkSyncState {
         let from_old_balance = from_account.get_balance(op.tx.token);
         let from_old_nonce = from_account.nonce;
 
-        ensure!(op.tx.nonce == from_old_nonce, "Nonce mismatch");
-        ensure!(
-            from_old_balance >= &op.tx.amount + &op.tx.fee,
-            "Not enough balance"
-        );
+        if op.tx.nonce != from_old_nonce {
+            return Err(TransferOpError::NonceMismatch);
+        }
+        if from_old_balance < &op.tx.amount + &op.tx.fee {
+            return Err(TransferOpError::InsufficientBalance);
+        }
 
         from_account.sub_balance(op.tx.token, &(&op.tx.amount + &op.tx.fee));
         *from_account.nonce += 1;
@@ -152,16 +151,14 @@ impl ZkSyncState {
     fn apply_transfer_op_to_self(
         &mut self,
         op: &TransferOp,
-    ) -> Result<(Option<CollectedFee>, AccountUpdates), anyhow::Error> {
+    ) -> Result<(Option<CollectedFee>, AccountUpdates), TransferOpError> {
         let start = Instant::now();
-        ensure!(
-            op.from <= max_account_id(),
-            "Transfer to self from account id is bigger than max supported"
-        );
-        ensure!(
-            op.from == op.to,
-            "Bug: transfer to self should not be called."
-        );
+        if op.from > max_account_id() {
+            return Err(TransferOpError::SourceAccountIncorrect);
+        }
+        if op.from != op.to {
+            return Err(TransferOpError::CannotTransferToSelf);
+        }
 
         let mut updates = Vec::new();
         let mut account = self.get_account(op.from).unwrap();
@@ -169,11 +166,12 @@ impl ZkSyncState {
         let old_balance = account.get_balance(op.tx.token);
         let old_nonce = account.nonce;
 
-        ensure!(op.tx.nonce == old_nonce, "Nonce mismatch");
-        ensure!(
-            old_balance >= &op.tx.amount + &op.tx.fee,
-            "Not enough balance"
-        );
+        if op.tx.nonce != old_nonce {
+            return Err(TransferOpError::NonceMismatch);
+        }
+        if old_balance < &op.tx.amount + &op.tx.fee {
+            return Err(TransferOpError::InsufficientBalance);
+        }
 
         account.sub_balance(op.tx.token, &op.tx.fee);
         *account.nonce += 1;
@@ -204,18 +202,16 @@ impl ZkSyncState {
     fn apply_transfer_to_new_op(
         &mut self,
         op: &TransferToNewOp,
-    ) -> Result<(Option<CollectedFee>, AccountUpdates), anyhow::Error> {
+    ) -> Result<(Option<CollectedFee>, AccountUpdates), TransferOpError> {
         let start = Instant::now();
         let mut updates = Vec::new();
 
-        ensure!(
-            op.from <= max_account_id(),
-            "TransferToNew from account id is bigger than max supported"
-        );
-        ensure!(
-            op.to <= max_account_id(),
-            "TransferToNew to account id is bigger than max supported"
-        );
+        if op.from > max_account_id() {
+            return Err(TransferOpError::SourceAccountIncorrect);
+        }
+        if op.to > max_account_id() {
+            return Err(TransferOpError::TargetAccountIncorrect);
+        }
 
         if let Some(account) = self.get_account(op.to) {
             vlog::error!(
@@ -235,11 +231,12 @@ impl ZkSyncState {
         let mut from_account = self.get_account(op.from).unwrap();
         let from_old_balance = from_account.get_balance(op.tx.token);
         let from_old_nonce = from_account.nonce;
-        ensure!(op.tx.nonce == from_old_nonce, "Nonce mismatch");
-        ensure!(
-            from_old_balance >= &op.tx.amount + &op.tx.fee,
-            "Not enough balance"
-        );
+        if op.tx.nonce != from_old_nonce {
+            return Err(TransferOpError::NonceMismatch);
+        }
+        if from_old_balance < &op.tx.amount + &op.tx.fee {
+            return Err(TransferOpError::InsufficientBalance);
+        }
         from_account.sub_balance(op.tx.token, &(&op.tx.amount + &op.tx.fee));
         *from_account.nonce += 1;
         let from_new_balance = from_account.get_balance(op.tx.token);
