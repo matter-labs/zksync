@@ -2,8 +2,7 @@ use zksync::{error::ClientError, operations::SyncTransactionHandle};
 
 use crate::{
     account::AccountLifespan,
-    command::{TxCommand, TxType},
-    constants::{COMMIT_TIMEOUT, POLLING_INTERVAL},
+    command::{IncorrectnessModifier, TxCommand, TxType},
     report::ReportLabel,
 };
 
@@ -31,15 +30,22 @@ impl AccountLifespan {
         // Batch result can be identified by a hash of a single transaction from this batch.
         let main_hash = batch[0].0.hash();
 
-        self.wallet.provider.send_txs_batch(batch, None).await?;
+        // If we have multiple bad transactions in the batch, the fail reason will be equal to the
+        // fail reason of the first incorrect transaction.
+        // This goes both to failures on API side and on the state side.
+        let modifier = batch_command
+            .iter()
+            .find_map(|cmd| match cmd.modifier {
+                IncorrectnessModifier::None => None,
+                other => Some(other),
+            })
+            .unwrap_or(IncorrectnessModifier::None);
 
-        let mut handle = SyncTransactionHandle::new(main_hash, self.wallet.provider.clone());
-        handle.polling_interval(POLLING_INTERVAL).unwrap();
-        handle
-            .commit_timeout(COMMIT_TIMEOUT)
-            .wait_for_commit()
-            .await?;
-
-        Ok(ReportLabel::done())
+        let provider = self.wallet.provider.clone();
+        self.sumbit(modifier, || async {
+            provider.send_txs_batch(batch, None).await?;
+            Ok(SyncTransactionHandle::new(main_hash, provider))
+        })
+        .await
     }
 }

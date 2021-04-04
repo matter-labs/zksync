@@ -1,6 +1,6 @@
 use std::time::Duration;
 
-use zksync_types::{Action, Address};
+use zksync_types::Address;
 
 use crate::command::{ApiRequestCommand, Command, TxType};
 

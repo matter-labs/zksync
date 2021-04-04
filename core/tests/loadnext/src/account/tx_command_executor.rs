@@ -1,7 +1,10 @@
 use std::convert::TryInto;
 
 use num::BigUint;
-use zksync::{error::ClientError, ethereum::PriorityOpHolder};
+use zksync::{
+    error::ClientError, ethereum::PriorityOpHolder, operations::SyncTransactionHandle,
+    provider::Provider,
+};
 use zksync_types::{tx::PackedEthSignature, TokenId, ZkSyncTx, H256};
 
 use crate::{
@@ -157,9 +160,13 @@ impl AccountLifespan {
 
     async fn execute_change_pubkey(&self, command: &TxCommand) -> Result<ReportLabel, ClientError> {
         let (tx, eth_signature) = self.build_change_pubkey(command).await?;
-        self.handle_transaction(command, tx, eth_signature).await?;
 
-        Ok(ReportLabel::done())
+        let provider = self.wallet.provider.clone();
+        self.sumbit(command.modifier, || async {
+            let tx_hash = provider.send_tx(tx, eth_signature).await?;
+            Ok(SyncTransactionHandle::new(tx_hash, provider))
+        })
+        .await
     }
 
     pub(super) async fn build_change_pubkey(
@@ -180,9 +187,13 @@ impl AccountLifespan {
 
     async fn execute_transfer(&self, command: &TxCommand) -> Result<ReportLabel, ClientError> {
         let (tx, eth_signature) = self.build_transfer(command).await?;
-        self.handle_transaction(command, tx, eth_signature).await?;
 
-        Ok(ReportLabel::done())
+        let provider = self.wallet.provider.clone();
+        self.sumbit(command.modifier, || async {
+            let tx_hash = provider.send_tx(tx, eth_signature).await?;
+            Ok(SyncTransactionHandle::new(tx_hash, provider))
+        })
+        .await
     }
 
     pub(super) async fn build_transfer(
@@ -205,9 +216,13 @@ impl AccountLifespan {
 
     async fn execute_withdraw(&self, command: &TxCommand) -> Result<ReportLabel, ClientError> {
         let (tx, eth_signature) = self.build_withdraw(command).await?;
-        self.handle_transaction(command, tx, eth_signature).await?;
 
-        Ok(ReportLabel::done())
+        let provider = self.wallet.provider.clone();
+        self.sumbit(command.modifier, || async {
+            let tx_hash = provider.send_tx(tx, eth_signature).await?;
+            Ok(SyncTransactionHandle::new(tx_hash, provider))
+        })
+        .await
     }
 
     pub(super) async fn build_withdraw(

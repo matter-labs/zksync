@@ -2,15 +2,13 @@ use std::time::{Duration, Instant};
 
 use futures::{channel::mpsc::Sender, SinkExt};
 
-use zksync::{
-    error::ClientError, operations::SyncTransactionHandle, provider::Provider, RpcProvider, Wallet,
-};
+use zksync::{error::ClientError, operations::SyncTransactionHandle, RpcProvider, Wallet};
 use zksync_eth_signer::PrivateKeySigner;
-use zksync_types::{tx::PackedEthSignature, Token, ZkSyncTx, H256};
+use zksync_types::{Token, H256};
 
 use crate::{
     account_pool::AddressPool,
-    command::{Command, ExpectedOutcome, TxCommand},
+    command::{Command, ExpectedOutcome, IncorrectnessModifier, TxCommand},
     config::LoadtestConfig,
     constants::{COMMIT_TIMEOUT, POLLING_INTERVAL},
     report::{Report, ReportBuilder, ReportLabel},
@@ -155,34 +153,40 @@ impl AccountLifespan {
             .unwrap_or_default();
     }
 
-    async fn handle_transaction(
+    /// Generic sumbitter for zkSync network: it can operate both individual transactions and
+    /// batches, as long as we can provide a `SyncTransactionHandle` to wait for the commitment and the
+    /// execution result.
+    /// Once result is obtained, it's compared to the expected operation outcome in order to check whether
+    /// command was completed as planned.
+    async fn sumbit<F, Fut>(
         &self,
-        command: &TxCommand,
-        tx: ZkSyncTx,
-        eth_signature: Option<PackedEthSignature>,
-    ) -> Result<ReportLabel, ClientError> {
-        let expected_outcome = command.modifier.expected_outcome();
+        modifier: IncorrectnessModifier,
+        send: F,
+    ) -> Result<ReportLabel, ClientError>
+    where
+        F: FnOnce() -> Fut,
+        Fut: std::future::Future<Output = Result<SyncTransactionHandle<RpcProvider>, ClientError>>,
+    {
+        let expected_outcome = modifier.expected_outcome();
 
-        let send_result = self
-            .wallet
-            .provider
-            .send_tx(tx.clone(), eth_signature)
-            .await
-            .map(|hash| SyncTransactionHandle::new(hash, self.wallet.provider.clone()));
+        let send_result = send().await;
         let mut handle = match (expected_outcome, send_result) {
             (ExpectedOutcome::ApiRequestFailed, Ok(_handle)) => {
                 // Transaction got accepted, but should have not been.
-                let error = format!("Transaction was accepted, but should have not been: {:#?}. Used modifier: {:?}", tx, command.modifier);
+                let error = "Tx/batch was accepted, but should have not been";
                 return Ok(ReportLabel::failed(&error));
             }
-            (_, Ok(handle)) => handle,
+            (_, Ok(handle)) => {
+                // Transaction should have been accepted by API and it was; now wait for the commitment.
+                handle
+            }
             (ExpectedOutcome::ApiRequestFailed, Err(_error)) => {
                 // Transaction was expected to be rejected and it was.
                 return Ok(ReportLabel::done());
             }
             (_, Err(_error)) => {
                 // Transaction was expected to be accepted, but was rejected.
-                let error = format!("Transaction should have been accepted, but got rejected: {:#?}. Used modifier: {:?}", tx, command.modifier);
+                let error = "Tx/batch should have been accepted, but got rejected";
                 return Ok(ReportLabel::failed(&error));
             }
         };
@@ -205,11 +209,8 @@ impl AccountLifespan {
             other => {
                 // Transaction status didn't match expected one.
                 let error = format!(
-                    "Unexpected transaction status: expected {:#?}, receipt {:#?}. Tx: {:#?}. Used modifier: {:?}",
-                    other,
-                    transaction_receipt,
-                    tx,
-                    command.modifier
+                    "Unexpected transaction status: expected {:#?}, receipt {:#?}",
+                    other, transaction_receipt
                 );
                 Ok(ReportLabel::failed(&error))
             }
