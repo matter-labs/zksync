@@ -19,23 +19,22 @@ pub enum Command {
 }
 
 impl Command {
-    pub fn random(own_address: Address, addresses: &AddressPool) -> Self {
-        const MAX_BATCH_SIZE: usize = 20;
+    pub const MAX_BATCH_SIZE: usize = 20;
 
+    pub fn random(own_address: Address, addresses: &AddressPool) -> Self {
         let rng = &mut thread_rng();
         let chance = rng.gen_range(0.0f32, 1.0f32);
 
-        // We have a 40% tx command rate, 10% batch command rate, and 50% API command rate.
-        if chance < 0.4 {
+        // We have a 70% tx command rate amd 30% batch command rate.
+        // We don't generate API requests at the moment.
+        if chance < 0.7 {
             Self::SingleTx(TxCommand::random(own_address, addresses))
-        } else if chance < 0.5 {
-            let batch_size = rng.gen_range(1, MAX_BATCH_SIZE + 1);
+        } else {
+            let batch_size = rng.gen_range(1, Self::MAX_BATCH_SIZE + 1);
             let batch_command = (0..batch_size)
                 .map(|_| TxCommand::random_batchable(own_address, addresses))
                 .collect();
             Self::Batch(batch_command)
-        } else {
-            Self::ApiRequest(ApiRequestCommand::random(own_address, addresses))
         }
     }
 }

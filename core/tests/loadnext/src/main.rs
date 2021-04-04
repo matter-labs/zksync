@@ -1,4 +1,4 @@
-use loadnext::{config::LoadtestConfig, executor::Executor};
+use loadnext::{config::LoadtestConfig, executor::Executor, report_collector::FinalResolution};
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -14,7 +14,16 @@ async fn main() -> anyhow::Result<()> {
     };
 
     let mut executor = Executor::new(config).await;
-    executor.init_accounts().await?;
+    let final_resolution = executor.start().await;
 
-    Ok(())
+    match final_resolution {
+        FinalResolution::TestPassed => {
+            vlog::info!("Test passed");
+            Ok(())
+        }
+        FinalResolution::TestFailed => {
+            vlog::error!("Test failed");
+            Err(anyhow::anyhow!("Test failed"))
+        }
+    }
 }

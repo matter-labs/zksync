@@ -6,7 +6,10 @@ use tokio::task::JoinHandle;
 use zksync::{ethereum::PriorityOpHolder, operations::SyncTransactionHandle, provider::Provider};
 use zksync_types::{TransactionReceipt, TxFeeTypes, U256};
 
-use crate::{account::AccountLifespan, account_pool::AccountPool, config::LoadtestConfig};
+use crate::{
+    account::AccountLifespan, account_pool::AccountPool, config::LoadtestConfig,
+    report_collector::FinalResolution,
+};
 use crate::{constants::*, report_collector::ReportCollector};
 
 #[derive(Debug)]
@@ -23,16 +26,26 @@ impl Executor {
         Self { config, pool }
     }
 
-    pub async fn init_accounts(&mut self) -> anyhow::Result<()> {
+    pub async fn start(&mut self) -> FinalResolution {
+        self.start_inner().await.unwrap_or_else(|err| {
+            vlog::error!("Loadtest was interrupted by the following error: {}", err);
+            FinalResolution::TestFailed
+        })
+    }
+
+    /// Inner representation of `start` function which returns a `Result`, so it can conveniently use `?`.
+    async fn start_inner(&mut self) -> anyhow::Result<FinalResolution> {
         vlog::info!("Initializing accounts");
         self.check_onchain_balance().await?;
         self.mint().await?;
         self.deposit_to_master().await?;
         self.set_signing_key().await?;
-        let account_futures = self.send_initial_transfers().await?;
+        let (executor_future, account_futures) = self.send_initial_transfers().await?;
         self.wait_account_routines(account_futures).await;
 
-        Ok(())
+        let final_resultion = executor_future.await.unwrap_or(FinalResolution::TestFailed);
+
+        Ok(final_resultion)
     }
 
     async fn check_onchain_balance(&mut self) -> anyhow::Result<()> {
@@ -164,7 +177,9 @@ impl Executor {
         Ok(())
     }
 
-    async fn send_initial_transfers(&mut self) -> anyhow::Result<Vec<JoinHandle<()>>> {
+    async fn send_initial_transfers(
+        &mut self,
+    ) -> anyhow::Result<(JoinHandle<FinalResolution>, Vec<JoinHandle<()>>)> {
         vlog::info!("Master Account: Sending initial transfers");
         // 40 is a safe limit for now.
         const MAX_TXS_PER_BATCH: usize = 20;
@@ -175,7 +190,7 @@ impl Executor {
         let (report_sender, report_receiver) = mpsc::channel(65535);
 
         let report_collector = ReportCollector::new(report_receiver);
-        tokio::spawn(report_collector.run());
+        let report_collector_future = tokio::spawn(report_collector.run());
 
         let account_balance = self.amount_to_deposit();
         let eth_to_distribute = self.eth_amount_to_distribute().await?;
@@ -343,7 +358,7 @@ impl Executor {
         );
         vlog::info!("All the initial transfers are completed");
 
-        Ok(account_futures)
+        Ok((report_collector_future, account_futures))
     }
 
     /// Calculated amount of ETH to be distributed per account in order to make them

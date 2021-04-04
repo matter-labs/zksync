@@ -8,9 +8,11 @@ use crate::report::ActionType;
 #[derive(Debug, Clone)]
 pub struct TimeHistogram {
     /// Supported time ranges.
-    pub ranges: Vec<(u64, u64)>,
+    ranges: Vec<(u64, u64)>,
     /// Mapping from the (lower time range) to (amount of elements)
-    pub histogram: BTreeMap<u64, usize>,
+    histogram: BTreeMap<u64, usize>,
+    /// Total entries in the histogram.
+    total: usize,
 }
 
 impl Default for TimeHistogram {
@@ -35,23 +37,59 @@ impl TimeHistogram {
             histogram.insert(start, 0);
         }
 
-        Self { ranges, histogram }
+        Self {
+            ranges,
+            histogram,
+            total: 0,
+        }
     }
 
     pub fn add_metric(&mut self, time: Duration) {
         let range = self.range_for(time);
 
         self.histogram.entry(range).and_modify(|count| *count += 1);
+        self.total += 1;
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.total == 0
+    }
+
+    /// Returns the time range for the requested distribution percentile.
+    pub fn percentile(&self, percentile: u64) -> (Duration, Duration) {
+        let lower_gap = self.total * percentile as usize / 100;
+        debug_assert!(lower_gap <= self.total);
+
+        let mut amount = 0;
+        for (range_start, current_amount) in self.histogram.iter() {
+            amount += current_amount;
+
+            if amount >= lower_gap {
+                let (range_start, range_end) = self.full_range_for(*range_start);
+                return (
+                    Duration::from_millis(range_start),
+                    Duration::from_millis(range_end),
+                );
+            }
+        }
+
+        unreachable!();
     }
 
     /// Returns the histogram entry key for the provided duration.
     fn range_for(&self, time: Duration) -> u64 {
+        let duration_millis = time.as_millis() as u64;
+
+        self.full_range_for(duration_millis).0
+    }
+
+    /// Returns the full time range for the provided duration.
+    fn full_range_for(&self, duration_millis: u64) -> (u64, u64) {
         debug_assert!(self.ranges[0].0 == 0, "Ranges don't start at 0");
 
-        let duration_millis = time.as_millis() as u64;
-        for &(range_start, _) in self.ranges.iter().rev() {
+        for &(range_start, range_end) in self.ranges.iter().rev() {
             if duration_millis >= range_start {
-                return range_start;
+                return (range_start, range_end);
             }
         }
 
@@ -92,6 +130,23 @@ impl MetricsCollector {
         self.action_stats
             .entry(action)
             .and_modify(|hist| hist.add_metric(time));
+    }
+
+    pub fn report(&self) {
+        vlog::info!("Action: [10 percentile, 50 percentile, 90 percentile]");
+        for (action, histogram) in self.action_stats.iter() {
+            // Only report data that was actually gathered.
+            if !histogram.is_empty() {
+                // +1 is a hack to have prettier numbers in the console (since ranges end with xx99).
+                vlog::info!(
+                    "{:?}: [{}ms {}ms {}ms]",
+                    action,
+                    histogram.percentile(10).1.as_millis() + 1,
+                    histogram.percentile(50).1.as_millis() + 1,
+                    histogram.percentile(90).1.as_millis() + 1,
+                );
+            }
+        }
     }
 }
 

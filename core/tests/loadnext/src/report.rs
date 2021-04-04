@@ -116,11 +116,15 @@ impl From<Command> for ActionType {
 
 impl ActionType {
     pub fn all() -> Vec<Self> {
+        let batch_action_types =
+            (1..=Command::MAX_BATCH_SIZE).map(|batch_size| ActionType::Batch { batch_size });
+
         TxActionType::all()
             .iter()
             .copied()
             .map(Self::from)
             .chain(ApiActionType::all().iter().copied().map(Self::from))
+            .chain(batch_action_types)
             .collect()
     }
 }
