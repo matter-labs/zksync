@@ -12,7 +12,7 @@ impl FailureCollector {
         Self::default()
     }
 
-    pub fn add_status(&mut self, status: ReportLabel) {
+    pub fn add_status(&mut self, status: &ReportLabel) {
         match status {
             ReportLabel::ActionDone => self.successes += 1,
             ReportLabel::ActionSkipped { .. } => self.skipped += 1,

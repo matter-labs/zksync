@@ -136,6 +136,10 @@ impl AccountLifespan {
         retries: usize,
         command: Command,
     ) {
+        if matches!(label, ReportLabel::ActionFailed { .. }) {
+            vlog::error!("Command failed: {:#?}", command);
+        }
+
         let report = ReportBuilder::new()
             .label(label)
             .reporter(self.wallet.address())
@@ -159,7 +163,7 @@ impl AccountLifespan {
     /// execution result.
     /// Once result is obtained, it's compared to the expected operation outcome in order to check whether
     /// command was completed as planned.
-    async fn sumbit<F, Fut>(
+    async fn submit<F, Fut>(
         &self,
         modifier: IncorrectnessModifier,
         send: F,
@@ -210,8 +214,8 @@ impl AccountLifespan {
             other => {
                 // Transaction status didn't match expected one.
                 let error = format!(
-                    "Unexpected transaction status: expected {:#?}, receipt {:#?}",
-                    other, transaction_receipt
+                    "Unexpected transaction status: expected {:#?} because of modifier {:?}, receipt {:#?}",
+                    other, modifier, transaction_receipt
                 );
                 Ok(ReportLabel::failed(&error))
             }

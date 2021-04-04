@@ -1,5 +1,8 @@
 use num::BigUint;
-use zksync::utils::{closest_packable_token_amount, private_key_from_seed};
+use zksync::utils::{
+    closest_packable_token_amount, is_fee_amount_packable, is_token_amount_packable,
+    private_key_from_seed,
+};
 use zksync_types::{
     tx::{PackedEthSignature, TxSignature},
     TokenId, ZkSyncTx, H256,
@@ -135,7 +138,9 @@ impl Corrupted for (ZkSyncTx, Option<PackedEthSignature>) {
     }
 
     fn not_packable_amount(mut self, eth_pk: H256, token_symbol: &str, decimals: u8) -> Self {
-        let bad_amount = BigUint::from(10u64.pow(18)) + BigUint::from(1u64);
+        let bad_amount = BigUint::from(10u128.pow(24)) + BigUint::from(1u64);
+        assert!(!is_token_amount_packable(&bad_amount));
+
         match &mut self.0 {
             ZkSyncTx::ChangePubKey(_tx) => unreachable!("CPK doesn't have amount"),
             ZkSyncTx::ForcedExit(_tx) => unreachable!("ForcedExit doesn't have amount"),
@@ -154,6 +159,8 @@ impl Corrupted for (ZkSyncTx, Option<PackedEthSignature>) {
 
     fn not_packable_fee(mut self, eth_pk: H256, token_symbol: &str, decimals: u8) -> Self {
         let bad_fee = BigUint::from(10u64.pow(18)) + BigUint::from(1u64);
+        debug_assert!(!is_fee_amount_packable(&bad_fee));
+
         match &mut self.0 {
             ZkSyncTx::ChangePubKey(tx) => {
                 tx.fee = bad_fee;
@@ -176,7 +183,7 @@ impl Corrupted for (ZkSyncTx, Option<PackedEthSignature>) {
 
     fn too_big_amount(mut self, eth_pk: H256, token_symbol: &str, decimals: u8) -> Self {
         // We want to fail tx because of the amount, not because of packability.
-        let big_amount = closest_packable_token_amount(&BigUint::from(u64::max_value()));
+        let big_amount = closest_packable_token_amount(&BigUint::from(u128::max_value() >> 32));
         match &mut self.0 {
             ZkSyncTx::ChangePubKey(_tx) => unreachable!("CPK doesn't have amount"),
             ZkSyncTx::ForcedExit(_tx) => unreachable!("ForcedExit doesn't have amount"),

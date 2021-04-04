@@ -41,7 +41,12 @@ impl ReportCollector {
                     .add_metric(report.action, report.time);
             }
 
-            self.failure_collector.add_status(report.label);
+            self.failure_collector.add_status(&report.label);
+
+            // Report failure, if it exists.
+            if let ReportLabel::ActionFailed { error } = &report.label {
+                vlog::warn!("Operation failed: {}", error);
+            }
         }
 
         // All the receivers are gone, it's likely the end of the test.

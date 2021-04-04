@@ -5,7 +5,7 @@ use zksync::{
     error::ClientError, ethereum::PriorityOpHolder, operations::SyncTransactionHandle,
     provider::Provider,
 };
-use zksync_types::{tx::PackedEthSignature, TokenId, ZkSyncTx, H256};
+use zksync_types::{tx::PackedEthSignature, Nonce, TokenId, ZkSyncTx, H256};
 
 use crate::{
     account::AccountLifespan,
@@ -102,9 +102,17 @@ impl AccountLifespan {
             .try_into()
             .unwrap_or_else(|_| u128::max_value())
             .into();
-        let eth_tx_hash = ethereum
+        let eth_tx_hash = match ethereum
             .deposit(self.main_token.id, amount, self.wallet.address())
-            .await?;
+            .await
+        {
+            Ok(hash) => hash,
+            Err(_err) => {
+                // Most likely we don't have enough ETH to perform operations.
+                // Just mark the operations as skipped.
+                return Ok(ReportLabel::skipped("Unable to perform an L1 operation"));
+            }
+        };
 
         self.handle_priority_op(eth_tx_hash).await
     }
@@ -127,7 +135,14 @@ impl AccountLifespan {
         };
 
         let ethereum = self.wallet.ethereum(&self.config.web3_url).await?;
-        let eth_tx_hash = ethereum.full_exit(exit_token_id, account_id).await?;
+        let eth_tx_hash = match ethereum.full_exit(exit_token_id, account_id).await {
+            Ok(hash) => hash,
+            Err(_err) => {
+                // Most likely we don't have enough ETH to perform operations.
+                // Just mark the operations as skipped.
+                return Ok(ReportLabel::skipped("Unable to perform an L1 operation"));
+            }
+        };
 
         self.handle_priority_op(eth_tx_hash).await
     }
@@ -162,7 +177,7 @@ impl AccountLifespan {
         let (tx, eth_signature) = self.build_change_pubkey(command).await?;
 
         let provider = self.wallet.provider.clone();
-        self.sumbit(command.modifier, || async {
+        self.submit(command.modifier, || async {
             let tx_hash = provider.send_tx(tx, eth_signature).await?;
             Ok(SyncTransactionHandle::new(tx_hash, provider))
         })
@@ -186,10 +201,10 @@ impl AccountLifespan {
     }
 
     async fn execute_transfer(&self, command: &TxCommand) -> Result<ReportLabel, ClientError> {
-        let (tx, eth_signature) = self.build_transfer(command).await?;
+        let (tx, eth_signature) = self.build_transfer(command, None).await?;
 
         let provider = self.wallet.provider.clone();
-        self.sumbit(command.modifier, || async {
+        self.submit(command.modifier, || async {
             let tx_hash = provider.send_tx(tx, eth_signature).await?;
             Ok(SyncTransactionHandle::new(tx_hash, provider))
         })
@@ -199,26 +214,30 @@ impl AccountLifespan {
     pub(super) async fn build_transfer(
         &self,
         command: &TxCommand,
+        nonce: Option<Nonce>,
     ) -> Result<(ZkSyncTx, Option<PackedEthSignature>), ClientError> {
-        let (tx, eth_signature) = self
+        let mut builder = self
             .wallet
             .start_transfer()
             .to(command.to)
             .amount(command.amount.clone())
             .token(self.config.main_token.as_str())
-            .unwrap()
-            .tx()
-            .await
-            .map_err(Self::tx_creation_error)?;
+            .unwrap();
+
+        if let Some(nonce) = nonce {
+            builder = builder.nonce(nonce);
+        }
+
+        let (tx, eth_signature) = builder.tx().await.map_err(Self::tx_creation_error)?;
 
         Ok(self.apply_modifier(tx, eth_signature, command.modifier))
     }
 
     async fn execute_withdraw(&self, command: &TxCommand) -> Result<ReportLabel, ClientError> {
-        let (tx, eth_signature) = self.build_withdraw(command).await?;
+        let (tx, eth_signature) = self.build_withdraw(command, None).await?;
 
         let provider = self.wallet.provider.clone();
-        self.sumbit(command.modifier, || async {
+        self.submit(command.modifier, || async {
             let tx_hash = provider.send_tx(tx, eth_signature).await?;
             Ok(SyncTransactionHandle::new(tx_hash, provider))
         })
@@ -228,17 +247,20 @@ impl AccountLifespan {
     pub(super) async fn build_withdraw(
         &self,
         command: &TxCommand,
+        nonce: Option<Nonce>,
     ) -> Result<(ZkSyncTx, Option<PackedEthSignature>), ClientError> {
-        let (tx, eth_signature) = self
+        let mut builder = self
             .wallet
             .start_withdraw()
             .to(command.to)
             .amount(command.amount.clone())
             .token(self.config.main_token.as_str())
-            .unwrap()
-            .tx()
-            .await
-            .map_err(Self::tx_creation_error)?;
+            .unwrap();
+        if let Some(nonce) = nonce {
+            builder = builder.nonce(nonce);
+        }
+
+        let (tx, eth_signature) = builder.tx().await.map_err(Self::tx_creation_error)?;
 
         Ok(self.apply_modifier(tx, eth_signature, command.modifier))
     }

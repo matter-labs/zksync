@@ -1,5 +1,5 @@
 use crate::{
-    helpers::{is_fee_amount_packable, pack_fee_amount},
+    helpers::{is_fee_amount_packable, is_token_amount_packable, pack_fee_amount},
     AccountId, Nonce, TokenId,
 };
 use num::{BigUint, ToPrimitive};
@@ -140,6 +140,7 @@ impl Withdraw {
     /// - zkSync signature must correspond to the PubKeyHash of the account.
     pub fn check_correctness(&mut self) -> bool {
         let mut valid = self.amount <= BigUint::from(u128::max_value())
+            && is_token_amount_packable(&self.amount)
             && is_fee_amount_packable(&self.fee)
             && self.account_id <= max_account_id()
             && self.token <= max_token_id()

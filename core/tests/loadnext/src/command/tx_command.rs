@@ -85,7 +85,7 @@ pub enum IncorrectnessModifier {
 /// Expected outcome of transaction:
 /// Since we may create erroneous transactions on purpose,
 /// we may expect different outcomes for each transaction.
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, PartialEq)]
 pub enum ExpectedOutcome {
     /// Transactions was successfully executed.
     TxSucceed,
