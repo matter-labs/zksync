@@ -49,6 +49,17 @@ impl TxType {
         rng.choose(&options).copied().unwrap()
     }
 
+    pub fn random_batchable() -> Self {
+        loop {
+            let output = Self::random();
+
+            // Priority ops and ChangePubKey cannot be inserted into the batch.
+            if !matches!(output, Self::Deposit | Self::FullExit | Self::ChangePubKey) {
+                return output;
+            }
+        }
+    }
+
     fn required_amount_of_copies(options: &[Self], likehood: f64) -> usize {
         // This value will be truncated down, but it will be compensated by the fact
         // that element is already inserted into `options`.
@@ -148,8 +159,20 @@ impl TxCommand {
     }
 
     pub fn random(own_address: Address, addresses: &AddressPool) -> Self {
+        let command_type = TxType::random();
+
+        Self::new_with_type(own_address, addresses, command_type)
+    }
+
+    pub fn random_batchable(own_address: Address, addresses: &AddressPool) -> Self {
+        let command_type = TxType::random_batchable();
+
+        Self::new_with_type(own_address, addresses, command_type)
+    }
+
+    fn new_with_type(own_address: Address, addresses: &AddressPool, command_type: TxType) -> Self {
         let mut command = Self {
-            command_type: TxType::random(),
+            command_type,
             modifier: IncorrectnessModifier::random(),
             to: addresses.random_address(),
             amount: Self::random_amount(),

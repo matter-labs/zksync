@@ -3,6 +3,7 @@ use futures::{channel::mpsc::Receiver, StreamExt};
 use crate::{report::Report, report_collector::metrics_collector::MetricsCollector};
 
 mod metrics_collector;
+mod script_collector;
 
 #[derive(Debug)]
 pub struct ReportCollector {

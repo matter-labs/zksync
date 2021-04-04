@@ -1,8 +1,8 @@
 use std::time::Duration;
 
-use zksync_types::Address;
+use zksync_types::{Action, Address};
 
-use crate::command::TxType;
+use crate::command::{ApiRequestCommand, Command, TxType};
 
 #[derive(Debug, Clone)]
 pub enum ReportLabel {
@@ -77,10 +77,17 @@ impl ApiActionType {
     }
 }
 
+impl From<ApiRequestCommand> for ApiActionType {
+    fn from(_: ApiRequestCommand) -> Self {
+        todo!()
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum ActionType {
     Tx(TxActionType),
     Api(ApiActionType),
+    Batch { batch_size: usize },
 }
 
 impl From<TxActionType> for ActionType {
@@ -92,6 +99,18 @@ impl From<TxActionType> for ActionType {
 impl From<ApiActionType> for ActionType {
     fn from(action: ApiActionType) -> Self {
         Self::Api(action)
+    }
+}
+
+impl From<Command> for ActionType {
+    fn from(command: Command) -> Self {
+        match command {
+            Command::SingleTx(tx_command) => Self::Tx(tx_command.command_type.into()),
+            Command::Batch(tx_commands) => Self::Batch {
+                batch_size: tx_commands.len(),
+            },
+            Command::ApiRequest(api_request) => Self::Api(api_request.into()),
+        }
     }
 }
 
