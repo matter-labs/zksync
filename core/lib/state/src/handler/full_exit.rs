@@ -75,9 +75,11 @@ impl TxHandler<FullExit> for ZkSyncState {
         account.sub_balance(op.priority_op.token, &amount.0);
 
         let new_balance = account.get_balance(op.priority_op.token);
-        if new_balance != BigUint::from(0u32) {
-            return Err(FullExitOpError::IncorrectAmount);
-        }
+        assert_eq!(
+            new_balance,
+            BigUint::from(0u32),
+            "Full exit amount is incorrect"
+        );
         let new_nonce = account.nonce;
 
         self.insert_account(account_id, account);

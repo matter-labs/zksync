@@ -8,7 +8,7 @@ Check if the sender address matches the private key, \
 the recipient address is not zero, \
 and the amount is correct and packable"
 )]
-pub struct TransactionSignatureError();
+pub struct TransactionSignatureError;
 
 #[derive(Debug, Error, PartialEq)]
 pub enum ChangePubkeySignedDataError {

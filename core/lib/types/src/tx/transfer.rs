@@ -106,7 +106,7 @@ impl Transfer {
         );
         tx.signature = TxSignature::sign_musig(private_key, &tx.get_bytes());
         if !tx.check_correctness() {
-            return Err(TransactionSignatureError());
+            return Err(TransactionSignatureError);
         }
         Ok(tx)
     }

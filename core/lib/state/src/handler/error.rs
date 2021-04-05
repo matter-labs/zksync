@@ -64,8 +64,6 @@ pub enum ForcedExitOpError {
 pub enum FullExitOpError {
     #[error("Full exit account not found")]
     AccountNotFound,
-    #[error("Full exit amount is incorrect")]
-    IncorrectAmount,
 }
 
 #[derive(Clone, Debug, Error, PartialEq)]
