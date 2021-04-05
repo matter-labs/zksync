@@ -500,7 +500,7 @@ impl<'a, 'c> OperationsSchema<'a, 'c> {
     // Removes ethereum unprocessed aggregated operations
     pub async fn remove_eth_unprocessed_aggregated_ops(&mut self) -> QueryResult<()> {
         let start = Instant::now();
-        sqlx::query!("DELETE FROM eth_unprocessed_aggregated_ops")
+        sqlx::query!("TRUNCATE eth_unprocessed_aggregated_ops")
             .execute(self.0.conn())
             .await?;
 
