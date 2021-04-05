@@ -370,11 +370,10 @@ impl<'a, 'c> StateSchema<'a, 'c> {
 
                     sqlx::query!(
                         r#"
-                        INSERT INTO nft ( token_id, account_id, creator_account_id, serial_id, address, content_hash )
-                        VALUES ( $1, $2, $3, $4, $5, $6 )
+                        INSERT INTO nft ( token_id, creator_account_id, serial_id, address, content_hash )
+                        VALUES ( $1, $2, $3, $4, $5)
                         "#,
                         upd.token_id,
-                        upd.account_id,
                         upd.creator_account_id,
                         upd.serial_id,
                         upd.address,

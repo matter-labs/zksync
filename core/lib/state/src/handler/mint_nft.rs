@@ -2,7 +2,7 @@ use anyhow::{bail, ensure, format_err};
 use std::time::Instant;
 use zksync_crypto::params;
 use zksync_types::{
-    operations::MintNFTOp, Account, AccountUpdate, AccountUpdates, Address, MintNFT, Nonce, Token,
+    operations::MintNFTOp, Account, AccountUpdate, AccountUpdates, Address, MintNFT, Nonce,
     TokenId, ZkSyncOp,
 };
 

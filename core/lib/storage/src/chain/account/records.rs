@@ -36,7 +36,6 @@ pub struct StorageAccountUpdate {
 #[derive(Debug, FromRow)]
 pub struct StorageMintNFTUpdate {
     pub token_id: i32,
-    pub account_id: i32,
     pub serial_id: i32,
     pub creator_account_id: i32,
     pub address: Vec<u8>,

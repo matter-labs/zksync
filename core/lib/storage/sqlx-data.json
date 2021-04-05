@@ -170,6 +170,22 @@
       "nullable": []
     }
   },
+  "0790a858fee7bec987610338be6efe97eb93136c5349197164a786fb26f50391": {
+    "query": "\n                        INSERT INTO nft ( token_id, creator_account_id, serial_id, address, content_hash )\n                        VALUES ( $1, $2, $3, $4, $5)\n                        ",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "Int4",
+          "Int4",
+          "Int4",
+          "Bytea",
+          "Bytea"
+        ]
+      },
+      "nullable": []
+    }
+  },
   "088013a67d0b8118980a606386ff38b394a26abfed0f209d17a6a583a297679b": {
     "query": "\n                SELECT * FROM account_creates\n                WHERE account_id = $1 AND block_number > $2\n            ",
     "describe": {
@@ -2998,23 +3014,6 @@
       "nullable": []
     }
   },
-  "a7cfeb302913a783d461a313a8d9e2766ec26c385ca41936bddca9df55d04b32": {
-    "query": "\n                        INSERT INTO nft ( token_id, account_id, creator_account_id, serial_id, address, content_hash )\n                        VALUES ( $1, $2, $3, $4, $5, $6 )\n                        ",
-    "describe": {
-      "columns": [],
-      "parameters": {
-        "Left": [
-          "Int4",
-          "Int4",
-          "Int4",
-          "Int4",
-          "Bytea",
-          "Bytea"
-        ]
-      },
-      "nullable": []
-    }
-  },
   "aaaf2bcea738151db11f6152772516a46ef7d23ae885936094226b837369ee3c": {
     "query": "DELETE FROM mempool_txs\n            WHERE tx_hash = ANY($1)",
     "describe": {
@@ -4377,36 +4376,31 @@
         },
         {
           "ordinal": 2,
-          "name": "account_id",
-          "type_info": "Int4"
-        },
-        {
-          "ordinal": 3,
           "name": "creator_account_id",
           "type_info": "Int4"
         },
         {
-          "ordinal": 4,
+          "ordinal": 3,
           "name": "update_order_id",
           "type_info": "Int4"
         },
         {
-          "ordinal": 5,
+          "ordinal": 4,
           "name": "serial_id",
           "type_info": "Int4"
         },
         {
-          "ordinal": 6,
+          "ordinal": 5,
           "name": "address",
           "type_info": "Bytea"
         },
         {
-          "ordinal": 7,
+          "ordinal": 6,
           "name": "content_hash",
           "type_info": "Bytea"
         },
         {
-          "ordinal": 8,
+          "ordinal": 7,
           "name": "symbol",
           "type_info": "Text"
         }
@@ -4417,7 +4411,6 @@
         ]
       },
       "nullable": [
-        false,
         false,
         false,
         false,
