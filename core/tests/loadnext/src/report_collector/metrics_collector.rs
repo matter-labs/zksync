@@ -57,7 +57,8 @@ impl TimeHistogram {
 
     /// Returns the time range for the requested distribution percentile.
     pub fn percentile(&self, percentile: u64) -> (Duration, Duration) {
-        let lower_gap = self.total * percentile as usize / 100;
+        let lower_gap_float = self.total as f64 * percentile as f64 / 100.0;
+        let lower_gap = lower_gap_float.round() as usize;
         debug_assert!(lower_gap <= self.total);
 
         let mut amount = 0;
@@ -105,6 +106,10 @@ impl TimeHistogram {
     }
 }
 
+/// Collector for the execution time metrics.
+///
+/// It builds a distribution histogram for each type of action, thus reported results are represented
+/// by a range window rather than a single concrete number.
 #[derive(Debug, Clone)]
 pub struct MetricsCollector {
     pub action_stats: HashMap<ActionType, TimeHistogram>,
@@ -201,5 +206,40 @@ mod tests {
         assert_eq!(histogram.histogram[&first_range_start], 2);
         assert_eq!(histogram.histogram[&second_range_start], 1);
         assert_eq!(histogram.histogram[&last_range_start], 1);
+    }
+
+    #[test]
+    fn histogram_percentile() {
+        let mut histogram = TimeHistogram::new();
+        let first_range = (
+            Duration::from_millis(histogram.ranges[0].0),
+            Duration::from_millis(histogram.ranges[0].1),
+        );
+        let second_range = (
+            Duration::from_millis(histogram.ranges[1].0),
+            Duration::from_millis(histogram.ranges[1].1),
+        );
+        let third_range = (
+            Duration::from_millis(histogram.ranges[2].0),
+            Duration::from_millis(histogram.ranges[2].1),
+        );
+
+        histogram.add_metric(Duration::from_millis(0));
+        for percentile in &[0, 10, 50, 90, 100] {
+            assert_eq!(histogram.percentile(*percentile), first_range);
+        }
+
+        histogram.add_metric(second_range.0);
+        for percentile in &[0, 10] {
+            assert_eq!(histogram.percentile(*percentile), first_range);
+        }
+        for percentile in &[90, 100] {
+            assert_eq!(histogram.percentile(*percentile), second_range);
+        }
+
+        histogram.add_metric(third_range.0);
+        assert_eq!(histogram.percentile(0), first_range);
+        assert_eq!(histogram.percentile(50), second_range);
+        assert_eq!(histogram.percentile(100), third_range);
     }
 }

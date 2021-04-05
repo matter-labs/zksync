@@ -1,5 +1,7 @@
 use crate::report::ReportLabel;
 
+/// Collector that analyzes the amount of failed operations.
+/// Currently it's solely capable of deciding whether test was failed or not.
 #[derive(Debug, Clone, Default)]
 pub struct FailureCollector {
     successes: u64,
