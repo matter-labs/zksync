@@ -25,7 +25,7 @@ pub trait FeConvert: PrimeField {
             });
         }
         repr.read_be(value).map_err(ConversionError::ParsingError)?;
-        Ok(Self::from_repr(repr)?)
+        Self::from_repr(repr).map_err(From::from)
     }
 
     /// Returns hex representation of the field element without `0x` prefix.
@@ -54,7 +54,7 @@ pub trait FeConvert: PrimeField {
         buf.resize(repr.as_ref().len() * 8, 0);
         repr.read_le(&buf[..])
             .map_err(ConversionError::ParsingError)?;
-        Ok(Self::from_repr(repr)?)
+        Self::from_repr(repr).map_err(From::from)
     }
 }
 
