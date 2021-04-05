@@ -3,8 +3,10 @@ use std::cell::RefCell;
 use structopt::StructOpt;
 use zksync_api::run_api;
 use zksync_core::{genesis_init, run_core, wait_for_tasks};
+use zksync_eth_client::EthereumGateway;
 use zksync_eth_sender::run_eth_sender;
 use zksync_forced_exit_requests::run_forced_exit_requests_actors;
+use zksync_gateway_watcher::run_gateway_watcher_if_multiplexed;
 use zksync_prometheus_exporter::run_prometheus_exporter;
 use zksync_witness_generator::run_prover_server;
 
@@ -47,6 +49,9 @@ async fn main() -> anyhow::Result<()> {
     vlog::info!("Running the zkSync server");
 
     let connection_pool = ConnectionPool::new(None);
+    let eth_gateway = EthereumGateway::from_config(&config);
+
+    let gateway_watcher_task_opt = run_gateway_watcher_if_multiplexed(eth_gateway.clone(), &config);
 
     // Handle Ctrl+C
     let (stop_signal_sender, mut stop_signal_receiver) = mpsc::channel(256);
@@ -65,17 +70,28 @@ async fn main() -> anyhow::Result<()> {
 
     // Run core actors.
     vlog::info!("Starting the Core actors");
-    let core_task_handles = run_core(connection_pool.clone(), stop_signal_sender.clone(), &config)
-        .await
-        .expect("Unable to start Core actors");
+    let core_task_handles = run_core(
+        connection_pool.clone(),
+        stop_signal_sender.clone(),
+        eth_gateway.clone(),
+        &config,
+    )
+    .await
+    .expect("Unable to start Core actors");
 
     // Run API actors.
     vlog::info!("Starting the API server actors");
-    let api_task_handle = run_api(connection_pool.clone(), stop_signal_sender.clone(), &config);
+    let api_task_handle = run_api(
+        connection_pool.clone(),
+        stop_signal_sender.clone(),
+        eth_gateway.clone(),
+        &config,
+    );
 
     // Run Ethereum sender actors.
     vlog::info!("Starting the Ethereum sender actors");
-    let eth_sender_task_handle = run_eth_sender(connection_pool.clone(), config.clone());
+    let eth_sender_task_handle =
+        run_eth_sender(connection_pool.clone(), eth_gateway.clone(), config.clone());
 
     // Run prover server & witness generator.
     vlog::info!("Starting the Prover server actors");
@@ -92,6 +108,9 @@ async fn main() -> anyhow::Result<()> {
         _ = async { api_task_handle.await } => {
             panic!("API server actors aren't supposed to finish their execution")
         },
+        _ = async { gateway_watcher_task_opt.unwrap().await }, if gateway_watcher_task_opt.is_some() => {
+            panic!("Gateway Watcher actors aren't supposed to finish their execution")
+        }
         _ = async { eth_sender_task_handle.await } => {
             panic!("Ethereum Sender actors aren't supposed to finish their execution")
         },
