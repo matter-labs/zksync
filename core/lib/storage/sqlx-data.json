@@ -1946,6 +1946,16 @@
       ]
     }
   },
+  "563bb13bbd17fe47979fb0d78b3ae2ec8da2aaa00cef4334cdb736df1631e4cc": {
+    "query": "DELETE FROM eth_unprocessed_aggregated_ops",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": []
+      },
+      "nullable": []
+    }
+  },
   "58b251c3fbdf9be9b62f669f8cdc2d98940026c831e02a53337474d36a5224f0": {
     "query": "UPDATE aggregate_operations\n                SET confirmed = $1\n                WHERE from_block >= $2 AND to_block <= $3 AND action_type = $4",
     "describe": {

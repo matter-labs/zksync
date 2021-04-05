@@ -413,3 +413,37 @@ async fn test_remove_executed_priority_operations(
 
     Ok(())
 }
+
+/// Checks if ethereum unprocessed aggregated operations are removed correctly.
+#[db_test]
+async fn test_remove_eth_unprocessed_aggregated_ops(
+    mut storage: StorageProcessor<'_>,
+) -> QueryResult<()> {
+    let block_number = 1;
+    let action_type = AggregatedActionType::CommitBlocks;
+    // Save commit aggregated operation.
+    OperationsSchema(&mut storage)
+        .store_aggregated_action(gen_unique_aggregated_operation(
+            BlockNumber(block_number),
+            action_type,
+            100,
+        ))
+        .await?;
+    // Add this operation to eth_unprocessed_aggregated_ops table.
+    storage
+        .ethereum_schema()
+        .restore_unprocessed_operations()
+        .await?;
+    // Remove ethereum unprocessed aggregated operations.
+    OperationsSchema(&mut storage)
+        .remove_eth_unprocessed_aggregated_ops()
+        .await?;
+    let unprocessed_op_count = storage
+        .ethereum_schema()
+        .load_unconfirmed_operations()
+        .await?
+        .len();
+    assert_eq!(unprocessed_op_count, 0);
+
+    Ok(())
+}

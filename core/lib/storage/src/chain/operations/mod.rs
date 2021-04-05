@@ -497,6 +497,20 @@ impl<'a, 'c> OperationsSchema<'a, 'c> {
         Ok(aggregated_op)
     }
 
+    // Removes ethereum unprocessed aggregated operations
+    pub async fn remove_eth_unprocessed_aggregated_ops(&mut self) -> QueryResult<()> {
+        let start = Instant::now();
+        sqlx::query!("DELETE FROM eth_unprocessed_aggregated_ops")
+            .execute(self.0.conn())
+            .await?;
+
+        metrics::histogram!(
+            "sql.chain.operations.remove_eth_unprocessed_aggregated_ops",
+            start.elapsed()
+        );
+        Ok(())
+    }
+
     // Removes executed priority operations for blocks with number greater than `last_block`
     pub async fn remove_executed_priority_operations(
         &mut self,
