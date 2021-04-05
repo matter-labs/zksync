@@ -80,8 +80,10 @@ pub struct AccountPool {
 impl AccountPool {
     /// Generates all the required test accounts and prepares `Wallet` objects.
     pub async fn new(config: &LoadtestConfig) -> Self {
-        let provider =
-            RpcProvider::from_addr_and_network(&config.zksync_rpc_addr, zksync::Network::Localhost);
+        let provider = RpcProvider::from_addr_and_network(
+            &config.zksync_rpc_addr,
+            zksync::Network::from_str(&config.eth_network).expect("Invalid network name"),
+        );
 
         let master_wallet = {
             let eth_pk = H256::from_str(&config.master_wallet_pk)

@@ -14,6 +14,8 @@ pub struct LoadtestConfig {
     pub zksync_rpc_addr: String,
     /// Address of the Ethereum web3 API.
     pub web3_url: String,
+    /// Used Ethereum network (e.g. `rinkeby` or `localhost`).
+    pub eth_network: String,
 
     /// Ethereum private key of the wallet that has funds to perform a test.
     pub master_wallet_pk: String,
