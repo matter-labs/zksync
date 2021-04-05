@@ -24,9 +24,8 @@ pub trait FeConvert: PrimeField {
                 expected_size: expected_input_size,
             });
         }
-        repr.read_be(value)
-            .map_err(|error| ConversionError::ParsingError(error))?;
-        Self::from_repr(repr).map_err(|e| ConversionError::PrimeFieldDecodingError(e))
+        repr.read_be(value).map_err(ConversionError::ParsingError)?;
+        Ok(Self::from_repr(repr)?)
     }
 
     /// Returns hex representation of the field element without `0x` prefix.
@@ -54,8 +53,8 @@ pub trait FeConvert: PrimeField {
         // so to obtain size in bytes, we multiply the array size with the size of `u64`.
         buf.resize(repr.as_ref().len() * 8, 0);
         repr.read_le(&buf[..])
-            .map_err(|error| ConversionError::ParsingError(error))?;
-        Self::from_repr(repr).map_err(|e| ConversionError::PrimeFieldDecodingError(e))
+            .map_err(ConversionError::ParsingError)?;
+        Ok(Self::from_repr(repr)?)
     }
 }
 
