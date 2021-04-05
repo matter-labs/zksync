@@ -142,13 +142,12 @@ impl MetricsCollector {
         for (action, histogram) in self.action_stats.iter() {
             // Only report data that was actually gathered.
             if !histogram.is_empty() {
-                // +1 is a hack to have prettier numbers in the console (since ranges end with xx99).
                 vlog::info!(
-                    "{:?}: [{}ms {}ms {}ms]",
+                    "{:?}: [>{}ms >{}ms >{}ms]",
                     action,
-                    histogram.percentile(10).1.as_millis() + 1,
-                    histogram.percentile(50).1.as_millis() + 1,
-                    histogram.percentile(90).1.as_millis() + 1,
+                    histogram.percentile(10).0.as_millis(),
+                    histogram.percentile(50).0.as_millis(),
+                    histogram.percentile(90).0.as_millis(),
                 );
             }
         }
