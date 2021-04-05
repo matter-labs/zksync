@@ -97,6 +97,10 @@ impl MockEthereum {
         Ok(self.block_number.into())
     }
 
+    pub fn set_gas_price(&mut self, gas_price: U256) {
+        self.gas_price = gas_price;
+    }
+
     pub async fn get_gas_price(&self) -> anyhow::Result<U256> {
         Ok(self.gas_price)
     }

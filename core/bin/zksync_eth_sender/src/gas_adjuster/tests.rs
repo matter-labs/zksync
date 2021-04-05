@@ -142,7 +142,10 @@ async fn average_gas_price_stored_correctly() {
 
     // Set the low gas price in Ethereum.
     let ethereum_price = U256::from(1u64);
-    ethereum.get_mut_mock().unwrap().gas_price = ethereum_price;
+    ethereum
+        .get_mut_mock()
+        .unwrap()
+        .set_gas_price(ethereum_price);
 
     // Update the gas adjuster state once.
     gas_adjuster.keep_updated(&ethereum, &db).await;
