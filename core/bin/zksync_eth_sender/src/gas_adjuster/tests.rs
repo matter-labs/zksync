@@ -165,7 +165,9 @@ async fn average_gas_price_stored_correctly() {
     ethereum
         .get_mut_mock()
         .unwrap()
-        .set_gas_price(ethereum_price);
+        .set_gas_price(ethereum_price)
+        .await
+        .unwrap();
 
     // Update the gas adjuster state once.
     gas_adjuster.keep_updated(&ethereum, &db).await;
