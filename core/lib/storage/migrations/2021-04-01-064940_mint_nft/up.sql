@@ -7,7 +7,8 @@ CREATE TABLE mint_nft_updates
     update_order_id    INT   NOT NULL,
     serial_id          INT   NOT NULL,
     address            bytea NOT NULL,
-    content_hash       bytea NOT NULL
+    content_hash       bytea NOT NULL,
+    symbol             text  NOT NULL
 );
 
 CREATE TABLE nft

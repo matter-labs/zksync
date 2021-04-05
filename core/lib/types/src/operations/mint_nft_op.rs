@@ -36,7 +36,6 @@ pub struct MintNFTOp {
     pub tx: MintNFT,
     pub creator_account_id: AccountId,
     pub recipient_account_id: AccountId,
-    pub token_account_id: AccountId,
 }
 
 impl MintNFTOp {

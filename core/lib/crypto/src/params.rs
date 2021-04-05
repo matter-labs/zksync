@@ -5,7 +5,8 @@ use lazy_static::lazy_static;
 // Workspace deps
 use crate::franklin_crypto::rescue::bn256::Bn256RescueParams;
 use crate::merkle_tree::rescue_hasher::BabyRescueHasher;
-use zksync_basic_types::{AccountId, TokenId};
+use std::str::FromStr;
+use zksync_basic_types::{AccountId, Address, TokenId};
 
 /// Depth of the account tree.
 pub const ACCOUNT_TREE_DEPTH: usize = 32;
@@ -22,10 +23,21 @@ pub fn balance_tree_depth() -> usize {
     BALANCE_TREE_DEPTH
 }
 
+/// Tokens settings
+
 /// Number of supported tokens.
 pub fn total_tokens() -> usize {
     2usize.pow(balance_tree_depth() as u32)
 }
+/// NFT settings
+
+/// Special token id, which enforce unique pair of creator account id and serial id for generating unique address for token.
+/// Where serial id is balance for this special token
+pub const NFT_TOKEN_ID: TokenId = TokenId(u32::MAX - 1);
+/// Special account which enforce unique token id for NFT.
+pub const NFT_STORAGE_ACCOUNT_ID: AccountId = AccountId(u32::MAX - 1);
+
+pub const MIN_NFT_TOKEN_ID: u32 = 10000;
 
 /// Number of tokens that are processed by this release
 pub fn number_of_processable_tokens() -> usize {
@@ -221,4 +233,6 @@ lazy_static! {
     pub static ref JUBJUB_PARAMS: AltJubjubBn256 = AltJubjubBn256::new();
     pub static ref RESCUE_PARAMS: Bn256RescueParams = Bn256RescueParams::new_checked_2_into_1();
     pub static ref RESCUE_HASHER: BabyRescueHasher = BabyRescueHasher::default();
+    pub static ref NFT_STORAGE_ACCOUNT_ADDRESS: Address =
+        Address::from_str("ffffffffffffffffffffffffffffffffffffffff").unwrap();
 }

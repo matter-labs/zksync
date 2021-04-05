@@ -174,8 +174,6 @@ pub enum TxFeeTypes {
 pub struct NFT {
     /// id is used for tx signature and serialization
     pub id: TokenId,
-    /// id is used for calculating address, make it unique, must be the same as id
-    pub account_id: AccountId,
     pub serial_id: u32,
     /// id of nft creator
     pub creator_id: AccountId,
@@ -187,31 +185,24 @@ pub struct NFT {
     pub content_hash: H256,
 }
 
-// TODO make an error
 impl NFT {
     pub fn new(
         token_id: TokenId,
-        account_id: AccountId,
         serial_id: u32,
         creator_id: AccountId,
         address: Address,
         symbol: Option<String>,
         content_hash: H256,
-    ) -> Result<Self, anyhow::Error> {
+    ) -> Self {
         let symbol = symbol.unwrap_or_else(|| format!("NFT-{}", token_id));
-        if token_id.0 != account_id.0 {
-            //TODO fix it
-            return Err(anyhow::format_err!("TokenId and AccountId mismatched"));
-        }
-        Ok(Self {
+        Self {
             id: token_id,
-            account_id,
             serial_id,
             creator_id,
             address,
             symbol,
             content_hash,
-        })
+        }
     }
 }
 

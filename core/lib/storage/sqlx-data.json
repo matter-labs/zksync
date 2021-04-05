@@ -1,5 +1,20 @@
 {
   "db": "PostgreSQL",
+  "001e118c02328872d63118fa4cb2334486c3361b30bc047a8d89a9812ffc4f3a": {
+    "query": "\n                        INSERT INTO tokens ( id, address, symbol, decimals )\n                        VALUES ( $1, $2, $3, $4 )\n                        ON CONFLICT (id)\n                        DO\n                          UPDATE SET address = $2, symbol = $3, decimals = $4\n                        ",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "Int4",
+          "Text",
+          "Text",
+          "Int2"
+        ]
+      },
+      "nullable": []
+    }
+  },
   "00783f36828b4d40330919774be08d091afffff24095e5c2ca47c93af29ee7bd": {
     "query": "SELECT count(*) as \"count!\" FROM aggregate_operations WHERE action_type = $1 AND confirmed = $2",
     "describe": {
@@ -689,24 +704,6 @@
         true,
         true
       ]
-    }
-  },
-  "1ca8ba6b18151ef9ae510f31d8bd7c2aeb0db620f000baef6e998d200faf9b89": {
-    "query": "\n                        INSERT INTO mint_nft_updates ( token_id, account_id, creator_account_id, serial_id, address, content_hash, block_number )\n                        VALUES ( $1, $2, $3, $4, $5, $6, $7 )\n                        ",
-    "describe": {
-      "columns": [],
-      "parameters": {
-        "Left": [
-          "Int4",
-          "Int4",
-          "Int4",
-          "Int4",
-          "Bytea",
-          "Bytea",
-          "Int8"
-        ]
-      },
-      "nullable": []
     }
   },
   "1ce3fbb6c510621c830b0b4679d51fb2ac4379a474d7ee7074500d786102fcd3": {
@@ -1924,20 +1921,6 @@
       "nullable": []
     }
   },
-  "5abdbe249ac5d9e4aecb3183c17a75ed89642bfa2b0715a2f3c32cb7248b7ac2": {
-    "query": "\n                        DELETE FROM mint_nft_updates\n                        WHERE token_id = $1 and account_id = $2 and block_number = $3\n                        ",
-    "describe": {
-      "columns": [],
-      "parameters": {
-        "Left": [
-          "Int4",
-          "Int4",
-          "Int8"
-        ]
-      },
-      "nullable": []
-    }
-  },
   "5b92ff5c1c97c0d870e75902d4f89b0725075b8a2f3f41cc4a4e443f792d1b5c": {
     "query": "DELETE FROM eth_unprocessed_aggregated_ops WHERE op_id = ANY($1)",
     "describe": {
@@ -3015,6 +2998,23 @@
       "nullable": []
     }
   },
+  "a7cfeb302913a783d461a313a8d9e2766ec26c385ca41936bddca9df55d04b32": {
+    "query": "\n                        INSERT INTO nft ( token_id, account_id, creator_account_id, serial_id, address, content_hash )\n                        VALUES ( $1, $2, $3, $4, $5, $6 )\n                        ",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "Int4",
+          "Int4",
+          "Int4",
+          "Int4",
+          "Bytea",
+          "Bytea"
+        ]
+      },
+      "nullable": []
+    }
+  },
   "aaaf2bcea738151db11f6152772516a46ef7d23ae885936094226b837369ee3c": {
     "query": "DELETE FROM mempool_txs\n            WHERE tx_hash = ANY($1)",
     "describe": {
@@ -3875,6 +3875,25 @@
       "nullable": []
     }
   },
+  "d736a57a217b33c4302854cb7928d85f92cabb665b2f638a261e4e6bf14cf018": {
+    "query": "\n                        INSERT INTO mint_nft_updates ( token_id, creator_account_id, serial_id, address, content_hash, block_number, update_order_id, symbol )\n                        VALUES ( $1, $2, $3, $4, $5, $6, $7, $8)\n                        ",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "Int4",
+          "Int4",
+          "Int4",
+          "Bytea",
+          "Bytea",
+          "Int8",
+          "Int4",
+          "Text"
+        ]
+      },
+      "nullable": []
+    }
+  },
   "d9e266ce374cc7d12511a61ca81cd167b59493ee74e44b26c4baf92f4a4152e4": {
     "query": "SELECT * FROM aggregate_operations WHERE from_block >= $1 AND to_block <= $1 AND action_type = $2",
     "describe": {
@@ -4342,6 +4361,74 @@
       "nullable": []
     }
   },
+  "ed4f6300995e13af62d0263cad9dfce76ae5aa8d2a5bc2be8e2f4b7de32fa2f6": {
+    "query": "\n                SELECT * FROM mint_nft_updates\n                WHERE block_number = $1\n            ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "token_id",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 1,
+          "name": "block_number",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 2,
+          "name": "account_id",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 3,
+          "name": "creator_account_id",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 4,
+          "name": "update_order_id",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 5,
+          "name": "serial_id",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 6,
+          "name": "address",
+          "type_info": "Bytea"
+        },
+        {
+          "ordinal": 7,
+          "name": "content_hash",
+          "type_info": "Bytea"
+        },
+        {
+          "ordinal": 8,
+          "name": "symbol",
+          "type_info": "Text"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Int8"
+        ]
+      },
+      "nullable": [
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false
+      ]
+    }
+  },
   "f057b85811c3991b73c58991fc8dae8bf4cdf9d2238171ca13a3fdf1172f2c91": {
     "query": "SELECT * FROM data_restore_events_state\n            WHERE block_type = $1\n            ORDER BY block_num ASC",
     "describe": {
@@ -4709,6 +4796,19 @@
         false,
         false
       ]
+    }
+  },
+  "fe0256b27116eafc9a83d0f9eff341751c6022a13d0bc3625c8c8f8b9001309e": {
+    "query": "\n                        DELETE FROM mint_nft_updates\n                        WHERE token_id = $1 and block_number = $2\n                        ",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "Int4",
+          "Int8"
+        ]
+      },
+      "nullable": []
     }
   }
 }

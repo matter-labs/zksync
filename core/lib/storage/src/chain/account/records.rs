@@ -43,6 +43,7 @@ pub struct StorageMintNFTUpdate {
     pub content_hash: Vec<u8>,
     pub update_order_id: i32,
     pub block_number: i64,
+    pub symbol: String,
 }
 
 #[derive(Debug, FromRow)]

@@ -155,7 +155,6 @@ impl<'a, 'c> StateSchema<'a, 'c> {
                 AccountUpdate::MintNFT { ref token } => {
                     let update_order_id = update_order_id as i32;
                     let token_id = token.id.0 as i32;
-                    let account_id = token.account_id.0 as i32;
                     let creator_account_id = token.creator_id.0 as i32;
                     let serial_id = token.serial_id as i32;
                     let address = token.address.as_bytes().to_vec();
@@ -163,25 +162,23 @@ impl<'a, 'c> StateSchema<'a, 'c> {
                     let block_number = i64::from(*block_number);
                     sqlx::query!(
                         r#"
-                        INSERT INTO mint_nft_updates ( token_id, account_id, creator_account_id, serial_id, address, content_hash, block_number, update_order_id )
-                        VALUES ( $1, $2, $3, $4, $5, $6, $7, $8 )
+                        INSERT INTO mint_nft_updates ( token_id, creator_account_id, serial_id, address, content_hash, block_number, update_order_id, symbol )
+                        VALUES ( $1, $2, $3, $4, $5, $6, $7, $8)
                         "#,
-                        token_id, account_id, creator_account_id, serial_id, address, content_hash, block_number, update_order_id
+                        token_id, creator_account_id, serial_id, address, content_hash, block_number, update_order_id, token.symbol
                     )
                         .execute(transaction.conn())
                         .await?;
                 }
                 AccountUpdate::RemoveToken { ref token } => {
                     let token_id = token.id.0 as i32;
-                    let account_id = token.account_id.0 as i32;
                     let block_number = i64::from(*block_number);
                     sqlx::query!(
                         r#"
                         DELETE FROM mint_nft_updates
-                        WHERE token_id = $1 and account_id = $2 and block_number = $3
+                        WHERE token_id = $1 and block_number = $2
                         "#,
                         token_id,
-                        account_id,
                         block_number
                     )
                     .execute(transaction.conn())
@@ -354,9 +351,7 @@ impl<'a, 'c> StateSchema<'a, 'c> {
                     .await?;
                 }
                 StorageAccountDiff::MintNFT(upd) => {
-                    let symbol = format!("NFT-{}", upd.token_id);
                     let address = address_to_stored_string(&Address::from_slice(&upd.address));
-                    // TODO get symbol somewhere else
                     sqlx::query!(
                         r#"
                         INSERT INTO tokens ( id, address, symbol, decimals )
@@ -367,7 +362,7 @@ impl<'a, 'c> StateSchema<'a, 'c> {
                         "#,
                         upd.token_id,
                         address,
-                        symbol,
+                        upd.symbol,
                         1
                     )
                     .execute(transaction.conn())

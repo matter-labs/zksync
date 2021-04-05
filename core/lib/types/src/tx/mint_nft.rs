@@ -14,6 +14,7 @@ use crate::{
     tx::{TimeRange, TxSignature, VerifiedSignatureCache},
     AccountId, Address, Nonce, PubKeyHash, TokenId, H256,
 };
+use parity_crypto::Keccak256;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MintNFT {
@@ -192,6 +193,10 @@ impl MintNFT {
     }
 
     pub fn calculate_address(&self, serial_id: u32) -> Address {
-        todo!()
+        let mut data = vec![];
+        data.extend_from_slice(&self.creator_id.0.to_be_bytes());
+        data.extend_from_slice(&serial_id.to_be_bytes());
+        data.extend_from_slice(self.content_hash.as_bytes());
+        Address::from_slice(&data.keccak256()[12..])
     }
 }
