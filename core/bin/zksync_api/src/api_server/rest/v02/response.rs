@@ -4,44 +4,16 @@ use std::convert::From;
 
 // External uses
 use actix_web::{web::Data, Error as ActixError, HttpRequest, HttpResponse, Responder};
-use chrono::{DateTime, Utc};
+use chrono::Utc;
 use futures::future::{ready, Ready};
 use qstring::QString;
 use serde::{Deserialize, Serialize};
-use serde_json::Value;
 
 // Workspace uses
-use zksync_types::network::Network;
+use zksync_api_client::rest::v02::{Request, Response, ResultStatus};
 
 // Local uses
-use super::{error::Error, ApiVersion, SharedData};
-
-#[derive(Debug, Deserialize, Serialize)]
-#[serde(rename_all = "snake_case")]
-pub enum ResultStatus {
-    Success,
-    Error,
-}
-#[derive(Debug, Deserialize, Serialize)]
-pub struct Request {
-    pub network: Network,
-    pub api_version: ApiVersion,
-    pub resource: String,
-    #[serde(skip_serializing_if = "HashMap::is_empty")]
-    pub args: HashMap<String, String>,
-    pub timestamp: DateTime<Utc>,
-}
-
-#[derive(Debug, Deserialize, Serialize)]
-pub struct Response {
-    pub request: Request,
-    pub status: ResultStatus,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub error: Option<Error>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub result: Option<Value>,
-}
-
+use super::{error::Error, SharedData};
 // This struct is needed to wrap all api responses is `Response` struct by implementing `Responder` trait for it.
 // We can't use simple `Result`, because `actix-web` has already `Responder` implementation for it.
 // Because of this we can't use '?' operator in implementations of endpoints.
@@ -87,7 +59,7 @@ impl<R: Serialize> Responder for ApiResult<R> {
                 request,
                 status: ResultStatus::Error,
                 result: None,
-                error: Some(err),
+                error: Some(serde_json::to_value(err).unwrap()),
             },
         };
 

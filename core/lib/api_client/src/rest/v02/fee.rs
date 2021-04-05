@@ -9,7 +9,8 @@ use zksync_types::{Address, OutputFeeType, TokenLike, TxFeeTypes};
 use zksync_utils::BigUintSerdeAsRadix10Str;
 
 // Local uses
-use super::{super::response::Response, Client, Result};
+use super::Response;
+use crate::rest::client::{Client, Result};
 
 // TODO: remove `fee_type`, `gas_tx_amount`, `gas_price_wei`
 #[derive(Debug, Serialize, Deserialize, Clone)]

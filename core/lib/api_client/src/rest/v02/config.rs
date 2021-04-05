@@ -8,15 +8,16 @@ use zksync_config::ZkSyncConfig;
 use zksync_types::{network::Network, Address};
 
 // Local uses
-use super::{super::response::Response, Client, Result};
+use super::Response;
+use crate::rest::client::{Client, Result};
 
-#[derive(Deserialize, Serialize, Debug, Clone, Copy)]
+#[derive(Deserialize, Serialize, Debug, Clone, Copy, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum ZksyncVersion {
     ContractV4,
 }
 
-#[derive(Deserialize, Serialize, Debug, Clone, Copy)]
+#[derive(Deserialize, Serialize, Debug, Clone, Copy, PartialEq, Eq)]
 pub struct ApiConfigData {
     network: Network,
     contract: Address,

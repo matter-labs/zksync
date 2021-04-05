@@ -16,6 +16,7 @@ use futures::{
 use num::{rational::Ratio, BigUint, FromPrimitive};
 
 // Workspace uses
+use zksync_api_client::rest::v02::token::ApiToken;
 use zksync_config::ZkSyncConfig;
 use zksync_storage::ConnectionPool;
 use zksync_types::{
@@ -25,7 +26,6 @@ use zksync_types::{
 
 // Local uses
 use super::{
-    client::token::ApiToken,
     error::{Error, InvalidDataError},
     paginate::Paginate,
     response::ApiResult,

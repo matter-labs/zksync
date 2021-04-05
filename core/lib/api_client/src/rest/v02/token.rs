@@ -7,7 +7,8 @@ use serde::{Deserialize, Serialize};
 use zksync_types::{pagination::PaginationQuery, Address, Token, TokenId, TokenLike};
 
 // Local uses
-use super::{super::response::Response, Client, Result};
+use super::Response;
+use crate::rest::client::{Client, Result};
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 pub struct ApiToken {

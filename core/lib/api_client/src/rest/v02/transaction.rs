@@ -17,7 +17,8 @@ use zksync_types::{
 };
 
 // Local uses
-use super::{super::response::Response, Client, Result};
+use super::Response;
+use crate::rest::client::{Client, Result};
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct IncomingTxBatch {

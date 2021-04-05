@@ -7,9 +7,11 @@ use std::str::FromStr;
 use actix_web::{web, App, Scope};
 use chrono::Utc;
 use once_cell::sync::Lazy;
+use serde::de::DeserializeOwned;
 use tokio::sync::Mutex;
 
 // Workspace uses
+use zksync_api_client::rest::{client::Client, v02::Response};
 use zksync_config::ZkSyncConfig;
 use zksync_crypto::rand::{SeedableRng, XorShiftRng};
 use zksync_storage::{
@@ -36,7 +38,6 @@ use zksync_types::{
 };
 
 // Local uses
-use super::client::Client;
 use super::SharedData;
 
 /// Serial ID of the verified priority operation.
@@ -658,5 +659,24 @@ pub fn dummy_full_exit_op(
         op: deposit_op,
         block_index,
         created_at: Utc::now(),
+    }
+}
+
+pub fn deserialize_response_result<T: DeserializeOwned>(response: Response) -> anyhow::Result<T> {
+    match response.result {
+        Some(result) => {
+            let result = serde_json::from_value(result)?;
+            Ok(result)
+        }
+        None => {
+            if response.error.is_some() {
+                anyhow::bail!("Response returned error: {:?}", response);
+            } else {
+                anyhow::bail!(
+                    "Response contains neither result nor response: {:?}",
+                    response
+                );
+            };
+        }
     }
 }

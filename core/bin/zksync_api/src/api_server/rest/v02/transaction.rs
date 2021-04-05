@@ -11,6 +11,9 @@ use actix_web::{
 use hex::FromHexError;
 
 // Workspace uses
+use zksync_api_client::rest::v02::transaction::{
+    IncomingTx, IncomingTxBatch, L1Receipt, L2Receipt, L2Status, Receipt, Transaction, TxData,
+};
 use zksync_storage::{QueryResult, StorageProcessor};
 use zksync_types::{
     aggregated_operations::AggregatedActionType, tx::EthSignData, tx::TxEthSignature, tx::TxHash,
@@ -19,9 +22,6 @@ use zksync_types::{
 
 // Local uses
 use super::{
-    client::transaction::{
-        IncomingTx, IncomingTxBatch, L1Receipt, L2Receipt, L2Status, Receipt, Transaction, TxData,
-    },
     error::{Error, TxError},
     response::ApiResult,
 };

@@ -10,7 +10,8 @@ use zksync_storage::chain::block::records::BlockDetails;
 use zksync_types::{pagination::PaginationQuery, tx::TxHash, BlockNumber};
 
 // Local uses
-use super::{super::response::Response, Client, Result};
+use super::Response;
+use crate::rest::client::{Client, Result};
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Clone)]
 pub struct BlockInfo {
