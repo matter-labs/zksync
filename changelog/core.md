@@ -29,6 +29,7 @@ All notable changes to the core components will be documented in this file.
 
 - (`zksync_api`): Internal error with tokens not listed on CoinGecko.
 - Fix wrong block info cache behavior in the `api_server`.
+- `timeout` in ETH sender main loop was replaced with `tokio::time::delay_for`.
 
 ## Release 2021-02-19
 
