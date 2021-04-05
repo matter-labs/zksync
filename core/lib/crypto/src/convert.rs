@@ -25,8 +25,8 @@ pub trait FeConvert: PrimeField {
             });
         }
         repr.read_be(value)
-            .map_err(|error| ConversionError::parsing_error_hex(value, error))?;
-        Self::from_repr(repr).map_err(|e| ConversionError::prime_field_decoding_error_hex(value, e))
+            .map_err(|error| ConversionError::ParsingError(error))?;
+        Self::from_repr(repr).map_err(|e| ConversionError::PrimeFieldDecodingError(e))
     }
 
     /// Returns hex representation of the field element without `0x` prefix.
@@ -46,8 +46,7 @@ pub trait FeConvert: PrimeField {
 
         // Buffer is reversed and read as little endian, since we pad it with zeros to
         // match the expected length.
-        let mut buf =
-            hex::decode(&value).map_err(|e| ConversionError::hex_decoding_error(value, e))?;
+        let mut buf = hex::decode(&value)?;
         buf.reverse();
         let mut repr = Self::Repr::default();
 
@@ -55,8 +54,8 @@ pub trait FeConvert: PrimeField {
         // so to obtain size in bytes, we multiply the array size with the size of `u64`.
         buf.resize(repr.as_ref().len() * 8, 0);
         repr.read_le(&buf[..])
-            .map_err(|error| ConversionError::parsing_error_str(value, error))?;
-        Self::from_repr(repr).map_err(|e| ConversionError::prime_field_decoding_error_str(value, e))
+            .map_err(|error| ConversionError::ParsingError(error))?;
+        Self::from_repr(repr).map_err(|e| ConversionError::PrimeFieldDecodingError(e))
     }
 }
 
