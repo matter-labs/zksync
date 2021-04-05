@@ -12,21 +12,34 @@ use crate::{
 };
 use crate::{constants::*, report_collector::ReportCollector};
 
+/// Executor is the entity capable of running the loadtest flow.
+///
+/// It takes care of the following topics:
+///
+/// - Minting the tokens on L1 for the main account.
+/// - Depositing tokens to the main account in L2 and unlocking it.
+/// - Spawning the report collector.
+/// - Distributing the funds among the test wallets.
+/// - Spawning account lifespan futures.
+/// - Awaiting for all the account futures to complete.
+/// - Getting the final test resolution from the report collector.
 #[derive(Debug)]
 pub struct Executor {
     config: LoadtestConfig,
-
     pool: AccountPool,
 }
 
 impl Executor {
+    /// Creates a new Executor entity.
     pub async fn new(config: LoadtestConfig) -> Self {
         let pool = AccountPool::new(&config).await;
 
         Self { config, pool }
     }
 
+    /// Runs the loadtest until the completion.
     pub async fn start(&mut self) -> FinalResolution {
+        // If the error occurs during the main flow, we will consider it as a test failure.
         self.start_inner().await.unwrap_or_else(|err| {
             vlog::error!("Loadtest was interrupted by the following error: {}", err);
             FinalResolution::TestFailed
@@ -48,6 +61,7 @@ impl Executor {
         Ok(final_resultion)
     }
 
+    /// Verifies that onchain ETH balance for the main account is sufficient to run the loadtest.
     async fn check_onchain_balance(&mut self) -> anyhow::Result<()> {
         vlog::info!("Master Account: Checking onchain balance...");
         let master_wallet = &mut self.pool.master_wallet;
@@ -65,6 +79,7 @@ impl Executor {
         Ok(())
     }
 
+    /// Mints the ERC-20 token on the main wallet.
     async fn mint(&mut self) -> anyhow::Result<()> {
         vlog::info!("Master Account: Minting ERC20 token...");
         let deposit_amount = self.amount_to_deposit();
@@ -93,6 +108,7 @@ impl Executor {
         Ok(())
     }
 
+    /// Deposits the ERC-20 token to main wallet in L2.
     async fn deposit_to_master(&mut self) -> anyhow::Result<()> {
         vlog::info!("Master Account: Performing a deposit to master");
         let deposit_amount = self.amount_to_deposit();
@@ -152,6 +168,7 @@ impl Executor {
         Ok(())
     }
 
+    /// Invokes `ChangePubKey` for the main wallet in L2.
     async fn set_signing_key(&mut self) -> anyhow::Result<()> {
         vlog::info!("Master Account: Setting the signing key");
         let mut handle = self
@@ -177,6 +194,13 @@ impl Executor {
         Ok(())
     }
 
+    /// Initializes the loadtest by doing the following:
+    ///
+    /// - Spawning the `ReportCollector`.
+    /// - Distributing ERC-20 token in L2 among test wallets via `Transfer` operation.
+    /// - Distributing ETH in L1 among test wallets in order to make them able to perform priority operations.
+    /// - Spawning test account routine futures.
+    /// - Collecting all the spawned tasks and returning them to the caller.
     async fn send_initial_transfers(
         &mut self,
     ) -> anyhow::Result<(JoinHandle<FinalResolution>, Vec<JoinHandle<()>>)> {
@@ -361,7 +385,7 @@ impl Executor {
         Ok((report_collector_future, account_futures))
     }
 
-    /// Calculated amount of ETH to be distributed per account in order to make them
+    /// Calculates amount of ETH to be distributed per account in order to make them
     /// able to perform priority operations.
     async fn eth_amount_to_distribute(&self) -> anyhow::Result<U256> {
         let ethereum = self
@@ -384,16 +408,21 @@ impl Executor {
         Ok(average_gas_price * gas_per_priority_op * priority_ops_per_account)
     }
 
+    /// Waits for all the test account futures to be completed.
     async fn wait_account_routines(&self, account_futures: Vec<JoinHandle<()>>) {
         vlog::info!("Waiting for the account futures to be completed...");
         join_all(account_futures).await;
         vlog::info!("All the spawned tasks are completed");
     }
 
+    /// Returns the amount of funds to be deposited on the main account in L2.
+    /// Amount is chosen to be big enough to not worry about precisely calculating the remaining balances on accounts,
+    /// but also to not be close to the supported limits in zkSYnc.
     fn amount_to_deposit(&self) -> u128 {
         u128::max_value() >> 32
     }
 
+    /// Ensures that Ethereum transaction was successfully executed.
     async fn assert_eth_tx_success(&self, receipt: &TransactionReceipt) {
         if receipt.status != Some(1u64.into()) {
             let master_wallet = &self.pool.master_wallet;

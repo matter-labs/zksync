@@ -17,6 +17,12 @@ use crate::{
 mod batch_command_executor;
 mod tx_command_executor;
 
+/// Account lifespan represents a flow of a single account:
+/// it will send transactions and batches, both correct and incorrect, and will check
+/// whether outcome matches expected one.
+///
+/// This structure is expected to not care about the server behavior; even if the server is down, it will only cause
+/// performed actions to be considered failed.
 #[derive(Debug)]
 pub struct AccountLifespan {
     pub wallet: Wallet<PrivateKeySigner, RpcProvider>,

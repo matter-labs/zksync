@@ -12,6 +12,13 @@ use zksync_types::{tx::PackedEthSignature, Address, H256};
 
 use crate::config::LoadtestConfig;
 
+/// Thread-safe pool of the addresses of accounts used in the loadtest.
+///
+/// Sync std `RwLock` is chosen instead of async `tokio` one because of `rand::thread_rng()` usage:
+/// since it's not `Send`, using it in the async functions will make all the affected futures also not
+/// `Send`, which in its turn will make it impossible to be used in `tokio::spawn`.
+///
+/// As long as we only use `read` operation on the lock, it doesn't really matter which kind of lock we use.
 #[derive(Debug, Clone)]
 pub struct AddressPool {
     pub addresses: Arc<RwLock<Vec<Address>>>,
@@ -24,6 +31,7 @@ impl AddressPool {
         }
     }
 
+    /// Randomly chooses on of the addresses stored in the pool.
     pub fn random_address(&self) -> Address {
         let rng = &mut thread_rng();
 
@@ -38,11 +46,14 @@ impl AddressPool {
 /// Currently we support only EOA accounts.
 #[derive(Debug, Clone)]
 pub struct AccountCredentials {
+    /// Ethereum private key.
     pub eth_pk: H256,
+    /// Ethereum address derived from the private key.
     pub address: Address,
 }
 
 impl AccountCredentials {
+    /// Generates random credentials.
     pub fn rand() -> Self {
         let eth_pk = H256::random();
         let address = pk_to_address(&eth_pk);
@@ -51,14 +62,23 @@ impl AccountCredentials {
     }
 }
 
+/// Pool of accounts to be used in the test.
+/// Each account is represented as `zksync::Wallet` in order to provide convenient interface of interation with zkSync.
 #[derive(Debug)]
 pub struct AccountPool {
+    /// Main wallet that will be used to initialize all the test wallets.
     pub master_wallet: Wallet<PrivateKeySigner, RpcProvider>,
+    /// Collection of test wallets and their Ethereum private key.
+    /// We have to collect private keys, since `Wallet` doesn't expose it, and we may need it to resign transactions
+    /// (for example, if we want to create a corrupted transaction: `zksync` library won't allow us to do it, thus
+    /// we will have to sign such a transaction manually).
     pub accounts: VecDeque<(Wallet<PrivateKeySigner, RpcProvider>, H256)>,
+    /// Pool of addresses of the test accounts.
     pub addresses: AddressPool,
 }
 
 impl AccountPool {
+    /// Generates all the required test accounts and prepares `Wallet` objects.
     pub async fn new(config: &LoadtestConfig) -> Self {
         let provider =
             RpcProvider::from_addr_and_network(&config.zksync_rpc_addr, zksync::Network::Localhost);

@@ -4,6 +4,7 @@ use zksync_types::Address;
 
 use crate::command::{ApiRequestCommand, Command, TxType};
 
+/// Denotes the outcome of a performed action.
 #[derive(Debug, Clone)]
 pub enum ReportLabel {
     ActionDone,
@@ -29,6 +30,7 @@ impl ReportLabel {
     }
 }
 
+/// Denotes the type of executed transaction.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum TxActionType {
     Transfer,
@@ -66,6 +68,9 @@ impl From<TxType> for TxActionType {
     }
 }
 
+/// Denotes the type of the performed API action.
+/// Currently loadtest doesn't do any API actions (only as part of the transactions flow), thus enum exists
+/// for the future.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum ApiActionType {}
 
@@ -83,6 +88,7 @@ impl From<ApiRequestCommand> for ApiActionType {
     }
 }
 
+/// Generic wrapper of all the actions that can be done in loadtest.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum ActionType {
     Tx(TxActionType),
@@ -115,6 +121,8 @@ impl From<Command> for ActionType {
 }
 
 impl ActionType {
+    /// Returns the vector containing the list of all the supported actions.
+    /// May be useful in different collectors to initialize their internal states.
     pub fn all() -> Vec<Self> {
         let batch_action_types =
             (1..=Command::MAX_BATCH_SIZE).map(|batch_size| ActionType::Batch { batch_size });
@@ -129,6 +137,7 @@ impl ActionType {
     }
 }
 
+/// Builder structure for `Report`.
 #[derive(Debug, Clone)]
 pub struct ReportBuilder {
     report: Report,
@@ -183,11 +192,23 @@ impl ReportBuilder {
     }
 }
 
+/// Report for any operation done by loadtest.
+///
+/// Reports are yielded by `Executor` or `AccountLifespan` and are collected
+/// by the `ReportCollector`.
+///
+/// Reports are expected to contain any kind of information useful for the analysis
+/// and deciding whether the test was passed.
 #[derive(Debug, Clone)]
 pub struct Report {
+    /// Address of the wallet that performed the action.
     pub reporter: Address,
+    /// Obtained outcome of action.
     pub label: ReportLabel,
+    /// Type of the action.
     pub action: ActionType,
+    /// Amount of retries that it took the wallet to finish the action.
     pub retries: usize,
+    /// Duration of the latest execution attempt.
     pub time: Duration,
 }

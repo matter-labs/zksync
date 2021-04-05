@@ -11,6 +11,9 @@ pub use self::{
 mod api_command;
 mod tx_command;
 
+/// Generic command that can be executed by the loadtest.
+///
+/// `Command::ApiRequest` is currently unused.
 #[derive(Debug, Clone)]
 pub enum Command {
     SingleTx(TxCommand),

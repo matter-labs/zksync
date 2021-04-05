@@ -4,6 +4,8 @@ use zksync_types::Address;
 
 use crate::account_pool::AddressPool;
 
+/// Type of transaction. It doesn't copy the zkSync operation list, because
+/// it divides some transactions in subcategories (e.g. to new account / to existing account; to self / to other; etc)/
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub enum TxType {
     Deposit,
@@ -16,6 +18,8 @@ pub enum TxType {
 }
 
 impl TxType {
+    /// Generates a random transaction type. Not all the variants have the equal chance to be generated;
+    /// specifically transfers are made more likely.
     pub fn random() -> Self {
         // All available options.
         let mut options = vec![
@@ -49,6 +53,7 @@ impl TxType {
         rng.choose(&options).copied().unwrap()
     }
 
+    /// Generates a random transaction type that can be a part of the batch.
     pub fn random_batchable() -> Self {
         loop {
             let output = Self::random();
@@ -67,6 +72,9 @@ impl TxType {
     }
 }
 
+/// Modifier to be applied to the transaction in order to make it incorrect.
+/// Incorrect transactions are a significant part of loadtest, because we want to ensure
+/// that server is resilient for all the possible kinds of user input.
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub enum IncorrectnessModifier {
     ZeroFee,
@@ -140,11 +148,16 @@ impl IncorrectnessModifier {
     }
 }
 
+/// Complete description of a transaction that must be executed by a test wallet.
 #[derive(Debug, Clone)]
 pub struct TxCommand {
+    /// Type of operation.
     pub command_type: TxType,
+    /// Whether and how transaction should be corrupted.
     pub modifier: IncorrectnessModifier,
+    /// Recipient address.
     pub to: Address,
+    /// Transaction amount (0 if not applicable).
     pub amount: BigUint,
 }
 
@@ -158,12 +171,14 @@ impl TxCommand {
         }
     }
 
+    /// Generates a fully random transaction command.
     pub fn random(own_address: Address, addresses: &AddressPool) -> Self {
         let command_type = TxType::random();
 
         Self::new_with_type(own_address, addresses, command_type)
     }
 
+    /// Generates a random transaction command that can be a part of the batch.
     pub fn random_batchable(own_address: Address, addresses: &AddressPool) -> Self {
         let command_type = TxType::random_batchable();
 

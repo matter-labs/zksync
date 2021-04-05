@@ -10,17 +10,35 @@ use zksync_types::{
 
 use crate::command::IncorrectnessModifier;
 
+/// Trait that exists solely to extend the signed zkSync transaction interface, providing the ability
+/// to modify transaction in a way that will make it invalid.
+///
+/// Loadtest is expected to simulate the user behavior, and it's not that uncommon of users to send incorrect
+/// transactions.
 pub trait Corrupted: Sized {
+    /// Replaces the zkSync signature with an incorrect one.
     fn bad_zksync_signature(self) -> Self;
+    /// Replaces the zkSync 2FA ECDSA signature with an incorrect one.
+    /// Note that it only affects 2FA signatures; signature in ChangePubKey transaction will not be affected.
     fn bad_eth_signature(self) -> Self;
+    /// Replaces the transaction token with the non-existing one.
+    /// In case of `ChangePubKey` transaction it affects the `fee_token`.
     fn nonexistent_token(self, eth_pk: H256, token_symbol: &str, decimals: u8) -> Self;
+    /// Creates a transaction with a token amount that cannot be packed.
+    /// Panics if called with `ChangePubKey` or `ForcedExit.
     fn not_packable_amount(self, eth_pk: H256, token_symbol: &str, decimals: u8) -> Self;
+    /// Creates a transaction with a fee amount that cannot be packed.
     fn not_packable_fee(self, eth_pk: H256, token_symbol: &str, decimals: u8) -> Self;
+    /// Creates a transaction with a token amount that exceeds the wallet balance.
+    /// Panics if called with `ChangePubKey` or `ForcedExit.
     fn too_big_amount(self, eth_pk: H256, token_symbol: &str, decimals: u8) -> Self;
+    /// Creates a transaction without fee provided.
     fn zero_fee(self, eth_pk: H256, token_symbol: &str, decimals: u8) -> Self;
 
+    /// Resigns the transaction after the modification in order to make signatures correct (if applicable).
     fn resign(&mut self, eth_pk: H256, token_symbol: &str, decimals: u8);
 
+    /// Automatically choses one of the methods of this trait based on the provided incorrectness modifiver.
     fn apply_modifier(
         self,
         modifier: IncorrectnessModifier,
