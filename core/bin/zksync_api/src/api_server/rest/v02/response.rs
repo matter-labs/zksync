@@ -7,7 +7,7 @@ use actix_web::{web::Data, Error as ActixError, HttpRequest, HttpResponse, Respo
 use chrono::{DateTime, Utc};
 use futures::future::{ready, Ready};
 use qstring::QString;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 // Workspace uses
@@ -16,36 +16,36 @@ use zksync_types::network::Network;
 // Local uses
 use super::{error::Error, ApiVersion, SharedData};
 
-#[derive(Serialize)]
+#[derive(Debug, Deserialize, Serialize)]
 #[serde(rename_all = "snake_case")]
-enum ResultStatus {
+pub enum ResultStatus {
     Success,
     Error,
 }
-
-#[derive(Serialize)]
-struct Request {
-    network: Network,
-    api_version: ApiVersion,
-    resource: String,
+#[derive(Debug, Deserialize, Serialize)]
+pub struct Request {
+    pub network: Network,
+    pub api_version: ApiVersion,
+    pub resource: String,
     #[serde(skip_serializing_if = "HashMap::is_empty")]
-    args: HashMap<String, String>,
-    timestamp: DateTime<Utc>,
+    pub args: HashMap<String, String>,
+    pub timestamp: DateTime<Utc>,
 }
 
-#[derive(Serialize)]
-struct Response {
-    request: Request,
-    status: ResultStatus,
+#[derive(Debug, Deserialize, Serialize)]
+pub struct Response {
+    pub request: Request,
+    pub status: ResultStatus,
     #[serde(skip_serializing_if = "Option::is_none")]
-    error: Option<Error>,
+    pub error: Option<Error>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    result: Option<Value>,
+    pub result: Option<Value>,
 }
 
 // This struct is needed to wrap all api responses is `Response` struct by implementing `Responder` trait for it.
 // We can't use simple `Result`, because `actix-web` has already `Responder` implementation for it.
 // Because of this we can't use '?' operator in implementations of endpoints.
+#[derive(Debug, Deserialize, Serialize)]
 pub enum ApiResult<R: Serialize> {
     Ok(R),
     Error(Error),

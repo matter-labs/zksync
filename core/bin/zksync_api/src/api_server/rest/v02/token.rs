@@ -1,6 +1,7 @@
 //! Tokens part of API implementation.
 
 // Built-in uses
+use std::str::FromStr;
 
 // External uses
 use actix_web::{
@@ -15,7 +16,6 @@ use futures::{
 use num::{rational::Ratio, BigUint, FromPrimitive};
 
 // Workspace uses
-use zksync_api_client::rest::v02::token::{ApiToken, TokenIdOrUsd, Usd};
 use zksync_config::ZkSyncConfig;
 use zksync_storage::ConnectionPool;
 use zksync_types::{
@@ -25,6 +25,7 @@ use zksync_types::{
 
 // Local uses
 use super::{
+    client::token::ApiToken,
     error::{Error, InvalidDataError},
     paginate::Paginate,
     response::ApiResult,
@@ -167,7 +168,7 @@ async fn token_by_id(
 
 async fn token_price(
     data: web::Data<ApiTokenData>,
-    web::Path((token_like, currency)): web::Path<(String, TokenIdOrUsd)>,
+    web::Path((token_like, currency)): web::Path<(String, String)>,
 ) -> ApiResult<BigDecimal> {
     let token_result = TokenLike::parse_without_symbol(&token_like);
     let first_token;
@@ -177,26 +178,28 @@ async fn token_price(
         first_token = token_result.unwrap();
     }
 
-    match currency {
-        TokenIdOrUsd::Id(second_token_id) => {
-            let second_token = TokenLike::from(second_token_id);
-            let first_usd_price = data.token_price_usd(first_token).await;
-            let second_usd_price = data.token_price_usd(second_token).await;
-            match (first_usd_price, second_usd_price) {
-                (Ok(first_usd_price), Ok(second_usd_price)) => {
-                    if second_usd_price.is_zero() {
-                        Error::from(InvalidDataError::TokenZeroPriceError).into()
-                    } else {
-                        Ok(first_usd_price / second_usd_price).into()
-                    }
+    if let Ok(second_token_id) = u16::from_str(&currency) {
+        let second_token = TokenLike::from(TokenId(second_token_id));
+        let first_usd_price = data.token_price_usd(first_token).await;
+        let second_usd_price = data.token_price_usd(second_token).await;
+        match (first_usd_price, second_usd_price) {
+            (Ok(first_usd_price), Ok(second_usd_price)) => {
+                if second_usd_price.is_zero() {
+                    Error::from(InvalidDataError::TokenZeroPriceError).into()
+                } else {
+                    Ok(first_usd_price / second_usd_price).into()
                 }
-                (Err(err), _) => err.into(),
-                (_, Err(err)) => err.into(),
             }
+            (Err(err), _) => err.into(),
+            (_, Err(err)) => err.into(),
         }
-        TokenIdOrUsd::Usd(Usd::Usd) => {
-            let usd_price = data.token_price_usd(first_token).await;
-            usd_price.into()
+    } else {
+        match currency.as_str() {
+            "usd" => {
+                let usd_price = data.token_price_usd(first_token).await;
+                usd_price.into()
+            }
+            _ => Error::from(InvalidDataError::InvalidCurrency).into(),
         }
     }
 }

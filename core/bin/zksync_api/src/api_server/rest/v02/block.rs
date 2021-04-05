@@ -1,15 +1,12 @@
 //! Block part of API implementation.
 
 // Built-in uses
+use std::str::FromStr;
 
 // External uses
 use actix_web::{web, Scope};
 
 // Workspace uses
-use zksync_api_client::rest::v02::{
-    block::{BlockInfo, BlockPosition, LastVariant},
-    transaction::Transaction,
-};
 use zksync_storage::{chain::block::records::BlockDetails, ConnectionPool, QueryResult};
 use zksync_types::{
     pagination::{BlockAndTxHash, Paginated, PaginationQuery},
@@ -18,7 +15,12 @@ use zksync_types::{
 };
 
 // Local uses
-use super::{error::Error, paginate::Paginate, response::ApiResult};
+use super::{
+    client::{block::BlockInfo, transaction::Transaction},
+    error::{Error, InvalidDataError},
+    paginate::Paginate,
+    response::ApiResult,
+};
 use crate::utils::block_details_cache::BlockDetailsCache;
 
 /// Shared data between `api/v0.2/block` endpoints.
@@ -46,21 +48,21 @@ impl ApiBlockData {
 
     async fn get_block_number_by_position(
         &self,
-        block_position: BlockPosition,
+        block_position: &str,
     ) -> Result<BlockNumber, Error> {
-        match block_position {
-            BlockPosition::Number(number) => Ok(number),
-            BlockPosition::Variant(LastVariant::LastCommitted) => {
-                match self.get_last_committed_block_number().await {
+        if let Ok(number) = u32::from_str(block_position) {
+            Ok(BlockNumber(number))
+        } else {
+            match block_position {
+                "last_committed" => match self.get_last_committed_block_number().await {
                     Ok(number) => Ok(number),
-                    Err(err) => Err(Error::storage(err)),
-                }
-            }
-            BlockPosition::Variant(LastVariant::LastFinalized) => {
-                match self.get_last_finalized_block_number().await {
+                    Err(err) => Err(Error::storage(err).into()),
+                },
+                "last_finalized" => match self.get_last_finalized_block_number().await {
                     Ok(number) => Ok(number),
-                    Err(err) => Err(Error::storage(err)),
-                }
+                    Err(err) => Err(Error::storage(err).into()),
+                },
+                _ => Err(Error::from(InvalidDataError::InvalidBlockPosition)),
             }
         }
     }
@@ -122,11 +124,11 @@ async fn block_pagination(
 
 async fn block_by_number(
     data: web::Data<ApiBlockData>,
-    web::Path(block_position): web::Path<BlockPosition>,
+    web::Path(block_position): web::Path<String>,
 ) -> ApiResult<Option<BlockInfo>> {
     let block_number: BlockNumber;
 
-    match data.get_block_number_by_position(block_position).await {
+    match data.get_block_number_by_position(&block_position).await {
         Ok(number) => {
             block_number = number;
         }
@@ -143,12 +145,12 @@ async fn block_by_number(
 
 async fn block_transactions(
     data: web::Data<ApiBlockData>,
-    web::Path(block_position): web::Path<BlockPosition>,
+    web::Path(block_position): web::Path<String>,
     web::Query(query): web::Query<PaginationQuery<TxHash>>,
 ) -> ApiResult<Paginated<Transaction, BlockAndTxHash>> {
     let block_number: BlockNumber;
 
-    match data.get_block_number_by_position(block_position).await {
+    match data.get_block_number_by_position(&block_position).await {
         Ok(number) => {
             block_number = number;
         }
@@ -175,7 +177,11 @@ pub fn api_scope(pool: ConnectionPool, cache: BlockDetailsCache) -> Scope {
 
 #[cfg(test)]
 mod tests {
-    use super::{super::test_utils::TestServerConfig, *};
+    use super::{
+        super::{test_utils::TestServerConfig, ApiVersion, SharedData},
+        *,
+    };
+    use std::collections::HashSet;
     use zksync_types::pagination::PaginationDirection;
 
     #[actix_rt::test]
@@ -187,36 +193,105 @@ mod tests {
         let cfg = TestServerConfig::default();
         cfg.fill_database().await?;
 
-        let (client, server) =
-            cfg.start_server(|cfg| api_scope(cfg.pool.clone(), BlockDetailsCache::new(10)));
-
-        // Block requests part
+        let shared_data = SharedData {
+            net: cfg.config.chain.eth.network,
+            api_version: ApiVersion::V02,
+        };
+        let (client, server) = cfg.start_server(
+            |cfg| api_scope(cfg.pool.clone(), BlockDetailsCache::new(10)),
+            shared_data,
+        );
 
         let query = PaginationQuery {
             from: BlockNumber(1),
             limit: 3,
             direction: PaginationDirection::Newer,
         };
-        let mut storage = cfg.pool.access_storage().await?;
-        let expected_blocks: Paginated<BlockInfo, BlockNumber> = storage
-            .paginate(&query)
-            .await
-            .map_err(|err| anyhow::anyhow!(err.message))?;
+        let expected_blocks: Paginated<BlockInfo, BlockNumber> = {
+            let mut storage = cfg.pool.access_storage().await?;
+            storage
+                .paginate(&query)
+                .await
+                .map_err(|err| anyhow::anyhow!(err.message))?
+        };
 
-        // assert_eq!(
-        //     client.block_by_number_v02(BlockNumber(2)).await?.as_ref(),
-        //     Some(&expected_blocks.list[1])
-        // );
+        let response = client.block_by_number_v02("2").await?;
+        match response.result {
+            Some(result) => {
+                let deserialized_result: Option<BlockInfo> =
+                    serde_json::from_value(result).unwrap();
+                assert_eq!(deserialized_result.unwrap(), expected_blocks.list[1]);
+            }
+            None => {
+                anyhow::bail!("block_by_number returned err");
+            }
+        };
 
-        let blocks = client.block_pagination_v02(&query).await?;
-        assert_eq!(blocks, expected_blocks);
+        let response = client.block_pagination_v02(&query).await?;
+        match response.result {
+            Some(result) => {
+                let deserialized_result: Paginated<BlockInfo, BlockNumber> =
+                    serde_json::from_value(result).unwrap();
+                assert_eq!(deserialized_result, expected_blocks);
+            }
+            None => {
+                anyhow::bail!("block_pagination returned err");
+            }
+        };
 
-        // Transaction requests part.
-        // let query = PaginationQuery {
-        //     from: tx_hash,
-        //     limit: 5,
-        //     direction: PaginationDirection::Older,
-        // };
+        let block_number = BlockNumber(3);
+        let expected_txs = {
+            let mut storage = cfg.pool.access_storage().await?;
+            storage
+                .chain()
+                .block_schema()
+                .get_block_transactions(block_number)
+                .await?
+        };
+        assert!(expected_txs.len() >= 3);
+        let tx_hash = expected_txs
+            .first()
+            .unwrap()
+            .tx_hash
+            .as_str()
+            .replace("0x", "sync-tx:");
+        let tx_hash = TxHash::from_str(tx_hash.as_str()).unwrap();
+
+        let query = PaginationQuery {
+            from: tx_hash,
+            limit: 2,
+            direction: PaginationDirection::Older,
+        };
+
+        let response = client
+            .block_transactions_v02(&query, &*block_number.to_string())
+            .await?;
+        match response.result {
+            Some(result) => {
+                let deserialized_result: Paginated<Transaction, BlockAndTxHash> =
+                    serde_json::from_value(result).unwrap();
+                assert_eq!(deserialized_result.count as usize, expected_txs.len());
+                assert_eq!(deserialized_result.limit, query.limit);
+                assert!(deserialized_result.list.len() <= query.limit as usize);
+                assert_eq!(deserialized_result.direction, PaginationDirection::Older);
+                assert_eq!(deserialized_result.from.tx_hash, tx_hash);
+                assert_eq!(deserialized_result.from.block_number, block_number);
+
+                for (tx, expected_tx) in deserialized_result.list.into_iter().zip(expected_txs) {
+                    assert_eq!(
+                        tx.tx_hash.to_string().replace("sync-tx:", "0x"),
+                        expected_tx.tx_hash
+                    );
+                    assert_eq!(tx.created_at, expected_tx.created_at);
+                    assert_eq!(*tx.block_number.unwrap(), expected_tx.block_number as u32);
+                    assert_eq!(tx.fail_reason, expected_tx.fail_reason);
+                    assert_eq!(tx.op, expected_tx.op);
+                }
+            }
+            None => {
+                anyhow::bail!("block_pagination returned err");
+            }
+        };
 
         server.stop().await;
         Ok(())

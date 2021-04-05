@@ -10,7 +10,6 @@ use once_cell::sync::Lazy;
 use tokio::sync::Mutex;
 
 // Workspace uses
-use zksync_api_client::rest::client::Client;
 use zksync_config::ZkSyncConfig;
 use zksync_crypto::rand::{SeedableRng, XorShiftRng};
 use zksync_storage::{
@@ -37,6 +36,8 @@ use zksync_types::{
 };
 
 // Local uses
+use super::client::Client;
+use super::SharedData;
 
 /// Serial ID of the verified priority operation.
 pub const VERIFIED_OP_SERIAL_ID: u64 = 10;
@@ -75,13 +76,16 @@ impl TestServerConfig {
         &self,
         scope: String,
         scope_factory: F,
+        shared_data: SharedData,
     ) -> (Client, actix_web::test::TestServer)
     where
         F: Fn(&TestServerConfig) -> Scope + Clone + Send + 'static,
     {
         let this = self.clone();
         let server = actix_web::test::start(move || {
-            App::new().service(web::scope(scope.as_ref()).service(scope_factory(&this)))
+            App::new()
+                .data(shared_data)
+                .service(web::scope(scope.as_ref()).service(scope_factory(&this)))
         });
 
         let url = server.url("").trim_end_matches('/').to_owned();
@@ -90,11 +94,15 @@ impl TestServerConfig {
         (client, server)
     }
 
-    pub fn start_server<F>(&self, scope_factory: F) -> (Client, actix_web::test::TestServer)
+    pub fn start_server<F>(
+        &self,
+        scope_factory: F,
+        shared_data: SharedData,
+    ) -> (Client, actix_web::test::TestServer)
     where
         F: Fn(&TestServerConfig) -> Scope + Clone + Send + 'static,
     {
-        self.start_server_with_scope(String::from("/api/v0.2"), scope_factory)
+        self.start_server_with_scope(String::from("/api/v0.2"), scope_factory, shared_data)
     }
 
     /// Creates several transactions and the corresponding executed operations.

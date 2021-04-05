@@ -3,7 +3,7 @@ use actix_web::{
     web::{self},
     Scope,
 };
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
 // Workspace uses
 use zksync_config::ZkSyncConfig;
@@ -13,6 +13,7 @@ use zksync_types::network::Network;
 use crate::api_server::tx_sender::TxSender;
 
 mod block;
+mod client;
 mod config;
 mod error;
 mod fee;
@@ -23,12 +24,13 @@ pub mod test_utils;
 mod token;
 mod transaction;
 
-#[derive(Serialize, Clone, Copy)]
+#[derive(Debug, Serialize, Deserialize, Clone, Copy)]
 #[serde(rename_all = "snake_case")]
 pub enum ApiVersion {
     V02,
 }
 
+#[derive(Debug, Clone, Copy)]
 pub struct SharedData {
     pub net: Network,
     pub api_version: ApiVersion,

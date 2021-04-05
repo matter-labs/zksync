@@ -8,7 +8,7 @@ use zksync_config::ZkSyncConfig;
 use zksync_types::{network::Network, Address};
 
 // Local uses
-use crate::rest::client::{self, Client};
+use super::{super::response::Response, Client, Result};
 
 #[derive(Deserialize, Serialize, Debug, Clone, Copy)]
 #[serde(rename_all = "snake_case")]
@@ -40,7 +40,7 @@ impl ApiConfigData {
 
 /// Configuration API part.
 impl Client {
-    pub async fn config_v02(&self) -> client::Result<ApiConfigData> {
+    pub async fn config_v02(&self) -> Result<Response> {
         self.get("config").send().await
     }
 }

@@ -6,11 +6,10 @@
 use actix_web::{web, Scope};
 
 // Workspace uses
-use zksync_api_client::rest::v02::config::ApiConfigData;
 use zksync_config::ZkSyncConfig;
 
 // Local uses
-use super::response::ApiResult;
+use super::{client::config::ApiConfigData, response::ApiResult};
 
 // Server implementation
 

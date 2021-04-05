@@ -2,16 +2,18 @@ use crate::api_server::tx_sender::SubmitError;
 use crate::fee_ticker::PriceError;
 use hex::FromHexError;
 use serde::export::Formatter;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use serde_repr::Serialize_repr;
 use std::fmt::Display;
 use thiserror::Error;
 
-#[derive(Serialize_repr)]
+#[derive(Serialize_repr, Debug, Deserialize)]
 #[repr(u16)]
 pub enum ErrorCode {
     UnreacheableError = 0,
     TokenZeroPriceError = 200,
+    InvalidCurrency = 201,
+    InvalidBlockPosition = 202,
     TransactionNotFound = 300,
     IncorrectTxHash = 301,
     StorageError = 400,
@@ -32,7 +34,7 @@ pub enum ErrorCode {
 }
 
 /// Error object in a response
-#[derive(Serialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct Error {
     pub error_type: String,
     pub code: ErrorCode,
@@ -115,6 +117,10 @@ impl ApiError for TxError {
 pub enum InvalidDataError {
     #[error("Cannot show price in zero price token")]
     TokenZeroPriceError,
+    #[error("Cannot parse block position. There are only block_number, last_committed, last_finalized options")]
+    InvalidBlockPosition,
+    #[error("Cannot parse currency. There are only token_id, usd options")]
+    InvalidCurrency,
 }
 
 impl ApiError for InvalidDataError {
@@ -125,6 +131,8 @@ impl ApiError for InvalidDataError {
     fn code(&self) -> ErrorCode {
         match self {
             Self::TokenZeroPriceError => ErrorCode::TokenZeroPriceError,
+            Self::InvalidBlockPosition => ErrorCode::InvalidBlockPosition,
+            Self::InvalidCurrency => ErrorCode::InvalidCurrency,
         }
     }
 }

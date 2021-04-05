@@ -7,15 +7,10 @@ use serde::{Deserialize, Serialize};
 // Workspace uses
 use zksync_crypto::{convert::FeConvert, serialization::FrSerde, Fr};
 use zksync_storage::chain::block::records::BlockDetails;
-use zksync_types::{
-    pagination::{BlockAndTxHash, Paginated, PaginationQuery},
-    tx::TxHash,
-    BlockNumber,
-};
+use zksync_types::{pagination::PaginationQuery, tx::TxHash, BlockNumber};
 
 // Local uses
-use super::transaction::Transaction;
-use crate::rest::client::{self, Client};
+use super::{super::response::Response, Client, Result};
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Clone)]
 pub struct BlockInfo {
@@ -62,37 +57,20 @@ impl From<BlockDetails> for BlockInfo {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug)]
-#[serde(rename_all = "snake_case")]
-pub enum LastVariant {
-    LastCommitted,
-    LastFinalized,
-}
-
-#[derive(Serialize, Deserialize, Debug)]
-#[serde(untagged)]
-pub enum BlockPosition {
-    Number(BlockNumber),
-    Variant(LastVariant),
-}
-
 /// Block API part.
 impl Client {
     /// Returns information about block with the specified number or null if block doesn't exist.
-    pub async fn block_by_number_v02(
-        &self,
-        block_number: BlockNumber,
-    ) -> client::Result<Option<BlockInfo>> {
-        self.get(&format!("block/{}", *block_number)).send().await
+    pub async fn block_by_number_v02(&self, block_position: &str) -> Result<Response> {
+        self.get(&format!("block/{}", block_position)).send().await
     }
 
     /// Returns information about transactions of the block with the specified number.
     pub async fn block_transactions_v02(
         &self,
-        pagination_query: PaginationQuery<TxHash>,
-        block_number: BlockNumber,
-    ) -> client::Result<Paginated<Transaction, BlockAndTxHash>> {
-        self.get(&format!("block/{}/transaction", *block_number))
+        pagination_query: &PaginationQuery<TxHash>,
+        block_position: &str,
+    ) -> Result<Response> {
+        self.get(&format!("block/{}/transaction", block_position))
             .query(&pagination_query)
             .send()
             .await
@@ -102,7 +80,7 @@ impl Client {
     pub async fn block_pagination_v02(
         &self,
         pagination_query: &PaginationQuery<BlockNumber>,
-    ) -> client::Result<Paginated<BlockInfo, BlockNumber>> {
+    ) -> Result<Response> {
         self.get("block").query(pagination_query).send().await
     }
 }

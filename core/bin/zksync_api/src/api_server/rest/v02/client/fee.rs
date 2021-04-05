@@ -9,7 +9,7 @@ use zksync_types::{Address, OutputFeeType, TokenLike, TxFeeTypes};
 use zksync_utils::BigUintSerdeAsRadix10Str;
 
 // Local uses
-use crate::rest::client::{self, Client};
+use super::{super::response::Response, Client, Result};
 
 // TODO: remove `fee_type`, `gas_tx_amount`, `gas_price_wei`
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -82,7 +82,7 @@ impl Client {
         tx_type: TxFeeTypes,
         address: Address,
         token_like: TokenLike,
-    ) -> client::Result<ApiFee> {
+    ) -> Result<Response> {
         self.post("transactions/fee")
             .body(&TxFeeRequest {
                 tx_type,
@@ -98,7 +98,7 @@ impl Client {
         &self,
         transactions: Vec<TxInBatchFeeRequest>,
         token_like: TokenLike,
-    ) -> client::Result<ApiBatchFee> {
+    ) -> Result<Response> {
         self.post("transactions/fee/batch")
             .body(&BatchFeeRequest {
                 transactions,

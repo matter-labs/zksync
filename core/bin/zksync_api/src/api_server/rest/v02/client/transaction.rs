@@ -17,7 +17,7 @@ use zksync_types::{
 };
 
 // Local uses
-use crate::rest::client::{self, Client};
+use super::{super::response::Response, Client, Result};
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct IncomingTxBatch {
@@ -173,7 +173,7 @@ impl Client {
         &self,
         tx: ZkSyncTx,
         signature: Option<TxEthSignature>,
-    ) -> client::Result<TxHash> {
+    ) -> Result<Response> {
         self.post("transaction")
             .body(&IncomingTx { tx, signature })
             .send()
@@ -185,7 +185,7 @@ impl Client {
         &self,
         txs: Vec<ZkSyncTx>,
         signature: EthBatchSignatures,
-    ) -> client::Result<Vec<TxHash>> {
+    ) -> Result<Response> {
         self.post("transaction/batches")
             .body(&IncomingTxBatch { txs, signature })
             .send()
@@ -193,14 +193,14 @@ impl Client {
     }
 
     /// Gets actual transaction receipt.
-    pub async fn tx_status_v02(&self, tx_hash: TxHash) -> client::Result<Option<Receipt>> {
+    pub async fn tx_status_v02(&self, tx_hash: TxHash) -> Result<Response> {
         self.get(&format!("transaction/{}", tx_hash.to_string()))
             .send()
             .await
     }
 
     /// Gets transaction content.
-    pub async fn tx_data_v02(&self, tx_hash: TxHash) -> client::Result<Option<TxData>> {
+    pub async fn tx_data_v02(&self, tx_hash: TxHash) -> Result<Response> {
         self.get(&format!("transaction/{}/data", tx_hash.to_string()))
             .send()
             .await
