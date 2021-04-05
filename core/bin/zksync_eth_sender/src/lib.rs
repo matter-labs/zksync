@@ -187,7 +187,7 @@ impl<DB: DatabaseInterface> ETHSender<DB> {
         loop {
             // We perform a loading routine every X seconds.
             tokio::time::delay_for(self.options.sender.tx_poll_period()).await;
-            // If we received an error when loading an new operation, we can't do anything about it and should panic.
+            // If we received an error when loading a new operation, we can't do anything about it and should panic.
             if let Err(error) = self.load_new_operations().await {
                 vlog::error!("Unable to restore operations from the database: {}", error);
                 panic!("Unable to restore operations from the database: {}", error);
