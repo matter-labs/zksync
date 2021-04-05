@@ -1,5 +1,5 @@
 use crate::{
-    helpers::{is_fee_amount_packable, is_token_amount_packable, pack_fee_amount},
+    helpers::{is_fee_amount_packable, pack_fee_amount},
     AccountId, Nonce, TokenId,
 };
 use num::{BigUint, ToPrimitive};
@@ -135,9 +135,11 @@ impl Withdraw {
     ///
     /// - `account_id` field must be within supported range.
     /// - `token` field must be within supported range.
-    /// - `amount` field must represent a packable value.
     /// - `fee` field must represent a packable value.
     /// - zkSync signature must correspond to the PubKeyHash of the account.
+    ///
+    /// Note that we don't need to check whether token amount is packable, because pubdata for this operation
+    /// contains unpacked value only.
     pub fn check_correctness(&mut self) -> bool {
         let mut valid = self.amount <= BigUint::from(u128::max_value())
             && is_fee_amount_packable(&self.fee)
