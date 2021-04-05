@@ -2658,6 +2658,7 @@ dependencies = [
  "async-trait",
  "chrono",
  "colored",
+ "envy",
  "futures 0.3.6",
  "hex",
  "num",
