@@ -24,71 +24,91 @@ async fn revert_blocks_in_storage(
         .block_schema()
         .remove_blocks(last_block)
         .await?;
+    println!("`block` table is cleaned");
     transaction
         .chain()
         .block_schema()
         .remove_pending_block()
         .await?;
+    println!("`pending_block` table is cleaned");
     transaction
         .chain()
         .block_schema()
         .remove_account_tree_cache(last_block)
         .await?;
+    println!("`account_tree_cache` table is cleaned");
 
     transaction
         .chain()
         .state_schema()
         .remove_account_balance_updates(last_block)
         .await?;
+    println!("`account_balance_updates` table is cleaned");
     transaction
         .chain()
         .state_schema()
         .remove_account_creates(last_block)
         .await?;
+    println!("`account_creates` table is cleaned");
     transaction
         .chain()
         .state_schema()
         .remove_account_pubkey_updates(last_block)
         .await?;
+    println!("`account_pubkey_updates` table is cleaned");
 
+    transaction
+        .chain()
+        .operations_schema()
+        .remove_eth_unprocessed_aggregated_ops()
+        .await?;
+    println!("`eth_unprocessed_aggregated_ops` table is cleaned");
     transaction
         .chain()
         .operations_schema()
         .remove_executed_priority_operations(last_block)
         .await?;
+    println!("`executed_priority_operations` table is cleaned");
     transaction
         .chain()
         .operations_schema()
         .remove_aggregate_operations_and_bindings(last_block)
         .await?;
+    println!("`aggregate_operations`, `eth_aggregated_ops_binding`, `eth_tx_hashes`, `eth_operations` tables are cleaned");
 
     transaction
         .prover_schema()
         .remove_witnesses(last_block)
         .await?;
+    println!("`block_witness` table is cleaned");
     transaction
         .prover_schema()
         .remove_proofs(last_block)
         .await?;
+    println!("`proofs` table is cleaned");
     transaction
         .prover_schema()
         .remove_aggregated_proofs(last_block)
         .await?;
+    println!("`aggregated_proofs` table is cleaned");
     transaction
         .prover_schema()
         .remove_prover_jobs(last_block)
         .await?;
+    println!("`prover_job_queue` table is cleaned");
 
     transaction
         .ethereum_schema()
         .update_eth_parameters(last_block)
         .await?;
+    println!("`eth_parameters` table is updated");
 
     transaction
         .chain()
         .mempool_schema()
         .return_executed_txs_to_mempool(last_block)
         .await?;
+    println!("`mempool_txs`, `executed_transactions` tables are updated");
 
     transaction.commit().await?;
 
@@ -186,9 +206,9 @@ enum Command {
 #[structopt(name = "zkSync block revert tool", author = "Matter Labs")]
 #[structopt(about = "Tool to revert blocks in zkSync network on contract and/or in storage")]
 struct Opt {
-    /// Number of blocks to revert
+    /// Last correct block, tool reverts blocks with numbers greater than this field.
     #[structopt(long)]
-    number: u32,
+    last_correct_block: u32,
     #[structopt(subcommand)]
     command: Command,
     /// Private key of operator which will call the contract function.
@@ -200,7 +220,6 @@ struct Opt {
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     let opt = Opt::from_args();
-    let blocks_to_revert = opt.number;
     let mut config = ZkSyncConfig::from_env();
 
     let key_without_prefix = opt
@@ -230,15 +249,17 @@ async fn main() -> anyhow::Result<()> {
         &last_commited_block, &last_verified_block
     );
     ensure!(
-        last_verified_block + blocks_to_revert <= last_commited_block,
+        *last_verified_block <= opt.last_correct_block,
         "Some blocks to revert are already verified"
     );
+
+    let blocks_to_revert = *last_commited_block - opt.last_correct_block;
+    let last_block = BlockNumber(opt.last_correct_block);
 
     match opt.command {
         Command::All => {
             println!("Start reverting blocks in database and in contract");
             let blocks = get_blocks(last_commited_block, blocks_to_revert, &mut storage).await?;
-            let last_block = BlockNumber(*last_commited_block - blocks_to_revert);
             println!("Last block for revert {}", &last_block);
             revert_blocks_on_contract(&mut storage, &client, &blocks).await?;
             revert_blocks_in_storage(&mut storage, last_block).await?;
@@ -250,7 +271,6 @@ async fn main() -> anyhow::Result<()> {
         }
         Command::Storage => {
             println!("Start reverting blocks in database");
-            let last_block = BlockNumber(*last_commited_block - blocks_to_revert);
             revert_blocks_in_storage(&mut storage, last_block).await?;
         }
     }
