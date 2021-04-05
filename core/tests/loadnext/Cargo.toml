@@ -39,3 +39,6 @@ rand = "0.4"
 reqwest = "0.10"
 structopt = "0.3"
 envy = "0.4"
+
+[dev-dependencies]
+zksync_test_account = { path = "../test_account", version = "1.0" }

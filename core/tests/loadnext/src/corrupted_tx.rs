@@ -240,3 +240,147 @@ impl Corrupted for (ZkSyncTx, Option<PackedEthSignature>) {
         self
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use zksync_test_account::ZkSyncAccount;
+    use zksync_types::{AccountId, Address, Nonce, PubKeyHash, Transfer};
+
+    const AMOUNT: u64 = 100;
+    const FEE: u64 = 100;
+
+    fn create_transfer(account: &ZkSyncAccount) -> (ZkSyncTx, Option<PackedEthSignature>) {
+        let (transfer, eth_signature) = account.sign_transfer(
+            TokenId(0),
+            "ETH",
+            AMOUNT.into(),
+            FEE.into(),
+            &Address::repeat_byte(0x7e),
+            Some(Nonce(1)),
+            false,
+            Default::default(),
+        );
+        let tx = ZkSyncTx::from(transfer);
+
+        (tx, eth_signature)
+    }
+
+    fn unwrap_transfer(transfer: ZkSyncTx) -> Transfer {
+        if let ZkSyncTx::Transfer(transfer) = transfer {
+            *transfer
+        } else {
+            panic!("Not a transfer")
+        }
+    }
+
+    fn create_account() -> ZkSyncAccount {
+        let mut account = ZkSyncAccount::rand();
+        account.set_account_id(Some(AccountId(1)));
+        let eth_pk = account.eth_account_data.unwrap_eoa_pk();
+        account.private_key = private_key_from_seed(eth_pk.as_bytes()).unwrap();
+        account.pubkey_hash = PubKeyHash::from_privkey(&account.private_key);
+        account.address = PackedEthSignature::address_from_private_key(&eth_pk).unwrap();
+        account
+    }
+
+    #[test]
+    fn zero_fee() {
+        let account = create_account();
+
+        let transfer = create_transfer(&account);
+
+        let (modified_transfer, _eth_signature) =
+            transfer.zero_fee(account.eth_account_data.unwrap_eoa_pk(), "ETH", 18);
+
+        assert_eq!(unwrap_transfer(modified_transfer).fee, 0u64.into());
+    }
+
+    #[test]
+    fn too_big_amount() {
+        let account = create_account();
+
+        let transfer = create_transfer(&account);
+
+        let (modified_transfer, _eth_signature) =
+            transfer.too_big_amount(account.eth_account_data.unwrap_eoa_pk(), "ETH", 18);
+
+        assert!(unwrap_transfer(modified_transfer).amount > AMOUNT.into());
+    }
+
+    #[test]
+    fn not_packable_amount() {
+        let account = create_account();
+
+        let transfer = create_transfer(&account);
+
+        let (modified_transfer, _eth_signature) =
+            transfer.not_packable_amount(account.eth_account_data.unwrap_eoa_pk(), "ETH", 18);
+
+        assert_eq!(
+            is_token_amount_packable(&unwrap_transfer(modified_transfer).amount),
+            false
+        );
+    }
+
+    #[test]
+    fn not_packable_fee() {
+        let account = create_account();
+
+        let transfer = create_transfer(&account);
+
+        let (modified_transfer, _eth_signature) =
+            transfer.not_packable_fee(account.eth_account_data.unwrap_eoa_pk(), "ETH", 18);
+
+        assert_eq!(
+            is_fee_amount_packable(&unwrap_transfer(modified_transfer).fee),
+            false
+        );
+    }
+
+    #[test]
+    fn nonexistent_token() {
+        let account = create_account();
+
+        let transfer = create_transfer(&account);
+
+        let (modified_transfer, _eth_signature) =
+            transfer.nonexistent_token(account.eth_account_data.unwrap_eoa_pk(), "ETH", 18);
+
+        assert_ne!(unwrap_transfer(modified_transfer).token, TokenId(0));
+    }
+
+    #[test]
+    fn bad_eth_signature() {
+        let account = create_account();
+
+        let transfer = create_transfer(&account);
+        let current_eth_signature = transfer.1.clone();
+
+        let (_modified_transfer, new_eth_signature) = transfer.bad_eth_signature();
+
+        assert_ne!(current_eth_signature, new_eth_signature);
+    }
+
+    #[test]
+    fn bad_zksync_signature() {
+        let account = create_account();
+
+        let transfer = create_transfer(&account);
+        let current_zksync_signature = unwrap_transfer(transfer.0.clone()).signature;
+
+        let (modified_transfer, _eth_signature) = transfer.bad_zksync_signature();
+
+        assert_ne!(
+            current_zksync_signature
+                .signature
+                .serialize_packed()
+                .unwrap(),
+            unwrap_transfer(modified_transfer)
+                .signature
+                .signature
+                .serialize_packed()
+                .unwrap()
+        );
+    }
+}
