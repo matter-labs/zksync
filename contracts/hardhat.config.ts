@@ -71,7 +71,7 @@ export default {
     },
     networks: {
         env: {
-            url: process.env.ETH_CLIENT_WEB3_URL
+            url: process.env.ETH_CLIENT_WEB3_URL?.split(',')[0]
         },
         hardhat: {
             allowUnlimitedContractSize: true

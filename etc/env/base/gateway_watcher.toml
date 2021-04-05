@@ -1,0 +1,11 @@
+[gateway_watcher]
+# How often all gateways will be checked.
+gateway_check_interval=10000
+# Time to wait before request again in case of unsuccessful request.
+gateway_check_retry_delay=500
+# How many requests are allowed to be done within a single task.
+gateway_check_request_per_task_limit=10
+# How many tasks are allowed to simultaneously make requests.
+gateway_check_task_limit=1
+# Max request timeout. In milliseconds.
+gateway_check_request_timeout=10000

@@ -43,7 +43,12 @@ async fn initial_price() {
     ];
 
     for eth_client_price in test_vector {
-        ethereum.get_mut_mock().unwrap().gas_price = eth_client_price.into();
+        ethereum
+            .get_mut_mock()
+            .unwrap()
+            .set_gas_price(eth_client_price.into())
+            .await
+            .unwrap();
 
         let scaled_gas = gas_adjuster.get_gas_price(&ethereum, None).await.unwrap();
         assert_eq!(scaled_gas, eth_client_price.into());
@@ -70,7 +75,12 @@ async fn lower_gas_limit() {
 
     for (eth_client_price, previous_price, expected_price) in test_vector {
         // Set the gas price in Ethereum.
-        ethereum.get_mut_mock().unwrap().gas_price = eth_client_price.into();
+        ethereum
+            .get_mut_mock()
+            .unwrap()
+            .set_gas_price(eth_client_price.into())
+            .await
+            .unwrap();
 
         // Check that gas price of 1000 is increased to 1150.
         let scaled_gas = gas_adjuster
@@ -108,7 +118,12 @@ async fn initial_upper_gas_limit() {
     let mut gas_adjuster: GasAdjuster<MockDatabase> = GasAdjuster::new(&db).await;
 
     // Set the gas price in Ethereum, which is greater than the current limit.
-    ethereum.get_mut_mock().unwrap().gas_price = U256::from(PRICE_LIMIT) + 1;
+    ethereum
+        .get_mut_mock()
+        .unwrap()
+        .set_gas_price(U256::from(PRICE_LIMIT) + 1)
+        .await
+        .unwrap();
 
     // Check that gas price of `PRICE_LIMIT` + 1 is clamped to `PRICE_LIMIT`.
     let scaled_gas = gas_adjuster.get_gas_price(&ethereum, None).await.unwrap();
@@ -116,7 +131,12 @@ async fn initial_upper_gas_limit() {
 
     // Check that gas price is clamped even if both the ethereum client price
     // and last used price are greater than price limit.
-    ethereum.get_mut_mock().unwrap().gas_price = U256::from(PRICE_LIMIT) * 2;
+    ethereum
+        .get_mut_mock()
+        .unwrap()
+        .set_gas_price(U256::from(PRICE_LIMIT) * 2)
+        .await
+        .unwrap();
     let previous_price = U256::from(PRICE_LIMIT) * 2;
 
     let scaled_gas = gas_adjuster
@@ -185,7 +205,12 @@ async fn gas_price_limit_scaling() {
     let mut gas_adjuster: GasAdjuster<MockDatabase> = GasAdjuster::new(&db).await;
 
     // Set the client price way beyond the limit.
-    ethereum.get_mut_mock().unwrap().gas_price = U256::from(PRICE_LIMIT * 2);
+    ethereum
+        .get_mut_mock()
+        .unwrap()
+        .set_gas_price(U256::from(PRICE_LIMIT * 2))
+        .await
+        .unwrap();
 
     let mut expected_price = PRICE_LIMIT;
 
@@ -206,7 +231,13 @@ async fn gas_price_limit_scaling() {
     }
 
     // Stats are gathered. Now they're based on the Ethereum price.
-    expected_price = ethereum.get_mock().unwrap().gas_price.as_u64();
+    expected_price = ethereum
+        .get_mock()
+        .unwrap()
+        .get_gas_price()
+        .await
+        .unwrap()
+        .as_u64();
     for _ in 0..PRICE_UPDATES {
         // Request the gas price N times to gather statistics in GasAdjuster.
         // Each time the limit will be changed, so it's not checked. Instead, we check
@@ -223,7 +254,12 @@ async fn gas_price_limit_scaling() {
         expected_price = new_limit.low_u64();
 
         // Also, scale up the price reported by the ethereum.
-        ethereum.get_mut_mock().unwrap().gas_price = U256::from(expected_price);
+        ethereum
+            .get_mut_mock()
+            .unwrap()
+            .set_gas_price(U256::from(expected_price))
+            .await
+            .unwrap();
     }
 }
 
@@ -252,7 +288,12 @@ async fn gas_price_limit_average_basis() {
     let mut gas_adjuster: GasAdjuster<MockDatabase> = GasAdjuster::new(&db).await;
 
     // Set the client price way beyond the limit.
-    ethereum.get_mut_mock().unwrap().gas_price = SUGGESTED_PRICE.into();
+    ethereum
+        .get_mut_mock()
+        .unwrap()
+        .set_gas_price(SUGGESTED_PRICE.into())
+        .await
+        .unwrap();
 
     let mut expected_price = SUGGESTED_PRICE;
     let mut current_limit = PRICE_LIMIT;
@@ -312,7 +353,12 @@ async fn gas_price_limit_preservation() {
     let mut gas_adjuster: GasAdjuster<MockDatabase> = GasAdjuster::new(&db).await;
 
     // Set the client price way beyond the limit.
-    ethereum.get_mut_mock().unwrap().gas_price = SUGGESTED_PRICE.into();
+    ethereum
+        .get_mut_mock()
+        .unwrap()
+        .set_gas_price(SUGGESTED_PRICE.into())
+        .await
+        .unwrap();
 
     for _ in 0..PRICE_UPDATES {
         // Request the gas price N times to gather statistics in GasAdjuster.

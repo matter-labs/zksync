@@ -1,42 +1,33 @@
 use ethabi::Contract;
+use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::Arc;
 use web3::{
     contract::tokens::{Detokenize, Tokenize},
     contract::Options,
     transports::Http,
     types::{Address, BlockId, Filter, Log, Transaction, U64},
 };
-
 use zksync_eth_signer::PrivateKeySigner;
 use zksync_types::{TransactionReceipt, H160, H256, U256};
 
 use crate::ethereum_gateway::{ExecutedTxStatus, FailureInfo, SignedCallResult};
 use crate::ETHDirectClient;
 
-#[derive(Debug, Clone)]
-pub struct MultiplexerEthereumClient {
+#[derive(Debug, Default)]
+struct MultiplexerEthereumClientInner {
     clients: Vec<(String, ETHDirectClient<PrivateKeySigner>)>,
+    preferred: AtomicUsize,
 }
 
-impl Default for MultiplexerEthereumClient {
-    fn default() -> Self {
-        Self::new()
-    }
+#[derive(Debug, Default, Clone)]
+pub struct MultiplexerEthereumClient {
+    inner: Arc<MultiplexerEthereumClientInner>,
 }
 
 macro_rules! multiple_call {
-    ($self:expr, $func:ident($($attr:expr),+)) => {
-        for (name, client) in $self.clients.iter() {
-            match client.$func($($attr.clone()),+).await {
-                Ok(res) => return Ok(res),
-                Err(err) => vlog::error!("Error in interface: {}, {} ", name, err),
-            }
-        }
-        anyhow::bail!("All interfaces was wrong please try again")
-    };
-
-    ($self:expr, $func:ident()) => {
-        for (name, client) in $self.clients.iter() {
-            match client.$func().await {
+    ($self:expr, $func:ident($($attr:expr),*)) => {
+        for (name, client) in $self.clients() {
+            match client.$func($($attr.clone()),*).await {
                 Ok(res) => return Ok(res),
                 Err(err) => vlog::error!("Error in interface: {}, {} ", name, err),
             }
@@ -47,12 +38,44 @@ macro_rules! multiple_call {
 
 impl MultiplexerEthereumClient {
     pub fn new() -> Self {
-        Self { clients: vec![] }
+        Self::default()
     }
 
-    pub fn add_client(mut self, name: String, client: ETHDirectClient<PrivateKeySigner>) -> Self {
-        self.clients.push((name, client));
+    pub fn add_client(
+        &mut self,
+        name: String,
+        client: ETHDirectClient<PrivateKeySigner>,
+    ) -> &mut Self {
+        Arc::get_mut(&mut self.inner)
+            .unwrap()
+            .clients
+            .push((name, client));
         self
+    }
+
+    pub fn prioritize_client(&self, name: &str) -> bool {
+        if let Some(idx) = self.inner.clients.iter().position(|(key, _)| key == name) {
+            self.inner.preferred.swap(idx, Ordering::Acquire) != idx
+        } else {
+            false
+        }
+    }
+
+    pub fn clients(&self) -> impl Iterator<Item = (&str, &ETHDirectClient<PrivateKeySigner>)> {
+        let preferred = self.inner.preferred.load(Ordering::Relaxed);
+        self.inner
+            .clients
+            .get(preferred)
+            .into_iter()
+            .chain(self.inner.clients.get(..preferred).unwrap_or(&[]).iter())
+            .chain(
+                self.inner
+                    .clients
+                    .get(1 + preferred..)
+                    .unwrap_or(&[])
+                    .iter(),
+            )
+            .map(|(name, client)| (name.as_str(), client))
     }
 
     pub fn create_contract(
@@ -60,7 +83,10 @@ impl MultiplexerEthereumClient {
         address: Address,
         contract: ethabi::Contract,
     ) -> web3::contract::Contract<Http> {
-        let client = self.clients.first().expect("Should be at least one client");
+        let client = self
+            .clients()
+            .next()
+            .expect("Should be at least one client");
         client.1.create_contract(address, contract)
     }
 
@@ -189,7 +215,10 @@ impl MultiplexerEthereumClient {
     }
 
     pub fn encode_tx_data<P: Tokenize + Clone>(&self, func: &str, params: P) -> Vec<u8> {
-        let (_, client) = self.clients.first().expect("Should be exactly one client");
+        let (_, client) = self
+            .clients()
+            .next()
+            .expect("Should be at least one client");
         client.encode_tx_data(func, params)
     }
 

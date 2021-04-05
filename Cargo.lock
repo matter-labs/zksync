@@ -5968,6 +5968,7 @@ dependencies = [
  "zksync_crypto",
  "zksync_eth_client",
  "zksync_eth_signer",
+ "zksync_gateway_watcher",
  "zksync_prometheus_exporter",
  "zksync_storage",
  "zksync_test_account",
@@ -6080,6 +6081,7 @@ dependencies = [
  "zksync_crypto",
  "zksync_eth_client",
  "zksync_eth_signer",
+ "zksync_gateway_watcher",
  "zksync_prometheus_exporter",
  "zksync_state",
  "zksync_storage",
@@ -6179,6 +6181,7 @@ dependencies = [
  "zksync_contracts",
  "zksync_eth_client",
  "zksync_eth_signer",
+ "zksync_gateway_watcher",
  "zksync_prometheus_exporter",
  "zksync_storage",
  "zksync_types",
@@ -6230,6 +6233,21 @@ dependencies = [
  "zksync_storage",
  "zksync_test_account",
  "zksync_types",
+]
+
+[[package]]
+name = "zksync_gateway_watcher"
+version = "1.0.0"
+dependencies = [
+ "futures 0.3.6",
+ "metrics",
+ "thiserror",
+ "tokio 0.2.22",
+ "vlog",
+ "web3",
+ "zksync_config",
+ "zksync_eth_client",
+ "zksync_utils",
 ]
 
 [[package]]
@@ -6321,8 +6339,10 @@ dependencies = [
  "zksync_config",
  "zksync_core",
  "zksync_crypto",
+ "zksync_eth_client",
  "zksync_eth_sender",
  "zksync_forced_exit_requests",
+ "zksync_gateway_watcher",
  "zksync_prometheus_exporter",
  "zksync_prover",
  "zksync_storage",
@@ -6451,6 +6471,7 @@ dependencies = [
  "num",
  "serde",
  "serde_json",
+ "tokio 0.2.22",
 ]
 
 [[package]]
