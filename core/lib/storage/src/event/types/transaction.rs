@@ -4,7 +4,7 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 // Workspace uses
-use zksync_basic_types::BlockNumber;
+use zksync_basic_types::{AccountId, BlockNumber};
 use zksync_types::block::ExecutedOperations;
 // Local uses
 
@@ -32,14 +32,15 @@ impl TransactionEvent {
     pub fn from_executed_operation(
         op: &ExecutedOperations,
         block: BlockNumber,
-    ) -> anyhow::Result<Self> {
-        Ok(match op {
+        account_id: AccountId,
+    ) -> Self {
+        match op {
             ExecutedOperations::Tx(exec_tx) => Self {
                 tx_hash: exec_tx.signed_tx.tx.hash().to_string(),
-                account_id: i64::from(*exec_tx.signed_tx.account_id()?),
+                account_id: i64::from(*account_id),
                 token_id: i32::from(*exec_tx.signed_tx.token_id()),
                 block_number: i64::from(*block),
-                tx: serde_json::to_value(exec_tx.signed_tx.tx.clone())?,
+                tx: serde_json::to_value(exec_tx.signed_tx.tx.clone()).unwrap(),
                 status: if exec_tx.success {
                     TransactionStatus::Committed
                 } else {
@@ -48,19 +49,16 @@ impl TransactionEvent {
                 fail_reason: exec_tx.fail_reason.clone(),
                 created_at: exec_tx.created_at.clone(),
             },
-            ExecutedOperations::PriorityOp(exec_prior_op) => {
-                // We have to fetch the account id for the `Deposit` operation.
-                Self {
-                    tx_hash: exec_prior_op.priority_op.eth_hash.to_string(),
-                    account_id: 0i64,
-                    token_id: i32::from(*exec_prior_op.priority_op.data.token_id()),
-                    block_number: i64::from(*block),
-                    tx: serde_json::to_value(&exec_prior_op.op.clone())?,
-                    status: TransactionStatus::Committed,
-                    fail_reason: None,
-                    created_at: exec_prior_op.created_at.clone(),
-                }
-            }
-        })
+            ExecutedOperations::PriorityOp(exec_prior_op) => Self {
+                tx_hash: exec_prior_op.priority_op.eth_hash.to_string(),
+                account_id: i64::from(*account_id),
+                token_id: i32::from(*exec_prior_op.priority_op.data.token_id()),
+                block_number: i64::from(*block),
+                tx: serde_json::to_value(&exec_prior_op.op.clone()).unwrap(),
+                status: TransactionStatus::Committed,
+                fail_reason: None,
+                created_at: exec_prior_op.created_at.clone(),
+            },
+        }
     }
 }

@@ -23,6 +23,7 @@ pub mod types;
 #[derive(Debug)]
 pub struct EventSchema<'a, 'c>(pub &'a mut StorageProcessor<'c>);
 
+// TODO: add metrics.
 impl<'a, 'c> EventSchema<'a, 'c> {
     async fn store_event_data(
         &mut self,
@@ -80,6 +81,7 @@ impl<'a, 'c> EventSchema<'a, 'c> {
         account_id: AccountId,
         account_update: &AccountUpdate,
     ) -> QueryResult<()> {
+        // TODO: skip fee account?
         let account_update_details =
             AccountUpdateDetails::from_account_update(account_id, account_update);
 
@@ -105,6 +107,7 @@ impl<'a, 'c> EventSchema<'a, 'c> {
         &mut self,
         account_diff: &StorageAccountDiff,
     ) -> QueryResult<()> {
+        // TODO: skip fee account?
         let account_update_details = AccountUpdateDetails::from(account_diff);
 
         let update_type = AccountStateChangeType::from(account_diff);
@@ -125,6 +128,26 @@ impl<'a, 'c> EventSchema<'a, 'c> {
         Ok(())
     }
 
+    async fn account_id_from_op(
+        &mut self,
+        executed_operation: &ExecutedOperations,
+    ) -> QueryResult<AccountId> {
+        let priority_op = match executed_operation {
+            ExecutedOperations::Tx(tx) => return tx.signed_tx.tx.account_id(),
+            ExecutedOperations::PriorityOp(priority_op) => priority_op,
+        };
+        match &priority_op.priority_op.data {
+            ZkSyncPriorityOp::Deposit(deposit) => self
+                .0
+                .chain()
+                .account_schema()
+                .account_id_by_address(deposit.to)
+                .await?
+                .ok_or(anyhow::Error::msg("account doesn't exist")),
+            ZkSyncPriorityOp::FullExit(full_exit) => Ok(full_exit.account_id),
+        }
+    }
+
     pub async fn store_transaction_event(
         &mut self,
         executed_operation: &ExecutedOperations,
@@ -132,24 +155,17 @@ impl<'a, 'c> EventSchema<'a, 'c> {
     ) -> QueryResult<()> {
         let mut transaction = self.0.start_transaction().await?;
 
-        // TODO: Ignore the error.
-        let mut transaction_event =
-            TransactionEvent::from_executed_operation(executed_operation, block)?;
-        // Account id for `Deposit` should be already present in the committed state.
-        if let ExecutedOperations::PriorityOp(priority_op) = executed_operation {
-            if let ZkSyncPriorityOp::Deposit(deposit) = &priority_op.priority_op.data {
-                let account_id = transaction
-                    .chain()
-                    .account_schema()
-                    .account_id_by_address(deposit.to)
-                    .await?;
-                let account_id = match account_id {
-                    Some(id) => id,
-                    None => return Ok(()),
-                };
-                transaction_event.account_id = i64::from(*account_id);
-            }
-        }
+        let account_id = match transaction
+            .event_schema()
+            .account_id_from_op(executed_operation)
+            .await
+        {
+            Ok(account_id) => account_id,
+            _ => return Ok(()),
+        };
+
+        let transaction_event =
+            TransactionEvent::from_executed_operation(executed_operation, block, account_id);
 
         let event_data =
             serde_json::to_value(transaction_event).expect("couldn't serialize account event");
