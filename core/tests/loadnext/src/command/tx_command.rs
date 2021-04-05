@@ -218,9 +218,19 @@ impl TxCommand {
         // It doesn't make sense to fail contract-based functions.
         let incorrect_priority_op =
             matches!(command.command_type, TxType::Deposit | TxType::FullExit);
+        // Amount doesn't have to be packable for withdrawals.
+        let unpackable_withdrawal = matches!(
+            command.command_type,
+            TxType::WithdrawToOther | TxType::WithdrawToSelf
+        ) && command.modifier
+            == IncorrectnessModifier::NotPackableAmount;
 
         // Check whether generator modifier does not make sense.
-        if cpk_incorrect_signature || no_amount_field || incorrect_priority_op {
+        if cpk_incorrect_signature
+            || no_amount_field
+            || incorrect_priority_op
+            || unpackable_withdrawal
+        {
             command.modifier = IncorrectnessModifier::None;
         }
 
