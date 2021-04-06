@@ -56,11 +56,11 @@ impl ApiBlockData {
             match block_position {
                 "last_committed" => match self.get_last_committed_block_number().await {
                     Ok(number) => Ok(number),
-                    Err(err) => Err(Error::storage(err).into()),
+                    Err(err) => Err(Error::storage(err)),
                 },
                 "last_finalized" => match self.get_last_finalized_block_number().await {
                     Ok(number) => Ok(number),
-                    Err(err) => Err(Error::storage(err).into()),
+                    Err(err) => Err(Error::storage(err)),
                 },
                 _ => Err(Error::from(InvalidDataError::InvalidBlockPosition)),
             }

@@ -536,17 +536,17 @@ mod tests {
 
             try_parse_tx_hash(&transactions[0].tx_hash).unwrap()
         };
-        let response = client.tx_status_v02(tx_hash.clone()).await?;
+        let response = client.tx_status_v02(tx_hash).await?;
         let tx_status: Receipt = deserialize_response_result(response)?;
         let expected_tx_status = Receipt::L2(L2Receipt {
-            tx_hash: tx_hash.clone(),
+            tx_hash,
             rollup_block: Some(BlockNumber(1)),
             status: L2Status::Finalized,
             fail_reason: None,
         });
         assert_eq!(tx_status, expected_tx_status);
 
-        let response = client.tx_data_v02(tx_hash.clone()).await?;
+        let response = client.tx_data_v02(tx_hash).await?;
         let tx_data: Option<TxData> = deserialize_response_result(response)?;
         assert_eq!(tx_data.unwrap().tx.tx_hash, tx_hash);
 
@@ -566,17 +566,17 @@ mod tests {
 
             tx_hash
         };
-        let response = client.tx_status_v02(pending_tx_hash.clone()).await?;
+        let response = client.tx_status_v02(pending_tx_hash).await?;
         let tx_status: Receipt = deserialize_response_result(response)?;
         let expected_tx_status = Receipt::L2(L2Receipt {
-            tx_hash: pending_tx_hash.clone(),
+            tx_hash: pending_tx_hash,
             rollup_block: None,
             status: L2Status::Queued,
             fail_reason: None,
         });
         assert_eq!(tx_status, expected_tx_status);
 
-        let response = client.tx_data_v02(pending_tx_hash.clone()).await?;
+        let response = client.tx_data_v02(pending_tx_hash).await?;
         let tx_data: Option<TxData> = deserialize_response_result(response)?;
         assert_eq!(tx_data.unwrap().tx.tx_hash, pending_tx_hash);
 
