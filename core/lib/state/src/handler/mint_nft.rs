@@ -76,6 +76,7 @@ impl TxHandler<MintNFT> for ZkSyncState {
 
         let last_token_id = nft_account.get_balance(NFT_TOKEN_ID);
         nft_account.add_balance(NFT_TOKEN_ID, &BigUint::from(1u32));
+
         let new_token_id = nft_account.get_balance(NFT_TOKEN_ID);
         updates.push((
             NFT_STORAGE_ACCOUNT_ID,
@@ -138,6 +139,7 @@ impl TxHandler<MintNFT> for ZkSyncState {
             },
         ));
 
+        self.insert_account(op.creator_account_id, creator_account);
         let old_amount = recipient_account.get_balance(token_id);
         if old_amount != BigUint::zero() {
             bail!("Token {} is already in account", token_id)
@@ -145,6 +147,7 @@ impl TxHandler<MintNFT> for ZkSyncState {
         let old_nonce = recipient_account.nonce;
         recipient_account.add_balance(token_id, &BigUint::from(1u32));
 
+        self.insert_account(op.recipient_account_id, recipient_account);
         updates.push((
             op.recipient_account_id,
             AccountUpdate::UpdateBalance {
@@ -166,6 +169,7 @@ impl TxHandler<MintNFT> for ZkSyncState {
             },
         ));
 
+        self.insert_account(NFT_STORAGE_ACCOUNT_ID, nft_account);
         let fee = CollectedFee {
             token: op.tx.fee_token,
             amount: op.tx.fee.clone(),
