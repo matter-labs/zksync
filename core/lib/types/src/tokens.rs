@@ -1,9 +1,9 @@
-use crate::error::GetGenesisTokenListError;
 use crate::{tx::ChangePubKeyType, Address, TokenId};
 use chrono::{DateTime, Utc};
 use num::{rational::Ratio, BigUint};
 use serde::{Deserialize, Serialize};
 use std::{fmt, fs::read_to_string, path::PathBuf, str::FromStr};
+use thiserror::Error;
 use zksync_utils::parse_env;
 use zksync_utils::UnsignedRatioSerializeAsDecimal;
 
@@ -168,6 +168,18 @@ pub enum TxFeeTypes {
     Transfer,
     /// Fee for the `ChangePubKey` operation.
     ChangePubKey(ChangePubKeyFeeTypeArg),
+}
+
+#[derive(Debug, Error, PartialEq)]
+#[error("Incorrect ProverJobStatus number: {0}")]
+pub struct IncorrectProverJobStatus(pub i32);
+
+#[derive(Debug, Error)]
+pub enum GetGenesisTokenListError {
+    #[error(transparent)]
+    IOError(#[from] std::io::Error),
+    #[error(transparent)]
+    SerdeError(#[from] serde_json::Error),
 }
 
 #[cfg(test)]

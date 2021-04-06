@@ -6,9 +6,8 @@ use zksync_types::{
     AccountUpdate, AccountUpdates,
 };
 
-use crate::handler::error::ChangePubKeyOpError;
 use crate::{
-    handler::TxHandler,
+    handler::{error::ChangePubKeyOpError, TxHandler},
     state::{CollectedFee, OpSuccess, ZkSyncState},
 };
 

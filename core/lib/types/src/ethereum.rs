@@ -4,9 +4,9 @@ use std::{convert::TryFrom, fmt, str::FromStr};
 // External uses
 use ethabi::{decode, ParamType};
 use serde::{Deserialize, Serialize};
+use thiserror::Error;
 // Local uses
 use crate::aggregated_operations::{AggregatedActionType, AggregatedOperation};
-use crate::error::{LogToCompleteWithdrawalsTxError, UnknownOperationType};
 use zksync_basic_types::{Log, H256, U256};
 
 /// Numerical identifier of the Ethereum operation.
@@ -125,9 +125,9 @@ pub struct CompleteWithdrawalsTx {
 }
 
 impl TryFrom<Log> for CompleteWithdrawalsTx {
-    type Error = LogToCompleteWithdrawalsTxError;
+    type Error = CompleteWithdrawalsTxParseError;
 
-    fn try_from(event: Log) -> Result<CompleteWithdrawalsTx, LogToCompleteWithdrawalsTxError> {
+    fn try_from(event: Log) -> Result<CompleteWithdrawalsTx, CompleteWithdrawalsTxParseError> {
         let mut decoded_event = decode(
             &[
                 ParamType::Uint(32), // queueStartIndex
@@ -139,21 +139,35 @@ impl TryFrom<Log> for CompleteWithdrawalsTx {
         Ok(CompleteWithdrawalsTx {
             tx_hash: event
                 .transaction_hash
-                .ok_or(LogToCompleteWithdrawalsTxError::TransactionHashMissing)?,
+                .ok_or(CompleteWithdrawalsTxParseError::TransactionHashMissing)?,
             pending_withdrawals_queue_start_index: decoded_event
                 .remove(0)
                 .to_uint()
                 .as_ref()
                 .map(U256::as_u32)
-                .ok_or(
-                    LogToCompleteWithdrawalsTxError::CannotConvertPendingWithdrawalsQueueStart,
-                )?,
+                .ok_or(CompleteWithdrawalsTxParseError::PendingWithdrawalsQueueStartConversion)?,
             pending_withdrawals_queue_end_index: decoded_event
                 .remove(0)
                 .to_uint()
                 .as_ref()
                 .map(U256::as_u32)
-                .ok_or(LogToCompleteWithdrawalsTxError::CannotConvertPendingWithdrawalsQueueEnd)?,
+                .ok_or(CompleteWithdrawalsTxParseError::PendingWithdrawalsQueueEndConversion)?,
         })
     }
 }
+
+#[derive(Debug, Error)]
+pub enum CompleteWithdrawalsTxParseError {
+    #[error("Cannot decode event data due to ETH abi error: {0}")]
+    DecodeEventData(#[from] ethabi::Error),
+    #[error("Cannot get a hash for a complete withdrawal transaction")]
+    TransactionHashMissing,
+    #[error("pending_withdrawals_queue_start_index value conversion failed")]
+    PendingWithdrawalsQueueStartConversion,
+    #[error("pending_withdrawals_queue_end_index value conversion failed")]
+    PendingWithdrawalsQueueEndConversion,
+}
+
+#[derive(Debug, Error, PartialEq)]
+#[error("Unknown type of operation: {0}")]
+pub struct UnknownOperationType(pub String);

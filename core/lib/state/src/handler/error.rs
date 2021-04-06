@@ -24,7 +24,7 @@ pub enum ChangePubKeyOpError {
 pub enum CloseOpError {
     #[error("Close operations are disabled")]
     CloseOperationsDisabled,
-    #[error("ChangePubKey account id is incorrect")]
+    #[error("CloseOpError account id is incorrect")]
     InvalidAccountId,
     #[error("Account is not empty, token id: {0}")]
     AccountNotEmpty(usize),
@@ -58,12 +58,6 @@ pub enum ForcedExitOpError {
     InitiatorInsufficientBalance,
     #[error("Target account: Target account balance is not equal to the withdrawal amount")]
     TargetAccountBalanceMismatch,
-}
-
-#[derive(Clone, Debug, Error, PartialEq)]
-pub enum FullExitOpError {
-    #[error("Full exit account not found")]
-    AccountNotFound,
 }
 
 #[derive(Clone, Debug, Error, PartialEq)]

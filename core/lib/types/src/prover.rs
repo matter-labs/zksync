@@ -1,4 +1,4 @@
-use crate::error::IncorrectProverJobStatus;
+use thiserror::Error;
 use zksync_basic_types::BlockNumber;
 
 #[derive(Debug, Clone)]
@@ -68,3 +68,7 @@ impl ToString for ProverJobType {
         }
     }
 }
+
+#[derive(Debug, Error, PartialEq)]
+#[error("Incorrect ProverJobStatus number: {0}")]
+pub struct IncorrectProverJobStatus(pub i32);

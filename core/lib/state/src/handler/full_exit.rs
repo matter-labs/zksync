@@ -4,18 +4,18 @@ use zksync_crypto::params;
 use zksync_types::{AccountUpdate, AccountUpdates, FullExit, FullExitOp, ZkSyncOp};
 use zksync_utils::BigUintSerdeWrapper;
 
-use crate::handler::error::FullExitOpError;
 use crate::{
     handler::TxHandler,
     state::{CollectedFee, OpSuccess, ZkSyncState},
 };
+use std::convert::Infallible;
 
 impl TxHandler<FullExit> for ZkSyncState {
     type Op = FullExitOp;
 
-    type OpError = FullExitOpError;
+    type OpError = Infallible;
 
-    fn create_op(&self, priority_op: FullExit) -> Result<Self::Op, FullExitOpError> {
+    fn create_op(&self, priority_op: FullExit) -> Result<Self::Op, Infallible> {
         // NOTE: Authorization of the FullExit is verified on the contract.
         assert!(
             priority_op.token <= params::max_token_id(),
@@ -37,7 +37,7 @@ impl TxHandler<FullExit> for ZkSyncState {
         Ok(op)
     }
 
-    fn apply_tx(&mut self, priority_op: FullExit) -> Result<OpSuccess, FullExitOpError> {
+    fn apply_tx(&mut self, priority_op: FullExit) -> Result<OpSuccess, Infallible> {
         let op = self.create_op(priority_op)?;
 
         let (fee, updates) = <Self as TxHandler<FullExit>>::apply_op(self, &op)?;
@@ -53,7 +53,7 @@ impl TxHandler<FullExit> for ZkSyncState {
     fn apply_op(
         &mut self,
         op: &Self::Op,
-    ) -> Result<(Option<CollectedFee>, AccountUpdates), FullExitOpError> {
+    ) -> Result<(Option<CollectedFee>, AccountUpdates), Infallible> {
         let start = Instant::now();
         let mut updates = Vec::new();
         let amount = if let Some(amount) = &op.withdraw_amount {
@@ -67,7 +67,7 @@ impl TxHandler<FullExit> for ZkSyncState {
         // expect is ok since account's existence was verified before
         let mut account = self
             .get_account(account_id)
-            .ok_or(FullExitOpError::AccountNotFound)?;
+            .expect("Full exit account not found");
 
         let old_balance = account.get_balance(op.priority_op.token);
         let old_nonce = account.nonce;

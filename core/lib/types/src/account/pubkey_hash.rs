@@ -66,7 +66,7 @@ impl PubKeyHash {
     /// ```
     pub fn from_hex(s: &str) -> Result<Self, PubkeyHashDecodingError> {
         if !s.starts_with("sync:") {
-            return Err(PubkeyHashDecodingError::PrefixFormatError());
+            return Err(PubkeyHashDecodingError::PrefixFormatError);
         }
         let bytes = hex::decode(&s[5..])?;
         Self::from_bytes(&bytes)
@@ -75,7 +75,7 @@ impl PubKeyHash {
     /// Decodes `PubKeyHash` from the byte sequence.
     pub fn from_bytes(bytes: &[u8]) -> Result<Self, PubkeyHashDecodingError> {
         if bytes.len() != params::FR_ADDRESS_LEN {
-            return Err(PubkeyHashDecodingError::SizeMismatch());
+            return Err(PubkeyHashDecodingError::SizeMismatch);
         }
         Ok(PubKeyHash {
             data: bytes.try_into().unwrap(),

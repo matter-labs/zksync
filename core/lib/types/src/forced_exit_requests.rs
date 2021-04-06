@@ -1,5 +1,6 @@
 use chrono::{DateTime, Utc};
 use num::BigUint;
+use thiserror::Error;
 use zksync_basic_types::{Address, TokenId};
 use zksync_utils::BigUintSerdeAsRadix10Str;
 
@@ -11,7 +12,6 @@ use ethabi::{decode, ParamType};
 use std::convert::TryFrom;
 use zksync_basic_types::Log;
 
-use crate::error::LogToFundsReceivedEventError;
 use crate::tx::TxHash;
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq, Hash)]
@@ -50,9 +50,9 @@ pub struct ForcedExitEligibilityResponse {
 }
 
 impl TryFrom<Log> for FundsReceivedEvent {
-    type Error = LogToFundsReceivedEventError;
+    type Error = FundsReceivedEventParseError;
 
-    fn try_from(event: Log) -> Result<FundsReceivedEvent, LogToFundsReceivedEventError> {
+    fn try_from(event: Log) -> Result<FundsReceivedEvent, FundsReceivedEventParseError> {
         let mut dec_ev = decode(
             &[
                 ParamType::Uint(256), // amount
@@ -63,7 +63,7 @@ impl TryFrom<Log> for FundsReceivedEvent {
         let amount = dec_ev.remove(0).to_uint().unwrap();
         let block_number = event
             .block_number
-            .ok_or(LogToFundsReceivedEventError::UnfinalizedBlockAccess)?
+            .ok_or(FundsReceivedEventParseError::UnfinalizedBlockAccess)?
             .as_u64();
 
         Ok(FundsReceivedEvent {
@@ -71,4 +71,12 @@ impl TryFrom<Log> for FundsReceivedEvent {
             block_number,
         })
     }
+}
+
+#[derive(Debug, Error)]
+pub enum FundsReceivedEventParseError {
+    #[error("Cannot decode event data due to ETH abi error: {0}")]
+    DecodeEventData(#[from] ethabi::Error),
+    #[error("Trying to access pending block")]
+    UnfinalizedBlockAccess,
 }
