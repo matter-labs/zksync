@@ -192,11 +192,11 @@ impl MintNFT {
         message
     }
 
-    pub fn calculate_address(&self, serial_id: u32) -> Address {
+    pub fn calculate_hash(&self, serial_id: u32) -> Vec<u8> {
         let mut data = vec![];
         data.extend_from_slice(&self.creator_id.0.to_be_bytes());
         data.extend_from_slice(&serial_id.to_be_bytes());
         data.extend_from_slice(self.content_hash.as_bytes());
-        Address::from_slice(&data.keccak256()[12..])
+        data
     }
 }

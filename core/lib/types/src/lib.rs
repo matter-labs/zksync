@@ -61,8 +61,8 @@ pub use self::account::{Account, AccountUpdate, PubKeyHash};
 pub use self::block::{ExecutedOperations, ExecutedPriorityOp, ExecutedTx};
 pub use self::fee::{BatchFee, Fee, OutputFeeType};
 pub use self::operations::{
-    ChangePubKeyOp, DepositOp, ForcedExitOp, FullExitOp, TransferOp, TransferToNewOp, WithdrawOp,
-    ZkSyncOp,
+    ChangePubKeyOp, DepositOp, ForcedExitOp, FullExitOp, MintNFTOp, TransferOp, TransferToNewOp,
+    WithdrawOp, ZkSyncOp,
 };
 pub use self::priority_ops::{Deposit, FullExit, PriorityOp, ZkSyncPriorityOp};
 pub use self::tokens::{Token, TokenGenesisListItem, TokenLike, TokenPrice, TxFeeTypes};

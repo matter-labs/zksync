@@ -11,6 +11,7 @@ use crate::{
     state::{CollectedFee, OpSuccess, ZkSyncState},
 };
 use num::{BigUint, ToPrimitive, Zero};
+use zksync_crypto::convert::FeConvert;
 use zksync_crypto::params::{
     MIN_NFT_TOKEN_ID, NFT_STORAGE_ACCOUNT_ADDRESS, NFT_STORAGE_ACCOUNT_ID, NFT_TOKEN_ID,
 };
@@ -70,7 +71,7 @@ impl TxHandler<MintNFT> for ZkSyncState {
             .ok_or(format_err!("Recipient account not found"))?;
 
         // Generate token id
-        let (mut nft_account, account_updates) = get_or_create_nft_account_token_id(self);
+        let (mut nft_account, account_updates) = self.get_or_create_nft_account_token_id();
         updates.extend(account_updates);
 
         let last_token_id = nft_account.get_balance(NFT_TOKEN_ID);
@@ -86,6 +87,21 @@ impl TxHandler<MintNFT> for ZkSyncState {
         ));
 
         let token_id = TokenId(new_token_id.to_u32().expect("Should be correct u32"));
+        // Sub fee
+        let old_balance = creator_account.get_balance(op.tx.fee_token);
+        let nonce = creator_account.nonce;
+        creator_account.sub_balance(op.tx.fee_token, &op.tx.fee);
+
+        let new_balance = creator_account.get_balance(op.tx.fee_token);
+
+        updates.push((
+            op.creator_account_id,
+            AccountUpdate::UpdateBalance {
+                balance_update: (op.tx.fee_token, old_balance, new_balance.clone()),
+                old_nonce: nonce,
+                new_nonce: nonce,
+            },
+        ));
 
         // Generate serial id
         let old_balance = creator_account.get_balance(NFT_TOKEN_ID);
@@ -105,7 +121,8 @@ impl TxHandler<MintNFT> for ZkSyncState {
         ));
         let serial_id = new_balance.to_u32().unwrap_or_default();
 
-        let token_address = op.tx.calculate_address(serial_id);
+        let token_hash = op.tx.calculate_hash(serial_id);
+        let token_address = Address::from_slice(&token_hash[12..]);
 
         updates.push((
             op.creator_account_id,
@@ -137,6 +154,18 @@ impl TxHandler<MintNFT> for ZkSyncState {
             },
         ));
 
+        let token_data = BigUint::from_bytes_be(&token_hash[..16]);
+        nft_account.add_balance(token_id, &token_data);
+
+        updates.push((
+            NFT_STORAGE_ACCOUNT_ID,
+            AccountUpdate::UpdateBalance {
+                balance_update: (token_id, BigUint::zero(), token_data),
+                old_nonce,
+                new_nonce: old_nonce,
+            },
+        ));
+
         let fee = CollectedFee {
             token: op.tx.fee_token,
             amount: op.tx.fee.clone(),
@@ -146,20 +175,18 @@ impl TxHandler<MintNFT> for ZkSyncState {
         Ok((Some(fee), updates))
     }
 }
-
-/// Get or create special account with special balance for enforcing uniqueness of token_id
-fn get_or_create_nft_account_token_id(state: &mut ZkSyncState) -> (Account, AccountUpdates) {
-    let mut updates = vec![];
-    let account = state
-        .get_account(NFT_STORAGE_ACCOUNT_ID)
-        .unwrap_or_else(|| {
+impl ZkSyncState {
+    /// Get or create special account with special balance for enforcing uniqueness of token_id
+    fn get_or_create_nft_account_token_id(&mut self) -> (Account, AccountUpdates) {
+        let mut updates = vec![];
+        let account = self.get_account(NFT_STORAGE_ACCOUNT_ID).unwrap_or_else(|| {
             let balance = BigUint::from(MIN_NFT_TOKEN_ID);
             let (mut account, upd) =
                 Account::create_account(NFT_STORAGE_ACCOUNT_ID, *NFT_STORAGE_ACCOUNT_ADDRESS);
             updates.extend(upd.into_iter());
             account.add_balance(NFT_TOKEN_ID, &BigUint::from(MIN_NFT_TOKEN_ID));
 
-            state.insert_account(NFT_STORAGE_ACCOUNT_ID, account.clone());
+            self.insert_account(NFT_STORAGE_ACCOUNT_ID, account.clone());
 
             updates.push((
                 NFT_STORAGE_ACCOUNT_ID,
@@ -171,5 +198,6 @@ fn get_or_create_nft_account_token_id(state: &mut ZkSyncState) -> (Account, Acco
             ));
             account
         });
-    (account, updates)
+        (account, updates)
+    }
 }

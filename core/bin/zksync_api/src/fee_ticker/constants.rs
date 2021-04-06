@@ -1,7 +1,6 @@
-use zksync_types::operations::MintNFTOp;
 use zksync_types::{
     gas_counter::{CommitCost, VerifyCost},
-    ChangePubKeyOp, TransferOp, TransferToNewOp, WithdrawOp,
+    ChangePubKeyOp, MintNFTOp, TransferOp, TransferToNewOp, WithdrawOp,
 };
 
 /// Gas cost per chunk to cover constant cost of commit, execute and prove transactions
