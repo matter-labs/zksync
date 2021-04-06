@@ -84,7 +84,7 @@ impl Client {
         address: Address,
         token_like: TokenLike,
     ) -> Result<Response> {
-        self.post("fee")
+        self.post_with_scope(super::API_V02_SCOPE, "fee")
             .body(&TxFeeRequest {
                 tx_type,
                 address,
@@ -100,7 +100,7 @@ impl Client {
         transactions: Vec<TxInBatchFeeRequest>,
         token_like: TokenLike,
     ) -> Result<Response> {
-        self.post("fee/batch")
+        self.post_with_scope(super::API_V02_SCOPE, "fee/batch")
             .body(&BatchFeeRequest {
                 transactions,
                 token_like,

@@ -62,7 +62,9 @@ impl From<BlockDetails> for BlockInfo {
 impl Client {
     /// Returns information about block with the specified number or null if block doesn't exist.
     pub async fn block_by_number_v02(&self, block_position: &str) -> Result<Response> {
-        self.get(&format!("block/{}", block_position)).send().await
+        self.get_with_scope(super::API_V02_SCOPE, &format!("block/{}", block_position))
+            .send()
+            .await
     }
 
     /// Returns information about transactions of the block with the specified number.
@@ -71,10 +73,13 @@ impl Client {
         pagination_query: &PaginationQuery<TxHash>,
         block_position: &str,
     ) -> Result<Response> {
-        self.get(&format!("block/{}/transaction", block_position))
-            .query(&pagination_query)
-            .send()
-            .await
+        self.get_with_scope(
+            super::API_V02_SCOPE,
+            &format!("block/{}/transaction", block_position),
+        )
+        .query(&pagination_query)
+        .send()
+        .await
     }
 
     /// Returns information about several blocks in a range.
@@ -82,6 +87,9 @@ impl Client {
         &self,
         pagination_query: &PaginationQuery<BlockNumber>,
     ) -> Result<Response> {
-        self.get("block").query(pagination_query).send().await
+        self.get_with_scope(super::API_V02_SCOPE, "block")
+            .query(pagination_query)
+            .send()
+            .await
     }
 }

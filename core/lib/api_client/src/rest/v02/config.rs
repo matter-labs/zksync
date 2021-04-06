@@ -42,6 +42,8 @@ impl ApiConfigData {
 /// Configuration API part.
 impl Client {
     pub async fn config_v02(&self) -> Result<Response> {
-        self.get("config").send().await
+        self.get_with_scope(super::API_V02_SCOPE, "config")
+            .send()
+            .await
     }
 }

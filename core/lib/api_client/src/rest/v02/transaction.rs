@@ -175,7 +175,7 @@ impl Client {
         tx: ZkSyncTx,
         signature: Option<TxEthSignature>,
     ) -> Result<Response> {
-        self.post("transaction")
+        self.post_with_scope(super::API_V02_SCOPE, "transaction")
             .body(&IncomingTx { tx, signature })
             .send()
             .await
@@ -187,7 +187,7 @@ impl Client {
         txs: Vec<ZkSyncTx>,
         signature: EthBatchSignatures,
     ) -> Result<Response> {
-        self.post("transaction/batches")
+        self.post_with_scope(super::API_V02_SCOPE, "transaction/batches")
             .body(&IncomingTxBatch { txs, signature })
             .send()
             .await
@@ -195,15 +195,21 @@ impl Client {
 
     /// Gets actual transaction receipt.
     pub async fn tx_status_v02(&self, tx_hash: TxHash) -> Result<Response> {
-        self.get(&format!("transaction/{}", tx_hash.to_string()))
-            .send()
-            .await
+        self.get_with_scope(
+            super::API_V02_SCOPE,
+            &format!("transaction/{}", tx_hash.to_string()),
+        )
+        .send()
+        .await
     }
 
     /// Gets transaction content.
     pub async fn tx_data_v02(&self, tx_hash: TxHash) -> Result<Response> {
-        self.get(&format!("transaction/{}/data", tx_hash.to_string()))
-            .send()
-            .await
+        self.get_with_scope(
+            super::API_V02_SCOPE,
+            &format!("transaction/{}/data", tx_hash.to_string()),
+        )
+        .send()
+        .await
     }
 }

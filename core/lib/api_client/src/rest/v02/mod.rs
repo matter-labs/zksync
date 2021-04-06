@@ -17,6 +17,8 @@ pub mod fee;
 pub mod token;
 pub mod transaction;
 
+const API_V02_SCOPE: &str = "/api/v0.2/";
+
 #[derive(Debug, Serialize, Deserialize, Clone, Copy)]
 #[serde(rename_all = "snake_case")]
 pub enum ApiVersion {
