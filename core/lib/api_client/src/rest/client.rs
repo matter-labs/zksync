@@ -52,7 +52,7 @@ pub struct Client {
     url: String,
 }
 
-const API_V1_SCOPE: &str = "/api/v1/";
+const _API_V1_SCOPE: &str = "/api/v1/";
 const API_V02_SCOPE: &str = "/api/v0.2/";
 
 impl Client {
@@ -87,7 +87,7 @@ impl Client {
 
     /// Constructs POST request for the specified method.
     pub(crate) fn post(&self, method: impl AsRef<str>) -> ClientRequestBuilder {
-        self.post_with_scope(API_V1_SCOPE, method)
+        self.post_with_scope(API_V02_SCOPE, method)
     }
 
     pub(crate) fn post_with_scope(

@@ -10,7 +10,7 @@ use zksync_types::{pagination::PaginationQuery, Address, Token, TokenId, TokenLi
 use super::Response;
 use crate::rest::client::{Client, Result};
 
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
 pub struct ApiToken {
     pub id: TokenId,
     pub address: Address,
@@ -35,7 +35,7 @@ impl From<(Token, bool)> for ApiToken {
 impl Client {
     pub async fn token_pagination_v02(
         &self,
-        pagination_query: PaginationQuery<TokenId>,
+        pagination_query: &PaginationQuery<TokenId>,
     ) -> Result<Response> {
         self.get("token").query(&pagination_query).send().await
     }

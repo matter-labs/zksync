@@ -672,11 +672,9 @@ pub fn deserialize_response_result<T: DeserializeOwned>(response: Response) -> a
             if response.error.is_some() {
                 anyhow::bail!("Response returned error: {:?}", response);
             } else {
-                anyhow::bail!(
-                    "Response contains neither result nor response: {:?}",
-                    response
-                );
-            };
+                let result = serde_json::from_str("null")?;
+                Ok(result)
+            }
         }
     }
 }

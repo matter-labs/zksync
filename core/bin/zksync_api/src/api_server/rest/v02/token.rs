@@ -18,7 +18,7 @@ use num::{rational::Ratio, BigUint, FromPrimitive};
 // Workspace uses
 use zksync_api_client::rest::v02::token::ApiToken;
 use zksync_config::ZkSyncConfig;
-use zksync_storage::ConnectionPool;
+use zksync_storage::{ConnectionPool, StorageProcessor};
 use zksync_types::{
     pagination::{Paginated, PaginationQuery},
     Token, TokenId, TokenLike,
@@ -62,9 +62,12 @@ impl ApiTokenData {
         }
     }
 
-    async fn is_token_enabled_for_fees(&self, token_id: TokenId) -> Result<bool, Error> {
-        let mut storage = self.pool.access_storage().await.map_err(Error::storage)?;
-        let market_volume = TokenDBCache::get_token_market_volume(&mut storage, token_id)
+    async fn is_token_enabled_for_fees(
+        &self,
+        storage: &mut StorageProcessor<'_>,
+        token_id: TokenId,
+    ) -> Result<bool, Error> {
+        let market_volume = TokenDBCache::get_token_market_volume(storage, token_id)
             .await
             .map_err(Error::storage)?;
         Ok(market_volume
@@ -83,7 +86,8 @@ impl ApiTokenData {
             Ok(paginated_tokens) => {
                 let mut list = Vec::new();
                 for token in paginated_tokens.list {
-                    let enabled_for_fees_result = self.is_token_enabled_for_fees(token.id).await;
+                    let enabled_for_fees_result =
+                        self.is_token_enabled_for_fees(&mut storage, token.id).await;
                     let enabled_for_fees;
                     match enabled_for_fees_result {
                         Ok(enabled_for_fees_result) => {
@@ -116,7 +120,9 @@ impl ApiTokenData {
             .await
             .map_err(Error::storage)?;
         if let Some(token) = token {
-            let enabled_for_fees = self.is_token_enabled_for_fees(token.id).await?;
+            let enabled_for_fees = self
+                .is_token_enabled_for_fees(&mut storage, token.id)
+                .await?;
             Ok(ApiToken::from((token, enabled_for_fees)))
         } else {
             Err(Error::from(PriceError::token_not_found(
@@ -166,6 +172,8 @@ async fn token_by_id(
     data.token(token_like).await.into()
 }
 
+// TODO: take `currency` as enum.
+// Currently actix path extractor doesn't work with enums: https://github.com/actix/actix-web/issues/318
 async fn token_price(
     data: web::Data<ApiTokenData>,
     web::Path((token_like, currency)): web::Path<(String, String)>,
@@ -217,4 +225,170 @@ pub fn api_scope(
         .route("", web::get().to(token_pagination))
         .route("{token_id}", web::get().to(token_by_id))
         .route("{token_id}/price_in/{currency}", web::get().to(token_price))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{
+        super::{
+            test_utils::{deserialize_response_result, TestServerConfig},
+            SharedData,
+        },
+        *,
+    };
+    use std::collections::HashMap;
+    use zksync_api_client::rest::v02::ApiVersion;
+    use zksync_types::{pagination::PaginationDirection, Address};
+
+    fn dummy_fee_ticker(prices: &[(TokenLike, BigDecimal)]) -> mpsc::Sender<TickerRequest> {
+        let (sender, mut receiver) = mpsc::channel(10);
+
+        let prices: HashMap<_, _> = prices.iter().cloned().collect();
+        actix_rt::spawn(async move {
+            while let Some(item) = receiver.next().await {
+                match item {
+                    TickerRequest::GetTokenPrice {
+                        token,
+                        response,
+                        req_type,
+                    } => {
+                        assert_eq!(
+                            req_type,
+                            TokenPriceRequestType::USDForOneToken,
+                            "Unsupported price request type"
+                        );
+
+                        let msg = if let Some(price) = prices.get(&token) {
+                            Ok(price.clone())
+                        } else {
+                            Err(PriceError::token_not_found(format!(
+                                "Token not found: {:?}",
+                                token
+                            )))
+                        };
+
+                        response.send(msg).expect("Unable to send response");
+                    }
+                    _ => unreachable!("Unsupported request"),
+                }
+            }
+        });
+
+        sender
+    }
+
+    async fn is_token_enabled_for_fees(
+        storage: &mut StorageProcessor<'_>,
+        token_id: TokenId,
+        config: &ZkSyncConfig,
+    ) -> anyhow::Result<bool> {
+        let market_volume = TokenDBCache::get_token_market_volume(storage, token_id).await?;
+        let min_market_volume = Ratio::from(
+            BigUint::from_f64(config.ticker.liquidity_volume)
+                .expect("TickerConfig::liquidity_volume must be positive"),
+        );
+        Ok(market_volume
+            .map(|volume| volume.market_volume.ge(&min_market_volume))
+            .unwrap_or(false))
+    }
+
+    #[actix_rt::test]
+    #[cfg_attr(
+        not(feature = "api_test"),
+        ignore = "Use `zk test rust-api` command to perform this test"
+    )]
+    async fn v02_test_token_scope() -> anyhow::Result<()> {
+        let cfg = TestServerConfig::default();
+        cfg.fill_database().await?;
+
+        let prices = [
+            (TokenLike::Id(TokenId(1)), 10_u64.into()),
+            (TokenLike::Id(TokenId(15)), 10_500_u64.into()),
+            (Address::default().into(), 1_u64.into()),
+        ];
+        let fee_ticker = dummy_fee_ticker(&prices);
+
+        let shared_data = SharedData {
+            net: cfg.config.chain.eth.network,
+            api_version: ApiVersion::V02,
+        };
+        let (client, server) = cfg.start_server(
+            move |cfg| {
+                api_scope(
+                    &cfg.config,
+                    cfg.pool.clone(),
+                    TokenDBCache::new(),
+                    fee_ticker.clone(),
+                )
+            },
+            shared_data,
+        );
+
+        let token_like = TokenLike::Id(TokenId(1));
+        let response = client.token_by_id_v02(&token_like).await?;
+        let api_token: ApiToken = deserialize_response_result(response)?;
+
+        let expected_token = {
+            let mut storage = cfg.pool.access_storage().await?;
+            storage
+                .tokens_schema()
+                .get_token(token_like)
+                .await?
+                .unwrap()
+        };
+        let expected_enabled_for_fees = {
+            let mut storage = cfg.pool.access_storage().await?;
+            is_token_enabled_for_fees(&mut storage, TokenId(1), &cfg.config).await?
+        };
+        let expected_api_token = ApiToken::from((expected_token, expected_enabled_for_fees));
+        assert_eq!(api_token, expected_api_token);
+
+        let query = PaginationQuery {
+            from: TokenId(15),
+            limit: 2,
+            direction: PaginationDirection::Older,
+        };
+        let response = client.token_pagination_v02(&query).await?;
+        let pagination: Paginated<ApiToken, TokenId> = deserialize_response_result(response)?;
+
+        let expected_pagination = {
+            let mut storage = cfg.pool.access_storage().await?;
+            let paginated_tokens: Paginated<Token, TokenId> = storage
+                .paginate(&query)
+                .await
+                .map_err(|err| anyhow::anyhow!(err.message))?;
+            let mut list = Vec::new();
+            for token in paginated_tokens.list {
+                let enabled_for_fees =
+                    is_token_enabled_for_fees(&mut storage, token.id, &cfg.config).await?;
+                list.push(ApiToken::from((token, enabled_for_fees)));
+            }
+            Paginated {
+                list,
+                from: paginated_tokens.from,
+                count: paginated_tokens.count,
+                limit: paginated_tokens.limit,
+                direction: paginated_tokens.direction,
+            }
+        };
+        assert_eq!(pagination, expected_pagination);
+
+        let token_like = TokenLike::Id(TokenId(1));
+        let response = client.token_price_v02(&token_like, "15").await?;
+        let price_in_token: BigDecimal = deserialize_response_result(response)?;
+        let expected_price_in_token =
+            BigDecimal::from_u32(10).unwrap() / BigDecimal::from_u32(10500).unwrap();
+        assert_eq!(price_in_token, expected_price_in_token);
+
+        let response = client.token_price_v02(&token_like, "usd").await?;
+        let price_in_usd: BigDecimal = deserialize_response_result(response)?;
+        let expected_price_in_usd = BigDecimal::from_u32(10).unwrap();
+        assert_eq!(price_in_usd, expected_price_in_usd);
+
+        let response = client.token_price_v02(&token_like, "333").await?;
+        assert!(response.error.is_some());
+
+        server.stop().await;
+        Ok(())
+    }
 }

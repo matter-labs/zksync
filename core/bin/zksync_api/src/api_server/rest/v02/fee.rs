@@ -63,3 +63,136 @@ pub fn api_scope(tx_sender: TxSender) -> Scope {
         .route("", web::post().to(get_tx_fee))
         .route("/batch", web::post().to(get_batch_fee))
 }
+
+#[cfg(test)]
+mod tests {
+    use super::{
+        super::{
+            test_utils::{deserialize_response_result, TestServerConfig},
+            SharedData,
+        },
+        *,
+    };
+    use crate::{
+        fee_ticker::{ResponseBatchFee, ResponseFee, TickerRequest},
+        signature_checker::VerifySignatureRequest,
+    };
+
+    use futures::{channel::mpsc, StreamExt};
+    use num::rational::Ratio;
+    use num::BigUint;
+
+    use zksync_api_client::rest::v02::{fee::TxInBatchFeeRequest, ApiVersion};
+    use zksync_types::{
+        tokens::TokenLike, Address, BatchFee, Fee, OutputFeeType, TokenId, TxFeeTypes,
+    };
+
+    fn dummy_fee_ticker() -> mpsc::Sender<TickerRequest> {
+        let (sender, mut receiver) = mpsc::channel(10);
+
+        actix_rt::spawn(async move {
+            while let Some(item) = receiver.next().await {
+                match item {
+                    TickerRequest::GetTxFee { response, .. } => {
+                        let normal_fee = Fee::new(
+                            OutputFeeType::Withdraw,
+                            BigUint::from(1_u64).into(),
+                            BigUint::from(1_u64).into(),
+                            1_u64.into(),
+                            1_u64.into(),
+                        );
+
+                        let subsidy_fee = normal_fee.clone();
+
+                        let res = Ok(ResponseFee {
+                            normal_fee,
+                            subsidy_fee,
+                            subsidy_size_usd: Ratio::from_integer(0u32.into()),
+                        });
+
+                        response.send(res).expect("Unable to send response");
+                    }
+                    TickerRequest::GetBatchTxFee {
+                        response,
+                        transactions,
+                        ..
+                    } => {
+                        let normal_fee = BatchFee {
+                            total_fee: BigUint::from(2 * transactions.len()),
+                        };
+                        let subsidy_fee = normal_fee.clone();
+
+                        let res = Ok(ResponseBatchFee {
+                            normal_fee,
+                            subsidy_fee,
+                            subsidy_size_usd: Ratio::from_integer(0u32.into()),
+                        });
+
+                        response.send(res).expect("Unable to send response");
+                    }
+                    _ => unreachable!(),
+                }
+            }
+        });
+
+        sender
+    }
+
+    fn dummy_sign_verifier() -> mpsc::Sender<VerifySignatureRequest> {
+        let (sender, _) = mpsc::channel::<VerifySignatureRequest>(0);
+        sender
+    }
+
+    #[actix_rt::test]
+    #[cfg_attr(
+        not(feature = "api_test"),
+        ignore = "Use `zk test rust-api` command to perform this test"
+    )]
+    async fn v02_test_fee_scope() -> anyhow::Result<()> {
+        let cfg = TestServerConfig::default();
+
+        let shared_data = SharedData {
+            net: cfg.config.chain.eth.network,
+            api_version: ApiVersion::V02,
+        };
+        let (client, server) = cfg.start_server(
+            move |cfg: &TestServerConfig| {
+                api_scope(TxSender::new(
+                    cfg.pool.clone(),
+                    dummy_sign_verifier(),
+                    dummy_fee_ticker(),
+                    &cfg.config,
+                ))
+            },
+            shared_data,
+        );
+
+        let tx_type = TxFeeTypes::Withdraw;
+        let address = Address::default();
+        let token_like = TokenLike::Id(TokenId(1));
+
+        let response = client
+            .get_txs_fee_v02(tx_type, address, token_like.clone())
+            .await?;
+        let api_fee: ApiFee = deserialize_response_result(response)?;
+        assert_eq!(api_fee.fee_type, OutputFeeType::Withdraw);
+        assert_eq!(api_fee.gas_tx_amount, BigUint::from(1u32));
+        assert_eq!(api_fee.gas_price_wei, BigUint::from(1u32));
+        assert_eq!(api_fee.gas_fee, BigUint::from(1u32));
+        assert_eq!(api_fee.zkp_fee, BigUint::from(1u32));
+        assert_eq!(api_fee.total_fee, BigUint::from(2u32));
+
+        let tx = TxInBatchFeeRequest {
+            tx_type: TxFeeTypes::Withdraw,
+            address: Address::default(),
+        };
+        let txs = vec![tx.clone(), tx.clone(), tx];
+
+        let response = client.get_batch_fee_v02(txs, token_like).await?;
+        let api_batch_fee: ApiBatchFee = deserialize_response_result(response)?;
+        assert_eq!(api_batch_fee.total_fee, BigUint::from(6u32));
+
+        server.stop().await;
+        Ok(())
+    }
+}

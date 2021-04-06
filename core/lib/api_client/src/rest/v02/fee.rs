@@ -84,7 +84,7 @@ impl Client {
         address: Address,
         token_like: TokenLike,
     ) -> Result<Response> {
-        self.post("transactions/fee")
+        self.post("fee")
             .body(&TxFeeRequest {
                 tx_type,
                 address,
@@ -95,12 +95,12 @@ impl Client {
     }
 
     /// Get txs fee for batch.
-    pub async fn get_batched_txs_fee_v02(
+    pub async fn get_batch_fee_v02(
         &self,
         transactions: Vec<TxInBatchFeeRequest>,
         token_like: TokenLike,
     ) -> Result<Response> {
-        self.post("transactions/fee/batch")
+        self.post("fee/batch")
             .body(&BatchFeeRequest {
                 transactions,
                 token_like,

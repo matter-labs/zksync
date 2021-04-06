@@ -34,7 +34,7 @@ pub struct Request {
     pub network: Network,
     pub api_version: ApiVersion,
     pub resource: String,
-    #[serde(skip_serializing_if = "HashMap::is_empty")]
+    #[serde(skip_serializing_if = "HashMap::is_empty", default)]
     pub args: HashMap<String, String>,
     pub timestamp: DateTime<Utc>,
 }

@@ -32,13 +32,13 @@ pub struct IncomingTx {
     pub signature: Option<TxEthSignature>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub struct TxData {
     pub tx: Transaction,
     pub eth_signature: Option<String>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum L1Status {
     //Pending,
@@ -46,7 +46,7 @@ pub enum L1Status {
     Finalized,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum L2Status {
     Queued,
@@ -64,7 +64,7 @@ impl From<L1Status> for L2Status {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub struct L1Receipt {
     pub status: L1Status,
     pub eth_block: EthBlockId,
@@ -95,7 +95,7 @@ impl From<(StoredExecutedPriorityOperation, bool)> for L1Receipt {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub struct L2Receipt {
     pub tx_hash: TxHash,
     pub rollup_block: Option<BlockNumber>,
@@ -127,14 +127,14 @@ impl From<TxReceiptResponse> for L2Receipt {
         }
     }
 }
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(untagged)]
 pub enum Receipt {
     L1(L1Receipt),
     L2(L2Receipt),
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub struct Transaction {
     pub tx_hash: TxHash,
     pub block_number: Option<BlockNumber>,

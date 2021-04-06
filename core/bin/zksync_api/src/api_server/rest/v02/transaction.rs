@@ -25,8 +25,7 @@ use super::{
     error::{Error, TxError},
     response::ApiResult,
 };
-use crate::api_server::rpc_server::types::TxWithSignature;
-use crate::api_server::tx_sender::TxSender;
+use crate::api_server::{rpc_server::types::TxWithSignature, tx_sender::TxSender};
 
 /// Shared data between `api/v0.2/transaction` endpoints.
 #[derive(Clone)]
@@ -327,8 +326,267 @@ pub fn api_scope(tx_sender: TxSender) -> Scope {
 
     web::scope("transaction")
         .data(data)
-        .route("", web::get().to(submit_tx))
+        .route("", web::post().to(submit_tx))
         .route("{tx_hash}", web::get().to(tx_status))
         .route("{tx_hash}/data", web::get().to(tx_data))
         .route("/batches", web::post().to(submit_batch))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{
+        super::{
+            test_utils::{deserialize_response_result, TestServerConfig, TestTransactions},
+            SharedData,
+        },
+        *,
+    };
+    use crate::{
+        api_server::helpers::try_parse_tx_hash,
+        core_api_client::CoreApiClient,
+        fee_ticker::{ResponseBatchFee, ResponseFee, TickerRequest},
+        signature_checker::{VerifiedTx, VerifySignatureRequest},
+    };
+
+    use actix_web::App;
+    use bigdecimal::BigDecimal;
+    use futures::{channel::mpsc, StreamExt};
+    use num::rational::Ratio;
+    use num::BigUint;
+
+    use zksync_api_client::rest::v02::ApiVersion;
+    use zksync_types::{
+        tokens::{Token, TokenLike},
+        tx::{EthBatchSignData, EthBatchSignatures, PackedEthSignature, TxEthSignature},
+        BatchFee, BlockNumber, Fee, OutputFeeType, SignedZkSyncTx, TokenId,
+    };
+
+    fn submit_txs_loopback() -> (CoreApiClient, actix_web::test::TestServer) {
+        async fn send_tx(_tx: Json<SignedZkSyncTx>) -> Json<Result<(), ()>> {
+            Json(Ok(()))
+        }
+
+        async fn send_txs_batch(
+            _txs: Json<(Vec<SignedZkSyncTx>, Vec<TxEthSignature>)>,
+        ) -> Json<Result<(), ()>> {
+            Json(Ok(()))
+        }
+
+        let server = actix_web::test::start(move || {
+            App::new()
+                .route("new_tx", web::post().to(send_tx))
+                .route("new_txs_batch", web::post().to(send_txs_batch))
+        });
+
+        let url = server.url("").trim_end_matches('/').to_owned();
+
+        (CoreApiClient::new(url), server)
+    }
+
+    fn dummy_fee_ticker() -> mpsc::Sender<TickerRequest> {
+        let (sender, mut receiver) = mpsc::channel(10);
+
+        actix_rt::spawn(async move {
+            while let Some(item) = receiver.next().await {
+                match item {
+                    TickerRequest::GetTxFee { response, .. } => {
+                        let normal_fee = Fee::new(
+                            OutputFeeType::Withdraw,
+                            BigUint::from(1_u64).into(),
+                            BigUint::from(1_u64).into(),
+                            1_u64.into(),
+                            1_u64.into(),
+                        );
+
+                        let subsidy_fee = normal_fee.clone();
+
+                        let res = Ok(ResponseFee {
+                            normal_fee,
+                            subsidy_fee,
+                            subsidy_size_usd: Ratio::from_integer(0u32.into()),
+                        });
+
+                        response.send(res).expect("Unable to send response");
+                    }
+                    TickerRequest::GetTokenPrice { response, .. } => {
+                        let price = Ok(BigDecimal::from(1_u64));
+
+                        response.send(price).expect("Unable to send response");
+                    }
+                    TickerRequest::IsTokenAllowed { token, response } => {
+                        // For test purposes, PHNX token is not allowed.
+                        let is_phnx = match token {
+                            TokenLike::Id(id) => *id == 1,
+                            TokenLike::Symbol(sym) => sym == "PHNX",
+                            TokenLike::Address(_) => unreachable!(),
+                        };
+                        response.send(Ok(!is_phnx)).unwrap_or_default();
+                    }
+                    TickerRequest::GetBatchTxFee {
+                        response,
+                        transactions,
+                        ..
+                    } => {
+                        let normal_fee = BatchFee {
+                            total_fee: BigUint::from(transactions.len()),
+                        };
+                        let subsidy_fee = normal_fee.clone();
+
+                        let res = Ok(ResponseBatchFee {
+                            normal_fee,
+                            subsidy_fee,
+                            subsidy_size_usd: Ratio::from_integer(0u32.into()),
+                        });
+
+                        response.send(res).expect("Unable to send response");
+                    }
+                }
+            }
+        });
+
+        sender
+    }
+
+    fn dummy_sign_verifier() -> mpsc::Sender<VerifySignatureRequest> {
+        let (sender, mut receiver) = mpsc::channel::<VerifySignatureRequest>(10);
+
+        actix_rt::spawn(async move {
+            while let Some(item) = receiver.next().await {
+                let verified = VerifiedTx::unverified(item.data.get_tx_variant());
+                item.response
+                    .send(Ok(verified))
+                    .expect("Unable to send response");
+            }
+        });
+
+        sender
+    }
+
+    #[actix_rt::test]
+    #[cfg_attr(
+        not(feature = "api_test"),
+        ignore = "Use `zk test rust-api` command to perform this test"
+    )]
+    async fn v02_test_transaction_scope() -> anyhow::Result<()> {
+        let (core_client, core_server) = submit_txs_loopback();
+
+        let cfg = TestServerConfig::default();
+        cfg.fill_database().await?;
+
+        let shared_data = SharedData {
+            net: cfg.config.chain.eth.network,
+            api_version: ApiVersion::V02,
+        };
+        let (client, server) = cfg.start_server(
+            move |cfg: &TestServerConfig| {
+                api_scope(TxSender::with_client(
+                    core_client.clone(),
+                    cfg.pool.clone(),
+                    dummy_sign_verifier(),
+                    dummy_fee_ticker(),
+                    &cfg.config,
+                ))
+            },
+            shared_data,
+        );
+
+        let tx = TestServerConfig::gen_zk_txs(100_u64).txs[0].0.clone();
+        let response = client.submit_tx_v02(tx.clone(), None).await?;
+        let tx_hash: TxHash = deserialize_response_result(response)?;
+        assert_eq!(tx.hash(), tx_hash);
+
+        let TestTransactions { acc, txs } = TestServerConfig::gen_zk_txs(1_00);
+        let eth = Token::new(TokenId(0), Default::default(), "ETH", 18);
+        let (good_batch, expected_tx_hashes): (Vec<_>, Vec<_>) = txs
+            .into_iter()
+            .map(|(tx, _op)| {
+                let tx_hash = tx.hash();
+                (tx, tx_hash)
+            })
+            .unzip();
+
+        let txs = good_batch
+            .iter()
+            .zip(std::iter::repeat(eth))
+            .map(|(tx, token)| (tx.clone(), token, tx.account()))
+            .collect::<Vec<_>>();
+        let batch_signature = {
+            let eth_private_key = acc
+                .try_get_eth_private_key()
+                .expect("Should have ETH private key");
+            let batch_message = EthBatchSignData::get_batch_sign_message(txs);
+            let eth_sig = PackedEthSignature::sign(eth_private_key, &batch_message).unwrap();
+            let single_signature = TxEthSignature::EthereumSignature(eth_sig);
+
+            EthBatchSignatures::Single(single_signature)
+        };
+
+        let response = client.submit_batch_v02(good_batch, batch_signature).await?;
+        let tx_hashes: Vec<TxHash> = deserialize_response_result(response)?;
+        assert_eq!(tx_hashes, expected_tx_hashes);
+
+        let tx_hash = {
+            let mut storage = cfg.pool.access_storage().await?;
+
+            let transactions = storage
+                .chain()
+                .block_schema()
+                .get_block_transactions(BlockNumber(1))
+                .await?;
+
+            try_parse_tx_hash(&transactions[0].tx_hash).unwrap()
+        };
+        let response = client.tx_status_v02(tx_hash.clone()).await?;
+        let tx_status: Receipt = deserialize_response_result(response)?;
+        let expected_tx_status = Receipt::L2(L2Receipt {
+            tx_hash: tx_hash.clone(),
+            rollup_block: Some(BlockNumber(1)),
+            status: L2Status::Finalized,
+            fail_reason: None,
+        });
+        assert_eq!(tx_status, expected_tx_status);
+
+        let response = client.tx_data_v02(tx_hash.clone()).await?;
+        let tx_data: Option<TxData> = deserialize_response_result(response)?;
+        assert_eq!(tx_data.unwrap().tx.tx_hash, tx_hash);
+
+        let pending_tx_hash = {
+            let mut storage = cfg.pool.access_storage().await?;
+
+            let tx = TestServerConfig::gen_zk_txs(1_u64).txs[0].0.clone();
+            let tx_hash = tx.hash();
+            storage
+                .chain()
+                .mempool_schema()
+                .insert_tx(&SignedZkSyncTx {
+                    tx,
+                    eth_sign_data: None,
+                })
+                .await?;
+
+            tx_hash
+        };
+        let response = client.tx_status_v02(pending_tx_hash.clone()).await?;
+        let tx_status: Receipt = deserialize_response_result(response)?;
+        let expected_tx_status = Receipt::L2(L2Receipt {
+            tx_hash: pending_tx_hash.clone(),
+            rollup_block: None,
+            status: L2Status::Queued,
+            fail_reason: None,
+        });
+        assert_eq!(tx_status, expected_tx_status);
+
+        let response = client.tx_data_v02(pending_tx_hash.clone()).await?;
+        let tx_data: Option<TxData> = deserialize_response_result(response)?;
+        assert_eq!(tx_data.unwrap().tx.tx_hash, pending_tx_hash);
+
+        let tx = TestServerConfig::gen_zk_txs(1_u64).txs[0].0.clone();
+        let response = client.tx_data_v02(tx.hash()).await?;
+        let tx_data: Option<TxData> = deserialize_response_result(response)?;
+        assert!(tx_data.is_none());
+
+        server.stop().await;
+        core_server.stop().await;
+        Ok(())
+    }
 }

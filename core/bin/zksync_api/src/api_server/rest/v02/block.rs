@@ -122,6 +122,8 @@ async fn block_pagination(
     data.block_page(query).await.into()
 }
 
+// TODO: take `block_position` as enum.
+// Currently actix path extractor doesn't work with enums: https://github.com/actix/actix-web/issues/318
 async fn block_by_number(
     data: web::Data<ApiBlockData>,
     web::Path(block_position): web::Path<String>,
@@ -192,7 +194,7 @@ mod tests {
         not(feature = "api_test"),
         ignore = "Use `zk test rust-api` command to perform this test"
     )]
-    async fn v02_test_blocks_scope() -> anyhow::Result<()> {
+    async fn v02_test_block_scope() -> anyhow::Result<()> {
         let cfg = TestServerConfig::default();
         cfg.fill_database().await?;
 
