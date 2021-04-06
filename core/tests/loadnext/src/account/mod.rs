@@ -28,13 +28,17 @@ mod tx_command_executor;
 /// performed actions to be considered failed.
 #[derive(Debug)]
 pub struct AccountLifespan {
+    /// Wallet used to perform the test.
     pub wallet: Wallet<PrivateKeySigner, RpcProvider>,
+    /// Ethereum private key of the used wallet.
+    /// zkSync private key can be obtained from it using `private_key_from_seed` function.
     eth_pk: H256,
     config: LoadtestConfig,
+    /// Pool of account addresses, used to generate commands.
     addresses: AddressPool,
-
+    /// ERC-20 token used in the test.
     main_token: Token,
-
+    /// Channel for sending reports about performed operations.
     report_sink: Sender<Report>,
 }
 
@@ -66,18 +70,24 @@ impl AccountLifespan {
         // thus we can start from obtaining the account ID.
         let retry_attempts = 3;
         for attempt in 0..3 {
-            if self.wallet.update_account_id().await.is_err() {
-                if attempt == retry_attempts - 1 {
-                    // We were not able to obtain the account ID.
-                    // Without it, the whole flow cannot be done.
-                    vlog::warn!(
-                        "Unable to set account ID for account {}",
-                        self.wallet.address()
-                    );
-                    return;
+            match self.wallet.update_account_id().await {
+                Ok(()) => {
+                    // Account updated, we're done.
+                    break;
                 }
-                // We will wait and try again.
-                tokio::time::delay_for(Duration::from_secs(1)).await;
+                Err(_err) => {
+                    if attempt == retry_attempts - 1 {
+                        // We were not able to obtain the account ID.
+                        // Without it, the whole flow cannot be done.
+                        vlog::warn!(
+                            "Unable to set account ID for account {}",
+                            self.wallet.address()
+                        );
+                        return;
+                    }
+                    // We will wait and try again.
+                    tokio::time::delay_for(Duration::from_secs(1)).await;
+                }
             }
         }
 
@@ -157,14 +167,10 @@ impl AccountLifespan {
             .action(command)
             .finish();
 
-        self.report_sink
-            .send(report)
-            .await
-            .map_err(|_err| {
-                // It's not that important if report will be skipped.
-                vlog::trace!("Failed to send report to the sink");
-            })
-            .unwrap_or_default();
+        if let Err(_err) = self.report_sink.send(report).await {
+            // It's not that important if report will be skipped.
+            vlog::trace!("Failed to send report to the sink");
+        };
     }
 
     /// Generic sumbitter for zkSync network: it can operate both individual transactions and

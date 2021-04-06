@@ -4,7 +4,7 @@
 //! Without required variables provided, test is launched in the localhost/development mode with some hard-coded
 //! values to check the local zkSync deployment.
 
-use loadnext::{config::LoadtestConfig, executor::Executor, report_collector::FinalResolution};
+use loadnext::{config::LoadtestConfig, executor::Executor, report_collector::LoadtestResult};
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -33,11 +33,11 @@ async fn main() -> anyhow::Result<()> {
     let final_resolution = executor.start().await;
 
     match final_resolution {
-        FinalResolution::TestPassed => {
+        LoadtestResult::TestPassed => {
             vlog::info!("Test passed");
             Ok(())
         }
-        FinalResolution::TestFailed => {
+        LoadtestResult::TestFailed => {
             vlog::error!("Test failed");
             Err(anyhow::anyhow!("Test failed"))
         }

@@ -110,6 +110,7 @@ impl MockEthereum {
         Arc::get_mut(&mut self.inner).unwrap().block_number = val.as_u64();
         Ok(self.inner.block_number.into())
     }
+
     pub async fn get_gas_price(&self) -> anyhow::Result<U256> {
         Ok(self.inner.gas_price)
     }

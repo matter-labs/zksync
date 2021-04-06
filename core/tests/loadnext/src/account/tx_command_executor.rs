@@ -1,11 +1,11 @@
 use std::convert::TryInto;
 
-use num::BigUint;
+use num::{BigUint, Zero};
 use zksync::{
     error::ClientError, ethereum::PriorityOpHolder, operations::SyncTransactionHandle,
     provider::Provider,
 };
-use zksync_types::{tx::PackedEthSignature, Nonce, TokenId, ZkSyncTx, H256};
+use zksync_types::{tokens::ETH_TOKEN_ID, tx::PackedEthSignature, Nonce, ZkSyncTx, H256};
 
 use crate::{
     account::AccountLifespan,
@@ -75,8 +75,8 @@ impl AccountLifespan {
     }
 
     async fn execute_deposit(&self, command: &TxCommand) -> Result<ReportLabel, ClientError> {
-        let balances = self.l1_balances().await?;
-        if balances.0 == 0u64.into() || balances.1 < command.amount {
+        let (eth_balance, erc20_balance) = self.l1_balances().await?;
+        if eth_balance.is_zero() || erc20_balance < command.amount {
             // We don't have either funds in L1 to pay for tx or to deposit.
             // It's not a problem with the server, thus we mark this operation as skipped.
             return Ok(ReportLabel::skipped("No L1 balance"));
@@ -107,10 +107,11 @@ impl AccountLifespan {
             .await
         {
             Ok(hash) => hash,
-            Err(_err) => {
+            Err(err) => {
                 // Most likely we don't have enough ETH to perform operations.
                 // Just mark the operations as skipped.
-                return Ok(ReportLabel::skipped("Unable to perform an L1 operation"));
+                let reason = format!("Unable to perform an L1 operation. Reason: {}", err);
+                return Ok(ReportLabel::skipped(&reason));
             }
         };
 
@@ -119,13 +120,13 @@ impl AccountLifespan {
 
     async fn execute_full_exit(&self) -> Result<ReportLabel, ClientError> {
         let balances = self.l1_balances().await?;
-        if balances.0 == 0u64.into() {
+        if balances.0.is_zero() {
             // We don't have either funds in L1 to pay for tx.
             return Ok(ReportLabel::skipped("No L1 balance"));
         }
 
         // We always call full exit for the ETH, since we don't want to leave the wallet without main token.
-        let exit_token_id = TokenId(0);
+        let exit_token_id = ETH_TOKEN_ID;
 
         let account_id = match self.wallet.account_id() {
             Some(id) => id,

@@ -59,7 +59,7 @@ impl AccountLifespan {
 
         let provider = self.wallet.provider.clone();
         self.submit(modifier, || async {
-            provider.send_txs_batch(batch, None).await?;
+            self.wallet.provider.send_txs_batch(batch, None).await?;
             Ok(SyncTransactionHandle::new(main_hash, provider))
         })
         .await

@@ -1,5 +1,3 @@
-use std::time::Duration;
-
 use futures::{channel::mpsc, future::join_all};
 
 use tokio::task::JoinHandle;
@@ -7,16 +5,11 @@ use zksync::{
     error::ClientError, ethereum::PriorityOpHolder, operations::SyncTransactionHandle,
     provider::Provider, types::TransactionInfo,
 };
-use zksync_types::{
-    tx::{PackedEthSignature, TxHash},
-    TransactionReceipt, TxFeeTypes, ZkSyncTx, U256,
-};
+use zksync_types::{tx::TxHash, TransactionReceipt, TxFeeTypes, U256};
 
 use crate::{
-    account::AccountLifespan,
-    account_pool::{AccountPool, TestWallet},
-    config::LoadtestConfig,
-    report_collector::FinalResolution,
+    account::AccountLifespan, account_pool::AccountPool, config::LoadtestConfig,
+    report_collector::LoadtestResult,
 };
 use crate::{constants::*, report_collector::ReportCollector};
 
@@ -46,16 +39,16 @@ impl Executor {
     }
 
     /// Runs the loadtest until the completion.
-    pub async fn start(&mut self) -> FinalResolution {
+    pub async fn start(&mut self) -> LoadtestResult {
         // If the error occurs during the main flow, we will consider it as a test failure.
         self.start_inner().await.unwrap_or_else(|err| {
             vlog::error!("Loadtest was interrupted by the following error: {}", err);
-            FinalResolution::TestFailed
+            LoadtestResult::TestFailed
         })
     }
 
     /// Inner representation of `start` function which returns a `Result`, so it can conveniently use `?`.
-    async fn start_inner(&mut self) -> anyhow::Result<FinalResolution> {
+    async fn start_inner(&mut self) -> anyhow::Result<LoadtestResult> {
         vlog::info!("Initializing accounts");
         self.check_onchain_balance().await?;
         self.mint().await?;
@@ -64,7 +57,7 @@ impl Executor {
         let (executor_future, account_futures) = self.send_initial_transfers().await?;
         self.wait_account_routines(account_futures).await;
 
-        let final_resultion = executor_future.await.unwrap_or(FinalResolution::TestFailed);
+        let final_resultion = executor_future.await.unwrap_or(LoadtestResult::TestFailed);
 
         Ok(final_resultion)
     }
@@ -232,10 +225,9 @@ impl Executor {
             // to be able to perform priority operations.
             // We don't actually care whether transactions will be successful or not; at worst we will not use
             // priority operations in test.
-            ethereum
+            let _ = ethereum
                 .transfer("ETH", eth_to_distribute, target_address)
-                .await
-                .unwrap_or_default();
+                .await;
 
             // And then we will prepare an L2 transaction.
             let (tx, signature) = master_wallet
@@ -317,7 +309,7 @@ impl Executor {
     /// - Collecting all the spawned tasks and returning them to the caller.
     async fn send_initial_transfers(
         &mut self,
-    ) -> anyhow::Result<(JoinHandle<FinalResolution>, Vec<JoinHandle<()>>)> {
+    ) -> anyhow::Result<(JoinHandle<LoadtestResult>, Vec<JoinHandle<()>>)> {
         vlog::info!("Master Account: Sending initial transfers");
         // 40 is a safe limit for now.
         const MAX_TXS_PER_BATCH: usize = 20;
@@ -325,7 +317,7 @@ impl Executor {
         const MAX_RETRIES: usize = 3;
 
         // Prepare channels for the report collector.
-        let (report_sender, report_receiver) = mpsc::channel(65535);
+        let (report_sender, report_receiver) = mpsc::channel(256);
 
         let report_collector = ReportCollector::new(report_receiver);
         let report_collector_future = tokio::spawn(report_collector.run());

@@ -31,7 +31,7 @@ impl AddressPool {
         }
     }
 
-    /// Randomly chooses on of the addresses stored in the pool.
+    /// Randomly chooses one of the addresses stored in the pool.
     pub fn random_address(&self) -> Address {
         let rng = &mut thread_rng();
 
@@ -101,8 +101,8 @@ impl AccountPool {
                 .expect("Can't create a wallet")
         };
 
-        let mut accounts = VecDeque::new();
-        let mut addresses = Vec::new();
+        let mut accounts = VecDeque::with_capacity(config.accounts_amount);
+        let mut addresses = Vec::with_capacity(config.accounts_amount);
 
         for _ in 0..config.accounts_amount {
             let eth_credentials = AccountCredentials::rand();

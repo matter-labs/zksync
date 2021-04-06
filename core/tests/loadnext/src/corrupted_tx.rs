@@ -106,10 +106,11 @@ impl Corrupted for (ZkSyncTx, Option<PackedEthSignature>) {
     fn bad_eth_signature(self) -> Self {
         let private_key = H256::random();
         let message = b"bad message";
+        let (tx, eth_signature) = self;
+
         (
-            self.0,
-            self.1
-                .and_then(|_| PackedEthSignature::sign(&private_key, message).ok()),
+            tx,
+            eth_signature.and_then(|_| PackedEthSignature::sign(&private_key, message).ok()),
         )
     }
 
@@ -181,7 +182,7 @@ impl Corrupted for (ZkSyncTx, Option<PackedEthSignature>) {
 
     fn not_packable_fee(mut self, eth_pk: H256, token_symbol: &str, decimals: u8) -> Self {
         let bad_fee = BigUint::from(10u64.pow(18)) + BigUint::from(1u64);
-        debug_assert!(!is_fee_amount_packable(&bad_fee));
+        assert!(!is_fee_amount_packable(&bad_fee));
 
         match &mut self.0 {
             ZkSyncTx::ChangePubKey(tx) => {

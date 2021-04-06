@@ -11,7 +11,7 @@ mod metrics_collector;
 
 /// Decision on whether loadtest considered passed or failed.
 #[derive(Debug, Clone, Copy)]
-pub enum FinalResolution {
+pub enum LoadtestResult {
     TestPassed,
     TestFailed,
 }
@@ -56,7 +56,7 @@ impl ReportCollector {
         }
     }
 
-    pub async fn run(mut self) -> FinalResolution {
+    pub async fn run(mut self) -> LoadtestResult {
         while let Some(report) = self.reports_stream.next().await {
             vlog::trace!("Report: {:?}", &report);
 
@@ -82,11 +82,11 @@ impl ReportCollector {
         self.final_resolution()
     }
 
-    fn final_resolution(&self) -> FinalResolution {
+    fn final_resolution(&self) -> LoadtestResult {
         if self.failure_collector.failures() > 0 {
-            FinalResolution::TestFailed
+            LoadtestResult::TestFailed
         } else {
-            FinalResolution::TestPassed
+            LoadtestResult::TestPassed
         }
     }
 }
