@@ -64,7 +64,7 @@ impl TxHandler<MintNFT> for ZkSyncState {
 
         let mut creator_account = self
             .get_account(op.creator_account_id)
-            .ok_or(format_err!("Recipient account not found"))?;
+            .ok_or(format_err!("Creator account not found"))?;
 
         let mut recipient_account = self
             .get_account(op.recipient_account_id)
