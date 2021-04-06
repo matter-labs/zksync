@@ -10,6 +10,7 @@ use zksync_types::{
 };
 
 use crate::handler::TxHandler;
+use zksync_crypto::params::NFT_STORAGE_ACCOUNT_ID;
 
 #[derive(Debug)]
 pub struct OpSuccess {
@@ -119,11 +120,7 @@ impl ZkSyncState {
     pub fn get_account(&self, account_id: AccountId) -> Option<Account> {
         let start = std::time::Instant::now();
 
-        let account = if account_id < self.next_free_id {
-            self.balance_tree.get(*account_id).cloned()
-        } else {
-            None
-        };
+        let account = self.balance_tree.get(*account_id).cloned();
 
         vlog::trace!(
             "Get account (id {}) execution time: {}ms",
@@ -343,8 +340,7 @@ impl ZkSyncState {
 
     #[doc(hidden)] // Public for benches.
     pub fn insert_account(&mut self, id: AccountId, account: Account) {
-        assert!(id <= self.next_free_id);
-
+        assert!(id == NFT_STORAGE_ACCOUNT_ID || id <= self.next_free_id);
         self.account_id_by_address.insert(account.address, id);
         self.balance_tree.insert(*id, account);
         if id == self.next_free_id {
@@ -407,7 +403,7 @@ impl ZkSyncState {
                 } => {
                     let mut account = self
                         .get_account(*account_id)
-                        .expect("account doesn't exist");
+                        .expect(format!("account {} doesn't exist", account_id).as_str());
 
                     let (token_id, old_amount, new_amount) = balance_update;
 

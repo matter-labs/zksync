@@ -122,7 +122,7 @@ impl TxHandler<MintNFT> for ZkSyncState {
         let serial_id = new_balance.to_u32().unwrap_or_default();
 
         let token_hash = op.tx.calculate_hash(serial_id);
-        let token_address = Address::from_slice(&token_hash[12..]);
+        let token_address = Address::from_slice(&token_hash[..20]);
 
         updates.push((
             op.creator_account_id,
@@ -161,8 +161,8 @@ impl TxHandler<MintNFT> for ZkSyncState {
             NFT_STORAGE_ACCOUNT_ID,
             AccountUpdate::UpdateBalance {
                 balance_update: (token_id, BigUint::zero(), token_data),
-                old_nonce,
-                new_nonce: old_nonce,
+                old_nonce: nft_account.nonce,
+                new_nonce: nft_account.nonce,
             },
         ));
 
