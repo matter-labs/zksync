@@ -14,7 +14,6 @@ use crate::{
     tx::{TimeRange, TxSignature, VerifiedSignatureCache},
     AccountId, Address, Nonce, PubKeyHash, TokenId, H256,
 };
-use parity_crypto::Keccak256;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MintNFT {

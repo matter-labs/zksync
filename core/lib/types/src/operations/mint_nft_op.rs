@@ -1,4 +1,4 @@
-use crate::{AccountId, Address, Nonce, TokenId};
+use crate::{AccountId, Address};
 use crate::{MintNFT, H256};
 
 use crate::helpers::unpack_fee_amount;
@@ -67,42 +67,42 @@ impl MintNFTOp {
         let fee_offset = recipient_account_id_offset + ACCOUNT_ID_BIT_WIDTH / 8;
         let fee_token_offset = fee_offset + (FEE_EXPONENT_BIT_WIDTH + FEE_MANTISSA_BIT_WIDTH) / 8;
 
-        let creator_account_id = u32::from_bytes(
+        let _creator_account_id = u32::from_bytes(
             &bytes[account_id_offset..account_id_offset + ACCOUNT_ID_BIT_WIDTH / 8],
         )
         .ok_or(MintNFTParsingError::CreatorAccountId)?;
 
-        let token_id =
+        let _token_id =
             u32::from_bytes(&bytes[token_id_offset..token_id_offset + TOKEN_BIT_WIDTH / 8])
                 .ok_or(MintNFTParsingError::TokenId)?;
-        let token_account_id = u32::from_bytes(
+        let _token_account_id = u32::from_bytes(
             &bytes[token_account_id_offset..token_account_id_offset + ACCOUNT_ID_BIT_WIDTH / 8],
         )
         .ok_or(MintNFTParsingError::AccountId)?;
-        let serial_id =
+        let _serial_id =
             u32::from_bytes(&bytes[serial_id_offset..serial_id_offset + SERIAL_ID_BIT_WIDTH / 8])
                 .ok_or(MintNFTParsingError::SerialId)?;
 
-        let token_address =
+        let _token_address =
             Address::from_slice(&bytes[address_offset..address_offset + ADDRESS_WIDTH / 8]);
 
-        let content_hash = H256::from_slice(
+        let _content_hash = H256::from_slice(
             &bytes[content_hash_offset..content_hash_offset + CONTENT_HASH_WIDTH / 8],
         );
-        let recipient_account_id = u32::from_bytes(
+        let _recipient_account_id = u32::from_bytes(
             &bytes[recipient_account_id_offset
                 ..recipient_account_id_offset + ACCOUNT_ID_BIT_WIDTH / 8],
         )
         .ok_or(MintNFTParsingError::RecipientAccountId)?;
 
-        let fee = unpack_fee_amount(
+        let _fee = unpack_fee_amount(
             &bytes[fee_offset..fee_offset + (FEE_EXPONENT_BIT_WIDTH + FEE_MANTISSA_BIT_WIDTH) / 8],
         )
         .ok_or(MintNFTParsingError::Fee)?;
-        let fee_token_id =
+        let _fee_token_id =
             u32::from_bytes(&bytes[fee_token_offset..fee_token_offset + TOKEN_BIT_WIDTH / 8])
                 .ok_or(MintNFTParsingError::FeeTokenId)?;
-        let nonce = 0; // It is unknown from pubdata
+        let _nonce = 0; // It is unknown from pubdata
 
         todo!()
         // let time_range = Default::default();

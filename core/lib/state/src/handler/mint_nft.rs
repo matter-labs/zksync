@@ -11,7 +11,7 @@ use crate::{
     state::{CollectedFee, OpSuccess, ZkSyncState},
 };
 use num::{BigUint, ToPrimitive, Zero};
-use zksync_crypto::convert::FeConvert;
+
 use zksync_crypto::params::{
     MIN_NFT_TOKEN_ID, NFT_STORAGE_ACCOUNT_ADDRESS, NFT_STORAGE_ACCOUNT_ID, NFT_TOKEN_ID,
 };
