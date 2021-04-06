@@ -84,11 +84,11 @@ impl<P: Provider> PriorityOpHandle<P> {
     /// Awaits for the transaction to reach given state and returns the information about its execution.
     async fn wait_for<WaitPredicate>(
         &self,
-        condition: WaitPredicate,
+        mut pred: WaitPredicate,
         timeout: Option<Duration>,
     ) -> Result<EthOpInfo, ClientError>
     where
-        WaitPredicate: Fn(&BlockInfo) -> bool,
+        WaitPredicate: FnMut(&BlockInfo) -> bool,
     {
         let mut timer = tokio::time::interval(self.polling_interval);
         let start = Instant::now();
@@ -104,7 +104,7 @@ impl<P: Provider> PriorityOpHandle<P> {
 
             let response = self.provider.ethop_info(*self.serial_id as u32).await?;
             if let Some(block) = &response.block {
-                if condition(block) {
+                if pred(block) {
                     return Ok(response);
                 }
             }

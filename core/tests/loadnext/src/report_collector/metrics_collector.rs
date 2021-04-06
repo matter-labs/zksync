@@ -74,7 +74,7 @@ impl TimeHistogram {
             }
         }
 
-        unreachable!();
+        unreachable!("Range for {} percentile was not found", percentile);
     }
 
     /// Returns the histogram entry key for the provided duration.
@@ -95,7 +95,7 @@ impl TimeHistogram {
         }
 
         // First range starts from 0, and negative ranges are prohibited.
-        unreachable!()
+        unreachable!("Range for duration {} was not found", duration_millis);
     }
 
     fn window(window_idx: u64, window_size: u64) -> (u64, u64) {

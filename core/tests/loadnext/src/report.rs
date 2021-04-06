@@ -4,6 +4,82 @@ use zksync_types::Address;
 
 use crate::command::{ApiRequestCommand, Command, TxType};
 
+/// Report for any operation done by loadtest.
+///
+/// Reports are yielded by `Executor` or `AccountLifespan` and are collected
+/// by the `ReportCollector`.
+///
+/// Reports are expected to contain any kind of information useful for the analysis
+/// and deciding whether the test was passed.
+#[derive(Debug, Clone)]
+pub struct Report {
+    /// Address of the wallet that performed the action.
+    pub reporter: Address,
+    /// Obtained outcome of action.
+    pub label: ReportLabel,
+    /// Type of the action.
+    pub action: ActionType,
+    /// Amount of retries that it took the wallet to finish the action.
+    pub retries: usize,
+    /// Duration of the latest execution attempt.
+    pub time: Duration,
+}
+
+/// Builder structure for `Report`.
+#[derive(Debug, Clone)]
+pub struct ReportBuilder {
+    report: Report,
+}
+
+impl Default for ReportBuilder {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl ReportBuilder {
+    pub fn new() -> Self {
+        Self {
+            report: Report {
+                reporter: Default::default(),
+                label: ReportLabel::done(),
+                action: ActionType::Tx(TxActionType::Transfer),
+                retries: 0,
+                time: Default::default(),
+            },
+        }
+    }
+
+    pub fn reporter(mut self, reporter: Address) -> Self {
+        self.report.reporter = reporter;
+        self
+    }
+
+    pub fn label(mut self, label: ReportLabel) -> Self {
+        self.report.label = label;
+        self
+    }
+
+    pub fn action(mut self, action: impl Into<ActionType>) -> Self {
+        self.report.action = action.into();
+        self
+    }
+
+    pub fn retries(mut self, retries: usize) -> Self {
+        self.report.retries = retries;
+        self
+    }
+
+    pub fn time(mut self, time: Duration) -> Self {
+        self.report.time = time;
+        self
+    }
+
+    pub fn finish(self) -> Report {
+        self.report
+    }
+}
+
 /// Denotes the outcome of a performed action.
 #[derive(Debug, Clone)]
 pub enum ReportLabel {
@@ -135,80 +211,4 @@ impl ActionType {
             .chain(batch_action_types)
             .collect()
     }
-}
-
-/// Builder structure for `Report`.
-#[derive(Debug, Clone)]
-pub struct ReportBuilder {
-    report: Report,
-}
-
-impl Default for ReportBuilder {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-impl ReportBuilder {
-    pub fn new() -> Self {
-        Self {
-            report: Report {
-                reporter: Default::default(),
-                label: ReportLabel::done(),
-                action: ActionType::Tx(TxActionType::Transfer),
-                retries: 0,
-                time: Default::default(),
-            },
-        }
-    }
-
-    pub fn reporter(mut self, reporter: Address) -> Self {
-        self.report.reporter = reporter;
-        self
-    }
-
-    pub fn label(mut self, label: ReportLabel) -> Self {
-        self.report.label = label;
-        self
-    }
-
-    pub fn action(mut self, action: impl Into<ActionType>) -> Self {
-        self.report.action = action.into();
-        self
-    }
-
-    pub fn retries(mut self, retries: usize) -> Self {
-        self.report.retries = retries;
-        self
-    }
-
-    pub fn time(mut self, time: Duration) -> Self {
-        self.report.time = time;
-        self
-    }
-
-    pub fn finish(self) -> Report {
-        self.report
-    }
-}
-
-/// Report for any operation done by loadtest.
-///
-/// Reports are yielded by `Executor` or `AccountLifespan` and are collected
-/// by the `ReportCollector`.
-///
-/// Reports are expected to contain any kind of information useful for the analysis
-/// and deciding whether the test was passed.
-#[derive(Debug, Clone)]
-pub struct Report {
-    /// Address of the wallet that performed the action.
-    pub reporter: Address,
-    /// Obtained outcome of action.
-    pub label: ReportLabel,
-    /// Type of the action.
-    pub action: ActionType,
-    /// Amount of retries that it took the wallet to finish the action.
-    pub retries: usize,
-    /// Duration of the latest execution attempt.
-    pub time: Duration,
 }

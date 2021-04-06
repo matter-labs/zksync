@@ -11,7 +11,7 @@ impl AccountLifespan {
         &mut self,
         batch_command: &[TxCommand],
     ) -> Result<ReportLabel, ClientError> {
-        let mut batch = vec![];
+        let mut batch = Vec::with_capacity(batch_command.len());
 
         // Since we're manually building the batch, we have to increment nonce by ourselves.
         // Otherwise all the pre-built transactions will have the same (currently committed) nonce.

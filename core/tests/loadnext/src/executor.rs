@@ -3,11 +3,19 @@ use std::time::Duration;
 use futures::{channel::mpsc, future::join_all};
 
 use tokio::task::JoinHandle;
-use zksync::{ethereum::PriorityOpHolder, operations::SyncTransactionHandle, provider::Provider};
-use zksync_types::{TransactionReceipt, TxFeeTypes, U256};
+use zksync::{
+    error::ClientError, ethereum::PriorityOpHolder, operations::SyncTransactionHandle,
+    provider::Provider, types::TransactionInfo,
+};
+use zksync_types::{
+    tx::{PackedEthSignature, TxHash},
+    TransactionReceipt, TxFeeTypes, ZkSyncTx, U256,
+};
 
 use crate::{
-    account::AccountLifespan, account_pool::AccountPool, config::LoadtestConfig,
+    account::AccountLifespan,
+    account_pool::{AccountPool, TestWallet},
+    config::LoadtestConfig,
     report_collector::FinalResolution,
 };
 use crate::{constants::*, report_collector::ReportCollector};
@@ -194,6 +202,112 @@ impl Executor {
         Ok(())
     }
 
+    async fn send_initial_transfers_batch(
+        &self,
+        accounts_to_process: usize,
+    ) -> anyhow::Result<TxHash> {
+        let eth_to_distribute = self.eth_amount_to_distribute().await?;
+        let master_wallet = &self.pool.master_wallet;
+        let config = &self.config;
+        let token = &config.main_token;
+
+        let transfer_amount = self.transfer_amount();
+
+        let ethereum = master_wallet
+            .ethereum(&self.config.web3_url)
+            .await
+            .expect("Can't get Ethereum client");
+
+        // We request nonce each time, so that if one iteration was failed, it will be repeated on the next iteration.
+        let mut nonce = master_wallet.account_info().await?.committed.nonce;
+
+        let mut batch = Vec::new();
+        let mut batch_fee_types = Vec::new();
+        let mut batch_addresses = Vec::new();
+
+        for account in self.pool.accounts.iter().take(accounts_to_process) {
+            let target_address = account.0.address();
+
+            // Prior to sending funds in L2, we will send funds in L1 for accounts
+            // to be able to perform priority operations.
+            // We don't actually care whether transactions will be successful or not; at worst we will not use
+            // priority operations in test.
+            ethereum
+                .transfer("ETH", eth_to_distribute, target_address)
+                .await
+                .unwrap_or_default();
+
+            // And then we will prepare an L2 transaction.
+            let (tx, signature) = master_wallet
+                .start_transfer()
+                .to(target_address)
+                .amount(transfer_amount)
+                .token(token.as_str())?
+                .fee(0u64)
+                .nonce(nonce)
+                .tx()
+                .await?;
+
+            let fee_type = tx.get_fee_info().unwrap().0;
+            batch_fee_types.push(fee_type);
+            batch_addresses.push(target_address);
+            batch.push((tx, signature));
+
+            *nonce += 1;
+        }
+
+        // Add mock transfer that contains the fee.
+        batch_fee_types.push(TxFeeTypes::Transfer);
+        batch_addresses.push(master_wallet.address());
+
+        // Request fee for the batch.
+        let batch_fee = master_wallet
+            .provider
+            .get_txs_batch_fee(batch_fee_types, batch_addresses, token.as_str())
+            .await?;
+
+        // Add the fee transaction to the batch.
+        let (fee_tx, fee_tx_signature) = master_wallet
+            .start_transfer()
+            .to(master_wallet.address())
+            .amount(0u64)
+            .token(token.as_str())?
+            .fee(batch_fee)
+            .nonce(nonce)
+            .tx()
+            .await?;
+
+        let batch_tx_hash = fee_tx.hash();
+
+        *nonce += 1;
+        batch.push((fee_tx, fee_tx_signature));
+
+        master_wallet.provider.send_txs_batch(batch, None).await?;
+
+        Ok(batch_tx_hash)
+    }
+
+    /// Returns the amount sufficient for wallets to perform many operations.
+    fn transfer_amount(&self) -> u128 {
+        let accounts_amount = self.config.accounts_amount;
+        let account_balance = self.amount_to_deposit();
+        let for_fees = u64::max_value() >> 24; // Leave some spare funds on the master account for fees.
+        let funds_to_distribute = account_balance - u128::from(for_fees);
+        funds_to_distribute / accounts_amount as u128
+    }
+
+    /// Waits for the transaction execution.
+    async fn wait_for_sync_tx(&self, tx_hash: TxHash) -> Result<TransactionInfo, ClientError> {
+        let mut tx_handle =
+            SyncTransactionHandle::new(tx_hash, self.pool.master_wallet.provider.clone());
+        tx_handle.polling_interval(POLLING_INTERVAL).unwrap();
+
+        tx_handle
+            .commit_timeout(COMMIT_TIMEOUT)
+            .wait_for_commit()
+            .await
+    }
+
     /// Initializes the loadtest by doing the following:
     ///
     /// - Spawning the `ReportCollector`.
@@ -216,22 +330,9 @@ impl Executor {
         let report_collector = ReportCollector::new(report_receiver);
         let report_collector_future = tokio::spawn(report_collector.run());
 
-        let account_balance = self.amount_to_deposit();
-        let eth_to_distribute = self.eth_amount_to_distribute().await?;
-
         let config = &self.config;
-        let master_wallet = &mut self.pool.master_wallet;
         let accounts_amount = config.accounts_amount;
-        let token = &config.main_token;
         let addresses = self.pool.addresses.clone();
-        let ethereum = master_wallet
-            .ethereum(&self.config.web3_url)
-            .await
-            .expect("Can't get Ethereum client");
-
-        let for_fees = u64::max_value() >> 24; // Leave some spare funds on the master account for fees.
-        let funds_to_distribute = account_balance - u128::from(for_fees);
-        let transfer_amount = funds_to_distribute / accounts_amount as u128;
 
         let mut retry_counter = 0;
         let mut accounts_processed = 0;
@@ -242,86 +343,20 @@ impl Executor {
                 anyhow::bail!("Reached max amount of retries when sending a batch");
             }
 
-            // We request nonce each time, so that if one iteration was failed, it will be repeated on the next iteration.
-            let mut nonce = master_wallet.account_info().await?.committed.nonce;
-
             let accounts_left = accounts_amount - accounts_processed;
             let accounts_to_process = std::cmp::min(accounts_left, MAX_TXS_PER_BATCH);
 
-            let mut batch = Vec::new();
-            let mut batch_fee_types = Vec::new();
-            let mut batch_addresses = Vec::new();
-
-            for account_number in 0..accounts_to_process {
-                let target_address = self.pool.accounts[account_number].0.address();
-
-                // Prior to sending funds in L2, we will send funds in L1 for accounts
-                // to be able to perform priority operations.
-                // We don't actually care whether transactions will be successful or not; at worst we will not use
-                // priority operations in test.
-                ethereum
-                    .transfer("ETH", eth_to_distribute, target_address)
-                    .await
-                    .unwrap_or_default();
-
-                // And then we will prepare an L2 transaction.
-                let (tx, signature) = master_wallet
-                    .start_transfer()
-                    .to(target_address)
-                    .amount(transfer_amount)
-                    .token(token.as_str())?
-                    .fee(0u64)
-                    .nonce(nonce)
-                    .tx()
-                    .await?;
-
-                let fee_type = tx.get_fee_info().unwrap().0;
-                batch_fee_types.push(fee_type);
-                batch_addresses.push(target_address);
-                batch.push((tx, signature));
-
-                *nonce += 1;
-            }
-
-            // Add mock transfer that contains the fee.
-            batch_fee_types.push(TxFeeTypes::Transfer);
-            batch_addresses.push(master_wallet.address());
-
-            vlog::info!(
-                "[{}/{}] Prepared the batch",
-                accounts_processed,
-                accounts_amount
-            );
-
-            // Request fee for the batch.
-            let batch_fee = master_wallet
-                .provider
-                .get_txs_batch_fee(batch_fee_types, batch_addresses, token.as_str())
-                .await?;
-
-            vlog::info!(
-                "[{}/{}] Got the batch fee info",
-                accounts_processed,
-                accounts_amount
-            );
-
-            // Add the fee transaction to the batch.
-            let (fee_tx, fee_tx_signature) = master_wallet
-                .start_transfer()
-                .to(master_wallet.address())
-                .amount(0u64)
-                .token(token.as_str())?
-                .fee(batch_fee)
-                .nonce(nonce)
-                .tx()
-                .await?;
-
-            let batch_tx_hash = fee_tx.hash();
-
-            *nonce += 1;
-            batch.push((fee_tx, fee_tx_signature));
-
-            master_wallet.provider.send_txs_batch(batch, None).await?;
+            let batch_tx_hash = match self.send_initial_transfers_batch(accounts_to_process).await {
+                Ok(hash) => hash,
+                Err(err) => {
+                    vlog::warn!(
+                        "Iteration of the initial funds distribution batch failed: {}",
+                        err
+                    );
+                    retry_counter += 1;
+                    continue;
+                }
+            };
 
             vlog::info!(
                 "[{}/{}] Sent txs batch",
@@ -330,15 +365,8 @@ impl Executor {
             );
 
             // Now we can wait for a single transaction from the batch to be committed.
-            let mut tx_handle =
-                SyncTransactionHandle::new(batch_tx_hash, master_wallet.provider.clone());
-            tx_handle.polling_interval(Duration::from_secs(3)).unwrap();
-            let result = tx_handle
-                .commit_timeout(Duration::from_secs(1200))
-                .wait_for_commit()
-                .await?;
-
-            if result.fail_reason.is_some() {
+            let tx_result = self.wait_for_sync_tx(batch_tx_hash).await?;
+            if tx_result.fail_reason.is_some() {
                 // Have to try once again.
                 retry_counter += 1;
                 vlog::info!(
@@ -417,7 +445,7 @@ impl Executor {
 
     /// Returns the amount of funds to be deposited on the main account in L2.
     /// Amount is chosen to be big enough to not worry about precisely calculating the remaining balances on accounts,
-    /// but also to not be close to the supported limits in zkSYnc.
+    /// but also to not be close to the supported limits in zkSync.
     fn amount_to_deposit(&self) -> u128 {
         u128::max_value() >> 32
     }

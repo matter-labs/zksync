@@ -1,5 +1,8 @@
+use std::iter;
+
 use num::BigUint;
 use rand::{thread_rng, Rng};
+
 use zksync_types::Address;
 
 use crate::account_pool::AddressPool;
@@ -42,10 +45,14 @@ impl TxType {
             Self::required_amount_of_copies(&options, transfer_to_new_likehood);
         let required_transfer_to_existing_copies =
             Self::required_amount_of_copies(&options, transfer_to_existing_likehood);
-        options
-            .extend(std::iter::repeat(Self::TransferToNew).take(required_transfer_to_new_copies));
+        let total_new_elements =
+            required_transfer_to_new_copies + required_transfer_to_existing_copies;
+
+        options.reserve(total_new_elements);
+
+        options.extend(iter::repeat(Self::TransferToNew).take(required_transfer_to_new_copies));
         options.extend(
-            std::iter::repeat(Self::TransferToExisting).take(required_transfer_to_existing_copies),
+            iter::repeat(Self::TransferToExisting).take(required_transfer_to_existing_copies),
         );
 
         // Now we can get weighted element by simply choosing the random value from the vector.
@@ -128,7 +135,7 @@ impl IncorrectnessModifier {
             4 => Self::TooBigAmount,
             5 => Self::NotPackableAmount,
             6 => Self::NotPackableFeeAmount,
-            _ => unreachable!(),
+            _ => unreachable!("Unexpected modifier type number"),
         }
     }
 

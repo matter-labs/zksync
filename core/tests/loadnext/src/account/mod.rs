@@ -1,4 +1,7 @@
-use std::time::{Duration, Instant};
+use std::{
+    future::Future,
+    time::{Duration, Instant},
+};
 
 use futures::{channel::mpsc::Sender, SinkExt};
 
@@ -176,7 +179,7 @@ impl AccountLifespan {
     ) -> Result<ReportLabel, ClientError>
     where
         F: FnOnce() -> Fut,
-        Fut: std::future::Future<Output = Result<SyncTransactionHandle<RpcProvider>, ClientError>>,
+        Fut: Future<Output = Result<SyncTransactionHandle<RpcProvider>, ClientError>>,
     {
         let expected_outcome = modifier.expected_outcome();
 

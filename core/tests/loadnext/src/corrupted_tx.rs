@@ -156,6 +156,10 @@ impl Corrupted for (ZkSyncTx, Option<PackedEthSignature>) {
     }
 
     fn not_packable_amount(mut self, eth_pk: H256, token_symbol: &str, decimals: u8) -> Self {
+        // We use a decimal-based packing, thus choosing some big power of ten and adding one will
+        // predictably result is a non-packable number.
+        // Just to be sure that this invariant will be held in the future we have both unit-test and
+        // an assertion for that.
         let bad_amount = BigUint::from(10u128.pow(24)) + BigUint::from(1u64);
         assert!(!is_token_amount_packable(&bad_amount));
 

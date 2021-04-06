@@ -62,17 +62,20 @@ impl AccountCredentials {
     }
 }
 
+/// Tuple that consists of pre-initialized wallet and the Ethereum private key.
+/// We have to collect private keys, since `Wallet` doesn't expose it, and we may need it to resign transactions
+/// (for example, if we want to create a corrupted transaction: `zksync` library won't allow us to do it, thus
+/// we will have to sign such a transaction manually).
+pub type TestWallet = (Wallet<PrivateKeySigner, RpcProvider>, H256);
+
 /// Pool of accounts to be used in the test.
 /// Each account is represented as `zksync::Wallet` in order to provide convenient interface of interation with zkSync.
 #[derive(Debug)]
 pub struct AccountPool {
     /// Main wallet that will be used to initialize all the test wallets.
     pub master_wallet: Wallet<PrivateKeySigner, RpcProvider>,
-    /// Collection of test wallets and their Ethereum private key.
-    /// We have to collect private keys, since `Wallet` doesn't expose it, and we may need it to resign transactions
-    /// (for example, if we want to create a corrupted transaction: `zksync` library won't allow us to do it, thus
-    /// we will have to sign such a transaction manually).
-    pub accounts: VecDeque<(Wallet<PrivateKeySigner, RpcProvider>, H256)>,
+    /// Collection of test wallets and their Ethereum private keys.
+    pub accounts: VecDeque<TestWallet>,
     /// Pool of addresses of the test accounts.
     pub addresses: AddressPool,
 }

@@ -124,10 +124,9 @@ impl<S: EthereumSigner> EthereumProvider<S> {
         address: Address,
         token: impl Into<TokenLike>,
     ) -> Result<U256, ClientError> {
-        let token = token.into();
         let token = self
             .tokens_cache
-            .resolve(token)
+            .resolve(token.into())
             .ok_or(ClientError::UnknownToken)?;
 
         let res = self
@@ -308,7 +307,7 @@ impl<S: EthereumSigner> EthereumProvider<S> {
 
         if self.tokens_cache.is_eth(token) {
             // ETH minting is not supported
-            return Err(ClientError::Other);
+            return Err(ClientError::IncorrectInput);
         }
 
         let signed_tx = {
