@@ -4,7 +4,7 @@ use zksync::utils::{
     private_key_from_seed,
 };
 use zksync_types::{
-    tx::{PackedEthSignature, TxSignature},
+    tx::{ChangePubKeyECDSAData, ChangePubKeyEthAuthData, PackedEthSignature, TxSignature},
     TokenId, ZkSyncTx, H256,
 };
 
@@ -19,8 +19,8 @@ pub trait Corrupted: Sized {
     /// Replaces the zkSync signature with an incorrect one.
     fn bad_zksync_signature(self) -> Self;
     /// Replaces the zkSync 2FA ECDSA signature with an incorrect one.
-    /// Note that it only affects 2FA signatures; signature in ChangePubKey transaction will not be affected.
-    fn bad_eth_signature(self) -> Self;
+    /// In case of ChangePubKey, Ethereum signature inside of the transaction will be affected.
+    fn bad_eth_signature(self, eth_pk: H256, token_symbol: &str, decimals: u8) -> Self;
     /// Replaces the transaction token with the non-existing one.
     /// In case of `ChangePubKey` transaction it affects the `fee_token`.
     fn nonexistent_token(self, eth_pk: H256, token_symbol: &str, decimals: u8) -> Self;
@@ -48,7 +48,9 @@ pub trait Corrupted: Sized {
     ) -> Self {
         match modifier {
             IncorrectnessModifier::None => self,
-            IncorrectnessModifier::IncorrectEthSignature => self.bad_eth_signature(),
+            IncorrectnessModifier::IncorrectEthSignature => {
+                self.bad_eth_signature(eth_pk, token_symbol, decimals)
+            }
             IncorrectnessModifier::IncorrectZkSyncSignature => self.bad_zksync_signature(),
             IncorrectnessModifier::NonExistentToken => {
                 self.nonexistent_token(eth_pk, token_symbol, decimals)
@@ -103,15 +105,22 @@ impl Corrupted for (ZkSyncTx, Option<PackedEthSignature>) {
         }
     }
 
-    fn bad_eth_signature(self) -> Self {
+    fn bad_eth_signature(mut self, eth_pk: H256, token_symbol: &str, decimals: u8) -> Self {
         let private_key = H256::random();
         let message = b"bad message";
-        let (tx, eth_signature) = self;
+        let bad_signature = PackedEthSignature::sign(&private_key, message).ok();
 
-        (
-            tx,
-            eth_signature.and_then(|_| PackedEthSignature::sign(&private_key, message).ok()),
-        )
+        if let ZkSyncTx::ChangePubKey(cpk_tx) = &mut self.0 {
+            let signature_data = ChangePubKeyECDSAData {
+                eth_signature: bad_signature.clone().unwrap(),
+                batch_hash: Default::default(),
+            };
+            cpk_tx.eth_auth_data = Some(ChangePubKeyEthAuthData::ECDSA(signature_data))
+        }
+
+        self.resign(eth_pk, token_symbol, decimals);
+        let (tx, eth_signature) = self;
+        (tx, eth_signature.and(bad_signature))
     }
 
     fn bad_zksync_signature(mut self) -> Self {
@@ -362,7 +371,8 @@ mod tests {
         let transfer = create_transfer(&account);
         let current_eth_signature = transfer.1.clone();
 
-        let (_modified_transfer, new_eth_signature) = transfer.bad_eth_signature();
+        let (_modified_transfer, new_eth_signature) =
+            transfer.bad_eth_signature(account.eth_account_data.unwrap_eoa_pk(), "ETH", 18);
 
         assert_ne!(current_eth_signature, new_eth_signature);
     }

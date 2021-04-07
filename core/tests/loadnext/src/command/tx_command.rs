@@ -1,5 +1,3 @@
-use std::iter;
-
 use num::BigUint;
 use rand::{seq::SliceRandom, Rng};
 
@@ -24,39 +22,22 @@ impl TxType {
     /// Generates a random transaction type. Not all the variants have the equal chance to be generated;
     /// specifically transfers are made more likely.
     pub fn random(rng: &mut LoadtestRng) -> Self {
-        // All available options.
-        let mut options = vec![
-            Self::Deposit,
-            Self::TransferToNew,
-            Self::TransferToExisting,
-            Self::WithdrawToSelf,
-            Self::WithdrawToOther,
-            Self::FullExit,
-            Self::ChangePubKey,
+        // All available options together with their weight.
+        // `TransferToNew` and `TransferToExisting` the most likely options.
+        const DEFAULT_WEIGHT: usize = 1;
+        const HIGH_WEIGHT: usize = 3;
+        let options = vec![
+            (Self::Deposit, DEFAULT_WEIGHT),
+            (Self::TransferToNew, HIGH_WEIGHT),
+            (Self::TransferToExisting, HIGH_WEIGHT),
+            (Self::WithdrawToSelf, DEFAULT_WEIGHT),
+            (Self::WithdrawToOther, DEFAULT_WEIGHT),
+            (Self::FullExit, DEFAULT_WEIGHT),
+            (Self::ChangePubKey, DEFAULT_WEIGHT),
         ];
 
-        // Make `TransferToNew` and `TransferToExisting` the most likely options
-        // by adding them multiple times.
-        let transfer_to_new_likehood = 0.3f64;
-        let transfer_to_existing_likehood = 0.4f64;
-
-        // We are ignoring the fact that variables in fact rely on each other; it's not that important for our purposes.
-        let required_transfer_to_new_copies =
-            Self::required_amount_of_copies(&options, transfer_to_new_likehood);
-        let required_transfer_to_existing_copies =
-            Self::required_amount_of_copies(&options, transfer_to_existing_likehood);
-        let total_new_elements =
-            required_transfer_to_new_copies + required_transfer_to_existing_copies;
-
-        options.reserve(total_new_elements);
-
-        options.extend(iter::repeat(Self::TransferToNew).take(required_transfer_to_new_copies));
-        options.extend(
-            iter::repeat(Self::TransferToExisting).take(required_transfer_to_existing_copies),
-        );
-
         // Now we can get weighted element by simply choosing the random value from the vector.
-        options.choose(rng).copied().unwrap()
+        options.choose_weighted(rng, |item| item.1).unwrap().0
     }
 
     /// Generates a random transaction type that can be a part of the batch.
@@ -69,12 +50,6 @@ impl TxType {
                 return output;
             }
         }
-    }
-
-    fn required_amount_of_copies(options: &[Self], likehood: f64) -> usize {
-        // This value will be truncated down, but it will be compensated by the fact
-        // that element is already inserted into `options`.
-        (options.len() as f64 * likehood) as usize
     }
 }
 
@@ -112,28 +87,30 @@ pub enum ExpectedOutcome {
 
 impl IncorrectnessModifier {
     pub fn random(rng: &mut LoadtestRng) -> Self {
-        // 90% of transactions should be correct.
-        const NO_MODIFIER_PROBABILITY: f32 = 0.9f32;
-        // Amount of elements in the enum.
-        const MODIFIERS_AMOUNT: usize = 7;
-
-        let chance = rng.gen_range(0f32, 1f32);
-        if chance <= NO_MODIFIER_PROBABILITY {
+        if Self::no_modifier(rng) {
             return Self::None;
         }
 
-        let modifier_type = rng.gen_range(0, MODIFIERS_AMOUNT);
+        let options = &[
+            Self::ZeroFee,
+            Self::IncorrectZkSyncSignature,
+            Self::IncorrectEthSignature,
+            Self::NonExistentToken,
+            Self::TooBigAmount,
+            Self::NotPackableAmount,
+            Self::NotPackableFeeAmount,
+        ];
 
-        match modifier_type {
-            0 => Self::ZeroFee,
-            1 => Self::IncorrectZkSyncSignature,
-            2 => Self::IncorrectEthSignature,
-            3 => Self::NonExistentToken,
-            4 => Self::TooBigAmount,
-            5 => Self::NotPackableAmount,
-            6 => Self::NotPackableFeeAmount,
-            _ => unreachable!("Unexpected modifier type number"),
-        }
+        options.choose(rng).copied().unwrap()
+    }
+
+    fn no_modifier(rng: &mut LoadtestRng) -> bool {
+        // 90% of transactions should be correct.
+        const NO_MODIFIER_PROBABILITY: f32 = 0.9f32;
+
+        let chance = rng.gen_range(0f32, 1f32);
+
+        chance <= NO_MODIFIER_PROBABILITY
     }
 
     pub fn expected_outcome(self) -> ExpectedOutcome {
@@ -219,9 +196,6 @@ impl TxCommand {
             command.to = own_address;
         }
 
-        // `ChangePubKey` does not have a 2FA signature.
-        let cpk_incorrect_signature = command.command_type == TxType::ChangePubKey
-            && command.modifier == IncorrectnessModifier::IncorrectEthSignature;
         // Transactions that have no amount field.
         let no_amount_field = matches!(command.command_type, TxType::ChangePubKey)
             && matches!(
@@ -239,11 +213,7 @@ impl TxCommand {
             == IncorrectnessModifier::NotPackableAmount;
 
         // Check whether generator modifier does not make sense.
-        if cpk_incorrect_signature
-            || no_amount_field
-            || incorrect_priority_op
-            || unpackable_withdrawal
-        {
+        if no_amount_field || incorrect_priority_op || unpackable_withdrawal {
             command.modifier = IncorrectnessModifier::None;
         }
 
