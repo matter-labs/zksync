@@ -67,12 +67,12 @@ impl ApiTokenData {
         storage: &mut StorageProcessor<'_>,
         token_id: TokenId,
     ) -> Result<bool, Error> {
-        let market_volume = TokenDBCache::get_token_market_volume(storage, token_id)
+        let result = storage
+            .tokens_schema()
+            .load_token_ids_that_enabled_for_fees(vec![token_id], &self.min_market_volume)
             .await
             .map_err(Error::storage)?;
-        Ok(market_volume
-            .map(|volume| volume.market_volume.ge(&self.min_market_volume))
-            .unwrap_or(false))
+        Ok(!result.is_empty())
     }
 
     async fn token_page(
@@ -85,15 +85,15 @@ impl ApiTokenData {
         match paginated_tokens {
             Ok(paginated_tokens) => {
                 let mut list = Vec::new();
+                let tokens_to_check: Vec<TokenId> =
+                    paginated_tokens.list.iter().map(|token| token.id).collect();
+                let tokens_enabled_for_fees = storage
+                    .tokens_schema()
+                    .load_token_ids_that_enabled_for_fees(tokens_to_check, &self.min_market_volume)
+                    .await
+                    .map_err(Error::storage)?;
                 for token in paginated_tokens.list {
-                    let enabled_for_fees_result =
-                        self.is_token_enabled_for_fees(&mut storage, token.id).await;
-                    let enabled_for_fees = match enabled_for_fees_result {
-                        Ok(enabled_for_fees_result) => enabled_for_fees_result,
-                        Err(err) => {
-                            return Err(err);
-                        }
-                    };
+                    let enabled_for_fees = tokens_enabled_for_fees.contains(&token.id);
                     list.push(ApiToken::from((token, enabled_for_fees)));
                 }
                 Ok(Paginated {

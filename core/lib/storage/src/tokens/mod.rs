@@ -1,5 +1,5 @@
 // Built-in deps
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::time::Instant;
 // External imports
 use num::{rational::Ratio, BigUint};
@@ -151,6 +151,39 @@ impl<'a, 'c> TokensSchema<'a, 'c> {
             .collect());
 
         metrics::histogram!("sql.token.load_tokens_by_market_volume", start.elapsed());
+        result
+    }
+
+    /// Loads tokens ids, which are presented in `tokens_to_check`
+    /// and have market_volume not less than parameter (min_market_volume).
+    pub async fn load_token_ids_that_enabled_for_fees(
+        &mut self,
+        tokens_to_check: Vec<TokenId>,
+        min_market_volume: &Ratio<BigUint>,
+    ) -> QueryResult<HashSet<TokenId>> {
+        let start = Instant::now();
+        let tokens_to_check: Vec<i32> = tokens_to_check.into_iter().map(|id| *id as i32).collect();
+        let tokens = sqlx::query!(
+            r#"
+            SELECT token_id
+            FROM ticker_market_volume
+            WHERE token_id = ANY($1) AND ticker_market_volume.market_volume >= $2
+            "#,
+            &tokens_to_check,
+            ratio_to_big_decimal(min_market_volume, STORED_USD_PRICE_PRECISION)
+        )
+        .fetch_all(self.0.conn())
+        .await?;
+
+        let result = Ok(tokens
+            .into_iter()
+            .map(|t| TokenId(t.token_id as u16))
+            .collect());
+
+        metrics::histogram!(
+            "sql.token.load_token_ids_that_enabled_for_fees",
+            start.elapsed()
+        );
         result
     }
 

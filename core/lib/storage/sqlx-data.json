@@ -860,6 +860,27 @@
       ]
     }
   },
+  "257ad460ee98be17abecab5beff724060bfd99d406b028b70da5828244a27813": {
+    "query": "\n            SELECT token_id\n            FROM ticker_market_volume\n            WHERE token_id = ANY($1) AND ticker_market_volume.market_volume >= $2\n            ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "token_id",
+          "type_info": "Int4"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Int4Array",
+          "Numeric"
+        ]
+      },
+      "nullable": [
+        false
+      ]
+    }
+  },
   "273c7371b1a13bbb03490e874b7f2eab969defa6aa9f2b416e4f9e8a135aa97c": {
     "query": "\n                        INSERT INTO account_creates ( account_id, is_create, block_number, address, nonce, update_order_id )\n                        VALUES ( $1, $2, $3, $4, $5, $6 )\n                        ",
     "describe": {
