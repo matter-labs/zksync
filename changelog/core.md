@@ -30,6 +30,7 @@ All notable changes to the core components will be documented in this file.
 - (`zksync_api`): Internal error with tokens not listed on CoinGecko.
 - Fix wrong block info cache behavior in the `api_server`.
 - Bug with gas price limit being used instead of average gas price when storing data to DB in gas adjuster.
+- `timeout` in ETH sender main loop was replaced with `tokio::time::delay_for`.
 
 ## Release 2021-02-19
 
