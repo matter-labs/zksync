@@ -16,11 +16,13 @@ use futures::{
 use num::{rational::Ratio, BigUint, FromPrimitive};
 
 // Workspace uses
-use zksync_api_client::rest::v02::token::ApiToken;
 use zksync_config::ZkSyncConfig;
 use zksync_storage::{ConnectionPool, StorageProcessor};
 use zksync_types::{
-    pagination::{Paginated, PaginationQuery},
+    api_v02::{
+        pagination::{Paginated, PaginationQuery},
+        token::ApiToken,
+    },
     Token, TokenId, TokenLike,
 };
 
@@ -234,8 +236,10 @@ mod tests {
         *,
     };
     use std::collections::HashMap;
-    use zksync_api_client::rest::v02::ApiVersion;
-    use zksync_types::{pagination::PaginationDirection, Address};
+    use zksync_types::{
+        api_v02::{pagination::PaginationDirection, ApiVersion},
+        Address,
+    };
 
     fn dummy_fee_ticker(prices: &[(TokenLike, BigDecimal)]) -> mpsc::Sender<TickerRequest> {
         let (sender, mut receiver) = mpsc::channel(10);

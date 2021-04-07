@@ -38,6 +38,7 @@
 
 pub mod account;
 pub mod aggregated_operations;
+pub mod api_v02;
 pub mod block;
 pub mod config;
 pub mod ethereum;
@@ -48,7 +49,6 @@ pub mod helpers;
 pub mod mempool;
 pub mod network;
 pub mod operations;
-pub mod pagination;
 pub mod priority_ops;
 pub mod prover;
 pub mod tokens;

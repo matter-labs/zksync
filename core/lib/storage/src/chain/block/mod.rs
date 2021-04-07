@@ -7,8 +7,8 @@ use zksync_basic_types::{H256, U256};
 use zksync_crypto::convert::FeConvert;
 use zksync_types::{
     aggregated_operations::AggregatedActionType,
+    api_v02::pagination::{BlockAndTxHash, PaginationDirection, PaginationQuery},
     block::{Block, BlockMetadata, ExecutedOperations, PendingBlock},
-    pagination::{BlockAndTxHash, PaginationDirection, PaginationQuery},
     tx::TxHash,
     AccountId, BlockNumber, Fr, ZkSyncOp,
 };

@@ -10,7 +10,7 @@ use qstring::QString;
 use serde::{Deserialize, Serialize};
 
 // Workspace uses
-use zksync_api_client::rest::v02::{Request, Response, ResultStatus};
+use zksync_types::api_v02::{Request, Response, ResultStatus};
 
 // Local uses
 use super::{error::Error, SharedData};

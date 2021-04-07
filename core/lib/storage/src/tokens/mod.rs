@@ -5,7 +5,7 @@ use std::time::Instant;
 use num::{rational::Ratio, BigUint};
 // Workspace imports
 use zksync_types::{
-    pagination::{PaginationDirection, PaginationQuery},
+    api_v02::pagination::{PaginationDirection, PaginationQuery},
     Token, TokenId, TokenLike, TokenPrice,
 };
 use zksync_utils::ratio_to_big_decimal;

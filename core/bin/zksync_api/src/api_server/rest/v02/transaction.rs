@@ -2,22 +2,33 @@
 
 // Built-in uses
 use std::convert::TryInto;
+use std::str::FromStr;
 
 // External uses
 use actix_web::{
     web::{self, Json},
     Scope,
 };
+use chrono::{DateTime, Utc};
 use hex::FromHexError;
+use serde::{Deserialize, Serialize};
+use serde_json::Value;
 
 // Workspace uses
-use zksync_api_client::rest::v02::transaction::{
-    IncomingTx, IncomingTxBatch, L1Receipt, L2Receipt, L2Status, Receipt, Transaction, TxData,
+use zksync_storage::{
+    chain::{
+        block::records::BlockTransactionItem, operations::records::StoredExecutedPriorityOperation,
+        operations_ext::records::TxReceiptResponse,
+    },
+    QueryResult, StorageProcessor,
 };
-use zksync_storage::{QueryResult, StorageProcessor};
 use zksync_types::{
-    aggregated_operations::AggregatedActionType, tx::EthSignData, tx::TxEthSignature, tx::TxHash,
-    BlockNumber,
+    aggregated_operations::AggregatedActionType,
+    api_v02::transaction::{IncomingTx, IncomingTxBatch, L1Status, L2Status},
+    tx::EthSignData,
+    tx::TxEthSignature,
+    tx::TxHash,
+    BlockNumber, EthBlockId, PriorityOpId,
 };
 
 // Local uses
@@ -26,6 +37,115 @@ use super::{
     response::ApiResult,
 };
 use crate::api_server::{rpc_server::types::TxWithSignature, tx_sender::TxSender};
+
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
+pub struct TxData {
+    pub tx: Transaction,
+    pub eth_signature: Option<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
+pub struct L1Receipt {
+    pub status: L1Status,
+    pub eth_block: EthBlockId,
+    pub rollup_block: Option<BlockNumber>,
+    pub id: PriorityOpId,
+}
+
+impl From<(StoredExecutedPriorityOperation, bool)> for L1Receipt {
+    fn from(op: (StoredExecutedPriorityOperation, bool)) -> L1Receipt {
+        let eth_block = EthBlockId(op.0.eth_block as u64);
+        let rollup_block = Some(BlockNumber(op.0.block_number as u32));
+        let id = PriorityOpId(op.0.priority_op_serialid as u64);
+
+        let finalized = op.1;
+
+        let status = if finalized {
+            L1Status::Finalized
+        } else {
+            L1Status::Committed
+        };
+
+        L1Receipt {
+            status,
+            eth_block,
+            rollup_block,
+            id,
+        }
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
+pub struct L2Receipt {
+    pub tx_hash: TxHash,
+    pub rollup_block: Option<BlockNumber>,
+    pub status: L2Status,
+    pub fail_reason: Option<String>,
+}
+
+impl From<TxReceiptResponse> for L2Receipt {
+    fn from(receipt: TxReceiptResponse) -> L2Receipt {
+        let mut tx_hash_with_prefix = "sync-tx:".to_string();
+        tx_hash_with_prefix.push_str(&receipt.tx_hash);
+        let tx_hash = TxHash::from_str(&tx_hash_with_prefix).unwrap();
+        let rollup_block = Some(BlockNumber(receipt.block_number as u32));
+        let fail_reason = receipt.fail_reason;
+        let status = if receipt.success {
+            if receipt.verified {
+                L2Status::Finalized
+            } else {
+                L2Status::Committed
+            }
+        } else {
+            L2Status::Rejected
+        };
+        L2Receipt {
+            tx_hash,
+            rollup_block,
+            status,
+            fail_reason,
+        }
+    }
+}
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(untagged)]
+pub enum Receipt {
+    L1(L1Receipt),
+    L2(L2Receipt),
+}
+
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
+pub struct Transaction {
+    pub tx_hash: TxHash,
+    pub block_number: Option<BlockNumber>,
+    pub op: Value,
+    pub status: L2Status,
+    pub fail_reason: Option<String>,
+    pub created_at: DateTime<Utc>,
+}
+
+impl From<(BlockTransactionItem, bool)> for Transaction {
+    fn from(item: (BlockTransactionItem, bool)) -> Self {
+        let tx_hash = TxHash::from_str(item.0.tx_hash.replace("0x", "sync-tx:").as_str()).unwrap();
+        let status = if item.0.success.unwrap_or_default() {
+            if item.1 {
+                L2Status::Finalized
+            } else {
+                L2Status::Committed
+            }
+        } else {
+            L2Status::Rejected
+        };
+        Self {
+            tx_hash,
+            block_number: Some(BlockNumber(item.0.block_number as u32)),
+            op: item.0.op,
+            status,
+            fail_reason: item.0.fail_reason,
+            created_at: item.0.created_at,
+        }
+    }
+}
 
 /// Shared data between `api/v0.2/transaction` endpoints.
 #[derive(Clone)]
@@ -354,8 +474,8 @@ mod tests {
     use num::rational::Ratio;
     use num::BigUint;
 
-    use zksync_api_client::rest::v02::ApiVersion;
     use zksync_types::{
+        api_v02::ApiVersion,
         tokens::{Token, TokenLike},
         tx::{EthBatchSignData, EthBatchSignatures, PackedEthSignature, TxEthSignature},
         BatchFee, BlockNumber, Fee, OutputFeeType, SignedZkSyncTx, TokenId,

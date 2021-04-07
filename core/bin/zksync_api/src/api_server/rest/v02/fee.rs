@@ -9,7 +9,7 @@ use actix_web::{
 };
 
 // Workspace uses
-use zksync_api_client::rest::v02::fee::{ApiBatchFee, ApiFee, BatchFeeRequest, TxFeeRequest};
+use zksync_types::api_v02::fee::{ApiBatchFee, ApiFee, BatchFeeRequest, TxFeeRequest};
 
 // Local uses
 use super::{error::Error, response::ApiResult};
@@ -82,9 +82,10 @@ mod tests {
     use num::rational::Ratio;
     use num::BigUint;
 
-    use zksync_api_client::rest::v02::{fee::TxInBatchFeeRequest, ApiVersion};
     use zksync_types::{
-        tokens::TokenLike, Address, BatchFee, Fee, OutputFeeType, TokenId, TxFeeTypes,
+        api_v02::{fee::TxInBatchFeeRequest, ApiVersion},
+        tokens::TokenLike,
+        Address, BatchFee, Fee, OutputFeeType, TokenId, TxFeeTypes,
     };
 
     fn dummy_fee_ticker() -> mpsc::Sender<TickerRequest> {

@@ -5,9 +5,8 @@ use actix_web::{
 };
 
 // Workspace uses
-use zksync_api_client::rest::v02::ApiVersion;
 use zksync_config::ZkSyncConfig;
-use zksync_types::network::Network;
+use zksync_types::{api_v02::ApiVersion, network::Network};
 
 // Local uses
 use crate::api_server::tx_sender::TxSender;

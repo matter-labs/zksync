@@ -1,43 +1,5 @@
-// Built-in uses
-
-// External uses
-use serde::{Deserialize, Serialize};
-
-// Workspace uses
-use zksync_config::ZkSyncConfig;
-use zksync_types::{network::Network, Address};
-
-// Local uses
-use super::Response;
 use crate::rest::client::{Client, Result};
-
-#[derive(Deserialize, Serialize, Debug, Clone, Copy, PartialEq, Eq)]
-#[serde(rename_all = "snake_case")]
-pub enum ZksyncVersion {
-    ContractV4,
-}
-
-#[derive(Deserialize, Serialize, Debug, Clone, Copy, PartialEq, Eq)]
-pub struct ApiConfigData {
-    network: Network,
-    contract: Address,
-    gov_contract: Address,
-    deposit_confirmations: u64,
-    zksync_version: ZksyncVersion,
-    // TODO: server_version
-}
-
-impl ApiConfigData {
-    pub fn new(config: &ZkSyncConfig) -> Self {
-        Self {
-            network: config.chain.eth.network,
-            contract: config.contracts.contract_addr,
-            gov_contract: config.contracts.governance_addr,
-            deposit_confirmations: config.eth_watch.confirmations_for_eth_event,
-            zksync_version: ZksyncVersion::ContractV4,
-        }
-    }
-}
+use zksync_types::api_v02::Response;
 
 /// Configuration API part.
 impl Client {

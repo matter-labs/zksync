@@ -1,35 +1,8 @@
-// Built-in uses
-
-// External uses
-use serde::{Deserialize, Serialize};
-
-// Workspace uses
-use zksync_types::{pagination::PaginationQuery, Address, Token, TokenId, TokenLike};
-
-// Local uses
-use super::Response;
 use crate::rest::client::{Client, Result};
-
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
-pub struct ApiToken {
-    pub id: TokenId,
-    pub address: Address,
-    pub symbol: String,
-    pub decimals: u8,
-    pub enabled_for_fees: bool,
-}
-
-impl From<(Token, bool)> for ApiToken {
-    fn from(token: (Token, bool)) -> Self {
-        ApiToken {
-            id: token.0.id,
-            address: token.0.address,
-            symbol: token.0.symbol,
-            decimals: token.0.decimals,
-            enabled_for_fees: token.1,
-        }
-    }
-}
+use zksync_types::{
+    api_v02::{pagination::PaginationQuery, Response},
+    TokenId, TokenLike,
+};
 
 /// Tokens API part.
 impl Client {
