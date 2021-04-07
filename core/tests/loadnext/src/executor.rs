@@ -219,7 +219,7 @@ impl Executor {
         let mut batch_addresses = Vec::new();
 
         for account in self.pool.accounts.iter().take(accounts_to_process) {
-            let target_address = account.0.address();
+            let target_address = account.wallet.address();
 
             // Prior to sending funds in L2, we will send funds in L1 for accounts
             // to be able to perform priority operations.

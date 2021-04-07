@@ -7,3 +7,4 @@ pub mod corrupted_tx;
 pub mod executor;
 pub mod report;
 pub mod report_collector;
+pub mod rng;

@@ -21,7 +21,7 @@ num = { version = "0.3.1", features = ["serde"] }
 tokio = { version = "0.2", features = ["full"] }
 futures = "0.3"
 anyhow = "1.0"
-rand = "0.4"
+rand = { version = "0.7", features = ["small_rng"] }
 envy = "0.4"
 
 [dev-dependencies]

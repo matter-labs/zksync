@@ -1,11 +1,11 @@
 use std::iter;
 
 use num::BigUint;
-use rand::{thread_rng, Rng};
+use rand::{seq::SliceRandom, Rng};
 
 use zksync_types::Address;
 
-use crate::account_pool::AddressPool;
+use crate::{account_pool::AddressPool, rng::LoadtestRng};
 
 /// Type of transaction. It doesn't copy the zkSync operation list, because
 /// it divides some transactions in subcategories (e.g. to new account / to existing account; to self / to other; etc)/
@@ -23,7 +23,7 @@ pub enum TxType {
 impl TxType {
     /// Generates a random transaction type. Not all the variants have the equal chance to be generated;
     /// specifically transfers are made more likely.
-    pub fn random() -> Self {
+    pub fn random(rng: &mut LoadtestRng) -> Self {
         // All available options.
         let mut options = vec![
             Self::Deposit,
@@ -56,14 +56,13 @@ impl TxType {
         );
 
         // Now we can get weighted element by simply choosing the random value from the vector.
-        let rng = &mut thread_rng();
-        rng.choose(&options).copied().unwrap()
+        options.choose(rng).copied().unwrap()
     }
 
     /// Generates a random transaction type that can be a part of the batch.
-    pub fn random_batchable() -> Self {
+    pub fn random_batchable(rng: &mut LoadtestRng) -> Self {
         loop {
-            let output = Self::random();
+            let output = Self::random(rng);
 
             // Priority ops and ChangePubKey cannot be inserted into the batch.
             if !matches!(output, Self::Deposit | Self::FullExit | Self::ChangePubKey) {
@@ -112,13 +111,11 @@ pub enum ExpectedOutcome {
 }
 
 impl IncorrectnessModifier {
-    pub fn random() -> Self {
+    pub fn random(rng: &mut LoadtestRng) -> Self {
         // 90% of transactions should be correct.
         const NO_MODIFIER_PROBABILITY: f32 = 0.9f32;
         // Amount of elements in the enum.
         const MODIFIERS_AMOUNT: usize = 7;
-
-        let rng = &mut thread_rng();
 
         let chance = rng.gen_range(0f32, 1f32);
         if chance <= NO_MODIFIER_PROBABILITY {
@@ -179,25 +176,34 @@ impl TxCommand {
     }
 
     /// Generates a fully random transaction command.
-    pub fn random(own_address: Address, addresses: &AddressPool) -> Self {
-        let command_type = TxType::random();
+    pub fn random(rng: &mut LoadtestRng, own_address: Address, addresses: &AddressPool) -> Self {
+        let command_type = TxType::random(rng);
 
-        Self::new_with_type(own_address, addresses, command_type)
+        Self::new_with_type(rng, own_address, addresses, command_type)
     }
 
     /// Generates a random transaction command that can be a part of the batch.
-    pub fn random_batchable(own_address: Address, addresses: &AddressPool) -> Self {
-        let command_type = TxType::random_batchable();
+    pub fn random_batchable(
+        rng: &mut LoadtestRng,
+        own_address: Address,
+        addresses: &AddressPool,
+    ) -> Self {
+        let command_type = TxType::random_batchable(rng);
 
-        Self::new_with_type(own_address, addresses, command_type)
+        Self::new_with_type(rng, own_address, addresses, command_type)
     }
 
-    fn new_with_type(own_address: Address, addresses: &AddressPool, command_type: TxType) -> Self {
+    fn new_with_type(
+        rng: &mut LoadtestRng,
+        own_address: Address,
+        addresses: &AddressPool,
+        command_type: TxType,
+    ) -> Self {
         let mut command = Self {
             command_type,
-            modifier: IncorrectnessModifier::random(),
-            to: addresses.random_address(),
-            amount: Self::random_amount(),
+            modifier: IncorrectnessModifier::random(rng),
+            to: addresses.random_address(rng),
+            amount: Self::random_amount(rng),
         };
 
         // Check whether we should use a non-existent address.
@@ -244,8 +250,7 @@ impl TxCommand {
         command
     }
 
-    fn random_amount() -> BigUint {
-        let rng = &mut thread_rng();
+    fn random_amount(rng: &mut LoadtestRng) -> BigUint {
         rng.gen_range(0u64, 2u64.pow(18)).into()
     }
 }

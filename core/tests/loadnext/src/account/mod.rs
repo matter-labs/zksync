@@ -10,11 +10,12 @@ use zksync_eth_signer::PrivateKeySigner;
 use zksync_types::{Token, H256};
 
 use crate::{
-    account_pool::AddressPool,
+    account_pool::{AddressPool, TestWallet},
     command::{Command, ExpectedOutcome, IncorrectnessModifier, TxCommand},
     config::LoadtestConfig,
     constants::{COMMIT_TIMEOUT, POLLING_INTERVAL},
     report::{Report, ReportBuilder, ReportLabel},
+    rng::LoadtestRng,
 };
 
 mod batch_command_executor;
@@ -33,6 +34,8 @@ pub struct AccountLifespan {
     /// Ethereum private key of the used wallet.
     /// zkSync private key can be obtained from it using `private_key_from_seed` function.
     eth_pk: H256,
+    /// Rng unique to the account.
+    rng: LoadtestRng,
     config: LoadtestConfig,
     /// Pool of account addresses, used to generate commands.
     addresses: AddressPool,
@@ -46,17 +49,19 @@ impl AccountLifespan {
     pub fn new(
         config: &LoadtestConfig,
         addresses: AddressPool,
-        (wallet, eth_pk): (Wallet<PrivateKeySigner, RpcProvider>, H256),
+        test_account: TestWallet,
         report_sink: Sender<Report>,
     ) -> Self {
-        let main_token = wallet
+        let main_token = test_account
+            .wallet
             .tokens
             .resolve(config.main_token.as_str().into())
             .unwrap();
 
         Self {
-            wallet,
-            eth_pk,
+            wallet: test_account.wallet,
+            eth_pk: test_account.eth_pk,
+            rng: test_account.rng,
             config: config.clone(),
             addresses,
             main_token,
@@ -238,14 +243,14 @@ impl AccountLifespan {
     }
 
     /// Prepares a list of random operations to be executed by an account.
-    fn generate_commands(&self) -> Vec<Command> {
+    fn generate_commands(&mut self) -> Vec<Command> {
         // We start with a CPK just to unlock accounts.
         let mut commands = vec![Command::SingleTx(TxCommand::change_pubkey(
             self.wallet.address(),
         ))];
 
         for _ in 0..self.config.operations_per_account {
-            let command = Command::random(self.wallet.address(), &self.addresses);
+            let command = Command::random(&mut self.rng, self.wallet.address(), &self.addresses);
             commands.push(command)
         }
 

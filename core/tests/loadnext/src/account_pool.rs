@@ -1,44 +1,30 @@
-use std::{
-    collections::VecDeque,
-    str::FromStr,
-    sync::{Arc, RwLock},
-};
+use std::{collections::VecDeque, str::FromStr, sync::Arc};
 
-use rand::{thread_rng, Rng};
+use rand::Rng;
 
 use zksync::{utils::private_key_from_seed, RpcProvider, Wallet, WalletCredentials};
 use zksync_eth_signer::PrivateKeySigner;
 use zksync_types::{tx::PackedEthSignature, Address, H256};
 
-use crate::config::LoadtestConfig;
+use crate::{config::LoadtestConfig, rng::LoadtestRng};
 
 /// Thread-safe pool of the addresses of accounts used in the loadtest.
-///
-/// Sync std `RwLock` is chosen instead of async `tokio` one because of `rand::thread_rng()` usage:
-/// since it's not `Send`, using it in the async functions will make all the affected futures also not
-/// `Send`, which in its turn will make it impossible to be used in `tokio::spawn`.
-///
-/// As long as we only use `read` operation on the lock, it doesn't really matter which kind of lock we use.
 #[derive(Debug, Clone)]
 pub struct AddressPool {
-    pub addresses: Arc<RwLock<Vec<Address>>>,
+    addresses: Arc<Vec<Address>>,
 }
 
 impl AddressPool {
     pub fn new(addresses: Vec<Address>) -> Self {
         Self {
-            addresses: Arc::new(RwLock::new(addresses)),
+            addresses: Arc::new(addresses),
         }
     }
 
     /// Randomly chooses one of the addresses stored in the pool.
-    pub fn random_address(&self) -> Address {
-        let rng = &mut thread_rng();
-
-        let addresses = self.addresses.read().unwrap();
-        let index = rng.gen_range(0, addresses.len());
-
-        addresses[index]
+    pub fn random_address(&self, rng: &mut LoadtestRng) -> Address {
+        let index = rng.gen_range(0, self.addresses.len());
+        self.addresses[index]
     }
 }
 
@@ -54,19 +40,28 @@ pub struct AccountCredentials {
 
 impl AccountCredentials {
     /// Generates random credentials.
-    pub fn rand() -> Self {
-        let eth_pk = H256::random();
+    pub fn rand(rng: &mut LoadtestRng) -> Self {
+        let eth_pk = H256::random_using(rng);
         let address = pk_to_address(&eth_pk);
 
         Self { eth_pk, address }
     }
 }
 
-/// Tuple that consists of pre-initialized wallet and the Ethereum private key.
-/// We have to collect private keys, since `Wallet` doesn't expose it, and we may need it to resign transactions
-/// (for example, if we want to create a corrupted transaction: `zksync` library won't allow us to do it, thus
-/// we will have to sign such a transaction manually).
-pub type TestWallet = (Wallet<PrivateKeySigner, RpcProvider>, H256);
+/// Type that contains the data required for the test wallet to operate.
+#[derive(Debug)]
+pub struct TestWallet {
+    /// Pre-initialized wallet object.
+    pub wallet: Wallet<PrivateKeySigner, RpcProvider>,
+    /// Ethereum private key of the wallet.
+    /// We have to collect private keys, since `Wallet` doesn't expose it, and we may need it to resign transactions
+    /// (for example, if we want to create a corrupted transaction: `zksync` library won't allow us to do it, thus
+    /// we will have to sign such a transaction manually).
+    /// zkSync private key can be restored from the Ethereum one using `private_key_from_seed` function.
+    pub eth_pk: H256,
+    /// RNG object derived from a common loadtest seed and the wallet private key.
+    pub rng: LoadtestRng,
+}
 
 /// Pool of accounts to be used in the test.
 /// Each account is represented as `zksync::Wallet` in order to provide convenient interface of interation with zkSync.
@@ -88,6 +83,8 @@ impl AccountPool {
             zksync::Network::from_str(&config.eth_network).expect("Invalid network name"),
         );
 
+        let mut rng = LoadtestRng::new_generic(None);
+
         let master_wallet = {
             let eth_pk = H256::from_str(&config.master_wallet_pk)
                 .expect("Can't parse master wallet private key");
@@ -105,7 +102,7 @@ impl AccountPool {
         let mut addresses = Vec::with_capacity(config.accounts_amount);
 
         for _ in 0..config.accounts_amount {
-            let eth_credentials = AccountCredentials::rand();
+            let eth_credentials = AccountCredentials::rand(&mut rng);
             let zksync_pk = private_key_from_seed(eth_credentials.eth_pk.as_bytes())
                 .expect("Can't generate the zkSync private key");
             let wallet_credentials = WalletCredentials::<PrivateKeySigner>::from_pk(
@@ -119,7 +116,12 @@ impl AccountPool {
                 .expect("Can't create a wallet");
 
             addresses.push(wallet.address());
-            accounts.push_back((wallet, eth_credentials.eth_pk));
+            let account = TestWallet {
+                wallet,
+                eth_pk: eth_credentials.eth_pk,
+                rng: rng.derive(eth_credentials.eth_pk),
+            };
+            accounts.push_back(account);
         }
 
         Self {
