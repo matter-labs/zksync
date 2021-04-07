@@ -1,16 +1,15 @@
+use crate::operations::error::TransferOpError;
 use crate::{
     helpers::{pack_fee_amount, pack_token_amount, unpack_fee_amount, unpack_token_amount},
-    operations::error::TransferOpError,
-    AccountId, Address, Nonce, TokenId, Transfer,
+    Transfer,
 };
+use crate::{AccountId, Address, Nonce, TokenId};
 use serde::{Deserialize, Serialize};
-use zksync_crypto::{
-    params::{
-        ACCOUNT_ID_BIT_WIDTH, AMOUNT_EXPONENT_BIT_WIDTH, AMOUNT_MANTISSA_BIT_WIDTH, CHUNK_BYTES,
-        FEE_EXPONENT_BIT_WIDTH, FEE_MANTISSA_BIT_WIDTH, FR_ADDRESS_LEN, TOKEN_BIT_WIDTH,
-    },
-    primitives::FromBytes,
+use zksync_crypto::params::{
+    ACCOUNT_ID_BIT_WIDTH, AMOUNT_EXPONENT_BIT_WIDTH, AMOUNT_MANTISSA_BIT_WIDTH, CHUNK_BYTES,
+    FEE_EXPONENT_BIT_WIDTH, FEE_MANTISSA_BIT_WIDTH, FR_ADDRESS_LEN, TOKEN_BIT_WIDTH,
 };
+use zksync_crypto::primitives::FromBytes;
 
 /// TransferToNew operation. For details, see the documentation of [`ZkSyncOp`](./operations/enum.ZkSyncOp.html).
 #[derive(Debug, Clone, Serialize, Deserialize)]

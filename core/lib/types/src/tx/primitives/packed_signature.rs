@@ -1,14 +1,15 @@
 use crate::Engine;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use thiserror::Error;
-use zksync_crypto::{
-    franklin_crypto::{
-        alt_babyjubjub::{edwards, fs::FsRepr, AltJubjubBn256, JubjubEngine},
-        bellman::pairing::ff::{PrimeField, PrimeFieldRepr},
-        eddsa::Signature,
+use zksync_crypto::franklin_crypto::{
+    alt_babyjubjub::{
+        fs::FsRepr,
+        JubjubEngine, {edwards, AltJubjubBn256},
     },
-    params::JUBJUB_PARAMS,
+    bellman::pairing::ff::{PrimeField, PrimeFieldRepr},
+    eddsa::Signature,
 };
+use zksync_crypto::params::JUBJUB_PARAMS;
 
 #[derive(Clone)]
 pub struct PackedSignature(pub Signature<Engine>);

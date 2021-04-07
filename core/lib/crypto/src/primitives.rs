@@ -1,20 +1,18 @@
 // Built-in deps
-use std::{convert::TryInto, mem};
+use std::convert::TryInto;
+use std::mem;
 // External deps
-use crate::franklin_crypto::bellman::pairing::{
-    bn256::Bn256,
-    ff::{PrimeField, PrimeFieldRepr, ScalarEngine},
-    CurveAffine, Engine,
-};
+use crate::franklin_crypto::bellman::pairing::bn256::Bn256;
+use crate::franklin_crypto::bellman::pairing::ff::ScalarEngine;
+use crate::franklin_crypto::bellman::pairing::ff::{PrimeField, PrimeFieldRepr};
+use crate::franklin_crypto::bellman::pairing::{CurveAffine, Engine};
 use num::{BigUint, ToPrimitive};
 use zksync_basic_types::U256;
 // Workspace deps
-use crate::{
-    circuit::utils::append_le_fixed_width,
-    error::PackingError,
-    merkle_tree::{hasher::Hasher, rescue_hasher::BabyRescueHasher},
-    params,
-};
+use crate::circuit::utils::append_le_fixed_width;
+use crate::error::PackingError;
+use crate::merkle_tree::{hasher::Hasher, rescue_hasher::BabyRescueHasher};
+use crate::params;
 
 pub trait GetBits {
     fn get_bits_le(&self) -> Vec<bool>;

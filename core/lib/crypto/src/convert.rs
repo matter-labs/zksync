@@ -1,7 +1,5 @@
-use crate::{
-    error::ConversionError,
-    franklin_crypto::bellman::pairing::ff::{PrimeField, PrimeFieldRepr},
-};
+use crate::error::ConversionError;
+use crate::franklin_crypto::bellman::pairing::ff::{PrimeField, PrimeFieldRepr};
 
 /// Extension trait denoting common conversion method for field elements.
 pub trait FeConvert: PrimeField {
@@ -66,10 +64,8 @@ impl<T> FeConvert for T where T: PrimeField {}
 mod tests {
     use super::*;
 
-    use crate::{
-        rand::{Rand, SeedableRng, XorShiftRng},
-        Fr,
-    };
+    use crate::rand::{Rand, SeedableRng, XorShiftRng};
+    use crate::Fr;
 
     /// Checks that converting FE to the hex form and back results
     /// in the same FE.

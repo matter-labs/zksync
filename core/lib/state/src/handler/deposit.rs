@@ -2,8 +2,9 @@ use std::time::Instant;
 use zksync_crypto::params;
 use zksync_types::{Account, AccountUpdate, AccountUpdates, Deposit, DepositOp, ZkSyncOp};
 
+use crate::handler::error::DepositOpError;
 use crate::{
-    handler::{error::DepositOpError, TxHandler},
+    handler::TxHandler,
     state::{CollectedFee, OpSuccess, ZkSyncState},
 };
 

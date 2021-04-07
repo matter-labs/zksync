@@ -15,10 +15,8 @@ use zksync_crypto::{
 use zksync_utils::{format_units, BigUintSerdeAsRadix10Str};
 
 use super::{PackedEthSignature, TimeRange, TxSignature, VerifiedSignatureCache};
-use crate::{
-    tokens::ChangePubKeyFeeTypeArg,
-    tx::error::{ChangePubkeySignedDataError, TransactionSignatureError},
-};
+use crate::tokens::ChangePubKeyFeeTypeArg;
+use crate::tx::error::{ChangePubkeySignedDataError, TransactionSignatureError};
 
 #[derive(Debug, Serialize, Deserialize, Clone, Copy, PartialEq, Hash, Eq)]
 pub enum ChangePubKeyType {

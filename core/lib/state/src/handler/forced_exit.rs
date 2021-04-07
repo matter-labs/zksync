@@ -3,8 +3,9 @@ use zksync_crypto::params;
 use zksync_types::{AccountUpdate, AccountUpdates, ForcedExit, ForcedExitOp, PubKeyHash, ZkSyncOp};
 use zksync_utils::BigUintSerdeWrapper;
 
+use crate::handler::error::ForcedExitOpError;
 use crate::{
-    handler::{error::ForcedExitOpError, TxHandler},
+    handler::TxHandler,
     state::{CollectedFee, OpSuccess, ZkSyncState},
 };
 

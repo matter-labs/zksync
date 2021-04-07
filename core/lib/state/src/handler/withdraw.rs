@@ -2,8 +2,9 @@ use std::time::Instant;
 use zksync_crypto::params::{self, max_account_id};
 use zksync_types::{AccountUpdate, AccountUpdates, PubKeyHash, Withdraw, WithdrawOp, ZkSyncOp};
 
+use crate::handler::error::WithdrawOpError;
 use crate::{
-    handler::{error::WithdrawOpError, TxHandler},
+    handler::TxHandler,
     state::{CollectedFee, OpSuccess, ZkSyncState},
 };
 

@@ -9,9 +9,10 @@ use zksync_crypto::{
     rand::{Rng, SeedableRng, XorShiftRng},
     PrivateKey,
 };
+use zksync_types::tx::PackedEthSignature;
 use zksync_types::{
-    tx::PackedEthSignature, Account, AccountId, AccountUpdate, PubKeyHash, SignedZkSyncTx, TokenId,
-    ZkSyncPriorityOp, ZkSyncTx,
+    Account, AccountId, AccountUpdate, PubKeyHash, SignedZkSyncTx, TokenId, ZkSyncPriorityOp,
+    ZkSyncTx,
 };
 
 type BoundAccountUpdates = [(AccountId, AccountUpdate)];

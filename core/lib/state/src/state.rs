@@ -8,10 +8,9 @@ use zksync_types::{
     BlockNumber, SignedZkSyncTx, TokenId, ZkSyncPriorityOp, ZkSyncTx,
 };
 
-use crate::{
-    error::{OpError, TxBatchError},
-    handler::{error::CloseOpError, TxHandler},
-};
+use crate::error::{OpError, TxBatchError};
+use crate::handler::error::CloseOpError;
+use crate::handler::TxHandler;
 
 #[derive(Debug)]
 pub struct OpSuccess {

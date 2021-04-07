@@ -2,8 +2,9 @@ use num::BigUint;
 use zksync_crypto::params::{self, max_account_id};
 use zksync_types::{AccountUpdate, AccountUpdates, Close, CloseOp, TokenId};
 
+use crate::handler::error::CloseOpError;
 use crate::{
-    handler::{error::CloseOpError, TxHandler},
+    handler::TxHandler,
     state::{CollectedFee, OpSuccess, ZkSyncState},
 };
 

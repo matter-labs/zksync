@@ -1,17 +1,14 @@
-use crate::{
-    helpers::{pack_fee_amount, unpack_fee_amount},
-    operations::error::ChangePubkeyOpError,
-    tx::ChangePubKey,
-    AccountId, Address, Nonce, PubKeyHash, TokenId,
-};
+use crate::helpers::{pack_fee_amount, unpack_fee_amount};
+use crate::operations::error::ChangePubkeyOpError;
+use crate::tx::ChangePubKey;
+use crate::PubKeyHash;
+use crate::{AccountId, Address, Nonce, TokenId};
 use serde::{Deserialize, Serialize};
-use zksync_crypto::{
-    params::{
-        ACCOUNT_ID_BIT_WIDTH, ADDRESS_WIDTH, CHUNK_BYTES, FEE_EXPONENT_BIT_WIDTH,
-        FEE_MANTISSA_BIT_WIDTH, NEW_PUBKEY_HASH_WIDTH, NONCE_BIT_WIDTH, TOKEN_BIT_WIDTH,
-    },
-    primitives::FromBytes,
+use zksync_crypto::params::{
+    ACCOUNT_ID_BIT_WIDTH, ADDRESS_WIDTH, CHUNK_BYTES, FEE_EXPONENT_BIT_WIDTH,
+    FEE_MANTISSA_BIT_WIDTH, NEW_PUBKEY_HASH_WIDTH, NONCE_BIT_WIDTH, TOKEN_BIT_WIDTH,
 };
+use zksync_crypto::primitives::FromBytes;
 
 /// ChangePubKey operation. For details, see the documentation of [`ZkSyncOp`](./operations/enum.ZkSyncOp.html).
 #[derive(Debug, Clone, Serialize, Deserialize)]
