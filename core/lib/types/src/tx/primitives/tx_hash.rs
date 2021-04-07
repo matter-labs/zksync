@@ -1,6 +1,6 @@
-use crate::tx::primitives::error::TxHashDecodeError;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::{convert::TryInto, str::FromStr};
+use thiserror::Error;
 
 /// Transaction hash.
 /// Essentially, a SHA-256 hash of transaction bytes encoded according to the zkSync protocol.
@@ -52,6 +52,16 @@ impl FromStr for TxHash {
             data: bytes.as_slice().try_into().unwrap(),
         })
     }
+}
+
+#[derive(Debug, Error)]
+pub enum TxHashDecodeError {
+    #[error("TxHash should start with sync-tx:")]
+    PrefixError,
+    #[error("Cannot decode Hex: {0}")]
+    DecodeHex(#[from] hex::FromHexError),
+    #[error("TxHash size should be equal to 32")]
+    IncorrectHashLength,
 }
 
 impl Serialize for TxHash {

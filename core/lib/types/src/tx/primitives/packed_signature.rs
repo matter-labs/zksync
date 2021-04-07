@@ -1,6 +1,6 @@
-use crate::tx::primitives::error::DeserializePackedSignatureError;
 use crate::Engine;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
+use thiserror::Error;
 use zksync_crypto::franklin_crypto::{
     alt_babyjubjub::{
         fs::FsRepr,
@@ -25,25 +25,35 @@ impl PackedSignature {
         Ok(packed_signature.to_vec())
     }
 
-    pub fn deserialize_packed(bytes: &[u8]) -> Result<Self, DeserializePackedSignatureError> {
+    pub fn deserialize_packed(bytes: &[u8]) -> Result<Self, DeserializeError> {
         if bytes.len() != 64 {
-            return Err(DeserializePackedSignatureError::IncorrectSignatureLength);
+            return Err(DeserializeError::IncorrectSignatureLength);
         }
         let (r_bar, s_bar) = bytes.split_at(32);
 
         let r = edwards::Point::read(r_bar, &JUBJUB_PARAMS as &AltJubjubBn256)
-            .map_err(DeserializePackedSignatureError::CannotRestoreRPoint)?;
+            .map_err(DeserializeError::RestoreRPoint)?;
 
         let mut s_repr = FsRepr::default();
-        s_repr
-            .read_le(s_bar)
-            .map_err(DeserializePackedSignatureError::CannotReadS)?;
+        s_repr.read_le(s_bar).map_err(DeserializeError::ReadS)?;
 
-        let s = <Engine as JubjubEngine>::Fs::from_repr(s_repr)
-            .map_err(DeserializePackedSignatureError::CannotRestoreS)?;
+        let s =
+            <Engine as JubjubEngine>::Fs::from_repr(s_repr).map_err(DeserializeError::RestoreS)?;
 
         Ok(Self(Signature { r, s }))
     }
+}
+
+#[derive(Debug, Error)]
+pub enum DeserializeError {
+    #[error("Signature length should be 64 bytes")]
+    IncorrectSignatureLength,
+    #[error("Failed to restore R point from R_bar: {0}")]
+    RestoreRPoint(std::io::Error),
+    #[error("Cannot read S scalar: {0}")]
+    ReadS(std::io::Error),
+    #[error("Cannot restore S scalar: {0}")]
+    RestoreS(zksync_crypto::ff::PrimeFieldDecodingError),
 }
 
 impl Serialize for PackedSignature {

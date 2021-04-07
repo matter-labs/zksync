@@ -1,10 +1,12 @@
-use crate::tx::primitives::error::DeserializePackedEthSignatureError;
-use parity_crypto::publickey::Error as ParityCryptoError;
 use parity_crypto::{
-    publickey::{public_to_address, recover, sign, KeyPair, Signature as ETHSignature},
+    publickey::{
+        public_to_address, recover, sign, Error as ParityCryptoError, KeyPair,
+        Signature as ETHSignature,
+    },
     Keccak256,
 };
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
+use thiserror::Error;
 use zksync_basic_types::{Address, H256};
 use zksync_utils::ZeroPrefixHexSerde;
 
@@ -34,9 +36,9 @@ impl PackedEthSignature {
         self.0.clone().into_electrum()
     }
 
-    pub fn deserialize_packed(bytes: &[u8]) -> Result<Self, DeserializePackedEthSignatureError> {
+    pub fn deserialize_packed(bytes: &[u8]) -> Result<Self, DeserializeError> {
         if bytes.len() != 65 {
-            return Err(DeserializePackedEthSignatureError::IncorrectSignatureLength);
+            return Err(DeserializeError::IncorrectSignatureLength);
         }
         let mut bytes_array = [0u8; 65];
         bytes_array.copy_from_slice(&bytes);
@@ -78,6 +80,12 @@ impl PackedEthSignature {
     pub fn address_from_private_key(private_key: &H256) -> Result<Address, ParityCryptoError> {
         Ok(KeyPair::from_secret((*private_key).into())?.address())
     }
+}
+
+#[derive(Debug, Error, PartialEq)]
+pub enum DeserializeError {
+    #[error("Eth signature length should be 65 bytes")]
+    IncorrectSignatureLength,
 }
 
 impl Serialize for PackedEthSignature {

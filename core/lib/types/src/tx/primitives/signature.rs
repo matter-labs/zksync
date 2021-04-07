@@ -2,6 +2,7 @@ use zksync_crypto::public_key_from_private;
 
 use crate::Engine;
 use serde::{Deserialize, Serialize};
+use thiserror::Error;
 use zksync_crypto::franklin_crypto::{
     eddsa::{PrivateKey, PublicKey, Seed},
     jubjub::FixedGenerators,
@@ -10,7 +11,7 @@ use zksync_crypto::franklin_crypto::{
 use zksync_crypto::params::{JUBJUB_PARAMS, RESCUE_PARAMS};
 use zksync_crypto::primitives::rescue_hash_tx_msg;
 
-use crate::tx::primitives::error::DeserializePackedTxSignature;
+use crate::tx::primitives::{packed_public_key, packed_signature};
 use crate::tx::{PackedPublicKey, PackedSignature};
 
 /// zkSync transaction signature.
@@ -81,17 +82,25 @@ impl TxSignature {
     /// Deserializes signature from packed bytes representation.
     /// [0..32] - packed pubkey of the signer.
     /// [32..96] - packed r,s of the signature
-    pub fn deserialize_from_packed_bytes(
-        bytes: &[u8],
-    ) -> Result<Self, DeserializePackedTxSignature> {
+    pub fn deserialize_from_packed_bytes(bytes: &[u8]) -> Result<Self, DeserializeError> {
         if bytes.len() != 32 + 64 {
-            return Err(DeserializePackedTxSignature::IncorrectTxSignatureLength);
+            return Err(DeserializeError::IncorrectTxSignatureLength);
         }
         Ok(Self {
             pub_key: PackedPublicKey::deserialize_packed(&bytes[0..32])?,
             signature: PackedSignature::deserialize_packed(&bytes[32..])?,
         })
     }
+}
+
+#[derive(Debug, Error)]
+pub enum DeserializeError {
+    #[error("Tx signature size mismatch")]
+    IncorrectTxSignatureLength,
+    #[error("Cannot deserialize public key: {0}")]
+    DeserializePublicKey(#[from] packed_public_key::DeserializeError),
+    #[error("Cannot deserialize signature: {0}")]
+    DeserializeSignature(#[from] packed_signature::DeserializeError),
 }
 
 impl Default for TxSignature {

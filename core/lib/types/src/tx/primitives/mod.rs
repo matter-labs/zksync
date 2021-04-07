@@ -10,6 +10,5 @@ pub mod signature_cache;
 pub mod time_range;
 pub mod tx_hash;
 
-mod error;
 #[cfg(test)]
 mod tests;
