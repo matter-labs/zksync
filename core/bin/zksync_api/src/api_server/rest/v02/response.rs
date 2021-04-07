@@ -14,6 +14,7 @@ use zksync_types::api_v02::{Request, Response, ResultStatus};
 
 // Local uses
 use super::{error::Error, SharedData};
+
 // This struct is needed to wrap all api responses is `Response` struct by implementing `Responder` trait for it.
 // We can't use simple `Result`, because `actix-web` has already `Responder` implementation for it.
 // Because of this we can't use '?' operator in implementations of endpoints.

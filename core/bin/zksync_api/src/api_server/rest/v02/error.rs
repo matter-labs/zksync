@@ -1,11 +1,16 @@
-use crate::api_server::tx_sender::SubmitError;
-use crate::fee_ticker::PriceError;
-use hex::FromHexError;
-use serde::export::Formatter;
-use serde::{Deserialize, Serialize};
-use serde_repr::Serialize_repr;
+// Built-in uses
 use std::fmt::Display;
+
+// External uses
+use hex::FromHexError;
+use serde::{export::Formatter, Deserialize, Serialize};
+use serde_repr::Serialize_repr;
 use thiserror::Error;
+
+// Workspace uses
+
+// Local uses
+use crate::{api_server::tx_sender::SubmitError, fee_ticker::PriceError};
 
 #[derive(Serialize_repr, Debug, Deserialize)]
 #[repr(u16)]
