@@ -25,6 +25,7 @@ impl AccountLifespan {
                 TxType::WithdrawToOther | TxType::WithdrawToSelf => {
                     self.build_withdraw(command, Some(nonce)).await?
                 }
+                TxType::ChangePubKey => self.build_change_pubkey(command, Some(nonce)).await?,
                 _ => unreachable!("Other tx types are not suitable for batches"),
             };
 

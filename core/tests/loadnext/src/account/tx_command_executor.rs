@@ -175,7 +175,7 @@ impl AccountLifespan {
     }
 
     async fn execute_change_pubkey(&self, command: &TxCommand) -> Result<ReportLabel, ClientError> {
-        let (tx, eth_signature) = self.build_change_pubkey(command).await?;
+        let (tx, eth_signature) = self.build_change_pubkey(command, None).await?;
 
         let provider = self.wallet.provider.clone();
         self.submit(command.modifier, || async {
@@ -188,15 +188,19 @@ impl AccountLifespan {
     pub(super) async fn build_change_pubkey(
         &self,
         command: &TxCommand,
+        nonce: Option<Nonce>,
     ) -> Result<(ZkSyncTx, Option<PackedEthSignature>), ClientError> {
-        let tx = self
+        let mut builder = self
             .wallet
             .start_change_pubkey()
             .fee_token(self.config.main_token.as_str())
-            .unwrap()
-            .tx()
-            .await
-            .map_err(Self::tx_creation_error)?;
+            .unwrap();
+
+        if let Some(nonce) = nonce {
+            builder = builder.nonce(nonce);
+        }
+
+        let tx = builder.tx().await.map_err(Self::tx_creation_error)?;
 
         Ok(self.apply_modifier(tx, None, command.modifier))
     }

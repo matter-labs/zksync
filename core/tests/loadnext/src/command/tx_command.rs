@@ -46,7 +46,7 @@ impl TxType {
             let output = Self::random(rng);
 
             // Priority ops and ChangePubKey cannot be inserted into the batch.
-            if !matches!(output, Self::Deposit | Self::FullExit | Self::ChangePubKey) {
+            if !matches!(output, Self::Deposit | Self::FullExit) {
                 return output;
             }
         }
