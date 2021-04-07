@@ -169,19 +169,20 @@ pub enum TxFeeTypes {
     MintNFT,
 }
 
-/// Token supported in zkSync protocol
+/// NFT supported in zkSync protocol
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 pub struct NFT {
     /// id is used for tx signature and serialization
     pub id: TokenId,
+    /// id for enforcing uniqueness token address
     pub serial_id: u32,
     /// id of nft creator
     pub creator_id: AccountId,
     /// L2 token address
     pub address: Address,
-    /// Token symbol
+    /// token symbol
     pub symbol: String,
-    /// hash of data in nft token
+    /// hash of content for nft token
     pub content_hash: H256,
 }
 

@@ -279,6 +279,7 @@ impl From<ForcedExitOp> for ZkSyncOp {
         Self::ForcedExit(Box::new(op))
     }
 }
+
 impl From<MintNFTOp> for ZkSyncOp {
     fn from(op: MintNFTOp) -> Self {
         Self::MintNFTOp(Box::new(op))

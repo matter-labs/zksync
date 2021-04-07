@@ -15,10 +15,12 @@ use crate::{
     AccountId, Address, Nonce, PubKeyHash, TokenId, H256,
 };
 
+/// `MintNFT` transaction performs NFT minting for the recipient.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MintNFT {
-    pub creator_id: AccountId,
     /// id of nft creator
+    pub creator_id: AccountId,
+    /// address of nft creator
     pub creator_address: Address,
     /// hash of data in nft token
     pub content_hash: H256,
@@ -26,7 +28,7 @@ pub struct MintNFT {
     pub recipient: Address,
     #[serde(with = "BigUintSerdeAsRadix10Str")]
     pub fee: BigUint,
-    /// Token to be used for fee.
+    /// Token that will be used for fee.
     #[serde(default)]
     pub fee_token: TokenId,
     /// Current account nonce.
@@ -127,14 +129,11 @@ impl MintNFT {
 
     /// Verifies the transaction correctness:
     ///
-    /// - `account_id` field must be within supported range.
-    /// - `token` field must be within supported range.
-    /// - `amount` field must represent a packable value.
+    /// - `creator_account_id` field must be within supported range.
+    /// - `fee_token` field must be within supported range.
     /// - `fee` field must represent a packable value.
-    /// - transfer recipient must not be `Adddress::zero()`.
-    /// - zkSync signature must correspond to the PubKeyHash of the account.
     pub fn check_correctness(&mut self) -> bool {
-        let mut valid = self.fee <= BigUint::from(u128::max_value())
+        let mut valid = self.fee <= BigUint::from(u128::MAX)
             && is_fee_amount_packable(&self.fee)
             && self.creator_id <= max_account_id()
             && self.fee_token <= max_token_id()
