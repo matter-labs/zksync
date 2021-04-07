@@ -140,149 +140,149 @@ pub fn api_scope(
         .route("{id}/price", web::get().to(token_price))
 }
 
-#[cfg(test)]
-mod tests {
-    use std::collections::HashMap;
+// #[cfg(test)]
+// mod tests {
+//     use std::collections::HashMap;
 
-    use zksync_types::{Address, TokenId};
+//     use zksync_types::{Address, TokenId};
 
-    use super::{super::test_utils::TestServerConfig, *};
+//     use super::{super::test_utils::TestServerConfig, *};
 
-    use zksync_api_client::rest::v1::ClientError;
+//     use zksync_api_client::rest::v1::ClientError;
 
-    fn dummy_fee_ticker(prices: &[(TokenLike, BigDecimal)]) -> mpsc::Sender<TickerRequest> {
-        let (sender, mut receiver) = mpsc::channel(10);
+//     fn dummy_fee_ticker(prices: &[(TokenLike, BigDecimal)]) -> mpsc::Sender<TickerRequest> {
+//         let (sender, mut receiver) = mpsc::channel(10);
 
-        let prices: HashMap<_, _> = prices.iter().cloned().collect();
-        actix_rt::spawn(async move {
-            while let Some(item) = receiver.next().await {
-                match item {
-                    TickerRequest::GetTokenPrice {
-                        token,
-                        response,
-                        req_type,
-                    } => {
-                        assert_eq!(
-                            req_type,
-                            TokenPriceRequestType::USDForOneToken,
-                            "Unsupported price request type"
-                        );
+//         let prices: HashMap<_, _> = prices.iter().cloned().collect();
+//         actix_rt::spawn(async move {
+//             while let Some(item) = receiver.next().await {
+//                 match item {
+//                     TickerRequest::GetTokenPrice {
+//                         token,
+//                         response,
+//                         req_type,
+//                     } => {
+//                         assert_eq!(
+//                             req_type,
+//                             TokenPriceRequestType::USDForOneToken,
+//                             "Unsupported price request type"
+//                         );
 
-                        let msg = if let Some(price) = prices.get(&token) {
-                            Ok(price.clone())
-                        } else {
-                            Err(PriceError::token_not_found(format!(
-                                "Token not found: {:?}",
-                                token
-                            )))
-                        };
+//                         let msg = if let Some(price) = prices.get(&token) {
+//                             Ok(price.clone())
+//                         } else {
+//                             Err(PriceError::token_not_found(format!(
+//                                 "Token not found: {:?}",
+//                                 token
+//                             )))
+//                         };
 
-                        response.send(msg).expect("Unable to send response");
-                    }
-                    _ => unreachable!("Unsupported request"),
-                }
-            }
-        });
+//                         response.send(msg).expect("Unable to send response");
+//                     }
+//                     _ => unreachable!("Unsupported request"),
+//                 }
+//             }
+//         });
 
-        sender
-    }
+//         sender
+//     }
 
-    #[actix_rt::test]
-    #[cfg_attr(
-        not(feature = "api_test"),
-        ignore = "Use `zk test rust-api` command to perform this test"
-    )]
-    async fn test_tokens_scope() -> anyhow::Result<()> {
-        let cfg = TestServerConfig::default();
-        cfg.fill_database().await?;
+//     #[actix_rt::test]
+//     #[cfg_attr(
+//         not(feature = "api_test"),
+//         ignore = "Use `zk test rust-api` command to perform this test"
+//     )]
+//     async fn test_tokens_scope() -> anyhow::Result<()> {
+//         let cfg = TestServerConfig::default();
+//         cfg.fill_database().await?;
 
-        let prices = [
-            (TokenLike::Id(TokenId(1)), 10_u64.into()),
-            (TokenLike::Id(TokenId(15)), 10_500_u64.into()),
-            ("ETH".into(), 0_u64.into()),
-            (Address::default().into(), 1_u64.into()),
-        ];
-        let fee_ticker = dummy_fee_ticker(&prices);
+//         let prices = [
+//             (TokenLike::Id(TokenId(1)), 10_u64.into()),
+//             (TokenLike::Id(TokenId(15)), 10_500_u64.into()),
+//             ("ETH".into(), 0_u64.into()),
+//             (Address::default().into(), 1_u64.into()),
+//         ];
+//         let fee_ticker = dummy_fee_ticker(&prices);
 
-        let (client, server) = cfg.start_server(move |cfg| {
-            api_scope(cfg.pool.clone(), TokenDBCache::new(), fee_ticker.clone())
-        });
+//         let (client, server) = cfg.start_server(move |cfg| {
+//             api_scope(cfg.pool.clone(), TokenDBCache::new(), fee_ticker.clone())
+//         });
 
-        // Fee requests
-        for (token, expected_price) in &prices {
-            let actual_price = client.token_price(token, TokenPriceKind::Currency).await?;
+//         // Fee requests
+//         for (token, expected_price) in &prices {
+//             let actual_price = client.token_price(token, TokenPriceKind::Currency).await?;
 
-            assert_eq!(
-                actual_price.as_ref(),
-                Some(expected_price),
-                "Price does not match"
-            );
-        }
-        assert_eq!(
-            client
-                .token_price(&TokenLike::Id(TokenId(2)), TokenPriceKind::Currency)
-                .await?,
-            None
-        );
-        let error = client
-            .token_price(&TokenLike::Id(TokenId(2)), TokenPriceKind::Token)
-            .await
-            .unwrap_err();
-        assert!(
-            matches!(error, ClientError::BadRequest { .. }),
-            "Incorrect error type: got {:?} instead of BadRequest",
-            error
-        );
-        // Tokens requests
-        let expected_tokens = {
-            let mut storage = cfg.pool.access_storage().await?;
+//             assert_eq!(
+//                 actual_price.as_ref(),
+//                 Some(expected_price),
+//                 "Price does not match"
+//             );
+//         }
+//         assert_eq!(
+//             client
+//                 .token_price(&TokenLike::Id(TokenId(2)), TokenPriceKind::Currency)
+//                 .await?,
+//             None
+//         );
+//         let error = client
+//             .token_price(&TokenLike::Id(TokenId(2)), TokenPriceKind::Token)
+//             .await
+//             .unwrap_err();
+//         assert!(
+//             matches!(error, ClientError::BadRequest { .. }),
+//             "Incorrect error type: got {:?} instead of BadRequest",
+//             error
+//         );
+//         // Tokens requests
+//         let expected_tokens = {
+//             let mut storage = cfg.pool.access_storage().await?;
 
-            let mut tokens: Vec<_> = storage
-                .tokens_schema()
-                .load_tokens()
-                .await?
-                .values()
-                .cloned()
-                .collect();
-            tokens.sort_unstable_by(|lhs, rhs| lhs.id.cmp(&rhs.id));
-            tokens
-        };
+//             let mut tokens: Vec<_> = storage
+//                 .tokens_schema()
+//                 .load_tokens()
+//                 .await?
+//                 .values()
+//                 .cloned()
+//                 .collect();
+//             tokens.sort_unstable_by(|lhs, rhs| lhs.id.cmp(&rhs.id));
+//             tokens
+//         };
 
-        assert_eq!(client.tokens().await?, expected_tokens);
+//         assert_eq!(client.tokens().await?, expected_tokens);
 
-        let expected_token = &expected_tokens[0];
-        assert_eq!(
-            &client
-                .token_by_id(&TokenLike::Id(TokenId(0)))
-                .await?
-                .unwrap(),
-            expected_token
-        );
-        assert_eq!(
-            &client
-                .token_by_id(&TokenLike::parse(
-                    "0x0000000000000000000000000000000000000000"
-                ))
-                .await?
-                .unwrap(),
-            expected_token
-        );
-        assert_eq!(
-            &client
-                .token_by_id(&TokenLike::parse(
-                    "0000000000000000000000000000000000000000"
-                ))
-                .await?
-                .unwrap(),
-            expected_token
-        );
-        assert_eq!(
-            &client.token_by_id(&TokenLike::parse("ETH")).await?.unwrap(),
-            expected_token
-        );
-        assert_eq!(client.token_by_id(&TokenLike::parse("XM")).await?, None);
+//         let expected_token = &expected_tokens[0];
+//         assert_eq!(
+//             &client
+//                 .token_by_id(&TokenLike::Id(TokenId(0)))
+//                 .await?
+//                 .unwrap(),
+//             expected_token
+//         );
+//         assert_eq!(
+//             &client
+//                 .token_by_id(&TokenLike::parse(
+//                     "0x0000000000000000000000000000000000000000"
+//                 ))
+//                 .await?
+//                 .unwrap(),
+//             expected_token
+//         );
+//         assert_eq!(
+//             &client
+//                 .token_by_id(&TokenLike::parse(
+//                     "0000000000000000000000000000000000000000"
+//                 ))
+//                 .await?
+//                 .unwrap(),
+//             expected_token
+//         );
+//         assert_eq!(
+//             &client.token_by_id(&TokenLike::parse("ETH")).await?.unwrap(),
+//             expected_token
+//         );
+//         assert_eq!(client.token_by_id(&TokenLike::parse("XM")).await?, None);
 
-        server.stop().await;
-        Ok(())
-    }
-}
+//         server.stop().await;
+//         Ok(())
+//     }
+// }

@@ -60,37 +60,37 @@ pub fn api_scope(config: &ZkSyncConfig) -> Scope {
         )
 }
 
-#[cfg(test)]
-mod tests {
-    use super::{super::test_utils::TestServerConfig, *};
+// #[cfg(test)]
+// mod tests {
+//     use super::{super::test_utils::TestServerConfig, *};
 
-    #[actix_rt::test]
-    #[cfg_attr(
-        not(feature = "api_test"),
-        ignore = "Use `zk test rust-api` command to perform this test"
-    )]
-    async fn test_config_scope() -> anyhow::Result<()> {
-        let cfg = TestServerConfig::default();
-        let (client, server) = cfg.start_server(|cfg| api_scope(&cfg.config));
+//     #[actix_rt::test]
+//     #[cfg_attr(
+//         not(feature = "api_test"),
+//         ignore = "Use `zk test rust-api` command to perform this test"
+//     )]
+//     async fn test_config_scope() -> anyhow::Result<()> {
+//         let cfg = TestServerConfig::default();
+//         let (client, server) = cfg.start_server(|cfg| api_scope(&cfg.config));
 
-        assert_eq!(
-            client.deposit_confirmations().await?,
-            cfg.config.eth_watch.confirmations_for_eth_event
-        );
+//         assert_eq!(
+//             client.deposit_confirmations().await?,
+//             cfg.config.eth_watch.confirmations_for_eth_event
+//         );
 
-        assert_eq!(
-            client.network().await?,
-            cfg.config.chain.eth.network.to_string()
-        );
-        assert_eq!(
-            client.contracts().await?,
-            Contracts {
-                contract: cfg.config.contracts.contract_addr
-            },
-        );
+//         assert_eq!(
+//             client.network().await?,
+//             cfg.config.chain.eth.network.to_string()
+//         );
+//         assert_eq!(
+//             client.contracts().await?,
+//             Contracts {
+//                 contract: cfg.config.contracts.contract_addr
+//             },
+//         );
 
-        server.stop().await;
+//         server.stop().await;
 
-        Ok(())
-    }
-}
+//         Ok(())
+//     }
+// }

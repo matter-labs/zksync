@@ -64,53 +64,53 @@ pub fn api_scope(pool: ConnectionPool) -> Scope {
         .route("", web::get().to(block_search))
 }
 
-#[cfg(test)]
-mod tests {
-    use super::{super::test_utils::TestServerConfig, *};
-    use zksync_types::BlockNumber;
+// #[cfg(test)]
+// mod tests {
+//     use super::{super::test_utils::TestServerConfig, *};
+//     use zksync_types::BlockNumber;
 
-    #[actix_rt::test]
-    #[cfg_attr(
-        not(feature = "api_test"),
-        ignore = "Use `zk test rust-api` command to perform this test"
-    )]
-    async fn search_scope() -> anyhow::Result<()> {
-        let cfg = TestServerConfig::default();
-        cfg.fill_database().await?;
+//     #[actix_rt::test]
+//     #[cfg_attr(
+//         not(feature = "api_test"),
+//         ignore = "Use `zk test rust-api` command to perform this test"
+//     )]
+//     async fn search_scope() -> anyhow::Result<()> {
+//         let cfg = TestServerConfig::default();
+//         cfg.fill_database().await?;
 
-        let (client, server) = cfg.start_server(move |cfg| api_scope(cfg.pool.clone()));
+//         let (client, server) = cfg.start_server(move |cfg| api_scope(cfg.pool.clone()));
 
-        // Search for the existing block by number.
-        let block_info = client
-            .search_block(BlockNumber(1))
-            .await?
-            .expect("block should be exist");
-        // Search for the existing block by root hash.
-        assert_eq!(
-            client
-                .search_block(block_info.new_state_root)
-                .await?
-                .unwrap(),
-            block_info
-        );
-        // Search for the existing block by committed tx hash.
-        assert_eq!(
-            client
-                .search_block(block_info.commit_tx_hash.unwrap())
-                .await?
-                .unwrap(),
-            block_info
-        );
-        // Search for the existing block by verified tx hash.
-        assert_eq!(
-            client
-                .search_block(block_info.verify_tx_hash.unwrap())
-                .await?
-                .unwrap(),
-            block_info
-        );
+//         // Search for the existing block by number.
+//         let block_info = client
+//             .search_block(BlockNumber(1))
+//             .await?
+//             .expect("block should be exist");
+//         // Search for the existing block by root hash.
+//         assert_eq!(
+//             client
+//                 .search_block(block_info.new_state_root)
+//                 .await?
+//                 .unwrap(),
+//             block_info
+//         );
+//         // Search for the existing block by committed tx hash.
+//         assert_eq!(
+//             client
+//                 .search_block(block_info.commit_tx_hash.unwrap())
+//                 .await?
+//                 .unwrap(),
+//             block_info
+//         );
+//         // Search for the existing block by verified tx hash.
+//         assert_eq!(
+//             client
+//                 .search_block(block_info.verify_tx_hash.unwrap())
+//                 .await?
+//                 .unwrap(),
+//             block_info
+//         );
 
-        server.stop().await;
-        Ok(())
-    }
-}
+//         server.stop().await;
+//         Ok(())
+//     }
+// }
