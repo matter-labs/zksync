@@ -5,9 +5,10 @@ use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use zksync_crypto::franklin_crypto::bellman::pairing::ff;
 
 use crate::account::error::PubkeyHashDecodingError;
-use zksync_crypto::circuit::utils::pub_key_hash_bytes;
-use zksync_crypto::merkle_tree::rescue_hasher::BabyRescueHasher;
-use zksync_crypto::{public_key_from_private, Fr, PrivateKey, PublicKey};
+use zksync_crypto::{
+    circuit::utils::pub_key_hash_bytes, merkle_tree::rescue_hasher::BabyRescueHasher,
+    public_key_from_private, Fr, PrivateKey, PublicKey,
+};
 
 /// Hash of the account's owner public key.
 ///

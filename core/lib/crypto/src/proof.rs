@@ -1,13 +1,18 @@
-use crate::bellman::plonk::better_better_cs::proof::Proof as NewProof;
-use crate::bellman::plonk::better_cs::{
-    cs::PlonkCsWidth4WithNextStepParams,
-    keys::{Proof as OldProof, VerificationKey as SingleVk},
+use crate::{
+    bellman::plonk::{
+        better_better_cs::proof::Proof as NewProof,
+        better_cs::{
+            cs::PlonkCsWidth4WithNextStepParams,
+            keys::{Proof as OldProof, VerificationKey as SingleVk},
+        },
+    },
+    primitives::EthereumSerializer,
+    serialization::{
+        serialize_new_proof, serialize_single_proof, AggregatedProofSerde, SingleProofSerde,
+        VecFrSerde,
+    },
+    Engine, Fr,
 };
-use crate::primitives::EthereumSerializer;
-use crate::serialization::{
-    serialize_new_proof, serialize_single_proof, AggregatedProofSerde, SingleProofSerde, VecFrSerde,
-};
-use crate::{Engine, Fr};
 use ethabi::Token;
 use recursive_aggregation_circuit::circuit::RecursiveAggregationCircuitBn256;
 use serde::{Deserialize, Serialize};

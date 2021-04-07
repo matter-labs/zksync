@@ -1,12 +1,12 @@
-use crate::operations::error::DepositOpError;
-use crate::Deposit;
-use crate::{AccountId, Address, TokenId};
+use crate::{operations::error::DepositOpError, AccountId, Address, Deposit, TokenId};
 use num::{BigUint, ToPrimitive};
 use serde::{Deserialize, Serialize};
-use zksync_crypto::params::{
-    ACCOUNT_ID_BIT_WIDTH, BALANCE_BIT_WIDTH, CHUNK_BYTES, FR_ADDRESS_LEN, TOKEN_BIT_WIDTH,
+use zksync_crypto::{
+    params::{
+        ACCOUNT_ID_BIT_WIDTH, BALANCE_BIT_WIDTH, CHUNK_BYTES, FR_ADDRESS_LEN, TOKEN_BIT_WIDTH,
+    },
+    primitives::FromBytes,
 };
-use zksync_crypto::primitives::FromBytes;
 
 /// Deposit operation. For details, see the documentation of [`ZkSyncOp`](./operations/enum.ZkSyncOp.html).
 #[derive(Debug, Clone, Serialize, Deserialize)]

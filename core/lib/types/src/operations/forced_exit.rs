@@ -1,16 +1,17 @@
-use crate::operations::error::ForcedExitOpError;
 use crate::{
     helpers::{pack_fee_amount, unpack_fee_amount},
-    ForcedExit,
+    operations::error::ForcedExitOpError,
+    AccountId, Address, ForcedExit, Nonce, TokenId,
 };
-use crate::{AccountId, Address, Nonce, TokenId};
 use num::{BigUint, FromPrimitive, ToPrimitive};
 use serde::{Deserialize, Serialize};
-use zksync_crypto::params::{
-    ACCOUNT_ID_BIT_WIDTH, BALANCE_BIT_WIDTH, CHUNK_BYTES, ETH_ADDRESS_BIT_WIDTH,
-    FEE_EXPONENT_BIT_WIDTH, FEE_MANTISSA_BIT_WIDTH, TOKEN_BIT_WIDTH,
+use zksync_crypto::{
+    params::{
+        ACCOUNT_ID_BIT_WIDTH, BALANCE_BIT_WIDTH, CHUNK_BYTES, ETH_ADDRESS_BIT_WIDTH,
+        FEE_EXPONENT_BIT_WIDTH, FEE_MANTISSA_BIT_WIDTH, TOKEN_BIT_WIDTH,
+    },
+    primitives::FromBytes,
 };
-use zksync_crypto::primitives::FromBytes;
 use zksync_utils::BigUintSerdeWrapper;
 
 /// ForcedExit operation. For details, see the documentation of [`ZkSyncOp`](./operations/enum.ZkSyncOp.html).

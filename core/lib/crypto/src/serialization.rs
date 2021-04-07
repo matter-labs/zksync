@@ -3,17 +3,17 @@
 //! This module provides building blocks for serializing and deserializing
 //! common `zksync` types.
 
-use crate::bellman::plonk::better_better_cs::cs::Circuit as NewCircuit;
-use crate::bellman::plonk::better_better_cs::proof::Proof as NewProof;
-use crate::bellman::plonk::better_cs::{
-    cs::PlonkCsWidth4WithNextStepParams, keys::Proof as OldProof,
+use crate::{
+    bellman::plonk::{
+        better_better_cs::{cs::Circuit as NewCircuit, proof::Proof as NewProof},
+        better_cs::{cs::PlonkCsWidth4WithNextStepParams, keys::Proof as OldProof},
+    },
+    convert::FeConvert,
+    primitives::EthereumSerializer,
+    proof::EncodedSingleProof,
+    recursive_aggregation_circuit::circuit::RecursiveAggregationCircuitBn256,
+    Engine, Fr,
 };
-use crate::convert::FeConvert;
-use crate::primitives::EthereumSerializer;
-use crate::proof::EncodedSingleProof;
-use crate::recursive_aggregation_circuit::circuit::RecursiveAggregationCircuitBn256;
-use crate::Engine;
-use crate::Fr;
 use serde::{de, ser, Deserialize, Deserializer, Serialize, Serializer};
 use zksync_basic_types::U256;
 

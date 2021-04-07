@@ -1,11 +1,13 @@
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use thiserror::Error;
-use zksync_crypto::franklin_crypto::{
-    alt_babyjubjub::{edwards, AltJubjubBn256},
-    eddsa::PublicKey,
+use zksync_crypto::{
+    franklin_crypto::{
+        alt_babyjubjub::{edwards, AltJubjubBn256},
+        eddsa::PublicKey,
+    },
+    params::JUBJUB_PARAMS,
+    Engine,
 };
-use zksync_crypto::params::JUBJUB_PARAMS;
-use zksync_crypto::Engine;
 
 #[derive(Clone)]
 pub struct PackedPublicKey(pub PublicKey<Engine>);

@@ -1,10 +1,9 @@
-use crate::operations::error::CloseOpError;
-use crate::tx::TxSignature;
-use crate::Close;
-use crate::{AccountId, Address, Nonce};
+use crate::{operations::error::CloseOpError, tx::TxSignature, AccountId, Address, Close, Nonce};
 use serde::{Deserialize, Serialize};
-use zksync_crypto::params::{ACCOUNT_ID_BIT_WIDTH, CHUNK_BYTES};
-use zksync_crypto::primitives::FromBytes;
+use zksync_crypto::{
+    params::{ACCOUNT_ID_BIT_WIDTH, CHUNK_BYTES},
+    primitives::FromBytes,
+};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CloseOp {

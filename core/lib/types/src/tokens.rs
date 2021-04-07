@@ -4,8 +4,7 @@ use num::{rational::Ratio, BigUint};
 use serde::{Deserialize, Serialize};
 use std::{fmt, fs::read_to_string, path::PathBuf, str::FromStr};
 use thiserror::Error;
-use zksync_utils::parse_env;
-use zksync_utils::UnsignedRatioSerializeAsDecimal;
+use zksync_utils::{parse_env, UnsignedRatioSerializeAsDecimal};
 
 // Order of the fields is important (from more specific types to less specific types)
 /// Set of values that can be interpreted as a token descriptor.
