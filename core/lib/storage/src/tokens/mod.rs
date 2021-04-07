@@ -4,10 +4,8 @@ use std::time::Instant;
 // External imports
 use num::{rational::Ratio, BigUint};
 // Workspace imports
-use zksync_types::{
-    api_v02::pagination::{PaginationDirection, PaginationQuery},
-    Token, TokenId, TokenLike, TokenPrice,
-};
+use zksync_api_types::v02::pagination::{PaginationDirection, PaginationQuery};
+use zksync_types::{Token, TokenId, TokenLike, TokenPrice};
 use zksync_utils::ratio_to_big_decimal;
 // Local imports
 use self::records::{DBMarketVolume, DbTickerPrice, DbToken};

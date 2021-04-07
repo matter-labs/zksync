@@ -64,7 +64,7 @@ mod tests {
         },
         *,
     };
-    use zksync_types::api_v02::ApiVersion;
+    use zksync_api_types::v02::ApiVersion;
 
     #[actix_rt::test]
     #[cfg_attr(

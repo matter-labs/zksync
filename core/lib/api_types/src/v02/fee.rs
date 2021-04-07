@@ -1,6 +1,6 @@
-use crate::{Address, BatchFee, Fee, OutputFeeType, TokenLike, TxFeeTypes};
 use num::BigUint;
 use serde::{Deserialize, Serialize};
+use zksync_types::{Address, BatchFee, Fee, OutputFeeType, TokenLike, TxFeeTypes};
 use zksync_utils::BigUintSerdeAsRadix10Str;
 
 // TODO: remove `fee_type`, `gas_tx_amount`, `gas_price_wei`

@@ -9,7 +9,7 @@ use actix_web::{
 };
 
 // Workspace uses
-use zksync_types::api_v02::fee::{ApiBatchFee, ApiFee, BatchFeeRequest, TxFeeRequest};
+use zksync_api_types::v02::fee::{ApiBatchFee, ApiFee, BatchFeeRequest, TxFeeRequest};
 
 // Local uses
 use super::{error::Error, response::ApiResult};
@@ -77,15 +77,12 @@ mod tests {
         fee_ticker::{ResponseBatchFee, ResponseFee, TickerRequest},
         signature_checker::VerifySignatureRequest,
     };
-
     use futures::{channel::mpsc, StreamExt};
     use num::rational::Ratio;
     use num::BigUint;
-
+    use zksync_api_types::v02::{fee::TxInBatchFeeRequest, ApiVersion};
     use zksync_types::{
-        api_v02::{fee::TxInBatchFeeRequest, ApiVersion},
-        tokens::TokenLike,
-        Address, BatchFee, Fee, OutputFeeType, TokenId, TxFeeTypes,
+        tokens::TokenLike, Address, BatchFee, Fee, OutputFeeType, TokenId, TxFeeTypes,
     };
 
     fn dummy_fee_ticker() -> mpsc::Sender<TickerRequest> {

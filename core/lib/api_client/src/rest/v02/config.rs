@@ -1,5 +1,5 @@
 use crate::rest::client::{Client, Result};
-use zksync_types::api_v02::Response;
+use zksync_api_types::v02::Response;
 
 /// Configuration API part.
 impl Client {

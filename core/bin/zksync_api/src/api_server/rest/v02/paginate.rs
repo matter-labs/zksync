@@ -4,12 +4,9 @@
 use serde::Serialize;
 
 // Workspace uses
+use zksync_api_types::v02::pagination::{BlockAndTxHash, Paginated, PaginationQuery};
 use zksync_storage::StorageProcessor;
-use zksync_types::{
-    aggregated_operations::AggregatedActionType,
-    api_v02::pagination::{BlockAndTxHash, Paginated, PaginationQuery},
-    BlockNumber, Token, TokenId,
-};
+use zksync_types::{aggregated_operations::AggregatedActionType, BlockNumber, Token, TokenId};
 
 // Local uses
 use super::{

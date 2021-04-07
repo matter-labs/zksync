@@ -76,6 +76,7 @@ impl Error {
     }
 }
 
+#[derive(Debug)]
 pub struct UnreachableError;
 
 impl Display for UnreachableError {

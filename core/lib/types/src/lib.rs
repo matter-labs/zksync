@@ -38,7 +38,6 @@
 
 pub mod account;
 pub mod aggregated_operations;
-pub mod api_v02;
 pub mod block;
 pub mod config;
 pub mod ethereum;

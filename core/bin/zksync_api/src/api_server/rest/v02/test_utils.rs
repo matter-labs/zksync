@@ -12,6 +12,7 @@ use tokio::sync::Mutex;
 
 // Workspace uses
 use zksync_api_client::rest::client::Client;
+use zksync_api_types::v02::Response;
 use zksync_config::ZkSyncConfig;
 use zksync_crypto::rand::{SeedableRng, XorShiftRng};
 use zksync_storage::{
@@ -28,7 +29,6 @@ use zksync_storage::{
 use zksync_test_account::ZkSyncAccount;
 use zksync_types::{
     aggregated_operations::AggregatedActionType,
-    api_v02::Response,
     helpers::{apply_updates, closest_packable_fee_amount, closest_packable_token_amount},
     operations::{ChangePubKeyOp, TransferToNewOp},
     prover::ProverJobType,

@@ -1,10 +1,8 @@
-use std::collections::HashMap;
-
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-
-use crate::network::Network;
+use std::collections::HashMap;
+use zksync_types::network::Network;
 
 pub mod fee;
 pub mod pagination;

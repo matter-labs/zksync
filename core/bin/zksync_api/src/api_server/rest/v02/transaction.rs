@@ -15,6 +15,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 // Workspace uses
+use zksync_api_types::v02::transaction::{IncomingTx, IncomingTxBatch, L1Status, L2Status};
 use zksync_storage::{
     chain::{
         block::records::BlockTransactionItem, operations::records::StoredExecutedPriorityOperation,
@@ -23,11 +24,7 @@ use zksync_storage::{
     QueryResult, StorageProcessor,
 };
 use zksync_types::{
-    aggregated_operations::AggregatedActionType,
-    api_v02::transaction::{IncomingTx, IncomingTxBatch, L1Status, L2Status},
-    tx::EthSignData,
-    tx::TxEthSignature,
-    tx::TxHash,
+    aggregated_operations::AggregatedActionType, tx::EthSignData, tx::TxEthSignature, tx::TxHash,
     BlockNumber, EthBlockId, PriorityOpId,
 };
 
@@ -467,15 +464,12 @@ mod tests {
         fee_ticker::{ResponseBatchFee, ResponseFee, TickerRequest},
         signature_checker::{VerifiedTx, VerifySignatureRequest},
     };
-
     use actix_web::App;
     use bigdecimal::BigDecimal;
     use futures::{channel::mpsc, StreamExt};
-    use num::rational::Ratio;
-    use num::BigUint;
-
+    use num::{rational::Ratio, BigUint};
+    use zksync_api_types::v02::ApiVersion;
     use zksync_types::{
-        api_v02::ApiVersion,
         tokens::{Token, TokenLike},
         tx::{EthBatchSignData, EthBatchSignatures, PackedEthSignature, TxEthSignature},
         BatchFee, BlockNumber, Fee, OutputFeeType, SignedZkSyncTx, TokenId,

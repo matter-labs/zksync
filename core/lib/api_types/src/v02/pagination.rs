@@ -1,5 +1,5 @@
-use crate::{tx::TxHash, BlockNumber};
 use serde::{Deserialize, Serialize};
+use zksync_types::{tx::TxHash, BlockNumber};
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone, Copy)]
 #[serde(rename_all = "snake_case")]

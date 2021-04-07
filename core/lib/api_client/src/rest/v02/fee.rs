@@ -1,12 +1,10 @@
 // Local uses
 use crate::rest::client::{Client, Result};
-use zksync_types::{
-    api_v02::{
-        fee::{BatchFeeRequest, TxFeeRequest, TxInBatchFeeRequest},
-        Response,
-    },
-    Address, TokenLike, TxFeeTypes,
+use zksync_api_types::v02::{
+    fee::{BatchFeeRequest, TxFeeRequest, TxInBatchFeeRequest},
+    Response,
 };
+use zksync_types::{Address, TokenLike, TxFeeTypes};
 
 /// Block API part.
 impl Client {

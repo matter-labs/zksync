@@ -9,13 +9,10 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
 // Workspace uses
+use zksync_api_types::v02::pagination::{BlockAndTxHash, Paginated, PaginationQuery};
 use zksync_crypto::{convert::FeConvert, serialization::FrSerde, Fr};
 use zksync_storage::{chain::block::records::BlockDetails, ConnectionPool, QueryResult};
-use zksync_types::{
-    api_v02::pagination::{BlockAndTxHash, Paginated, PaginationQuery},
-    tx::TxHash,
-    BlockNumber,
-};
+use zksync_types::{tx::TxHash, BlockNumber};
 
 // Local uses
 use super::{
@@ -226,7 +223,7 @@ mod tests {
         },
         *,
     };
-    use zksync_types::api_v02::{pagination::PaginationDirection, ApiVersion};
+    use zksync_api_types::v02::{pagination::PaginationDirection, ApiVersion};
 
     #[actix_rt::test]
     #[cfg_attr(

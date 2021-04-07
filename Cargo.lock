@@ -5930,6 +5930,7 @@ dependencies = [
  "vlog",
  "web3",
  "zksync_api_client",
+ "zksync_api_types",
  "zksync_balancer",
  "zksync_config",
  "zksync_contracts",
@@ -5955,6 +5956,22 @@ dependencies = [
  "serde",
  "serde_json",
  "thiserror",
+ "zksync_api_types",
+ "zksync_config",
+ "zksync_crypto",
+ "zksync_types",
+ "zksync_utils",
+]
+
+[[package]]
+name = "zksync_api_types"
+version = "1.0.0"
+dependencies = [
+ "chrono",
+ "hex",
+ "num",
+ "serde",
+ "serde_json",
  "zksync_config",
  "zksync_crypto",
  "zksync_types",
@@ -6337,6 +6354,7 @@ dependencies = [
  "thiserror",
  "tokio 0.2.22",
  "vlog",
+ "zksync_api_types",
  "zksync_basic_types",
  "zksync_config",
  "zksync_crypto",

@@ -1,11 +1,9 @@
 use crate::rest::client::{Client, Result};
-use zksync_types::{
-    api_v02::{
-        transaction::{IncomingTx, IncomingTxBatch},
-        Response,
-    },
-    tx::{EthBatchSignatures, TxEthSignature, TxHash, ZkSyncTx},
+use zksync_api_types::v02::{
+    transaction::{IncomingTx, IncomingTxBatch},
+    Response,
 };
+use zksync_types::tx::{EthBatchSignatures, TxEthSignature, TxHash, ZkSyncTx};
 
 /// Transaction API part.
 impl Client {

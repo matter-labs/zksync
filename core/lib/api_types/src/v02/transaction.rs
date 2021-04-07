@@ -1,8 +1,8 @@
-use crate::{
+use serde::{Deserialize, Serialize};
+use zksync_types::{
     tx::{EthBatchSignatures, TxEthSignature},
     ZkSyncTx,
 };
-use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct IncomingTxBatch {

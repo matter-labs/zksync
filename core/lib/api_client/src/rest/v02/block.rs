@@ -1,10 +1,7 @@
 use crate::rest::client::{Client, Result};
 
-use zksync_types::{
-    api_v02::{pagination::PaginationQuery, Response},
-    tx::TxHash,
-    BlockNumber,
-};
+use zksync_api_types::v02::{pagination::PaginationQuery, Response};
+use zksync_types::{tx::TxHash, BlockNumber};
 
 /// Block API part.
 impl Client {

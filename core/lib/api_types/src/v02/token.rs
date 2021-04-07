@@ -1,5 +1,5 @@
-use crate::{Address, Token, TokenId};
 use serde::{Deserialize, Serialize};
+use zksync_types::{Address, Token, TokenId};
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
 pub struct ApiToken {
