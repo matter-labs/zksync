@@ -18,22 +18,25 @@ impl TxHandler<ForcedExit> for ZkSyncState {
         let initiator_account = self
             .get_account(tx.initiator_account_id)
             .ok_or(ForcedExitOpError::InitiatorAccountNotFound)?;
-        if tx.verify_signature() != Some(initiator_account.pub_key_hash) {
-            return Err(ForcedExitOpError::InvalidSignature);
-        }
+        invariant!(
+            tx.verify_signature() == Some(initiator_account.pub_key_hash),
+            ForcedExitOpError::InvalidSignature
+        );
 
         // Check the token ID correctness.
-        if tx.token > params::max_token_id() {
-            return Err(ForcedExitOpError::InvalidTokenId);
-        }
+        invariant!(
+            tx.token <= params::max_token_id(),
+            ForcedExitOpError::InvalidTokenId
+        );
 
         // Check that target account does not have an account ID set.
         let (target_account_id, account) = self
             .get_account_by_address(&tx.target)
             .ok_or(ForcedExitOpError::TargetAccountNotFound)?;
-        if account.pub_key_hash != PubKeyHash::default() {
-            return Err(ForcedExitOpError::TargetAccountNotLocked);
-        }
+        invariant!(
+            account.pub_key_hash == PubKeyHash::default(),
+            ForcedExitOpError::TargetAccountNotLocked
+        );
 
         // Obtain the token balance to be withdrawn.
         let account_balance = self
@@ -67,9 +70,10 @@ impl TxHandler<ForcedExit> for ZkSyncState {
         op: &Self::Op,
     ) -> Result<(Option<CollectedFee>, AccountUpdates), ForcedExitOpError> {
         let start = Instant::now();
-        if op.tx.initiator_account_id > params::max_account_id() {
-            return Err(ForcedExitOpError::IncorrectInitiatorAccount);
-        }
+        invariant!(
+            op.tx.initiator_account_id <= params::max_account_id(),
+            ForcedExitOpError::IncorrectInitiatorAccount
+        );
 
         let initiator_account_id = op.tx.initiator_account_id;
         let target_account_id = op.target_account_id;
@@ -89,20 +93,23 @@ impl TxHandler<ForcedExit> for ZkSyncState {
         let initiator_old_balance = initiator_account.get_balance(op.tx.token);
         let initiator_old_nonce = initiator_account.nonce;
 
-        if op.tx.nonce != initiator_old_nonce {
-            return Err(ForcedExitOpError::NonceMismatch);
-        }
-        if initiator_old_balance < op.tx.fee {
-            return Err(ForcedExitOpError::InitiatorInsufficientBalance);
-        }
+        invariant!(
+            op.tx.nonce == initiator_old_nonce,
+            ForcedExitOpError::NonceMismatch
+        );
+        invariant!(
+            initiator_old_balance >= op.tx.fee,
+            ForcedExitOpError::InitiatorInsufficientBalance
+        );
 
         // Check that target account has required amount of tokens to withdraw.
         // (normally, it should, since we're declaring this amount ourselves, but
         // this check is added for additional safety).
         let target_old_balance = target_account.get_balance(op.tx.token);
-        if target_old_balance != amount {
-            return Err(ForcedExitOpError::TargetAccountBalanceMismatch);
-        }
+        invariant!(
+            target_old_balance == amount,
+            ForcedExitOpError::TargetAccountBalanceMismatch
+        );
 
         // Take fees from the initiator account (and update initiator account nonce).
         initiator_account.sub_balance(op.tx.token, &op.tx.fee);

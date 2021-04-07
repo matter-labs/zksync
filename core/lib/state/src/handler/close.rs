@@ -24,22 +24,22 @@ impl TxHandler<Close> for ZkSyncState {
         &mut self,
         op: &Self::Op,
     ) -> Result<(Option<CollectedFee>, AccountUpdates), CloseOpError> {
-        if op.account_id > max_account_id() {
-            return Err(CloseOpError::InvalidAccountId);
-        }
+        invariant!(
+            op.account_id <= max_account_id(),
+            CloseOpError::InvalidAccountId
+        );
 
         let mut updates = Vec::new();
         let account = self.get_account(op.account_id).unwrap();
 
         for token in 0..params::total_tokens() {
-            if account.get_balance(TokenId(token as u16)) != BigUint::from(0u32) {
-                return Err(CloseOpError::AccountNotEmpty(token));
-            }
+            invariant!(
+                account.get_balance(TokenId(token as u16)) == BigUint::from(0u32),
+                CloseOpError::AccountNotEmpty(token)
+            );
         }
 
-        if op.tx.nonce != account.nonce {
-            return Err(CloseOpError::NonceMismatch);
-        }
+        invariant!(op.tx.nonce == account.nonce, CloseOpError::NonceMismatch);
 
         self.remove_account(op.account_id);
 

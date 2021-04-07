@@ -1,6 +1,8 @@
 use crate::state::{CollectedFee, OpSuccess};
 use zksync_types::AccountUpdates;
 
+#[macro_use]
+mod invariant;
 mod change_pubkey;
 mod close;
 mod deposit;

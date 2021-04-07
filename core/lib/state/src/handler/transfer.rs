@@ -16,24 +16,26 @@ impl TxHandler<Transfer> for ZkSyncState {
     type OpError = TransferOpError;
 
     fn create_op(&self, tx: Transfer) -> Result<Self::Op, TransferOpError> {
-        if tx.token > params::max_token_id() {
-            return Err(TransferOpError::InvalidTokenId);
-        }
-        if tx.to == Address::zero() {
-            return Err(TransferOpError::TargetAccountZero);
-        }
+        invariant!(
+            tx.token <= params::max_token_id(),
+            TransferOpError::InvalidTokenId
+        );
+        invariant!(tx.to != Address::zero(), TransferOpError::TargetAccountZero);
         let (from, from_account) = self
             .get_account_by_address(&tx.from)
             .ok_or(TransferOpError::FromAccountNotFound)?;
-        if from_account.pub_key_hash == PubKeyHash::default() {
-            return Err(TransferOpError::FromAccountLocked);
-        }
-        if tx.verify_signature() != Some(from_account.pub_key_hash) {
-            return Err(TransferOpError::InvalidSignature);
-        }
-        if from != tx.account_id {
-            return Err(TransferOpError::TransferAccountIncorrect);
-        }
+        invariant!(
+            from_account.pub_key_hash != PubKeyHash::default(),
+            TransferOpError::FromAccountLocked
+        );
+        invariant!(
+            tx.verify_signature() == Some(from_account.pub_key_hash),
+            TransferOpError::InvalidSignature
+        );
+        invariant!(
+            from == tx.account_id,
+            TransferOpError::TransferAccountIncorrect
+        );
 
         let outcome = if let Some((to, _)) = self.get_account_by_address(&tx.to) {
             let transfer_op = TransferOp { tx, from, to };
@@ -79,12 +81,15 @@ impl ZkSyncState {
         op: &TransferOp,
     ) -> Result<(Option<CollectedFee>, AccountUpdates), TransferOpError> {
         let start = Instant::now();
-        if op.from > max_account_id() {
-            return Err(TransferOpError::SourceAccountIncorrect);
-        }
-        if op.to > max_account_id() {
-            return Err(TransferOpError::TargetAccountIncorrect);
-        }
+
+        invariant!(
+            op.from <= max_account_id(),
+            TransferOpError::SourceAccountIncorrect
+        );
+        invariant!(
+            op.to <= max_account_id(),
+            TransferOpError::TargetAccountIncorrect
+        );
 
         if op.from == op.to {
             return self.apply_transfer_op_to_self(op);
@@ -97,12 +102,14 @@ impl ZkSyncState {
         let from_old_balance = from_account.get_balance(op.tx.token);
         let from_old_nonce = from_account.nonce;
 
-        if op.tx.nonce != from_old_nonce {
-            return Err(TransferOpError::NonceMismatch);
-        }
-        if from_old_balance < &op.tx.amount + &op.tx.fee {
-            return Err(TransferOpError::InsufficientBalance);
-        }
+        invariant!(
+            op.tx.nonce == from_old_nonce,
+            TransferOpError::NonceMismatch
+        );
+        invariant!(
+            from_old_balance >= &op.tx.amount + &op.tx.fee,
+            TransferOpError::InsufficientBalance
+        );
 
         from_account.sub_balance(op.tx.token, &(&op.tx.amount + &op.tx.fee));
         *from_account.nonce += 1;
@@ -152,12 +159,12 @@ impl ZkSyncState {
         op: &TransferOp,
     ) -> Result<(Option<CollectedFee>, AccountUpdates), TransferOpError> {
         let start = Instant::now();
-        if op.from > max_account_id() {
-            return Err(TransferOpError::SourceAccountIncorrect);
-        }
-        if op.from != op.to {
-            return Err(TransferOpError::CannotTransferToSelf);
-        }
+
+        invariant!(
+            op.from <= max_account_id(),
+            TransferOpError::SourceAccountIncorrect
+        );
+        invariant!(op.from == op.to, TransferOpError::CannotTransferToSelf);
 
         let mut updates = Vec::new();
         let mut account = self.get_account(op.from).unwrap();
@@ -165,12 +172,11 @@ impl ZkSyncState {
         let old_balance = account.get_balance(op.tx.token);
         let old_nonce = account.nonce;
 
-        if op.tx.nonce != old_nonce {
-            return Err(TransferOpError::NonceMismatch);
-        }
-        if old_balance < &op.tx.amount + &op.tx.fee {
-            return Err(TransferOpError::InsufficientBalance);
-        }
+        invariant!(op.tx.nonce == old_nonce, TransferOpError::NonceMismatch);
+        invariant!(
+            old_balance >= &op.tx.amount + &op.tx.fee,
+            TransferOpError::InsufficientBalance
+        );
 
         account.sub_balance(op.tx.token, &op.tx.fee);
         *account.nonce += 1;
@@ -204,13 +210,14 @@ impl ZkSyncState {
     ) -> Result<(Option<CollectedFee>, AccountUpdates), TransferOpError> {
         let start = Instant::now();
         let mut updates = Vec::new();
-
-        if op.from > max_account_id() {
-            return Err(TransferOpError::SourceAccountIncorrect);
-        }
-        if op.to > max_account_id() {
-            return Err(TransferOpError::TargetAccountIncorrect);
-        }
+        invariant!(
+            op.from <= max_account_id(),
+            TransferOpError::SourceAccountIncorrect
+        );
+        invariant!(
+            op.to <= max_account_id(),
+            TransferOpError::TargetAccountIncorrect
+        );
 
         if let Some(account) = self.get_account(op.to) {
             vlog::error!(
@@ -230,12 +237,14 @@ impl ZkSyncState {
         let mut from_account = self.get_account(op.from).unwrap();
         let from_old_balance = from_account.get_balance(op.tx.token);
         let from_old_nonce = from_account.nonce;
-        if op.tx.nonce != from_old_nonce {
-            return Err(TransferOpError::NonceMismatch);
-        }
-        if from_old_balance < &op.tx.amount + &op.tx.fee {
-            return Err(TransferOpError::InsufficientBalance);
-        }
+        invariant!(
+            op.tx.nonce == from_old_nonce,
+            TransferOpError::NonceMismatch
+        );
+        invariant!(
+            from_old_balance >= &op.tx.amount + &op.tx.fee,
+            TransferOpError::InsufficientBalance
+        );
         from_account.sub_balance(op.tx.token, &(&op.tx.amount + &op.tx.fee));
         *from_account.nonce += 1;
         let from_new_balance = from_account.get_balance(op.tx.token);

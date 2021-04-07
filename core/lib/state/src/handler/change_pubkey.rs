@@ -19,21 +19,26 @@ impl TxHandler<ChangePubKey> for ZkSyncState {
         let (account_id, account) = self
             .get_account_by_address(&tx.account)
             .ok_or(ChangePubKeyOpError::AccountNotFound)?;
-        if tx.account != account.address {
-            return Err(ChangePubKeyOpError::InvalidAccountAddress);
-        }
-        if !tx.is_eth_auth_data_valid() {
-            return Err(ChangePubKeyOpError::InvalidAuthData);
-        }
-        if tx.verify_signature() != Some(tx.new_pk_hash) {
-            return Err(ChangePubKeyOpError::InvalidZksyncSignature);
-        }
-        if account_id != tx.account_id {
-            return Err(ChangePubKeyOpError::InvalidAccountId);
-        }
-        if account_id > params::max_account_id() {
-            return Err(ChangePubKeyOpError::AccountIdTooBig);
-        }
+        invariant!(
+            tx.account == account.address,
+            ChangePubKeyOpError::InvalidAccountAddress
+        );
+        invariant!(
+            tx.is_eth_auth_data_valid(),
+            ChangePubKeyOpError::InvalidAuthData
+        );
+        invariant!(
+            tx.verify_signature() == Some(tx.new_pk_hash),
+            ChangePubKeyOpError::InvalidZksyncSignature
+        );
+        invariant!(
+            account_id == tx.account_id,
+            ChangePubKeyOpError::InvalidAccountId
+        );
+        invariant!(
+            account_id <= params::max_account_id(),
+            ChangePubKeyOpError::AccountIdTooBig
+        );
         let change_pk_op = ChangePubKeyOp { tx, account_id };
 
         Ok(change_pk_op)
@@ -64,18 +69,20 @@ impl TxHandler<ChangePubKey> for ZkSyncState {
         let old_nonce = account.nonce;
 
         // Update nonce.
-        if op.tx.nonce != account.nonce {
-            return Err(ChangePubKeyOpError::NonceMismatch);
-        }
+        invariant!(
+            op.tx.nonce == account.nonce,
+            ChangePubKeyOpError::NonceMismatch
+        );
         *account.nonce += 1;
 
         // Update pubkey hash.
         account.pub_key_hash = op.tx.new_pk_hash;
 
         // Subract fees.
-        if old_balance < op.tx.fee {
-            return Err(ChangePubKeyOpError::InsufficientBalance);
-        }
+        invariant!(
+            old_balance >= op.tx.fee,
+            ChangePubKeyOpError::InsufficientBalance
+        );
         account.sub_balance(op.tx.fee_token, &op.tx.fee);
 
         let new_pub_key_hash = account.pub_key_hash;

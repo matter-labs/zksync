@@ -13,21 +13,25 @@ impl TxHandler<Withdraw> for ZkSyncState {
     type OpError = WithdrawOpError;
 
     fn create_op(&self, tx: Withdraw) -> Result<Self::Op, WithdrawOpError> {
-        if tx.token > params::max_token_id() {
-            return Err(WithdrawOpError::InvalidTokenId);
-        }
+        invariant!(
+            tx.token <= params::max_token_id(),
+            WithdrawOpError::InvalidTokenId
+        );
         let (account_id, account) = self
             .get_account_by_address(&tx.from)
             .ok_or(WithdrawOpError::FromAccountNotFound)?;
-        if account.pub_key_hash == PubKeyHash::default() {
-            return Err(WithdrawOpError::FromAccountLocked);
-        }
-        if tx.verify_signature() != Some(account.pub_key_hash) {
-            return Err(WithdrawOpError::InvalidSignature);
-        }
-        if account_id != tx.account_id {
-            return Err(WithdrawOpError::FromAccountIncorrect);
-        }
+        invariant!(
+            account.pub_key_hash != PubKeyHash::default(),
+            WithdrawOpError::FromAccountLocked
+        );
+        invariant!(
+            tx.verify_signature() == Some(account.pub_key_hash),
+            WithdrawOpError::InvalidSignature
+        );
+        invariant!(
+            account_id == tx.account_id,
+            WithdrawOpError::FromAccountIncorrect
+        );
         let withdraw_op = WithdrawOp { tx, account_id };
 
         Ok(withdraw_op)
@@ -49,22 +53,24 @@ impl TxHandler<Withdraw> for ZkSyncState {
         op: &Self::Op,
     ) -> Result<(Option<CollectedFee>, AccountUpdates), WithdrawOpError> {
         let start = Instant::now();
-        if op.account_id > max_account_id() {
-            return Err(WithdrawOpError::FromAccountIncorrect);
-        }
+        invariant!(
+            op.account_id <= max_account_id(),
+            WithdrawOpError::FromAccountIncorrect
+        );
 
         let mut updates = Vec::new();
         let mut from_account = self.get_account(op.account_id).unwrap();
 
         let from_old_balance = from_account.get_balance(op.tx.token);
         let from_old_nonce = from_account.nonce;
-
-        if op.tx.nonce != from_old_nonce {
-            return Err(WithdrawOpError::NonceMismatch);
-        }
-        if from_old_balance < &op.tx.amount + &op.tx.fee {
-            return Err(WithdrawOpError::InsufficientBalance);
-        }
+        invariant!(
+            op.tx.nonce == from_old_nonce,
+            WithdrawOpError::NonceMismatch
+        );
+        invariant!(
+            from_old_balance >= &op.tx.amount + &op.tx.fee,
+            WithdrawOpError::InsufficientBalance
+        );
 
         from_account.sub_balance(op.tx.token, &(&op.tx.amount + &op.tx.fee));
         *from_account.nonce += 1;
