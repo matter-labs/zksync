@@ -1,6 +1,8 @@
-use crate::merkle_tree::{parallel_smt, RescueHasher};
-use crate::rand::{Rng, SeedableRng, XorShiftRng};
-use crate::{Engine, Fr};
+use crate::{
+    merkle_tree::{parallel_smt, RescueHasher},
+    rand::{Rng, SeedableRng, XorShiftRng},
+    Engine, Fr,
+};
 use serde::{Deserialize, Serialize};
 
 /// Checks if verify_proof method works correctly using merkle_path method

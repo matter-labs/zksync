@@ -5,9 +5,8 @@ use zksync_types::{
     TransferToNewOp,
 };
 
-use crate::handler::error::TransferOpError;
 use crate::{
-    handler::TxHandler,
+    handler::{error::TransferOpError, TxHandler},
     state::{CollectedFee, OpSuccess, TransferOutcome, ZkSyncState},
 };
 

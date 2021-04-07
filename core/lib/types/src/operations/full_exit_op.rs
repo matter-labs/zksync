@@ -1,12 +1,13 @@
-use crate::operations::error::FullExitOpError;
-use crate::FullExit;
-use crate::{AccountId, Address, TokenId};
+use crate::{operations::error::FullExitOpError, AccountId, Address, FullExit, TokenId};
 use num::{BigUint, FromPrimitive, ToPrimitive};
 use serde::{Deserialize, Serialize};
-use zksync_crypto::params::{
-    ACCOUNT_ID_BIT_WIDTH, BALANCE_BIT_WIDTH, CHUNK_BYTES, ETH_ADDRESS_BIT_WIDTH, TOKEN_BIT_WIDTH,
+use zksync_crypto::{
+    params::{
+        ACCOUNT_ID_BIT_WIDTH, BALANCE_BIT_WIDTH, CHUNK_BYTES, ETH_ADDRESS_BIT_WIDTH,
+        TOKEN_BIT_WIDTH,
+    },
+    primitives::FromBytes,
 };
-use zksync_crypto::primitives::FromBytes;
 use zksync_utils::BigUintSerdeWrapper;
 
 /// FullExit operation. For details, see the documentation of [`ZkSyncOp`](./operations/enum.ZkSyncOp.html).

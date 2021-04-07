@@ -2,14 +2,19 @@ use lazy_static::lazy_static;
 
 use crate::params;
 
-use crate::franklin_crypto::bellman::pairing::ff::{Field, PrimeField};
-use crate::franklin_crypto::bellman::pairing::Engine;
+use crate::franklin_crypto::bellman::pairing::{
+    ff::{Field, PrimeField},
+    Engine,
+};
 
-use crate::franklin_crypto::bellman::pairing::bn256::{Bn256, Fr};
-use crate::franklin_crypto::rescue::RescueEngine;
-use crate::merkle_tree::hasher::Hasher;
-use crate::merkle_tree::{RescueHasher, SparseMerkleTree};
-use crate::primitives::{GetBits, GetBitsFixed};
+use crate::{
+    franklin_crypto::{
+        bellman::pairing::bn256::{Bn256, Fr},
+        rescue::RescueEngine,
+    },
+    merkle_tree::{hasher::Hasher, RescueHasher, SparseMerkleTree},
+    primitives::{GetBits, GetBitsFixed},
+};
 
 /// Account tree used in the `zksync_circuit`.
 pub type CircuitAccountTree = SparseMerkleTree<CircuitAccount<Bn256>, Fr, RescueHasher<Bn256>>;

@@ -3,16 +3,20 @@ use zksync_crypto::public_key_from_private;
 use crate::Engine;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
-use zksync_crypto::franklin_crypto::{
-    eddsa::{PrivateKey, PublicKey, Seed},
-    jubjub::FixedGenerators,
-    rescue::RescueEngine,
+use zksync_crypto::{
+    franklin_crypto::{
+        eddsa::{PrivateKey, PublicKey, Seed},
+        jubjub::FixedGenerators,
+        rescue::RescueEngine,
+    },
+    params::{JUBJUB_PARAMS, RESCUE_PARAMS},
+    primitives::rescue_hash_tx_msg,
 };
-use zksync_crypto::params::{JUBJUB_PARAMS, RESCUE_PARAMS};
-use zksync_crypto::primitives::rescue_hash_tx_msg;
 
-use crate::tx::primitives::{packed_public_key, packed_signature};
-use crate::tx::{PackedPublicKey, PackedSignature};
+use crate::tx::{
+    primitives::{packed_public_key, packed_signature},
+    PackedPublicKey, PackedSignature,
+};
 
 /// zkSync transaction signature.
 ///

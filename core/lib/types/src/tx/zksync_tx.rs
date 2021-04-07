@@ -4,10 +4,12 @@ use serde::{Deserialize, Serialize};
 
 use zksync_basic_types::{AccountId, Address};
 
-use crate::tx::error::CloseOperationsDisabled;
 use crate::{
     operations::ChangePubKeyOp,
-    tx::{ChangePubKey, Close, ForcedExit, Transfer, TxEthSignature, TxHash, Withdraw},
+    tx::{
+        error::CloseOperationsDisabled, ChangePubKey, Close, ForcedExit, Transfer, TxEthSignature,
+        TxHash, Withdraw,
+    },
     utils::deserialize_eth_message,
     CloseOp, ForcedExitOp, Nonce, Token, TokenId, TokenLike, TransferOp, TxFeeTypes, WithdrawOp,
 };

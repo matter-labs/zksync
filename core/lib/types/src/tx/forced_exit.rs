@@ -4,17 +4,17 @@ use crate::{
 };
 use num::{BigUint, Zero};
 
-use crate::account::PubKeyHash;
-use crate::Engine;
+use crate::{account::PubKeyHash, Engine};
 use serde::{Deserialize, Serialize};
 use zksync_basic_types::Address;
-use zksync_crypto::franklin_crypto::eddsa::PrivateKey;
-use zksync_crypto::params::{max_account_id, max_token_id};
+use zksync_crypto::{
+    franklin_crypto::eddsa::PrivateKey,
+    params::{max_account_id, max_token_id},
+};
 use zksync_utils::{format_units, BigUintSerdeAsRadix10Str};
 
 use super::{TxSignature, VerifiedSignatureCache};
-use crate::tx::error::TransactionSignatureError;
-use crate::tx::TimeRange;
+use crate::tx::{error::TransactionSignatureError, TimeRange};
 
 /// `ForcedExit` transaction is used to withdraw funds from an unowned
 /// account to its corresponding L1 address.
