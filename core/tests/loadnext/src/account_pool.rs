@@ -83,7 +83,8 @@ impl AccountPool {
             zksync::Network::from_str(&config.eth_network).expect("Invalid network name"),
         );
 
-        let mut rng = LoadtestRng::new_generic(None);
+        let mut rng = LoadtestRng::new_generic(config.seed.clone());
+        vlog::info!("Using RNG with master seed: {}", rng.seed_hex());
 
         let master_wallet = {
             let eth_pk = H256::from_str(&config.master_wallet_pk)

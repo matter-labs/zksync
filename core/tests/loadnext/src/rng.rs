@@ -15,18 +15,29 @@ pub struct LoadtestRng {
 }
 
 impl LoadtestRng {
-    pub fn new_generic(seed: Option<[u8; SEED_SIZE]>) -> Self {
-        let seed: [u8; SEED_SIZE] = seed.unwrap_or_else(|| {
-            let rng = &mut thread_rng();
-            let mut output = [0u8; SEED_SIZE];
-            rng.fill_bytes(&mut output);
+    pub fn new_generic(seed: Option<String>) -> Self {
+        let seed: [u8; SEED_SIZE] = seed
+            .map(|seed_str| {
+                let mut output = [0u8; SEED_SIZE];
+                let decoded_seed = hex::decode(&seed_str).expect("Incorrect seed hex");
+                output.copy_from_slice(decoded_seed.as_ref());
+                output
+            })
+            .unwrap_or_else(|| {
+                let rng = &mut thread_rng();
+                let mut output = [0u8; SEED_SIZE];
+                rng.fill_bytes(&mut output);
 
-            output
-        });
+                output
+            });
 
         let rng = SmallRng::from_seed(seed);
 
         Self { seed, rng }
+    }
+
+    pub fn seed_hex(&self) -> String {
+        hex::encode(&self.seed)
     }
 
     pub fn derive(&self, eth_pk: H256) -> Self {

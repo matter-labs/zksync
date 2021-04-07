@@ -38,6 +38,11 @@ pub struct LoadtestConfig {
     /// Note that we use ERC-20 token since we can't easily mint a lot of ETH on
     /// Rinkeby or Ropsten without caring about collecting it back.
     pub main_token: String,
+
+    /// Optional seed to be used in the test: normally you don't need to set the seed,
+    /// but you can re-use seed from previous run to reproduce the sequence of operations locally.
+    /// Seed must be represented as a hexadecimal string.
+    pub seed: Option<String>,
 }
 
 impl LoadtestConfig {
@@ -60,6 +65,7 @@ impl Default for LoadtestConfig {
             accounts_amount: 20,
             operations_per_account: 40,
             main_token: "DAI".into(),
+            seed: None,
         }
     }
 }

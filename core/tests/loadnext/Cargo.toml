@@ -23,6 +23,7 @@ futures = "0.3"
 anyhow = "1.0"
 rand = { version = "0.7", features = ["small_rng"] }
 envy = "0.4"
+hex = "0.4"
 
 [dev-dependencies]
 zksync_test_account = { path = "../test_account", version = "1.0" }

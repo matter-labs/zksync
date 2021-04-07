@@ -79,6 +79,15 @@ OPERATIONS_PER_ACCOUNT
 MAIN_TOKEN
 ```
 
+Optional parameters:
+
+```sh
+# Optional seed to be used in the test: normally you don't need to set the seed,
+# but you can re-use seed from previous run to reproduce the sequence of operations locally.
+# Seed must be represented as a hexadecimal string.
+SEED
+```
+
 ## Infrastructure relationship
 
 This crate is meant to be independent of the existing zkSync infrastructure. It is not integrated in `zk` and does not
