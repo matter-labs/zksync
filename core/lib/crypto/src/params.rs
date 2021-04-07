@@ -92,10 +92,7 @@ pub const TX_TYPE_BIT_WIDTH: usize = 8;
 pub const SUBTREE_HASH_WIDTH: usize = 254; //seems to be equal to Bn256::NUM_BITS could be replaced
 pub const SUBTREE_HASH_WIDTH_PADDED: usize = 256;
 
-/// Serial id
-pub const SERIAL_ID_BIT_WIDTH: usize = 32;
-// Content hash size
-
+/// Content hash size
 pub const CONTENT_HASH_WIDTH: usize = FR_ADDRESS_LEN * 8;
 
 /// balance bit width

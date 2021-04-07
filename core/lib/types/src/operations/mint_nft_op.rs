@@ -7,7 +7,7 @@ use thiserror::Error;
 use zksync_basic_types::TokenId;
 use zksync_crypto::params::{
     ACCOUNT_ID_BIT_WIDTH, ADDRESS_WIDTH, CHUNK_BYTES, CONTENT_HASH_WIDTH, FEE_EXPONENT_BIT_WIDTH,
-    FEE_MANTISSA_BIT_WIDTH, NFT_STORAGE_ACCOUNT_ID, SERIAL_ID_BIT_WIDTH, TOKEN_BIT_WIDTH,
+    FEE_MANTISSA_BIT_WIDTH, NFT_STORAGE_ACCOUNT_ID, TOKEN_BIT_WIDTH,
 };
 use zksync_crypto::primitives::FromBytes;
 
@@ -51,7 +51,7 @@ impl MintNFTOp {
         data.extend_from_slice(&self.tx.content_hash.as_bytes());
         data.extend_from_slice(&self.tx.recipient.as_bytes());
         data.extend_from_slice(&pack_fee_amount(&self.tx.fee));
-        data.extend_from_slice(&self.tx.fee_token.as_bytes());
+        data.extend_from_slice(&self.tx.fee_token.to_be_bytes());
         data.resize(Self::CHUNKS * CHUNK_BYTES, 0x00);
         data
     }
