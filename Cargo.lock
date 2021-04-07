@@ -5957,7 +5957,6 @@ dependencies = [
  "thiserror",
  "zksync_config",
  "zksync_crypto",
- "zksync_storage",
  "zksync_types",
  "zksync_utils",
 ]
