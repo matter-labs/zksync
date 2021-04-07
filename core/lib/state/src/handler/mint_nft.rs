@@ -62,11 +62,11 @@ impl TxHandler<MintNFT> for ZkSyncState {
 
         let mut creator_account = self
             .get_account(op.creator_account_id)
-            .ok_or(format_err!("Creator account not found"))?;
+            .ok_or_else(|| format_err!("Creator account not found"))?;
 
         let mut recipient_account = self
             .get_account(op.recipient_account_id)
-            .ok_or(format_err!("Recipient account not found"))?;
+            .ok_or_else(|| format_err!("Recipient account not found"))?;
 
         // Generate token id. We have a special NFT account, which stores the next token id for nft in balance of NFT_TOKEN
         let (mut nft_account, account_updates) = self.get_or_create_nft_account_token_id();
@@ -97,7 +97,7 @@ impl TxHandler<MintNFT> for ZkSyncState {
         updates.push((
             op.creator_account_id,
             AccountUpdate::UpdateBalance {
-                balance_update: (op.tx.fee_token, old_balance, new_balance.clone()),
+                balance_update: (op.tx.fee_token, old_balance, new_balance),
                 old_nonce: nonce,
                 new_nonce: nonce,
             },

@@ -231,7 +231,7 @@ fn mint_token_to_new_account() {
         creator_account.address,
         new_address,
         fee_token_id,
-        zero_amount.clone(),
+        zero_amount,
         fee.clone(),
         creator_account.nonce,
         Default::default(),
@@ -297,7 +297,7 @@ fn mint_token_to_new_account() {
                 AccountUpdate::UpdateBalance {
                     old_nonce: creator_account.nonce,
                     new_nonce: creator_account.nonce + 1,
-                    balance_update: (fee_token_id, balance_from.clone(), fee.clone()),
+                    balance_update: (fee_token_id, balance_from, fee),
                 },
             ),
             (
@@ -305,7 +305,7 @@ fn mint_token_to_new_account() {
                 AccountUpdate::UpdateBalance {
                     old_nonce: Nonce(0),
                     new_nonce: Nonce(0),
-                    balance_update: (fee_token_id, balance_to.clone(), balance_to.clone()),
+                    balance_update: (fee_token_id, balance_to.clone(), balance_to),
                 },
             ),
             (
@@ -398,7 +398,7 @@ fn mint_already_created_nft() {
         creator_account.address,
         content_hash,
         to_account.address,
-        fee.clone(),
+        fee,
         fee_token_id,
         creator_account.nonce,
         Default::default(),

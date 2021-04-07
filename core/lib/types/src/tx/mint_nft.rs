@@ -196,5 +196,9 @@ impl MintNFT {
         data.extend_from_slice(&serial_id.to_be_bytes());
         data.extend_from_slice(self.content_hash.as_bytes());
         data
+        // let x0 = Fr(self.creator_id.0 + 2.pow(32) * serial_id); // linear combination of them
+        // let x1 = Fr(self.content_hash.as_bytes());
+        // let result = rescue_hash(&[x0, x1]);
+        // result
     }
 }
