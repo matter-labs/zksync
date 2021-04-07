@@ -128,16 +128,12 @@ async fn block_by_number(
     data: web::Data<ApiBlockData>,
     web::Path(block_position): web::Path<String>,
 ) -> ApiResult<Option<BlockInfo>> {
-    let block_number: BlockNumber;
-
-    match data.get_block_number_by_position(&block_position).await {
-        Ok(number) => {
-            block_number = number;
-        }
+    let block_number = match data.get_block_number_by_position(&block_position).await {
+        Ok(number) => number,
         Err(err) => {
             return err.into();
         }
-    }
+    };
 
     data.block_info(block_number)
         .await
@@ -150,16 +146,12 @@ async fn block_transactions(
     web::Path(block_position): web::Path<String>,
     web::Query(query): web::Query<PaginationQuery<TxHash>>,
 ) -> ApiResult<Paginated<Transaction, BlockAndTxHash>> {
-    let block_number: BlockNumber;
-
-    match data.get_block_number_by_position(&block_position).await {
-        Ok(number) => {
-            block_number = number;
-        }
+    let block_number = match data.get_block_number_by_position(&block_position).await {
+        Ok(number) => number,
         Err(err) => {
             return err.into();
         }
-    }
+    };
 
     data.transaction_page(block_number, query).await.into()
 }
@@ -259,7 +251,7 @@ mod tests {
             deserialize_response_result(response)?;
         assert_eq!(paginated.count as usize, expected_txs.len());
         assert_eq!(paginated.limit, query.limit);
-        assert!(paginated.list.len() <= query.limit as usize);
+        assert_eq!(paginated.list.len(), query.limit as usize);
         assert_eq!(paginated.direction, PaginationDirection::Older);
         assert_eq!(paginated.from.tx_hash, tx_hash);
         assert_eq!(paginated.from.block_number, block_number);

@@ -88,15 +88,12 @@ impl ApiTokenData {
                 for token in paginated_tokens.list {
                     let enabled_for_fees_result =
                         self.is_token_enabled_for_fees(&mut storage, token.id).await;
-                    let enabled_for_fees;
-                    match enabled_for_fees_result {
-                        Ok(enabled_for_fees_result) => {
-                            enabled_for_fees = enabled_for_fees_result;
-                        }
+                    let enabled_for_fees = match enabled_for_fees_result {
+                        Ok(enabled_for_fees_result) => enabled_for_fees_result,
                         Err(err) => {
                             return Err(err);
                         }
-                    }
+                    };
                     list.push(ApiToken::from((token, enabled_for_fees)));
                 }
                 Ok(Paginated {
@@ -162,12 +159,12 @@ async fn token_by_id(
     web::Path(token_like): web::Path<String>,
 ) -> ApiResult<ApiToken> {
     let token_result = TokenLike::parse_without_symbol(&token_like);
-    let token_like;
-    if token_result.is_none() {
-        return Error::from(PriceError::token_not_found("Cannot parse token")).into();
-    } else {
-        token_like = token_result.unwrap();
-    }
+    let token_like = match token_result {
+        Some(token_result) => token_result,
+        None => {
+            return Error::from(PriceError::token_not_found("Cannot parse token")).into();
+        }
+    };
 
     data.token(token_like).await.into()
 }
@@ -179,12 +176,12 @@ async fn token_price(
     web::Path((token_like, currency)): web::Path<(String, String)>,
 ) -> ApiResult<BigDecimal> {
     let token_result = TokenLike::parse_without_symbol(&token_like);
-    let first_token;
-    if token_result.is_none() {
-        return Error::from(PriceError::token_not_found("Cannot parse token")).into();
-    } else {
-        first_token = token_result.unwrap();
-    }
+    let first_token = match token_result {
+        Some(token_result) => token_result,
+        None => {
+            return Error::from(PriceError::token_not_found("Cannot parse token")).into();
+        }
+    };
 
     if let Ok(second_token_id) = u16::from_str(&currency) {
         let second_token = TokenLike::from(TokenId(second_token_id));
