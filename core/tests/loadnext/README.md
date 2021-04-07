@@ -1,12 +1,12 @@
 # Loadnext: the next generation loadtest for zkSync
 
-Loadnext is an utility for random stress-testing the zkSync server.
-It is capable of simulating the behavior of many independent users of zkSync network, who are sending quasi-random
-requests to the server.
+Loadnext is an utility for random stress-testing the zkSync server. It is capable of simulating the behavior of many
+independent users of zkSync network, who are sending quasi-random requests to the server.
 
 It:
-- doesn't care whether the server is alive or not. At worst, it will just consider the test failed.
-  No panics, no mindless unwraps, yay.
+
+- doesn't care whether the server is alive or not. At worst, it will just consider the test failed. No panics, no
+  mindless unwraps, yay.
 - does a unique set of operations for each participating account.
 - sends transactions, batches, and priority operations.
 - sends incorrect transactions as well as correct ones and compares the outcome to the expected one.
@@ -15,13 +15,14 @@ It:
 - already found a bug in the server code.
 
 Flaws:
+
 - It does not send API requests other than required to execute transactions.
 - So far it has pretty primitive report system.
 
 ## Launch
 
-In order to launch the test in the development scenario, you must first run server and prover (it is recommended
-to use dummy prover), and then launch the test itself.
+In order to launch the test in the development scenario, you must first run server and prover (it is recommended to use
+dummy prover), and then launch the test itself.
 
 ```sh
 # First terminal
@@ -69,11 +70,11 @@ ACCOUNTS_AMOUNT
 # how many individual operations each account of the test will execute.
 OPERATIONS_PER_ACCOUNT
 # Symbolic representation of the ERC-20 token to be used in test.
-# 
+#
 # Token must satisfy two criteria:
 # - Be supported by zkSync.
 # - Have `mint` operation.
-# 
+#
 # Note that we use ERC-20 token since we can't easily mint a lot of ETH on
 # Rinkeby or Ropsten without caring about collecting it back.
 MAIN_TOKEN
