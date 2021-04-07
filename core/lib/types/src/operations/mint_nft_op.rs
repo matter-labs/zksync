@@ -1,12 +1,13 @@
-use crate::{AccountId, Address};
+use crate::{AccountId, Address, Nonce};
 use crate::{MintNFT, H256};
 
-use crate::helpers::unpack_fee_amount;
+use crate::helpers::{pack_fee_amount, unpack_fee_amount};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
+use zksync_basic_types::TokenId;
 use zksync_crypto::params::{
     ACCOUNT_ID_BIT_WIDTH, ADDRESS_WIDTH, CHUNK_BYTES, CONTENT_HASH_WIDTH, FEE_EXPONENT_BIT_WIDTH,
-    FEE_MANTISSA_BIT_WIDTH, SERIAL_ID_BIT_WIDTH, TOKEN_BIT_WIDTH,
+    FEE_MANTISSA_BIT_WIDTH, NFT_STORAGE_ACCOUNT_ID, SERIAL_ID_BIT_WIDTH, TOKEN_BIT_WIDTH,
 };
 use zksync_crypto::primitives::FromBytes;
 
@@ -44,10 +45,13 @@ impl MintNFTOp {
 
     pub fn get_public_data(&self) -> Vec<u8> {
         let mut data = vec![Self::OP_CODE];
-        data.extend_from_slice(&self.tx.creator_id.to_be_bytes());
+        data.extend_from_slice(&self.creator_account_id.to_be_bytes());
+        data.extend_from_slice(&self.recipient_account_id.to_be_bytes());
         data.extend_from_slice(&self.tx.creator_address.as_bytes());
         data.extend_from_slice(&self.tx.content_hash.as_bytes());
         data.extend_from_slice(&self.tx.recipient.as_bytes());
+        data.extend_from_slice(&pack_fee_amount(&self.tx.fee));
+        data.extend_from_slice(&self.tx.fee_token.as_bytes());
         data.resize(Self::CHUNKS * CHUNK_BYTES, 0x00);
         data
     }
@@ -57,75 +61,71 @@ impl MintNFTOp {
             return Err(MintNFTParsingError::WrongNumberOfBytes);
         }
 
-        let account_id_offset = 1;
-        let token_id_offset = account_id_offset + ACCOUNT_ID_BIT_WIDTH / 8;
-        let token_account_id_offset = token_id_offset + TOKEN_BIT_WIDTH / 8;
-        let serial_id_offset = token_account_id_offset + ACCOUNT_ID_BIT_WIDTH / 8;
-        let address_offset = serial_id_offset + SERIAL_ID_BIT_WIDTH / 8;
-        let content_hash_offset = address_offset + ADDRESS_WIDTH / 8;
-        let recipient_account_id_offset = content_hash_offset + CONTENT_HASH_WIDTH / 8;
-        let fee_offset = recipient_account_id_offset + ACCOUNT_ID_BIT_WIDTH / 8;
+        let creator_account_id_offset = 1;
+        let recipient_account_id_offset = creator_account_id_offset + ACCOUNT_ID_BIT_WIDTH / 8;
+        let creator_address_offset = recipient_account_id_offset + ACCOUNT_ID_BIT_WIDTH / 8;
+        let content_hash_offset = creator_address_offset + ADDRESS_WIDTH / 8;
+        let recipient_address_offset = content_hash_offset + CONTENT_HASH_WIDTH / 8;
+        let fee_offset = recipient_address_offset + ADDRESS_WIDTH / 8;
         let fee_token_offset = fee_offset + (FEE_EXPONENT_BIT_WIDTH + FEE_MANTISSA_BIT_WIDTH) / 8;
 
-        let _creator_account_id = u32::from_bytes(
-            &bytes[account_id_offset..account_id_offset + ACCOUNT_ID_BIT_WIDTH / 8],
+        let creator_account_id = u32::from_bytes(
+            &bytes[creator_account_id_offset..creator_account_id_offset + ACCOUNT_ID_BIT_WIDTH / 8],
         )
         .ok_or(MintNFTParsingError::CreatorAccountId)?;
 
-        let _token_id =
-            u32::from_bytes(&bytes[token_id_offset..token_id_offset + TOKEN_BIT_WIDTH / 8])
-                .ok_or(MintNFTParsingError::TokenId)?;
-        let _token_account_id = u32::from_bytes(
-            &bytes[token_account_id_offset..token_account_id_offset + ACCOUNT_ID_BIT_WIDTH / 8],
-        )
-        .ok_or(MintNFTParsingError::AccountId)?;
-        let _serial_id =
-            u32::from_bytes(&bytes[serial_id_offset..serial_id_offset + SERIAL_ID_BIT_WIDTH / 8])
-                .ok_or(MintNFTParsingError::SerialId)?;
-
-        let _token_address =
-            Address::from_slice(&bytes[address_offset..address_offset + ADDRESS_WIDTH / 8]);
-
-        let _content_hash = H256::from_slice(
-            &bytes[content_hash_offset..content_hash_offset + CONTENT_HASH_WIDTH / 8],
-        );
-        let _recipient_account_id = u32::from_bytes(
+        let recipient_account_id = u32::from_bytes(
             &bytes[recipient_account_id_offset
                 ..recipient_account_id_offset + ACCOUNT_ID_BIT_WIDTH / 8],
         )
         .ok_or(MintNFTParsingError::RecipientAccountId)?;
 
-        let _fee = unpack_fee_amount(
+        let creator_address = Address::from_slice(
+            &bytes[creator_address_offset..creator_address_offset + ADDRESS_WIDTH / 8],
+        );
+
+        let content_hash = H256::from_slice(
+            &bytes[content_hash_offset..content_hash_offset + CONTENT_HASH_WIDTH / 8],
+        );
+
+        let recipient_address = Address::from_slice(
+            &bytes[recipient_address_offset..recipient_address_offset + ADDRESS_WIDTH / 8],
+        );
+
+        let fee = unpack_fee_amount(
             &bytes[fee_offset..fee_offset + (FEE_EXPONENT_BIT_WIDTH + FEE_MANTISSA_BIT_WIDTH) / 8],
         )
         .ok_or(MintNFTParsingError::Fee)?;
-        let _fee_token_id =
+
+        let fee_token_id =
             u32::from_bytes(&bytes[fee_token_offset..fee_token_offset + TOKEN_BIT_WIDTH / 8])
                 .ok_or(MintNFTParsingError::FeeTokenId)?;
-        let _nonce = 0; // It is unknown from pubdata
 
-        todo!()
-        // let time_range = Default::default();
-        // Ok(Self {
-        //     tx: MintNFT::new(
-        //         AccountId(token_account_id),
-        //         serial_id,
-        //         AccountId(creator_account_id),
-        //         token_address,
-        //         content_hash,
-        //         AccountId(recipient_account_id),
-        //         fee,
-        //         TokenId(fee_token_id),
-        //         Nonce(nonce),
-        //         time_range,
-        //         None,
-        //     ),
-        //     creator_account_id: AccountId(creator_account_id),
-        //     recipient_account_id: AccountId(recipient_account_id),
-        // })
+        let nonce = 0; // It is unknown from pubdata
+
+        let time_range = Default::default();
+        Ok(Self {
+            tx: MintNFT::new(
+                AccountId(creator_account_id),
+                creator_address,
+                content_hash,
+                recipient_address,
+                fee,
+                TokenId(fee_token_id),
+                Nonce(nonce),
+                time_range,
+                None,
+            ),
+            creator_account_id: AccountId(creator_account_id),
+            recipient_account_id: AccountId(recipient_account_id),
+        })
     }
 
     pub fn get_updated_account_ids(&self) -> Vec<AccountId> {
-        vec![self.recipient_account_id, self.creator_account_id]
+        vec![
+            self.recipient_account_id,
+            self.creator_account_id,
+            NFT_STORAGE_ACCOUNT_ID,
+        ]
     }
 }
