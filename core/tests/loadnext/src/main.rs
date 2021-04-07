@@ -16,17 +16,7 @@ async fn main() -> anyhow::Result<()> {
             err
         );
         vlog::warn!("Using the hard-coded config, assuming it's the development run");
-
-        LoadtestConfig {
-            zksync_rpc_addr: "http://127.0.0.1:3030".into(),
-            web3_url: "http://127.0.0.1:8545".into(),
-            eth_network: "localhost".into(),
-            master_wallet_pk: "74d8b3a188f7260f67698eb44da07397a298df5427df681ef68c45b34b61f998"
-                .into(),
-            accounts_amount: 20,
-            operations_per_account: 40,
-            main_token: "DAI".into(),
-        }
+        LoadtestConfig::default()
     });
 
     let mut executor = Executor::new(config).await;
