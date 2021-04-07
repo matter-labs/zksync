@@ -32,10 +32,10 @@ pub struct Executor {
 
 impl Executor {
     /// Creates a new Executor entity.
-    pub async fn new(config: LoadtestConfig) -> Self {
-        let pool = AccountPool::new(&config).await;
+    pub async fn new(config: LoadtestConfig) -> anyhow::Result<Self> {
+        let pool = AccountPool::new(&config).await?;
 
-        Self { config, pool }
+        Ok(Self { config, pool })
     }
 
     /// Runs the loadtest until the completion.

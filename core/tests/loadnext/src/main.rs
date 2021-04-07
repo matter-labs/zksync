@@ -19,7 +19,7 @@ async fn main() -> anyhow::Result<()> {
         LoadtestConfig::default()
     });
 
-    let mut executor = Executor::new(config).await;
+    let mut executor = Executor::new(config).await?;
     let final_resolution = executor.start().await;
 
     match final_resolution {

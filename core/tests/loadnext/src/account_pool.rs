@@ -1,8 +1,11 @@
-use std::{collections::VecDeque, str::FromStr, sync::Arc};
+use std::{collections::VecDeque, str::FromStr, sync::Arc, time::Duration};
 
 use rand::Rng;
 
-use zksync::{utils::private_key_from_seed, RpcProvider, Wallet, WalletCredentials};
+use tokio::time::timeout;
+use zksync::{
+    provider::Provider, utils::private_key_from_seed, RpcProvider, Wallet, WalletCredentials,
+};
 use zksync_eth_signer::PrivateKeySigner;
 use zksync_types::{tx::PackedEthSignature, Address, H256};
 
@@ -77,11 +80,23 @@ pub struct AccountPool {
 
 impl AccountPool {
     /// Generates all the required test accounts and prepares `Wallet` objects.
-    pub async fn new(config: &LoadtestConfig) -> Self {
+    pub async fn new(config: &LoadtestConfig) -> anyhow::Result<Self> {
         let provider = RpcProvider::from_addr_and_network(
             &config.zksync_rpc_addr,
             zksync::Network::from_str(&config.eth_network).expect("Invalid network name"),
         );
+
+        // Perform a health check: check whether zkSync server is alive.
+        let mut server_alive = false;
+        for _ in 0u64..3 {
+            if let Ok(Ok(_)) = timeout(Duration::from_secs(3), provider.contract_address()).await {
+                server_alive = true;
+                break;
+            }
+        }
+        if !server_alive {
+            anyhow::bail!("zkSync server does not respond. Please check RPC addres and whether server is launched");
+        }
 
         let mut rng = LoadtestRng::new_generic(config.seed.clone());
         vlog::info!("Using RNG with master seed: {}", rng.seed_hex());
@@ -125,11 +140,11 @@ impl AccountPool {
             accounts.push_back(account);
         }
 
-        Self {
+        Ok(Self {
             master_wallet,
             accounts,
             addresses: AddressPool::new(addresses),
-        }
+        })
     }
 }
 

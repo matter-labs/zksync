@@ -12,7 +12,6 @@ It:
 - sends incorrect transactions as well as correct ones and compares the outcome to the expected one.
 - has an easy-to-extend command system that allows adding new types of actions to the flow.
 - has an easy-to-extend report analysis system.
-- already found a bug in the server code.
 
 Flaws:
 
