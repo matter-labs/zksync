@@ -1,9 +1,9 @@
 // Built-in uses
-use std::fmt::Display;
+use std::fmt::{Display, Formatter};
 
 // External uses
 use hex::FromHexError;
-use serde::{export::Formatter, Deserialize, Serialize};
+use serde::{Deserialize, Serialize};
 use serde_repr::Serialize_repr;
 use thiserror::Error;
 

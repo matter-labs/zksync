@@ -49,7 +49,7 @@ impl From<BatchFee> for ApiBatchFee {
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct TxFeeRequest {
-    pub tx_type: TxFeeTypes, // TODO: (De)Serialize tx_type as snake_case.
+    pub tx_type: TxFeeTypes,
     pub address: Address,
     pub token_like: TokenLike,
 }
