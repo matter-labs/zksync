@@ -228,51 +228,13 @@ pub fn api_scope(
 mod tests {
     use super::{
         super::{
-            test_utils::{deserialize_response_result, TestServerConfig},
+            test_utils::{deserialize_response_result, dummy_fee_ticker, TestServerConfig},
             SharedData,
         },
         *,
     };
-    use std::collections::HashMap;
     use zksync_api_types::v02::{pagination::PaginationDirection, ApiVersion};
     use zksync_types::Address;
-
-    fn dummy_fee_ticker(prices: &[(TokenLike, BigDecimal)]) -> mpsc::Sender<TickerRequest> {
-        let (sender, mut receiver) = mpsc::channel(10);
-
-        let prices: HashMap<_, _> = prices.iter().cloned().collect();
-        actix_rt::spawn(async move {
-            while let Some(item) = receiver.next().await {
-                match item {
-                    TickerRequest::GetTokenPrice {
-                        token,
-                        response,
-                        req_type,
-                    } => {
-                        assert_eq!(
-                            req_type,
-                            TokenPriceRequestType::USDForOneToken,
-                            "Unsupported price request type"
-                        );
-
-                        let msg = if let Some(price) = prices.get(&token) {
-                            Ok(price.clone())
-                        } else {
-                            Err(PriceError::token_not_found(format!(
-                                "Token not found: {:?}",
-                                token
-                            )))
-                        };
-
-                        response.send(msg).expect("Unable to send response");
-                    }
-                    _ => unreachable!("Unsupported request"),
-                }
-            }
-        });
-
-        sender
-    }
 
     async fn is_token_enabled_for_fees(
         storage: &mut StorageProcessor<'_>,

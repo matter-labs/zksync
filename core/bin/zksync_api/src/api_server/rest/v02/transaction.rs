@@ -453,26 +453,21 @@ pub fn api_scope(tx_sender: TxSender) -> Scope {
 mod tests {
     use super::{
         super::{
-            test_utils::{deserialize_response_result, TestServerConfig, TestTransactions},
+            test_utils::{
+                deserialize_response_result, dummy_fee_ticker, dummy_sign_verifier,
+                TestServerConfig, TestTransactions,
+            },
             SharedData,
         },
         *,
     };
-    use crate::{
-        api_server::helpers::try_parse_tx_hash,
-        core_api_client::CoreApiClient,
-        fee_ticker::{ResponseBatchFee, ResponseFee, TickerRequest},
-        signature_checker::{VerifiedTx, VerifySignatureRequest},
-    };
+    use crate::{api_server::helpers::try_parse_tx_hash, core_api_client::CoreApiClient};
     use actix_web::App;
-    use bigdecimal::BigDecimal;
-    use futures::{channel::mpsc, StreamExt};
-    use num::{rational::Ratio, BigUint};
     use zksync_api_types::v02::ApiVersion;
     use zksync_types::{
-        tokens::{Token, TokenLike},
+        tokens::Token,
         tx::{EthBatchSignData, EthBatchSignatures, PackedEthSignature, TxEthSignature},
-        BatchFee, BlockNumber, Fee, OutputFeeType, SignedZkSyncTx, TokenId,
+        BlockNumber, SignedZkSyncTx, TokenId,
     };
 
     fn submit_txs_loopback() -> (CoreApiClient, actix_web::test::TestServer) {
@@ -497,85 +492,6 @@ mod tests {
         (CoreApiClient::new(url), server)
     }
 
-    fn dummy_fee_ticker() -> mpsc::Sender<TickerRequest> {
-        let (sender, mut receiver) = mpsc::channel(10);
-
-        actix_rt::spawn(async move {
-            while let Some(item) = receiver.next().await {
-                match item {
-                    TickerRequest::GetTxFee { response, .. } => {
-                        let normal_fee = Fee::new(
-                            OutputFeeType::Withdraw,
-                            BigUint::from(1_u64).into(),
-                            BigUint::from(1_u64).into(),
-                            1_u64.into(),
-                            1_u64.into(),
-                        );
-
-                        let subsidy_fee = normal_fee.clone();
-
-                        let res = Ok(ResponseFee {
-                            normal_fee,
-                            subsidy_fee,
-                            subsidy_size_usd: Ratio::from_integer(0u32.into()),
-                        });
-
-                        response.send(res).expect("Unable to send response");
-                    }
-                    TickerRequest::GetTokenPrice { response, .. } => {
-                        let price = Ok(BigDecimal::from(1_u64));
-
-                        response.send(price).expect("Unable to send response");
-                    }
-                    TickerRequest::IsTokenAllowed { token, response } => {
-                        // For test purposes, PHNX token is not allowed.
-                        let is_phnx = match token {
-                            TokenLike::Id(id) => *id == 1,
-                            TokenLike::Symbol(sym) => sym == "PHNX",
-                            TokenLike::Address(_) => unreachable!(),
-                        };
-                        response.send(Ok(!is_phnx)).unwrap_or_default();
-                    }
-                    TickerRequest::GetBatchTxFee {
-                        response,
-                        transactions,
-                        ..
-                    } => {
-                        let normal_fee = BatchFee {
-                            total_fee: BigUint::from(transactions.len()),
-                        };
-                        let subsidy_fee = normal_fee.clone();
-
-                        let res = Ok(ResponseBatchFee {
-                            normal_fee,
-                            subsidy_fee,
-                            subsidy_size_usd: Ratio::from_integer(0u32.into()),
-                        });
-
-                        response.send(res).expect("Unable to send response");
-                    }
-                }
-            }
-        });
-
-        sender
-    }
-
-    fn dummy_sign_verifier() -> mpsc::Sender<VerifySignatureRequest> {
-        let (sender, mut receiver) = mpsc::channel::<VerifySignatureRequest>(10);
-
-        actix_rt::spawn(async move {
-            while let Some(item) = receiver.next().await {
-                let verified = VerifiedTx::unverified(item.data.get_tx_variant());
-                item.response
-                    .send(Ok(verified))
-                    .expect("Unable to send response");
-            }
-        });
-
-        sender
-    }
-
     #[actix_rt::test]
     #[cfg_attr(
         not(feature = "api_test"),
@@ -597,7 +513,7 @@ mod tests {
                     core_client.clone(),
                     cfg.pool.clone(),
                     dummy_sign_verifier(),
-                    dummy_fee_ticker(),
+                    dummy_fee_ticker(&[]),
                     &cfg.config,
                 ))
             },

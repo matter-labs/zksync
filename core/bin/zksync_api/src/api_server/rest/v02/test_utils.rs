@@ -1,11 +1,15 @@
 //! API testing helpers.
 
 // Built-in uses
+use std::collections::HashMap;
 use std::str::FromStr;
 
 // External uses
 use actix_web::{web, App, Scope};
+use bigdecimal::BigDecimal;
 use chrono::Utc;
+use futures::{channel::mpsc, StreamExt};
+use num::{rational::Ratio, BigUint};
 use once_cell::sync::Lazy;
 use serde::de::DeserializeOwned;
 use tokio::sync::Mutex;
@@ -33,13 +37,17 @@ use zksync_types::{
     operations::{ChangePubKeyOp, TransferToNewOp},
     prover::ProverJobType,
     tx::ChangePubKeyType,
-    AccountId, AccountMap, Address, BlockNumber, Deposit, DepositOp, ExecutedOperations,
-    ExecutedPriorityOp, ExecutedTx, FullExit, FullExitOp, Nonce, PriorityOp, Token, TokenId,
-    Transfer, TransferOp, ZkSyncOp, ZkSyncTx, H256,
+    AccountId, AccountMap, Address, BatchFee, BlockNumber, Deposit, DepositOp, ExecutedOperations,
+    ExecutedPriorityOp, ExecutedTx, Fee, FullExit, FullExitOp, Nonce, OutputFeeType, PriorityOp,
+    Token, TokenId, TokenLike, Transfer, TransferOp, ZkSyncOp, ZkSyncTx, H256,
 };
 
 // Local uses
 use super::SharedData;
+use crate::{
+    fee_ticker::{ResponseBatchFee, ResponseFee, TickerRequest},
+    signature_checker::{VerifiedTx, VerifySignatureRequest},
+};
 
 /// Serial ID of the verified priority operation.
 pub const VERIFIED_OP_SERIAL_ID: u64 = 10;
@@ -678,4 +686,90 @@ pub fn deserialize_response_result<T: DeserializeOwned>(response: Response) -> a
             }
         }
     }
+}
+
+pub fn dummy_sign_verifier() -> mpsc::Sender<VerifySignatureRequest> {
+    let (sender, mut receiver) = mpsc::channel::<VerifySignatureRequest>(10);
+
+    actix_rt::spawn(async move {
+        while let Some(item) = receiver.next().await {
+            let verified = VerifiedTx::unverified(item.data.get_tx_variant());
+            item.response
+                .send(Ok(verified))
+                .expect("Unable to send response");
+        }
+    });
+
+    sender
+}
+
+pub fn dummy_fee_ticker(prices: &[(TokenLike, BigDecimal)]) -> mpsc::Sender<TickerRequest> {
+    let (sender, mut receiver) = mpsc::channel(10);
+
+    let prices: HashMap<_, _> = prices.iter().cloned().collect();
+    actix_rt::spawn(async move {
+        while let Some(item) = receiver.next().await {
+            match item {
+                TickerRequest::GetTxFee { response, .. } => {
+                    let normal_fee = Fee::new(
+                        OutputFeeType::Withdraw,
+                        BigUint::from(1_u64).into(),
+                        BigUint::from(1_u64).into(),
+                        1_u64.into(),
+                        1_u64.into(),
+                    );
+
+                    let subsidy_fee = normal_fee.clone();
+
+                    let res = Ok(ResponseFee {
+                        normal_fee,
+                        subsidy_fee,
+                        subsidy_size_usd: Ratio::from_integer(0u32.into()),
+                    });
+
+                    response.send(res).expect("Unable to send response");
+                }
+                TickerRequest::GetTokenPrice {
+                    token, response, ..
+                } => {
+                    let msg = if let Some(price) = prices.get(&token) {
+                        Ok(price.clone())
+                    } else {
+                        Ok(BigDecimal::from(0u64))
+                    };
+
+                    response.send(msg).expect("Unable to send response");
+                }
+                TickerRequest::IsTokenAllowed { token, response } => {
+                    // For test purposes, PHNX token is not allowed.
+                    let is_phnx = match token {
+                        TokenLike::Id(id) => *id == 1,
+                        TokenLike::Symbol(sym) => sym == "PHNX",
+                        TokenLike::Address(_) => unreachable!(),
+                    };
+                    response.send(Ok(!is_phnx)).unwrap_or_default();
+                }
+                TickerRequest::GetBatchTxFee {
+                    response,
+                    transactions,
+                    ..
+                } => {
+                    let normal_fee = BatchFee {
+                        total_fee: BigUint::from(2 * transactions.len()),
+                    };
+                    let subsidy_fee = normal_fee.clone();
+
+                    let res = Ok(ResponseBatchFee {
+                        normal_fee,
+                        subsidy_fee,
+                        subsidy_size_usd: Ratio::from_integer(0u32.into()),
+                    });
+
+                    response.send(res).expect("Unable to send response");
+                }
+            }
+        }
+    });
+
+    sender
 }

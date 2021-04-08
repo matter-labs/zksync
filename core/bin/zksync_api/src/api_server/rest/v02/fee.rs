@@ -68,78 +68,17 @@ pub fn api_scope(tx_sender: TxSender) -> Scope {
 mod tests {
     use super::{
         super::{
-            test_utils::{deserialize_response_result, TestServerConfig},
+            test_utils::{
+                deserialize_response_result, dummy_fee_ticker, dummy_sign_verifier,
+                TestServerConfig,
+            },
             SharedData,
         },
         *,
     };
-    use crate::{
-        fee_ticker::{ResponseBatchFee, ResponseFee, TickerRequest},
-        signature_checker::VerifySignatureRequest,
-    };
-    use futures::{channel::mpsc, StreamExt};
-    use num::rational::Ratio;
     use num::BigUint;
     use zksync_api_types::v02::{fee::TxInBatchFeeRequest, ApiVersion};
-    use zksync_types::{
-        tokens::TokenLike, Address, BatchFee, Fee, OutputFeeType, TokenId, TxFeeTypes,
-    };
-
-    fn dummy_fee_ticker() -> mpsc::Sender<TickerRequest> {
-        let (sender, mut receiver) = mpsc::channel(10);
-
-        actix_rt::spawn(async move {
-            while let Some(item) = receiver.next().await {
-                match item {
-                    TickerRequest::GetTxFee { response, .. } => {
-                        let normal_fee = Fee::new(
-                            OutputFeeType::Withdraw,
-                            BigUint::from(1_u64).into(),
-                            BigUint::from(1_u64).into(),
-                            1_u64.into(),
-                            1_u64.into(),
-                        );
-
-                        let subsidy_fee = normal_fee.clone();
-
-                        let res = Ok(ResponseFee {
-                            normal_fee,
-                            subsidy_fee,
-                            subsidy_size_usd: Ratio::from_integer(0u32.into()),
-                        });
-
-                        response.send(res).expect("Unable to send response");
-                    }
-                    TickerRequest::GetBatchTxFee {
-                        response,
-                        transactions,
-                        ..
-                    } => {
-                        let normal_fee = BatchFee {
-                            total_fee: BigUint::from(2 * transactions.len()),
-                        };
-                        let subsidy_fee = normal_fee.clone();
-
-                        let res = Ok(ResponseBatchFee {
-                            normal_fee,
-                            subsidy_fee,
-                            subsidy_size_usd: Ratio::from_integer(0u32.into()),
-                        });
-
-                        response.send(res).expect("Unable to send response");
-                    }
-                    _ => unreachable!(),
-                }
-            }
-        });
-
-        sender
-    }
-
-    fn dummy_sign_verifier() -> mpsc::Sender<VerifySignatureRequest> {
-        let (sender, _) = mpsc::channel::<VerifySignatureRequest>(0);
-        sender
-    }
+    use zksync_types::{tokens::TokenLike, Address, OutputFeeType, TokenId, TxFeeTypes};
 
     #[actix_rt::test]
     #[cfg_attr(
@@ -158,7 +97,7 @@ mod tests {
                 api_scope(TxSender::new(
                     cfg.pool.clone(),
                     dummy_sign_verifier(),
-                    dummy_fee_ticker(),
+                    dummy_fee_ticker(&[]),
                     &cfg.config,
                 ))
             },
