@@ -1,17 +1,22 @@
 use zksync_crypto::public_key_from_private;
 
 use crate::Engine;
-use anyhow::ensure;
 use serde::{Deserialize, Serialize};
-use zksync_crypto::franklin_crypto::{
-    eddsa::{PrivateKey, PublicKey, Seed},
-    jubjub::FixedGenerators,
-    rescue::RescueEngine,
+use thiserror::Error;
+use zksync_crypto::{
+    franklin_crypto::{
+        eddsa::{PrivateKey, PublicKey, Seed},
+        jubjub::FixedGenerators,
+        rescue::RescueEngine,
+    },
+    params::{JUBJUB_PARAMS, RESCUE_PARAMS},
+    primitives::rescue_hash_tx_msg,
 };
-use zksync_crypto::params::{JUBJUB_PARAMS, RESCUE_PARAMS};
-use zksync_crypto::primitives::rescue_hash_tx_msg;
 
-use crate::tx::{PackedPublicKey, PackedSignature};
+use crate::tx::{
+    primitives::{packed_public_key, packed_signature},
+    PackedPublicKey, PackedSignature,
+};
 
 /// zkSync transaction signature.
 ///
@@ -81,13 +86,25 @@ impl TxSignature {
     /// Deserializes signature from packed bytes representation.
     /// [0..32] - packed pubkey of the signer.
     /// [32..96] - packed r,s of the signature
-    pub fn deserialize_from_packed_bytes(bytes: &[u8]) -> Result<Self, anyhow::Error> {
-        ensure!(bytes.len() == 32 + 64, "packed signature length mismatch");
+    pub fn deserialize_from_packed_bytes(bytes: &[u8]) -> Result<Self, DeserializeError> {
+        if bytes.len() != 32 + 64 {
+            return Err(DeserializeError::IncorrectTxSignatureLength);
+        }
         Ok(Self {
             pub_key: PackedPublicKey::deserialize_packed(&bytes[0..32])?,
             signature: PackedSignature::deserialize_packed(&bytes[32..])?,
         })
     }
+}
+
+#[derive(Debug, Error)]
+pub enum DeserializeError {
+    #[error("Tx signature size mismatch")]
+    IncorrectTxSignatureLength,
+    #[error("Cannot deserialize public key: {0}")]
+    DeserializePublicKey(#[from] packed_public_key::DeserializeError),
+    #[error("Cannot deserialize signature: {0}")]
+    DeserializeSignature(#[from] packed_signature::DeserializeError),
 }
 
 impl Default for TxSignature {

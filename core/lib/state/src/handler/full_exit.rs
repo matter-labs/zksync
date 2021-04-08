@@ -8,11 +8,14 @@ use crate::{
     handler::TxHandler,
     state::{CollectedFee, OpSuccess, ZkSyncState},
 };
+use std::convert::Infallible;
 
 impl TxHandler<FullExit> for ZkSyncState {
     type Op = FullExitOp;
 
-    fn create_op(&self, priority_op: FullExit) -> Result<Self::Op, anyhow::Error> {
+    type OpError = Infallible;
+
+    fn create_op(&self, priority_op: FullExit) -> Result<Self::Op, Infallible> {
         // NOTE: Authorization of the FullExit is verified on the contract.
         assert!(
             priority_op.token <= params::max_token_id(),
@@ -34,7 +37,7 @@ impl TxHandler<FullExit> for ZkSyncState {
         Ok(op)
     }
 
-    fn apply_tx(&mut self, priority_op: FullExit) -> Result<OpSuccess, anyhow::Error> {
+    fn apply_tx(&mut self, priority_op: FullExit) -> Result<OpSuccess, Infallible> {
         let op = self.create_op(priority_op)?;
 
         let (fee, updates) = <Self as TxHandler<FullExit>>::apply_op(self, &op)?;
@@ -50,7 +53,7 @@ impl TxHandler<FullExit> for ZkSyncState {
     fn apply_op(
         &mut self,
         op: &Self::Op,
-    ) -> Result<(Option<CollectedFee>, AccountUpdates), anyhow::Error> {
+    ) -> Result<(Option<CollectedFee>, AccountUpdates), Infallible> {
         let start = Instant::now();
         let mut updates = Vec::new();
         let amount = if let Some(amount) = &op.withdraw_amount {
@@ -61,7 +64,7 @@ impl TxHandler<FullExit> for ZkSyncState {
 
         let account_id = op.priority_op.account_id;
 
-        // expect is ok since account since existence was verified before
+        // expect is ok since account's existence was verified before
         let mut account = self
             .get_account(account_id)
             .expect("Full exit account not found");

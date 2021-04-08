@@ -14,6 +14,7 @@ All notable changes to the core components will be documented in this file.
   now.
 - (`api_server`): Make `submit_txs_batch` send only one signature request.
 - Fast withdrawals now can trigger aggregated block execution.
+- Replaced `anyhow` errors with typed errors in `lib/state`, `lib/crypto` and `lib/types`.
 
 ### Added
 

@@ -3,8 +3,8 @@ use chrono::{DateTime, Utc};
 use num::{rational::Ratio, BigUint};
 use serde::{Deserialize, Serialize};
 use std::{fmt, fs::read_to_string, path::PathBuf, str::FromStr};
-use zksync_utils::parse_env;
-use zksync_utils::UnsignedRatioSerializeAsDecimal;
+use thiserror::Error;
+use zksync_utils::{parse_env, UnsignedRatioSerializeAsDecimal};
 
 // Order of the fields is important (from more specific types to less specific types)
 /// Set of values that can be interpreted as a token descriptor.
@@ -119,7 +119,9 @@ impl Token {
 
 // Hidden as it relies on the filesystem structure, which can be different for reverse dependencies.
 #[doc(hidden)]
-pub fn get_genesis_token_list(network: &str) -> Result<Vec<TokenGenesisListItem>, anyhow::Error> {
+pub fn get_genesis_token_list(
+    network: &str,
+) -> Result<Vec<TokenGenesisListItem>, GetGenesisTokenListError> {
     let mut file_path = parse_env::<PathBuf>("ZKSYNC_HOME");
     file_path.push("etc");
     file_path.push("tokens");
@@ -165,6 +167,18 @@ pub enum TxFeeTypes {
     Transfer,
     /// Fee for the `ChangePubKey` operation.
     ChangePubKey(ChangePubKeyFeeTypeArg),
+}
+
+#[derive(Debug, Error, PartialEq)]
+#[error("Incorrect ProverJobStatus number: {0}")]
+pub struct IncorrectProverJobStatus(pub i32);
+
+#[derive(Debug, Error)]
+pub enum GetGenesisTokenListError {
+    #[error(transparent)]
+    IOError(#[from] std::io::Error),
+    #[error(transparent)]
+    SerdeError(#[from] serde_json::Error),
 }
 
 #[cfg(test)]

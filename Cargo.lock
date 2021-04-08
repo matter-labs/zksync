@@ -6061,7 +6061,6 @@ dependencies = [
 name = "zksync_crypto"
 version = "1.0.0"
 dependencies = [
- "anyhow",
  "base64 0.13.0",
  "ethabi",
  "fnv",
@@ -6074,6 +6073,7 @@ dependencies = [
  "recursive_aggregation_circuit",
  "serde",
  "serde_json",
+ "thiserror",
  "zksync_basic_types",
 ]
 
@@ -6323,11 +6323,11 @@ dependencies = [
 name = "zksync_state"
 version = "1.0.0"
 dependencies = [
- "anyhow",
  "criterion",
  "metrics",
  "num",
  "serde_json",
+ "thiserror",
  "vlog",
  "web3",
  "zksync_crypto",
@@ -6408,7 +6408,6 @@ dependencies = [
 name = "zksync_types"
 version = "1.0.0"
 dependencies = [
- "anyhow",
  "chrono",
  "criterion",
  "ethabi",
@@ -6420,6 +6419,7 @@ dependencies = [
  "secp256k1",
  "serde",
  "serde_json",
+ "thiserror",
  "tiny-keccak 1.5.0",
  "vlog",
  "web3",
