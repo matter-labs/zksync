@@ -156,14 +156,14 @@ async fn token_pagination(
 
 async fn token_by_id(
     data: web::Data<ApiTokenData>,
-    web::Path(token_like): web::Path<String>,
+    web::Path(token_like_string): web::Path<String>,
 ) -> ApiResult<ApiToken> {
-    let token_result = TokenLike::parse_without_symbol(&token_like);
-    let token_like = match token_result {
-        Some(token_result) => token_result,
-        None => {
-            return Error::from(PriceError::token_not_found("Cannot parse token")).into();
+    let token_like = TokenLike::parse(&token_like_string);
+    let token_like = match token_like {
+        TokenLike::Symbol(_) => {
+            return Error::from(PriceError::token_not_found("Could not parse token as id or address")).into();
         }
+        _ => token_like,
     };
 
     data.token(token_like).await.into()
@@ -173,14 +173,14 @@ async fn token_by_id(
 // Currently actix path extractor doesn't work with enums: https://github.com/actix/actix-web/issues/318
 async fn token_price(
     data: web::Data<ApiTokenData>,
-    web::Path((token_like, currency)): web::Path<(String, String)>,
+    web::Path((token_like_string, currency)): web::Path<(String, String)>,
 ) -> ApiResult<BigDecimal> {
-    let token_result = TokenLike::parse_without_symbol(&token_like);
-    let first_token = match token_result {
-        Some(token_result) => token_result,
-        None => {
-            return Error::from(PriceError::token_not_found("Cannot parse token")).into();
+    let first_token = TokenLike::parse(&token_like_string);
+    let first_token = match first_token {
+        TokenLike::Symbol(_) => {
+            return Error::from(PriceError::token_not_found("Could not parse token as id or address")).into();
         }
+        _ => first_token,
     };
 
     if let Ok(second_token_id) = u16::from_str(&currency) {
