@@ -466,45 +466,6 @@
       ]
     }
   },
-  "0e899c700b8da512bade7d9d4ce4b805d33b9ba5e47db1ae503fa9defc1e9a42": {
-    "query": "\n                    SELECT * FROM tokens\n                    WHERE id <= $1\n                    ORDER BY id DESC\n                    LIMIT $2\n                    ",
-    "describe": {
-      "columns": [
-        {
-          "ordinal": 0,
-          "name": "id",
-          "type_info": "Int4"
-        },
-        {
-          "ordinal": 1,
-          "name": "address",
-          "type_info": "Text"
-        },
-        {
-          "ordinal": 2,
-          "name": "symbol",
-          "type_info": "Text"
-        },
-        {
-          "ordinal": 3,
-          "name": "decimals",
-          "type_info": "Int2"
-        }
-      ],
-      "parameters": {
-        "Left": [
-          "Int4",
-          "Int8"
-        ]
-      },
-      "nullable": [
-        false,
-        false,
-        false,
-        false
-      ]
-    }
-  },
   "0fbc25e0f2aab2b56acf7e09d75690a78f7c2df7cec0644a8e45461ee9aab75b": {
     "query": "SELECT * FROM data_restore_rollup_ops\n            ORDER BY id ASC",
     "describe": {
@@ -669,6 +630,63 @@
         ]
       },
       "nullable": []
+    }
+  },
+  "191d122fc8342dfd76b60c0462a62099a1432f0648daef301e16c7c2a49849db": {
+    "query": "\n            WITH aggr_comm AS (\n                SELECT \n                    aggregate_operations.created_at, \n                    eth_operations.final_hash, \n                    commit_aggregated_blocks_binding.block_number \n                FROM aggregate_operations\n                    INNER JOIN commit_aggregated_blocks_binding ON aggregate_operations.id = commit_aggregated_blocks_binding.op_id\n                    INNER JOIN eth_aggregated_ops_binding ON aggregate_operations.id = eth_aggregated_ops_binding.op_id\n                    INNER JOIN eth_operations ON eth_operations.id = eth_aggregated_ops_binding.eth_op_id\n                WHERE aggregate_operations.confirmed = true \n            )\n            ,aggr_exec as (\n                 SELECT \n                    aggregate_operations.created_at, \n                    eth_operations.final_hash, \n                    execute_aggregated_blocks_binding.block_number \n                FROM aggregate_operations\n                    INNER JOIN execute_aggregated_blocks_binding ON aggregate_operations.id = execute_aggregated_blocks_binding.op_id\n                    INNER JOIN eth_aggregated_ops_binding ON aggregate_operations.id = eth_aggregated_ops_binding.op_id\n                    INNER JOIN eth_operations ON eth_operations.id = eth_aggregated_ops_binding.eth_op_id\n                WHERE aggregate_operations.confirmed = true \n            )\n            SELECT\n                blocks.number AS \"block_number!\",\n                blocks.root_hash AS \"new_state_root!\",\n                blocks.block_size AS \"block_size!\",\n                committed.final_hash AS \"commit_tx_hash?\",\n                verified.final_hash AS \"verify_tx_hash?\",\n                committed.created_at AS \"committed_at!\",\n                verified.created_at AS \"verified_at?\"\n            FROM blocks\n                     INNER JOIN aggr_comm committed ON blocks.number = committed.block_number\n                     LEFT JOIN aggr_exec verified ON blocks.number = verified.block_number\n            WHERE\n                blocks.number >= $1\n            ORDER BY blocks.number ASC\n            LIMIT $2;\n            ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "block_number!",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 1,
+          "name": "new_state_root!",
+          "type_info": "Bytea"
+        },
+        {
+          "ordinal": 2,
+          "name": "block_size!",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 3,
+          "name": "commit_tx_hash?",
+          "type_info": "Bytea"
+        },
+        {
+          "ordinal": 4,
+          "name": "verify_tx_hash?",
+          "type_info": "Bytea"
+        },
+        {
+          "ordinal": 5,
+          "name": "committed_at!",
+          "type_info": "Timestamptz"
+        },
+        {
+          "ordinal": 6,
+          "name": "verified_at?",
+          "type_info": "Timestamptz"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Int8",
+          "Int8"
+        ]
+      },
+      "nullable": [
+        false,
+        false,
+        false,
+        true,
+        true,
+        false,
+        false
+      ]
     }
   },
   "1a3122983ff3dc5c9a1b6e2b5d68f10e93f9db6aac216c105157048ea5b802ed": {
@@ -1224,6 +1242,45 @@
       "nullable": []
     }
   },
+  "38ba90a27d582bd0c3247fc9716ddb76b1d2b0d87bec4e299c6c621168adf491": {
+    "query": "\n            SELECT * FROM tokens\n            WHERE id >= $1\n            ORDER BY id ASC\n            LIMIT $2\n            ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "id",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 1,
+          "name": "address",
+          "type_info": "Text"
+        },
+        {
+          "ordinal": 2,
+          "name": "symbol",
+          "type_info": "Text"
+        },
+        {
+          "ordinal": 3,
+          "name": "decimals",
+          "type_info": "Int2"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Int4",
+          "Int8"
+        ]
+      },
+      "nullable": [
+        false,
+        false,
+        false,
+        false
+      ]
+    }
+  },
   "393fa462bb0a3b247c99946e569f06fc7fa1f742d564adce560ac69e1729fece": {
     "query": "SELECT * FROM balances WHERE account_id = ANY($1)",
     "describe": {
@@ -1704,45 +1761,6 @@
       ]
     }
   },
-  "4c8e60d4a459c93a9e87435c8216fe85cf6ae0f94d2aeddde02e82143b0dffcc": {
-    "query": "\n                    SELECT * FROM tokens\n                    WHERE id >= $1\n                    ORDER BY id ASC\n                    LIMIT $2\n                    ",
-    "describe": {
-      "columns": [
-        {
-          "ordinal": 0,
-          "name": "id",
-          "type_info": "Int4"
-        },
-        {
-          "ordinal": 1,
-          "name": "address",
-          "type_info": "Text"
-        },
-        {
-          "ordinal": 2,
-          "name": "symbol",
-          "type_info": "Text"
-        },
-        {
-          "ordinal": 3,
-          "name": "decimals",
-          "type_info": "Int2"
-        }
-      ],
-      "parameters": {
-        "Left": [
-          "Int4",
-          "Int8"
-        ]
-      },
-      "nullable": [
-        false,
-        false,
-        false,
-        false
-      ]
-    }
-  },
   "4fc97e18f8e63d63d3a52db84ddd38243a865011e69a60061af37ebc2a8f1566": {
     "query": "SELECT * FROM complete_withdrawals_transactions\n                        WHERE pending_withdrawals_queue_start_index <= $1\n                            AND $1 < pending_withdrawals_queue_end_index\n                    LIMIT 1\n                    ",
     "describe": {
@@ -2124,6 +2142,45 @@
         ]
       },
       "nullable": []
+    }
+  },
+  "5e6bcb09720f9722091c80e4d90828b515d0398f9020abd4a328cfeca6c88b3a": {
+    "query": "\n            SELECT * FROM tokens\n            WHERE id <= $1\n            ORDER BY id DESC\n            LIMIT $2\n            ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "id",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 1,
+          "name": "address",
+          "type_info": "Text"
+        },
+        {
+          "ordinal": 2,
+          "name": "symbol",
+          "type_info": "Text"
+        },
+        {
+          "ordinal": 3,
+          "name": "decimals",
+          "type_info": "Int2"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Int4",
+          "Int8"
+        ]
+      },
+      "nullable": [
+        false,
+        false,
+        false,
+        false
+      ]
     }
   },
   "60cf573e253358218a6319233221e8c2ff0561fd7ffbf8339a11a4509d955442": {
@@ -2994,63 +3051,6 @@
       "nullable": []
     }
   },
-  "9d335bc4ade4536e74578dde6ce30ae73fada1b315eccb0444d33a70beac87cb": {
-    "query": "\n                    WITH aggr_comm AS (\n                        SELECT \n                            aggregate_operations.created_at, \n                            eth_operations.final_hash, \n                            commit_aggregated_blocks_binding.block_number \n                        FROM aggregate_operations\n                            INNER JOIN commit_aggregated_blocks_binding ON aggregate_operations.id = commit_aggregated_blocks_binding.op_id\n                            INNER JOIN eth_aggregated_ops_binding ON aggregate_operations.id = eth_aggregated_ops_binding.op_id\n                            INNER JOIN eth_operations ON eth_operations.id = eth_aggregated_ops_binding.eth_op_id\n                        WHERE aggregate_operations.confirmed = true \n                    )\n                    ,aggr_exec as (\n                         SELECT \n                            aggregate_operations.created_at, \n                            eth_operations.final_hash, \n                            execute_aggregated_blocks_binding.block_number \n                        FROM aggregate_operations\n                            INNER JOIN execute_aggregated_blocks_binding ON aggregate_operations.id = execute_aggregated_blocks_binding.op_id\n                            INNER JOIN eth_aggregated_ops_binding ON aggregate_operations.id = eth_aggregated_ops_binding.op_id\n                            INNER JOIN eth_operations ON eth_operations.id = eth_aggregated_ops_binding.eth_op_id\n                        WHERE aggregate_operations.confirmed = true \n                    )\n                    SELECT\n                        blocks.number AS \"block_number!\",\n                        blocks.root_hash AS \"new_state_root!\",\n                        blocks.block_size AS \"block_size!\",\n                        committed.final_hash AS \"commit_tx_hash?\",\n                        verified.final_hash AS \"verify_tx_hash?\",\n                        committed.created_at AS \"committed_at!\",\n                        verified.created_at AS \"verified_at?\"\n                    FROM blocks\n                             INNER JOIN aggr_comm committed ON blocks.number = committed.block_number\n                             LEFT JOIN aggr_exec verified ON blocks.number = verified.block_number\n                    WHERE\n                        blocks.number <= $1\n                    ORDER BY blocks.number DESC\n                    LIMIT $2;\n                    ",
-    "describe": {
-      "columns": [
-        {
-          "ordinal": 0,
-          "name": "block_number!",
-          "type_info": "Int8"
-        },
-        {
-          "ordinal": 1,
-          "name": "new_state_root!",
-          "type_info": "Bytea"
-        },
-        {
-          "ordinal": 2,
-          "name": "block_size!",
-          "type_info": "Int8"
-        },
-        {
-          "ordinal": 3,
-          "name": "commit_tx_hash?",
-          "type_info": "Bytea"
-        },
-        {
-          "ordinal": 4,
-          "name": "verify_tx_hash?",
-          "type_info": "Bytea"
-        },
-        {
-          "ordinal": 5,
-          "name": "committed_at!",
-          "type_info": "Timestamptz"
-        },
-        {
-          "ordinal": 6,
-          "name": "verified_at?",
-          "type_info": "Timestamptz"
-        }
-      ],
-      "parameters": {
-        "Left": [
-          "Int8",
-          "Int8"
-        ]
-      },
-      "nullable": [
-        false,
-        false,
-        false,
-        true,
-        true,
-        false,
-        false
-      ]
-    }
-  },
   "9fbf3d0ae8610fb464ac74ff989860eb913f4bfb14790373021ef456b671ed96": {
     "query": "SELECT * FROM eth_tx_hashes\n                WHERE eth_op_id = $1\n                ORDER BY id ASC",
     "describe": {
@@ -3167,42 +3167,6 @@
       ]
     }
   },
-  "a270c88373710266a4904a7e5e1e418edebed57af308cf8233f6a7331331c5e4": {
-    "query": "\n            SELECT * FROM tokens\n            ORDER BY id ASC\n            ",
-    "describe": {
-      "columns": [
-        {
-          "ordinal": 0,
-          "name": "id",
-          "type_info": "Int4"
-        },
-        {
-          "ordinal": 1,
-          "name": "address",
-          "type_info": "Text"
-        },
-        {
-          "ordinal": 2,
-          "name": "symbol",
-          "type_info": "Text"
-        },
-        {
-          "ordinal": 3,
-          "name": "decimals",
-          "type_info": "Int2"
-        }
-      ],
-      "parameters": {
-        "Left": []
-      },
-      "nullable": [
-        false,
-        false,
-        false,
-        false
-      ]
-    }
-  },
   "a2da93cd95ba78f23b8e7df776892a32a2228957881389d5a59803e9de38623f": {
     "query": "\n            INSERT INTO ticker_price ( token_id, usd_price, last_updated )\n            VALUES ( $1, $2, $3 )\n            ON CONFLICT (token_id)\n            DO\n              UPDATE SET usd_price = $2, last_updated = $3\n            ",
     "describe": {
@@ -3292,63 +3256,6 @@
         ]
       },
       "nullable": []
-    }
-  },
-  "b24f2aec0a840d6c8077502b06b886c9cadaf11dca7c6480beb19dafe5e264e3": {
-    "query": "\n                    WITH aggr_comm AS (\n                        SELECT \n                            aggregate_operations.created_at, \n                            eth_operations.final_hash, \n                            commit_aggregated_blocks_binding.block_number \n                        FROM aggregate_operations\n                            INNER JOIN commit_aggregated_blocks_binding ON aggregate_operations.id = commit_aggregated_blocks_binding.op_id\n                            INNER JOIN eth_aggregated_ops_binding ON aggregate_operations.id = eth_aggregated_ops_binding.op_id\n                            INNER JOIN eth_operations ON eth_operations.id = eth_aggregated_ops_binding.eth_op_id\n                        WHERE aggregate_operations.confirmed = true \n                    )\n                    ,aggr_exec as (\n                         SELECT \n                            aggregate_operations.created_at, \n                            eth_operations.final_hash, \n                            execute_aggregated_blocks_binding.block_number \n                        FROM aggregate_operations\n                            INNER JOIN execute_aggregated_blocks_binding ON aggregate_operations.id = execute_aggregated_blocks_binding.op_id\n                            INNER JOIN eth_aggregated_ops_binding ON aggregate_operations.id = eth_aggregated_ops_binding.op_id\n                            INNER JOIN eth_operations ON eth_operations.id = eth_aggregated_ops_binding.eth_op_id\n                        WHERE aggregate_operations.confirmed = true \n                    )\n                    SELECT\n                        blocks.number AS \"block_number!\",\n                        blocks.root_hash AS \"new_state_root!\",\n                        blocks.block_size AS \"block_size!\",\n                        committed.final_hash AS \"commit_tx_hash?\",\n                        verified.final_hash AS \"verify_tx_hash?\",\n                        committed.created_at AS \"committed_at!\",\n                        verified.created_at AS \"verified_at?\"\n                    FROM blocks\n                             INNER JOIN aggr_comm committed ON blocks.number = committed.block_number\n                             LEFT JOIN aggr_exec verified ON blocks.number = verified.block_number\n                    WHERE\n                        blocks.number >= $1\n                    ORDER BY blocks.number ASC\n                    LIMIT $2;\n                    ",
-    "describe": {
-      "columns": [
-        {
-          "ordinal": 0,
-          "name": "block_number!",
-          "type_info": "Int8"
-        },
-        {
-          "ordinal": 1,
-          "name": "new_state_root!",
-          "type_info": "Bytea"
-        },
-        {
-          "ordinal": 2,
-          "name": "block_size!",
-          "type_info": "Int8"
-        },
-        {
-          "ordinal": 3,
-          "name": "commit_tx_hash?",
-          "type_info": "Bytea"
-        },
-        {
-          "ordinal": 4,
-          "name": "verify_tx_hash?",
-          "type_info": "Bytea"
-        },
-        {
-          "ordinal": 5,
-          "name": "committed_at!",
-          "type_info": "Timestamptz"
-        },
-        {
-          "ordinal": 6,
-          "name": "verified_at?",
-          "type_info": "Timestamptz"
-        }
-      ],
-      "parameters": {
-        "Left": [
-          "Int8",
-          "Int8"
-        ]
-      },
-      "nullable": [
-        false,
-        false,
-        false,
-        true,
-        true,
-        false,
-        false
-      ]
     }
   },
   "b5e0f843d267576d57f41e2c4a63335749cb40e79bdb2b2cccbbaed5200abe96": {

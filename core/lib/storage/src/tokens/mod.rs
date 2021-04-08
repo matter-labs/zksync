@@ -47,28 +47,69 @@ impl<'a, 'c> TokensSchema<'a, 'c> {
         Ok(())
     }
 
+    /// Loads tokens from the database starting from the given id with the given limit in the ascending order.
+    pub async fn load_tokens_asc(
+        &mut self,
+        from: TokenId,
+        limit: Option<u32>,
+    ) -> QueryResult<Vec<Token>> {
+        let start = Instant::now();
+        let limit = limit.map(i64::from);
+        let tokens = sqlx::query_as!(
+            DbToken,
+            r#"
+            SELECT * FROM tokens
+            WHERE id >= $1
+            ORDER BY id ASC
+            LIMIT $2
+            "#,
+            i32::from(*from),
+            limit
+        )
+        .fetch_all(self.0.conn())
+        .await?;
+
+        let result = Ok(tokens.into_iter().map(Token::from).collect());
+
+        metrics::histogram!("sql.token.load_tokens_asc", start.elapsed());
+        result
+    }
+
+    /// Loads tokens from the database starting from the given id with the given limit in the descending order.
+    pub async fn load_tokens_desc(
+        &mut self,
+        from: TokenId,
+        limit: Option<u32>,
+    ) -> QueryResult<Vec<Token>> {
+        let start = Instant::now();
+        let limit = limit.map(i64::from);
+        let tokens = sqlx::query_as!(
+            DbToken,
+            r#"
+            SELECT * FROM tokens
+            WHERE id <= $1
+            ORDER BY id DESC
+            LIMIT $2
+            "#,
+            i32::from(*from),
+            limit
+        )
+        .fetch_all(self.0.conn())
+        .await?;
+
+        let result = Ok(tokens.into_iter().map(Token::from).collect());
+
+        metrics::histogram!("sql.token.load_tokens_desc", start.elapsed());
+        result
+    }
+
     /// Loads all the stored tokens from the database.
     /// Alongside with the tokens added via `store_token` method, the default `ETH` token
     /// is returned.
     pub async fn load_tokens(&mut self) -> QueryResult<HashMap<TokenId, Token>> {
         let start = Instant::now();
-        let tokens = sqlx::query_as!(
-            DbToken,
-            r#"
-            SELECT * FROM tokens
-            ORDER BY id ASC
-            "#,
-        )
-        .fetch_all(self.0.conn())
-        .await?;
-
-        let result = Ok(tokens
-            .into_iter()
-            .map(|t| {
-                let token: Token = t.into();
-                (token.id, token)
-            })
-            .collect());
+        let tokens = self.load_tokens_asc(TokenId(0), None).await?;
+        let result = Ok(tokens.into_iter().map(|token| (token.id, token)).collect());
 
         metrics::histogram!("sql.token.load_tokens", start.elapsed());
         result
@@ -82,34 +123,10 @@ impl<'a, 'c> TokensSchema<'a, 'c> {
         let start = Instant::now();
         let tokens = match query.direction {
             PaginationDirection::Newer => {
-                sqlx::query_as!(
-                    DbToken,
-                    r#"
-                    SELECT * FROM tokens
-                    WHERE id >= $1
-                    ORDER BY id ASC
-                    LIMIT $2
-                    "#,
-                    *(query.from) as i32,
-                    query.limit as i64
-                )
-                .fetch_all(self.0.conn())
-                .await?
+                self.load_tokens_asc(query.from, Some(query.limit)).await?
             }
             PaginationDirection::Older => {
-                sqlx::query_as!(
-                    DbToken,
-                    r#"
-                    SELECT * FROM tokens
-                    WHERE id <= $1
-                    ORDER BY id DESC
-                    LIMIT $2
-                    "#,
-                    i32::from(*(query.from)),
-                    i64::from(query.limit)
-                )
-                .fetch_all(self.0.conn())
-                .await?
+                self.load_tokens_desc(query.from, Some(query.limit)).await?
             }
         };
 
