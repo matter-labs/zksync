@@ -6,7 +6,7 @@ use chrono::{DateTime, Utc};
 
 // Workspace imports
 use zksync_types::aggregated_operations::AggregatedActionType;
-use zksync_types::{Address, BlockNumber, TokenId};
+use zksync_types::{tx::TxHash, Address, BlockNumber, TokenId};
 
 // Local imports
 use self::records::{
@@ -988,5 +988,45 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
             start.elapsed()
         );
         Ok(receipts)
+    }
+
+    /// Returns `created_at` field for transaction with given hash.
+    pub async fn get_tx_created_at(
+        &mut self,
+        block_number: BlockNumber,
+        tx_hash: TxHash,
+    ) -> QueryResult<Option<DateTime<Utc>>> {
+        let start = Instant::now();
+
+        let tx_created_at = sqlx::query!(
+            "SELECT created_at FROM executed_transactions
+            WHERE block_number = $1 AND tx_hash = $2",
+            i64::from(*block_number),
+            tx_hash.as_ref()
+        )
+        .fetch_optional(self.0.conn())
+        .await?;
+
+        let created_at = if let Some(tx_created_at) = tx_created_at {
+            Some(tx_created_at.created_at)
+        } else {
+            let priority_op_created_op = sqlx::query!(
+                "SELECT created_at FROM executed_priority_operations
+                WHERE block_number = $1 AND eth_hash = $2",
+                i64::from(*block_number),
+                tx_hash.as_ref()
+            )
+            .fetch_optional(self.0.conn())
+            .await?;
+
+            if let Some(priority_op_created_op) = priority_op_created_op {
+                Some(priority_op_created_op.created_at)
+            } else {
+                None
+            }
+        };
+
+        metrics::histogram!("sql.chain.block.get_tx_created_at", start.elapsed());
+        Ok(created_at)
     }
 }

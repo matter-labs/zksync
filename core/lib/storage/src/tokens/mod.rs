@@ -74,6 +74,7 @@ impl<'a, 'c> TokensSchema<'a, 'c> {
         result
     }
 
+    /// Loads tokens for the given pagination query
     pub async fn load_token_page(
         &mut self,
         query: &PaginationQuery<TokenId>,

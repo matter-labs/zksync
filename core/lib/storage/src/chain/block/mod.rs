@@ -9,7 +9,6 @@ use zksync_crypto::convert::FeConvert;
 use zksync_types::{
     aggregated_operations::AggregatedActionType,
     block::{Block, BlockMetadata, ExecutedOperations, PendingBlock},
-    tx::TxHash,
     AccountId, BlockNumber, Fr, ZkSyncOp,
 };
 // Local imports
@@ -857,6 +856,7 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
         Ok(self.save_block(block).await?)
     }
 
+    /// Loads the block headers for the given pagination query
     pub async fn load_block_page(
         &mut self,
         query: &PaginationQuery<BlockNumber>,
@@ -964,44 +964,7 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
         Ok(details)
     }
 
-    pub async fn get_tx_created_at(
-        &mut self,
-        block_number: BlockNumber,
-        tx_hash: TxHash,
-    ) -> QueryResult<Option<DateTime<Utc>>> {
-        let start = Instant::now();
-
-        let tx_created_at = sqlx::query!(
-            "SELECT created_at FROM executed_transactions
-            WHERE block_number = $1 AND tx_hash = $2",
-            i64::from(*block_number),
-            tx_hash.as_ref()
-        )
-        .fetch_optional(self.0.conn())
-        .await?;
-
-        let created_at = if let Some(tx_created_at) = tx_created_at {
-            Some(tx_created_at.created_at)
-        } else {
-            let priority_op_created_op = sqlx::query!(
-                "SELECT created_at FROM executed_priority_operations
-                WHERE block_number = $1 AND eth_hash = $2",
-                i64::from(*block_number),
-                tx_hash.as_ref()
-            )
-            .fetch_optional(self.0.conn())
-            .await?;
-            if let Some(priority_op_created_op) = priority_op_created_op {
-                Some(priority_op_created_op.created_at)
-            } else {
-                None
-            }
-        };
-
-        metrics::histogram!("sql.chain.block.get_tx_created_at", start.elapsed());
-        Ok(created_at)
-    }
-
+    /// Retrieves both L1 and L2 operations stored in the block for the given pagination query
     pub async fn get_block_transactions_page(
         &mut self,
         query: &PaginationQuery<BlockAndTxHash>,
@@ -1009,6 +972,9 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
         let start = Instant::now();
 
         let created_at: Option<DateTime<Utc>> = self
+            .0
+            .chain()
+            .operations_ext_schema()
             .get_tx_created_at(query.from.block_number, query.from.tx_hash)
             .await?;
         let block_txs = if let Some(created_at) = created_at {
@@ -1117,6 +1083,7 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
         Ok(block_txs)
     }
 
+    /// Returns count of both L1 and L2 operations stored in the block
     pub async fn get_block_transactions_count(
         &mut self,
         block_number: BlockNumber,
