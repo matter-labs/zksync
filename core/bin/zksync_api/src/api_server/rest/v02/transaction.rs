@@ -82,7 +82,7 @@ pub struct L2Receipt {
 
 impl From<TxReceiptResponse> for L2Receipt {
     fn from(receipt: TxReceiptResponse) -> L2Receipt {
-        let mut tx_hash_with_prefix = "sync-tx:".to_string();
+        let mut tx_hash_with_prefix = "0x".to_string();
         tx_hash_with_prefix.push_str(&receipt.tx_hash);
         let tx_hash = TxHash::from_str(&tx_hash_with_prefix).unwrap();
         let rollup_block = Some(BlockNumber(receipt.block_number as u32));
@@ -123,7 +123,7 @@ pub struct Transaction {
 
 impl From<(BlockTransactionItem, bool)> for Transaction {
     fn from(item: (BlockTransactionItem, bool)) -> Self {
-        let tx_hash = TxHash::from_str(item.0.tx_hash.replace("0x", "sync-tx:").as_str()).unwrap();
+        let tx_hash = TxHash::from_str(&item.0.tx_hash).unwrap();
         let status = if item.0.success.unwrap_or_default() {
             if item.1 {
                 L2Status::Finalized

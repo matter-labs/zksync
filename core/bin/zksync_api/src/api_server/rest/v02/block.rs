@@ -274,13 +274,8 @@ mod tests {
                 .await?
         };
         assert!(expected_txs.len() >= 3);
-        let tx_hash = expected_txs
-            .first()
-            .unwrap()
-            .tx_hash
-            .as_str()
-            .replace("0x", "sync-tx:");
-        let tx_hash = TxHash::from_str(tx_hash.as_str()).unwrap();
+        let tx_hash_str = expected_txs.first().unwrap().tx_hash.as_str();
+        let tx_hash = TxHash::from_str(tx_hash_str).unwrap();
 
         let query = PaginationQuery {
             from: tx_hash,
