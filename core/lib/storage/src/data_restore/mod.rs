@@ -196,7 +196,7 @@ impl<'a, 'c> DataRestoreSchema<'a, 'c> {
             // The only way to know decimals is to query ERC20 contract 'decimals' function
             // that may or may not (in most cases, may not) be there, so we just assume it to be 18
             let decimals = 18;
-            let token = Token::new(id, address, &format!("ERC20-{}", *id), decimals);
+            let token = Token::new(id, address, &format!("ERC20-{}", *id), decimals, false);
             TokensSchema(&mut transaction).store_token(token).await?;
         }
 

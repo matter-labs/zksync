@@ -128,6 +128,7 @@ impl StorageInteractor for DatabaseStorageInteractor<'_> {
                     .parse()
                     .expect("failed to parse token address"),
                 decimals: token.decimals,
+                is_nft: false,
             })
             .await
             .expect("failed to store token");

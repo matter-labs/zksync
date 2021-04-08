@@ -18,3 +18,5 @@ CREATE TABLE nft
     address            bytea NOT NULL,
     content_hash       bytea NOT NULL
 );
+
+ALTER TABLE tokens ADD COLUMN is_nft BOOL NOT NULL DEFAULT FALSE;

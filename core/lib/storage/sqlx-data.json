@@ -139,6 +139,11 @@
           "ordinal": 3,
           "name": "decimals",
           "type_info": "Int2"
+        },
+        {
+          "ordinal": 4,
+          "name": "is_nft",
+          "type_info": "Bool"
         }
       ],
       "parameters": {
@@ -147,6 +152,7 @@
         ]
       },
       "nullable": [
+        false,
         false,
         false,
         false,
@@ -1045,44 +1051,6 @@
         false,
         false,
         true,
-        false,
-        false
-      ]
-    }
-  },
-  "2d70c5906b5c17523afd243c8be132f5b1724482e2f9d2795085455cafa0d6ce": {
-    "query": "\n            SELECT id, address, symbol, decimals\n            FROM tokens\n            INNER JOIN ticker_market_volume\n            ON tokens.id = ticker_market_volume.token_id\n            WHERE ticker_market_volume.market_volume >= $1\n            ORDER BY id ASC\n            ",
-    "describe": {
-      "columns": [
-        {
-          "ordinal": 0,
-          "name": "id",
-          "type_info": "Int4"
-        },
-        {
-          "ordinal": 1,
-          "name": "address",
-          "type_info": "Text"
-        },
-        {
-          "ordinal": 2,
-          "name": "symbol",
-          "type_info": "Text"
-        },
-        {
-          "ordinal": 3,
-          "name": "decimals",
-          "type_info": "Int2"
-        }
-      ],
-      "parameters": {
-        "Left": [
-          "Numeric"
-        ]
-      },
-      "nullable": [
-        false,
-        false,
         false,
         false
       ]
@@ -2128,6 +2096,50 @@
       ]
     }
   },
+  "7001b7475a8e8dde389fcf21f7b848a6c4dcdff32f0e03727f23b7b8808328d2": {
+    "query": "\n            SELECT id, address, symbol, decimals, is_nft\n            FROM tokens\n            INNER JOIN ticker_market_volume\n            ON tokens.id = ticker_market_volume.token_id\n            WHERE ticker_market_volume.market_volume >= $1\n            ORDER BY id ASC\n            ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "id",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 1,
+          "name": "address",
+          "type_info": "Text"
+        },
+        {
+          "ordinal": 2,
+          "name": "symbol",
+          "type_info": "Text"
+        },
+        {
+          "ordinal": 3,
+          "name": "decimals",
+          "type_info": "Int2"
+        },
+        {
+          "ordinal": 4,
+          "name": "is_nft",
+          "type_info": "Bool"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Numeric"
+        ]
+      },
+      "nullable": [
+        false,
+        false,
+        false,
+        false,
+        false
+      ]
+    }
+  },
   "714d10cb76076a8c10d147a14bfda609e7d809186b602406b671d4dd79a0ca8e": {
     "query": "SELECT * FROM accounts",
     "describe": {
@@ -2912,42 +2924,6 @@
       ]
     }
   },
-  "a270c88373710266a4904a7e5e1e418edebed57af308cf8233f6a7331331c5e4": {
-    "query": "\n            SELECT * FROM tokens\n            ORDER BY id ASC\n            ",
-    "describe": {
-      "columns": [
-        {
-          "ordinal": 0,
-          "name": "id",
-          "type_info": "Int4"
-        },
-        {
-          "ordinal": 1,
-          "name": "address",
-          "type_info": "Text"
-        },
-        {
-          "ordinal": 2,
-          "name": "symbol",
-          "type_info": "Text"
-        },
-        {
-          "ordinal": 3,
-          "name": "decimals",
-          "type_info": "Int2"
-        }
-      ],
-      "parameters": {
-        "Left": []
-      },
-      "nullable": [
-        false,
-        false,
-        false,
-        false
-      ]
-    }
-  },
   "a2da93cd95ba78f23b8e7df776892a32a2228957881389d5a59803e9de38623f": {
     "query": "\n            INSERT INTO ticker_price ( token_id, usd_price, last_updated )\n            VALUES ( $1, $2, $3 )\n            ON CONFLICT (token_id)\n            DO\n              UPDATE SET usd_price = $2, last_updated = $3\n            ",
     "describe": {
@@ -3062,6 +3038,11 @@
           "ordinal": 3,
           "name": "decimals",
           "type_info": "Int2"
+        },
+        {
+          "ordinal": 4,
+          "name": "is_nft",
+          "type_info": "Bool"
         }
       ],
       "parameters": {
@@ -3070,6 +3051,7 @@
         ]
       },
       "nullable": [
+        false,
         false,
         false,
         false,
@@ -4192,6 +4174,11 @@
           "ordinal": 3,
           "name": "decimals",
           "type_info": "Int2"
+        },
+        {
+          "ordinal": 4,
+          "name": "is_nft",
+          "type_info": "Bool"
         }
       ],
       "parameters": {
@@ -4200,6 +4187,7 @@
         ]
       },
       "nullable": [
+        false,
         false,
         false,
         false,
@@ -4650,6 +4638,48 @@
         ]
       },
       "nullable": []
+    }
+  },
+  "f491f570438dd3a3ecd5988d0682751448723b41f1bd17198cc60d7f5d9aeb11": {
+    "query": "\n            SELECT * FROM tokens WHERE is_nft = false\n            ORDER BY id ASC\n            ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "id",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 1,
+          "name": "address",
+          "type_info": "Text"
+        },
+        {
+          "ordinal": 2,
+          "name": "symbol",
+          "type_info": "Text"
+        },
+        {
+          "ordinal": 3,
+          "name": "decimals",
+          "type_info": "Int2"
+        },
+        {
+          "ordinal": 4,
+          "name": "is_nft",
+          "type_info": "Bool"
+        }
+      ],
+      "parameters": {
+        "Left": []
+      },
+      "nullable": [
+        false,
+        false,
+        false,
+        false,
+        false
+      ]
     }
   },
   "f4aaa302a20921ae9ff490ac1a86083c49ee4a9afacf0faeb76aa8e1549f2fe7": {

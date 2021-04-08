@@ -54,7 +54,7 @@ impl<'a, 'c> TokensSchema<'a, 'c> {
         let tokens = sqlx::query_as!(
             DbToken,
             r#"
-            SELECT * FROM tokens
+            SELECT * FROM tokens WHERE is_nft = false
             ORDER BY id ASC
             "#,
         )
@@ -83,11 +83,12 @@ impl<'a, 'c> TokensSchema<'a, 'c> {
         let tokens = sqlx::query_as!(
             DbToken,
             r#"
-            SELECT id, address, symbol, decimals
+            SELECT id, address, symbol, decimals, is_nft
             FROM tokens
             INNER JOIN ticker_market_volume
             ON tokens.id = ticker_market_volume.token_id
             WHERE ticker_market_volume.market_volume >= $1
+            AND is_nft = false
             ORDER BY id ASC
             "#,
             ratio_to_big_decimal(&min_market_volume, STORED_USD_PRICE_PRECISION)
@@ -112,7 +113,7 @@ impl<'a, 'c> TokensSchema<'a, 'c> {
         let start = Instant::now();
         let tokens_count = sqlx::query!(
             r#"
-            SELECT count(*) as "count!" FROM tokens
+            SELECT count(*) as "count!" FROM tokens WHERE is_nft = false
             "#,
         )
         .fetch_one(self.0.conn())

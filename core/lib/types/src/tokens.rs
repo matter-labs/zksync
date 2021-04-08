@@ -93,6 +93,7 @@ pub struct Token {
     pub symbol: String,
     /// Token precision (e.g. 18 for "ETH" so "1.0" ETH = 10e18 as U256 number)
     pub decimals: u8,
+    pub is_nft: bool,
 }
 
 /// Tokens that added when deploying contract
@@ -107,12 +108,13 @@ pub struct TokenGenesisListItem {
 }
 
 impl Token {
-    pub fn new(id: TokenId, address: Address, symbol: &str, decimals: u8) -> Self {
+    pub fn new(id: TokenId, address: Address, symbol: &str, decimals: u8, is_nft: bool) -> Self {
         Self {
             id,
             address,
             symbol: symbol.to_string(),
             decimals,
+            is_nft,
         }
     }
 }

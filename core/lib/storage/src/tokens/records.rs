@@ -15,6 +15,7 @@ pub struct DbToken {
     pub address: String,
     pub symbol: String,
     pub decimals: i16,
+    pub is_nft: bool,
 }
 
 impl From<Token> for DbToken {
@@ -24,6 +25,7 @@ impl From<Token> for DbToken {
             address: address_to_stored_string(&token.address),
             symbol: token.symbol,
             decimals: token.decimals as i16,
+            is_nft: token.is_nft,
         }
     }
 }
@@ -35,6 +37,7 @@ impl From<DbToken> for Token {
             address: stored_str_address_to_address(&val.address),
             symbol: val.symbol,
             decimals: val.decimals as u8,
+            is_nft: val.is_nft,
         }
     }
 }

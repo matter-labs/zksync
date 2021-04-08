@@ -195,6 +195,7 @@ mod signatures_with_vectors {
                     address: Default::default(),
                     symbol: sign_data.string_token.clone(),
                     decimals: 0,
+                    is_nft: false,
                 };
                 let (transfer, eth_signature) = signer
                     .sign_transfer(

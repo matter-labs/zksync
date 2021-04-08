@@ -76,6 +76,7 @@ pub async fn genesis_init(config: &ZkSyncConfig) {
                     .parse()
                     .expect("failed to parse token address"),
                 decimals: token.decimals,
+                is_nft: false,
             })
             .await
             .expect("failed to store token");
