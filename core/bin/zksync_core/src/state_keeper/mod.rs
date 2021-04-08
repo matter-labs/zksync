@@ -1,4 +1,3 @@
-use anyhow::Result;
 use std::collections::{HashMap, VecDeque};
 use std::time::Instant;
 // External uses
