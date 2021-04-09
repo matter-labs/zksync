@@ -146,6 +146,46 @@ async fn initial_upper_gas_limit() {
     assert_eq!(scaled_gas, PRICE_LIMIT.into());
 }
 
+/// Checks whether the average gas price is stored to the database correctly.
+#[tokio::test]
+async fn average_gas_price_stored_correctly() {
+    // Initial price limit to set.
+    const PRICE_LIMIT: i64 = 1000;
+
+    let (mut ethereum, db) = eth_and_db_clients().await;
+
+    db.update_gas_price_limit(PRICE_LIMIT).await.unwrap();
+    let mut gas_adjuster: GasAdjuster<MockDatabase> = GasAdjuster::new(&db).await;
+
+    let initial_db_price = db.average_gas_price().await;
+    assert_eq!(initial_db_price, 0u64.into()); // Check just in case.
+
+    // Set the low gas price in Ethereum.
+    let ethereum_price = U256::from(1u64);
+    ethereum
+        .get_mut_mock()
+        .unwrap()
+        .set_gas_price(ethereum_price)
+        .await
+        .unwrap();
+
+    // Update the gas adjuster state once.
+    gas_adjuster.keep_updated(&ethereum, &db).await;
+
+    // Average gas price should not be changed in the DB, as we don't have enough samples.
+    let current_db_price = db.average_gas_price().await;
+    assert_eq!(current_db_price, initial_db_price);
+
+    // Now update adjuster multiple times for it to gather enough statistics.
+    for _ in 0..GasStatistics::GAS_PRICE_SAMPLES_AMOUNT {
+        gas_adjuster.keep_updated(&ethereum, &db).await;
+    }
+
+    // Finally, the stored price should become equal to the network price.
+    let current_db_price = db.average_gas_price().await;
+    assert_eq!(current_db_price, ethereum_price);
+}
+
 /// Checks the gas price limit scaling algorithm:
 /// We are successively keep requesting the gas price with the
 /// ethereum client suggesting the price far beyond the current limit

@@ -11,11 +11,15 @@ use web3::types::{TransactionReceipt, H160, H256, U256};
 
 use zksync_eth_client::ETHDirectClient;
 use zksync_eth_signer::EthereumSigner;
-use zksync_types::{AccountId, PriorityOp, TokenLike};
+use zksync_types::{AccountId, Address, PriorityOp, PriorityOpId, TokenLike};
 
 use crate::{
     error::ClientError, provider::Provider, tokens_cache::TokensCache, utils::u256_to_biguint,
 };
+
+pub use self::priority_op_handle::PriorityOpHandle;
+
+mod priority_op_handle;
 
 const IERC20_INTERFACE: &str = include_str!("abi/IERC20.json");
 const ZKSYNC_INTERFACE: &str = include_str!("abi/ZkSync.json");
@@ -112,6 +116,33 @@ impl<S: EthereumSigner> EthereumProvider<S> {
             .await
             .map_err(|err| ClientError::NetworkError(err.to_string()))
             .map(u256_to_biguint)
+    }
+
+    /// Returns the ERC20 token account balance.
+    pub async fn erc20_balance(
+        &self,
+        address: Address,
+        token: impl Into<TokenLike>,
+    ) -> Result<U256, ClientError> {
+        let token = self
+            .tokens_cache
+            .resolve(token.into())
+            .ok_or(ClientError::UnknownToken)?;
+
+        let res = self
+            .eth_client
+            .call_contract_function(
+                "balanceOf",
+                address,
+                None,
+                Options::default(),
+                None,
+                token.address,
+                self.erc20_abi.clone(),
+            )
+            .await
+            .map_err(|err| ClientError::NetworkError(err.to_string()))?;
+        Ok(res)
     }
 
     /// Returns the pending nonce for the Ethereum account.
@@ -261,6 +292,56 @@ impl<S: EthereumSigner> EthereumProvider<S> {
         Ok(transaction_hash)
     }
 
+    #[cfg(feature = "mint")]
+    pub async fn mint_erc20(
+        &self,
+        token: impl Into<TokenLike>,
+        amount: U256,
+        to: H160,
+    ) -> Result<H256, ClientError> {
+        let token = token.into();
+        let token_info = self
+            .tokens_cache
+            .resolve(token.clone())
+            .ok_or(ClientError::UnknownToken)?;
+
+        if self.tokens_cache.is_eth(token) {
+            // ETH minting is not supported
+            return Err(ClientError::IncorrectInput);
+        }
+
+        let signed_tx = {
+            let contract_function = self
+                .erc20_abi
+                .function("mint")
+                .expect("failed to get function parameters");
+            let params = (to, amount);
+            let data = contract_function
+                .encode_input(&params.into_tokens())
+                .expect("failed to encode parameters");
+
+            self.eth_client
+                .sign_prepared_tx_for_addr(
+                    data,
+                    token_info.address,
+                    Options {
+                        gas: Some(300_000.into()),
+                        ..Default::default()
+                    },
+                )
+                .await
+                .map_err(|_| ClientError::IncorrectCredentials)?
+        };
+
+        let transaction_hash = self
+            .eth_client
+            .send_raw_tx(signed_tx.raw_tx)
+            .await
+            .map_err(|err| ClientError::NetworkError(err.to_string()))?;
+
+        Ok(transaction_hash)
+    }
+
     /// Performs a deposit in zkSync network.
     /// For ERC20 tokens, a deposit must be approved beforehand via the `EthereumProvider::approve_erc20_token_deposits` method.
     pub async fn deposit(
@@ -390,8 +471,14 @@ impl<S: EthereumSigner> EthereumProvider<S> {
 
 /// Trait describes the ability to receive the priority operation from this holder.
 pub trait PriorityOpHolder {
-    /// Returns the priority operation if exist.
+    /// Returns the priority operation if exists.
     fn priority_op(&self) -> Option<PriorityOp>;
+
+    /// Returns the handle for the priority operation.
+    fn priority_op_handle<P: Provider>(&self, provider: P) -> Option<PriorityOpHandle<P>> {
+        self.priority_op()
+            .map(|op| PriorityOpHandle::new(PriorityOpId(op.serial_id), provider))
+    }
 }
 
 impl PriorityOpHolder for TransactionReceipt {

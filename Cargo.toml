@@ -37,6 +37,7 @@ members = [
     "core/tests/test_account",
     "core/tests/testkit",
     "core/tests/loadtest",
+    "core/tests/loadnext",
 
     # SDK section
     "sdk/zksync-rs",

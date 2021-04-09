@@ -6,6 +6,9 @@ use std::{fmt, fs::read_to_string, path::PathBuf, str::FromStr};
 use thiserror::Error;
 use zksync_utils::{parse_env, UnsignedRatioSerializeAsDecimal};
 
+/// ID of the ETH token in zkSync network.
+pub use zksync_crypto::params::ETH_TOKEN_ID;
+
 // Order of the fields is important (from more specific types to less specific types)
 /// Set of values that can be interpreted as a token descriptor.
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq, Hash)]
