@@ -42,14 +42,12 @@ impl Random for CommandType {
         const SINGLE_TX_CHANCE: f32 = 0.7;
         const BATCH_CHANCE: f32 = 0.3;
         // We don't generate API requests at the moment.
-        #[allow(dead_code)] // I't used to count total chance.
-        const API_REQUEST_CHANCE: f32 = 0.0;
+        const _API_REQUEST_CHANCE: f32 = 0.0;
 
-        #[allow(dead_code)] // I't used in the const assertion.
-        const CHANCES_SUM: f32 = SINGLE_TX_CHANCE + BATCH_CHANCE + API_REQUEST_CHANCE;
+        const _CHANCES_SUM: f32 = SINGLE_TX_CHANCE + BATCH_CHANCE + _API_REQUEST_CHANCE;
         // Unfortunately. f64::abs()` is not yet a `const` function.
         const_assert!(
-            -f32::EPSILON <= (CHANCES_SUM - 1.0f32) && (CHANCES_SUM - 1.0f32) <= f32::EPSILON
+            -f32::EPSILON <= (_CHANCES_SUM - 1.0f32) && (_CHANCES_SUM - 1.0f32) <= f32::EPSILON
         );
         let chance = rng.gen_range(0.0f32, 1.0f32);
 
