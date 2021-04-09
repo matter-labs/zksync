@@ -337,8 +337,8 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
                     INNER JOIN eth_aggregated_ops_binding ON aggregate_operations.id = eth_aggregated_ops_binding.op_id
                     INNER JOIN eth_operations ON eth_operations.id = eth_aggregated_ops_binding.eth_op_id
                 WHERE aggregate_operations.confirmed = true 
-            )
-            ,aggr_exec as (
+            ),
+            aggr_exec as (
                  SELECT 
                     aggregate_operations.created_at, 
                     eth_operations.final_hash, 
@@ -401,8 +401,8 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
                     INNER JOIN eth_aggregated_ops_binding ON aggregate_operations.id = eth_aggregated_ops_binding.op_id
                     INNER JOIN eth_operations ON eth_operations.id = eth_aggregated_ops_binding.eth_op_id
                 WHERE aggregate_operations.confirmed = true 
-            )
-            ,aggr_exec as (
+            ),
+            aggr_exec as (
                  SELECT 
                     aggregate_operations.created_at, 
                     eth_operations.final_hash, 
@@ -529,8 +529,8 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
                     INNER JOIN eth_aggregated_ops_binding ON aggregate_operations.id = eth_aggregated_ops_binding.op_id
                     INNER JOIN eth_operations ON eth_operations.id = eth_aggregated_ops_binding.eth_op_id
                 WHERE aggregate_operations.confirmed = true 
-            )
-            ,aggr_exec as (
+            ),
+            aggr_exec as (
                  SELECT 
                     aggregate_operations.created_at, 
                     eth_operations.final_hash, 
@@ -1067,18 +1067,14 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
         let start = Instant::now();
 
         let tx_count = sqlx::query!(
-            r#"
-                SELECT count(*) as "count!" FROM executed_transactions WHERE block_number = $1
-            "#,
+            r#"SELECT count(*) as "count!" FROM executed_transactions WHERE block_number = $1"#,
             i64::from(*block_number)
         )
         .fetch_one(self.0.conn())
         .await?
         .count;
         let priority_op_count = sqlx::query!(
-            r#"
-                SELECT count(*) as "count!" FROM executed_priority_operations WHERE block_number = $1
-            "#,
+            r#"SELECT count(*) as "count!" FROM executed_priority_operations WHERE block_number = $1"#,
             i64::from(*block_number)
         )
         .fetch_one(self.0.conn())

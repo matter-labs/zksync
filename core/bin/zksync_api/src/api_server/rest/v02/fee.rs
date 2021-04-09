@@ -66,15 +66,12 @@ pub fn api_scope(tx_sender: TxSender) -> Scope {
 
 #[cfg(test)]
 mod tests {
-    use super::{
-        super::{
-            test_utils::{
-                deserialize_response_result, dummy_fee_ticker, dummy_sign_verifier,
-                TestServerConfig,
-            },
-            SharedData,
+    use super::*;
+    use crate::api_server::rest::v02::{
+        test_utils::{
+            deserialize_response_result, dummy_fee_ticker, dummy_sign_verifier, TestServerConfig,
         },
-        *,
+        SharedData,
     };
     use num::BigUint;
     use zksync_api_types::v02::{fee::TxInBatchFeeRequest, ApiVersion};

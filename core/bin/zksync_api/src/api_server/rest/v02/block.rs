@@ -218,12 +218,10 @@ pub fn api_scope(pool: ConnectionPool, cache: BlockDetailsCache) -> Scope {
 
 #[cfg(test)]
 mod tests {
-    use super::{
-        super::{
-            test_utils::{deserialize_response_result, TestServerConfig},
-            SharedData,
-        },
-        *,
+    use super::*;
+    use crate::api_server::rest::v02::{
+        test_utils::{deserialize_response_result, TestServerConfig},
+        SharedData,
     };
     use zksync_api_types::v02::{pagination::PaginationDirection, ApiVersion};
 

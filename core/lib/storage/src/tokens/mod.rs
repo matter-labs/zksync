@@ -107,11 +107,9 @@ impl<'a, 'c> TokensSchema<'a, 'c> {
     /// Alongside with the tokens added via `store_token` method, the default `ETH` token
     /// is returned.
     pub async fn load_tokens(&mut self) -> QueryResult<HashMap<TokenId, Token>> {
-        let start = Instant::now();
         let tokens = self.load_tokens_asc(TokenId(0), None).await?;
         let result = Ok(tokens.into_iter().map(|token| (token.id, token)).collect());
 
-        metrics::histogram!("sql.token.load_tokens", start.elapsed());
         result
     }
 
@@ -120,7 +118,6 @@ impl<'a, 'c> TokensSchema<'a, 'c> {
         &mut self,
         query: &PaginationQuery<TokenId>,
     ) -> QueryResult<Vec<Token>> {
-        let start = Instant::now();
         let tokens = match query.direction {
             PaginationDirection::Newer => {
                 self.load_tokens_asc(query.from, Some(query.limit)).await?
@@ -129,11 +126,7 @@ impl<'a, 'c> TokensSchema<'a, 'c> {
                 self.load_tokens_desc(query.from, Some(query.limit)).await?
             }
         };
-
-        let result = Ok(tokens.into_iter().map(|t| t.into()).collect());
-
-        metrics::histogram!("sql.token.load_token_page", start.elapsed());
-        result
+        Ok(tokens)
     }
 
     /// Loads all the stored tokens, which have market_volume (ticker_market_volume table)

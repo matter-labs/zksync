@@ -451,17 +451,20 @@ pub fn api_scope(tx_sender: TxSender) -> Scope {
 
 #[cfg(test)]
 mod tests {
-    use super::{
-        super::{
-            test_utils::{
-                deserialize_response_result, dummy_fee_ticker, dummy_sign_verifier,
-                TestServerConfig, TestTransactions,
+    use super::*;
+    use crate::{
+        api_server::{
+            helpers::try_parse_tx_hash,
+            rest::v02::{
+                test_utils::{
+                    deserialize_response_result, dummy_fee_ticker, dummy_sign_verifier,
+                    TestServerConfig, TestTransactions,
+                },
+                SharedData,
             },
-            SharedData,
         },
-        *,
+        core_api_client::CoreApiClient,
     };
-    use crate::{api_server::helpers::try_parse_tx_hash, core_api_client::CoreApiClient};
     use actix_web::App;
     use zksync_api_types::v02::ApiVersion;
     use zksync_types::{

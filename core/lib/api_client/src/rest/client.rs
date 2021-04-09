@@ -18,6 +18,7 @@ pub use super::v1::{
     transactions::{Receipt, TxData},
     Pagination,
 };
+
 // Local uses
 use super::v1::error::ErrorBody;
 
