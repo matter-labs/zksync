@@ -25,7 +25,8 @@ pub enum LoadtestResult {
 /// Currently, only the following collectors are used:
 ///
 /// - MetricsCollector, which builds time distribution histograms for each kind of performed action.
-/// - FailureCollector, a primitive collector that counts the amount of failures and decides whether test is passed.
+/// - OperationResultsCollector, a primitive collector that counts the amount of failures and decides whether
+///   test is passed.
 ///
 /// Other possible collectors that can be implemented:
 ///
@@ -44,7 +45,7 @@ pub enum LoadtestResult {
 pub struct ReportCollector {
     reports_stream: Receiver<Report>,
     metrics_collector: MetricsCollector,
-    failure_collector: OperationResultsCollector,
+    operations_results_collector: OperationResultsCollector,
 }
 
 impl ReportCollector {
@@ -52,7 +53,7 @@ impl ReportCollector {
         Self {
             reports_stream,
             metrics_collector: MetricsCollector::new(),
-            failure_collector: OperationResultsCollector::new(),
+            operations_results_collector: OperationResultsCollector::new(),
         }
     }
 
@@ -66,7 +67,7 @@ impl ReportCollector {
                     .add_metric(report.action, report.time);
             }
 
-            self.failure_collector.add_status(&report.label);
+            self.operations_results_collector.add_status(&report.label);
 
             // Report failure, if it exists.
             if let ReportLabel::ActionFailed { error } = &report.label {
@@ -77,13 +78,13 @@ impl ReportCollector {
         // All the receivers are gone, it's likely the end of the test.
         // Now we can output the statistics.
         self.metrics_collector.report();
-        self.failure_collector.report();
+        self.operations_results_collector.report();
 
         self.final_resolution()
     }
 
     fn final_resolution(&self) -> LoadtestResult {
-        if self.failure_collector.failures() > 0 {
+        if self.operations_results_collector.failures() > 0 {
             LoadtestResult::TestFailed
         } else {
             LoadtestResult::TestPassed
