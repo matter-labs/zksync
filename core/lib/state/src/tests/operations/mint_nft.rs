@@ -260,9 +260,9 @@ fn mint_token_to_new_account() {
     )
     .unwrap();
 
-    let token_hash: Vec<u8> = vec![
-        0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    let token_hash = [
+        17, 92, 21, 125, 147, 127, 105, 189, 163, 27, 143, 248, 157, 139, 82, 174, 40, 2, 73, 52,
+        23, 51, 96, 19, 125, 4, 81, 76, 226, 204, 145, 69,
     ];
     let token_address = Address::from_slice(&token_hash[..20]);
     let balance = BigUint::from(MIN_NFT_TOKEN_ID);

@@ -1,12 +1,19 @@
 use serde::{Deserialize, Serialize};
 
 use num::{BigUint, Zero};
+use rescue_poseidon::rescue_hash;
 
 use zksync_crypto::{
-    franklin_crypto::eddsa::PrivateKey,
+    convert::FeConvert,
+    franklin_crypto::bellman::{
+        eddsa::PrivateKey,
+        pairing::bn256::{Bn256, Fr, FrRepr},
+        PrimeField, PrimeFieldRepr,
+    },
     params::{max_account_id, max_token_id},
     Engine,
 };
+
 use zksync_utils::{format_units, BigUintSerdeAsRadix10Str};
 
 use crate::{
@@ -191,14 +198,16 @@ impl MintNFT {
     }
 
     pub fn calculate_hash(&self, serial_id: u32) -> Vec<u8> {
-        let mut data = vec![];
-        data.extend_from_slice(&self.creator_id.0.to_be_bytes());
-        data.extend_from_slice(&serial_id.to_be_bytes());
-        data.extend_from_slice(self.content_hash.as_bytes());
-        data
-        // let x0 = Fr(self.creator_id.0 + 2.pow(32) * serial_id); // linear combination of them
-        // let x1 = Fr(self.content_hash.as_bytes());
-        // let result = rescue_hash(&[x0, x1]);
-        // result
+        let value = self.creator_id.0 as u64 + 2u64.pow(32) * serial_id as u64; // Pack creator_id and serial_id
+        let repr = FrRepr::from(value);
+        let value_fr = Fr::from_repr(repr).expect("a Fr");
+
+        let mut repr = FrRepr::default();
+        repr.read_le(&self.content_hash.as_bytes()[..])
+            .expect("a Fr");
+        let content_hash = Fr::from_repr(repr).expect("a Fr");
+
+        let result = rescue_hash::<Bn256, 2>(&[value_fr, content_hash]);
+        result[0].to_bytes()
     }
 }
