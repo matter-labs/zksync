@@ -12,7 +12,7 @@ use serde::{Deserialize, Serialize};
 use zksync_api_types::v02::pagination::{BlockAndTxHash, Paginated, PaginationQuery};
 use zksync_crypto::{convert::FeConvert, serialization::FrSerde, Fr};
 use zksync_storage::{chain::block::records::BlockDetails, ConnectionPool, QueryResult};
-use zksync_types::{tx::TxHash, BlockNumber};
+use zksync_types::{tx::TxHash, BlockNumber, H256};
 
 // Local uses
 use super::{
@@ -29,8 +29,8 @@ pub struct BlockInfo {
     #[serde(with = "FrSerde")]
     pub new_state_root: Fr,
     pub block_size: u64,
-    pub commit_tx_hash: Option<TxHash>,
-    pub verify_tx_hash: Option<TxHash>,
+    pub commit_tx_hash: Option<H256>,
+    pub verify_tx_hash: Option<H256>,
     pub committed_at: DateTime<Utc>,
     pub finalized_at: Option<DateTime<Utc>>,
 }
@@ -47,20 +47,10 @@ impl From<BlockDetails> for BlockInfo {
             }),
             block_size: details.block_size as u64,
             commit_tx_hash: details.commit_tx_hash.map(|bytes| {
-                TxHash::from_slice(&bytes).unwrap_or_else(|| {
-                    panic!(
-                        "Database provided an incorrect commit_tx_hash field: {:?}",
-                        hex::encode(bytes)
-                    )
-                })
+                H256::from_slice(&bytes)
             }),
             verify_tx_hash: details.verify_tx_hash.map(|bytes| {
-                TxHash::from_slice(&bytes).unwrap_or_else(|| {
-                    panic!(
-                        "Database provided an incorrect verify_tx_hash field: {:?}",
-                        hex::encode(bytes)
-                    )
-                })
+                H256::from_slice(&bytes)
             }),
             committed_at: details.committed_at,
             finalized_at: details.verified_at,
