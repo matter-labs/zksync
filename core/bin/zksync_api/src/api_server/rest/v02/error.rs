@@ -35,7 +35,7 @@ pub enum ErrorCode {
     TxAddError = 705,
     InappropriateFeeToken = 706,
     CommunicationCoreServer = 707,
-    Other = 708,
+    Other = 60_000,
 }
 
 /// Error object in a response

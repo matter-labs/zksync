@@ -201,7 +201,7 @@ impl ApiV01 {
         if let Ok(block_details) = transaction
             .chain()
             .block_schema()
-            .load_block_range(block_id, 1)
+            .load_block_range_desc(block_id, 1)
             .await
         {
             // Unverified blocks can still change, so we can't cache them.

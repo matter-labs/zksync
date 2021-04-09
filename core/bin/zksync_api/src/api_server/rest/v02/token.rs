@@ -161,7 +161,10 @@ async fn token_by_id(
     let token_like = TokenLike::parse(&token_like_string);
     let token_like = match token_like {
         TokenLike::Symbol(_) => {
-            return Error::from(PriceError::token_not_found("Could not parse token as id or address")).into();
+            return Error::from(PriceError::token_not_found(
+                "Could not parse token as id or address",
+            ))
+            .into();
         }
         _ => token_like,
     };
@@ -178,7 +181,10 @@ async fn token_price(
     let first_token = TokenLike::parse(&token_like_string);
     let first_token = match first_token {
         TokenLike::Symbol(_) => {
-            return Error::from(PriceError::token_not_found("Could not parse token as id or address")).into();
+            return Error::from(PriceError::token_not_found(
+                "Could not parse token as id or address",
+            ))
+            .into();
         }
         _ => first_token,
     };

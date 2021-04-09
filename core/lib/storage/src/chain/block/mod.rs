@@ -311,7 +311,7 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
     }
 
     /// Loads the block headers for the given amount of blocks in the descending order.
-    pub async fn load_block_range(
+    pub async fn load_block_range_desc(
         &mut self,
         max_block: BlockNumber,
         limit: u32,
@@ -447,7 +447,9 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
             PaginationDirection::Newer => {
                 self.load_block_range_asc(query.from, query.limit).await?
             }
-            PaginationDirection::Older => self.load_block_range(query.from, query.limit).await?,
+            PaginationDirection::Older => {
+                self.load_block_range_desc(query.from, query.limit).await?
+            }
         };
 
         Ok(details)

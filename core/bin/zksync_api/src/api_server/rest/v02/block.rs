@@ -72,20 +72,22 @@ impl From<BlockDetails> for BlockInfo {
 #[derive(Debug, Clone)]
 struct ApiBlockData {
     pool: ConnectionPool,
-    /// Verified blocks cache.
-    cache: BlockDetailsCache,
+    verified_blocks_cache: BlockDetailsCache,
 }
 
 impl ApiBlockData {
-    fn new(pool: ConnectionPool, cache: BlockDetailsCache) -> Self {
-        Self { pool, cache }
+    fn new(pool: ConnectionPool, verified_blocks_cache: BlockDetailsCache) -> Self {
+        Self {
+            pool,
+            verified_blocks_cache,
+        }
     }
 
     /// Returns information about block with the specified number.
     ///
     /// This method caches some of the verified blocks.
     async fn block_info(&self, block_number: BlockNumber) -> Result<Option<BlockDetails>, Error> {
-        self.cache
+        self.verified_blocks_cache
             .get(&self.pool, block_number)
             .await
             .map_err(Error::storage)
@@ -99,14 +101,14 @@ impl ApiBlockData {
             Ok(BlockNumber(number))
         } else {
             match block_position {
-                "last_committed" => match self.get_last_committed_block_number().await {
-                    Ok(number) => Ok(number),
-                    Err(err) => Err(Error::storage(err)),
-                },
-                "last_finalized" => match self.get_last_finalized_block_number().await {
-                    Ok(number) => Ok(number),
-                    Err(err) => Err(Error::storage(err)),
-                },
+                "last_committed" => self
+                    .get_last_committed_block_number()
+                    .await
+                    .map_err(Error::storage),
+                "last_finalized" => self
+                    .get_last_finalized_block_number()
+                    .await
+                    .map_err(Error::storage),
                 _ => Err(Error::from(InvalidDataError::InvalidBlockPosition)),
             }
         }
