@@ -60,7 +60,7 @@ impl ApiBlocksData {
         storage
             .chain()
             .block_schema()
-            .load_block_range(max_block, limit)
+            .load_block_range_desc(max_block, limit)
             .await
     }
 
@@ -232,7 +232,7 @@ pub fn api_scope(pool: ConnectionPool, cache: BlockDetailsCache) -> Scope {
 //             let blocks = storage
 //                 .chain()
 //                 .block_schema()
-//                 .load_block_range(BlockNumber(10), 10)
+//                 .load_block_range_desc(BlockNumber(10), 10)
 //                 .await?;
 
 //             blocks

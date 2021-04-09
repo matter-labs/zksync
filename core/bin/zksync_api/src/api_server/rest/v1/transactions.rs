@@ -135,7 +135,7 @@ impl ApiTransactionsData {
         let block = storage
             .chain()
             .block_schema()
-            .load_block_range(block_number, 1)
+            .load_block_range_desc(block_number, 1)
             .await?
             .into_iter()
             .next();

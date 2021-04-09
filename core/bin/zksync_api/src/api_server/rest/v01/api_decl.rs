@@ -228,7 +228,7 @@ impl ApiV01 {
         let mut blocks = storage
             .chain()
             .block_schema()
-            .load_block_range(block_id, 1)
+            .load_block_range_desc(block_id, 1)
             .await
             .map_err(|err| {
                 vlog::warn!("Internal Server Error: '{}'; input: {}", err, *block_id);

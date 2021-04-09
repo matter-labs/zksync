@@ -58,7 +58,7 @@ impl ApiOperationsData {
         let blocks = storage
             .chain()
             .block_schema()
-            .load_block_range(BlockNumber(executed_op.block_number as u32), 1)
+            .load_block_range_desc(BlockNumber(executed_op.block_number as u32), 1)
             .await?;
 
         let block_info = blocks
