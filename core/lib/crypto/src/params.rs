@@ -93,7 +93,7 @@ pub const SUBTREE_HASH_WIDTH: usize = 254; //seems to be equal to Bn256::NUM_BIT
 pub const SUBTREE_HASH_WIDTH_PADDED: usize = 256;
 
 /// Content hash size
-pub const CONTENT_HASH_WIDTH: usize = FR_ADDRESS_LEN * 8;
+pub const CONTENT_HASH_WIDTH: usize = 256;
 
 /// balance bit width
 pub const BALANCE_BIT_WIDTH: usize = 128;

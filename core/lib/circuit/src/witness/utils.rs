@@ -443,6 +443,15 @@ pub fn fr_from_bytes(bytes: Vec<u8>) -> Fr {
     Fr::from_repr(fr_repr).unwrap()
 }
 
+pub fn fr_into_u32_low(value: Fr) -> u32 {
+    let mut be_bytes = [0u8; 32];
+    value
+        .into_repr()
+        .write_be(be_bytes.as_mut())
+        .expect("Write value bytes");
+    u32::from_be_bytes([be_bytes[28], be_bytes[29], be_bytes[30], be_bytes[31]])
+}
+
 /// Gathered signature data for calculating the operations in several
 /// witness structured (e.g. `TransferWitness` or `WithdrawWitness`).
 #[derive(Debug, Clone)]

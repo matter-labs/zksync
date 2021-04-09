@@ -115,12 +115,12 @@ impl TxHandler<MintNFT> for ZkSyncState {
         updates.push((
             op.creator_account_id,
             AccountUpdate::UpdateBalance {
-                balance_update: (NFT_TOKEN_ID, old_balance, new_balance.clone()),
+                balance_update: (NFT_TOKEN_ID, old_balance.clone(), new_balance.clone()),
                 old_nonce,
                 new_nonce: creator_account.nonce,
             },
         ));
-        let serial_id = new_balance.to_u32().unwrap_or_default();
+        let serial_id = old_balance.to_u32().unwrap_or_default();
 
         let token_hash = op.tx.calculate_hash(serial_id);
         let token_address = Address::from_slice(&token_hash[..20]);
