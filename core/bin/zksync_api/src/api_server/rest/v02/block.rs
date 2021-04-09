@@ -32,7 +32,7 @@ pub struct BlockInfo {
     pub commit_tx_hash: Option<TxHash>,
     pub verify_tx_hash: Option<TxHash>,
     pub committed_at: DateTime<Utc>,
-    pub verified_at: Option<DateTime<Utc>>,
+    pub finalized_at: Option<DateTime<Utc>>,
 }
 
 impl From<BlockDetails> for BlockInfo {
@@ -63,7 +63,7 @@ impl From<BlockDetails> for BlockInfo {
                 })
             }),
             committed_at: details.committed_at,
-            verified_at: details.verified_at,
+            finalized_at: details.verified_at,
         }
     }
 }
