@@ -108,9 +108,8 @@ impl<'a, 'c> TokensSchema<'a, 'c> {
     /// is returned.
     pub async fn load_tokens(&mut self) -> QueryResult<HashMap<TokenId, Token>> {
         let tokens = self.load_tokens_asc(TokenId(0), None).await?;
-        let result = Ok(tokens.into_iter().map(|token| (token.id, token)).collect());
 
-        result
+        Ok(tokens.into_iter().map(|token| (token.id, token)).collect())
     }
 
     /// Loads tokens for the given pagination query

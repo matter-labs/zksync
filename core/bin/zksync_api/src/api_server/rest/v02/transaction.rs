@@ -49,15 +49,16 @@ pub struct L1Receipt {
     pub id: PriorityOpId,
 }
 
-impl From<(StoredExecutedPriorityOperation, bool)> for L1Receipt {
-    fn from(op: (StoredExecutedPriorityOperation, bool)) -> L1Receipt {
-        let eth_block = EthBlockId(op.0.eth_block as u64);
-        let rollup_block = Some(BlockNumber(op.0.block_number as u32));
-        let id = PriorityOpId(op.0.priority_op_serialid as u64);
+impl L1Receipt {
+    pub fn from_op_and_finalization(
+        op: StoredExecutedPriorityOperation,
+        is_finalized: bool,
+    ) -> L1Receipt {
+        let eth_block = EthBlockId(op.eth_block as u64);
+        let rollup_block = Some(BlockNumber(op.block_number as u32));
+        let id = PriorityOpId(op.priority_op_serialid as u64);
 
-        let finalized = op.1;
-
-        let status = if finalized {
+        let status = if is_finalized {
             L1Status::Finalized
         } else {
             L1Status::Committed
@@ -121,11 +122,11 @@ pub struct Transaction {
     pub created_at: DateTime<Utc>,
 }
 
-impl From<(BlockTransactionItem, bool)> for Transaction {
-    fn from(item: (BlockTransactionItem, bool)) -> Self {
-        let tx_hash = TxHash::from_str(&item.0.tx_hash).unwrap();
-        let status = if item.0.success.unwrap_or_default() {
-            if item.1 {
+impl Transaction {
+    pub fn from_item_and_finalization(item: BlockTransactionItem, is_finalized: bool) -> Self {
+        let tx_hash = TxHash::from_str(&item.tx_hash).unwrap();
+        let status = if item.success.unwrap_or_default() {
+            if is_finalized {
                 L2Status::Finalized
             } else {
                 L2Status::Committed
@@ -135,11 +136,11 @@ impl From<(BlockTransactionItem, bool)> for Transaction {
         };
         Self {
             tx_hash,
-            block_number: Some(BlockNumber(item.0.block_number as u32)),
-            op: item.0.op,
+            block_number: Some(BlockNumber(item.block_number as u32)),
+            op: item.op,
             status,
-            fail_reason: item.0.fail_reason,
-            created_at: item.0.created_at,
+            fail_reason: item.fail_reason,
+            created_at: item.created_at,
         }
     }
 }
@@ -191,7 +192,7 @@ impl ApiTransactionData {
         {
             let finalized =
                 Self::is_block_finalized(storage, BlockNumber(op.block_number as u32)).await;
-            Ok(Some(L1Receipt::from((op, finalized))))
+            Ok(Some(L1Receipt::from_op_and_finalization(op, finalized)))
         } else {
             Ok(None)
         }

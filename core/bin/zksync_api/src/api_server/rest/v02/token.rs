@@ -94,7 +94,10 @@ impl ApiTokenData {
                     .map_err(Error::storage)?;
                 for token in paginated_tokens.list {
                     let enabled_for_fees = tokens_enabled_for_fees.contains(&token.id);
-                    list.push(ApiToken::from((token, enabled_for_fees)));
+                    list.push(ApiToken::from_token_and_eligibility(
+                        token,
+                        enabled_for_fees,
+                    ));
                 }
                 Ok(Paginated {
                     list,
@@ -120,7 +123,10 @@ impl ApiTokenData {
             let enabled_for_fees = self
                 .is_token_enabled_for_fees(&mut storage, token.id)
                 .await?;
-            Ok(ApiToken::from((token, enabled_for_fees)))
+            Ok(ApiToken::from_token_and_eligibility(
+                token,
+                enabled_for_fees,
+            ))
         } else {
             Err(Error::from(PriceError::token_not_found(
                 "Token not found in storage",
@@ -303,7 +309,8 @@ mod tests {
             let mut storage = cfg.pool.access_storage().await?;
             is_token_enabled_for_fees(&mut storage, TokenId(1), &cfg.config).await?
         };
-        let expected_api_token = ApiToken::from((expected_token, expected_enabled_for_fees));
+        let expected_api_token =
+            ApiToken::from_token_and_eligibility(expected_token, expected_enabled_for_fees);
         assert_eq!(api_token, expected_api_token);
 
         let query = PaginationQuery {
@@ -324,7 +331,10 @@ mod tests {
             for token in paginated_tokens.list {
                 let enabled_for_fees =
                     is_token_enabled_for_fees(&mut storage, token.id, &cfg.config).await?;
-                list.push(ApiToken::from((token, enabled_for_fees)));
+                list.push(ApiToken::from_token_and_eligibility(
+                    token,
+                    enabled_for_fees,
+                ));
             }
             Paginated {
                 list,

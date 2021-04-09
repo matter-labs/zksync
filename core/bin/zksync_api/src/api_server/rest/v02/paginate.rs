@@ -111,7 +111,7 @@ impl Paginate<Transaction> for StorageProcessor<'_> {
             .unwrap_or(false);
         let txs = raw_txs
             .into_iter()
-            .map(|tx| Transaction::from((tx, is_block_finalized)))
+            .map(|tx| Transaction::from_item_and_finalization(tx, is_block_finalized))
             .collect();
         let count = self
             .chain()

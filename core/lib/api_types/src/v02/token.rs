@@ -10,14 +10,14 @@ pub struct ApiToken {
     pub enabled_for_fees: bool,
 }
 
-impl From<(Token, bool)> for ApiToken {
-    fn from(token: (Token, bool)) -> Self {
+impl ApiToken {
+    pub fn from_token_and_eligibility(token: Token, eligibility: bool) -> Self {
         ApiToken {
-            id: token.0.id,
-            address: token.0.address,
-            symbol: token.0.symbol,
-            decimals: token.0.decimals,
-            enabled_for_fees: token.1,
+            id: token.id,
+            address: token.address,
+            symbol: token.symbol,
+            decimals: token.decimals,
+            enabled_for_fees: eligibility,
         }
     }
 }
