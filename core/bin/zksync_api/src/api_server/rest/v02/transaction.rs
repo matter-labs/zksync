@@ -25,7 +25,7 @@ use zksync_storage::{
 };
 use zksync_types::{
     aggregated_operations::AggregatedActionType, tx::EthSignData, tx::TxEthSignature, tx::TxHash,
-    BlockNumber, EthBlockId, PriorityOpId,
+    BlockNumber, EthBlockId, PriorityOpId, H256,
 };
 
 // Local uses
@@ -119,7 +119,7 @@ pub struct Transaction {
     pub op: Value,
     pub status: L2Status,
     pub fail_reason: Option<String>,
-    pub created_at: DateTime<Utc>,
+    pub created_at: Option<DateTime<Utc>>,
 }
 
 impl Transaction {
@@ -140,7 +140,7 @@ impl Transaction {
             op: item.op,
             status,
             fail_reason: item.fail_reason,
-            created_at: item.created_at,
+            created_at: Some(item.created_at),
         }
     }
 }
@@ -180,10 +180,8 @@ impl ApiTransactionData {
             .unwrap_or(false)
     }
 
-    async fn get_l1_receipt(
-        storage: &mut StorageProcessor<'_>,
-        eth_hash: &[u8],
-    ) -> QueryResult<Option<L1Receipt>> {
+    async fn get_l1_receipt(&self, eth_hash: &[u8]) -> QueryResult<Option<L1Receipt>> {
+        let mut storage = self.tx_sender.pool.access_storage().await?;
         if let Some(op) = storage
             .chain()
             .operations_schema()
@@ -191,17 +189,27 @@ impl ApiTransactionData {
             .await?
         {
             let finalized =
-                Self::is_block_finalized(storage, BlockNumber(op.block_number as u32)).await;
+                Self::is_block_finalized(&mut storage, BlockNumber(op.block_number as u32)).await;
             Ok(Some(L1Receipt::from_op_and_finalization(op, finalized)))
+        } else if let Some((eth_block, priority_op)) = self
+            .tx_sender
+            .core_api_client
+            .get_unconfirmed_op(H256::from_slice(eth_hash))
+            .await?
+        {
+            Ok(Some(L1Receipt {
+                status: L1Status::Queued,
+                eth_block,
+                rollup_block: None,
+                id: PriorityOpId(priority_op.serial_id),
+            }))
         } else {
             Ok(None)
         }
     }
 
-    async fn get_l2_receipt(
-        storage: &mut StorageProcessor<'_>,
-        tx_hash: TxHash,
-    ) -> QueryResult<Option<L2Receipt>> {
+    async fn get_l2_receipt(&self, tx_hash: TxHash) -> QueryResult<Option<L2Receipt>> {
+        let mut storage = self.tx_sender.pool.access_storage().await?;
         if let Some(receipt) = storage
             .chain()
             .operations_ext_schema()
@@ -227,11 +235,11 @@ impl ApiTransactionData {
     }
 
     async fn tx_status(&self, tx_hash: &[u8; 32]) -> QueryResult<Option<Receipt>> {
-        let mut storage = self.tx_sender.pool.access_storage().await?;
-        if let Some(receipt) = Self::get_l1_receipt(&mut storage, tx_hash).await? {
+        if let Some(receipt) = self.get_l1_receipt(tx_hash).await? {
             Ok(Some(Receipt::L1(receipt)))
-        } else if let Some(receipt) =
-            Self::get_l2_receipt(&mut storage, TxHash::from_slice(tx_hash).unwrap()).await?
+        } else if let Some(receipt) = self
+            .get_l2_receipt(TxHash::from_slice(tx_hash).unwrap())
+            .await?
         {
             Ok(Some(Receipt::L2(receipt)))
         } else {
@@ -250,10 +258,8 @@ impl ApiTransactionData {
         result
     }
 
-    async fn get_l1_tx_data(
-        storage: &mut StorageProcessor<'_>,
-        eth_hash: &[u8],
-    ) -> QueryResult<Option<TxData>> {
+    async fn get_l1_tx_data(&self, eth_hash: &[u8]) -> QueryResult<Option<TxData>> {
+        let mut storage = self.tx_sender.pool.access_storage().await?;
         let operation = storage
             .chain()
             .operations_schema()
@@ -261,7 +267,7 @@ impl ApiTransactionData {
             .await?;
         if let Some(op) = operation {
             let block_number = BlockNumber(op.block_number as u32);
-            let finalized = Self::is_block_finalized(storage, block_number).await;
+            let finalized = Self::is_block_finalized(&mut storage, block_number).await;
 
             let status = if finalized {
                 L2Status::Finalized
@@ -274,7 +280,26 @@ impl ApiTransactionData {
                 op: op.operation,
                 status,
                 fail_reason: None,
-                created_at: op.created_at,
+                created_at: Some(op.created_at),
+            };
+
+            Ok(Some(TxData {
+                tx,
+                eth_signature: None,
+            }))
+        } else if let Some((_, priority_op)) = self
+            .tx_sender
+            .core_api_client
+            .get_unconfirmed_op(H256::from_slice(eth_hash))
+            .await?
+        {
+            let tx = Transaction {
+                tx_hash: TxHash::from_slice(eth_hash).unwrap(),
+                block_number: None,
+                op: serde_json::to_value(priority_op.data).unwrap(),
+                status: L2Status::Queued,
+                fail_reason: None,
+                created_at: None,
             };
 
             Ok(Some(TxData {
@@ -286,10 +311,8 @@ impl ApiTransactionData {
         }
     }
 
-    async fn get_l2_tx_data(
-        storage: &mut StorageProcessor<'_>,
-        tx_hash: TxHash,
-    ) -> QueryResult<Option<TxData>> {
+    async fn get_l2_tx_data(&self, tx_hash: TxHash) -> QueryResult<Option<TxData>> {
+        let mut storage = self.tx_sender.pool.access_storage().await?;
         let operation = storage
             .chain()
             .operations_schema()
@@ -298,7 +321,7 @@ impl ApiTransactionData {
 
         if let Some(op) = operation {
             let block_number = BlockNumber(op.block_number as u32);
-            let finalized = Self::is_block_finalized(storage, block_number).await;
+            let finalized = Self::is_block_finalized(&mut storage, block_number).await;
 
             let status = if op.success {
                 if finalized {
@@ -315,7 +338,7 @@ impl ApiTransactionData {
                 op: op.tx,
                 status,
                 fail_reason: op.fail_reason,
-                created_at: op.created_at,
+                created_at: Some(op.created_at),
             };
             let eth_sign_data: Option<EthSignData> =
                 op.eth_sign_data.map(serde_json::from_value).transpose()?;
@@ -334,7 +357,7 @@ impl ApiTransactionData {
                 op: op.tx,
                 status: L2Status::Queued,
                 fail_reason: None,
-                created_at: op.created_at,
+                created_at: Some(op.created_at),
             };
 
             let eth_sign_data: Option<EthSignData> =
@@ -348,11 +371,11 @@ impl ApiTransactionData {
     }
 
     async fn tx_data(&self, tx_hash: &[u8; 32]) -> QueryResult<Option<TxData>> {
-        let mut storage = self.tx_sender.pool.access_storage().await?;
-        if let Some(tx_data) = Self::get_l1_tx_data(&mut storage, tx_hash).await? {
+        if let Some(tx_data) = self.get_l1_tx_data(tx_hash).await? {
             Ok(Some(tx_data))
-        } else if let Some(tx_data) =
-            Self::get_l2_tx_data(&mut storage, TxHash::from_slice(tx_hash).unwrap()).await?
+        } else if let Some(tx_data) = self
+            .get_l2_tx_data(TxHash::from_slice(tx_hash).unwrap())
+            .await?
         {
             Ok(Some(tx_data))
         } else {
@@ -485,10 +508,18 @@ mod tests {
             Json(Ok(()))
         }
 
+        async fn get_unconfirmed_op(web::Path(_tx_hash): web::Path<String>) -> Json<Option<()>> {
+            Json(None)
+        }
+
         let server = actix_web::test::start(move || {
             App::new()
                 .route("new_tx", web::post().to(send_tx))
                 .route("new_txs_batch", web::post().to(send_txs_batch))
+                .route(
+                    "unconfirmed_op/{tx_hash}",
+                    web::get().to(get_unconfirmed_op),
+                )
         });
 
         let url = server.url("").trim_end_matches('/').to_owned();

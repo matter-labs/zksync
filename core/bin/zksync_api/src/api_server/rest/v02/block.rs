@@ -290,7 +290,7 @@ mod tests {
                 tx.tx_hash.to_string().replace("sync-tx:", "0x"),
                 expected_tx.tx_hash
             );
-            assert_eq!(tx.created_at, expected_tx.created_at);
+            assert_eq!(tx.created_at, Some(expected_tx.created_at));
             assert_eq!(*tx.block_number.unwrap(), expected_tx.block_number as u32);
             assert_eq!(tx.fail_reason, expected_tx.fail_reason);
             assert_eq!(tx.op, expected_tx.op);

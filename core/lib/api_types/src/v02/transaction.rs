@@ -19,7 +19,7 @@ pub struct IncomingTx {
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum L1Status {
-    //Pending,
+    Queued,
     Committed,
     Finalized,
 }
@@ -36,6 +36,7 @@ pub enum L2Status {
 impl From<L1Status> for L2Status {
     fn from(status: L1Status) -> Self {
         match status {
+            L1Status::Queued => L2Status::Queued,
             L1Status::Committed => L2Status::Committed,
             L1Status::Finalized => L2Status::Finalized,
         }
