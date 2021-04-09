@@ -143,7 +143,7 @@ impl<'a, 'c> EventSchema<'a, 'c> {
                 .account_schema()
                 .account_id_by_address(deposit.to)
                 .await?
-                .ok_or(anyhow::Error::msg("account doesn't exist")),
+                .ok_or(anyhow::Error::msg("Account doesn't exist")),
             ZkSyncPriorityOp::FullExit(full_exit) => Ok(full_exit.account_id),
         }
     }

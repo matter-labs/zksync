@@ -79,7 +79,7 @@ impl AccountUpdateDetails {
             } => Self {
                 account_id: i64::from(*account_id),
                 nonce: i64::from(**new_nonce),
-                new_pub_key_hash: Some(new_pub_key_hash.clone()),
+                new_pub_key_hash: Some(*new_pub_key_hash),
                 token_id: None,
                 new_balance: None,
             },

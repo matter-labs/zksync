@@ -47,7 +47,7 @@ impl TransactionEvent {
                     TransactionStatus::Rejected
                 },
                 fail_reason: exec_tx.fail_reason.clone(),
-                created_at: exec_tx.created_at.clone(),
+                created_at: exec_tx.created_at,
             },
             ExecutedOperations::PriorityOp(exec_prior_op) => Self {
                 tx_hash: exec_prior_op.priority_op.eth_hash.to_string(),
@@ -57,7 +57,7 @@ impl TransactionEvent {
                 tx: serde_json::to_value(&exec_prior_op.op.clone()).unwrap(),
                 status: TransactionStatus::Committed,
                 fail_reason: None,
-                created_at: exec_prior_op.created_at.clone(),
+                created_at: exec_prior_op.created_at,
             },
         }
     }
