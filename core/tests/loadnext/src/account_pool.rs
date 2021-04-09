@@ -9,7 +9,10 @@ use zksync::{
 use zksync_eth_signer::PrivateKeySigner;
 use zksync_types::{tx::PackedEthSignature, Address, H256};
 
-use crate::{config::LoadtestConfig, rng::LoadtestRng};
+use crate::{
+    config::LoadtestConfig,
+    rng::{LoadtestRng, Random},
+};
 
 /// Thread-safe pool of the addresses of accounts used in the loadtest.
 #[derive(Debug, Clone)]
@@ -41,16 +44,14 @@ pub struct AccountCredentials {
     pub address: Address,
 }
 
-impl AccountCredentials {
-    /// Generates random credentials.
-    pub fn rand(rng: &mut LoadtestRng) -> Self {
+impl Random for AccountCredentials {
+    fn random(rng: &mut LoadtestRng) -> Self {
         let eth_pk = H256::random_using(rng);
         let address = pk_to_address(&eth_pk);
 
         Self { eth_pk, address }
     }
 }
-
 /// Type that contains the data required for the test wallet to operate.
 #[derive(Debug)]
 pub struct TestWallet {
@@ -88,14 +89,14 @@ impl AccountPool {
 
         // Perform a health check: check whether zkSync server is alive.
         let mut server_alive = false;
-        for _ in 0u64..3 {
+        for _ in 0usize..3 {
             if let Ok(Ok(_)) = timeout(Duration::from_secs(3), provider.contract_address()).await {
                 server_alive = true;
                 break;
             }
         }
         if !server_alive {
-            anyhow::bail!("zkSync server does not respond. Please check RPC addres and whether server is launched");
+            anyhow::bail!("zkSync server does not respond. Please check RPC address and whether server is launched");
         }
 
         let mut rng = LoadtestRng::new_generic(config.seed.clone());
@@ -118,7 +119,7 @@ impl AccountPool {
         let mut addresses = Vec::with_capacity(config.accounts_amount);
 
         for _ in 0..config.accounts_amount {
-            let eth_credentials = AccountCredentials::rand(&mut rng);
+            let eth_credentials = AccountCredentials::random(&mut rng);
             let zksync_pk = private_key_from_seed(eth_credentials.eth_pk.as_bytes())
                 .expect("Can't generate the zkSync private key");
             let wallet_credentials = WalletCredentials::<PrivateKeySigner>::from_pk(

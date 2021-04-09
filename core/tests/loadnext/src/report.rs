@@ -2,7 +2,11 @@ use std::time::Duration;
 
 use zksync_types::Address;
 
-use crate::command::{ApiRequestCommand, Command, TxType};
+use crate::{
+    all::All,
+    command::{ApiRequestCommand, Command, TxType},
+    constants::MAX_BATCH_SIZE,
+};
 
 /// Report for any operation done by loadtest.
 ///
@@ -117,8 +121,8 @@ pub enum TxActionType {
     Deposit,
 }
 
-impl TxActionType {
-    pub fn all() -> &'static [Self] {
+impl All for TxActionType {
+    fn all() -> &'static [Self] {
         const ALL: &[TxActionType] = &[
             TxActionType::Transfer,
             TxActionType::Withdraw,
@@ -150,8 +154,8 @@ impl From<TxType> for TxActionType {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum ApiActionType {}
 
-impl ApiActionType {
-    pub fn all() -> &'static [Self] {
+impl All for ApiActionType {
+    fn all() -> &'static [Self] {
         const ALL: &[ApiActionType] = &[];
 
         ALL
@@ -201,7 +205,7 @@ impl ActionType {
     /// May be useful in different collectors to initialize their internal states.
     pub fn all() -> Vec<Self> {
         let batch_action_types =
-            (1..=Command::MAX_BATCH_SIZE).map(|batch_size| ActionType::Batch { batch_size });
+            (1..=MAX_BATCH_SIZE).map(|batch_size| ActionType::Batch { batch_size });
 
         TxActionType::all()
             .iter()

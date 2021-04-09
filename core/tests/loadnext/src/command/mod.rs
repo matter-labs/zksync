@@ -1,7 +1,13 @@
 use rand::Rng;
+use static_assertions::const_assert;
+
 use zksync_types::Address;
 
-use crate::{account_pool::AddressPool, rng::LoadtestRng};
+use crate::{
+    account_pool::AddressPool,
+    constants::MAX_BATCH_SIZE,
+    rng::{LoadtestRng, Random},
+};
 
 pub use self::{
     api_command::ApiRequestCommand,
@@ -29,19 +35,21 @@ enum CommandType {
     ApiRequest,
 }
 
-impl CommandType {
+impl Random for CommandType {
     fn random(rng: &mut LoadtestRng) -> Self {
         // Chances of a certain event generation.
         // You must maintain the sum of these constants to be equal to 1.0f32.
         const SINGLE_TX_CHANCE: f32 = 0.7;
         const BATCH_CHANCE: f32 = 0.3;
         // We don't generate API requests at the moment.
+        #[allow(dead_code)] // I't used to count total chance.
         const API_REQUEST_CHANCE: f32 = 0.0;
 
+        #[allow(dead_code)] // I't used in the const assertion.
         const CHANCES_SUM: f32 = SINGLE_TX_CHANCE + BATCH_CHANCE + API_REQUEST_CHANCE;
-        assert!(
-            (CHANCES_SUM - 1.0f32).abs() <= f32::EPSILON,
-            "Sum of chances is not equal to 1.0"
+        // Unfortunately. f64::abs()` is not yet a `const` function.
+        const_assert!(
+            -f32::EPSILON <= (CHANCES_SUM - 1.0f32) && (CHANCES_SUM - 1.0f32) <= f32::EPSILON
         );
         let chance = rng.gen_range(0.0f32, 1.0f32);
 
@@ -56,15 +64,13 @@ impl CommandType {
 }
 
 impl Command {
-    pub const MAX_BATCH_SIZE: usize = 20;
-
     pub fn random(rng: &mut LoadtestRng, own_address: Address, addresses: &AddressPool) -> Self {
         match CommandType::random(rng) {
             CommandType::SingleTx => Self::SingleTx(TxCommand::random(rng, own_address, addresses)),
             CommandType::Batch => {
                 // TODO: For some reason, batches of size 1 are being rejected because of nonce mistmatch.
                 // It may be either bug in loadtest or server code, thus it should be investigated.
-                let batch_size = rng.gen_range(2, Self::MAX_BATCH_SIZE + 1);
+                let batch_size = rng.gen_range(2, MAX_BATCH_SIZE + 1);
                 let mut batch_command: Vec<_> = (0..batch_size)
                     .map(|_| TxCommand::random_batchable(rng, own_address, addresses))
                     .collect();

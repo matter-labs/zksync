@@ -1,13 +1,13 @@
-use failure_collector::FailureCollector;
 use futures::{channel::mpsc::Receiver, StreamExt};
+use operation_results_collector::OperationResultsCollector;
 
 use crate::{
     report::{Report, ReportLabel},
     report_collector::metrics_collector::MetricsCollector,
 };
 
-mod failure_collector;
 mod metrics_collector;
+mod operation_results_collector;
 
 /// Decision on whether loadtest considered passed or failed.
 #[derive(Debug, Clone, Copy)]
@@ -18,10 +18,10 @@ pub enum LoadtestResult {
 
 /// ReportCollector is an entity capable of analyzing everything that happens in the loadtest.
 ///
-/// It is designed to be in separated from the actual execution, so that logic of the execution does not
+/// It is designed to be separated from the actual execution, so that logic of the execution does not
 /// interfere with the logic of analyzing, reporting and decision making.
 ///
-/// Report collector by it's nature only receives reports and uses different collectors in order to analyze them.
+/// Report collector by its nature only receives reports and uses different collectors in order to analyze them.
 /// Currently, only the following collectors are used:
 ///
 /// - MetricsCollector, which builds time distribution histograms for each kind of performed action.
@@ -44,7 +44,7 @@ pub enum LoadtestResult {
 pub struct ReportCollector {
     reports_stream: Receiver<Report>,
     metrics_collector: MetricsCollector,
-    failure_collector: FailureCollector,
+    failure_collector: OperationResultsCollector,
 }
 
 impl ReportCollector {
@@ -52,7 +52,7 @@ impl ReportCollector {
         Self {
             reports_stream,
             metrics_collector: MetricsCollector::new(),
-            failure_collector: FailureCollector::new(),
+            failure_collector: OperationResultsCollector::new(),
         }
     }
 

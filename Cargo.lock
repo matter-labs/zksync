@@ -2661,6 +2661,7 @@ dependencies = [
  "num",
  "rand 0.7.3",
  "serde",
+ "static_assertions",
  "tokio 0.2.22",
  "vlog",
  "zksync",

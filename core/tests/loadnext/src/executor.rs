@@ -214,9 +214,11 @@ impl Executor {
         // We request nonce each time, so that if one iteration was failed, it will be repeated on the next iteration.
         let mut nonce = master_wallet.account_info().await?.committed.nonce;
 
-        let mut batch = Vec::new();
-        let mut batch_fee_types = Vec::new();
-        let mut batch_addresses = Vec::new();
+        // 1 tx per account + 1 fee tx.
+        let batch_txs_amount = accounts_to_process + 1;
+        let mut batch = Vec::with_capacity(batch_txs_amount);
+        let mut batch_fee_types = Vec::with_capacity(batch_txs_amount);
+        let mut batch_addresses = Vec::with_capacity(batch_txs_amount);
 
         for account in self.pool.accounts.iter().take(accounts_to_process) {
             let target_address = account.wallet.address();
@@ -311,8 +313,6 @@ impl Executor {
         &mut self,
     ) -> anyhow::Result<(JoinHandle<LoadtestResult>, Vec<JoinHandle<()>>)> {
         vlog::info!("Master Account: Sending initial transfers");
-        // 40 is a safe limit for now.
-        const MAX_TXS_PER_BATCH: usize = 20;
         // How many times we will resend a batch.
         const MAX_RETRIES: usize = 3;
 
@@ -336,7 +336,7 @@ impl Executor {
             }
 
             let accounts_left = accounts_amount - accounts_processed;
-            let accounts_to_process = std::cmp::min(accounts_left, MAX_TXS_PER_BATCH);
+            let accounts_to_process = std::cmp::min(accounts_left, MAX_BATCH_SIZE);
 
             let batch_tx_hash = match self.send_initial_transfers_batch(accounts_to_process).await {
                 Ok(hash) => hash,

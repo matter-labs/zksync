@@ -1,9 +1,11 @@
 use std::convert::TryInto;
 
-use rand::{rngs::SmallRng, thread_rng, RngCore, SeedableRng};
+use rand::{rngs::SmallRng, seq::SliceRandom, thread_rng, RngCore, SeedableRng};
 
 use zksync::web3::signing::keccak256;
 use zksync_types::H256;
+
+use crate::all::AllWeighted;
 
 // SmallRng seed type is [u8; 16].
 const SEED_SIZE: usize = 16;
@@ -15,8 +17,8 @@ pub struct LoadtestRng {
 }
 
 impl LoadtestRng {
-    pub fn new_generic(seed: Option<String>) -> Self {
-        let seed: [u8; SEED_SIZE] = seed
+    pub fn new_generic(seed_hex: Option<String>) -> Self {
+        let seed: [u8; SEED_SIZE] = seed_hex
             .map(|seed_str| {
                 let mut output = [0u8; SEED_SIZE];
                 let decoded_seed = hex::decode(&seed_str).expect("Incorrect seed hex");
@@ -77,5 +79,25 @@ impl RngCore for LoadtestRng {
 
     fn try_fill_bytes(&mut self, dest: &mut [u8]) -> Result<(), rand::Error> {
         self.rng.try_fill_bytes(dest)
+    }
+}
+
+pub trait Random {
+    fn random(rng: &mut LoadtestRng) -> Self;
+}
+
+pub trait WeightedRandom {
+    fn random(rng: &mut LoadtestRng) -> Self;
+}
+
+impl<V> WeightedRandom for V
+where
+    V: 'static + AllWeighted + Sized + Copy,
+{
+    fn random(rng: &mut LoadtestRng) -> Self {
+        V::all_weighted()
+            .choose_weighted(rng, |item| item.1)
+            .unwrap()
+            .0
     }
 }

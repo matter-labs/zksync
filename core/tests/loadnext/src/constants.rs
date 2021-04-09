@@ -10,3 +10,7 @@ pub const COMMIT_TIMEOUT: Duration = Duration::from_secs(600);
 /// We don't want to overload the server with too many requests; given the fact that blocks are expected to be created
 /// every couple of seconds, chosen value seems to be adequate to provide the result in one or two calls at average.
 pub const POLLING_INTERVAL: Duration = Duration::from_secs(3);
+
+// TODO (ZKS-623): This value is not the greatest batch size zkSync supports.
+// However, choosing the bigger value (e.g. 40) causes server to fail with error "Error communicating core server".
+pub const MAX_BATCH_SIZE: usize = 20;
