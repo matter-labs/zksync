@@ -1,7 +1,6 @@
 // Built-in uses
 
 // External uses
-use serde::Serialize;
 
 // Workspace uses
 use zksync_api_types::v02::pagination::{BlockAndTxHash, Paginated, PaginationQuery};
@@ -12,18 +11,9 @@ use zksync_types::{aggregated_operations::AggregatedActionType, BlockNumber, Tok
 use super::{
     block::BlockInfo,
     error::{Error, TxError},
+    paginate_trait::Paginate,
     transaction::Transaction,
 };
-
-#[async_trait::async_trait]
-pub trait Paginate<T: Serialize> {
-    type Index: Serialize;
-
-    async fn paginate(
-        &mut self,
-        query: &PaginationQuery<Self::Index>,
-    ) -> Result<Paginated<T, Self::Index>, Error>;
-}
 
 #[async_trait::async_trait]
 impl Paginate<Token> for StorageProcessor<'_> {

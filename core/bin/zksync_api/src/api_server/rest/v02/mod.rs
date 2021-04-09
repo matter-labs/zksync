@@ -16,7 +16,8 @@ mod block;
 mod config;
 mod error;
 mod fee;
-mod paginate;
+mod paginate_impl;
+mod paginate_trait;
 mod response;
 #[cfg(test)]
 pub mod test_utils;

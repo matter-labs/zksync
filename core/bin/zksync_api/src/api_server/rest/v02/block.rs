@@ -17,7 +17,7 @@ use zksync_types::{tx::TxHash, BlockNumber, H256};
 // Local uses
 use super::{
     error::{Error, InvalidDataError},
-    paginate::Paginate,
+    paginate_trait::Paginate,
     response::ApiResult,
     transaction::Transaction,
 };

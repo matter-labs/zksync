@@ -27,7 +27,7 @@ use zksync_types::{Token, TokenId, TokenLike};
 // Local uses
 use super::{
     error::{Error, InvalidDataError},
-    paginate::Paginate,
+    paginate_trait::Paginate,
     response::ApiResult,
 };
 use crate::{
