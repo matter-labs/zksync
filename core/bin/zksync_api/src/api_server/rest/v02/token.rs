@@ -179,7 +179,7 @@ async fn token_by_id(
 }
 
 // TODO: take `currency` as enum.
-// Currently actix path extractor doesn't work with enums: https://github.com/actix/actix-web/issues/318
+// Currently actix path extractor doesn't work with enums: https://github.com/actix/actix-web/issues/318 (ZKS-628)
 async fn token_price(
     data: web::Data<ApiTokenData>,
     web::Path((token_like_string, currency)): web::Path<(String, String)>,

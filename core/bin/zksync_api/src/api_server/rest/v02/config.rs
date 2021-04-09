@@ -26,7 +26,7 @@ pub struct ApiConfigData {
     gov_contract: Address,
     deposit_confirmations: u64,
     zksync_version: ZksyncVersion,
-    // TODO: server_version
+    // TODO: server_version (ZKS-627)
 }
 
 impl ApiConfigData {

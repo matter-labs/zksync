@@ -160,7 +160,7 @@ async fn block_pagination(
 }
 
 // TODO: take `block_position` as enum.
-// Currently actix path extractor doesn't work with enums: https://github.com/actix/actix-web/issues/318
+// Currently actix path extractor doesn't work with enums: https://github.com/actix/actix-web/issues/318 (ZKS-628)
 async fn block_by_number(
     data: web::Data<ApiBlockData>,
     web::Path(block_position): web::Path<String>,

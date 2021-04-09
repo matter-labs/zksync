@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 use zksync_types::{Address, BatchFee, Fee, OutputFeeType, TokenLike, TxFeeTypes};
 use zksync_utils::BigUintSerdeAsRadix10Str;
 
-// TODO: remove `fee_type`, `gas_tx_amount`, `gas_price_wei`
+// TODO: remove `fee_type`, `gas_tx_amount`, `gas_price_wei` (ZKP-626)
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct ApiFee {
     pub fee_type: OutputFeeType,
@@ -19,7 +19,7 @@ pub struct ApiFee {
     pub total_fee: BigUint,
 }
 
-// TODO: add `zkp_fee` and `gas_fee`
+// TODO: add `zkp_fee` and `gas_fee` (ZKP-626)
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct ApiBatchFee {
     #[serde(with = "BigUintSerdeAsRadix10Str")]

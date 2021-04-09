@@ -27,7 +27,6 @@ pub struct Request {
     pub network: Network,
     pub api_version: ApiVersion,
     pub resource: String,
-    #[serde(skip_serializing_if = "HashMap::is_empty", default)]
     pub args: HashMap<String, String>,
     pub timestamp: DateTime<Utc>,
 }
@@ -36,8 +35,6 @@ pub struct Request {
 pub struct Response {
     pub request: Request,
     pub status: ResultStatus,
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub error: Option<Value>,
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub result: Option<Value>,
 }
