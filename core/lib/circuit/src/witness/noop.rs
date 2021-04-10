@@ -7,7 +7,7 @@ use zksync_crypto::franklin_crypto::bellman::pairing::{
 use zksync_crypto::circuit::{
     account::CircuitAccountTree, utils::le_bit_vector_into_field_element,
 };
-use zksync_crypto::params::CHUNK_BIT_WIDTH;
+use zksync_crypto::params::{CHUNK_BIT_WIDTH, CONTENT_HASH_WIDTH};
 // Local deps
 use crate::{
     account::AccountWitness,
@@ -60,6 +60,12 @@ pub fn noop_operation(tree: &CircuitAccountTree, acc_id: u32) -> Operation<Bn256
             new_pub_key_hash: Some(Fr::zero()),
             valid_from: Some(Fr::zero()),
             valid_until: Some(Fr::from_str(&u32::MAX.to_string()).unwrap()),
+
+            special_eth_addresses: vec![Some(Fr::zero())],
+            special_tokens: vec![Some(Fr::zero()), Some(Fr::zero())],
+            special_account_ids: vec![Some(Fr::zero())],
+            special_content_hash: vec![Some(Fr::zero()); CONTENT_HASH_WIDTH],
+            special_serial_id: Some(Fr::zero()),
         },
         lhs: OperationBranch {
             address: Some(account_address_fe),

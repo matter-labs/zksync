@@ -14,9 +14,9 @@ use zksync_crypto::{
         utils::{append_be_fixed_width, eth_address_to_fr, le_bit_vector_into_field_element},
     },
     params::{
-        account_tree_depth, ACCOUNT_ID_BIT_WIDTH, CHUNK_BIT_WIDTH, ETH_ADDRESS_BIT_WIDTH,
-        FEE_EXPONENT_BIT_WIDTH, FEE_MANTISSA_BIT_WIDTH, NEW_PUBKEY_HASH_WIDTH, NONCE_BIT_WIDTH,
-        TOKEN_BIT_WIDTH, TX_TYPE_BIT_WIDTH,
+        account_tree_depth, ACCOUNT_ID_BIT_WIDTH, CHUNK_BIT_WIDTH, CONTENT_HASH_WIDTH,
+        ETH_ADDRESS_BIT_WIDTH, FEE_EXPONENT_BIT_WIDTH, FEE_MANTISSA_BIT_WIDTH,
+        NEW_PUBKEY_HASH_WIDTH, NONCE_BIT_WIDTH, TOKEN_BIT_WIDTH, TX_TYPE_BIT_WIDTH,
     },
     primitives::FloatConversions,
 };
@@ -243,6 +243,12 @@ impl ChangePubkeyOffChainWitness<Bn256> {
                 valid_until: Some(
                     Fr::from_str(&change_pubkey_offcahin.valid_until.to_string()).unwrap(),
                 ),
+
+                special_eth_addresses: vec![Some(Fr::zero())],
+                special_tokens: vec![Some(Fr::zero()), Some(Fr::zero())],
+                special_account_ids: vec![Some(Fr::zero())],
+                special_content_hash: vec![Some(Fr::zero()); CONTENT_HASH_WIDTH],
+                special_serial_id: Some(Fr::zero()),
             },
             before_root: Some(before_root),
             after_root: Some(after_root),

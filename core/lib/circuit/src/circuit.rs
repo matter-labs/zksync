@@ -1914,7 +1914,7 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
                 pubdata_properly_copied,
                 is_pubdata_chunk_correct,
                 is_mintNFT_operation,
-                is_valid_timestamp,
+                is_valid_timestamp.clone(),
             ],
         )?;
 

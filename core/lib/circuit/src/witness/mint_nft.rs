@@ -375,7 +375,7 @@ impl MintNFTWitness<Bn256> {
         let (audit_special_account_after_third_chunk, audit_special_balance_after_third_chunk) =
             get_audits(tree, NFT_STORAGE_ACCOUNT_ID.0, NFT_TOKEN_ID.0);
 
-        let new_token_id = nft_counter_after_third_chunk;
+        let new_token_id = nft_counter_before_third_chunk;
         let new_token_id_u32: u32 = fr_into_u32_low(new_token_id);
 
         let before_fourth_chunk_root = tree.root_hash();
@@ -451,6 +451,24 @@ impl MintNFTWitness<Bn256> {
         let a = fee_balance_before_first_chunk;
         let b = fee_as_field_element;
 
+        let content_hash_as_vec: Vec<Option<Fr>> = mint_NFT
+            .content_hash
+            .as_bytes()
+            .iter()
+            .map(|input_byte| {
+                let mut byte_as_bits = vec![];
+                let mut byte = *input_byte;
+                for i in 0..8 {
+                    byte_as_bits.push(byte & 1);
+                    byte /= 2;
+                }
+                byte_as_bits.reverse();
+                byte_as_bits
+            })
+            .flatten()
+            .map(|bit| Some(Fr::from_str(&bit.to_string()).unwrap()))
+            .collect();
+
         MintNFTWitness {
             before_second_chunk_root: Some(before_second_chunk_root),
             before_third_chunk_root: Some(before_third_chunk_root),
@@ -474,6 +492,16 @@ impl MintNFTWitness<Bn256> {
                 new_pub_key_hash: Some(Fr::zero()),
                 valid_from: Some(Fr::from_str(&valid_from.to_string()).unwrap()),
                 valid_until: Some(Fr::from_str(&valid_until.to_string()).unwrap()),
+
+                special_eth_addresses: vec![Some(
+                    recipient_account_witness_before_fifth_chunk
+                        .address
+                        .expect("recipient account should not be empty"),
+                )],
+                special_tokens: vec![Some(token_fe), Some(new_token_id)],
+                special_account_ids: vec![Some(recipient_account_id_fe)],
+                special_content_hash: content_hash_as_vec.clone(),
+                special_serial_id: Some(serial_id),
             },
 
             creator_before_first_chunk: OperationBranch {
@@ -537,23 +565,7 @@ impl MintNFTWitness<Bn256> {
                 },
             },
 
-            content_hash: mint_NFT
-                .content_hash
-                .as_bytes()
-                .iter()
-                .map(|input_byte| {
-                    let mut byte_as_bits = vec![];
-                    let mut byte = *input_byte;
-                    for i in 0..8 {
-                        byte_as_bits.push(byte & 1);
-                        byte /= 2;
-                    }
-                    byte_as_bits.reverse();
-                    byte_as_bits
-                })
-                .flatten()
-                .map(|bit| Some(Fr::from_str(&bit.to_string()).unwrap()))
-                .collect(),
+            content_hash: content_hash_as_vec,
         }
     }
 }
