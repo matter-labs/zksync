@@ -231,7 +231,7 @@ fn mint_token_to_new_account() {
         creator_account.address,
         new_address,
         fee_token_id,
-        zero_amount.clone(),
+        zero_amount,
         fee.clone(),
         creator_account.nonce,
         Default::default(),
@@ -260,9 +260,9 @@ fn mint_token_to_new_account() {
     )
     .unwrap();
 
-    let token_hash: Vec<u8> = vec![
-        0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    let token_hash = [
+        17, 92, 21, 125, 147, 127, 105, 189, 163, 27, 143, 248, 157, 139, 82, 174, 40, 2, 73, 52,
+        23, 51, 96, 19, 125, 4, 81, 76, 226, 204, 145, 69,
     ];
     let token_address = Address::from_slice(&token_hash[..20]);
     let balance = BigUint::from(MIN_NFT_TOKEN_ID);
@@ -297,7 +297,7 @@ fn mint_token_to_new_account() {
                 AccountUpdate::UpdateBalance {
                     old_nonce: creator_account.nonce,
                     new_nonce: creator_account.nonce + 1,
-                    balance_update: (fee_token_id, balance_from.clone(), fee.clone()),
+                    balance_update: (fee_token_id, balance_from, fee),
                 },
             ),
             (
@@ -305,7 +305,7 @@ fn mint_token_to_new_account() {
                 AccountUpdate::UpdateBalance {
                     old_nonce: Nonce(0),
                     new_nonce: Nonce(0),
-                    balance_update: (fee_token_id, balance_to.clone(), balance_to.clone()),
+                    balance_update: (fee_token_id, balance_to.clone(), balance_to),
                 },
             ),
             (
@@ -398,7 +398,7 @@ fn mint_already_created_nft() {
         creator_account.address,
         content_hash,
         to_account.address,
-        fee.clone(),
+        fee,
         fee_token_id,
         creator_account.nonce,
         Default::default(),

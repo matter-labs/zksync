@@ -1,7 +1,9 @@
-use anyhow::Error;
 use num::BigUint;
 use std::collections::{HashMap, HashSet};
-use zksync_crypto::{params, Fr};
+
+use anyhow::Error;
+
+use zksync_crypto::{params, params::NFT_STORAGE_ACCOUNT_ID, Fr};
 use zksync_types::{
     helpers::reverse_updates,
     operations::{TransferOp, TransferToNewOp, ZkSyncOp},
@@ -10,7 +12,6 @@ use zksync_types::{
 };
 
 use crate::handler::TxHandler;
-use zksync_crypto::params::NFT_STORAGE_ACCOUNT_ID;
 
 #[derive(Debug)]
 pub struct OpSuccess {
@@ -403,7 +404,7 @@ impl ZkSyncState {
                 } => {
                     let mut account = self
                         .get_account(*account_id)
-                        .expect(format!("account {} doesn't exist", account_id).as_str());
+                        .expect("account doesn't exist");
 
                     let (token_id, old_amount, new_amount) = balance_update;
 
@@ -439,8 +440,7 @@ impl ZkSyncState {
 
                     self.insert_account(*account_id, account);
                 }
-                AccountUpdate::MintNFT { .. } => {}
-                AccountUpdate::RemoveToken { .. } => {}
+                AccountUpdate::MintNFT { .. } | AccountUpdate::RemoveToken { .. } => {}
             }
         }
     }

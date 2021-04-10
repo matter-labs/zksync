@@ -73,6 +73,7 @@ impl StorageInteractor for InMemoryStorageInteractor {
                 .parse()
                 .expect("failed to parse token address"),
             decimals: token.decimals,
+            is_nft: false,
         };
         self.tokens.insert(token_id, token);
     }
@@ -93,6 +94,7 @@ impl StorageInteractor for InMemoryStorageInteractor {
                     address,
                     symbol: format!("ERC20-{}", *id),
                     decimals: 18,
+                    is_nft: false,
                 },
             );
         }

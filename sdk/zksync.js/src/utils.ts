@@ -16,7 +16,7 @@ import {
 } from './types';
 
 // Max number of tokens for the current version, it is determined by the zkSync circuit implementation.
-const MAX_NUMBER_OF_TOKENS = 128;
+const MAX_NUMBER_OF_TOKENS = Math.pow(2, 32);
 // Max number of accounts for the current version, it is determined by the zkSync circuit implementation.
 const MAX_NUMBER_OF_ACCOUNTS = Math.pow(2, 24);
 
@@ -531,7 +531,7 @@ export function serializeTokenId(tokenId: number): Uint8Array {
     if (tokenId >= MAX_NUMBER_OF_TOKENS) {
         throw new Error('TokenId is too big');
     }
-    return numberToBytesBE(tokenId, 2);
+    return numberToBytesBE(tokenId, 4);
 }
 
 export function serializeAmountPacked(amount: BigNumberish): Uint8Array {

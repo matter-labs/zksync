@@ -440,8 +440,8 @@ impl<E: RescueEngine + JubjubEngine> CircuitPubkey<E> {
 
         let is_equal_y = Boolean::from(AllocatedNum::equals(
             cs.namespace(|| "is_equal_y"),
-            &a.get_x().get_number(),
-            &b.get_x().get_number(),
+            &a.get_y().get_number(),
+            &b.get_y().get_number(),
         )?);
         Boolean::and(cs.namespace(|| "is_equal"), &is_equal_x, &is_equal_y)
     }

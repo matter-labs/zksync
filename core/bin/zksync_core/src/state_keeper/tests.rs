@@ -263,12 +263,11 @@ mod apply_priority_op {
     /// Checks if deposit is processed correctly by the state_keeper
     #[test]
     fn success() {
-        let mut tester = StateKeeperTester::new(6, 1, 1);
+        let mut tester = StateKeeperTester::new(8, 1, 1);
         let old_pending_block = tester.state_keeper.pending_block.clone();
         let deposit = create_deposit(TokenId(0), 145u32);
         let result = tester.state_keeper.apply_priority_op(deposit);
         let pending_block = tester.state_keeper.pending_block;
-
         assert!(result.is_ok());
         assert!(pending_block.chunks_left < old_pending_block.chunks_left);
         assert_eq!(
@@ -559,7 +558,7 @@ mod execute_proposed_block {
         // First batch
         apply_batch_with_two_transfers(&mut tester).await;
         if let Some(CommitRequest::PendingBlock((block, _))) = tester.response_rx.next().await {
-            assert_eq!(block.chunks_left, 4);
+            assert_eq!(block.chunks_left, 2);
         } else {
             panic!("Block is not received!");
         }
@@ -569,7 +568,7 @@ mod execute_proposed_block {
 
         // Check sealed block
         if let Some(CommitRequest::Block((block, _))) = tester.response_rx.next().await {
-            assert_eq!(block.block.block_transactions.len(), 4);
+            assert_eq!(block.block.block_transactions.len(), 2);
         } else {
             panic!("Block is not received!");
         }
@@ -580,12 +579,12 @@ mod execute_proposed_block {
     /// Also, checks if number of chunks left is correct after each operation
     #[tokio::test]
     async fn chunks_to_fit_three_transfers_2_2_1() {
-        let mut tester = StateKeeperTester::new(6, 3, 3);
+        let mut tester = StateKeeperTester::new(9, 3, 3);
 
         // First batch
         apply_batch_with_two_transfers(&mut tester).await;
         if let Some(CommitRequest::PendingBlock((block, _))) = tester.response_rx.next().await {
-            assert_eq!(block.chunks_left, 2);
+            assert_eq!(block.chunks_left, 3);
         } else {
             panic!("Block is not received!");
         }
@@ -598,7 +597,7 @@ mod execute_proposed_block {
             panic!("Block is not received!");
         }
         if let Some(CommitRequest::PendingBlock((block, _))) = tester.response_rx.next().await {
-            assert_eq!(block.chunks_left, 2);
+            assert_eq!(block.chunks_left, 3);
         } else {
             panic!("Block is not received!");
         }
@@ -619,12 +618,12 @@ mod execute_proposed_block {
     /// Also, checks if number of chunks left is correct after each operation
     #[tokio::test]
     async fn chunks_to_fit_three_transfers_1_1_2_1() {
-        let mut tester = StateKeeperTester::new(6, 3, 3);
+        let mut tester = StateKeeperTester::new(8, 3, 3);
 
         // First single tx
         apply_single_transfer(&mut tester).await;
         if let Some(CommitRequest::PendingBlock((block, _))) = tester.response_rx.next().await {
-            assert_eq!(block.chunks_left, 4);
+            assert_eq!(block.chunks_left, 5);
         } else {
             panic!("Block is not received!");
         }
@@ -655,7 +654,7 @@ mod execute_proposed_block {
 
         // Check sealed block
         if let Some(CommitRequest::Block((block, _))) = tester.response_rx.next().await {
-            assert_eq!(block.block.block_transactions.len(), 3);
+            assert_eq!(block.block.block_transactions.len(), 2);
         } else {
             panic!("Block is not received!");
         }

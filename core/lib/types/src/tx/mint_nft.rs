@@ -1,12 +1,19 @@
 use serde::{Deserialize, Serialize};
 
 use num::{BigUint, Zero};
+use rescue_poseidon::rescue_hash;
 
 use zksync_crypto::{
-    franklin_crypto::eddsa::PrivateKey,
+    convert::FeConvert,
+    franklin_crypto::bellman::{
+        eddsa::PrivateKey,
+        pairing::bn256::{Bn256, Fr, FrRepr},
+        PrimeField, PrimeFieldRepr,
+    },
     params::{max_account_id, max_token_id},
     Engine,
 };
+
 use zksync_utils::{format_units, BigUintSerdeAsRadix10Str};
 
 use crate::{
@@ -15,10 +22,12 @@ use crate::{
     AccountId, Address, Nonce, PubKeyHash, TokenId, H256,
 };
 
+/// `MintNFT` transaction performs NFT minting for the recipient.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MintNFT {
-    pub creator_id: AccountId,
     /// id of nft creator
+    pub creator_id: AccountId,
+    /// address of nft creator
     pub creator_address: Address,
     /// hash of data in nft token
     pub content_hash: H256,
@@ -26,7 +35,7 @@ pub struct MintNFT {
     pub recipient: Address,
     #[serde(with = "BigUintSerdeAsRadix10Str")]
     pub fee: BigUint,
-    /// Token to be used for fee.
+    /// Token that will be used for fee.
     #[serde(default)]
     pub fee_token: TokenId,
     /// Current account nonce.
@@ -127,14 +136,11 @@ impl MintNFT {
 
     /// Verifies the transaction correctness:
     ///
-    /// - `account_id` field must be within supported range.
-    /// - `token` field must be within supported range.
-    /// - `amount` field must represent a packable value.
+    /// - `creator_account_id` field must be within supported range.
+    /// - `fee_token` field must be within supported range.
     /// - `fee` field must represent a packable value.
-    /// - transfer recipient must not be `Adddress::zero()`.
-    /// - zkSync signature must correspond to the PubKeyHash of the account.
     pub fn check_correctness(&mut self) -> bool {
-        let mut valid = self.fee <= BigUint::from(u128::max_value())
+        let mut valid = self.fee <= BigUint::from(u128::MAX)
             && is_fee_amount_packable(&self.fee)
             && self.creator_id <= max_account_id()
             && self.fee_token <= max_token_id()
@@ -192,10 +198,16 @@ impl MintNFT {
     }
 
     pub fn calculate_hash(&self, serial_id: u32) -> Vec<u8> {
-        let mut data = vec![];
-        data.extend_from_slice(&self.creator_id.0.to_be_bytes());
-        data.extend_from_slice(&serial_id.to_be_bytes());
-        data.extend_from_slice(self.content_hash.as_bytes());
-        data
+        let value = self.creator_id.0 as u64 + 2u64.pow(32) * serial_id as u64; // Pack creator_id and serial_id
+        let repr = FrRepr::from(value);
+        let value_fr = Fr::from_repr(repr).expect("a Fr");
+
+        let mut repr = FrRepr::default();
+        repr.read_le(&self.content_hash.as_bytes()[..])
+            .expect("a Fr");
+        let content_hash = Fr::from_repr(repr).expect("a Fr");
+
+        let result = rescue_hash::<Bn256, 2>(&[value_fr, content_hash]);
+        result[0].to_bytes()
     }
 }

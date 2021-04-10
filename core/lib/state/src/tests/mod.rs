@@ -154,8 +154,6 @@ impl PlasmaTestBuilder {
 
         state_clone.apply_updates(expected_updates);
 
-        dbg!(&state_clone);
-        dbg!(&self.state);
         assert_eq!(
             self.state.root_hash(),
             state_clone.root_hash(),

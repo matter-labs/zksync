@@ -34,9 +34,11 @@ pub fn total_tokens() -> usize {
 /// Special token id, which enforce unique pair of creator account id and serial id for generating unique address for token.
 /// Where serial id is balance for this special token
 pub const NFT_TOKEN_ID: TokenId = TokenId(u32::MAX - 1);
+
 /// Special account which enforce unique token id for NFT.
 pub const NFT_STORAGE_ACCOUNT_ID: AccountId = AccountId(u32::MAX - 1);
 
+/// First token id for NFT, all fungible token id must be less, all NFT must be above.
 pub const MIN_NFT_TOKEN_ID: u32 = 10000;
 
 /// Number of tokens that are processed by this release
@@ -85,7 +87,7 @@ pub const INPUT_DATA_ROOT_BYTES_WIDTH: usize = 32;
 pub const INPUT_DATA_EMPTY_BYTES_WIDTH: usize = 64;
 pub const INPUT_DATA_ROOT_HASH_BYTES_WIDTH: usize = 32;
 
-pub const TOKEN_BIT_WIDTH: usize = 16;
+pub const TOKEN_BIT_WIDTH: usize = 32;
 pub const TX_TYPE_BIT_WIDTH: usize = 8;
 
 /// Account subtree hash width
@@ -230,6 +232,7 @@ lazy_static! {
     pub static ref JUBJUB_PARAMS: AltJubjubBn256 = AltJubjubBn256::new();
     pub static ref RESCUE_PARAMS: Bn256RescueParams = Bn256RescueParams::new_checked_2_into_1();
     pub static ref RESCUE_HASHER: BabyRescueHasher = BabyRescueHasher::default();
+    ///  Special address for the account used in the nft logic
     pub static ref NFT_STORAGE_ACCOUNT_ADDRESS: Address =
         Address::from_str("ffffffffffffffffffffffffffffffffffffffff").unwrap();
 }

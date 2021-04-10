@@ -93,6 +93,7 @@ pub struct Token {
     pub symbol: String,
     /// Token precision (e.g. 18 for "ETH" so "1.0" ETH = 10e18 as U256 number)
     pub decimals: u8,
+    pub is_nft: bool,
 }
 
 /// Tokens that added when deploying contract
@@ -107,12 +108,13 @@ pub struct TokenGenesisListItem {
 }
 
 impl Token {
-    pub fn new(id: TokenId, address: Address, symbol: &str, decimals: u8) -> Self {
+    pub fn new(id: TokenId, address: Address, symbol: &str, decimals: u8, is_nft: bool) -> Self {
         Self {
             id,
             address,
             symbol: symbol.to_string(),
             decimals,
+            is_nft,
         }
     }
 }
@@ -169,19 +171,20 @@ pub enum TxFeeTypes {
     MintNFT,
 }
 
-/// Token supported in zkSync protocol
+/// NFT supported in zkSync protocol
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 pub struct NFT {
     /// id is used for tx signature and serialization
     pub id: TokenId,
+    /// id for enforcing uniqueness token address
     pub serial_id: u32,
     /// id of nft creator
     pub creator_id: AccountId,
     /// L2 token address
     pub address: Address,
-    /// Token symbol
+    /// token symbol
     pub symbol: String,
-    /// hash of data in nft token
+    /// hash of content for nft token
     pub content_hash: H256,
 }
 

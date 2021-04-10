@@ -2,13 +2,10 @@
 use std::cmp::Ordering;
 // External imports
 use num::bigint::ToBigInt;
-use zksync_basic_types::Address;
 // Workspace imports
-use zksync_types::{AccountId, AccountUpdate, Nonce, TokenId};
-use zksync_types::{PubKeyHash, H256};
+use zksync_types::{AccountId, AccountUpdate, Address, Nonce, PubKeyHash, TokenId, H256, NFT};
 // Local imports
 use crate::chain::account::records::*;
-use zksync_types::tokens::NFT;
 
 /// `StorageAccoundDiff` is a enum that combines all the possible
 /// changes that can be applied to account, which includes:
