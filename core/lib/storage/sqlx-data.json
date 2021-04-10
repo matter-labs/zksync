@@ -1,20 +1,5 @@
 {
   "db": "PostgreSQL",
-  "001e118c02328872d63118fa4cb2334486c3361b30bc047a8d89a9812ffc4f3a": {
-    "query": "\n                        INSERT INTO tokens ( id, address, symbol, decimals )\n                        VALUES ( $1, $2, $3, $4 )\n                        ON CONFLICT (id)\n                        DO\n                          UPDATE SET address = $2, symbol = $3, decimals = $4\n                        ",
-    "describe": {
-      "columns": [],
-      "parameters": {
-        "Left": [
-          "Int4",
-          "Text",
-          "Text",
-          "Int2"
-        ]
-      },
-      "nullable": []
-    }
-  },
   "00783f36828b4d40330919774be08d091afffff24095e5c2ca47c93af29ee7bd": {
     "query": "SELECT count(*) as \"count!\" FROM aggregate_operations WHERE action_type = $1 AND confirmed = $2",
     "describe": {
@@ -2060,26 +2045,8 @@
       ]
     }
   },
-  "6d676581f14d0935983aca496bc37b58206b90320058290809020a2604b11df3": {
-    "query": "SELECT max(number) FROM blocks",
-    "describe": {
-      "columns": [
-        {
-          "ordinal": 0,
-          "name": "max",
-          "type_info": "Int8"
-        }
-      ],
-      "parameters": {
-        "Left": []
-      },
-      "nullable": [
-        null
-      ]
-    }
-  },
-  "6e4c5231bdde779bdf1e714557b6763e244ff62edfcbcdfc7166c9f561d7f670": {
-    "query": "\n            SELECT count(*) as \"count!\" FROM tokens\n            ",
+  "6c742a130e375ab8474d57c822c3157c8dec3a2b329e3e90697e58f7cd7c1375": {
+    "query": "\n            SELECT count(*) as \"count!\" FROM tokens WHERE is_nft = false\n            ",
     "describe": {
       "columns": [
         {
@@ -2096,47 +2063,21 @@
       ]
     }
   },
-  "7001b7475a8e8dde389fcf21f7b848a6c4dcdff32f0e03727f23b7b8808328d2": {
-    "query": "\n            SELECT id, address, symbol, decimals, is_nft\n            FROM tokens\n            INNER JOIN ticker_market_volume\n            ON tokens.id = ticker_market_volume.token_id\n            WHERE ticker_market_volume.market_volume >= $1\n            ORDER BY id ASC\n            ",
+  "6d676581f14d0935983aca496bc37b58206b90320058290809020a2604b11df3": {
+    "query": "SELECT max(number) FROM blocks",
     "describe": {
       "columns": [
         {
           "ordinal": 0,
-          "name": "id",
-          "type_info": "Int4"
-        },
-        {
-          "ordinal": 1,
-          "name": "address",
-          "type_info": "Text"
-        },
-        {
-          "ordinal": 2,
-          "name": "symbol",
-          "type_info": "Text"
-        },
-        {
-          "ordinal": 3,
-          "name": "decimals",
-          "type_info": "Int2"
-        },
-        {
-          "ordinal": 4,
-          "name": "is_nft",
-          "type_info": "Bool"
+          "name": "max",
+          "type_info": "Int8"
         }
       ],
       "parameters": {
-        "Left": [
-          "Numeric"
-        ]
+        "Left": []
       },
       "nullable": [
-        false,
-        false,
-        false,
-        false,
-        false
+        null
       ]
     }
   },
@@ -3274,6 +3215,50 @@
       ]
     }
   },
+  "bc246679e533069cc7fbdf248e62c3e649f32b8019b48a94d074a95a09777069": {
+    "query": "\n            SELECT id, address, symbol, decimals, is_nft\n            FROM tokens\n            INNER JOIN ticker_market_volume\n            ON tokens.id = ticker_market_volume.token_id\n            WHERE ticker_market_volume.market_volume >= $1\n            AND is_nft = false\n            ORDER BY id ASC\n            ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "id",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 1,
+          "name": "address",
+          "type_info": "Text"
+        },
+        {
+          "ordinal": 2,
+          "name": "symbol",
+          "type_info": "Text"
+        },
+        {
+          "ordinal": 3,
+          "name": "decimals",
+          "type_info": "Int2"
+        },
+        {
+          "ordinal": 4,
+          "name": "is_nft",
+          "type_info": "Bool"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Numeric"
+        ]
+      },
+      "nullable": [
+        false,
+        false,
+        false,
+        false,
+        false
+      ]
+    }
+  },
   "be887d91df5cb45059e7ac1a857e79829b42b931cc7d9f086536c7ec1f096b75": {
     "query": "\n                WITH transactions AS (\n                    SELECT\n                        '0x' || encode(tx_hash, 'hex') as tx_hash,\n                        tx as op,\n                        block_number,\n                        success,\n                        fail_reason,\n                        created_at\n                    FROM executed_transactions\n                    WHERE block_number = $1\n                ), priority_ops AS (\n                    SELECT\n                        '0x' || encode(eth_hash, 'hex') as tx_hash,\n                        operation as op,\n                        block_number,\n                        true as success,\n                        Null as fail_reason,\n                        created_at\n                    FROM executed_priority_operations\n                    WHERE block_number = $1\n                ), everything AS (\n                    SELECT * FROM transactions\n                    UNION ALL\n                    SELECT * FROM priority_ops\n                )\n                SELECT\n                    tx_hash as \"tx_hash!\",\n                    block_number as \"block_number!\",\n                    op as \"op!\",\n                    success as \"success?\",\n                    fail_reason as \"fail_reason?\",\n                    created_at as \"created_at!\"\n                FROM everything\n                ORDER BY created_at DESC\n            ",
     "describe": {
@@ -4262,6 +4247,21 @@
         false,
         false
       ]
+    }
+  },
+  "e964f4fbac9fb6f04f70922515ccb87fab8a88dcb53d31d9477ee41038242f69": {
+    "query": "\n                        INSERT INTO tokens ( id, address, symbol, decimals, is_nft )\n                        VALUES ( $1, $2, $3, $4, true )\n                        ON CONFLICT (id)\n                        DO\n                          UPDATE SET address = $2, symbol = $3, decimals = $4\n                        ",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "Int4",
+          "Text",
+          "Text",
+          "Int2"
+        ]
+      },
+      "nullable": []
     }
   },
   "e99d990d2d9b1c6068efb623634d6d6cf49a3c7ec33a5a916b7ddaa745e24c9b": {

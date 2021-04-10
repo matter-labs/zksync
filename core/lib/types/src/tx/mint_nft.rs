@@ -6,10 +6,10 @@ use rescue_poseidon::rescue_hash;
 use zksync_crypto::{
     convert::FeConvert,
     franklin_crypto::bellman::{
-        eddsa::PrivateKey,
         pairing::bn256::{Bn256, Fr, FrRepr},
         PrimeField, PrimeFieldRepr,
     },
+    franklin_crypto::eddsa::PrivateKey,
     params::{max_account_id, max_token_id},
     Engine,
 };
