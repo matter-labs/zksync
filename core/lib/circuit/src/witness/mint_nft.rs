@@ -153,7 +153,7 @@ impl Witness for MintNFTWitness<Bn256> {
             signature_data: input.signature.clone(),
             signer_pub_key_packed: input.signer_pub_key_packed.to_vec(),
             args: self.args.clone(),
-            lhs: self.creator_before_first_chunk.clone(),
+            lhs: self.creator_before_second_chunk.clone(),
             rhs: self.creator_before_second_chunk.clone(),
         };
         let third_chunk = Operation {
@@ -167,7 +167,7 @@ impl Witness for MintNFTWitness<Bn256> {
             signature_data: input.signature.clone(),
             signer_pub_key_packed: input.signer_pub_key_packed.to_vec(),
             args: self.args.clone(),
-            lhs: self.creator_before_first_chunk.clone(),
+            lhs: self.special_account_before_third_chunk.clone(),
             rhs: self.special_account_before_third_chunk.clone(),
         };
         let fourth_chunk = Operation {
@@ -181,7 +181,7 @@ impl Witness for MintNFTWitness<Bn256> {
             signature_data: input.signature.clone(),
             signer_pub_key_packed: input.signer_pub_key_packed.to_vec(),
             args: self.args.clone(),
-            lhs: self.creator_before_first_chunk.clone(),
+            lhs: self.special_account_before_fourth_chunk.clone(),
             rhs: self.special_account_before_fourth_chunk.clone(),
         };
         let fifth_chunk = Operation {
@@ -195,7 +195,7 @@ impl Witness for MintNFTWitness<Bn256> {
             signature_data: input.signature.clone(),
             signer_pub_key_packed: input.signer_pub_key_packed.to_vec(),
             args: self.args.clone(),
-            lhs: self.creator_before_first_chunk.clone(),
+            lhs: self.recipient_account_before_fifth_chunk.clone(),
             rhs: self.recipient_account_before_fifth_chunk.clone(),
         };
         let sixth_chunk = Operation {
@@ -209,7 +209,7 @@ impl Witness for MintNFTWitness<Bn256> {
             signature_data: input.signature.clone(),
             signer_pub_key_packed: input.signer_pub_key_packed.to_vec(),
             args: self.args.clone(),
-            lhs: self.creator_before_first_chunk.clone(),
+            lhs: self.recipient_account_after_fifth_chunk.clone(),
             rhs: self.recipient_account_after_fifth_chunk.clone(),
         };
         vec![

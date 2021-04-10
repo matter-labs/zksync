@@ -1836,13 +1836,12 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
         &self,
         mut cs: CS,
         cur: &mut AllocatedOperationBranch<E>,
-        lhs: &AllocatedOperationBranch<E>,
-        rhs: &AllocatedOperationBranch<E>,
         global_variables: &CircuitGlobalVariables<E>,
         is_a_geq_b: &Boolean,
         is_account_empty: &Boolean,
         op_data: &AllocatedOperationData<E>,
         ext_pubdata_chunk: &AllocatedNum<E>,
+        is_valid_timestamp: &Boolean,
         pubdata_holder: &mut Vec<AllocatedNum<E>>,
     ) -> Result<Boolean, SynthesisError> {
         assert!(
@@ -1853,10 +1852,10 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
         //construct pubdata
         let mut pubdata_bits = vec![];
         pubdata_bits.extend(global_variables.chunk_data.tx_type.get_bits_be()); //TX_TYPE_BIT_WIDTH=8
-        pubdata_bits.extend(lhs.account_id.get_bits_be()); //ACCOUNT_TREE_DEPTH=24
+        todo!(); // add creator id
         todo!(); // add recipient id
         todo!(); // add content hash
-        pubdata_bits.extend(lhs.token.get_bits_be()); //TOKEN_BIT_WIDTH=16
+        todo!(); // add token id
         pubdata_bits.extend(op_data.fee_packed.get_bits_be());
         resize_grow_only(
             &mut pubdata_bits,
@@ -1915,6 +1914,7 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
                 pubdata_properly_copied,
                 is_pubdata_chunk_correct,
                 is_mintNFT_operation,
+                is_valid_timestamp,
             ],
         )?;
 
@@ -1960,12 +1960,7 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
         let second_chunk_valid = {
             let mut flags = vec![common_valid, is_chunk_with_index[1]];
 
-            let is_creator_account = Boolean::from(Expression::equals(
-                cs.namespace(|| "is_creator_account (second chunk)"),
-                &cur.account_id.get_number(),
-                &lhs.account_id.get_number(),
-            )?);
-            flags.push(is_creator_account);
+            todo!(); // is creator_id from op_data equals to cur.account_id
             let is_nft_token = Boolean::from(Expression::equals(
                 cs.namespace(|| "is_nft_token (second chunk)"),
                 &cur.token.get_number(),

@@ -28,14 +28,17 @@ use zksync_crypto::{
 use zksync_state::state::CollectedFee;
 use zksync_types::{
     block::Block,
-    operations::{ChangePubKeyOp, CloseOp, ForcedExitOp, TransferOp, TransferToNewOp, WithdrawOp},
+    operations::{
+        ChangePubKeyOp, CloseOp, ForcedExitOp, MintNFTOp, TransferOp, TransferToNewOp, WithdrawOp,
+    },
     tx::PackedPublicKey,
     AccountId, BlockNumber, ZkSyncOp,
 };
 // Local deps
 use crate::witness::{
     ChangePubkeyOffChainWitness, CloseAccountWitness, DepositWitness, ForcedExitWitness,
-    FullExitWitness, TransferToNewWitness, TransferWitness, WithdrawWitness, Witness,
+    FullExitWitness, MintNFTWitness, TransferToNewWitness, TransferWitness, WithdrawWitness,
+    Witness,
 };
 use crate::{
     account::AccountWitness,
@@ -587,6 +590,20 @@ impl SigDataInput {
         )
     }
 
+    pub fn from_mintNFT_op(mintNFT_op: &MintNFTOp) -> Result<Self, anyhow::Error> {
+        let sign_packed = mintNFT_op
+            .tx
+            .signature
+            .signature
+            .serialize_packed()
+            .expect("signature serialize");
+        SigDataInput::new(
+            &sign_packed,
+            &mintNFT_op.tx.get_bytes(),
+            &mintNFT_op.tx.signature.pub_key,
+        )
+    }
+
     /// Provides a vector of copies of this `SigDataInput` object, all with one field
     /// set to incorrect value.
     /// Used for circuit tests.
@@ -781,8 +798,16 @@ pub fn build_block_witness<'a>(
                 offset_commitment.extend(forced_exit_witness.get_offset_commitment_data())
             }
             ZkSyncOp::Noop(_) => {} // Noops are handled below
-            ZkSyncOp::MintNFTOp(_) => {
-                todo!()
+            ZkSyncOp::MintNFTOp(mintNFT) => {
+                let mintNFT_witness =
+                    MintNFTWitness::apply_tx(&mut witness_accum.account_tree, &mintNFT);
+
+                let input = SigDataInput::from_mintNFT_op(&mintNFT)?;
+                let mintNFT_operations = mintNFT_witness.calculate_operations(input);
+
+                operations.extend(mintNFT_operations);
+                pub_data.extend(mintNFT_witness.get_pubdata());
+                offset_commitment.extend(mintNFT_witness.get_offset_commitment_data())
             }
         }
     }
