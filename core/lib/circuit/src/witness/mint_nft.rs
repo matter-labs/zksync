@@ -448,6 +448,9 @@ impl MintNFTWitness<Bn256> {
         let after_root = tree.root_hash();
         vlog::debug!("After root = {}", after_root);
 
+        let a = fee_balance_before_first_chunk;
+        let b = fee_as_field_element;
+
         MintNFTWitness {
             before_second_chunk_root: Some(before_second_chunk_root),
             before_third_chunk_root: Some(before_third_chunk_root),
@@ -466,8 +469,8 @@ impl MintNFTWitness<Bn256> {
                 full_amount: Some(Fr::zero()),
                 fee: Some(fee_encoded),
                 pub_nonce: Some(Fr::zero()),
-                a: Some(Fr::zero()),
-                b: Some(Fr::zero()),
+                a: Some(a),
+                b: Some(b),
                 new_pub_key_hash: Some(Fr::zero()),
                 valid_from: Some(Fr::from_str(&valid_from.to_string()).unwrap()),
                 valid_until: Some(Fr::from_str(&valid_until.to_string()).unwrap()),

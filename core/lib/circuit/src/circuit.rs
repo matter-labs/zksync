@@ -18,12 +18,13 @@ use zksync_crypto::franklin_crypto::{
 };
 // Workspace deps
 use zksync_crypto::params::{
-    self, FR_BIT_WIDTH_PADDED, OLD_SIGNED_TRANSFER_BIT_WIDTH, SIGNED_FORCED_EXIT_BIT_WIDTH,
-    SIGNED_TRANSFER_BIT_WIDTH,
+    self, FR_BIT_WIDTH_PADDED, NFT_STORAGE_ACCOUNT_ID, NFT_TOKEN_ID, OLD_SIGNED_TRANSFER_BIT_WIDTH,
+    SIGNED_FORCED_EXIT_BIT_WIDTH, SIGNED_TRANSFER_BIT_WIDTH,
 };
 use zksync_types::{
     operations::{ChangePubKeyOp, NoopOp},
-    CloseOp, DepositOp, ForcedExitOp, FullExitOp, TransferOp, TransferToNewOp, WithdrawOp,
+    CloseOp, DepositOp, ForcedExitOp, FullExitOp, MintNFTOp, TransferOp, TransferToNewOp,
+    WithdrawOp,
 };
 // Local deps
 use crate::{
@@ -557,6 +558,8 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
             params::TX_TYPE_BIT_WIDTH,
         )?;
 
+        todo!(); // add minf NFT
+
         let max_chunks_powers = generate_powers(
             cs.namespace(|| "generate powers of max chunks"),
             &tx_type.get_number(),
@@ -969,6 +972,7 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
                 &signature_data.is_verified,
                 &mut previous_pubdatas[ForcedExitOp::OP_CODE as usize],
             )?,
+            todo!(), // add mintNFT
         ];
 
         assert_eq!(DIFFERENT_TRANSACTIONS_TYPE_NUMBER - 1, op_flags.len());
@@ -1826,6 +1830,249 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
         let tx_valid = multi_and(cs.namespace(|| "is_tx_valid"), &is_valid_flags)?;
 
         Ok(tx_valid)
+    }
+
+    fn mintNFT<CS: ConstraintSystem<E>>(
+        &self,
+        mut cs: CS,
+        cur: &mut AllocatedOperationBranch<E>,
+        lhs: &AllocatedOperationBranch<E>,
+        rhs: &AllocatedOperationBranch<E>,
+        global_variables: &CircuitGlobalVariables<E>,
+        is_a_geq_b: &Boolean,
+        is_account_empty: &Boolean,
+        op_data: &AllocatedOperationData<E>,
+        ext_pubdata_chunk: &AllocatedNum<E>,
+        pubdata_holder: &mut Vec<AllocatedNum<E>>,
+    ) -> Result<Boolean, SynthesisError> {
+        assert!(
+            !pubdata_holder.is_empty(),
+            "pubdata holder has to be preallocated"
+        );
+
+        //construct pubdata
+        let mut pubdata_bits = vec![];
+        pubdata_bits.extend(global_variables.chunk_data.tx_type.get_bits_be()); //TX_TYPE_BIT_WIDTH=8
+        pubdata_bits.extend(lhs.account_id.get_bits_be()); //ACCOUNT_TREE_DEPTH=24
+        todo!(); // add recipient id
+        todo!(); // add content hash
+        pubdata_bits.extend(lhs.token.get_bits_be()); //TOKEN_BIT_WIDTH=16
+        pubdata_bits.extend(op_data.fee_packed.get_bits_be());
+        resize_grow_only(
+            &mut pubdata_bits,
+            MintNFTOp::CHUNKS * params::CHUNK_BIT_WIDTH,
+            Boolean::constant(false),
+        );
+
+        let (is_equal_pubdata, packed_pubdata) = vectorized_compare(
+            cs.namespace(|| "compare pubdata"),
+            &*pubdata_holder,
+            &pubdata_bits,
+        )?;
+
+        todo!(); // fix pubdata holder
+        *pubdata_holder = packed_pubdata;
+
+        let is_chunk_with_index: Vec<Boolean> = (0u64..MintNFTOp::CHUNKS as u64)
+            .map(|chunk_index| {
+                Expression::equals(
+                    cs.namespace(|| format!("is_chunk_with_index {}", chunk_index)),
+                    &global_variables.chunk_data.chunk_number,
+                    Expression::u64::<CS>(chunk_index),
+                )
+            })
+            .collect::<Result<Vec<_>, SynthesisError>>()?
+            .iter()
+            .map(|bit| Boolean::from(bit.clone()))
+            .collect();
+
+        // common valid flags
+        let pubdata_properly_copied = boolean_or(
+            cs.namespace(|| "first chunk or pubdata is copied properly"),
+            &is_chunk_with_index[0],
+            &is_equal_pubdata,
+        )?;
+        let pubdata_chunk = select_pubdata_chunk(
+            cs.namespace(|| "select_pubdata_chunk"),
+            &pubdata_bits,
+            &global_variables.chunk_data.chunk_number,
+            MintNFTOp::CHUNKS,
+        )?;
+        let is_pubdata_chunk_correct = Boolean::from(Expression::equals(
+            cs.namespace(|| "is_pubdata_equal"),
+            &pubdata_chunk,
+            ext_pubdata_chunk,
+        )?);
+        let is_mintNFT_operation = Boolean::from(Expression::equals(
+            cs.namespace(|| "is_mintNFT_opcode"),
+            &global_variables.chunk_data.tx_type.get_number(),
+            Expression::u64::<CS>(u64::from(MintNFTOp::OP_CODE)),
+        )?);
+
+        let common_valid = multi_and(
+            cs.namespace(|| "is_common_valid"),
+            &[
+                pubdata_properly_copied,
+                is_pubdata_chunk_correct,
+                is_mintNFT_operation,
+            ],
+        )?;
+
+        let first_chunk_valid = {
+            let mut flags = vec![common_valid, is_chunk_with_index[0]];
+
+            todo!(); // verify signature
+
+            let is_a_correct =
+                CircuitElement::equals(cs.namespace(|| "is_a_correct"), &op_data.a, &cur.balance)?;
+            let is_b_correct = Boolean::from(Expression::equals(
+                cs.namespace(|| "is_b_correct"),
+                &op_data.b.get_number(),
+                &op_data.fee.get_number(),
+            )?);
+            flags.push(is_a_correct);
+            flags.push(is_b_correct);
+            flags.push(is_a_geq_b.clone());
+            flags.push(no_nonce_overflow(
+                cs.namespace(|| "no nonce overflow"),
+                &cur.account.nonce.get_number(),
+            )?);
+
+            multi_and(cs.namespace(|| "first_chunk_valid"), &flags)?
+        };
+        let updated_nonce_first_chunk =
+            Expression::from(&cur.account.nonce.get_number()) + Expression::u64::<CS>(1);
+        let updated_balance_first_chunk = Expression::from(&cur.balance.get_number())
+            - Expression::from(&op_data.fee.get_number());
+        cur.account.nonce = CircuitElement::conditionally_select_with_number_strict(
+            cs.namespace(|| "update cur nonce (first chunk)"),
+            updated_nonce_first_chunk,
+            &cur.account.nonce,
+            &first_chunk_valid,
+        )?;
+        cur.balance = CircuitElement::conditionally_select_with_number_strict(
+            cs.namespace(|| "updated cur balance (first chunk)"),
+            updated_balance_first_chunk,
+            &cur.balance,
+            &first_chunk_valid,
+        )?;
+
+        let second_chunk_valid = {
+            let mut flags = vec![common_valid, is_chunk_with_index[1]];
+
+            let is_creator_account = Boolean::from(Expression::equals(
+                cs.namespace(|| "is_creator_account (second chunk)"),
+                &cur.account_id.get_number(),
+                &lhs.account_id.get_number(),
+            )?);
+            flags.push(is_creator_account);
+            let is_nft_token = Boolean::from(Expression::equals(
+                cs.namespace(|| "is_nft_token (second chunk)"),
+                &cur.token.get_number(),
+                Expression::u64::<CS>(NFT_TOKEN_ID.0.into()),
+            )?);
+            flags.push(is_nft_token);
+
+            todo!(); // is serial_id from op_data equals to cur.balance
+
+            multi_and(cs.namespace(|| "second_chunk_valid"), &flags)?
+        };
+        let updated_balance_second_chunk =
+            Expression::from(&cur.balance.get_number()) + Expression::u64::<CS>(1);
+        cur.balance = CircuitElement::conditionally_select_with_number_strict(
+            cs.namespace(|| "updated cur balance (second chunk)"),
+            updated_balance_second_chunk,
+            &cur.balance,
+            &second_chunk_valid,
+        )?;
+
+        let third_chunk_valid = {
+            let mut flags = vec![common_valid, is_chunk_with_index[2]];
+
+            let is_special_account = Boolean::from(Expression::equals(
+                cs.namespace(|| "is_special_account (third chunk)"),
+                &cur.account_id.get_number(),
+                Expression::u64::<CS>(NFT_STORAGE_ACCOUNT_ID.0.into()),
+            )?);
+            flags.push(is_special_account);
+            let is_nft_token = Boolean::from(Expression::equals(
+                cs.namespace(|| "is_nft_token (third chunk)"),
+                &cur.token.get_number(),
+                Expression::u64::<CS>(NFT_TOKEN_ID.0.into()),
+            )?);
+            flags.push(is_nft_token);
+
+            todo!(); // is new_token_id from op_data equals to cur.balance
+
+            multi_and(cs.namespace(|| "third_chunk_valid"), &flags)?
+        };
+        let updated_balance_third_chunk =
+            Expression::from(&cur.balance.get_number()) + Expression::u64::<CS>(1);
+        cur.balance = CircuitElement::conditionally_select_with_number_strict(
+            cs.namespace(|| "updated cur balance (third chunk)"),
+            updated_balance_third_chunk,
+            &cur.balance,
+            &third_chunk_valid,
+        )?;
+
+        let fourth_chunk_valid = {
+            let mut flags = vec![common_valid, is_chunk_with_index[3]];
+
+            let is_special_account = Boolean::from(Expression::equals(
+                cs.namespace(|| "is_special_account (fourth chunk)"),
+                &cur.account_id.get_number(),
+                Expression::u64::<CS>(NFT_STORAGE_ACCOUNT_ID.0.into()),
+            )?);
+            flags.push(is_special_account);
+
+            todo!(); // is new_token_id from op_data equals to cur.token
+
+            multi_and(cs.namespace(|| "fourth_chunk_valid"), &flags)?
+        };
+        todo!(); // calculate content_to_store
+        let content_to_store = Expression::u64::<CS>(0);
+        cur.balance = CircuitElement::conditionally_select_with_number_strict(
+            cs.namespace(|| "updated cur balance (fourth chunk)"),
+            content_to_store,
+            &cur.balance,
+            &fourth_chunk_valid,
+        )?;
+
+        let fifth_chunk_valid = {
+            let mut flags = vec![common_valid, is_chunk_with_index[4]];
+
+            todo!(); // is recipient_id from op_data equals to cur.account_id
+            todo!(); // is new_token_id from op_data equals to cur.token
+
+            multi_and(cs.namespace(|| "fifth_chunk_valid"), &flags)?
+        };
+        let updated_balance_fifth_chunk =
+            Expression::from(&cur.balance.get_number()) + Expression::u64::<CS>(1);
+        cur.balance = CircuitElement::conditionally_select_with_number_strict(
+            cs.namespace(|| "updated cur balance (fifth chunk)"),
+            updated_balance_fifth_chunk,
+            &cur.balance,
+            &fifth_chunk_valid,
+        )?;
+
+        let sixth_chunk_valid = {
+            multi_and(
+                cs.namespace(|| "sixth_chunk_valid"),
+                &[common_valid, is_chunk_with_index[5]],
+            )?
+        };
+
+        Ok(multi_or(
+            cs.namespace(|| "is_mintNFT_valid"),
+            &[
+                first_chunk_valid,
+                second_chunk_valid,
+                third_chunk_valid,
+                fourth_chunk_valid,
+                fifth_chunk_valid,
+                sixth_chunk_valid,
+            ],
+        )?)
     }
 
     #[allow(clippy::too_many_arguments)]
