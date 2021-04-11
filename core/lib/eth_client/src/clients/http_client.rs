@@ -240,7 +240,7 @@ impl<S: EthereumSigner> ETHDirectClient<S> {
             .into_iter()
             .next()
             .unwrap()
-            .to_string()
+            .into_string()
             .unwrap()
         } else {
             "unknown".to_string()

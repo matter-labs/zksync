@@ -6339,14 +6339,14 @@ name = "zksync_eth_client"
 version = "1.0.0"
 dependencies = [
  "anyhow",
- "ethabi 12.0.0",
+ "ethabi 13.0.0",
  "hex",
  "metrics",
- "parity-crypto 0.6.2",
+ "parity-crypto 0.7.0",
  "serde",
  "tokio 0.2.25",
  "vlog",
- "web3 0.13.0",
+ "web3 0.15.0",
  "zksync_config",
  "zksync_contracts",
  "zksync_eth_signer",
