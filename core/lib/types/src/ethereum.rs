@@ -142,13 +142,13 @@ impl TryFrom<Log> for CompleteWithdrawalsTx {
                 .expect("complete withdrawals transaction should have hash"),
             pending_withdrawals_queue_start_index: decoded_event
                 .remove(0)
-                .to_uint()
+                .into_uint()
                 .as_ref()
                 .map(U256::as_u32)
                 .expect("pending_withdrawals_queue_start_index value conversion failed"),
             pending_withdrawals_queue_end_index: decoded_event
                 .remove(0)
-                .to_uint()
+                .into_uint()
                 .as_ref()
                 .map(U256::as_u32)
                 .expect("pending_withdrawals_queue_end_index value conversion failed"),

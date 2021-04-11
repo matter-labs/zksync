@@ -27,14 +27,14 @@ serde = "1.0.90"
 serde_json = "1.0.0"
 
 # Crypto stuff
-parity-crypto = {version = "0.6.2", features = ["publickey"] }
-ethabi = "12.0.0"
+parity-crypto = { version = "0.7.0", features = ["publickey"] }
+ethabi = "13.0.0"
 
 [dev-dependencies]
 lazy_static = "1.4.0"
 criterion = "0.3.0"
-web3 = "0.13.0"
-secp256k1 = {version = "0.17.2", features = ["std", "recovery"] }
+web3 = "0.15.0"
+secp256k1 = { version = "0.20.0", features = ["std", "recovery"] }
 
 [[bench]]
 name = "criterion"

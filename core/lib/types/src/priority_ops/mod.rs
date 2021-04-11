@@ -252,27 +252,27 @@ impl TryFrom<Log> for PriorityOp {
         )
         .map_err(|e| format_err!("Event data decode: {:?}", e))?;
 
-        let sender = dec_ev.remove(0).to_address().unwrap();
+        let sender = dec_ev.remove(0).into_address().unwrap();
         Ok(PriorityOp {
             serial_id: dec_ev
                 .remove(0)
-                .to_uint()
+                .into_uint()
                 .as_ref()
                 .map(U256::as_u64)
                 .unwrap(),
             data: {
                 let op_type = dec_ev
                     .remove(0)
-                    .to_uint()
+                    .into_uint()
                     .as_ref()
                     .map(|ui| U256::as_u32(ui) as u8)
                     .unwrap();
-                let op_pubdata = dec_ev.remove(0).to_bytes().unwrap();
+                let op_pubdata = dec_ev.remove(0).into_bytes().unwrap();
                 ZkSyncPriorityOp::parse_from_priority_queue_logs(&op_pubdata, op_type, sender)?
             },
             deadline_block: dec_ev
                 .remove(0)
-                .to_uint()
+                .into_uint()
                 .as_ref()
                 .map(U256::as_u64)
                 .unwrap(),
