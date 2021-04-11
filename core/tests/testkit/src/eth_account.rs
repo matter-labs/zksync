@@ -593,7 +593,7 @@ async fn get_revert_reason<T: Transport>(
                 .into_iter()
                 .next()
                 .unwrap()
-                .to_string()
+                .into_string()
                 .unwrap(),
         )
     } else {

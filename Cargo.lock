@@ -6401,7 +6401,7 @@ name = "zksync_testkit"
 version = "1.0.0"
 dependencies = [
  "anyhow",
- "ethabi 12.0.0",
+ "ethabi 13.0.0",
  "futures 0.3.6",
  "itertools 0.9.0",
  "num",
@@ -6410,7 +6410,7 @@ dependencies = [
  "structopt",
  "tokio 0.2.25",
  "vlog",
- "web3 0.13.0",
+ "web3 0.15.0",
  "zksync_circuit",
  "zksync_config",
  "zksync_contracts",
