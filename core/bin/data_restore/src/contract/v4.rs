@@ -9,7 +9,7 @@ fn decode_commitment_parameters(input_data: Vec<u8>) -> anyhow::Result<Vec<Token
         ParamType::Bytes,          // bytes calldata _publicData,
         ParamType::Uint(256),      // uint256 _timestamp,
         ParamType::Array(Box::new(ParamType::Tuple(vec![
-            ParamType::Bytes,    // bytes eht_witness
+            ParamType::Bytes,   // bytes eht_witness
             ParamType::Uint(32), //uint32 public_data_offset
         ]))),
         ParamType::Uint(32), // uint32 _blockNumber,
