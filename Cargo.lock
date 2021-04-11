@@ -2757,7 +2757,7 @@ dependencies = [
  "tokio 0.2.25",
  "toml",
  "vlog",
- "web3 0.13.0",
+ "web3 0.15.0",
  "zksync",
  "zksync_api_client",
  "zksync_config",
