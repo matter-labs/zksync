@@ -21,7 +21,7 @@ zksync_prover_utils = { path = "../../lib/prover_utils", version = "1.0" }
 
 hex = "0.4"
 rust-crypto = "0.2"
-web3 = "0.13.0"
+web3 = "0.15.0"
 tokio = { version = "0.2", features = ["full"] }
 async-trait = "0.1"
 futures = "0.3"

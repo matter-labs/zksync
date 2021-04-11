@@ -40,4 +40,4 @@ members = [
 ]
 
 [patch.crates-io]
-ethabi = { git = "https://github.com/dvush/ethabi.git" }
+ethabi = { git = "https://github.com/fanatid/ethabi.git", branch = "v13.0.0-zksync-patch" }
