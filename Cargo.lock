@@ -6350,7 +6350,7 @@ dependencies = [
  "num",
  "serde_json",
  "vlog",
- "web3 0.13.0",
+ "web3 0.15.0",
  "zksync_crypto",
  "zksync_types",
  "zksync_utils",
