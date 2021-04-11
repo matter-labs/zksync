@@ -6144,7 +6144,7 @@ version = "1.0.0"
 dependencies = [
  "anyhow",
  "base64 0.13.0",
- "ethabi 12.0.0",
+ "ethabi 13.0.0",
  "fnv",
  "franklin-crypto",
  "hex",
