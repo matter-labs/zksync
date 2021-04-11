@@ -42,7 +42,7 @@ impl<'a, 'c> MempoolSchema<'a, 'c> {
                 0 => None,
                 _ => Some(batch_id),
             }
-        };
+        }
 
         let mut prev_batch_id = txs.first().and_then(|tx| batch_id_optional(tx.batch_id));
 

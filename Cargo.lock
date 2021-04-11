@@ -305,36 +305,13 @@ checksum = "ee2a4ec343196209d6594e19543ae87a39f96d5534d7174822a3ad825dd6ed7e"
 
 [[package]]
 name = "aes"
-version = "0.3.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "54eb1d8fe354e5fc611daf4f2ea97dd45a765f4f1e4512306ec183ae2e8f20c9"
-dependencies = [
- "aes-soft 0.3.3",
- "aesni 0.6.0",
- "block-cipher-trait",
-]
-
-[[package]]
-name = "aes"
 version = "0.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "884391ef1066acaa41e766ba8f596341b96e93ce34f9a43e7d24bf0a0eaf0561"
 dependencies = [
- "aes-soft 0.6.4",
- "aesni 0.10.0",
+ "aes-soft",
+ "aesni",
  "cipher",
-]
-
-[[package]]
-name = "aes-ctr"
-version = "0.3.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d2e5b0458ea3beae0d1d8c0f3946564f8e10f90646cf78c06b4351052058d1ee"
-dependencies = [
- "aes-soft 0.3.3",
- "aesni 0.6.0",
- "ctr 0.3.2",
- "stream-cipher",
 ]
 
 [[package]]
@@ -343,21 +320,10 @@ version = "0.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7729c3cde54d67063be556aeac75a81330d802f0259500ca40cb52967f975763"
 dependencies = [
- "aes-soft 0.6.4",
- "aesni 0.10.0",
+ "aes-soft",
+ "aesni",
  "cipher",
- "ctr 0.6.0",
-]
-
-[[package]]
-name = "aes-soft"
-version = "0.3.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cfd7e7ae3f9a1fb5c03b389fc6bb9a51400d0c13053f0dca698c832bfd893a0d"
-dependencies = [
- "block-cipher-trait",
- "byteorder",
- "opaque-debug 0.2.3",
+ "ctr",
 ]
 
 [[package]]
@@ -368,17 +334,6 @@ checksum = "be14c7498ea50828a38d0e24a765ed2effe92a705885b57d029cd67d45744072"
 dependencies = [
  "cipher",
  "opaque-debug 0.3.0",
-]
-
-[[package]]
-name = "aesni"
-version = "0.6.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2f70a6b5f971e473091ab7cfb5ffac6cde81666c4556751d8d5620ead8abf100"
-dependencies = [
- "block-cipher-trait",
- "opaque-debug 0.2.3",
- "stream-cipher",
 ]
 
 [[package]]
@@ -900,25 +855,6 @@ checksum = "4152116fd6e9dadb291ae18fc1ec3575ed6d84c29642d97890f4b4a3417297e4"
 dependencies = [
  "block-padding 0.2.1",
  "generic-array 0.14.4",
-]
-
-[[package]]
-name = "block-cipher-trait"
-version = "0.6.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1c924d49bd09e7c06003acda26cd9742e796e34282ec6c1189404dee0c1f4774"
-dependencies = [
- "generic-array 0.12.3",
-]
-
-[[package]]
-name = "block-modes"
-version = "0.3.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "31aa8410095e39fdb732909fb5730a48d5bd7c2e3cd76bd1b07b3dbea130c529"
-dependencies = [
- "block-cipher-trait",
- "block-padding 0.1.5",
 ]
 
 [[package]]
@@ -1474,16 +1410,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2b2466559f260f48ad25fe6317b3c8dac77b5bdb5763ac7d9d6103530663bc90"
 dependencies = [
  "memchr",
-]
-
-[[package]]
-name = "ctr"
-version = "0.3.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "022cd691704491df67d25d006fe8eca083098253c4d43516c2206479c58c6736"
-dependencies = [
- "block-cipher-trait",
- "stream-cipher",
 ]
 
 [[package]]
@@ -3388,46 +3314,21 @@ dependencies = [
 
 [[package]]
 name = "parity-crypto"
-version = "0.6.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "88e15b5e11d7a4829490630a797c537a68c9e864a139f56fe7a1e6a51f0da25d"
-dependencies = [
- "aes 0.3.2",
- "aes-ctr 0.3.0",
- "block-modes 0.3.3",
- "digest 0.8.1",
- "ethereum-types 0.9.2",
- "hmac 0.7.1",
- "lazy_static",
- "pbkdf2 0.3.0",
- "rand 0.7.3",
- "ripemd160 0.8.0",
- "rustc-hex",
- "scrypt 0.2.0",
- "secp256k1 0.17.2",
- "sha2 0.8.2",
- "subtle 2.4.0",
- "tiny-keccak 2.0.2",
- "zeroize",
-]
-
-[[package]]
-name = "parity-crypto"
 version = "0.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "868c55e939883391346b69c8b93f6999688d89a84b7ea7e7d0a94e7a2c07c185"
 dependencies = [
- "aes 0.6.0",
- "aes-ctr 0.6.0",
- "block-modes 0.7.0",
+ "aes",
+ "aes-ctr",
+ "block-modes",
  "digest 0.9.0",
  "ethereum-types 0.10.0",
  "hmac 0.10.1",
  "lazy_static",
- "pbkdf2 0.6.0",
- "ripemd160 0.9.1",
+ "pbkdf2",
+ "ripemd160",
  "rustc-hex",
- "scrypt 0.5.0",
+ "scrypt",
  "secp256k1 0.20.1",
  "sha2 0.9.3",
  "subtle 2.4.0",
@@ -3535,21 +3436,6 @@ version = "1.0.0"
 dependencies = [
  "hex",
  "zksync_types",
-]
-
-[[package]]
-name = "pbkdf2"
-version = "0.3.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "006c038a43a45995a9670da19e67600114740e8511d4333bf97a56e66a7542d9"
-dependencies = [
- "base64 0.9.3",
- "byteorder",
- "crypto-mac 0.7.0",
- "hmac 0.7.1",
- "rand 0.5.6",
- "sha2 0.8.2",
- "subtle 1.0.0",
 ]
 
 [[package]]
@@ -3901,19 +3787,6 @@ dependencies = [
 
 [[package]]
 name = "rand"
-version = "0.5.6"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c618c47cd3ebd209790115ab837de41425723956ad3ce2e6a7f09890947cacb9"
-dependencies = [
- "cloudabi 0.0.3",
- "fuchsia-cprng",
- "libc",
- "rand_core 0.3.1",
- "winapi 0.3.9",
-]
-
-[[package]]
-name = "rand"
 version = "0.6.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6d71dacdc3c88c1fde3885a3be3fbab9f35724e6ce99467f7d9c5026132184ca"
@@ -4240,17 +4113,6 @@ dependencies = [
 
 [[package]]
 name = "ripemd160"
-version = "0.8.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ad5112e0dbbb87577bfbc56c42450235e3012ce336e29c5befd7807bd626da4a"
-dependencies = [
- "block-buffer 0.7.3",
- "digest 0.8.1",
- "opaque-debug 0.2.3",
-]
-
-[[package]]
-name = "ripemd160"
 version = "0.9.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2eca4ecc81b7f313189bf73ce724400a07da2a6dac19588b03c8bd76a2dcc251"
@@ -4367,26 +4229,13 @@ checksum = "d29ab0c6d3fc0ee92fe66e2d99f700eab17a8d57d1c1d3b748380fb20baa78cd"
 
 [[package]]
 name = "scrypt"
-version = "0.2.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "656c79d0e90d0ab28ac86bf3c3d10bfbbac91450d3f190113b4e76d9fec3cfdd"
-dependencies = [
- "byte-tools",
- "byteorder",
- "hmac 0.7.1",
- "pbkdf2 0.3.0",
- "sha2 0.8.2",
-]
-
-[[package]]
-name = "scrypt"
 version = "0.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8da492dab03f925d977776a0b7233d7b934d6dc2b94faead48928e2e9bacedb9"
 dependencies = [
  "base64 0.13.0",
  "hmac 0.10.1",
- "pbkdf2 0.6.0",
+ "pbkdf2",
  "rand 0.7.3",
  "rand_core 0.5.1",
  "salsa20",
@@ -4400,7 +4249,6 @@ version = "0.17.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2932dc07acd2066ff2e3921a4419606b220ba6cd03a9935123856cc534877056"
 dependencies = [
- "rand 0.6.5",
  "secp256k1-sys 0.1.2",
 ]
 
@@ -4868,15 +4716,6 @@ name = "stdweb-internal-runtime"
 version = "0.1.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "213701ba3370744dcd1a12960caa4843b3d68b4d1c0a5d575e0d65b2ee9d16c0"
-
-[[package]]
-name = "stream-cipher"
-version = "0.3.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8131256a5896cabcf5eb04f4d6dacbe1aefda854b0d9896e09cb58829ec5638c"
-dependencies = [
- "generic-array 0.12.3",
-]
 
 [[package]]
 name = "string"
@@ -6342,7 +6181,7 @@ dependencies = [
  "ethabi 13.0.0",
  "hex",
  "metrics",
- "parity-crypto 0.7.0",
+ "parity-crypto",
  "serde",
  "tokio 0.2.25",
  "vlog",
@@ -6392,7 +6231,7 @@ dependencies = [
  "futures 0.3.6",
  "hex",
  "jsonrpc-core 14.2.0",
- "parity-crypto 0.7.0",
+ "parity-crypto",
  "reqwest",
  "rlp 0.5.0",
  "serde",
@@ -6531,7 +6370,7 @@ dependencies = [
  "lazy_static",
  "metrics",
  "num",
- "parity-crypto 0.6.2",
+ "parity-crypto",
  "serde",
  "serde_json",
  "sqlx",
@@ -6598,7 +6437,7 @@ dependencies = [
  "itertools 0.9.0",
  "lazy_static",
  "num",
- "parity-crypto 0.7.0",
+ "parity-crypto",
  "secp256k1 0.20.1",
  "serde",
  "serde_json",
