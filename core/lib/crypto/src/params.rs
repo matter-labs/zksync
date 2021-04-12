@@ -97,6 +97,9 @@ pub const SUBTREE_HASH_WIDTH_PADDED: usize = 256;
 /// Content hash size
 pub const CONTENT_HASH_WIDTH: usize = 256;
 
+/// NFT serial id size
+pub const SERIAL_ID_WIDTH: usize = 32;
+
 /// balance bit width
 pub const BALANCE_BIT_WIDTH: usize = 128;
 

@@ -187,7 +187,7 @@ impl CloseAccountWitness<Bn256> {
 
                 special_eth_addresses: vec![Some(Fr::zero())],
                 special_tokens: vec![Some(Fr::zero()), Some(Fr::zero())],
-                special_account_ids: vec![Some(Fr::zero())],
+                special_account_ids: vec![Some(Fr::zero()), Some(Fr::zero())],
                 special_content_hash: vec![Some(Fr::zero()); CONTENT_HASH_WIDTH],
                 special_serial_id: Some(Fr::zero()),
             },

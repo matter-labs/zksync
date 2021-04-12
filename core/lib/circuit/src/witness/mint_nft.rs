@@ -499,7 +499,10 @@ impl MintNFTWitness<Bn256> {
                         .expect("recipient account should not be empty"),
                 )],
                 special_tokens: vec![Some(token_fe), Some(new_token_id)],
-                special_account_ids: vec![Some(recipient_account_id_fe)],
+                special_account_ids: vec![
+                    Some(creator_account_id_fe),
+                    Some(recipient_account_id_fe),
+                ],
                 special_content_hash: content_hash_as_vec.clone(),
                 special_serial_id: Some(serial_id),
             },

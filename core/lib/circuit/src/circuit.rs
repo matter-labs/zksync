@@ -1852,10 +1852,17 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
         //construct pubdata
         let mut pubdata_bits = vec![];
         pubdata_bits.extend(global_variables.chunk_data.tx_type.get_bits_be()); //TX_TYPE_BIT_WIDTH=8
-        todo!(); // add creator id
-        todo!(); // add recipient id
-        todo!(); // add content hash
-        todo!(); // add token id
+        pubdata_bits.extend(op_data.special_account_ids[0].get_bits_be());
+        pubdata_bits.extend(op_data.special_account_ids[1].get_bits_be());
+        pubdata_bits.extend(
+            op_data
+                .special_content_hash
+                .iter()
+                .map(|bit| bit.get_bits_be())
+                .flatten()
+                .collect::<Vec<_>>(),
+        );
+        pubdata_bits.extend(op_data.special_tokens[0].get_bits_be());
         pubdata_bits.extend(op_data.fee_packed.get_bits_be());
         resize_grow_only(
             &mut pubdata_bits,
@@ -1921,7 +1928,20 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
         let first_chunk_valid = {
             let mut flags = vec![common_valid, is_chunk_with_index[0]];
 
-            todo!(); // verify signature
+            todo!(); // verify signature (using cur.address)
+
+            let is_creator_account = Boolean::from(Expression::equals(
+                cs.namespace(|| "is_creator_account (first chunk)"),
+                &op_data.special_account_ids[0].get_number(),
+                &cur.account_id.get_number(),
+            )?);
+            flags.push(is_creator_account);
+            let is_fee_token = Boolean::from(Expression::equals(
+                cs.namespace(|| "is_fee_token (first chunk)"),
+                &op_data.special_tokens[0].get_number(),
+                &cur.token.get_number(),
+            )?);
+            flags.push(is_fee_token);
 
             let is_a_correct =
                 CircuitElement::equals(cs.namespace(|| "is_a_correct"), &op_data.a, &cur.balance)?;
@@ -1960,15 +1980,24 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
         let second_chunk_valid = {
             let mut flags = vec![common_valid, is_chunk_with_index[1]];
 
-            todo!(); // is creator_id from op_data equals to cur.account_id
+            let is_creator_account = Boolean::from(Expression::equals(
+                cs.namespace(|| "is_creator_account (second chunk)"),
+                &op_data.special_account_ids[0].get_number(),
+                &cur.account_id.get_number(),
+            )?);
+            flags.push(is_creator_account);
             let is_nft_token = Boolean::from(Expression::equals(
                 cs.namespace(|| "is_nft_token (second chunk)"),
                 &cur.token.get_number(),
                 Expression::u64::<CS>(NFT_TOKEN_ID.0.into()),
             )?);
             flags.push(is_nft_token);
-
-            todo!(); // is serial_id from op_data equals to cur.balance
+            let valid_serial_id = Boolean::from(Expression::equals(
+                cs.namespace(|| "valid_serial_id (second chunk)"),
+                &op_data.special_serial_id.get_number(),
+                &cur.balance.get_number(),
+            )?);
+            flags.push(valid_serial_id);
 
             multi_and(cs.namespace(|| "second_chunk_valid"), &flags)?
         };
@@ -1996,8 +2025,12 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
                 Expression::u64::<CS>(NFT_TOKEN_ID.0.into()),
             )?);
             flags.push(is_nft_token);
-
-            todo!(); // is new_token_id from op_data equals to cur.balance
+            let is_new_token_id_valid = Boolean::from(Expression::equals(
+                cs.namespace(|| "is_new_token_id_valid (third chunk)"),
+                &op_data.special_tokens[1].get_number(),
+                &cur.balance.get_number(),
+            )?);
+            flags.push(is_new_token_id_valid);
 
             multi_and(cs.namespace(|| "third_chunk_valid"), &flags)?
         };
@@ -2019,8 +2052,12 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
                 Expression::u64::<CS>(NFT_STORAGE_ACCOUNT_ID.0.into()),
             )?);
             flags.push(is_special_account);
-
-            todo!(); // is new_token_id from op_data equals to cur.token
+            let is_new_token = Boolean::from(Expression::equals(
+                cs.namespace(|| "is_new_token (fourth chunk)"),
+                &op_data.special_tokens[1].get_number(),
+                &cur.token.get_number(),
+            )?);
+            flags.push(is_new_token);
 
             multi_and(cs.namespace(|| "fourth_chunk_valid"), &flags)?
         };
@@ -2036,8 +2073,25 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
         let fifth_chunk_valid = {
             let mut flags = vec![common_valid, is_chunk_with_index[4]];
 
-            todo!(); // is recipient_id from op_data equals to cur.account_id
-            todo!(); // is new_token_id from op_data equals to cur.token
+            let is_recipient_account = Boolean::from(Expression::equals(
+                cs.namespace(|| "is_recipient_account (fifth chunk)"),
+                &op_data.special_account_ids[1].get_number(),
+                &cur.account_id.get_number(),
+            )?);
+            flags.push(is_recipient_account);
+            let is_recipient_address = Boolean::from(Expression::equals(
+                cs.namespace(|| "is_recipient_address (fifth chunk)"),
+                &op_data.special_eth_addresses[0].get_number(),
+                &cur.account.address.get_number(),
+            )?);
+            flags.push(is_recipient_address);
+            let is_new_token = Boolean::from(Expression::equals(
+                cs.namespace(|| "is_new_token (fifth chunk)"),
+                &op_data.special_tokens[1].get_number(),
+                &cur.token.get_number(),
+            )?);
+            flags.push(is_new_token);
+            flags.push(is_account_empty.not());
 
             multi_and(cs.namespace(|| "fifth_chunk_valid"), &flags)?
         };
