@@ -5,12 +5,14 @@ use std::str::FromStr;
 
 // External uses
 use actix_web::{web, Scope};
-use chrono::{DateTime, Utc};
-use serde::{Deserialize, Serialize};
 
 // Workspace uses
-use zksync_api_types::v02::pagination::{BlockAndTxHash, Paginated, PaginationQuery};
-use zksync_crypto::{convert::FeConvert, serialization::FrSerde, Fr};
+use zksync_api_types::v02::{
+    block::BlockInfo,
+    pagination::{BlockAndTxHash, Paginated, PaginationQuery},
+    transaction::Transaction,
+};
+use zksync_crypto::{convert::FeConvert, Fr};
 use zksync_storage::{chain::block::records::BlockDetails, ConnectionPool, QueryResult};
 use zksync_types::{tx::TxHash, BlockNumber, H256};
 
@@ -19,42 +21,23 @@ use super::{
     error::{Error, InvalidDataError},
     paginate_trait::Paginate,
     response::ApiResult,
-    transaction::Transaction,
 };
 use crate::utils::block_details_cache::BlockDetailsCache;
 
-#[derive(Debug, Serialize, Deserialize, PartialEq, Clone)]
-pub struct BlockInfo {
-    pub block_number: BlockNumber,
-    #[serde(with = "FrSerde")]
-    pub new_state_root: Fr,
-    pub block_size: u64,
-    pub commit_tx_hash: Option<H256>,
-    pub verify_tx_hash: Option<H256>,
-    pub committed_at: DateTime<Utc>,
-    pub finalized_at: Option<DateTime<Utc>>,
-}
-
-impl From<BlockDetails> for BlockInfo {
-    fn from(details: BlockDetails) -> BlockInfo {
-        BlockInfo {
-            block_number: BlockNumber(details.block_number as u32),
-            new_state_root: Fr::from_bytes(&details.new_state_root).unwrap_or_else(|err| {
-                panic!(
-                    "Database provided an incorrect new_state_root field: {:?}, an error occurred {}",
-                    details.new_state_root, err
-                )
-            }),
-            block_size: details.block_size as u64,
-            commit_tx_hash: details.commit_tx_hash.map(|bytes| {
-                H256::from_slice(&bytes)
-            }),
-            verify_tx_hash: details.verify_tx_hash.map(|bytes| {
-                H256::from_slice(&bytes)
-            }),
-            committed_at: details.committed_at,
-            finalized_at: details.verified_at,
-        }
+pub fn block_info_from_details(details: BlockDetails) -> BlockInfo {
+    BlockInfo {
+        block_number: BlockNumber(details.block_number as u32),
+        new_state_root: Fr::from_bytes(&details.new_state_root).unwrap_or_else(|err| {
+            panic!(
+                "Database provided an incorrect new_state_root field: {:?}, an error occurred {}",
+                details.new_state_root, err
+            )
+        }),
+        block_size: details.block_size as u64,
+        commit_tx_hash: details.commit_tx_hash.map(|bytes| H256::from_slice(&bytes)),
+        verify_tx_hash: details.verify_tx_hash.map(|bytes| H256::from_slice(&bytes)),
+        committed_at: details.committed_at,
+        finalized_at: details.verified_at,
     }
 }
 
@@ -174,7 +157,7 @@ async fn block_by_number(
 
     data.block_info(block_number)
         .await
-        .map(|details| details.map(BlockInfo::from))
+        .map(|details| details.map(block_info_from_details))
         .into()
 }
 

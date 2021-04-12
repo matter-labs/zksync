@@ -3,16 +3,20 @@
 // External uses
 
 // Workspace uses
-use zksync_api_types::v02::pagination::{BlockAndTxHash, Paginated, PaginationQuery};
+use zksync_api_types::v02::{
+    block::BlockInfo,
+    pagination::{BlockAndTxHash, Paginated, PaginationQuery},
+    transaction::Transaction,
+};
 use zksync_storage::StorageProcessor;
 use zksync_types::{aggregated_operations::AggregatedActionType, BlockNumber, Token, TokenId};
 
 // Local uses
 use super::{
-    block::BlockInfo,
+    block::block_info_from_details,
     error::{Error, TxError},
     paginate_trait::Paginate,
-    transaction::Transaction,
+    transaction::transaction_from_item_and_finalization,
 };
 
 #[async_trait::async_trait]
@@ -57,7 +61,7 @@ impl Paginate<BlockInfo> for StorageProcessor<'_> {
             .load_block_page(query)
             .await
             .map_err(Error::storage)?;
-        let blocks: Vec<BlockInfo> = blocks.into_iter().map(BlockInfo::from).collect();
+        let blocks: Vec<BlockInfo> = blocks.into_iter().map(block_info_from_details).collect();
         let count = *self
             .chain()
             .block_schema()
@@ -101,7 +105,7 @@ impl Paginate<Transaction> for StorageProcessor<'_> {
             .unwrap_or(false);
         let txs = raw_txs
             .into_iter()
-            .map(|tx| Transaction::from_item_and_finalization(tx, is_block_finalized))
+            .map(|tx| transaction_from_item_and_finalization(tx, is_block_finalized))
             .collect();
         let count = self
             .chain()

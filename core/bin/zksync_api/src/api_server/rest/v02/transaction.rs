@@ -9,13 +9,13 @@ use actix_web::{
     web::{self, Json},
     Scope,
 };
-use chrono::{DateTime, Utc};
 use hex::FromHexError;
-use serde::{Deserialize, Serialize};
-use serde_json::Value;
 
 // Workspace uses
-use zksync_api_types::v02::transaction::{IncomingTx, IncomingTxBatch, L1Status, L2Status};
+use zksync_api_types::v02::transaction::{
+    IncomingTx, IncomingTxBatch, L1Receipt, L1Status, L2Receipt, L2Status, Receipt, Transaction,
+    TxData,
+};
 use zksync_storage::{
     chain::{
         block::records::BlockTransactionItem, operations::records::StoredExecutedPriorityOperation,
@@ -35,113 +35,72 @@ use super::{
 };
 use crate::api_server::{rpc_server::types::TxWithSignature, tx_sender::TxSender};
 
-#[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
-pub struct TxData {
-    pub tx: Transaction,
-    pub eth_signature: Option<String>,
-}
+pub fn l1_receipt_from_op_and_finalization(
+    op: StoredExecutedPriorityOperation,
+    is_finalized: bool,
+) -> L1Receipt {
+    let eth_block = EthBlockId(op.eth_block as u64);
+    let rollup_block = Some(BlockNumber(op.block_number as u32));
+    let id = PriorityOpId(op.priority_op_serialid as u64);
 
-#[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
-pub struct L1Receipt {
-    pub status: L1Status,
-    pub eth_block: EthBlockId,
-    pub rollup_block: Option<BlockNumber>,
-    pub id: PriorityOpId,
-}
+    let status = if is_finalized {
+        L1Status::Finalized
+    } else {
+        L1Status::Committed
+    };
 
-impl L1Receipt {
-    pub fn from_op_and_finalization(
-        op: StoredExecutedPriorityOperation,
-        is_finalized: bool,
-    ) -> L1Receipt {
-        let eth_block = EthBlockId(op.eth_block as u64);
-        let rollup_block = Some(BlockNumber(op.block_number as u32));
-        let id = PriorityOpId(op.priority_op_serialid as u64);
-
-        let status = if is_finalized {
-            L1Status::Finalized
-        } else {
-            L1Status::Committed
-        };
-
-        L1Receipt {
-            status,
-            eth_block,
-            rollup_block,
-            id,
-        }
+    L1Receipt {
+        status,
+        eth_block,
+        rollup_block,
+        id,
     }
 }
 
-#[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
-pub struct L2Receipt {
-    pub tx_hash: TxHash,
-    pub rollup_block: Option<BlockNumber>,
-    pub status: L2Status,
-    pub fail_reason: Option<String>,
-}
-
-impl From<TxReceiptResponse> for L2Receipt {
-    fn from(receipt: TxReceiptResponse) -> L2Receipt {
-        let mut tx_hash_with_prefix = "0x".to_string();
-        tx_hash_with_prefix.push_str(&receipt.tx_hash);
-        let tx_hash = TxHash::from_str(&tx_hash_with_prefix).unwrap();
-        let rollup_block = Some(BlockNumber(receipt.block_number as u32));
-        let fail_reason = receipt.fail_reason;
-        let status = if receipt.success {
-            if receipt.verified {
-                L2Status::Finalized
-            } else {
-                L2Status::Committed
-            }
+pub fn l2_receipt_from_tx_receipt_response(receipt: TxReceiptResponse) -> L2Receipt {
+    let mut tx_hash_with_prefix = "0x".to_string();
+    tx_hash_with_prefix.push_str(&receipt.tx_hash);
+    let tx_hash = TxHash::from_str(&tx_hash_with_prefix).unwrap();
+    let rollup_block = Some(BlockNumber(receipt.block_number as u32));
+    let fail_reason = receipt.fail_reason;
+    let status = if receipt.success {
+        if receipt.verified {
+            L2Status::Finalized
         } else {
-            L2Status::Rejected
-        };
-        L2Receipt {
-            tx_hash,
-            rollup_block,
-            status,
-            fail_reason,
+            L2Status::Committed
         }
+    } else {
+        L2Status::Rejected
+    };
+    L2Receipt {
+        tx_hash,
+        rollup_block,
+        status,
+        fail_reason,
     }
 }
-#[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
-#[serde(untagged)]
-pub enum Receipt {
-    L1(L1Receipt),
-    L2(L2Receipt),
-}
 
-#[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
-pub struct Transaction {
-    pub tx_hash: TxHash,
-    pub block_number: Option<BlockNumber>,
-    pub op: Value,
-    pub status: L2Status,
-    pub fail_reason: Option<String>,
-    pub created_at: Option<DateTime<Utc>>,
-}
-
-impl Transaction {
-    pub fn from_item_and_finalization(item: BlockTransactionItem, is_finalized: bool) -> Self {
-        let tx_hash = TxHash::from_str(&item.tx_hash).unwrap();
-        let status = if item.success.unwrap_or_default() {
-            if is_finalized {
-                L2Status::Finalized
-            } else {
-                L2Status::Committed
-            }
+pub fn transaction_from_item_and_finalization(
+    item: BlockTransactionItem,
+    is_finalized: bool,
+) -> Transaction {
+    let tx_hash = TxHash::from_str(&item.tx_hash).unwrap();
+    let status = if item.success.unwrap_or_default() {
+        if is_finalized {
+            L2Status::Finalized
         } else {
-            L2Status::Rejected
-        };
-        Self {
-            tx_hash,
-            block_number: Some(BlockNumber(item.block_number as u32)),
-            op: item.op,
-            status,
-            fail_reason: item.fail_reason,
-            created_at: Some(item.created_at),
+            L2Status::Committed
         }
+    } else {
+        L2Status::Rejected
+    };
+    Transaction {
+        tx_hash,
+        block_number: Some(BlockNumber(item.block_number as u32)),
+        op: item.op,
+        status,
+        fail_reason: item.fail_reason,
+        created_at: Some(item.created_at),
     }
 }
 
@@ -190,7 +149,7 @@ impl ApiTransactionData {
         {
             let finalized =
                 Self::is_block_finalized(&mut storage, BlockNumber(op.block_number as u32)).await;
-            Ok(Some(L1Receipt::from_op_and_finalization(op, finalized)))
+            Ok(Some(l1_receipt_from_op_and_finalization(op, finalized)))
         } else if let Some((eth_block, priority_op)) = self
             .tx_sender
             .core_api_client
@@ -216,7 +175,7 @@ impl ApiTransactionData {
             .tx_receipt(tx_hash.as_ref())
             .await?
         {
-            Ok(Some(L2Receipt::from(receipt)))
+            Ok(Some(l2_receipt_from_tx_receipt_response(receipt)))
         } else if storage
             .chain()
             .mempool_schema()

@@ -1,7 +1,10 @@
+use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
+use serde_json::Value;
 use zksync_types::{
+    tx::TxHash,
     tx::{EthBatchSignatures, TxEthSignature},
-    ZkSyncTx,
+    BlockNumber, EthBlockId, PriorityOpId, ZkSyncTx,
 };
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -41,4 +44,43 @@ impl From<L1Status> for L2Status {
             L1Status::Finalized => L2Status::Finalized,
         }
     }
+}
+
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
+pub struct TxData {
+    pub tx: Transaction,
+    pub eth_signature: Option<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
+pub struct L1Receipt {
+    pub status: L1Status,
+    pub eth_block: EthBlockId,
+    pub rollup_block: Option<BlockNumber>,
+    pub id: PriorityOpId,
+}
+
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
+pub struct L2Receipt {
+    pub tx_hash: TxHash,
+    pub rollup_block: Option<BlockNumber>,
+    pub status: L2Status,
+    pub fail_reason: Option<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(untagged)]
+pub enum Receipt {
+    L1(L1Receipt),
+    L2(L2Receipt),
+}
+
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
+pub struct Transaction {
+    pub tx_hash: TxHash,
+    pub block_number: Option<BlockNumber>,
+    pub op: Value,
+    pub status: L2Status,
+    pub fail_reason: Option<String>,
+    pub created_at: Option<DateTime<Utc>>,
 }
