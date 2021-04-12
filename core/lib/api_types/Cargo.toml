@@ -20,4 +20,4 @@ serde_json = "1.0"
 chrono = { version = "0.4", features = ["serde", "rustc-serialize"] }
 hex = "0.4"
 num = "0.3"
-
+bigdecimal = { version = "0.2.0", features = ["serde"]}

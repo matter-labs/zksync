@@ -18,7 +18,7 @@ use num::{rational::Ratio, BigUint, FromPrimitive};
 // Workspace uses
 use zksync_api_types::v02::{
     pagination::{Paginated, PaginationQuery},
-    token::ApiToken,
+    token::{ApiToken, TokenPrice},
 };
 use zksync_config::ZkSyncConfig;
 use zksync_storage::{ConnectionPool, StorageProcessor};
@@ -31,6 +31,7 @@ use super::{
     response::ApiResult,
 };
 use crate::{
+    api_try,
     fee_ticker::{PriceError, TickerRequest, TokenPriceRequestType},
     utils::token_db_cache::TokenDBCache,
 };
@@ -111,7 +112,7 @@ impl ApiTokenData {
         }
     }
 
-    async fn token(&self, token_like: TokenLike) -> Result<ApiToken, Error> {
+    async fn token(&self, token_like: TokenLike) -> Result<Token, Error> {
         let mut storage = self.pool.access_storage().await.map_err(Error::storage)?;
 
         let token = self
@@ -120,18 +121,24 @@ impl ApiTokenData {
             .await
             .map_err(Error::storage)?;
         if let Some(token) = token {
-            let enabled_for_fees = self
-                .is_token_enabled_for_fees(&mut storage, token.id)
-                .await?;
-            Ok(ApiToken::from_token_and_eligibility(
-                token,
-                enabled_for_fees,
-            ))
+            Ok(token)
         } else {
             Err(Error::from(PriceError::token_not_found(
                 "Token not found in storage",
             )))
         }
+    }
+
+    async fn api_token(&self, token_like: TokenLike) -> Result<ApiToken, Error> {
+        let token = self.token(token_like).await?;
+        let mut storage = self.pool.access_storage().await.map_err(Error::storage)?;
+        let enabled_for_fees = self
+            .is_token_enabled_for_fees(&mut storage, token.id)
+            .await?;
+        Ok(ApiToken::from_token_and_eligibility(
+            token,
+            enabled_for_fees,
+        ))
     }
 
     async fn token_price_usd(&self, token: TokenLike) -> Result<BigDecimal, Error> {
@@ -149,6 +156,34 @@ impl ApiTokenData {
         let price_result = price_receiver.await.map_err(Error::storage)?;
         price_result.map_err(Error::from)
     }
+
+    async fn token_price_in(
+        &self,
+        first_token: TokenLike,
+        currency: &str,
+    ) -> Result<BigDecimal, Error> {
+        if let Ok(second_token_id) = u16::from_str(currency) {
+            let second_token = TokenLike::from(TokenId(second_token_id));
+            let first_usd_price = self.token_price_usd(first_token).await;
+            let second_usd_price = self.token_price_usd(second_token).await;
+            match (first_usd_price, second_usd_price) {
+                (Ok(first_usd_price), Ok(second_usd_price)) => {
+                    if second_usd_price.is_zero() {
+                        Err(Error::from(InvalidDataError::TokenZeroPriceError))
+                    } else {
+                        Ok(first_usd_price / second_usd_price)
+                    }
+                }
+                (Err(err), _) => Err(err),
+                (_, Err(err)) => Err(err),
+            }
+        } else {
+            match currency {
+                "usd" => self.token_price_usd(first_token).await,
+                _ => Err(Error::from(InvalidDataError::InvalidCurrency)),
+            }
+        }
+    }
 }
 
 // Server implementation
@@ -157,7 +192,7 @@ async fn token_pagination(
     data: web::Data<ApiTokenData>,
     web::Query(query): web::Query<PaginationQuery<TokenId>>,
 ) -> ApiResult<Paginated<ApiToken, TokenId>> {
-    data.token_page(query).await.map_err(Error::from).into()
+    data.token_page(query).await.into()
 }
 
 async fn token_by_id(
@@ -175,7 +210,7 @@ async fn token_by_id(
         _ => token_like,
     };
 
-    data.token(token_like).await.into()
+    data.api_token(token_like).await.into()
 }
 
 // TODO: take `currency` as enum.
@@ -183,7 +218,7 @@ async fn token_by_id(
 async fn token_price(
     data: web::Data<ApiTokenData>,
     web::Path((token_like_string, currency)): web::Path<(String, String)>,
-) -> ApiResult<BigDecimal> {
+) -> ApiResult<TokenPrice> {
     let first_token = TokenLike::parse(&token_like_string);
     let first_token = match first_token {
         TokenLike::Symbol(_) => {
@@ -195,30 +230,17 @@ async fn token_price(
         _ => first_token,
     };
 
-    if let Ok(second_token_id) = u16::from_str(&currency) {
-        let second_token = TokenLike::from(TokenId(second_token_id));
-        let first_usd_price = data.token_price_usd(first_token).await;
-        let second_usd_price = data.token_price_usd(second_token).await;
-        match (first_usd_price, second_usd_price) {
-            (Ok(first_usd_price), Ok(second_usd_price)) => {
-                if second_usd_price.is_zero() {
-                    Error::from(InvalidDataError::TokenZeroPriceError).into()
-                } else {
-                    Ok(first_usd_price / second_usd_price).into()
-                }
-            }
-            (Err(err), _) => err.into(),
-            (_, Err(err)) => err.into(),
-        }
-    } else {
-        match currency.as_str() {
-            "usd" => {
-                let usd_price = data.token_price_usd(first_token).await;
-                usd_price.into()
-            }
-            _ => Error::from(InvalidDataError::InvalidCurrency).into(),
-        }
-    }
+    let price = api_try!(data.token_price_in(first_token.clone(), &currency).await);
+    let token = api_try!(data.token(first_token).await);
+
+    Ok(TokenPrice {
+        token_id: token.id,
+        token_symbol: token.symbol,
+        price_in: currency,
+        decimals: token.decimals,
+        price,
+    })
+    .into()
 }
 
 pub fn api_scope(
@@ -347,11 +369,28 @@ mod tests {
         assert_eq!(pagination, expected_pagination);
 
         let token_like = TokenLike::Id(TokenId(1));
+        let token = {
+            let mut storage = cfg.pool.access_storage().await?;
+            storage
+                .tokens_schema()
+                .get_token(token_like.clone())
+                .await?
+                .unwrap()
+        };
+        let mut expected_token_price = TokenPrice {
+            token_id: token.id,
+            token_symbol: token.symbol,
+            price_in: String::from("15"),
+            decimals: token.decimals,
+            price: BigDecimal::from_u32(10).unwrap() / BigDecimal::from_u32(10500).unwrap(),
+        };
+
         let response = client.token_price_v02(&token_like, "15").await?;
-        let price_in_token: BigDecimal = deserialize_response_result(response)?;
-        let expected_price_in_token =
-            BigDecimal::from_u32(10).unwrap() / BigDecimal::from_u32(10500).unwrap();
-        assert_eq!(price_in_token, expected_price_in_token);
+        let price_in_token: TokenPrice = deserialize_response_result(response)?;
+        assert_eq!(price_in_token, expected_token_price);
+
+        expected_token_price.price_in = String::from("usd");
+        expected_token_price.price = BigDecimal::from_u32(10).unwrap();
 
         let response = client.token_price_v02(&token_like, "usd").await?;
         let price_in_usd: BigDecimal = deserialize_response_result(response)?;

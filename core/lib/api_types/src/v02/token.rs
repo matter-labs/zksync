@@ -1,3 +1,4 @@
+use bigdecimal::BigDecimal;
 use serde::{Deserialize, Serialize};
 use zksync_types::{Address, Token, TokenId};
 
@@ -8,6 +9,15 @@ pub struct ApiToken {
     pub symbol: String,
     pub decimals: u8,
     pub enabled_for_fees: bool,
+}
+
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
+pub struct TokenPrice {
+    pub token_id: TokenId,
+    pub token_symbol: String,
+    pub price_in: String,
+    pub decimals: u8,
+    pub price: BigDecimal,
 }
 
 impl ApiToken {

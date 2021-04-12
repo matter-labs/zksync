@@ -22,7 +22,7 @@ use super::{
     paginate_trait::Paginate,
     response::ApiResult,
 };
-use crate::utils::block_details_cache::BlockDetailsCache;
+use crate::{api_try, utils::block_details_cache::BlockDetailsCache};
 
 pub fn block_info_from_details(details: BlockDetails) -> BlockInfo {
     BlockInfo {
@@ -148,12 +148,7 @@ async fn block_by_number(
     data: web::Data<ApiBlockData>,
     web::Path(block_position): web::Path<String>,
 ) -> ApiResult<Option<BlockInfo>> {
-    let block_number = match data.get_block_number_by_position(&block_position).await {
-        Ok(number) => number,
-        Err(err) => {
-            return err.into();
-        }
-    };
+    let block_number = api_try!(data.get_block_number_by_position(&block_position).await);
 
     data.block_info(block_number)
         .await
@@ -166,12 +161,7 @@ async fn block_transactions(
     web::Path(block_position): web::Path<String>,
     web::Query(query): web::Query<PaginationQuery<TxHash>>,
 ) -> ApiResult<Paginated<Transaction, BlockAndTxHash>> {
-    let block_number = match data.get_block_number_by_position(&block_position).await {
-        Ok(number) => number,
-        Err(err) => {
-            return err.into();
-        }
-    };
+    let block_number = api_try!(data.get_block_number_by_position(&block_position).await);
 
     data.transaction_page(block_number, query).await.into()
 }

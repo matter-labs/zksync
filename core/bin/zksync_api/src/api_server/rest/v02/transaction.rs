@@ -33,7 +33,10 @@ use super::{
     error::{Error, TxError},
     response::ApiResult,
 };
-use crate::api_server::{rpc_server::types::TxWithSignature, tx_sender::TxSender};
+use crate::{
+    api_server::{rpc_server::types::TxWithSignature, tx_sender::TxSender},
+    api_try,
+};
 
 pub fn l1_receipt_from_op_and_finalization(
     op: StoredExecutedPriorityOperation,
@@ -139,13 +142,19 @@ impl ApiTransactionData {
             .unwrap_or(false)
     }
 
-    async fn get_l1_receipt(&self, eth_hash: &[u8]) -> QueryResult<Option<L1Receipt>> {
-        let mut storage = self.tx_sender.pool.access_storage().await?;
+    async fn get_l1_receipt(&self, eth_hash: &[u8]) -> Result<Option<L1Receipt>, Error> {
+        let mut storage = self
+            .tx_sender
+            .pool
+            .access_storage()
+            .await
+            .map_err(Error::storage)?;
         if let Some(op) = storage
             .chain()
             .operations_schema()
             .get_executed_priority_operation_by_hash(eth_hash)
-            .await?
+            .await
+            .map_err(Error::storage)?
         {
             let finalized =
                 Self::is_block_finalized(&mut storage, BlockNumber(op.block_number as u32)).await;
@@ -154,7 +163,8 @@ impl ApiTransactionData {
             .tx_sender
             .core_api_client
             .get_unconfirmed_op(H256::from_slice(eth_hash))
-            .await?
+            .await
+            .map_err(Error::core_api)?
         {
             Ok(Some(L1Receipt {
                 status: L1Status::Queued,
@@ -193,12 +203,13 @@ impl ApiTransactionData {
         }
     }
 
-    async fn tx_status(&self, tx_hash: &[u8; 32]) -> QueryResult<Option<Receipt>> {
+    async fn tx_status(&self, tx_hash: &[u8; 32]) -> Result<Option<Receipt>, Error> {
         if let Some(receipt) = self.get_l1_receipt(tx_hash).await? {
             Ok(Some(Receipt::L1(receipt)))
         } else if let Some(receipt) = self
             .get_l2_receipt(TxHash::from_slice(tx_hash).unwrap())
-            .await?
+            .await
+            .map_err(Error::storage)?
         {
             Ok(Some(Receipt::L2(receipt)))
         } else {
@@ -217,13 +228,19 @@ impl ApiTransactionData {
         result
     }
 
-    async fn get_l1_tx_data(&self, eth_hash: &[u8]) -> QueryResult<Option<TxData>> {
-        let mut storage = self.tx_sender.pool.access_storage().await?;
+    async fn get_l1_tx_data(&self, eth_hash: &[u8]) -> Result<Option<TxData>, Error> {
+        let mut storage = self
+            .tx_sender
+            .pool
+            .access_storage()
+            .await
+            .map_err(Error::storage)?;
         let operation = storage
             .chain()
             .operations_schema()
             .get_executed_priority_operation_by_hash(eth_hash)
-            .await?;
+            .await
+            .map_err(Error::storage)?;
         if let Some(op) = operation {
             let block_number = BlockNumber(op.block_number as u32);
             let finalized = Self::is_block_finalized(&mut storage, block_number).await;
@@ -250,7 +267,8 @@ impl ApiTransactionData {
             .tx_sender
             .core_api_client
             .get_unconfirmed_op(H256::from_slice(eth_hash))
-            .await?
+            .await
+            .map_err(Error::core_api)?
         {
             let tx = Transaction {
                 tx_hash: TxHash::from_slice(eth_hash).unwrap(),
@@ -299,8 +317,16 @@ impl ApiTransactionData {
                 fail_reason: op.fail_reason,
                 created_at: Some(op.created_at),
             };
-            let eth_sign_data: Option<EthSignData> =
-                op.eth_sign_data.map(serde_json::from_value).transpose()?;
+            let eth_sign_data: Option<EthSignData> = op
+                .eth_sign_data
+                .map(serde_json::from_value)
+                .transpose()
+                .unwrap_or_else(|err| {
+                    panic!(
+                        "Database provided an incorrect eth_sign_data field, an error occurred {}",
+                        err
+                    )
+                });
             let eth_signature = eth_sign_data.map(Self::get_sign_bytes);
 
             Ok(Some(TxData { tx, eth_signature }))
@@ -319,8 +345,16 @@ impl ApiTransactionData {
                 created_at: Some(op.created_at),
             };
 
-            let eth_sign_data: Option<EthSignData> =
-                op.eth_sign_data.map(serde_json::from_value).transpose()?;
+            let eth_sign_data: Option<EthSignData> = op
+                .eth_sign_data
+                .map(serde_json::from_value)
+                .transpose()
+                .unwrap_or_else(|err| {
+                    panic!(
+                        "Database provided an incorrect eth_sign_data field, an error occurred {}",
+                        err
+                    )
+                });
             let eth_signature = eth_sign_data.map(Self::get_sign_bytes);
 
             Ok(Some(TxData { tx, eth_signature }))
@@ -329,12 +363,13 @@ impl ApiTransactionData {
         }
     }
 
-    async fn tx_data(&self, tx_hash: &[u8; 32]) -> QueryResult<Option<TxData>> {
+    async fn tx_data(&self, tx_hash: &[u8; 32]) -> Result<Option<TxData>, Error> {
         if let Some(tx_data) = self.get_l1_tx_data(tx_hash).await? {
             Ok(Some(tx_data))
         } else if let Some(tx_data) = self
             .get_l2_tx_data(TxHash::from_slice(tx_hash).unwrap())
-            .await?
+            .await
+            .map_err(Error::storage)?
         {
             Ok(Some(tx_data))
         } else {
@@ -350,19 +385,10 @@ async fn tx_status(
     web::Path(tx_hash): web::Path<String>,
 ) -> ApiResult<Option<Receipt>> {
     let decode_result = data.decode_hash(tx_hash);
-    match decode_result {
-        Ok(tx_hash) => {
-            let tx_hash_result: Result<&[u8; 32], _> = tx_hash.as_slice().try_into();
-            match tx_hash_result {
-                Ok(tx_hash) => {
-                    let tx_status = data.tx_status(&tx_hash).await;
-                    tx_status.map_err(Error::storage).into()
-                }
-                Err(_) => Error::from(TxError::IncorrectTxHash).into(),
-            }
-        }
-        Err(err) => Error::from(err).into(),
-    }
+    let bytes = api_try!(decode_result.map_err(Error::from));
+    let tx_hash_result: Result<&[u8; 32], _> = bytes.as_slice().try_into();
+    let tx_hash = api_try!(tx_hash_result.map_err(|_| Error::from(TxError::IncorrectTxHash)));
+    data.tx_status(&tx_hash).await.into()
 }
 
 async fn tx_data(
@@ -370,19 +396,10 @@ async fn tx_data(
     web::Path(tx_hash): web::Path<String>,
 ) -> ApiResult<Option<TxData>> {
     let decode_result = data.decode_hash(tx_hash);
-    match decode_result {
-        Ok(tx_hash) => {
-            let tx_hash_result: Result<&[u8; 32], _> = tx_hash.as_slice().try_into();
-            match tx_hash_result {
-                Ok(tx_hash) => {
-                    let tx_data = data.tx_data(&tx_hash).await;
-                    tx_data.map_err(Error::storage).into()
-                }
-                Err(_) => Error::from(TxError::IncorrectTxHash).into(),
-            }
-        }
-        Err(err) => Error::from(err).into(),
-    }
+    let bytes = api_try!(decode_result.map_err(Error::from));
+    let tx_hash_result: Result<&[u8; 32], _> = bytes.as_slice().try_into();
+    let tx_hash = api_try!(tx_hash_result.map_err(|_| Error::from(TxError::IncorrectTxHash)));
+    data.tx_data(&tx_hash).await.into()
 }
 
 async fn submit_tx(

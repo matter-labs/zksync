@@ -86,3 +86,15 @@ impl<R: Serialize> From<Result<R, Error>> for ApiResult<R> {
         }
     }
 }
+
+#[macro_export]
+macro_rules! api_try {
+    ($e:expr) => {
+        match $e {
+            Ok(res) => res,
+            Err(err) => {
+                return ApiResult::from(err);
+            }
+        };
+    };
+}

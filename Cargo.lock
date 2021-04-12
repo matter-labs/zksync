@@ -5967,6 +5967,7 @@ dependencies = [
 name = "zksync_api_types"
 version = "1.0.0"
 dependencies = [
+ "bigdecimal",
  "chrono",
  "hex",
  "num",

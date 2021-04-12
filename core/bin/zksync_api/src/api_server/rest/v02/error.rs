@@ -16,6 +16,7 @@ use crate::{api_server::tx_sender::SubmitError, fee_ticker::PriceError};
 #[repr(u16)]
 pub enum ErrorCode {
     UnreacheableError = 0,
+    CoreApiError = 100,
     TokenZeroPriceError = 200,
     InvalidCurrency = 201,
     InvalidBlockPosition = 202,
@@ -73,6 +74,10 @@ where
 impl Error {
     pub fn storage(err: impl Display) -> Error {
         Error::from(StorageError::new(err))
+    }
+
+    pub fn core_api(err: impl Display) -> Error {
+        Error::from(CoreApiError::new(err))
     }
 }
 
@@ -165,6 +170,31 @@ impl ApiError for StorageError {
 
     fn code(&self) -> ErrorCode {
         ErrorCode::StorageError
+    }
+}
+
+#[derive(Debug)]
+pub struct CoreApiError(String);
+
+impl CoreApiError {
+    pub fn new(title: impl Display) -> Self {
+        Self(title.to_string())
+    }
+}
+
+impl Display for CoreApiError {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        f.write_str(&self.0)
+    }
+}
+
+impl ApiError for CoreApiError {
+    fn error_type(&self) -> String {
+        String::from("core_api_error")
+    }
+
+    fn code(&self) -> ErrorCode {
+        ErrorCode::CoreApiError
     }
 }
 
