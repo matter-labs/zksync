@@ -241,7 +241,7 @@ async fn submit_tx(
 ) -> JsonResult<TxHash> {
     let tx_hash = data
         .tx_sender
-        .submit_tx(body.tx, body.signature, query.fast_processing)
+        .submit_tx_with_separate_fp(body.tx, body.signature, query.fast_processing)
         .await
         .map_err(ApiError::from)?;
 
