@@ -1,7 +1,7 @@
 // External
 use serde::{Deserialize, Serialize};
 use zksync_crypto::franklin_crypto::{
-    bellman::pairing::ff::Field,
+    bellman::pairing::ff::{Field, PrimeField},
     jubjub::{edwards, JubjubEngine, Unknown},
     rescue::RescueEngine,
 };
@@ -46,6 +46,11 @@ pub struct OperationArguments<E: RescueEngine> {
     pub a: Option<E::Fr>,
     pub b: Option<E::Fr>,
     pub amount_packed: Option<E::Fr>,
+    pub second_amount_packed: Option<E::Fr>,
+    pub special_amounts: Vec<Option<E::Fr>>,
+    pub special_nonces: Vec<Option<E::Fr>>,
+    pub special_tokens: Vec<Option<E::Fr>>,
+    pub special_accounts: Vec<Option<E::Fr>>,
     pub full_amount: Option<E::Fr>,
     pub fee: Option<E::Fr>,
     pub new_pub_key_hash: Option<E::Fr>,
@@ -53,6 +58,28 @@ pub struct OperationArguments<E: RescueEngine> {
     pub pub_nonce: Option<E::Fr>,
     pub valid_from: Option<E::Fr>,
     pub valid_until: Option<E::Fr>,
+}
+
+impl<E: RescueEngine> Default for OperationArguments<E> {
+    fn default() -> Self {
+        OperationArguments {
+            a: Some(E::Fr::zero()),
+            b: Some(E::Fr::zero()),
+            amount_packed: Some(E::Fr::zero()),
+            second_amount_packed: Some(E::Fr::zero()),
+            special_amounts: vec![],
+            special_nonces: vec![],
+            special_tokens: vec![],
+            special_accounts: vec![],
+            full_amount: Some(E::Fr::zero()),
+            fee: Some(E::Fr::zero()),
+            new_pub_key_hash: Some(E::Fr::zero()),
+            eth_address: Some(E::Fr::zero()),
+            pub_nonce: Some(E::Fr::zero()),
+            valid_from: Some(E::Fr::zero()),
+            valid_until: Some(E::Fr::from_str(&u32::MAX.to_string()).unwrap()),
+        }
+    }
 }
 
 #[derive(Clone)]

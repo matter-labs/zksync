@@ -23,6 +23,7 @@ pub mod deposit;
 pub mod forced_exit;
 pub mod full_exit;
 pub mod noop;
+pub mod swap;
 pub mod transfer;
 pub mod transfer_to_new;
 pub mod withdraw;

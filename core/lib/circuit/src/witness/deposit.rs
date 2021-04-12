@@ -14,8 +14,7 @@ use zksync_crypto::{
     },
     params::{
         account_tree_depth, ACCOUNT_ID_BIT_WIDTH, BALANCE_BIT_WIDTH, CHUNK_BIT_WIDTH,
-        ETH_ADDRESS_BIT_WIDTH, NEW_PUBKEY_HASH_WIDTH, NONCE_BIT_WIDTH, TOKEN_BIT_WIDTH,
-        TX_TYPE_BIT_WIDTH,
+        ETH_ADDRESS_BIT_WIDTH, TOKEN_BIT_WIDTH, TX_TYPE_BIT_WIDTH,
     },
 };
 use zksync_types::operations::DepositOp;
@@ -152,35 +151,6 @@ impl Witness for DepositWitness<Bn256> {
     }
 }
 
-impl<E: RescueEngine> DepositWitness<E> {
-    // CLARIFY: What? Why?
-    pub fn get_sig_bits(&self) -> Vec<bool> {
-        let mut sig_bits = vec![];
-        append_be_fixed_width(
-            &mut sig_bits,
-            &Fr::from_str("1").unwrap(), //Corresponding tx_type
-            TX_TYPE_BIT_WIDTH,
-        );
-        append_be_fixed_width(
-            &mut sig_bits,
-            &self.args.new_pub_key_hash.unwrap(),
-            NEW_PUBKEY_HASH_WIDTH,
-        );
-        append_be_fixed_width(&mut sig_bits, &self.before.token.unwrap(), TOKEN_BIT_WIDTH);
-        append_be_fixed_width(
-            &mut sig_bits,
-            &self.args.full_amount.unwrap(),
-            BALANCE_BIT_WIDTH,
-        );
-        append_be_fixed_width(
-            &mut sig_bits,
-            &self.before.witness.account_witness.nonce.unwrap(),
-            NONCE_BIT_WIDTH,
-        );
-        sig_bits
-    }
-}
-
 impl DepositWitness<Bn256> {
     fn apply_data(tree: &mut CircuitAccountTree, deposit: &DepositData) -> Self {
         //preparing data and base witness
@@ -240,15 +210,10 @@ impl DepositWitness<Bn256> {
             },
             args: OperationArguments {
                 eth_address: Some(deposit.address),
-                amount_packed: Some(Fr::zero()),
                 full_amount: Some(amount_as_field_element),
-                fee: Some(Fr::zero()),
                 a: Some(a),
                 b: Some(b),
-                pub_nonce: Some(Fr::zero()),
-                new_pub_key_hash: Some(Fr::zero()),
-                valid_from: Some(Fr::zero()),
-                valid_until: Some(Fr::from_str(&u32::MAX.to_string()).unwrap()),
+                ..Default::default()
             },
             before_root: Some(before_root),
             after_root: Some(after_root),

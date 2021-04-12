@@ -224,15 +224,10 @@ impl FullExitWitness<Bn256> {
             },
             args: OperationArguments {
                 eth_address: Some(full_exit.eth_address),
-                amount_packed: Some(Fr::zero()),
                 full_amount: Some(full_exit.full_exit_amount),
-                fee: Some(Fr::zero()),
-                pub_nonce: Some(Fr::zero()),
                 a: Some(a),
                 b: Some(b),
-                new_pub_key_hash: Some(Fr::zero()),
-                valid_from: Some(Fr::zero()),
-                valid_until: Some(Fr::from_str(&u32::MAX.to_string()).unwrap()),
+                ..Default::default()
             },
             before_root: Some(before_root),
             after_root: Some(after_root),

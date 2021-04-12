@@ -16,8 +16,7 @@ use zksync_crypto::{
     params::{
         account_tree_depth, ACCOUNT_ID_BIT_WIDTH, AMOUNT_EXPONENT_BIT_WIDTH,
         AMOUNT_MANTISSA_BIT_WIDTH, BALANCE_BIT_WIDTH, CHUNK_BIT_WIDTH, ETH_ADDRESS_BIT_WIDTH,
-        FEE_EXPONENT_BIT_WIDTH, FEE_MANTISSA_BIT_WIDTH, NEW_PUBKEY_HASH_WIDTH, NONCE_BIT_WIDTH,
-        TOKEN_BIT_WIDTH, TX_TYPE_BIT_WIDTH,
+        FEE_EXPONENT_BIT_WIDTH, FEE_MANTISSA_BIT_WIDTH, TOKEN_BIT_WIDTH, TX_TYPE_BIT_WIDTH,
     },
     primitives::FloatConversions,
 };
@@ -192,59 +191,6 @@ impl Witness for ForcedExitWitness<Bn256> {
     }
 }
 
-impl<E: RescueEngine> ForcedExitWitness<E> {
-    pub fn get_sig_bits(&self) -> Vec<bool> {
-        let mut sig_bits = vec![];
-        append_be_fixed_width(
-            &mut sig_bits,
-            &Fr::from_str("8").unwrap(), //Corresponding tx_type
-            TX_TYPE_BIT_WIDTH,
-        );
-        append_be_fixed_width(
-            &mut sig_bits,
-            &self
-                .initiator_before
-                .witness
-                .account_witness
-                .pub_key_hash
-                .unwrap(),
-            NEW_PUBKEY_HASH_WIDTH,
-        );
-        append_be_fixed_width(
-            &mut sig_bits,
-            &self
-                .target_before
-                .witness
-                .account_witness
-                .pub_key_hash
-                .unwrap(),
-            NEW_PUBKEY_HASH_WIDTH,
-        );
-
-        append_be_fixed_width(
-            &mut sig_bits,
-            &self.initiator_before.token.unwrap(),
-            TOKEN_BIT_WIDTH,
-        );
-        append_be_fixed_width(
-            &mut sig_bits,
-            &self.args.amount_packed.unwrap(),
-            AMOUNT_MANTISSA_BIT_WIDTH + AMOUNT_EXPONENT_BIT_WIDTH,
-        );
-        append_be_fixed_width(
-            &mut sig_bits,
-            &self.args.fee.unwrap(),
-            FEE_MANTISSA_BIT_WIDTH + FEE_EXPONENT_BIT_WIDTH,
-        );
-        append_be_fixed_width(
-            &mut sig_bits,
-            &self.initiator_before.witness.account_witness.nonce.unwrap(),
-            NONCE_BIT_WIDTH,
-        );
-        sig_bits
-    }
-}
-
 impl ForcedExitWitness<Bn256> {
     fn apply_data(tree: &mut CircuitAccountTree, forced_exit: &ForcedExitData) -> Self {
         //preparing data and base witness
@@ -411,12 +357,11 @@ impl ForcedExitWitness<Bn256> {
                 amount_packed: Some(amount_encoded),
                 full_amount: Some(amount_as_field_element),
                 fee: Some(fee_encoded),
-                pub_nonce: Some(Fr::zero()),
                 a: Some(a),
                 b: Some(b),
-                new_pub_key_hash: Some(Fr::zero()),
                 valid_from: Some(Fr::from_str(&forced_exit.valid_from.to_string()).unwrap()),
                 valid_until: Some(Fr::from_str(&forced_exit.valid_until.to_string()).unwrap()),
+                ..Default::default()
             },
             before_root: Some(before_root),
             intermediate_root: Some(intermediate_root),

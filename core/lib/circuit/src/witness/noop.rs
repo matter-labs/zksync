@@ -11,9 +11,7 @@ use zksync_crypto::params::CHUNK_BIT_WIDTH;
 // Local deps
 use crate::{
     account::AccountWitness,
-    operation::{
-        Operation, OperationArguments, OperationBranch, OperationBranchWitness, SignatureData,
-    },
+    operation::{Operation, OperationBranch, OperationBranchWitness, SignatureData},
     witness::utils::get_audits,
 };
 
@@ -48,19 +46,7 @@ pub fn noop_operation(tree: &CircuitAccountTree, acc_id: u32) -> Operation<Bn256
         third_sig_msg: Some(third_sig_msg),
         signature_data,
         signer_pub_key_packed: signer_pub_key_packed.to_vec(),
-
-        args: OperationArguments {
-            eth_address: Some(Fr::zero()),
-            amount_packed: Some(Fr::zero()),
-            full_amount: Some(Fr::zero()),
-            fee: Some(Fr::zero()),
-            a: Some(Fr::zero()),
-            b: Some(Fr::zero()),
-            pub_nonce: Some(Fr::zero()),
-            new_pub_key_hash: Some(Fr::zero()),
-            valid_from: Some(Fr::zero()),
-            valid_until: Some(Fr::from_str(&u32::MAX.to_string()).unwrap()),
-        },
+        args: Default::default(),
         lhs: OperationBranch {
             address: Some(account_address_fe),
             token: Some(token_fe),

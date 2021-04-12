@@ -230,8 +230,6 @@ impl ChangePubkeyOffChainWitness<Bn256> {
             },
             args: OperationArguments {
                 eth_address: Some(change_pubkey_offcahin.address),
-                amount_packed: Some(Fr::zero()),
-                full_amount: Some(Fr::zero()),
                 fee: Some(fee_encoded),
                 a: Some(a),
                 b: Some(b),
@@ -243,6 +241,7 @@ impl ChangePubkeyOffChainWitness<Bn256> {
                 valid_until: Some(
                     Fr::from_str(&change_pubkey_offcahin.valid_until.to_string()).unwrap(),
                 ),
+                ..Default::default()
             },
             before_root: Some(before_root),
             after_root: Some(after_root),

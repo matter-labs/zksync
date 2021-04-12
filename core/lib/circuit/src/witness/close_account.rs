@@ -12,10 +12,7 @@ use zksync_crypto::{
         account::CircuitAccountTree,
         utils::{append_be_fixed_width, le_bit_vector_into_field_element},
     },
-    params::{
-        account_tree_depth, ACCOUNT_ID_BIT_WIDTH, CHUNK_BIT_WIDTH, NEW_PUBKEY_HASH_WIDTH,
-        NONCE_BIT_WIDTH, TX_TYPE_BIT_WIDTH,
-    },
+    params::{account_tree_depth, ACCOUNT_ID_BIT_WIDTH, CHUNK_BIT_WIDTH, TX_TYPE_BIT_WIDTH},
 };
 use zksync_types::operations::CloseOp;
 // Local deps
@@ -95,29 +92,6 @@ impl Witness for CloseAccountWitness<Bn256> {
     }
 }
 
-impl<E: RescueEngine> CloseAccountWitness<E> {
-    pub fn get_sig_bits(&self) -> Vec<bool> {
-        let mut sig_bits = vec![];
-        append_be_fixed_width(
-            &mut sig_bits,
-            &Fr::from_str("4").unwrap(), //Corresponding tx_type
-            TX_TYPE_BIT_WIDTH,
-        );
-        append_be_fixed_width(
-            &mut sig_bits,
-            &self.before.witness.account_witness.pub_key_hash.unwrap(),
-            NEW_PUBKEY_HASH_WIDTH,
-        );
-
-        append_be_fixed_width(
-            &mut sig_bits,
-            &self.before.witness.account_witness.nonce.unwrap(),
-            NONCE_BIT_WIDTH,
-        );
-        sig_bits
-    }
-}
-
 impl CloseAccountWitness<Bn256> {
     fn apply_data(tree: &mut CircuitAccountTree, close_account: &CloseAccountData) -> Self {
         //preparing data and base witness
@@ -174,16 +148,9 @@ impl CloseAccountWitness<Bn256> {
                 },
             },
             args: OperationArguments {
-                eth_address: Some(Fr::zero()),
-                amount_packed: Some(Fr::zero()),
-                full_amount: Some(Fr::zero()),
-                pub_nonce: Some(Fr::zero()),
-                fee: Some(Fr::zero()),
                 a: Some(a),
                 b: Some(b),
-                new_pub_key_hash: Some(Fr::zero()),
-                valid_from: Some(Fr::zero()),
-                valid_until: Some(Fr::from_str(&u32::MAX.to_string()).unwrap()),
+                ..Default::default()
             },
             before_root: Some(before_root),
             after_root: Some(after_root),
