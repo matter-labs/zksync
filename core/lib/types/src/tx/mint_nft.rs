@@ -6,12 +6,11 @@ use rescue_poseidon::rescue_hash;
 use zksync_crypto::{
     convert::FeConvert,
     franklin_crypto::bellman::{
-        eddsa::PrivateKey,
         pairing::bn256::{Bn256, Fr, FrRepr},
         PrimeField, PrimeFieldRepr,
     },
-    params::{max_account_id, max_token_id},
-    Engine,
+    params::{max_account_id, max_fungible_token_id},
+    PrivateKey,
 };
 
 use zksync_utils::{format_units, BigUintSerdeAsRadix10Str};
@@ -99,7 +98,7 @@ impl MintNFT {
         fee_token: TokenId,
         nonce: Nonce,
         time_range: TimeRange,
-        private_key: &PrivateKey<Engine>,
+        private_key: &PrivateKey,
     ) -> Result<Self, anyhow::Error> {
         let mut tx = Self::new(
             creator_id,
@@ -143,7 +142,7 @@ impl MintNFT {
         let mut valid = self.fee <= BigUint::from(u128::MAX)
             && is_fee_amount_packable(&self.fee)
             && self.creator_id <= max_account_id()
-            && self.fee_token <= max_token_id()
+            && self.fee_token <= max_fungible_token_id()
             && self.time_range.check_correctness();
         if valid {
             let signer = self.verify_signature();
@@ -198,13 +197,12 @@ impl MintNFT {
     }
 
     pub fn calculate_hash(&self, serial_id: u32) -> Vec<u8> {
-        let value = self.creator_id.0 as u64 + 2u64.pow(32) * serial_id as u64; // Pack creator_id and serial_id
+        let value = self.creator_id.0 as u64 + ((serial_id as u64) << 32); // Pack creator_id and serial_id
         let repr = FrRepr::from(value);
         let value_fr = Fr::from_repr(repr).expect("a Fr");
 
         let mut repr = FrRepr::default();
-        repr.read_le(&self.content_hash.as_bytes()[..])
-            .expect("a Fr");
+        repr.read_le(self.content_hash.as_bytes()).expect("a Fr");
         let content_hash = Fr::from_repr(repr).expect("a Fr");
 
         let result = rescue_hash::<Bn256, 2>(&[value_fr, content_hash]);

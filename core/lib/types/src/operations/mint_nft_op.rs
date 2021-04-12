@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use zksync_basic_types::TokenId;
 use zksync_crypto::params::{
-    ACCOUNT_ID_BIT_WIDTH, ADDRESS_WIDTH, CHUNK_BYTES, CONTENT_HASH_WIDTH, FEE_EXPONENT_BIT_WIDTH,
+    ACCOUNT_ID_BIT_WIDTH, CHUNK_BYTES, CONTENT_HASH_WIDTH, FEE_EXPONENT_BIT_WIDTH,
     FEE_MANTISSA_BIT_WIDTH, NFT_STORAGE_ACCOUNT_ID, TOKEN_BIT_WIDTH,
 };
 use zksync_crypto::primitives::FromBytes;
@@ -47,11 +47,9 @@ impl MintNFTOp {
         let mut data = vec![Self::OP_CODE];
         data.extend_from_slice(&self.creator_account_id.to_be_bytes());
         data.extend_from_slice(&self.recipient_account_id.to_be_bytes());
-        data.extend_from_slice(&self.tx.creator_address.as_bytes());
         data.extend_from_slice(&self.tx.content_hash.as_bytes());
-        data.extend_from_slice(&self.tx.recipient.as_bytes());
-        data.extend_from_slice(&pack_fee_amount(&self.tx.fee));
         data.extend_from_slice(&self.tx.fee_token.to_be_bytes());
+        data.extend_from_slice(&pack_fee_amount(&self.tx.fee));
         data.resize(Self::CHUNKS * CHUNK_BYTES, 0x00);
         data
     }
@@ -63,11 +61,9 @@ impl MintNFTOp {
 
         let creator_account_id_offset = 1;
         let recipient_account_id_offset = creator_account_id_offset + ACCOUNT_ID_BIT_WIDTH / 8;
-        let creator_address_offset = recipient_account_id_offset + ACCOUNT_ID_BIT_WIDTH / 8;
-        let content_hash_offset = creator_address_offset + ADDRESS_WIDTH / 8;
-        let recipient_address_offset = content_hash_offset + CONTENT_HASH_WIDTH / 8;
-        let fee_offset = recipient_address_offset + ADDRESS_WIDTH / 8;
-        let fee_token_offset = fee_offset + (FEE_EXPONENT_BIT_WIDTH + FEE_MANTISSA_BIT_WIDTH) / 8;
+        let content_hash_offset = recipient_account_id_offset + ACCOUNT_ID_BIT_WIDTH / 8;
+        let fee_token_offset = content_hash_offset + CONTENT_HASH_WIDTH / 8;
+        let fee_offset = fee_token_offset + TOKEN_BIT_WIDTH / 8;
 
         let creator_account_id = u32::from_bytes(
             &bytes[creator_account_id_offset..creator_account_id_offset + ACCOUNT_ID_BIT_WIDTH / 8],
@@ -80,26 +76,22 @@ impl MintNFTOp {
         )
         .ok_or(MintNFTParsingError::RecipientAccountId)?;
 
-        let creator_address = Address::from_slice(
-            &bytes[creator_address_offset..creator_address_offset + ADDRESS_WIDTH / 8],
-        );
+        let creator_address = Address::default(); // Unknown from pubdata
 
         let content_hash = H256::from_slice(
             &bytes[content_hash_offset..content_hash_offset + CONTENT_HASH_WIDTH / 8],
         );
 
-        let recipient_address = Address::from_slice(
-            &bytes[recipient_address_offset..recipient_address_offset + ADDRESS_WIDTH / 8],
-        );
+        let recipient_address = Address::default(); // Unknown from pubdata
+
+        let fee_token_id =
+            u32::from_bytes(&bytes[fee_token_offset..fee_token_offset + TOKEN_BIT_WIDTH / 8])
+                .ok_or(MintNFTParsingError::FeeTokenId)?;
 
         let fee = unpack_fee_amount(
             &bytes[fee_offset..fee_offset + (FEE_EXPONENT_BIT_WIDTH + FEE_MANTISSA_BIT_WIDTH) / 8],
         )
         .ok_or(MintNFTParsingError::Fee)?;
-
-        let fee_token_id =
-            u32::from_bytes(&bytes[fee_token_offset..fee_token_offset + TOKEN_BIT_WIDTH / 8])
-                .ok_or(MintNFTParsingError::FeeTokenId)?;
 
         let nonce = 0; // It is unknown from pubdata
 
@@ -127,5 +119,42 @@ impl MintNFTOp {
             self.creator_account_id,
             NFT_STORAGE_ACCOUNT_ID,
         ]
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::{AccountId, Address, MintNFT, MintNFTOp, Nonce, TokenId, H256};
+    use num::BigUint;
+
+    #[test]
+    fn public_data() {
+        let op = MintNFTOp {
+            tx: MintNFT::new(
+                AccountId(10),
+                Address::random(),
+                H256::random(),
+                Address::random(),
+                BigUint::from(10u32),
+                TokenId(0),
+                Nonce(0),
+                Default::default(),
+                None,
+            ),
+            creator_account_id: AccountId(10),
+            recipient_account_id: AccountId(11),
+        };
+        let pub_data = op.get_public_data();
+        let new_op = MintNFTOp::from_public_data(&pub_data).unwrap();
+        assert!(
+            new_op.creator_account_id == op.creator_account_id
+                && new_op.recipient_account_id == op.recipient_account_id
+                && new_op.tx.content_hash == op.tx.content_hash
+                && new_op.tx.fee == op.tx.fee
+                && new_op.tx.fee_token == op.tx.fee_token
+                && new_op.tx.creator_address == Default::default()
+                && new_op.tx.recipient == Default::default()
+                && new_op.tx.creator_id == op.tx.creator_id
+        )
     }
 }

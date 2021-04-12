@@ -57,7 +57,7 @@ fn test_empty_batch() {
 /// Checks the correctness of the message `EthBatchSignData::new()` returns.
 #[test]
 fn test_batch_message() {
-    let token = Token::new(TokenId(0), Default::default(), "ETH", 18);
+    let token = Token::new(TokenId(0), Default::default(), "ETH", 18, false);
     let transfer = get_transfer();
     let withdraw = get_withdraw();
     let change_pub_key = get_change_pub_key();

@@ -25,6 +25,7 @@ async fn tokens_storage(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
         address: "0000000000000000000000000000000000000000".parse().unwrap(),
         symbol: "ETH".into(),
         decimals: 18,
+        is_nft: false,
     };
     assert_eq!(tokens[&TokenId(0)], eth_token);
 
@@ -34,12 +35,14 @@ async fn tokens_storage(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
         address: "0000000000000000000000000000000000000001".parse().unwrap(),
         symbol: "ABC".into(),
         decimals: 9,
+        is_nft: false,
     };
     let token_b = Token {
         id: TokenId(2),
         address: "0000000000000000000000000000000000000002".parse().unwrap(),
         symbol: "DEF".into(),
         decimals: 6,
+        is_nft: false,
     };
 
     TokensSchema(&mut storage)
@@ -91,6 +94,7 @@ async fn tokens_storage(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
         address: "0000000000000000000000000000000000000008".parse().unwrap(),
         symbol: "BAT".into(),
         decimals: 6,
+        is_nft: false,
     };
     TokensSchema(&mut storage)
         .store_token(token_c.clone())

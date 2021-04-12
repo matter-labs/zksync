@@ -75,6 +75,11 @@ pub fn max_token_id() -> TokenId {
     TokenId(number_of_processable_tokens() as u32 - 1)
 }
 
+/// Max token id, based on the number of processable tokens
+pub fn max_fungible_token_id() -> TokenId {
+    TokenId(MIN_NFT_TOKEN_ID - 1)
+}
+
 pub const ETH_TOKEN_ID: TokenId = TokenId(0);
 
 pub const ACCOUNT_ID_BIT_WIDTH: usize = 32;

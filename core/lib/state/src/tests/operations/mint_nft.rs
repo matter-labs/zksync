@@ -56,6 +56,7 @@ fn mint_success() {
     tb.test_tx_success(
         mint_nft.into(),
         &[
+            // Create special nft storage account
             (
                 NFT_STORAGE_ACCOUNT_ID,
                 AccountUpdate::Create {
@@ -63,6 +64,7 @@ fn mint_success() {
                     nonce: Nonce(0),
                 },
             ),
+            // Add Minimum NFT token id to NFT storage account balance
             (
                 NFT_STORAGE_ACCOUNT_ID,
                 AccountUpdate::UpdateBalance {
@@ -71,6 +73,7 @@ fn mint_success() {
                     balance_update: (NFT_TOKEN_ID, BigUint::zero(), balance),
                 },
             ),
+            // Increment NFT counter
             (
                 NFT_STORAGE_ACCOUNT_ID,
                 AccountUpdate::UpdateBalance {
@@ -83,6 +86,7 @@ fn mint_success() {
                     ),
                 },
             ),
+            // Pay fee for minting nft
             (
                 creator_account_id,
                 AccountUpdate::UpdateBalance {
@@ -91,6 +95,7 @@ fn mint_success() {
                     balance_update: (fee_token_id, BigUint::from(20u32), BigUint::from(10u32)),
                 },
             ),
+            // Increment counter of nft tokens for creator
             (
                 creator_account_id,
                 AccountUpdate::UpdateBalance {
@@ -99,10 +104,12 @@ fn mint_success() {
                     balance_update: (NFT_TOKEN_ID, BigUint::zero(), BigUint::from(1u32)),
                 },
             ),
+            // Mint nft
             (
                 creator_account_id,
                 AccountUpdate::MintNFT { token: nft.clone() },
             ),
+            // Deposit nft token to recipient account
             (
                 to_account_id,
                 AccountUpdate::UpdateBalance {
@@ -111,6 +118,7 @@ fn mint_success() {
                     balance_update: (nft.id, BigUint::zero(), BigUint::from(1u32)),
                 },
             ),
+            // Store part of nft token hash as balance to NFT storage account id
             (
                 NFT_STORAGE_ACCOUNT_ID,
                 AccountUpdate::UpdateBalance {
@@ -157,6 +165,7 @@ fn mint_success() {
     tb.test_tx_success(
         mint_nft.into(),
         &[
+            // Increment NFT counter
             (
                 NFT_STORAGE_ACCOUNT_ID,
                 AccountUpdate::UpdateBalance {
@@ -169,6 +178,7 @@ fn mint_success() {
                     ),
                 },
             ),
+            // Pay fee for minting nft
             (
                 creator_account_id,
                 AccountUpdate::UpdateBalance {
@@ -177,6 +187,7 @@ fn mint_success() {
                     balance_update: (fee_token_id, fee, BigUint::zero()),
                 },
             ),
+            // Increment counter of nft tokens for creator
             (
                 creator_account_id,
                 AccountUpdate::UpdateBalance {
@@ -185,10 +196,12 @@ fn mint_success() {
                     balance_update: (NFT_TOKEN_ID, BigUint::from(1u32), BigUint::from(2u32)),
                 },
             ),
+            // Mint nft
             (
                 creator_account_id,
                 AccountUpdate::MintNFT { token: nft.clone() },
             ),
+            // Deposit nft token to recipient account
             (
                 to_account_id,
                 AccountUpdate::UpdateBalance {
@@ -197,6 +210,7 @@ fn mint_success() {
                     balance_update: (nft.id, BigUint::zero(), BigUint::from(1u32)),
                 },
             ),
+            // Store part of nft token hash as balance to NFT storage account id
             (
                 NFT_STORAGE_ACCOUNT_ID,
                 AccountUpdate::UpdateBalance {
@@ -285,6 +299,7 @@ fn mint_token_to_new_account() {
     tb.test_txs_batch_success(
         &[signed_zk_sync_tx1, signed_zk_sync_mint],
         &[
+            // Create new account
             (
                 new_id,
                 AccountUpdate::Create {
@@ -292,6 +307,7 @@ fn mint_token_to_new_account() {
                     nonce: Nonce(0),
                 },
             ),
+            // Pay for for creating account
             (
                 creator_account_id,
                 AccountUpdate::UpdateBalance {
@@ -300,6 +316,7 @@ fn mint_token_to_new_account() {
                     balance_update: (fee_token_id, balance_from, fee),
                 },
             ),
+            // Transfer zero token to new account (TransferToNew operation)
             (
                 new_id,
                 AccountUpdate::UpdateBalance {
@@ -308,6 +325,7 @@ fn mint_token_to_new_account() {
                     balance_update: (fee_token_id, balance_to.clone(), balance_to),
                 },
             ),
+            // Create special nft storage account
             (
                 NFT_STORAGE_ACCOUNT_ID,
                 AccountUpdate::Create {
@@ -315,6 +333,7 @@ fn mint_token_to_new_account() {
                     nonce: Nonce(0),
                 },
             ),
+            // Add Minimum NFT token id to NFT storage account balance
             (
                 NFT_STORAGE_ACCOUNT_ID,
                 AccountUpdate::UpdateBalance {
@@ -323,6 +342,7 @@ fn mint_token_to_new_account() {
                     balance_update: (NFT_TOKEN_ID, BigUint::zero(), balance),
                 },
             ),
+            // Increment NFT counter
             (
                 NFT_STORAGE_ACCOUNT_ID,
                 AccountUpdate::UpdateBalance {
@@ -335,6 +355,7 @@ fn mint_token_to_new_account() {
                     ),
                 },
             ),
+            // Pay fee for minting nft
             (
                 creator_account_id,
                 AccountUpdate::UpdateBalance {
@@ -343,6 +364,7 @@ fn mint_token_to_new_account() {
                     balance_update: (fee_token_id, BigUint::from(10u32), BigUint::from(0u32)),
                 },
             ),
+            // Increment counter of nft tokens for creator
             (
                 creator_account_id,
                 AccountUpdate::UpdateBalance {
@@ -351,10 +373,12 @@ fn mint_token_to_new_account() {
                     balance_update: (NFT_TOKEN_ID, BigUint::zero(), BigUint::from(1u32)),
                 },
             ),
+            // Mint nft
             (
                 creator_account_id,
                 AccountUpdate::MintNFT { token: nft.clone() },
             ),
+            // Deposit nft token to recipient account
             (
                 new_id,
                 AccountUpdate::UpdateBalance {
@@ -363,6 +387,7 @@ fn mint_token_to_new_account() {
                     balance_update: (nft.id, BigUint::zero(), BigUint::from(1u32)),
                 },
             ),
+            // Store part of nft token hash as balance to NFT storage account id
             (
                 NFT_STORAGE_ACCOUNT_ID,
                 AccountUpdate::UpdateBalance {

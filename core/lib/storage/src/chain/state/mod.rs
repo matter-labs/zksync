@@ -356,9 +356,6 @@ impl<'a, 'c> StateSchema<'a, 'c> {
                         r#"
                         INSERT INTO tokens ( id, address, symbol, decimals, is_nft )
                         VALUES ( $1, $2, $3, $4, true )
-                        ON CONFLICT (id)
-                        DO
-                          UPDATE SET address = $2, symbol = $3, decimals = $4
                         "#,
                         upd.token_id,
                         address,

@@ -8,12 +8,12 @@ use zksync_types::{tx::TxSignature, AccountId, Nonce, TokenId};
 fn test_tokens_cache() {
     let mut tokens: HashMap<String, Token> = HashMap::default();
 
-    let token_eth = Token::new(TokenId(0), H160::default(), "ETH", 18);
+    let token_eth = Token::new(TokenId(0), H160::default(), "ETH", 18, false);
     tokens.insert("ETH".to_string(), token_eth.clone());
-    let token_dai = Token::new(TokenId(1), H160::random(), "DAI", 18);
+    let token_dai = Token::new(TokenId(1), H160::random(), "DAI", 18, false);
     tokens.insert("DAI".to_string(), token_dai.clone());
 
-    let uncahed_token = Token::new(TokenId(2), H160::random(), "UNC", 5);
+    let uncahed_token = Token::new(TokenId(2), H160::random(), "UNC", 5, false);
 
     let tokens_hash = TokensCache::new(tokens);
 
@@ -252,6 +252,7 @@ mod signatures_with_vectors {
                     address: Default::default(),
                     symbol: sign_data.string_token.clone(),
                     decimals: 0,
+                    is_nft: false,
                 };
                 let (withdraw, eth_signature) = signer
                     .sign_withdraw(
@@ -309,6 +310,7 @@ mod signatures_with_vectors {
                     address: Default::default(),
                     symbol: String::new(),
                     decimals: 0,
+                    is_nft: false,
                 };
                 let change_pub_key = signer
                     .sign_change_pubkey_tx(
@@ -364,6 +366,7 @@ mod signatures_with_vectors {
                     address: Default::default(),
                     symbol: String::new(),
                     decimals: 0,
+                    is_nft: false,
                 };
                 let (forced_exit, _) = signer
                     .sign_forced_exit(
@@ -474,6 +477,7 @@ mod wallet_tests {
                         .parse()
                         .expect("failed to parse token address"),
                     decimals: token.decimals,
+                    is_nft: false,
                 })
                 .map(|token| (token.symbol.clone(), token))
                 .collect();
