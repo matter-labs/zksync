@@ -34,7 +34,7 @@ export async function migrate() {
 
 export async function setup() {
     await basicSetup();
-    await utils.spawn('cargo sqlx prepare --check || cargo sqlx prepare');
+    await utils.spawn('cargo sqlx prepare --check -- --tests || cargo sqlx prepare -- --tests');
     process.chdir(process.env.ZKSYNC_HOME as string);
 }
 

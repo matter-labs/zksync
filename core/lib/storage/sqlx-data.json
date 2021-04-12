@@ -1164,6 +1164,24 @@
       "nullable": []
     }
   },
+  "379999e0e38149efab633ece21c87b3d28db263563278c9ae18d4148c7b68d8a": {
+    "query": "SELECT MAX(id) FROM events WHERE is_processed = true",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "max",
+          "type_info": "Int8"
+        }
+      ],
+      "parameters": {
+        "Left": []
+      },
+      "nullable": [
+        null
+      ]
+    }
+  },
   "393fa462bb0a3b247c99946e569f06fc7fa1f742d564adce560ac69e1729fece": {
     "query": "SELECT * FROM balances WHERE account_id = ANY($1)",
     "describe": {
@@ -4320,6 +4338,53 @@
         "Left": []
       },
       "nullable": []
+    }
+  },
+  "ef038cf4026b804617dda638d7fe9c380f44a05d76aa0e92455c73a966300757": {
+    "query": "\n            UPDATE events SET is_processed = true \n            WHERE is_processed = false\n            RETURNING id, event_type as \"event_type!: EventType\",\n                event_data, is_processed\n            ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "id",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 1,
+          "name": "event_type!: EventType",
+          "type_info": {
+            "Custom": {
+              "name": "event_type",
+              "kind": {
+                "Enum": [
+                  "ACCOUNT",
+                  "BLOCK",
+                  "TRANSACTION"
+                ]
+              }
+            }
+          }
+        },
+        {
+          "ordinal": 2,
+          "name": "event_data",
+          "type_info": "Jsonb"
+        },
+        {
+          "ordinal": 3,
+          "name": "is_processed",
+          "type_info": "Bool"
+        }
+      ],
+      "parameters": {
+        "Left": []
+      },
+      "nullable": [
+        false,
+        false,
+        false,
+        false
+      ]
     }
   },
   "f057b85811c3991b73c58991fc8dae8bf4cdf9d2238171ca13a3fdf1172f2c91": {

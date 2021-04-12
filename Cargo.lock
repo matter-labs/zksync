@@ -6254,7 +6254,9 @@ name = "zksync_event_listener"
 version = "1.0.0"
 dependencies = [
  "anyhow",
+ "futures 0.3.6",
  "tokio 0.2.22",
+ "vlog",
  "zksync_config",
  "zksync_storage",
 ]

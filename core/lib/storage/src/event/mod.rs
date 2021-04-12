@@ -8,13 +8,14 @@ use zksync_types::{
 };
 // Local uses
 use crate::{diff::StorageAccountDiff, QueryResult, StorageProcessor};
-use records::EventType;
+use records::{EventType, StoredEvent};
 use types::{
     account::{
         AccountEvent, AccountStateChangeStatus, AccountStateChangeType, AccountUpdateDetails,
     },
     block::{BlockEvent, BlockStatus},
     transaction::TransactionEvent,
+    ZkSyncEvent,
 };
 
 pub mod records;
@@ -40,6 +41,36 @@ impl<'a, 'c> EventSchema<'a, 'c> {
         .await?;
 
         Ok(())
+    }
+
+    pub async fn get_unprocessed_events(&mut self) -> QueryResult<Vec<ZkSyncEvent>> {
+        let events = sqlx::query_as!(
+            StoredEvent,
+            r#"
+            UPDATE events SET is_processed = true 
+            WHERE is_processed = false
+            RETURNING id, event_type as "event_type!: EventType",
+                event_data, is_processed
+            "#
+        )
+        .fetch_all(self.0.conn())
+        .await?
+        .into_iter()
+        .map(ZkSyncEvent::from)
+        .collect();
+
+        Ok(events)
+    }
+
+    pub async fn get_last_processed_event_id(&mut self) -> QueryResult<Option<i64>> {
+        let id = sqlx::query!(
+            "SELECT MAX(id) FROM events WHERE is_processed = true"
+        )
+        .fetch_one(self.0.conn())
+        .await?
+        .max;
+
+        Ok(id)
     }
 
     pub async fn store_block_event(

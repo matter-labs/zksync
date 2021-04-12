@@ -1,18 +1,28 @@
 // Built-in uses
+use std::cell::Cell;
 // External uses
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
-use serde_json::Value;
 // Workspace uses
 use zksync_basic_types::{AccountId, BlockNumber};
 use zksync_types::block::ExecutedOperations;
 // Local uses
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum TransactionStatus {
     Committed,
     Rejected,
+}
+
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, Deserialize)]
+pub enum TransactionType {
+    Transfer,
+    Withdraw,
+    ChangePubKey,
+    ForcedExit,
+    FullExit,
+    Deposit,
 }
 
 #[serde_with::skip_serializing_none]
@@ -22,10 +32,13 @@ pub struct TransactionEvent {
     pub account_id: i64,
     pub token_id: i32,
     pub block_number: i64,
-    pub tx: Value,
+    pub tx: serde_json::Value,
     pub status: TransactionStatus,
     pub fail_reason: Option<String>,
     pub created_at: DateTime<Utc>,
+    /// This field is only used for filtering.
+    #[serde(skip)]
+    tx_type: Cell<Option<TransactionType>>,
 }
 
 impl TransactionEvent {
@@ -48,6 +61,7 @@ impl TransactionEvent {
                 },
                 fail_reason: exec_tx.fail_reason.clone(),
                 created_at: exec_tx.created_at,
+                tx_type: Cell::default(),
             },
             ExecutedOperations::PriorityOp(exec_prior_op) => Self {
                 tx_hash: exec_prior_op.priority_op.eth_hash.to_string(),
@@ -58,7 +72,19 @@ impl TransactionEvent {
                 status: TransactionStatus::Committed,
                 fail_reason: None,
                 created_at: exec_prior_op.created_at,
+                tx_type: Cell::default(),
             },
+        }
+    }
+
+    pub fn tx_type(&self) -> TransactionType {
+        match self.tx_type.get() {
+            Some(tx_type) => tx_type,
+            None => {
+                let tx_type = serde_json::from_value(self.tx["type"].clone()).unwrap();
+                self.tx_type.set(Some(tx_type));
+                tx_type
+            }
         }
     }
 }

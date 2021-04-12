@@ -7,7 +7,7 @@ use zksync_types::aggregated_operations::AggregatedActionType;
 // Local uses
 use crate::chain::block::records::BlockDetails;
 
-#[derive(Debug, Copy, Clone, Serialize, Deserialize)]
+#[derive(Debug, Copy, Clone, Serialize, PartialEq, Eq, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum BlockStatus {
     Committed,

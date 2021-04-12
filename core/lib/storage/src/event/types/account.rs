@@ -10,7 +10,7 @@ use zksync_types::account::{AccountUpdate, PubKeyHash};
 // Local uses
 use crate::diff::StorageAccountDiff;
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum AccountStateChangeStatus {
     Committed,

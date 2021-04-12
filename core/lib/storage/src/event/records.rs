@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::value::Value;
 use sqlx::FromRow;
 
-#[derive(sqlx::Type, Debug, Clone, Serialize, Deserialize)]
+#[derive(sqlx::Type, Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[sqlx(rename = "event_type")]
 #[sqlx(rename_all = "UPPERCASE")]
 pub enum EventType {
@@ -14,8 +14,8 @@ pub enum EventType {
 
 #[derive(FromRow, Debug, Clone, Serialize, Deserialize)]
 pub struct StoredEvent {
-    id: i64,
-    event_type: EventType,
-    event_data: Value,
-    is_processed: bool,
+    pub id: i64,
+    pub event_type: EventType,
+    pub event_data: Value,
+    pub is_processed: bool,
 }
