@@ -393,9 +393,8 @@ mod tests {
         expected_token_price.price = BigDecimal::from_u32(10).unwrap();
 
         let response = client.token_price_v02(&token_like, "usd").await?;
-        let price_in_usd: BigDecimal = deserialize_response_result(response)?;
-        let expected_price_in_usd = BigDecimal::from_u32(10).unwrap();
-        assert_eq!(price_in_usd, expected_price_in_usd);
+        let price_in_usd: TokenPrice = deserialize_response_result(response)?;
+        assert_eq!(price_in_usd, expected_token_price);
 
         let response = client.token_price_v02(&token_like, "333").await?;
         assert!(response.error.is_some());
