@@ -535,9 +535,26 @@ impl SwapWitness<Bn256> {
                 second_amount_packed: Some(amount_1_encoded),
                 full_amount: Some(amount_0_fe),
                 // TODO: second full amount?
+                // TODO: special_nonces?
                 fee: Some(fee_encoded),
                 valid_from: Some(Fr::from_str(&valid_from.to_string()).unwrap()),
                 valid_until: Some(Fr::from_str(&valid_until.to_string()).unwrap()),
+                special_accounts: vec![
+                    Some(account_0_fe),
+                    Some(account_1_fe),
+                    Some(recipient_0_fe),
+                    Some(recipient_1_fe),
+                    Some(submitter_fe),
+                ],
+                special_tokens: vec![Some(token_0_fe), Some(token_1_fe), Some(fee_token_fe)],
+                special_amounts: vec![
+                    Fr::from_str(&swap.orders.0.amount.to_string()),
+                    Fr::from_str(&swap.orders.0.price.0.to_string()),
+                    Fr::from_str(&swap.orders.0.price.1.to_string()),
+                    Fr::from_str(&swap.orders.1.amount.to_string()),
+                    Fr::from_str(&swap.orders.1.price.0.to_string()),
+                    Fr::from_str(&swap.orders.1.price.1.to_string()),
+                ],
                 ..Default::default()
             },
             a_and_b: a_and_b
