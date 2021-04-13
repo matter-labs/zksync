@@ -714,6 +714,28 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
         })
     }
 
+    fn enforce_op_data_element_equality_to_previous<CS: ConstraintSystem<E>>(
+        mut cs: CS,
+        is_op_data_correct_flags: &mut Vec<Boolean>,
+        cur: &Vec<CircuitElement<E>>,
+        prev: &Vec<CircuitElement<E>>,
+    ) -> Result<(), SynthesisError> {
+        is_op_data_correct_flags.extend(
+            cur.iter()
+                .zip(prev.iter())
+                .enumerate()
+                .map(|(idx, (cur, prev))| {
+                    CircuitElement::equals(
+                        cs.namespace(|| format!("element with index {} equals to previous", idx)),
+                        &cur,
+                        &prev,
+                    )
+                })
+                .collect::<Result<Vec<_>, SynthesisError>>()?,
+        );
+        Ok(())
+    }
+
     #[allow(clippy::too_many_arguments)]
     fn execute_op<CS: ConstraintSystem<E>>(
         &self,
@@ -771,7 +793,7 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
             AllocatedOperationData::from_witness(cs.namespace(|| "allocated_operation_data"), op)?;
         // ensure op_data is equal to previous
         {
-            let is_op_data_correct_flags = vec![
+            let mut is_op_data_correct_flags = vec![
                 CircuitElement::equals(
                     cs.namespace(|| "is a equal to previous"),
                     &op_data.a,
@@ -818,6 +840,35 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
                     &prev.op_data.valid_until,
                 )?,
             ];
+            Self::enforce_op_data_element_equality_to_previous(
+                cs.namespace(|| "special_eth_addresses"),
+                &mut is_op_data_correct_flags,
+                &op_data.special_eth_addresses,
+                &prev.op_data.special_eth_addresses,
+            )?;
+            Self::enforce_op_data_element_equality_to_previous(
+                cs.namespace(|| "special_tokens"),
+                &mut is_op_data_correct_flags,
+                &op_data.special_tokens,
+                &prev.op_data.special_tokens,
+            )?;
+            Self::enforce_op_data_element_equality_to_previous(
+                cs.namespace(|| "special_account_ids"),
+                &mut is_op_data_correct_flags,
+                &op_data.special_account_ids,
+                &prev.op_data.special_account_ids,
+            )?;
+            Self::enforce_op_data_element_equality_to_previous(
+                cs.namespace(|| "special_content_hash"),
+                &mut is_op_data_correct_flags,
+                &op_data.special_content_hash,
+                &prev.op_data.special_content_hash,
+            )?;
+            is_op_data_correct_flags.push(CircuitElement::equals(
+                cs.namespace(|| "is special_serial_id equal to previous"),
+                &op_data.special_serial_id,
+                &prev.op_data.special_serial_id,
+            )?);
 
             let is_op_data_equal_to_previous = multi_and(
                 cs.namespace(|| "is_op_data_equal_to_previous"),
