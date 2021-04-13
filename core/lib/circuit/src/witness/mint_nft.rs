@@ -224,50 +224,7 @@ impl Witness for MintNFTWitness<Bn256> {
 
 impl<E: RescueEngine> MintNFTWitness<E> {
     pub fn get_sig_bits(&self) -> Vec<bool> {
-        todo!()
-        //        let mut sig_bits = vec![];
-        //        append_be_fixed_width(
-        //            &mut sig_bits,
-        //            &Fr::from_str("5").unwrap(), //Corresponding tx_type
-        //            TX_TYPE_BIT_WIDTH,
-        //        );
-        //        append_be_fixed_width(
-        //            &mut sig_bits,
-        //            &self
-        //                .from_before
-        //                .witness
-        //                .account_witness
-        //                .pub_key_hash
-        //                .unwrap(),
-        //            NEW_PUBKEY_HASH_WIDTH,
-        //        );
-        //        append_be_fixed_width(
-        //            &mut sig_bits,
-        //            &self.to_before.witness.account_witness.pub_key_hash.unwrap(),
-        //            NEW_PUBKEY_HASH_WIDTH,
-        //        );
-        //
-        //        append_be_fixed_width(
-        //            &mut sig_bits,
-        //            &self.from_before.token.unwrap(),
-        //            TOKEN_BIT_WIDTH,
-        //        );
-        //        append_be_fixed_width(
-        //            &mut sig_bits,
-        //            &self.args.amount_packed.unwrap(),
-        //            AMOUNT_MANTISSA_BIT_WIDTH + AMOUNT_EXPONENT_BIT_WIDTH,
-        //        );
-        //        append_be_fixed_width(
-        //            &mut sig_bits,
-        //            &self.args.fee.unwrap(),
-        //            FEE_MANTISSA_BIT_WIDTH + FEE_EXPONENT_BIT_WIDTH,
-        //        );
-        //        append_be_fixed_width(
-        //            &mut sig_bits,
-        //            &self.from_before.witness.account_witness.nonce.unwrap(),
-        //            NONCE_BIT_WIDTH,
-        //        );
-        //        sig_bits
+        unreachable!() // no reason to keep this
     }
 }
 

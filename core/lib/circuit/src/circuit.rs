@@ -2084,7 +2084,7 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
             flags.push(is_signer_valid);
             flags.push(is_sig_verified.clone());
 
-            flags.push(is_creator_account);
+            flags.push(is_creator_account.clone());
             let is_fee_token = Boolean::from(Expression::equals(
                 cs.namespace(|| "is_fee_token"),
                 &op_data.special_tokens[0].get_number(),
@@ -2131,7 +2131,7 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
             let mut flags = vec![common_valid.clone(), is_chunk_with_index[1].clone()];
 
             flags.push(is_creator_account);
-            flags.push(is_special_nft_token);
+            flags.push(is_special_nft_token.clone());
             let valid_serial_id = Boolean::from(Expression::equals(
                 cs.namespace(|| "valid_serial_id"),
                 &op_data.special_serial_id.get_number(),
@@ -2153,8 +2153,8 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
         let third_chunk_valid = {
             let mut flags = vec![common_valid.clone(), is_chunk_with_index[2].clone()];
 
-            flags.push(is_special_nft_storage_account);
-            flags.push(is_special_nft_token);
+            flags.push(is_special_nft_storage_account.clone());
+            flags.push(is_special_nft_token.clone());
             let is_new_token_id_valid = Boolean::from(Expression::equals(
                 cs.namespace(|| "is_new_token_id_valid"),
                 &op_data.special_tokens[1].get_number(),
@@ -2176,7 +2176,7 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
         let fourth_chunk_valid = {
             let mut flags = vec![common_valid.clone(), is_chunk_with_index[3].clone()];
 
-            flags.push(is_special_nft_storage_account);
+            flags.push(is_special_nft_storage_account.clone());
             flags.push(is_new_token);
 
             multi_and(cs.namespace(|| "fourth_chunk_valid"), &flags)?
