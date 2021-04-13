@@ -7,7 +7,8 @@ import {
     ChangePubKeyFee,
     SignedTransaction,
     TxEthSignature,
-    ChangePubkeyTypes
+    ChangePubkeyTypes,
+    TotalFee
 } from './types';
 import { MAX_TIMESTAMP } from './utils';
 import { Wallet } from './wallet';
@@ -25,8 +26,6 @@ interface InternalTx {
     // Considered false by default
     alreadySigned?: boolean;
 }
-
-export type TotalFee = Map<TokenLike, BigNumber>;
 
 /**
  * Provides iterface for constructing batches of transactions.
