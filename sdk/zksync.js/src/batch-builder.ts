@@ -26,7 +26,7 @@ interface InternalTx {
     alreadySigned?: boolean;
 }
 
-type TotalFee = Map<TokenLike, BigNumber>;
+export type TotalFee = Map<TokenLike, BigNumber>;
 
 /**
  * Provides iterface for constructing batches of transactions.
