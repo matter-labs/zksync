@@ -92,6 +92,7 @@ impl RpcApp {
         })
     }
 
+    #[allow(deprecated)]
     pub async fn _impl_tx_submit(
         self,
         tx: Box<ZkSyncTx>,

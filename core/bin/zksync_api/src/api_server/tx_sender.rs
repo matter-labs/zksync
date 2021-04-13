@@ -264,7 +264,8 @@ impl TxSender {
             .unwrap_or(EthAccountType::Owned))
     }
 
-    /// This method is left for RPC API
+    // This method is left for RPC API
+    #[deprecated(note = "Use the submit_tx function instead")]
     pub async fn submit_tx_with_separate_fp(
         &self,
         mut tx: ZkSyncTx,
@@ -278,6 +279,7 @@ impl TxSender {
 
         if let ZkSyncTx::Withdraw(withdraw) = &mut tx {
             if withdraw.fast {
+                // We set `fast` field ourselves, so we have to check that user did not set it themselves.
                 return Err(SubmitError::IncorrectTx(
                     "'fast' field of Withdraw transaction must not be set manually.".to_string(),
                 ));

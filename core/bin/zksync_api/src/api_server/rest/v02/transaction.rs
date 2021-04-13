@@ -142,13 +142,11 @@ impl ApiTransactionData {
             .unwrap_or(false)
     }
 
-    async fn get_l1_receipt(&self, eth_hash: &[u8]) -> Result<Option<L1Receipt>, Error> {
-        let mut storage = self
-            .tx_sender
-            .pool
-            .access_storage()
-            .await
-            .map_err(Error::storage)?;
+    async fn get_l1_receipt(
+        &self,
+        storage: &mut StorageProcessor<'_>,
+        eth_hash: &[u8],
+    ) -> Result<Option<L1Receipt>, Error> {
         if let Some(op) = storage
             .chain()
             .operations_schema()
@@ -157,7 +155,7 @@ impl ApiTransactionData {
             .map_err(Error::storage)?
         {
             let finalized =
-                Self::is_block_finalized(&mut storage, BlockNumber(op.block_number as u32)).await;
+                Self::is_block_finalized(storage, BlockNumber(op.block_number as u32)).await;
             Ok(Some(l1_receipt_from_op_and_finalization(op, finalized)))
         } else if let Some((eth_block, priority_op)) = self
             .tx_sender
@@ -177,8 +175,11 @@ impl ApiTransactionData {
         }
     }
 
-    async fn get_l2_receipt(&self, tx_hash: TxHash) -> QueryResult<Option<L2Receipt>> {
-        let mut storage = self.tx_sender.pool.access_storage().await?;
+    async fn get_l2_receipt(
+        &self,
+        storage: &mut StorageProcessor<'_>,
+        tx_hash: TxHash,
+    ) -> QueryResult<Option<L2Receipt>> {
         if let Some(receipt) = storage
             .chain()
             .operations_ext_schema()
@@ -204,10 +205,16 @@ impl ApiTransactionData {
     }
 
     async fn tx_status(&self, tx_hash: &[u8; 32]) -> Result<Option<Receipt>, Error> {
-        if let Some(receipt) = self.get_l1_receipt(tx_hash).await? {
+        let mut storage = self
+            .tx_sender
+            .pool
+            .access_storage()
+            .await
+            .map_err(Error::storage)?;
+        if let Some(receipt) = self.get_l1_receipt(&mut storage, tx_hash).await? {
             Ok(Some(Receipt::L1(receipt)))
         } else if let Some(receipt) = self
-            .get_l2_receipt(TxHash::from_slice(tx_hash).unwrap())
+            .get_l2_receipt(&mut storage, TxHash::from_slice(tx_hash).unwrap())
             .await
             .map_err(Error::storage)?
         {
@@ -228,13 +235,11 @@ impl ApiTransactionData {
         result
     }
 
-    async fn get_l1_tx_data(&self, eth_hash: &[u8]) -> Result<Option<TxData>, Error> {
-        let mut storage = self
-            .tx_sender
-            .pool
-            .access_storage()
-            .await
-            .map_err(Error::storage)?;
+    async fn get_l1_tx_data(
+        &self,
+        storage: &mut StorageProcessor<'_>,
+        eth_hash: &[u8],
+    ) -> Result<Option<TxData>, Error> {
         let operation = storage
             .chain()
             .operations_schema()
@@ -243,7 +248,7 @@ impl ApiTransactionData {
             .map_err(Error::storage)?;
         if let Some(op) = operation {
             let block_number = BlockNumber(op.block_number as u32);
-            let finalized = Self::is_block_finalized(&mut storage, block_number).await;
+            let finalized = Self::is_block_finalized(storage, block_number).await;
 
             let status = if finalized {
                 L2Status::Finalized
@@ -288,8 +293,11 @@ impl ApiTransactionData {
         }
     }
 
-    async fn get_l2_tx_data(&self, tx_hash: TxHash) -> QueryResult<Option<TxData>> {
-        let mut storage = self.tx_sender.pool.access_storage().await?;
+    async fn get_l2_tx_data(
+        &self,
+        storage: &mut StorageProcessor<'_>,
+        tx_hash: TxHash,
+    ) -> QueryResult<Option<TxData>> {
         let operation = storage
             .chain()
             .operations_schema()
@@ -298,7 +306,7 @@ impl ApiTransactionData {
 
         if let Some(op) = operation {
             let block_number = BlockNumber(op.block_number as u32);
-            let finalized = Self::is_block_finalized(&mut storage, block_number).await;
+            let finalized = Self::is_block_finalized(storage, block_number).await;
 
             let status = if op.success {
                 if finalized {
@@ -364,10 +372,16 @@ impl ApiTransactionData {
     }
 
     async fn tx_data(&self, tx_hash: &[u8; 32]) -> Result<Option<TxData>, Error> {
-        if let Some(tx_data) = self.get_l1_tx_data(tx_hash).await? {
+        let mut storage = self
+            .tx_sender
+            .pool
+            .access_storage()
+            .await
+            .map_err(Error::storage)?;
+        if let Some(tx_data) = self.get_l1_tx_data(&mut storage, tx_hash).await? {
             Ok(Some(tx_data))
         } else if let Some(tx_data) = self
-            .get_l2_tx_data(TxHash::from_slice(tx_hash).unwrap())
+            .get_l2_tx_data(&mut storage, TxHash::from_slice(tx_hash).unwrap())
             .await
             .map_err(Error::storage)?
         {
