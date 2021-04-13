@@ -549,4 +549,58 @@ impl<'a, 'c> StateSchema<'a, 'c> {
         metrics::histogram!("sql.chain.state.load_state_diff", start.elapsed());
         result
     }
+
+    // Removes account balance updates for blocks with number greater than `last_block`
+    pub async fn remove_account_balance_updates(
+        &mut self,
+        last_block: BlockNumber,
+    ) -> QueryResult<()> {
+        let start = Instant::now();
+        sqlx::query!(
+            "DELETE FROM account_balance_updates WHERE block_number > $1",
+            *last_block as i64
+        )
+        .execute(self.0.conn())
+        .await?;
+
+        metrics::histogram!(
+            "sql.chain.state.remove_account_balance_updates",
+            start.elapsed()
+        );
+        Ok(())
+    }
+
+    // Removes account creates for blocks with number greater than `last_block`
+    pub async fn remove_account_creates(&mut self, last_block: BlockNumber) -> QueryResult<()> {
+        let start = Instant::now();
+        sqlx::query!(
+            "DELETE FROM account_creates WHERE block_number > $1",
+            *last_block as i64
+        )
+        .execute(self.0.conn())
+        .await?;
+
+        metrics::histogram!("sql.chain.state.remove_account_creates", start.elapsed());
+        Ok(())
+    }
+
+    // Removes account pubkey updates for blocks with number greater than `last_block`
+    pub async fn remove_account_pubkey_updates(
+        &mut self,
+        last_block: BlockNumber,
+    ) -> QueryResult<()> {
+        let start = Instant::now();
+        sqlx::query!(
+            "DELETE FROM account_pubkey_updates WHERE block_number > $1",
+            *last_block as i64
+        )
+        .execute(self.0.conn())
+        .await?;
+
+        metrics::histogram!(
+            "sql.chain.state.remove_account_pubkey_updates",
+            start.elapsed()
+        );
+        Ok(())
+    }
 }

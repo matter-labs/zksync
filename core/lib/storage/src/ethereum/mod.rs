@@ -525,7 +525,8 @@ impl<'a, 'c> EthereumSchema<'a, 'c> {
     /// This method expects the database to be initially prepared with inserting the actual
     /// nonce value. Currently the script `db-insert-eth-data.sh` is responsible for that
     /// and it's invoked within `db-reset` subcommand.
-    pub(crate) async fn get_next_nonce(&mut self) -> QueryResult<i64> {
+    #[doc = "hidden"]
+    pub async fn get_next_nonce(&mut self) -> QueryResult<i64> {
         let start = Instant::now();
         let mut transaction = self.0.start_transaction().await?;
 
@@ -615,5 +616,29 @@ impl<'a, 'c> EthereumSchema<'a, 'c> {
             .flatten();
 
         Ok(final_hash)
+    }
+
+    // Updates eth_parameters with given nonce and last block.
+    // It updates last_verified_block only if it is greater than given last block.
+    pub async fn update_eth_parameters(&mut self, last_block: BlockNumber) -> QueryResult<()> {
+        let start = Instant::now();
+        let mut transaction = self.0.start_transaction().await?;
+        sqlx::query!(
+            "UPDATE eth_parameters SET last_committed_block = $1 WHERE id = true",
+            *last_block as i64
+        )
+        .execute(transaction.conn())
+        .await?;
+
+        sqlx::query!(
+            "UPDATE eth_parameters SET last_verified_block = $1 WHERE id = true AND last_verified_block > $1",
+            *last_block as i64
+        )
+        .execute(transaction.conn())
+        .await?;
+        transaction.commit().await?;
+
+        metrics::histogram!("sql.ethereum.update_eth_parameters", start.elapsed());
+        Ok(())
     }
 }

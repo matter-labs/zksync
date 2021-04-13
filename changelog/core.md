@@ -25,6 +25,7 @@ All notable changes to the core components will be documented in this file.
   ETHDirectClient.
 - (`api_server`): Support for accounts that don't have to pay fees (e.g. network service accounts) was added.
 - Added `BlockMetadata` structure and corresponding table to track block data that is not related to protocol.
+- (`block_revert`): CLI that calls `revertBlocks` smart contract function and updates the database respectively.
 
 ### Fixed
 
