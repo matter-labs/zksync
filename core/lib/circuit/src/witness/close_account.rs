@@ -2,7 +2,7 @@
 use zksync_crypto::franklin_crypto::{
     bellman::pairing::{
         bn256::{Bn256, Fr},
-        ff::{Field, PrimeField},
+        ff::Field,
     },
     rescue::RescueEngine,
 };
@@ -20,7 +20,7 @@ use crate::{
     operation::{Operation, OperationArguments, OperationBranch, OperationBranchWitness},
     utils::resize_grow_only,
     witness::{
-        utils::{apply_leaf_operation, get_audits, SigDataInput},
+        utils::{apply_leaf_operation, fr_from, get_audits, SigDataInput},
         Witness,
     },
 };
@@ -75,7 +75,7 @@ impl Witness for CloseAccountWitness<Bn256> {
         let operation_zero = Operation {
             new_root: self.after_root,
             tx_type: self.tx_type,
-            chunk: Some(Fr::from_str("0").unwrap()),
+            chunk: Some(fr_from(0)),
             pubdata_chunk: Some(pubdata_chunks[0]),
             first_sig_msg: Some(input.first_sig_msg),
             second_sig_msg: Some(input.second_sig_msg),
@@ -102,7 +102,7 @@ impl CloseAccountWitness<Bn256> {
 
         let capacity = tree.capacity();
         assert_eq!(capacity, 1 << account_tree_depth());
-        let account_address_fe = Fr::from_str(&close_account.account_address.to_string()).unwrap();
+        let account_address_fe = fr_from(close_account.account_address);
 
         //calculate a and b
         let a = Fr::zero();
@@ -154,7 +154,7 @@ impl CloseAccountWitness<Bn256> {
             },
             before_root: Some(before_root),
             after_root: Some(after_root),
-            tx_type: Some(Fr::from_str("4").unwrap()),
+            tx_type: Some(fr_from(CloseOp::OP_CODE)),
         }
     }
 }
@@ -187,8 +187,8 @@ impl CloseAccountWitness<Bn256> {
 //        let params = &AltJubjubBn256::new();
 //        let p_g = FixedGenerators::SpendingKeyGenerator;
 //        let validator_address_number = 7;
-//        let validator_address = Fr::from_str(&validator_address_number.to_string()).unwrap();
-//        let block_number = Fr::from_str("1").unwrap();
+//        let validator_address = fr_from(validator_address_number);
+//        let block_number = fr_from(1);
 //        let rng = &mut XorShiftRng::from_seed([0x3dbe_6258, 0x8d31_3d76, 0x3237_db17, 0xe5bc_0654]);
 //        let phasher = PedersenHasher::<Bn256>::default();
 //

@@ -1,18 +1,19 @@
 // External deps
 use zksync_crypto::franklin_crypto::bellman::pairing::{
     bn256::{Bn256, Fr},
-    ff::{Field, PrimeField},
+    ff::Field,
 };
 // Workspace deps
 use zksync_crypto::circuit::{
     account::CircuitAccountTree, utils::le_bit_vector_into_field_element,
 };
 use zksync_crypto::params::CHUNK_BIT_WIDTH;
+use zksync_types::operations::NoopOp;
 // Local deps
 use crate::{
     account::AccountWitness,
     operation::{Operation, OperationBranch, OperationBranchWitness, SignatureData},
-    witness::utils::get_audits,
+    witness::utils::{fr_from, get_audits},
 };
 
 pub fn noop_operation(tree: &CircuitAccountTree, acc_id: u32) -> Operation<Bn256> {
@@ -23,7 +24,7 @@ pub fn noop_operation(tree: &CircuitAccountTree, acc_id: u32) -> Operation<Bn256
     let signer_pub_key_packed = [Some(false); 256];
 
     let acc = tree.get(acc_id).unwrap();
-    let account_address_fe = Fr::from_str(&acc_id.to_string()).unwrap();
+    let account_address_fe = fr_from(acc_id);
     let token_fe = Fr::zero();
     let balance_value = match acc.subtree.get(0) {
         None => Fr::zero(),
@@ -38,8 +39,8 @@ pub fn noop_operation(tree: &CircuitAccountTree, acc_id: u32) -> Operation<Bn256
 
     Operation {
         new_root: Some(tree.root_hash()),
-        tx_type: Some(Fr::from_str("0").unwrap()),
-        chunk: Some(Fr::from_str("0").unwrap()),
+        tx_type: Some(fr_from(NoopOp::OP_CODE)),
+        chunk: Some(fr_from(0)),
         pubdata_chunk: Some(pubdata_chunks[0]),
         first_sig_msg: Some(first_sig_msg),
         second_sig_msg: Some(second_sig_msg),

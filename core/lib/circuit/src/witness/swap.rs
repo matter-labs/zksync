@@ -3,7 +3,7 @@ use num::ToPrimitive;
 use zksync_crypto::franklin_crypto::{
     bellman::pairing::{
         bn256::{Bn256, Fr},
-        ff::{Field, PrimeField},
+        ff::Field,
     },
     rescue::RescueEngine,
 };
@@ -26,7 +26,7 @@ use crate::{
     operation::{Operation, OperationArguments, OperationBranch, OperationBranchWitness},
     utils::resize_grow_only,
     witness::{
-        utils::{apply_leaf_operation, get_audits, SigDataInput},
+        utils::{apply_leaf_operation, fr_from, get_audits, SigDataInput},
         Witness,
     },
 };
@@ -36,7 +36,8 @@ pub struct OrderData {
     pub account: u32,
     pub recipient: u32,
     pub amount: u128,
-    pub price: (u128, u128),
+    pub price_sell: u128,
+    pub price_buy: u128,
 }
 
 #[derive(Debug)]
@@ -71,20 +72,16 @@ impl Witness for SwapWitness<Bn256> {
             account: *swap.accounts.0 as u32,
             recipient: *swap.recipients.0 as u32,
             amount: swap.tx.orders.0.amount.to_u128().unwrap(),
-            price: (
-                swap.tx.orders.0.price.0.to_u128().unwrap(),
-                swap.tx.orders.0.price.1.to_u128().unwrap(),
-            ),
+            price_sell: swap.tx.orders.0.price.0.to_u128().unwrap(),
+            price_buy: swap.tx.orders.0.price.1.to_u128().unwrap(),
         };
 
         let order_1 = OrderData {
             account: *swap.accounts.1 as u32,
             recipient: *swap.recipients.1 as u32,
             amount: swap.tx.orders.1.amount.to_u128().unwrap(),
-            price: (
-                swap.tx.orders.1.price.0.to_u128().unwrap(),
-                swap.tx.orders.1.price.1.to_u128().unwrap(),
-            ),
+            price_sell: swap.tx.orders.1.price.0.to_u128().unwrap(),
+            price_buy: swap.tx.orders.1.price.1.to_u128().unwrap(),
         };
 
         let swap_data = SwapData {
@@ -103,7 +100,7 @@ impl Witness for SwapWitness<Bn256> {
             valid_from: swap.tx.valid_from(),
             valid_until: swap.tx.valid_until(),
         };
-        // le_bit_vector_into_field_element()
+
         Self::apply_data(tree, &swap_data)
     }
 
@@ -167,24 +164,8 @@ impl Witness for SwapWitness<Bn256> {
             &self.args.fee.unwrap(),
             FEE_MANTISSA_BIT_WIDTH + FEE_EXPONENT_BIT_WIDTH,
         );
+        append_be_fixed_width(&mut pubdata_bits, &self.nonce_mask(), 8);
 
-        let one = Fr::one();
-        let zero = Fr::zero();
-        let mut nonce_mask = zero;
-
-        nonce_mask.add_assign(if self.args.second_amount_packed.unwrap().is_zero() {
-            &zero
-        } else {
-            &one
-        });
-        nonce_mask.mul_assign(&Fr::from_str("2").unwrap());
-        nonce_mask.add_assign(if self.args.amount_packed.unwrap().is_zero() {
-            &zero
-        } else {
-            &one
-        });
-
-        append_be_fixed_width(&mut pubdata_bits, &nonce_mask, 8);
         resize_grow_only(&mut pubdata_bits, SwapOp::CHUNKS * CHUNK_BIT_WIDTH, false);
         pubdata_bits
     }
@@ -205,9 +186,9 @@ impl Witness for SwapWitness<Bn256> {
 
         vec![
             Operation {
-                new_root: self.roots[1],
+                new_root: self.roots[0],
                 tx_type: self.tx_type,
-                chunk: Some(Fr::from_str("0").unwrap()),
+                chunk: Some(fr_from(0)),
                 pubdata_chunk: Some(pubdata_chunks[0]),
                 first_sig_msg: Some(input.0.first_sig_msg),
                 second_sig_msg: Some(input.0.second_sig_msg),
@@ -223,9 +204,9 @@ impl Witness for SwapWitness<Bn256> {
                 rhs: self.recipients.1[0].clone(),
             },
             Operation {
-                new_root: self.roots[2],
+                new_root: self.roots[1],
                 tx_type: self.tx_type,
-                chunk: Some(Fr::from_str("1").unwrap()),
+                chunk: Some(fr_from(1)),
                 pubdata_chunk: Some(pubdata_chunks[1]),
                 first_sig_msg: Some(input.0.first_sig_msg),
                 second_sig_msg: Some(input.0.second_sig_msg),
@@ -237,9 +218,9 @@ impl Witness for SwapWitness<Bn256> {
                 rhs: self.accounts.0[1].clone(),
             },
             Operation {
-                new_root: self.roots[3],
+                new_root: self.roots[2],
                 tx_type: self.tx_type,
-                chunk: Some(Fr::from_str("2").unwrap()),
+                chunk: Some(fr_from(2)),
                 pubdata_chunk: Some(pubdata_chunks[2]),
                 first_sig_msg: Some(input.1.first_sig_msg),
                 second_sig_msg: Some(input.1.second_sig_msg),
@@ -255,9 +236,9 @@ impl Witness for SwapWitness<Bn256> {
                 rhs: self.recipients.0[0].clone(),
             },
             Operation {
-                new_root: self.roots[4],
+                new_root: self.roots[3],
                 tx_type: self.tx_type,
-                chunk: Some(Fr::from_str("3").unwrap()),
+                chunk: Some(fr_from(3)),
                 pubdata_chunk: Some(pubdata_chunks[3]),
                 first_sig_msg: Some(input.1.first_sig_msg),
                 second_sig_msg: Some(input.1.second_sig_msg),
@@ -269,9 +250,9 @@ impl Witness for SwapWitness<Bn256> {
                 rhs: self.accounts.1[1].clone(),
             },
             Operation {
-                new_root: self.roots[5],
+                new_root: self.roots[4],
                 tx_type: self.tx_type,
-                chunk: Some(Fr::from_str("4").unwrap()),
+                chunk: Some(fr_from(4)),
                 pubdata_chunk: Some(pubdata_chunks[4]),
                 first_sig_msg: Some(input.2.first_sig_msg),
                 second_sig_msg: Some(input.2.second_sig_msg),
@@ -291,19 +272,30 @@ impl Witness for SwapWitness<Bn256> {
 }
 
 impl SwapWitness<Bn256> {
+    fn nonce_mask(&self) -> Fr {
+        // a = 0 if orders.0.amount == 0 else 1
+        // b = 0 if orders.1.amount == 0 else 1
+        // nonce_mask = a | (b << 1)
+        let mut nonce_mask = Fr::zero();
+        nonce_mask.add_assign(&nonce_increment(&self.args.special_amounts[3]));
+        nonce_mask.double();
+        nonce_mask.add_assign(&nonce_increment(&self.args.special_amounts[0]));
+        nonce_mask
+    }
+
     fn apply_data(tree: &mut CircuitAccountTree, swap: &SwapData) -> Self {
         assert_eq!(tree.capacity(), 1 << account_tree_depth());
-        let account_0_fe = Fr::from_str(&swap.orders.0.account.to_string()).unwrap();
-        let account_1_fe = Fr::from_str(&swap.orders.1.account.to_string()).unwrap();
-        let recipient_0_fe = Fr::from_str(&swap.orders.0.recipient.to_string()).unwrap();
-        let recipient_1_fe = Fr::from_str(&swap.orders.1.recipient.to_string()).unwrap();
-        let submitter_fe = Fr::from_str(&swap.submitter.to_string()).unwrap();
-        let token_0_fe = Fr::from_str(&swap.tokens.0.to_string()).unwrap();
-        let token_1_fe = Fr::from_str(&swap.tokens.1.to_string()).unwrap();
-        let fee_token_fe = Fr::from_str(&swap.fee_token.to_string()).unwrap();
-        let amount_0_fe = Fr::from_str(&swap.amounts.0.to_string()).unwrap();
-        let amount_1_fe = Fr::from_str(&swap.amounts.1.to_string()).unwrap();
-        let fee_fe = Fr::from_str(&swap.fee.to_string()).unwrap();
+        let account_0_fe = fr_from(swap.orders.0.account);
+        let account_1_fe = fr_from(swap.orders.1.account);
+        let recipient_0_fe = fr_from(swap.orders.0.recipient);
+        let recipient_1_fe = fr_from(swap.orders.1.recipient);
+        let submitter_fe = fr_from(swap.submitter);
+        let token_0_fe = fr_from(swap.tokens.0);
+        let token_1_fe = fr_from(swap.tokens.1);
+        let fee_token_fe = fr_from(swap.fee_token);
+        let amount_0_fe = fr_from(swap.amounts.0);
+        let amount_1_fe = fr_from(swap.amounts.1);
+        let fee_fe = fr_from(swap.fee);
 
         let amount_0_bits = FloatConversions::to_float(
             swap.amounts.0,
@@ -340,7 +332,18 @@ impl SwapWitness<Bn256> {
         let mut rhs_paths = vec![];
         let mut witnesses = vec![];
 
-        roots.push(tree.root_hash());
+        let special_amounts: Vec<_> = vec![
+            swap.orders.0.amount,
+            swap.orders.0.price_sell,
+            swap.orders.0.price_buy,
+            swap.orders.1.amount,
+            swap.orders.1.price_sell,
+            swap.orders.1.price_buy,
+        ]
+        .into_iter()
+        .map(|x| Some(fr_from(x)))
+        .collect();
+
         lhs_paths.push(get_audits(tree, swap.orders.0.account, swap.tokens.0));
         rhs_paths.push(get_audits(tree, swap.orders.1.recipient, swap.tokens.0));
 
@@ -349,12 +352,7 @@ impl SwapWitness<Bn256> {
             swap.orders.0.account,
             swap.tokens.0,
             |acc| {
-                let nonce_increment = if swap.orders.0.amount == 0 {
-                    Fr::zero()
-                } else {
-                    Fr::one()
-                };
-                acc.nonce.add_assign(&nonce_increment);
+                acc.nonce.add_assign(&nonce_increment(&special_amounts[0]));
             },
             |bal| {
                 bal.value.sub_assign(&amount_0_fe);
@@ -382,12 +380,7 @@ impl SwapWitness<Bn256> {
             swap.orders.1.account,
             swap.tokens.1,
             |acc| {
-                let nonce_increment = if swap.orders.1.amount == 0 {
-                    Fr::zero()
-                } else {
-                    Fr::one()
-                };
-                acc.nonce.add_assign(&nonce_increment);
+                acc.nonce.add_assign(&nonce_increment(&special_amounts[3]));
             },
             |bal| {
                 bal.value.sub_assign(&amount_1_fe);
@@ -537,8 +530,8 @@ impl SwapWitness<Bn256> {
                 // TODO: second full amount?
                 // TODO: special_nonces?
                 fee: Some(fee_encoded),
-                valid_from: Some(Fr::from_str(&valid_from.to_string()).unwrap()),
-                valid_until: Some(Fr::from_str(&valid_until.to_string()).unwrap()),
+                valid_from: Some(fr_from(valid_from)),
+                valid_until: Some(fr_from(valid_until)),
                 special_accounts: vec![
                     Some(account_0_fe),
                     Some(account_1_fe),
@@ -547,14 +540,7 @@ impl SwapWitness<Bn256> {
                     Some(submitter_fe),
                 ],
                 special_tokens: vec![Some(token_0_fe), Some(token_1_fe), Some(fee_token_fe)],
-                special_amounts: vec![
-                    Fr::from_str(&swap.orders.0.amount.to_string()),
-                    Fr::from_str(&swap.orders.0.price.0.to_string()),
-                    Fr::from_str(&swap.orders.0.price.1.to_string()),
-                    Fr::from_str(&swap.orders.1.amount.to_string()),
-                    Fr::from_str(&swap.orders.1.price.0.to_string()),
-                    Fr::from_str(&swap.orders.1.price.1.to_string()),
-                ],
+                special_amounts,
                 ..Default::default()
             },
             a_and_b: a_and_b
@@ -562,7 +548,15 @@ impl SwapWitness<Bn256> {
                 .map(|(x, y)| (Some(x), Some(y)))
                 .collect(),
             roots: roots.into_iter().map(Some).collect(),
-            tx_type: Some(Fr::from_str("5").unwrap()),
+            tx_type: Some(fr_from(SwapOp::OP_CODE)),
         }
+    }
+}
+
+fn nonce_increment(amount: &Option<Fr>) -> Fr {
+    if amount.unwrap().is_zero() {
+        Fr::zero()
+    } else {
+        Fr::one()
     }
 }
