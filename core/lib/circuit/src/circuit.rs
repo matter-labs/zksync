@@ -43,7 +43,7 @@ use crate::{
     },
 };
 
-const DIFFERENT_TRANSACTIONS_TYPE_NUMBER: usize = 9;
+const DIFFERENT_TRANSACTIONS_TYPE_NUMBER: usize = 10;
 pub struct ZkSyncCircuit<'a, E: RescueEngine + JubjubEngine> {
     pub rescue_params: &'a <E as RescueEngine>::Params,
     pub jubjub_params: &'a <E as JubjubEngine>::Params,
@@ -570,8 +570,6 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
             || op.tx_type.grab(),
             params::TX_TYPE_BIT_WIDTH,
         )?;
-
-        todo!(); // add minf NFT
 
         let max_chunks_powers = generate_powers(
             cs.namespace(|| "generate powers of max chunks"),
@@ -3342,6 +3340,7 @@ fn generate_maxchunk_polynomial<E: JubjubEngine>() -> Vec<E::Fr> {
         get_xy(FullExitOp::OP_CODE, FullExitOp::CHUNKS),
         get_xy(ChangePubKeyOp::OP_CODE, ChangePubKeyOp::CHUNKS),
         get_xy(ForcedExitOp::OP_CODE, ForcedExitOp::CHUNKS),
+        get_xy(MintNFTOp::OP_CODE, MintNFTOp::CHUNKS),
     ];
     let interpolation = interpolate::<E>(&points[..]).expect("must interpolate");
     assert_eq!(interpolation.len(), DIFFERENT_TRANSACTIONS_TYPE_NUMBER);
