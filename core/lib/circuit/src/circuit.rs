@@ -193,7 +193,8 @@ impl<'a, E: RescueEngine + JubjubEngine> Circuit<E> for ZkSyncCircuit<'a, E> {
             data[WithdrawOp::OP_CODE as usize] = vec![zero.clone(); 2];
             data[FullExitOp::OP_CODE as usize] = vec![zero.clone(); 2];
             data[ChangePubKeyOp::OP_CODE as usize] = vec![zero.clone(); 2];
-            data[ForcedExitOp::OP_CODE as usize] = vec![zero; 2];
+            data[ForcedExitOp::OP_CODE as usize] = vec![zero.clone(); 2];
+            data[MintNFTOp::OP_CODE as usize] = vec![zero; 2];
 
             // this operation is disabled for now
             // data[CloseOp::OP_CODE as usize] = vec![];
@@ -983,7 +984,18 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
                 &signature_data.is_verified,
                 &mut previous_pubdatas[ForcedExitOp::OP_CODE as usize],
             )?,
-            todo!(), // add mintNFT
+            self.mintNFT(
+                cs.namespace(|| "mintNFT"),
+                &mut cur,
+                global_variables,
+                &is_a_geq_b,
+                &is_account_empty,
+                &op_data,
+                &signer_key,
+                &ext_pubdata_chunk,
+                &signature_data.is_verified,
+                &mut previous_pubdatas[MintNFTOp::OP_CODE as usize],
+            )?,
         ];
 
         assert_eq!(DIFFERENT_TRANSACTIONS_TYPE_NUMBER - 1, op_flags.len());
@@ -1888,7 +1900,6 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
             &pubdata_bits,
         )?;
 
-        todo!(); // fix pubdata holder
         *pubdata_holder = packed_pubdata;
 
         let is_chunk_with_index: Vec<Boolean> = (0u64..MintNFTOp::CHUNKS as u64)
