@@ -11,7 +11,7 @@ use zksync_basic_types::{AccountId, Address, TokenId};
 /// Depth of the account tree.
 pub const ACCOUNT_TREE_DEPTH: usize = 32;
 /// Depth of the balance tree for each account.
-pub const BALANCE_TREE_DEPTH: usize = 32;
+pub const BALANCE_TREE_DEPTH: usize = 11;
 
 /// account_tree_depth.
 pub fn account_tree_depth() -> usize {

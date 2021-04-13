@@ -178,6 +178,27 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
         totalOpenPriorityRequests -= toProcess;
     }
 
+    /// @notice
+    /// @param
+    function registerNFTFactory(address _creatorAddress, bytes memory _signature) external {
+        requireActive();
+        bytes32 messageHash =
+            keccak256(
+                abi.encodePacked(
+                    "\x19Ethereum Signed Message:\n60",
+                    "\nCreator:",
+                    _creatorAddress,
+                    "\nFactory:",
+                    msg.sender
+                )
+            );
+        address recoveredAddress = Utils.recoverAddressFromEthSignature(_signature, messageHash);
+        if (recoveredAddress == _creatorAddress && recoveredAddress != address(0)) {
+            NFTFactories[_creatorAddress] = msg.sender;
+            emit NFTFactoryRegistered(_creatorAddress, msg.sender, _signature);
+        }
+    }
+
     /// @notice Deposit ETH to Layer 2 - transfer ether from user into contract, validate it, register deposit
     /// @param _zkSyncAddress The receiver Layer 2 address
     function depositETH(address _zkSyncAddress) external payable {

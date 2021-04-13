@@ -19,7 +19,7 @@ use zksync_types::{
 struct ContractTopics {
     new_priority_request: Hash,
     new_token: Hash,
-    register_factory: Hash,
+    factory_registered: Hash,
 }
 
 impl ContractTopics {
@@ -33,8 +33,8 @@ impl ContractTopics {
                 .event("NewToken")
                 .expect("main contract abi error")
                 .signature(),
-            register_factory: zksync_contract
-                .event("RegisterNFTFactory")
+            factory_registered: zksync_contract
+                .event("NFTFactoryRegistered")
                 .expect("main contract abi error")
                 .signature(),
         }
@@ -150,7 +150,7 @@ impl EthClient for EthHttpClient {
         let start = Instant::now();
 
         let result = self
-            .get_events(from, to, vec![self.topics.register_factory])
+            .get_events(from, to, vec![self.topics.factory_registered])
             .await;
         metrics::histogram!(
             "eth_watcher.get_new_register_nft_factory_events",
