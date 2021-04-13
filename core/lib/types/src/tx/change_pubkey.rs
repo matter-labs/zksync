@@ -10,7 +10,7 @@ use parity_crypto::Keccak256;
 use serde::{Deserialize, Serialize};
 use zksync_basic_types::{Address, TokenId, H256};
 use zksync_crypto::{
-    params::{max_account_id, max_token_id},
+    params::{max_account_id, max_fungible_token_id},
     PrivateKey,
 };
 use zksync_utils::{format_units, BigUintSerdeAsRadix10Str};
@@ -366,7 +366,7 @@ impl ChangePubKey {
         self.is_eth_auth_data_valid()
             && self.verify_signature() == Some(self.new_pk_hash)
             && self.account_id <= max_account_id()
-            && self.fee_token <= max_token_id()
+            && self.fee_token <= max_fungible_token_id()
             && is_fee_amount_packable(&self.fee)
             && self
                 .time_range

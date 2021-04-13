@@ -726,7 +726,8 @@ impl ZkSyncStateKeeper {
             ZkSyncTx::ForcedExit(tx) => tx.time_range,
             ZkSyncTx::ChangePubKey(tx) => tx.time_range.unwrap_or_default(),
             ZkSyncTx::Close(tx) => tx.time_range,
-            ZkSyncTx::MintNFT(tx) => tx.time_range,
+            ZkSyncTx::MintNFT(_) => Default::default(),
+            ZkSyncTx::Swap(tx) => tx.time_range(),
         };
         ensure!(
             time_range.is_valid(block_timestamp),

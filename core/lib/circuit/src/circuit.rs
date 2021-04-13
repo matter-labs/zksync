@@ -175,7 +175,7 @@ impl<'a, E: RescueEngine + JubjubEngine> Circuit<E> for ZkSyncCircuit<'a, E> {
 
         // we create a memory value for a token ID that is used to collect fees.
         // It is overwritten when we enter the first chunk of the op (that exposes sender
-        // and defined a token in which transaction is valued). Later one (at the last chunk)
+        // and defines a token in which transaction is valued). Later one (at the last chunk)
         // we use this value to give fee to the operator
         let mut last_token_id = zero.clone();
 
@@ -465,11 +465,12 @@ impl<'a, E: RescueEngine + JubjubEngine> Circuit<E> for ZkSyncCircuit<'a, E> {
                 params::BLOCK_NUMBER_BIT_WIDTH,
             )?;
 
-            initial_hash_data.extend(block_number.into_padded_be_bits(256));
+            initial_hash_data.extend(block_number.into_padded_be_bits(FR_BIT_WIDTH_PADDED));
 
-            initial_hash_data.extend(validator_address_padded.into_padded_be_bits(256));
+            initial_hash_data
+                .extend(validator_address_padded.into_padded_be_bits(FR_BIT_WIDTH_PADDED));
 
-            assert_eq!(initial_hash_data.len(), 512);
+            assert_eq!(initial_hash_data.len(), FR_BIT_WIDTH_PADDED * 2);
 
             let mut hash_block = sha256::sha256(
                 cs.namespace(|| "initial rolling sha256"),
@@ -485,10 +486,14 @@ impl<'a, E: RescueEngine + JubjubEngine> Circuit<E> for ZkSyncCircuit<'a, E> {
                 let mut old_root_le_bits = old_root
                     .into_bits_le_strict(cs.namespace(|| "old root hash into LE bits strict"))?;
                 assert_eq!(old_root_le_bits.len(), E::Fr::NUM_BITS as usize);
-                resize_grow_only(&mut old_root_le_bits, 256, Boolean::constant(false));
+                resize_grow_only(
+                    &mut old_root_le_bits,
+                    FR_BIT_WIDTH_PADDED,
+                    Boolean::constant(false),
+                );
                 let mut old_root_be_bits = old_root_le_bits;
                 old_root_be_bits.reverse();
-                assert_eq!(old_root_be_bits.len(), 256);
+                assert_eq!(old_root_be_bits.len(), FR_BIT_WIDTH_PADDED);
                 old_root_be_bits
             };
             pack_bits.extend(old_root_be_bits);
@@ -504,10 +509,14 @@ impl<'a, E: RescueEngine + JubjubEngine> Circuit<E> for ZkSyncCircuit<'a, E> {
                 let mut final_root_le_bits = final_root
                     .into_bits_le_strict(cs.namespace(|| "final root hash into LE bits strict"))?;
                 assert_eq!(final_root_le_bits.len(), E::Fr::NUM_BITS as usize);
-                resize_grow_only(&mut final_root_le_bits, 256, Boolean::constant(false));
+                resize_grow_only(
+                    &mut final_root_le_bits,
+                    FR_BIT_WIDTH_PADDED,
+                    Boolean::constant(false),
+                );
                 let mut final_root_be_bits = final_root_le_bits;
                 final_root_be_bits.reverse();
-                assert_eq!(final_root_be_bits.len(), 256);
+                assert_eq!(final_root_be_bits.len(), FR_BIT_WIDTH_PADDED);
                 final_root_be_bits
             };
             pack_bits.extend(final_root_be_bits);
@@ -516,8 +525,12 @@ impl<'a, E: RescueEngine + JubjubEngine> Circuit<E> for ZkSyncCircuit<'a, E> {
 
             let mut pack_bits = vec![];
             pack_bits.extend(hash_block);
-            pack_bits.extend(global_variables.block_timestamp.into_padded_be_bits(256));
-            assert_eq!(pack_bits.len(), 512);
+            pack_bits.extend(
+                global_variables
+                    .block_timestamp
+                    .into_padded_be_bits(FR_BIT_WIDTH_PADDED),
+            );
+            assert_eq!(pack_bits.len(), FR_BIT_WIDTH_PADDED * 2);
 
             hash_block = sha256::sha256(cs.namespace(|| "hash with timestamp"), &pack_bits)?;
 
@@ -1493,7 +1506,7 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
         //keys are same or account is empty
 
         let is_pubkey_correct = Boolean::xor(
-            cs.namespace(|| "keys are same or account is empty"),
+            cs.namespace(|| "keys are same xor account is empty"),
             &is_pub_equal_to_previous,
             &is_account_empty,
         )?;
@@ -1958,7 +1971,7 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
                 &cur.account.pub_key_hash,
             )?;
             flags.push(is_signer_valid);
-            flags.push(is_sig_verified);
+            flags.push(is_sig_verified.clone());
 
             let is_creator_account = Boolean::from(Expression::equals(
                 cs.namespace(|| "is_creator_account (first chunk)"),
@@ -2637,7 +2650,7 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
             &is_rhs_valid,
         )?;
 
-        // Either LHS or RHS are correct (due to chunking at least)
+        // Either LHS xor RHS are correct (due to chunking at least)
         let correct = Boolean::xor(
             cs.namespace(|| "lhs_valid XOR rhs_valid"),
             &lhs_valid,
@@ -2840,6 +2853,14 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
         )?;
         rhs_valid_flags.push(is_address_correct);
 
+        // Check that `eth_address` corresponds to the rhs account Ethereum address.
+        let is_pubkey_empty = CircuitElement::equals(
+            cs.namespace(|| "is_pubkey_empty"),
+            &rhs.account.pub_key_hash,
+            &global_variables.explicit_zero,
+        )?;
+        rhs_valid_flags.push(is_pubkey_empty);
+
         let rhs_valid = multi_and(cs.namespace(|| "is_rhs_valid"), &rhs_valid_flags)?;
 
         // calculate new rhs balance value
@@ -3027,6 +3048,12 @@ pub fn allocate_merkle_root<E: RescueEngine, CS: ConstraintSystem<E>>(
     // only first bits of index are considered valuable
     assert!(length_to_root <= index.len());
     assert!(index.len() >= audit_path.len());
+
+    let remaining_index_bits = AllocatedNum::pack_bits_to_element(
+        cs.namespace(|| "index_bits_after_length_root_packed"),
+        &index[length_to_root..],
+    )?;
+    remaining_index_bits.assert_zero(cs.namespace(|| "index_bits_after_length_are_zero"))?;
 
     let index = &index[0..length_to_root];
     let audit_path = &audit_path[0..length_to_root];

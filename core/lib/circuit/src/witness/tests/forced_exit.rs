@@ -180,6 +180,9 @@ fn test_target_has_key_set() {
     const FEE_AMOUNT: u64 = 3;
     const WITHDRAW_AMOUNT: u64 = 100;
 
+    // Operation is not valid, since account has signing key set.
+    const ERR_MSG: &str = "op_valid is true/enforce equal to one";
+
     // Input data: we DO NOT reset the signing key for the second account.
     let accounts = vec![
         WitnessTestAccount::new(AccountId(1), FEE_AMOUNT),
@@ -204,17 +207,16 @@ fn test_target_has_key_set() {
     let input =
         SigDataInput::from_forced_exit_op(&forced_exit_op).expect("SigDataInput creation failed");
 
-    generic_test_scenario::<ForcedExitWitness<Bn256>, _>(
+    incorrect_op_test_scenario::<ForcedExitWitness<Bn256>, _>(
         &accounts,
         forced_exit_op,
         input,
-        |plasma_state, op| {
-            let fee = <ZkSyncState as TxHandler<ForcedExit>>::apply_op(plasma_state, &op)
-                .expect("ForcedExit failed")
-                .0
-                .unwrap();
-
-            vec![fee]
+        ERR_MSG,
+        || {
+            vec![CollectedFee {
+                token: TOKEN_ID,
+                amount: FEE_AMOUNT.into(),
+            }]
         },
     );
 }

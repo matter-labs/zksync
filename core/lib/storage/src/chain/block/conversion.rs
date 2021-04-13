@@ -167,6 +167,10 @@ impl NewExecutedTransaction {
                     serde_json::from_value(tx["creatorAddress"].clone()).unwrap(),
                     serde_json::from_value(tx["recipientAddress"].clone()).unwrap(),
                 ),
+                ZkSyncTx::Swap(_) => (
+                    serde_json::from_value(tx["submitter_address"].clone()).unwrap(),
+                    serde_json::from_value(tx["submitter_address"].clone()).unwrap(),
+                ),
             };
 
         let from_account: Vec<u8> = hex::decode(cut_prefix(&from_account_hex)).unwrap();

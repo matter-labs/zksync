@@ -3,7 +3,9 @@ use std::collections::HashMap;
 
 use web3::types::{Address, BlockNumber};
 
-use zksync_types::{AccountId, Deposit, FullExit, Nonce, PriorityOp, TokenId, ZkSyncPriorityOp};
+use zksync_types::{
+    AccountId, Deposit, FullExit, NewTokenEvent, Nonce, PriorityOp, TokenId, ZkSyncPriorityOp,
+};
 
 use crate::eth_watch::{client::EthClient, EthWatch};
 use std::sync::Arc;
@@ -75,6 +77,15 @@ impl EthClient for FakeEthClient {
             }
         }
         Ok(operations)
+    }
+
+    async fn get_new_tokens_events(
+        &self,
+        _from: BlockNumber,
+        _to: BlockNumber,
+    ) -> anyhow::Result<Vec<NewTokenEvent>> {
+        // Ignore NewTokens event.
+        Ok(Vec::new())
     }
 
     async fn block_number(&self) -> Result<u64, anyhow::Error> {

@@ -19,7 +19,9 @@ const CONFIG_FILES = [
     'prover.toml',
     'rust.toml',
     'private.toml',
-    'forced_exit_requests.toml'
+    'forced_exit_requests.toml',
+    'private.toml',
+    'token_handler.toml'
 ];
 
 async function getEnvironment(): Promise<string> {

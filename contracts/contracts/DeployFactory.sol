@@ -35,9 +35,9 @@ contract DeployFactory is TokenDeployInit {
         address _governor,
         address _feeAccountAddress
     ) {
-        require(_firstValidator != address(0));
-        require(_governor != address(0));
-        require(_feeAccountAddress != address(0));
+        require(_firstValidator != address(0), "validator check");
+        require(_governor != address(0), "governor check");
+        require(_feeAccountAddress != address(0), "fee acc address check");
 
         deployProxyContracts(_govTarget, _verifierTarget, _zkSyncTarget, _genesisRoot, _firstValidator, _governor);
 
@@ -87,6 +87,7 @@ contract DeployFactory is TokenDeployInit {
         for (uint256 i = 0; i < tokens.length; ++i) {
             _governance.addToken(tokens[i]);
         }
+        _governance.changeTokenGovernance(_finalGovernor);
         _governance.setValidator(_validator, true);
         _governance.changeGovernor(_finalGovernor);
     }

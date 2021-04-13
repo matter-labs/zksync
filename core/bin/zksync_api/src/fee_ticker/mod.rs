@@ -31,7 +31,8 @@ use zksync_config::{configs::ticker::TokenPriceSource, ZkSyncConfig};
 use zksync_storage::ConnectionPool;
 use zksync_types::{
     tokens::ChangePubKeyFeeTypeArg, tx::ChangePubKeyType, Address, BatchFee, ChangePubKeyOp, Fee,
-    OutputFeeType, Token, TokenId, TokenLike, TransferOp, TransferToNewOp, TxFeeTypes, WithdrawOp,
+    OutputFeeType, SwapOp, Token, TokenId, TokenLike, TransferOp, TransferToNewOp, TxFeeTypes,
+    WithdrawOp,
 };
 use zksync_utils::ratio_to_big_decimal;
 
@@ -661,6 +662,7 @@ impl<API: FeeTickerAPI, INFO: FeeTickerInfo, WATCHER: TokenWatcher> FeeTicker<AP
                     (OutputFeeType::Transfer, TransferOp::CHUNKS)
                 }
             }
+            TxFeeTypes::Swap => (OutputFeeType::Swap, SwapOp::CHUNKS),
             TxFeeTypes::ChangePubKey(arg) => {
                 (OutputFeeType::ChangePubKey(arg), ChangePubKeyOp::CHUNKS)
             }

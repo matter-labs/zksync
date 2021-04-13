@@ -11,6 +11,7 @@
       "infrastructure/explorer",
       "infrastructure/zk",
       "infrastructure/reading-tool",
+      "infrastructure/token-lists-manager",
       "core/tests/ts-tests"
     ],
     "nohoist": [

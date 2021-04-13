@@ -13,6 +13,7 @@ publish = false # We don't want to publish our binaries.
 [dependencies]
 zksync_state = { path = "../../lib/state", version = "1.0" }
 zksync_types = { path = "../../lib/types", version = "1.0" }
+zksync_notifier = { path = "../../lib/notifier", version = "1.0" }
 zksync_storage = { path = "../../lib/storage", version = "1.0" }
 
 zksync_crypto = { path = "../../lib/crypto", version = "1.0" }
@@ -37,6 +38,7 @@ tokio = { version = "0.2", features = ["full"] }
 futures = "0.3"
 actix-rt = "1.1.1"
 actix-web = "3.0.0"
+reqwest = { version = "0.10", features = ["blocking", "json"] }
 chrono = { version = "0.4", features = ["serde", "rustc-serialize"] }
 ctrlc = { version = "3.1", features = ["termination"] }
 anyhow = "1.0"

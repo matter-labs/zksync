@@ -43,7 +43,7 @@ pub const MIN_NFT_TOKEN_ID: u32 = 10000;
 
 /// Number of tokens that are processed by this release
 pub fn number_of_processable_tokens() -> usize {
-    let num = 128;
+    let num = 512;
 
     assert!(num <= total_tokens());
     assert!(num.is_power_of_two());
@@ -73,6 +73,11 @@ pub fn max_account_id() -> AccountId {
 /// Max token id, based on the number of processable tokens
 pub fn max_token_id() -> TokenId {
     TokenId(number_of_processable_tokens() as u32 - 1)
+}
+
+/// Max token id, based on the number of processable tokens
+pub fn max_fungible_token_id() -> TokenId {
+    TokenId(MIN_NFT_TOKEN_ID - 1)
 }
 
 pub const ETH_TOKEN_ID: TokenId = TokenId(0);
@@ -143,7 +148,7 @@ pub const LEAF_DATA_BIT_WIDTH: usize =
     NONCE_BIT_WIDTH + NEW_PUBKEY_HASH_WIDTH + FR_BIT_WIDTH_PADDED + ETH_ADDRESS_BIT_WIDTH;
 
 /// Priority op should be executed for this number of eth blocks.
-pub const PRIORITY_EXPIRATION: u64 = 35000;
+pub const PRIORITY_EXPIRATION: u64 = 35000; // TODO: Check that in the future this constant cannot cause unexpected behavior (ZKS-520).
 pub const FR_ADDRESS_LEN: usize = 20;
 
 pub const PAD_MSG_BEFORE_HASH_BITS_LEN: usize = 736;
@@ -240,7 +245,7 @@ pub const RECURSIVE_CIRCUIT_NUM_INPUTS: usize = 1;
 pub const RECURSIVE_CIRCUIT_VK_TREE_DEPTH: usize = 3;
 
 /// Major version of the ZkSync
-pub const ZKSYNC_VERSION: &str = "contracts-4";
+pub const ZKSYNC_VERSION: &str = "contracts-5";
 
 lazy_static! {
     pub static ref JUBJUB_PARAMS: AltJubjubBn256 = AltJubjubBn256::new();

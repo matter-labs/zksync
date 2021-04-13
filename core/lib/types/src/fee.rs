@@ -15,6 +15,7 @@ pub enum OutputFeeType {
     Transfer,
     TransferToNew,
     Withdraw,
+    Swap,
     FastWithdraw,
     MintNFT,
     ChangePubKey(ChangePubKeyFeeTypeArg),

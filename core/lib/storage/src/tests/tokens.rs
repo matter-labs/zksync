@@ -14,7 +14,7 @@ use crate::{
 #[db_test]
 async fn tokens_storage(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
     // There should be only Ethereum main token by default.
-    assert_eq!(storage.tokens_schema().get_count().await?, 1);
+    assert_eq!(storage.tokens_schema().get_last_token_id().await?.0, 0);
     let tokens = TokensSchema(&mut storage)
         .load_tokens()
         .await
@@ -25,6 +25,7 @@ async fn tokens_storage(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
         address: "0000000000000000000000000000000000000000".parse().unwrap(),
         symbol: "ETH".into(),
         decimals: 18,
+        is_nft: false,
     };
     assert_eq!(tokens[&TokenId(0)], eth_token);
 
@@ -34,24 +35,26 @@ async fn tokens_storage(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
         address: "0000000000000000000000000000000000000001".parse().unwrap(),
         symbol: "ABC".into(),
         decimals: 9,
+        is_nft: false,
     };
     let token_b = Token {
         id: TokenId(2),
         address: "0000000000000000000000000000000000000002".parse().unwrap(),
         symbol: "DEF".into(),
         decimals: 6,
+        is_nft: false,
     };
 
     TokensSchema(&mut storage)
-        .store_token(token_a.clone())
+        .store_or_update_token(token_a.clone())
         .await
         .expect("Store tokens query failed");
     TokensSchema(&mut storage)
-        .store_token(token_b.clone())
+        .store_or_update_token(token_b.clone())
         .await
         .expect("Store tokens query failed");
     // The count is updated.
-    assert_eq!(storage.tokens_schema().get_count().await?, 3);
+    assert_eq!(storage.tokens_schema().get_last_token_id().await?.0, 2);
 
     // Load tokens again.
     let tokens = TokensSchema(&mut storage)
@@ -84,25 +87,6 @@ async fn tokens_storage(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
         .expect("get token query failed")
         .expect("token by symbol not found");
     assert_eq!(token_b, token_b_by_symbol);
-
-    // Now check that storing the token that already exists is the same as updating it.
-    let token_c = Token {
-        id: TokenId(2),
-        address: "0000000000000000000000000000000000000008".parse().unwrap(),
-        symbol: "BAT".into(),
-        decimals: 6,
-    };
-    TokensSchema(&mut storage)
-        .store_token(token_c.clone())
-        .await
-        .expect("Store tokens query failed");
-    // Load updated token.
-    let token_c_by_id = TokensSchema(&mut storage)
-        .get_token(TokenLike::Id(token_c.id))
-        .await
-        .expect("get token query failed")
-        .expect("token by id not found");
-    assert_eq!(token_c, token_c_by_id);
 
     Ok(())
 }

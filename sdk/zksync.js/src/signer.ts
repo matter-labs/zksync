@@ -9,6 +9,7 @@ import {
     Withdraw,
     ForcedExit,
     ChangePubKey,
+    MintNFT,
     ChangePubKeyOnchain,
     ChangePubKeyECDSA,
     ChangePubKeyCREATE2,

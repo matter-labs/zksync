@@ -30,6 +30,7 @@ members = [
     "core/lib/config",
     "core/lib/contracts",
     "core/lib/api_client",
+    "core/lib/notifier",
     "core/lib/balancer",
 
     # Test infrastructure

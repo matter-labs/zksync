@@ -2,6 +2,7 @@
 
 pragma solidity ^0.7.0;
 
+// solhint-disable-next-line compiler-version
 pragma abicoder v2;
 
 import "../Operations.sol";

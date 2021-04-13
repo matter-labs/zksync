@@ -259,7 +259,7 @@ dependencies = [
  "socket2",
  "time 0.2.22",
  "tinyvec 1.0.1",
- "url 2.1.1",
+ "url 2.2.1",
 ]
 
 [[package]]
@@ -528,7 +528,7 @@ dependencies = [
  "async-std",
  "native-tls",
  "thiserror",
- "url 2.1.1",
+ "url 2.2.1",
 ]
 
 [[package]]
@@ -1722,6 +1722,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "00b0228411908ca8685dba7fc2cdd70ec9990a6e753e89b6ac91a84c40fbaf4b"
 
 [[package]]
+name = "form_urlencoded"
+version = "1.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5fc25a87fa4fd2094bffb06925852034d90a17f0d1e05197d4956d3555752191"
+dependencies = [
+ "matches",
+ "percent-encoding 2.1.0",
+]
+
+[[package]]
 name = "franklin-crypto"
 version = "0.0.5"
 source = "git+https://github.com/matter-labs/franklin-crypto.git?branch=beta#4a706d93628980e036249e3b182b91af8797ce8c"
@@ -2647,9 +2657,9 @@ dependencies = [
 
 [[package]]
 name = "libc"
-version = "0.2.79"
+version = "0.2.86"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2448f6066e80e3bfc792e9c98bf705b4b0fc6e8ef5b43e5889aff0eaa9c58743"
+checksum = "b7282d924be3275cec7f6756ff4121987bc6481325397dde6ba3e7802b1a8b1c"
 
 [[package]]
 name = "libm"
@@ -3994,7 +4004,7 @@ dependencies = [
  "serde_urlencoded",
  "tokio 0.2.22",
  "tokio-tls 0.3.1",
- "url 2.1.1",
+ "url 2.2.1",
  "wasm-bindgen",
  "wasm-bindgen-futures",
  "web-sys",
@@ -4315,7 +4325,7 @@ dependencies = [
  "serde",
  "serde_json",
  "thiserror",
- "url 2.1.1",
+ "url 2.2.1",
  "uuid",
 ]
 
@@ -4381,7 +4391,7 @@ dependencies = [
  "dtoa",
  "itoa",
  "serde",
- "url 2.1.1",
+ "url 2.2.1",
 ]
 
 [[package]]
@@ -4615,7 +4625,7 @@ dependencies = [
  "sqlx-rt",
  "stringprep",
  "thiserror",
- "url 2.1.1",
+ "url 2.2.1",
  "whoami",
 ]
 
@@ -4640,7 +4650,7 @@ dependencies = [
  "sqlx-core",
  "sqlx-rt",
  "syn",
- "url 2.1.1",
+ "url 2.2.1",
 ]
 
 [[package]]
@@ -5374,7 +5384,7 @@ dependencies = [
  "smallvec 1.4.2",
  "thiserror",
  "tokio 0.2.22",
- "url 2.1.1",
+ "url 2.2.1",
 ]
 
 [[package]]
@@ -5515,10 +5525,11 @@ dependencies = [
 
 [[package]]
 name = "url"
-version = "2.1.1"
+version = "2.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "829d4a8476c35c9bf0bbce5a3b23f4106f79728039b726d292bb93bc106787cb"
+checksum = "9ccd964113622c8e9322cfac19eb1004a07e636c545f325da085d5cdde6f1f8b"
 dependencies = [
+ "form_urlencoded",
  "idna 0.2.0",
  "matches",
  "percent-encoding 2.1.0",
@@ -5731,7 +5742,7 @@ dependencies = [
  "serde_json",
  "soketto",
  "tiny-keccak 2.0.2",
- "url 2.1.1",
+ "url 2.2.1",
 ]
 
 [[package]]
@@ -5876,7 +5887,7 @@ dependencies = [
  "rand 0.7.3",
  "sha-1 0.8.2",
  "slab",
- "url 2.1.1",
+ "url 2.2.1",
 ]
 
 [[package]]
@@ -6042,11 +6053,12 @@ dependencies = [
  "chrono",
  "envy",
  "num",
+ "reqwest",
  "serde",
  "serde_json",
  "toml",
  "tracing",
- "url 2.1.1",
+ "url 2.2.1",
  "zksync_crypto",
  "zksync_types",
  "zksync_utils",
@@ -6075,6 +6087,7 @@ dependencies = [
  "itertools 0.9.0",
  "metrics",
  "num",
+ "reqwest",
  "serde",
  "serde_json",
  "thiserror",
@@ -6088,6 +6101,7 @@ dependencies = [
  "zksync_crypto",
  "zksync_eth_client",
  "zksync_eth_signer",
+ "zksync_notifier",
  "zksync_prometheus_exporter",
  "zksync_state",
  "zksync_storage",
@@ -6237,6 +6251,21 @@ dependencies = [
  "zksync_eth_signer",
  "zksync_storage",
  "zksync_test_account",
+ "zksync_types",
+]
+
+[[package]]
+name = "zksync_notifier"
+version = "1.0.0"
+dependencies = [
+ "anyhow",
+ "bigdecimal",
+ "futures 0.3.6",
+ "hex",
+ "num",
+ "reqwest",
+ "serde",
+ "serde_json",
  "zksync_types",
 ]
 

@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
+// solhint-disable max-states-count
 
 pragma solidity ^0.7.0;
 
@@ -37,13 +38,13 @@ contract Storage {
     mapping(bytes22 => PendingBalance) internal pendingBalances;
 
     // @dev Pending withdrawals are not used in this version
-    struct PendingWithdrawal_DEPRECATED {
+    struct PendingWithdrawalDEPRECATED {
         address to;
         uint16 tokenId;
     }
-    mapping(uint32 => PendingWithdrawal_DEPRECATED) internal pendingWithdrawals_DEPRECATED;
-    uint32 internal firstPendingWithdrawalIndex_DEPRECATED;
-    uint32 internal numberOfPendingWithdrawals_DEPRECATED;
+    mapping(uint32 => PendingWithdrawalDEPRECATED) internal pendingWithdrawalsDEPRECATED;
+    uint32 internal firstPendingWithdrawalIndexDEPRECATED;
+    uint32 internal numberOfPendingWithdrawalsDEPRECATED;
 
     /// @notice Total number of executed blocks i.e. blocks[totalBlocksExecuted] points at the latest executed block (block 0 is genesis)
     uint32 public totalBlocksExecuted;
@@ -60,7 +61,7 @@ contract Storage {
     /// @member stateRoot New tree root hash
     ///
     /// Consider memory alignment when changing field order: https://solidity.readthedocs.io/en/v0.4.21/miscellaneous.html
-    struct Block_DEPRECATED {
+    struct BlockDEPRECATED {
         uint32 committedAtBlock;
         uint64 priorityOperations;
         uint32 chunks;
@@ -68,7 +69,7 @@ contract Storage {
         bytes32 commitment;
         bytes32 stateRoot;
     }
-    mapping(uint32 => Block_DEPRECATED) internal blocks_DEPRECATED;
+    mapping(uint32 => BlockDEPRECATED) internal blocksDEPRECATED;
 
     /// @notice Flag indicates that a user has exited in the exodus mode certain token balance (per account id and tokenId)
     mapping(uint32 => mapping(uint16 => bool)) public performedExodus;
@@ -84,7 +85,7 @@ contract Storage {
     /// @member opType Priority operation type
     /// @member pubData Priority operation public data
     /// @member expirationBlock Expiration block number (ETH block) for this request (must be satisfied before)
-    struct PriorityOperation_DEPRECATED {
+    struct PriorityOperationDEPRECATED {
         Operations.OpType opType;
         bytes pubData;
         uint256 expirationBlock;
@@ -93,7 +94,7 @@ contract Storage {
     /// @dev Priority Requests mapping (request id - operation)
     /// @dev Contains op type, pubdata and expiration block of unsatisfied requests.
     /// @dev Numbers are in order of requests receiving
-    mapping(uint64 => PriorityOperation_DEPRECATED) internal priorityRequests_DEPRECATED;
+    mapping(uint64 => PriorityOperationDEPRECATED) internal priorityRequestsDEPRECATED;
 
     /// @notice First open priority request id
     uint64 public firstPriorityRequestId;

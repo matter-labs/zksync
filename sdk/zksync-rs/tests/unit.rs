@@ -252,6 +252,7 @@ mod signatures_with_vectors {
                     address: Default::default(),
                     symbol: sign_data.string_token.clone(),
                     decimals: 0,
+                    is_nft: false,
                 };
                 let (withdraw, eth_signature) = signer
                     .sign_withdraw(
@@ -309,6 +310,7 @@ mod signatures_with_vectors {
                     address: Default::default(),
                     symbol: String::new(),
                     decimals: 0,
+                    is_nft: false,
                 };
                 let change_pub_key = signer
                     .sign_change_pubkey_tx(
@@ -364,6 +366,7 @@ mod signatures_with_vectors {
                     address: Default::default(),
                     symbol: String::new(),
                     decimals: 0,
+                    is_nft: false,
                 };
                 let (forced_exit, _) = signer
                     .sign_forced_exit(
@@ -470,10 +473,9 @@ mod wallet_tests {
                 .map(|(id, token)| Token {
                     id: TokenId(id),
                     symbol: token.symbol.clone(),
-                    address: token.address[2..]
-                        .parse()
-                        .expect("failed to parse token address"),
+                    address: token.address,
                     decimals: token.decimals,
+                    is_nft: false,
                 })
                 .map(|token| (token.symbol.clone(), token))
                 .collect();

@@ -30,7 +30,7 @@ import "../../SafeMath.sol";
  * functions have been added to mitigate the well-known issues around setting
  * allowances. See {IERC20-approve}.
  */
-contract MintableERC20FeeAndDividendsTest is ContextTest, MintableIERC20Test {
+contract MintableERC20FeeAndPayoutTest is ContextTest, MintableIERC20Test {
     using SafeMath for uint256;
 
     mapping(address => uint256) private _balances;
@@ -43,14 +43,14 @@ contract MintableERC20FeeAndDividendsTest is ContextTest, MintableIERC20Test {
         _mint(to, amount);
     }
 
-    bool _shouldBeFeeTransfers;
-    bool _senderUnintuitiveProcess;
+    bool private _shouldBeFeeTransfers;
+    bool private _senderUnintuitiveProcess;
 
-    uint256 public FEE_AMOUNT_AS_VALUE = 15;
-    uint256 public DIVIDEND_AMOUNT_AS_VALUE = 7;
+    uint256 public feeAmount = 15;
+    uint256 public payoutAmount = 7;
 
-    /// shouldBeFeeTransfers - true if there is should be taken fee, false if there should be dividends
-    /// senderUnintuitiveProcess - true if there is should be taken fee from sender (or dividends for him), false if this process works with recipient
+    /// shouldBeFeeTransfers - true if there is should be taken fee, false if there should be payouts
+    /// senderUnintuitiveProcess - true if there is should be taken fee from sender (or payouts for him), false if this process works with recipient
     constructor(bool shouldBeFeeTransfers, bool senderUnintuitiveProcess) {
         _shouldBeFeeTransfers = shouldBeFeeTransfers;
         _senderUnintuitiveProcess = senderUnintuitiveProcess;
@@ -187,25 +187,25 @@ contract MintableERC20FeeAndDividendsTest is ContextTest, MintableIERC20Test {
         address recipient,
         uint256 amount
     ) internal {
-        require(sender != address(0), "ERC20: transfer from the zero address");
-        require(recipient != address(0), "ERC20: transfer to the zero address");
+        require(sender != address(0), "ERC20: transfer from zero addr");
+        require(recipient != address(0), "ERC20: transfer to zero addr");
 
         _balances[sender] = _balances[sender].sub(amount, "ERC20: transfer amount exceeds balance");
         _balances[recipient] = _balances[recipient].add(amount);
         emit Transfer(sender, recipient, amount);
 
         if (_shouldBeFeeTransfers) {
-            require(FEE_AMOUNT_AS_VALUE <= amount, "tet10"); // tet10 - fee is bigger than transfer amount
+            require(feeAmount <= amount, "tet10"); // tet10 - fee is bigger than transfer amount
             if (_senderUnintuitiveProcess) {
-                _burn(sender, FEE_AMOUNT_AS_VALUE);
+                _burn(sender, feeAmount);
             } else {
-                _burn(recipient, FEE_AMOUNT_AS_VALUE);
+                _burn(recipient, feeAmount);
             }
         } else {
             if (_senderUnintuitiveProcess) {
-                _mint(sender, DIVIDEND_AMOUNT_AS_VALUE);
+                _mint(sender, payoutAmount);
             } else {
-                _mint(recipient, DIVIDEND_AMOUNT_AS_VALUE);
+                _mint(recipient, payoutAmount);
             }
         }
     }
@@ -239,7 +239,7 @@ contract MintableERC20FeeAndDividendsTest is ContextTest, MintableIERC20Test {
      * - `account` must have at least `amount` tokens.
      */
     function _burn(address account, uint256 amount) internal {
-        require(account != address(0), "ERC20: burn from the zero address");
+        require(account != address(0), "ERC20: burn from tzero addr");
 
         _balances[account] = _balances[account].sub(amount, "ERC20: burn amount exceeds balance");
         _totalSupply = _totalSupply.sub(amount);
@@ -264,8 +264,8 @@ contract MintableERC20FeeAndDividendsTest is ContextTest, MintableIERC20Test {
         address spender,
         uint256 amount
     ) internal {
-        require(owner != address(0), "ERC20: approve from the zero address");
-        require(spender != address(0), "ERC20: approve to the zero address");
+        require(owner != address(0), "ERC20: approve from zero addr");
+        require(spender != address(0), "ERC20: approve to zero addr");
 
         _allowances[owner][spender] = amount;
         emit Approval(owner, spender, amount);

@@ -66,7 +66,6 @@ impl Witness for MintNFTWitness<Bn256> {
     type CalculateOpsInput = SigDataInput;
 
     fn apply_tx(tree: &mut CircuitAccountTree, mintNFT: &MintNFTOp) -> Self {
-        let time_range = mintNFT.tx.time_range;
         let mintNFT_data = MintNFTData {
             fee: mintNFT.tx.fee.to_u128().unwrap(),
             fee_token: *mintNFT.tx.fee_token as u32,
