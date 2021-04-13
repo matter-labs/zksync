@@ -3,7 +3,7 @@
 use super::PriorityOp;
 use super::ZkSyncOp;
 use super::{AccountId, BlockNumber, Fr};
-use crate::SignedZkSyncTx;
+use crate::{tx::TxHash, SignedZkSyncTx};
 use chrono::Utc;
 use chrono::{DateTime, TimeZone};
 use parity_crypto::digest::sha256;
@@ -60,6 +60,19 @@ pub struct ExecutedPriorityOp {
     pub op: ZkSyncOp,
     pub block_index: u32,
     pub created_at: DateTime<Utc>,
+}
+
+impl ExecutedPriorityOp {
+    pub fn tx_hash(&self) -> TxHash {
+        let mut bytes = Vec::new();
+        bytes.extend_from_slice(&self.priority_op.eth_block.to_be_bytes());
+        bytes.extend_from_slice(&self.block_index.to_be_bytes());
+
+        let hash = sha256(&bytes);
+        let mut out = [0u8; 32];
+        out.copy_from_slice(&hash);
+        TxHash { data: out }
+    }
 }
 
 /// Representation of executed operation, which can be either L1 or L2.

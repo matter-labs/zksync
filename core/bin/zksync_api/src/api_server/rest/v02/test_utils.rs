@@ -557,6 +557,7 @@ impl TestServerConfig {
                     .to_vec(),
                 eth_block: 10,
                 created_at: chrono::Utc::now(),
+                tx_hash: Default::default(),
             },
             // Committed priority operation.
             NewExecutedPriorityOperation {
@@ -576,6 +577,7 @@ impl TestServerConfig {
                     .to_vec(),
                 eth_block: 14,
                 created_at: chrono::Utc::now(),
+                tx_hash: Default::default(),
             },
         ];
 

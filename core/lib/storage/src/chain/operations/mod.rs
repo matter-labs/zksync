@@ -2,7 +2,6 @@
 use std::time::Instant;
 // External imports
 use chrono::{Duration, Utc};
-use parity_crypto::digest::sha256;
 // Workspace imports
 use zksync_types::{tx::TxHash, BlockNumber};
 // Local imports
@@ -266,13 +265,6 @@ impl<'a, 'c> OperationsSchema<'a, 'c> {
     ) -> QueryResult<()> {
         let start = Instant::now();
 
-        let mut bytes = Vec::new();
-        bytes.extend_from_slice(&operation.eth_block.to_be_bytes());
-        bytes.extend_from_slice(&operation.block_index.to_be_bytes());
-        let hash = sha256(&bytes);
-        let mut tx_hash = Vec::new();
-        tx_hash.extend_from_slice(&hash);
-
         sqlx::query!(
             "INSERT INTO executed_priority_operations (block_number, block_index, operation, from_account, to_account, priority_op_serialid, deadline_block, eth_hash, eth_block, created_at, tx_hash)
             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
@@ -288,7 +280,7 @@ impl<'a, 'c> OperationsSchema<'a, 'c> {
             operation.eth_hash,
             operation.eth_block,
             operation.created_at,
-            tx_hash
+            operation.tx_hash,
         )
         .execute(self.0.conn())
         .await?;
