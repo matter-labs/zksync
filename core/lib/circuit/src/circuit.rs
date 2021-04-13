@@ -19,7 +19,7 @@ use zksync_crypto::franklin_crypto::{
 // Workspace deps
 use zksync_crypto::params::{
     self, FR_BIT_WIDTH_PADDED, NFT_STORAGE_ACCOUNT_ID, NFT_TOKEN_ID, OLD_SIGNED_TRANSFER_BIT_WIDTH,
-    SIGNED_FORCED_EXIT_BIT_WIDTH, SIGNED_TRANSFER_BIT_WIDTH,
+    SIGNED_FORCED_EXIT_BIT_WIDTH, SIGNED_MINT_NFT_BIT_WIDTH, SIGNED_TRANSFER_BIT_WIDTH,
 };
 use zksync_types::{
     operations::{ChangePubKeyOp, NoopOp},
@@ -1840,8 +1840,9 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
         is_a_geq_b: &Boolean,
         is_account_empty: &Boolean,
         op_data: &AllocatedOperationData<E>,
+        signer_key: &AllocatedSignerPubkey<E>,
         ext_pubdata_chunk: &AllocatedNum<E>,
-        is_valid_timestamp: &Boolean,
+        is_sig_verified: &Boolean,
         pubdata_holder: &mut Vec<AllocatedNum<E>>,
     ) -> Result<Boolean, SynthesisError> {
         assert!(
@@ -1921,14 +1922,43 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
                 pubdata_properly_copied,
                 is_pubdata_chunk_correct,
                 is_mintNFT_operation,
-                is_valid_timestamp.clone(),
             ],
         )?;
 
         let first_chunk_valid = {
             let mut flags = vec![common_valid, is_chunk_with_index[0]];
 
-            todo!(); // verify signature (using cur.address)
+            let mut serialized_tx_bits = vec![];
+            serialized_tx_bits.extend(global_variables.chunk_data.tx_type.get_bits_be()); // tx_type
+            serialized_tx_bits.extend(op_data.special_account_ids[0].get_bits_be()); // creator_id
+            serialized_tx_bits.extend(cur.account.address.get_bits_be()); // creator_address
+            serialized_tx_bits.extend(
+                op_data
+                    .special_content_hash
+                    .iter()
+                    .map(|bit| bit.get_bits_be())
+                    .flatten()
+                    .collect::<Vec<_>>(),
+            ); // content_hash
+            serialized_tx_bits.extend(op_data.special_eth_addresses[0].get_bits_be()); // recipient_address
+            serialized_tx_bits.extend(cur.token.get_bits_be()); // fee token
+            serialized_tx_bits.extend(op_data.fee_packed.get_bits_be()); // fee
+            serialized_tx_bits.extend(cur.account.nonce.get_bits_be()); // nonce
+            assert_eq!(serialized_tx_bits.len(), SIGNED_MINT_NFT_BIT_WIDTH);
+
+            let is_serialized_tx_correct = verify_signature_message_construction(
+                cs.namespace(|| "is_serialized_tx_correct"),
+                serialized_tx_bits,
+                &op_data,
+            )?;
+            flags.push(is_serialized_tx_correct);
+            let is_signer_valid = CircuitElement::equals(
+                cs.namespace(|| "signer_key_correct"),
+                &signer_key.pubkey.get_hash(),
+                &cur.account.pub_key_hash,
+            )?;
+            flags.push(is_signer_valid);
+            flags.push(is_sig_verified);
 
             let is_creator_account = Boolean::from(Expression::equals(
                 cs.namespace(|| "is_creator_account (first chunk)"),

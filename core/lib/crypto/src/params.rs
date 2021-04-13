@@ -202,6 +202,17 @@ pub const SIGNED_FORCED_EXIT_BIT_WIDTH: usize = TX_TYPE_BIT_WIDTH
     + NONCE_BIT_WIDTH
     + 2 * TIMESTAMP_BIT_WIDTH;
 
+/// Size of the data that is signed for mint nft tx
+pub const SIGNED_MINT_NFT_BIT_WIDTH: usize = TX_TYPE_BIT_WIDTH
+    + ACCOUNT_ID_BIT_WIDTH
+    + ADDRESS_WIDTH
+    + CONTENT_HASH_WIDTH
+    + ADDRESS_WIDTH
+    + TOKEN_BIT_WIDTH
+    + FEE_EXPONENT_BIT_WIDTH
+    + FEE_MANTISSA_BIT_WIDTH
+    + NONCE_BIT_WIDTH;
+
 /// Size of the data that is signed for change pubkey tx
 pub const SIGNED_CHANGE_PUBKEY_BIT_WIDTH: usize = TX_TYPE_BIT_WIDTH
     + ACCOUNT_ID_BIT_WIDTH
