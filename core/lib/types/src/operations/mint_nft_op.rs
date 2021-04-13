@@ -95,7 +95,6 @@ impl MintNFTOp {
 
         let nonce = 0; // It is unknown from pubdata
 
-        let time_range = Default::default();
         Ok(Self {
             tx: MintNFT::new(
                 AccountId(creator_account_id),
@@ -105,7 +104,6 @@ impl MintNFTOp {
                 fee,
                 TokenId(fee_token_id),
                 Nonce(nonce),
-                time_range,
                 None,
             ),
             creator_account_id: AccountId(creator_account_id),
@@ -138,7 +136,6 @@ mod tests {
                 BigUint::from(10u32),
                 TokenId(0),
                 Nonce(0),
-                Default::default(),
                 None,
             ),
             creator_account_id: AccountId(10),

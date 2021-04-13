@@ -39,9 +39,6 @@ pub struct MintNFT {
     pub fee_token: TokenId,
     /// Current account nonce.
     pub nonce: Nonce,
-    /// Time range when the transaction is valid
-    #[serde(flatten)]
-    pub time_range: TimeRange,
     /// Transaction zkSync signature.
     pub signature: TxSignature,
     #[serde(skip)]
@@ -65,7 +62,6 @@ impl MintNFT {
         fee: BigUint,
         fee_token: TokenId,
         nonce: Nonce,
-        time_range: TimeRange,
         signature: Option<TxSignature>,
     ) -> Self {
         let mut tx = Self {
@@ -76,7 +72,6 @@ impl MintNFT {
             fee,
             fee_token,
             nonce,
-            time_range,
             signature: signature.clone().unwrap_or_default(),
             cached_signer: VerifiedSignatureCache::NotCached,
         };
@@ -97,7 +92,6 @@ impl MintNFT {
         fee: BigUint,
         fee_token: TokenId,
         nonce: Nonce,
-        time_range: TimeRange,
         private_key: &PrivateKey,
     ) -> Result<Self, anyhow::Error> {
         let mut tx = Self::new(
@@ -108,7 +102,6 @@ impl MintNFT {
             fee,
             fee_token,
             nonce,
-            time_range,
             None,
         );
         tx.signature = TxSignature::sign_musig(private_key, &tx.get_bytes());
@@ -129,7 +122,6 @@ impl MintNFT {
         out.extend_from_slice(&pack_fee_amount(&self.fee));
         out.extend_from_slice(&self.fee_token.to_be_bytes());
         out.extend_from_slice(&self.nonce.to_be_bytes());
-        out.extend_from_slice(&self.time_range.to_be_bytes());
         out
     }
 
@@ -142,8 +134,7 @@ impl MintNFT {
         let mut valid = self.fee <= BigUint::from(u128::MAX)
             && is_fee_amount_packable(&self.fee)
             && self.creator_id <= max_account_id()
-            && self.fee_token <= max_fungible_token_id()
-            && self.time_range.check_correctness();
+            && self.fee_token <= max_fungible_token_id();
         if valid {
             let signer = self.verify_signature();
             valid = valid && signer.is_some();
