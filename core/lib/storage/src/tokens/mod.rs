@@ -6,7 +6,7 @@ use num::{rational::Ratio, BigUint};
 
 use thiserror::Error;
 // Workspace imports
-use zksync_types::{Token, TokenId, TokenLike, TokenPrice};
+use zksync_types::{AccountId, Address, BlockNumber, Token, TokenId, TokenLike, TokenPrice, H256};
 use zksync_utils::ratio_to_big_decimal;
 // Local imports
 use self::records::{DBMarketVolume, DbTickerPrice, DbToken};
@@ -343,6 +343,29 @@ impl<'a, 'c> TokensSchema<'a, 'c> {
         .await?;
 
         metrics::histogram!("sql.token.update_historical_ticker_price", start.elapsed());
+        Ok(())
+    }
+
+    pub async fn store_nft_factory(
+        &mut self,
+        creator_id: AccountId,
+        creator_address: Address,
+        factory_address: Address,
+    ) -> QueryResult<()> {
+        let start = Instant::now();
+        sqlx::query!(
+            r#"
+            INSERT INTO nft_factory ( creator_id, factory_address, creator_address )
+            VALUES ( $1, $2, $3 )
+            "#,
+            creator_id.0 as i32,
+            address_to_stored_string(&factory_address),
+            address_to_stored_string(&creator_address),
+        )
+        .fetch_optional(self.0.conn())
+        .await?;
+
+        metrics::histogram!("sql.token.store_nft_factory", start.elapsed());
         Ok(())
     }
 }

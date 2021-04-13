@@ -729,6 +729,20 @@
       "nullable": []
     }
   },
+  "1dfe010be8194296b893b596337eb89f95a1381c888e0723d7b7a950bd909122": {
+    "query": "\n            INSERT INTO nft_factory ( creator_id, factory_address, creator_address )\n            VALUES ( $1, $2, $3 )\n            ",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "Int4",
+          "Text",
+          "Text"
+        ]
+      },
+      "nullable": []
+    }
+  },
   "1e491f4afb54c10a9e4f2ea467bd7f219e7a32bdf741691cb6f350d50caae417": {
     "query": "\n            UPDATE forced_exit_requests\n                SET fulfilled_at = $1\n                WHERE id = $2\n            ",
     "describe": {

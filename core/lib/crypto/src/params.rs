@@ -60,18 +60,18 @@ pub const MIN_NFT_TOKEN_ID: u32 = 65536;
 
 /// Depth of the left subtree of the account tree that can be used in the current version of the circuit.
 pub fn used_account_subtree_depth() -> usize {
-    let num = 24; // total accounts = 2.pow(num) ~ 16mil
+    let num = 32; // total accounts = 2.pow(num) ~ 16mil
 
     assert!(num <= account_tree_depth());
 
     num
 }
 
-/// Max token id, based on the depth of the used left subtree
+/// Max account id, based on the depth of the used left subtree
 pub fn max_account_id() -> AccountId {
     let list_count = 2u32.saturating_pow(used_account_subtree_depth() as u32);
     if list_count == u32::MAX {
-        AccountId(list_count)
+        AccountId(list_count - 2)
     } else {
         AccountId(list_count - 1)
     }

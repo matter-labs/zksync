@@ -12,11 +12,14 @@ use web3::{
 
 use zksync_contracts::{governance_contract, zksync_contract};
 use zksync_eth_client::ethereum_gateway::EthereumGateway;
-use zksync_types::{Address, NewTokenEvent, Nonce, PriorityOp, H160, U256};
+use zksync_types::{
+    Address, NewTokenEvent, Nonce, PriorityOp, RegisterNFTFactoryEvent, H160, U256,
+};
 
 struct ContractTopics {
     new_priority_request: Hash,
     new_token: Hash,
+    register_factory: Hash,
 }
 
 impl ContractTopics {
@@ -30,6 +33,10 @@ impl ContractTopics {
                 .event("NewToken")
                 .expect("main contract abi error")
                 .signature(),
+            register_factory: zksync_contract
+                .event("RegisterNFTFactory")
+                .expect("main contract abi error")
+                .signature(),
         }
     }
 }
@@ -41,6 +48,11 @@ pub trait EthClient {
         from: BlockNumber,
         to: BlockNumber,
     ) -> anyhow::Result<Vec<PriorityOp>>;
+    async fn get_new_register_nft_factory_events(
+        &self,
+        from: BlockNumber,
+        to: BlockNumber,
+    ) -> anyhow::Result<Vec<RegisterNFTFactoryEvent>>;
     async fn get_new_tokens_events(
         &self,
         from: BlockNumber,
@@ -127,6 +139,23 @@ impl EthClient for EthHttpClient {
             .get_events(from, to, vec![self.topics.new_priority_request])
             .await;
         metrics::histogram!("eth_watcher.get_priority_op_events", start.elapsed());
+        result
+    }
+
+    async fn get_new_register_nft_factory_events(
+        &self,
+        from: BlockNumber,
+        to: BlockNumber,
+    ) -> anyhow::Result<Vec<RegisterNFTFactoryEvent>> {
+        let start = Instant::now();
+
+        let result = self
+            .get_events(from, to, vec![self.topics.register_factory])
+            .await;
+        metrics::histogram!(
+            "eth_watcher.get_new_register_nft_factory_events",
+            start.elapsed()
+        );
         result
     }
 
