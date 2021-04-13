@@ -68,6 +68,42 @@ impl BigUintSerdeAsRadix10Str {
     }
 }
 
+/// Used to serialize BigUint as radix 10 string.
+#[derive(Clone, Debug)]
+pub struct BigUintPairSerdeAsRadix10Str;
+
+impl BigUintPairSerdeAsRadix10Str {
+    pub fn serialize<S>(pair: &(BigUint, BigUint), serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        <(BigDecimal, BigDecimal)>::serialize(
+            &(
+                BigDecimal::from(pair.0.to_bigint().unwrap()),
+                BigDecimal::from(pair.1.to_bigint().unwrap()),
+            ),
+            serializer,
+        )
+    }
+
+    pub fn deserialize<'de, D>(deserializer: D) -> Result<(BigUint, BigUint), D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        use serde::de::Error;
+        let convert = |bigdecimal: BigDecimal| {
+            bigdecimal
+                .to_bigint()
+                .ok_or_else(|| Error::custom("Expected integer value"))?
+                .to_biguint()
+                .ok_or_else(|| Error::custom("Expected positive value"))
+        };
+
+        <(BigDecimal, BigDecimal)>::deserialize(deserializer)
+            .and_then(|(a, b)| Ok((convert(a)?, convert(b)?)))
+    }
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize, Default, Ord, PartialOrd, Eq, PartialEq, Hash)]
 pub struct BigUintSerdeWrapper(#[serde(with = "BigUintSerdeAsRadix10Str")] pub BigUint);
 
@@ -221,5 +257,26 @@ mod test {
         let uint: BigUintSerdeWrapper =
             serde_json::from_value(value).expect("cannot deserialize BigUintSerdeWrapper");
         assert_eq!(uint.0, expected);
+    }
+
+    /// Tests that `BigUintPair` serializer works correctly.
+    #[test]
+    fn test_serde_big_uint_pair() {
+        #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+        struct Wrapper {
+            #[serde(with = "BigUintPairSerdeAsRadix10Str")]
+            pair: (BigUint, BigUint),
+        }
+
+        let wrapper = Wrapper {
+            pair: (BigUint::from(u64::MAX), BigUint::from(u64::MAX)),
+        };
+
+        let serialized =
+            serde_json::to_value(wrapper.clone()).expect("cannot serialize BigUintSerdeWrapper");
+        let deserialized: Wrapper =
+            serde_json::from_value(serialized).expect("cannot deserialize BigUintSerdeWrapper");
+
+        assert_eq!(wrapper, deserialized);
     }
 }

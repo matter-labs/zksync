@@ -4,11 +4,12 @@ mod change_pubkey;
 mod close;
 mod forced_exit;
 mod primitives;
+mod swap;
 mod transfer;
 mod withdraw;
 mod zksync_tx;
-
 mod mint_nft;
+
 #[cfg(test)]
 mod tests;
 
@@ -21,6 +22,7 @@ pub use self::{
         ChangePubKeyType,
     },
     forced_exit::ForcedExit,
+    swap::{Order, Swap},
     mint_nft::MintNFT,
     transfer::Transfer,
     withdraw::Withdraw,

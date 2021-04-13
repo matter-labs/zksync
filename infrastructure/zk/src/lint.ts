@@ -45,7 +45,7 @@ async function clippy() {
 }
 
 export const command = new Command('lint')
-    .description('lint non-rust code')
+    .description('lint code')
     .option('--check')
     .arguments('[extension]')
     .action(async (extension: string | null, cmd: Command) => {
@@ -55,7 +55,6 @@ export const command = new Command('lint')
             for (const ext of EXTENSIONS) {
                 await lint(ext, cmd.check);
             }
-
             await clippy();
         }
     });

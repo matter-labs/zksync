@@ -13,11 +13,13 @@ use web3::types::Bytes;
 use crate::{
     account::PubKeyHash,
     operations::{
-        ChangePubKeyOp, DepositOp, ForcedExitOp, FullExitOp, NoopOp, TransferOp, TransferToNewOp,
-        WithdrawOp,
+        ChangePubKeyOp, DepositOp, ForcedExitOp, FullExitOp, NoopOp, SwapOp, TransferOp,
+        TransferToNewOp, WithdrawOp,
     },
     priority_ops::{Deposit, FullExit},
-    tx::{ChangePubKey, ForcedExit, PackedEthSignature, TimeRange, Transfer, Withdraw},
+    tx::{
+        ChangePubKey, ForcedExit, Order, PackedEthSignature, Swap, TimeRange, Transfer, Withdraw,
+    },
     Log, PriorityOp,
 };
 use lazy_static::lazy_static;
@@ -37,6 +39,7 @@ pub mod operations_test {
     const FULL_EXIT_PUBLIC_DATA: &str = "060000002a2a0a81e257a2f5d6ed4f07b81dbda09f107bd026002a000000000000000000000000000000000000000000000000000000";
     const CHANGE_PUBKEY_PUBLIC_DATA: &str = "070000002a3cfb9a39096d9e02b24187355f628f9a6331511b2a0a81e257a2f5d6ed4f07b81dbda09f107bd0260000002a002a054000";
     const FORCED_EXIT_PUBLIC_DATA: &str = "080000002a0000002a002a0000000000000000000000000000000005402a0a81e257a2f5d6ed4f07b81dbda09f107bd0260000000000";
+    const SWAP_PUBLIC_DATA: &str = "0a000000050000000600000007000000080000002a00070001002d00000012200000001b200580020000000000000000000000000000";
 
     #[test]
     fn test_public_data_conversions_noop() {
@@ -205,6 +208,54 @@ pub mod operations_test {
     }
 
     #[test]
+    fn test_public_data_conversions_swap() {
+        let expected_op = {
+            let tx = Swap::new(
+                AccountId(42),
+                Address::from_str("2a0a81e257a2f5d6ed4f07b81dbda09f107bd026").unwrap(),
+                Nonce(43),
+                (
+                    Order {
+                        account_id: AccountId(5),
+                        nonce: Nonce(123),
+                        recipient_id: AccountId(6),
+                        token_buy: TokenId(1),
+                        token_sell: TokenId(7),
+                        amount: BigUint::from(0u8),
+                        price: (BigUint::from(1u8), BigUint::from(2u8)),
+                        time_range: TimeRange::new(0, 1 << 31),
+                        signature: Default::default(),
+                    },
+                    Order {
+                        account_id: AccountId(7),
+                        nonce: Nonce(100),
+                        recipient_id: AccountId(8),
+                        token_buy: TokenId(7),
+                        token_sell: TokenId(1),
+                        amount: BigUint::from(12345u32),
+                        price: (BigUint::from(2u8), BigUint::from(1u8)),
+                        time_range: TimeRange::new(0, 1 << 31),
+                        signature: Default::default(),
+                    },
+                ),
+                (BigUint::from(145u32), BigUint::from(217u32)),
+                BigUint::from(44u32),
+                TokenId(45),
+                None,
+            );
+
+            SwapOp {
+                tx,
+                submitter: AccountId(42),
+                accounts: (AccountId(5), AccountId(7)),
+                recipients: (AccountId(6), AccountId(8)),
+            }
+        };
+
+        assert_eq!(hex::encode(expected_op.get_public_data()), SWAP_PUBLIC_DATA);
+    }
+
+    #[test]
     fn test_withdrawal_data() {
         let (withdraw, forced_exit, full_exit) = (
             WithdrawOp::from_public_data(&hex::decode(WITHDRAW_PUBLIC_DATA).unwrap()).unwrap(),
@@ -268,6 +319,12 @@ pub mod tx_conversion_test {
         static ref AMOUNT: BigUint = BigUint::from(12345678u64);
         static ref FEE: BigUint = BigUint::from(1000000u32);
         static ref TIME_RANGE: TimeRange = TimeRange::new(VALID_FROM, VALID_UNTIL);
+    }
+
+    #[ignore]
+    #[test]
+    fn test_convert_to_bytes_swap() {
+        todo!(); // Part of (ZKS-593)
     }
 
     #[test]

@@ -10,7 +10,7 @@ use zksync_types::block::{Block, ExecutedOperations, ExecutedPriorityOp, Execute
 use zksync_types::operations::ZkSyncOp;
 use zksync_types::priority_ops::PriorityOp;
 use zksync_types::priority_ops::ZkSyncPriorityOp;
-use zksync_types::tx::{ChangePubKey, Close, ForcedExit, Transfer, Withdraw, ZkSyncTx};
+use zksync_types::tx::{ChangePubKey, Close, ForcedExit, Swap, Transfer, Withdraw, ZkSyncTx};
 use zksync_types::{AccountId, AccountMap, AccountUpdates, Address, BlockNumber, H256};
 
 /// Rollup accounts states
@@ -132,11 +132,11 @@ impl TreeState {
                     let from = self
                         .state
                         .get_account(op.from)
-                        .ok_or_else(|| format_err!("TransferFail: Nonexistent account"))?;
+                        .ok_or_else(|| format_err!("Transfer Fail: Nonexistent account"))?;
                     let to = self
                         .state
                         .get_account(op.to)
-                        .ok_or_else(|| format_err!("TransferFail: Nonexistent account"))?;
+                        .ok_or_else(|| format_err!("Transfer Fail: Nonexistent account"))?;
                     op.tx.from = from.address;
                     op.tx.to = to.address;
                     op.tx.nonce = from.nonce;
@@ -146,7 +146,7 @@ impl TreeState {
                     let tx = ZkSyncTx::Transfer(Box::new(op.tx.clone()));
                     let (fee, updates) =
                         <ZkSyncState as TxHandler<Transfer>>::apply_op(&mut self.state, &raw_op)
-                            .map_err(|e| format_err!("Withdraw fail: {}", e))?;
+                            .map_err(|e| format_err!("Transfer fail: {}", e))?;
                     let tx_result = OpSuccess {
                         fee,
                         updates,
@@ -272,6 +272,43 @@ impl TreeState {
                         fee,
                         updates,
                         executed_op: ZkSyncOp::ChangePubKeyOffchain(op),
+                    };
+                    current_op_block_index = self.update_from_tx(
+                        tx,
+                        tx_result,
+                        &mut fees,
+                        &mut accounts_updated,
+                        current_op_block_index,
+                        &mut ops,
+                    );
+                }
+                ZkSyncOp::Swap(mut op) => {
+                    let submitter = self
+                        .state
+                        .get_account(op.submitter)
+                        .ok_or_else(|| format_err!("Swap Fail: Nonexistent account"))?;
+                    let account_0 = self
+                        .state
+                        .get_account(op.submitter)
+                        .ok_or_else(|| format_err!("Swap Fail: Nonexistent account"))?;
+                    let account_1 = self
+                        .state
+                        .get_account(op.submitter)
+                        .ok_or_else(|| format_err!("Swap Fail: Nonexistent account"))?;
+
+                    op.tx.submitter_address = submitter.address;
+                    op.tx.orders.0.nonce = account_0.nonce;
+                    op.tx.orders.1.nonce = account_1.nonce;
+                    op.tx.nonce = submitter.nonce;
+
+                    let tx = ZkSyncTx::Swap(Box::new(op.tx.clone()));
+                    let (fee, updates) =
+                        <ZkSyncState as TxHandler<Swap>>::apply_op(&mut self.state, &op)
+                            .map_err(|e| format_err!("Swap fail: {}", e))?;
+                    let tx_result = OpSuccess {
+                        fee,
+                        updates,
+                        executed_op: ZkSyncOp::Swap(op),
                     };
                     current_op_block_index = self.update_from_tx(
                         tx,
