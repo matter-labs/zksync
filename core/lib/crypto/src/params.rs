@@ -27,7 +27,8 @@ pub fn balance_tree_depth() -> usize {
 
 /// Number of supported tokens.
 pub fn total_tokens() -> usize {
-    2usize.pow(balance_tree_depth() as u32)
+    // Exclude  NFT_TOKEN_ID
+    2usize.pow(balance_tree_depth() as u32) - 2
 }
 /// NFT settings
 
@@ -43,8 +44,7 @@ pub const MIN_NFT_TOKEN_ID: u32 = 10000;
 
 /// Number of tokens that are processed by this release
 pub fn number_of_processable_tokens() -> usize {
-    let num = 512;
-
+    let num = total_tokens();
     assert!(num <= total_tokens());
     assert!(num.is_power_of_two());
 
