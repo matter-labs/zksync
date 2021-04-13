@@ -282,6 +282,7 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
     function requestFullExit(uint32 _accountId, address _token) public nonReentrant {
         requireActive();
         require(_accountId <= MAX_ACCOUNT_ID, "e");
+        require(_accountId != (2**32) - 2, "v"); // request full exit for nft storage account
 
         uint16 tokenId;
         if (_token == address(0)) {
