@@ -65,7 +65,7 @@ pub use self::operations::{
     WithdrawOp, ZkSyncOp,
 };
 pub use self::priority_ops::{Deposit, FullExit, PriorityOp, ZkSyncPriorityOp};
-pub use self::tokens::{Token, TokenGenesisListItem, TokenLike, TokenPrice, TxFeeTypes, NFT};
+pub use self::tokens::{NewTokenEvent, Token, TokenInfo, TokenLike, TokenPrice, TxFeeTypes, NFT};
 pub use self::tx::{ForcedExit, MintNFT, SignedZkSyncTx, Transfer, Withdraw, ZkSyncTx};
 
 #[doc(hidden)]

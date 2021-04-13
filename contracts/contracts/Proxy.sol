@@ -11,7 +11,7 @@ import "./UpgradeableMaster.sol";
 /// @author Matter Labs
 contract Proxy is Upgradeable, UpgradeableMaster, Ownable {
     /// @dev Storage position of "target" (actual implementation address: keccak256('eip1967.proxy.implementation') - 1)
-    bytes32 private constant targetPosition = 0x360894a13ba1a3210667c828492db98dca3e2076cc3735a920a3ca505d382bbc;
+    bytes32 private constant TARGET_POSITION = 0x360894a13ba1a3210667c828492db98dca3e2076cc3735a920a3ca505d382bbc;
 
     /// @notice Contract constructor
     /// @dev Calls Ownable contract constructor and initialize target
@@ -37,7 +37,7 @@ contract Proxy is Upgradeable, UpgradeableMaster, Ownable {
     /// @notice Returns target of contract
     /// @return target Actual implementation address
     function getTarget() public view returns (address target) {
-        bytes32 position = targetPosition;
+        bytes32 position = TARGET_POSITION;
         assembly {
             target := sload(position)
         }
@@ -46,7 +46,7 @@ contract Proxy is Upgradeable, UpgradeableMaster, Ownable {
     /// @notice Sets new target of contract
     /// @param _newTarget New actual implementation address
     function setTarget(address _newTarget) internal {
-        bytes32 position = targetPosition;
+        bytes32 position = TARGET_POSITION;
         assembly {
             sstore(position, _newTarget)
         }

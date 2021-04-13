@@ -31,9 +31,9 @@ pub struct TransactionsHistoryTestSetup {
 impl TransactionsHistoryTestSetup {
     pub fn new() -> Self {
         let tokens = vec![
-            Token::new(TokenId(0), Address::zero(), "ETH", 18, false), // used for deposits
-            Token::new(TokenId(1), Address::random(), "DAI", 18, false), // used for transfers
-            Token::new(TokenId(2), Address::random(), "FAU", 6, false), // used for withdraws
+            Token::new(TokenId(0), Address::zero(), "ETH", 18), // used for deposits
+            Token::new(TokenId(1), Address::random(), "DAI", 18), // used for transfers
+            Token::new(TokenId(2), Address::random(), "FAU", 6), // used for withdraws
         ];
 
         let from_account_id = AccountId(0xbabe);

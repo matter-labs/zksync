@@ -43,7 +43,7 @@ export async function unpack() {
 export async function pack() {
     const keysTarball = verfiyKeysTarball();
     fs.mkdirSync('keys/packed', { recursive: true });
-    await utils.exec(`tar cvzf keys/packed/${keysTarball}  ${process.env.KEY_DIR}/*`);
+    await utils.exec(`tar cvzf keys/packed/${keysTarball}  ${process.env.CHAIN_CIRCUIT_KEY_DIR}/*`);
     console.log('Keys packed');
 }
 

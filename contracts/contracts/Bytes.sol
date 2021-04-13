@@ -159,89 +159,89 @@ library Bytes {
     }
 
     /// Reads byte stream
-    /// @return new_offset - offset + amount of bytes read
+    /// @return newOffset - offset + amount of bytes read
     /// @return data - actually read data
     // NOTE: theoretically possible overflow of (_offset + _length)
     function read(
         bytes memory _data,
         uint256 _offset,
         uint256 _length
-    ) internal pure returns (uint256 new_offset, bytes memory data) {
+    ) internal pure returns (uint256 newOffset, bytes memory data) {
         data = slice(_data, _offset, _length);
-        new_offset = _offset + _length;
+        newOffset = _offset + _length;
     }
 
     // NOTE: theoretically possible overflow of (_offset + 1)
-    function readBool(bytes memory _data, uint256 _offset) internal pure returns (uint256 new_offset, bool r) {
-        new_offset = _offset + 1;
+    function readBool(bytes memory _data, uint256 _offset) internal pure returns (uint256 newOffset, bool r) {
+        newOffset = _offset + 1;
         r = uint8(_data[_offset]) != 0;
     }
 
     // NOTE: theoretically possible overflow of (_offset + 1)
-    function readUint8(bytes memory _data, uint256 _offset) internal pure returns (uint256 new_offset, uint8 r) {
-        new_offset = _offset + 1;
+    function readUint8(bytes memory _data, uint256 _offset) internal pure returns (uint256 newOffset, uint8 r) {
+        newOffset = _offset + 1;
         r = uint8(_data[_offset]);
     }
 
     // NOTE: theoretically possible overflow of (_offset + 2)
-    function readUInt16(bytes memory _data, uint256 _offset) internal pure returns (uint256 new_offset, uint16 r) {
-        new_offset = _offset + 2;
+    function readUInt16(bytes memory _data, uint256 _offset) internal pure returns (uint256 newOffset, uint16 r) {
+        newOffset = _offset + 2;
         r = bytesToUInt16(_data, _offset);
     }
 
     // NOTE: theoretically possible overflow of (_offset + 3)
-    function readUInt24(bytes memory _data, uint256 _offset) internal pure returns (uint256 new_offset, uint24 r) {
-        new_offset = _offset + 3;
+    function readUInt24(bytes memory _data, uint256 _offset) internal pure returns (uint256 newOffset, uint24 r) {
+        newOffset = _offset + 3;
         r = bytesToUInt24(_data, _offset);
     }
 
     // NOTE: theoretically possible overflow of (_offset + 4)
-    function readUInt32(bytes memory _data, uint256 _offset) internal pure returns (uint256 new_offset, uint32 r) {
-        new_offset = _offset + 4;
+    function readUInt32(bytes memory _data, uint256 _offset) internal pure returns (uint256 newOffset, uint32 r) {
+        newOffset = _offset + 4;
         r = bytesToUInt32(_data, _offset);
     }
 
     // NOTE: theoretically possible overflow of (_offset + 16)
-    function readUInt128(bytes memory _data, uint256 _offset) internal pure returns (uint256 new_offset, uint128 r) {
-        new_offset = _offset + 16;
+    function readUInt128(bytes memory _data, uint256 _offset) internal pure returns (uint256 newOffset, uint128 r) {
+        newOffset = _offset + 16;
         r = bytesToUInt128(_data, _offset);
     }
 
     // NOTE: theoretically possible overflow of (_offset + 20)
-    function readUInt160(bytes memory _data, uint256 _offset) internal pure returns (uint256 new_offset, uint160 r) {
-        new_offset = _offset + 20;
+    function readUInt160(bytes memory _data, uint256 _offset) internal pure returns (uint256 newOffset, uint160 r) {
+        newOffset = _offset + 20;
         r = bytesToUInt160(_data, _offset);
     }
 
     // NOTE: theoretically possible overflow of (_offset + 20)
-    function readAddress(bytes memory _data, uint256 _offset) internal pure returns (uint256 new_offset, address r) {
-        new_offset = _offset + 20;
+    function readAddress(bytes memory _data, uint256 _offset) internal pure returns (uint256 newOffset, address r) {
+        newOffset = _offset + 20;
         r = bytesToAddress(_data, _offset);
     }
 
     // NOTE: theoretically possible overflow of (_offset + 20)
-    function readBytes20(bytes memory _data, uint256 _offset) internal pure returns (uint256 new_offset, bytes20 r) {
-        new_offset = _offset + 20;
+    function readBytes20(bytes memory _data, uint256 _offset) internal pure returns (uint256 newOffset, bytes20 r) {
+        newOffset = _offset + 20;
         r = bytesToBytes20(_data, _offset);
     }
 
     // NOTE: theoretically possible overflow of (_offset + 32)
-    function readBytes32(bytes memory _data, uint256 _offset) internal pure returns (uint256 new_offset, bytes32 r) {
-        new_offset = _offset + 32;
+    function readBytes32(bytes memory _data, uint256 _offset) internal pure returns (uint256 newOffset, bytes32 r) {
+        newOffset = _offset + 32;
         r = bytesToBytes32(_data, _offset);
     }
 
     /// Trim bytes into single word
-    function trim(bytes memory _data, uint256 _new_length) internal pure returns (uint256 r) {
-        require(_new_length <= 0x20, "10"); // new_length is longer than word
-        require(_data.length >= _new_length, "11"); // data is to short
+    function trim(bytes memory _data, uint256 _newLength) internal pure returns (uint256 r) {
+        require(_newLength <= 0x20, "10"); // new_length is longer than word
+        require(_data.length >= _newLength, "11"); // data is to short
 
         uint256 a;
         assembly {
             a := mload(add(_data, 0x20)) // load bytes into uint256
         }
 
-        return a >> ((0x20 - _new_length) * 8);
+        return a >> ((0x20 - _newLength) * 8);
     }
 
     // Helper function for hex conversion.

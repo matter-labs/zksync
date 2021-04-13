@@ -32,7 +32,6 @@ fn mint_success() {
         fee.clone(),
         fee_token_id,
         creator_account.nonce,
-        Default::default(),
         &creator_sk,
     )
     .unwrap();
@@ -142,7 +141,6 @@ fn mint_success() {
         fee.clone(),
         fee_token_id,
         creator_account.nonce,
-        Default::default(),
         &creator_sk,
     )
     .unwrap();
@@ -269,7 +267,6 @@ fn mint_token_to_new_account() {
         fee.clone(),
         fee_token_id,
         creator_account.nonce,
-        Default::default(),
         &sk,
     )
     .unwrap();
@@ -426,7 +423,6 @@ fn mint_already_created_nft() {
         fee,
         fee_token_id,
         creator_account.nonce,
-        Default::default(),
         &creator_sk,
     )
     .unwrap();

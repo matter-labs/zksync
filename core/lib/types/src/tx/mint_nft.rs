@@ -7,7 +7,7 @@ use zksync_crypto::{
     convert::FeConvert,
     franklin_crypto::bellman::{
         pairing::bn256::{Bn256, Fr, FrRepr},
-        PrimeField, PrimeFieldRepr,
+        PrimeField,
     },
     params::{max_account_id, max_fungible_token_id},
     PrivateKey,
@@ -17,7 +17,7 @@ use zksync_utils::{format_units, BigUintSerdeAsRadix10Str};
 
 use crate::{
     helpers::{is_fee_amount_packable, pack_fee_amount},
-    tx::{TimeRange, TxSignature, VerifiedSignatureCache},
+    tx::{TxSignature, VerifiedSignatureCache},
     AccountId, Address, Nonce, PubKeyHash, TokenId, H256,
 };
 
@@ -192,9 +192,7 @@ impl MintNFT {
         let repr = FrRepr::from(value);
         let value_fr = Fr::from_repr(repr).expect("a Fr");
 
-        let mut repr = FrRepr::default();
-        repr.read_le(self.content_hash.as_bytes()).expect("a Fr");
-        let content_hash = Fr::from_repr(repr).expect("a Fr");
+        let content_hash = Fr::from_bytes(self.content_hash.as_bytes()).expect("a Fr");
 
         let result = rescue_hash::<Bn256, 2>(&[value_fr, content_hash]);
         result[0].to_bytes()

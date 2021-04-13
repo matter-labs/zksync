@@ -73,7 +73,11 @@ export async function rust() {
     await rustApi(true);
     await prover();
     const { stdout: threads } = await utils.exec('nproc');
-    await circuit(parseInt(threads));
+    let circuitTestsThreads = Math.trunc(parseInt(threads) / 4); // if we use all CPUs tests can consume all RAM
+    if (circuitTestsThreads < 3) {
+        circuitTestsThreads = 3;
+    }
+    await circuit(circuitTestsThreads);
     await rustCryptoTests();
 }
 

@@ -8,12 +8,12 @@ use zksync_types::{tx::TxSignature, AccountId, Nonce, TokenId};
 fn test_tokens_cache() {
     let mut tokens: HashMap<String, Token> = HashMap::default();
 
-    let token_eth = Token::new(TokenId(0), H160::default(), "ETH", 18, false);
+    let token_eth = Token::new(TokenId(0), H160::default(), "ETH", 18);
     tokens.insert("ETH".to_string(), token_eth.clone());
-    let token_dai = Token::new(TokenId(1), H160::random(), "DAI", 18, false);
+    let token_dai = Token::new(TokenId(1), H160::random(), "DAI", 18);
     tokens.insert("DAI".to_string(), token_dai.clone());
 
-    let uncahed_token = Token::new(TokenId(2), H160::random(), "UNC", 5, false);
+    let uncahed_token = Token::new(TokenId(2), H160::random(), "UNC", 5);
 
     let tokens_hash = TokensCache::new(tokens);
 
@@ -473,9 +473,7 @@ mod wallet_tests {
                 .map(|(id, token)| Token {
                     id: TokenId(id),
                     symbol: token.symbol.clone(),
-                    address: token.address[2..]
-                        .parse()
-                        .expect("failed to parse token address"),
+                    address: token.address,
                     decimals: token.decimals,
                     is_nft: false,
                 })

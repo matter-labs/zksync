@@ -6,17 +6,15 @@ import 'hardhat-contract-sizer';
 
 const prodConfig = {
     // UPGRADE_NOTICE_PERIOD: 0,
-    MAX_AMOUNT_OF_REGISTERED_TOKENS: 127,
+    MAX_AMOUNT_OF_REGISTERED_TOKENS: 511,
     // PRIORITY_EXPIRATION: 101,
-    DUMMY_VERIFIER: false,
-    UPGRADE_FROM_V3: true
+    DUMMY_VERIFIER: false
 };
 const testnetConfig = {
     UPGRADE_NOTICE_PERIOD: 0,
-    MAX_AMOUNT_OF_REGISTERED_TOKENS: 127,
+    MAX_AMOUNT_OF_REGISTERED_TOKENS: 511,
     // PRIORITY_EXPIRATION: 101,
-    DUMMY_VERIFIER: false,
-    UPGRADE_FROM_V3: true
+    DUMMY_VERIFIER: false
 };
 const testConfig = {
     UPGRADE_NOTICE_PERIOD: 0,

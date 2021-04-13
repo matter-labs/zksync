@@ -1,8 +1,9 @@
-use crate::{tx::ChangePubKeyType, AccountId, Address, TokenId, H256};
+use crate::{tx::ChangePubKeyType, Address, Log, TokenId, U256};
 use chrono::{DateTime, Utc};
 use num::{rational::Ratio, BigUint};
 use serde::{Deserialize, Serialize};
-use std::{fmt, fs::read_to_string, path::PathBuf, str::FromStr};
+use std::{convert::TryFrom, fmt, fs::read_to_string, path::PathBuf, str::FromStr};
+use zksync_basic_types::{AccountId, H256};
 use zksync_utils::parse_env;
 use zksync_utils::UnsignedRatioSerializeAsDecimal;
 
@@ -96,32 +97,91 @@ pub struct Token {
     pub is_nft: bool,
 }
 
-/// Tokens that added when deploying contract
+impl Token {
+    pub fn new(id: TokenId, address: Address, symbol: &str, decimals: u8) -> Self {
+        Self {
+            id,
+            address,
+            symbol: symbol.to_string(),
+            decimals,
+            is_nft: false,
+        }
+    }
+
+    pub fn new_nft(id: TokenId, address: Address, symbol: &str, decimals: u8) -> Self {
+        Self {
+            id,
+            address,
+            symbol: symbol.to_string(),
+            decimals,
+            is_nft: true,
+        }
+    }
+}
+
+/// ERC-20 standard token.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct TokenGenesisListItem {
+pub struct TokenInfo {
     /// Address (prefixed with 0x)
-    pub address: String,
+    pub address: Address,
     /// Powers of 10 in 1.0 token (18 for default ETH-like tokens)
     pub decimals: u8,
     /// Token symbol
     pub symbol: String,
 }
 
-impl Token {
-    pub fn new(id: TokenId, address: Address, symbol: &str, decimals: u8, is_nft: bool) -> Self {
+impl TokenInfo {
+    pub fn new(address: Address, symbol: &str, decimals: u8) -> Self {
         Self {
-            id,
             address,
             symbol: symbol.to_string(),
             decimals,
-            is_nft,
         }
+    }
+}
+
+/// Tokens that added through a contract.
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct NewTokenEvent {
+    pub eth_block_number: u64,
+    pub address: Address,
+    pub id: TokenId,
+}
+
+impl TryFrom<Log> for NewTokenEvent {
+    type Error = anyhow::Error;
+
+    fn try_from(event: Log) -> Result<NewTokenEvent, anyhow::Error> {
+        // `event NewToken(address indexed token, uint16 indexed tokenId)`
+        //  Event has such a signature, so let's check that the number of topics is equal to the number of parameters + 1.
+        if event.topics.len() != 3 {
+            return Err(anyhow::format_err!(
+                "Failed to parse NewTokenEvent: {:#?}",
+                event
+            ));
+        }
+
+        let eth_block_number = match event.block_number {
+            Some(block_number) => block_number.as_u64(),
+            None => {
+                return Err(anyhow::format_err!(
+                    "Failed to parse NewTokenEvent: {:#?}",
+                    event
+                ))
+            }
+        };
+
+        Ok(NewTokenEvent {
+            eth_block_number,
+            address: Address::from_slice(&event.topics[1].as_fixed_bytes()[12..]),
+            id: TokenId(U256::from_big_endian(&event.topics[2].as_fixed_bytes()[..]).as_u32()),
+        })
     }
 }
 
 // Hidden as it relies on the filesystem structure, which can be different for reverse dependencies.
 #[doc(hidden)]
-pub fn get_genesis_token_list(network: &str) -> Result<Vec<TokenGenesisListItem>, anyhow::Error> {
+pub fn get_genesis_token_list(network: &str) -> anyhow::Result<Vec<TokenInfo>> {
     let mut file_path = parse_env::<PathBuf>("ZKSYNC_HOME");
     file_path.push("etc");
     file_path.push("tokens");

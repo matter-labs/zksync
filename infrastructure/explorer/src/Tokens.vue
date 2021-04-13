@@ -93,7 +93,6 @@ export default {
         async update() {
             const client = await clientPromise;
             this.tokens = await client.loadTokens();
-            this.tokens.sort((a, b) => a.symbol.localeCompare(b.symbol));
             this.loading = false;
         },
         urlForToken(address) {

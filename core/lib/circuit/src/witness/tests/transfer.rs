@@ -20,6 +20,7 @@ use crate::witness::{
     transfer::TransferWitness,
     utils::SigDataInput,
 };
+use zksync_crypto::params::number_of_processable_tokens;
 
 /// Basic check for execution of `Transfer` operation in circuit.
 /// Here we create two accounts and perform a transfer between them.
@@ -78,6 +79,53 @@ fn test_transfer_success() {
             },
         );
     }
+}
+
+/// Check for execution of `Transfer` to self works with max token id.
+/// Here we create one accounts and perform a transfer to self.
+#[test]
+#[ignore]
+fn test_transfer_to_self_max_token_id() {
+    let max_token_id = TokenId(number_of_processable_tokens() as u32 - 1);
+    // Input data.
+    let mut account = WitnessTestAccount::new(AccountId(1), 10);
+    account.account.add_balance(max_token_id, &10u32.into());
+    let accounts = vec![account];
+    let account = &accounts[0];
+    let transfer_op = TransferOp {
+        tx: account
+            .zksync_account
+            .sign_transfer(
+                max_token_id,
+                "",
+                BigUint::from(7u32),
+                BigUint::from(3u32),
+                &account.account.address,
+                None,
+                true,
+                Default::default(),
+            )
+            .0,
+        from: account.id,
+        to: account.id,
+    };
+
+    // Additional data required for performing the operation.
+    let input = SigDataInput::from_transfer_op(&transfer_op).expect("SigDataInput creation failed");
+
+    generic_test_scenario::<TransferWitness<Bn256>, _>(
+        &accounts,
+        transfer_op,
+        input,
+        |plasma_state, op| {
+            let raw_op = TransferOutcome::Transfer(op.clone());
+            let fee = <ZkSyncState as TxHandler<Transfer>>::apply_op(plasma_state, &raw_op)
+                .expect("Operation failed")
+                .0
+                .unwrap();
+            vec![fee]
+        },
+    );
 }
 
 /// Check for execution of `Transfer` operation with recipient same as sender in circuit.

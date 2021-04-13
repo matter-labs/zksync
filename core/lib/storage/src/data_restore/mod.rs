@@ -11,7 +11,10 @@ use self::records::{
 };
 
 use crate::chain::operations::OperationsSchema;
-use crate::{chain::state::StateSchema, tokens::TokensSchema};
+use crate::{
+    chain::state::StateSchema,
+    tokens::{StoreTokenError, TokensSchema},
+};
 use crate::{QueryResult, StorageProcessor};
 use zksync_types::aggregated_operations::{
     AggregatedActionType, AggregatedOperation, BlocksCommitOperation, BlocksExecuteOperation,
@@ -196,8 +199,16 @@ impl<'a, 'c> DataRestoreSchema<'a, 'c> {
             // The only way to know decimals is to query ERC20 contract 'decimals' function
             // that may or may not (in most cases, may not) be there, so we just assume it to be 18
             let decimals = 18;
-            let token = Token::new(id, address, &format!("ERC20-{}", *id), decimals, false);
-            TokensSchema(&mut transaction).store_token(token).await?;
+            let token = Token::new(id, address, &format!("ERC20-{}", *id), decimals);
+            let try_insert_token = TokensSchema(&mut transaction).store_token(token).await;
+
+            match try_insert_token {
+                Err(StoreTokenError::TokenAlreadyExistsError(err)) => {
+                    anyhow::bail!("failed to insert token to database: {}", err)
+                }
+                Err(StoreTokenError::Other(anyhow_err)) => return Err(anyhow_err),
+                _ => (),
+            }
         }
 
         DataRestoreSchema(&mut transaction)

@@ -4,8 +4,9 @@ use std::str::FromStr;
 use zksync_storage::{data_restore::records::NewBlockEvent, StorageProcessor};
 use zksync_types::{
     aggregated_operations::{BlocksCommitOperation, BlocksExecuteOperation},
-    AccountId, BlockNumber, Token, TokenGenesisListItem, TokenId,
-    {block::Block, AccountUpdate, AccountUpdates, ZkSyncOp},
+    block::Block,
+    AccountId, AccountUpdate, AccountUpdates, BlockNumber, NewTokenEvent, Token, TokenId,
+    TokenInfo, ZkSyncOp,
 };
 
 // Local deps
@@ -13,22 +14,13 @@ use crate::storage_interactor::StoredTreeState;
 use crate::{
     data_restore_driver::StorageUpdateState,
     events::BlockEvent,
-    events_state::{EventsState, NewTokenEvent},
+    events_state::EventsState,
     rollup_ops::RollupOpsBlock,
     storage_interactor::{
         block_event_into_stored_block_event, stored_block_event_into_block_event,
         stored_ops_block_into_ops_block, StorageInteractor,
     },
 };
-
-impl From<&NewTokenEvent> for zksync_storage::data_restore::records::NewTokenEvent {
-    fn from(event: &NewTokenEvent) -> Self {
-        Self {
-            address: event.address,
-            id: event.id,
-        }
-    }
-}
 
 pub struct DatabaseStorageInteractor<'a> {
     storage: StorageProcessor<'a>,
@@ -118,15 +110,13 @@ impl StorageInteractor for DatabaseStorageInteractor<'_> {
             .expect("Unable to commit DB transaction");
     }
 
-    async fn store_token(&mut self, token: TokenGenesisListItem, token_id: TokenId) {
+    async fn store_token(&mut self, token: TokenInfo, token_id: TokenId) {
         self.storage
             .tokens_schema()
             .store_token(Token {
                 id: token_id,
                 symbol: token.symbol,
-                address: token.address[2..]
-                    .parse()
-                    .expect("failed to parse token address"),
+                address: token.address,
                 decimals: token.decimals,
                 is_nft: false,
             })
@@ -147,7 +137,15 @@ impl StorageInteractor for DatabaseStorageInteractor<'_> {
 
         let block_number = last_watched_eth_block_number.to_string();
 
-        let tokens: Vec<_> = tokens.iter().map(From::from).collect();
+        let tokens: Vec<_> = tokens
+            .iter()
+            .map(
+                |event| zksync_storage::data_restore::records::NewTokenEvent {
+                    address: event.address,
+                    id: event.id,
+                },
+            )
+            .collect();
         self.storage
             .data_restore_schema()
             .save_events_state(new_events.as_slice(), &tokens, &block_number)

@@ -16,9 +16,9 @@ import { Wallet } from './wallet';
  * Used by `BatchBuilder` to store transactions until the `build()` call.
  */
 interface InternalTx {
-    type: 'Withdraw' | 'Transfer' | 'ChangePubKey' | 'ForcedExit';
+    type: 'Withdraw' | 'Transfer' | 'ChangePubKey' | 'ForcedExit' | 'MintNFT';
     tx: any;
-    feeType: 'Withdraw' | 'Transfer' | 'FastWithdraw' | ChangePubKeyFee;
+    feeType: 'Withdraw' | 'Transfer' | 'FastWithdraw' | ChangePubKeyFee | 'MintNFT';
     address: Address;
     token: TokenLike;
     // Whether or not the tx has been signed.

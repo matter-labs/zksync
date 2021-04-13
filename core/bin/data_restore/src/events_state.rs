@@ -5,31 +5,11 @@ use web3::contract::Contract;
 use web3::types::Transaction;
 use web3::types::{BlockNumber as Web3BlockNumber, FilterBuilder, Log, H256, U256};
 use web3::{Transport, Web3};
+use zksync_types::{BlockNumber, NewTokenEvent};
 // Workspace deps
 use crate::contract::ZkSyncDeployedContract;
 use crate::eth_tx_helpers::get_block_number_from_ethereum_transaction;
 use crate::events::{BlockEvent, EventType};
-use zksync_types::{Address, BlockNumber, TokenId};
-
-#[derive(Debug)]
-pub struct NewTokenEvent {
-    pub address: Address,
-    pub id: TokenId,
-}
-
-impl TryFrom<Log> for NewTokenEvent {
-    type Error = anyhow::Error;
-
-    fn try_from(event: Log) -> Result<NewTokenEvent, anyhow::Error> {
-        if event.topics.len() != 3 {
-            return Err(format_err!("Failed to parse NewTokenEvent: {:#?}", event));
-        }
-        Ok(NewTokenEvent {
-            address: Address::from_slice(&event.topics[1].as_fixed_bytes()[12..]),
-            id: TokenId(U256::from_big_endian(&event.topics[2].as_fixed_bytes()[..]).as_u32()),
-        })
-    }
-}
 
 /// Rollup contract events states description
 #[derive(Debug, Clone)]
