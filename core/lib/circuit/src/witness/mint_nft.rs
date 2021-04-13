@@ -1,10 +1,14 @@
 // External deps
 use num::ToPrimitive;
+
+use rescue_poseidon::rescue_hash;
+use zksync_crypto::convert::FeConvert;
 use zksync_crypto::franklin_crypto::{
     bellman::pairing::{
-        bn256::{Bn256, Fr},
+        bn256::{Bn256, Fr, FrRepr},
         ff::{Field, PrimeField},
     },
+    bellman::PrimeFieldRepr,
     rescue::RescueEngine,
 };
 // Workspace deps
@@ -382,7 +386,21 @@ impl MintNFTWitness<Bn256> {
             serial_id: u32,
             content_hash: H256,
         ) -> Fr {
-            todo!()
+            let value = creator_account_id as u64 + ((serial_id as u64) << 32); // Pack creator_id and serial_id
+            let value_fr = Fr::from_repr(FrRepr::from(value)).expect("a Fr");
+
+            let content_hash = Fr::from_bytes(content_hash.as_bytes()).expect("a Fr");
+
+            let hash_result = rescue_hash::<Bn256, 2>(&[value_fr, content_hash]);
+
+            let mut result_bytes = vec![0u8; 16];
+            result_bytes.extend_from_slice(&hash_result[0].to_bytes()[..16]);
+
+            let mut repr = Fr::zero().into_repr();
+            repr.read_be(&result_bytes[..])
+                .expect("pack hash as balance field element");
+
+            Fr::from_repr(repr).expect("can't convert repr to Fr")
         };
         let content_to_store = content_to_store_as_balance(
             mint_NFT.creator_account_id,

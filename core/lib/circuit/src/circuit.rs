@@ -1918,7 +1918,7 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
         // common valid flags
         let pubdata_properly_copied = boolean_or(
             cs.namespace(|| "first chunk or pubdata is copied properly"),
-            &is_chunk_with_index[0],
+            &is_chunk_with_index[0].clone(),
             &is_equal_pubdata,
         )?;
         let pubdata_chunk = select_pubdata_chunk(
@@ -1948,7 +1948,7 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
         )?;
 
         let first_chunk_valid = {
-            let mut flags = vec![common_valid, is_chunk_with_index[0]];
+            let mut flags = vec![common_valid.clone(), is_chunk_with_index[0].clone()];
 
             let mut serialized_tx_bits = vec![];
             serialized_tx_bits.extend(global_variables.chunk_data.tx_type.get_bits_be()); // tx_type
@@ -2030,7 +2030,7 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
         )?;
 
         let second_chunk_valid = {
-            let mut flags = vec![common_valid, is_chunk_with_index[1]];
+            let mut flags = vec![common_valid.clone(), is_chunk_with_index[1].clone()];
 
             let is_creator_account = Boolean::from(Expression::equals(
                 cs.namespace(|| "is_creator_account (second chunk)"),
@@ -2063,7 +2063,7 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
         )?;
 
         let third_chunk_valid = {
-            let mut flags = vec![common_valid, is_chunk_with_index[2]];
+            let mut flags = vec![common_valid.clone(), is_chunk_with_index[2].clone()];
 
             let is_special_account = Boolean::from(Expression::equals(
                 cs.namespace(|| "is_special_account (third chunk)"),
@@ -2096,7 +2096,7 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
         )?;
 
         let fourth_chunk_valid = {
-            let mut flags = vec![common_valid, is_chunk_with_index[3]];
+            let mut flags = vec![common_valid.clone(), is_chunk_with_index[3].clone()];
 
             let is_special_account = Boolean::from(Expression::equals(
                 cs.namespace(|| "is_special_account (fourth chunk)"),
@@ -2123,7 +2123,7 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
         )?;
 
         let fifth_chunk_valid = {
-            let mut flags = vec![common_valid, is_chunk_with_index[4]];
+            let mut flags = vec![common_valid.clone(), is_chunk_with_index[4].clone()];
 
             let is_recipient_account = Boolean::from(Expression::equals(
                 cs.namespace(|| "is_recipient_account (fifth chunk)"),
@@ -2159,7 +2159,7 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
         let sixth_chunk_valid = {
             multi_and(
                 cs.namespace(|| "sixth_chunk_valid"),
-                &[common_valid, is_chunk_with_index[5]],
+                &[common_valid, is_chunk_with_index[5].clone()],
             )?
         };
 
