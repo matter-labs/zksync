@@ -27,6 +27,7 @@ pub struct StoredExecutedPriorityOperation {
     pub eth_hash: Vec<u8>,
     pub eth_block: i64,
     pub created_at: DateTime<Utc>,
+    pub tx_hash: Vec<u8>,
 }
 
 #[derive(Debug, Clone, FromRow)]

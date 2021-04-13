@@ -1014,27 +1014,6 @@
       ]
     }
   },
-  "285c1453d6e486c92a2b9b73f75c17ac00f0ca553d2b9e9a689e0da9e7471482": {
-    "query": "INSERT INTO executed_priority_operations (block_number, block_index, operation, from_account, to_account, priority_op_serialid, deadline_block, eth_hash, eth_block, created_at)\n            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)\n            ON CONFLICT (priority_op_serialid)\n            DO NOTHING",
-    "describe": {
-      "columns": [],
-      "parameters": {
-        "Left": [
-          "Int8",
-          "Int4",
-          "Jsonb",
-          "Bytea",
-          "Bytea",
-          "Int8",
-          "Int8",
-          "Bytea",
-          "Int8",
-          "Timestamptz"
-        ]
-      },
-      "nullable": []
-    }
-  },
   "28f120a906bc5fd893293d391913ac53ed79855274b85979a0cb38c3307e9ee9": {
     "query": "SELECT * FROM eth_operations WHERE id <= $1 ORDER BY ID DESC LIMIT 1",
     "describe": {
@@ -2276,6 +2255,11 @@
           "ordinal": 9,
           "name": "created_at",
           "type_info": "Timestamptz"
+        },
+        {
+          "ordinal": 10,
+          "name": "tx_hash",
+          "type_info": "Bytea"
         }
       ],
       "parameters": {
@@ -2284,6 +2268,7 @@
         ]
       },
       "nullable": [
+        false,
         false,
         false,
         false,
@@ -3771,6 +3756,11 @@
           "ordinal": 9,
           "name": "created_at",
           "type_info": "Timestamptz"
+        },
+        {
+          "ordinal": 10,
+          "name": "tx_hash",
+          "type_info": "Bytea"
         }
       ],
       "parameters": {
@@ -3779,6 +3769,7 @@
         ]
       },
       "nullable": [
+        false,
         false,
         false,
         false,
@@ -3886,6 +3877,28 @@
       "nullable": [
         false
       ]
+    }
+  },
+  "c2f82b785d35c9752ba34278d4a62fd55439256430beece05275275a32bb93a9": {
+    "query": "INSERT INTO executed_priority_operations (block_number, block_index, operation, from_account, to_account, priority_op_serialid, deadline_block, eth_hash, eth_block, created_at, tx_hash)\n            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)\n            ON CONFLICT (priority_op_serialid)\n            DO NOTHING",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "Int8",
+          "Int4",
+          "Jsonb",
+          "Bytea",
+          "Bytea",
+          "Int8",
+          "Int8",
+          "Bytea",
+          "Int8",
+          "Timestamptz",
+          "Bytea"
+        ]
+      },
+      "nullable": []
     }
   },
   "c55231e06a5969f1531b98a925fd1575ee60967b7c546ed5650a9d42a738abee": {
@@ -4790,6 +4803,11 @@
           "ordinal": 9,
           "name": "created_at",
           "type_info": "Timestamptz"
+        },
+        {
+          "ordinal": 10,
+          "name": "tx_hash",
+          "type_info": "Bytea"
         }
       ],
       "parameters": {
@@ -4798,6 +4816,7 @@
         ]
       },
       "nullable": [
+        false,
         false,
         false,
         false,
