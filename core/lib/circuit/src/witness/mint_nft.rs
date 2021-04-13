@@ -38,8 +38,6 @@ pub struct MintNFTData {
     pub fee_token: u32,
     pub creator_account_id: u32,
     pub recipient_account_id: u32,
-    pub valid_from: u64,
-    pub valid_until: u64,
     pub content_hash: H256,
 }
 
@@ -74,8 +72,6 @@ impl Witness for MintNFTWitness<Bn256> {
             fee_token: *mintNFT.tx.fee_token as u32,
             creator_account_id: *mintNFT.creator_account_id,
             recipient_account_id: *mintNFT.recipient_account_id,
-            valid_from: time_range.valid_from,
-            valid_until: time_range.valid_until,
             content_hash: mintNFT.tx.content_hash,
         };
         Self::apply_data(tree, &mintNFT_data)
@@ -292,9 +288,6 @@ impl MintNFTWitness<Bn256> {
         .unwrap();
         let fee_encoded: Fr = le_bit_vector_into_field_element(&fee_bits);
 
-        let valid_from = mint_NFT.valid_from;
-        let valid_until = mint_NFT.valid_until;
-
         let before_first_chunk_root = tree.root_hash();
         vlog::debug!("Initial root = {}", before_first_chunk_root);
 
@@ -490,8 +483,8 @@ impl MintNFTWitness<Bn256> {
                 a: Some(a),
                 b: Some(b),
                 new_pub_key_hash: Some(Fr::zero()),
-                valid_from: Some(Fr::from_str(&valid_from.to_string()).unwrap()),
-                valid_until: Some(Fr::from_str(&valid_until.to_string()).unwrap()),
+                valid_from: Some(Fr::zero()),
+                valid_until: Some(Fr::from_str(&u32::MAX.to_string()).unwrap()),
 
                 special_eth_addresses: vec![Some(
                     recipient_account_witness_before_fifth_chunk
