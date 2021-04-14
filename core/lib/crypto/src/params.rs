@@ -44,11 +44,7 @@ pub const MIN_NFT_TOKEN_ID: u32 = 10000;
 
 /// Number of tokens that are processed by this release
 pub fn number_of_processable_tokens() -> usize {
-    let num = total_tokens();
-    assert!(num <= total_tokens());
-    assert!(num.is_power_of_two());
-
-    num
+    total_tokens()
 }
 
 /// Depth of the left subtree of the account tree that can be used in the current version of the circuit.

@@ -139,6 +139,7 @@ fn test_data_for_prover() -> JobRequestData {
 }
 
 #[tokio::test]
+#[ignore]
 async fn test_shutdown_request() {
     let MockProverConfigs {
         plonk_config,
@@ -177,6 +178,7 @@ async fn test_shutdown_request() {
 }
 
 #[tokio::test]
+#[ignore]
 async fn test_receiving_heartbeats() {
     let MockProverConfigs {
         plonk_config,
@@ -214,6 +216,7 @@ async fn test_receiving_heartbeats() {
 }
 
 #[tokio::test]
+#[ignore]
 async fn test_publishing_proof() {
     let MockProverConfigs {
         plonk_config: _,
