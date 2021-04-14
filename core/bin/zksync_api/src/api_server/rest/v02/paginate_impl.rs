@@ -16,7 +16,7 @@ use super::{
     block::block_info_from_details,
     error::{Error, TxError},
     paginate_trait::Paginate,
-    transaction::transaction_from_item_and_finalization,
+    transaction::transaction_from_item_and_status,
 };
 
 #[async_trait::async_trait]
@@ -115,7 +115,7 @@ impl Paginate<Transaction> for StorageProcessor<'_> {
                 } else {
                     L2Status::Rejected
                 };
-                transaction_from_item_and_finalization(tx, status)
+                transaction_from_item_and_status(tx, status)
             })
             .collect();
         let count = self

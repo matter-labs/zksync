@@ -76,7 +76,7 @@ pub fn l2_receipt_from_tx_receipt_response(receipt: TxReceiptResponse) -> L2Rece
     }
 }
 
-pub fn transaction_from_item_and_finalization(
+pub fn transaction_from_item_and_status(
     item: BlockTransactionItem,
     status: L2Status,
 ) -> Transaction {
