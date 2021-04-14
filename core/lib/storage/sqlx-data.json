@@ -3891,28 +3891,6 @@
       ]
     }
   },
-  "c2f82b785d35c9752ba34278d4a62fd55439256430beece05275275a32bb93a9": {
-    "query": "INSERT INTO executed_priority_operations (block_number, block_index, operation, from_account, to_account, priority_op_serialid, deadline_block, eth_hash, eth_block, created_at, tx_hash)\n            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)\n            ON CONFLICT (priority_op_serialid)\n            DO NOTHING",
-    "describe": {
-      "columns": [],
-      "parameters": {
-        "Left": [
-          "Int8",
-          "Int4",
-          "Jsonb",
-          "Bytea",
-          "Bytea",
-          "Int8",
-          "Int8",
-          "Bytea",
-          "Int8",
-          "Timestamptz",
-          "Bytea"
-        ]
-      },
-      "nullable": []
-    }
-  },
   "c55231e06a5969f1531b98a925fd1575ee60967b7c546ed5650a9d42a738abee": {
     "query": "\n                SELECT * FROM account_pubkey_updates\n                WHERE block_number = $1\n            ",
     "describe": {
@@ -4210,6 +4188,29 @@
           "Int8",
           "Int8",
           "Int8"
+        ]
+      },
+      "nullable": []
+    }
+  },
+  "d8ce549c4c30b3f9de6ddd4c9b4af9b789861a4d1488c77ff104493a8b48bba0": {
+    "query": "INSERT INTO executed_priority_operations (block_number, block_index, operation, from_account, to_account, priority_op_serialid, deadline_block, eth_hash, eth_block, created_at, eth_block_index, tx_hash)\n            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)\n            ON CONFLICT (priority_op_serialid)\n            DO NOTHING",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "Int8",
+          "Int4",
+          "Jsonb",
+          "Bytea",
+          "Bytea",
+          "Int8",
+          "Int8",
+          "Bytea",
+          "Int8",
+          "Timestamptz",
+          "Int8",
+          "Bytea"
         ]
       },
       "nullable": []
