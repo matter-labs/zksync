@@ -5,9 +5,7 @@ use zksync_api_types::v02::{
 };
 use zksync_types::tx::{EthBatchSignatures, TxEthSignature, TxHash, ZkSyncTx};
 
-/// Transaction API part.
 impl Client {
-    /// Sends a new transaction to the memory pool.
     pub async fn submit_tx_v02(
         &self,
         tx: ZkSyncTx,
@@ -19,7 +17,6 @@ impl Client {
             .await
     }
 
-    /// Sends a new transactions batch to the memory pool.
     pub async fn submit_batch_v02(
         &self,
         txs: Vec<ZkSyncTx>,
@@ -31,7 +28,6 @@ impl Client {
             .await
     }
 
-    /// Gets actual transaction receipt.
     pub async fn tx_status_v02(&self, tx_hash: TxHash) -> Result<Response> {
         self.get_with_scope(
             super::API_V02_SCOPE,
@@ -41,7 +37,6 @@ impl Client {
         .await
     }
 
-    /// Gets transaction content.
     pub async fn tx_data_v02(&self, tx_hash: TxHash) -> Result<Response> {
         self.get_with_scope(
             super::API_V02_SCOPE,

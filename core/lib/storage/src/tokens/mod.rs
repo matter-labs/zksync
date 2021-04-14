@@ -162,9 +162,8 @@ impl<'a, 'c> TokensSchema<'a, 'c> {
         result
     }
 
-    /// Loads tokens ids, which are presented in `tokens_to_check`
-    /// and have market_volume not less than parameter (min_market_volume).
-    pub async fn load_token_ids_that_enabled_for_fees(
+    /// Filters out tokens whose market volume is less than the specified limit (min_market_volume).
+    pub async fn filter_tokens_by_market_volume(
         &mut self,
         tokens_to_check: Vec<TokenId>,
         min_market_volume: &Ratio<BigUint>,
@@ -175,7 +174,7 @@ impl<'a, 'c> TokensSchema<'a, 'c> {
             r#"
             SELECT token_id
             FROM ticker_market_volume
-            WHERE token_id = ANY($1) AND ticker_market_volume.market_volume >= $2
+            WHERE token_id = ANY($1) AND market_volume >= $2
             "#,
             &tokens_to_check,
             ratio_to_big_decimal(min_market_volume, STORED_USD_PRICE_PRECISION)

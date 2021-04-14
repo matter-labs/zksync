@@ -70,7 +70,7 @@ impl ApiTokenData {
     ) -> Result<bool, Error> {
         let result = storage
             .tokens_schema()
-            .load_token_ids_that_enabled_for_fees(vec![token_id], &self.min_market_volume)
+            .filter_tokens_by_market_volume(vec![token_id], &self.min_market_volume)
             .await
             .map_err(Error::storage)?;
         Ok(!result.is_empty())
@@ -90,7 +90,7 @@ impl ApiTokenData {
                     paginated_tokens.list.iter().map(|token| token.id).collect();
                 let tokens_enabled_for_fees = storage
                     .tokens_schema()
-                    .load_token_ids_that_enabled_for_fees(tokens_to_check, &self.min_market_volume)
+                    .filter_tokens_by_market_volume(tokens_to_check, &self.min_market_volume)
                     .await
                     .map_err(Error::storage)?;
                 for token in paginated_tokens.list {
@@ -157,6 +157,7 @@ impl ApiTokenData {
         price_result.map_err(Error::from)
     }
 
+    // TODO: take `currency` as enum. (ZKS-628)
     async fn token_price_in(
         &self,
         first_token: TokenLike,

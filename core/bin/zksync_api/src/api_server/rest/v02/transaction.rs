@@ -38,19 +38,13 @@ use crate::{
     api_try,
 };
 
-pub fn l1_receipt_from_op_and_finalization(
+pub fn l1_receipt_from_op_and_status(
     op: StoredExecutedPriorityOperation,
-    is_finalized: bool,
+    status: L1Status,
 ) -> L1Receipt {
     let eth_block = EthBlockId(op.eth_block as u64);
     let rollup_block = Some(BlockNumber(op.block_number as u32));
     let id = PriorityOpId(op.priority_op_serialid as u64);
-
-    let status = if is_finalized {
-        L1Status::Finalized
-    } else {
-        L1Status::Committed
-    };
 
     L1Receipt {
         status,
@@ -61,9 +55,8 @@ pub fn l1_receipt_from_op_and_finalization(
 }
 
 pub fn l2_receipt_from_tx_receipt_response(receipt: TxReceiptResponse) -> L2Receipt {
-    let mut tx_hash_with_prefix = "0x".to_string();
-    tx_hash_with_prefix.push_str(&receipt.tx_hash);
-    let tx_hash = TxHash::from_str(&tx_hash_with_prefix).unwrap();
+    let tx_hash_prefixed = format!("0x{}", receipt.tx_hash);
+    let tx_hash = TxHash::from_str(&tx_hash_prefixed).unwrap();
     let rollup_block = Some(BlockNumber(receipt.block_number as u32));
     let fail_reason = receipt.fail_reason;
     let status = if receipt.success {
@@ -85,18 +78,9 @@ pub fn l2_receipt_from_tx_receipt_response(receipt: TxReceiptResponse) -> L2Rece
 
 pub fn transaction_from_item_and_finalization(
     item: BlockTransactionItem,
-    is_finalized: bool,
+    status: L2Status,
 ) -> Transaction {
     let tx_hash = TxHash::from_str(&item.tx_hash).unwrap();
-    let status = if item.success.unwrap_or_default() {
-        if is_finalized {
-            L2Status::Finalized
-        } else {
-            L2Status::Committed
-        }
-    } else {
-        L2Status::Rejected
-    };
     Transaction {
         tx_hash,
         block_number: Some(BlockNumber(item.block_number as u32)),
@@ -154,9 +138,14 @@ impl ApiTransactionData {
             .await
             .map_err(Error::storage)?
         {
-            let finalized =
-                Self::is_block_finalized(storage, BlockNumber(op.block_number as u32)).await;
-            Ok(Some(l1_receipt_from_op_and_finalization(op, finalized)))
+            let status =
+                if Self::is_block_finalized(storage, BlockNumber(op.block_number as u32)).await {
+                    L1Status::Finalized
+                } else {
+                    L1Status::Committed
+                };
+
+            Ok(Some(l1_receipt_from_op_and_status(op, status)))
         } else if let Some((eth_block, priority_op)) = self
             .tx_sender
             .core_api_client
