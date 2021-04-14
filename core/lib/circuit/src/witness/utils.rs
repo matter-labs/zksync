@@ -46,6 +46,9 @@ use crate::{
     operation::{Operation, SignatureData},
     utils::sign_rescue,
 };
+use std::thread::sleep;
+use std::time::Duration;
+use zksync_crypto::params::total_fungible_tokens;
 
 /// Wrapper around `CircuitAccountTree`
 /// that simplifies witness generation
@@ -132,8 +135,8 @@ impl<'a> WitnessBuilder<'a> {
             .account_tree
             .get(*self.fee_account_id)
             .expect("fee account is not in the tree");
-        let mut fee_circuit_account_balances = Vec::with_capacity(total_tokens());
-        for i in 0u32..(total_tokens() as u32) {
+        let mut fee_circuit_account_balances = Vec::with_capacity(total_fungible_tokens());
+        for i in 0u32..(total_fungible_tokens() as u32) {
             let balance_value = fee_circuit_account
                 .subtree
                 .get(i)

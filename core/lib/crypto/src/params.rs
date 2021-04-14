@@ -26,9 +26,22 @@ pub fn balance_tree_depth() -> usize {
 /// Tokens settings
 
 /// Number of supported tokens.
+pub fn total_fungible_tokens() -> usize {
+    (MIN_NFT_TOKEN_ID - 1) as usize
+}
+/// Number of supported tokens.
 pub fn total_tokens() -> usize {
-    // Exclude  NFT_TOKEN_ID
-    2usize.pow(balance_tree_depth() as u32) - 2
+    2usize.pow(balance_tree_depth() as u32)
+}
+
+/// Number of tokens that are processed by this release
+pub fn number_of_processable_tokens() -> usize {
+    let num = 512;
+
+    assert!(num <= total_tokens());
+    assert!(num.is_power_of_two());
+
+    num
 }
 /// NFT settings
 
@@ -41,11 +54,6 @@ pub const NFT_STORAGE_ACCOUNT_ID: AccountId = AccountId(u32::MAX - 1);
 
 /// First token id for NFT, all fungible token id must be less, all NFT must be above.
 pub const MIN_NFT_TOKEN_ID: u32 = 10000;
-
-/// Number of tokens that are processed by this release
-pub fn number_of_processable_tokens() -> usize {
-    total_tokens()
-}
 
 /// Depth of the left subtree of the account tree that can be used in the current version of the circuit.
 pub fn used_account_subtree_depth() -> usize {
