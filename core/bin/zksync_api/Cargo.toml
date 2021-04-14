@@ -27,6 +27,7 @@ zksync_eth_signer = { path = "../../lib/eth_signer", version = "1.0" }
 zksync_api_client  = { path = "../../lib/api_client", version = "0.1" }
 zksync_prometheus_exporter = { path = "../../lib/prometheus_exporter", version = "1.0" }
 zksync_balancer = { path = "../../lib/balancer", version = "1.0" }
+zksync_gateway_watcher = { path = "../../lib/gateway_watcher", version = "1.0" }
 
 vlog = { path = "../../lib/vlog", version = "1.0", features=['actix'] }
 

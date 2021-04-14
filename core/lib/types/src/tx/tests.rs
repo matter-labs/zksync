@@ -1,11 +1,13 @@
 use zksync_basic_types::Address;
-use zksync_crypto::franklin_crypto::{
-    eddsa::{PrivateKey, PublicKey},
-    jubjub::FixedGenerators,
+use zksync_crypto::{
+    franklin_crypto::{
+        eddsa::{PrivateKey, PublicKey},
+        jubjub::FixedGenerators,
+    },
+    params::{max_account_id, max_token_id, JUBJUB_PARAMS},
+    public_key_from_private,
+    rand::{Rng, SeedableRng, XorShiftRng},
 };
-use zksync_crypto::params::{max_account_id, max_token_id, JUBJUB_PARAMS};
-use zksync_crypto::public_key_from_private;
-use zksync_crypto::rand::{Rng, SeedableRng, XorShiftRng};
 
 use num::{BigUint, ToPrimitive};
 use serde::{Deserialize, Serialize};

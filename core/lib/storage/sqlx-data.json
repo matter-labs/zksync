@@ -206,6 +206,38 @@
       ]
     }
   },
+  "0929e7b917ff45833b2f36a0b987e2efa6ab3a22c04b0aacb06a97e8269e442f": {
+    "query": "DELETE FROM block_witness WHERE block > $1",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "Int8"
+        ]
+      },
+      "nullable": []
+    }
+  },
+  "0bdd32081fc9c8fbfb63787696884617129c30915c400e5647d2a81f882c6d4d": {
+    "query": "SELECT eth_op_id FROM eth_aggregated_ops_binding WHERE op_id = ANY($1)",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "eth_op_id",
+          "type_info": "Int8"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Int8Array"
+        ]
+      },
+      "nullable": [
+        false
+      ]
+    }
+  },
   "0c9fc29aabfefa38588a298002e7a60c0c6cf578f7a305e8e7f58695651662dc": {
     "query": "UPDATE prover_job_queue\n            SET (updated_at, updated_by) = (now(), $1)\n            WHERE id = $2",
     "describe": {
@@ -466,6 +498,18 @@
       ]
     }
   },
+  "0fb38a8f186b2b0a2b3d608bf43b111876e16bafe8e10ad9078b5066908ea0cf": {
+    "query": "DELETE FROM proofs WHERE block_number > $1",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "Int8"
+        ]
+      },
+      "nullable": []
+    }
+  },
   "0fbc25e0f2aab2b56acf7e09d75690a78f7c2df7cec0644a8e45461ee9aab75b": {
     "query": "SELECT * FROM data_restore_rollup_ops\n            ORDER BY id ASC",
     "describe": {
@@ -627,6 +671,30 @@
         "Left": [
           "Bool",
           "Text"
+        ]
+      },
+      "nullable": []
+    }
+  },
+  "19b2670f1ac5f960611e9ed59ec49ee1395d0a0193f317276cdaa675023945af": {
+    "query": "UPDATE eth_parameters SET last_verified_block = $1 WHERE id = true AND last_verified_block > $1",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "Int8"
+        ]
+      },
+      "nullable": []
+    }
+  },
+  "1a2ad5fc72cc6110c64c777a863519054f4a976f00339a2368c86e830ac4c7fd": {
+    "query": "DELETE FROM aggregated_proofs WHERE last_block > $1",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "Int8"
         ]
       },
       "nullable": []
@@ -819,6 +887,18 @@
         false,
         false
       ]
+    }
+  },
+  "26204b0d5ff5ce98cc8ee5d483d4b5536724f7d8f17c66e19387bc5acd3e713d": {
+    "query": "DELETE FROM eth_tx_hashes WHERE eth_op_id = ANY($1)",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "Int8Array"
+        ]
+      },
+      "nullable": []
     }
   },
   "273c7371b1a13bbb03490e874b7f2eab969defa6aa9f2b416e4f9e8a135aa97c": {
@@ -1337,6 +1417,30 @@
       "nullable": []
     }
   },
+  "439d0083a3b98066071cde5909969b4e9ce744bc1bfa761116c6fb5bcc356075": {
+    "query": "DELETE FROM account_balance_updates WHERE block_number > $1",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "Int8"
+        ]
+      },
+      "nullable": []
+    }
+  },
+  "4469f85caafd8e489247f5a16d567910a113975fb5911622e40440b09eac7e4f": {
+    "query": "DELETE FROM account_pubkey_updates WHERE block_number > $1",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "Int8"
+        ]
+      },
+      "nullable": []
+    }
+  },
   "44b276fda62734e9c9d9853f493340265116ab7f13599674d27aafe3d3887391": {
     "query": "UPDATE eth_operations \n            SET last_used_gas_price = $1, last_deadline_block = $2\n            WHERE id = $3",
     "describe": {
@@ -1662,6 +1766,18 @@
       ]
     }
   },
+  "4d9627c05c67f50b8cf9927923e3d8a1be86cdd23e55b1ada791ebb2cc3942ca": {
+    "query": "DELETE FROM eth_aggregated_ops_binding WHERE op_id = ANY($1)",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "Int8Array"
+        ]
+      },
+      "nullable": []
+    }
+  },
   "4dd0d931ce42a1a7a3606a2914b3c0686c103fbb18d60efd96232a2617734272": {
     "query": "INSERT INTO events VALUES (DEFAULT, $1, $2, $3)",
     "describe": {
@@ -1961,6 +2077,18 @@
       "nullable": []
     }
   },
+  "5d114595ec0f4fb9c49b846b4f245e454b02a47e88fa3b800d90c50564db74f0": {
+    "query": "UPDATE eth_parameters SET last_committed_block = $1 WHERE id = true",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "Int8"
+        ]
+      },
+      "nullable": []
+    }
+  },
   "60cf573e253358218a6319233221e8c2ff0561fd7ffbf8339a11a4509d955442": {
     "query": "SELECT count(*) from mempool_txs\n            WHERE tx_hash = $1",
     "describe": {
@@ -2180,6 +2308,18 @@
         false,
         false
       ]
+    }
+  },
+  "725d371ede030384949fa02f2d8f727f5cb441f4642f07033103fc037e6214c3": {
+    "query": "UPDATE aggregate_operations SET to_block = $1 WHERE to_block > $1",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "Int8"
+        ]
+      },
+      "nullable": []
     }
   },
   "73eedd4444ef5bfbfd526c319f97d75609a65517d63e88add0a864a9f7141a02": {
@@ -2465,6 +2605,18 @@
       "nullable": []
     }
   },
+  "7ffe90960741dbd6cba1bb6784bfb2f91e54b153fb652e61edaee3a73c40b43c": {
+    "query": "DELETE FROM eth_operations WHERE id = ANY($1)",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "Int8Array"
+        ]
+      },
+      "nullable": []
+    }
+  },
   "80c2eb3abd0f05fb464113ca06dc2a7f1fe860bc4fcac0da805f13e980ca75a5": {
     "query": "SELECT * FROM pending_withdrawals WHERE withdrawal_hash = $1\n            LIMIT 1",
     "describe": {
@@ -2489,6 +2641,16 @@
         false,
         false
       ]
+    }
+  },
+  "82486779f7f76a4a50c2a3d5cbc460dae08a2296ffcb9744dfde5c44e70d2a5d": {
+    "query": "TRUNCATE eth_unprocessed_aggregated_ops",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": []
+      },
+      "nullable": []
     }
   },
   "83cc9ff843c9dd1c974b651f5ed1e0c6bea94454db1d6f01b8fdf556cdd77d81": {
@@ -2542,6 +2704,18 @@
       "parameters": {
         "Left": [
           "Timestamptz"
+        ]
+      },
+      "nullable": []
+    }
+  },
+  "86a1592862553cfb07b950a5f4547a650ee40ba774ddb367d8e84b5e8166cbea": {
+    "query": "UPDATE prover_job_queue SET last_block = $1 WHERE last_block > $1",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "Int8"
         ]
       },
       "nullable": []
@@ -2753,6 +2927,16 @@
       "nullable": []
     }
   },
+  "99345d28e9aa3a325a7b8027ccd73f1dcea835cdf80e4432404337b2bf62a64e": {
+    "query": "DELETE FROM pending_block",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": []
+      },
+      "nullable": []
+    }
+  },
   "9aeeb5e20f4f34d4b4e1987f1bf0a23ee931f12da071b134225069d32c1896de": {
     "query": "SELECT * FROM pending_block\n            ORDER BY number DESC\n            LIMIT 1",
     "describe": {
@@ -2911,6 +3095,26 @@
       ]
     }
   },
+  "a2136dbcda0662f6010efd6d52a67aef28c103d0bfd83c7bba384a305b41e9ca": {
+    "query": "SELECT id FROM aggregate_operations WHERE from_block > $1",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "id",
+          "type_info": "Int8"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Int8"
+        ]
+      },
+      "nullable": [
+        false
+      ]
+    }
+  },
   "a270c88373710266a4904a7e5e1e418edebed57af308cf8233f6a7331331c5e4": {
     "query": "\n            SELECT * FROM tokens\n            ORDER BY id ASC\n            ",
     "describe": {
@@ -2956,6 +3160,18 @@
           "Int4",
           "Numeric",
           "Timestamptz"
+        ]
+      },
+      "nullable": []
+    }
+  },
+  "a2f0e74e1c9640230efbb47588000d9cc55a6d27d1ab829acc03fa1aeca69e35": {
+    "query": "\n            DELETE FROM executed_transactions\n            WHERE block_number > $1\n        ",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "Int8"
         ]
       },
       "nullable": []
@@ -3178,6 +3394,18 @@
       ]
     }
   },
+  "b89088c6516e2db2e01bfdf0afa5a8fdd7e20fde80183884a9769eae9b635010": {
+    "query": "DELETE FROM executed_priority_operations WHERE block_number > $1",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "Int8"
+        ]
+      },
+      "nullable": []
+    }
+  },
   "ba155dc95f19a097d1a16bf35f23371872f72dfb618cb871693752be93fed472": {
     "query": "\n            WITH aggr_comm AS (\n                SELECT \n                    aggregate_operations.created_at, \n                    eth_operations.final_hash, \n                    commit_aggregated_blocks_binding.block_number \n                FROM aggregate_operations\n                    INNER JOIN commit_aggregated_blocks_binding ON aggregate_operations.id = commit_aggregated_blocks_binding.op_id\n                    INNER JOIN eth_aggregated_ops_binding ON aggregate_operations.id = eth_aggregated_ops_binding.op_id\n                    INNER JOIN eth_operations ON eth_operations.id = eth_aggregated_ops_binding.eth_op_id\n                WHERE aggregate_operations.confirmed = true \n            )\n            ,aggr_exec as (\n                 SELECT \n                    aggregate_operations.created_at, \n                    eth_operations.final_hash, \n                    execute_aggregated_blocks_binding.block_number \n                FROM aggregate_operations\n                    INNER JOIN execute_aggregated_blocks_binding ON aggregate_operations.id = execute_aggregated_blocks_binding.op_id\n                    INNER JOIN eth_aggregated_ops_binding ON aggregate_operations.id = eth_aggregated_ops_binding.op_id\n                    INNER JOIN eth_operations ON eth_operations.id = eth_aggregated_ops_binding.eth_op_id\n                WHERE aggregate_operations.confirmed = true \n            )\n            SELECT\n                blocks.number AS \"block_number!\",\n                blocks.root_hash AS \"new_state_root!\",\n                blocks.block_size AS \"block_size!\",\n                committed.final_hash AS \"commit_tx_hash?\",\n                verified.final_hash AS \"verify_tx_hash?\",\n                committed.created_at AS \"committed_at!\",\n                verified.created_at AS \"verified_at?\"\n            FROM blocks\n                     INNER JOIN aggr_comm committed ON blocks.number = committed.block_number\n                     LEFT JOIN aggr_exec verified ON blocks.number = verified.block_number\n            WHERE\n                blocks.number <= $1\n            ORDER BY blocks.number DESC\n            LIMIT $2;\n            ",
     "describe": {
@@ -3289,6 +3517,18 @@
         false,
         false
       ]
+    }
+  },
+  "bcb77615d5418437f8ef3a4b035ee320c2fb3f15467e8c7a89ecc1d743e24c18": {
+    "query": "DELETE FROM aggregate_operations WHERE from_block > $1",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "Int8"
+        ]
+      },
+      "nullable": []
     }
   },
   "be887d91df5cb45059e7ac1a857e79829b42b931cc7d9f086536c7ec1f096b75": {
@@ -3873,6 +4113,18 @@
       "nullable": []
     }
   },
+  "d71db9de5e4ec2dc9a511d4a1247d912b15250bbd8f834f11b252de653c73176": {
+    "query": "DELETE FROM account_creates WHERE block_number > $1",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "Int8"
+        ]
+      },
+      "nullable": []
+    }
+  },
   "d9e266ce374cc7d12511a61ca81cd167b59493ee74e44b26c4baf92f4a4152e4": {
     "query": "SELECT * FROM aggregate_operations WHERE from_block >= $1 AND to_block <= $1 AND action_type = $2",
     "describe": {
@@ -4017,6 +4269,18 @@
       ]
     }
   },
+  "dcef2a0727cc074e66d5d5ac5c0d65e7581d0c4d635452950f1704859b06a94b": {
+    "query": "DELETE FROM prover_job_queue WHERE first_block > $1",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "Int8"
+        ]
+      },
+      "nullable": []
+    }
+  },
   "debbe23f0c730c331482c798387d1739911923edcafc2bd80463464ff98f3b71": {
     "query": "SELECT * from mempool_txs\n            WHERE tx_hash = $1",
     "describe": {
@@ -4065,6 +4329,18 @@
         true,
         false
       ]
+    }
+  },
+  "e295fe3cf4138c1dfd76fc7b4f5e72ab981229c036c46fb937cd6fc974af843d": {
+    "query": "DELETE FROM blocks WHERE number > $1",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "Int8"
+        ]
+      },
+      "nullable": []
     }
   },
   "e32e0ba9ec31e6e78de5972548dced78d2a6949ec723b71ce210627dbb92dfe4": {
@@ -4330,6 +4606,18 @@
       ]
     }
   },
+  "eab13daa273992f1a4ac94095acdb03a4118f66837fc94694853da8687ae8cc2": {
+    "query": "DELETE FROM account_tree_cache WHERE block > $1",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "Int8"
+        ]
+      },
+      "nullable": []
+    }
+  },
   "eb0993e049fd111aa11978aeb1617b11d859a008afec77a4a80a6cfadc1565ff": {
     "query": "DELETE FROM data_restore_rollup_ops",
     "describe": {
@@ -4385,6 +4673,18 @@
         false,
         false
       ]
+    }
+  },
+  "f02021c46f5edc171f22c16e29bb028353eb0519aec1555c066fdd8dfe1d61e5": {
+    "query": "\n            INSERT INTO mempool_txs (tx_hash, tx, created_at, eth_sign_data, batch_id)\n            SELECT tx_hash, tx, created_at, eth_sign_data, COALESCE(batch_id, 0) FROM executed_transactions\n            WHERE block_number > $1\n        ",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "Int8"
+        ]
+      },
+      "nullable": []
     }
   },
   "f057b85811c3991b73c58991fc8dae8bf4cdf9d2238171ca13a3fdf1172f2c91": {

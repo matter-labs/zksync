@@ -4,16 +4,17 @@ use crate::{
 };
 use num::{BigUint, ToPrimitive};
 
-use crate::account::PubKeyHash;
-use crate::utils::ethereum_sign_message_part;
-use crate::Engine;
+use crate::{account::PubKeyHash, utils::ethereum_sign_message_part, Engine};
 use serde::{Deserialize, Serialize};
 use zksync_basic_types::Address;
-use zksync_crypto::franklin_crypto::eddsa::PrivateKey;
-use zksync_crypto::params::{max_account_id, max_token_id};
+use zksync_crypto::{
+    franklin_crypto::eddsa::PrivateKey,
+    params::{max_account_id, max_token_id},
+};
 use zksync_utils::{format_units, BigUintSerdeAsRadix10Str};
 
 use super::{TimeRange, TxSignature, VerifiedSignatureCache};
+use crate::tx::error::TransactionSignatureError;
 
 /// `Withdraw` transaction performs a withdrawal of funds from zkSync account to L1 account.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -103,13 +104,13 @@ impl Withdraw {
         nonce: Nonce,
         time_range: TimeRange,
         private_key: &PrivateKey<Engine>,
-    ) -> Result<Self, anyhow::Error> {
+    ) -> Result<Self, TransactionSignatureError> {
         let mut tx = Self::new(
             account_id, from, to, token, amount, fee, nonce, time_range, None,
         );
         tx.signature = TxSignature::sign_musig(private_key, &tx.get_bytes());
         if !tx.check_correctness() {
-            anyhow::bail!(crate::tx::TRANSACTION_SIGNATURE_ERROR);
+            return Err(TransactionSignatureError);
         }
         Ok(tx)
     }
@@ -135,9 +136,11 @@ impl Withdraw {
     ///
     /// - `account_id` field must be within supported range.
     /// - `token` field must be within supported range.
-    /// - `amount` field must represent a packable value.
     /// - `fee` field must represent a packable value.
     /// - zkSync signature must correspond to the PubKeyHash of the account.
+    ///
+    /// Note that we don't need to check whether token amount is packable, because pubdata for this operation
+    /// contains unpacked value only.
     pub fn check_correctness(&mut self) -> bool {
         let mut valid = self.amount <= BigUint::from(u128::max_value())
             && is_fee_amount_packable(&self.fee)

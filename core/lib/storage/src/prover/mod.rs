@@ -365,4 +365,69 @@ impl<'a, 'c> ProverSchema<'a, 'c> {
 
         Ok(result)
     }
+
+    // Removes witnesses for blocks with number greater than `last_block`
+    pub async fn remove_witnesses(&mut self, last_block: BlockNumber) -> QueryResult<()> {
+        let start = Instant::now();
+        sqlx::query!(
+            "DELETE FROM block_witness WHERE block > $1",
+            *last_block as i64
+        )
+        .execute(self.0.conn())
+        .await?;
+
+        metrics::histogram!("sql", start.elapsed(), "prover" => "remove_witnesses");
+        Ok(())
+    }
+
+    // Removes proofs for blocks with number greater than `last_block`
+    pub async fn remove_proofs(&mut self, last_block: BlockNumber) -> QueryResult<()> {
+        let start = Instant::now();
+        sqlx::query!(
+            "DELETE FROM proofs WHERE block_number > $1",
+            *last_block as i64
+        )
+        .execute(self.0.conn())
+        .await?;
+
+        metrics::histogram!("sql", start.elapsed(), "prover" => "remove_proofs");
+        Ok(())
+    }
+
+    // Removes aggregated proofs for blocks with number greater than `last_block`
+    pub async fn remove_aggregated_proofs(&mut self, last_block: BlockNumber) -> QueryResult<()> {
+        let start = Instant::now();
+        sqlx::query!(
+            "DELETE FROM aggregated_proofs WHERE last_block > $1",
+            *last_block as i64
+        )
+        .execute(self.0.conn())
+        .await?;
+
+        metrics::histogram!("sql", start.elapsed(), "prover" => "remove_aggregated_proofs");
+        Ok(())
+    }
+
+    // Removes blocks with number greater than `last_block` from prover job queue
+    pub async fn remove_prover_jobs(&mut self, last_block: BlockNumber) -> QueryResult<()> {
+        let start = Instant::now();
+        let mut transaction = self.0.start_transaction().await?;
+        sqlx::query!(
+            "DELETE FROM prover_job_queue WHERE first_block > $1",
+            *last_block as i64
+        )
+        .execute(transaction.conn())
+        .await?;
+
+        sqlx::query!(
+            "UPDATE prover_job_queue SET last_block = $1 WHERE last_block > $1",
+            *last_block as i64
+        )
+        .execute(transaction.conn())
+        .await?;
+        transaction.commit().await?;
+
+        metrics::histogram!("sql", start.elapsed(), "prover" => "remove_prover_jobs");
+        Ok(())
+    }
 }

@@ -13,6 +13,7 @@ const CONFIG_FILES = [
     'eth_client.toml',
     'eth_sender.toml',
     'eth_watch.toml',
+    'gateway_watcher.toml',
     'fee_ticker.toml',
     'misc.toml',
     'dev_liquidity_token_watcher.toml',

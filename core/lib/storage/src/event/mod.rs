@@ -63,12 +63,10 @@ impl<'a, 'c> EventSchema<'a, 'c> {
     }
 
     pub async fn get_last_processed_event_id(&mut self) -> QueryResult<Option<i64>> {
-        let id = sqlx::query!(
-            "SELECT MAX(id) FROM events WHERE is_processed = true"
-        )
-        .fetch_one(self.0.conn())
-        .await?
-        .max;
+        let id = sqlx::query!("SELECT MAX(id) FROM events WHERE is_processed = true")
+            .fetch_one(self.0.conn())
+            .await?
+            .max;
 
         Ok(id)
     }
@@ -164,7 +162,13 @@ impl<'a, 'c> EventSchema<'a, 'c> {
         executed_operation: &ExecutedOperations,
     ) -> QueryResult<AccountId> {
         let priority_op = match executed_operation {
-            ExecutedOperations::Tx(tx) => return tx.signed_tx.tx.account_id(),
+            ExecutedOperations::Tx(tx) => {
+                return tx
+                    .signed_tx
+                    .tx
+                    .account_id()
+                    .map_err(anyhow::Error::from)
+            }
             ExecutedOperations::PriorityOp(priority_op) => priority_op,
         };
         match &priority_op.priority_op.data {

@@ -860,4 +860,40 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
 
         Ok(self.save_block(block).await?)
     }
+
+    // Removes blocks with number greater than `last_block`
+    pub async fn remove_blocks(&mut self, last_block: BlockNumber) -> QueryResult<()> {
+        let start = Instant::now();
+        sqlx::query!("DELETE FROM blocks WHERE number > $1", *last_block as i64)
+            .execute(self.0.conn())
+            .await?;
+
+        metrics::histogram!("sql.chain.block.remove_blocks", start.elapsed());
+        Ok(())
+    }
+
+    // Removes pending block
+    pub async fn remove_pending_block(&mut self) -> QueryResult<()> {
+        let start = Instant::now();
+        sqlx::query!("DELETE FROM pending_block")
+            .execute(self.0.conn())
+            .await?;
+
+        metrics::histogram!("sql.chain.block.remove_pending_block", start.elapsed());
+        Ok(())
+    }
+
+    // Removes account tree cache for blocks with number greater than `last_block`
+    pub async fn remove_account_tree_cache(&mut self, last_block: BlockNumber) -> QueryResult<()> {
+        let start = Instant::now();
+        sqlx::query!(
+            "DELETE FROM account_tree_cache WHERE block > $1",
+            *last_block as i64
+        )
+        .execute(self.0.conn())
+        .await?;
+
+        metrics::histogram!("sql.chain.block.remove_account_tree_cache", start.elapsed());
+        Ok(())
+    }
 }

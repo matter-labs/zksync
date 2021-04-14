@@ -1,40 +1,41 @@
-use anyhow::{ensure, format_err};
 use std::time::Instant;
 use zksync_crypto::params;
 use zksync_types::{AccountUpdate, AccountUpdates, ForcedExit, ForcedExitOp, PubKeyHash, ZkSyncOp};
 use zksync_utils::BigUintSerdeWrapper;
 
 use crate::{
-    handler::TxHandler,
+    handler::{error::ForcedExitOpError, TxHandler},
     state::{CollectedFee, OpSuccess, ZkSyncState},
 };
 
 impl TxHandler<ForcedExit> for ZkSyncState {
     type Op = ForcedExitOp;
 
-    fn create_op(&self, tx: ForcedExit) -> Result<Self::Op, anyhow::Error> {
+    type OpError = ForcedExitOpError;
+
+    fn create_op(&self, tx: ForcedExit) -> Result<Self::Op, ForcedExitOpError> {
         // Check the tx signature.
         let initiator_account = self
             .get_account(tx.initiator_account_id)
-            .ok_or_else(|| format_err!("Initiator account does not exist"))?;
-        ensure!(
+            .ok_or(ForcedExitOpError::InitiatorAccountNotFound)?;
+        invariant!(
             tx.verify_signature() == Some(initiator_account.pub_key_hash),
-            "ForcedExit signature is incorrect"
+            ForcedExitOpError::InvalidSignature
         );
 
         // Check the token ID correctness.
-        ensure!(
+        invariant!(
             tx.token <= params::max_token_id(),
-            "Token id is not supported"
+            ForcedExitOpError::InvalidTokenId
         );
 
         // Check that target account does not have an account ID set.
         let (target_account_id, account) = self
             .get_account_by_address(&tx.target)
-            .ok_or_else(|| format_err!("Target account does not exist"))?;
-        ensure!(
+            .ok_or(ForcedExitOpError::TargetAccountNotFound)?;
+        invariant!(
             account.pub_key_hash == PubKeyHash::default(),
-            "Target account is not locked; forced exit is forbidden"
+            ForcedExitOpError::TargetAccountNotLocked
         );
 
         // Obtain the token balance to be withdrawn.
@@ -53,7 +54,7 @@ impl TxHandler<ForcedExit> for ZkSyncState {
         Ok(forced_exit_op)
     }
 
-    fn apply_tx(&mut self, tx: ForcedExit) -> Result<OpSuccess, anyhow::Error> {
+    fn apply_tx(&mut self, tx: ForcedExit) -> Result<OpSuccess, ForcedExitOpError> {
         let op = self.create_op(tx)?;
 
         let (fee, updates) = <Self as TxHandler<ForcedExit>>::apply_op(self, &op)?;
@@ -67,11 +68,11 @@ impl TxHandler<ForcedExit> for ZkSyncState {
     fn apply_op(
         &mut self,
         op: &Self::Op,
-    ) -> Result<(Option<CollectedFee>, AccountUpdates), anyhow::Error> {
+    ) -> Result<(Option<CollectedFee>, AccountUpdates), ForcedExitOpError> {
         let start = Instant::now();
-        ensure!(
+        invariant!(
             op.tx.initiator_account_id <= params::max_account_id(),
-            "Incorrect initiator account ID"
+            ForcedExitOpError::IncorrectInitiatorAccount
         );
 
         let initiator_account_id = op.tx.initiator_account_id;
@@ -92,19 +93,22 @@ impl TxHandler<ForcedExit> for ZkSyncState {
         let initiator_old_balance = initiator_account.get_balance(op.tx.token);
         let initiator_old_nonce = initiator_account.nonce;
 
-        ensure!(op.tx.nonce == initiator_old_nonce, "Nonce mismatch");
-        ensure!(
+        invariant!(
+            op.tx.nonce == initiator_old_nonce,
+            ForcedExitOpError::NonceMismatch
+        );
+        invariant!(
             initiator_old_balance >= op.tx.fee,
-            "Initiator account: Not enough balance to cover fees"
+            ForcedExitOpError::InitiatorInsufficientBalance
         );
 
         // Check that target account has required amount of tokens to withdraw.
         // (normally, it should, since we're declaring this amount ourselves, but
         // this check is added for additional safety).
         let target_old_balance = target_account.get_balance(op.tx.token);
-        ensure!(
+        invariant!(
             target_old_balance == amount,
-            "Target account: Target account balance is not equal to the withdrawal amount"
+            ForcedExitOpError::TargetAccountBalanceMismatch
         );
 
         // Take fees from the initiator account (and update initiator account nonce).

@@ -1,4 +1,5 @@
 // Built-in deps
+use std::sync::Arc;
 use std::{fmt, time::Instant};
 
 // External uses
@@ -25,15 +26,19 @@ use crate::ethereum_gateway::{ExecutedTxStatus, FailureInfo, SignedCallResult};
 /// This is an emergency value, which will not be used normally.
 const FALLBACK_GAS_LIMIT: u64 = 3_000_000;
 
-#[derive(Clone)]
-pub struct ETHDirectClient<S: EthereumSigner> {
+struct ETHDirectClientInner<S: EthereumSigner> {
     eth_signer: S,
     sender_account: Address,
-    pub contract_addr: H160,
+    contract_addr: H160,
     contract: ethabi::Contract,
-    pub chain_id: u8,
-    pub gas_price_factor: f64,
+    chain_id: u8,
+    gas_price_factor: f64,
     web3: Web3<Http>,
+}
+
+#[derive(Clone)]
+pub struct ETHDirectClient<S: EthereumSigner> {
+    inner: Arc<ETHDirectClientInner<S>>,
 }
 
 impl<S: EthereumSigner> fmt::Debug for ETHDirectClient<S> {
@@ -41,10 +46,10 @@ impl<S: EthereumSigner> fmt::Debug for ETHDirectClient<S> {
         // We do not want to have a private key in the debug representation.
 
         f.debug_struct("ETHDirectClient")
-            .field("sender_account", &self.sender_account)
-            .field("contract_addr", &self.contract_addr)
-            .field("chain_id", &self.chain_id)
-            .field("gas_price_factor", &self.gas_price_factor)
+            .field("sender_account", &self.inner.sender_account)
+            .field("contract_addr", &self.inner.contract_addr)
+            .field("chain_id", &self.inner.chain_id)
+            .field("gas_price_factor", &self.inner.gas_price_factor)
             .finish()
     }
 }
@@ -60,34 +65,37 @@ impl<S: EthereumSigner> ETHDirectClient<S> {
         gas_price_factor: f64,
     ) -> Self {
         Self {
-            sender_account: operator_eth_addr,
-            eth_signer,
-            contract_addr: contract_eth_addr,
-            chain_id,
-            contract,
-            gas_price_factor,
-            web3: Web3::new(transport),
+            inner: Arc::new(ETHDirectClientInner {
+                sender_account: operator_eth_addr,
+                eth_signer,
+                contract_addr: contract_eth_addr,
+                chain_id,
+                contract,
+                gas_price_factor,
+                web3: Web3::new(transport),
+            }),
         }
     }
 
     pub fn main_contract_with_address(&self, address: Address) -> Contract<Http> {
-        Contract::new(self.web3.eth(), address, self.contract.clone())
+        Contract::new(self.inner.web3.eth(), address, self.inner.contract.clone())
     }
 
     pub fn main_contract(&self) -> Contract<Http> {
-        self.main_contract_with_address(self.contract_addr)
+        self.main_contract_with_address(self.inner.contract_addr)
     }
 
     pub fn create_contract(&self, address: Address, contract: ethabi::Contract) -> Contract<Http> {
-        Contract::new(self.web3.eth(), address, contract)
+        Contract::new(self.inner.web3.eth(), address, contract)
     }
 
     pub async fn pending_nonce(&self) -> Result<U256, anyhow::Error> {
         let start = Instant::now();
         let count = self
+            .inner
             .web3
             .eth()
-            .transaction_count(self.sender_account, Some(BlockNumber::Pending))
+            .transaction_count(self.inner.sender_account, Some(BlockNumber::Pending))
             .await?;
         metrics::histogram!("eth_client.direct.pending_nonce", start.elapsed());
         Ok(count)
@@ -96,25 +104,37 @@ impl<S: EthereumSigner> ETHDirectClient<S> {
     pub async fn current_nonce(&self) -> Result<U256, anyhow::Error> {
         let start = Instant::now();
         let nonce = self
+            .inner
             .web3
             .eth()
-            .transaction_count(self.sender_account, Some(BlockNumber::Latest))
+            .transaction_count(self.inner.sender_account, Some(BlockNumber::Latest))
             .await?;
         metrics::histogram!("eth_client.direct.current_nonce", start.elapsed());
         Ok(nonce)
     }
 
+    pub async fn block(
+        &self,
+        id: BlockId,
+    ) -> Result<Option<web3::types::Block<H256>>, anyhow::Error> {
+        let start = Instant::now();
+        let block = self.inner.web3.eth().block(id).await?;
+        metrics::histogram!("eth_client.direct.block", start.elapsed());
+        Ok(block)
+    }
+
     pub async fn block_number(&self) -> Result<U64, anyhow::Error> {
         let start = Instant::now();
-        let block_number = self.web3.eth().block_number().await?;
+        let block_number = self.inner.web3.eth().block_number().await?;
         metrics::histogram!("eth_client.direct.current_nonce", start.elapsed());
         Ok(block_number)
     }
 
     pub async fn get_gas_price(&self) -> Result<U256, anyhow::Error> {
         let start = Instant::now();
-        let mut network_gas_price = self.web3.eth().gas_price().await?;
-        let percent_gas_price_factor = U256::from((self.gas_price_factor * 100.0).round() as u64);
+        let mut network_gas_price = self.inner.web3.eth().gas_price().await?;
+        let percent_gas_price_factor =
+            U256::from((self.inner.gas_price_factor * 100.0).round() as u64);
         network_gas_price = (network_gas_price * percent_gas_price_factor) / U256::from(100);
         metrics::histogram!("eth_client.direct.get_gas_price", start.elapsed());
         Ok(network_gas_price)
@@ -125,7 +145,7 @@ impl<S: EthereumSigner> ETHDirectClient<S> {
         data: Vec<u8>,
         options: Options,
     ) -> Result<SignedCallResult, anyhow::Error> {
-        self.sign_prepared_tx_for_addr(data, self.contract_addr, options)
+        self.sign_prepared_tx_for_addr(data, self.inner.contract_addr, options)
             .await
     }
 
@@ -165,7 +185,7 @@ impl<S: EthereumSigner> ETHDirectClient<S> {
 
         // form and sign tx
         let tx = RawTransaction {
-            chain_id: self.chain_id,
+            chain_id: self.inner.chain_id,
             nonce,
             to: Some(contract_addr),
             value: options.value.unwrap_or_default(),
@@ -174,8 +194,13 @@ impl<S: EthereumSigner> ETHDirectClient<S> {
             data,
         };
 
-        let signed_tx = self.eth_signer.sign_transaction(tx).await?;
-        let hash = self.web3.web3().sha3(Bytes(signed_tx.clone())).await?;
+        let signed_tx = self.inner.eth_signer.sign_transaction(tx).await?;
+        let hash = self
+            .inner
+            .web3
+            .web3()
+            .sha3(Bytes(signed_tx.clone()))
+            .await?;
 
         metrics::histogram!(
             "eth_client.direct.sign_prepared_tx_for_addr",
@@ -191,7 +216,12 @@ impl<S: EthereumSigner> ETHDirectClient<S> {
 
     pub async fn send_raw_tx(&self, tx: Vec<u8>) -> Result<H256, anyhow::Error> {
         let start = Instant::now();
-        let tx = self.web3.eth().send_raw_transaction(Bytes(tx)).await?;
+        let tx = self
+            .inner
+            .web3
+            .eth()
+            .send_raw_transaction(Bytes(tx))
+            .await?;
         metrics::histogram!("eth_client.direct.send_raw_tx", start.elapsed());
         Ok(tx)
     }
@@ -201,7 +231,7 @@ impl<S: EthereumSigner> ETHDirectClient<S> {
         tx_hash: H256,
     ) -> Result<Option<TransactionReceipt>, anyhow::Error> {
         let start = Instant::now();
-        let receipt = self.web3.eth().transaction_receipt(tx_hash).await?;
+        let receipt = self.inner.web3.eth().transaction_receipt(tx_hash).await?;
         metrics::histogram!("eth_client.direct.tx_receipt", start.elapsed());
         Ok(receipt)
     }
@@ -211,61 +241,67 @@ impl<S: EthereumSigner> ETHDirectClient<S> {
         tx_hash: H256,
     ) -> Result<Option<FailureInfo>, anyhow::Error> {
         let start = Instant::now();
-        let transaction = self.web3.eth().transaction(tx_hash.into()).await?.unwrap();
-        let receipt = self.web3.eth().transaction_receipt(tx_hash).await?.unwrap();
+        let transaction = self.inner.web3.eth().transaction(tx_hash.into()).await?;
+        let receipt = self.inner.web3.eth().transaction_receipt(tx_hash).await?;
 
-        let gas_limit = transaction.gas;
-        let gas_used = receipt.gas_used;
+        match (transaction, receipt) {
+            (Some(transaction), Some(receipt)) => {
+                let gas_limit = transaction.gas;
+                let gas_used = receipt.gas_used;
 
-        let call_request = web3::types::CallRequest {
-            from: Some(transaction.from),
-            to: transaction.to,
-            gas: Some(transaction.gas),
-            gas_price: Some(transaction.gas_price),
-            value: Some(transaction.value),
-            data: Some(transaction.input),
-        };
+                let call_request = web3::types::CallRequest {
+                    from: Some(transaction.from),
+                    to: transaction.to,
+                    gas: Some(transaction.gas),
+                    gas_price: Some(transaction.gas_price),
+                    value: Some(transaction.value),
+                    data: Some(transaction.input),
+                };
 
-        let encoded_revert_reason = self
-            .web3
-            .eth()
-            .call(call_request, receipt.block_number.map(Into::into))
-            .await?;
-        let revert_code = hex::encode(&encoded_revert_reason.0);
-        let revert_reason = if encoded_revert_reason.0.len() >= 4 {
-            let encoded_string_without_function_hash = &encoded_revert_reason.0[4..];
+                let encoded_revert_reason = self
+                    .inner
+                    .web3
+                    .eth()
+                    .call(call_request, receipt.block_number.map(Into::into))
+                    .await?;
+                let revert_code = hex::encode(&encoded_revert_reason.0);
+                let revert_reason = if encoded_revert_reason.0.len() >= 4 {
+                    let encoded_string_without_function_hash = &encoded_revert_reason.0[4..];
 
-            ethabi::decode(
-                &[ethabi::ParamType::String],
-                encoded_string_without_function_hash,
-            )?
-            .into_iter()
-            .next()
-            .unwrap()
-            .to_string()
-            .unwrap()
-        } else {
-            "unknown".to_string()
-        };
+                    ethabi::decode(
+                        &[ethabi::ParamType::String],
+                        encoded_string_without_function_hash,
+                    )?
+                    .into_iter()
+                    .next()
+                    .unwrap()
+                    .to_string()
+                    .unwrap()
+                } else {
+                    "unknown".to_string()
+                };
 
-        metrics::histogram!("eth_client.direct.failure_reason", start.elapsed());
-        Ok(Some(FailureInfo {
-            gas_limit,
-            gas_used,
-            revert_code,
-            revert_reason,
-        }))
+                metrics::histogram!("eth_client.direct.failure_reason", start.elapsed());
+                Ok(Some(FailureInfo {
+                    gas_limit,
+                    gas_used,
+                    revert_code,
+                    revert_reason,
+                }))
+            }
+            _ => Ok(None),
+        }
     }
 
     pub async fn eth_balance(&self, address: Address) -> Result<U256, anyhow::Error> {
         let start = Instant::now();
-        let balance = self.web3.eth().balance(address, None).await?;
+        let balance = self.inner.web3.eth().balance(address, None).await?;
         metrics::histogram!("eth_client.direct.eth_balance", start.elapsed());
         Ok(balance)
     }
 
     pub async fn sender_eth_balance(&self) -> Result<U256, anyhow::Error> {
-        self.eth_balance(self.sender_account).await
+        self.eth_balance(self.inner.sender_account).await
     }
 
     pub async fn allowance(
@@ -277,7 +313,7 @@ impl<S: EthereumSigner> ETHDirectClient<S> {
         let res = self
             .call_contract_function(
                 "allowance",
-                (self.sender_account, self.contract_addr),
+                (self.inner.sender_account, self.inner.contract_addr),
                 None,
                 Options::default(),
                 None,
@@ -309,8 +345,8 @@ impl<S: EthereumSigner> ETHDirectClient<S> {
             from,
             options,
             block,
-            self.contract_addr,
-            self.contract.clone(),
+            self.inner.contract_addr,
+            self.inner.contract.clone(),
         )
         .await
     }
@@ -333,7 +369,7 @@ impl<S: EthereumSigner> ETHDirectClient<S> {
         P: Tokenize,
     {
         let start = Instant::now();
-        let contract = Contract::new(self.web3.eth(), token_address, erc20_abi);
+        let contract = Contract::new(self.inner.web3.eth(), token_address, erc20_abi);
         let res = contract.query(func, params, from, options, block).await?;
         metrics::histogram!("eth_client.direct.call_contract_function", start.elapsed());
         Ok(res)
@@ -377,13 +413,25 @@ impl<S: EthereumSigner> ETHDirectClient<S> {
 
     pub async fn logs(&self, filter: Filter) -> anyhow::Result<Vec<Log>> {
         let start = Instant::now();
-        let logs = self.web3.eth().logs(filter).await?;
+        let logs = self.inner.web3.eth().logs(filter).await?;
         metrics::histogram!("eth_client.direct.logs", start.elapsed());
         Ok(logs)
     }
 
     pub fn contract(&self) -> &ethabi::Contract {
-        &self.contract
+        &self.inner.contract
+    }
+
+    pub fn contract_addr(&self) -> H160 {
+        self.inner.contract_addr
+    }
+
+    pub fn chain_id(&self) -> u8 {
+        self.inner.chain_id
+    }
+
+    pub fn gas_price_factor(&self) -> f64 {
+        self.inner.gas_price_factor
     }
 
     pub fn encode_tx_data<P: Tokenize>(&self, func: &str, params: P) -> Vec<u8> {
@@ -397,11 +445,12 @@ impl<S: EthereumSigner> ETHDirectClient<S> {
     }
 
     pub fn get_web3_transport(&self) -> &Http {
-        self.web3.transport()
+        self.inner.web3.transport()
     }
 
     pub async fn get_tx(&self, hash: H256) -> Result<Option<Transaction>, anyhow::Error> {
         let tx = self
+            .inner
             .web3
             .eth()
             .transaction(TransactionId::Hash(hash))
