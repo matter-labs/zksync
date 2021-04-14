@@ -169,7 +169,7 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
                 ++currentDepositIdx;
 
                 Operations.Deposit memory op = Operations.readDepositPubdata(depositPubdata);
-                bytes22 packedBalanceKey = packAddressAndTokenId(op.owner, op.tokenId);
+                bytes22 packedBalanceKey = packAddressAndTokenId(op.owner, uint16(op.tokenId));
                 pendingBalances[packedBalanceKey].balanceToWithdraw += op.amount;
             }
             delete priorityRequests[id];

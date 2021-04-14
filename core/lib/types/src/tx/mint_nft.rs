@@ -119,8 +119,8 @@ impl MintNFT {
         out.extend_from_slice(&self.creator_address.as_bytes());
         out.extend_from_slice(&self.content_hash.as_bytes());
         out.extend_from_slice(&self.recipient.as_bytes());
-        out.extend_from_slice(&pack_fee_amount(&self.fee));
         out.extend_from_slice(&self.fee_token.to_be_bytes());
+        out.extend_from_slice(&pack_fee_amount(&self.fee));
         out.extend_from_slice(&self.nonce.to_be_bytes());
         out
     }
@@ -191,11 +191,11 @@ impl MintNFT {
         let mut lhs_be_bits = vec![];
         lhs_be_bits.extend_from_slice(&self.creator_id.0.to_be_bytes());
         lhs_be_bits.extend_from_slice(&serial_id.to_be_bytes());
-        lhs_be_bits.extend_from_slice(&self.content_hash.as_bytes()[..128]);
+        lhs_be_bits.extend_from_slice(&self.content_hash.as_bytes()[..16]);
         let lhs_fr = Fr::from_hex(&format!("0x{}", hex::encode(&lhs_be_bits))).expect("lhs as Fr");
 
         let mut rhs_be_bits = vec![];
-        rhs_be_bits.extend_from_slice(&self.content_hash.as_bytes()[128..]);
+        rhs_be_bits.extend_from_slice(&self.content_hash.as_bytes()[16..]);
         let rhs_fr = Fr::from_hex(&format!("0x{}", hex::encode(&rhs_be_bits))).expect("rhs as Fr");
 
         let hash_result = rescue_hash::<Bn256, 2>(&[lhs_fr, rhs_fr]);

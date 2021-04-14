@@ -347,12 +347,12 @@ impl MintNFTWitness<Bn256> {
             let mut lhs_be_bits = vec![];
             lhs_be_bits.extend_from_slice(&creator_account_id.to_be_bytes());
             lhs_be_bits.extend_from_slice(&serial_id.to_be_bytes());
-            lhs_be_bits.extend_from_slice(&content_hash.as_bytes()[..128]);
+            lhs_be_bits.extend_from_slice(&content_hash.as_bytes()[..16]);
             let lhs_fr =
                 Fr::from_hex(&format!("0x{}", hex::encode(&lhs_be_bits))).expect("lhs as Fr");
 
             let mut rhs_be_bits = vec![];
-            rhs_be_bits.extend_from_slice(&content_hash.as_bytes()[128..]);
+            rhs_be_bits.extend_from_slice(&content_hash.as_bytes()[16..]);
             let rhs_fr =
                 Fr::from_hex(&format!("0x{}", hex::encode(&rhs_be_bits))).expect("rhs as Fr");
 
