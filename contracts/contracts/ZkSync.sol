@@ -430,15 +430,15 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
 
             if (opType == Operations.OpType.PartialExit) {
                 Operations.PartialExit memory op = Operations.readPartialExitPubdata(pubData);
-                require(op.tokenId<(2**16), "w");
+                require(op.tokenId < (2**16), "w");
                 withdrawOrStore(uint16(op.tokenId), op.owner, op.amount);
             } else if (opType == Operations.OpType.ForcedExit) {
                 Operations.ForcedExit memory op = Operations.readForcedExitPubdata(pubData);
-                require(op.tokenId<(2**16), "w");
+                require(op.tokenId < (2**16), "w");
                 withdrawOrStore(uint16(op.tokenId), op.target, op.amount);
             } else if (opType == Operations.OpType.FullExit) {
                 Operations.FullExit memory op = Operations.readFullExitPubdata(pubData);
-                require(op.tokenId<(2**16), "w");
+                require(op.tokenId < (2**16), "w");
                 withdrawOrStore(uint16(op.tokenId), op.owner, op.amount);
             } else {
                 revert("l"); // unsupported op in block execution
