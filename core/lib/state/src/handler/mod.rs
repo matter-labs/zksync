@@ -10,6 +10,7 @@ mod mint_nft;
 mod swap;
 mod transfer;
 mod withdraw;
+mod withdraw_nft;
 
 /// TxHandler trait encapsulates the logic of each individual transaction
 /// handling. By transactions we assume both zkSync network transactions,

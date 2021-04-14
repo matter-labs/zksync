@@ -4,7 +4,7 @@ use ethabi::{decode, ParamType};
 
 use zksync_basic_types::Log;
 
-use crate::{AccountId, Address, BlockNumber};
+use crate::Address;
 
 #[derive(Clone, Debug)]
 pub struct RegisterNFTFactoryEvent {

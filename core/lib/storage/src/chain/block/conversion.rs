@@ -147,7 +147,7 @@ impl NewExecutedTransaction {
 
         let (from_account_hex, to_account_hex): (String, Option<String>) =
             match exec_tx.signed_tx.tx {
-                ZkSyncTx::Withdraw(_) | ZkSyncTx::Transfer(_) => (
+                ZkSyncTx::Withdraw(_) | ZkSyncTx::Transfer(_) | ZkSyncTx::WithdrawNFT(_) => (
                     serde_json::from_value(tx["from"].clone()).unwrap(),
                     serde_json::from_value(tx["to"].clone()).unwrap(),
                 ),

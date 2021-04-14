@@ -323,6 +323,9 @@ impl TreeState {
                 ZkSyncOp::MintNFTOp(_) => {
                     todo!()
                 }
+                ZkSyncOp::WithdrawNFT(_) => {
+                    todo!()
+                }
             }
         }
 

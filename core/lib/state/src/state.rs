@@ -336,6 +336,7 @@ impl ZkSyncState {
             ZkSyncTx::ForcedExit(tx) => self.apply_tx(*tx),
             ZkSyncTx::Swap(tx) => self.apply_tx(*tx),
             ZkSyncTx::MintNFT(tx) => self.apply_tx(*tx),
+            ZkSyncTx::WithdrawNFT(tx) => self.apply_tx(*tx),
         }
     }
 
@@ -418,6 +419,7 @@ impl ZkSyncState {
             ZkSyncTx::ForcedExit(tx) => self.create_op(*tx).map(Into::into),
             ZkSyncTx::Swap(tx) => self.create_op(*tx).map(Into::into),
             ZkSyncTx::MintNFT(tx) => self.create_op(*tx).map(Into::into),
+            ZkSyncTx::WithdrawNFT(tx) => self.create_op(*tx).map(Into::into),
         }
     }
 

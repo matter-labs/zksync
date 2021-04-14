@@ -1,5 +1,5 @@
 // Built-in deps
-use std::collections::HashMap;
+
 // External uses
 use futures::{
     channel::{mpsc, oneshot},
@@ -8,16 +8,11 @@ use futures::{
 use tokio::task::JoinHandle;
 // Workspace uses
 use zksync_config::{TokenHandlerConfig, ZkSyncConfig};
-use zksync_notifier::Notifier;
-use zksync_storage::{tokens::StoreTokenError, ConnectionPool, StorageProcessor};
-use zksync_types::{
-    tokens::{NewTokenEvent, Token, TokenInfo},
-    Address, RegisterNFTFactoryEvent,
-};
+
+use zksync_storage::{ConnectionPool, StorageProcessor};
+use zksync_types::RegisterNFTFactoryEvent;
 // Local uses
 use crate::eth_watch::EthWatchRequest;
-use web3::types::H256;
-use zksync_types::tx::PackedEthSignature;
 
 struct RegisterFactoryHandler {
     connection_pool: ConnectionPool,

@@ -850,6 +850,9 @@ pub fn build_block_witness<'a>(
                 pub_data.extend(mint_nft_witness.get_pubdata());
                 offset_commitment.extend(mint_nft_witness.get_offset_commitment_data())
             }
+            ZkSyncOp::WithdrawNFT(_) => {
+                todo!()
+            }
         }
     }
 

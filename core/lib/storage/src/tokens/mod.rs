@@ -6,7 +6,7 @@ use num::{rational::Ratio, BigUint};
 
 use thiserror::Error;
 // Workspace imports
-use zksync_types::{AccountId, Address, BlockNumber, Token, TokenId, TokenLike, TokenPrice, H256};
+use zksync_types::{AccountId, Address, Token, TokenId, TokenLike, TokenPrice};
 use zksync_utils::ratio_to_big_decimal;
 // Local imports
 use self::records::{DBMarketVolume, DbTickerPrice, DbToken};

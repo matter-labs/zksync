@@ -32,7 +32,7 @@ use zksync_storage::ConnectionPool;
 use zksync_types::{
     tokens::ChangePubKeyFeeTypeArg, tx::ChangePubKeyType, Address, BatchFee, ChangePubKeyOp, Fee,
     OutputFeeType, SwapOp, Token, TokenId, TokenLike, TransferOp, TransferToNewOp, TxFeeTypes,
-    WithdrawOp,
+    WithdrawNFTOp, WithdrawOp,
 };
 use zksync_utils::ratio_to_big_decimal;
 
@@ -657,6 +657,8 @@ impl<API: FeeTickerAPI, INFO: FeeTickerInfo, WATCHER: TokenWatcher> FeeTicker<AP
         let (fee_type, op_chunks) = match tx_type {
             TxFeeTypes::Withdraw => (OutputFeeType::Withdraw, WithdrawOp::CHUNKS),
             TxFeeTypes::FastWithdraw => (OutputFeeType::FastWithdraw, WithdrawOp::CHUNKS),
+            TxFeeTypes::WithdrawNFT => (OutputFeeType::WithdrawNFT, WithdrawNFTOp::CHUNKS),
+            TxFeeTypes::FastWithdrawNFT => (OutputFeeType::FastWithdrawNFT, WithdrawNFTOp::CHUNKS),
             TxFeeTypes::Transfer => {
                 if self.is_account_new(recipient).await {
                     (OutputFeeType::TransferToNew, TransferToNewOp::CHUNKS)

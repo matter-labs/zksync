@@ -220,6 +220,10 @@ pub enum ChangePubKeyFeeTypeArg {
 #[derive(Debug, Serialize, Deserialize, Clone, Copy, PartialEq, Hash, Eq)]
 pub enum TxFeeTypes {
     /// Fee for the `Withdraw` or `ForcedExit` transaction.
+    WithdrawNFT,
+    /// Fee for the `Withdraw` operation that requires fast processing.
+    FastWithdrawNFT,
+    /// Fee for the `Withdraw` or `ForcedExit` transaction.
     Withdraw,
     /// Fee for the `Withdraw` operation that requires fast processing.
     FastWithdraw,

@@ -8,6 +8,7 @@ mod primitives;
 mod swap;
 mod transfer;
 mod withdraw;
+mod withdraw_nft;
 mod zksync_tx;
 
 #[cfg(test)]
@@ -26,6 +27,7 @@ pub use self::{
     swap::{Order, Swap},
     transfer::Transfer,
     withdraw::Withdraw,
+    withdraw_nft::WithdrawNFT,
     zksync_tx::{EthSignData, SignedZkSyncTx, ZkSyncTx},
 };
 
