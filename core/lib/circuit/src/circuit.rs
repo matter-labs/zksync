@@ -18,8 +18,9 @@ use zksync_crypto::franklin_crypto::{
 };
 // Workspace deps
 use zksync_crypto::params::{
-    self, FR_BIT_WIDTH_PADDED, NFT_STORAGE_ACCOUNT_ID, NFT_TOKEN_ID, OLD_SIGNED_TRANSFER_BIT_WIDTH,
-    SIGNED_FORCED_EXIT_BIT_WIDTH, SIGNED_MINT_NFT_BIT_WIDTH, SIGNED_TRANSFER_BIT_WIDTH,
+    self, CONTENT_HASH_WIDTH, FR_BIT_WIDTH_PADDED, NFT_STORAGE_ACCOUNT_ID, NFT_TOKEN_ID,
+    OLD_SIGNED_TRANSFER_BIT_WIDTH, SIGNED_FORCED_EXIT_BIT_WIDTH, SIGNED_MINT_NFT_BIT_WIDTH,
+    SIGNED_TRANSFER_BIT_WIDTH,
 };
 use zksync_types::{
     operations::{ChangePubKeyOp, NoopOp},
@@ -2177,15 +2178,20 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
             let mut flags = vec![common_valid.clone(), is_chunk_with_index[3].clone()];
 
             flags.push(is_special_nft_storage_account.clone());
-            flags.push(is_new_token);
+            flags.push(is_new_token.clone());
 
             multi_and(cs.namespace(|| "fourth_chunk_valid"), &flags)?
         };
-        todo!(); // calculate content_to_store
-        let content_to_store = Expression::u64::<CS>(0);
+        let content_to_store_as_balance = NFT_content_to_store_as_balance(
+            cs.namespace(|| "NFT_content_to_store_as_balance"),
+            &op_data.special_account_ids[0],
+            &op_data.special_serial_id,
+            &op_data.special_content_hash,
+            self.rescue_params,
+        )?;
         cur.balance = CircuitElement::conditionally_select_with_number_strict(
             cs.namespace(|| "updated cur balance (fourth chunk)"),
-            content_to_store,
+            Expression::from(&content_to_store_as_balance.get_number()),
             &cur.balance,
             &fourth_chunk_valid,
         )?;
@@ -3407,6 +3413,48 @@ fn continue_leftmost_subroot_to_root<E: RescueEngine, CS: ConstraintSystem<E>>(
     }
 
     Ok(node_hash)
+}
+
+fn NFT_content_to_store_as_balance<E: RescueEngine, CS: ConstraintSystem<E>>(
+    mut cs: CS,
+    creator_account_id: &CircuitElement<E>,
+    serial_id: &CircuitElement<E>,
+    content_hash: &Vec<CircuitElement<E>>,
+    params: &E::Params,
+) -> Result<CircuitElement<E>, SynthesisError> {
+    let mut content_hash_as_booleans_le = content_hash
+        .iter()
+        .map(|bit| bit.get_bits_le())
+        .flatten()
+        .collect::<Vec<_>>();
+    content_hash_as_booleans_le.reverse();
+    assert_eq!(content_hash_as_booleans_le.len(), CONTENT_HASH_WIDTH);
+
+    let mut lhs_le_bits = vec![];
+    lhs_le_bits.extend_from_slice(&content_hash_as_booleans_le[128..]);
+    lhs_le_bits.extend(serial_id.get_bits_le());
+    lhs_le_bits.extend(creator_account_id.get_bits_le());
+    let lhs = CircuitElement::from_le_bits(cs.namespace(|| "lhs"), lhs_le_bits)?;
+
+    let mut rhs_le_bits = vec![];
+    rhs_le_bits.extend_from_slice(&content_hash_as_booleans_le[..128]);
+    let rhs = CircuitElement::from_le_bits(cs.namespace(|| "rhs"), rhs_le_bits)?;
+
+    let mut sponge_output = rescue::rescue_hash(
+        cs.namespace(|| "hash lhs and rhs"),
+        &[lhs.get_number(), rhs.get_number()],
+        params,
+    )?;
+    assert_eq!(sponge_output.len(), 1);
+    let content_to_store_as_bits_le = sponge_output
+        .pop()
+        .expect("must get a single element")
+        .into_bits_le(cs.namespace(|| "content_to_store into_bits_le"))?;
+
+    CircuitElement::from_le_bits(
+        cs.namespace(|| "NFT_content_to_store_as_balance from lower 128 bits"),
+        content_to_store_as_bits_le[..128].to_vec(),
+    )
 }
 
 fn generate_maxchunk_polynomial<E: JubjubEngine>() -> Vec<E::Fr> {

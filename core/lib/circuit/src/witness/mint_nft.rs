@@ -343,7 +343,7 @@ impl MintNFTWitness<Bn256> {
             serial_id: u32,
             content_hash: H256,
         ) -> Fr {
-            let value = creator_account_id as u64 + ((serial_id as u64) << 32); // Pack creator_id and serial_id
+            let value = ((creator_account_id as u64) << 32) + serial_id; // Pack creator_id and serial_id
             let value_fr = Fr::from_repr(FrRepr::from(value)).expect("a Fr");
 
             let content_hash = Fr::from_bytes(content_hash.as_bytes()).expect("a Fr");
