@@ -15,6 +15,7 @@ pub fn create_full_exit_op() -> ExecutedOperations {
             deadline_block: 0,
             eth_hash: H256::zero(),
             eth_block: 0,
+            eth_block_index: 0,
         },
         op: ZkSyncOp::FullExit(Box::new(FullExitOp {
             priority_op,

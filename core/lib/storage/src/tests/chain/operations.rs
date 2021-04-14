@@ -105,6 +105,7 @@ async fn executed_priority_operations(mut storage: StorageProcessor<'_>) -> Quer
         eth_block: 10,
         created_at: chrono::Utc::now(),
         tx_hash: Default::default(),
+        eth_block_index: 1,
     };
     OperationsSchema(&mut storage)
         .store_executed_priority_op(executed_tx.clone())
@@ -164,6 +165,7 @@ async fn duplicated_operations(mut storage: StorageProcessor<'_>) -> QueryResult
         eth_block: 10,
         created_at: chrono::Utc::now(),
         tx_hash: Default::default(),
+        eth_block_index: 1,
     };
 
     // Save the same operations twice.

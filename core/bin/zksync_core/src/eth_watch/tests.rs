@@ -122,6 +122,7 @@ async fn test_operation_queues() {
                 deadline_block: 0,
                 eth_hash: [2; 32].into(),
                 eth_block: 4,
+                eth_block_index: 1,
             },
             PriorityOp {
                 serial_id: 1,
@@ -134,6 +135,7 @@ async fn test_operation_queues() {
                 deadline_block: 0,
                 eth_hash: [3; 32].into(),
                 eth_block: 3,
+                eth_block_index: 1,
             },
             PriorityOp {
                 serial_id: 2,
@@ -145,6 +147,7 @@ async fn test_operation_queues() {
                 deadline_block: 0,
                 eth_block: 4,
                 eth_hash: [4; 32].into(),
+                eth_block_index: 2,
             },
         ])
         .await;
@@ -200,6 +203,7 @@ async fn test_operation_queues_time_lag() {
                 deadline_block: 0,
                 eth_hash: [2; 32].into(),
                 eth_block: 1, // <- First operation goes to the first block.
+                eth_block_index: 1,
             },
             PriorityOp {
                 serial_id: 1,
@@ -211,6 +215,7 @@ async fn test_operation_queues_time_lag() {
                 deadline_block: 0,
                 eth_hash: [3; 32].into(),
                 eth_block: 100, // <-- Note 100th block, it will set the network block to 100.
+                eth_block_index: 1,
             },
             PriorityOp {
                 serial_id: 2,
@@ -223,6 +228,7 @@ async fn test_operation_queues_time_lag() {
                 deadline_block: 0,
                 eth_hash: [3; 32].into(),
                 eth_block: 110, // <-- This operation will get to the unconfirmed queue.
+                eth_block_index: 1,
             },
         ])
         .await;
@@ -266,6 +272,7 @@ async fn test_restore_and_poll() {
                 deadline_block: 0,
                 eth_hash: [2; 32].into(),
                 eth_block: 4,
+                eth_block_index: 1,
             },
             PriorityOp {
                 serial_id: 1,
@@ -278,6 +285,7 @@ async fn test_restore_and_poll() {
                 deadline_block: 0,
                 eth_hash: [3; 32].into(),
                 eth_block: 3,
+                eth_block_index: 1,
             },
         ])
         .await;
@@ -297,6 +305,7 @@ async fn test_restore_and_poll() {
                 deadline_block: 0,
                 eth_hash: [2; 32].into(),
                 eth_block: 5,
+                eth_block_index: 1,
             },
             PriorityOp {
                 serial_id: 4,
@@ -308,6 +317,7 @@ async fn test_restore_and_poll() {
                 deadline_block: 0,
                 eth_hash: [3; 32].into(),
                 eth_block: 5,
+                eth_block_index: 2,
             },
         ])
         .await;
@@ -341,6 +351,7 @@ async fn test_restore_and_poll_time_lag() {
                 deadline_block: 0,
                 eth_hash: [2; 32].into(),
                 eth_block: 1,
+                eth_block_index: 1,
             },
             PriorityOp {
                 serial_id: 1,
@@ -352,6 +363,7 @@ async fn test_restore_and_poll_time_lag() {
                 deadline_block: 0,
                 eth_hash: [3; 32].into(),
                 eth_block: 100,
+                eth_block_index: 1,
             },
         ])
         .await;

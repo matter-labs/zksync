@@ -539,6 +539,7 @@ impl TestServerConfig {
                     .to_vec(),
                 eth_block: 10,
                 created_at: chrono::Utc::now(),
+                eth_block_index: 1,
                 tx_hash: Default::default(),
             },
             // Committed priority operation.
@@ -559,6 +560,7 @@ impl TestServerConfig {
                     .to_vec(),
                 eth_block: 14,
                 created_at: chrono::Utc::now(),
+                eth_block_index: 1,
                 tx_hash: Default::default(),
             },
         ];
@@ -618,6 +620,7 @@ pub fn dummy_deposit_op(
             deadline_block: 0,
             eth_hash: H256::default(),
             eth_block: 10,
+            eth_block_index: 1,
         },
         op: deposit_op,
         block_index,
@@ -648,6 +651,7 @@ pub fn dummy_full_exit_op(
             deadline_block: 0,
             eth_hash: H256::default(),
             eth_block: 10,
+            eth_block_index: 1,
         },
         op: deposit_op,
         block_index,

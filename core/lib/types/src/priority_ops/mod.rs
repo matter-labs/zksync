@@ -233,6 +233,8 @@ pub struct PriorityOp {
     pub eth_hash: H256,
     /// Block in which Ethereum transaction was included.
     pub eth_block: u64,
+    /// Transaction index in Ethereum block
+    pub eth_block_index: u64,
 }
 
 impl TryFrom<Log> for PriorityOp {
@@ -281,6 +283,10 @@ impl TryFrom<Log> for PriorityOp {
             eth_block: event
                 .block_number
                 .expect("Event block number is missing")
+                .as_u64(),
+            eth_block_index: event
+                .transaction_index
+                .expect("Event transaction index is missing")
                 .as_u64(),
         })
     }
