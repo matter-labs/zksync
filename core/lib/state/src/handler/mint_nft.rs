@@ -125,7 +125,7 @@ impl TxHandler<MintNFT> for ZkSyncState {
         let serial_id = old_balance.to_u32().unwrap_or_default();
 
         let token_hash = op.tx.calculate_hash(serial_id);
-        let token_address = Address::from_slice(&token_hash[..20]);
+        let token_address = Address::from_slice(&token_hash[12..]);
 
         // Mint NFT with precalculated token_id, serial_id and address
         updates.push((
@@ -161,8 +161,8 @@ impl TxHandler<MintNFT> for ZkSyncState {
         self.insert_account(op.recipient_account_id, recipient_account);
 
         // Token data is a special balance for NFT_STORAGE_ACCOUNT,
-        // which represent first 16 bytes of hash of (account_id, serial_id, content_hash) for storing this data in circuit
-        let token_data = BigUint::from_bytes_be(&token_hash[..16]);
+        // which represent last 16 bytes of hash of (account_id, serial_id, content_hash) for storing this data in circuit
+        let token_data = BigUint::from_bytes_be(&token_hash[16..]);
         let old_balance = nft_account.get_balance(token_id);
         assert_eq!(
             old_balance,

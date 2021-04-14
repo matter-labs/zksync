@@ -2182,7 +2182,7 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
 
             multi_and(cs.namespace(|| "fourth_chunk_valid"), &flags)?
         };
-        let content_to_store_as_balance = NFT_content_to_store_as_balance(
+        let content_to_store_as_balance = NFT_content_as_balance(
             cs.namespace(|| "NFT_content_to_store_as_balance"),
             &op_data.special_account_ids[0],
             &op_data.special_serial_id,
@@ -3415,7 +3415,7 @@ fn continue_leftmost_subroot_to_root<E: RescueEngine, CS: ConstraintSystem<E>>(
     Ok(node_hash)
 }
 
-fn NFT_content_to_store_as_balance<E: RescueEngine, CS: ConstraintSystem<E>>(
+fn NFT_content_as_balance<E: RescueEngine, CS: ConstraintSystem<E>>(
     mut cs: CS,
     creator_account_id: &CircuitElement<E>,
     serial_id: &CircuitElement<E>,
@@ -3446,14 +3446,14 @@ fn NFT_content_to_store_as_balance<E: RescueEngine, CS: ConstraintSystem<E>>(
         params,
     )?;
     assert_eq!(sponge_output.len(), 1);
-    let content_to_store_as_bits_le = sponge_output
+    let content_as_bits_le = sponge_output
         .pop()
         .expect("must get a single element")
-        .into_bits_le(cs.namespace(|| "content_to_store into_bits_le"))?;
+        .into_bits_le(cs.namespace(|| "content into_bits_le"))?;
 
     CircuitElement::from_le_bits(
-        cs.namespace(|| "NFT_content_to_store_as_balance from lower 128 bits"),
-        content_to_store_as_bits_le[..128].to_vec(),
+        cs.namespace(|| "NFT_content_as_balance from lower 128 bits"),
+        content_as_bits_le[..128].to_vec(),
     )
 }
 

@@ -188,13 +188,17 @@ impl MintNFT {
     }
 
     pub fn calculate_hash(&self, serial_id: u32) -> Vec<u8> {
-        let value = self.creator_id.0 as u64 + ((serial_id as u64) << 32); // Pack creator_id and serial_id
-        let repr = FrRepr::from(value);
-        let value_fr = Fr::from_repr(repr).expect("a Fr");
+        let mut lhs_be_bits = vec![];
+        lhs_be_bits.extend_from_slice(&self.creator_id.0.to_be_bytes());
+        lhs_be_bits.extend_from_slice(&serial_id.to_be_bytes());
+        lhs_be_bits.extend_from_slice(&self.content_hash.as_bytes()[..128]);
+        let lhs_fr = Fr::from_hex(&format!("0x{}", hex::encode(&lhs_be_bits))).expect("lhs as Fr");
 
-        let content_hash = Fr::from_bytes(self.content_hash.as_bytes()).expect("a Fr");
+        let mut rhs_be_bits = vec![];
+        rhs_be_bits.extend_from_slice(&self.content_hash.as_bytes()[128..]);
+        let rhs_fr = Fr::from_hex(&format!("0x{}", hex::encode(&rhs_be_bits))).expect("rhs as Fr");
 
-        let result = rescue_hash::<Bn256, 2>(&[value_fr, content_hash]);
-        result[0].to_bytes()
+        let hash_result = rescue_hash::<Bn256, 2>(&[lhs_fr, rhs_fr]);
+        hash_result[0].to_bytes()
     }
 }

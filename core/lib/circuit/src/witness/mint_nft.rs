@@ -12,6 +12,7 @@ use zksync_crypto::franklin_crypto::{
     rescue::RescueEngine,
 };
 // Workspace deps
+use hex::encode;
 use zksync_crypto::{
     circuit::{
         account::CircuitAccountTree,
@@ -343,15 +344,22 @@ impl MintNFTWitness<Bn256> {
             serial_id: u32,
             content_hash: H256,
         ) -> Fr {
-            let value = ((creator_account_id as u64) << 32) + serial_id; // Pack creator_id and serial_id
-            let value_fr = Fr::from_repr(FrRepr::from(value)).expect("a Fr");
+            let mut lhs_be_bits = vec![];
+            lhs_be_bits.extend_from_slice(&creator_account_id.to_be_bytes());
+            lhs_be_bits.extend_from_slice(&serial_id.to_be_bytes());
+            lhs_be_bits.extend_from_slice(&content_hash.as_bytes()[..128]);
+            let lhs_fr =
+                Fr::from_hex(&format!("0x{}", hex::encode(&lhs_be_bits))).expect("lhs as Fr");
 
-            let content_hash = Fr::from_bytes(content_hash.as_bytes()).expect("a Fr");
+            let mut rhs_be_bits = vec![];
+            rhs_be_bits.extend_from_slice(&content_hash.as_bytes()[128..]);
+            let rhs_fr =
+                Fr::from_hex(&format!("0x{}", hex::encode(&rhs_be_bits))).expect("rhs as Fr");
 
-            let hash_result = rescue_hash::<Bn256, 2>(&[value_fr, content_hash]);
+            let hash_result = rescue_hash::<Bn256, 2>(&[lhs_fr, rhs_fr]);
 
             let mut result_bytes = vec![0u8; 16];
-            result_bytes.extend_from_slice(&hash_result[0].to_bytes()[..16]);
+            result_bytes.extend_from_slice(&hash_result[0].to_bytes()[16..]);
 
             let mut repr = Fr::zero().into_repr();
             repr.read_be(&result_bytes[..])

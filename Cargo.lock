@@ -6037,6 +6037,7 @@ dependencies = [
  "anyhow",
  "bigdecimal",
  "criterion",
+ "hex",
  "num",
  "rayon",
  "rescue_poseidon",
