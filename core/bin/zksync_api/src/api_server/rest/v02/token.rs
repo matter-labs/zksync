@@ -100,13 +100,13 @@ impl ApiTokenData {
                         enabled_for_fees,
                     ));
                 }
-                Ok(Paginated {
+                Ok(Paginated::new(
                     list,
-                    from: paginated_tokens.from,
-                    count: paginated_tokens.count,
-                    limit: paginated_tokens.limit,
-                    direction: paginated_tokens.direction,
-                })
+                    paginated_tokens.pagination.from,
+                    paginated_tokens.pagination.limit,
+                    paginated_tokens.pagination.direction,
+                    paginated_tokens.pagination.count,
+                ))
             }
             Err(err) => Err(err),
         }
@@ -359,13 +359,13 @@ mod tests {
                     enabled_for_fees,
                 ));
             }
-            Paginated {
+            Paginated::new(
                 list,
-                from: paginated_tokens.from,
-                count: paginated_tokens.count,
-                limit: paginated_tokens.limit,
-                direction: paginated_tokens.direction,
-            }
+                paginated_tokens.pagination.from,
+                paginated_tokens.pagination.limit,
+                paginated_tokens.pagination.direction,
+                paginated_tokens.pagination.count,
+            )
         };
         assert_eq!(pagination, expected_pagination);
 

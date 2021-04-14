@@ -40,9 +40,9 @@ impl Paginate<Token> for StorageProcessor<'_> {
         Ok(Paginated::new(
             tokens,
             query.from,
-            count,
             query.limit,
             query.direction,
+            count,
         ))
     }
 }
@@ -71,9 +71,9 @@ impl Paginate<BlockInfo> for StorageProcessor<'_> {
         Ok(Paginated::new(
             blocks,
             query.from,
-            count,
             query.limit,
             query.direction,
+            count,
         ))
     }
 }
@@ -127,9 +127,9 @@ impl Paginate<Transaction> for StorageProcessor<'_> {
         Ok(Paginated::new(
             txs,
             query.from,
-            count,
             query.limit,
             query.direction,
+            count,
         ))
     }
 }
