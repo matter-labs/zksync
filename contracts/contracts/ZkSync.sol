@@ -296,7 +296,7 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
             Operations.FullExit({
                 accountId: _accountId,
                 owner: msg.sender,
-                tokenId: tokenId,
+                tokenId: uint32(tokenId),
                 amount: 0 // unknown at this point
             });
         bytes memory pubData = Operations.writeFullExitPubdataForPriorityQueue(op);
@@ -430,13 +430,16 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
 
             if (opType == Operations.OpType.PartialExit) {
                 Operations.PartialExit memory op = Operations.readPartialExitPubdata(pubData);
-                withdrawOrStore(op.tokenId, op.owner, op.amount);
+                require(op.tokenId<(2**16), "w");
+                withdrawOrStore(uint16(op.tokenId), op.owner, op.amount);
             } else if (opType == Operations.OpType.ForcedExit) {
                 Operations.ForcedExit memory op = Operations.readForcedExitPubdata(pubData);
-                withdrawOrStore(op.tokenId, op.target, op.amount);
+                require(op.tokenId<(2**16), "w");
+                withdrawOrStore(uint16(op.tokenId), op.target, op.amount);
             } else if (opType == Operations.OpType.FullExit) {
                 Operations.FullExit memory op = Operations.readFullExitPubdata(pubData);
-                withdrawOrStore(op.tokenId, op.owner, op.amount);
+                require(op.tokenId<(2**16), "w");
+                withdrawOrStore(uint16(op.tokenId), op.owner, op.amount);
             } else {
                 revert("l"); // unsupported op in block execution
             }
@@ -559,13 +562,15 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
         uint128 _amount,
         uint256[] memory _proof
     ) external nonReentrant {
+        require(governance.isValidTokenId(_tokenId), "a"); // should request only available tokens
+
         bytes22 packedBalanceKey = packAddressAndTokenId(_owner, _tokenId);
         require(exodusMode, "s"); // must be in exodus mode
         require(!performedExodus[_accountId][_tokenId], "t"); // already exited
-        require(storedBlockHashes[totalBlocksExecuted] == hashStoredBlockInfo(_storedBlockInfo), "u"); // incorrect sotred block info
+        require(storedBlockHashes[totalBlocksExecuted] == hashStoredBlockInfo(_storedBlockInfo), "u"); // incorrect stored block info
 
         bool proofCorrect =
-            verifier.verifyExitProof(_storedBlockInfo.stateHash, _accountId, _owner, _tokenId, _amount, _proof);
+            verifier.verifyExitProof(_storedBlockInfo.stateHash, _accountId, _owner, uint32(_tokenId), _amount, _proof);
         require(proofCorrect, "x");
 
         increaseBalanceToWithdraw(packedBalanceKey, _amount);
@@ -609,7 +614,7 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
             Operations.Deposit({
                 accountId: 0, // unknown at this point
                 owner: _owner,
-                tokenId: _tokenId,
+                tokenId: uint32(_tokenId),
                 amount: _amount
             });
         bytes memory pubData = Operations.writeDepositPubdataForPriorityQueue(op);

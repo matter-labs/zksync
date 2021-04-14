@@ -22,14 +22,14 @@ library Operations {
         FullExit,
         ChangePubKey,
         ForcedExit,
-        TransferFrom,
+        MintNFT,
         Swap
     }
 
     // Byte lengths
 
     uint8 internal constant OP_TYPE_BYTES = 1;
-    uint8 internal constant TOKEN_BYTES = 2;
+    uint8 internal constant TOKEN_BYTES = 4;
     uint8 internal constant PUBKEY_BYTES = 32;
     uint8 internal constant NONCE_BYTES = 4;
     uint8 internal constant PUBKEY_HASH_BYTES = 20;
@@ -46,7 +46,7 @@ library Operations {
     struct Deposit {
         // uint8 opType
         uint32 accountId;
-        uint16 tokenId;
+        uint32 tokenId;
         uint128 amount;
         address owner;
     }
@@ -59,7 +59,7 @@ library Operations {
         // NOTE: there is no check that variable sizes are same as constants (i.e. TOKEN_BYTES), fix if possible.
         uint256 offset = OP_TYPE_BYTES;
         (offset, parsed.accountId) = Bytes.readUInt32(_data, offset); // accountId
-        (offset, parsed.tokenId) = Bytes.readUInt16(_data, offset); // tokenId
+        (offset, parsed.tokenId) = Bytes.readUInt32(_data, offset); // tokenId
         (offset, parsed.amount) = Bytes.readUInt128(_data, offset); // amount
         (offset, parsed.owner) = Bytes.readAddress(_data, offset); // owner
 
@@ -88,7 +88,7 @@ library Operations {
         // uint8 opType
         uint32 accountId;
         address owner;
-        uint16 tokenId;
+        uint32 tokenId;
         uint128 amount;
     }
 
@@ -100,7 +100,7 @@ library Operations {
         uint256 offset = OP_TYPE_BYTES;
         (offset, parsed.accountId) = Bytes.readUInt32(_data, offset); // accountId
         (offset, parsed.owner) = Bytes.readAddress(_data, offset); // owner
-        (offset, parsed.tokenId) = Bytes.readUInt16(_data, offset); // tokenId
+        (offset, parsed.tokenId) = Bytes.readUInt32(_data, offset); // tokenId
         (offset, parsed.amount) = Bytes.readUInt128(_data, offset); // amount
 
         require(offset == PACKED_FULL_EXIT_PUBDATA_BYTES, "O"); // reading invalid full exit pubdata size
@@ -125,7 +125,7 @@ library Operations {
     struct PartialExit {
         //uint8 opType; -- present in pubdata, ignored at serialization
         //uint32 accountId; -- present in pubdata, ignored at serialization
-        uint16 tokenId;
+        uint32 tokenId;
         uint128 amount;
         //uint16 fee; -- present in pubdata, ignored at serialization
         address owner;
@@ -134,7 +134,7 @@ library Operations {
     function readPartialExitPubdata(bytes memory _data) internal pure returns (PartialExit memory parsed) {
         // NOTE: there is no check that variable sizes are same as constants (i.e. TOKEN_BYTES), fix if possible.
         uint256 offset = OP_TYPE_BYTES + ACCOUNT_ID_BYTES; // opType + accountId (ignored)
-        (offset, parsed.tokenId) = Bytes.readUInt16(_data, offset); // tokenId
+        (offset, parsed.tokenId) = Bytes.readUInt32(_data, offset); // tokenId
         (offset, parsed.amount) = Bytes.readUInt128(_data, offset); // amount
         offset += FEE_BYTES; // fee (ignored)
         (offset, parsed.owner) = Bytes.readAddress(_data, offset); // owner
@@ -146,7 +146,7 @@ library Operations {
         //uint8 opType; -- present in pubdata, ignored at serialization
         //uint32 initiatorAccountId; -- present in pubdata, ignored at serialization
         //uint32 targetAccountId; -- present in pubdata, ignored at serialization
-        uint16 tokenId;
+        uint32 tokenId;
         uint128 amount;
         //uint16 fee; -- present in pubdata, ignored at serialization
         address target;
@@ -155,7 +155,7 @@ library Operations {
     function readForcedExitPubdata(bytes memory _data) internal pure returns (ForcedExit memory parsed) {
         // NOTE: there is no check that variable sizes are same as constants (i.e. TOKEN_BYTES), fix if possible.
         uint256 offset = OP_TYPE_BYTES + ACCOUNT_ID_BYTES * 2; // opType + initiatorAccountId + targetAccountId (ignored)
-        (offset, parsed.tokenId) = Bytes.readUInt16(_data, offset); // tokenId
+        (offset, parsed.tokenId) = Bytes.readUInt32(_data, offset); // tokenId
         (offset, parsed.amount) = Bytes.readUInt128(_data, offset); // amount
         offset += FEE_BYTES; // fee (ignored)
         (offset, parsed.target) = Bytes.readAddress(_data, offset); // target
@@ -171,7 +171,7 @@ library Operations {
         bytes20 pubKeyHash;
         address owner;
         uint32 nonce;
-        //uint16 tokenId; -- present in pubdata, ignored at serialization
+        //uint32 tokenId; -- present in pubdata, ignored at serialization
         //uint16 fee; -- present in pubdata, ignored at serialization
     }
 

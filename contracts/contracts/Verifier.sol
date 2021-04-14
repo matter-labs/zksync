@@ -57,7 +57,7 @@ contract Verifier is KeysWithPlonkVerifier, KeysWithPlonkVerifierOld, Config {
         bytes32 _rootHash,
         uint32 _accountId,
         address _owner,
-        uint16 _tokenId,
+        uint32 _tokenId,
         uint128 _amount,
         uint256[] calldata _proof
     ) external view returns (bool) {

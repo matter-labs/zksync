@@ -443,7 +443,7 @@ impl MintNFTWitness<Bn256> {
             before_fifth_chunk_root: Some(before_fifth_chunk_root),
             after_root: Some(after_root),
 
-            tx_type: Some(Fr::from_str("9").unwrap()),
+            tx_type: Some(Fr::from_str(&MintNFTOp::OP_CODE.to_string()).unwrap()),
             args: OperationArguments {
                 eth_address: Some(
                     creator_account_witness_before_first_chunk
