@@ -23,7 +23,8 @@ import {
     ChangePubKeyOnchain,
     ChangePubKeyECDSA,
     ChangePubKeyCREATE2,
-    Create2Data
+    Create2Data,
+    MintNFT
 } from './types';
 import {
     ERC20_APPROVE_TRESHOLD,
@@ -380,6 +381,34 @@ export class Wallet {
         return submitSignedTransaction(signedTransferTransaction, this.provider);
     }
 
+    async getMintNFT(mintNft: {
+        recipient: string;
+        contentHash: string;
+        feeToken: TokenLike;
+        fee: BigNumberish;
+        nonce: number;
+        validFrom: number;
+        validUntil: number;
+    }): Promise<MintNFT> {
+        if (!this.signer) {
+            throw new Error('ZKSync signer is required for sending zksync transactions.');
+        }
+        await this.setRequiredAccountIdFromServer('MintNFT');
+
+        const feeTokenId = this.provider.tokenSet.resolveTokenId(mintNft.feeToken);
+        const transactionData = {
+            creatorAccountId: this.accountId,
+            creatorAccountAddress: this.address(),
+            recipient: mintNft.recipient,
+            contentHash: mintNft.contentHash,
+            feeTokenId,
+            fee: mintNft.fee,
+            nonce: mintNft.nonce
+        };
+
+        return await this.signer.signMintNFT(transactionData);
+    }
+
     async getWithdrawFromSyncToEthereum(withdraw: {
         ethAddress: string;
         token: TokenLike;
@@ -410,6 +439,35 @@ export class Wallet {
         return await this.signer.signSyncWithdraw(transactionData);
     }
 
+    async signMintNFT(mintNft: {
+        recipient: string;
+        contentHash: string;
+        feeToken: TokenLike;
+        fee: BigNumberish;
+        nonce: number;
+    }): Promise<SignedTransaction> {
+        const signedMintNFTTransaction = await this.getMintNFT(mintNft as any);
+
+        const stringFee = BigNumber.from(mintNft.fee).isZero()
+            ? null
+            : this.provider.tokenSet.formatToken(mintNft.feeToken, mintNft.fee);
+        const stringToken = this.provider.tokenSet.resolveTokenSymbol(mintNft.feeToken);
+        const ethereumSignature =
+            this.ethSigner instanceof Create2WalletSigner
+                ? null
+                : await this.ethMessageSigner.ethSignMintNFT({
+                      stringToken,
+                      stringFee,
+                      recipient: mintNft.recipient,
+                      contentHash: mintNft.contentHash,
+                      nonce: mintNft.nonce
+                  });
+
+        return {
+            tx: signedMintNFTTransaction,
+            ethereumSignature
+        };
+    }
     async signWithdrawFromSyncToEthereum(withdraw: {
         ethAddress: string;
         token: TokenLike;
@@ -446,6 +504,27 @@ export class Wallet {
             tx: signedWithdrawTransaction,
             ethereumSignature
         };
+    }
+
+    async mintNFT(mintNft: {
+        recipient: string;
+        contentHash: string;
+        feeToken: TokenLike;
+        fee?: BigNumberish;
+        nonce?: Nonce;
+        validFrom?: number;
+        validUntil?: number;
+    }): Promise<Transaction> {
+        mintNft.nonce = mintNft.nonce != null ? await this.getNonce(mintNft.nonce) : await this.getNonce();
+
+        if (mintNft.fee == null) {
+            const fullFee = await this.provider.getTransactionFee('MintNFT', mintNft.recipient, mintNft.feeToken);
+            mintNft.fee = fullFee.totalFee;
+        }
+
+        const signedMintNFTTransaction = await this.signMintNFT(mintNft as any);
+
+        return submitSignedTransaction(signedMintNFTTransaction, this.provider, false);
     }
 
     async withdrawFromSyncToEthereum(withdraw: {

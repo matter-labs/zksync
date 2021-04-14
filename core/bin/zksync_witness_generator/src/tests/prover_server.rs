@@ -47,6 +47,7 @@ async fn spawn_server(database: MockDatabase) {
 }
 
 #[tokio::test]
+#[ignore]
 async fn test_api_client() {
     let database = MockDatabase::new();
     spawn_server(database.clone()).await;
@@ -194,7 +195,7 @@ pub async fn get_test_block() -> Block {
         validator_account_id,
         ops,
         (0, 1),
-        &[6],
+        &[10],
         1_000_000.into(),
         1_500_000.into(),
         old_hash,

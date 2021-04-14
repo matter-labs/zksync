@@ -7,6 +7,7 @@ import './priority-ops';
 import './change-pub-key';
 import './transfer';
 import './withdraw';
+import './mint-nft';
 import './forced-exit';
 import './misc';
 import './batch-builder';
@@ -45,6 +46,9 @@ describe(`ZkSync integration tests (token: ${token}, transport: ${transport})`, 
 
     after('disconnect tester', async () => {
         await tester.disconnect();
+    });
+    step('should execute a mintNFT', async () => {
+        await tester.testMintNFT(alice, chuck, "0x0000000000000000000000000000000000000000000000000000000000000000", token);
     });
 
     step('should execute an auto-approved deposit', async () => {

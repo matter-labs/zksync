@@ -269,6 +269,7 @@ fn invalid_account_id() {
 }
 
 #[test]
+#[ignore]
 fn execute_txs_batch_success_transfers() {
     let token_id = TokenId(0);
     let amount = BigUint::from(100u32);
@@ -315,7 +316,6 @@ fn execute_txs_batch_success_transfers() {
         &sk,
     )
     .unwrap();
-
     let transfer_bad = Transfer::new_signed(
         account_id,
         account.address,

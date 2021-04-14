@@ -110,8 +110,6 @@ export interface MintNFT {
     feeToken: number;
     nonce: number;
     signature?: Signature;
-    validFrom: number;
-    validUntil: number;
 }
 
 export interface ForcedExit {

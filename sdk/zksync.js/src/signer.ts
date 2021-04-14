@@ -27,6 +27,30 @@ export class Signer {
         return await privateKeyToPubKeyHash(this.#privateKey);
     }
 
+    async signMintNFT(mintNft: {
+        creatorAccountId: number;
+        creatorAccountAddress: Address;
+        recipient: Address;
+        contentHash: string;
+        feeTokenId: number;
+        fee: BigNumberish;
+        nonce: number;
+    }): Promise<MintNFT> {
+        const tx: MintNFT = {
+            ...mintNft,
+            type: 'MintNFT',
+            feeToken: mintNft.feeTokenId
+        };
+        const msgBytes = utils.serializeMintNFT(tx);
+        const signature = await signTransactionBytes(this.#privateKey, msgBytes);
+
+        return {
+            ...tx,
+            fee: BigNumber.from(mintNft.fee).toString(),
+            signature
+        };
+    }
+
     /**
      * @deprecated `Signer.*SignBytes` methods will be removed in future. Use `utils.serializeTx` instead.
      */
