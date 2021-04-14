@@ -163,11 +163,7 @@ impl<'a, 'c> EventSchema<'a, 'c> {
     ) -> QueryResult<AccountId> {
         let priority_op = match executed_operation {
             ExecutedOperations::Tx(tx) => {
-                return tx
-                    .signed_tx
-                    .tx
-                    .account_id()
-                    .map_err(anyhow::Error::from)
+                return tx.signed_tx.tx.account_id().map_err(anyhow::Error::from)
             }
             ExecutedOperations::PriorityOp(priority_op) => priority_op,
         };

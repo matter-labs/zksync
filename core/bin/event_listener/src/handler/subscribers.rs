@@ -1,7 +1,7 @@
+use super::filters::EventFilter;
 use std::collections::HashMap;
 use std::hash::{Hash, Hasher};
 use zksync_storage::event::types::{EventType, ZkSyncEvent};
-use super::filters::EventFilter;
 
 #[derive(Debug, Clone)]
 pub struct Subscriber {

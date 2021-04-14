@@ -1,5 +1,5 @@
 use std::collections::HashSet;
-use zksync_storage::event::types::{transaction::*, ZkSyncEvent, EventData};
+use zksync_storage::event::types::{transaction::*, EventData, ZkSyncEvent};
 
 #[derive(Debug, Clone)]
 pub struct TransactionFilter {

@@ -1,5 +1,5 @@
 use std::collections::HashSet;
-use zksync_storage::event::types::{account::*, ZkSyncEvent, EventData};
+use zksync_storage::event::types::{account::*, EventData, ZkSyncEvent};
 
 #[derive(Debug, Clone)]
 pub struct AccountFilter {

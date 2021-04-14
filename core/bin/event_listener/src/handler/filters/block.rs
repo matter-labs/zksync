@@ -1,4 +1,4 @@
-use zksync_storage::event::types::{block::*, ZkSyncEvent, EventData};
+use zksync_storage::event::types::{block::*, EventData, ZkSyncEvent};
 
 #[derive(Debug, Clone)]
 pub struct BlockFilter {

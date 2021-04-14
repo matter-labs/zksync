@@ -12,16 +12,22 @@ pub struct EventListener<'a> {
     storage: StorageProcessor<'a>,
     listener: StorageListener,
     db_channel: String,
-    last_processed_event_id: Option<i64>,
+    last_processed_event_id: i64,
     events_sender: mpsc::Sender<Vec<ZkSyncEvent>>,
 }
 
 impl<'a> EventListener<'a> {
     // pub async fn new<'b>(config: ZkSyncConfig) -> anyhow::Result<EventListener<'b>> {
-    pub async fn new<'b>(sender: mpsc::Sender<Vec<ZkSyncEvent>>) -> anyhow::Result<EventListener<'b>> {
+    pub async fn new<'b>(
+        sender: mpsc::Sender<Vec<ZkSyncEvent>>,
+    ) -> anyhow::Result<EventListener<'b>> {
         let listener = StorageListener::connect().await?;
         let mut storage = StorageProcessor::establish_connection().await?;
-        let last_processed_event_id = storage.event_schema().get_last_processed_event_id().await?;
+        let last_processed_event_id = storage
+            .event_schema()
+            .get_last_processed_event_id()
+            .await?
+            .unwrap_or(0);
 
         // let channel = config.db.listen_channel_name;
         let db_channel = "event_channel".into();
@@ -53,11 +59,9 @@ impl<'a> EventListener<'a> {
         &mut self,
         notification: StorageNotification,
     ) -> anyhow::Result<()> {
-        if let Some(id) = self.last_processed_event_id {
-            let received_id: i64 = notification.payload().parse().unwrap();
-            if id >= received_id {
-                return Ok(());
-            }
+        let received_id: i64 = notification.payload().parse().unwrap();
+        if self.last_processed_event_id >= received_id {
+            return Ok(());
         }
         self.process_new_events().await?;
         Ok(())
@@ -66,7 +70,7 @@ impl<'a> EventListener<'a> {
     async fn process_new_events(&mut self) -> anyhow::Result<()> {
         let events = self.storage.event_schema().get_unprocessed_events().await?;
         self.last_processed_event_id = match events.last() {
-            Some(event) => Some(event.id),
+            Some(event) => event.id,
             None => return Ok(()),
         };
         // Send new events to the filtering component.
