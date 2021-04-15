@@ -23,6 +23,7 @@ use crate::{
         },
         OperationsSchema,
     },
+    event::types::block::BlockStatus,
     QueryResult, StorageProcessor,
 };
 
@@ -864,10 +865,25 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
     // Removes blocks with number greater than `last_block`
     pub async fn remove_blocks(&mut self, last_block: BlockNumber) -> QueryResult<()> {
         let start = Instant::now();
+        let mut transaction = self.0.start_transaction().await?;
+
+        let last_commited_block = transaction
+            .chain()
+            .block_schema()
+            .get_last_committed_block()
+            .await?;
+        for block_number in *last_block..=*last_commited_block {
+            transaction
+                .event_schema()
+                .store_block_event(BlockStatus::Reverted, BlockNumber(block_number))
+                .await?;
+        }
+
         sqlx::query!("DELETE FROM blocks WHERE number > $1", *last_block as i64)
-            .execute(self.0.conn())
+            .execute(transaction.conn())
             .await?;
 
+        transaction.commit().await?;
         metrics::histogram!("sql.chain.block.remove_blocks", start.elapsed());
         Ok(())
     }

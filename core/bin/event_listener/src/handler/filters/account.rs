@@ -20,10 +20,12 @@ impl AccountFilter {
             }
         }
         if let Some(token_ids) = &self.token_ids {
-            if let Some(token_id) = account_event.account_update_details.token_id {
-                if !token_ids.contains(&token_id) {
-                    return false;
-                }
+            let token_id = match account_event.account_update_details.token_id {
+                Some(token_id) => token_id,
+                None => return false,
+            };
+            if !token_ids.contains(&token_id) {
+                return false;
             }
         }
         if let Some(account_ids) = &self.account_ids {
