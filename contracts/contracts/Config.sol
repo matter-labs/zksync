@@ -9,7 +9,7 @@ contract Config {
     uint256 internal constant WITHDRAWAL_GAS_LIMIT = 100000;
 
     /// @dev Bytes in one chunk
-    uint8 internal constant CHUNK_BYTES = 9;
+    uint8 internal constant CHUNK_BYTES = 10;
 
     /// @dev zkSync address length
     uint8 internal constant ADDRESS_BYTES = 20;
@@ -40,18 +40,18 @@ contract Config {
     uint256 internal constant EXPECT_VERIFICATION_IN = 0 hours / BLOCK_PERIOD;
 
     uint256 internal constant NOOP_BYTES = 1 * CHUNK_BYTES;
-    uint256 internal constant DEPOSIT_BYTES = 7 * CHUNK_BYTES;
-    uint256 internal constant MINT_NFT_BYTES = 6 * CHUNK_BYTES;
+    uint256 internal constant DEPOSIT_BYTES = 6 * CHUNK_BYTES;
+    uint256 internal constant MINT_NFT_BYTES = 5 * CHUNK_BYTES;
     uint256 internal constant TRANSFER_TO_NEW_BYTES = 6 * CHUNK_BYTES;
     uint256 internal constant PARTIAL_EXIT_BYTES = 6 * CHUNK_BYTES;
-    uint256 internal constant TRANSFER_BYTES = 3 * CHUNK_BYTES;
+    uint256 internal constant TRANSFER_BYTES = 2 * CHUNK_BYTES;
     uint256 internal constant FORCED_EXIT_BYTES = 6 * CHUNK_BYTES;
 
     /// @dev Full exit operation length
     uint256 internal constant FULL_EXIT_BYTES = 6 * CHUNK_BYTES;
 
     /// @dev ChangePubKey operation length
-    uint256 internal constant CHANGE_PUBKEY_BYTES = 7 * CHUNK_BYTES;
+    uint256 internal constant CHANGE_PUBKEY_BYTES = 6 * CHUNK_BYTES;
 
     /// @dev Expiration delta for priority request to be satisfied (in seconds)
     /// @dev NOTE: Priority expiration should be > (EXPECT_VERIFICATION_IN * BLOCK_PERIOD)

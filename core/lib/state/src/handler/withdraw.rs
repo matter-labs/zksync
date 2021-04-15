@@ -13,7 +13,7 @@ impl TxHandler<Withdraw> for ZkSyncState {
 
     fn create_op(&self, tx: Withdraw) -> Result<Self::Op, anyhow::Error> {
         ensure!(
-            tx.token <= params::max_token_id(),
+            tx.token <= params::max_fungible_token_id(),
             "Token id is not supported"
         );
         let (account_id, account) = self

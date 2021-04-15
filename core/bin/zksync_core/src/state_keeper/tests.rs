@@ -553,7 +553,7 @@ mod execute_proposed_block {
     /// and checks if number of chunks left is correct after each operation
     #[tokio::test]
     async fn just_enough_chunks() {
-        let mut tester = StateKeeperTester::new(8, 3, 3);
+        let mut tester = StateKeeperTester::new(6, 3, 3);
 
         // First batch
         apply_batch_with_two_transfers(&mut tester).await;
@@ -579,12 +579,12 @@ mod execute_proposed_block {
     /// Also, checks if number of chunks left is correct after each operation
     #[tokio::test]
     async fn chunks_to_fit_three_transfers_2_2_1() {
-        let mut tester = StateKeeperTester::new(9, 3, 3);
+        let mut tester = StateKeeperTester::new(6, 3, 3);
 
         // First batch
         apply_batch_with_two_transfers(&mut tester).await;
         if let Some(CommitRequest::PendingBlock((block, _))) = tester.response_rx.next().await {
-            assert_eq!(block.chunks_left, 3);
+            assert_eq!(block.chunks_left, 2);
         } else {
             panic!("Block is not received!");
         }
@@ -597,7 +597,7 @@ mod execute_proposed_block {
             panic!("Block is not received!");
         }
         if let Some(CommitRequest::PendingBlock((block, _))) = tester.response_rx.next().await {
-            assert_eq!(block.chunks_left, 3);
+            assert_eq!(block.chunks_left, 2);
         } else {
             panic!("Block is not received!");
         }
@@ -618,12 +618,12 @@ mod execute_proposed_block {
     /// Also, checks if number of chunks left is correct after each operation
     #[tokio::test]
     async fn chunks_to_fit_three_transfers_1_1_2_1() {
-        let mut tester = StateKeeperTester::new(8, 3, 3);
+        let mut tester = StateKeeperTester::new(6, 3, 3);
 
         // First single tx
         apply_single_transfer(&mut tester).await;
         if let Some(CommitRequest::PendingBlock((block, _))) = tester.response_rx.next().await {
-            assert_eq!(block.chunks_left, 5);
+            assert_eq!(block.chunks_left, 4);
         } else {
             panic!("Block is not received!");
         }
@@ -654,7 +654,7 @@ mod execute_proposed_block {
 
         // Check sealed block
         if let Some(CommitRequest::Block((block, _))) = tester.response_rx.next().await {
-            assert_eq!(block.block.block_transactions.len(), 2);
+            assert_eq!(block.block.block_transactions.len(), 3);
         } else {
             panic!("Block is not received!");
         }

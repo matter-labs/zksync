@@ -40,7 +40,7 @@ pub struct MintNFTOp {
 }
 
 impl MintNFTOp {
-    pub const CHUNKS: usize = 6;
+    pub const CHUNKS: usize = 5;
     pub const OP_CODE: u8 = 0x09;
 
     pub fn get_public_data(&self) -> Vec<u8> {

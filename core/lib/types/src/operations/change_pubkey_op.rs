@@ -18,7 +18,7 @@ pub struct ChangePubKeyOp {
 }
 
 impl ChangePubKeyOp {
-    pub const CHUNKS: usize = 7;
+    pub const CHUNKS: usize = 6;
     pub const OP_CODE: u8 = 0x07;
 
     pub fn get_public_data(&self) -> Vec<u8> {
