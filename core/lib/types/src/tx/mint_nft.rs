@@ -20,6 +20,7 @@ use crate::{
 
 /// `MintNFT` transaction performs NFT minting for the recipient.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct MintNFT {
     /// id of nft creator
     pub creator_id: AccountId,
@@ -156,7 +157,7 @@ impl MintNFT {
     /// batch message.
     pub fn get_ethereum_sign_message_part(&self, token_symbol: &str, decimals: u8) -> String {
         let mut message = format!(
-            "MintNFT {content} for: {recipient}",
+            "MintNFT {content:?} for: {recipient:?}",
             content = self.content_hash,
             recipient = self.recipient
         );
@@ -181,6 +182,7 @@ impl MintNFT {
             message.push('\n');
         }
         message.push_str(format!("Nonce: {}", self.nonce).as_str());
+        dbg!(&message);
         message
     }
 

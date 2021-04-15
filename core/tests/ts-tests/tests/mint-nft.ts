@@ -33,5 +33,5 @@ Tester.prototype.testMintNFT = async function (
     // const balanceAfter = await wallet.getBalance(token);
     // expect(balanceBefore.sub(balanceAfter).eq(amount.add(fee)), 'Wrong amount in wallet after withdraw').to.be.true;
     // this.runningFee = this.runningFee.add(fee);
-    return handle;
+    // return handle;
 };

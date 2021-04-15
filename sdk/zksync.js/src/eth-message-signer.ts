@@ -69,7 +69,7 @@ export class EthMessageSigner {
         contentHash: string;
         nonce: number;
     }): string {
-        let humanReadableTxInfo = `MintNFT ${mintNft.contentHash} for: ${mintNft.contentHash}`;
+        let humanReadableTxInfo = `MintNFT ${mintNft.contentHash} for: ${mintNft.recipient.toLowerCase()}`;
 
         if (mintNft.stringFee != null) {
             humanReadableTxInfo += `\nFee: ${mintNft.stringFee} ${mintNft.stringToken}`;
@@ -176,6 +176,7 @@ export class EthMessageSigner {
         nonce: number;
     }): Promise<TxEthSignature> {
         const message = this.getMintEthEthSignMessage(mintNFT);
+        console.log(message);
         return await this.getEthMessageSignature(message);
     }
 

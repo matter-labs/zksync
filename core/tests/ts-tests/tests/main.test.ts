@@ -47,9 +47,6 @@ describe(`ZkSync integration tests (token: ${token}, transport: ${transport})`, 
     after('disconnect tester', async () => {
         await tester.disconnect();
     });
-    step('should execute a mintNFT', async () => {
-        await tester.testMintNFT(alice, chuck, "0x0000000000000000000000000000000000000000000000000000000000000000", token);
-    });
 
     step('should execute an auto-approved deposit', async () => {
         await tester.testDeposit(alice, token, DEPOSIT_AMOUNT, true);
@@ -88,6 +85,9 @@ describe(`ZkSync integration tests (token: ${token}, transport: ${transport})`, 
         await tester.testTransfer(alice, chuck, token, TX_AMOUNT);
     });
 
+    step('should execute a mintNFT', async () => {
+        await tester.testMintNFT(alice, chuck, "0x0000000000000000000000000000000000000000000000000000000000000000", token);
+    });
     step('should execute a transfer to existing account', async () => {
         if (onlyBasic) {
             return;
@@ -308,12 +308,12 @@ if (process.env.TEST_TRANSPORT) {
             transport: 'HTTP',
             token: 'ETH',
             onlyBasic: true
-        },
-        {
-            transport: 'HTTP',
-            token: defaultERC20,
-            onlyBasic: false
         }
+        // {
+        //     transport: 'HTTP',
+        //     token: defaultERC20,
+        //     onlyBasic: false
+        // }
     ];
 }
 

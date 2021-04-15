@@ -97,6 +97,7 @@ impl GasOperationsCost {
                 OutputFeeType::FastWithdraw,
                 standard_fast_withdrawal_cost.into(),
             ),
+            (OutputFeeType::MintNFT, constants::BASE_MINT_NFT_COST.into()),
             (
                 OutputFeeType::ChangePubKey(ChangePubKeyFeeTypeArg::PreContracts4Version {
                     onchain_pubkey_auth: false,
@@ -178,6 +179,7 @@ impl GasOperationsCost {
                 )),
                 constants::SUBSIDY_CHANGE_PUBKEY_CREATE2_COST.into(),
             ),
+            (OutputFeeType::MintNFT, constants::BASE_MINT_NFT_COST.into()),
         ]
         .into_iter()
         .collect::<HashMap<_, _>>();

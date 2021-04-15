@@ -597,8 +597,8 @@ export function serializeWithdraw(withdraw: Withdraw): Uint8Array {
 
 export function serializeMintNFT(mintNFT: MintNFT): Uint8Array {
     const type = new Uint8Array([9]);
-    const accountId = serializeAccountId(mintNFT.creatorAccountId);
-    const accountBytes = serializeAddress(mintNFT.creatorAccountAddress);
+    const accountId = serializeAccountId(mintNFT.creatorId);
+    const accountBytes = serializeAddress(mintNFT.creatorAddress);
     const contentHashBytes = serializeContentHash(mintNFT.contentHash);
     const recipientBytes = serializeAddress(mintNFT.recipient);
     const tokenIdBytes = serializeTokenId(mintNFT.feeToken);

@@ -397,15 +397,16 @@ export class Wallet {
 
         const feeTokenId = this.provider.tokenSet.resolveTokenId(mintNft.feeToken);
         const transactionData = {
-            creatorAccountId: this.accountId,
-            creatorAccountAddress: this.address(),
+            creatorId: this.accountId,
+            creatorAddress: this.address(),
             recipient: mintNft.recipient,
             contentHash: mintNft.contentHash,
             feeTokenId,
             fee: mintNft.fee,
             nonce: mintNft.nonce
         };
-
+        console.log('data');
+        console.log(transactionData);
         return await this.signer.signMintNFT(transactionData);
     }
 
@@ -516,7 +517,7 @@ export class Wallet {
         validUntil?: number;
     }): Promise<Transaction> {
         mintNft.nonce = mintNft.nonce != null ? await this.getNonce(mintNft.nonce) : await this.getNonce();
-
+        console.log(mintNft);
         if (mintNft.fee == null) {
             const fullFee = await this.provider.getTransactionFee('MintNFT', mintNft.recipient, mintNft.feeToken);
             mintNft.fee = fullFee.totalFee;

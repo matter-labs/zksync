@@ -28,8 +28,8 @@ export class Signer {
     }
 
     async signMintNFT(mintNft: {
-        creatorAccountId: number;
-        creatorAccountAddress: Address;
+        creatorId: number;
+        creatorAddress: Address;
         recipient: Address;
         contentHash: string;
         feeTokenId: number;
