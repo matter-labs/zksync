@@ -1938,9 +1938,9 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
 
         //construct pubdata
         let mut pubdata_bits = vec![];
-        pubdata_bits.extend(global_variables.chunk_data.tx_type.get_bits_be()); //TX_TYPE_BIT_WIDTH=8
-        pubdata_bits.extend(op_data.special_account_ids[0].get_bits_be());
-        pubdata_bits.extend(op_data.special_account_ids[1].get_bits_be());
+        pubdata_bits.extend(global_variables.chunk_data.tx_type.get_bits_be()); // tx_type = 1 byte
+        pubdata_bits.extend(op_data.special_account_ids[0].get_bits_be()); // creator_id = 4 bytes
+        pubdata_bits.extend(op_data.special_account_ids[1].get_bits_be()); // recipient_id = 4 bytes
         pubdata_bits.extend(
             op_data
                 .special_content_hash
@@ -1948,9 +1948,9 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
                 .map(|bit| bit.get_bits_be())
                 .flatten()
                 .collect::<Vec<_>>(),
-        );
-        pubdata_bits.extend(op_data.special_tokens[0].get_bits_be());
-        pubdata_bits.extend(op_data.fee_packed.get_bits_be());
+        ); // content_hash = 32 bytes
+        pubdata_bits.extend(op_data.special_tokens[0].get_bits_be()); // fee_token = 4 bytes
+        pubdata_bits.extend(op_data.fee_packed.get_bits_be()); // fee = 2 bytes
         resize_grow_only(
             &mut pubdata_bits,
             MintNFTOp::CHUNKS * params::CHUNK_BIT_WIDTH,
