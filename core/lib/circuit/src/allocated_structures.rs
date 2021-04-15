@@ -98,7 +98,7 @@ pub struct AllocatedOperationData<E: Engine> {
     pub amount_packed: CircuitElement<E>,
     pub fee_packed: CircuitElement<E>,
     pub amount_unpacked: CircuitElement<E>,
-    pub special_eth_addresses: Vec<CircuitElement<E>>,
+    pub special_eth_address: CircuitElement<E>,
     pub special_tokens: Vec<CircuitElement<E>>,
     pub special_account_ids: Vec<CircuitElement<E>>,
     pub special_content_hash: Vec<CircuitElement<E>>,
@@ -226,7 +226,7 @@ impl<E: RescueEngine> AllocatedOperationData<E> {
             pub_nonce,
             amount_packed,
 
-            special_eth_addresses: vec![special_eth_address; 1],
+            special_eth_address: special_eth_address,
             special_tokens: vec![special_token; 2],
             special_account_ids: vec![special_account_id; 2],
             special_content_hash,
@@ -257,19 +257,11 @@ impl<E: RescueEngine> AllocatedOperationData<E> {
             franklin_constants::ETH_ADDRESS_BIT_WIDTH,
         )?;
 
-        let special_eth_addresses = op
-            .args
-            .special_eth_addresses
-            .iter()
-            .enumerate()
-            .map(|(idx, special_eth_address)| {
-                CircuitElement::from_fe_with_known_length(
-                    cs.namespace(|| format!("special_eth_address with index {}", idx)),
-                    || special_eth_address.grab(),
-                    franklin_constants::ETH_ADDRESS_BIT_WIDTH,
-                )
-            })
-            .collect::<Result<Vec<_>, SynthesisError>>()?;
+        let special_eth_address = CircuitElement::from_fe_with_known_length(
+            cs.namespace(|| "special_eth_address"),
+            || op.args.special_eth_address.grab(),
+            franklin_constants::ETH_ADDRESS_BIT_WIDTH,
+        )?;
 
         let special_tokens = op
             .args
@@ -417,7 +409,7 @@ impl<E: RescueEngine> AllocatedOperationData<E> {
             pub_nonce,
             amount_packed,
 
-            special_eth_addresses,
+            special_eth_address,
             special_tokens,
             special_account_ids,
             special_content_hash,

@@ -425,7 +425,7 @@ impl TransferToNewWitness<Bn256> {
                 valid_from: Some(Fr::from_str(&valid_from.to_string()).unwrap()),
                 valid_until: Some(Fr::from_str(&valid_until.to_string()).unwrap()),
 
-                special_eth_addresses: vec![Some(Fr::zero())],
+                special_eth_address: Some(Fr::zero()),
                 special_tokens: vec![Some(Fr::zero()), Some(Fr::zero())],
                 special_account_ids: vec![Some(Fr::zero()), Some(Fr::zero())],
                 special_content_hash: vec![Some(Fr::zero()); CONTENT_HASH_WIDTH],

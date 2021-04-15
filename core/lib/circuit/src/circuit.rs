@@ -828,10 +828,10 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
                     &prev.op_data.valid_until,
                 )?,
             ];
-            is_op_data_correct_flags.push(sequences_equal(
-                cs.namespace(|| "special_eth_addresses"),
-                &op_data.special_eth_addresses,
-                &prev.op_data.special_eth_addresses,
+            is_op_data_correct_flags.push(CircuitElement::equals(
+                cs.namespace(|| "is special_eth_address equal to previous"),
+                &op_data.special_eth_address,
+                &prev.op_data.special_eth_address,
             )?);
             is_op_data_correct_flags.push(sequences_equal(
                 cs.namespace(|| "special_tokens"),
@@ -2032,7 +2032,7 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
                     .flatten()
                     .collect::<Vec<_>>(),
             ); // content_hash
-            serialized_tx_bits.extend(op_data.special_eth_addresses[0].get_bits_be()); // recipient_address
+            serialized_tx_bits.extend(op_data.special_eth_address.get_bits_be()); // recipient_address
             serialized_tx_bits.extend(cur.token.get_bits_be()); // fee token
             serialized_tx_bits.extend(op_data.fee_packed.get_bits_be()); // fee
             serialized_tx_bits.extend(cur.account.nonce.get_bits_be()); // nonce
@@ -2175,7 +2175,7 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
             flags.push(is_special_nft_storage_account.not());
             let is_recipient_address = Boolean::from(Expression::equals(
                 cs.namespace(|| "is_recipient_address"),
-                &op_data.special_eth_addresses[0].get_number(),
+                &op_data.special_eth_address.get_number(),
                 &cur.account.address.get_number(),
             )?);
             flags.push(is_recipient_address);

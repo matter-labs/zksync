@@ -46,7 +46,7 @@ pub struct OperationArguments<E: RescueEngine> {
     pub a: Option<E::Fr>,
     pub b: Option<E::Fr>,
     pub amount_packed: Option<E::Fr>,
-    pub special_eth_addresses: Vec<Option<E::Fr>>,
+    pub special_eth_address: Option<E::Fr>,
     pub special_tokens: Vec<Option<E::Fr>>,
     pub special_account_ids: Vec<Option<E::Fr>>,
     pub special_content_hash: Vec<Option<E::Fr>>,
