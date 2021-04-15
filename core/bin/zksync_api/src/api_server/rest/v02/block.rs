@@ -251,12 +251,12 @@ mod tests {
             .await?;
         let paginated: Paginated<Transaction, BlockAndTxHash> =
             deserialize_response_result(response)?;
-        assert_eq!(paginated.count as usize, expected_txs.len());
-        assert_eq!(paginated.limit, query.limit);
+        assert_eq!(paginated.pagination.count as usize, expected_txs.len());
+        assert_eq!(paginated.pagination.limit, query.limit);
         assert_eq!(paginated.list.len(), query.limit as usize);
-        assert_eq!(paginated.direction, PaginationDirection::Older);
-        assert_eq!(paginated.from.tx_hash, tx_hash);
-        assert_eq!(paginated.from.block_number, block_number);
+        assert_eq!(paginated.pagination.direction, PaginationDirection::Older);
+        assert_eq!(paginated.pagination.from.tx_hash, tx_hash);
+        assert_eq!(paginated.pagination.from.block_number, block_number);
 
         for (tx, expected_tx) in paginated.list.into_iter().zip(expected_txs) {
             assert_eq!(

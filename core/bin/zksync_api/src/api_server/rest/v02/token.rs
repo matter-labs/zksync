@@ -70,7 +70,7 @@ impl ApiTokenData {
     ) -> Result<bool, Error> {
         let result = storage
             .tokens_schema()
-            .load_token_ids_that_enabled_for_fees(vec![token_id], &self.min_market_volume)
+            .filter_tokens_by_market_volume(vec![token_id], &self.min_market_volume)
             .await
             .map_err(Error::storage)?;
         Ok(!result.is_empty())
@@ -90,7 +90,7 @@ impl ApiTokenData {
                     paginated_tokens.list.iter().map(|token| token.id).collect();
                 let tokens_enabled_for_fees = storage
                     .tokens_schema()
-                    .load_token_ids_that_enabled_for_fees(tokens_to_check, &self.min_market_volume)
+                    .filter_tokens_by_market_volume(tokens_to_check, &self.min_market_volume)
                     .await
                     .map_err(Error::storage)?;
                 for token in paginated_tokens.list {
@@ -100,13 +100,13 @@ impl ApiTokenData {
                         enabled_for_fees,
                     ));
                 }
-                Ok(Paginated {
+                Ok(Paginated::new(
                     list,
-                    from: paginated_tokens.from,
-                    count: paginated_tokens.count,
-                    limit: paginated_tokens.limit,
-                    direction: paginated_tokens.direction,
-                })
+                    paginated_tokens.pagination.from,
+                    paginated_tokens.pagination.limit,
+                    paginated_tokens.pagination.direction,
+                    paginated_tokens.pagination.count,
+                ))
             }
             Err(err) => Err(err),
         }
@@ -157,6 +157,7 @@ impl ApiTokenData {
         price_result.map_err(Error::from)
     }
 
+    // TODO: take `currency` as enum. (ZKS-628)
     async fn token_price_in(
         &self,
         first_token: TokenLike,
@@ -358,13 +359,13 @@ mod tests {
                     enabled_for_fees,
                 ));
             }
-            Paginated {
+            Paginated::new(
                 list,
-                from: paginated_tokens.from,
-                count: paginated_tokens.count,
-                limit: paginated_tokens.limit,
-                direction: paginated_tokens.direction,
-            }
+                paginated_tokens.pagination.from,
+                paginated_tokens.pagination.limit,
+                paginated_tokens.pagination.direction,
+                paginated_tokens.pagination.count,
+            )
         };
         assert_eq!(pagination, expected_pagination);
 

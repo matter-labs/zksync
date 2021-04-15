@@ -6,7 +6,7 @@
 use zksync_api_types::v02::{
     block::BlockInfo,
     pagination::{BlockAndTxHash, Paginated, PaginationQuery},
-    transaction::Transaction,
+    transaction::{L2Status, Transaction},
 };
 use zksync_storage::StorageProcessor;
 use zksync_types::{aggregated_operations::AggregatedActionType, BlockNumber, Token, TokenId};
@@ -16,7 +16,7 @@ use super::{
     block::block_info_from_details,
     error::{Error, TxError},
     paginate_trait::Paginate,
-    transaction::transaction_from_item_and_finalization,
+    transaction::transaction_from_item_and_status,
 };
 
 #[async_trait::async_trait]
@@ -40,9 +40,9 @@ impl Paginate<Token> for StorageProcessor<'_> {
         Ok(Paginated::new(
             tokens,
             query.from,
-            count,
             query.limit,
             query.direction,
+            count,
         ))
     }
 }
@@ -71,9 +71,9 @@ impl Paginate<BlockInfo> for StorageProcessor<'_> {
         Ok(Paginated::new(
             blocks,
             query.from,
-            count,
             query.limit,
             query.direction,
+            count,
         ))
     }
 }
@@ -105,7 +105,18 @@ impl Paginate<Transaction> for StorageProcessor<'_> {
             .unwrap_or(false);
         let txs = raw_txs
             .into_iter()
-            .map(|tx| transaction_from_item_and_finalization(tx, is_block_finalized))
+            .map(|tx| {
+                let status = if tx.success.unwrap_or(false) {
+                    if is_block_finalized {
+                        L2Status::Finalized
+                    } else {
+                        L2Status::Committed
+                    }
+                } else {
+                    L2Status::Rejected
+                };
+                transaction_from_item_and_status(tx, status)
+            })
             .collect();
         let count = self
             .chain()
@@ -116,9 +127,9 @@ impl Paginate<Transaction> for StorageProcessor<'_> {
         Ok(Paginated::new(
             txs,
             query.from,
-            count,
             query.limit,
             query.direction,
+            count,
         ))
     }
 }

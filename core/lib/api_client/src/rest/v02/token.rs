@@ -2,7 +2,6 @@ use crate::rest::client::{Client, Result};
 use zksync_api_types::v02::{pagination::PaginationQuery, Response};
 use zksync_types::{TokenId, TokenLike};
 
-/// Tokens API part.
 impl Client {
     pub async fn token_pagination_v02(
         &self,

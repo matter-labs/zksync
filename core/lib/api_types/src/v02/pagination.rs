@@ -16,28 +16,35 @@ pub struct PaginationQuery<Id> {
 }
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
-pub struct Paginated<T: Sized + Serialize, F: Serialize> {
-    pub list: Vec<T>,
+pub struct PaginationDetails<F: Serialize> {
     pub from: F,
-    pub count: u32,
     pub limit: u32,
     pub direction: PaginationDirection,
+    pub count: u32,
+}
+
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
+pub struct Paginated<T: Sized + Serialize, F: Serialize> {
+    pub list: Vec<T>,
+    pub pagination: PaginationDetails<F>,
 }
 
 impl<T: Sized + Serialize, F: Serialize> Paginated<T, F> {
     pub fn new(
         list: Vec<T>,
         from: F,
-        count: u32,
         limit: u32,
         direction: PaginationDirection,
+        count: u32,
     ) -> Self {
         Self {
             list,
-            from,
-            count,
-            limit,
-            direction,
+            pagination: PaginationDetails {
+                from,
+                limit,
+                direction,
+                count,
+            },
         }
     }
 }

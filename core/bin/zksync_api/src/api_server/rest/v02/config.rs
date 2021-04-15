@@ -3,10 +3,10 @@
 // Built-in uses
 
 // External uses
+use actix_web::{web, Scope};
 use serde::{Deserialize, Serialize};
 
 // Workspace uses
-use actix_web::{web, Scope};
 use zksync_config::ZkSyncConfig;
 use zksync_types::{network::Network, Address};
 

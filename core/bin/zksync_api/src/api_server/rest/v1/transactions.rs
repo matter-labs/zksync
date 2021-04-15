@@ -234,6 +234,7 @@ async fn tx_receipts(
     }
 }
 
+#[allow(deprecated)]
 async fn submit_tx(
     data: web::Data<ApiTransactionsData>,
     Json(body): Json<IncomingTx>,
