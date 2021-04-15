@@ -24,7 +24,7 @@ impl TxHandler<ForcedExit> for ZkSyncState {
 
         // Check the token ID correctness.
         ensure!(
-            tx.token <= params::max_token_id(),
+            tx.token <= params::max_fungible_token_id(),
             "Token id is not supported"
         );
 

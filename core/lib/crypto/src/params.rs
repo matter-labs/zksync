@@ -31,12 +31,12 @@ pub fn total_fungible_tokens() -> usize {
 }
 /// Number of supported tokens.
 pub fn total_tokens() -> usize {
-    2usize.pow(balance_tree_depth() as u32)
+    2usize.pow(balance_tree_depth() as u32) - 2
 }
 
 /// Number of tokens that are processed by this release
 pub fn number_of_processable_tokens() -> usize {
-    let num = 512;
+    let num = 2usize.pow(11);
 
     assert!(num <= total_tokens());
     assert!(num.is_power_of_two());
@@ -76,12 +76,12 @@ pub fn max_account_id() -> AccountId {
 
 /// Max token id, based on the number of processable tokens
 pub fn max_token_id() -> TokenId {
-    TokenId(number_of_processable_tokens() as u32 - 1)
+    TokenId(total_tokens() as u32)
 }
 
-/// Max token id, based on the number of processable tokens
+/// Max fungible token id
 pub fn max_fungible_token_id() -> TokenId {
-    TokenId(MIN_NFT_TOKEN_ID - 1)
+    TokenId(number_of_processable_tokens() as u32 - 1)
 }
 
 pub const ETH_TOKEN_ID: TokenId = TokenId(0);

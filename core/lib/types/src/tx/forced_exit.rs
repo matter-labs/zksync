@@ -9,7 +9,7 @@ use crate::Engine;
 use serde::{Deserialize, Serialize};
 use zksync_basic_types::Address;
 use zksync_crypto::franklin_crypto::eddsa::PrivateKey;
-use zksync_crypto::params::{max_account_id, max_token_id};
+use zksync_crypto::params::{max_account_id, max_fungible_token_id, max_token_id};
 use zksync_utils::{format_units, BigUintSerdeAsRadix10Str};
 
 use super::{TxSignature, VerifiedSignatureCache};
@@ -131,7 +131,7 @@ impl ForcedExit {
     pub fn check_correctness(&mut self) -> bool {
         let mut valid = is_fee_amount_packable(&self.fee)
             && self.initiator_account_id <= max_account_id()
-            && self.token <= max_token_id()
+            && self.token <= max_fungible_token_id()
             && self.time_range.check_correctness();
 
         if valid {
