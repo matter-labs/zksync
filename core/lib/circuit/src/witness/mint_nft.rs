@@ -60,7 +60,6 @@ pub struct MintNFTWitness<E: RescueEngine> {
     pub special_account_before_third_chunk: OperationBranch<E>,
     pub special_account_before_fourth_chunk: OperationBranch<E>,
     pub recipient_account_before_fifth_chunk: OperationBranch<E>,
-    pub recipient_account_after_fifth_chunk: OperationBranch<E>,
 
     pub content_hash: Vec<Option<E::Fr>>,
 }
@@ -197,27 +196,12 @@ impl Witness for MintNFTWitness<Bn256> {
             lhs: self.recipient_account_before_fifth_chunk.clone(),
             rhs: self.recipient_account_before_fifth_chunk.clone(),
         };
-        let sixth_chunk = Operation {
-            new_root: self.after_root,
-            tx_type: self.tx_type,
-            chunk: Some(Fr::from_str("5").unwrap()),
-            pubdata_chunk: Some(pubdata_chunks[5]),
-            first_sig_msg: Some(input.first_sig_msg),
-            second_sig_msg: Some(input.second_sig_msg),
-            third_sig_msg: Some(input.third_sig_msg),
-            signature_data: input.signature.clone(),
-            signer_pub_key_packed: input.signer_pub_key_packed.to_vec(),
-            args: self.args.clone(),
-            lhs: self.recipient_account_after_fifth_chunk.clone(),
-            rhs: self.recipient_account_after_fifth_chunk.clone(),
-        };
         vec![
             first_chunk,
             second_chunk,
             third_chunk,
             fourth_chunk,
             fifth_chunk,
-            sixth_chunk,
         ]
     }
 }
@@ -402,9 +386,9 @@ impl MintNFTWitness<Bn256> {
 
         let (
             recipient_account_witness_before_fifth_chunk,
-            recipient_account_witness_after_fifth_chunk,
+            _recipient_account_witness_after_fifth_chunk,
             recipient_account_balance_before_fifth_chunk,
-            recipient_account_balance_after_fifth_chunk,
+            _recipient_account_balance_after_fifth_chunk,
         ) = apply_leaf_operation(
             tree,
             mint_NFT.recipient_account_id,
@@ -416,8 +400,10 @@ impl MintNFTWitness<Bn256> {
         );
         assert_eq!(recipient_account_balance_before_fifth_chunk, Fr::zero());
 
-        let (audit_recipient_account_after_fifth_chunk, audit_recipient_balance_after_fifth_chunk) =
-            get_audits(tree, mint_NFT.recipient_account_id, new_token_id_u32);
+        let (
+            _audit_recipient_account_after_fifth_chunk,
+            _audit_recipient_balance_after_fifth_chunk,
+        ) = get_audits(tree, mint_NFT.recipient_account_id, new_token_id_u32);
 
         let after_root = tree.root_hash();
         vlog::debug!("After root = {}", after_root);
@@ -529,16 +515,6 @@ impl MintNFTWitness<Bn256> {
                     account_path: audit_recipient_account_before_fifth_chunk,
                     balance_value: Some(recipient_account_balance_before_fifth_chunk),
                     balance_subtree_path: audit_recipient_balance_before_fifth_chunk,
-                },
-            },
-            recipient_account_after_fifth_chunk: OperationBranch {
-                address: Some(recipient_account_id_fe),
-                token: Some(new_token_id),
-                witness: OperationBranchWitness {
-                    account_witness: recipient_account_witness_after_fifth_chunk,
-                    account_path: audit_recipient_account_after_fifth_chunk,
-                    balance_value: Some(recipient_account_balance_after_fifth_chunk),
-                    balance_subtree_path: audit_recipient_balance_after_fifth_chunk,
                 },
             },
 

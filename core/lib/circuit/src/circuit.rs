@@ -2201,13 +2201,6 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
             &fifth_chunk_valid,
         )?;
 
-        let sixth_chunk_valid = {
-            multi_and(
-                cs.namespace(|| "sixth_chunk_valid"),
-                &[common_valid, is_chunk_with_index[5].clone()],
-            )?
-        };
-
         Ok(multi_or(
             cs.namespace(|| "is_mintNFT_valid"),
             &[
@@ -2216,7 +2209,6 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
                 third_chunk_valid,
                 fourth_chunk_valid,
                 fifth_chunk_valid,
-                sixth_chunk_valid,
             ],
         )?)
     }
