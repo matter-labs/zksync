@@ -168,7 +168,7 @@ async fn test_operation_queues() {
     assert_eq!(unconfirmed_queue[1].serial_id, 2);
 
     priority_queues.get(&1).unwrap();
-    watcher.find_ongoing_op_by_hash(&[2u8; 32]).unwrap();
+    watcher.find_ongoing_op_by_eth_hash(&[2u8; 32]).unwrap();
 
     // Make sure that the old behavior of the pending deposits getter has not changed.
     let deposits = watcher.get_ongoing_deposits_for(to_addr);
@@ -329,7 +329,7 @@ async fn test_restore_and_poll() {
     assert_eq!(unconfirmed_queue.len(), 2);
     assert_eq!(unconfirmed_queue[0].serial_id, 3);
     priority_queues.get(&1).unwrap();
-    watcher.find_ongoing_op_by_hash(&[2u8; 32]).unwrap();
+    watcher.find_ongoing_op_by_eth_hash(&[2u8; 32]).unwrap();
     let deposits = watcher.get_ongoing_deposits_for([2u8; 20].into());
     assert_eq!(deposits.len(), 1);
 }

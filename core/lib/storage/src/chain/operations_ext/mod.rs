@@ -232,7 +232,7 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
         let start = Instant::now();
         // TODO: Maybe move the transformations to api_server (ZKS-114)?
         let tx: Option<StoredExecutedPriorityOperation> = OperationsSchema(self.0)
-            .get_executed_priority_operation_by_hash(hash)
+            .get_executed_priority_operation_by_eth_hash(hash)
             .await?;
 
         let result = if let Some(tx) = tx {

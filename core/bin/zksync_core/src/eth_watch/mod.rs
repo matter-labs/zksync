@@ -22,7 +22,7 @@ use web3::types::{Address, BlockNumber};
 
 // Workspace deps
 use zksync_crypto::params::PRIORITY_EXPIRATION;
-use zksync_types::{Nonce, PriorityOp, PubKeyHash, ZkSyncPriorityOp};
+use zksync_types::{tx::TxHash, Nonce, PriorityOp, PubKeyHash, ZkSyncPriorityOp};
 
 // Local deps
 use self::{
@@ -84,8 +84,12 @@ pub enum EthWatchRequest {
         address: Address,
         resp: oneshot::Sender<Vec<PriorityOp>>,
     },
-    GetUnconfirmedOpByHash {
+    GetUnconfirmedOpByEthHash {
         eth_hash: Vec<u8>,
+        resp: oneshot::Sender<Option<PriorityOp>>,
+    },
+    GetUnconfirmedOpByTxHash {
+        tx_hash: TxHash,
         resp: oneshot::Sender<Option<PriorityOp>>,
     },
 }
@@ -228,11 +232,19 @@ impl<W: EthClient> EthWatch<W> {
         Ok(auth_fact.as_slice() == tiny_keccak::keccak256(&pub_key_hash.data[..]))
     }
 
-    fn find_ongoing_op_by_hash(&self, eth_hash: &[u8]) -> Option<PriorityOp> {
+    fn find_ongoing_op_by_eth_hash(&self, eth_hash: &[u8]) -> Option<PriorityOp> {
         self.eth_state
             .unconfirmed_queue()
             .iter()
             .find(|op| op.eth_hash.as_bytes() == eth_hash)
+            .cloned()
+    }
+
+    fn find_ongoing_op_by_tx_hash(&self, tx_hash: TxHash) -> Option<PriorityOp> {
+        self.eth_state
+            .unconfirmed_queue()
+            .iter()
+            .find(|op| op.tx_hash() == tx_hash)
             .cloned()
     }
 
@@ -378,8 +390,12 @@ impl<W: EthClient> EthWatch<W> {
                     let deposits_for_address = self.get_ongoing_ops_for(address);
                     resp.send(deposits_for_address).ok();
                 }
-                EthWatchRequest::GetUnconfirmedOpByHash { eth_hash, resp } => {
-                    let unconfirmed_op = self.find_ongoing_op_by_hash(&eth_hash);
+                EthWatchRequest::GetUnconfirmedOpByEthHash { eth_hash, resp } => {
+                    let unconfirmed_op = self.find_ongoing_op_by_eth_hash(&eth_hash);
+                    resp.send(unconfirmed_op).unwrap_or_default();
+                }
+                EthWatchRequest::GetUnconfirmedOpByTxHash { tx_hash, resp } => {
+                    let unconfirmed_op = self.find_ongoing_op_by_tx_hash(tx_hash);
                     resp.send(unconfirmed_op).unwrap_or_default();
                 }
                 EthWatchRequest::IsPubkeyChangeAuthorized {

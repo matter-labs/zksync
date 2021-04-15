@@ -15,7 +15,10 @@ use futures::{
 };
 use std::thread;
 use zksync_config::configs::api::PrivateApi;
-use zksync_types::{tx::TxEthSignature, Address, SignedZkSyncTx, H256};
+use zksync_types::{
+    tx::{TxEthSignature, TxHash},
+    Address, SignedZkSyncTx, H256,
+};
 use zksync_utils::panic_notify::ThreadPanicNotify;
 
 #[derive(Debug, Clone)]
@@ -125,8 +128,32 @@ async fn unconfirmed_op(
     web::Path(eth_hash): web::Path<H256>,
 ) -> actix_web::Result<HttpResponse> {
     let (sender, receiver) = oneshot::channel();
-    let item = EthWatchRequest::GetUnconfirmedOpByHash {
+    let item = EthWatchRequest::GetUnconfirmedOpByEthHash {
         eth_hash: eth_hash.as_ref().to_vec(),
+        resp: sender,
+    };
+    let mut eth_watch_sender = data.eth_watch_req_sender.clone();
+    eth_watch_sender
+        .send(item)
+        .await
+        .map_err(|_err| HttpResponse::InternalServerError().finish())?;
+
+    let response = receiver
+        .await
+        .map_err(|_err| HttpResponse::InternalServerError().finish())?;
+
+    Ok(HttpResponse::Ok().json(response))
+}
+
+/// Obtains information about unconfirmed deposits known for a certain address.
+#[actix_web::get("/unconfirmed_op_by_tx_hash/{tx_hash}")]
+async fn unconfirmed_op_by_tx_hash(
+    data: web::Data<AppState>,
+    web::Path(tx_hash): web::Path<TxHash>,
+) -> actix_web::Result<HttpResponse> {
+    let (sender, receiver) = oneshot::channel();
+    let item = EthWatchRequest::GetUnconfirmedOpByTxHash {
+        tx_hash,
         resp: sender,
     };
     let mut eth_watch_sender = data.eth_watch_req_sender.clone();

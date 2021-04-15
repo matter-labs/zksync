@@ -1,7 +1,6 @@
 //! Transactions part of API implementation.
 
 // Built-in uses
-use std::convert::TryInto;
 use std::str::FromStr;
 
 // External uses
@@ -25,7 +24,7 @@ use zksync_storage::{
 };
 use zksync_types::{
     aggregated_operations::AggregatedActionType, tx::EthSignData, tx::TxEthSignature, tx::TxHash,
-    BlockNumber, EthBlockId, PriorityOpId, H256,
+    BlockNumber, EthBlockId, PriorityOpId,
 };
 
 // Local uses
@@ -142,7 +141,7 @@ impl ApiTransactionData {
             .unwrap_or(false)
     }
 
-    async fn get_l1_receipt(&self, eth_hash: &[u8]) -> Result<Option<L1Receipt>, Error> {
+    async fn get_l1_receipt(&self, tx_hash: TxHash) -> Result<Option<L1Receipt>, Error> {
         let mut storage = self
             .tx_sender
             .pool
@@ -152,7 +151,7 @@ impl ApiTransactionData {
         if let Some(op) = storage
             .chain()
             .operations_schema()
-            .get_executed_priority_operation_by_hash(eth_hash)
+            .get_executed_priority_operation_by_hash(tx_hash.as_ref())
             .await
             .map_err(Error::storage)?
         {
@@ -162,7 +161,7 @@ impl ApiTransactionData {
         } else if let Some((eth_block, priority_op)) = self
             .tx_sender
             .core_api_client
-            .get_unconfirmed_op(H256::from_slice(eth_hash))
+            .get_unconfirmed_op_by_tx_hash(tx_hash)
             .await
             .map_err(Error::core_api)?
         {
@@ -203,14 +202,10 @@ impl ApiTransactionData {
         }
     }
 
-    async fn tx_status(&self, tx_hash: &[u8; 32]) -> Result<Option<Receipt>, Error> {
+    async fn tx_status(&self, tx_hash: TxHash) -> Result<Option<Receipt>, Error> {
         if let Some(receipt) = self.get_l1_receipt(tx_hash).await? {
             Ok(Some(Receipt::L1(receipt)))
-        } else if let Some(receipt) = self
-            .get_l2_receipt(TxHash::from_slice(tx_hash).unwrap())
-            .await
-            .map_err(Error::storage)?
-        {
+        } else if let Some(receipt) = self.get_l2_receipt(tx_hash).await.map_err(Error::storage)? {
             Ok(Some(Receipt::L2(receipt)))
         } else {
             Ok(None)
@@ -228,7 +223,7 @@ impl ApiTransactionData {
         result
     }
 
-    async fn get_l1_tx_data(&self, eth_hash: &[u8]) -> Result<Option<TxData>, Error> {
+    async fn get_l1_tx_data(&self, tx_hash: TxHash) -> Result<Option<TxData>, Error> {
         let mut storage = self
             .tx_sender
             .pool
@@ -238,7 +233,7 @@ impl ApiTransactionData {
         let operation = storage
             .chain()
             .operations_schema()
-            .get_executed_priority_operation_by_hash(eth_hash)
+            .get_executed_priority_operation_by_hash(tx_hash.as_ref())
             .await
             .map_err(Error::storage)?;
         if let Some(op) = operation {
@@ -251,7 +246,7 @@ impl ApiTransactionData {
                 L2Status::Committed
             };
             let tx = Transaction {
-                tx_hash: TxHash::from_slice(eth_hash).unwrap(),
+                tx_hash,
                 block_number: Some(block_number),
                 op: op.operation,
                 status,
@@ -266,12 +261,12 @@ impl ApiTransactionData {
         } else if let Some((_, priority_op)) = self
             .tx_sender
             .core_api_client
-            .get_unconfirmed_op(H256::from_slice(eth_hash))
+            .get_unconfirmed_op_by_tx_hash(tx_hash)
             .await
             .map_err(Error::core_api)?
         {
             let tx = Transaction {
-                tx_hash: TxHash::from_slice(eth_hash).unwrap(),
+                tx_hash,
                 block_number: None,
                 op: serde_json::to_value(priority_op.data).unwrap(),
                 status: L2Status::Queued,
@@ -363,14 +358,10 @@ impl ApiTransactionData {
         }
     }
 
-    async fn tx_data(&self, tx_hash: &[u8; 32]) -> Result<Option<TxData>, Error> {
+    async fn tx_data(&self, tx_hash: TxHash) -> Result<Option<TxData>, Error> {
         if let Some(tx_data) = self.get_l1_tx_data(tx_hash).await? {
             Ok(Some(tx_data))
-        } else if let Some(tx_data) = self
-            .get_l2_tx_data(TxHash::from_slice(tx_hash).unwrap())
-            .await
-            .map_err(Error::storage)?
-        {
+        } else if let Some(tx_data) = self.get_l2_tx_data(tx_hash).await.map_err(Error::storage)? {
             Ok(Some(tx_data))
         } else {
             Ok(None)
@@ -384,22 +375,20 @@ async fn tx_status(
     data: web::Data<ApiTransactionData>,
     web::Path(tx_hash): web::Path<String>,
 ) -> ApiResult<Option<Receipt>> {
-    let decode_result = data.decode_hash(tx_hash);
-    let bytes = api_try!(decode_result.map_err(Error::from));
-    let tx_hash_result: Result<&[u8; 32], _> = bytes.as_slice().try_into();
-    let tx_hash = api_try!(tx_hash_result.map_err(|_| Error::from(TxError::IncorrectTxHash)));
-    data.tx_status(&tx_hash).await.into()
+    let bytes = api_try!(data.decode_hash(tx_hash).map_err(Error::from));
+    let tx_hash =
+        api_try!(TxHash::from_slice(&bytes).ok_or_else(|| Error::from(TxError::IncorrectTxHash)));
+    data.tx_status(tx_hash).await.into()
 }
 
 async fn tx_data(
     data: web::Data<ApiTransactionData>,
     web::Path(tx_hash): web::Path<String>,
 ) -> ApiResult<Option<TxData>> {
-    let decode_result = data.decode_hash(tx_hash);
-    let bytes = api_try!(decode_result.map_err(Error::from));
-    let tx_hash_result: Result<&[u8; 32], _> = bytes.as_slice().try_into();
-    let tx_hash = api_try!(tx_hash_result.map_err(|_| Error::from(TxError::IncorrectTxHash)));
-    data.tx_data(&tx_hash).await.into()
+    let bytes = api_try!(data.decode_hash(tx_hash).map_err(Error::from));
+    let tx_hash =
+        api_try!(TxHash::from_slice(&bytes).ok_or_else(|| Error::from(TxError::IncorrectTxHash)));
+    data.tx_data(tx_hash).await.into()
 }
 
 async fn submit_tx(

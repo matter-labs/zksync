@@ -1,5 +1,8 @@
 pub use zksync_types::EthBlockId;
-use zksync_types::{tx::TxEthSignature, Address, PriorityOp, SignedZkSyncTx, H256};
+use zksync_types::{
+    tx::{TxEthSignature, TxHash},
+    Address, PriorityOp, SignedZkSyncTx, H256,
+};
 
 use crate::tx_error::TxAddError;
 
@@ -64,6 +67,19 @@ impl CoreApiClient {
             "{}/unconfirmed_op/0x{}",
             self.addr,
             hex::encode(eth_tx_hash)
+        );
+        self.get(&endpoint).await
+    }
+
+    /// Queries information about unconfirmed priority operation from a Core.
+    pub async fn get_unconfirmed_op_by_tx_hash(
+        &self,
+        tx_hash: TxHash,
+    ) -> anyhow::Result<Option<(EthBlockId, PriorityOp)>> {
+        let endpoint = format!(
+            "{}/unconfirmed_op_by_tx_hash/0x{}",
+            self.addr,
+            hex::encode(tx_hash)
         );
         self.get(&endpoint).await
     }

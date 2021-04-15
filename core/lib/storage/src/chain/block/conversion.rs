@@ -103,7 +103,7 @@ impl NewExecutedPriorityOperation {
         block: BlockNumber,
     ) -> Self {
         let operation = serde_json::to_value(&exec_prior_op.op).unwrap();
-        let tx_hash = exec_prior_op.tx_hash().as_ref().to_vec();
+        let tx_hash = exec_prior_op.priority_op.tx_hash().as_ref().to_vec();
 
         let (from_account, to_account) = match exec_prior_op.op {
             ZkSyncOp::Deposit(deposit) => (deposit.priority_op.from, deposit.priority_op.to),

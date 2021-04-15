@@ -3,6 +3,7 @@
 use anyhow::{bail, ensure, format_err};
 use ethabi::{decode, ParamType};
 use num::{BigUint, ToPrimitive};
+use parity_crypto::digest::sha256;
 use serde::{Deserialize, Serialize};
 use std::convert::{TryFrom, TryInto};
 use zksync_basic_types::{Address, Log, H256, U256};
@@ -14,6 +15,7 @@ use zksync_utils::BigUintSerdeAsRadix10Str;
 
 use super::{
     operations::{DepositOp, FullExitOp},
+    tx::TxHash,
     utils::h256_as_vec,
     AccountId, SerialId, TokenId,
 };
@@ -297,5 +299,16 @@ impl PriorityOp {
         ZkSyncPriorityOp::get_args_for_priority_queue_cancel(
             queue_entries.iter().map(|priority_op| &priority_op.data),
         )
+    }
+
+    pub fn tx_hash(&self) -> TxHash {
+        let mut bytes = Vec::new();
+        bytes.extend_from_slice(&self.eth_block.to_be_bytes());
+        bytes.extend_from_slice(&self.eth_block_index.to_be_bytes());
+
+        let hash = sha256(&bytes);
+        let mut out = [0u8; 32];
+        out.copy_from_slice(&hash);
+        TxHash { data: out }
     }
 }
