@@ -48,7 +48,6 @@ pub mod helpers;
 pub mod mempool;
 pub mod network;
 pub mod operations;
-pub mod pagination;
 pub mod priority_ops;
 pub mod prover;
 pub mod tokens;

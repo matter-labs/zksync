@@ -92,6 +92,7 @@ impl RpcApp {
         })
     }
 
+    #[allow(deprecated)]
     pub async fn _impl_tx_submit(
         self,
         tx: Box<ZkSyncTx>,
@@ -101,7 +102,7 @@ impl RpcApp {
         let start = Instant::now();
         let result = self
             .tx_sender
-            .submit_tx(*tx, *signature, fast_processing)
+            .submit_tx_with_separate_fp(*tx, *signature, fast_processing)
             .await
             .map_err(Error::from);
         metrics::histogram!("api.rpc.tx_submit", start.elapsed());

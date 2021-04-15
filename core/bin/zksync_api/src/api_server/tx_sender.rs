@@ -264,22 +264,15 @@ impl TxSender {
             .unwrap_or(EthAccountType::Owned))
     }
 
-    // TODO: remove fast_processing parameter
-    pub async fn submit_tx(
+    // This method is left for RPC API
+    #[deprecated(note = "Use the submit_tx function instead")]
+    pub async fn submit_tx_with_separate_fp(
         &self,
         mut tx: ZkSyncTx,
         signature: Option<TxEthSignature>,
         fast_processing: Option<bool>,
     ) -> Result<TxHash, SubmitError> {
-        if tx.is_close() {
-            return Err(SubmitError::AccountCloseDisabled);
-        }
-
-        if let ZkSyncTx::ForcedExit(forced_exit) = &tx {
-            self.check_forced_exit(forced_exit).await?;
-        }
-
-        let fast_processing = fast_processing.unwrap_or_default(); // `None` => false
+        let fast_processing = fast_processing.unwrap_or(false);
         if fast_processing && !tx.is_withdraw() {
             return Err(SubmitError::UnsupportedFastProcessing);
         }
@@ -292,10 +285,23 @@ impl TxSender {
                 ));
             }
 
-            // `fast` field is not used in serializing (as it's an internal server option,
-            // not the actual transaction part), so we have to set it manually depending on
-            // the RPC method input.
             withdraw.fast = fast_processing;
+        }
+
+        self.submit_tx(tx, signature).await
+    }
+
+    pub async fn submit_tx(
+        &self,
+        tx: ZkSyncTx,
+        signature: Option<TxEthSignature>,
+    ) -> Result<TxHash, SubmitError> {
+        if tx.is_close() {
+            return Err(SubmitError::AccountCloseDisabled);
+        }
+
+        if let ZkSyncTx::ForcedExit(forced_exit) = &tx {
+            self.check_forced_exit(forced_exit).await?;
         }
 
         // Resolve the token.

@@ -9,7 +9,7 @@ use serde::{Deserialize, Serialize};
 use zksync_types::Address;
 
 // Local uses
-use super::client::{self, Client};
+use crate::rest::client::{self, Client};
 
 // Data transfer objects.
 

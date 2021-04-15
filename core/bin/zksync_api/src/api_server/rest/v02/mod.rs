@@ -3,9 +3,9 @@ use actix_web::{
     web::{self},
     Scope,
 };
-use serde::Serialize;
 
 // Workspace uses
+use zksync_api_types::v02::ApiVersion;
 use zksync_config::ZkSyncConfig;
 use zksync_types::network::Network;
 
@@ -16,18 +16,15 @@ mod block;
 mod config;
 mod error;
 mod fee;
-mod paginate;
+mod paginate_impl;
+mod paginate_trait;
 mod response;
+#[cfg(test)]
+pub mod test_utils;
 mod token;
 mod transaction;
-mod types;
 
-#[derive(Serialize, Clone, Copy)]
-#[serde(rename_all = "snake_case")]
-pub enum ApiVersion {
-    V02,
-}
-
+#[derive(Debug, Clone, Copy)]
 pub struct SharedData {
     pub net: Network,
     pub api_version: ApiVersion,

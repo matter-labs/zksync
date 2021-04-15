@@ -344,7 +344,7 @@ async fn test_block_range(mut storage: StorageProcessor<'_>) -> QueryResult<()> 
             BlockNumber(1)
         };
         let block_range = BlockSchema(storage)
-            .load_block_range(max_block, limit)
+            .load_block_range_desc(max_block, limit)
             .await?;
         // Go in the reversed order, since the blocks themselves are ordered backwards.
         for (idx, block_number) in (*start_block..=*max_block).rev().enumerate() {
@@ -592,7 +592,7 @@ async fn unconfirmed_transaction(mut storage: StorageProcessor<'_>) -> QueryResu
         .is_none());
 
     let block_range = BlockSchema(&mut storage)
-        .load_block_range(BlockNumber(n_committed), 100)
+        .load_block_range_desc(BlockNumber(n_committed), 100)
         .await?;
 
     assert_eq!(block_range.len(), n_commited_confirmed as usize);

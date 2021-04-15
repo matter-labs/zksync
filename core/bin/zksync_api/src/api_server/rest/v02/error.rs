@@ -1,17 +1,25 @@
-use crate::api_server::tx_sender::SubmitError;
-use crate::fee_ticker::PriceError;
+// Built-in uses
+use std::fmt::{Display, Formatter};
+
+// External uses
 use hex::FromHexError;
-use serde::export::Formatter;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use serde_repr::Serialize_repr;
-use std::fmt::Display;
 use thiserror::Error;
 
-#[derive(Serialize_repr)]
+// Workspace uses
+
+// Local uses
+use crate::{api_server::tx_sender::SubmitError, fee_ticker::PriceError};
+
+#[derive(Serialize_repr, Debug, Deserialize)]
 #[repr(u16)]
 pub enum ErrorCode {
     UnreacheableError = 0,
+    CoreApiError = 100,
     TokenZeroPriceError = 200,
+    InvalidCurrency = 201,
+    InvalidBlockPosition = 202,
     TransactionNotFound = 300,
     IncorrectTxHash = 301,
     StorageError = 400,
@@ -28,15 +36,15 @@ pub enum ErrorCode {
     TxAddError = 705,
     InappropriateFeeToken = 706,
     CommunicationCoreServer = 707,
-    Other = 708,
+    Other = 60_000,
 }
 
 /// Error object in a response
-#[derive(Serialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct Error {
-    error_type: String,
-    code: ErrorCode,
-    message: String,
+    pub error_type: String,
+    pub code: ErrorCode,
+    pub message: String,
 }
 
 /// Trait that can be used to map custom errors to the object.
@@ -67,8 +75,13 @@ impl Error {
     pub fn storage(err: impl Display) -> Error {
         Error::from(StorageError::new(err))
     }
+
+    pub fn core_api(err: impl Display) -> Error {
+        Error::from(CoreApiError::new(err))
+    }
 }
 
+#[derive(Debug)]
 pub struct UnreachableError;
 
 impl Display for UnreachableError {
@@ -115,6 +128,10 @@ impl ApiError for TxError {
 pub enum InvalidDataError {
     #[error("Cannot show price in zero price token")]
     TokenZeroPriceError,
+    #[error("Cannot parse block position. There are only block_number, last_committed, last_finalized options")]
+    InvalidBlockPosition,
+    #[error("Cannot parse currency. There are only token_id, usd options")]
+    InvalidCurrency,
 }
 
 impl ApiError for InvalidDataError {
@@ -125,6 +142,8 @@ impl ApiError for InvalidDataError {
     fn code(&self) -> ErrorCode {
         match self {
             Self::TokenZeroPriceError => ErrorCode::TokenZeroPriceError,
+            Self::InvalidBlockPosition => ErrorCode::InvalidBlockPosition,
+            Self::InvalidCurrency => ErrorCode::InvalidCurrency,
         }
     }
 }
@@ -151,6 +170,31 @@ impl ApiError for StorageError {
 
     fn code(&self) -> ErrorCode {
         ErrorCode::StorageError
+    }
+}
+
+#[derive(Debug)]
+pub struct CoreApiError(String);
+
+impl CoreApiError {
+    pub fn new(title: impl Display) -> Self {
+        Self(title.to_string())
+    }
+}
+
+impl Display for CoreApiError {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        f.write_str(&self.0)
+    }
+}
+
+impl ApiError for CoreApiError {
+    fn error_type(&self) -> String {
+        String::from("core_api_error")
+    }
+
+    fn code(&self) -> ErrorCode {
+        ErrorCode::CoreApiError
     }
 }
 

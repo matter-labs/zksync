@@ -13,10 +13,8 @@ use zksync_types::{
 use zksync_utils::{remove_prefix, BigUintSerdeWrapper};
 
 // Local uses
-use super::{
-    client::{Client, ClientError},
-    transactions::Receipt,
-};
+use super::transactions::Receipt;
+use crate::rest::client::{Client, ClientError};
 
 // Data transfer objects
 

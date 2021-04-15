@@ -10,10 +10,8 @@ use zksync_crypto::{convert::FeConvert, Fr};
 use zksync_types::{tx::TxHash, BlockNumber};
 
 // Local uses
-use super::{
-    blocks::BlockInfo,
-    client::{self, Client},
-};
+use super::blocks::BlockInfo;
+use crate::rest::client::{self, Client};
 
 // Data transfer objects.
 

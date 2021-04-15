@@ -3,13 +3,12 @@ use std::time::{Instant, SystemTime, UNIX_EPOCH};
 // External imports
 use chrono::{DateTime, Utc};
 // Workspace imports
+use zksync_api_types::v02::pagination::{BlockAndTxHash, PaginationDirection, PaginationQuery};
 use zksync_basic_types::{H256, U256};
 use zksync_crypto::convert::FeConvert;
 use zksync_types::{
     aggregated_operations::AggregatedActionType,
     block::{Block, BlockMetadata, ExecutedOperations, PendingBlock},
-    pagination::{BlockAndTxHash, PaginationDirection, PaginationQuery},
-    tx::TxHash,
     AccountId, BlockNumber, Fr, ZkSyncOp,
 };
 // Local imports
@@ -311,8 +310,8 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
         Ok(executed_operations)
     }
 
-    /// Loads the block headers for the given amount of blocks.
-    pub async fn load_block_range(
+    /// Loads the block headers for the given amount of blocks in the descending order.
+    pub async fn load_block_range_desc(
         &mut self,
         max_block: BlockNumber,
         limit: u32,
@@ -338,8 +337,8 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
                     INNER JOIN eth_aggregated_ops_binding ON aggregate_operations.id = eth_aggregated_ops_binding.op_id
                     INNER JOIN eth_operations ON eth_operations.id = eth_aggregated_ops_binding.eth_op_id
                 WHERE aggregate_operations.confirmed = true 
-            )
-            ,aggr_exec as (
+            ),
+            aggr_exec as (
                  SELECT 
                     aggregate_operations.created_at, 
                     eth_operations.final_hash, 
@@ -372,6 +371,87 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
         .await?;
 
         metrics::histogram!("sql.chain.block.load_block_range", start.elapsed());
+        Ok(details)
+    }
+
+    /// Loads the block headers for the given amount of blocks in the ascending order.
+    pub async fn load_block_range_asc(
+        &mut self,
+        min_block: BlockNumber,
+        limit: u32,
+    ) -> QueryResult<Vec<BlockDetails>> {
+        let start = Instant::now();
+        // This query does the following:
+        // - joins the `operations` and `eth_tx_hashes` (using the intermediate `eth_ops_binding` table)
+        //   tables to collect the data:
+        //   block number, ethereum transaction hash, action type and action creation timestamp;
+        // - joins the `blocks` table with result of the join twice: once for committed operations
+        //   and verified operations;
+        // - collects the {limit} blocks in the ascending order with the data gathered above.
+        let details = sqlx::query_as!(
+            BlockDetails,
+            r#"
+            WITH aggr_comm AS (
+                SELECT 
+                    aggregate_operations.created_at, 
+                    eth_operations.final_hash, 
+                    commit_aggregated_blocks_binding.block_number 
+                FROM aggregate_operations
+                    INNER JOIN commit_aggregated_blocks_binding ON aggregate_operations.id = commit_aggregated_blocks_binding.op_id
+                    INNER JOIN eth_aggregated_ops_binding ON aggregate_operations.id = eth_aggregated_ops_binding.op_id
+                    INNER JOIN eth_operations ON eth_operations.id = eth_aggregated_ops_binding.eth_op_id
+                WHERE aggregate_operations.confirmed = true 
+            ),
+            aggr_exec as (
+                 SELECT 
+                    aggregate_operations.created_at, 
+                    eth_operations.final_hash, 
+                    execute_aggregated_blocks_binding.block_number 
+                FROM aggregate_operations
+                    INNER JOIN execute_aggregated_blocks_binding ON aggregate_operations.id = execute_aggregated_blocks_binding.op_id
+                    INNER JOIN eth_aggregated_ops_binding ON aggregate_operations.id = eth_aggregated_ops_binding.op_id
+                    INNER JOIN eth_operations ON eth_operations.id = eth_aggregated_ops_binding.eth_op_id
+                WHERE aggregate_operations.confirmed = true 
+            )
+            SELECT
+                blocks.number AS "block_number!",
+                blocks.root_hash AS "new_state_root!",
+                blocks.block_size AS "block_size!",
+                committed.final_hash AS "commit_tx_hash?",
+                verified.final_hash AS "verify_tx_hash?",
+                committed.created_at AS "committed_at!",
+                verified.created_at AS "verified_at?"
+            FROM blocks
+                     INNER JOIN aggr_comm committed ON blocks.number = committed.block_number
+                     LEFT JOIN aggr_exec verified ON blocks.number = verified.block_number
+            WHERE
+                blocks.number >= $1
+            ORDER BY blocks.number ASC
+            LIMIT $2;
+            "#,
+            i64::from(*min_block),
+            i64::from(limit)
+        ).fetch_all(self.0.conn())
+        .await?;
+
+        metrics::histogram!("sql.chain.block.load_block_range_asc", start.elapsed());
+        Ok(details)
+    }
+
+    /// Loads the block headers for the given pagination query
+    pub async fn load_block_page(
+        &mut self,
+        query: &PaginationQuery<BlockNumber>,
+    ) -> QueryResult<Vec<BlockDetails>> {
+        let details = match query.direction {
+            PaginationDirection::Newer => {
+                self.load_block_range_asc(query.from, query.limit).await?
+            }
+            PaginationDirection::Older => {
+                self.load_block_range_desc(query.from, query.limit).await?
+            }
+        };
+
         Ok(details)
     }
 
@@ -449,8 +529,8 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
                     INNER JOIN eth_aggregated_ops_binding ON aggregate_operations.id = eth_aggregated_ops_binding.op_id
                     INNER JOIN eth_operations ON eth_operations.id = eth_aggregated_ops_binding.eth_op_id
                 WHERE aggregate_operations.confirmed = true 
-            )
-            ,aggr_exec as (
+            ),
+            aggr_exec as (
                  SELECT 
                     aggregate_operations.created_at, 
                     eth_operations.final_hash, 
@@ -857,151 +937,7 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
         Ok(self.save_block(block).await?)
     }
 
-    pub async fn load_block_page(
-        &mut self,
-        query: &PaginationQuery<BlockNumber>,
-    ) -> QueryResult<Vec<BlockDetails>> {
-        let start = Instant::now();
-
-        let details = match query.direction {
-            PaginationDirection::Newer => {
-                sqlx::query_as!(
-                    BlockDetails,
-                    r#"
-                    WITH aggr_comm AS (
-                        SELECT 
-                            aggregate_operations.created_at, 
-                            eth_operations.final_hash, 
-                            commit_aggregated_blocks_binding.block_number 
-                        FROM aggregate_operations
-                            INNER JOIN commit_aggregated_blocks_binding ON aggregate_operations.id = commit_aggregated_blocks_binding.op_id
-                            INNER JOIN eth_aggregated_ops_binding ON aggregate_operations.id = eth_aggregated_ops_binding.op_id
-                            INNER JOIN eth_operations ON eth_operations.id = eth_aggregated_ops_binding.eth_op_id
-                        WHERE aggregate_operations.confirmed = true 
-                    )
-                    ,aggr_exec as (
-                         SELECT 
-                            aggregate_operations.created_at, 
-                            eth_operations.final_hash, 
-                            execute_aggregated_blocks_binding.block_number 
-                        FROM aggregate_operations
-                            INNER JOIN execute_aggregated_blocks_binding ON aggregate_operations.id = execute_aggregated_blocks_binding.op_id
-                            INNER JOIN eth_aggregated_ops_binding ON aggregate_operations.id = eth_aggregated_ops_binding.op_id
-                            INNER JOIN eth_operations ON eth_operations.id = eth_aggregated_ops_binding.eth_op_id
-                        WHERE aggregate_operations.confirmed = true 
-                    )
-                    SELECT
-                        blocks.number AS "block_number!",
-                        blocks.root_hash AS "new_state_root!",
-                        blocks.block_size AS "block_size!",
-                        committed.final_hash AS "commit_tx_hash?",
-                        verified.final_hash AS "verify_tx_hash?",
-                        committed.created_at AS "committed_at!",
-                        verified.created_at AS "verified_at?"
-                    FROM blocks
-                             INNER JOIN aggr_comm committed ON blocks.number = committed.block_number
-                             LEFT JOIN aggr_exec verified ON blocks.number = verified.block_number
-                    WHERE
-                        blocks.number >= $1
-                    ORDER BY blocks.number ASC
-                    LIMIT $2;
-                    "#,
-                    i64::from(*query.from),
-                    i64::from(query.limit)
-                ).fetch_all(self.0.conn())
-                .await?
-            }
-            PaginationDirection::Older => {
-                sqlx::query_as!(
-                    BlockDetails,
-                    r#"
-                    WITH aggr_comm AS (
-                        SELECT 
-                            aggregate_operations.created_at, 
-                            eth_operations.final_hash, 
-                            commit_aggregated_blocks_binding.block_number 
-                        FROM aggregate_operations
-                            INNER JOIN commit_aggregated_blocks_binding ON aggregate_operations.id = commit_aggregated_blocks_binding.op_id
-                            INNER JOIN eth_aggregated_ops_binding ON aggregate_operations.id = eth_aggregated_ops_binding.op_id
-                            INNER JOIN eth_operations ON eth_operations.id = eth_aggregated_ops_binding.eth_op_id
-                        WHERE aggregate_operations.confirmed = true 
-                    )
-                    ,aggr_exec as (
-                         SELECT 
-                            aggregate_operations.created_at, 
-                            eth_operations.final_hash, 
-                            execute_aggregated_blocks_binding.block_number 
-                        FROM aggregate_operations
-                            INNER JOIN execute_aggregated_blocks_binding ON aggregate_operations.id = execute_aggregated_blocks_binding.op_id
-                            INNER JOIN eth_aggregated_ops_binding ON aggregate_operations.id = eth_aggregated_ops_binding.op_id
-                            INNER JOIN eth_operations ON eth_operations.id = eth_aggregated_ops_binding.eth_op_id
-                        WHERE aggregate_operations.confirmed = true 
-                    )
-                    SELECT
-                        blocks.number AS "block_number!",
-                        blocks.root_hash AS "new_state_root!",
-                        blocks.block_size AS "block_size!",
-                        committed.final_hash AS "commit_tx_hash?",
-                        verified.final_hash AS "verify_tx_hash?",
-                        committed.created_at AS "committed_at!",
-                        verified.created_at AS "verified_at?"
-                    FROM blocks
-                             INNER JOIN aggr_comm committed ON blocks.number = committed.block_number
-                             LEFT JOIN aggr_exec verified ON blocks.number = verified.block_number
-                    WHERE
-                        blocks.number <= $1
-                    ORDER BY blocks.number DESC
-                    LIMIT $2;
-                    "#,
-                    i64::from(*query.from),
-                    i64::from(query.limit)
-                ).fetch_all(self.0.conn())
-                .await?
-            }
-        };
-
-        metrics::histogram!("sql.chain.block.load_block_page", start.elapsed());
-        Ok(details)
-    }
-
-    pub async fn get_tx_created_at(
-        &mut self,
-        block_number: BlockNumber,
-        tx_hash: TxHash,
-    ) -> QueryResult<Option<DateTime<Utc>>> {
-        let start = Instant::now();
-
-        let tx_created_at = sqlx::query!(
-            "SELECT created_at FROM executed_transactions
-            WHERE block_number = $1 AND tx_hash = $2",
-            i64::from(*block_number),
-            tx_hash.as_ref()
-        )
-        .fetch_optional(self.0.conn())
-        .await?;
-
-        let created_at = if let Some(tx_created_at) = tx_created_at {
-            Some(tx_created_at.created_at)
-        } else {
-            let priority_op_created_op = sqlx::query!(
-                "SELECT created_at FROM executed_priority_operations
-                WHERE block_number = $1 AND eth_hash = $2",
-                i64::from(*block_number),
-                tx_hash.as_ref()
-            )
-            .fetch_optional(self.0.conn())
-            .await?;
-            if let Some(priority_op_created_op) = priority_op_created_op {
-                Some(priority_op_created_op.created_at)
-            } else {
-                None
-            }
-        };
-
-        metrics::histogram!("sql.chain.block.get_tx_created_at", start.elapsed());
-        Ok(created_at)
-    }
-
+    /// Retrieves both L1 and L2 operations stored in the block for the given pagination query
     pub async fn get_block_transactions_page(
         &mut self,
         query: &PaginationQuery<BlockAndTxHash>,
@@ -1009,6 +945,9 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
         let start = Instant::now();
 
         let created_at: Option<DateTime<Utc>> = self
+            .0
+            .chain()
+            .operations_ext_schema()
             .get_tx_created_at(query.from.block_number, query.from.tx_hash)
             .await?;
         let block_txs = if let Some(created_at) = created_at {
@@ -1113,10 +1052,14 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
             None
         };
 
-        metrics::histogram!("sql.chain.block.get_block_transactions", start.elapsed());
+        metrics::histogram!(
+            "sql.chain.block.get_block_transactions_page",
+            start.elapsed()
+        );
         Ok(block_txs)
     }
 
+    /// Returns count of both L1 and L2 operations stored in the block
     pub async fn get_block_transactions_count(
         &mut self,
         block_number: BlockNumber,
@@ -1124,18 +1067,14 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
         let start = Instant::now();
 
         let tx_count = sqlx::query!(
-            r#"
-                SELECT count(*) as "count!" FROM executed_transactions WHERE block_number = $1
-            "#,
+            r#"SELECT count(*) as "count!" FROM executed_transactions WHERE block_number = $1"#,
             i64::from(*block_number)
         )
         .fetch_one(self.0.conn())
         .await?
         .count;
         let priority_op_count = sqlx::query!(
-            r#"
-                SELECT count(*) as "count!" FROM executed_priority_operations WHERE block_number = $1
-            "#,
+            r#"SELECT count(*) as "count!" FROM executed_priority_operations WHERE block_number = $1"#,
             i64::from(*block_number)
         )
         .fetch_one(self.0.conn())

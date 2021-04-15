@@ -1,31 +1,23 @@
 // Built-in uses
 
 // External uses
-use serde::Serialize;
 
 // Workspace uses
-use zksync_storage::StorageProcessor;
-use zksync_types::{
-    aggregated_operations::AggregatedActionType,
+use zksync_api_types::v02::{
+    block::BlockInfo,
     pagination::{BlockAndTxHash, Paginated, PaginationQuery},
-    BlockNumber, Token, TokenId,
+    transaction::{L2Status, Transaction},
 };
+use zksync_storage::StorageProcessor;
+use zksync_types::{aggregated_operations::AggregatedActionType, BlockNumber, Token, TokenId};
 
 // Local uses
 use super::{
+    block::block_info_from_details,
     error::{Error, TxError},
-    types::{BlockInfo, Transaction},
+    paginate_trait::Paginate,
+    transaction::transaction_from_item_and_status,
 };
-
-#[async_trait::async_trait]
-pub trait Paginate<T: Serialize> {
-    type Index: Serialize;
-
-    async fn paginate(
-        &mut self,
-        query: PaginationQuery<Self::Index>,
-    ) -> Result<Paginated<T, Self::Index>, Error>;
-}
 
 #[async_trait::async_trait]
 impl Paginate<Token> for StorageProcessor<'_> {
@@ -33,11 +25,11 @@ impl Paginate<Token> for StorageProcessor<'_> {
 
     async fn paginate(
         &mut self,
-        query: PaginationQuery<TokenId>,
+        query: &PaginationQuery<TokenId>,
     ) -> Result<Paginated<Token, TokenId>, Error> {
         let tokens = self
             .tokens_schema()
-            .load_token_page(&query)
+            .load_token_page(query)
             .await
             .map_err(Error::storage)?;
         let count = self
@@ -48,9 +40,9 @@ impl Paginate<Token> for StorageProcessor<'_> {
         Ok(Paginated::new(
             tokens,
             query.from,
-            count,
             query.limit,
             query.direction,
+            count,
         ))
     }
 }
@@ -61,15 +53,15 @@ impl Paginate<BlockInfo> for StorageProcessor<'_> {
 
     async fn paginate(
         &mut self,
-        query: PaginationQuery<BlockNumber>,
+        query: &PaginationQuery<BlockNumber>,
     ) -> Result<Paginated<BlockInfo, BlockNumber>, Error> {
         let blocks = self
             .chain()
             .block_schema()
-            .load_block_page(&query)
+            .load_block_page(query)
             .await
             .map_err(Error::storage)?;
-        let blocks: Vec<BlockInfo> = blocks.into_iter().map(BlockInfo::from).collect();
+        let blocks: Vec<BlockInfo> = blocks.into_iter().map(block_info_from_details).collect();
         let count = *self
             .chain()
             .block_schema()
@@ -79,9 +71,9 @@ impl Paginate<BlockInfo> for StorageProcessor<'_> {
         Ok(Paginated::new(
             blocks,
             query.from,
-            count,
             query.limit,
             query.direction,
+            count,
         ))
     }
 }
@@ -92,12 +84,12 @@ impl Paginate<Transaction> for StorageProcessor<'_> {
 
     async fn paginate(
         &mut self,
-        query: PaginationQuery<BlockAndTxHash>,
+        query: &PaginationQuery<BlockAndTxHash>,
     ) -> Result<Paginated<Transaction, BlockAndTxHash>, Error> {
         let raw_txs = self
             .chain()
             .block_schema()
-            .get_block_transactions_page(&query)
+            .get_block_transactions_page(query)
             .await
             .map_err(Error::storage)?
             .ok_or_else(|| Error::from(TxError::TransactionNotFound))?;
@@ -113,7 +105,18 @@ impl Paginate<Transaction> for StorageProcessor<'_> {
             .unwrap_or(false);
         let txs = raw_txs
             .into_iter()
-            .map(|tx| Transaction::from((tx, is_block_finalized)))
+            .map(|tx| {
+                let status = if tx.success.unwrap_or(false) {
+                    if is_block_finalized {
+                        L2Status::Finalized
+                    } else {
+                        L2Status::Committed
+                    }
+                } else {
+                    L2Status::Rejected
+                };
+                transaction_from_item_and_status(tx, status)
+            })
             .collect();
         let count = self
             .chain()
@@ -124,9 +127,9 @@ impl Paginate<Transaction> for StorageProcessor<'_> {
         Ok(Paginated::new(
             txs,
             query.from,
-            count,
             query.limit,
             query.direction,
+            count,
         ))
     }
 }

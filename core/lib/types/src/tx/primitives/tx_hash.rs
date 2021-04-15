@@ -40,11 +40,14 @@ impl FromStr for TxHash {
     type Err = anyhow::Error;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        anyhow::ensure!(
-            s.starts_with("sync-tx:"),
-            "TxHash should start with sync-tx:"
-        );
-        let bytes = hex::decode(&s[8..])?;
+        let s = if let Some(s) = s.strip_prefix("0x") {
+            s
+        } else if let Some(s) = s.strip_prefix("sync-tx:") {
+            s
+        } else {
+            anyhow::bail!("TxHash should start with 0x or sync-tx:");
+        };
+        let bytes = hex::decode(&s)?;
         anyhow::ensure!(bytes.len() == 32, "Size mismatch");
         Ok(TxHash {
             data: bytes.as_slice().try_into().unwrap(),

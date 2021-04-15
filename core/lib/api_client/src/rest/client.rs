@@ -6,7 +6,7 @@ use serde::{de::DeserializeOwned, ser::Serialize};
 use thiserror::Error;
 
 // Public uses
-pub use super::{
+pub use super::v1::{
     accounts::{
         AccountInfo, AccountQuery, AccountReceipts, AccountState, DepositingBalances,
         DepositingFunds,
@@ -18,8 +18,9 @@ pub use super::{
     transactions::{Receipt, TxData},
     Pagination,
 };
+
 // Local uses
-use super::error::ErrorBody;
+use super::v1::error::ErrorBody;
 
 pub type Result<T> = std::result::Result<T, ClientError>;
 
