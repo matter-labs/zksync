@@ -58,7 +58,7 @@ impl CoreApiClient {
         self.get(&endpoint).await
     }
 
-    /// Queries information about unconfirmed priority operation from a Core.
+    /// Queries information about unconfirmed priority operation from a Core by its eth_tx_hash.
     pub async fn get_unconfirmed_op(
         &self,
         eth_tx_hash: H256,
@@ -71,7 +71,7 @@ impl CoreApiClient {
         self.get(&endpoint).await
     }
 
-    /// Queries information about unconfirmed priority operation from a Core.
+    /// Queries information about unconfirmed priority operation from a Core by its tx_hash.
     pub async fn get_unconfirmed_op_by_tx_hash(
         &self,
         tx_hash: TxHash,

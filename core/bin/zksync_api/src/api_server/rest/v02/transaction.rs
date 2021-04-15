@@ -1,6 +1,7 @@
 //! Transactions part of API implementation.
 
 // Built-in uses
+use std::convert::TryInto;
 use std::str::FromStr;
 
 // External uses
@@ -24,7 +25,7 @@ use zksync_storage::{
 };
 use zksync_types::{
     aggregated_operations::AggregatedActionType, tx::EthSignData, tx::TxEthSignature, tx::TxHash,
-    BlockNumber, EthBlockId, PriorityOpId,
+    BlockNumber, EthBlockId, PriorityOpId, H256,
 };
 
 // Local uses
@@ -142,6 +143,7 @@ impl ApiTransactionData {
     }
 
     async fn get_l1_receipt(&self, tx_hash: TxHash) -> Result<Option<L1Receipt>, Error> {
+        let tx_hash_ref: &[u8; 32] = tx_hash.as_ref().try_into().unwrap();
         let mut storage = self
             .tx_sender
             .pool
@@ -162,6 +164,19 @@ impl ApiTransactionData {
             .tx_sender
             .core_api_client
             .get_unconfirmed_op_by_tx_hash(tx_hash)
+            .await
+            .map_err(Error::core_api)?
+        {
+            Ok(Some(L1Receipt {
+                status: L1Status::Queued,
+                eth_block,
+                rollup_block: None,
+                id: PriorityOpId(priority_op.serial_id),
+            }))
+        } else if let Some((eth_block, priority_op)) = self
+            .tx_sender
+            .core_api_client
+            .get_unconfirmed_op(H256::from(tx_hash_ref))
             .await
             .map_err(Error::core_api)?
         {
@@ -224,6 +239,7 @@ impl ApiTransactionData {
     }
 
     async fn get_l1_tx_data(&self, tx_hash: TxHash) -> Result<Option<TxData>, Error> {
+        let tx_hash_ref: &[u8; 32] = tx_hash.as_ref().try_into().unwrap();
         let mut storage = self
             .tx_sender
             .pool
@@ -262,6 +278,26 @@ impl ApiTransactionData {
             .tx_sender
             .core_api_client
             .get_unconfirmed_op_by_tx_hash(tx_hash)
+            .await
+            .map_err(Error::core_api)?
+        {
+            let tx = Transaction {
+                tx_hash,
+                block_number: None,
+                op: serde_json::to_value(priority_op.data).unwrap(),
+                status: L2Status::Queued,
+                fail_reason: None,
+                created_at: None,
+            };
+
+            Ok(Some(TxData {
+                tx,
+                eth_signature: None,
+            }))
+        } else if let Some((_, priority_op)) = self
+            .tx_sender
+            .core_api_client
+            .get_unconfirmed_op(H256::from(tx_hash_ref))
             .await
             .map_err(Error::core_api)?
         {

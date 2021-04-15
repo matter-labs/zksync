@@ -121,8 +121,8 @@ async fn unconfirmed_ops(
     Ok(HttpResponse::Ok().json(response))
 }
 
-/// Obtains information about unconfirmed deposits known for a certain address.
-#[actix_web::get("/unconfirmed_op/{tx_hash}")]
+/// Obtains information about unconfirmed operation by its eth_hash.
+#[actix_web::get("/unconfirmed_op/{eth_hash}")]
 async fn unconfirmed_op(
     data: web::Data<AppState>,
     web::Path(eth_hash): web::Path<H256>,
@@ -145,7 +145,7 @@ async fn unconfirmed_op(
     Ok(HttpResponse::Ok().json(response))
 }
 
-/// Obtains information about unconfirmed deposits known for a certain address.
+/// Obtains information about unconfirmed operation by its tx_hash.
 #[actix_web::get("/unconfirmed_op_by_tx_hash/{tx_hash}")]
 async fn unconfirmed_op_by_tx_hash(
     data: web::Data<AppState>,
