@@ -1995,8 +1995,8 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
             &pubdata_chunk,
             ext_pubdata_chunk,
         )?);
-        let is_mintNFT_operation = Boolean::from(Expression::equals(
-            cs.namespace(|| "is_mintNFT_opcode"),
+        let is_mint_nft_operation = Boolean::from(Expression::equals(
+            cs.namespace(|| "is_mint_nft_operation"),
             &global_variables.chunk_data.tx_type.get_number(),
             Expression::u64::<CS>(u64::from(MintNFTOp::OP_CODE)),
         )?);
@@ -2006,7 +2006,7 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
             &[
                 pubdata_properly_copied,
                 is_pubdata_chunk_correct,
-                is_mintNFT_operation,
+                is_mint_nft_operation,
             ],
         )?;
 
