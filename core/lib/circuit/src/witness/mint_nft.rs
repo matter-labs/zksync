@@ -5,23 +5,22 @@ use rescue_poseidon::rescue_hash;
 use zksync_crypto::convert::FeConvert;
 use zksync_crypto::franklin_crypto::{
     bellman::pairing::{
-        bn256::{Bn256, Fr, FrRepr},
+        bn256::{Bn256, Fr},
         ff::{Field, PrimeField},
     },
     bellman::PrimeFieldRepr,
     rescue::RescueEngine,
 };
 // Workspace deps
-use hex::encode;
 use zksync_crypto::{
     circuit::{
         account::CircuitAccountTree,
         utils::{append_be_fixed_width, le_bit_vector_into_field_element},
     },
     params::{
-        account_tree_depth, ACCOUNT_ID_BIT_WIDTH, AMOUNT_EXPONENT_BIT_WIDTH, CHUNK_BIT_WIDTH,
-        FEE_EXPONENT_BIT_WIDTH, FEE_MANTISSA_BIT_WIDTH, NFT_STORAGE_ACCOUNT_ID, NFT_TOKEN_ID,
-        NONCE_BIT_WIDTH, TOKEN_BIT_WIDTH, TX_TYPE_BIT_WIDTH,
+        account_tree_depth, ACCOUNT_ID_BIT_WIDTH, CHUNK_BIT_WIDTH, FEE_EXPONENT_BIT_WIDTH,
+        FEE_MANTISSA_BIT_WIDTH, NFT_STORAGE_ACCOUNT_ID, NFT_TOKEN_ID, TOKEN_BIT_WIDTH,
+        TX_TYPE_BIT_WIDTH,
     },
     primitives::FloatConversions,
 };
@@ -258,9 +257,9 @@ impl MintNFTWitness<Bn256> {
 
         let (
             creator_account_witness_before_first_chunk,
-            creator_account_witness_after_first_chunk,
+            _creator_account_witness_after_first_chunk,
             fee_balance_before_first_chunk,
-            fee_balance_after_first_chunk,
+            _fee_balance_after_first_chunk,
         ) = apply_leaf_operation(
             tree,
             mint_NFT.creator_account_id,
@@ -273,7 +272,7 @@ impl MintNFTWitness<Bn256> {
             },
         );
 
-        let (audit_creator_account_after_first_chunk, audit_creator_balance_after_first_chunk) =
+        let (_audit_creator_account_after_first_chunk, _audit_creator_balance_after_first_chunk) =
             get_audits(tree, mint_NFT.creator_account_id, mint_NFT.fee_token);
 
         let before_second_chunk_root = tree.root_hash();
@@ -285,20 +284,20 @@ impl MintNFTWitness<Bn256> {
 
         let (
             creator_account_witness_before_second_chunk,
-            creator_account_witness_after_second_chunk,
+            _creator_account_witness_after_second_chunk,
             serial_id_before_second_chunk,
-            serial_id_after_second_chunk,
+            _serial_id_after_second_chunk,
         ) = apply_leaf_operation(
             tree,
             mint_NFT.creator_account_id,
             NFT_TOKEN_ID.0,
-            |acc| {},
+            |_| {},
             |bal| {
                 bal.value.add_assign(&Fr::from_str("1").unwrap());
             },
         );
 
-        let (audit_creator_account_after_second_chunk, audit_creator_balance_after_second_chunk) =
+        let (_audit_creator_account_after_second_chunk, _audit_creator_balance_after_second_chunk) =
             get_audits(tree, mint_NFT.creator_account_id, NFT_TOKEN_ID.0);
 
         let serial_id = serial_id_before_second_chunk;
@@ -313,20 +312,20 @@ impl MintNFTWitness<Bn256> {
 
         let (
             special_account_witness_before_third_chunk,
-            special_account_witness_after_third_chunk,
+            _special_account_witness_after_third_chunk,
             nft_counter_before_third_chunk,
-            nft_counter_after_third_chunk,
+            _nft_counter_after_third_chunk,
         ) = apply_leaf_operation(
             tree,
             NFT_STORAGE_ACCOUNT_ID.0,
             NFT_TOKEN_ID.0,
-            |acc| {},
+            |_| {},
             |bal| {
                 bal.value.add_assign(&Fr::from_str("1").unwrap());
             },
         );
 
-        let (audit_special_account_after_third_chunk, audit_special_balance_after_third_chunk) =
+        let (_audit_special_account_after_third_chunk, _audit_special_balance_after_third_chunk) =
             get_audits(tree, NFT_STORAGE_ACCOUNT_ID.0, NFT_TOKEN_ID.0);
 
         let new_token_id = nft_counter_before_third_chunk;
@@ -366,7 +365,7 @@ impl MintNFTWitness<Bn256> {
                 .expect("pack hash as balance field element");
 
             Fr::from_repr(repr).expect("can't convert repr to Fr")
-        };
+        }
         let content_to_store = content_to_store_as_balance(
             mint_NFT.creator_account_id,
             serial_id_u32,
@@ -375,21 +374,21 @@ impl MintNFTWitness<Bn256> {
 
         let (
             special_account_witness_before_fourth_chunk,
-            special_account_witness_after_fourth_chunk,
+            _special_account_witness_after_fourth_chunk,
             special_account_content_before_fourth_chunk,
-            special_account_content_after_fourth_chunk,
+            _special_account_content_after_fourth_chunk,
         ) = apply_leaf_operation(
             tree,
             NFT_STORAGE_ACCOUNT_ID.0,
             new_token_id_u32,
-            |acc| {},
+            |_| {},
             |bal| {
                 bal.value.add_assign(&content_to_store);
             },
         );
         assert_eq!(special_account_content_before_fourth_chunk, Fr::zero());
 
-        let (audit_special_account_after_fourth_chunk, audit_special_balance_after_fourth_chunk) =
+        let (_audit_special_account_after_fourth_chunk, _audit_special_balance_after_fourth_chunk) =
             get_audits(tree, NFT_STORAGE_ACCOUNT_ID.0, new_token_id_u32);
 
         let before_fifth_chunk_root = tree.root_hash();
@@ -410,7 +409,7 @@ impl MintNFTWitness<Bn256> {
             tree,
             mint_NFT.recipient_account_id,
             new_token_id_u32,
-            |acc| {},
+            |_| {},
             |bal| {
                 bal.value.add_assign(&Fr::from_str("1").unwrap());
             },
@@ -433,7 +432,7 @@ impl MintNFTWitness<Bn256> {
             .map(|input_byte| {
                 let mut byte_as_bits = vec![];
                 let mut byte = *input_byte;
-                for i in 0..8 {
+                for _ in 0..8 {
                     byte_as_bits.push(byte & 1);
                     byte /= 2;
                 }

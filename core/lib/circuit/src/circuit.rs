@@ -1279,7 +1279,6 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
         )?;
         base_valid_flags.push(is_signer_valid);
 
-        // base_valid_flags.push(_is_signer_valid);
         let is_base_valid = multi_and(cs.namespace(|| "valid base withdraw"), &base_valid_flags)?;
 
         let mut lhs_valid_flags = vec![
@@ -2679,8 +2678,6 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
             &lhs.account.pub_key_hash,
         )?;
         lhs_valid_flags.push(is_signer_valid);
-
-        // lhs_valid_flags.push(_is_signer_valid);
 
         let lhs_valid = multi_and(cs.namespace(|| "lhs_valid"), &lhs_valid_flags)?;
 

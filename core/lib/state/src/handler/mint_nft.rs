@@ -114,7 +114,7 @@ impl TxHandler<MintNFT> for ZkSyncState {
         updates.push((
             op.creator_account_id,
             AccountUpdate::UpdateBalance {
-                balance_update: (NFT_TOKEN_ID, old_balance.clone(), new_balance.clone()),
+                balance_update: (NFT_TOKEN_ID, old_balance.clone(), new_balance),
                 old_nonce,
                 new_nonce: creator_account.nonce,
             },
