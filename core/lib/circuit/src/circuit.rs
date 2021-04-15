@@ -750,20 +750,12 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
         is_special_nft_storage_account: &Boolean,
         is_special_nft_token: &Boolean,
     ) -> Result<(), SynthesisError> {
-        let max_token_id = Expression::<E>::u64::<CS>(params::total_tokens() as u64);
         cs.enforce(
             || "left and right tokens are equal",
             |lc| lc + lhs.token.get_number().get_variable(),
             |lc| lc + CS::one(),
             |lc| lc + rhs.token.get_number().get_variable(),
         );
-
-        let diff_token_numbers = max_token_id - Expression::from(&lhs.token.get_number());
-
-        let _ = diff_token_numbers.into_bits_le_fixed(
-            cs.namespace(|| "token number is smaller than processable number"),
-            params::balance_tree_depth(),
-        )?;
 
         let public_generator = self
             .jubjub_params
