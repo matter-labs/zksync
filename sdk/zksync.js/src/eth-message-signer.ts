@@ -62,6 +62,22 @@ export class EthMessageSigner {
         return await this.getEthMessageSignature(message);
     }
 
+    getMintEthEthSignMessage(mintNft: {
+        stringToken: string;
+        stringFee: string;
+        recipient: string;
+        contentHash: string;
+        nonce: number;
+    }): string {
+        let humanReadableTxInfo = `MintNFT ${mintNft.contentHash} for: ${mintNft.recipient.toLowerCase()}`;
+
+        if (mintNft.stringFee != null) {
+            humanReadableTxInfo += `\nFee: ${mintNft.stringFee} ${mintNft.stringToken}`;
+        }
+        humanReadableTxInfo += `\nNonce: ${mintNft.nonce}`;
+
+        return humanReadableTxInfo;
+    }
     getWithdrawEthSignMessage(withdraw: {
         stringAmount: string;
         stringToken: string;
@@ -150,6 +166,18 @@ export class EthMessageSigner {
             message += `\nFee: ${forcedExit.stringFee} ${forcedExit.stringToken}`;
         }
         return message;
+    }
+
+    async ethSignMintNFT(mintNFT: {
+        stringToken: string;
+        stringFee: string;
+        recipient: string;
+        contentHash: string;
+        nonce: number;
+    }): Promise<TxEthSignature> {
+        const message = this.getMintEthEthSignMessage(mintNFT);
+        console.log(message);
+        return await this.getEthMessageSignature(message);
     }
 
     async ethSignWithdraw(withdraw: {

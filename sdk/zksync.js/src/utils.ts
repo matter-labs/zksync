@@ -12,7 +12,8 @@ import {
     ForcedExit,
     ChangePubKey,
     Withdraw,
-    CloseAccount
+    CloseAccount,
+    MintNFT
 } from './types';
 
 // Max number of tokens for the current version, it is determined by the zkSync circuit implementation.
@@ -502,6 +503,14 @@ function removeAddressPrefix(address: Address | PubKeyHash): string {
     throw new Error("ETH address must start with '0x' and PubKeyHash must start with 'sync:'");
 }
 
+export function serializeContentHash(contentHash: string): Uint8Array {
+    const contentHashBytes = utils.arrayify(contentHash);
+    if (contentHashBytes.length !== 32) {
+        throw new Error('Content hash must be 32 bytes long');
+    }
+
+    return contentHashBytes;
+}
 // PubKeyHash or eth address
 export function serializeAddress(address: Address | PubKeyHash): Uint8Array {
     const prefixlessAddress = removeAddressPrefix(address);
@@ -583,6 +592,27 @@ export function serializeWithdraw(withdraw: Withdraw): Uint8Array {
         nonceBytes,
         validFrom,
         validUntil
+    ]);
+}
+
+export function serializeMintNFT(mintNFT: MintNFT): Uint8Array {
+    const type = new Uint8Array([9]);
+    const accountId = serializeAccountId(mintNFT.creatorId);
+    const accountBytes = serializeAddress(mintNFT.creatorAddress);
+    const contentHashBytes = serializeContentHash(mintNFT.contentHash);
+    const recipientBytes = serializeAddress(mintNFT.recipient);
+    const tokenIdBytes = serializeTokenId(mintNFT.feeToken);
+    const feeBytes = serializeFeePacked(mintNFT.fee);
+    const nonceBytes = serializeNonce(mintNFT.nonce);
+    return ethers.utils.concat([
+        type,
+        accountId,
+        accountBytes,
+        contentHashBytes,
+        recipientBytes,
+        tokenIdBytes,
+        feeBytes,
+        nonceBytes
     ]);
 }
 

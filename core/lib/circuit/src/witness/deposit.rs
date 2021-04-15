@@ -113,7 +113,7 @@ impl Witness for DepositWitness<Bn256> {
             .collect();
 
         vlog::debug!(
-            "acc_path{} \n bal_path {} ",
+            "acc_path {} \n bal_path {} ",
             self.before.witness.account_path.len(),
             self.before.witness.balance_subtree_path.len()
         );

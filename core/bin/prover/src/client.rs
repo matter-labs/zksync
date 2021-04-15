@@ -97,7 +97,7 @@ impl ApiClient {
 impl crate::ApiClient for ApiClient {
     async fn get_job(&self, req: ProverInputRequest) -> anyhow::Result<ProverInputResponse> {
         let operation = (|| async {
-            log::trace!("get prover job");
+            vlog::trace!("get prover job");
 
             let response = self
                 .http_client

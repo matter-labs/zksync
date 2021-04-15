@@ -37,21 +37,21 @@ fn mint_success() {
     .unwrap();
 
     let token_hash: Vec<u8> = vec![
-        0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+        22, 150, 31, 94, 253, 41, 54, 65, 235, 128, 255, 236, 34, 19, 209, 244, 186, 158, 170, 230,
+        95, 69, 89, 207, 183, 93, 214, 213, 45, 174, 51, 194,
     ];
-    let token_address = Address::from_slice(&token_hash[..20]);
+    let token_address = Address::from_slice(&token_hash[12..]);
     let balance = BigUint::from(MIN_NFT_TOKEN_ID);
     let nft = NFT::new(
-        TokenId(MIN_NFT_TOKEN_ID + 1),
-        1,
+        TokenId(MIN_NFT_TOKEN_ID),
+        0,
         creator_account_id,
         token_address,
         None,
         content_hash,
     );
 
-    let token_data = BigUint::from_bytes_be(&token_hash[..16]);
+    let token_data = BigUint::from_bytes_be(&token_hash[16..]);
     tb.test_tx_success(
         mint_nft.into(),
         &[
@@ -146,20 +146,20 @@ fn mint_success() {
     .unwrap();
 
     let token_hash: Vec<u8> = vec![
-        0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+        40, 111, 148, 133, 22, 50, 233, 206, 55, 114, 54, 47, 147, 227, 204, 20, 62, 91, 163, 18,
+        248, 69, 144, 106, 242, 0, 60, 234, 75, 178, 210, 166,
     ];
-    let token_address = Address::from_slice(&token_hash[..20]);
+    let token_address = Address::from_slice(&token_hash[12..]);
     let nft = NFT::new(
-        TokenId(MIN_NFT_TOKEN_ID + 2),
-        2,
+        TokenId(MIN_NFT_TOKEN_ID + 1),
+        1,
         creator_account_id,
         token_address,
         None,
         content_hash,
     );
 
-    let token_data = BigUint::from_bytes_be(&token_hash[..16]);
+    let token_data = BigUint::from_bytes_be(&token_hash[16..]);
     tb.test_tx_success(
         mint_nft.into(),
         &[
@@ -271,22 +271,22 @@ fn mint_token_to_new_account() {
     )
     .unwrap();
 
-    let token_hash = [
-        17, 92, 21, 125, 147, 127, 105, 189, 163, 27, 143, 248, 157, 139, 82, 174, 40, 2, 73, 52,
-        23, 51, 96, 19, 125, 4, 81, 76, 226, 204, 145, 69,
+    let token_hash: Vec<u8> = vec![
+        22, 150, 31, 94, 253, 41, 54, 65, 235, 128, 255, 236, 34, 19, 209, 244, 186, 158, 170, 230,
+        95, 69, 89, 207, 183, 93, 214, 213, 45, 174, 51, 194,
     ];
-    let token_address = Address::from_slice(&token_hash[..20]);
+    let token_address = Address::from_slice(&token_hash[12..]);
     let balance = BigUint::from(MIN_NFT_TOKEN_ID);
     let nft = NFT::new(
-        TokenId(MIN_NFT_TOKEN_ID + 1),
-        1,
+        TokenId(MIN_NFT_TOKEN_ID),
+        0,
         creator_account_id,
         token_address,
         None,
         content_hash,
     );
 
-    let token_data = BigUint::from_bytes_be(&token_hash[..16]);
+    let token_data = BigUint::from_bytes_be(&token_hash[16..]);
 
     let signed_zk_sync_mint = SignedZkSyncTx {
         tx: ZkSyncTx::MintNFT(Box::new(mint_nft)),
@@ -411,7 +411,7 @@ fn mint_already_created_nft() {
 
     let (to_account_id, mut to_account, _to_sk) = tb.add_account(Locked);
 
-    let nft_token_id = TokenId(MIN_NFT_TOKEN_ID + 1);
+    let nft_token_id = TokenId(MIN_NFT_TOKEN_ID);
     to_account.set_balance(nft_token_id, BigUint::from(1u32));
     tb.state.insert_account(to_account_id, to_account.clone());
     let content_hash = H256::default();

@@ -20,7 +20,7 @@ pub struct TransferToNewOp {
 }
 
 impl TransferToNewOp {
-    pub const CHUNKS: usize = 6;
+    pub const CHUNKS: usize = 7;
     pub const OP_CODE: u8 = 0x02;
 
     pub(crate) fn get_public_data(&self) -> Vec<u8> {

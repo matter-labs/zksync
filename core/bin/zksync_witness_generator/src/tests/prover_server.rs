@@ -95,7 +95,6 @@ async fn test_api_client_simple_simulation(prover_name: &str, database: MockData
     database.add_block(block).await;
 
     println!("Inserting test block");
-
     MockDatabase::wait_for_stale_job_stale_idle().await;
 
     // Should return job.
@@ -194,7 +193,7 @@ pub async fn get_test_block() -> Block {
         validator_account_id,
         ops,
         (0, 1),
-        &[6],
+        &[10],
         1_000_000.into(),
         1_500_000.into(),
         old_hash,

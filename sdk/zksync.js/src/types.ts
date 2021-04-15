@@ -102,16 +102,14 @@ export interface Withdraw {
 
 export interface MintNFT {
     type: 'MintNFT';
-    creatorAccountId: number;
-    creatorAccountAddress: Address;
+    creatorId: number;
+    creatorAddress: Address;
     recipient: Address;
     contentHash: string;
     fee: BigNumberish;
     feeToken: number;
     nonce: number;
     signature?: Signature;
-    validFrom: number;
-    validUntil: number;
 }
 
 export interface ForcedExit {

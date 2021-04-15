@@ -1034,7 +1034,9 @@ mod tests {
     }
 
     /// Checks if insert_account panics if account has id greater that next_free_id.
-    #[should_panic(expected = "assertion failed: id <= self.next_free_id")]
+    #[should_panic(
+        expected = "assertion failed: id == NFT_STORAGE_ACCOUNT_ID || id <= self.next_free_id"
+    )]
     #[test]
     fn insert_account_with_bigger_id() {
         let mut rng = XorShiftRng::from_seed([1, 2, 3, 4]);

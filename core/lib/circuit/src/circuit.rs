@@ -342,7 +342,10 @@ impl<'a, E: RescueEngine + JubjubEngine> Circuit<E> for ZkSyncCircuit<'a, E> {
         assert_eq!(validator_address_bits.len(), params::ACCOUNT_ID_BIT_WIDTH);
 
         let mut validator_balances_processable_tokens = {
-            assert_eq!(self.validator_balances.len(), params::total_tokens());
+            assert_eq!(
+                self.validator_balances.len(),
+                params::total_fungible_tokens()
+            );
             for balance in &self.validator_balances[params::number_of_processable_tokens()..] {
                 if let Some(ingored_tokens_balance) = balance {
                     assert!(ingored_tokens_balance.is_zero());
@@ -747,8 +750,7 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
         is_special_nft_storage_account: &Boolean,
         is_special_nft_token: &Boolean,
     ) -> Result<(), SynthesisError> {
-        let max_token_id =
-            Expression::<E>::u64::<CS>(params::number_of_processable_tokens() as u64);
+        let max_token_id = Expression::<E>::u64::<CS>(params::total_tokens() as u64);
         cs.enforce(
             || "left and right tokens are equal",
             |lc| lc + lhs.token.get_number().get_variable(),
