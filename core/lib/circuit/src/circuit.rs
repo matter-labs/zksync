@@ -2018,6 +2018,8 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
         )?);
 
         let first_chunk_valid = {
+            // First chunk should take a fee from creator address and increment nonce.
+            // Here will be checked signature of the creator.
             let mut flags = vec![common_valid.clone(), is_chunk_with_index[0].clone()];
 
             let mut serialized_tx_bits = vec![];
@@ -2096,6 +2098,8 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
         )?;
 
         let second_chunk_valid = {
+            // Second chunk should enforce the validity of serial_id of creator address.
+            // Also here serial_id counter of the creator will be incremented.
             let mut flags = vec![common_valid.clone(), is_chunk_with_index[1].clone()];
 
             flags.push(is_creator_account);
@@ -2119,6 +2123,8 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
         )?;
 
         let third_chunk_valid = {
+            // Third chunk should enforce the validity of new_token_id value.
+            // Also here nft counter of the special account will be incremented.
             let mut flags = vec![common_valid.clone(), is_chunk_with_index[2].clone()];
 
             flags.push(is_special_nft_storage_account.clone());
@@ -2142,6 +2148,7 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
         )?;
 
         let fourth_chunk_valid = {
+            // Fourth chunk should store nft content to the corresponding leaf of the special account.
             let mut flags = vec![common_valid.clone(), is_chunk_with_index[3].clone()];
 
             flags.push(is_special_nft_storage_account.clone());
@@ -2164,6 +2171,7 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
         )?;
 
         let fifth_chunk_valid = {
+            // Fifth chunk should increment the balance of the recipient.
             let mut flags = vec![common_valid.clone(), is_chunk_with_index[4].clone()];
 
             let is_recipient_account = Boolean::from(Expression::equals(
