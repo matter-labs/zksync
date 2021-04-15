@@ -117,7 +117,7 @@ pub const ADDRESS_WIDTH: usize = FR_ADDRESS_LEN * 8;
 /// Nonce bit width
 pub const NONCE_BIT_WIDTH: usize = 32;
 //
-pub const CHUNK_BIT_WIDTH: usize = 72;
+pub const CHUNK_BIT_WIDTH: usize = 80;
 pub const CHUNK_BYTES: usize = CHUNK_BIT_WIDTH / 8;
 
 pub const MAX_CIRCUIT_MSG_HASH_BITS: usize = 736;
