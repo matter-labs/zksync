@@ -491,7 +491,19 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
         result
     }
 
-    /// Returns the number of last block
+    /// Returns the number of last block saved to the database.
+    pub async fn get_last_saved_block(&mut self) -> QueryResult<BlockNumber> {
+        let start = Instant::now();
+        let count = sqlx::query!("SELECT MAX(number) FROM blocks")
+            .fetch_one(self.0.conn())
+            .await?
+            .max
+            .unwrap_or(0);
+        metrics::histogram!("sql.chain.block.get_last_committed_block", start.elapsed());
+        Ok(BlockNumber(count as u32))
+    }
+
+    /// Returns the number of last block for which an aggregated operation exists.
     pub async fn get_last_committed_block(&mut self) -> QueryResult<BlockNumber> {
         let start = Instant::now();
         let result = OperationsSchema(self.0)

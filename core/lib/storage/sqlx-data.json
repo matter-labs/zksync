@@ -3428,6 +3428,24 @@
       ]
     }
   },
+  "bf88992c521353535925401702028307ba3d79dfa2e60d939a117e7aae5a6403": {
+    "query": "SELECT MAX(number) FROM blocks",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "max",
+          "type_info": "Int8"
+        }
+      ],
+      "parameters": {
+        "Left": []
+      },
+      "nullable": [
+        null
+      ]
+    }
+  },
   "c0bc09d944da0d6a2eb2108185c757ff16440ed9c3d1fb2835cf3d4f552078f2": {
     "query": "SELECT * FROM executed_priority_operations WHERE block_number = $1",
     "describe": {

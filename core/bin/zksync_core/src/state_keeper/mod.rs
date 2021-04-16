@@ -289,6 +289,17 @@ impl ZkSyncStateInitParams {
                 "restored root_hash is different"
             );
         }
+
+        // We have to load actual number of the last committed block, since above we load the block number from state,
+        // and in case of empty block being sealed (that may happen because of bug).
+        let last_actually_committed_block_number = storage
+            .chain()
+            .block_schema()
+            .get_last_saved_block()
+            .await?;
+
+        let block_number = std::cmp::max(last_actually_committed_block_number, block_number);
+
         Ok(block_number)
     }
 
