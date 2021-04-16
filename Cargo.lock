@@ -3577,6 +3577,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "priority_op_tx_hashes_migration"
+version = "1.0.0"
+dependencies = [
+ "anyhow",
+ "parity-crypto",
+ "sqlx",
+ "tokio 0.2.22",
+]
+
+[[package]]
 name = "proc-macro-crate"
 version = "0.1.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"

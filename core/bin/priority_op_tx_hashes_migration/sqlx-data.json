@@ -1,0 +1,62 @@
+{
+  "db": "PostgreSQL",
+  "60727040d82ffa0535d348e896cf846e645496f2990be962f020b10975652106": {
+    "query": "ALTER TABLE executed_priority_operations ALTER COLUMN tx_hash SET NOT NULL",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": []
+      },
+      "nullable": []
+    }
+  },
+  "de85461124585b0eeaca713d199af9917edc09319a2f4f2c61fb30e0d7b482c8": {
+    "query": "UPDATE executed_priority_operations SET tx_hash = $1 WHERE priority_op_serialid = $2",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "Bytea",
+          "Int8"
+        ]
+      },
+      "nullable": []
+    }
+  },
+  "e80dba3fa7252902a9c53f7500f7e498bbe062eb833baeb271ecb1c9af468dc1": {
+    "query": "SELECT priority_op_serialid, eth_hash, eth_block, eth_block_index FROM executed_priority_operations",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "priority_op_serialid",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 1,
+          "name": "eth_hash",
+          "type_info": "Bytea"
+        },
+        {
+          "ordinal": 2,
+          "name": "eth_block",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 3,
+          "name": "eth_block_index",
+          "type_info": "Int8"
+        }
+      ],
+      "parameters": {
+        "Left": []
+      },
+      "nullable": [
+        false,
+        false,
+        false,
+        true
+      ]
+    }
+  }
+}
