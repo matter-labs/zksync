@@ -40,6 +40,9 @@ members = [
 
     # SDK section
     "sdk/zksync-rs",
+
+    # Utilities
+    "infrastructure/regen-root-hash"
 ]
 
 [patch.crates-io]
