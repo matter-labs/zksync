@@ -88,6 +88,7 @@ describe(`ZkSync integration tests (token: ${token}, transport: ${transport})`, 
     step('should execute a mintNFT', async () => {
         await tester.testMintNFT(alice, chuck, "0x0000000000000000000000000000000000000000000000000000000000000000", token);
     });
+
     step('should execute a transfer to existing account', async () => {
         if (onlyBasic) {
             return;

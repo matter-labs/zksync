@@ -98,7 +98,13 @@ impl ZkSyncState {
         let next_free_id = if balance_tree.items.is_empty() {
             AccountId(0)
         } else {
-            AccountId(*balance_tree.items.keys().max().unwrap() as u32 + 1)
+            let mut next_free_id = 0;
+            for index in balance_tree.items.keys() {
+                if *index != NFT_STORAGE_ACCOUNT_ID.0 as u64 {
+                    next_free_id = std::cmp::max(next_free_id, *index + 1);
+                }
+            }
+            AccountId(next_free_id as u32)
         };
 
         Self {

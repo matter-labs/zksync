@@ -25,6 +25,8 @@ zksync_eth_signer = { path = "../../lib/eth_signer", version = "1.0" }
 zksync_prometheus_exporter = { path = "../../lib/prometheus_exporter", version = "1.0" }
 zksync_balancer = { path = "../../lib/balancer", version = "1.0" }
 
+num = { version = "0.3.1", features = ["serde"] }
+
 ethabi = "12.0.0"
 web3 = "0.13.0"
 serde = "1.0.90"

@@ -28,7 +28,7 @@ use zksync_types::{
     mempool::SignedTxVariant,
     tx::{TxHash, ZkSyncTx},
     Account, AccountId, AccountTree, AccountUpdate, AccountUpdates, Address, BlockNumber,
-    PriorityOp, SignedZkSyncTx, Transfer, TransferOp, H256,
+    PriorityOp, SignedZkSyncTx, Token, Transfer, TransferOp, H256,
 };
 // Local uses
 use crate::{
@@ -36,6 +36,9 @@ use crate::{
     mempool::ProposedBlock,
 };
 use std::time::{SystemTime, UNIX_EPOCH};
+use zksync_crypto::params::{
+    MIN_NFT_TOKEN_ID, NFT_STORAGE_ACCOUNT_ADDRESS, NFT_STORAGE_ACCOUNT_ID, NFT_TOKEN_ID,
+};
 
 #[cfg(test)]
 mod tests;
@@ -498,16 +501,54 @@ impl ZkSyncStateKeeper {
             *last_committed == 0 && accounts.is_empty(),
             "db should be empty"
         );
+
+        vlog::info!("Adding special token");
+        transaction
+            .tokens_schema()
+            .store_token(Token {
+                id: NFT_TOKEN_ID,
+                symbol: "SPECIAL".to_string(),
+                address: *NFT_STORAGE_ACCOUNT_ADDRESS,
+                decimals: 18,
+                is_nft: true, // TODO: ZKS-635
+            })
+            .await
+            .expect("failed to store special token");
+        vlog::info!("Special token added");
+
         let fee_account = Account::default_with_address(fee_account_address);
-        let db_account_update = AccountUpdate::Create {
+        let db_create_fee_account = AccountUpdate::Create {
             address: *fee_account_address,
             nonce: fee_account.nonce,
         };
         accounts.insert(AccountId(0), fee_account);
+
+        let (mut special_account, db_create_special_account) =
+            Account::create_account(NFT_STORAGE_ACCOUNT_ID, *NFT_STORAGE_ACCOUNT_ADDRESS);
+        special_account.set_balance(NFT_TOKEN_ID, num::BigUint::from(MIN_NFT_TOKEN_ID));
+        let db_set_special_account_balance = AccountUpdate::UpdateBalance {
+            old_nonce: special_account.nonce,
+            new_nonce: special_account.nonce,
+            balance_update: (
+                NFT_TOKEN_ID,
+                num::BigUint::from(0u64),
+                num::BigUint::from(MIN_NFT_TOKEN_ID),
+            ),
+        };
+        accounts.insert(NFT_STORAGE_ACCOUNT_ID, special_account);
+
         transaction
             .chain()
             .state_schema()
-            .commit_state_update(BlockNumber(0), &[(AccountId(0), db_account_update)], 0)
+            .commit_state_update(
+                BlockNumber(0),
+                &[
+                    (AccountId(0), db_create_fee_account),
+                    db_create_special_account[0].clone(),
+                    (NFT_STORAGE_ACCOUNT_ID, db_set_special_account_balance),
+                ],
+                0,
+            )
             .await
             .expect("db fail");
         transaction

@@ -194,6 +194,7 @@ impl ZkSyncState {
     fn get_or_create_nft_account_token_id(&mut self) -> (Account, AccountUpdates) {
         let mut updates = vec![];
         let account = self.get_account(NFT_STORAGE_ACCOUNT_ID).unwrap_or_else(|| {
+            unreachable!();
             let balance = BigUint::from(MIN_NFT_TOKEN_ID);
             let (mut account, upd) =
                 Account::create_account(NFT_STORAGE_ACCOUNT_ID, *NFT_STORAGE_ACCOUNT_ADDRESS);
