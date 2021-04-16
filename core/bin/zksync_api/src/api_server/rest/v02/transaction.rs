@@ -133,7 +133,7 @@ impl ApiTransactionData {
         if let Some(op) = storage
             .chain()
             .operations_schema()
-            .get_executed_priority_operation_by_hash(tx_hash.as_ref())
+            .get_executed_priority_operation_by_tx_hash(tx_hash.as_ref())
             .await
             .map_err(Error::storage)?
         {
@@ -231,7 +231,7 @@ impl ApiTransactionData {
         let operation = storage
             .chain()
             .operations_schema()
-            .get_executed_priority_operation_by_hash(tx_hash.as_ref())
+            .get_executed_priority_operation_by_tx_hash(tx_hash.as_ref())
             .await
             .map_err(Error::storage)?;
         if let Some(op) = operation {

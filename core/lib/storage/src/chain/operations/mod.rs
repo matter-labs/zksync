@@ -137,7 +137,7 @@ impl<'a, 'c> OperationsSchema<'a, 'c> {
     }
 
     /// Retrieves priority operation from the database by its tx_hash.
-    pub async fn get_executed_priority_operation_by_hash(
+    pub async fn get_executed_priority_operation_by_tx_hash(
         &mut self,
         tx_hash: &[u8],
     ) -> QueryResult<Option<StoredExecutedPriorityOperation>> {

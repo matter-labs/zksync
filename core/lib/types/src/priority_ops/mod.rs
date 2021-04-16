@@ -235,7 +235,8 @@ pub struct PriorityOp {
     pub eth_hash: H256,
     /// Block in which Ethereum transaction was included.
     pub eth_block: u64,
-    /// Transaction index in Ethereum block
+    /// Transaction index in Ethereum block.
+    /// This field must be optional because of backward compatibility.
     pub eth_block_index: Option<u64>,
 }
 

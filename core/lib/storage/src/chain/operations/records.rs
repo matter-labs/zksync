@@ -29,7 +29,6 @@ pub struct StoredExecutedPriorityOperation {
     pub created_at: DateTime<Utc>,
     /// This field must be optional because of backward compatibility.
     pub eth_block_index: Option<i64>,
-    /// This field must be optional because of backward compatibility.
     pub tx_hash: Vec<u8>,
 }
 
