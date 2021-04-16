@@ -17,7 +17,10 @@ use zksync_storage::{
     },
     ConnectionPool, StorageProcessor,
 };
-use zksync_types::{block::ExecutedOperations, BlockNumber, PriorityOp, H160, H256};
+use zksync_types::{
+    block::ExecutedOperations, priority_ops::PriorityOpLookupQuery, BlockNumber, PriorityOp, H160,
+    H256,
+};
 
 /// `ApiV01` structure contains the implementation of `/api/v0.1` endpoints set.
 /// It is considered (somewhat) stable and will be supported for a while.
@@ -275,6 +278,8 @@ impl ApiV01 {
         &self,
         eth_tx_hash: H256,
     ) -> Result<Option<(EthBlockId, PriorityOp)>, anyhow::Error> {
-        self.api_client.get_unconfirmed_op(eth_tx_hash).await
+        self.api_client
+            .get_unconfirmed_op(PriorityOpLookupQuery::ByEthHash(eth_tx_hash))
+            .await
     }
 }

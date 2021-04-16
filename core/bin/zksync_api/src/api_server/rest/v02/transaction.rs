@@ -1,7 +1,6 @@
 //! Transactions part of API implementation.
 
 // Built-in uses
-use std::convert::TryInto;
 use std::str::FromStr;
 
 // External uses
@@ -24,8 +23,8 @@ use zksync_storage::{
     QueryResult, StorageProcessor,
 };
 use zksync_types::{
-    aggregated_operations::AggregatedActionType, tx::EthSignData, tx::TxEthSignature, tx::TxHash,
-    BlockNumber, EthBlockId, PriorityOpId, H256,
+    aggregated_operations::AggregatedActionType, priority_ops::PriorityOpLookupQuery,
+    tx::EthSignData, tx::TxEthSignature, tx::TxHash, BlockNumber, EthBlockId, PriorityOpId,
 };
 
 // Local uses
@@ -131,7 +130,6 @@ impl ApiTransactionData {
         storage: &mut StorageProcessor<'_>,
         tx_hash: TxHash,
     ) -> Result<Option<L1Receipt>, Error> {
-        let tx_hash_ref: &[u8; 32] = tx_hash.as_ref().try_into().unwrap();
         if let Some(op) = storage
             .chain()
             .operations_schema()
@@ -150,20 +148,7 @@ impl ApiTransactionData {
         } else if let Some((eth_block, priority_op)) = self
             .tx_sender
             .core_api_client
-            .get_unconfirmed_op_by_tx_hash(tx_hash)
-            .await
-            .map_err(Error::core_api)?
-        {
-            Ok(Some(L1Receipt {
-                status: L1Status::Queued,
-                eth_block,
-                rollup_block: None,
-                id: PriorityOpId(priority_op.serial_id),
-            }))
-        } else if let Some((eth_block, priority_op)) = self
-            .tx_sender
-            .core_api_client
-            .get_unconfirmed_op(H256::from(tx_hash_ref))
+            .get_unconfirmed_op(PriorityOpLookupQuery::BySyncHash(tx_hash))
             .await
             .map_err(Error::core_api)?
         {
@@ -243,7 +228,6 @@ impl ApiTransactionData {
         storage: &mut StorageProcessor<'_>,
         tx_hash: TxHash,
     ) -> Result<Option<TxData>, Error> {
-        let tx_hash_ref: &[u8; 32] = tx_hash.as_ref().try_into().unwrap();
         let operation = storage
             .chain()
             .operations_schema()
@@ -275,27 +259,7 @@ impl ApiTransactionData {
         } else if let Some((_, priority_op)) = self
             .tx_sender
             .core_api_client
-            .get_unconfirmed_op_by_tx_hash(tx_hash)
-            .await
-            .map_err(Error::core_api)?
-        {
-            let tx = Transaction {
-                tx_hash,
-                block_number: None,
-                op: serde_json::to_value(priority_op.data).unwrap(),
-                status: L2Status::Queued,
-                fail_reason: None,
-                created_at: None,
-            };
-
-            Ok(Some(TxData {
-                tx,
-                eth_signature: None,
-            }))
-        } else if let Some((_, priority_op)) = self
-            .tx_sender
-            .core_api_client
-            .get_unconfirmed_op(H256::from(tx_hash_ref))
+            .get_unconfirmed_op(PriorityOpLookupQuery::BySyncHash(tx_hash))
             .await
             .map_err(Error::core_api)?
         {

@@ -3,7 +3,9 @@ use std::collections::HashMap;
 
 use web3::types::{Address, BlockNumber};
 
-use zksync_types::{AccountId, Deposit, FullExit, Nonce, PriorityOp, TokenId, ZkSyncPriorityOp};
+use zksync_types::{
+    AccountId, Deposit, FullExit, Nonce, PriorityOp, TokenId, ZkSyncPriorityOp, H256,
+};
 
 use crate::eth_watch::{client::EthClient, EthWatch};
 use std::sync::Arc;
@@ -122,7 +124,7 @@ async fn test_operation_queues() {
                 deadline_block: 0,
                 eth_hash: [2; 32].into(),
                 eth_block: 4,
-                eth_block_index: 1,
+                eth_block_index: Some(1),
             },
             PriorityOp {
                 serial_id: 1,
@@ -135,7 +137,7 @@ async fn test_operation_queues() {
                 deadline_block: 0,
                 eth_hash: [3; 32].into(),
                 eth_block: 3,
-                eth_block_index: 1,
+                eth_block_index: Some(1),
             },
             PriorityOp {
                 serial_id: 2,
@@ -147,7 +149,7 @@ async fn test_operation_queues() {
                 deadline_block: 0,
                 eth_block: 4,
                 eth_hash: [4; 32].into(),
-                eth_block_index: 2,
+                eth_block_index: Some(2),
             },
         ])
         .await;
@@ -168,7 +170,9 @@ async fn test_operation_queues() {
     assert_eq!(unconfirmed_queue[1].serial_id, 2);
 
     priority_queues.get(&1).unwrap();
-    watcher.find_ongoing_op_by_eth_hash(&[2u8; 32]).unwrap();
+    watcher
+        .find_ongoing_op_by_eth_hash(H256::from_slice(&[2u8; 32]))
+        .unwrap();
 
     // Make sure that the old behavior of the pending deposits getter has not changed.
     let deposits = watcher.get_ongoing_deposits_for(to_addr);
@@ -203,7 +207,7 @@ async fn test_operation_queues_time_lag() {
                 deadline_block: 0,
                 eth_hash: [2; 32].into(),
                 eth_block: 1, // <- First operation goes to the first block.
-                eth_block_index: 1,
+                eth_block_index: Some(1),
             },
             PriorityOp {
                 serial_id: 1,
@@ -215,7 +219,7 @@ async fn test_operation_queues_time_lag() {
                 deadline_block: 0,
                 eth_hash: [3; 32].into(),
                 eth_block: 100, // <-- Note 100th block, it will set the network block to 100.
-                eth_block_index: 1,
+                eth_block_index: Some(1),
             },
             PriorityOp {
                 serial_id: 2,
@@ -228,7 +232,7 @@ async fn test_operation_queues_time_lag() {
                 deadline_block: 0,
                 eth_hash: [3; 32].into(),
                 eth_block: 110, // <-- This operation will get to the unconfirmed queue.
-                eth_block_index: 1,
+                eth_block_index: Some(1),
             },
         ])
         .await;
@@ -272,7 +276,7 @@ async fn test_restore_and_poll() {
                 deadline_block: 0,
                 eth_hash: [2; 32].into(),
                 eth_block: 4,
-                eth_block_index: 1,
+                eth_block_index: Some(1),
             },
             PriorityOp {
                 serial_id: 1,
@@ -285,7 +289,7 @@ async fn test_restore_and_poll() {
                 deadline_block: 0,
                 eth_hash: [3; 32].into(),
                 eth_block: 3,
-                eth_block_index: 1,
+                eth_block_index: Some(1),
             },
         ])
         .await;
@@ -305,7 +309,7 @@ async fn test_restore_and_poll() {
                 deadline_block: 0,
                 eth_hash: [2; 32].into(),
                 eth_block: 5,
-                eth_block_index: 1,
+                eth_block_index: Some(1),
             },
             PriorityOp {
                 serial_id: 4,
@@ -317,7 +321,7 @@ async fn test_restore_and_poll() {
                 deadline_block: 0,
                 eth_hash: [3; 32].into(),
                 eth_block: 5,
-                eth_block_index: 2,
+                eth_block_index: Some(2),
             },
         ])
         .await;
@@ -329,7 +333,9 @@ async fn test_restore_and_poll() {
     assert_eq!(unconfirmed_queue.len(), 2);
     assert_eq!(unconfirmed_queue[0].serial_id, 3);
     priority_queues.get(&1).unwrap();
-    watcher.find_ongoing_op_by_eth_hash(&[2u8; 32]).unwrap();
+    watcher
+        .find_ongoing_op_by_eth_hash(H256::from_slice(&[2u8; 32]))
+        .unwrap();
     let deposits = watcher.get_ongoing_deposits_for([2u8; 20].into());
     assert_eq!(deposits.len(), 1);
 }
@@ -351,7 +357,7 @@ async fn test_restore_and_poll_time_lag() {
                 deadline_block: 0,
                 eth_hash: [2; 32].into(),
                 eth_block: 1,
-                eth_block_index: 1,
+                eth_block_index: Some(1),
             },
             PriorityOp {
                 serial_id: 1,
@@ -363,7 +369,7 @@ async fn test_restore_and_poll_time_lag() {
                 deadline_block: 0,
                 eth_hash: [3; 32].into(),
                 eth_block: 100,
-                eth_block_index: 1,
+                eth_block_index: Some(1),
             },
         ])
         .await;

@@ -36,7 +36,7 @@ fn gen_aggregated_operation(
                 deadline_block: 0,
                 eth_hash: H256::zero(),
                 eth_block: 0,
-                eth_block_index: 0,
+                eth_block_index: None,
             },
             op: ZkSyncOp::FullExit(Box::new(FullExitOp {
                 priority_op,

@@ -236,7 +236,7 @@ pub struct PriorityOp {
     /// Block in which Ethereum transaction was included.
     pub eth_block: u64,
     /// Transaction index in Ethereum block
-    pub eth_block_index: u64,
+    pub eth_block_index: Option<u64>,
 }
 
 impl TryFrom<Log> for PriorityOp {
@@ -286,10 +286,7 @@ impl TryFrom<Log> for PriorityOp {
                 .block_number
                 .expect("Event block number is missing")
                 .as_u64(),
-            eth_block_index: event
-                .transaction_index
-                .expect("Event transaction index is missing")
-                .as_u64(),
+            eth_block_index: event.transaction_index.map(|index| index.as_u64()),
         })
     }
 }
@@ -305,11 +302,20 @@ impl PriorityOp {
         let mut bytes = Vec::new();
         bytes.extend_from_slice(self.eth_hash.as_bytes());
         bytes.extend_from_slice(&self.eth_block.to_be_bytes());
-        bytes.extend_from_slice(&self.eth_block_index.to_be_bytes());
+        bytes.extend_from_slice(&self.eth_block_index.unwrap_or(0).to_be_bytes());
 
         let hash = sha256(&bytes);
         let mut out = [0u8; 32];
         out.copy_from_slice(&hash);
         TxHash { data: out }
     }
+}
+
+/// Combined identifier of the priority operations for the lookup.
+#[derive(Debug, Serialize, Deserialize)]
+pub enum PriorityOpLookupQuery {
+    /// Query priority operation using zkSync hash, which is calculated based on the priority operation metadata.
+    BySyncHash(TxHash),
+    /// Query priority operation using the corresponding Ethereum transaction hash.
+    ByEthHash(H256),
 }

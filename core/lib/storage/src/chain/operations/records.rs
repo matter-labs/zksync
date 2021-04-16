@@ -27,7 +27,9 @@ pub struct StoredExecutedPriorityOperation {
     pub eth_hash: Vec<u8>,
     pub eth_block: i64,
     pub created_at: DateTime<Utc>,
-    pub eth_block_index: i64,
+    /// This field must be optional because of backward compatibility.
+    pub eth_block_index: Option<i64>,
+    /// This field must be optional because of backward compatibility.
     pub tx_hash: Vec<u8>,
 }
 
@@ -67,7 +69,8 @@ pub struct NewExecutedPriorityOperation {
     pub eth_hash: Vec<u8>,
     pub eth_block: i64,
     pub created_at: DateTime<Utc>,
-    pub eth_block_index: i64,
+    /// This field must be optional because of backward compatibility.
+    pub eth_block_index: Option<i64>,
     pub tx_hash: Vec<u8>,
 }
 

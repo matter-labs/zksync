@@ -2258,13 +2258,13 @@
         },
         {
           "ordinal": 10,
-          "name": "tx_hash",
-          "type_info": "Bytea"
+          "name": "eth_block_index",
+          "type_info": "Int8"
         },
         {
           "ordinal": 11,
-          "name": "eth_block_index",
-          "type_info": "Int8"
+          "name": "tx_hash",
+          "type_info": "Bytea"
         }
       ],
       "parameters": {
@@ -2283,7 +2283,7 @@
         false,
         false,
         false,
-        false,
+        true,
         false
       ]
     }
@@ -3350,13 +3350,13 @@
         },
         {
           "ordinal": 10,
-          "name": "tx_hash",
-          "type_info": "Bytea"
+          "name": "eth_block_index",
+          "type_info": "Int8"
         },
         {
           "ordinal": 11,
-          "name": "eth_block_index",
-          "type_info": "Int8"
+          "name": "tx_hash",
+          "type_info": "Bytea"
         }
       ],
       "parameters": {
@@ -3375,7 +3375,7 @@
         false,
         false,
         false,
-        false,
+        true,
         false
       ]
     }
@@ -3851,13 +3851,13 @@
         },
         {
           "ordinal": 10,
-          "name": "tx_hash",
-          "type_info": "Bytea"
+          "name": "eth_block_index",
+          "type_info": "Int8"
         },
         {
           "ordinal": 11,
-          "name": "eth_block_index",
-          "type_info": "Int8"
+          "name": "tx_hash",
+          "type_info": "Bytea"
         }
       ],
       "parameters": {
@@ -3876,7 +3876,7 @@
         false,
         false,
         false,
-        false,
+        true,
         false
       ]
     }
@@ -4905,13 +4905,13 @@
         },
         {
           "ordinal": 10,
-          "name": "tx_hash",
-          "type_info": "Bytea"
+          "name": "eth_block_index",
+          "type_info": "Int8"
         },
         {
           "ordinal": 11,
-          "name": "eth_block_index",
-          "type_info": "Int8"
+          "name": "tx_hash",
+          "type_info": "Bytea"
         }
       ],
       "parameters": {
@@ -4930,7 +4930,7 @@
         false,
         false,
         false,
-        false,
+        true,
         false
       ]
     }

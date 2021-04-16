@@ -88,7 +88,7 @@ impl StoredExecutedPriorityOperation {
                 deadline_block: self.deadline_block as u64,
                 eth_hash: H256::from_slice(&self.eth_hash),
                 eth_block: self.eth_block as u64,
-                eth_block_index: self.eth_block_index as u64,
+                eth_block_index: self.eth_block_index.map(|index| index as u64),
             },
             op: franklin_op,
             block_index: self.block_index as u32,
@@ -128,7 +128,10 @@ impl NewExecutedPriorityOperation {
             eth_hash: exec_prior_op.priority_op.eth_hash.as_bytes().to_vec(),
             eth_block: exec_prior_op.priority_op.eth_block as i64,
             created_at: exec_prior_op.created_at,
-            eth_block_index: exec_prior_op.priority_op.eth_block_index as i64,
+            eth_block_index: exec_prior_op
+                .priority_op
+                .eth_block_index
+                .map(|index| index as i64),
             tx_hash,
         }
     }

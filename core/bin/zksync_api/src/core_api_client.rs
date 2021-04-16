@@ -1,7 +1,6 @@
 pub use zksync_types::EthBlockId;
 use zksync_types::{
-    tx::{TxEthSignature, TxHash},
-    Address, PriorityOp, SignedZkSyncTx, H256,
+    priority_ops::PriorityOpLookupQuery, tx::TxEthSignature, Address, PriorityOp, SignedZkSyncTx,
 };
 
 use crate::tx_error::TxAddError;
@@ -58,30 +57,13 @@ impl CoreApiClient {
         self.get(&endpoint).await
     }
 
-    /// Queries information about unconfirmed priority operation from a Core by its eth_tx_hash.
+    /// Queries information about unconfirmed priority operation from a Core.
     pub async fn get_unconfirmed_op(
         &self,
-        eth_tx_hash: H256,
+        query: PriorityOpLookupQuery,
     ) -> anyhow::Result<Option<(EthBlockId, PriorityOp)>> {
-        let endpoint = format!(
-            "{}/unconfirmed_op/0x{}",
-            self.addr,
-            hex::encode(eth_tx_hash)
-        );
-        self.get(&endpoint).await
-    }
-
-    /// Queries information about unconfirmed priority operation from a Core by its tx_hash.
-    pub async fn get_unconfirmed_op_by_tx_hash(
-        &self,
-        tx_hash: TxHash,
-    ) -> anyhow::Result<Option<(EthBlockId, PriorityOp)>> {
-        let endpoint = format!(
-            "{}/unconfirmed_op_by_tx_hash/0x{}",
-            self.addr,
-            hex::encode(tx_hash)
-        );
-        self.get(&endpoint).await
+        let endpoint = format!("{}/unconfirmed_op", self.addr,);
+        self.post(&endpoint, query).await
     }
 
     async fn get<T: serde::de::DeserializeOwned>(&self, url: &str) -> anyhow::Result<T> {
