@@ -25,7 +25,7 @@ fn main() {
     let current_hash_fr = fr_from_bytes(current_hash_bytes);
 
     let old_hash = get_state_root_hash(&accounts, &BALANCE_TREE_11);
-    println!("OldHash: 0x{}", fr_to_hex(old_hash));
+    println!("OldHash: {}", fr_to_hex(old_hash));
 
     assert_eq!(
         old_hash, current_hash_fr,
@@ -33,8 +33,8 @@ fn main() {
     );
 
     let new_hash = get_state_root_hash(&accounts, &BALANCE_TREE_32);
-    println!("NewHash: 0x{}", fr_to_hex(new_hash));
+    println!("NewHash: {}", fr_to_hex(new_hash));
 
     let signature = sign_update_message(private_key, old_hash, new_hash);
-    println!("Sigтature: 0x{}", signature);
+    println!("Signature: {}", signature);
 }
