@@ -25,16 +25,16 @@ fn main() {
     let current_hash_fr = fr_from_bytes(current_hash_bytes);
 
     let old_hash = get_state_root_hash(&accounts, &BALANCE_TREE_11);
-    print!("OldHash: 0x{}\n", fr_to_hex(old_hash));
+    println!("OldHash: 0x{}", fr_to_hex(old_hash));
 
     assert_eq!(
         old_hash, current_hash_fr,
-        "The recalculated hash is not equal to the current one.\n"
+        "The recalculated hash is not equal to the current one."
     );
 
     let new_hash = get_state_root_hash(&accounts, &BALANCE_TREE_32);
-    print!("NewHash: 0x{}\n", fr_to_hex(new_hash));
+    println!("NewHash: 0x{}", fr_to_hex(new_hash));
 
     let signature = sign_update_message(private_key, old_hash, new_hash);
-    print!("Sigтature: 0x{}\n", signature);
+    println!("Sigтature: 0x{}", signature);
 }
