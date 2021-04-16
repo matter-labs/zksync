@@ -5,7 +5,7 @@ mod tests;
 mod utils;
 
 use std::env;
-use utils::sign_update_message;
+use utils::{fr_to_hex, sign_update_message};
 use zksync_circuit::witness::utils::fr_from_bytes;
 
 use account::read_accounts;
@@ -25,7 +25,7 @@ fn main() {
     let current_hash_fr = fr_from_bytes(current_hash_bytes);
 
     let old_hash = get_state_root_hash(&accounts, &BALANCE_TREE_11);
-    print!("OldHash: {} \n", old_hash.to_string());
+    print!("OldHash: 0x{}\n", fr_to_hex(old_hash));
 
     assert_eq!(
         old_hash, current_hash_fr,
@@ -33,8 +33,8 @@ fn main() {
     );
 
     let new_hash = get_state_root_hash(&accounts, &BALANCE_TREE_32);
-    print!("NewHash: {} \n", new_hash.to_string());
+    print!("NewHash: 0x{}\n", fr_to_hex(new_hash));
 
     let signature = sign_update_message(private_key, old_hash, new_hash);
-    print!("Sigтature: {}\n", signature);
+    print!("Sigтature: 0x{}\n", signature);
 }

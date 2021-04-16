@@ -5,7 +5,7 @@ use zksync_crypto::{
 };
 use zksync_types::H256;
 
-fn fr_to_hex(scalar: Fr) -> String {
+pub fn fr_to_hex(scalar: Fr) -> String {
     let mut be_bytes = [0u8; 32];
     scalar
         .into_repr()
