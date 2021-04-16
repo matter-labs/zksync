@@ -276,6 +276,19 @@ impl ZkSyncStateInitParams {
                 }
             }
         }
+
+        // We have to load actual number of the last committed block, since above we load the block number from state,
+        // and in case of empty block being sealed (that may happen because of bug).
+        // Note that if this block is greater than the `block_number`, it means that some empty blocks were committed,
+        // so the root hash has not changed and we don't need to update the tree in order to get the right root hash.
+        let last_actually_committed_block_number = storage
+            .chain()
+            .block_schema()
+            .get_last_saved_block()
+            .await?;
+
+        let block_number = std::cmp::max(last_actually_committed_block_number, block_number);
+
         if *block_number != 0 {
             let storage_root_hash = storage
                 .chain()
@@ -289,16 +302,6 @@ impl ZkSyncStateInitParams {
                 "restored root_hash is different"
             );
         }
-
-        // We have to load actual number of the last committed block, since above we load the block number from state,
-        // and in case of empty block being sealed (that may happen because of bug).
-        let last_actually_committed_block_number = storage
-            .chain()
-            .block_schema()
-            .get_last_saved_block()
-            .await?;
-
-        let block_number = std::cmp::max(last_actually_committed_block_number, block_number);
 
         Ok(block_number)
     }
