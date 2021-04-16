@@ -3572,42 +3572,6 @@
       ]
     }
   },
-  "b8d57467bdc7e6480dd0c92988bacbe1256a0d9e72438c3b4fa3db77124ffbc3": {
-    "query": "\n            SELECT priority_op_serialid, eth_hash, eth_block, eth_block_index\n                FROM executed_priority_operations\n                WHERE tx_hash IS NULL\n            ",
-    "describe": {
-      "columns": [
-        {
-          "ordinal": 0,
-          "name": "priority_op_serialid",
-          "type_info": "Int8"
-        },
-        {
-          "ordinal": 1,
-          "name": "eth_hash",
-          "type_info": "Bytea"
-        },
-        {
-          "ordinal": 2,
-          "name": "eth_block",
-          "type_info": "Int8"
-        },
-        {
-          "ordinal": 3,
-          "name": "eth_block_index",
-          "type_info": "Int8"
-        }
-      ],
-      "parameters": {
-        "Left": []
-      },
-      "nullable": [
-        false,
-        false,
-        false,
-        true
-      ]
-    }
-  },
   "baaaff359564c5d1094fcf2650d53cf9dcac5d50fc3a549c6cff53dd472350f7": {
     "query": "\n            SELECT * FROM ticker_price\n            WHERE token_id = $1\n            LIMIT 1\n            ",
     "describe": {
@@ -4423,19 +4387,6 @@
         true,
         true
       ]
-    }
-  },
-  "de85461124585b0eeaca713d199af9917edc09319a2f4f2c61fb30e0d7b482c8": {
-    "query": "UPDATE executed_priority_operations SET tx_hash = $1 WHERE priority_op_serialid = $2",
-    "describe": {
-      "columns": [],
-      "parameters": {
-        "Left": [
-          "Bytea",
-          "Int8"
-        ]
-      },
-      "nullable": []
     }
   },
   "debbe23f0c730c331482c798387d1739911923edcafc2bd80463464ff98f3b71": {
