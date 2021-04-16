@@ -39,18 +39,20 @@ impl FromAccount for CircuitAccount<Engine> {
         let balances: Vec<_> = account
             .get_nonzero_balances()
             .iter()
-            .map(|(id, b)| {
+            .map(|(token_id, balance)| {
                 (
-                    *id,
+                    *token_id,
                     Balance {
-                        value: Fr::from_str(&b.0.to_string()).unwrap(),
+                        value: Fr::from_str(&balance.0.to_string()).unwrap(),
                     },
                 )
             })
             .collect();
 
-        for (i, b) in balances.into_iter() {
-            circuit_account.subtree.insert(u32::from(*i), b);
+        for (token_id, balance) in balances.into_iter() {
+            circuit_account
+                .subtree
+                .insert(u32::from(*token_id), balance);
         }
 
         circuit_account.nonce = Fr::from_str(&account.nonce.to_string()).unwrap();
