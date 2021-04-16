@@ -181,6 +181,7 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
     /// @notice Deposit ETH to Layer 2 - transfer ether from user into contract, validate it, register deposit
     /// @param _zkSyncAddress The receiver Layer 2 address
     function depositETH(address _zkSyncAddress) external payable {
+        require(_zkSyncAddress != SPECIAL_ACCOUNT_ADDRESS, "P");
         requireActive();
         registerDeposit(0, SafeCast.toUint128(msg.value), _zkSyncAddress);
     }
@@ -194,6 +195,7 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
         uint104 _amount,
         address _zkSyncAddress
     ) external nonReentrant {
+        require(_zkSyncAddress != SPECIAL_ACCOUNT_ADDRESS, "P");
         requireActive();
 
         // Get token id by its address
