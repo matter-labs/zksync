@@ -16,20 +16,18 @@ use num::BigUint;
 use franklin_crypto::bellman::pairing::ff::Field;
 use zksync_types::{account::Account, Address, Nonce, PubKeyHash, TokenId};
 
-/*
-
-Even though the original library already implements
-CircuitAccount with account subtree depth of 11,
-here it is still reimplemented in the same way as 32 to
-make sure that the implementation is correct
-
-*/
-
-pub trait Rehashable {
+pub trait FromAccount {
     fn from_account(account: Account, balance_tree: &CircuitBalanceTree) -> Self;
 }
 
-impl Rehashable for CircuitAccount<Engine> {
+impl FromAccount for CircuitAccount<Engine> {
+    /*
+        Even though the original library already implements
+        CircuitAccount with account subtree depth of 11,
+        here it is still reimplemented in the same way as 32 to
+        make sure that the implementation is correct
+    */
+
     fn from_account(account: Account, balance_tree: &CircuitBalanceTree) -> Self {
         let mut circuit_account = Self {
             nonce: Fr::zero(),
@@ -75,6 +73,9 @@ pub struct StorageAccount {
 pub struct StorageBalance {
     pub account_id: i64,
     pub coin_id: i32,
+    // The DB stores balances as large numbers, so
+    // the only way to keep precision is too use serde_json::Number
+    // with unlimited precision and then convert it to BigUint
     pub balance: serde_json::Number,
 }
 

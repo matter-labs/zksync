@@ -4,7 +4,7 @@ use zksync_crypto::{
     Fr,
 };
 
-use crate::account::Rehashable;
+use crate::account::FromAccount;
 use lazy_static::lazy_static;
 use zksync_types::Account;
 

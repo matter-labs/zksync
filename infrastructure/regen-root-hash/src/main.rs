@@ -1,5 +1,7 @@
 mod account;
 mod hasher;
+#[cfg(test)]
+mod tests;
 
 use zksync_circuit::witness::utils::fr_from_bytes;
 
@@ -18,15 +20,13 @@ fn main() {
     let current_hash = fr_from_bytes(current_hash_bytes);
 
     let hash_11 = get_state_root_hash(&accounts, &BALANCE_TREE_11);
+    print!("hash11: {} \n", hash_11.to_string());
 
     assert_eq!(
         hash_11, current_hash,
         "The recalculated hash is not equal to the current one."
     );
 
-    print!("hash11: {} \n", hash_11.to_string());
-
     let hash_32 = get_state_root_hash(&accounts, &BALANCE_TREE_32);
-
     print!("hash32: {} \n", hash_32.to_string());
 }
