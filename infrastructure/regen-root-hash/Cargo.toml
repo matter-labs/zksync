@@ -8,7 +8,6 @@ edition = "2018"
 
 [dependencies]
 lazy_static  = "1.2.0"
-metrics = "=0.13.0-alpha.8"
 anyhow = "1.0"
 franklin_crypto = { package = "franklin-crypto", version = "0.0.5", git = "https://github.com/matter-labs/franklin-crypto.git", branch="beta", features = ["multicore", "plonk"]}
 bigdecimal = { version = "0.2.0", features = ["serde"]}
@@ -18,8 +17,9 @@ hex = "0.4"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = { version = "1.0.0", features = ["arbitrary_precision"] }
 
+parity-crypto = {version = "0.6.2", features = ["publickey"] }
+
 zksync_crypto = { path = "../../core/lib/crypto", version = "1.0" }
 zksync_types = { path = "../../core/lib/types", version = "1.0" }
-zksync_storage = { path = "../../core/lib/storage", version = "1.0" }
 zksync_utils = { path = "../../core/lib/utils", version = "1.0" }
 zksync_circuit = { path = "../../core/lib/circuit", version = "1.0" }
