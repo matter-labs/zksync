@@ -484,13 +484,7 @@ mod tests {
             Json(Ok(()))
         }
 
-        async fn get_unconfirmed_op(web::Path(_eth_hash): web::Path<String>) -> Json<Option<()>> {
-            Json(None)
-        }
-
-        async fn get_unconfirmed_op_by_tx_hash(
-            web::Path(_tx_hash): web::Path<String>,
-        ) -> Json<Option<()>> {
+        async fn get_unconfirmed_op(_query: Json<PriorityOpLookupQuery>) -> Json<Option<()>> {
             Json(None)
         }
 
@@ -498,14 +492,7 @@ mod tests {
             App::new()
                 .route("new_tx", web::post().to(send_tx))
                 .route("new_txs_batch", web::post().to(send_txs_batch))
-                .route(
-                    "unconfirmed_op/{eth_hash}",
-                    web::get().to(get_unconfirmed_op),
-                )
-                .route(
-                    "unconfirmed_op_by_tx_hash/{tx_hash}",
-                    web::get().to(get_unconfirmed_op_by_tx_hash),
-                )
+                .route("unconfirmed_op", web::post().to(get_unconfirmed_op))
         });
 
         let url = server.url("").trim_end_matches('/').to_owned();
