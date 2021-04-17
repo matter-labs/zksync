@@ -52,30 +52,30 @@ describe(`ZkSync integration tests (token: ${token}, transport: ${transport})`, 
         await tester.testDeposit(alice, token, DEPOSIT_AMOUNT, true);
     });
 
-    // step('should execute a normal deposit', async () => {
-    //     if (token == 'ETH') {
-    //         await tester.testDeposit(alice, token, DEPOSIT_AMOUNT);
-    //     } else {
-    //         expect(await tester.syncWallet.isERC20DepositsApproved(token), 'Token should not be approved').to.be
-    //             .false;
-    //         const approveERC20 = await tester.syncWallet.approveERC20TokenDeposits(token, DEPOSIT_AMOUNT);
-    //         await approveERC20.wait();
-    //         expect(
-    //             await tester.syncWallet.isERC20DepositsApproved(token, DEPOSIT_AMOUNT),
-    //             'Token should be approved'
-    //         ).to.be.true;
-    //         await tester.testDeposit(alice, token, DEPOSIT_AMOUNT);
-    //         // It should not be approved because we have approved only DEPOSIT_AMOUNT, not the maximum possible amount of deposit
-    //         expect(
-    //             await tester.syncWallet.isERC20DepositsApproved(token, DEPOSIT_AMOUNT),
-    //             'Token should not be approved'
-    //         ).to.be.false;
-    //         const approveERC20_next = await tester.syncWallet.approveERC20TokenDeposits(token);
-    //         await approveERC20_next.wait();
-    //         expect(await tester.syncWallet.isERC20DepositsApproved(token), 'The second deposit should be approved')
-    //             .to.be.true;
-    //     }
-    // });
+    step('should execute a normal deposit', async () => {
+        if (token == 'ETH') {
+            await tester.testDeposit(alice, token, DEPOSIT_AMOUNT);
+        } else {
+            expect(await tester.syncWallet.isERC20DepositsApproved(token), 'Token should not be approved').to.be
+                .false;
+            const approveERC20 = await tester.syncWallet.approveERC20TokenDeposits(token, DEPOSIT_AMOUNT);
+            await approveERC20.wait();
+            expect(
+                await tester.syncWallet.isERC20DepositsApproved(token, DEPOSIT_AMOUNT),
+                'Token should be approved'
+            ).to.be.true;
+            await tester.testDeposit(alice, token, DEPOSIT_AMOUNT);
+            // It should not be approved because we have approved only DEPOSIT_AMOUNT, not the maximum possible amount of deposit
+            expect(
+                await tester.syncWallet.isERC20DepositsApproved(token, DEPOSIT_AMOUNT),
+                'Token should not be approved'
+            ).to.be.false;
+            const approveERC20_next = await tester.syncWallet.approveERC20TokenDeposits(token);
+            await approveERC20_next.wait();
+            expect(await tester.syncWallet.isERC20DepositsApproved(token), 'The second deposit should be approved')
+                .to.be.true;
+        }
+    });
 
     step('should change pubkey onchain', async () => {
         await tester.testChangePubKey(alice, token, true);

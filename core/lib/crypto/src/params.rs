@@ -249,7 +249,7 @@ pub const RECURSIVE_CIRCUIT_NUM_INPUTS: usize = 1;
 pub const RECURSIVE_CIRCUIT_VK_TREE_DEPTH: usize = 3;
 
 /// Major version of the ZkSync
-pub const ZKSYNC_VERSION: &str = "contracts-5";
+pub const ZKSYNC_VERSION: &str = "contracts-6";
 
 lazy_static! {
     pub static ref JUBJUB_PARAMS: AltJubjubBn256 = AltJubjubBn256::new();
