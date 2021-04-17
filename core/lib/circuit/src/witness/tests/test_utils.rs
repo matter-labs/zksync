@@ -95,13 +95,13 @@ pub struct WitnessTestAccount {
 }
 
 impl WitnessTestAccount {
-    pub fn new(id: AccountId, balance: u64) -> Self {
+    pub fn new_with_token(id: AccountId, token: TokenId, balance: u64) -> Self {
         let zksync_account = ZkSyncAccount::rand();
         zksync_account.set_account_id(Some(id));
 
         let account = {
             let mut account = Account::default_with_address(&zksync_account.address);
-            account.add_balance(TokenId(0), &BigUint::from(balance));
+            account.add_balance(token, &BigUint::from(balance));
             account.pub_key_hash = zksync_account.pubkey_hash;
             account
         };
@@ -111,6 +111,10 @@ impl WitnessTestAccount {
             id,
             account,
         }
+    }
+
+    pub fn new(id: AccountId, balance: u64) -> Self {
+        Self::new_with_token(id, TokenId(0), balance)
     }
 
     pub fn set_empty_pubkey_hash(&mut self) {

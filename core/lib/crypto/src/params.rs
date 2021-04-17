@@ -57,7 +57,7 @@ pub const MIN_NFT_TOKEN_ID: u32 = 65536;
 
 /// Depth of the left subtree of the account tree that can be used in the current version of the circuit.
 pub fn used_account_subtree_depth() -> usize {
-    let num = 24; // total accounts = 2.pow(num) ~ 16mil
+    let num = 32; // total accounts = 2.pow(num) ~ 16mil
 
     assert!(num <= account_tree_depth());
 

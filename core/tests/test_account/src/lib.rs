@@ -11,7 +11,7 @@ use zksync_types::{
         ChangePubKey, ChangePubKeyCREATE2Data, ChangePubKeyECDSAData, ChangePubKeyEthAuthData,
         ChangePubKeyType, PackedEthSignature, TimeRange, TxSignature,
     },
-    AccountId, Address, Close, ForcedExit, Nonce, PubKeyHash, TokenId, Transfer, Withdraw,
+    AccountId, Address, Close, ForcedExit, MintNFT, Nonce, PubKeyHash, TokenId, Transfer, Withdraw,
 };
 
 #[derive(Debug, Clone)]
@@ -138,6 +138,50 @@ impl ZkSyncAccount {
 
     pub fn get_account_id(&self) -> Option<AccountId> {
         *self.account_id.lock().unwrap()
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    pub fn sign_mint_nft(
+        &self,
+        fee_token: TokenId,
+        token_symbol: &str,
+        content_hash: H256,
+        fee: BigUint,
+        recipient: &Address,
+        nonce: Option<Nonce>,
+        increment_nonce: bool,
+    ) -> (MintNFT, Option<PackedEthSignature>) {
+        let mut stored_nonce = self.nonce.lock().unwrap();
+        let mint_nft = MintNFT::new_signed(
+            self.account_id
+                .lock()
+                .unwrap()
+                .expect("can't sign tx without account id"),
+            self.address,
+            content_hash,
+            *recipient,
+            fee,
+            fee_token,
+            nonce.unwrap_or_else(|| *stored_nonce),
+            &self.private_key,
+        )
+        .expect("Failed to sign transfer");
+
+        if increment_nonce {
+            **stored_nonce += 1;
+        }
+
+        let eth_signature =
+            if let ZkSyncETHAccountData::EOA { eth_private_key } = &self.eth_account_data {
+                let message = mint_nft.get_ethereum_sign_message(token_symbol, 18);
+                Some(
+                    PackedEthSignature::sign(&eth_private_key, &message.as_bytes())
+                        .expect("Signing the transfer unexpectedly failed"),
+                )
+            } else {
+                None
+            };
+        (mint_nft, eth_signature)
     }
 
     #[allow(clippy::too_many_arguments)]
