@@ -17,7 +17,7 @@ The tool takes the following parameters:
 Example of using the tool:
 
 ```sh
-> cargo run -- 2bd61f42837c0fa77fc113b3b341c520edb1ffadefc48c2b907901aaaf42b906 ./sample/accounts ./sample/balances d03f45dc6e06aa9a0fc53189a2a89561c42dc4ffffc13881d64401cd0beb604a
+> cargo run -- -a ./sample/accounts -b ./sample/balances -h 2bd61f42837c0fa77fc113b3b341c520edb1ffadefc48c2b907901aaaf42b906 -p d03f45dc6e06aa9a0fc53189a2a89561c42dc4ffffc13881d64401cd0beb604a
 
 OldHash: 2bd61f42837c0fa77fc113b3b341c520edb1ffadefc48c2b907901aaaf42b906
 NewHash: 22aca7af1d99f525d1a60f31fd95f7626831a3a20561bf30c699da64149ac6b6

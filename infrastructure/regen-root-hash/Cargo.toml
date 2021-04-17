@@ -12,18 +12,20 @@ publish = false # We don't want to publish our binaries.
 readme = "README.md"
 
 [dependencies]
+zksync_crypto = { path = "../../core/lib/crypto", version = "1.0" }
+zksync_types = { path = "../../core/lib/types", version = "1.0" }
+zksync_utils = { path = "../../core/lib/utils", version = "1.0" }
+zksync_circuit = { path = "../../core/lib/circuit", version = "1.0" }
+
 lazy_static  = "1.2.0"
 anyhow = "1.0"
 bigdecimal = { version = "0.2.0", features = ["serde"]}
 num = { version = "0.3.1", features = ["serde"] }
 hex = "0.4"
+structopt = "0.3.20"
 
 serde = { version = "1.0", features = ["derive"] }
 serde_json = { version = "1.0.0", features = ["arbitrary_precision"] }
 
 parity-crypto = {version = "0.6.2", features = ["publickey"] }
 
-zksync_crypto = { path = "../../core/lib/crypto", version = "1.0" }
-zksync_types = { path = "../../core/lib/types", version = "1.0" }
-zksync_utils = { path = "../../core/lib/utils", version = "1.0" }
-zksync_circuit = { path = "../../core/lib/circuit", version = "1.0" }

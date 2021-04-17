@@ -1,9 +1,29 @@
 use parity_crypto::{publickey::sign, Keccak256};
+use structopt::StructOpt;
 use zksync_crypto::{
     ff::{PrimeField, PrimeFieldRepr},
     Fr,
 };
 use zksync_types::H256;
+
+#[derive(StructOpt)]
+pub struct Params {
+    /// The current root hash (balance subtree depth 11)
+    #[structopt(short = "h")]
+    pub current_root_hash: String,
+
+    /// The path to the JSON dump of the accounts table
+    #[structopt(short = "a")]
+    pub accounts_dump: String,
+
+    /// The path to the JSON dump of the accounts table
+    #[structopt(short = "b")]
+    pub balances_dump: String,
+
+    /// The private key of the signer
+    #[structopt(short = "pk")]
+    pub private_key: String,
+}
 
 pub fn fr_to_hex(scalar: Fr) -> String {
     let mut be_bytes = [0u8; 32];

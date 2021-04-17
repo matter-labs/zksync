@@ -13,10 +13,7 @@ lazy_static! {
     pub static ref BALANCE_TREE_11: CircuitBalanceTree = SparseMerkleTree::new(11);
 }
 
-pub fn get_state_root_hash(
-    accounts: &Vec<(i64, Account)>,
-    balance_tree: &CircuitBalanceTree,
-) -> Fr {
+pub fn get_state_root_hash(accounts: &[(i64, Account)], balance_tree: &CircuitBalanceTree) -> Fr {
     let mut account_state_tree: CircuitAccountTree = SparseMerkleTree::new(32);
 
     for (id, account) in accounts {
