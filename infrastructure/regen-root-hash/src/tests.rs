@@ -16,7 +16,6 @@ fn test_sample_tree_hashing() {
     let expected_hash = fr_from_bytes(expected_hash_bytes);
 
     let hash_11 = get_state_root_hash(&accounts, &BALANCE_TREE_11);
-    print!("hash11: {} \n", hash_11.to_string());
 
     assert_eq!(
         hash_11, expected_hash,

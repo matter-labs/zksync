@@ -3,6 +3,7 @@ use zksync_crypto::{
         account::{Balance, CircuitAccount, CircuitBalanceTree},
         utils::eth_address_to_fr,
     },
+    franklin_crypto::bellman::pairing::ff::Field,
     pairing::ff::PrimeField,
     Engine, Fr,
 };
@@ -13,7 +14,6 @@ use std::fs;
 
 use num::BigUint;
 
-use franklin_crypto::bellman::pairing::ff::Field;
 use zksync_types::{account::Account, Address, Nonce, PubKeyHash, TokenId};
 
 pub trait FromAccount {

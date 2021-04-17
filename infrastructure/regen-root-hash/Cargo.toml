@@ -1,15 +1,19 @@
 [package]
 name = "regen-root-hash"
-version = "0.1.0"
-authors = ["The Matter Labs Team <hello@matterlabs.dev>"]
+version = "1.0.0"
 edition = "2018"
-
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+authors = ["The Matter Labs Team <hello@matterlabs.dev>"]
+homepage = "https://zksync.io/"
+repository = "https://github.com/matter-labs/zksync"
+license = "Apache-2.0"
+keywords = ["blockchain", "zksync"]
+categories = ["cryptography"]
+publish = false # We don't want to publish our binaries.
+readme = "README.md"
 
 [dependencies]
 lazy_static  = "1.2.0"
 anyhow = "1.0"
-franklin_crypto = { package = "franklin-crypto", version = "0.0.5", git = "https://github.com/matter-labs/franklin-crypto.git", branch="beta", features = ["multicore", "plonk"]}
 bigdecimal = { version = "0.2.0", features = ["serde"]}
 num = { version = "0.3.1", features = ["serde"] }
 hex = "0.4"
