@@ -7,6 +7,7 @@ use zksync_prover_utils::fs_utils::{
 };
 
 pub fn make_recursive_verification_keys(config: ChainConfig) {
+    println!("make recursive");
     for (proofs, setup_power) in config
         .circuit
         .supported_aggregated_proof_sizes_with_setup_pow()
