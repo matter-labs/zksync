@@ -812,6 +812,10 @@ pub fn build_block_witness<'a>(
                 let mintNFT_operations = mintNFT_witness.calculate_operations(input);
 
                 operations.extend(mintNFT_operations);
+                fees.push(CollectedFee {
+                    token: mintNFT.tx.fee_token,
+                    amount: mintNFT.tx.fee,
+                });
                 pub_data.extend(mintNFT_witness.get_pubdata());
                 offset_commitment.extend(mintNFT_witness.get_offset_commitment_data())
             }
