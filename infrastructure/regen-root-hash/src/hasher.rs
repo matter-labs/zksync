@@ -5,13 +5,11 @@ use zksync_crypto::{
 };
 
 use crate::account::FromAccount;
-use lazy_static::lazy_static;
+use once_cell::sync::Lazy;
 use zksync_types::Account;
 
-lazy_static! {
-    pub static ref BALANCE_TREE_32: CircuitBalanceTree = SparseMerkleTree::new(32);
-    pub static ref BALANCE_TREE_11: CircuitBalanceTree = SparseMerkleTree::new(11);
-}
+pub static BALANCE_TREE_32: Lazy<CircuitBalanceTree> = Lazy::new(|| SparseMerkleTree::new(32));
+pub static BALANCE_TREE_11: Lazy<CircuitBalanceTree> = Lazy::new(|| SparseMerkleTree::new(11));
 
 pub fn get_state_root_hash(accounts: &[(i64, Account)], balance_tree: &CircuitBalanceTree) -> Fr {
     let mut account_state_tree: CircuitAccountTree = SparseMerkleTree::new(32);

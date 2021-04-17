@@ -17,7 +17,7 @@ zksync_types = { path = "../../core/lib/types", version = "1.0" }
 zksync_utils = { path = "../../core/lib/utils", version = "1.0" }
 zksync_circuit = { path = "../../core/lib/circuit", version = "1.0" }
 
-lazy_static  = "1.2.0"
+once_cell = "1.4"
 anyhow = "1.0"
 bigdecimal = { version = "0.2.0", features = ["serde"]}
 num = { version = "0.3.1", features = ["serde"] }
