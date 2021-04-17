@@ -233,7 +233,7 @@ impl MintNFTWitness<Bn256> {
         let fee_encoded: Fr = le_bit_vector_into_field_element(&fee_bits);
 
         let before_first_chunk_root = tree.root_hash();
-        vlog::debug!("Initial root = {}", before_first_chunk_root);
+        println!("Initial root = {}", before_first_chunk_root);
 
         // applying first chunk: change the balance of the creator
         let (audit_creator_account_before_first_chunk, audit_creator_balance_before_first_chunk) =
@@ -260,7 +260,7 @@ impl MintNFTWitness<Bn256> {
             get_audits(tree, mint_NFT.creator_account_id, mint_NFT.fee_token);
 
         let before_second_chunk_root = tree.root_hash();
-        vlog::debug!("Before second chunk root = {}", before_second_chunk_root);
+        println!("Before second chunk root = {}", before_second_chunk_root);
 
         // applying second chunk: change the counter of the creator == serial_id
         let (audit_creator_account_before_second_chunk, audit_creator_balance_before_second_chunk) =
@@ -288,7 +288,7 @@ impl MintNFTWitness<Bn256> {
         let serial_id_u32: u32 = fr_into_u32_low(serial_id);
 
         let before_third_chunk_root = tree.root_hash();
-        vlog::debug!("Before third chunk root = {}", before_third_chunk_root);
+        println!("Before third chunk root = {}", before_third_chunk_root);
 
         // applying third chunk: change the counter of the special account == new_token_id
         let (audit_special_account_before_third_chunk, audit_special_balance_before_third_chunk) =
@@ -314,9 +314,10 @@ impl MintNFTWitness<Bn256> {
 
         let new_token_id = nft_counter_before_third_chunk;
         let new_token_id_u32: u32 = fr_into_u32_low(new_token_id);
+        println!("New token id {}", new_token_id);
 
         let before_fourth_chunk_root = tree.root_hash();
-        vlog::debug!("Before fourth chunk root = {}", before_fourth_chunk_root);
+        println!("Before fourth chunk root = {}", before_fourth_chunk_root);
 
         // applying fourth chunk: store the content in the special account
         let (audit_special_account_before_fourth_chunk, audit_special_balance_before_fourth_chunk) =
@@ -355,6 +356,7 @@ impl MintNFTWitness<Bn256> {
             serial_id_u32,
             mint_NFT.content_hash,
         );
+        println!("Content to store {}", content_to_store);
 
         let (
             special_account_witness_before_fourth_chunk,
@@ -376,7 +378,7 @@ impl MintNFTWitness<Bn256> {
             get_audits(tree, NFT_STORAGE_ACCOUNT_ID.0, new_token_id_u32);
 
         let before_fifth_chunk_root = tree.root_hash();
-        vlog::debug!("Before fifth chunk root = {}", before_fifth_chunk_root);
+        println!("Before fifth chunk root = {}", before_fifth_chunk_root);
 
         // applying fifth chunk: increment balance of the new token in the recipient account
         let (
@@ -386,7 +388,7 @@ impl MintNFTWitness<Bn256> {
 
         let (
             recipient_account_witness_before_fifth_chunk,
-            _recipient_account_witness_after_fifth_chunk,
+            recipient_account_witness_after_fifth_chunk,
             recipient_account_balance_before_fifth_chunk,
             _recipient_account_balance_after_fifth_chunk,
         ) = apply_leaf_operation(
@@ -399,6 +401,16 @@ impl MintNFTWitness<Bn256> {
             },
         );
         assert_eq!(recipient_account_balance_before_fifth_chunk, Fr::zero());
+        println!(
+
+            "Witnesss inserted token id {} to recipient {}, before balance {} after balance {}, old{:?} nonce: {:?}",
+            new_token_id_u32,
+            mint_NFT.recipient_account_id,
+            recipient_account_balance_before_fifth_chunk,
+            _recipient_account_balance_after_fifth_chunk,
+            recipient_account_witness_before_fifth_chunk.nonce,
+            recipient_account_witness_after_fifth_chunk.nonce
+        );
 
         let (
             _audit_recipient_account_after_fifth_chunk,
@@ -406,7 +418,7 @@ impl MintNFTWitness<Bn256> {
         ) = get_audits(tree, mint_NFT.recipient_account_id, new_token_id_u32);
 
         let after_root = tree.root_hash();
-        vlog::debug!("After root = {}", after_root);
+        println!("After root = {}", after_root);
 
         let a = fee_balance_before_first_chunk;
         let b = fee_as_field_element;
@@ -429,6 +441,7 @@ impl MintNFTWitness<Bn256> {
             .map(|bit| Some(Fr::from_str(&bit.to_string()).unwrap()))
             .collect();
 
+        println!("after witness {:?}", tree.root_hash());
         MintNFTWitness {
             before_second_chunk_root: Some(before_second_chunk_root),
             before_third_chunk_root: Some(before_third_chunk_root),

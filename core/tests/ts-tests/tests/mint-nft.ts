@@ -21,7 +21,7 @@ Tester.prototype.testMintNFT = async function (
     let { totalFee: fee } = await this.syncProvider.getTransactionFee(type, wallet.address(), feeToken);
 
     const handle = await wallet.mintNFT({
-        recipient: wallet.address(),
+        recipient: receiver.address(),
         contentHash,
         feeToken,
         fee
