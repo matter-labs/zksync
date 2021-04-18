@@ -50,14 +50,14 @@ pub fn number_of_processable_tokens() -> usize {
 pub const NFT_TOKEN_ID: TokenId = TokenId(u32::MAX - 1);
 
 /// Special account which enforce unique token id for NFT.
-pub const NFT_STORAGE_ACCOUNT_ID: AccountId = AccountId(u32::MAX - 1);
+pub const NFT_STORAGE_ACCOUNT_ID: AccountId = AccountId(16777216 - 1);
 
 /// First token id for NFT, all fungible token id must be less, all NFT must be above.
 pub const MIN_NFT_TOKEN_ID: u32 = 65536;
 
 /// Depth of the left subtree of the account tree that can be used in the current version of the circuit.
 pub fn used_account_subtree_depth() -> usize {
-    let num = 32; // total accounts = 2.pow(num) ~ 16mil
+    let num = 24; // total accounts = 2.pow(num) ~ 16mil
 
     assert!(num <= account_tree_depth());
 
