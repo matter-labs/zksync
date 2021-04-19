@@ -195,7 +195,7 @@ impl GasCounter {
                 .iter()
                 .map(CommitCost::op_cost)
                 .fold(U256::zero(), |mut sum, val| {
-                    sum = sum + val;
+                    sum += val;
                     sum
                 });
         if Self::scale_up(new_commit_cost) > U256::from(TX_GAS_LIMIT) {
@@ -207,7 +207,7 @@ impl GasCounter {
                 .iter()
                 .map(VerifyCost::op_cost)
                 .fold(U256::zero(), |mut sum, val| {
-                    sum = sum + val;
+                    sum += val;
                     sum
                 });
         if Self::scale_up(new_verify_cost) > U256::from(TX_GAS_LIMIT) {
@@ -222,7 +222,7 @@ impl GasCounter {
             ops.iter()
                 .map(CommitCost::op_cost)
                 .fold(U256::zero(), |mut sum, val| {
-                    sum = sum + val;
+                    sum += val;
                     sum
                 });
         if Self::scale_up(commit_cost) > U256::from(TX_GAS_LIMIT) {
@@ -233,7 +233,7 @@ impl GasCounter {
             ops.iter()
                 .map(VerifyCost::op_cost)
                 .fold(U256::zero(), |mut sum, val| {
-                    sum = sum + val;
+                    sum += val;
                     sum
                 });
         if Self::scale_up(verify_cost) > U256::from(TX_GAS_LIMIT) {
