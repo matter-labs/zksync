@@ -1246,14 +1246,14 @@ mod execute_proposed_block {
         let op = tester
             .state_keeper
             .state
-            .zksync_tx_to_zksync_op(withdraw.tx.clone())
+            .zksync_tx_to_zksync_op(withdraw.tx)
             .unwrap();
         let mut count = 0;
         let mut gas_counter = GasCounter::new();
         while gas_counter.add_op(&op).is_ok() {
             count += 1;
         }
-        return count;
+        count
     }
 
     /// Checks that block seals after reaching gas limit.
