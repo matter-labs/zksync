@@ -186,16 +186,18 @@ pub fn generic_test_scenario<W, F>(
 /// Does the same operations as the `generic_test_scenario`, but assumes
 /// that input for `calculate_operations` is corrupted and will lead to an error.
 /// The error is caught and checked to match the provided message.
-pub fn corrupted_input_test_scenario<W, F>(
+pub fn corrupted_input_test_scenario<W, F, B>(
     accounts: &[WitnessTestAccount],
     op: W::OperationType,
     input: W::CalculateOpsInput,
     expected_msg: &str,
     apply_op_on_plasma: F,
+    corrupt_witness_builder: B,
 ) where
     W: Witness,
     W::CalculateOpsInput: Clone + std::fmt::Debug,
     F: FnOnce(&mut ZkSyncState, &W::OperationType) -> Vec<CollectedFee>,
+    B: FnOnce(&mut WitnessBuilder),
 {
     // Initialize Plasma and WitnessBuilder.
     let (mut plasma_state, mut circuit_account_tree) = ZkSyncStateGenerator::generate(&accounts);
@@ -225,6 +227,8 @@ pub fn corrupted_input_test_scenario<W, F>(
     witness_accum.collect_fees(&fees);
     witness_accum.calculate_pubdata_commitment();
 
+    corrupt_witness_builder(&mut witness_accum);
+
     let result = check_circuit_non_panicking(witness_accum.into_circuit_instance());
 
     match result {
@@ -250,16 +254,18 @@ pub fn corrupted_input_test_scenario<W, F>(
 /// Performs the operation on the circuit, but not on the plasma,
 /// since the operation is meant to be incorrect and should result in an error.
 /// The error is caught and checked to match the provided message.
-pub fn incorrect_op_test_scenario<W, F>(
+pub fn incorrect_op_test_scenario<W, F, B>(
     accounts: &[WitnessTestAccount],
     op: W::OperationType,
     input: W::CalculateOpsInput,
     expected_msg: &str,
     collect_fees: F,
+    corrupt_witness_builder: B,
 ) where
     W: Witness,
     W::CalculateOpsInput: Clone + std::fmt::Debug,
     F: FnOnce() -> Vec<CollectedFee>,
+    B: FnOnce(&mut WitnessBuilder),
 {
     // Initialize WitnessBuilder.
     let (_, mut circuit_account_tree) = ZkSyncStateGenerator::generate(&accounts);
@@ -287,6 +293,8 @@ pub fn incorrect_op_test_scenario<W, F>(
     );
     witness_accum.collect_fees(&fees);
     witness_accum.calculate_pubdata_commitment();
+
+    corrupt_witness_builder(&mut witness_accum);
 
     let result = check_circuit_non_panicking(witness_accum.into_circuit_instance());
 

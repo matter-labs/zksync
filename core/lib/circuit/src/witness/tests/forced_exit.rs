@@ -108,7 +108,7 @@ fn corrupted_ops_input() {
     let test_vector = input.corrupted_variations();
 
     for input in test_vector {
-        corrupted_input_test_scenario::<ForcedExitWitness<Bn256>, _>(
+        corrupted_input_test_scenario::<ForcedExitWitness<Bn256>, _, _>(
             &accounts,
             forced_exit_op.clone(),
             input,
@@ -120,6 +120,7 @@ fn corrupted_ops_input() {
                     .unwrap();
                 vec![fee]
             },
+            |_| {},
         );
     }
 }
@@ -158,7 +159,7 @@ fn test_incorrect_target() {
     let input =
         SigDataInput::from_forced_exit_op(&forced_exit_op).expect("SigDataInput creation failed");
 
-    incorrect_op_test_scenario::<ForcedExitWitness<Bn256>, _>(
+    incorrect_op_test_scenario::<ForcedExitWitness<Bn256>, _, _>(
         &accounts,
         forced_exit_op,
         input,
@@ -169,6 +170,7 @@ fn test_incorrect_target() {
                 amount: FEE_AMOUNT.into(),
             }]
         },
+        |_| {},
     );
 }
 
@@ -207,7 +209,7 @@ fn test_target_has_key_set() {
     let input =
         SigDataInput::from_forced_exit_op(&forced_exit_op).expect("SigDataInput creation failed");
 
-    incorrect_op_test_scenario::<ForcedExitWitness<Bn256>, _>(
+    incorrect_op_test_scenario::<ForcedExitWitness<Bn256>, _, _>(
         &accounts,
         forced_exit_op,
         input,
@@ -218,6 +220,7 @@ fn test_target_has_key_set() {
                 amount: FEE_AMOUNT.into(),
             }]
         },
+        |_| {},
     );
 }
 
@@ -259,7 +262,7 @@ fn test_not_enough_fees() {
     let input =
         SigDataInput::from_forced_exit_op(&forced_exit_op).expect("SigDataInput creation failed");
 
-    incorrect_op_test_scenario::<ForcedExitWitness<Bn256>, _>(
+    incorrect_op_test_scenario::<ForcedExitWitness<Bn256>, _, _>(
         &accounts,
         forced_exit_op,
         input,
@@ -270,6 +273,7 @@ fn test_not_enough_fees() {
                 amount: FEE_AMOUNT.into(),
             }]
         },
+        |_| {},
     );
 }
 
@@ -310,7 +314,7 @@ fn test_not_enough_balance() {
     let input =
         SigDataInput::from_forced_exit_op(&forced_exit_op).expect("SigDataInput creation failed");
 
-    incorrect_op_test_scenario::<ForcedExitWitness<Bn256>, _>(
+    incorrect_op_test_scenario::<ForcedExitWitness<Bn256>, _, _>(
         &accounts,
         forced_exit_op,
         input,
@@ -321,6 +325,7 @@ fn test_not_enough_balance() {
                 amount: FEE_AMOUNT.into(),
             }]
         },
+        |_| {},
     );
 }
 
@@ -362,7 +367,7 @@ fn test_not_exact_withdrawal_amount() {
     let input =
         SigDataInput::from_forced_exit_op(&forced_exit_op).expect("SigDataInput creation failed");
 
-    incorrect_op_test_scenario::<ForcedExitWitness<Bn256>, _>(
+    incorrect_op_test_scenario::<ForcedExitWitness<Bn256>, _, _>(
         &accounts,
         forced_exit_op,
         input,
@@ -373,5 +378,6 @@ fn test_not_exact_withdrawal_amount() {
                 amount: FEE_AMOUNT.into(),
             }]
         },
+        |_| {},
     );
 }
