@@ -90,7 +90,7 @@ fn zksync_circuit(block_chunks: usize) -> impl Circuit<Engine> + Clone {
             amount_packed: None,
             second_amount_packed: None,
             special_amounts: vec![None; 6],
-            special_nonces: vec![None; 2],
+            special_nonces: vec![None; 3],
             special_tokens: vec![None; 3],
             special_accounts: vec![None; 5],
             full_amount: None,

@@ -2209,7 +2209,11 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
             let double_nonce_inc_1 =
                 nonce_inc_1.add(cs.namespace(|| "double nonce_inc_1"), &nonce_inc_1)?;
             let nonce_mask = nonce_inc_0.add(cs.namespace(|| "nonce mask"), &double_nonce_inc_1)?;
-            CircuitElement::from_number(cs.namespace(|| "nonce mask construction"), nonce_mask)?
+            CircuitElement::from_fe_with_known_length(
+                cs.namespace(|| "nonce mask construction"),
+                || nonce_mask.get_value().grab(),
+                8,
+            )?
         };
 
         pubdata_bits.extend(nonce_mask.get_bits_be());
@@ -2266,8 +2270,6 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
         serialized_tx_bits.extend(op_data.fee.get_bits_be());
         serialized_tx_bits.extend(op_data.amount_packed.get_bits_be());
         serialized_tx_bits.extend(op_data.second_amount_packed.get_bits_be());
-
-        assert_eq!(serialized_tx_bits.len(), SIGNED_TRANSFER_BIT_WIDTH);
 
         let pubdata_chunk = select_pubdata_chunk(
             cs.namespace(|| "select_pubdata_chunk"),
@@ -3545,6 +3547,7 @@ fn generate_maxchunk_polynomial<E: JubjubEngine>() -> Vec<E::Fr> {
         get_xy(FullExitOp::OP_CODE, FullExitOp::CHUNKS),
         get_xy(ChangePubKeyOp::OP_CODE, ChangePubKeyOp::CHUNKS),
         get_xy(ForcedExitOp::OP_CODE, ForcedExitOp::CHUNKS),
+        get_xy(SwapOp::OP_CODE, SwapOp::CHUNKS),
     ];
     let interpolation = interpolate::<E>(&points[..]).expect("must interpolate");
     assert_eq!(interpolation.len(), DIFFERENT_TRANSACTIONS_TYPE_NUMBER);

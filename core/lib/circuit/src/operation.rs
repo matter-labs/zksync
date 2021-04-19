@@ -70,7 +70,7 @@ impl<E: RescueEngine> Default for OperationArguments<E> {
             amount_packed: Some(E::Fr::zero()),
             second_amount_packed: Some(E::Fr::zero()),
             special_amounts: vec![Some(E::Fr::zero()); 6],
-            special_nonces: vec![Some(E::Fr::zero()); 2],
+            special_nonces: vec![Some(E::Fr::zero()); 3],
             special_tokens: vec![Some(E::Fr::zero()); 3],
             special_accounts: vec![Some(E::Fr::zero()); 5],
             full_amount: Some(E::Fr::zero()),
