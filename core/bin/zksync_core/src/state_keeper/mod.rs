@@ -794,26 +794,23 @@ impl ZkSyncStateKeeper {
             return Err(());
         }
 
-        let mut ops = Vec::new();
-        for tx in txs {
-            let non_executed_op = self.state.zksync_tx_to_zksync_op(tx.tx.clone());
-            if let Ok(non_executed_op) = non_executed_op {
-                ops.push(non_executed_op);
-            }
-        }
+        let ops: Vec<_> = txs
+            .iter()
+            .filter_map(|tx| self.state.zksync_tx_to_zksync_op(tx.tx.clone()).ok())
+            .collect();
 
         let mut executed_operations = Vec::new();
 
         // If batch doesn't fit into an empty block than we should mark it as failed.
         if !GasCounter::batch_fits_into_empty_block(&ops) {
-            let e = "Amount of gas required to process batch is too big".to_string();
-            vlog::warn!("Failed to execute batch: {}", e);
+            let fail_reason = "Amount of gas required to process batch is too big".to_string();
+            vlog::warn!("Failed to execute batch: {}", fail_reason);
             for tx in txs {
                 let failed_tx = ExecutedTx {
                     signed_tx: tx.clone(),
                     success: false,
                     op: None,
-                    fail_reason: Some(e.clone()),
+                    fail_reason: Some(fail_reason.clone()),
                     block_index: None,
                     created_at: chrono::Utc::now(),
                     batch_id: Some(batch_id),
