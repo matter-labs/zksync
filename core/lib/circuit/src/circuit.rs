@@ -62,6 +62,9 @@ pub struct ZkSyncCircuit<'a, E: RescueEngine + JubjubEngine> {
     pub validator_balances: Vec<Option<E::Fr>>,
     pub validator_audit_path: Vec<Option<E::Fr>>,
     pub validator_account: AccountWitness<E>,
+
+    pub validator_non_processable_tokens_audit_before_fees: Vec<Option<E::Fr>>,
+    pub validator_non_processable_tokens_audit_after_fees: Vec<Option<E::Fr>>,
 }
 
 pub struct CircuitGlobalVariables<E: RescueEngine + JubjubEngine> {
@@ -86,6 +89,13 @@ impl<'a, E: RescueEngine + JubjubEngine> std::clone::Clone for ZkSyncCircuit<'a,
             validator_balances: self.validator_balances.clone(),
             validator_audit_path: self.validator_audit_path.clone(),
             validator_account: self.validator_account.clone(),
+
+            validator_non_processable_tokens_audit_before_fees: self
+                .validator_non_processable_tokens_audit_before_fees
+                .clone(),
+            validator_non_processable_tokens_audit_after_fees: self
+                .validator_non_processable_tokens_audit_after_fees
+                .clone(),
         }
     }
 }
@@ -360,11 +370,15 @@ impl<'a, E: RescueEngine + JubjubEngine> Circuit<E> for ZkSyncCircuit<'a, E> {
             &self.validator_account,
         )?;
 
-        // calculate operator's balance_tree root hash from sub tree representation
-        let old_operator_balance_root = calculate_balances_root_from_left_tree_values(
-            cs.namespace(|| "calculate_root_from_full_representation_fees before"),
+        // calculate operator's balance_tree root hash from processable tokens balances full representation
+        let validator_non_processable_tokens_audit_before_fees = allocate_numbers_vec(
+            cs.namespace(|| "validator_non_processable_tokens_audit_before_fees"),
+            &self.validator_non_processable_tokens_audit_before_fees,
+        )?;
+        let old_operator_balance_root = calculate_validator_root_from_processable_values(
+            cs.namespace(|| "calculate_validator_root_from_processable_values before fees"),
             &validator_balances_processable_tokens,
-            params::balance_tree_depth(),
+            &validator_non_processable_tokens_audit_before_fees,
             self.rescue_params,
         )?;
 
@@ -412,11 +426,15 @@ impl<'a, E: RescueEngine + JubjubEngine> Circuit<E> for ZkSyncCircuit<'a, E> {
             )?;
         }
 
-        // calculate operator's balance_tree root hash from whole tree representation
-        let new_operator_balance_root = calculate_balances_root_from_left_tree_values(
-            cs.namespace(|| "calculate_root_from_full_representation_fees after"),
+        // calculate operator's balance_tree root hash from processable tokens balances full representation
+        let validator_non_processable_tokens_audit_after_fees = allocate_numbers_vec(
+            cs.namespace(|| "validator_non_processable_tokens_audit_after_fees"),
+            &self.validator_non_processable_tokens_audit_after_fees,
+        )?;
+        let new_operator_balance_root = calculate_validator_root_from_processable_values(
+            cs.namespace(|| "calculate_validator_root_from_processable_values after fees"),
             &validator_balances_processable_tokens,
-            params::balance_tree_depth(),
+            &validator_non_processable_tokens_audit_after_fees,
             self.rescue_params,
         )?;
 
@@ -3241,6 +3259,7 @@ fn multi_or<E: JubjubEngine, CS: ConstraintSystem<E>>(
     Ok(result)
 }
 
+#[allow(dead_code)]
 fn calculate_balances_root_from_left_tree_values<E: RescueEngine, CS: ConstraintSystem<E>>(
     mut cs: CS,
     processable_fees: &[AllocatedNum<E>],
@@ -3327,6 +3346,93 @@ fn calculate_balances_root_from_left_tree_values<E: RescueEngine, CS: Constraint
         let mut sponge_output = rescue::rescue_hash(
             cs.namespace(|| "perform smt hashing"),
             &[node_hash, pair],
+            params,
+        )?;
+        assert_eq!(sponge_output.len(), 1, "must get a single element");
+        node_hash = sponge_output.pop().unwrap();
+    }
+
+    Ok(node_hash)
+}
+
+fn calculate_validator_root_from_processable_values<E: RescueEngine, CS: ConstraintSystem<E>>(
+    mut cs: CS,
+    processable_fees: &[AllocatedNum<E>],
+    non_processable_audit: &[AllocatedNum<E>],
+    params: &E::Params,
+) -> Result<AllocatedNum<E>, SynthesisError> {
+    assert_eq!(
+        processable_fees.len(),
+        params::number_of_processable_tokens()
+    );
+
+    let processable_fee_hashes = processable_fees
+        .iter()
+        .cloned()
+        .enumerate()
+        .map(|(index, fee)| {
+            let cs = &mut cs.namespace(|| format!("fee hashing index number {}", index));
+
+            fee.limit_number_of_bits(
+                cs.namespace(|| "ensure that fees are short enough"),
+                params::BALANCE_BIT_WIDTH,
+            )?;
+
+            let fee_hash = {
+                let mut sponge_output = rescue::rescue_hash(
+                    cs.namespace(|| "hash the fee leaf content"),
+                    &[fee],
+                    params,
+                )?;
+                assert_eq!(sponge_output.len(), 1);
+                sponge_output.pop().expect("must get a single element")
+            };
+
+            Ok(fee_hash)
+        })
+        .collect::<Result<Vec<_>, SynthesisError>>()?;
+
+    let processable_fees_tree_depth = processable_fees.len().trailing_zeros() as usize;
+    assert_eq!(
+        1 << processable_fees_tree_depth,
+        params::number_of_processable_tokens()
+    );
+    assert_eq!(
+        non_processable_audit.len(),
+        params::balance_tree_depth() - processable_fees_tree_depth,
+    );
+
+    // will hash processable part of the tree
+    let mut hash_vec = processable_fee_hashes;
+    for i in 0..processable_fees_tree_depth {
+        let cs = &mut cs.namespace(|| format!("merkle tree level index number {}", i));
+        assert!(hash_vec.len().is_power_of_two());
+        let chunks = hash_vec.chunks(2);
+        let mut new_hashes = vec![];
+        for (chunk_number, x) in chunks.enumerate() {
+            let cs = &mut cs.namespace(|| format!("chunk number {}", chunk_number));
+
+            let mut sponge_output = rescue::rescue_hash(cs, &x, params)?;
+
+            assert_eq!(sponge_output.len(), 1);
+
+            let tmp = sponge_output.pop().expect("must get a single element");
+
+            new_hashes.push(tmp);
+        }
+        hash_vec = new_hashes;
+    }
+    assert_eq!(hash_vec.len(), 1);
+
+    let mut node_hash = hash_vec[0].clone();
+    for (i, audit_value) in (processable_fees_tree_depth..params::balance_tree_depth())
+        .zip(non_processable_audit.iter())
+    {
+        let cs = &mut cs.namespace(|| format!("merkle tree level index number {}", i));
+
+        let mut sponge_output = rescue::rescue_hash(
+            cs.namespace(|| "perform smt hashing"),
+            &[node_hash, audit_value.clone()],
             params,
         )?;
         assert_eq!(sponge_output.len(), 1, "must get a single element");

@@ -130,12 +130,13 @@ fn test_incorrect_full_exit_withdraw_amount() {
         };
 
         #[allow(clippy::redundant_closure)]
-        incorrect_op_test_scenario::<FullExitWitness<Bn256>, _>(
+        incorrect_op_test_scenario::<FullExitWitness<Bn256>, _, _>(
             &accounts,
             (full_exit_op, success),
             (),
             ERR_MSG,
             || vec![],
+            |_| {},
         );
     }
 }

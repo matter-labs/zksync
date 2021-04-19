@@ -143,6 +143,18 @@ fn zksync_circuit(block_chunks: usize) -> impl Circuit<Engine> + Clone {
         pub_data_commitment: None,
         validator_balances: vec![None; params::number_of_processable_tokens()],
         validator_audit_path: vec![None; params::account_tree_depth()],
+        validator_non_processable_tokens_audit_before_fees: vec![
+            None;
+            params::balance_tree_depth()
+                - params::PROCESSABLE_TOKENS_DEPTH
+                    as usize
+        ],
+        validator_non_processable_tokens_audit_after_fees: vec![
+            None;
+            params::balance_tree_depth()
+                - params::PROCESSABLE_TOKENS_DEPTH
+                    as usize
+        ],
         operations: vec![empty_operation; block_chunks],
         validator_account: AccountWitness {
             nonce: None,

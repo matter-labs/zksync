@@ -122,7 +122,7 @@ fn test_incorrect_change_pubkey_account() {
     let input = SigDataInput::from_change_pubkey_op(&change_pkhash_op)
         .expect("SigDataInput creation failed");
 
-    incorrect_op_test_scenario::<ChangePubkeyOffChainWitness<Bn256>, _>(
+    incorrect_op_test_scenario::<ChangePubkeyOffChainWitness<Bn256>, _, _>(
         &accounts,
         change_pkhash_op,
         input,
@@ -133,6 +133,7 @@ fn test_incorrect_change_pubkey_account() {
                 amount: 0u32.into(),
             }]
         },
+        |_| {},
     );
 }
 
@@ -184,7 +185,7 @@ fn test_incorrect_change_pubkey_signature() {
     let input = SigDataInput::from_change_pubkey_op(&change_pkhash_op)
         .expect("SigDataInput creation failed");
 
-    incorrect_op_test_scenario::<ChangePubkeyOffChainWitness<Bn256>, _>(
+    incorrect_op_test_scenario::<ChangePubkeyOffChainWitness<Bn256>, _, _>(
         &accounts,
         change_pkhash_op,
         input,
@@ -195,5 +196,6 @@ fn test_incorrect_change_pubkey_signature() {
                 amount: HIJACK_FEE_AMOUNT.into(),
             }]
         },
+        |_| {},
     );
 }

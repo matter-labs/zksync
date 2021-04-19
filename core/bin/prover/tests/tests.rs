@@ -133,6 +133,12 @@ fn test_data_for_prover() -> JobRequestData {
             .expect("failed to parse"),
         block_number: Fr::from_str(&witness_accum.block_number.to_string())
             .expect("failed to parse"),
+        validator_non_processable_tokens_audit_before_fees: witness_accum
+            .validator_non_processable_tokens_audit_before_fees
+            .unwrap(),
+        validator_non_processable_tokens_audit_after_fees: witness_accum
+            .validator_non_processable_tokens_audit_after_fees
+            .unwrap(),
     };
 
     JobRequestData::BlockProof(prover_data, 10)
