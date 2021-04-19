@@ -1151,4 +1151,81 @@ mod execute_proposed_block {
             panic!("Block not stored");
         }
     }
+
+    /// Checks that execution of failed transaction shouldn't change gas count.
+    #[tokio::test]
+    async fn gas_count_change() {
+        let mut tester = StateKeeperTester::new(50, 5, 5);
+        let initial_gas_count = tester
+            .state_keeper
+            .pending_block
+            .gas_counter
+            .commit_gas_limit();
+
+        // Create withdraw which will fail.
+        let withdraw = create_account_and_withdrawal(
+            &mut tester,
+            TokenId(0),
+            AccountId(1),
+            200u32,
+            300u32,
+            Default::default(),
+        );
+        let result = tester.state_keeper.apply_tx(&withdraw);
+
+        assert!(result.is_ok());
+        // Check that gas count shouldn't change
+        assert_eq!(
+            initial_gas_count,
+            tester
+                .state_keeper
+                .pending_block
+                .gas_counter
+                .commit_gas_limit()
+        );
+
+        // Create two transfers which will fail.
+        let first_transfer =
+            create_account_and_transfer(tester, TokenId(0), AccountId(2), 200u32, 300u32);
+        let second_transfer =
+            create_account_and_transfer(tester, TokenId(0), AccountId(3), 200u32, 300u32);
+        let proposed_block = ProposedBlock {
+            txs: vec![SignedTxVariant::Batch(SignedTxsBatch {
+                txs: vec![first_transfer, second_transfer],
+                batch_id: 1,
+                eth_signatures: Vec::new(),
+            })],
+            priority_ops: Vec::new(),
+        };
+        tester
+            .state_keeper
+            .execute_proposed_block(proposed_block)
+            .await;
+        // Check that gas count shouldn't change
+        assert_eq!(
+            initial_gas_count,
+            tester
+                .state_keeper
+                .pending_block
+                .gas_counter
+                .commit_gas_limit()
+        );
+
+        // Create correct transfer.
+        let third_transfer =
+            create_account_and_transfer(tester, TokenId(0), AccountId(4), 200u32, 100u32);
+
+        let result = tester.state_keeper.apply_tx(&third_transfer);
+
+        assert!(result.is_ok());
+        // Check that gas count should increase
+        assert!(
+            initial_gas_count
+                < tester
+                    .state_keeper
+                    .pending_block
+                    .gas_counter
+                    .commit_gas_limit()
+        );
+    }
 }

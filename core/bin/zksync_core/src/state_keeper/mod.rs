@@ -793,26 +793,6 @@ impl ZkSyncStateKeeper {
             return Err(());
         }
 
-        for tx in txs {
-            // Check if adding this transaction to the block won't make the contract operations
-            // too expensive.
-            let non_executed_op = self.state.zksync_tx_to_zksync_op(tx.tx.clone());
-            if let Ok(non_executed_op) = non_executed_op {
-                // We only care about successful conversions, since if conversion failed,
-                // then transaction will fail as well (as it shares the same code base).
-                if self
-                    .pending_block
-                    .gas_counter
-                    .add_op(&non_executed_op)
-                    .is_err()
-                {
-                    // We've reached the gas limit, seal the block.
-                    // This transaction will go into the next one.
-                    return Err(());
-                }
-            }
-        }
-
         let all_updates = self.execute_txs_batch(txs, self.pending_block.timestamp);
         let mut executed_operations = Vec::new();
 
@@ -823,6 +803,21 @@ impl ZkSyncStateKeeper {
                     mut updates,
                     executed_op,
                 }) => {
+                    // Check if adding this transaction to the block won't make the contract operations
+                    // too expensive. Since tx is executed successfully then conversion must be successful too.
+                    let non_executed_op = self.state.zksync_tx_to_zksync_op(tx.tx.clone())
+                    .expect("Convertion from zksync_tx to zksync_op failed after successful execution of transaction");
+                    if self
+                        .pending_block
+                        .gas_counter
+                        .add_op(&non_executed_op)
+                        .is_err()
+                    {
+                        // We've reached the gas limit, seal the block.
+                        // This transaction will go into the next one.
+                        return Err(());
+                    }
+
                     self.pending_block.chunks_left -= executed_op.chunks();
                     self.pending_block.account_updates.append(&mut updates);
                     if let Some(fee) = fee {
@@ -877,24 +872,6 @@ impl ZkSyncStateKeeper {
             return Err(());
         }
 
-        // Check if adding this transaction to the block won't make the contract operations
-        // too expensive.
-        let non_executed_op = self.state.zksync_tx_to_zksync_op(tx.tx.clone());
-        if let Ok(non_executed_op) = non_executed_op {
-            // We only care about successful conversions, since if conversion failed,
-            // then transaction will fail as well (as it shares the same code base).
-            if self
-                .pending_block
-                .gas_counter
-                .add_op(&non_executed_op)
-                .is_err()
-            {
-                // We've reached the gas limit, seal the block.
-                // This transaction will go into the next one.
-                return Err(());
-            }
-        }
-
         if let ZkSyncTx::Withdraw(tx) = &tx.tx {
             // Check if we should mark this block as requiring fast processing.
             if tx.fast {
@@ -910,6 +887,21 @@ impl ZkSyncStateKeeper {
                 mut updates,
                 executed_op,
             }) => {
+                // Check if adding this transaction to the block won't make the contract operations
+                // too expensive. Since tx is executed successfully then conversion must be successful too.
+                let non_executed_op = self.state.zksync_tx_to_zksync_op(tx.tx.clone())
+                .expect("Convertion from zksync_tx to zksync_op failed after successful execution of transaction");
+                if self
+                    .pending_block
+                    .gas_counter
+                    .add_op(&non_executed_op)
+                    .is_err()
+                {
+                    // We've reached the gas limit, seal the block.
+                    // This transaction will go into the next one.
+                    return Err(());
+                }
+
                 self.pending_block.chunks_left -= chunks_needed;
                 self.pending_block.account_updates.append(&mut updates);
                 if let Some(fee) = fee {
