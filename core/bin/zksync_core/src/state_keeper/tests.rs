@@ -548,7 +548,9 @@ async fn store_pending_block() {
 }
 
 mod execute_proposed_block {
+
     use super::*;
+    use zksync_types::gas_counter::GasCounter;
 
     /// Checks if executing a proposed_block with just enough chunks is done correctly
     /// and checks if number of chunks left is correct after each operation
@@ -1229,16 +1231,14 @@ mod execute_proposed_block {
         );
     }
 
-    /// Checks that block seals after reaching gas limit.
-    #[tokio::test]
-    async fn gas_limit_sealing() {
+    /// Calculates count of withdrawals that fit into block gas limit.
+    fn withdrawals_fit_into_block() -> u32 {
         let mut tester = StateKeeperTester::new(1000, 1000, 1000);
-        let mut account_id = AccountId(1);
 
         let withdraw = create_account_and_withdrawal(
             &mut tester,
             TokenId(0),
-            account_id,
+            AccountId(1),
             20u32,
             10u32,
             Default::default(),
@@ -1248,45 +1248,54 @@ mod execute_proposed_block {
             .state
             .zksync_tx_to_zksync_op(withdraw.tx.clone())
             .unwrap();
-        let mut test_gas_counter = tester.state_keeper.pending_block.gas_counter.clone();
-        let mut proposed_block = ProposedBlock {
-            txs: Vec::new(),
-            priority_ops: Vec::new(),
+        let mut count = 0;
+        let mut gas_counter = GasCounter::new();
+        while gas_counter.add_op(&op).is_ok() {
+            count += 1;
+        }
+        return count;
+    }
+
+    /// Checks that block seals after reaching gas limit.
+    #[tokio::test]
+    async fn gas_limit_sealing() {
+        let mut tester = StateKeeperTester::new(1000, 1000, 1000);
+
+        let withdrawals_count = withdrawals_fit_into_block();
+
+        // Create (withdrawals_count + 1) withdrawal
+        let txs: Vec<_> = (0..=withdrawals_count)
+            .map(|i| {
+                let withdraw = create_account_and_withdrawal(
+                    &mut tester,
+                    TokenId(0),
+                    AccountId(i + 1),
+                    20u32,
+                    10u32,
+                    Default::default(),
+                );
+                SignedTxVariant::Tx(withdraw)
+            })
+            .collect();
+        let last_withdraw = match txs.last().unwrap() {
+            SignedTxVariant::Tx(tx) => tx.clone(),
+            _ => panic!("Tx was expected"),
         };
 
-        // Add txs while they fit into block.
-        while test_gas_counter.add_op(&op).is_ok() {
-            let withdraw = create_account_and_withdrawal(
-                &mut tester,
-                TokenId(0),
-                account_id,
-                20u32,
-                10u32,
-                Default::default(),
-            );
-            *account_id += 1;
-            proposed_block.txs.push(SignedTxVariant::Tx(withdraw));
-        }
-
-        let last_withdraw = create_account_and_withdrawal(
-            &mut tester,
-            TokenId(0),
-            account_id,
-            2000000u32,
-            10u32,
-            Default::default(),
-        );
-        // Add one more tx.
-        proposed_block
-            .txs
-            .push(SignedTxVariant::Tx(last_withdraw.clone()));
-
+        let proposed_block = ProposedBlock {
+            txs,
+            priority_ops: Vec::new(),
+        };
         tester
             .state_keeper
             .execute_proposed_block(proposed_block)
             .await;
-        if let Some(CommitRequest::Block((_, _))) = tester.response_rx.next().await {
-        } else {
+
+        // Checks that one block is sealed and pending block has only the last withdrawal.
+        if !matches!(
+            tester.response_rx.next().await,
+            Some(CommitRequest::Block((_, _)))
+        ) {
             panic!("Sealed block is not received");
         }
         if let Some(CommitRequest::PendingBlock((pending_block, _))) =
@@ -1309,19 +1318,21 @@ mod execute_proposed_block {
     #[tokio::test]
     async fn batch_gas_limit() {
         let mut tester = StateKeeperTester::new(1000, 1000, 1000);
+        let withdrawals_count = withdrawals_fit_into_block();
 
-        let mut txs = Vec::new();
-        for i in 0..100 {
-            let withdraw = create_account_and_withdrawal(
-                &mut tester,
-                TokenId(0),
-                AccountId(i + 1),
-                2000000u32,
-                10u32,
-                Default::default(),
-            );
-            txs.push(withdraw);
-        }
+        // Create (withdrawals_count + 1) withdrawal
+        let txs: Vec<_> = (0..=withdrawals_count)
+            .map(|i| {
+                create_account_and_withdrawal(
+                    &mut tester,
+                    TokenId(0),
+                    AccountId(i + 1),
+                    20u32,
+                    10u32,
+                    Default::default(),
+                )
+            })
+            .collect();
 
         let proposed_block = ProposedBlock {
             txs: vec![SignedTxVariant::Batch(SignedTxsBatch {
@@ -1337,12 +1348,12 @@ mod execute_proposed_block {
             .execute_proposed_block(proposed_block)
             .await;
         if let Some(CommitRequest::PendingBlock((block, _))) = tester.response_rx.next().await {
-            assert_eq!(block.failed_txs.len(), 100);
-            let tx = block.failed_txs.first().unwrap();
-            assert_eq!(
-                tx.fail_reason,
-                Some("Amount of gas required to process batch is too big".to_string())
-            );
+            assert_eq!(block.failed_txs.len() as u32, withdrawals_count + 1);
+            let expected_fail_reason =
+                Some("Amount of gas required to process batch is too big".to_string());
+            for tx in block.failed_txs {
+                assert_eq!(tx.fail_reason, expected_fail_reason);
+            }
         } else {
             panic!("Pending block is not received");
         }

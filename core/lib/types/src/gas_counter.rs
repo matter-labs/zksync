@@ -190,26 +190,20 @@ impl GasCounter {
     }
 
     pub fn can_include(&self, ops: &[ZkSyncOp]) -> bool {
-        let new_commit_cost: U256 = self.commit_cost
-            + ops
-                .iter()
-                .map(CommitCost::op_cost)
-                .fold(U256::zero(), |mut sum, val| {
-                    sum += val;
-                    sum
-                });
+        let ops_cost: (U256, U256) = ops
+            .iter()
+            .map(|op| (CommitCost::op_cost(op), VerifyCost::op_cost(op)))
+            .fold((U256::zero(), U256::zero()), |mut sum, val| {
+                sum.0 += val.0;
+                sum.1 += val.1;
+                sum
+            });
+        let new_commit_cost = self.commit_cost + ops_cost.0;
+        let new_verify_cost = self.verify_cost + ops_cost.1;
+
         if Self::scale_up(new_commit_cost) > U256::from(TX_GAS_LIMIT) {
             return false;
         }
-
-        let new_verify_cost: U256 = self.verify_cost
-            + ops
-                .iter()
-                .map(VerifyCost::op_cost)
-                .fold(U256::zero(), |mut sum, val| {
-                    sum += val;
-                    sum
-                });
         if Self::scale_up(new_verify_cost) > U256::from(TX_GAS_LIMIT) {
             return false;
         }
@@ -218,29 +212,7 @@ impl GasCounter {
     }
 
     pub fn batch_fits_into_empty_block(ops: &[ZkSyncOp]) -> bool {
-        let commit_cost: U256 =
-            ops.iter()
-                .map(CommitCost::op_cost)
-                .fold(U256::zero(), |mut sum, val| {
-                    sum += val;
-                    sum
-                });
-        if Self::scale_up(commit_cost) > U256::from(TX_GAS_LIMIT) {
-            return false;
-        }
-
-        let verify_cost: U256 =
-            ops.iter()
-                .map(VerifyCost::op_cost)
-                .fold(U256::zero(), |mut sum, val| {
-                    sum += val;
-                    sum
-                });
-        if Self::scale_up(verify_cost) > U256::from(TX_GAS_LIMIT) {
-            return false;
-        }
-
-        true
+        Self::new().can_include(ops)
     }
 
     pub fn commit_gas_limit(&self) -> U256 {
