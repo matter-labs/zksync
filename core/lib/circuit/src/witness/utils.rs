@@ -37,7 +37,7 @@ use zksync_types::{
 // Local deps
 use crate::witness::{
     ChangePubkeyOffChainWitness, CloseAccountWitness, DepositWitness, ForcedExitWitness,
-    FullExitWitness, TransferToNewWitness, TransferWitness, WithdrawWitness, Witness,
+    FullExitWitness, SwapWitness, TransferToNewWitness, TransferWitness, WithdrawWitness, Witness,
 };
 use crate::{
     account::AccountWitness,
@@ -800,8 +800,24 @@ pub fn build_block_witness<'a>(
                 pub_data.extend(forced_exit_witness.get_pubdata());
                 offset_commitment.extend(forced_exit_witness.get_offset_commitment_data())
             }
-            ZkSyncOp::Swap(_swap) => {
-                todo!(); // Part of (ZKS-551)
+            ZkSyncOp::Swap(swap) => {
+                let swap_witness = SwapWitness::apply_tx(&mut witness_accum.account_tree, &swap);
+
+                let input = (
+                    SigDataInput::from_order(&swap.tx.orders.0)?,
+                    SigDataInput::from_order(&swap.tx.orders.1)?,
+                    SigDataInput::from_swap_op(&swap)?,
+                );
+
+                let swap_operations = swap_witness.calculate_operations(input);
+
+                operations.extend(swap_operations);
+                fees.push(CollectedFee {
+                    token: swap.tx.fee_token,
+                    amount: swap.tx.fee,
+                });
+                pub_data.extend(swap_witness.get_pubdata());
+                offset_commitment.extend(swap_witness.get_offset_commitment_data())
             }
             ZkSyncOp::Noop(_) => {} // Noops are handled below
         }

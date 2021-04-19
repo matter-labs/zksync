@@ -34,10 +34,13 @@ use crate::{
 #[derive(Debug)]
 pub struct OrderData {
     pub account: u32,
+    pub nonce: Fr,
     pub recipient: u32,
     pub amount: u128,
     pub price_sell: u128,
     pub price_buy: u128,
+    pub valid_from: u64,
+    pub valid_until: u64,
 }
 
 #[derive(Debug)]
@@ -48,8 +51,8 @@ pub struct SwapData {
     pub fee: u128,
     pub fee_token: u32,
     pub submitter: u32,
-    pub valid_from: u64,
-    pub valid_until: u64,
+    pub submitter_address: Fr,
+    pub nonce: Fr,
 }
 
 pub struct SwapWitness<E: RescueEngine> {
@@ -74,6 +77,9 @@ impl Witness for SwapWitness<Bn256> {
             amount: swap.tx.orders.0.amount.to_u128().unwrap(),
             price_sell: swap.tx.orders.0.price.0.to_u128().unwrap(),
             price_buy: swap.tx.orders.0.price.1.to_u128().unwrap(),
+            valid_from: swap.tx.orders.0.time_range.valid_from,
+            valid_until: swap.tx.orders.0.time_range.valid_until,
+            nonce: fr_from(swap.tx.orders.0.nonce),
         };
 
         let order_1 = OrderData {
@@ -82,6 +88,9 @@ impl Witness for SwapWitness<Bn256> {
             amount: swap.tx.orders.1.amount.to_u128().unwrap(),
             price_sell: swap.tx.orders.1.price.0.to_u128().unwrap(),
             price_buy: swap.tx.orders.1.price.1.to_u128().unwrap(),
+            valid_from: swap.tx.orders.1.time_range.valid_from,
+            valid_until: swap.tx.orders.1.time_range.valid_until,
+            nonce: fr_from(swap.tx.orders.1.nonce),
         };
 
         let swap_data = SwapData {
@@ -97,8 +106,8 @@ impl Witness for SwapWitness<Bn256> {
             fee_token: *swap.tx.fee_token as u32,
             orders: (order_0, order_1),
             submitter: *swap.submitter as u32,
-            valid_from: swap.tx.valid_from(),
-            valid_until: swap.tx.valid_until(),
+            submitter_address: fr_from(swap.tx.submitter_address),
+            nonce: fr_from(swap.tx.nonce),
         };
 
         Self::apply_data(tree, &swap_data)
@@ -213,9 +222,13 @@ impl Witness for SwapWitness<Bn256> {
                 third_sig_msg: Some(input.0.third_sig_msg),
                 signature_data: input.0.signature.clone(),
                 signer_pub_key_packed: input.0.signer_pub_key_packed.to_vec(),
-                args: self.args.clone(),
-                lhs: self.recipients.1[1].clone(),
-                rhs: self.accounts.0[1].clone(),
+                args: OperationArguments {
+                    a: self.a_and_b[0].0,
+                    b: self.a_and_b[0].1,
+                    ..self.args.clone()
+                },
+                lhs: self.accounts.0[1].clone(),
+                rhs: self.recipients.1[1].clone(),
             },
             Operation {
                 new_root: self.roots[2],
@@ -245,9 +258,13 @@ impl Witness for SwapWitness<Bn256> {
                 third_sig_msg: Some(input.1.third_sig_msg),
                 signature_data: input.1.signature.clone(),
                 signer_pub_key_packed: input.1.signer_pub_key_packed.to_vec(),
-                args: self.args.clone(),
-                lhs: self.recipients.0[1].clone(),
-                rhs: self.accounts.1[1].clone(),
+                args: OperationArguments {
+                    a: self.a_and_b[1].0,
+                    b: self.a_and_b[1].1,
+                    ..self.args.clone()
+                },
+                lhs: self.accounts.1[1].clone(),
+                rhs: self.recipients.0[1].clone(),
             },
             Operation {
                 new_root: self.roots[4],
@@ -324,8 +341,6 @@ impl SwapWitness<Bn256> {
         let amount_0_encoded: Fr = le_bit_vector_into_field_element(&amount_0_bits);
         let amount_1_encoded: Fr = le_bit_vector_into_field_element(&amount_1_bits);
         let fee_encoded: Fr = le_bit_vector_into_field_element(&fee_bits);
-        let valid_from = swap.valid_from;
-        let valid_until = swap.valid_until;
 
         let mut roots = vec![];
         let mut lhs_paths = vec![];
@@ -526,16 +541,17 @@ impl SwapWitness<Bn256> {
             args: OperationArguments {
                 amount_packed: Some(amount_0_encoded),
                 second_amount_packed: Some(amount_1_encoded),
-                full_amount: Some(amount_0_fe),
-                // TODO: second full amount?
-                // TODO: special_nonces?
+                special_nonces: vec![swap.orders.0.nonce, swap.orders.1.nonce, swap.nonce],
+                valid_from: Some(fr_from(swap.orders.0.valid_from)),
+                valid_until: Some(fr_from(swap.orders.0.valid_until)),
+                second_valid_from: Some(fr_from(swap.orders.1.valid_from)),
+                second_valid_until: Some(fr_from(swap.orders.1.valid_until)),
+                eth_address: Some(swap.submitter_address),
                 fee: Some(fee_encoded),
-                valid_from: Some(fr_from(valid_from)),
-                valid_until: Some(fr_from(valid_until)),
                 special_accounts: vec![
                     Some(account_0_fe),
-                    Some(account_1_fe),
                     Some(recipient_0_fe),
+                    Some(account_1_fe),
                     Some(recipient_1_fe),
                     Some(submitter_fe),
                 ],

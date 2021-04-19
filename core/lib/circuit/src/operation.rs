@@ -58,6 +58,8 @@ pub struct OperationArguments<E: RescueEngine> {
     pub pub_nonce: Option<E::Fr>,
     pub valid_from: Option<E::Fr>,
     pub valid_until: Option<E::Fr>,
+    pub second_valid_from: Option<E::Fr>,
+    pub second_valid_until: Option<E::Fr>,
 }
 
 impl<E: RescueEngine> Default for OperationArguments<E> {
@@ -78,6 +80,8 @@ impl<E: RescueEngine> Default for OperationArguments<E> {
             pub_nonce: Some(E::Fr::zero()),
             valid_from: Some(E::Fr::zero()),
             valid_until: Some(E::Fr::from_str(&u32::MAX.to_string()).unwrap()),
+            second_valid_from: Some(E::Fr::zero()),
+            second_valid_until: Some(E::Fr::from_str(&u32::MAX.to_string()).unwrap()),
         }
     }
 }

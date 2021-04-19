@@ -11,6 +11,7 @@ pub use self::{
     deposit::DepositWitness,
     forced_exit::ForcedExitWitness,
     full_exit::FullExitWitness,
+    swap::SwapWitness,
     transfer::TransferWitness,
     transfer_to_new::TransferToNewWitness,
     utils::{SigDataInput, WitnessBuilder},
