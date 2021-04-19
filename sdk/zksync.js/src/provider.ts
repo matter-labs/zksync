@@ -225,7 +225,7 @@ export class Provider {
     }
 
     async getTransactionFee(
-        txType: 'Withdraw' | 'Transfer' | 'FastWithdraw' | ChangePubKeyFee | LegacyChangePubKeyFee,
+        txType: 'Withdraw' | 'Transfer' | 'FastWithdraw' | 'Swap' | ChangePubKeyFee | LegacyChangePubKeyFee,
         address: Address,
         tokenLike: TokenLike
     ): Promise<Fee> {
@@ -241,7 +241,7 @@ export class Provider {
     }
 
     async getTransactionsBatchFee(
-        txTypes: ('Withdraw' | 'Transfer' | 'FastWithdraw' | ChangePubKeyFee | LegacyChangePubKeyFee)[],
+        txTypes: ('Withdraw' | 'Transfer' | 'FastWithdraw' | 'Swap' | ChangePubKeyFee | LegacyChangePubKeyFee)[],
         addresses: Address[],
         tokenLike: TokenLike
     ): Promise<BigNumber> {

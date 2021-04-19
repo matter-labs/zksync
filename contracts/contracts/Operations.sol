@@ -22,7 +22,6 @@ library Operations {
         FullExit,
         ChangePubKey,
         ForcedExit,
-        TransferFrom,
         Swap
     }
 

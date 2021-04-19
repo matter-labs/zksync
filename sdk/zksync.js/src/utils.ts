@@ -12,7 +12,9 @@ import {
     ForcedExit,
     ChangePubKey,
     Withdraw,
-    CloseAccount
+    CloseAccount,
+    Order,
+    Swap
 } from './types';
 
 // Max number of tokens for the current version, it is determined by the zkSync circuit implementation.
@@ -52,6 +54,22 @@ const AMOUNT_EXPONENT_BIT_WIDTH = 5;
 const AMOUNT_MANTISSA_BIT_WIDTH = 35;
 const FEE_EXPONENT_BIT_WIDTH = 5;
 const FEE_MANTISSA_BIT_WIDTH = 11;
+
+export class Price {
+    private constructor(private _sell: BigNumber, private _buy: BigNumber) {}
+    static from(price: string) {
+        return new Price(utils.parseUnits(price, 18), BigNumber.from(10**18));
+    }
+    static fromRatio(sell: BigNumberish, buy: BigNumberish) {
+        return new Price(BigNumber.from(sell), BigNumber.from(buy));
+    }
+    sell() {
+        return this._sell;
+    }
+    buy() {
+        return this._buy;
+    }
+}
 
 export function floatToInteger(
     floatBytes: Uint8Array,
@@ -561,6 +579,56 @@ export function serializeTimestamp(time: number): Uint8Array {
     return ethers.utils.concat([new Uint8Array(4), numberToBytesBE(time, 4)]);
 }
 
+export function serializeOrder(order: Order): Uint8Array {
+    const accountId = serializeAccountId(order.accountId);
+    const recipientId = serializeAccountId(order.recipientId);
+    const nonceBytes = serializeNonce(order.nonce);
+    const tokenSellId = serializeTokenId(order.tokenSell);
+    const tokenBuyId = serializeTokenId(order.tokenBuy);
+    const priceSellBytes = serializeAmountFull(order.price.sell());
+    const priceBuyBytes = serializeAmountFull(order.price.buy());
+    const amountBytes = serializeAmountFull(order.amount);
+    const validFrom = serializeTimestamp(order.validFrom);
+    const validUntil = serializeTimestamp(order.validUntil);
+    return ethers.utils.concat([
+        accountId,
+        recipientId,
+        nonceBytes,
+        tokenSellId,
+        tokenBuyId,
+        priceSellBytes,
+        priceBuyBytes,
+        amountBytes,
+        validFrom,
+        validUntil
+    ]);
+} 
+
+export function serializeSwap(swap: Swap): Uint8Array {
+    const type = new Uint8Array([9]);
+    const submitterId = serializeAccountId(swap.submitterId);
+    const submitterAddress = serializeAddress(swap.submitterAddress);
+    const nonceBytes = serializeNonce(swap.nonce);
+    const orderA = serializeOrder(swap.orders[0]);
+    const orderB = serializeOrder(swap.orders[1]);
+    const tokenIdBytes = serializeTokenId(swap.feeToken);
+    const feeBytes = serializeFeePacked(swap.fee);
+    const amountABytes = serializeAmountFull(swap.amounts[0]);
+    const amountBBytes = serializeAmountFull(swap.amounts[1]);
+    return ethers.utils.concat([
+        type,
+        submitterId,
+        submitterAddress,
+        nonceBytes,
+        orderA,
+        orderB,
+        tokenIdBytes,
+        feeBytes,
+        amountABytes,
+        amountBBytes
+    ]);
+}
+
 export function serializeWithdraw(withdraw: Withdraw): Uint8Array {
     const type = new Uint8Array([3]);
     const accountId = serializeAccountId(withdraw.accountId);
@@ -648,7 +716,7 @@ export function serializeForcedExit(forcedExit: ForcedExit): Uint8Array {
  * Encodes the transaction data as the byte sequence according to the zkSync protocol.
  * @param tx A transaction to serialize.
  */
-export function serializeTx(tx: Transfer | Withdraw | ChangePubKey | CloseAccount | ForcedExit): Uint8Array {
+export function serializeTx(tx: Transfer | Withdraw | ChangePubKey | CloseAccount | ForcedExit | Swap): Uint8Array {
     switch (tx.type) {
         case 'Transfer':
             return serializeTransfer(tx);
@@ -658,6 +726,8 @@ export function serializeTx(tx: Transfer | Withdraw | ChangePubKey | CloseAccoun
             return serializeChangePubKey(tx);
         case 'ForcedExit':
             return serializeForcedExit(tx);
+        case 'Swap':
+            return serializeSwap(tx);
         default:
             return new Uint8Array();
     }

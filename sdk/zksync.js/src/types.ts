@@ -1,4 +1,5 @@
 import { BigNumber, BigNumberish } from 'ethers';
+import { Price } from './utils';
 
 // 0x-prefixed, hex encoded, ethereum account address
 export type Address = string;
@@ -70,6 +71,32 @@ export interface TxEthSignature {
 export interface Signature {
     pubKey: string;
     signature: string;
+}
+
+
+export interface Order {
+    accountId: number;
+    recipientId: number;
+    nonce: number;
+    tokenSell: number;
+    tokenBuy: number;
+    price: Price;
+    amount: BigNumberish;
+    signature?: Signature;
+    validFrom: number;
+    validUntil: number;
+}
+
+export interface Swap {
+    type: 'Swap';
+    orders: [Order, Order];
+    amounts: [BigNumberish, BigNumberish];
+    submitterId: number;
+    submitterAddress: Address;
+    nonce: number;
+    signature?: Signature;
+    feeToken: number;
+    fee: BigNumberish;
 }
 
 export interface Transfer {
@@ -154,7 +181,7 @@ export interface CloseAccount {
 }
 
 export interface SignedTransaction {
-    tx: Transfer | Withdraw | ChangePubKey | CloseAccount | ForcedExit;
+    tx: Transfer | Withdraw | ChangePubKey | CloseAccount | ForcedExit | Swap;
     ethereumSignature?: TxEthSignature;
 }
 
@@ -212,7 +239,7 @@ export interface LegacyChangePubKeyFee {
 
 export interface Fee {
     // Operation type (amount of chunks in operation differs and impacts the total fee).
-    feeType: 'Withdraw' | 'Transfer' | 'TransferToNew' | 'FastWithdraw' | ChangePubKeyFee;
+    feeType: 'Withdraw' | 'Transfer' | 'TransferToNew' | 'FastWithdraw' | 'Swap' | ChangePubKeyFee;
     // Amount of gas used by transaction
     gasTxAmount: BigNumber;
     // Gas price (in wei)

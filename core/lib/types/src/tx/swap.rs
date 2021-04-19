@@ -55,8 +55,8 @@ impl Order {
         out.extend_from_slice(&self.account_id.to_be_bytes());
         out.extend_from_slice(&self.recipient_id.to_be_bytes());
         out.extend_from_slice(&self.nonce.to_be_bytes());
-        out.extend_from_slice(&self.token_buy.to_be_bytes());
         out.extend_from_slice(&self.token_sell.to_be_bytes());
+        out.extend_from_slice(&self.token_buy.to_be_bytes());
         out.extend_from_slice(&self.price.0.to_bytes_be());
         out.extend_from_slice(&self.price.1.to_bytes_be());
         out.extend_from_slice(&pack_token_amount(&self.amount));
@@ -83,7 +83,7 @@ impl Order {
 
 impl Swap {
     /// Unique identifier of the transaction type in zkSync network.
-    pub const TX_TYPE: u8 = 10;
+    pub const TX_TYPE: u8 = 9;
 
     /// Creates transaction from all the required fields.
     ///
