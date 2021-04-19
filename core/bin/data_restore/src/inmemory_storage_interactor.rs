@@ -24,6 +24,7 @@ pub struct InMemoryStorageInteractor {
     tokens: HashMap<TokenId, Token>,
     events_state: Vec<BlockEvent>,
     last_watched_block: u64,
+    #[allow(dead_code)]
     last_committed_block: BlockNumber,
     last_verified_block: BlockNumber,
     accounts: AccountMap,
