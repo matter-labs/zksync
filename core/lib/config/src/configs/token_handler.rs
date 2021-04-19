@@ -35,13 +35,11 @@ impl TokenHandlerConfig {
     }
 
     pub fn token_list(&self) -> Vec<TokenInfo> {
-        vec![]
-        // let home = get_env("ZKSYNC_HOME");
-        // let token_list_name = self.token_list_file();
-        // let path = format!("{}/etc/token-lists/{}.json", home, token_list_name);
-        //
-        // serde_json::from_str(&fs::read_to_string(path).expect("Invalid config path"))
-        //     .expect("Invalid config format")
+        let token_list_name = self.token_list_file();
+        let path = format!("etc/token-lists/{}.json", token_list_name);
+
+        serde_json::from_str(&fs::read_to_string(path).expect("Invalid config path"))
+            .expect("Invalid config format")
     }
 }
 
