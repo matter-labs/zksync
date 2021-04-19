@@ -42,7 +42,7 @@ use crate::{
     },
 };
 
-const DIFFERENT_TRANSACTIONS_TYPE_NUMBER: usize = 9;
+const DIFFERENT_TRANSACTIONS_TYPE_NUMBER: usize = 10;
 pub struct ZkSyncCircuit<'a, E: RescueEngine + JubjubEngine> {
     pub rescue_params: &'a <E as RescueEngine>::Params,
     pub jubjub_params: &'a <E as JubjubEngine>::Params,

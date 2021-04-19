@@ -367,6 +367,9 @@ impl SwapWitness<Bn256> {
             swap.orders.0.account,
             swap.tokens.0,
             |acc| {
+                if swap.orders.0.account == swap.submitter {
+                    return;
+                }
                 acc.nonce.add_assign(&nonce_increment(&special_amounts[0]));
             },
             |bal| {
@@ -395,6 +398,9 @@ impl SwapWitness<Bn256> {
             swap.orders.1.account,
             swap.tokens.1,
             |acc| {
+                if swap.orders.1.account == swap.submitter {
+                    return;
+                }
                 acc.nonce.add_assign(&nonce_increment(&special_amounts[3]));
             },
             |bal| {
