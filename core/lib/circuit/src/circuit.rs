@@ -23,7 +23,7 @@ use zksync_crypto::params::{
 };
 use zksync_types::{
     operations::{ChangePubKeyOp, NoopOp},
-    CloseOp, DepositOp, ForcedExitOp, FullExitOp, TransferOp, TransferToNewOp, WithdrawOp,
+    CloseOp, DepositOp, ForcedExitOp, FullExitOp, SwapOp, TransferOp, TransferToNewOp, WithdrawOp,
 };
 // Local deps
 use crate::{
@@ -192,7 +192,8 @@ impl<'a, E: RescueEngine + JubjubEngine> Circuit<E> for ZkSyncCircuit<'a, E> {
             data[WithdrawOp::OP_CODE as usize] = vec![zero.clone(); 2];
             data[FullExitOp::OP_CODE as usize] = vec![zero.clone(); 2];
             data[ChangePubKeyOp::OP_CODE as usize] = vec![zero.clone(); 2];
-            data[ForcedExitOp::OP_CODE as usize] = vec![zero; 2];
+            data[ForcedExitOp::OP_CODE as usize] = vec![zero.clone(); 2];
+            data[SwapOp::OP_CODE as usize] = vec![zero; 2];
 
             // this operation is disabled for now
             // data[CloseOp::OP_CODE as usize] = vec![];
@@ -631,6 +632,7 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
 
     // select a branch.
     // If TX type == deposit then select first branch
+    // If TX type == swap then select first if chunk number is even, else second
     // else if chunk number == 0 select first, else - select second
     fn select_branch<CS: ConstraintSystem<E>>(
         &self,
@@ -640,7 +642,8 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
         _op: &Operation<E>,
         chunk_data: &AllocatedChunkData<E>,
     ) -> Result<AllocatedOperationBranch<E>, SynthesisError> {
-        let deposit_tx_type = Expression::u64::<CS>(1);
+        let deposit_tx_type = Expression::u64::<CS>(DepositOp::OP_CODE.into());
+        let swap_tx_type = Expression::u64::<CS>(SwapOp::OP_CODE.into());
         let left_side = Expression::constant::<CS>(E::Fr::zero());
 
         let cur_side = Expression::select_ifeq(
@@ -649,6 +652,17 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
             deposit_tx_type,
             left_side.clone(),
             &chunk_data.chunk_number,
+        )?;
+
+        let chunk_number_bits = chunk_data.chunk_number.into_bits_le(cs.namespace(|| ""))?;
+        let chunk_number_last_bit = Expression::boolean::<CS>(chunk_number_bits[0]);
+
+        let cur_side = Expression::select_ifeq(
+            cs.namespace(|| ""),
+            &chunk_data.tx_type.get_number(),
+            swap_tx_type,
+            chunk_number_last_bit,
+            &cur_side,
         )?;
 
         let is_left = Boolean::from(Expression::equals(
@@ -768,6 +782,7 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
         let op_data =
             AllocatedOperationData::from_witness(cs.namespace(|| "allocated_operation_data"), op)?;
         // ensure op_data is equal to previous
+        // TODO make a special case for swaps
         {
             let is_op_data_correct_flags = vec![
                 CircuitElement::equals(
@@ -928,7 +943,7 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
                 &mut previous_pubdatas[WithdrawOp::OP_CODE as usize],
             )?,
             // Close disable.
-            //  op_flags.push(self.close_account(
+            // self.close_account(
             //      cs.namespace(|| "close_account"),
             //      &mut cur,
             //      &chunk_data,
@@ -938,7 +953,7 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
             //      &subtree_root,
             //      &is_valid_timestamp,
             //      &signature_data.is_verified,
-            //  )?);
+            // )?,
             self.full_exit(
                 cs.namespace(|| "full_exit"),
                 &mut cur,
@@ -981,6 +996,21 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
                 &is_valid_timestamp,
                 &signature_data.is_verified,
                 &mut previous_pubdatas[ForcedExitOp::OP_CODE as usize],
+            )?,
+            self.swap(
+                cs.namespace(|| "swap"),
+                &mut cur,
+                &lhs,
+                &rhs,
+                global_variables,
+                &is_a_geq_b,
+                &is_account_empty,
+                &op_data,
+                &signer_key,
+                &ext_pubdata_chunk,
+                &is_valid_timestamp,
+                &signature_data.is_verified,
+                &mut previous_pubdatas[SwapOp::OP_CODE as usize],
             )?,
         ];
 
@@ -2109,6 +2139,482 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
     }
 
     #[allow(clippy::too_many_arguments)]
+    fn swap<CS: ConstraintSystem<E>>(
+        &self,
+        mut cs: CS,
+        cur: &mut AllocatedOperationBranch<E>,
+        lhs: &AllocatedOperationBranch<E>,
+        rhs: &AllocatedOperationBranch<E>,
+        global_variables: &CircuitGlobalVariables<E>,
+        is_a_geq_b: &Boolean,
+        is_account_empty: &Boolean,
+        op_data: &AllocatedOperationData<E>,
+        signer_key: &AllocatedSignerPubkey<E>,
+        ext_pubdata_chunk: &AllocatedNum<E>,
+        is_valid_timestamp: &Boolean,
+        is_sig_verified: &Boolean,
+        pubdata_holder: &mut Vec<AllocatedNum<E>>,
+    ) -> Result<Boolean, SynthesisError> {
+        assert!(
+            !pubdata_holder.is_empty(),
+            "pubdata holder has to be preallocated"
+        );
+
+        // construct pubdata
+        let mut pubdata_bits = vec![];
+        pubdata_bits.extend(global_variables.chunk_data.tx_type.get_bits_be());
+        pubdata_bits.extend(
+            op_data
+                .special_accounts
+                .iter()
+                .map(|acc| acc.get_bits_be())
+                .flatten(),
+        );
+        pubdata_bits.extend(
+            op_data
+                .special_tokens
+                .iter()
+                .map(|tok| tok.get_bits_be())
+                .flatten(),
+        );
+        pubdata_bits.extend(op_data.amount_packed.get_bits_be());
+        pubdata_bits.extend(op_data.second_amount_packed.get_bits_be());
+        pubdata_bits.extend(op_data.fee_packed.get_bits_be());
+
+        let zero = Expression::constant::<CS>(E::Fr::zero());
+        let one = Expression::constant::<CS>(E::Fr::one());
+        let two = one + one;
+
+        let nonce_inc_0 = Expression::select_ifeq(
+            cs.namespace(|| "nonce increment 0"),
+            &op_data.special_amounts_unpacked[0].get_number(),
+            Expression::u64::<CS>(0u64),
+            zero,
+            one,
+        )?;
+
+        let nonce_inc_1 = Expression::select_ifeq(
+            cs.namespace(|| "nonce increment 1"),
+            &op_data.special_amounts_unpacked[3].get_number(),
+            Expression::u64::<CS>(0u64),
+            zero,
+            one,
+        )?;
+
+        let nonce_mask = CircuitElement::from_number(
+            cs.namespace(|| "nonce mask construction"),
+            nonce_inc_0.add(
+                cs.namespace(|| "nonce mask"),
+                &nonce_inc_1.add(cs.namespace(|| ""), &nonce_inc_1)?,
+            )?,
+        )?;
+
+        pubdata_bits.extend(nonce_mask.get_bits_be());
+
+        resize_grow_only(
+            &mut pubdata_bits,
+            SwapOp::CHUNKS * params::CHUNK_BIT_WIDTH,
+            Boolean::constant(false),
+        );
+
+        let (is_equal_pubdata, packed_pubdata) = vectorized_compare(
+            cs.namespace(|| "compare pubdata"),
+            &*pubdata_holder,
+            &pubdata_bits,
+        )?;
+
+        *pubdata_holder = packed_pubdata;
+
+        // construct signature message preimage (serialized_tx)
+
+        let mut serialized_order_bits_0 = vec![];
+        let mut serialized_order_bits_1 = vec![];
+        let mut serialized_tx_bits = vec![];
+
+        serialized_order_bits_0.extend(op_data.special_accounts[0].get_bits_be());
+        serialized_order_bits_0.extend(op_data.special_accounts[1].get_bits_be());
+        serialized_order_bits_0.extend(op_data.special_nonces[0].get_bits_be());
+        serialized_order_bits_0.extend(op_data.special_tokens[0].get_bits_be());
+        serialized_order_bits_0.extend(op_data.special_tokens[1].get_bits_be());
+        serialized_order_bits_0.extend(op_data.special_amounts_unpacked[1].get_bits_be());
+        serialized_order_bits_0.extend(op_data.special_amounts_unpacked[2].get_bits_be());
+        serialized_order_bits_0.extend(op_data.special_amounts_packed[0].get_bits_be());
+        serialized_order_bits_0.extend(op_data.valid_from.get_bits_be());
+        serialized_order_bits_0.extend(op_data.valid_until.get_bits_be());
+
+        serialized_order_bits_1.extend(op_data.special_accounts[2].get_bits_be());
+        serialized_order_bits_1.extend(op_data.special_accounts[3].get_bits_be());
+        serialized_order_bits_1.extend(op_data.special_nonces[1].get_bits_be());
+        serialized_order_bits_1.extend(op_data.special_tokens[1].get_bits_be());
+        serialized_order_bits_1.extend(op_data.special_tokens[0].get_bits_be());
+        serialized_order_bits_1.extend(op_data.special_amounts_unpacked[4].get_bits_be());
+        serialized_order_bits_1.extend(op_data.special_amounts_unpacked[5].get_bits_be());
+        serialized_order_bits_1.extend(op_data.special_amounts_packed[3].get_bits_be());
+        serialized_order_bits_1.extend(op_data.second_valid_from.get_bits_be());
+        serialized_order_bits_1.extend(op_data.second_valid_until.get_bits_be());
+
+        serialized_tx_bits.extend(global_variables.chunk_data.tx_type.get_bits_be());
+        serialized_tx_bits.extend(op_data.special_accounts[4].get_bits_be());
+        serialized_tx_bits.extend(op_data.eth_address.get_bits_be());
+        serialized_tx_bits.extend(op_data.special_nonces[2].get_bits_be());
+        serialized_tx_bits.extend(serialized_order_bits_0);
+        serialized_tx_bits.extend(serialized_order_bits_1);
+        serialized_tx_bits.extend(op_data.special_tokens[2].get_bits_be());
+        serialized_tx_bits.extend(op_data.fee.get_bits_be());
+        serialized_tx_bits.extend(op_data.amount_packed.get_bits_be());
+        serialized_tx_bits.extend(op_data.second_amount_packed.get_bits_be());
+
+        assert_eq!(serialized_tx_bits.len(), SIGNED_TRANSFER_BIT_WIDTH);
+
+        let pubdata_chunk = select_pubdata_chunk(
+            cs.namespace(|| "select_pubdata_chunk"),
+            &pubdata_bits,
+            &global_variables.chunk_data.chunk_number,
+            SwapOp::CHUNKS,
+        )?;
+        let is_pubdata_chunk_correct = Boolean::from(Expression::equals(
+            cs.namespace(|| "is_pubdata_correct"),
+            &pubdata_chunk,
+            ext_pubdata_chunk,
+        )?);
+
+        // verify correct tx_code
+
+        let is_swap = Boolean::from(Expression::equals(
+            cs.namespace(|| "is_swap"),
+            &global_variables.chunk_data.tx_type.get_number(),
+            Expression::u64::<CS>(u64::from(SwapOp::OP_CODE)), // swap tx_type
+        )?);
+
+        let is_chunk_number = vec![zero, one, two, one + two, two + two]
+            .into_iter()
+            .enumerate()
+            .map(|(idx, num)| {
+                Ok(Boolean::from(Expression::equals(
+                    cs.namespace(|| format!("is chunk number {}", idx)),
+                    &global_variables.chunk_data.chunk_number,
+                    num,
+                )?))
+            })
+            .collect::<Result<Vec<_>, SynthesisError>>()?;
+
+        let is_first_part = Boolean::xor(
+            cs.namespace(|| "is first part"),
+            &is_chunk_number[0],
+            &is_chunk_number[1],
+        )?;
+        let is_second_part = Boolean::xor(
+            cs.namespace(|| "is second part"),
+            &is_chunk_number[2],
+            &is_chunk_number[3],
+        )?;
+
+        let pubdata_properly_copied = boolean_or(
+            cs.namespace(|| "first chunk or pubdata is copied properly"),
+            &is_chunk_number[0],
+            &is_equal_pubdata,
+        )?;
+
+        let is_nonce_correct_in_slot = |num| {
+            CircuitElement::equals(
+                cs.namespace(|| ""),
+                &lhs.account.nonce,
+                &op_data.special_nonces[num],
+            )
+        };
+
+        let is_nonce_correct = multi_or(
+            cs.namespace(|| ""),
+            &[
+                Boolean::and(
+                    cs.namespace(|| ""),
+                    &is_nonce_correct_in_slot(0)?,
+                    &is_chunk_number[0],
+                )?,
+                Boolean::and(
+                    cs.namespace(|| ""),
+                    &is_nonce_correct_in_slot(1)?,
+                    &is_chunk_number[2],
+                )?,
+                Boolean::and(
+                    cs.namespace(|| ""),
+                    &is_nonce_correct_in_slot(2)?,
+                    &is_chunk_number[4],
+                )?,
+            ],
+        )?;
+
+        let is_account_id_correct_in_slot = |num| {
+            CircuitElement::equals(
+                cs.namespace(|| ""),
+                &cur.account_id,
+                &op_data.special_accounts[num],
+            )
+        };
+
+        let is_account_id_correct = multi_or(
+            cs.namespace(|| ""),
+            &(0..5)
+                .map(|num| {
+                    Boolean::and(
+                        cs.namespace(|| ""),
+                        &is_account_id_correct_in_slot(num)?,
+                        &is_chunk_number[num],
+                    )
+                })
+                .collect::<Result<Vec<_>, _>>()?,
+        )?;
+
+        let is_address_correct = CircuitElement::equals(
+            cs.namespace(|| "is_address_correct"),
+            &cur.account.address,
+            &op_data.eth_address,
+        )?;
+
+        let is_address_correct = Boolean::xor(
+            cs.namespace(|| ""),
+            &is_address_correct,
+            &is_chunk_number[4].not(),
+        )?;
+
+        let is_a_correct =
+            CircuitElement::equals(cs.namespace(|| "is_a_correct"), &op_data.a, &cur.balance)?;
+
+        let actual_b = CircuitElement::conditionally_select(
+            cs.namespace(|| ""),
+            &op_data.fee,
+            &CircuitElement::conditionally_select(
+                cs.namespace(|| ""),
+                &op_data.amount_unpacked,
+                &op_data.second_amount_unpacked,
+                &is_first_part,
+            )?,
+            &is_chunk_number[4],
+        )?;
+
+        let is_b_correct = Boolean::from(Expression::equals(
+            cs.namespace(|| "is_b_correct"),
+            &op_data.b.get_number(),
+            &actual_b.get_number(),
+        )?);
+
+        let are_swapped_tokens_different = CircuitElement::equals(
+            cs.namespace(|| "swapped tokens different"),
+            &op_data.special_tokens[0],
+            &op_data.special_tokens[1],
+        )?
+        .not();
+
+        let is_amount_valid = boolean_or(
+            cs.namespace(|| ""),
+            &CircuitElement::equals(
+                cs.namespace(|| ""),
+                &op_data.amount_unpacked,
+                &global_variables.explicit_zero,
+            )?,
+            &CircuitElement::equals(
+                cs.namespace(|| ""),
+                &op_data.amount_unpacked,
+                &op_data.special_amounts_unpacked[0],
+            )?,
+        )?;
+
+        let is_second_amount_valid = boolean_or(
+            cs.namespace(|| ""),
+            &CircuitElement::equals(
+                cs.namespace(|| ""),
+                &op_data.second_amount_unpacked,
+                &global_variables.explicit_zero,
+            )?,
+            &CircuitElement::equals(
+                cs.namespace(|| ""),
+                &op_data.second_amount_unpacked,
+                &op_data.special_amounts_unpacked[3],
+            )?,
+        )?;
+
+        // TODO check that both prices are valid
+
+        let common_valid_flags = vec![
+            is_pubdata_chunk_correct.clone(),
+            is_swap.clone(),
+            is_valid_timestamp.clone(),
+            pubdata_properly_copied.clone(),
+            is_account_id_correct.clone(),
+            is_address_correct.clone(),
+            are_swapped_tokens_different.clone(),
+            is_amount_valid.clone(),
+            is_second_amount_valid.clone(),
+        ];
+
+        let is_sender = multi_or(
+            cs.namespace(|| "is sender"),
+            &[is_chunk_number[0], is_chunk_number[2], is_chunk_number[4]],
+        )?;
+
+        let is_recipient = Boolean::xor(
+            cs.namespace(|| "is sender"),
+            &is_chunk_number[1],
+            &is_chunk_number[3],
+        )?;
+
+        let mut lhs_valid_flags = vec![
+            is_a_correct.clone(),
+            is_b_correct.clone(),
+            is_a_geq_b.clone(),
+            is_sig_verified.clone(),
+            is_nonce_correct.clone(),
+            is_sender.clone(),
+            no_nonce_overflow(
+                cs.namespace(|| "no nonce overflow"),
+                &cur.account.nonce.get_number(),
+            )?,
+        ];
+
+        lhs_valid_flags.extend(common_valid_flags.clone());
+
+        let is_serialized_swap_correct = verify_signature_message_construction(
+            cs.namespace(|| "is_serialized_swap_correct"),
+            serialized_tx_bits,
+            &op_data,
+        )?;
+
+        let is_serialized_order_0_correct = verify_signature_message_construction(
+            cs.namespace(|| "is_serialized_order_0_correct"),
+            serialized_order_bits_0,
+            &op_data,
+        )?;
+
+        let is_serialized_order_1_correct = verify_signature_message_construction(
+            cs.namespace(|| "is_serialized_order_1_correct"),
+            serialized_order_bits_1,
+            &op_data,
+        )?;
+
+        let is_serialized_tx_correct = multi_or(
+            cs.namespace(|| ""),
+            &[
+                Boolean::and(
+                    cs.namespace(|| ""),
+                    &is_first_part,
+                    &is_serialized_order_0_correct,
+                )?,
+                Boolean::and(
+                    cs.namespace(|| ""),
+                    &is_second_part,
+                    &is_serialized_order_1_correct,
+                )?,
+                Boolean::and(
+                    cs.namespace(|| ""),
+                    &is_chunk_number[4],
+                    &is_serialized_swap_correct,
+                )?,
+            ],
+        )?;
+
+        lhs_valid_flags.push(is_serialized_tx_correct);
+
+        let is_signer_valid = CircuitElement::equals(
+            cs.namespace(|| "signer_key_correct"),
+            &signer_key.pubkey.get_hash(),
+            &lhs.account.pub_key_hash,
+        )?;
+        lhs_valid_flags.push(is_signer_valid);
+
+        let lhs_valid = multi_and(cs.namespace(|| "lhs_valid"), &lhs_valid_flags)?;
+
+        let updated_balance =
+            Expression::from(&cur.balance.get_number()) - Expression::from(&actual_b.get_number());
+
+        let nonce_inc = Expression::conditionally_select(
+            cs.namespace(|| "nonce increment"),
+            &nonce_inc_0,
+            &nonce_inc_1,
+            &is_first_part,
+        )?;
+
+        let nonce_inc = Expression::conditionally_select(
+            cs.namespace(|| ""),
+            one,
+            Expression::from(&nonce_inc),
+            &is_chunk_number[4],
+        )?;
+
+        let sender_is_submitter = CircuitElement::equals(
+            cs.namespace(|| ""),
+            &lhs.account_id,
+            &op_data.special_accounts[4],
+        )?;
+
+        // if submitter == account_0 or account_1 then
+        // don't increment nonce for this account
+        let nonce_inc = Expression::conditionally_select(
+            cs.namespace(|| ""),
+            zero,
+            Expression::from(&nonce_inc),
+            &Boolean::and(
+                cs.namespace(|| ""),
+                &sender_is_submitter,
+                &is_chunk_number[4].not(),
+            )?,
+        )?;
+
+        let updated_nonce =
+            Expression::from(&cur.account.nonce.get_number()) + Expression::from(&nonce_inc);
+
+        //update cur values if lhs is valid
+        //update nonce
+        cur.account.nonce = CircuitElement::conditionally_select_with_number_strict(
+            cs.namespace(|| "update cur nonce"),
+            updated_nonce,
+            &cur.account.nonce,
+            &lhs_valid,
+        )?;
+
+        //update balance
+        cur.balance = CircuitElement::conditionally_select_with_number_strict(
+            cs.namespace(|| "updated cur balance"),
+            updated_balance,
+            &cur.balance,
+            &lhs_valid,
+        )?;
+
+        // rhs
+        let mut rhs_valid_flags = common_valid_flags;
+        rhs_valid_flags.push(is_account_empty.not());
+        rhs_valid_flags.push(is_recipient);
+        let rhs_valid = multi_and(cs.namespace(|| "is_rhs_valid"), &rhs_valid_flags)?;
+
+        let amount = CircuitElement::conditionally_select(
+            cs.namespace(|| ""),
+            &op_data.amount_unpacked,
+            &op_data.second_amount_unpacked,
+            &is_first_part,
+        )?;
+
+        // calculate new rhs balance value
+        let updated_balance =
+            Expression::from(&cur.balance.get_number()) + Expression::from(&amount.get_number());
+
+        //update balance
+        cur.balance = CircuitElement::conditionally_select_with_number_strict(
+            cs.namespace(|| "updated_balance rhs"),
+            updated_balance,
+            &cur.balance,
+            &rhs_valid,
+        )?;
+
+        // Either LHS xor RHS are correct (due to chunking at least)
+        let correct = Boolean::xor(
+            cs.namespace(|| "lhs_valid XOR rhs_valid"),
+            &lhs_valid,
+            &rhs_valid,
+        )?;
+
+        Ok(correct)
+    }
+
+    #[allow(clippy::too_many_arguments)]
     fn transfer<CS: ConstraintSystem<E>>(
         &self,
         mut cs: CS,
@@ -2588,10 +3094,28 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
         )?
         .not();
 
-        let is_valid_timestamp = Boolean::and(
+        let is_second_valid_from_ok = CircuitElement::less_than_fixed(
+            cs.namespace(|| "second_valid_from leq block_timestamp"),
+            &global_variables.block_timestamp,
+            &op_data.second_valid_from,
+        )?
+        .not();
+
+        let is_second_valid_until_ok = CircuitElement::less_than_fixed(
+            cs.namespace(|| "block_timestamp leq second_valid_until"),
+            &op_data.second_valid_until,
+            &global_variables.block_timestamp,
+        )?
+        .not();
+
+        let is_valid_timestamp = multi_and(
             cs.namespace(|| "is_valid_from_ok AND is_valid_until_ok"),
-            &is_valid_from_ok,
-            &is_valid_until_ok,
+            &[
+                is_valid_from_ok,
+                is_valid_until_ok,
+                is_second_valid_from_ok,
+                is_second_valid_until_ok,
+            ],
         )?;
 
         Ok(is_valid_timestamp)
