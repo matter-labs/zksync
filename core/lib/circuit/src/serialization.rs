@@ -154,6 +154,10 @@ pub struct OperationArgumentsDef {
     pub valid_from: Option<Fr>,
     #[serde(with = "OptionalFrSerde")]
     pub valid_until: Option<Fr>,
+    #[serde(with = "OptionalFrSerde")]
+    pub second_valid_from: Option<Fr>,
+    #[serde(with = "OptionalFrSerde")]
+    pub second_valid_until: Option<Fr>,
 }
 
 #[derive(Serialize, Deserialize)]

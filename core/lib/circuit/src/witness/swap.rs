@@ -541,7 +541,11 @@ impl SwapWitness<Bn256> {
             args: OperationArguments {
                 amount_packed: Some(amount_0_encoded),
                 second_amount_packed: Some(amount_1_encoded),
-                special_nonces: vec![swap.orders.0.nonce, swap.orders.1.nonce, swap.nonce],
+                special_nonces: vec![
+                    Some(fr_from(swap.orders.0.nonce)),
+                    Some(fr_from(swap.orders.1.nonce)),
+                    Some(fr_from(swap.nonce)),
+                ],
                 valid_from: Some(fr_from(swap.orders.0.valid_from)),
                 valid_until: Some(fr_from(swap.orders.0.valid_until)),
                 second_valid_from: Some(fr_from(swap.orders.1.valid_from)),
