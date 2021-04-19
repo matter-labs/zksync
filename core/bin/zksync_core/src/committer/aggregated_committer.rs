@@ -434,10 +434,12 @@ pub async fn create_aggregated_operations_storage(
     storage: &mut StorageProcessor<'_>,
     config: &ZkSyncConfig,
 ) -> anyhow::Result<()> {
-    while create_aggregated_commits_storage(storage, config).await? {}
-    while create_aggregated_prover_task_storage(storage, config).await? {}
-    while create_aggregated_publish_proof_operation_storage(storage).await? {}
-    while create_aggregated_execute_operation_storage(storage, config).await? {}
+    let mut transaction = storage.start_transaction().await?;
+    while create_aggregated_commits_storage(&mut transaction, config).await? {}
+    while create_aggregated_prover_task_storage(&mut transaction, config).await? {}
+    while create_aggregated_publish_proof_operation_storage(&mut transaction).await? {}
+    while create_aggregated_execute_operation_storage(&mut transaction, config).await? {}
+    transaction.commit().await?;
 
     Ok(())
 }
