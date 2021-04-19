@@ -1186,9 +1186,9 @@ mod execute_proposed_block {
 
         // Create two transfers which will fail.
         let first_transfer =
-            create_account_and_transfer(tester, TokenId(0), AccountId(2), 200u32, 300u32);
+            create_account_and_transfer(&mut tester, TokenId(0), AccountId(2), 200u32, 300u32);
         let second_transfer =
-            create_account_and_transfer(tester, TokenId(0), AccountId(3), 200u32, 300u32);
+            create_account_and_transfer(&mut tester, TokenId(0), AccountId(3), 200u32, 300u32);
         let proposed_block = ProposedBlock {
             txs: vec![SignedTxVariant::Batch(SignedTxsBatch {
                 txs: vec![first_transfer, second_transfer],
@@ -1213,7 +1213,7 @@ mod execute_proposed_block {
 
         // Create correct transfer.
         let third_transfer =
-            create_account_and_transfer(tester, TokenId(0), AccountId(4), 200u32, 100u32);
+            create_account_and_transfer(&mut tester, TokenId(0), AccountId(4), 200u32, 100u32);
 
         let result = tester.state_keeper.apply_tx(&third_transfer);
 
