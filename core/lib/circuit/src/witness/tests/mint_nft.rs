@@ -12,6 +12,7 @@ use zksync_crypto::params::{MIN_NFT_TOKEN_ID, NFT_STORAGE_ACCOUNT_ID, NFT_TOKEN_
 /// Basic check for execution of `Transfer` operation in circuit.
 /// Here we create two accounts and perform a transfer between them.
 #[test]
+#[ignore]
 fn test_success() {
     // Test vector of (initial_balance, transfer_amount, fee_amount).
     let test_vector = vec![
