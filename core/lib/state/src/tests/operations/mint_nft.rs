@@ -103,6 +103,11 @@ fn mint_success() {
                     ),
                 },
             ),
+            // Mint nft
+            (
+                creator_account_id,
+                AccountUpdate::MintNFT { token: nft.clone() },
+            ),
             // Store part of nft token hash as balance to NFT storage account id
             (
                 NFT_STORAGE_ACCOUNT_ID,
@@ -111,11 +116,6 @@ fn mint_success() {
                     new_nonce: to_account.nonce,
                     balance_update: (nft.id, BigUint::zero(), token_data),
                 },
-            ),
-            // Mint nft
-            (
-                creator_account_id,
-                AccountUpdate::MintNFT { token: nft.clone() },
             ),
             // Deposit nft token to recipient account
             (
@@ -194,6 +194,11 @@ fn mint_success() {
                     ),
                 },
             ),
+            // Mint nft
+            (
+                creator_account_id,
+                AccountUpdate::MintNFT { token: nft.clone() },
+            ),
             // Store part of nft token hash as balance to NFT storage account id
             (
                 NFT_STORAGE_ACCOUNT_ID,
@@ -202,11 +207,6 @@ fn mint_success() {
                     new_nonce: to_account.nonce,
                     balance_update: (nft.id, BigUint::zero(), token_data),
                 },
-            ),
-            // Mint nft
-            (
-                creator_account_id,
-                AccountUpdate::MintNFT { token: nft.clone() },
             ),
             // Deposit nft token to recipient account
             (
@@ -370,6 +370,11 @@ fn mint_token_to_new_account() {
                     ),
                 },
             ),
+            // Mint nft
+            (
+                creator_account_id,
+                AccountUpdate::MintNFT { token: nft.clone() },
+            ),
             // Store part of nft token hash as balance to NFT storage account id
             (
                 NFT_STORAGE_ACCOUNT_ID,
@@ -378,11 +383,6 @@ fn mint_token_to_new_account() {
                     new_nonce: Nonce(0),
                     balance_update: (nft.id, BigUint::zero(), token_data),
                 },
-            ),
-            // Mint nft
-            (
-                creator_account_id,
-                AccountUpdate::MintNFT { token: nft.clone() },
             ),
             // Deposit nft token to recipient account
             (

@@ -31,7 +31,7 @@ pub fn total_fungible_tokens() -> usize {
 }
 /// Number of supported tokens.
 pub fn total_tokens() -> usize {
-    2usize.pow(balance_tree_depth() as u32) - 2
+    2usize.pow((balance_tree_depth() - 1) as u32) - 2
 }
 
 /// Number of tokens that are processed by this release
@@ -47,7 +47,7 @@ pub fn number_of_processable_tokens() -> usize {
 
 /// Special token id, which enforce unique pair of creator account id and serial id for generating unique address for token.
 /// Where serial id is balance for this special token
-pub const NFT_TOKEN_ID: TokenId = TokenId(u32::MAX - 1);
+pub const NFT_TOKEN_ID: TokenId = TokenId(((i32::MAX) - 1) as u32);
 
 /// Special account which enforce unique token id for NFT.
 pub const NFT_STORAGE_ACCOUNT_ID: AccountId = AccountId(16777216 - 1);

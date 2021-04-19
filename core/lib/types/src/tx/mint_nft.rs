@@ -182,7 +182,6 @@ impl MintNFT {
             message.push('\n');
         }
         message.push_str(format!("Nonce: {}", self.nonce).as_str());
-        dbg!(&message);
         message
     }
 
