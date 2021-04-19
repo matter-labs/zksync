@@ -647,18 +647,20 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
         let left_side = Expression::constant::<CS>(E::Fr::zero());
 
         let cur_side = Expression::select_ifeq(
-            cs.namespace(|| "select corresponding branch"),
+            cs.namespace(|| "select corresponding branch - if deposit"),
             &chunk_data.tx_type.get_number(),
             deposit_tx_type,
             left_side.clone(),
             &chunk_data.chunk_number,
         )?;
 
-        let chunk_number_bits = chunk_data.chunk_number.into_bits_le(cs.namespace(|| ""))?;
+        let chunk_number_bits = chunk_data
+            .chunk_number
+            .into_bits_le(cs.namespace(|| "chunk number into bits"))?;
         let chunk_number_last_bit = Expression::boolean::<CS>(chunk_number_bits[0].clone());
 
         let cur_side = Expression::select_ifeq(
-            cs.namespace(|| ""),
+            cs.namespace(|| "select corresponding branch - if swap"),
             &chunk_data.tx_type.get_number(),
             swap_tx_type,
             chunk_number_last_bit,
@@ -2204,7 +2206,8 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
         )?;
 
         let nonce_mask = {
-            let double_nonce_inc_1 = nonce_inc_1.add(cs.namespace(|| ""), &nonce_inc_1)?;
+            let double_nonce_inc_1 =
+                nonce_inc_1.add(cs.namespace(|| "double nonce_inc_1"), &nonce_inc_1)?;
             let nonce_mask = nonce_inc_0.add(cs.namespace(|| "nonce mask"), &double_nonce_inc_1)?;
             CircuitElement::from_number(cs.namespace(|| "nonce mask construction"), nonce_mask)?
         };
@@ -2286,7 +2289,7 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
             Expression::u64::<CS>(u64::from(SwapOp::OP_CODE)), // swap tx_type
         )?);
 
-        let is_chunk_number = vec![zero.clone(), one.clone(), two.clone(), three, four]
+        let is_chunk_number = vec![zero.clone(), one.clone(), two, three, four]
             .into_iter()
             .enumerate()
             .map(|(idx, num)| {
@@ -2318,19 +2321,22 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
         let is_nonce_correct_in_slot = (0..3)
             .map(|num| {
                 let nonce_correct = CircuitElement::equals(
-                    cs.namespace(|| ""),
+                    cs.namespace(|| format!("is_nonce_correct_in_slot {}", num)),
                     &lhs.account.nonce,
                     &op_data.special_nonces[num],
                 )?;
                 Boolean::and(
-                    cs.namespace(|| ""),
+                    cs.namespace(|| format!("is nonce is correct in chunk {}", num * 2)),
                     &nonce_correct,
                     &is_chunk_number[num * 2],
                 )
             })
             .collect::<Result<Vec<_>, _>>()?;
 
-        let is_nonce_correct = multi_or(cs.namespace(|| ""), &is_nonce_correct_in_slot[..])?;
+        let is_nonce_correct = multi_or(
+            cs.namespace(|| "is_nonce_correct"),
+            &is_nonce_correct_in_slot[..],
+        )?;
 
         let is_account_id_correct_in_slot = (0..5)
             .map(|num| {
@@ -2340,15 +2346,17 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
                     &op_data.special_accounts[num],
                 )?;
                 Boolean::and(
-                    cs.namespace(|| ""),
+                    cs.namespace(|| format!("is account id correct in chunk {}", num)),
                     &account_id_correct,
                     &is_chunk_number[num],
                 )
             })
             .collect::<Result<Vec<_>, _>>()?;
 
-        let is_account_id_correct =
-            multi_or(cs.namespace(|| ""), &is_account_id_correct_in_slot[..])?;
+        let is_account_id_correct = multi_or(
+            cs.namespace(|| "is_account_id_correct"),
+            &is_account_id_correct_in_slot[..],
+        )?;
 
         let is_address_correct = CircuitElement::equals(
             cs.namespace(|| "is_address_correct"),
@@ -2357,7 +2365,7 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
         )?;
 
         let is_address_correct = Boolean::xor(
-            cs.namespace(|| ""),
+            cs.namespace(|| "is_address_correct"),
             &is_address_correct,
             &is_chunk_number[4].not(),
         )?;
@@ -2366,14 +2374,14 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
             CircuitElement::equals(cs.namespace(|| "is_a_correct"), &op_data.a, &cur.balance)?;
 
         let amount = CircuitElement::conditionally_select(
-            cs.namespace(|| ""),
+            cs.namespace(|| "swapped amount"),
             &op_data.amount_unpacked,
             &op_data.second_amount_unpacked,
             &is_first_part,
         )?;
 
         let actual_b = CircuitElement::conditionally_select(
-            cs.namespace(|| ""),
+            cs.namespace(|| "b"),
             &op_data.fee,
             &amount,
             &is_chunk_number[4],
@@ -2394,17 +2402,17 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
 
         let is_amount_valid = {
             let is_amount_explicit = CircuitElement::equals(
-                cs.namespace(|| ""),
+                cs.namespace(|| "is first amount explicit"),
                 &op_data.amount_unpacked,
                 &op_data.special_amounts_unpacked[0],
             )?;
             let is_amount_implicit = CircuitElement::equals(
-                cs.namespace(|| ""),
+                cs.namespace(|| "is first amount implicit"),
                 &op_data.amount_unpacked,
                 &global_variables.explicit_zero,
             )?;
             boolean_or(
-                cs.namespace(|| ""),
+                cs.namespace(|| "is first amount valid"),
                 &is_amount_explicit,
                 &is_amount_implicit,
             )?
@@ -2412,17 +2420,17 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
 
         let is_second_amount_valid = {
             let is_amount_explicit = CircuitElement::equals(
-                cs.namespace(|| ""),
+                cs.namespace(|| "is second amount explicit"),
                 &op_data.second_amount_unpacked,
                 &op_data.special_amounts_unpacked[3],
             )?;
             let is_amount_implicit = CircuitElement::equals(
-                cs.namespace(|| ""),
+                cs.namespace(|| "is second amount implicit"),
                 &op_data.second_amount_unpacked,
                 &global_variables.explicit_zero,
             )?;
             boolean_or(
-                cs.namespace(|| ""),
+                cs.namespace(|| "is second amount valid"),
                 &is_amount_explicit,
                 &is_amount_implicit,
             )?
@@ -2431,15 +2439,15 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
         // TODO check that both prices are valid
 
         let common_valid_flags = vec![
-            is_pubdata_chunk_correct.clone(),
-            is_swap.clone(),
+            is_pubdata_chunk_correct,
+            is_swap,
             is_valid_timestamp.clone(),
-            pubdata_properly_copied.clone(),
-            is_account_id_correct.clone(),
-            is_address_correct.clone(),
-            are_swapped_tokens_different.clone(),
-            is_amount_valid.clone(),
-            is_second_amount_valid.clone(),
+            pubdata_properly_copied,
+            is_account_id_correct,
+            is_address_correct,
+            are_swapped_tokens_different,
+            is_amount_valid,
+            is_second_amount_valid,
         ];
 
         let is_sender = multi_or(
@@ -2458,12 +2466,12 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
         )?;
 
         let mut lhs_valid_flags = vec![
-            is_a_correct.clone(),
-            is_b_correct.clone(),
+            is_a_correct,
+            is_b_correct,
             is_a_geq_b.clone(),
             is_sig_verified.clone(),
-            is_nonce_correct.clone(),
-            is_sender.clone(),
+            is_nonce_correct,
+            is_sender,
             no_nonce_overflow(
                 cs.namespace(|| "no nonce overflow"),
                 &cur.account.nonce.get_number(),
@@ -2492,24 +2500,26 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
 
         let right_messages_in_right_chunks = &[
             Boolean::and(
-                cs.namespace(|| ""),
+                cs.namespace(|| "serialized order 0 in first part of the swap"),
                 &is_first_part,
                 &is_serialized_order_0_correct,
             )?,
             Boolean::and(
-                cs.namespace(|| ""),
+                cs.namespace(|| "serialized order 1 in second part of the swap"),
                 &is_second_part,
                 &is_serialized_order_1_correct,
             )?,
             Boolean::and(
-                cs.namespace(|| ""),
+                cs.namespace(|| "whole swap serialized in last part of the swap"),
                 &is_chunk_number[4],
                 &is_serialized_swap_correct,
             )?,
         ];
 
-        let is_serialized_tx_correct =
-            multi_or(cs.namespace(|| ""), right_messages_in_right_chunks)?;
+        let is_serialized_tx_correct = multi_or(
+            cs.namespace(|| "is_serialized_tx_correct"),
+            right_messages_in_right_chunks,
+        )?;
 
         lhs_valid_flags.push(is_serialized_tx_correct);
 
@@ -2533,14 +2543,14 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
         )?;
 
         let nonce_inc = Expression::conditionally_select(
-            cs.namespace(|| ""),
+            cs.namespace(|| "nonce increment for submitter always 1"),
             one,
             Expression::from(&nonce_inc),
             &is_chunk_number[4],
         )?;
 
         let sender_is_submitter = CircuitElement::equals(
-            cs.namespace(|| ""),
+            cs.namespace(|| "is account sender == submitter"),
             &lhs.account_id,
             &op_data.special_accounts[4],
         )?;
@@ -2549,12 +2559,12 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
         // don't increment nonce for this account
         let nonce_inc = {
             let sender_is_submitter_and_not_last_chunk = Boolean::and(
-                cs.namespace(|| ""),
+                cs.namespace(|| "sender == submitter and we are not in the last chunk"),
                 &sender_is_submitter,
                 &is_chunk_number[4].not(),
             )?;
             Expression::conditionally_select(
-                cs.namespace(|| ""),
+                cs.namespace(|| "nonce increment is 0 if account == submitter (for account)"),
                 zero,
                 Expression::from(&nonce_inc),
                 &sender_is_submitter_and_not_last_chunk,

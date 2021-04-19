@@ -100,6 +100,8 @@ fn zksync_circuit(block_chunks: usize) -> impl Circuit<Engine> + Clone {
             eth_address: None,
             valid_from: None,
             valid_until: None,
+            second_valid_from: None,
+            second_valid_until: None,
         },
         lhs: OperationBranch {
             address: None,
