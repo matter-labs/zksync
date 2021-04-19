@@ -1029,7 +1029,7 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
                 is_special_nft_storage_account,
                 is_special_nft_token,
             )?,
-            self.mintNFT(
+            self.mint_nft(
                 cs.namespace(|| "mintNFT"),
                 &mut cur,
                 global_variables,
@@ -1105,6 +1105,7 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
         Ok(())
     }
 
+    #[allow(clippy::too_many_arguments)]
     fn withdraw<CS: ConstraintSystem<E>>(
         &self,
         mut cs: CS,
@@ -1612,6 +1613,7 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
         Ok(tx_valid)
     }
 
+    #[allow(clippy::too_many_arguments)]
     fn change_pubkey_offchain<CS: ConstraintSystem<E>>(
         &self,
         mut cs: CS,
@@ -1910,7 +1912,8 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
         Ok(tx_valid)
     }
 
-    fn mintNFT<CS: ConstraintSystem<E>>(
+    #[allow(clippy::too_many_arguments)]
+    fn mint_nft<CS: ConstraintSystem<E>>(
         &self,
         mut cs: CS,
         cur: &mut AllocatedOperationBranch<E>,
@@ -2156,7 +2159,7 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
 
             multi_and(cs.namespace(|| "fourth_chunk_valid"), &flags)?
         };
-        let content_to_store_as_balance = NFT_content_as_balance(
+        let content_to_store_as_balance = nft_content_as_balance(
             cs.namespace(|| "NFT_content_to_store_as_balance"),
             &op_data.special_account_ids[0],
             &op_data.special_serial_id,
@@ -2172,7 +2175,7 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
 
         let fifth_chunk_valid = {
             // Fifth chunk should increment the balance of the recipient.
-            let mut flags = vec![common_valid.clone(), is_chunk_with_index[4].clone()];
+            let mut flags = vec![common_valid, is_chunk_with_index[4].clone()];
 
             let is_recipient_account = Boolean::from(Expression::equals(
                 cs.namespace(|| "is_recipient_account"),
@@ -2201,7 +2204,7 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
             &fifth_chunk_valid,
         )?;
 
-        Ok(multi_or(
+        multi_or(
             cs.namespace(|| "is_mintNFT_valid"),
             &[
                 first_chunk_valid,
@@ -2210,7 +2213,7 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
                 fourth_chunk_valid,
                 fifth_chunk_valid,
             ],
-        )?)
+        )
     }
 
     #[allow(clippy::too_many_arguments)]
@@ -3380,11 +3383,11 @@ fn continue_leftmost_subroot_to_root<E: RescueEngine, CS: ConstraintSystem<E>>(
     Ok(node_hash)
 }
 
-fn NFT_content_as_balance<E: RescueEngine, CS: ConstraintSystem<E>>(
+fn nft_content_as_balance<E: RescueEngine, CS: ConstraintSystem<E>>(
     mut cs: CS,
     creator_account_id: &CircuitElement<E>,
     serial_id: &CircuitElement<E>,
-    content_hash: &Vec<CircuitElement<E>>,
+    content_hash: &[CircuitElement<E>],
     params: &E::Params,
 ) -> Result<CircuitElement<E>, SynthesisError> {
     let mut content_hash_as_booleans_le = content_hash

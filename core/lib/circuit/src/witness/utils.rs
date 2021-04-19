@@ -19,9 +19,7 @@ use zksync_crypto::{
         utils::{be_bit_vector_into_bytes, le_bit_vector_into_field_element},
     },
     merkle_tree::{hasher::Hasher, RescueHasher},
-    params::{
-        total_tokens, used_account_subtree_depth, CHUNK_BIT_WIDTH, MAX_CIRCUIT_MSG_HASH_BITS,
-    },
+    params::{used_account_subtree_depth, CHUNK_BIT_WIDTH, MAX_CIRCUIT_MSG_HASH_BITS},
     primitives::GetBits,
     Engine,
 };
@@ -46,9 +44,8 @@ use crate::{
     operation::{Operation, SignatureData},
     utils::sign_rescue,
 };
-use std::thread::sleep;
-use std::time::Duration;
-use zksync_crypto::params::{number_of_processable_tokens, total_fungible_tokens};
+
+use zksync_crypto::params::number_of_processable_tokens;
 
 /// Wrapper around `CircuitAccountTree`
 /// that simplifies witness generation
@@ -593,8 +590,8 @@ impl SigDataInput {
         )
     }
 
-    pub fn from_mintNFT_op(mintNFT_op: &MintNFTOp) -> Result<Self, anyhow::Error> {
-        let sign_packed = mintNFT_op
+    pub fn from_mint_nft_op(mint_nft_op: &MintNFTOp) -> Result<Self, anyhow::Error> {
+        let sign_packed = mint_nft_op
             .tx
             .signature
             .signature
@@ -602,8 +599,8 @@ impl SigDataInput {
             .expect("signature serialize");
         SigDataInput::new(
             &sign_packed,
-            &mintNFT_op.tx.get_bytes(),
-            &mintNFT_op.tx.signature.pub_key,
+            &mint_nft_op.tx.get_bytes(),
+            &mint_nft_op.tx.signature.pub_key,
         )
     }
 
@@ -804,20 +801,20 @@ pub fn build_block_witness<'a>(
                 todo!(); // Part of (ZKS-551)
             }
             ZkSyncOp::Noop(_) => {} // Noops are handled below
-            ZkSyncOp::MintNFTOp(mintNFT) => {
-                let mintNFT_witness =
-                    MintNFTWitness::apply_tx(&mut witness_accum.account_tree, &mintNFT);
+            ZkSyncOp::MintNFTOp(mint_nft) => {
+                let mint_nft_witness =
+                    MintNFTWitness::apply_tx(&mut witness_accum.account_tree, &mint_nft);
 
-                let input = SigDataInput::from_mintNFT_op(&mintNFT)?;
-                let mintNFT_operations = mintNFT_witness.calculate_operations(input);
+                let input = SigDataInput::from_mint_nft_op(&mint_nft)?;
+                let mint_nft_operations = mint_nft_witness.calculate_operations(input);
 
-                operations.extend(mintNFT_operations);
+                operations.extend(mint_nft_operations);
                 fees.push(CollectedFee {
-                    token: mintNFT.tx.fee_token,
-                    amount: mintNFT.tx.fee,
+                    token: mint_nft.tx.fee_token,
+                    amount: mint_nft.tx.fee,
                 });
-                pub_data.extend(mintNFT_witness.get_pubdata());
-                offset_commitment.extend(mintNFT_witness.get_offset_commitment_data())
+                pub_data.extend(mint_nft_witness.get_pubdata());
+                offset_commitment.extend(mint_nft_witness.get_offset_commitment_data())
             }
         }
     }

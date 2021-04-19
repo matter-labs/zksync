@@ -3,7 +3,7 @@ use zksync_crypto::franklin_crypto::{
     eddsa::{PrivateKey, PublicKey},
     jubjub::FixedGenerators,
 };
-use zksync_crypto::params::{max_account_id, max_fungible_token_id, max_token_id, JUBJUB_PARAMS};
+use zksync_crypto::params::{max_account_id, max_fungible_token_id, JUBJUB_PARAMS};
 use zksync_crypto::public_key_from_private;
 use zksync_crypto::rand::{Rng, SeedableRng, XorShiftRng};
 

@@ -225,8 +225,7 @@ impl<E: RescueEngine> AllocatedOperationData<E> {
             eth_address,
             pub_nonce,
             amount_packed,
-
-            special_eth_address: special_eth_address,
+            special_eth_address,
             special_tokens: vec![special_token; 2],
             special_account_ids: vec![special_account_id; 2],
             special_content_hash,

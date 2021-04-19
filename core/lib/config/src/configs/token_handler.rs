@@ -5,7 +5,7 @@ use std::time::Duration;
 use serde::Deserialize;
 // Workspace uses
 use zksync_types::TokenInfo;
-use zksync_utils::get_env;
+
 // Local uses
 use crate::envy_load;
 

@@ -96,7 +96,7 @@ impl TxHandler<MintNFT> for ZkSyncState {
         updates.push((
             op.creator_account_id,
             AccountUpdate::UpdateBalance {
-                balance_update: (NFT_TOKEN_ID, old_balance.clone(), new_balance),
+                balance_update: (NFT_TOKEN_ID, old_balance, new_balance),
                 old_nonce,
                 new_nonce: creator_account.nonce,
             },
@@ -215,7 +215,7 @@ impl ZkSyncState {
     fn get_or_create_nft_account_token_id(&mut self) -> (Account, AccountUpdates) {
         let mut updates = vec![];
         let account = self.get_account(NFT_STORAGE_ACCOUNT_ID).unwrap_or_else(|| {
-            unreachable!();
+            vlog::error!("NFT Account is not defined in account tree, add it manually");
             let balance = BigUint::from(MIN_NFT_TOKEN_ID);
             let (mut account, upd) =
                 Account::create_account(NFT_STORAGE_ACCOUNT_ID, *NFT_STORAGE_ACCOUNT_ADDRESS);

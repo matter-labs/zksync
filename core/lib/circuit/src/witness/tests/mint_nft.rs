@@ -37,7 +37,7 @@ fn test_success() {
                 .sign_mint_nft(
                     TokenId(0),
                     "",
-                    content_hash.clone(),
+                    content_hash,
                     BigUint::from(fee_amount),
                     &account_to.account.address,
                     None,
@@ -50,7 +50,7 @@ fn test_success() {
 
         // Additional data required for performing the operation.
         let input =
-            SigDataInput::from_mintNFT_op(&mint_nft_op).expect("SigDataInput creation failed");
+            SigDataInput::from_mint_nft_op(&mint_nft_op).expect("SigDataInput creation failed");
 
         generic_test_scenario::<MintNFTWitness<Bn256>, _>(
             &accounts,
