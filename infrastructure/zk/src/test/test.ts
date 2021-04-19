@@ -44,14 +44,9 @@ export async function contracts() {
 
 export async function circuit(threads: number = 1, testName?: string, ...args: string[]) {
     await utils.spawn(
-        `cargo test --no-fail-fast --release -p zksync_circuit ${testName || ''} 
-         -- --test-threads ${threads} ${args.join(' ')}`
+        `cargo test --no-fail-fast --release -p zksync_circuit ${testName || ''}
+         -- --ignored --test-threads ${threads} ${args.join(' ')}`
     );
-    // TODO Enable ignored tests. Now, new tests required 128 gb of memory. Our ci server does not have enough
-    // await utils.spawn(
-    //     `cargo test --no-fail-fast --release -p zksync_circuit ${testName || ''}
-    //      -- --ignored --test-threads ${threads} ${args.join(' ')}`
-    // );
 }
 
 export async function prover() {
@@ -78,9 +73,9 @@ export async function rust() {
     await rustApi(true);
     await prover();
     const { stdout: threads } = await utils.exec('nproc');
-    let circuitTestsThreads = Math.trunc(parseInt(threads) / 4); // if we use all CPUs tests can consume all RAM
-    if (circuitTestsThreads < 3) {
-        circuitTestsThreads = 3;
+    let circuitTestsThreads = Math.trunc(parseInt(threads) / 8); // if we use all CPUs tests can consume all RAM
+    if (circuitTestsThreads < 2) {
+        circuitTestsThreads = 2;
     }
     await circuit(circuitTestsThreads);
     await rustCryptoTests();

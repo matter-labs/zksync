@@ -36,7 +36,7 @@ pub fn total_tokens() -> usize {
 
 /// Number of tokens that are processed by this release
 pub fn number_of_processable_tokens() -> usize {
-    let num = 2usize.pow(11);
+    let num = 1024;
 
     assert!(num <= total_tokens());
     assert!(num.is_power_of_two());
