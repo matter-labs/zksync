@@ -75,16 +75,17 @@ impl ZkSyncState {
 
     pub fn from_acc_map(accounts: AccountMap, current_block: BlockNumber) -> Self {
         let mut empty = Self::empty();
-        let sorted_accounts = {
-            let mut sorted_accounts: Vec<_> = accounts.into_iter().collect();
-            sorted_accounts.sort_by(|a, b| a.0.cmp(&b.0));
-            sorted_accounts
-        };
-        if !sorted_accounts.is_empty() {
-            empty.next_free_id = AccountId(*sorted_accounts.last().unwrap().0 + 1);
+
+        let mut next_free_id = 0;
+        for account in &accounts {
+            if account.0 != &NFT_STORAGE_ACCOUNT_ID {
+                next_free_id = std::cmp::max(next_free_id, **account.0 + 1);
+            }
         }
+        empty.next_free_id = AccountId(next_free_id as u32);
+
         empty.block_number = current_block;
-        for (id, account) in sorted_accounts {
+        for (id, account) in accounts {
             empty.insert_account(id, account);
         }
         empty

@@ -341,21 +341,10 @@ impl<'a, E: RescueEngine + JubjubEngine> Circuit<E> for ZkSyncCircuit<'a, E> {
         let validator_address_bits = validator_address_padded.get_bits_le();
         assert_eq!(validator_address_bits.len(), params::ACCOUNT_ID_BIT_WIDTH);
 
-        let mut validator_balances_processable_tokens = {
-            assert_eq!(
-                self.validator_balances.len(),
-                params::number_of_processable_tokens()
-            );
-            let allocated_validator_balances = allocate_numbers_vec(
-                cs.namespace(|| "validator_balances"),
-                &self.validator_balances[..params::number_of_processable_tokens()],
-            )?;
-            assert_eq!(
-                allocated_validator_balances.len(),
-                params::number_of_processable_tokens()
-            );
-            allocated_validator_balances
-        };
+        let mut validator_balances_processable_tokens = allocate_numbers_vec(
+            cs.namespace(|| "validator_balances"),
+            &self.validator_balances,
+        )?;
 
         let validator_audit_path = allocate_numbers_vec(
             cs.namespace(|| "validator_audit_path"),
@@ -1927,12 +1916,20 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
             !pubdata_holder.is_empty(),
             "pubdata holder has to be preallocated"
         );
+        /*
+        op_data special fields specification:
+        special_eth_address = recipient_address
+        special_tokens = [fee_token, new_token]
+        special_account_ids = [creator_account_id, recipient_account_id]
+        special_content_hash = vector of bits of the content hash
+        special_serial_id = serial_id of the NFT from this creator
+        */
 
         //construct pubdata
         let mut pubdata_bits = vec![];
         pubdata_bits.extend(global_variables.chunk_data.tx_type.get_bits_be()); // tx_type = 1 byte
-        pubdata_bits.extend(op_data.special_account_ids[0].get_bits_be()); // creator_id = 4 bytes
-        pubdata_bits.extend(op_data.special_account_ids[1].get_bits_be()); // recipient_id = 4 bytes
+        pubdata_bits.extend(op_data.special_account_ids[0].get_bits_be()); // creator_account_id = 4 bytes
+        pubdata_bits.extend(op_data.special_account_ids[1].get_bits_be()); // recipient_account_id = 4 bytes
         pubdata_bits.extend(
             op_data
                 .special_content_hash
