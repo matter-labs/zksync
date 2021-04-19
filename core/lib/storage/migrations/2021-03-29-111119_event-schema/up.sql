@@ -1,4 +1,4 @@
-CREATE TYPE event_type AS ENUM ('ACCOUNT', 'BLOCK', 'TRANSACTION');
+CREATE TYPE event_type AS ENUM ('Account', 'Block', 'Transaction');
 
 CREATE TABLE events (
     id BIGSERIAL PRIMARY KEY,

@@ -1,6 +1,7 @@
+use serde::Deserialize;
 use zksync_storage::event::types::{block::*, EventData, ZkSyncEvent};
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Deserialize)]
 pub struct BlockFilter {
     pub block_status: Option<BlockStatus>,
 }

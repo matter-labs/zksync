@@ -1789,9 +1789,9 @@
               "name": "event_type",
               "kind": {
                 "Enum": [
-                  "ACCOUNT",
-                  "BLOCK",
-                  "TRANSACTION"
+                  "Account",
+                  "Block",
+                  "Transaction"
                 ]
               }
             }
@@ -4645,9 +4645,9 @@
               "name": "event_type",
               "kind": {
                 "Enum": [
-                  "ACCOUNT",
-                  "BLOCK",
-                  "TRANSACTION"
+                  "Account",
+                  "Block",
+                  "Transaction"
                 ]
               }
             }

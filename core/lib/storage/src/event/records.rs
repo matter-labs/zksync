@@ -5,7 +5,7 @@ use sqlx::FromRow;
 
 #[derive(sqlx::Type, Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[sqlx(rename = "event_type")]
-#[sqlx(rename_all = "UPPERCASE")]
+#[serde(rename_all = "snake_case")]
 pub enum EventType {
     Account,
     Block,

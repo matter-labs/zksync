@@ -1,96 +1,89 @@
+use std::sync::Arc;
+
 // TODO: Handle errors thoroughly once anyhow is removed from storage.
 // use zksync_config::ZkSyncConfig;
-use futures::channel::mpsc;
-use futures::SinkExt;
-use zksync_storage::{
-    event::types::ZkSyncEvent,
-    listener::{notification::StorageNotification, StorageListener},
-    StorageProcessor,
-};
+use crate::messages::{NewEvents, NewStorageEvent};
+use crate::monitor::ServerMonitor;
+use actix::prelude::*;
+use futures::StreamExt;
+use zksync_storage::{listener::StorageListener, ConnectionPool};
 
-pub struct EventListener<'a> {
-    storage: StorageProcessor<'a>,
-    listener: StorageListener,
-    db_channel: String,
+pub struct EventListener {
+    db_pool: ConnectionPool,
+    server_monitor: Addr<ServerMonitor>,
+    listener: Option<StorageListener>,
     last_processed_event_id: i64,
-    events_sender: mpsc::Sender<Vec<ZkSyncEvent>>,
 }
 
-impl<'a> EventListener<'a> {
-    // pub async fn new<'b>(config: ZkSyncConfig) -> anyhow::Result<EventListener<'b>> {
-    pub async fn new<'b>(
-        sender: mpsc::Sender<Vec<ZkSyncEvent>>,
-    ) -> anyhow::Result<EventListener<'b>> {
-        let listener = StorageListener::connect().await?;
-        let mut storage = StorageProcessor::establish_connection().await?;
-        let last_processed_event_id = storage
+impl StreamHandler<NewStorageEvent> for EventListener {
+    fn handle(&mut self, new_event: NewStorageEvent, ctx: &mut Self::Context) {
+        if self.last_processed_event_id >= new_event.0 {
+            return;
+        }
+        let pool = self.db_pool.clone();
+        async move {
+            pool.access_storage()
+                .await
+                .unwrap()
+                .event_schema()
+                .get_unprocessed_events()
+                .await
+                .unwrap()
+        }
+        .into_actor(self)
+        .then(|events, act, _ctx| {
+            if let Some(event) = events.last() {
+                act.last_processed_event_id = event.id;
+            }
+            let msg = NewEvents(Arc::new(events));
+            act.server_monitor.send(msg).into_actor(act)
+        })
+        .map(|response, _, _| {
+            if let Err(err) = response {
+                vlog::warn!(
+                    "Couldn't send new events to server monitor, reason: {:?}",
+                    err
+                );
+            }
+        })
+        .wait(ctx);
+    }
+}
+
+impl Actor for EventListener {
+    type Context = Context<Self>;
+
+    fn started(&mut self, ctx: &mut Self::Context) {
+        let stream = self
+            .listener
+            .take()
+            .unwrap()
+            .into_stream()
+            .map(|item| NewStorageEvent::from(item.unwrap()));
+        Self::add_stream(stream, ctx);
+    }
+}
+
+impl EventListener {
+    const DB_POOL_SIZE: u32 = 1;
+
+    pub async fn new(server_monitor: Addr<ServerMonitor>) -> anyhow::Result<EventListener> {
+        let mut listener = StorageListener::connect().await?;
+        let db_pool = ConnectionPool::new(Some(Self::DB_POOL_SIZE));
+        let last_processed_event_id = db_pool
+            .access_storage()
+            .await?
             .event_schema()
             .get_last_processed_event_id()
             .await?
             .unwrap_or(0);
+        listener.listen("event_channel").await?;
 
-        // let channel = config.db.listen_channel_name;
-        let db_channel = "event_channel".into();
         Ok(EventListener {
-            storage,
-            listener,
-            db_channel,
+            db_pool,
+            server_monitor,
+            listener: Some(listener),
             last_processed_event_id,
-            events_sender: sender,
         })
     }
-
-    pub async fn run(&mut self) -> anyhow::Result<()> {
-        self.listener.listen(&self.db_channel).await?;
-
-        // If the connection is aborted, it will be restored on the next
-        // iteration, in this case we will try to fetch new events without
-        // waiting for new notifications.
-        // TODO: throttle processing.
-        loop {
-            match self.listener.try_recv().await? {
-                Some(notification) => self.handle_notification(notification).await?,
-                None => self.process_new_events().await?,
-            }
-        }
-    }
-
-    async fn handle_notification(
-        &mut self,
-        notification: StorageNotification,
-    ) -> anyhow::Result<()> {
-        let received_id: i64 = notification.payload().parse().unwrap();
-        if self.last_processed_event_id >= received_id {
-            return Ok(());
-        }
-        self.process_new_events().await?;
-        Ok(())
-    }
-
-    async fn process_new_events(&mut self) -> anyhow::Result<()> {
-        let events = self.storage.event_schema().get_unprocessed_events().await?;
-        self.last_processed_event_id = match events.last() {
-            Some(event) => event.id,
-            None => return Ok(()),
-        };
-        // Send new events to the filtering component.
-        let _ids: Vec<_> = events.iter().map(|event| event.id).collect();
-        eprintln!("Fetched ids:\n{:?}", _ids);
-        self.events_sender.send(events).await?;
-        Ok(())
-    }
-}
-
-#[must_use]
-pub fn run_event_listener(sender: mpsc::Sender<Vec<ZkSyncEvent>>) -> tokio::task::JoinHandle<()> {
-    tokio::spawn(async {
-        let mut listener = EventListener::new(sender)
-            .await
-            .expect("couldn't intialize event listener");
-
-        listener
-            .run()
-            .await
-            .expect("an error happened while fetching new events from the database");
-    })
 }

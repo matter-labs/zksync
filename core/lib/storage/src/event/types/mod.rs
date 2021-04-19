@@ -3,24 +3,29 @@ pub mod account;
 pub mod block;
 pub mod transaction;
 
+use std::convert::TryFrom;
+
 use self::account::AccountEvent;
 use self::block::BlockEvent;
 use self::transaction::TransactionEvent;
 
 use super::records::*;
+use serde::Serialize;
 
 pub use super::records::EventType;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize)]
 pub enum EventData {
     Account(AccountEvent),
     Block(BlockEvent),
     Transaction(TransactionEvent),
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize)]
 pub struct ZkSyncEvent {
+    #[serde(skip)]
     pub id: i64,
+    #[serde(flatten)]
     pub data: EventData,
 }
 
@@ -35,7 +40,7 @@ impl From<StoredEvent> for ZkSyncEvent {
                 EventData::Block(serde_json::from_value(stored_event.event_data).unwrap())
             }
             EventType::Transaction => {
-                EventData::Transaction(serde_json::from_value(stored_event.event_data).unwrap())
+                EventData::Transaction(TransactionEvent::try_from(stored_event.event_data).unwrap())
             }
         };
         Self { id, data }

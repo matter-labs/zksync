@@ -1,5 +1,6 @@
 // Built-in uses
 // External uses
+use futures_util::stream::{Stream, StreamExt};
 use sqlx::postgres::PgListener;
 // Workspace uses
 // Local uses
@@ -51,6 +52,13 @@ impl StorageListener {
     /// Any notifications received while the connection was lost cannot be recovered.
     pub async fn try_recv(&mut self) -> QueryResult<Option<StorageNotification>> {
         Ok(self.conn.try_recv().await?.map(StorageNotification::from))
+    }
+
+    /// Consume this listener, returning a Stream of notifications.
+    pub fn into_stream(self) -> impl Unpin + Stream<Item = QueryResult<StorageNotification>> {
+        self.conn
+            .into_stream()
+            .map(|item| Ok(StorageNotification::from(item?)))
     }
 }
 

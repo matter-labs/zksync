@@ -1,5 +1,5 @@
 // Built-in uses
-use std::cell::Cell;
+use std::convert::TryFrom;
 // External uses
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
@@ -37,8 +37,9 @@ pub struct TransactionEvent {
     pub fail_reason: Option<String>,
     pub created_at: DateTime<Utc>,
     /// This field is only used for filtering.
+    /// TODO: move to another type after removing deserializing
     #[serde(skip)]
-    tx_type: Cell<Option<TransactionType>>,
+    tx_type: Option<TransactionType>,
 }
 
 impl TransactionEvent {
@@ -61,7 +62,7 @@ impl TransactionEvent {
                 },
                 fail_reason: exec_tx.fail_reason.clone(),
                 created_at: exec_tx.created_at,
-                tx_type: Cell::default(),
+                tx_type: None,
             },
             ExecutedOperations::PriorityOp(exec_prior_op) => Self {
                 tx_hash: exec_prior_op.priority_op.eth_hash.to_string(),
@@ -72,19 +73,23 @@ impl TransactionEvent {
                 status: TransactionStatus::Committed,
                 fail_reason: None,
                 created_at: exec_prior_op.created_at,
-                tx_type: Cell::default(),
+                tx_type: None,
             },
         }
     }
 
     pub fn tx_type(&self) -> TransactionType {
-        match self.tx_type.get() {
-            Some(tx_type) => tx_type,
-            None => {
-                let tx_type = serde_json::from_value(self.tx["type"].clone()).unwrap();
-                self.tx_type.set(Some(tx_type));
-                tx_type
-            }
-        }
+        self.tx_type.unwrap()
+    }
+}
+
+impl TryFrom<serde_json::Value> for TransactionEvent {
+    type Error = serde_json::Error;
+
+    fn try_from(value: serde_json::Value) -> Result<Self, Self::Error> {
+        let mut tx_event: TransactionEvent = serde_json::from_value(value)?;
+        let tx_type = serde_json::from_value(tx_event.tx["type"].clone())?;
+        tx_event.tx_type = Some(tx_type);
+        Ok(tx_event)
     }
 }

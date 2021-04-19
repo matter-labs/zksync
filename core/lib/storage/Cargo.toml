@@ -36,6 +36,7 @@ parity-crypto = { version = "0.6.2", features = ["publickey"] }
 vlog = { path = "../../lib/vlog", version = "1.0" }
 
 async-trait = "0.1"
+futures-util = "0.3"
 deadpool = "0.5.2"
 sqlx = { version = "0.4.2", default-features = false, features = [
     "runtime-tokio-native-tls",

@@ -1,11 +1,12 @@
+use serde::Deserialize;
 use std::collections::HashSet;
 use zksync_storage::event::types::{transaction::*, EventData, ZkSyncEvent};
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Deserialize)]
 pub struct TransactionFilter {
-    pub tx_types: Option<HashSet<TransactionType>>,
-    pub account_ids: Option<HashSet<i64>>,
-    pub token_ids: Option<HashSet<i32>>,
+    pub types: Option<HashSet<TransactionType>>,
+    pub accounts: Option<HashSet<i64>>,
+    pub tokens: Option<HashSet<i32>>,
     pub status: Option<TransactionStatus>,
 }
 
@@ -20,19 +21,19 @@ impl TransactionFilter {
                 return false;
             }
         }
-        if let Some(tx_types) = &self.tx_types {
+        if let Some(tx_types) = &self.types {
             let tx_type = tx_event.tx_type();
             if !tx_types.contains(&tx_type) {
                 return false;
             }
         }
-        if let Some(token_ids) = &self.token_ids {
+        if let Some(token_ids) = &self.tokens {
             let token_id = tx_event.token_id;
             if !token_ids.contains(&token_id) {
                 return false;
             }
         }
-        if let Some(account_ids) = &self.account_ids {
+        if let Some(account_ids) = &self.accounts {
             let account_id = tx_event.account_id;
             if !account_ids.contains(&account_id) {
                 return false;

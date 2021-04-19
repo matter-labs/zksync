@@ -11,9 +11,15 @@ categories = ["cryptography"]
 publish = false # We don't want to publish our binaries.
 
 [dependencies]
+actix-web-actors = "3"
+actix = "0.10.0"
+actix-web = "3"
+
 anyhow = "1.0"
 tokio = { version = "0.2", features = ["full"] }
 futures = "0.3"
+serde = "1"
+serde_json = "1"
 
 zksync_storage = { path = "../../lib/storage", version = "1.0" }
 zksync_config = { path = "../../lib/config", version = "1.0" }
