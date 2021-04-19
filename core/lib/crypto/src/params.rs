@@ -34,7 +34,7 @@ pub fn total_tokens() -> usize {
     2usize.pow(balance_tree_depth() as u32) - 2
 }
 
-pub const PROCESSABLE_TOKENS_DEPTH: u32 = 11;
+pub const PROCESSABLE_TOKENS_DEPTH: u32 = 10;
 /// Number of tokens that are processed by this release
 pub fn number_of_processable_tokens() -> usize {
     let num = 2usize.pow(PROCESSABLE_TOKENS_DEPTH);
@@ -44,6 +44,7 @@ pub fn number_of_processable_tokens() -> usize {
 
     num
 }
+
 /// NFT settings
 
 /// Special token id, which enforce unique pair of creator account id and serial id for generating unique address for token.
