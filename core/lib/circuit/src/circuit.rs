@@ -62,6 +62,9 @@ pub struct ZkSyncCircuit<'a, E: RescueEngine + JubjubEngine> {
     pub validator_balances: Vec<Option<E::Fr>>,
     pub validator_audit_path: Vec<Option<E::Fr>>,
     pub validator_account: AccountWitness<E>,
+
+    pub validator_non_processable_tokens_audit_before_fees: Vec<Option<E::Fr>>,
+    pub validator_non_processable_tokens_audit_after_fees: Vec<Option<E::Fr>>,
 }
 
 pub struct CircuitGlobalVariables<E: RescueEngine + JubjubEngine> {
@@ -86,6 +89,13 @@ impl<'a, E: RescueEngine + JubjubEngine> std::clone::Clone for ZkSyncCircuit<'a,
             validator_balances: self.validator_balances.clone(),
             validator_audit_path: self.validator_audit_path.clone(),
             validator_account: self.validator_account.clone(),
+
+            validator_non_processable_tokens_audit_before_fees: self
+                .validator_non_processable_tokens_audit_before_fees
+                .clone(),
+            validator_non_processable_tokens_audit_after_fees: self
+                .validator_non_processable_tokens_audit_after_fees
+                .clone(),
         }
     }
 }

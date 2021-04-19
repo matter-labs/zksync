@@ -65,6 +65,8 @@ pub struct WitnessBuilder<'a> {
     pub fee_account_balances: Option<Vec<Option<Fr>>>,
     pub fee_account_witness: Option<AccountWitness<Engine>>,
     pub fee_account_audit_path: Option<Vec<Option<Fr>>>,
+    pub validator_non_processable_tokens_audit_before_fees: Option<Vec<Option<Fr>>>,
+    pub validator_non_processable_tokens_audit_after_fees: Option<Vec<Option<Fr>>>,
     pub pubdata_commitment: Option<Fr>,
 }
 
@@ -92,6 +94,8 @@ impl<'a> WitnessBuilder<'a> {
             fee_account_balances: None,
             fee_account_witness: None,
             fee_account_audit_path: None,
+            validator_non_processable_tokens_audit_before_fees: None,
+            validator_non_processable_tokens_audit_after_fees: None,
             pubdata_commitment: None,
         }
     }
@@ -143,6 +147,18 @@ impl<'a> WitnessBuilder<'a> {
         }
         self.fee_account_balances = Some(fee_circuit_account_balances);
 
+        self.validator_non_processable_tokens_audit_before_fees = Some(
+            self.account_tree
+                .get(*self.fee_account_id)
+                .unwrap_or(&CircuitAccount::default())
+                .subtree
+                .merkle_path(0)
+                .into_iter()
+                .map(|e| Some(e.0))
+                .collect::<Vec<_>>()
+                .as_slice()[zksync_crypto::params::PROCESSABLE_TOKENS_DEPTH as usize..]
+                .to_vec(),
+        );
         let (mut root_after_fee, mut fee_account_witness) =
             crate::witness::utils::apply_fee(&mut self.account_tree, *self.fee_account_id, 0, 0);
         for CollectedFee { token, amount } in fees {
@@ -155,6 +171,18 @@ impl<'a> WitnessBuilder<'a> {
             root_after_fee = root;
             fee_account_witness = acc_witness;
         }
+        self.validator_non_processable_tokens_audit_after_fees = Some(
+            self.account_tree
+                .get(*self.fee_account_id)
+                .unwrap_or(&CircuitAccount::default())
+                .subtree
+                .merkle_path(0)
+                .into_iter()
+                .map(|e| Some(e.0))
+                .collect::<Vec<_>>()
+                .as_slice()[zksync_crypto::params::PROCESSABLE_TOKENS_DEPTH as usize..]
+                .to_vec(),
+        );
 
         self.root_after_fees = Some(root_after_fee);
         self.fee_account_witness = Some(fee_account_witness);
@@ -205,6 +233,12 @@ impl<'a> WitnessBuilder<'a> {
             validator_audit_path: self
                 .fee_account_audit_path
                 .expect("fee account audit path not present"),
+            validator_non_processable_tokens_audit_before_fees: self
+                .validator_non_processable_tokens_audit_before_fees
+                .expect("fee account non processable tokens audit before fees not present"),
+            validator_non_processable_tokens_audit_after_fees: self
+                .validator_non_processable_tokens_audit_after_fees
+                .expect("fee account non processable tokens audit after fees not present"),
         }
     }
 }

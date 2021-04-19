@@ -34,9 +34,10 @@ pub fn total_tokens() -> usize {
     2usize.pow(balance_tree_depth() as u32) - 2
 }
 
+pub const PROCESSABLE_TOKENS_DEPTH: u32 = 11;
 /// Number of tokens that are processed by this release
 pub fn number_of_processable_tokens() -> usize {
-    let num = 2usize.pow(11);
+    let num = 2usize.pow(PROCESSABLE_TOKENS_DEPTH);
 
     assert!(num <= total_tokens());
     assert!(num.is_power_of_two());

@@ -40,6 +40,10 @@ pub struct ProverData {
     pub operations: Vec<Operation<Engine>>,
     #[serde(with = "AccountWitnessDef")]
     pub validator_account: AccountWitness<Engine>,
+    #[serde(with = "VecOptionalFrSerde")]
+    pub validator_non_processable_tokens_audit_before_fees: Vec<Option<Fr>>,
+    #[serde(with = "VecOptionalFrSerde")]
+    pub validator_non_processable_tokens_audit_after_fees: Vec<Option<Fr>>,
 }
 
 impl From<WitnessBuilder<'_>> for ProverData {
@@ -59,6 +63,12 @@ impl From<WitnessBuilder<'_>> for ProverData {
             validator_balances: witness_builder.fee_account_balances.unwrap(),
             validator_audit_path: witness_builder.fee_account_audit_path.unwrap(),
             validator_account: witness_builder.fee_account_witness.unwrap(),
+            validator_non_processable_tokens_audit_before_fees: witness_builder
+                .validator_non_processable_tokens_audit_before_fees
+                .unwrap(),
+            validator_non_processable_tokens_audit_after_fees: witness_builder
+                .validator_non_processable_tokens_audit_after_fees
+                .unwrap(),
         }
     }
 }
@@ -78,6 +88,10 @@ impl ProverData {
             validator_balances: self.validator_balances,
             validator_audit_path: self.validator_audit_path,
             validator_account: self.validator_account,
+            validator_non_processable_tokens_audit_before_fees: self
+                .validator_non_processable_tokens_audit_before_fees,
+            validator_non_processable_tokens_audit_after_fees: self
+                .validator_non_processable_tokens_audit_after_fees,
         }
     }
 }
