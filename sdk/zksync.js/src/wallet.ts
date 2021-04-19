@@ -372,7 +372,7 @@ export class Wallet {
         recipient?: Address;
         nonce?: Nonce;
         validFrom?: number;
-        validUntil?: number
+        validUntil?: number;
     }): Promise<Order> {
         if (!this.signer) {
             throw new Error('zkSync signer is required for signing an order');
@@ -387,7 +387,7 @@ export class Wallet {
             recipientId = this.accountId;
         }
         if (recipientId === undefined) {
-            throw new Error("Recipient has to have an accountID");
+            throw new Error('Recipient has to have an accountID');
         }
         return this.signer.signSyncOrder({
             accountId: this.accountId,
@@ -403,11 +403,11 @@ export class Wallet {
     }
 
     async getSwap(swap: {
-        orders: [Order, Order],
-        feeToken: number
-        amounts: [BigNumberish, BigNumberish],
-        nonce: number,
-        fee: BigNumberish
+        orders: [Order, Order];
+        feeToken: number;
+        amounts: [BigNumberish, BigNumberish];
+        nonce: number;
+        fee: BigNumberish;
     }): Promise<Swap> {
         if (!this.signer) {
             throw new Error('zkSync signer is required for swapping funds');
@@ -423,16 +423,39 @@ export class Wallet {
         });
     }
 
-    async signSyncSwap(): Promise<SignedTransaction> {
-        // TODO
+    async signSyncSwap(swap: {
+        orders: [Order, Order];
+        feeToken: number;
+        amounts: [BigNumberish, BigNumberish];
+        nonce: number;
+        fee: BigNumberish;
+    }): Promise<SignedTransaction> {
+        const signedSwapTransaction = await this.getSwap(swap);
+        const stringFee = BigNumber.from(swap.fee).isZero()
+            ? null
+            : this.provider.tokenSet.formatToken(swap.feeToken, swap.fee);
+        const stringToken = this.provider.tokenSet.resolveTokenSymbol(swap.feeToken);
+        const ethereumSignature =
+            this.ethSigner instanceof Create2WalletSigner
+                ? null
+                : await this.ethMessageSigner.ethSignSwap({
+                      fee: stringFee,
+                      feeToken: stringToken,
+                      nonce: swap.nonce
+                  });
+
+        return {
+            tx: signedSwapTransaction,
+            ethereumSignature
+        };
     }
 
     async syncSwap(swap: {
-        orders: [Order, Order],
-        feeToken: TokenLike,
-        amounts?: [BigNumberish, BigNumberish],
-        nonce?: number,
-        fee?: BigNumberish
+        orders: [Order, Order];
+        feeToken: TokenLike;
+        amounts?: [BigNumberish, BigNumberish];
+        nonce?: number;
+        fee?: BigNumberish;
     }): Promise<Transaction> {
         swap.nonce = swap.nonce != null ? await this.getNonce(swap.nonce) : await this.getNonce();
         if (swap.fee == null) {

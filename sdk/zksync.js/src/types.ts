@@ -73,7 +73,6 @@ export interface Signature {
     signature: string;
 }
 
-
 export interface Order {
     accountId: number;
     recipientId: number;

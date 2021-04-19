@@ -52,6 +52,27 @@ export class EthMessageSigner {
         return await this.getEthMessageSignature(message);
     }
 
+    async ethSignSwap(swap: { fee: string; feeToken: string; nonce: number }): Promise<TxEthSignature> {
+        const message = this.getSwapEthSignMessage(swap);
+        return await this.getEthMessageSignature(message);
+    }
+
+    getSwapEthSignMessagePart(swap: { fee: string; feeToken: string }): string {
+        if (swap.fee != '0') {
+            return `Swap fee: ${swap.fee} ${swap.feeToken}`;
+        }
+        return '';
+    }
+
+    getSwapEthSignMessage(swap: { fee: string; feeToken: string; nonce: number }): string {
+        let message = this.getSwapEthSignMessagePart(swap);
+        if (message != '') {
+            message += '\n';
+        }
+        message += `Nonce: ${swap.nonce}`;
+        return message;
+    }
+
     async ethSignForcedExit(forcedExit: {
         stringToken: string;
         stringFee: string;

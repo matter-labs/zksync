@@ -58,7 +58,7 @@ const FEE_MANTISSA_BIT_WIDTH = 11;
 export class Price {
     private constructor(private _sell: BigNumber, private _buy: BigNumber) {}
     static from(price: string) {
-        return new Price(utils.parseUnits(price, 18), BigNumber.from(10**18));
+        return new Price(utils.parseUnits(price, 18), BigNumber.from(10 ** 18));
     }
     static fromRatio(sell: BigNumberish, buy: BigNumberish) {
         return new Price(BigNumber.from(sell), BigNumber.from(buy));
@@ -602,7 +602,7 @@ export function serializeOrder(order: Order): Uint8Array {
         validFrom,
         validUntil
     ]);
-} 
+}
 
 export function serializeSwap(swap: Swap): Uint8Array {
     const type = new Uint8Array([9]);

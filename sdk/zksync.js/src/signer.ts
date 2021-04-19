@@ -89,10 +89,7 @@ export class Signer {
 
         return {
             ...tx,
-            amounts: [
-                BigNumber.from(tx.amounts[0]).toString(),
-                BigNumber.from(tx.amounts[1]).toString(),
-            ],
+            amounts: [BigNumber.from(tx.amounts[0]).toString(), BigNumber.from(tx.amounts[1]).toString()],
             fee: BigNumber.from(tx.fee).toString(),
             signature
         };
