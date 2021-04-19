@@ -189,6 +189,60 @@ impl GasCounter {
         Ok(())
     }
 
+    pub fn can_include(&self, ops: &[ZkSyncOp]) -> bool {
+        let new_commit_cost: U256 = self.commit_cost
+            + ops
+                .iter()
+                .map(CommitCost::op_cost)
+                .fold(U256::zero(), |mut sum, val| {
+                    sum = sum + val;
+                    sum
+                });
+        if Self::scale_up(new_commit_cost) > U256::from(TX_GAS_LIMIT) {
+            return false;
+        }
+
+        let new_verify_cost: U256 = self.verify_cost
+            + ops
+                .iter()
+                .map(VerifyCost::op_cost)
+                .fold(U256::zero(), |mut sum, val| {
+                    sum = sum + val;
+                    sum
+                });
+        if Self::scale_up(new_verify_cost) > U256::from(TX_GAS_LIMIT) {
+            return false;
+        }
+
+        true
+    }
+
+    pub fn batch_fits_into_empty_block(ops: &[ZkSyncOp]) -> bool {
+        let commit_cost: U256 =
+            ops.iter()
+                .map(CommitCost::op_cost)
+                .fold(U256::zero(), |mut sum, val| {
+                    sum = sum + val;
+                    sum
+                });
+        if Self::scale_up(commit_cost) > U256::from(TX_GAS_LIMIT) {
+            return false;
+        }
+
+        let verify_cost: U256 =
+            ops.iter()
+                .map(VerifyCost::op_cost)
+                .fold(U256::zero(), |mut sum, val| {
+                    sum = sum + val;
+                    sum
+                });
+        if Self::scale_up(verify_cost) > U256::from(TX_GAS_LIMIT) {
+            return false;
+        }
+
+        true
+    }
+
     pub fn commit_gas_limit(&self) -> U256 {
         self.commit_cost * U256::from(130) / U256::from(100)
     }

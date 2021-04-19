@@ -1228,4 +1228,123 @@ mod execute_proposed_block {
                     .commit_gas_limit()
         );
     }
+
+    /// Checks that block seals after reaching gas limit.
+    #[tokio::test]
+    async fn gas_limit_sealing() {
+        let mut tester = StateKeeperTester::new(1000, 1000, 1000);
+        let mut account_id = AccountId(1);
+
+        let withdraw = create_account_and_withdrawal(
+            &mut tester,
+            TokenId(0),
+            account_id,
+            20u32,
+            10u32,
+            Default::default(),
+        );
+        let op = tester
+            .state_keeper
+            .state
+            .zksync_tx_to_zksync_op(withdraw.tx.clone())
+            .unwrap();
+        let mut test_gas_counter = tester.state_keeper.pending_block.gas_counter.clone();
+        let mut proposed_block = ProposedBlock {
+            txs: Vec::new(),
+            priority_ops: Vec::new(),
+        };
+
+        // Add txs while they fit into block.
+        while test_gas_counter.add_op(&op).is_ok() {
+            let withdraw = create_account_and_withdrawal(
+                &mut tester,
+                TokenId(0),
+                account_id,
+                20u32,
+                10u32,
+                Default::default(),
+            );
+            *account_id += 1;
+            proposed_block.txs.push(SignedTxVariant::Tx(withdraw));
+        }
+
+        let last_withdraw = create_account_and_withdrawal(
+            &mut tester,
+            TokenId(0),
+            account_id,
+            2000000u32,
+            10u32,
+            Default::default(),
+        );
+        // Add one more tx.
+        proposed_block
+            .txs
+            .push(SignedTxVariant::Tx(last_withdraw.clone()));
+
+        tester
+            .state_keeper
+            .execute_proposed_block(proposed_block)
+            .await;
+        if let Some(CommitRequest::Block((_, _))) = tester.response_rx.next().await {
+        } else {
+            panic!("Sealed block is not received");
+        }
+        if let Some(CommitRequest::PendingBlock((pending_block, _))) =
+            tester.response_rx.next().await
+        {
+            assert_eq!(pending_block.success_operations.len(), 1);
+            let tx = pending_block.success_operations.first().unwrap();
+            match tx {
+                ExecutedOperations::Tx(tx) => {
+                    assert_eq!(tx.signed_tx.tx.hash(), last_withdraw.tx.hash());
+                }
+                _ => panic!("Tx was expected"),
+            }
+        } else {
+            panic!("Pending block is not received");
+        }
+    }
+
+    /// Checks that batch that doesn't fit into gas limit is processed correctly.
+    #[tokio::test]
+    async fn batch_gas_limit() {
+        let mut tester = StateKeeperTester::new(1000, 1000, 1000);
+
+        let mut txs = Vec::new();
+        for i in 0..100 {
+            let withdraw = create_account_and_withdrawal(
+                &mut tester,
+                TokenId(0),
+                AccountId(i + 1),
+                2000000u32,
+                10u32,
+                Default::default(),
+            );
+            txs.push(withdraw);
+        }
+
+        let proposed_block = ProposedBlock {
+            txs: vec![SignedTxVariant::Batch(SignedTxsBatch {
+                txs,
+                batch_id: 1,
+                eth_signatures: Vec::new(),
+            })],
+            priority_ops: Vec::new(),
+        };
+        // Execute big batch.
+        tester
+            .state_keeper
+            .execute_proposed_block(proposed_block)
+            .await;
+        if let Some(CommitRequest::PendingBlock((block, _))) = tester.response_rx.next().await {
+            assert_eq!(block.failed_txs.len(), 100);
+            let tx = block.failed_txs.first().unwrap();
+            assert_eq!(
+                tx.fail_reason,
+                Some("Amount of gas required to process batch is too big".to_string())
+            );
+        } else {
+            panic!("Pending block is not received");
+        }
+    }
 }
