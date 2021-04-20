@@ -388,7 +388,7 @@ impl MintNFTWitness<Bn256> {
 
         let (
             recipient_account_witness_before_fifth_chunk,
-            recipient_account_witness_after_fifth_chunk,
+            _recipient_account_witness_after_fifth_chunk,
             recipient_account_balance_before_fifth_chunk,
             _recipient_account_balance_after_fifth_chunk,
         ) = apply_leaf_operation(
