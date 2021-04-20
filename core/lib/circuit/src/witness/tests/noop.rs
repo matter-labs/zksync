@@ -68,7 +68,7 @@ fn insert_validator(
 
     // Initialize all the validator balances as 0.
     let empty_balance = Some(Fr::zero());
-    let validator_balances = vec![empty_balance; params::total_tokens()];
+    let validator_balances = vec![empty_balance; params::number_of_processable_tokens()];
 
     // Insert account into tree.
     tree.insert(validator_address_number, validator_leaf);

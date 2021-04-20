@@ -76,9 +76,9 @@ pub fn max_account_id() -> AccountId {
     }
 }
 
-/// Max token id, based on the number of processable tokens
+/// Max token id
 pub fn max_token_id() -> TokenId {
-    TokenId(total_tokens() as u32)
+    TokenId(*NFT_TOKEN_ID - 1)
 }
 
 /// Max fungible token id
