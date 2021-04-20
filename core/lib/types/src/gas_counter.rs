@@ -443,7 +443,17 @@ mod tests {
             - GasCounter::scale_up(gas_counter.commit_cost))
             / GasCounter::scale_up(U256::from(CommitCost::OLD_CHANGE_PUBKEY_COST_OFFCHAIN)); // restore after [ZKS-554]
 
+        let mut batch: Vec<_> = (0..amount_ops_in_block.as_u64())
+            .map(|_| zksync_op.clone())
+            .collect();
+        assert!(GasCounter::batch_fits_into_empty_block(&batch));
+
+        batch.push(zksync_op.clone());
+        assert!(!GasCounter::batch_fits_into_empty_block(&batch));
+
+        let slice = &[zksync_op.clone()];
         for _ in 0..amount_ops_in_block.as_u64() {
+            assert!(gas_counter.can_include(slice));
             gas_counter
                 .add_op(&zksync_op)
                 .expect("Gas limit was not reached, but op adding failed");
@@ -460,6 +470,7 @@ mod tests {
             / U256::from(100);
         assert_eq!(gas_counter.commit_gas_limit(), expected_commit_limit);
         assert_eq!(gas_counter.verify_gas_limit(), expected_verify_limit);
+        assert!(!gas_counter.can_include(slice));
 
         // Attempt to add one more operation (it should fail).
         gas_counter
