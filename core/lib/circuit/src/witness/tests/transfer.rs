@@ -20,7 +20,7 @@ use crate::witness::{
     transfer::TransferWitness,
     utils::SigDataInput,
 };
-use zksync_crypto::params::{number_of_processable_tokens, NFT_STORAGE_ACCOUNT_ID, NFT_TOKEN_ID};
+use zksync_crypto::params::{number_of_processable_tokens, NFT_STORAGE_ACCOUNT_ID};
 
 /// Basic check for execution of `Transfer` operation in circuit.
 /// Here we create two accounts and perform a transfer between them.
