@@ -1,26 +1,25 @@
 use zksync_crypto::{
-    circuit::account::{Balance, CircuitAccount, CircuitAccountTree, CircuitBalanceTree},
+    circuit::account::{Balance, CircuitBalanceTree},
     merkle_tree::RescueHasher,
     merkle_tree::SparseMerkleTree,
     primitives::GetBits,
     Engine, Fr,
 };
 
-use crate::account::FromAccount;
+use crate::account::CircuitAccountWrapper;
 use once_cell::sync::Lazy;
 use zksync_types::Account;
 
 pub static BALANCE_TREE_32: Lazy<CircuitBalanceTree> = Lazy::new(|| SparseMerkleTree::new(32));
 pub static BALANCE_TREE_11: Lazy<CircuitBalanceTree> = Lazy::new(|| SparseMerkleTree::new(11));
 
-pub fn get_state(
-    accounts: &[(i64, Account)],
-    balance_tree: &CircuitBalanceTree,
-) -> CircuitAccountTree {
-    let mut account_state_tree: CircuitAccountTree = SparseMerkleTree::new(32);
+pub type CustomMerkleTree<T> = SparseMerkleTree<T, Fr, RescueHasher<Engine>>;
+
+pub fn get_state<T: CircuitAccountWrapper>(accounts: &[(i64, Account)]) -> CustomMerkleTree<T> {
+    let mut account_state_tree: CustomMerkleTree<T> = SparseMerkleTree::new(32);
 
     for (id, account) in accounts {
-        let circuit_account = CircuitAccount::from_account(account.clone(), &balance_tree);
+        let circuit_account = T::from_account(account.clone());
 
         account_state_tree.insert(*id as u32, circuit_account);
     }
@@ -30,11 +29,11 @@ pub fn get_state(
 
 type GenericSparseMerkeTree<T> = SparseMerkleTree<T, Fr, RescueHasher<Engine>>;
 
-pub fn verify_identical_trees<T: GetBits + Default + Sync>(
+pub fn verify_identical_trees<T: Sync + GetBits + Default, S: Sync + GetBits + Default>(
     first_tree: &GenericSparseMerkeTree<T>,
-    second_tree: &GenericSparseMerkeTree<T>,
+    second_tree: &GenericSparseMerkeTree<S>,
     elements_to_check: u32,
-    verify_equality: fn(u32, &T, &T) -> anyhow::Result<()>,
+    verify_equality: fn(u32, &T, &S) -> anyhow::Result<()>,
 ) -> anyhow::Result<()> {
     for index in 0..=elements_to_check {
         let first_tree_element = first_tree.get(index);
@@ -78,11 +77,14 @@ pub fn verify_identical_balances(
     }
 }
 
-pub fn verify_accounts_equal(
+pub fn verify_accounts_equal<T: CircuitAccountWrapper, S: CircuitAccountWrapper>(
     index: u32,
-    first_account: &CircuitAccount<Engine>,
-    second_account: &CircuitAccount<Engine>,
+    first_account: &T,
+    second_account: &S,
 ) -> anyhow::Result<()> {
+    let first_account = first_account.get_inner();
+    let second_account = second_account.get_inner();
+
     if first_account.nonce != second_account.nonce {
         return Err(anyhow::format_err!(
             "The account {} have different nonces",
@@ -116,18 +118,3 @@ pub fn verify_accounts_equal(
 
     Ok(())
 }
-
-// pub fn verify_identical_accounts(tree_depth_11: &CircuitAccountTree, tree_depth_32: &CircuitAccountTree) -> anyhow::Result<()> {
-//     for index in 0..=u32::MAX {
-//         let first_tree_element = tree_depth_11.get(index).ok_or_else(|| anyhow::format_err!("The first tree does not contain account {}", index))?;
-//         let second_tree_element = tree_depth_32.get(index).ok_or_else(|| anyhow::format_err!("The second tree does not contain account {}", index))?;
-
-//         let are_equal = verify_accounts_equal(first_tree_element, second_tree_element);
-
-//         if !are_equal {
-//             return Err(anyhow::format_err!("Account {} is different in the second tree", index));
-//         }
-//     }
-
-//     Ok(())
-// }

@@ -4,14 +4,16 @@ mod hasher;
 mod tests;
 mod utils;
 
+use account::{
+    get_nft_account, read_accounts, verify_empty, CircuitAccountDepth11, CircuitAccountDepth32,
+};
+
 use structopt::StructOpt;
 use utils::{fr_to_hex, sign_update_message, Params};
 use zksync_circuit::witness::utils::fr_from_bytes;
 
-use account::read_accounts;
-use hasher::{
-    get_state, verify_accounts_equal, verify_identical_trees, BALANCE_TREE_11, BALANCE_TREE_32,
-};
+use hasher::{get_state, verify_accounts_equal, verify_identical_trees};
+use zksync_crypto::params::NFT_STORAGE_ACCOUNT_ID;
 
 fn main() {
     let params = Params::from_args();
@@ -21,7 +23,11 @@ fn main() {
     let current_hash_bytes = hex::decode(params.current_root_hash).unwrap();
     let current_hash_fr = fr_from_bytes(current_hash_bytes);
 
-    let old_tree = get_state(&accounts, &BALANCE_TREE_11);
+    let old_tree = get_state::<CircuitAccountDepth11>(&accounts);
+
+    // Verifying that the nft account is empty
+    verify_empty(NFT_STORAGE_ACCOUNT_ID.0, &old_tree).unwrap();
+
     let old_hash = old_tree.root_hash();
     println!("OldHash: {}", fr_to_hex(old_hash));
 
@@ -30,12 +36,16 @@ fn main() {
         "The recalculated hash is not equal to the current one."
     );
 
-    let new_tree = get_state(&accounts, &BALANCE_TREE_32);
-    let new_hash = new_tree.root_hash();
-    println!("NewHash: {}", fr_to_hex(new_hash));
+    let mut new_tree = get_state::<CircuitAccountDepth32>(&accounts);
 
     // Verify that each of the u32::MAX accounts has the same accounts in both trees
     verify_identical_trees(&old_tree, &new_tree, u32::MAX, verify_accounts_equal).unwrap();
+
+    // The new tree will also contain the NFT_STORAGE_ACCOUNT
+    let nft_account = get_nft_account();
+    new_tree.insert(NFT_STORAGE_ACCOUNT_ID.0, nft_account);
+    let new_hash = new_tree.root_hash();
+    println!("NewHash: {}", fr_to_hex(new_hash));
 
     let signature = sign_update_message(params.private_key, old_hash, new_hash);
     println!("Signature: {}", signature);

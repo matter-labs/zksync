@@ -1,7 +1,7 @@
 use zksync_circuit::witness::utils::fr_from_bytes;
 
-use crate::account::read_accounts;
-use crate::hasher::{get_state, BALANCE_TREE_11};
+use crate::account::{read_accounts, CircuitAccountDepth11};
+use crate::hasher::get_state;
 
 #[test]
 fn test_sample_tree_hashing() {
@@ -15,7 +15,7 @@ fn test_sample_tree_hashing() {
     let expected_hash_bytes = hex::decode(expected_hash_str).unwrap();
     let expected_hash = fr_from_bytes(expected_hash_bytes);
 
-    let tree = get_state(&accounts, &BALANCE_TREE_11);
+    let tree = get_state::<CircuitAccountDepth11>(&accounts);
     let root_hash = tree.root_hash();
 
     assert_eq!(
