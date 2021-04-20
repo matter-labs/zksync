@@ -7,6 +7,7 @@ use zksync_storage::event::types::{account::*, EventData, ZkSyncEvent};
 // Local uses
 
 #[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct AccountFilter {
     pub accounts: Option<HashSet<i64>>,
     pub tokens: Option<HashSet<i32>>,

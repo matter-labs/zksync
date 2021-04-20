@@ -1,9 +1,11 @@
 // Built-in uses
 use std::collections::HashMap;
-use std::convert::TryFrom;
+use std::fmt;
 // Workspace uses
 use zksync_storage::event::{records::EventType, types::ZkSyncEvent};
 // External uses
+use serde::de::{MapAccess, Visitor};
+use serde::{Deserialize, Deserializer};
 // Local uses
 use account::AccountFilter;
 use block::BlockFilter;
@@ -43,20 +45,42 @@ impl SubscriberFilters {
     }
 }
 
-impl TryFrom<String> for SubscriberFilters {
-    type Error = serde_json::Error;
+struct EventFiltersVisitor;
 
-    fn try_from(input: String) -> Result<Self, Self::Error> {
-        let value_map: HashMap<EventType, serde_json::Value> = serde_json::from_str(&input)?;
-        let mut event_map = HashMap::new();
-        for (event_type, value) in value_map.into_iter() {
-            let filter = match event_type {
-                EventType::Account => EventFilter::Account(serde_json::from_value(value)?),
-                EventType::Block => EventFilter::Block(serde_json::from_value(value)?),
-                EventType::Transaction => EventFilter::Transaction(serde_json::from_value(value)?),
+impl<'de> Visitor<'de> for EventFiltersVisitor {
+    type Value = HashMap<EventType, EventFilter>;
+
+    fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+        formatter.write_str("a map of event interests")
+    }
+
+    fn visit_map<M>(self, mut access: M) -> Result<Self::Value, M::Error>
+    where
+        M: MapAccess<'de>,
+    {
+        let mut map = HashMap::with_capacity(access.size_hint().unwrap_or(0));
+
+        while let Some(key) = access.next_key()? {
+            let value = match key {
+                EventType::Account => EventFilter::Account(access.next_value::<AccountFilter>()?),
+                EventType::Block => EventFilter::Block(access.next_value::<BlockFilter>()?),
+                EventType::Transaction => {
+                    EventFilter::Transaction(access.next_value::<TransactionFilter>()?)
+                }
             };
-            event_map.insert(event_type, filter);
+
+            map.insert(key, value);
         }
-        Ok(Self(event_map))
+
+        Ok(map)
+    }
+}
+
+impl<'de> Deserialize<'de> for SubscriberFilters {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        Ok(Self(deserializer.deserialize_map(EventFiltersVisitor)?))
     }
 }

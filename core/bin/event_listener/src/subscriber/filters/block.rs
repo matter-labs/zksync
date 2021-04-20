@@ -6,6 +6,7 @@ use zksync_storage::event::types::{block::*, EventData, ZkSyncEvent};
 // Local uses
 
 #[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct BlockFilter {
     pub block_status: Option<BlockStatus>,
 }

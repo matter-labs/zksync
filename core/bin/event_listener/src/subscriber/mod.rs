@@ -1,8 +1,8 @@
 // Built-in uses
-use std::convert::TryFrom;
 // External uses
 use actix::prelude::*;
 use actix_web_actors::ws;
+use futures_util::FutureExt;
 // Workspace uses
 // Local uses
 use crate::messages::{NewEvents, RegisterSubscriber, RemoveSubscriber};
@@ -47,15 +47,11 @@ impl Actor for Subscriber {
 
     fn stopped(&mut self, ctx: &mut Self::Context) {
         let request = RemoveSubscriber(ctx.address());
-        self.monitor
-            .send(request)
-            .into_actor(self)
-            .map(|response, _, _| {
-                if let Err(err) = response {
-                    vlog::error!("Couldn't remove the subscriber, reason: {:?}", err);
-                }
-            })
-            .wait(ctx);
+        actix::spawn(self.monitor.send(request).map(|response| {
+            if let Err(err) = response {
+                vlog::error!("Couldn't remove the subscriber, reason: {:?}", err);
+            }
+        }));
     }
 }
 
@@ -64,16 +60,17 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for Subscriber {
         match msg {
             Ok(ws::Message::Ping(msg)) => ctx.pong(&msg),
             Ok(ws::Message::Text(text)) => {
-                if self.filters.is_none() {
-                    match SubscriberFilters::try_from(text) {
-                        Ok(filters) => {
-                            eprintln!("New sub events: {:?}", filters);
-                            self.filters = Some(filters);
-                        }
-                        Err(_) => {
-                            ctx.stop();
-                        }
-                    };
+                if self.filters.is_some() {
+                    return;
+                }
+                match serde_json::from_str(&text) {
+                    Ok(filters) => {
+                        self.filters = Some(filters);
+                    }
+                    Err(_err) => {
+                        // TODO: close the connection with a reason.
+                        ctx.stop();
+                    }
                 }
             }
             Ok(ws::Message::Close(_)) => {

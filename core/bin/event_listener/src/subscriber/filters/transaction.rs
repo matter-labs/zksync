@@ -7,6 +7,7 @@ use serde::Deserialize;
 // Local uses
 
 #[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct TransactionFilter {
     pub types: Option<HashSet<TransactionType>>,
     pub accounts: Option<HashSet<i64>>,
