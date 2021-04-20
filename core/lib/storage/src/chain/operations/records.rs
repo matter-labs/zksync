@@ -15,7 +15,7 @@ pub struct StoredOperation {
     pub confirmed: bool,
 }
 
-#[derive(Debug, Clone, FromRow)]
+#[derive(Debug, Clone, FromRow, PartialEq)]
 pub struct StoredExecutedPriorityOperation {
     pub block_number: i64,
     pub block_index: i32,
