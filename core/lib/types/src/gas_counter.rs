@@ -189,6 +189,32 @@ impl GasCounter {
         Ok(())
     }
 
+    pub fn can_include(&self, ops: &[ZkSyncOp]) -> bool {
+        let ops_cost: (U256, U256) = ops
+            .iter()
+            .map(|op| (CommitCost::op_cost(op), VerifyCost::op_cost(op)))
+            .fold((U256::zero(), U256::zero()), |mut sum, val| {
+                sum.0 += val.0;
+                sum.1 += val.1;
+                sum
+            });
+        let new_commit_cost = self.commit_cost + ops_cost.0;
+        let new_verify_cost = self.verify_cost + ops_cost.1;
+
+        if Self::scale_up(new_commit_cost) > U256::from(TX_GAS_LIMIT) {
+            return false;
+        }
+        if Self::scale_up(new_verify_cost) > U256::from(TX_GAS_LIMIT) {
+            return false;
+        }
+
+        true
+    }
+
+    pub fn batch_fits_into_empty_block(ops: &[ZkSyncOp]) -> bool {
+        Self::new().can_include(ops)
+    }
+
     pub fn commit_gas_limit(&self) -> U256 {
         self.commit_cost * U256::from(130) / U256::from(100)
     }
@@ -417,7 +443,17 @@ mod tests {
             - GasCounter::scale_up(gas_counter.commit_cost))
             / GasCounter::scale_up(U256::from(CommitCost::OLD_CHANGE_PUBKEY_COST_OFFCHAIN)); // restore after [ZKS-554]
 
+        let mut batch: Vec<_> = (0..amount_ops_in_block.as_u64())
+            .map(|_| zksync_op.clone())
+            .collect();
+        assert!(GasCounter::batch_fits_into_empty_block(&batch));
+
+        batch.push(zksync_op.clone());
+        assert!(!GasCounter::batch_fits_into_empty_block(&batch));
+
+        let slice = &[zksync_op.clone()];
         for _ in 0..amount_ops_in_block.as_u64() {
+            assert!(gas_counter.can_include(slice));
             gas_counter
                 .add_op(&zksync_op)
                 .expect("Gas limit was not reached, but op adding failed");
@@ -434,6 +470,7 @@ mod tests {
             / U256::from(100);
         assert_eq!(gas_counter.commit_gas_limit(), expected_commit_limit);
         assert_eq!(gas_counter.verify_gas_limit(), expected_verify_limit);
+        assert!(!gas_counter.can_include(slice));
 
         // Attempt to add one more operation (it should fail).
         gas_counter
