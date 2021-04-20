@@ -1,23 +1,20 @@
 // External deps
-use zksync_crypto::{
-    franklin_crypto::{
-        bellman::{
-            pairing::ff::{Field, PrimeField},
-            Circuit, ConstraintSystem, SynthesisError,
-        },
-        circuit::{
-            boolean::Boolean,
-            ecc,
-            expression::Expression,
-            multipack,
-            num::AllocatedNum,
-            polynomial_lookup::{do_the_lookup, generate_powers},
-            rescue, sha256, Assignment,
-        },
-        jubjub::{FixedGenerators, JubjubEngine, JubjubParams},
-        rescue::RescueEngine,
+use zksync_crypto::franklin_crypto::{
+    bellman::{
+        pairing::ff::{Field, PrimeField},
+        Circuit, ConstraintSystem, SynthesisError,
     },
-    pairing::BitIterator,
+    circuit::{
+        boolean::Boolean,
+        ecc,
+        expression::Expression,
+        multipack,
+        num::AllocatedNum,
+        polynomial_lookup::{do_the_lookup, generate_powers},
+        rescue, sha256, Assignment,
+    },
+    jubjub::{FixedGenerators, JubjubEngine, JubjubParams},
+    rescue::RescueEngine,
 };
 // Workspace deps
 use zksync_crypto::params::{
@@ -3688,9 +3685,10 @@ fn rescue_hash_allocated_bits<'a, E: RescueEngine + JubjubEngine, CS: Constraint
 
     assert_eq!(sponge_output.len(), 1);
 
-    let bits_be: Vec<_> = BitIterator::new(sponge_output[0].get_value().grab()?.into_repr())
-        .map(Boolean::constant)
-        .collect();
+    let result = CircuitElement::from_number(
+        cs.namespace(|| "sponge output - sig_msg"),
+        sponge_output[0].clone(),
+    )?;
 
-    Ok(bits_be)
+    Ok(result.get_bits_be())
 }
