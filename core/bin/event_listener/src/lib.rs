@@ -1,15 +1,18 @@
+// Built-in uses
+// Workspace uses
+// External uses
 use actix::prelude::*;
 use actix_web::{web, App, Error, HttpRequest, HttpResponse, HttpServer};
 use actix_web_actors::ws;
+// Local uses
 use listener::EventListener;
 use monitor::ServerMonitor;
 use subscriber::Subscriber;
 
 pub mod listener;
+pub mod messages;
 pub mod monitor;
 pub mod subscriber;
-
-pub mod messages;
 
 struct AppState {
     server_monitor: Addr<ServerMonitor>,

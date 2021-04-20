@@ -1,5 +1,9 @@
+// Built-in uses
+// External uses
 use serde::Deserialize;
+// Workspace uses
 use zksync_storage::event::types::{block::*, EventData, ZkSyncEvent};
+// Local uses
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct BlockFilter {

@@ -1,12 +1,14 @@
+// Built-in uses
 use std::sync::Arc;
-
-// TODO: Handle errors thoroughly once anyhow is removed from storage.
+// External uses
+use actix::prelude::*;
+use futures_util::stream::StreamExt;
+// Workspace uses
+use zksync_storage::{listener::StorageListener, ConnectionPool};
 // use zksync_config::ZkSyncConfig;
+// Local uses
 use crate::messages::{NewEvents, NewStorageEvent};
 use crate::monitor::ServerMonitor;
-use actix::prelude::*;
-use futures::StreamExt;
-use zksync_storage::{listener::StorageListener, ConnectionPool};
 
 pub struct EventListener {
     db_pool: ConnectionPool,

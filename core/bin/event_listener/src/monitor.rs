@@ -1,7 +1,11 @@
+// Built-in uses
+use std::collections::HashSet;
+// External uses
+use actix::prelude::*;
+// Workspace uses
+// Local uses
 use crate::messages::*;
 use crate::subscriber::Subscriber;
-use actix::prelude::*;
-use std::collections::HashSet;
 
 #[derive(Debug)]
 pub struct ServerMonitor {

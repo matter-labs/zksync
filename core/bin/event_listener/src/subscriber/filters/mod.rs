@@ -1,15 +1,17 @@
+// Built-in uses
 use std::collections::HashMap;
 use std::convert::TryFrom;
-
+// Workspace uses
 use zksync_storage::event::{records::EventType, types::ZkSyncEvent};
+// External uses
+// Local uses
+use account::AccountFilter;
+use block::BlockFilter;
+use transaction::TransactionFilter;
 
 mod account;
 mod block;
 mod transaction;
-
-pub use account::AccountFilter;
-pub use block::BlockFilter;
-pub use transaction::TransactionFilter;
 
 #[derive(Debug, Clone)]
 pub enum EventFilter {

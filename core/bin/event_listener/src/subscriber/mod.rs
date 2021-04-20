@@ -1,11 +1,12 @@
+// Built-in uses
 use std::convert::TryFrom;
-
+// External uses
 use actix::prelude::*;
 use actix_web_actors::ws;
-
+// Workspace uses
+// Local uses
 use crate::messages::{NewEvents, RegisterSubscriber, RemoveSubscriber};
 use crate::monitor::ServerMonitor;
-
 use filters::SubscriberFilters;
 
 mod filters;
@@ -13,7 +14,6 @@ mod filters;
 #[derive(Debug)]
 pub struct Subscriber {
     filters: Option<SubscriberFilters>,
-
     monitor: Addr<ServerMonitor>,
 }
 

@@ -1,7 +1,10 @@
-use actix::prelude::*;
+// Built-in uses
 use std::sync::Arc;
+// External uses
+use actix::prelude::*;
+// Workspace uses
 use zksync_storage::{event::types::ZkSyncEvent, listener::notification::StorageNotification};
-
+// Local uses
 use crate::subscriber::Subscriber;
 
 #[derive(Debug, Message)]

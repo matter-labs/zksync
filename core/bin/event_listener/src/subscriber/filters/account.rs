@@ -1,6 +1,10 @@
-use serde::Deserialize;
+// Built-in uses
 use std::collections::HashSet;
+// External uses
+use serde::Deserialize;
+// Workspace uses
 use zksync_storage::event::types::{account::*, EventData, ZkSyncEvent};
+// Local uses
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct AccountFilter {
