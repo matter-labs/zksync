@@ -2488,7 +2488,50 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
             )?
         };
 
-        // TODO check that both prices are valid
+        // check that both prices are valid
+        // Swap.amountA * Swap.orderA.price.buy <= Swap.amountB * Swap.orderA.price.sell
+        // Swap.amountB * Swap.orderB.price.buy <= Swap.amountA * Swap.orderB.price.sell
+        let is_first_price_ok = {
+            let amount_bought = {
+                let amount = op_data.amount_unpacked.get_number().mul(
+                    cs.namespace(|| ""),
+                    &op_data.special_amounts_unpacked[2].get_number(),
+                )?;
+                CircuitElement::from_number(cs.namespace(|| ""), amount)?
+            };
+
+            let amount_sold = {
+                let amount = op_data.second_amount_unpacked.get_number().mul(
+                    cs.namespace(|| ""),
+                    &op_data.special_amounts_unpacked[1].get_number(),
+                )?;
+                CircuitElement::from_number(cs.namespace(|| ""), amount)?
+            };
+
+            CircuitElement::less_than_fixed(cs.namespace(|| ""), &amount_sold, &amount_bought)?
+                .not()
+        };
+
+        let is_second_price_ok = {
+            let amount_bought = {
+                let amount = op_data.second_amount_unpacked.get_number().mul(
+                    cs.namespace(|| ""),
+                    &op_data.special_amounts_unpacked[5].get_number(),
+                )?;
+                CircuitElement::from_number(cs.namespace(|| ""), amount)?
+            };
+
+            let amount_sold = {
+                let amount = op_data.amount_unpacked.get_number().mul(
+                    cs.namespace(|| ""),
+                    &op_data.special_amounts_unpacked[4].get_number(),
+                )?;
+                CircuitElement::from_number(cs.namespace(|| ""), amount)?
+            };
+
+            CircuitElement::less_than_fixed(cs.namespace(|| ""), &amount_sold, &amount_bought)?
+                .not()
+        };
 
         let common_valid_flag = multi_and(
             cs.namespace(|| "common_valid_flags"),
@@ -2504,6 +2547,8 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
                 are_swapping_accounts_different,
                 is_amount_valid,
                 is_second_amount_valid,
+                is_first_price_ok,
+                is_second_price_ok,
             ],
         )?;
 
