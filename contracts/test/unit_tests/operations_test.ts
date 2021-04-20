@@ -95,7 +95,7 @@ describe('Operations unit tests', function () {
 
     it('Correctly Parse Deposit pubdata', async () => {
         const accountId = '0x01020304';
-        const tokenId = '0x0102';
+        const tokenId = '0x01020304';
         const amount = '0x101112131415161718191a1b1c1d1e1f';
         const owner = '0x823B747710C5bC9b8A47243f2c3d1805F1aA00c5';
 
@@ -105,7 +105,7 @@ describe('Operations unit tests', function () {
 
     it('Correctly write Deposit data priority queue', async () => {
         const accountId = '0x01020304';
-        const tokenId = '0x0102';
+        const tokenId = '0x01020304';
         const amount = '0x101112131415161718191a1b1c1d1e1f';
         const owner = '0x823B747710C5bC9b8A47243f2c3d1805F1aA00c5';
 
@@ -115,7 +115,7 @@ describe('Operations unit tests', function () {
 
     it('Correctly Parse FullExit pubdata', async () => {
         const accountId = '0x01020304';
-        const tokenId = '0x0102';
+        const tokenId = '0x01020304';
         const amount = '0x101112131415161718191a1b1c1d1e1f';
         const owner = '0x823B747710C5bC9b8A47243f2c3d1805F1aA00c5';
 
@@ -125,7 +125,7 @@ describe('Operations unit tests', function () {
 
     it('Correctly Write FullExit data priority queue', async () => {
         const accountId = '0x01020304';
-        const tokenId = '0x0102';
+        const tokenId = '0x01020304';
         const amount = '0x101112131415161718191a1b1c1d1e1f';
         const owner = '0x823B747710C5bC9b8A47243f2c3d1805F1aA00c5';
 
@@ -134,7 +134,7 @@ describe('Operations unit tests', function () {
     });
 
     it('Correctly Parse Withdraw pubdata', async () => {
-        const tokenId = '0x0102';
+        const tokenId = '0x01020304';
         const accountId = '0x01020304';
         const amount = '0x101112131415161718191a1b1c1d1e1f';
         const owner = '0x823B747710C5bC9b8A47243f2c3d1805F1aA00c5';
@@ -145,7 +145,7 @@ describe('Operations unit tests', function () {
     });
 
     it('Correctly Parse ForcedExit pubdata', async () => {
-        const tokenId = '0x0102';
+        const tokenId = '0x01020304';
         const initiatorAccountId = '0xa1a2a3a4';
         const accountId = '0x01020304';
         const amount = '0x101112131415161718191a1b1c1d1e1f';
@@ -161,7 +161,7 @@ describe('Operations unit tests', function () {
         const pubKeyHash = '0x4f6C02876350d615be18C530D869cF746D69d1df';
         const owner = '0x823B747710C5bC9b8A47243f2c3d1805F1aA00c5';
         const nonce = '0xa1a2a3a4';
-        const tokenId = '0x0102';
+        const tokenId = '0x01020304';
         const packedFee = '0xffee';
 
         const pubdata = getChangePubkeyPubdata({ accountId, pubKeyHash, owner, nonce, tokenId, packedFee });

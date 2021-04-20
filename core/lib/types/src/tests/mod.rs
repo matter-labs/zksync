@@ -1,3 +1,3 @@
 mod block;
-// mod hardcoded;
+mod hardcoded;
 pub mod utils;

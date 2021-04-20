@@ -116,11 +116,27 @@ impl TxHandler<MintNFT> for ZkSyncState {
         ));
         self.insert_account(NFT_STORAGE_ACCOUNT_ID, nft_account.clone());
 
-        // Token data is a special balance for NFT_STORAGE_ACCOUNT,
-        // which represent last 16 bytes of hash of (account_id, serial_id, content_hash) for storing this data in circuit
+        // Mint NFT with precalculated token_id, serial_id and address
         let token_id = TokenId(new_token_id.to_u32().expect("Should be correct u32"));
         let token_hash = op.tx.calculate_hash(serial_id);
         let token_address = Address::from_slice(&token_hash[12..]);
+        updates.push((
+            op.creator_account_id,
+            AccountUpdate::MintNFT {
+                token: NFT::new(
+                    token_id,
+                    serial_id,
+                    op.tx.creator_id,
+                    token_address,
+                    None,
+                    op.tx.content_hash,
+                ),
+            },
+        ));
+        self.insert_account(op.creator_account_id, creator_account);
+
+        // Token data is a special balance for NFT_STORAGE_ACCOUNT,
+        // which represent last 16 bytes of hash of (account_id, serial_id, content_hash) for storing this data in circuit
         let token_data = BigUint::from_bytes_be(&token_hash[16..]);
         let old_balance = nft_account.get_balance(token_id);
         assert_eq!(
@@ -138,22 +154,6 @@ impl TxHandler<MintNFT> for ZkSyncState {
             },
         ));
         self.insert_account(NFT_STORAGE_ACCOUNT_ID, nft_account);
-
-        // Mint NFT with precalculated token_id, serial_id and address
-        updates.push((
-            op.creator_account_id,
-            AccountUpdate::MintNFT {
-                token: NFT::new(
-                    token_id,
-                    serial_id,
-                    op.tx.creator_id,
-                    token_address,
-                    None,
-                    op.tx.content_hash,
-                ),
-            },
-        ));
-        self.insert_account(op.creator_account_id, creator_account);
 
         // Add this token to recipient account
         let mut recipient_account = self
