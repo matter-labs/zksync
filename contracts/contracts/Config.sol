@@ -95,6 +95,8 @@ contract Config {
     /// @dev Max deposit of ERC20 token that is possible to deposit
     uint128 internal constant MAX_DEPOSIT_AMOUNT = $$((2**104) - 1);
 
-    uint32 internal constant SPECIAL_ACCOUNT_ID = (2**31) - 2;
+    uint32 internal constant SPECIAL_ACCOUNT_ID = $$((2**31) - 2);
     address internal constant SPECIAL_ACCOUNT_ADDRESS = address(0xFFfFfFffFFfffFFfFFfFFFFFffFFFffffFfFFFfF);
+
+    uint32 internal constant MAX_FUNGIBLE_TOKEN_ID = $$((2**16) - 1);
 }
