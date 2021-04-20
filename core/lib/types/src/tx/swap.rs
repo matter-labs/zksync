@@ -10,8 +10,11 @@ use crate::{
 use num::{BigUint, Zero};
 use serde::{Deserialize, Serialize};
 use zksync_basic_types::Address;
-use zksync_crypto::franklin_crypto::eddsa::PrivateKey;
-use zksync_crypto::params::{max_account_id, max_token_id};
+use zksync_crypto::{
+    franklin_crypto::eddsa::PrivateKey,
+    params::{max_account_id, max_token_id},
+    primitives::rescue_hash_tx_msg,
+};
 use zksync_utils::{format_units, BigUintPairSerdeAsRadix10Str, BigUintSerdeAsRadix10Str};
 
 use super::{TxSignature, VerifiedSignatureCache};
@@ -140,7 +143,7 @@ impl Swap {
             fee_token,
             None,
         );
-        tx.signature = TxSignature::sign_musig(private_key, &tx.get_bytes());
+        tx.signature = TxSignature::sign_musig(private_key, &tx.get_sign_bytes());
         if !tx.check_correctness() {
             anyhow::bail!(crate::tx::TRANSACTION_SIGNATURE_ERROR);
         }
@@ -149,13 +152,44 @@ impl Swap {
 
     /// Encodes the transaction data as the byte sequence according to the zkSync protocol.
     pub fn get_bytes(&self) -> Vec<u8> {
+        let mut first_order_bytes = self.orders.0.get_bytes();
+        let mut second_order_bytes = self.orders.1.get_bytes();
+        let order_byte_size = first_order_bytes.len();
+
+        let mut orders_bytes = Vec::with_capacity(order_byte_size * 2);
+        orders_bytes.append(&mut first_order_bytes);
+        orders_bytes.append(&mut second_order_bytes);
+
+        self.get_swap_bytes(&orders_bytes)
+    }
+
+    /// Constructs the byte sequence to be signed for swap.
+    /// It differs from `get_bytes`, because there we include all the data, including orders data,
+    /// and here we represent orders by their hashes. This is required due to limited message size
+    /// for which signatures can be verified in circuit.
+    pub fn get_sign_bytes(&self) -> Vec<u8> {
+        let mut first_order_bytes = self.orders.0.get_bytes();
+        let mut second_order_bytes = self.orders.1.get_bytes();
+        let order_byte_size = first_order_bytes.len();
+
+        let mut orders_bytes = Vec::with_capacity(order_byte_size * 2);
+        orders_bytes.append(&mut first_order_bytes);
+        orders_bytes.append(&mut second_order_bytes);
+
+        let orders_hash = rescue_hash_tx_msg(&orders_bytes);
+
+        self.get_swap_bytes(&orders_hash)
+    }
+
+    /// Encodes transaction data, using provided encoded data for orders.
+    /// This function does not care how orders are encoded: is it data or hash.
+    fn get_swap_bytes(&self, order_bytes: &[u8]) -> Vec<u8> {
         let mut out = Vec::new();
         out.extend_from_slice(&[Self::TX_TYPE]);
         out.extend_from_slice(&self.submitter_id.to_be_bytes());
         out.extend_from_slice(&self.submitter_address.as_bytes());
         out.extend_from_slice(&self.nonce.to_be_bytes());
-        out.extend_from_slice(&self.orders.0.get_bytes());
-        out.extend_from_slice(&self.orders.1.get_bytes());
+        out.extend_from_slice(order_bytes);
         out.extend_from_slice(&self.fee_token.to_be_bytes());
         out.extend_from_slice(&pack_fee_amount(&self.fee));
         out.extend_from_slice(&pack_token_amount(&self.amounts.0));
@@ -211,7 +245,7 @@ impl Swap {
             *cached_signer
         } else {
             self.signature
-                .verify_musig(&self.get_bytes())
+                .verify_musig(&self.get_sign_bytes())
                 .map(|pub_key| PubKeyHash::from_pubkey(&pub_key))
         }
     }

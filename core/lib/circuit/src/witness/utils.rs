@@ -602,7 +602,7 @@ impl SigDataInput {
             .expect("signature serialize");
         SigDataInput::new(
             &sign_packed,
-            &swap_op.tx.get_bytes(),
+            &swap_op.tx.get_sign_bytes(),
             &swap_op.tx.signature.pub_key,
         )
     }
