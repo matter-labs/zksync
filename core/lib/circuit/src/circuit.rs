@@ -2303,12 +2303,13 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
             })
             .collect::<Result<Vec<_>, SynthesisError>>()?;
 
-        let is_first_part = Boolean::xor(
+        let is_first_part = boolean_or(
             cs.namespace(|| "is first part"),
             &is_chunk_number[0],
             &is_chunk_number[1],
         )?;
-        let is_second_part = Boolean::xor(
+
+        let is_second_part = boolean_or(
             cs.namespace(|| "is second part"),
             &is_chunk_number[2],
             &is_chunk_number[3],
@@ -2337,7 +2338,7 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
 
         let is_nonce_correct = multi_or(
             cs.namespace(|| "is_nonce_correct"),
-            &is_nonce_correct_in_slot[..],
+            &is_nonce_correct_in_slot,
         )?;
 
         let is_account_id_correct_in_slot = (0..5)
@@ -2357,18 +2358,18 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
 
         let is_account_id_correct = multi_or(
             cs.namespace(|| "is_account_id_correct"),
-            &is_account_id_correct_in_slot[..],
+            &is_account_id_correct_in_slot,
         )?;
 
-        let is_address_correct = CircuitElement::equals(
+        let is_submitter_address_correct = CircuitElement::equals(
             cs.namespace(|| "is_address_correct"),
             &cur.account.address,
             &op_data.eth_address,
         )?;
 
-        let is_address_correct = Boolean::xor(
+        let is_submitter_address_correct = boolean_or(
             cs.namespace(|| "is_address_correct"),
-            &is_address_correct,
+            &is_submitter_address_correct,
             &is_chunk_number[4].not(),
         )?;
 
@@ -2405,12 +2406,12 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
         let is_amount_valid = {
             let is_amount_explicit = CircuitElement::equals(
                 cs.namespace(|| "is first amount explicit"),
-                &op_data.amount_unpacked,
                 &op_data.special_amounts_unpacked[0],
+                &op_data.amount_unpacked,
             )?;
             let is_amount_implicit = CircuitElement::equals(
                 cs.namespace(|| "is first amount implicit"),
-                &op_data.amount_unpacked,
+                &op_data.special_amounts_unpacked[0],
                 &global_variables.explicit_zero,
             )?;
             boolean_or(
@@ -2423,12 +2424,12 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
         let is_second_amount_valid = {
             let is_amount_explicit = CircuitElement::equals(
                 cs.namespace(|| "is second amount explicit"),
-                &op_data.second_amount_unpacked,
                 &op_data.special_amounts_unpacked[3],
+                &op_data.second_amount_unpacked,
             )?;
             let is_amount_implicit = CircuitElement::equals(
                 cs.namespace(|| "is second amount implicit"),
-                &op_data.second_amount_unpacked,
+                &op_data.special_amounts_unpacked[3],
                 &global_variables.explicit_zero,
             )?;
             boolean_or(
@@ -2446,14 +2447,14 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
             is_valid_timestamp.clone(),
             pubdata_properly_copied,
             is_account_id_correct,
-            is_address_correct,
+            is_submitter_address_correct,
             are_swapped_tokens_different,
             is_amount_valid,
             is_second_amount_valid,
         ];
 
-        let is_sender = multi_or(
-            cs.namespace(|| "is sender"),
+        let is_lhs_chunk = multi_or(
+            cs.namespace(|| "is lhs chunk"),
             &[
                 is_chunk_number[0].clone(),
                 is_chunk_number[2].clone(),
@@ -2461,26 +2462,11 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
             ],
         )?;
 
-        let is_recipient = Boolean::xor(
-            cs.namespace(|| "is sender"),
+        let is_rhs_chunk = boolean_or(
+            cs.namespace(|| "is rhs chunk"),
             &is_chunk_number[1],
             &is_chunk_number[3],
         )?;
-
-        let mut lhs_valid_flags = vec![
-            is_a_correct,
-            is_b_correct,
-            is_a_geq_b.clone(),
-            is_sig_verified.clone(),
-            is_nonce_correct,
-            is_sender,
-            no_nonce_overflow(
-                cs.namespace(|| "no nonce overflow"),
-                &cur.account.nonce.get_number(),
-            )?,
-        ];
-
-        lhs_valid_flags.extend(common_valid_flags.clone());
 
         let is_serialized_swap_correct = verify_signature_message_construction(
             cs.namespace(|| "is_serialized_swap_correct"),
@@ -2500,7 +2486,7 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
             &op_data,
         )?;
 
-        let right_messages_in_right_chunks = &[
+        let correct_messages_in_corresponding_chunks = &[
             Boolean::and(
                 cs.namespace(|| "serialized order 0 in first part of the swap"),
                 &is_first_part,
@@ -2520,18 +2506,31 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
 
         let is_serialized_tx_correct = multi_or(
             cs.namespace(|| "is_serialized_tx_correct"),
-            right_messages_in_right_chunks,
+            correct_messages_in_corresponding_chunks,
         )?;
-
-        lhs_valid_flags.push(is_serialized_tx_correct);
 
         let is_signer_valid = CircuitElement::equals(
             cs.namespace(|| "signer_key_correct"),
             &signer_key.pubkey.get_hash(),
             &lhs.account.pub_key_hash,
         )?;
-        lhs_valid_flags.push(is_signer_valid);
 
+        let mut lhs_valid_flags = vec![
+            is_a_correct,
+            is_b_correct,
+            is_a_geq_b.clone(),
+            is_sig_verified.clone(),
+            is_nonce_correct,
+            is_lhs_chunk,
+            is_serialized_tx_correct,
+            is_signer_valid,
+            no_nonce_overflow(
+                cs.namespace(|| "no nonce overflow"),
+                &cur.account.nonce.get_number(),
+            )?,
+        ];
+
+        lhs_valid_flags.extend(common_valid_flags.clone());
         let lhs_valid = multi_and(cs.namespace(|| "lhs_valid"), &lhs_valid_flags)?;
 
         let updated_balance =
@@ -2596,7 +2595,7 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
         // rhs
         let mut rhs_valid_flags = common_valid_flags;
         rhs_valid_flags.push(is_account_empty.not());
-        rhs_valid_flags.push(is_recipient);
+        rhs_valid_flags.push(is_rhs_chunk);
         let rhs_valid = multi_and(cs.namespace(|| "is_rhs_valid"), &rhs_valid_flags)?;
 
         // calculate new rhs balance value
