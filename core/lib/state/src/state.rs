@@ -96,23 +96,18 @@ impl ZkSyncState {
         account_id_by_address: HashMap<Address, AccountId>,
         current_block: BlockNumber,
     ) -> Self {
-        let next_free_id = if balance_tree.items.is_empty() {
-            AccountId(0)
-        } else {
-            let mut next_free_id = 0;
-            for index in balance_tree.items.keys() {
-                if *index != NFT_STORAGE_ACCOUNT_ID.0 as u64 {
-                    next_free_id = std::cmp::max(next_free_id, *index + 1);
-                }
+        let mut next_free_id = 0;
+        for index in balance_tree.items.keys() {
+            if *index != NFT_STORAGE_ACCOUNT_ID.0 as u64 {
+                next_free_id = std::cmp::max(next_free_id, *index + 1);
             }
-            AccountId(next_free_id as u32)
-        };
+        }
 
         Self {
             balance_tree,
             block_number: current_block,
             account_id_by_address,
-            next_free_id,
+            next_free_id: AccountId(next_free_id as u32),
         }
     }
 
@@ -120,7 +115,13 @@ impl ZkSyncState {
         self.balance_tree
             .items
             .iter()
-            .map(|a| (*a.0 as u32, a.1.clone()))
+            .filter_map(|a| {
+                if a.1 == &Account::default() {
+                    None
+                } else {
+                    Some((*a.0 as u32, a.1.clone()))
+                }
+            })
             .collect()
     }
 
@@ -134,7 +135,10 @@ impl ZkSyncState {
     pub fn get_account(&self, account_id: AccountId) -> Option<Account> {
         let start = std::time::Instant::now();
 
-        let account = self.balance_tree.get(*account_id).cloned();
+        let mut account = self.balance_tree.get(*account_id).cloned();
+        if account == Some(Account::default()) {
+            account = None;
+        }
 
         vlog::trace!(
             "Get account (id {}) execution time: {}ms",

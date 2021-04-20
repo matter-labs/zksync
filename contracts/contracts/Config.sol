@@ -28,6 +28,9 @@ contract Config {
     /// @dev Max amount of tokens registered in the network (excluding ETH, which is hardcoded as tokenId = 0)
     uint16 internal constant MAX_AMOUNT_OF_REGISTERED_TOKENS = $(MAX_AMOUNT_OF_REGISTERED_TOKENS);
 
+    /// @dev Max account id that could be registered in the network
+    uint32 internal constant MAX_ACCOUNT_ID = $$((2**24) - 1);
+
     /// @dev Expected average period of block creation
     uint256 internal constant BLOCK_PERIOD = 15 seconds;
 
@@ -95,7 +98,7 @@ contract Config {
     /// @dev Max deposit of ERC20 token that is possible to deposit
     uint128 internal constant MAX_DEPOSIT_AMOUNT = $$((2**104) - 1);
 
-    uint32 internal constant SPECIAL_ACCOUNT_ID = $$((2**31) - 2);
+    uint32 internal constant SPECIAL_ACCOUNT_ID = $$((2**24) - 1);
     address internal constant SPECIAL_ACCOUNT_ADDRESS = address(0xFFfFfFffFFfffFFfFFfFFFFFffFFFffffFfFFFfF);
 
     uint32 internal constant MAX_FUNGIBLE_TOKEN_ID = $$((2**16) - 1);
