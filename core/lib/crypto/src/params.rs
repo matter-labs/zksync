@@ -52,7 +52,7 @@ pub fn number_of_processable_tokens() -> usize {
 pub const NFT_TOKEN_ID: TokenId = TokenId(u32::MAX - 1);
 
 /// Special account which enforce unique token id for NFT.
-pub const NFT_STORAGE_ACCOUNT_ID: AccountId = AccountId(16777216 - 1);
+pub const NFT_STORAGE_ACCOUNT_ID: AccountId = AccountId(((i32::MAX) - 1) as u32);
 
 /// First token id for NFT, all fungible token id must be less, all NFT must be above.
 pub const MIN_NFT_TOKEN_ID: u32 = 65536;

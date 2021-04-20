@@ -1953,8 +1953,7 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
                 .special_content_hash
                 .iter()
                 .map(|bit| bit.get_bits_be())
-                .flatten()
-                .collect::<Vec<_>>(),
+                .flatten(),
         ); // content_hash = 32 bytes
         pubdata_bits.extend(op_data.special_tokens[0].get_bits_be()); // fee_token = 4 bytes
         pubdata_bits.extend(op_data.fee_packed.get_bits_be()); // fee = 2 bytes
@@ -2044,8 +2043,7 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
                     .special_content_hash
                     .iter()
                     .map(|bit| bit.get_bits_be())
-                    .flatten()
-                    .collect::<Vec<_>>(),
+                    .flatten(),
             ); // content_hash
             serialized_tx_bits.extend(op_data.special_eth_address.get_bits_be()); // recipient_address
             serialized_tx_bits.extend(cur.token.get_bits_be()); // fee token
@@ -2068,6 +2066,8 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
             flags.push(is_sig_verified.clone());
 
             flags.push(is_creator_account.clone());
+            // We should enforce that fee_token value that is used in pubdata (op_data.special_tokens[0])
+            // is equal to the token used in the first chunk and signed by the creator
             let is_fee_token = Boolean::from(Expression::equals(
                 cs.namespace(|| "is_fee_token"),
                 &op_data.special_tokens[0].get_number(),
