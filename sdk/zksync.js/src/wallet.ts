@@ -387,8 +387,6 @@ export class Wallet {
         feeToken: TokenLike;
         fee: BigNumberish;
         nonce: number;
-        validFrom: number;
-        validUntil: number;
     }): Promise<MintNFT> {
         if (!this.signer) {
             throw new Error('ZKSync signer is required for sending zksync transactions.');
@@ -405,8 +403,7 @@ export class Wallet {
             fee: mintNft.fee,
             nonce: mintNft.nonce
         };
-        console.log('data');
-        console.log(transactionData);
+
         return await this.signer.signMintNFT(transactionData);
     }
 
@@ -513,11 +510,9 @@ export class Wallet {
         feeToken: TokenLike;
         fee?: BigNumberish;
         nonce?: Nonce;
-        validFrom?: number;
-        validUntil?: number;
     }): Promise<Transaction> {
         mintNft.nonce = mintNft.nonce != null ? await this.getNonce(mintNft.nonce) : await this.getNonce();
-        console.log(mintNft);
+
         if (mintNft.fee == null) {
             const fullFee = await this.provider.getTransactionFee('MintNFT', mintNft.recipient, mintNft.feeToken);
             mintNft.fee = fullFee.totalFee;
