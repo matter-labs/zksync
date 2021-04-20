@@ -784,9 +784,9 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
         let op_data =
             AllocatedOperationData::from_witness(cs.namespace(|| "allocated_operation_data"), op)?;
         // ensure op_data is equal to previous
-        // TODO make a special case for swaps
+        // TODO add other opdata fields here
         {
-            let is_op_data_correct_flags = vec![
+            let a_and_b_same_as_previous_flags = vec![
                 CircuitElement::equals(
                     cs.namespace(|| "is a equal to previous"),
                     &op_data.a,
@@ -796,6 +796,25 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
                     cs.namespace(|| "is b equal to previous"),
                     &op_data.b,
                     &prev.op_data.b,
+                )?,
+            ];
+
+            let a_and_b_same_as_previous = multi_and(
+                cs.namespace(|| "a and b are equal to previous"),
+                &a_and_b_same_as_previous_flags,
+            )?;
+
+            let is_swap = Boolean::from(Expression::equals(
+                cs.namespace(|| "is_swap"),
+                &global_variables.chunk_data.tx_type.get_number(),
+                Expression::u64::<CS>(u64::from(SwapOp::OP_CODE)),
+            )?);
+
+            let is_op_data_correct_flags = vec![
+                boolean_or(
+                    cs.namespace(|| "a and b are equal to previous or op == swap"),
+                    &a_and_b_same_as_previous,
+                    &is_swap,
                 )?,
                 CircuitElement::equals(
                     cs.namespace(|| "is amount_packed equal to previous"),
@@ -2185,9 +2204,6 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
 
         let zero = Expression::constant::<CS>(E::Fr::zero());
         let one = Expression::constant::<CS>(E::Fr::one());
-        let two = one.clone() + one.clone();
-        let three = one.clone() + two.clone();
-        let four = one.clone() + three.clone();
 
         let nonce_inc_0 = Expression::select_ifeq(
             cs.namespace(|| "nonce increment 0"),
@@ -2283,22 +2299,18 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
             ext_pubdata_chunk,
         )?);
 
-        // verify correct tx_code
-
         let is_swap = Boolean::from(Expression::equals(
             cs.namespace(|| "is_swap"),
             &global_variables.chunk_data.tx_type.get_number(),
             Expression::u64::<CS>(u64::from(SwapOp::OP_CODE)), // swap tx_type
         )?);
 
-        let is_chunk_number = vec![zero.clone(), one.clone(), two, three, four]
-            .into_iter()
-            .enumerate()
-            .map(|(idx, num)| {
+        let is_chunk_number = (0..SwapOp::CHUNKS as u64)
+            .map(|num| {
                 Ok(Boolean::from(Expression::equals(
-                    cs.namespace(|| format!("is chunk number {}", idx)),
+                    cs.namespace(|| format!("is chunk number {}", num)),
                     &global_variables.chunk_data.chunk_number,
-                    num,
+                    Expression::u64::<CS>(num),
                 )?))
             })
             .collect::<Result<Vec<_>, SynthesisError>>()?;
@@ -2321,6 +2333,9 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
             &is_equal_pubdata,
         )?;
 
+        // nonce enforcement
+        // order in special_nonces: account0, account1, submitter
+        // order in chunks:         account0, recipient1, account1, recipient0, submitter
         let is_nonce_correct_in_slot = (0..3)
             .map(|num| {
                 let nonce_correct = CircuitElement::equals(
@@ -2341,8 +2356,12 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
             &is_nonce_correct_in_slot,
         )?;
 
+        // account id enforcement
+        // order in special accounts: account0, recipient0, account1, recipient1, submitter
+        // order in chunks:           account0, recipient1, account1, recipient0, submitter
         let is_account_id_correct_in_slot = (0..5)
             .map(|num| {
+                let permutation = [0, 3, 2, 1, 4];
                 let account_id_correct = CircuitElement::equals(
                     cs.namespace(|| format!("is_account_id_correct_in_slot {}", num)),
                     &cur.account_id,
@@ -2351,7 +2370,7 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
                 Boolean::and(
                     cs.namespace(|| format!("is account id correct in chunk {}", num)),
                     &account_id_correct,
-                    &is_chunk_number[num],
+                    &is_chunk_number[permutation[num]],
                 )
             })
             .collect::<Result<Vec<_>, _>>()?;
@@ -2359,6 +2378,29 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
         let is_account_id_correct = multi_or(
             cs.namespace(|| "is_account_id_correct"),
             &is_account_id_correct_in_slot,
+        )?;
+
+        // token enforcement
+        // order in special_tokens: token_sell, token_buy, fee_token
+        // order in chunks:         token_sell, token_sell, token_buy, token_buy, fee_token
+        let is_token_correct_in_chunk = (0..5)
+            .map(|num| {
+                let token_correct = CircuitElement::equals(
+                    cs.namespace(|| format!("is_account_id_correct_in_slot {}", num)),
+                    &cur.token,
+                    &op_data.special_tokens[num / 2],
+                )?;
+                Boolean::and(
+                    cs.namespace(|| format!("is account id correct in chunk {}", num)),
+                    &token_correct,
+                    &is_chunk_number[num],
+                )
+            })
+            .collect::<Result<Vec<_>, _>>()?;
+
+        let is_token_correct = multi_or(
+            cs.namespace(|| "is_account_id_correct"),
+            &is_token_correct_in_chunk,
         )?;
 
         let is_submitter_address_correct = CircuitElement::equals(
@@ -2376,7 +2418,7 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
         let is_a_correct =
             CircuitElement::equals(cs.namespace(|| "is_a_correct"), &op_data.a, &cur.balance)?;
 
-        let amount = CircuitElement::conditionally_select(
+        let amount_unpacked = CircuitElement::conditionally_select(
             cs.namespace(|| "swapped amount"),
             &op_data.amount_unpacked,
             &op_data.second_amount_unpacked,
@@ -2386,7 +2428,7 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
         let actual_b = CircuitElement::conditionally_select(
             cs.namespace(|| "b"),
             &op_data.fee,
-            &amount,
+            &amount_unpacked,
             &is_chunk_number[4],
         )?;
 
@@ -2397,9 +2439,16 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
         )?);
 
         let are_swapped_tokens_different = CircuitElement::equals(
-            cs.namespace(|| "swapped tokens different"),
+            cs.namespace(|| "swapped tokens equal"),
             &op_data.special_tokens[0],
             &op_data.special_tokens[1],
+        )?
+        .not();
+
+        let are_swapping_accounts_different = CircuitElement::equals(
+            cs.namespace(|| "swapping accounts equal"),
+            &op_data.special_accounts[0],
+            &op_data.special_accounts[2],
         )?
         .not();
 
@@ -2441,17 +2490,22 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
 
         // TODO check that both prices are valid
 
-        let common_valid_flags = vec![
-            is_pubdata_chunk_correct,
-            is_swap,
-            is_valid_timestamp.clone(),
-            pubdata_properly_copied,
-            is_account_id_correct,
-            is_submitter_address_correct,
-            are_swapped_tokens_different,
-            is_amount_valid,
-            is_second_amount_valid,
-        ];
+        let common_valid_flag = multi_and(
+            cs.namespace(|| "common_valid_flags"),
+            &[
+                is_pubdata_chunk_correct,
+                is_swap,
+                is_valid_timestamp.clone(),
+                pubdata_properly_copied,
+                is_account_id_correct,
+                is_token_correct,
+                is_submitter_address_correct,
+                are_swapped_tokens_different,
+                are_swapping_accounts_different,
+                is_amount_valid,
+                is_second_amount_valid,
+            ],
+        )?;
 
         let is_lhs_chunk = multi_or(
             cs.namespace(|| "is lhs chunk"),
@@ -2515,7 +2569,8 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
             &lhs.account.pub_key_hash,
         )?;
 
-        let mut lhs_valid_flags = vec![
+        let lhs_valid_flags = vec![
+            common_valid_flag.clone(),
             is_a_correct,
             is_b_correct,
             is_a_geq_b.clone(),
@@ -2530,7 +2585,6 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
             )?,
         ];
 
-        lhs_valid_flags.extend(common_valid_flags.clone());
         let lhs_valid = multi_and(cs.namespace(|| "lhs_valid"), &lhs_valid_flags)?;
 
         let updated_balance =
@@ -2593,14 +2647,14 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
         )?;
 
         // rhs
-        let mut rhs_valid_flags = common_valid_flags;
-        rhs_valid_flags.push(is_account_empty.not());
-        rhs_valid_flags.push(is_rhs_chunk);
-        let rhs_valid = multi_and(cs.namespace(|| "is_rhs_valid"), &rhs_valid_flags)?;
+        let rhs_valid = multi_and(
+            cs.namespace(|| "is_rhs_valid"),
+            &[common_valid_flag, is_account_empty.not(), is_rhs_chunk],
+        )?;
 
         // calculate new rhs balance value
-        let updated_balance =
-            Expression::from(&cur.balance.get_number()) + Expression::from(&amount.get_number());
+        let updated_balance = Expression::from(&cur.balance.get_number())
+            + Expression::from(&amount_unpacked.get_number());
 
         //update balance
         cur.balance = CircuitElement::conditionally_select_with_number_strict(
