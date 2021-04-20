@@ -4,12 +4,13 @@ use tokio::sync::RwLock;
 
 use zksync_storage::StorageProcessor;
 use zksync_types::tokens::TokenMarketVolume;
-use zksync_types::{Token, TokenId, TokenLike};
+use zksync_types::{Token, TokenId, TokenLike, NFT};
 
 #[derive(Debug, Clone, Default)]
 pub struct TokenDBCache {
     // TODO: handle stale entries, edge case when we rename token after adding it (ZKS-97)
     cache: Arc<RwLock<HashMap<TokenLike, Token>>>,
+    nft_tokens: Arc<RwLock<HashMap<TokenId, NFT>>>,
 }
 
 impl TokenDBCache {
@@ -56,6 +57,30 @@ impl TokenDBCache {
     ) -> anyhow::Result<Option<String>> {
         let token = self.get_token(storage, token_id).await?;
         Ok(token.map(|token| token.symbol))
+    }
+
+    pub async fn get_nft_by_id(
+        &self,
+        storage: &mut StorageProcessor<'_>,
+        token_id: TokenId,
+    ) -> anyhow::Result<Option<NFT>> {
+        if let Some(nft) = self.nft_tokens.read().await.get(&token_id) {
+            return Ok(Some(nft.clone()));
+        }
+        // It's save to get from mint_nft_updates, because availability of token in balance regulates by balance of this token
+        if let Some(token) = storage
+            .chain()
+            .state_schema()
+            .get_mint_nft_updates(token_id)
+            .await?
+        {
+            self.nft_tokens
+                .write()
+                .await
+                .insert(token_id, token.clone());
+            return Ok(Some(token));
+        }
+        Ok(None)
     }
 
     pub async fn get_all_tokens(

@@ -6,7 +6,7 @@ use sqlx::types::BigDecimal;
 // Workspace imports
 use zksync_types::{
     helpers::{apply_updates, reverse_updates},
-    AccountId, AccountMap, AccountUpdate, AccountUpdates, BlockNumber, PubKeyHash,
+    AccountId, AccountMap, AccountUpdate, AccountUpdates, BlockNumber, PubKeyHash, TokenId, NFT,
 };
 // Local imports
 use crate::chain::{
@@ -170,7 +170,7 @@ impl<'a, 'c> StateSchema<'a, 'c> {
                         .execute(transaction.conn())
                         .await?;
                 }
-                AccountUpdate::RemoveToken { ref token } => {
+                AccountUpdate::RemoveNFT { ref token } => {
                     let token_id = token.id.0 as i32;
                     let block_number = i64::from(*block_number);
                     sqlx::query!(
@@ -545,6 +545,15 @@ impl<'a, 'c> StateSchema<'a, 'c> {
         .fetch_all(transaction.conn())
         .await?;
 
+        let mint_nft_diffs = sqlx::query_as!(
+            StorageMintNFTUpdate,
+            "SELECT * FROM mint_nft_updates WHERE block_number > $1 AND block_number <= $2 ",
+            i64::from(*start_block),
+            i64::from(*end_block),
+        )
+        .fetch_all(transaction.conn())
+        .await?;
+
         vlog::debug!(
             "Loading state diff: forward: {}, start_block: {}, end_block: {}, unbounded: {}",
             time_forward,
@@ -574,6 +583,7 @@ impl<'a, 'c> StateSchema<'a, 'c> {
                     .into_iter()
                     .map(StorageAccountDiff::from),
             );
+            account_diff.extend(mint_nft_diffs.into_iter().map(StorageAccountDiff::from));
             let last_block = account_diff
                 .iter()
                 .map(|acc| acc.block_number())
@@ -627,5 +637,49 @@ impl<'a, 'c> StateSchema<'a, 'c> {
 
         metrics::histogram!("sql.chain.state.load_state_diff", start.elapsed());
         result
+    }
+
+    pub async fn load_verified_nft_tokens(&mut self) -> QueryResult<Vec<StorageNFT>> {
+        Ok(sqlx::query_as!(StorageNFT, "SELECT * FROM nft")
+            .fetch_all(self.0.conn())
+            .await?)
+    }
+
+    pub async fn load_committed_nft_tokens(
+        &mut self,
+        block_number: Option<BlockNumber>,
+    ) -> QueryResult<Vec<StorageMintNFTUpdate>> {
+        let tokens = if let Some(block_number) = block_number {
+            sqlx::query_as!(
+                StorageMintNFTUpdate,
+                "SELECT * FROM mint_nft_updates WHERE block_number <= $1",
+                block_number.0 as i64
+            )
+            .fetch_all(self.0.conn())
+            .await
+        } else {
+            sqlx::query_as!(StorageMintNFTUpdate, "SELECT * FROM mint_nft_updates")
+                .fetch_all(self.0.conn())
+                .await
+        };
+        Ok(tokens?)
+    }
+
+    pub async fn get_mint_nft_updates(&mut self, token_id: TokenId) -> QueryResult<Option<NFT>> {
+        let start = Instant::now();
+        let nft = sqlx::query_as!(
+            StorageMintNFTUpdate,
+            r#"
+            SELECT * FROM mint_nft_updates 
+            WHERE token_id = $1
+            LIMIT 1
+            "#,
+            *token_id as i32
+        )
+        .fetch_optional(self.0.conn())
+        .await?;
+
+        metrics::histogram!("sql.token.get_historical_ticker_price", start.elapsed());
+        Ok(nft.map(|p| p.into()))
     }
 }

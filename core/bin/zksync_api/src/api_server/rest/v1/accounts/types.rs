@@ -19,15 +19,15 @@ use zksync_storage::{
 use zksync_types::{tx::TxHash, Account, BlockNumber, PriorityOp, ZkSyncPriorityOp, H256};
 
 // Local uses
-use crate::{api_server::v1::MAX_LIMIT, utils::token_db_cache::TokenDBCache};
-
 use super::{
     super::{transactions::Receipt, ApiError},
     unable_to_find_token,
 };
+use crate::{api_server::v1::MAX_LIMIT, utils::token_db_cache::TokenDBCache};
 
 pub(super) mod convert {
     use super::*;
+    use zksync_crypto::params::MIN_NFT_TOKEN_ID;
 
     pub async fn account_state_from_storage(
         storage: &mut StorageProcessor<'_>,
@@ -35,17 +35,28 @@ pub(super) mod convert {
         account: &Account,
     ) -> QueryResult<AccountState> {
         let mut balances = BTreeMap::new();
+        let mut nfts = vec![];
         for (token_id, balance) in account.get_nonzero_balances() {
-            let token_symbol = tokens
-                .token_symbol(storage, token_id)
-                .await?
-                .ok_or_else(|| unable_to_find_token(token_id))?;
-
-            balances.insert(token_symbol, balance);
+            if token_id.0 >= MIN_NFT_TOKEN_ID {
+                nfts.push(
+                    tokens
+                        .get_nft_by_id(storage, token_id)
+                        .await?
+                        .ok_or_else(|| unable_to_find_token(token_id))?
+                        .into(),
+                );
+            } else {
+                let token_symbol = tokens
+                    .token_symbol(storage, token_id)
+                    .await?
+                    .ok_or_else(|| unable_to_find_token(token_id))?;
+                balances.insert(token_symbol, balance);
+            }
         }
 
         Ok(AccountState {
             balances,
+            nfts,
             nonce: account.nonce,
             pub_key_hash: account.pub_key_hash,
         })

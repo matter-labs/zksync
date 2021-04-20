@@ -13,6 +13,9 @@ use zksync_types::{
 };
 use zksync_utils::{BigUintSerdeAsRadix10Str, BigUintSerdeWrapper};
 
+// This wrong dependency, but the whole data about account info stored in this place
+use zksync_api_client::rest::v1::accounts::NFT;
+
 // Local uses
 use crate::{
     api_server::v1::accounts::account_state_from_storage, utils::token_db_cache::TokenDBCache,
@@ -29,6 +32,7 @@ pub struct TxWithSignature {
 #[serde(rename_all = "camelCase")]
 pub struct ResponseAccountState {
     pub balances: HashMap<String, BigUintSerdeWrapper>,
+    pub nfts: Vec<NFT>,
     pub nonce: Nonce,
     pub pub_key_hash: PubKeyHash,
 }
@@ -49,6 +53,7 @@ impl ResponseAccountState {
 
         Ok(Self {
             balances,
+            nfts: inner.nfts,
             nonce: inner.nonce,
             pub_key_hash: inner.pub_key_hash,
         })
