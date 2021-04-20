@@ -168,16 +168,17 @@ impl Swap {
     /// and here we represent orders by their hashes. This is required due to limited message size
     /// for which signatures can be verified in circuit.
     pub fn get_sign_bytes(&self) -> Vec<u8> {
-        let mut first_order_hash = rescue_hash_tx_msg(&self.orders.0.get_bytes());
-        let mut second_order_hash = rescue_hash_tx_msg(&self.orders.1.get_bytes());
-        let hash_byte_size = first_order_hash.len();
+        let mut first_order_bytes = self.orders.0.get_bytes();
+        let mut second_order_bytes = self.orders.1.get_bytes();
+        let order_byte_size = first_order_bytes.len();
 
-        let mut orders_bytes = Vec::with_capacity(hash_byte_size * 2);
-        orders_bytes.append(&mut first_order_hash);
-        orders_bytes.append(&mut second_order_hash);
-        let chained_order_hash = rescue_hash_tx_msg(&orders_bytes);
+        let mut orders_bytes = Vec::with_capacity(order_byte_size * 2);
+        orders_bytes.append(&mut first_order_bytes);
+        orders_bytes.append(&mut second_order_bytes);
 
-        self.get_swap_bytes(&chained_order_hash)
+        let orders_hash = rescue_hash_tx_msg(&orders_bytes);
+
+        self.get_swap_bytes(&orders_hash)
     }
 
     /// Encodes transaction data, using provided encoded data for orders.
