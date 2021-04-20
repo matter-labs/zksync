@@ -889,21 +889,11 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
             generator,
         )?;
 
-        let diff_a_b =
-            Expression::from(&op_data.a.get_number()) - Expression::from(&op_data.b.get_number());
-
-        let diff_a_b_bits = diff_a_b.into_bits_le_fixed(
-            cs.namespace(|| "balance-fee bits"),
-            params::BALANCE_BIT_WIDTH,
+        let is_a_geq_b = is_geq(
+            cs.namespace(|| "is_a_geq_b"),
+            &op_data.a.get_number(),
+            &op_data.b.get_number(),
         )?;
-
-        let diff_a_b_bits_repacked = Expression::from_le_bits::<CS>(&diff_a_b_bits);
-
-        let is_a_geq_b = Boolean::from(Expression::equals(
-            cs.namespace(|| "is_a_geq_b: diff equal to repacked"),
-            diff_a_b,
-            diff_a_b_bits_repacked,
-        )?);
 
         let is_valid_timestamp = self.verify_operation_timestamp(
             cs.namespace(|| "verify operation timestamp"),
@@ -2498,45 +2488,39 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
         // Swap.amountA * Swap.orderA.price.buy <= Swap.amountB * Swap.orderA.price.sell
         // Swap.amountB * Swap.orderB.price.buy <= Swap.amountA * Swap.orderB.price.sell
         let is_first_price_ok = {
-            let amount_bought = {
-                let amount = op_data.amount_unpacked.get_number().mul(
-                    cs.namespace(|| ""),
-                    &op_data.special_amounts_unpacked[2].get_number(),
-                )?;
-                CircuitElement::from_number(cs.namespace(|| ""), amount)?
-            };
+            let amount_bought = op_data.amount_unpacked.get_number().mul(
+                cs.namespace(|| "amountA * orderA.price_buy"),
+                &op_data.special_amounts_unpacked[2].get_number(),
+            )?;
 
-            let amount_sold = {
-                let amount = op_data.second_amount_unpacked.get_number().mul(
-                    cs.namespace(|| ""),
-                    &op_data.special_amounts_unpacked[1].get_number(),
-                )?;
-                CircuitElement::from_number(cs.namespace(|| ""), amount)?
-            };
+            let amount_sold = op_data.second_amount_unpacked.get_number().mul(
+                cs.namespace(|| "amountB * orderA.price_sell"),
+                &op_data.special_amounts_unpacked[1].get_number(),
+            )?;
 
-            CircuitElement::less_than_fixed(cs.namespace(|| ""), &amount_sold, &amount_bought)?
-                .not()
+            is_geq(
+                cs.namespace(|| "is_first_price_ok"),
+                &amount_sold,
+                &amount_bought,
+            )?
         };
 
         let is_second_price_ok = {
-            let amount_bought = {
-                let amount = op_data.second_amount_unpacked.get_number().mul(
-                    cs.namespace(|| ""),
-                    &op_data.special_amounts_unpacked[5].get_number(),
-                )?;
-                CircuitElement::from_number(cs.namespace(|| ""), amount)?
-            };
+            let amount_bought = op_data.second_amount_unpacked.get_number().mul(
+                cs.namespace(|| "amountB * orderB.price_buy"),
+                &op_data.special_amounts_unpacked[5].get_number(),
+            )?;
 
-            let amount_sold = {
-                let amount = op_data.amount_unpacked.get_number().mul(
-                    cs.namespace(|| ""),
-                    &op_data.special_amounts_unpacked[4].get_number(),
-                )?;
-                CircuitElement::from_number(cs.namespace(|| ""), amount)?
-            };
+            let amount_sold = op_data.amount_unpacked.get_number().mul(
+                cs.namespace(|| "amountA * orderB.price_sell"),
+                &op_data.special_amounts_unpacked[4].get_number(),
+            )?;
 
-            CircuitElement::less_than_fixed(cs.namespace(|| ""), &amount_sold, &amount_bought)?
-                .not()
+            is_geq(
+                cs.namespace(|| "is_second_price_ok"),
+                &amount_sold,
+                &amount_bought,
+            )?
         };
 
         let common_valid_flag = multi_and(
@@ -3672,7 +3656,7 @@ fn no_nonce_overflow<E: JubjubEngine, CS: ConstraintSystem<E>>(
 }
 
 fn rescue_hash_allocated_bits<'a, E: RescueEngine + JubjubEngine, CS: ConstraintSystem<E>>(
-    cs: &mut CS,
+    mut cs: CS,
     rescue_params: &'a <E as RescueEngine>::Params,
     bits: &[Boolean],
 ) -> Result<Vec<Boolean>, SynthesisError> {
@@ -3691,4 +3675,28 @@ fn rescue_hash_allocated_bits<'a, E: RescueEngine + JubjubEngine, CS: Constraint
     )?;
 
     Ok(result.get_bits_be())
+}
+
+// is first >= second
+fn is_geq<E: RescueEngine + JubjubEngine, CS: ConstraintSystem<E>>(
+    mut cs: CS,
+    first: &AllocatedNum<E>,
+    second: &AllocatedNum<E>,
+) -> Result<Boolean, SynthesisError> {
+    let diff = Expression::from(first) - Expression::from(second);
+
+    let diff_bits = diff.into_bits_le_fixed(
+        cs.namespace(|| "first minus second bits"),
+        params::BALANCE_BIT_WIDTH,
+    )?;
+
+    let diff_bits_repacked = Expression::from_le_bits::<CS>(&diff_bits);
+
+    let is_geq = Boolean::from(Expression::equals(
+        cs.namespace(|| "is first >= second: diff equal to repacked"),
+        diff,
+        diff_bits_repacked,
+    )?);
+
+    Ok(is_geq)
 }

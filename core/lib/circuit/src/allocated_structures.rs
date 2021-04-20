@@ -222,7 +222,7 @@ impl<E: RescueEngine> AllocatedOperationData<E> {
             special_amounts_unpacked: vec![amount_unpacked; 6],
             special_accounts: vec![special_account_id; 5],
             special_nonces: vec![pub_nonce; 3],
-            special_tokens: vec![special_token; 2],
+            special_tokens: vec![special_token; 3],
             fee_packed,
             fee,
             full_amount,
