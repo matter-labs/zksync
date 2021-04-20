@@ -1,20 +1,23 @@
 // External deps
-use zksync_crypto::franklin_crypto::{
-    bellman::{
-        pairing::ff::{Field, PrimeField},
-        Circuit, ConstraintSystem, SynthesisError,
+use zksync_crypto::{
+    franklin_crypto::{
+        bellman::{
+            pairing::ff::{Field, PrimeField},
+            Circuit, ConstraintSystem, SynthesisError,
+        },
+        circuit::{
+            boolean::Boolean,
+            ecc,
+            expression::Expression,
+            multipack,
+            num::AllocatedNum,
+            polynomial_lookup::{do_the_lookup, generate_powers},
+            rescue, sha256, Assignment,
+        },
+        jubjub::{FixedGenerators, JubjubEngine, JubjubParams},
+        rescue::RescueEngine,
     },
-    circuit::{
-        boolean::Boolean,
-        ecc,
-        expression::Expression,
-        multipack,
-        num::AllocatedNum,
-        polynomial_lookup::{do_the_lookup, generate_powers},
-        rescue, sha256, Assignment,
-    },
-    jubjub::{FixedGenerators, JubjubEngine, JubjubParams},
-    rescue::RescueEngine,
+    pairing::BitIterator,
 };
 // Workspace deps
 use zksync_crypto::params::{
@@ -2249,6 +2252,9 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
         serialized_order_bits_0.extend(op_data.valid_from.get_bits_be());
         serialized_order_bits_0.extend(op_data.valid_until.get_bits_be());
 
+        let mut hashed_order_bits_0 =
+            rescue_hash_allocated_bits(&mut cs, self.rescue_params, &serialized_order_bits_0)?;
+
         serialized_order_bits_1.extend(op_data.special_accounts[2].get_bits_be());
         serialized_order_bits_1.extend(op_data.special_accounts[3].get_bits_be());
         serialized_order_bits_1.extend(op_data.special_nonces[1].get_bits_be());
@@ -2260,12 +2266,21 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
         serialized_order_bits_1.extend(op_data.second_valid_from.get_bits_be());
         serialized_order_bits_1.extend(op_data.second_valid_until.get_bits_be());
 
+        let mut hashed_order_bits_1 =
+            rescue_hash_allocated_bits(&mut cs, self.rescue_params, &serialized_order_bits_1)?;
+
+        let mut hashed_orders_bits = Vec::with_capacity(hashed_order_bits_0.len() * 2);
+        hashed_orders_bits.append(&mut hashed_order_bits_0);
+        hashed_orders_bits.append(&mut hashed_order_bits_1);
+
+        let result_orders_hash =
+            rescue_hash_allocated_bits(&mut cs, self.rescue_params, &hashed_orders_bits)?;
+
         serialized_tx_bits.extend(global_variables.chunk_data.tx_type.get_bits_be());
         serialized_tx_bits.extend(op_data.special_accounts[4].get_bits_be());
         serialized_tx_bits.extend(op_data.eth_address.get_bits_be());
         serialized_tx_bits.extend(op_data.special_nonces[2].get_bits_be());
-        serialized_tx_bits.extend(serialized_order_bits_0.clone());
-        serialized_tx_bits.extend(serialized_order_bits_1.clone());
+        serialized_tx_bits.extend(result_orders_hash);
         serialized_tx_bits.extend(op_data.special_tokens[2].get_bits_be());
         serialized_tx_bits.extend(op_data.fee.get_bits_be());
         serialized_tx_bits.extend(op_data.amount_packed.get_bits_be());
@@ -3565,4 +3580,25 @@ fn no_nonce_overflow<E: JubjubEngine, CS: ConstraintSystem<E>>(
         Expression::constant::<CS>(E::Fr::from_str(&std::u32::MAX.to_string()).unwrap()),
     )?)
     .not())
+}
+
+fn rescue_hash_allocated_bits<'a, E: RescueEngine + JubjubEngine, CS: ConstraintSystem<E>>(
+    cs: &mut CS,
+    rescue_params: &'a <E as RescueEngine>::Params,
+    bits: &[Boolean],
+) -> Result<Vec<Boolean>, SynthesisError> {
+    let input = multipack::pack_into_witness(
+        cs.namespace(|| "pack transaction bits into field elements for rescue"),
+        &bits,
+    )?;
+
+    let sponge_output = rescue::rescue_hash(cs.namespace(|| "sig_msg"), &input, rescue_params)?;
+
+    assert_eq!(sponge_output.len(), 1);
+
+    let bits_be: Vec<_> = BitIterator::new(sponge_output[0].get_value().grab()?.into_repr())
+        .map(Boolean::constant)
+        .collect();
+
+    Ok(bits_be)
 }
