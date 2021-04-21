@@ -574,12 +574,9 @@ impl<'a, 'c> OperationsSchema<'a, 'c> {
         for tx in txs {
             if tx.batch_id.unwrap_or(0) != 0 {
                 let batch_id = tx.batch_id.unwrap();
-                if !hash_bytes.contains_key(&batch_id) {
-                    hash_bytes.insert(batch_id, Vec::new());
-                }
                 hash_bytes
-                    .get_mut(&batch_id)
-                    .unwrap()
+                    .entry(batch_id)
+                    .or_default()
                     .extend_from_slice(&tx.tx_hash);
             }
         }
