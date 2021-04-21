@@ -67,7 +67,8 @@ impl TokenDBCache {
         if let Some(nft) = self.nft_tokens.read().await.get(&token_id) {
             return Ok(Some(nft.clone()));
         }
-        // It's save to get from mint_nft_updates, because availability of token in balance regulates by balance of this token
+        // It's safe to get from `mint_nft_updates` because the availability of token in balance is regulated
+        // by the balance of this token.
         if let Some(token) = storage
             .chain()
             .state_schema()
