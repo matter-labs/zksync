@@ -3,7 +3,7 @@ ALTER TABLE executed_priority_operations
 ALTER TABLE executed_priority_operations
     ADD tx_hash bytea NOT NULL DEFAULT ''::bytea;
 CREATE TABLE txs_batches_hashes (
-    id BIGSERIAL PRIMARY KEY,
+    batch_id BIGSERIAL PRIMARY KEY,
     tx_batch_hash bytea NOT NULL
 );
 -- Also you need to calculate tx_hashes for existing operation and batches.

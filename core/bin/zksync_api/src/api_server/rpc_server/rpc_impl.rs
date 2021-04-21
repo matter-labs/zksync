@@ -119,7 +119,8 @@ impl RpcApp {
             .tx_sender
             .submit_txs_batch(txs, eth_signatures)
             .await
-            .map_err(Error::from);
+            .map_err(Error::from)
+            .map(|response| response.transaction_hashes);
         metrics::histogram!("api.rpc.submit_txs_batch", start.elapsed());
         result
     }

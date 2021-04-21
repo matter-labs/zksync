@@ -191,3 +191,9 @@ where
 {
     serializer.serialize_str(&val.to_string().replace("sync-tx:", "0x"))
 }
+
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
+pub struct SubmitBatchResponse {
+    pub transaction_hashes: Vec<TxHash>,
+    pub batch_hash: TxHash,
+}

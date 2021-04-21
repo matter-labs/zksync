@@ -13,7 +13,7 @@ use hex::FromHexError;
 // Workspace uses
 use zksync_api_types::v02::transaction::{
     IncomingTx, IncomingTxBatch, L1Receipt, L1Status, L1Transaction, L2Receipt, L2Status, Receipt,
-    Transaction, TransactionData, TxData,
+    SubmitBatchResponse, Transaction, TransactionData, TxData,
 };
 use zksync_storage::{
     chain::{
@@ -417,7 +417,7 @@ async fn submit_tx(
 async fn submit_batch(
     data: web::Data<ApiTransactionData>,
     Json(body): Json<IncomingTxBatch>,
-) -> ApiResult<Vec<TxHash>> {
+) -> ApiResult<SubmitBatchResponse> {
     let txs = body
         .txs
         .into_iter()
@@ -428,13 +428,13 @@ async fn submit_batch(
         .collect();
 
     let signatures = body.signature;
-    let tx_hashes = data
+    let response = data
         .tx_sender
         .submit_txs_batch(txs, Some(signatures))
         .await
         .map_err(Error::from);
 
-    tx_hashes.into()
+    response.into()
 }
 
 pub fn api_scope(tx_sender: TxSender) -> Scope {
@@ -541,6 +541,11 @@ mod tests {
                 (tx, tx_hash)
             })
             .unzip();
+        let expected_batch_hash = TxHash::batch_hash(&expected_tx_hashes);
+        let expected_response = SubmitBatchResponse {
+            transaction_hashes: expected_tx_hashes,
+            batch_hash: expected_batch_hash,
+        };
 
         let txs = good_batch
             .iter()
@@ -559,8 +564,8 @@ mod tests {
         };
 
         let response = client.submit_batch_v02(good_batch, batch_signature).await?;
-        let tx_hashes: Vec<TxHash> = deserialize_response_result(response)?;
-        assert_eq!(tx_hashes, expected_tx_hashes);
+        let submit_batch_response: SubmitBatchResponse = deserialize_response_result(response)?;
+        assert_eq!(submit_batch_response, expected_response);
 
         let tx_hash = {
             let mut storage = cfg.pool.access_storage().await?;

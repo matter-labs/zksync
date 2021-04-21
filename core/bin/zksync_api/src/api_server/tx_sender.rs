@@ -21,6 +21,7 @@ use num::{bigint::ToBigInt, rational::Ratio, BigUint, CheckedSub, Zero};
 use thiserror::Error;
 
 // Workspace uses
+use zksync_api_types::v02::transaction::SubmitBatchResponse;
 use zksync_config::ZkSyncConfig;
 use zksync_storage::{chain::account::records::EthAccountType, ConnectionPool};
 use zksync_types::{
@@ -421,7 +422,7 @@ impl TxSender {
         &self,
         txs: Vec<TxWithSignature>,
         eth_signatures: Option<EthBatchSignatures>,
-    ) -> Result<Vec<TxHash>, SubmitError> {
+    ) -> Result<SubmitBatchResponse, SubmitError> {
         // Bring the received signatures into a vector for simplified work.
         let eth_signatures = EthBatchSignatures::api_arg_to_vec(eth_signatures);
 
@@ -653,7 +654,11 @@ impl TxSender {
             .map_err(SubmitError::communication_core_server)?
             .map_err(SubmitError::TxAdd)?;
 
-        Ok(tx_hashes)
+        let batch_hash = TxHash::batch_hash(&tx_hashes);
+        Ok(SubmitBatchResponse {
+            transaction_hashes: tx_hashes,
+            batch_hash,
+        })
     }
 
     pub async fn get_txs_fee_in_wei(

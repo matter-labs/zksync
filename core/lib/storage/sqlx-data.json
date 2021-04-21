@@ -2918,6 +2918,19 @@
       ]
     }
   },
+  "8cc434d8801cbe1f957e54a29b0aa49182bd5b693d24b5c74c34290ed5768389": {
+    "query": "INSERT INTO txs_batches_hashes VALUES($1, $2)",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "Int8",
+          "Bytea"
+        ]
+      },
+      "nullable": []
+    }
+  },
   "8f703c1371cfad6b11cb022ef8edcd1e3068ce3d7c82251a92a4dd1797fe299f": {
     "query": "\n                        INSERT INTO account_pubkey_updates ( update_order_id, account_id, block_number, old_pubkey_hash, new_pubkey_hash, old_nonce, new_nonce )\n                        VALUES ( $1, $2, $3, $4, $5, $6, $7 )\n                        ",
     "describe": {

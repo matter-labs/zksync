@@ -137,13 +137,15 @@ impl<'a, 'c> MempoolSchema<'a, 'c> {
             anyhow::bail!("Cannot insert an empty batch");
         }
 
+        let tx_hashes: Vec<TxHash> = txs.iter().map(|tx| tx.tx.hash()).collect();
+
         // The first transaction of the batch would be inserted manually
         // batch_id of the inserted transaction would be the id of this batch
         // Will be unique cause batch_id is bigserial
         // Special case: batch_id == 0 <==> transaction is not a part of some batch (uses in `insert_tx` function)
         let batch_id = {
             let first_tx_data = txs[0].clone();
-            let tx_hash = hex::encode(first_tx_data.hash().as_ref());
+            let tx_hash = hex::encode(tx_hashes[0].as_ref());
             let tx = serde_json::to_value(&first_tx_data.tx)
                 .expect("Unserializable TX provided to the database");
             let eth_sign_data = first_tx_data
@@ -175,12 +177,12 @@ impl<'a, 'c> MempoolSchema<'a, 'c> {
         };
 
         // Processing of all batch transactions, except the first
-        let mut tx_hashes = Vec::with_capacity(txs.len());
+        let mut tx_hashes_strs = Vec::with_capacity(txs.len());
         let mut tx_values = Vec::with_capacity(txs.len());
         let mut txs_sign_data = Vec::with_capacity(txs.len());
 
-        for tx_data in txs[1..].iter() {
-            tx_hashes.push(hex::encode(tx_data.hash().as_ref()));
+        for (tx_data, tx_hash) in txs[1..].iter().zip(tx_hashes[1..].iter()) {
+            tx_hashes_strs.push(hex::encode(tx_hash.as_ref()));
             tx_values.push(
                 serde_json::to_value(&tx_data.tx)
                     .expect("Unserializable TX provided to the database"),
@@ -198,7 +200,7 @@ impl<'a, 'c> MempoolSchema<'a, 'c> {
             SELECT u.tx_hash, u.tx, u.eth_sign_data, $4, $5
                 FROM UNNEST ($1::text[], $2::jsonb[], $3::jsonb[])
                 AS u(tx_hash, tx, eth_sign_data)",
-            &tx_hashes,
+            &tx_hashes_strs,
             &tx_values,
             &txs_sign_data,
             chrono::Utc::now(),
@@ -218,6 +220,15 @@ impl<'a, 'c> MempoolSchema<'a, 'c> {
             .execute(self.0.conn())
             .await?;
         }
+
+        let batch_hash = TxHash::batch_hash(&tx_hashes);
+        sqlx::query!(
+            "INSERT INTO txs_batches_hashes VALUES($1, $2)",
+            batch_id,
+            batch_hash.as_ref()
+        )
+        .execute(self.0.conn())
+        .await?;
 
         metrics::histogram!("sql.chain.mempool.insert_batch", start.elapsed());
         Ok(batch_id)
