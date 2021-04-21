@@ -4,20 +4,25 @@
 
 // Built-in deps
 use std::convert::TryFrom;
+use std::str::FromStr;
 // External imports
 // Workspace imports
+use zksync_api_types::v02::transaction::{L1Transaction, L2Status, Transaction, TransactionData};
 use zksync_types::{
-    Action, ActionType, Operation, SignedZkSyncTx, H256,
-    {
-        block::{ExecutedPriorityOp, ExecutedTx},
-        BlockNumber, PriorityOp, ZkSyncOp, ZkSyncTx,
-    },
+    aggregated_operations::AggregatedOperation,
+    block::{ExecutedPriorityOp, ExecutedTx},
+    tx::TxHash,
+    Action, ActionType, BlockNumber, Operation, PriorityOp, PriorityOpId, SignedZkSyncTx, ZkSyncOp,
+    ZkSyncTx, H256,
 };
 // Local imports
 use crate::chain::operations::records::StoredAggregatedOperation;
 use crate::{
     chain::{
-        block::BlockSchema,
+        block::{
+            records::{BlockL1TransactionItem, BlockTransactionItem},
+            BlockSchema,
+        },
         operations::records::{
             NewExecutedPriorityOperation, NewExecutedTransaction, StoredExecutedPriorityOperation,
             StoredExecutedTransaction, StoredOperation,
@@ -26,7 +31,6 @@ use crate::{
     prover::ProverSchema,
     QueryResult, StorageActionType, StorageProcessor,
 };
-use zksync_types::aggregated_operations::AggregatedOperation;
 
 impl StoredOperation {
     pub async fn into_op(self, conn: &mut StorageProcessor<'_>) -> QueryResult<Operation> {
@@ -206,5 +210,40 @@ impl StoredAggregatedOperation {
             serde_json::from_value(self.arguments)
                 .expect("Incorrect serialized aggregated operation in storage"),
         )
+    }
+}
+
+pub fn l2_transaction_from_item_and_status(
+    item: BlockTransactionItem,
+    status: L2Status,
+) -> Transaction {
+    let tx_hash = TxHash::from_str(&item.tx_hash).unwrap();
+    Transaction {
+        tx_hash,
+        block_number: Some(BlockNumber(item.block_number as u32)),
+        op: TransactionData::L2(item.op),
+        status,
+        fail_reason: item.fail_reason,
+        created_at: Some(item.created_at),
+    }
+}
+
+pub fn l1_transaction_from_item_and_status(
+    item: BlockL1TransactionItem,
+    status: L2Status,
+) -> Transaction {
+    let tx_hash = TxHash::from_slice(&item.tx_hash).unwrap();
+    let eth_hash = H256::from_slice(&item.eth_hash);
+    let id = PriorityOpId(item.priority_op_serialid as u64);
+    let operation: ZkSyncOp = serde_json::from_value(item.operation).unwrap();
+    Transaction {
+        tx_hash,
+        block_number: Some(BlockNumber(item.block_number as u32)),
+        op: TransactionData::L1(
+            L1Transaction::from_executed_op(operation, eth_hash, id, tx_hash).unwrap(),
+        ),
+        status,
+        fail_reason: None,
+        created_at: Some(item.created_at),
     }
 }

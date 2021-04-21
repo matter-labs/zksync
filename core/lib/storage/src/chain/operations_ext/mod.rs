@@ -1012,7 +1012,7 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
         } else {
             let priority_op_created_op = sqlx::query!(
                 "SELECT created_at FROM executed_priority_operations
-                WHERE block_number = $1 AND eth_hash = $2",
+                WHERE block_number = $1 AND tx_hash = $2",
                 i64::from(*block_number),
                 tx_hash.as_ref()
             )

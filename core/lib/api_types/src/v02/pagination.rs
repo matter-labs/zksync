@@ -1,3 +1,4 @@
+use super::transaction::serialize_tx_hash_with_0x;
 use serde::{Deserialize, Serialize};
 use zksync_types::{tx::TxHash, BlockNumber};
 
@@ -52,5 +53,6 @@ impl<T: Sized + Serialize, F: Serialize> Paginated<T, F> {
 #[derive(Debug, Serialize, Deserialize, Clone, Copy)]
 pub struct BlockAndTxHash {
     pub block_number: BlockNumber,
+    #[serde(serialize_with = "serialize_tx_hash_with_0x")]
     pub tx_hash: TxHash,
 }

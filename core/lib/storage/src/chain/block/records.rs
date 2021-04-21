@@ -61,6 +61,16 @@ pub struct BlockTransactionItem {
     pub created_at: DateTime<Utc>,
 }
 
+#[derive(Debug, Serialize, Deserialize, FromRow, PartialEq)]
+pub struct BlockL1TransactionItem {
+    pub tx_hash: Vec<u8>,
+    pub eth_hash: Vec<u8>,
+    pub priority_op_serialid: i64,
+    pub block_number: i64,
+    pub operation: Value,
+    pub created_at: DateTime<Utc>,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AccountTreeCache {
     pub block: i64,

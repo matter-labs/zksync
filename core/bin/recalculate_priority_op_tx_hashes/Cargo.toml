@@ -1,5 +1,5 @@
 [package]
-name = "priority_op_tx_hashes_migration"
+name = "recalculate_priority_ops_tx_hashes"
 version = "1.0.0"
 edition = "2018"
 authors = ["The Matter Labs Team <hello@matterlabs.dev>"]
@@ -13,13 +13,4 @@ publish = false # We don't want to publish our binaries.
 [dependencies]
 anyhow = "1.0"
 tokio = { version = "0.2", features = ["full"] }
-sqlx = { version = "0.4.2", default-features = false, features = [
-    "runtime-tokio-native-tls",
-    "macros",
-    "postgres",
-    "bigdecimal",
-    "chrono",
-    "json",
-    "offline",
-] }
-parity-crypto = { version = "0.6.2", features = ["publickey"] }
+zksync_storage = { path = "../../lib/storage", version = "1.0" }

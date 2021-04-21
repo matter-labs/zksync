@@ -1,11 +1,14 @@
 use chrono::{DateTime, Utc};
-use serde::{Deserialize, Serialize};
+use num::BigUint;
+use serde::{Deserialize, Serialize, Serializer};
 use serde_json::Value;
 use zksync_types::{
     tx::TxHash,
     tx::{EthBatchSignatures, TxEthSignature},
-    BlockNumber, EthBlockId, PriorityOpId, ZkSyncTx,
+    AccountId, Address, BlockNumber, EthBlockId, PriorityOpId, TokenId, ZkSyncOp, ZkSyncPriorityOp,
+    ZkSyncTx, H256,
 };
+use zksync_utils::BigUintSerdeAsRadix10Str;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct IncomingTxBatch {
@@ -62,6 +65,7 @@ pub struct L1Receipt {
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub struct L2Receipt {
+    #[serde(serialize_with = "serialize_tx_hash_with_0x")]
     pub tx_hash: TxHash,
     pub rollup_block: Option<BlockNumber>,
     pub status: L2Status,
@@ -77,10 +81,113 @@ pub enum Receipt {
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub struct Transaction {
+    #[serde(serialize_with = "serialize_tx_hash_with_0x")]
     pub tx_hash: TxHash,
     pub block_number: Option<BlockNumber>,
-    pub op: Value,
+    pub op: TransactionData,
     pub status: L2Status,
     pub fail_reason: Option<String>,
     pub created_at: Option<DateTime<Utc>>,
+}
+
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(untagged)]
+pub enum TransactionData {
+    L1(L1Transaction),
+    L2(Value),
+}
+
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(tag = "type")]
+pub enum L1Transaction {
+    Deposit(ApiDeposit),
+    FullExit(ApiFullExit),
+}
+
+impl L1Transaction {
+    pub fn from_executed_op(
+        op: ZkSyncOp,
+        eth_hash: H256,
+        id: PriorityOpId,
+        tx_hash: TxHash,
+    ) -> Option<Self> {
+        match op {
+            ZkSyncOp::Deposit(deposit) => Some(Self::Deposit(ApiDeposit {
+                from: deposit.priority_op.from,
+                token_id: deposit.priority_op.token,
+                amount: deposit.priority_op.amount,
+                to: deposit.priority_op.to,
+                account_id: Some(deposit.account_id),
+                eth_hash,
+                id,
+                tx_hash,
+            })),
+            ZkSyncOp::FullExit(deposit) => Some(Self::FullExit(ApiFullExit {
+                token_id: deposit.priority_op.token,
+                account_id: deposit.priority_op.account_id,
+                eth_hash,
+                id,
+                tx_hash,
+            })),
+            _ => None,
+        }
+    }
+
+    pub fn from_pending_op(
+        op: ZkSyncPriorityOp,
+        eth_hash: H256,
+        id: PriorityOpId,
+        tx_hash: TxHash,
+    ) -> Option<Self> {
+        match op {
+            ZkSyncPriorityOp::Deposit(deposit) => Some(Self::Deposit(ApiDeposit {
+                from: deposit.from,
+                token_id: deposit.token,
+                amount: deposit.amount,
+                to: deposit.to,
+                account_id: None,
+                eth_hash,
+                id,
+                tx_hash,
+            })),
+            ZkSyncPriorityOp::FullExit(deposit) => Some(Self::FullExit(ApiFullExit {
+                token_id: deposit.token,
+                account_id: deposit.account_id,
+                eth_hash,
+                id,
+                tx_hash,
+            })),
+        }
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
+pub struct ApiDeposit {
+    pub from: Address,
+    pub token_id: TokenId,
+    #[serde(with = "BigUintSerdeAsRadix10Str")]
+    pub amount: BigUint,
+    pub to: Address,
+    pub account_id: Option<AccountId>,
+    pub eth_hash: H256,
+    pub id: PriorityOpId,
+    #[serde(serialize_with = "serialize_tx_hash_with_0x")]
+    pub tx_hash: TxHash,
+}
+
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
+pub struct ApiFullExit {
+    pub account_id: AccountId,
+    pub token_id: TokenId,
+    pub eth_hash: H256,
+    pub id: PriorityOpId,
+    #[serde(serialize_with = "serialize_tx_hash_with_0x")]
+    pub tx_hash: TxHash,
+}
+
+pub fn serialize_tx_hash_with_0x<S>(val: &TxHash, serializer: S) -> Result<S::Ok, S::Error>
+where
+    S: Serializer,
+{
+    serializer.serialize_str(&val.to_string().replace("sync-tx:", "0x"))
 }

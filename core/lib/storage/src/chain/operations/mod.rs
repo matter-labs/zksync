@@ -2,6 +2,7 @@
 use std::time::Instant;
 // External imports
 use chrono::{Duration, Utc};
+use parity_crypto::digest::sha256;
 // Workspace imports
 use zksync_types::{tx::TxHash, BlockNumber};
 // Local imports
@@ -519,5 +520,35 @@ impl<'a, 'c> OperationsSchema<'a, 'c> {
             )
         });
         Ok(aggregated_op)
+    }
+
+    pub async fn recalculate_tx_hashes_to_existing_priority_ops(&mut self) -> QueryResult<()> {
+        let mut transaction = self.0.start_transaction().await?;
+
+        let ops = sqlx::query!(
+            "SELECT priority_op_serialid, eth_hash, eth_block, eth_block_index FROM executed_priority_operations"
+        )
+        .fetch_all(transaction.conn())
+        .await?;
+
+        for op in ops {
+            let mut bytes = Vec::new();
+            bytes.extend_from_slice(&op.eth_hash);
+            bytes.extend_from_slice(&(op.eth_block as u64).to_be_bytes());
+            bytes.extend_from_slice(&(op.eth_block_index.unwrap_or(0) as u64).to_be_bytes());
+
+            let tx_hash = sha256(&bytes);
+
+            sqlx::query!(
+                "UPDATE executed_priority_operations SET tx_hash = $1 WHERE priority_op_serialid = $2",
+                &*tx_hash,
+                op.priority_op_serialid
+            )
+            .execute(transaction.conn())
+            .await?;
+        }
+
+        transaction.commit().await?;
+        Ok(())
     }
 }

@@ -12,12 +12,12 @@ use hex::FromHexError;
 
 // Workspace uses
 use zksync_api_types::v02::transaction::{
-    IncomingTx, IncomingTxBatch, L1Receipt, L1Status, L2Receipt, L2Status, Receipt, Transaction,
-    TxData,
+    IncomingTx, IncomingTxBatch, L1Receipt, L1Status, L1Transaction, L2Receipt, L2Status, Receipt,
+    Transaction, TransactionData, TxData,
 };
 use zksync_storage::{
     chain::{
-        block::records::BlockTransactionItem, operations::records::StoredExecutedPriorityOperation,
+        operations::records::StoredExecutedPriorityOperation,
         operations_ext::records::TxReceiptResponse,
     },
     QueryResult, StorageProcessor,
@@ -25,6 +25,7 @@ use zksync_storage::{
 use zksync_types::{
     aggregated_operations::AggregatedActionType, priority_ops::PriorityOpLookupQuery,
     tx::EthSignData, tx::TxEthSignature, tx::TxHash, BlockNumber, EthBlockId, PriorityOpId,
+    ZkSyncOp, H256,
 };
 
 // Local uses
@@ -72,21 +73,6 @@ pub fn l2_receipt_from_tx_receipt_response(receipt: TxReceiptResponse) -> L2Rece
         rollup_block,
         status,
         fail_reason,
-    }
-}
-
-pub fn transaction_from_item_and_status(
-    item: BlockTransactionItem,
-    status: L2Status,
-) -> Transaction {
-    let tx_hash = TxHash::from_str(&item.tx_hash).unwrap();
-    Transaction {
-        tx_hash,
-        block_number: Some(BlockNumber(item.block_number as u32)),
-        op: item.op,
-        status,
-        fail_reason: item.fail_reason,
-        created_at: Some(item.created_at),
     }
 }
 
@@ -243,10 +229,15 @@ impl ApiTransactionData {
             } else {
                 L2Status::Committed
             };
+            let operation: ZkSyncOp = serde_json::from_value(op.operation).unwrap();
+            let eth_hash = H256::from_slice(&op.eth_hash);
+            let id = PriorityOpId(op.priority_op_serialid as u64);
             let tx = Transaction {
                 tx_hash,
                 block_number: Some(block_number),
-                op: op.operation,
+                op: TransactionData::L1(
+                    L1Transaction::from_executed_op(operation, eth_hash, id, tx_hash).unwrap(),
+                ),
                 status,
                 fail_reason: None,
                 created_at: Some(op.created_at),
@@ -266,7 +257,15 @@ impl ApiTransactionData {
             let tx = Transaction {
                 tx_hash,
                 block_number: None,
-                op: serde_json::to_value(priority_op.data).unwrap(),
+                op: TransactionData::L1(
+                    L1Transaction::from_pending_op(
+                        priority_op.data,
+                        priority_op.eth_hash,
+                        PriorityOpId(priority_op.serial_id),
+                        tx_hash,
+                    )
+                    .unwrap(),
+                ),
                 status: L2Status::Queued,
                 fail_reason: None,
                 created_at: None,
@@ -308,7 +307,7 @@ impl ApiTransactionData {
             let tx = Transaction {
                 tx_hash,
                 block_number: Some(block_number),
-                op: op.tx,
+                op: TransactionData::L2(op.tx),
                 status,
                 fail_reason: op.fail_reason,
                 created_at: Some(op.created_at),
@@ -335,7 +334,7 @@ impl ApiTransactionData {
             let tx = Transaction {
                 tx_hash,
                 block_number: None,
-                op: op.tx,
+                op: TransactionData::L2(op.tx),
                 status: L2Status::Queued,
                 fail_reason: None,
                 created_at: Some(op.created_at),

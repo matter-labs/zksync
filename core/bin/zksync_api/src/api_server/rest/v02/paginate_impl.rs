@@ -6,17 +6,16 @@
 use zksync_api_types::v02::{
     block::BlockInfo,
     pagination::{BlockAndTxHash, Paginated, PaginationQuery},
-    transaction::{L2Status, Transaction},
+    transaction::Transaction,
 };
 use zksync_storage::StorageProcessor;
-use zksync_types::{aggregated_operations::AggregatedActionType, BlockNumber, Token, TokenId};
+use zksync_types::{BlockNumber, Token, TokenId};
 
 // Local uses
 use super::{
     block::block_info_from_details,
     error::{Error, TxError},
     paginate_trait::Paginate,
-    transaction::transaction_from_item_and_status,
 };
 
 #[async_trait::async_trait]
@@ -86,38 +85,13 @@ impl Paginate<Transaction> for StorageProcessor<'_> {
         &mut self,
         query: &PaginationQuery<BlockAndTxHash>,
     ) -> Result<Paginated<Transaction, BlockAndTxHash>, Error> {
-        let raw_txs = self
+        let txs = self
             .chain()
             .block_schema()
             .get_block_transactions_page(query)
             .await
             .map_err(Error::storage)?
             .ok_or_else(|| Error::from(TxError::TransactionNotFound))?;
-        let is_block_finalized = self
-            .chain()
-            .operations_schema()
-            .get_stored_aggregated_operation(
-                query.from.block_number,
-                AggregatedActionType::ExecuteBlocks,
-            )
-            .await
-            .map(|operation| operation.confirmed)
-            .unwrap_or(false);
-        let txs = raw_txs
-            .into_iter()
-            .map(|tx| {
-                let status = if tx.success.unwrap_or(false) {
-                    if is_block_finalized {
-                        L2Status::Finalized
-                    } else {
-                        L2Status::Committed
-                    }
-                } else {
-                    L2Status::Rejected
-                };
-                transaction_from_item_and_status(tx, status)
-            })
-            .collect();
         let count = self
             .chain()
             .block_schema()
