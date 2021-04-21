@@ -2298,6 +2298,30 @@
       "nullable": []
     }
   },
+  "677998cfc5acd58d1a88bc30a9ac7b4ab1f1a4f8bfbb57b06624f92e076eb5d2": {
+    "query": "SELECT tx_hash, batch_id FROM executed_transactions ORDER BY created_at",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "tx_hash",
+          "type_info": "Bytea"
+        },
+        {
+          "ordinal": 1,
+          "name": "batch_id",
+          "type_info": "Int8"
+        }
+      ],
+      "parameters": {
+        "Left": []
+      },
+      "nullable": [
+        false,
+        true
+      ]
+    }
+  },
   "681359f99d0e4bafdd3109f67c7af4d235dc1197ba88cd0d6148f632ae0cdf8f": {
     "query": "SELECT * FROM aggregated_proofs WHERE first_block = $1 and last_block = $2",
     "describe": {
@@ -4396,6 +4420,19 @@
       "nullable": []
     }
   },
+  "d5c6be595f62ef758fd39d8263139cf2ce777612bae32805daba299881d9b1e0": {
+    "query": "\n                UPDATE executed_priority_operations\n                SET tx_hash = u.tx_hash\n                FROM (\n                    SELECT * FROM\n                    UNNEST($1::bytea[], $2::bigint[])\n                    AS u(tx_hash, id)\n                ) u\n                WHERE priority_op_serialid = u.id\n            ",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "ByteaArray",
+          "Int8Array"
+        ]
+      },
+      "nullable": []
+    }
+  },
   "d8ce549c4c30b3f9de6ddd4c9b4af9b789861a4d1488c77ff104493a8b48bba0": {
     "query": "INSERT INTO executed_priority_operations (block_number, block_index, operation, from_account, to_account, priority_op_serialid, deadline_block, eth_hash, eth_block, created_at, eth_block_index, tx_hash)\n            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)\n            ON CONFLICT (priority_op_serialid)\n            DO NOTHING",
     "describe": {
@@ -4504,19 +4541,6 @@
         true,
         true
       ]
-    }
-  },
-  "de85461124585b0eeaca713d199af9917edc09319a2f4f2c61fb30e0d7b482c8": {
-    "query": "UPDATE executed_priority_operations SET tx_hash = $1 WHERE priority_op_serialid = $2",
-    "describe": {
-      "columns": [],
-      "parameters": {
-        "Left": [
-          "Bytea",
-          "Int8"
-        ]
-      },
-      "nullable": []
     }
   },
   "debbe23f0c730c331482c798387d1739911923edcafc2bd80463464ff98f3b71": {
@@ -4817,6 +4841,19 @@
       "columns": [],
       "parameters": {
         "Left": []
+      },
+      "nullable": []
+    }
+  },
+  "ec07bf1dcfe77b28e753f3f145ff02ce47924ed311b2b7848b6e13c377d1a235": {
+    "query": "\n                INSERT INTO txs_batches_hashes (batch_id, batch_hash)\n                SELECT u.batch_id, u.batch_hash\n                FROM UNNEST ($1::bigint[], $2::bytea[])\n                AS u(batch_id, batch_hash)\n            ",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "Int8Array",
+          "ByteaArray"
+        ]
       },
       "nullable": []
     }

@@ -2067,6 +2067,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "hashes_migration"
+version = "1.0.0"
+dependencies = [
+ "anyhow",
+ "tokio 0.2.22",
+ "zksync_storage",
+]
+
+[[package]]
 name = "hashlink"
 version = "0.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3896,15 +3905,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "678054eb77286b51581ba43620cc911abf02758c91f93f479767aed0f90458b2"
 dependencies = [
  "rand_core 0.3.1",
-]
-
-[[package]]
-name = "recalculate_priority_ops_tx_hashes"
-version = "1.0.0"
-dependencies = [
- "anyhow",
- "tokio 0.2.22",
- "zksync_storage",
 ]
 
 [[package]]
