@@ -8,6 +8,7 @@ type TokenLike = types.TokenLike;
 declare module './tester' {
     interface Tester {
         testTransfer(from: Wallet, to: Wallet, token: TokenLike, amount: BigNumber, timeout?: number): Promise<void>;
+        testTransferNFT(from: Wallet, to: Wallet, feeToken: TokenLike, timeout?: number): Promise<void>;
         testBatch(from: Wallet, to: Wallet, token: TokenLike, amount: BigNumber): Promise<void>;
         testIgnoredBatch(from: Wallet, to: Wallet, token: TokenLike, amount: BigNumber): Promise<void>;
         testRejectedBatch(from: Wallet, to: Wallet, token: TokenLike, amount: BigNumber): Promise<void>;
@@ -47,6 +48,34 @@ Tester.prototype.testTransfer = async function (sender: Wallet, receiver: Wallet
         expect(receiverAfter.sub(receiverBefore).eq(amount), 'Transfer failed (incorrect receiver balance)').to.be.true;
     }
 
+    this.runningFee = this.runningFee.add(fee);
+};
+
+Tester.prototype.testTransferNFT = async function (sender: Wallet, receiver: Wallet, feeToken: TokenLike) {
+    const fee = await this.syncProvider.getTransactionsBatchFee(
+        ['Transfer', 'Transfer'],
+        [receiver.address(), receiver.address()],
+        feeToken
+    );
+
+    const state = await sender.getAccountState();
+    let nft: any = Object.values(state.verified.nfts)[0];
+
+    const senderBefore = await sender.getNFT(nft.id);
+    const receiverBefore = await receiver.getNFT(nft.id);
+    const handles = await sender.syncTransferNFT({
+        to: receiver.address(),
+        feeToken,
+        token: nft,
+        fee
+    });
+    await Promise.all(handles.map((handle) => handle.awaitReceipt()));
+    const senderAfter = await sender.getNFT(nft.id);
+    const receiverAfter = await receiver.getNFT(nft.id);
+    expect(senderBefore.id == nft.id, 'NFT transfer failed').to.be.true;
+    expect(receiverAfter.id == nft.id, 'NFT transfer failed').to.be.true;
+    expect(senderAfter === undefined, 'NFT transfer failed').to.be.true;
+    expect(receiverBefore === undefined, 'NFT transfer failed').to.be.true;
     this.runningFee = this.runningFee.add(fee);
 };
 

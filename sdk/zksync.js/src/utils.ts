@@ -22,6 +22,7 @@ const MAX_NUMBER_OF_TOKENS = Math.pow(2, 32);
 const MAX_NUMBER_OF_ACCOUNTS = Math.pow(2, 24);
 
 export const MAX_TIMESTAMP = 4294967295;
+export const MIN_NFT_TOKEN_ID = 65536;
 
 export const IERC20_INTERFACE = new utils.Interface(require('../abi/IERC20.json').abi);
 export const SYNC_MAIN_CONTRACT_INTERFACE = new utils.Interface(require('../abi/SyncMain.json').abi);
@@ -295,6 +296,11 @@ export function closestGreaterOrEqPackableTransactionFee(fee: BigNumberish): Big
 export function isTransactionFeePackable(amount: BigNumberish): boolean {
     return closestPackableTransactionFee(amount).eq(amount);
 }
+// Check that this token could be an NFT.
+// NFT not presented in TokenSets, so we can't their correctness in TokenSet
+function isNFT(token: TokenLike): boolean {
+    return (typeof token === 'number' && token >= MIN_NFT_TOKEN_ID)
+}
 
 export function buffer2bitsBE(buff) {
     const res = new Array(buff.length * 8);
@@ -368,10 +374,16 @@ export class TokenSet {
     }
 
     public resolveTokenDecimals(tokenLike: TokenOrId): number {
+        if (isNFT(tokenLike)) {
+            return 1;
+        }
         return this.resolveTokenObject(tokenLike).decimals;
     }
 
     public resolveTokenId(tokenLike: TokenOrId): number {
+        if (isNFT(tokenLike)) {
+            return tokenLike as number;
+        }
         return this.resolveTokenObject(tokenLike).id;
     }
 
