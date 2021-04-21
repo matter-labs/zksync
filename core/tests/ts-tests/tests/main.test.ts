@@ -107,47 +107,47 @@ describe(`ZkSync integration tests (token: ${token}, transport: ${transport})`, 
         await tester.testChangePubKey(chuck, token, false);
     });
 
-    // step('should test multi-transfers', async () => {
-    //     if (onlyBasic) {
-    //         return;
-    //     }
-    //     await tester.testBatch(alice, bob, token, TX_AMOUNT);
-    //     await tester.testIgnoredBatch(alice, bob, token, TX_AMOUNT);
-    //     await tester.testRejectedBatch(alice, bob, token, TX_AMOUNT);
-    //     await tester.testInvalidFeeBatch(alice, bob, token, TX_AMOUNT);
-    // });
-    //
-    // step('should test batch-builder', async () => {
-    //     // We will pay with different token.
-    //     const feeToken = token == 'ETH' ? 'wBTC' : 'ETH';
-    //     // Add these accounts to the network.
-    //     await tester.testTransfer(alice, david, token, TX_AMOUNT.mul(10));
-    //     await tester.testTransfer(alice, judy, token, TX_AMOUNT.mul(10));
-    //     await tester.testTransfer(alice, frank, token, TX_AMOUNT.mul(10));
-    //     await tester.testTransfer(alice, chris, token, TX_AMOUNT.mul(10));
-    //     // Also deposit another token to pay with.
-    //     await tester.testDeposit(frank, feeToken, DEPOSIT_AMOUNT, true);
-    //
-    //     await tester.testBatchBuilderInvalidUsage(david, alice, token);
-    //     await tester.testBatchBuilderChangePubKey(david, token, TX_AMOUNT, true);
-    //     await tester.testBatchBuilderSignedChangePubKey(chris, token, TX_AMOUNT);
-    //     await tester.testBatchBuilderChangePubKey(frank, token, TX_AMOUNT, false);
-    //     await tester.testBatchBuilderTransfers(david, frank, token, TX_AMOUNT);
-    //     await tester.testBatchBuilderPayInDifferentToken(frank, david, token, feeToken, TX_AMOUNT);
-    //     // Finally, transfer, withdraw and forced exit in a single batch.
-    //     await tester.testBatchBuilderGenericUsage(david, frank, judy, token, TX_AMOUNT);
-    // });
-    //
-    // step('should test multi-signers', async () => {
-    //     // At this point, all these wallets already have their public keys set.
-    //     await tester.testMultipleBatchSigners([alice, david, frank], token, TX_AMOUNT);
-    //     await tester.testMultipleWalletsWrongSignature(alice, david, token, TX_AMOUNT);
-    // });
-    //
-    // step('should test backwards compatibility', async () => {
-    //     await tester.testBackwardCompatibleEthMessages(alice, david, token, TX_AMOUNT);
-    // });
-    //
+    step('should test multi-transfers', async () => {
+        if (onlyBasic) {
+            return;
+        }
+        await tester.testBatch(alice, bob, token, TX_AMOUNT);
+        await tester.testIgnoredBatch(alice, bob, token, TX_AMOUNT);
+        await tester.testRejectedBatch(alice, bob, token, TX_AMOUNT);
+        await tester.testInvalidFeeBatch(alice, bob, token, TX_AMOUNT);
+    });
+
+    step('should test batch-builder', async () => {
+        // We will pay with different token.
+        const feeToken = token == 'ETH' ? 'wBTC' : 'ETH';
+        // Add these accounts to the network.
+        await tester.testTransfer(alice, david, token, TX_AMOUNT.mul(10));
+        await tester.testTransfer(alice, judy, token, TX_AMOUNT.mul(10));
+        await tester.testTransfer(alice, frank, token, TX_AMOUNT.mul(10));
+        await tester.testTransfer(alice, chris, token, TX_AMOUNT.mul(10));
+        // Also deposit another token to pay with.
+        await tester.testDeposit(frank, feeToken, DEPOSIT_AMOUNT, true);
+
+        await tester.testBatchBuilderInvalidUsage(david, alice, token);
+        await tester.testBatchBuilderChangePubKey(david, token, TX_AMOUNT, true);
+        await tester.testBatchBuilderSignedChangePubKey(chris, token, TX_AMOUNT);
+        await tester.testBatchBuilderChangePubKey(frank, token, TX_AMOUNT, false);
+        await tester.testBatchBuilderTransfers(david, frank, token, TX_AMOUNT);
+        await tester.testBatchBuilderPayInDifferentToken(frank, david, token, feeToken, TX_AMOUNT);
+        // Finally, transfer, withdraw and forced exit in a single batch.
+        await tester.testBatchBuilderGenericUsage(david, frank, judy, token, TX_AMOUNT);
+    });
+
+    step('should test multi-signers', async () => {
+        // At this point, all these wallets already have their public keys set.
+        await tester.testMultipleBatchSigners([alice, david, frank], token, TX_AMOUNT);
+        await tester.testMultipleWalletsWrongSignature(alice, david, token, TX_AMOUNT);
+    });
+
+    step('should test backwards compatibility', async () => {
+        await tester.testBackwardCompatibleEthMessages(alice, david, token, TX_AMOUNT);
+    });
+
     step('should execute a withdrawal', async () => {
         await tester.testVerifiedWithdraw(alice, token, TX_AMOUNT);
     });
