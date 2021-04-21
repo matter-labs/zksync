@@ -2364,7 +2364,7 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
                     &op_data.special_accounts[num],
                 )?;
                 Boolean::and(
-                    cs.namespace(|| format!("is account id correct in chunk {}", num)),
+                    cs.namespace(|| format!("is account id correct in chunk {}", permutation[num])),
                     &account_id_correct,
                     &is_chunk_number[permutation[num]],
                 )
@@ -2382,12 +2382,12 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
         let is_token_correct_in_chunk = (0..5)
             .map(|num| {
                 let token_correct = CircuitElement::equals(
-                    cs.namespace(|| format!("is_account_id_correct_in_slot {}", num)),
+                    cs.namespace(|| format!("is_token_correct_in_slot {}", num)),
                     &cur.token,
                     &op_data.special_tokens[num / 2],
                 )?;
                 Boolean::and(
-                    cs.namespace(|| format!("is account id correct in chunk {}", num)),
+                    cs.namespace(|| format!("is token correct in chunk {}", num)),
                     &token_correct,
                     &is_chunk_number[num],
                 )
@@ -2395,7 +2395,7 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
             .collect::<Result<Vec<_>, _>>()?;
 
         let is_token_correct = multi_or(
-            cs.namespace(|| "is_account_id_correct"),
+            cs.namespace(|| "is_token_correct"),
             &is_token_correct_in_chunk,
         )?;
 
@@ -2406,7 +2406,7 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
         )?;
 
         let is_submitter_address_correct = boolean_or(
-            cs.namespace(|| "is_address_correct"),
+            cs.namespace(|| "is_address_correct_in_last_chunk"),
             &is_submitter_address_correct,
             &is_chunk_number[4].not(),
         )?;
@@ -3655,9 +3655,9 @@ fn no_nonce_overflow<E: JubjubEngine, CS: ConstraintSystem<E>>(
     .not())
 }
 
-fn rescue_hash_allocated_bits<'a, E: RescueEngine + JubjubEngine, CS: ConstraintSystem<E>>(
+fn rescue_hash_allocated_bits<E: RescueEngine + JubjubEngine, CS: ConstraintSystem<E>>(
     mut cs: CS,
-    rescue_params: &'a <E as RescueEngine>::Params,
+    rescue_params: &<E as RescueEngine>::Params,
     bits: &[Boolean],
 ) -> Result<Vec<Boolean>, SynthesisError> {
     let input = multipack::pack_into_witness(
