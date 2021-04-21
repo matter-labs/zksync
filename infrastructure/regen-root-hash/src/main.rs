@@ -9,11 +9,30 @@ use account::{
 };
 
 use structopt::StructOpt;
-use utils::{fr_to_hex, sign_update_message, Params};
+use utils::{fr_to_hex, sign_update_message};
 use zksync_circuit::witness::utils::fr_from_bytes;
 
 use hasher::{get_state, verify_accounts_equal, verify_identical_trees};
 use zksync_crypto::params::NFT_STORAGE_ACCOUNT_ID;
+
+#[derive(StructOpt)]
+pub struct Params {
+    /// The current root hash (balance subtree depth 11)
+    #[structopt(short = "h")]
+    pub current_root_hash: String,
+
+    /// The path to the JSON dump of the accounts table
+    #[structopt(short = "a")]
+    pub accounts_dump: String,
+
+    /// The path to the JSON dump of the accounts table
+    #[structopt(short = "b")]
+    pub balances_dump: String,
+
+    /// The private key of the signer
+    #[structopt(short = "pk")]
+    pub private_key: String,
+}
 
 fn main() {
     let params = Params::from_args();
