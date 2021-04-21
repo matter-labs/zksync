@@ -6,6 +6,7 @@ members = [
     "core/bin/server",
     "core/bin/prover",
     "core/bin/parse_pub_data",
+    "core/bin/regen-root-hash",
 
     # Server micro-services
     "core/bin/zksync_api",
@@ -39,10 +40,7 @@ members = [
     "core/tests/loadtest",
 
     # SDK section
-    "sdk/zksync-rs",
-
-    # Utilities
-    "infrastructure/regen-root-hash"
+    "sdk/zksync-rs"
 ]
 
 [patch.crates-io]
