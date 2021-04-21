@@ -10,12 +10,9 @@ use zksync_crypto::franklin_crypto::bellman::pairing::ff::PrimeField;
 use super::Fr;
 use super::{AccountId, AccountUpdates, Nonce, TokenId};
 use zksync_basic_types::Address;
-use zksync_crypto::{
-    circuit::{
-        account::{Balance, CircuitAccount},
-        utils::eth_address_to_fr,
-    },
-    params::MIN_NFT_TOKEN_ID,
+use zksync_crypto::circuit::{
+    account::{Balance, CircuitAccount},
+    utils::eth_address_to_fr,
 };
 
 pub use self::{account_update::AccountUpdate, pubkey_hash::PubKeyHash};
@@ -34,8 +31,6 @@ pub struct Account {
     /// Address of the account. Directly corresponds to the L1 address.
     pub address: Address,
     balances: HashMap<TokenId, BigUintSerdeWrapper>,
-    /// Token ids for NFT tokens
-    pub nfts: Vec<TokenId>,
     /// Current nonce of the account. All the transactions require nonce field to be set in
     /// order to not allow double spend, and the nonce must increment by one after each operation.
     pub nonce: Nonce,
@@ -79,7 +74,6 @@ impl Default for Account {
     fn default() -> Self {
         Self {
             balances: HashMap::new(),
-            nfts: vec![],
             nonce: Nonce(0),
             pub_key_hash: PubKeyHash::default(),
             address: Address::zero(),
@@ -124,9 +118,6 @@ impl Account {
     /// Overrides the token balance value.
     pub fn set_balance(&mut self, token: TokenId, amount: BigUint) {
         self.balances.insert(token, amount.into());
-        if token >= TokenId(MIN_NFT_TOKEN_ID) {
-            self.add_nft(token)
-        }
     }
 
     /// Adds the provided amount to the token balance.
@@ -134,9 +125,6 @@ impl Account {
         let mut balance = self.balances.remove(&token).unwrap_or_default();
         balance.0 += amount;
         self.balances.insert(token, balance);
-        if token >= TokenId(MIN_NFT_TOKEN_ID) {
-            self.add_nft(token)
-        }
     }
 
     /// Subtracts the provided amount from the token balance.
@@ -148,9 +136,6 @@ impl Account {
         let mut balance = self.balances.remove(&token).unwrap_or_default();
         balance.0 -= amount;
         self.balances.insert(token, balance);
-        if token >= TokenId(MIN_NFT_TOKEN_ID) {
-            self.remove_nft(token)
-        }
     }
 
     /// Given the list of updates to apply, changes the account state.
@@ -161,23 +146,6 @@ impl Account {
         account
     }
 
-    pub fn add_nft(&mut self, token_id: TokenId) {
-        assert!(
-            token_id >= TokenId(MIN_NFT_TOKEN_ID),
-            "Wrong token id for nft"
-        );
-        self.nfts.push(token_id)
-    }
-    pub fn remove_nft(&mut self, token_id: TokenId) {
-        assert!(
-            token_id >= TokenId(MIN_NFT_TOKEN_ID),
-            "Wrong token id for nft"
-        );
-        self.nfts
-            .iter()
-            .position(|id| id.0 == token_id.0)
-            .map(|index| self.nfts.remove(index));
-    }
     /// Applies an update to the account state.
     pub fn apply_update(account: Option<Self>, update: AccountUpdate) -> Option<Self> {
         match account {

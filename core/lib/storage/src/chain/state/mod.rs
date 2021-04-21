@@ -545,15 +545,6 @@ impl<'a, 'c> StateSchema<'a, 'c> {
         .fetch_all(transaction.conn())
         .await?;
 
-        let mint_nft_diffs = sqlx::query_as!(
-            StorageMintNFTUpdate,
-            "SELECT * FROM mint_nft_updates WHERE block_number > $1 AND block_number <= $2 ",
-            i64::from(*start_block),
-            i64::from(*end_block),
-        )
-        .fetch_all(transaction.conn())
-        .await?;
-
         vlog::debug!(
             "Loading state diff: forward: {}, start_block: {}, end_block: {}, unbounded: {}",
             time_forward,
@@ -583,7 +574,6 @@ impl<'a, 'c> StateSchema<'a, 'c> {
                     .into_iter()
                     .map(StorageAccountDiff::from),
             );
-            account_diff.extend(mint_nft_diffs.into_iter().map(StorageAccountDiff::from));
             let last_block = account_diff
                 .iter()
                 .map(|acc| acc.block_number())
@@ -637,32 +627,6 @@ impl<'a, 'c> StateSchema<'a, 'c> {
 
         metrics::histogram!("sql.chain.state.load_state_diff", start.elapsed());
         result
-    }
-
-    pub async fn load_verified_nft_tokens(&mut self) -> QueryResult<Vec<StorageNFT>> {
-        Ok(sqlx::query_as!(StorageNFT, "SELECT * FROM nft")
-            .fetch_all(self.0.conn())
-            .await?)
-    }
-
-    pub async fn load_committed_nft_tokens(
-        &mut self,
-        block_number: Option<BlockNumber>,
-    ) -> QueryResult<Vec<StorageMintNFTUpdate>> {
-        let tokens = if let Some(block_number) = block_number {
-            sqlx::query_as!(
-                StorageMintNFTUpdate,
-                "SELECT * FROM mint_nft_updates WHERE block_number <= $1",
-                block_number.0 as i64
-            )
-            .fetch_all(self.0.conn())
-            .await
-        } else {
-            sqlx::query_as!(StorageMintNFTUpdate, "SELECT * FROM mint_nft_updates")
-                .fetch_all(self.0.conn())
-                .await
-        };
-        Ok(tokens?)
     }
 
     pub async fn get_mint_nft_updates(&mut self, token_id: TokenId) -> QueryResult<Option<NFT>> {
