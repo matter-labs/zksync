@@ -2,7 +2,6 @@ import { Tester } from './tester';
 import { expect } from 'chai';
 import { Wallet, types } from 'zksync';
 import { BigNumber } from 'ethers';
-import { NFT } from '../../../../sdk/zksync.js/build/types';
 
 type TokenLike = types.TokenLike;
 
