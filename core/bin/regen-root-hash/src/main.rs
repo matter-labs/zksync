@@ -18,19 +18,19 @@ use zksync_crypto::params::NFT_STORAGE_ACCOUNT_ID;
 #[derive(StructOpt)]
 pub struct Params {
     /// The current root hash (balance subtree depth 11)
-    #[structopt(short = "h")]
+    #[structopt(short = "h", env = "CURRENT_ROOT_HASH")]
     pub current_root_hash: String,
 
     /// The path to the JSON dump of the accounts table
-    #[structopt(short = "a")]
+    #[structopt(short = "a", env = "ACCOUNTS_DUMP")]
     pub accounts_dump: String,
 
     /// The path to the JSON dump of the accounts table
-    #[structopt(short = "b")]
+    #[structopt(short = "b", env = "BALANCES_DUMP")]
     pub balances_dump: String,
 
     /// The private key of the signer
-    #[structopt(short = "pk")]
+    #[structopt(short = "pk", env = "PRIVATE_KEY")]
     pub private_key: String,
 }
 
