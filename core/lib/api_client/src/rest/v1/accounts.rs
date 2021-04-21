@@ -17,6 +17,7 @@ use super::{
     client::{Client, ClientError},
     transactions::Receipt,
 };
+use std::collections::HashMap;
 
 // Data transfer objects
 
@@ -54,7 +55,7 @@ impl From<zksync_types::NFT> for NFT {
 pub struct AccountState {
     /// Account wallet balances.
     pub balances: BTreeMap<String, BigUintSerdeWrapper>,
-    pub nfts: Vec<NFT>,
+    pub nfts: HashMap<TokenId, NFT>,
     /// zkSync account nonce.
     pub nonce: Nonce,
     /// Hash of the account's owner public key.

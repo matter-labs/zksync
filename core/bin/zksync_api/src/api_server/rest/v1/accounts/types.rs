@@ -27,6 +27,7 @@ use crate::{api_server::v1::MAX_LIMIT, utils::token_db_cache::TokenDBCache};
 
 pub(super) mod convert {
     use super::*;
+    use std::collections::HashMap;
     use zksync_crypto::params::MIN_NFT_TOKEN_ID;
 
     pub async fn account_state_from_storage(
@@ -35,10 +36,11 @@ pub(super) mod convert {
         account: &Account,
     ) -> QueryResult<AccountState> {
         let mut balances = BTreeMap::new();
-        let mut nfts = vec![];
+        let mut nfts = HashMap::new();
         for (token_id, balance) in account.get_nonzero_balances() {
             if token_id.0 >= MIN_NFT_TOKEN_ID {
-                nfts.push(
+                nfts.insert(
+                    token_id,
                     tokens
                         .get_nft_by_id(storage, token_id)
                         .await?

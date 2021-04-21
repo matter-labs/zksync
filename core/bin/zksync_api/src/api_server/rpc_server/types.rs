@@ -32,7 +32,7 @@ pub struct TxWithSignature {
 #[serde(rename_all = "camelCase")]
 pub struct ResponseAccountState {
     pub balances: HashMap<String, BigUintSerdeWrapper>,
-    pub nfts: Vec<NFT>,
+    pub nfts: HashMap<TokenId, NFT>,
     pub nonce: Nonce,
     pub pub_key_hash: PubKeyHash,
 }
