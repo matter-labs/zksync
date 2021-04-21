@@ -7,6 +7,7 @@ import './priority-ops';
 import './change-pub-key';
 import './transfer';
 import './withdraw';
+import './mint-nft';
 import './forced-exit';
 import './misc';
 import './batch-builder';
@@ -84,6 +85,10 @@ describe(`ZkSync integration tests (token: ${token}, transport: ${transport})`, 
         await tester.testTransfer(alice, chuck, token, TX_AMOUNT);
     });
 
+    step('should execute a mintNFT', async () => {
+        await tester.testMintNFT(alice, chuck, "0x0000000000000000000000000000000000000000000000000000000000000000", token);
+    });
+
     step('should execute a transfer to existing account', async () => {
         if (onlyBasic) {
             return;
@@ -99,9 +104,6 @@ describe(`ZkSync integration tests (token: ${token}, transport: ${transport})`, 
     });
 
     step('should change pubkey offchain', async () => {
-        if (onlyBasic) {
-            return;
-        }
         await tester.testChangePubKey(chuck, token, false);
     });
 
@@ -148,6 +150,10 @@ describe(`ZkSync integration tests (token: ${token}, transport: ${transport})`, 
 
     step('should execute a withdrawal', async () => {
         await tester.testVerifiedWithdraw(alice, token, TX_AMOUNT);
+    });
+
+    step('should execute a transfer NFT', async () => {
+        await tester.testTransferNFT(chuck, alice, token);
     });
 
     step('should execute a ForcedExit', async () => {
@@ -304,12 +310,12 @@ if (process.env.TEST_TRANSPORT) {
             transport: 'HTTP',
             token: 'ETH',
             onlyBasic: true
-        },
-        {
-            transport: 'HTTP',
-            token: defaultERC20,
-            onlyBasic: false
         }
+        // {
+        //     transport: 'HTTP',
+        //     token: defaultERC20,
+        //     onlyBasic: false
+        // }
     ];
 }
 

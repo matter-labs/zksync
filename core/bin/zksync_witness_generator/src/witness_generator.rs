@@ -28,6 +28,7 @@ pub struct WitnessGenerator<DB: DatabaseInterface> {
     block_step: BlockNumber,
 }
 
+#[derive(Debug)]
 enum BlockInfo {
     NotReadyBlock,
     WithWitness,

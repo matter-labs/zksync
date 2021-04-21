@@ -20,3 +20,6 @@ CREATE TABLE nft
 );
 
 ALTER TABLE tokens ADD COLUMN is_nft BOOL NOT NULL DEFAULT FALSE;
+
+/* We should drop this constraint, because now we could increase balance token before inserting token into tokens */
+alter table account_balance_updates drop constraint account_balance_updates_coin_id_fkey;

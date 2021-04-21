@@ -11,6 +11,7 @@ pub use self::{
     deposit::DepositWitness,
     forced_exit::ForcedExitWitness,
     full_exit::FullExitWitness,
+    mint_nft::MintNFTWitness,
     transfer::TransferWitness,
     transfer_to_new::TransferToNewWitness,
     utils::{SigDataInput, WitnessBuilder},
@@ -22,6 +23,7 @@ pub mod close_account;
 pub mod deposit;
 pub mod forced_exit;
 pub mod full_exit;
+pub mod mint_nft;
 pub mod noop;
 pub mod transfer;
 pub mod transfer_to_new;

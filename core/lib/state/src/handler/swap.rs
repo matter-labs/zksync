@@ -1,7 +1,7 @@
 use anyhow::{ensure, format_err};
 use num::{BigUint, Zero};
 use std::time::Instant;
-use zksync_crypto::params::{max_account_id, max_token_id};
+use zksync_crypto::params::{max_account_id, max_fungible_token_id, max_token_id};
 use zksync_types::{AccountUpdates, Order, PubKeyHash, Swap, SwapOp};
 
 use crate::{
@@ -16,7 +16,10 @@ impl TxHandler<Swap> for ZkSyncState {
         self.verify_order(&tx.orders.0)?;
         self.verify_order(&tx.orders.1)?;
         ensure!(tx.submitter_id <= max_account_id(), "Account id is too big");
-        ensure!(tx.fee_token <= max_token_id(), "Token is not supported");
+        ensure!(
+            tx.fee_token <= max_fungible_token_id(),
+            "Token is not supported"
+        );
 
         let (submitter, submitter_account) = self
             .get_account_by_address(&tx.submitter_address)

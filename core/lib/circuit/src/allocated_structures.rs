@@ -98,6 +98,11 @@ pub struct AllocatedOperationData<E: Engine> {
     pub amount_packed: CircuitElement<E>,
     pub fee_packed: CircuitElement<E>,
     pub amount_unpacked: CircuitElement<E>,
+    pub special_eth_address: CircuitElement<E>,
+    pub special_tokens: Vec<CircuitElement<E>>,
+    pub special_account_ids: Vec<CircuitElement<E>>,
+    pub special_content_hash: Vec<CircuitElement<E>>,
+    pub special_serial_id: CircuitElement<E>,
     pub full_amount: CircuitElement<E>,
     pub fee: CircuitElement<E>,
     pub first_sig_msg: CircuitElement<E>,
@@ -128,6 +133,32 @@ impl<E: RescueEngine> AllocatedOperationData<E> {
             zero_element.clone(),
             franklin_constants::AMOUNT_EXPONENT_BIT_WIDTH
                 + franklin_constants::AMOUNT_MANTISSA_BIT_WIDTH,
+        );
+
+        let special_eth_address = CircuitElement::unsafe_empty_of_some_length(
+            zero_element.clone(),
+            franklin_constants::ETH_ADDRESS_BIT_WIDTH,
+        );
+
+        let special_token = CircuitElement::unsafe_empty_of_some_length(
+            zero_element.clone(),
+            franklin_constants::TOKEN_BIT_WIDTH,
+        );
+
+        let special_account_id = CircuitElement::unsafe_empty_of_some_length(
+            zero_element.clone(),
+            franklin_constants::ACCOUNT_ID_BIT_WIDTH,
+        );
+
+        let special_content_hash =
+            vec![
+                CircuitElement::unsafe_empty_of_some_length(zero_element.clone(), 1,);
+                franklin_constants::CONTENT_HASH_WIDTH
+            ];
+
+        let special_serial_id = CircuitElement::unsafe_empty_of_some_length(
+            zero_element.clone(),
+            franklin_constants::SERIAL_ID_WIDTH,
         );
 
         let fee_packed = CircuitElement::unsafe_empty_of_some_length(
@@ -194,6 +225,12 @@ impl<E: RescueEngine> AllocatedOperationData<E> {
             eth_address,
             pub_nonce,
             amount_packed,
+            special_eth_address,
+            special_tokens: vec![special_token; 2],
+            special_account_ids: vec![special_account_id; 2],
+            special_content_hash,
+            special_serial_id,
+
             fee_packed,
             fee,
             amount_unpacked,
@@ -217,6 +254,60 @@ impl<E: RescueEngine> AllocatedOperationData<E> {
             cs.namespace(|| "eth_address"),
             || op.args.eth_address.grab(),
             franklin_constants::ETH_ADDRESS_BIT_WIDTH,
+        )?;
+
+        let special_eth_address = CircuitElement::from_fe_with_known_length(
+            cs.namespace(|| "special_eth_address"),
+            || op.args.special_eth_address.grab(),
+            franklin_constants::ETH_ADDRESS_BIT_WIDTH,
+        )?;
+
+        let special_tokens = op
+            .args
+            .special_tokens
+            .iter()
+            .enumerate()
+            .map(|(idx, special_token)| {
+                CircuitElement::from_fe_with_known_length(
+                    cs.namespace(|| format!("special_token with index {}", idx)),
+                    || special_token.grab(),
+                    franklin_constants::TOKEN_BIT_WIDTH,
+                )
+            })
+            .collect::<Result<Vec<_>, SynthesisError>>()?;
+
+        let special_account_ids = op
+            .args
+            .special_account_ids
+            .iter()
+            .enumerate()
+            .map(|(idx, special_account_id)| {
+                CircuitElement::from_fe_with_known_length(
+                    cs.namespace(|| format!("special_account_id with index {}", idx)),
+                    || special_account_id.grab(),
+                    franklin_constants::ACCOUNT_ID_BIT_WIDTH,
+                )
+            })
+            .collect::<Result<Vec<_>, SynthesisError>>()?;
+
+        let special_content_hash = op
+            .args
+            .special_content_hash
+            .iter()
+            .enumerate()
+            .map(|(idx, special_content_hash_bit)| {
+                CircuitElement::from_fe_with_known_length(
+                    cs.namespace(|| format!("special_content_hash bit with index {}", idx)),
+                    || special_content_hash_bit.grab(),
+                    1,
+                )
+            })
+            .collect::<Result<Vec<_>, SynthesisError>>()?;
+
+        let special_serial_id = CircuitElement::from_fe_with_known_length(
+            cs.namespace(|| "special_serial_id"),
+            || op.args.special_serial_id.grab(),
+            franklin_constants::SERIAL_ID_WIDTH,
         )?;
 
         let full_amount = CircuitElement::from_fe_with_known_length(
@@ -316,6 +407,13 @@ impl<E: RescueEngine> AllocatedOperationData<E> {
             eth_address,
             pub_nonce,
             amount_packed,
+
+            special_eth_address,
+            special_tokens,
+            special_account_ids,
+            special_content_hash,
+            special_serial_id,
+
             fee_packed,
             fee,
             amount_unpacked,

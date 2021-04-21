@@ -12,7 +12,7 @@ impl TxHandler<Deposit> for ZkSyncState {
 
     fn create_op(&self, priority_op: Deposit) -> Result<Self::Op, anyhow::Error> {
         assert!(
-            priority_op.token <= params::max_token_id(),
+            priority_op.token <= params::max_fungible_token_id(),
             "Deposit token is out of range, this should be enforced by contract"
         );
         let account_id = if let Some((account_id, _)) = self.get_account_by_address(&priority_op.to)

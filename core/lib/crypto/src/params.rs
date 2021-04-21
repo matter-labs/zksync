@@ -26,30 +26,37 @@ pub fn balance_tree_depth() -> usize {
 /// Tokens settings
 
 /// Number of supported tokens.
-pub fn total_tokens() -> usize {
-    // Exclude  NFT_TOKEN_ID
-    2usize.pow(balance_tree_depth() as u32) - 2
+pub fn total_fungible_tokens() -> usize {
+    MIN_NFT_TOKEN_ID as usize
 }
-/// NFT settings
+/// Number of supported tokens.
+pub fn total_tokens() -> usize {
+    2usize.pow((balance_tree_depth() - 1) as u32) - 2
+}
 
-/// Special token id, which enforce unique pair of creator account id and serial id for generating unique address for token.
-/// Where serial id is balance for this special token
-pub const NFT_TOKEN_ID: TokenId = TokenId(u32::MAX - 1);
-
-/// Special account which enforce unique token id for NFT.
-pub const NFT_STORAGE_ACCOUNT_ID: AccountId = AccountId(u32::MAX - 1);
-
-/// First token id for NFT, all fungible token id must be less, all NFT must be above.
-pub const MIN_NFT_TOKEN_ID: u32 = 10000;
-
+pub const PROCESSABLE_TOKENS_DEPTH: u32 = 10;
 /// Number of tokens that are processed by this release
 pub fn number_of_processable_tokens() -> usize {
-    let num = total_tokens();
+    let num = 2usize.pow(PROCESSABLE_TOKENS_DEPTH);
+
     assert!(num <= total_tokens());
     assert!(num.is_power_of_two());
 
     num
 }
+
+/// NFT settings
+
+/// Special token id, which enforce unique pair of creator account id and serial id for generating unique address for token.
+/// Where serial id is balance for this special token
+pub const NFT_TOKEN_ID_VAL: u32 = ((i32::MAX) - 1) as u32;
+pub const NFT_TOKEN_ID: TokenId = TokenId(NFT_TOKEN_ID_VAL);
+
+/// Special account which enforce unique token id for NFT.
+pub const NFT_STORAGE_ACCOUNT_ID: AccountId = AccountId(2u32.pow(24) - 1);
+
+/// First token id for NFT, all fungible token id must be less, all NFT must be above.
+pub const MIN_NFT_TOKEN_ID: u32 = 65536;
 
 /// Depth of the left subtree of the account tree that can be used in the current version of the circuit.
 pub fn used_account_subtree_depth() -> usize {
@@ -70,14 +77,14 @@ pub fn max_account_id() -> AccountId {
     }
 }
 
-/// Max token id, based on the number of processable tokens
+/// Max token id
 pub fn max_token_id() -> TokenId {
-    TokenId(number_of_processable_tokens() as u32 - 1)
+    TokenId(*NFT_TOKEN_ID - 1)
 }
 
-/// Max token id, based on the number of processable tokens
+/// Max fungible token id
 pub fn max_fungible_token_id() -> TokenId {
-    TokenId(MIN_NFT_TOKEN_ID - 1)
+    TokenId(number_of_processable_tokens() as u32 - 1)
 }
 
 pub const ETH_TOKEN_ID: TokenId = TokenId(0);
@@ -102,6 +109,9 @@ pub const SUBTREE_HASH_WIDTH_PADDED: usize = 256;
 /// Content hash size
 pub const CONTENT_HASH_WIDTH: usize = 256;
 
+/// NFT serial id size
+pub const SERIAL_ID_WIDTH: usize = 32;
+
 /// balance bit width
 pub const BALANCE_BIT_WIDTH: usize = 128;
 
@@ -110,7 +120,7 @@ pub const ADDRESS_WIDTH: usize = FR_ADDRESS_LEN * 8;
 /// Nonce bit width
 pub const NONCE_BIT_WIDTH: usize = 32;
 //
-pub const CHUNK_BIT_WIDTH: usize = 72;
+pub const CHUNK_BIT_WIDTH: usize = 80;
 pub const CHUNK_BYTES: usize = CHUNK_BIT_WIDTH / 8;
 
 pub const MAX_CIRCUIT_MSG_HASH_BITS: usize = 736;
@@ -204,6 +214,17 @@ pub const SIGNED_FORCED_EXIT_BIT_WIDTH: usize = TX_TYPE_BIT_WIDTH
     + NONCE_BIT_WIDTH
     + 2 * TIMESTAMP_BIT_WIDTH;
 
+/// Size of the data that is signed for mint nft tx
+pub const SIGNED_MINT_NFT_BIT_WIDTH: usize = TX_TYPE_BIT_WIDTH
+    + ACCOUNT_ID_BIT_WIDTH
+    + ADDRESS_WIDTH
+    + CONTENT_HASH_WIDTH
+    + ADDRESS_WIDTH
+    + TOKEN_BIT_WIDTH
+    + FEE_EXPONENT_BIT_WIDTH
+    + FEE_MANTISSA_BIT_WIDTH
+    + NONCE_BIT_WIDTH;
+
 /// Size of the data that is signed for change pubkey tx
 pub const SIGNED_CHANGE_PUBKEY_BIT_WIDTH: usize = TX_TYPE_BIT_WIDTH
     + ACCOUNT_ID_BIT_WIDTH
@@ -231,7 +252,7 @@ pub const RECURSIVE_CIRCUIT_NUM_INPUTS: usize = 1;
 pub const RECURSIVE_CIRCUIT_VK_TREE_DEPTH: usize = 3;
 
 /// Major version of the ZkSync
-pub const ZKSYNC_VERSION: &str = "contracts-5";
+pub const ZKSYNC_VERSION: &str = "contracts-6";
 
 lazy_static! {
     pub static ref JUBJUB_PARAMS: AltJubjubBn256 = AltJubjubBn256::new();

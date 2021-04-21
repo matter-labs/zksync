@@ -12,7 +12,8 @@ import {
     ForcedExit,
     ChangePubKey,
     Withdraw,
-    CloseAccount
+    CloseAccount,
+    MintNFT
 } from './types';
 
 // Max number of tokens for the current version, it is determined by the zkSync circuit implementation.
@@ -21,6 +22,7 @@ const MAX_NUMBER_OF_TOKENS = Math.pow(2, 32);
 const MAX_NUMBER_OF_ACCOUNTS = Math.pow(2, 24);
 
 export const MAX_TIMESTAMP = 4294967295;
+export const MIN_NFT_TOKEN_ID = 65536;
 
 export const IERC20_INTERFACE = new utils.Interface(require('../abi/IERC20.json').abi);
 export const SYNC_MAIN_CONTRACT_INTERFACE = new utils.Interface(require('../abi/SyncMain.json').abi);
@@ -294,6 +296,11 @@ export function closestGreaterOrEqPackableTransactionFee(fee: BigNumberish): Big
 export function isTransactionFeePackable(amount: BigNumberish): boolean {
     return closestPackableTransactionFee(amount).eq(amount);
 }
+// Check that this token could be an NFT.
+// NFT not presented in TokenSets, so we can't their correctness in TokenSet
+function isNFT(token: TokenLike): boolean {
+    return (typeof token === 'number' && token >= MIN_NFT_TOKEN_ID)
+}
 
 export function buffer2bitsBE(buff) {
     const res = new Array(buff.length * 8);
@@ -367,10 +374,16 @@ export class TokenSet {
     }
 
     public resolveTokenDecimals(tokenLike: TokenOrId): number {
+        if (isNFT(tokenLike)) {
+            return 1;
+        }
         return this.resolveTokenObject(tokenLike).decimals;
     }
 
     public resolveTokenId(tokenLike: TokenOrId): number {
+        if (isNFT(tokenLike)) {
+            return tokenLike as number;
+        }
         return this.resolveTokenObject(tokenLike).id;
     }
 
@@ -502,6 +515,14 @@ function removeAddressPrefix(address: Address | PubKeyHash): string {
     throw new Error("ETH address must start with '0x' and PubKeyHash must start with 'sync:'");
 }
 
+export function serializeContentHash(contentHash: string): Uint8Array {
+    const contentHashBytes = utils.arrayify(contentHash);
+    if (contentHashBytes.length !== 32) {
+        throw new Error('Content hash must be 32 bytes long');
+    }
+
+    return contentHashBytes;
+}
 // PubKeyHash or eth address
 export function serializeAddress(address: Address | PubKeyHash): Uint8Array {
     const prefixlessAddress = removeAddressPrefix(address);
@@ -583,6 +604,27 @@ export function serializeWithdraw(withdraw: Withdraw): Uint8Array {
         nonceBytes,
         validFrom,
         validUntil
+    ]);
+}
+
+export function serializeMintNFT(mintNFT: MintNFT): Uint8Array {
+    const type = new Uint8Array([9]);
+    const accountId = serializeAccountId(mintNFT.creatorId);
+    const accountBytes = serializeAddress(mintNFT.creatorAddress);
+    const contentHashBytes = serializeContentHash(mintNFT.contentHash);
+    const recipientBytes = serializeAddress(mintNFT.recipient);
+    const tokenIdBytes = serializeTokenId(mintNFT.feeToken);
+    const feeBytes = serializeFeePacked(mintNFT.fee);
+    const nonceBytes = serializeNonce(mintNFT.nonce);
+    return ethers.utils.concat([
+        type,
+        accountId,
+        accountBytes,
+        contentHashBytes,
+        recipientBytes,
+        tokenIdBytes,
+        feeBytes,
+        nonceBytes
     ]);
 }
 

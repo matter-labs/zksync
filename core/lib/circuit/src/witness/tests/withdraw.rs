@@ -102,7 +102,7 @@ fn corrupted_ops_input() {
     let test_vector = input.corrupted_variations();
 
     for input in test_vector {
-        corrupted_input_test_scenario::<WithdrawWitness<Bn256>, _>(
+        corrupted_input_test_scenario::<WithdrawWitness<Bn256>, _, _>(
             &accounts,
             withdraw_op.clone(),
             input,
@@ -114,6 +114,7 @@ fn corrupted_ops_input() {
                     .unwrap();
                 vec![fee]
             },
+            |_| {},
         );
     }
 }
@@ -156,7 +157,7 @@ fn test_incorrect_withdraw_account_from() {
 
     let input = SigDataInput::from_withdraw_op(&withdraw_op).expect("SigDataInput creation failed");
 
-    incorrect_op_test_scenario::<WithdrawWitness<Bn256>, _>(
+    incorrect_op_test_scenario::<WithdrawWitness<Bn256>, _, _>(
         &accounts,
         withdraw_op,
         input,
@@ -167,6 +168,7 @@ fn test_incorrect_withdraw_account_from() {
                 amount: FEE_AMOUNT.into(),
             }]
         },
+        |_| {},
     );
 }
 
@@ -212,7 +214,7 @@ fn test_incorrect_withdraw_amount() {
         let input =
             SigDataInput::from_withdraw_op(&withdraw_op).expect("SigDataInput creation failed");
 
-        incorrect_op_test_scenario::<WithdrawWitness<Bn256>, _>(
+        incorrect_op_test_scenario::<WithdrawWitness<Bn256>, _, _>(
             &accounts,
             withdraw_op,
             input,
@@ -223,6 +225,7 @@ fn test_incorrect_withdraw_amount() {
                     amount: fee_amount.into(),
                 }]
             },
+            |_| {},
         );
     }
 }
@@ -275,7 +278,7 @@ fn test_withdraw_replay() {
 
     let input = SigDataInput::from_withdraw_op(&withdraw_op).expect("SigDataInput creation failed");
 
-    incorrect_op_test_scenario::<WithdrawWitness<Bn256>, _>(
+    incorrect_op_test_scenario::<WithdrawWitness<Bn256>, _, _>(
         &accounts,
         withdraw_op,
         input,
@@ -286,5 +289,6 @@ fn test_withdraw_replay() {
                 amount: FEE_AMOUNT.into(),
             }]
         },
+        |_| {},
     );
 }

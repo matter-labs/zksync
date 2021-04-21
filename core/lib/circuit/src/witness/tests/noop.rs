@@ -68,7 +68,7 @@ fn insert_validator(
 
     // Initialize all the validator balances as 0.
     let empty_balance = Some(Fr::zero());
-    let validator_balances = vec![empty_balance; params::total_tokens()];
+    let validator_balances = vec![empty_balance; params::number_of_processable_tokens()];
 
     // Insert account into tree.
     tree.insert(validator_address_number, validator_leaf);
@@ -187,6 +187,16 @@ fn incorrect_circuit_pubdata() {
     let operation = noop_operation(&tree, validator_address_number);
     let (_, validator_account_witness) = apply_fee(&mut tree, validator_address_number, 0, 0);
     let (validator_audit_path, _) = get_audits(&tree, validator_address_number, 0);
+    let validator_non_processable_tokens_audit = tree
+        .get(validator_address_number)
+        .unwrap_or(&CircuitAccount::default())
+        .subtree
+        .merkle_path(0)
+        .into_iter()
+        .map(|e| Some(e.0))
+        .collect::<Vec<_>>()
+        .as_slice()[zksync_crypto::params::PROCESSABLE_TOKENS_DEPTH as usize..]
+        .to_vec();
 
     let correct_hash = tree.root_hash();
     let incorrect_hash = Default::default();
@@ -248,6 +258,10 @@ fn incorrect_circuit_pubdata() {
             validator_address: Some(validator_address),
             validator_balances: validator_balances.clone(),
             validator_audit_path: validator_audit_path.clone(),
+            validator_non_processable_tokens_audit_before_fees:
+                validator_non_processable_tokens_audit.clone(),
+            validator_non_processable_tokens_audit_after_fees:
+                validator_non_processable_tokens_audit.clone(),
             block_timestamp: Some(timestamp),
         };
 
@@ -288,6 +302,10 @@ fn incorrect_circuit_pubdata() {
         validator_address: Some(validator_address),
         validator_balances: validator_balances.clone(),
         validator_audit_path: validator_audit_path.clone(),
+        validator_non_processable_tokens_audit_before_fees: validator_non_processable_tokens_audit
+            .clone(),
+        validator_non_processable_tokens_audit_after_fees: validator_non_processable_tokens_audit
+            .clone(),
         block_timestamp: Some(timestamp),
     };
 
@@ -333,6 +351,9 @@ fn incorrect_circuit_pubdata() {
         validator_address: Some(validator_address),
         validator_balances,
         validator_audit_path,
+        validator_non_processable_tokens_audit_before_fees: validator_non_processable_tokens_audit
+            .clone(),
+        validator_non_processable_tokens_audit_after_fees: validator_non_processable_tokens_audit,
         block_timestamp: Some(timestamp),
     };
 

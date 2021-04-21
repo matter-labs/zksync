@@ -15,7 +15,7 @@ impl TxHandler<FullExit> for ZkSyncState {
     fn create_op(&self, priority_op: FullExit) -> Result<Self::Op, anyhow::Error> {
         // NOTE: Authorization of the FullExit is verified on the contract.
         assert!(
-            priority_op.token <= params::max_token_id(),
+            priority_op.token <= params::max_fungible_token_id(),
             "Full exit token is out of range, this should be enforced by contract"
         );
         vlog::debug!("Processing {:?}", priority_op);

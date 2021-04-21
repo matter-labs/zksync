@@ -14,8 +14,8 @@ use zksync_crypto::{
     },
     params::{
         account_tree_depth, ACCOUNT_ID_BIT_WIDTH, BALANCE_BIT_WIDTH, CHUNK_BIT_WIDTH,
-        ETH_ADDRESS_BIT_WIDTH, NEW_PUBKEY_HASH_WIDTH, NONCE_BIT_WIDTH, TOKEN_BIT_WIDTH,
-        TX_TYPE_BIT_WIDTH,
+        CONTENT_HASH_WIDTH, ETH_ADDRESS_BIT_WIDTH, NEW_PUBKEY_HASH_WIDTH, NONCE_BIT_WIDTH,
+        TOKEN_BIT_WIDTH, TX_TYPE_BIT_WIDTH,
     },
 };
 use zksync_types::operations::DepositOp;
@@ -113,7 +113,7 @@ impl Witness for DepositWitness<Bn256> {
             .collect();
 
         vlog::debug!(
-            "acc_path{} \n bal_path {} ",
+            "acc_path {} \n bal_path {} ",
             self.before.witness.account_path.len(),
             self.before.witness.balance_subtree_path.len()
         );
@@ -249,6 +249,12 @@ impl DepositWitness<Bn256> {
                 new_pub_key_hash: Some(Fr::zero()),
                 valid_from: Some(Fr::zero()),
                 valid_until: Some(Fr::from_str(&u32::MAX.to_string()).unwrap()),
+
+                special_eth_address: Some(Fr::zero()),
+                special_tokens: vec![Some(Fr::zero()), Some(Fr::zero())],
+                special_account_ids: vec![Some(Fr::zero()), Some(Fr::zero())],
+                special_content_hash: vec![Some(Fr::zero()); CONTENT_HASH_WIDTH],
+                special_serial_id: Some(Fr::zero()),
             },
             before_root: Some(before_root),
             after_root: Some(after_root),

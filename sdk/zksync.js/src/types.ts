@@ -6,7 +6,7 @@ export type Address = string;
 export type PubKeyHash = string;
 
 // Symbol like "ETH" or "FAU" or token contract address(zero address is implied for "ETH").
-export type TokenLike = TokenSymbol | TokenAddress;
+export type TokenLike = TokenSymbol | TokenAddress | number;
 // Token symbol (e.g. "ETH", "FAU", etc.)
 export type TokenSymbol = string;
 // Token address (e.g. 0xde..ad for ERC20, or 0x00.00 for "ETH")
@@ -20,6 +20,13 @@ export interface Create2Data {
     creatorAddress: string;
     saltArg: string;
     codeHash: string;
+}
+
+export interface NFT {
+    id: number;
+    symbol: string;
+    creatorId: number;
+    contentHash: string;
 }
 
 export interface AccountState {
@@ -42,6 +49,10 @@ export interface AccountState {
             // Token are indexed by their symbol (e.g. "ETH")
             [token: string]: BigNumberish;
         };
+        nfts: {
+            // NFT are indexed by their id
+            [tokenId: number]: NFT;
+        };
         nonce: number;
         pubKeyHash: PubKeyHash;
     };
@@ -49,6 +60,10 @@ export interface AccountState {
         balances: {
             // Token are indexed by their symbol (e.g. "ETH")
             [token: string]: BigNumberish;
+        };
+        nfts: {
+            // NFT are indexed by their id
+            [tokenId: number]: NFT;
         };
         nonce: number;
         pubKeyHash: PubKeyHash;
@@ -102,16 +117,14 @@ export interface Withdraw {
 
 export interface MintNFT {
     type: 'MintNFT';
-    creatorAccountId: number;
-    creatorAccountAddress: Address;
+    creatorId: number;
+    creatorAddress: Address;
     recipient: Address;
     contentHash: string;
     fee: BigNumberish;
     feeToken: number;
     nonce: number;
     signature?: Signature;
-    validFrom: number;
-    validUntil: number;
 }
 
 export interface ForcedExit {
