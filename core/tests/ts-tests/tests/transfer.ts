@@ -2,12 +2,14 @@ import { Tester } from './tester';
 import { expect } from 'chai';
 import { Wallet, types } from 'zksync';
 import { BigNumber } from 'ethers';
+import { NFT } from '../../../../sdk/zksync.js/build/types';
 
 type TokenLike = types.TokenLike;
 
 declare module './tester' {
     interface Tester {
         testTransfer(from: Wallet, to: Wallet, token: TokenLike, amount: BigNumber, timeout?: number): Promise<void>;
+        testTransferNFT(from: Wallet, to: Wallet, feeToken: TokenLike, timeout?: number): Promise<void>;
         testBatch(from: Wallet, to: Wallet, token: TokenLike, amount: BigNumber): Promise<void>;
         testIgnoredBatch(from: Wallet, to: Wallet, token: TokenLike, amount: BigNumber): Promise<void>;
         testRejectedBatch(from: Wallet, to: Wallet, token: TokenLike, amount: BigNumber): Promise<void>;
@@ -50,6 +52,26 @@ Tester.prototype.testTransfer = async function (sender: Wallet, receiver: Wallet
     this.runningFee = this.runningFee.add(fee);
 };
 
+Tester.prototype.testTransferNFT = async function (sender: Wallet, receiver: Wallet, feeToken: TokenLike) {
+    const state = await sender.getAccountState();
+    let nft: any = Object.values(state.verified.nfts)[0];
+
+    const senderBefore = await sender.getNFT(nft.id);
+    const receiverBefore = await receiver.getNFT(nft.id);
+    const handles = await sender.syncTransferNFT({
+        to: receiver.address(),
+        feeToken,
+        token: nft
+    });
+    await Promise.all(handles.map((handle) => handle.awaitReceipt()));
+    const senderAfter = await sender.getNFT(nft.id);
+    const receiverAfter = await receiver.getNFT(nft.id);
+    expect(senderBefore.id == nft.id, 'NFT transfer failed').to.be.true;
+    expect(receiverAfter.id == nft.id, 'NFT transfer failed').to.be.true;
+    expect(senderAfter === undefined, 'NFT transfer failed').to.be.true;
+    expect(receiverBefore === undefined, 'NFT transfer failed').to.be.true;
+};
+
 Tester.prototype.testBatch = async function (sender: Wallet, receiver: Wallet, token: TokenLike, amount: BigNumber) {
     const fee = await this.syncProvider.getTransactionsBatchFee(
         ['Transfer', 'Transfer'],
@@ -77,7 +99,6 @@ Tester.prototype.testBatch = async function (sender: Wallet, receiver: Wallet, t
     const receiverAfter = await receiver.getBalance(token);
     expect(senderBefore.sub(senderAfter).eq(amount.mul(2).add(fee)), 'Batched transfer failed').to.be.true;
     expect(receiverAfter.sub(receiverBefore).eq(amount.mul(2)), 'Batched transfer failed').to.be.true;
-    this.runningFee = this.runningFee.add(fee);
 };
 
 Tester.prototype.testIgnoredBatch = async function (

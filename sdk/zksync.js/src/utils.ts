@@ -22,6 +22,7 @@ const MAX_NUMBER_OF_TOKENS = Math.pow(2, 32);
 const MAX_NUMBER_OF_ACCOUNTS = Math.pow(2, 24);
 
 export const MAX_TIMESTAMP = 4294967295;
+export const MIN_NFT_TOKEN_ID = 65536;
 
 export const IERC20_INTERFACE = new utils.Interface(require('../abi/IERC20.json').abi);
 export const SYNC_MAIN_CONTRACT_INTERFACE = new utils.Interface(require('../abi/SyncMain.json').abi);
@@ -368,10 +369,16 @@ export class TokenSet {
     }
 
     public resolveTokenDecimals(tokenLike: TokenOrId): number {
+        if (typeof tokenLike === 'number' && tokenLike >= MIN_NFT_TOKEN_ID) {
+            return 1;
+        }
         return this.resolveTokenObject(tokenLike).decimals;
     }
 
     public resolveTokenId(tokenLike: TokenOrId): number {
+        if (typeof tokenLike === 'number' && tokenLike >= MIN_NFT_TOKEN_ID) {
+            return tokenLike;
+        }
         return this.resolveTokenObject(tokenLike).id;
     }
 
