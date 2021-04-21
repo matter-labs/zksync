@@ -1860,6 +1860,68 @@
       ]
     }
   },
+  "54ed1580c2307315bc49854df89e8fb823cdeee8eee1f5ebb886e01a8a298e72": {
+    "query": "\n            SELECT * FROM mint_nft_updates \n            WHERE token_id = $1\n            LIMIT 1\n            ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "token_id",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 1,
+          "name": "block_number",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 2,
+          "name": "creator_account_id",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 3,
+          "name": "update_order_id",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 4,
+          "name": "serial_id",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 5,
+          "name": "address",
+          "type_info": "Bytea"
+        },
+        {
+          "ordinal": 6,
+          "name": "content_hash",
+          "type_info": "Bytea"
+        },
+        {
+          "ordinal": 7,
+          "name": "symbol",
+          "type_info": "Text"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Int4"
+        ]
+      },
+      "nullable": [
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false
+      ]
+    }
+  },
   "58b251c3fbdf9be9b62f669f8cdc2d98940026c831e02a53337474d36a5224f0": {
     "query": "UPDATE aggregate_operations\n                SET confirmed = $1\n                WHERE from_block >= $2 AND to_block <= $3 AND action_type = $4",
     "describe": {

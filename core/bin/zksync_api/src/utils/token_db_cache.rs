@@ -71,7 +71,7 @@ impl TokenDBCache {
         if let Some(token) = storage
             .chain()
             .state_schema()
-            .get_mint_nft_updates(token_id)
+            .get_mint_nft_update(token_id)
             .await?
         {
             self.nft_tokens

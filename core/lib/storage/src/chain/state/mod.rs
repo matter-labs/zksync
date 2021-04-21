@@ -629,7 +629,7 @@ impl<'a, 'c> StateSchema<'a, 'c> {
         result
     }
 
-    pub async fn get_mint_nft_updates(&mut self, token_id: TokenId) -> QueryResult<Option<NFT>> {
+    pub async fn get_mint_nft_update(&mut self, token_id: TokenId) -> QueryResult<Option<NFT>> {
         let start = Instant::now();
         let nft = sqlx::query_as!(
             StorageMintNFTUpdate,
@@ -643,7 +643,7 @@ impl<'a, 'c> StateSchema<'a, 'c> {
         .fetch_optional(self.0.conn())
         .await?;
 
-        metrics::histogram!("sql.token.get_historical_ticker_price", start.elapsed());
+        metrics::histogram!("sql.token.get_mint_nft_update", start.elapsed());
         Ok(nft.map(|p| p.into()))
     }
 }
