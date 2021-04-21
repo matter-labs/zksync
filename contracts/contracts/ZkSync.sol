@@ -178,10 +178,12 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
         totalOpenPriorityRequests -= toProcess;
     }
 
-    /// @notice
-    /// @param
+    /// @notice Registers creator corresponding to the factory
+    /// @param _creatorAddress NFT creator address
+    /// @param _signature creator's signature
     function registerNFTFactory(address _creatorAddress, bytes memory _signature) external {
         requireActive();
+        require(NFTFactories[_creatorAddress] == address(0), "Q");
         bytes32 messageHash =
             keccak256(
                 abi.encodePacked(

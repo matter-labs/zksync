@@ -81,9 +81,6 @@ contract Storage {
     /// @notice User authenticated fact hashes for some nonce.
     mapping(address => mapping(uint32 => bytes32)) public authFacts;
 
-    /// @notice NFT Creator address to factory address mapping
-    mapping(address => address) public NFTFactories;
-
     /// @notice Old Priority Operation container
     /// @member opType Priority operation type
     /// @member pubData Priority operation public data
@@ -159,4 +156,7 @@ contract Storage {
     /// @dev Timer for authFacts entry reset (address, nonce -> timer).
     /// @dev Used when user wants to reset `authFacts` for some nonce.
     mapping(address => mapping(uint32 => uint256)) internal authFactsResetTimer;
+
+    /// @notice NFT Creator address to factory address mapping
+    mapping(address => address) public NFTFactories;
 }

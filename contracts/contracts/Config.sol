@@ -44,14 +44,14 @@ contract Config {
     uint256 internal constant MINT_NFT_BYTES = 5 * CHUNK_BYTES;
     uint256 internal constant TRANSFER_TO_NEW_BYTES = 6 * CHUNK_BYTES;
     uint256 internal constant PARTIAL_EXIT_BYTES = 6 * CHUNK_BYTES;
-    uint256 internal constant TRANSFER_BYTES = 3 * CHUNK_BYTES;
+    uint256 internal constant TRANSFER_BYTES = 2 * CHUNK_BYTES;
     uint256 internal constant FORCED_EXIT_BYTES = 6 * CHUNK_BYTES;
 
     /// @dev Full exit operation length
     uint256 internal constant FULL_EXIT_BYTES = 6 * CHUNK_BYTES;
 
     /// @dev ChangePubKey operation length
-    uint256 internal constant CHANGE_PUBKEY_BYTES = 7 * CHUNK_BYTES;
+    uint256 internal constant CHANGE_PUBKEY_BYTES = 6 * CHUNK_BYTES;
 
     /// @dev Expiration delta for priority request to be satisfied (in seconds)
     /// @dev NOTE: Priority expiration should be > (EXPECT_VERIFICATION_IN * BLOCK_PERIOD)

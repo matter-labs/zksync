@@ -11,7 +11,7 @@ use zksync_basic_types::{AccountId, Address, TokenId};
 /// Depth of the account tree.
 pub const ACCOUNT_TREE_DEPTH: usize = 32;
 /// Depth of the balance tree for each account.
-pub const BALANCE_TREE_DEPTH: usize = 11;
+pub const BALANCE_TREE_DEPTH: usize = 32;
 
 /// account_tree_depth.
 pub fn account_tree_depth() -> usize {
@@ -60,7 +60,7 @@ pub const MIN_NFT_TOKEN_ID: u32 = 65536;
 
 /// Depth of the left subtree of the account tree that can be used in the current version of the circuit.
 pub fn used_account_subtree_depth() -> usize {
-    let num = 32; // total accounts = 2.pow(num) ~ 16mil
+    let num = 24; // total accounts = 2.pow(num) ~ 16mil
 
     assert!(num <= account_tree_depth());
 
@@ -68,13 +68,15 @@ pub fn used_account_subtree_depth() -> usize {
 }
 
 /// Max account id, based on the depth of the used left subtree
+/// Excludes NFT_STORAGE_ACCOUNT_ID
 pub fn max_account_id() -> AccountId {
-    let list_count = 2u32.saturating_pow(used_account_subtree_depth() as u32);
-    if list_count == u32::MAX {
-        AccountId(list_count - 2)
-    } else {
-        AccountId(list_count - 1)
-    }
+    AccountId(*NFT_STORAGE_ACCOUNT_ID - 1)
+    //    let list_count = 2u32.saturating_pow(used_account_subtree_depth() as u32);
+    //    if list_count == u32::MAX {
+    //        AccountId(list_count)
+    //    } else {
+    //        AccountId(list_count - 1)
+    //    }
 }
 
 /// Max token id
