@@ -38,7 +38,7 @@ use crate::{
     utils::{
         allocate_numbers_vec, allocate_sum, boolean_or, calculate_empty_account_tree_hashes,
         calculate_empty_balance_tree_hashes, multi_and, pack_bits_to_element_strict,
-        resize_grow_only, vectorized_compare,
+        resize_grow_only, sequences_equal, vectorized_compare,
     },
 };
 
@@ -783,8 +783,8 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
 
         let op_data =
             AllocatedOperationData::from_witness(cs.namespace(|| "allocated_operation_data"), op)?;
+
         // ensure op_data is equal to previous
-        // TODO add other opdata fields here
         {
             let a_and_b_same_as_previous_flags = vec![
                 CircuitElement::equals(
@@ -822,9 +822,34 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
                     &prev.op_data.amount_packed,
                 )?,
                 CircuitElement::equals(
+                    cs.namespace(|| "is second_amount_packed equal to previous"),
+                    &op_data.second_amount_packed,
+                    &prev.op_data.second_amount_packed,
+                )?,
+                CircuitElement::equals(
                     cs.namespace(|| "is fee_packed equal to previous"),
                     &op_data.fee_packed,
                     &prev.op_data.fee_packed,
+                )?,
+                sequences_equal(
+                    cs.namespace(|| "are special_amounts_packed equal to previous"),
+                    &op_data.special_amounts_packed,
+                    &prev.op_data.special_amounts_packed,
+                )?,
+                sequences_equal(
+                    cs.namespace(|| "are special_nonces equal to previous"),
+                    &op_data.special_nonces,
+                    &prev.op_data.special_nonces,
+                )?,
+                sequences_equal(
+                    cs.namespace(|| "are special_tokens equal to previous"),
+                    &op_data.special_tokens,
+                    &prev.op_data.special_tokens,
+                )?,
+                sequences_equal(
+                    cs.namespace(|| "are special_accounts equal to previous"),
+                    &op_data.special_accounts,
+                    &prev.op_data.special_accounts,
                 )?,
                 CircuitElement::equals(
                     cs.namespace(|| "is eth_address equal to previous"),
@@ -850,6 +875,16 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
                     cs.namespace(|| "is valid_until equal to previous"),
                     &op_data.valid_until,
                     &prev.op_data.valid_until,
+                )?,
+                CircuitElement::equals(
+                    cs.namespace(|| "is second_valid_from equal to previous"),
+                    &op_data.second_valid_from,
+                    &prev.op_data.second_valid_from,
+                )?,
+                CircuitElement::equals(
+                    cs.namespace(|| "is second_valid_until equal to previous"),
+                    &op_data.second_valid_until,
+                    &prev.op_data.second_valid_until,
                 )?,
             ];
 
