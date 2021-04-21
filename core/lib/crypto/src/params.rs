@@ -34,7 +34,7 @@ pub fn total_tokens() -> usize {
     2usize.pow((balance_tree_depth() - 1) as u32) - 2
 }
 
-pub const PROCESSABLE_TOKENS_DEPTH: u32 = 10;
+pub const PROCESSABLE_TOKENS_DEPTH: u32 = 8;
 /// Number of tokens that are processed by this release
 pub fn number_of_processable_tokens() -> usize {
     let num = 2usize.pow(PROCESSABLE_TOKENS_DEPTH);
@@ -52,7 +52,7 @@ pub fn number_of_processable_tokens() -> usize {
 pub const NFT_TOKEN_ID: TokenId = TokenId(((i32::MAX) - 1) as u32);
 
 /// Special account which enforce unique token id for NFT.
-pub const NFT_STORAGE_ACCOUNT_ID: AccountId = AccountId(((i32::MAX) - 1) as u32);
+pub const NFT_STORAGE_ACCOUNT_ID: AccountId = AccountId(2u32.pow(24) - 1);
 
 /// First token id for NFT, all fungible token id must be less, all NFT must be above.
 pub const MIN_NFT_TOKEN_ID: u32 = 65536;
@@ -76,9 +76,9 @@ pub fn max_account_id() -> AccountId {
     }
 }
 
-/// Max token id, based on the number of processable tokens
+/// Max token id
 pub fn max_token_id() -> TokenId {
-    TokenId(total_tokens() as u32)
+    TokenId(*NFT_TOKEN_ID - 1)
 }
 
 /// Max fungible token id

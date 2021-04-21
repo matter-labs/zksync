@@ -12,6 +12,7 @@ use zksync_test_account::ZkSyncAccount;
 use zksync_types::{Account, AccountId, AccountMap, Address, BlockNumber, TokenId};
 // Local deps
 use crate::{circuit::ZkSyncCircuit, witness::Witness};
+use std::str::FromStr;
 
 // Public re-exports
 pub use crate::witness::utils::WitnessBuilder;
@@ -75,7 +76,9 @@ impl ZkSyncStateGenerator {
         } else {
             std::iter::once((
                 FEE_ACCOUNT_ID,
-                Account::default_with_address(&Address::default()),
+                Account::default_with_address(
+                    &Address::from_str("feeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee").unwrap(),
+                ),
             ))
             .chain(accounts)
             .collect()

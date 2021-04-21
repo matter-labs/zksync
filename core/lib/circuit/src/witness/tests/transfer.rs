@@ -20,7 +20,7 @@ use crate::witness::{
     transfer::TransferWitness,
     utils::SigDataInput,
 };
-use zksync_crypto::params::{number_of_processable_tokens, NFT_STORAGE_ACCOUNT_ID, NFT_TOKEN_ID};
+use zksync_crypto::params::{number_of_processable_tokens, NFT_STORAGE_ACCOUNT_ID};
 
 /// Basic check for execution of `Transfer` operation in circuit.
 /// Here we create two accounts and perform a transfer between them.
@@ -531,53 +531,55 @@ fn test_incorrect_transfer_timestamp() {
     }
 }
 
-/// Basic check for execution of `Transfer` operation in circuit with nft token id.
-#[test]
-#[ignore]
-fn test_transfer_with_nft_token_id() {
-    // Input data.
-    let accounts = vec![
-        WitnessTestAccount::new_empty(AccountId(1)),
-        WitnessTestAccount::new_empty(AccountId(2)),
-    ];
-    let (account_from, account_to) = (&accounts[0], &accounts[1]);
-    let transfer_op = TransferOp {
-        tx: account_from
-            .zksync_account
-            .sign_transfer(
-                NFT_TOKEN_ID,
-                "",
-                BigUint::from(0u32),
-                BigUint::from(0u32),
-                &account_to.account.address,
-                None,
-                true,
-                Default::default(),
-            )
-            .0,
-        from: account_from.id,
-        to: account_to.id,
-    };
+// This test cannot be processed because transfer transaction cannot be signed with NFT_TOKEN_ID as token id
 
-    // Additional data required for performing the operation.
-    let input = SigDataInput::from_transfer_op(&transfer_op).expect("SigDataInput creation failed");
-
-    const ERR_MSG: &str = "chunk number 1/execute_op/op_valid is true/enforce equal to one";
-
-    incorrect_op_test_scenario::<TransferWitness<Bn256>, _, _>(
-        &accounts,
-        transfer_op,
-        input,
-        ERR_MSG,
-        || {
-            vec![CollectedFee {
-                token: NFT_TOKEN_ID,
-                amount: BigUint::from(0u32),
-            }]
-        },
-        |_| {},
-    );
-}
+///// Basic check for execution of `Transfer` operation in circuit with nft token id.
+//#[test]
+//#[ignore]
+//fn test_transfer_with_nft_token_id() {
+//    // Input data.
+//    let accounts = vec![
+//        WitnessTestAccount::new_empty(AccountId(1)),
+//        WitnessTestAccount::new_empty(AccountId(2)),
+//    ];
+//    let (account_from, account_to) = (&accounts[0], &accounts[1]);
+//    let transfer_op = TransferOp {
+//        tx: account_from
+//            .zksync_account
+//            .sign_transfer(
+//                NFT_TOKEN_ID,
+//                "",
+//                BigUint::from(0u32),
+//                BigUint::from(0u32),
+//                &account_to.account.address,
+//                None,
+//                true,
+//                Default::default(),
+//            )
+//            .0,
+//        from: account_from.id,
+//        to: account_to.id,
+//    };
+//
+//    // Additional data required for performing the operation.
+//    let input = SigDataInput::from_transfer_op(&transfer_op).expect("SigDataInput creation failed");
+//
+//    const ERR_MSG: &str = "chunk number 1/execute_op/op_valid is true/enforce equal to one";
+//
+//    incorrect_op_test_scenario::<TransferWitness<Bn256>, _, _>(
+//        &accounts,
+//        transfer_op,
+//        input,
+//        ERR_MSG,
+//        || {
+//            vec![CollectedFee {
+//                token: NFT_TOKEN_ID,
+//                amount: BigUint::from(0u32),
+//            }]
+//        },
+//        |_| {},
+//    );
+//}
 
 /// Basic check for execution of `Transfer` operation in circuit with nft storage account id.
 #[test]

@@ -176,7 +176,6 @@ export class EthMessageSigner {
         nonce: number;
     }): Promise<TxEthSignature> {
         const message = this.getMintEthEthSignMessage(mintNFT);
-        console.log(message);
         return await this.getEthMessageSignature(message);
     }
 

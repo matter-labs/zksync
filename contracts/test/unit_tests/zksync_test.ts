@@ -633,7 +633,7 @@ describe('zkSync test process next operation', function () {
         zksyncContract.connect(wallet);
         const tokenId = await ethProxy.resolveTokenId(tokenContract.address);
         const fullExitAmount = parseEther('0.7');
-        const accountId = 0x00ffffff;
+        const accountId = 0x00faffaf;
 
         await zksyncContract.requestFullExit(accountId, tokenContract.address);
 

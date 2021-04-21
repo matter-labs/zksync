@@ -283,6 +283,7 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
     /// @param _token Token address, 0 address for ether
     function requestFullExit(uint32 _accountId, address _token) public nonReentrant {
         requireActive();
+        require(_accountId <= MAX_ACCOUNT_ID, "e");
         require(_accountId != SPECIAL_ACCOUNT_ID, "v"); // request full exit for nft storage account
 
         uint16 tokenId;
@@ -431,15 +432,15 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
 
             if (opType == Operations.OpType.PartialExit) {
                 Operations.PartialExit memory op = Operations.readPartialExitPubdata(pubData);
-                require(op.tokenId < (2**16), "w");
+                require(op.tokenId <= MAX_FUNGIBLE_TOKEN_ID, "w");
                 withdrawOrStore(uint16(op.tokenId), op.owner, op.amount);
             } else if (opType == Operations.OpType.ForcedExit) {
                 Operations.ForcedExit memory op = Operations.readForcedExitPubdata(pubData);
-                require(op.tokenId < (2**16), "w");
+                require(op.tokenId <= MAX_FUNGIBLE_TOKEN_ID, "w");
                 withdrawOrStore(uint16(op.tokenId), op.target, op.amount);
             } else if (opType == Operations.OpType.FullExit) {
                 Operations.FullExit memory op = Operations.readFullExitPubdata(pubData);
-                require(op.tokenId < (2**16), "w");
+                require(op.tokenId <= MAX_FUNGIBLE_TOKEN_ID, "w");
                 withdrawOrStore(uint16(op.tokenId), op.owner, op.amount);
             } else {
                 revert("l"); // unsupported op in block execution
