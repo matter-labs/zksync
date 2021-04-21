@@ -13,8 +13,8 @@ use zksync_crypto::{
 use crate::hasher::{verify_accounts_equal, CustomMerkleTree, BALANCE_TREE_11, BALANCE_TREE_32};
 use num::BigUint;
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
 use std::fs;
+use std::{collections::HashMap, convert::TryInto};
 use zksync_types::{account::Account, Address, Nonce, PubKeyHash, TokenId};
 
 pub fn get_balance_tree(depth: usize) -> CircuitBalanceTree {
@@ -116,20 +116,24 @@ pub struct StorageBalance {
     pub balance: serde_json::Number,
 }
 
-fn storage_account_to_account(account: &StorageAccount) -> anyhow::Result<Account> {
-    let pub_key_hash_bytes = hex::decode(&account.pubkey_hash)?;
-    let pub_key_hash = PubKeyHash::from_bytes(&pub_key_hash_bytes)?;
+impl TryInto<Account> for StorageAccount {
+    type Error = anyhow::Error;
 
-    let address_bytes = hex::decode(&account.address)?;
-    let address = Address::from_slice(&address_bytes);
+    fn try_into(self) -> anyhow::Result<Account> {
+        let pub_key_hash_bytes = hex::decode(&self.pubkey_hash)?;
+        let pub_key_hash = PubKeyHash::from_bytes(&pub_key_hash_bytes)?;
 
-    let nonce = Nonce(account.nonce as u32);
+        let address_bytes = hex::decode(&self.address)?;
+        let address = Address::from_slice(&address_bytes);
 
-    let mut result = Account::default_with_address(&address);
-    result.nonce = nonce;
-    result.pub_key_hash = pub_key_hash;
+        let nonce = Nonce(self.nonce as u32);
 
-    Ok(result)
+        let mut result = Account::default_with_address(&address);
+        result.nonce = nonce;
+        result.pub_key_hash = pub_key_hash;
+
+        Ok(result)
+    }
 }
 
 pub fn read_accounts(
@@ -145,10 +149,9 @@ pub fn read_accounts(
     let stored_accounts: Vec<StorageAccount> = serde_json::from_str(&accounts_content)?;
     let stored_balances: Vec<StorageBalance> = serde_json::from_str(&balances_content)?;
 
-    let mut account_map = HashMap::new();
+    let mut account_map: HashMap<i64, Account> = HashMap::new();
     for stored_account in stored_accounts {
-        let account = storage_account_to_account(&stored_account)?;
-        account_map.insert(stored_account.id, account);
+        account_map.insert(stored_account.id, stored_account.try_into()?);
     }
 
     for stored_balance in stored_balances {
