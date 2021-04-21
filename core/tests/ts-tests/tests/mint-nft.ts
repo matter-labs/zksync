@@ -31,6 +31,7 @@ Tester.prototype.testMintNFT = async function (
     expect(receipt.success, `Mint NFT failed with a reason: ${receipt.failReason}`).to.be.true;
 
     const balanceAfter = await wallet.getBalance(feeToken);
+
     expect(balanceBefore.sub(balanceAfter).eq(fee), 'Wrong amount in wallet after withdraw').to.be.true;
     this.runningFee = this.runningFee.add(fee);
     return handle;

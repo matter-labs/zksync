@@ -30,13 +30,14 @@ use zksync_types::{
     prover::ProverJobType,
     tx::ChangePubKeyType,
     AccountId, AccountMap, Address, BlockNumber, Deposit, DepositOp, ExecutedOperations,
-    ExecutedPriorityOp, ExecutedTx, FullExit, FullExitOp, Nonce, PriorityOp, Token, TokenId,
-    Transfer, TransferOp, ZkSyncOp, ZkSyncTx, H256,
+    ExecutedPriorityOp, ExecutedTx, FullExit, FullExitOp, MintNFTOp, Nonce, PriorityOp, Token,
+    TokenId, Transfer, TransferOp, ZkSyncOp, ZkSyncTx, H256,
 };
 
 // Local uses
 use super::Client;
 use std::str::FromStr;
+use zksync_storage::test_data::generate_nft;
 
 /// Serial ID of the verified priority operation.
 pub const VERIFIED_OP_SERIAL_ID: u64 = 10;
@@ -257,6 +258,41 @@ impl TestServerConfig {
             ));
         }
 
+        // Mint NFT
+        {
+            let tx = from
+                .sign_mint_nft(
+                    TokenId(0),
+                    "ETH",
+                    H256::random(),
+                    closest_packable_fee_amount(&fee.into()),
+                    &to.address,
+                    None,
+                    true,
+                )
+                .0;
+
+            let zksync_op = ZkSyncOp::MintNFTOp(Box::new(MintNFTOp {
+                tx: tx.clone(),
+                creator_account_id: from.get_account_id().unwrap(),
+                recipient_account_id: to.get_account_id().unwrap(),
+            }));
+
+            let executed_tx = ExecutedTx {
+                signed_tx: zksync_op.try_get_tx().unwrap().into(),
+                success: true,
+                op: Some(zksync_op),
+                fail_reason: None,
+                block_index: Some(4),
+                created_at: chrono::Utc::now(),
+                batch_id: None,
+            };
+
+            txs.push((
+                ZkSyncTx::MintNFT(Box::new(tx)),
+                ExecutedOperations::Tx(Box::new(executed_tx)),
+            ));
+        }
         TestTransactions { acc: from, txs }
     }
 
@@ -318,9 +354,20 @@ impl TestServerConfig {
         // Create and apply several blocks to work with.
         for block_number in 1..=COMMITTED_BLOCKS_COUNT {
             let block_number = BlockNumber(block_number);
-            let updates = (0..3)
+            let mut updates = (0..3)
                 .flat_map(|_| gen_acc_random_updates(&mut rng))
                 .collect::<Vec<_>>();
+
+            accounts
+                .iter()
+                .enumerate()
+                .for_each(|(id, (account_id, account))| {
+                    updates.append(&mut generate_nft(
+                        *account_id,
+                        account,
+                        block_number.0 * accounts.len() as u32 + id as u32,
+                    ));
+                });
             apply_updates(&mut accounts, updates.clone());
 
             // Add transactions to every odd block.

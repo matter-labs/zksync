@@ -10,8 +10,10 @@ use zksync_crypto::franklin_crypto::bellman::pairing::ff::PrimeField;
 use super::Fr;
 use super::{AccountId, AccountUpdates, Nonce, TokenId};
 use zksync_basic_types::Address;
-use zksync_crypto::circuit::account::{Balance, CircuitAccount};
-use zksync_crypto::circuit::utils::eth_address_to_fr;
+use zksync_crypto::circuit::{
+    account::{Balance, CircuitAccount},
+    utils::eth_address_to_fr,
+};
 
 pub use self::{account_update::AccountUpdate, pubkey_hash::PubKeyHash};
 
@@ -167,6 +169,8 @@ impl Account {
                     account.nonce = new_nonce;
                     Some(account)
                 }
+                AccountUpdate::MintNFT { .. } | AccountUpdate::RemoveNFT { .. } => Some(account),
+                // Minting do not change account state
                 _ => {
                     vlog::error!(
                         "Incorrect update received {:?} for account {:?}",

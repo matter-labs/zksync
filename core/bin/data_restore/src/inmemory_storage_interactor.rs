@@ -244,7 +244,7 @@ impl InMemoryStorageInteractor {
                     account.pub_key_hash = *new_pub_key_hash;
                 }
                 AccountUpdate::MintNFT { .. } => todo!(),
-                AccountUpdate::RemoveToken { .. } => todo!(),
+                AccountUpdate::RemoveNFT { .. } => todo!(),
             }
         }
     }

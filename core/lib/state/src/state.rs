@@ -281,9 +281,8 @@ impl ZkSyncState {
                     account.nonce = new_nonce;
                     self.insert_account(account_id, account);
                 }
-                AccountUpdate::MintNFT { .. } | AccountUpdate::RemoveToken { .. } => {
-                    // There are no changes in state
-                }
+                AccountUpdate::RemoveNFT { .. } => {}
+                AccountUpdate::MintNFT { .. } => {} // NFT does not affect zksync state
             }
         }
     }
@@ -490,7 +489,8 @@ impl ZkSyncState {
 
                     self.insert_account(*account_id, account);
                 }
-                AccountUpdate::MintNFT { .. } | AccountUpdate::RemoveToken { .. } => {}
+                AccountUpdate::MintNFT { .. } => {}
+                AccountUpdate::RemoveNFT { .. } => {}
             }
         }
     }
@@ -1040,6 +1040,7 @@ mod tests {
         account_id_by_address.insert(random_addresses[2], AccountId(3));
         account_id_by_address.insert(random_addresses[3], AccountId(8));
         account_id_by_address.insert(random_addresses[4], AccountId(9));
+
         let state = ZkSyncState::new(balance_tree, account_id_by_address, BlockNumber(5));
         assert_eq!(*state.next_free_id, 10);
     }

@@ -10,6 +10,7 @@ use zksync_types::{Token, TokenId, TokenLike, TokenPrice};
 use zksync_utils::ratio_to_big_decimal;
 // Local imports
 use self::records::{DBMarketVolume, DbTickerPrice, DbToken};
+
 use crate::utils::address_to_stored_string;
 use crate::{QueryResult, StorageProcessor};
 use zksync_types::tokens::TokenMarketVolume;
@@ -292,6 +293,7 @@ impl<'a, 'c> TokensSchema<'a, 'c> {
         metrics::histogram!("sql.token.update_market_volume", start.elapsed());
         Ok(())
     }
+
     /// Given token id, returns its price in USD and a timestamp of the last update.
     pub async fn get_historical_ticker_price(
         &mut self,
