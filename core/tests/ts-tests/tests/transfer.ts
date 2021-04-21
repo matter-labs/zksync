@@ -52,6 +52,12 @@ Tester.prototype.testTransfer = async function (sender: Wallet, receiver: Wallet
 };
 
 Tester.prototype.testTransferNFT = async function (sender: Wallet, receiver: Wallet, feeToken: TokenLike) {
+    const fee = await this.syncProvider.getTransactionsBatchFee(
+        ['Transfer', 'Transfer'],
+        [receiver.address(), receiver.address()],
+        feeToken
+    );
+
     const state = await sender.getAccountState();
     let nft: any = Object.values(state.verified.nfts)[0];
 
@@ -60,7 +66,8 @@ Tester.prototype.testTransferNFT = async function (sender: Wallet, receiver: Wal
     const handles = await sender.syncTransferNFT({
         to: receiver.address(),
         feeToken,
-        token: nft
+        token: nft,
+        fee
     });
     await Promise.all(handles.map((handle) => handle.awaitReceipt()));
     const senderAfter = await sender.getNFT(nft.id);
@@ -69,6 +76,7 @@ Tester.prototype.testTransferNFT = async function (sender: Wallet, receiver: Wal
     expect(receiverAfter.id == nft.id, 'NFT transfer failed').to.be.true;
     expect(senderAfter === undefined, 'NFT transfer failed').to.be.true;
     expect(receiverBefore === undefined, 'NFT transfer failed').to.be.true;
+    this.runningFee = this.runningFee.add(fee);
 };
 
 Tester.prototype.testBatch = async function (sender: Wallet, receiver: Wallet, token: TokenLike, amount: BigNumber) {
@@ -98,6 +106,7 @@ Tester.prototype.testBatch = async function (sender: Wallet, receiver: Wallet, t
     const receiverAfter = await receiver.getBalance(token);
     expect(senderBefore.sub(senderAfter).eq(amount.mul(2).add(fee)), 'Batched transfer failed').to.be.true;
     expect(receiverAfter.sub(receiverBefore).eq(amount.mul(2)), 'Batched transfer failed').to.be.true;
+    this.runningFee = this.runningFee.add(fee);
 };
 
 Tester.prototype.testIgnoredBatch = async function (
