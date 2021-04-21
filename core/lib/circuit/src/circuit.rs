@@ -2500,43 +2500,67 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
         let is_first_price_ok = {
             let amount_bought = {
                 let amount = op_data.amount_unpacked.get_number().mul(
-                    cs.namespace(|| ""),
+                    cs.namespace(|| "amountA * orderA.price_buy"),
                     &op_data.special_amounts_unpacked[2].get_number(),
                 )?;
-                CircuitElement::from_number(cs.namespace(|| ""), amount)?
+                CircuitElement::from_number_with_known_length(
+                    cs.namespace(|| "amount bought - first order"),
+                    amount,
+                    (E::Fr::CAPACITY - 1) as usize,
+                )?
             };
 
             let amount_sold = {
                 let amount = op_data.second_amount_unpacked.get_number().mul(
-                    cs.namespace(|| ""),
+                    cs.namespace(|| "amountB * orderA.price_sell"),
                     &op_data.special_amounts_unpacked[1].get_number(),
                 )?;
-                CircuitElement::from_number(cs.namespace(|| ""), amount)?
+                CircuitElement::from_number_with_known_length(
+                    cs.namespace(|| "amount sold - first order"),
+                    amount,
+                    (E::Fr::CAPACITY - 1) as usize,
+                )?
             };
 
-            CircuitElement::less_than_fixed(cs.namespace(|| ""), &amount_sold, &amount_bought)?
-                .not()
+            CircuitElement::less_than_fixed(
+                cs.namespace(|| "sold < bought (first order)"),
+                &amount_sold,
+                &amount_bought,
+            )?
+            .not()
         };
 
         let is_second_price_ok = {
             let amount_bought = {
                 let amount = op_data.second_amount_unpacked.get_number().mul(
-                    cs.namespace(|| ""),
+                    cs.namespace(|| "amountB * orderB.price_buy"),
                     &op_data.special_amounts_unpacked[5].get_number(),
                 )?;
-                CircuitElement::from_number(cs.namespace(|| ""), amount)?
+                CircuitElement::from_number_with_known_length(
+                    cs.namespace(|| "amount bought - second order"),
+                    amount,
+                    (E::Fr::CAPACITY - 1) as usize,
+                )?
             };
 
             let amount_sold = {
                 let amount = op_data.amount_unpacked.get_number().mul(
-                    cs.namespace(|| ""),
+                    cs.namespace(|| "amountA * orderB.price_sell"),
                     &op_data.special_amounts_unpacked[4].get_number(),
                 )?;
-                CircuitElement::from_number(cs.namespace(|| ""), amount)?
+                CircuitElement::from_number_with_known_length(
+                    cs.namespace(|| "amount sold - second order"),
+                    amount,
+                    (E::Fr::CAPACITY - 1) as usize,
+                )?
             };
 
-            CircuitElement::less_than_fixed(cs.namespace(|| ""), &amount_sold, &amount_bought)?
-                .not()
+            CircuitElement::less_than_fixed(
+                cs.namespace(|| "sold < bought (second order)"),
+                &amount_sold,
+                &amount_bought,
+            )?
+            .not()
         };
 
         let common_valid_flag = multi_and(
