@@ -784,6 +784,12 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
         let op_data =
             AllocatedOperationData::from_witness(cs.namespace(|| "allocated_operation_data"), op)?;
 
+        let is_swap = Boolean::from(Expression::equals(
+            cs.namespace(|| "is_swap"),
+            &global_variables.chunk_data.tx_type.get_number(),
+            Expression::u64::<CS>(u64::from(SwapOp::OP_CODE)),
+        )?);
+
         // ensure op_data is equal to previous
         {
             let a_and_b_same_as_previous_flags = vec![
@@ -803,12 +809,6 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
                 cs.namespace(|| "a and b are equal to previous"),
                 &a_and_b_same_as_previous_flags,
             )?;
-
-            let is_swap = Boolean::from(Expression::equals(
-                cs.namespace(|| "is_swap"),
-                &global_variables.chunk_data.tx_type.get_number(),
-                Expression::u64::<CS>(u64::from(SwapOp::OP_CODE)),
-            )?);
 
             let is_op_data_correct_flags = vec![
                 boolean_or(
@@ -1100,6 +1100,19 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
             &cur.token.get_number(),
             &last_token_id,
             &global_variables.chunk_data.is_chunk_first,
+        )?;
+
+        // if TX type == swap then update the token on the last chunk
+        let swap_and_last_chunk = Boolean::and(
+            cs.namespace(|| "last chunk of swap tx"),
+            &is_swap,
+            &global_variables.chunk_data.is_chunk_last,
+        )?;
+        let new_last_token_id = AllocatedNum::conditionally_select(
+            cs.namespace(|| "change token_id on last chunk of swap tx"),
+            &cur.token.get_number(),
+            &new_last_token_id,
+            &swap_and_last_chunk,
         )?;
 
         *last_token_id = new_last_token_id.clone();
