@@ -299,7 +299,7 @@ export function isTransactionFeePackable(amount: BigNumberish): boolean {
 // Check that this token could be an NFT.
 // NFT not presented in TokenSets, so we can't their correctness in TokenSet
 function isNFT(token: TokenLike): boolean {
-    return (typeof token === 'number' && token >= MIN_NFT_TOKEN_ID)
+    return typeof token === 'number' && token >= MIN_NFT_TOKEN_ID;
 }
 
 export function buffer2bitsBE(buff) {
