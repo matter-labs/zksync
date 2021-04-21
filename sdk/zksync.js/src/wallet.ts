@@ -379,7 +379,7 @@ export class Wallet {
         if (transfer.fee == null) {
             fee = await this.provider.getTransactionsBatchFee(
                 ['Transfer', 'Transfer'],
-                [transfer.to, transfer.to],
+                [this.address(), this.address()],
                 transfer.feeToken
             );
         } else {

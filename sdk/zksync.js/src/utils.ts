@@ -296,6 +296,11 @@ export function closestGreaterOrEqPackableTransactionFee(fee: BigNumberish): Big
 export function isTransactionFeePackable(amount: BigNumberish): boolean {
     return closestPackableTransactionFee(amount).eq(amount);
 }
+// Check that this token could be an NFT.
+// NFT not presented in TokenSets, so we can't their correctness in TokenSet
+function isNFT(token: TokenLike): boolean {
+    return (typeof token === 'number' && token >= MIN_NFT_TOKEN_ID)
+}
 
 export function buffer2bitsBE(buff) {
     const res = new Array(buff.length * 8);
@@ -369,15 +374,15 @@ export class TokenSet {
     }
 
     public resolveTokenDecimals(tokenLike: TokenOrId): number {
-        if (typeof tokenLike === 'number' && tokenLike >= MIN_NFT_TOKEN_ID) {
+        if (isNFT(tokenLike)) {
             return 1;
         }
         return this.resolveTokenObject(tokenLike).decimals;
     }
 
     public resolveTokenId(tokenLike: TokenOrId): number {
-        if (typeof tokenLike === 'number' && tokenLike >= MIN_NFT_TOKEN_ID) {
-            return tokenLike;
+        if (isNFT(tokenLike)) {
+            return tokenLike as number;
         }
         return this.resolveTokenObject(tokenLike).id;
     }
