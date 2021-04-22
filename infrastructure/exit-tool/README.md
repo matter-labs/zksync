@@ -28,7 +28,9 @@ This tool handles these steps as follows:
 
 ## Usage
 
-Prior to the state restoring, application must be initialized
+Prior to the state restoring, application must be initialized.
+
+Firstly, you need to create the `volumes/postgres` folder. Then run the initialization script with the following command
 
 ```sh
 ./exit-tool.sh init
