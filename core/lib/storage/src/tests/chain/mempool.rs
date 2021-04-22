@@ -3,6 +3,7 @@ use zksync_crypto::rand::{Rng, SeedableRng, XorShiftRng};
 // Workspace imports
 use zksync_types::{
     mempool::SignedTxVariant,
+    tx::TxHash,
     tx::{ChangePubKey, Transfer, Withdraw},
     AccountId, Address, Nonce, SignedZkSyncTx, TokenId, ZkSyncTx,
 };
@@ -13,6 +14,7 @@ use crate::{
     chain::{
         mempool::MempoolSchema,
         operations::{records::NewExecutedTransaction, OperationsSchema},
+        operations_ext::OperationsExtSchema,
     },
     QueryResult, StorageProcessor,
 };
@@ -344,6 +346,26 @@ async fn contains_and_get_tx(mut storage: StorageProcessor<'_>) -> QueryResult<(
             tx_hash,
         );
     }
+
+    Ok(())
+}
+
+/// Checks that batch is got from mempool correctly
+#[db_test]
+async fn test_get_batch_info_from_mempool(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
+    let txs = gen_transfers(5);
+    MempoolSchema(&mut storage)
+        .insert_batch(&txs, Vec::new())
+        .await?;
+
+    let tx_hashes: Vec<TxHash> = txs.into_iter().map(|tx| tx.hash()).collect();
+    let batch_hash = TxHash::batch_hash(&tx_hashes);
+
+    let batch = OperationsExtSchema(&mut storage)
+        .get_batch_info(batch_hash)
+        .await?
+        .unwrap();
+    assert_eq!(batch.transaction_hashes, tx_hashes);
 
     Ok(())
 }

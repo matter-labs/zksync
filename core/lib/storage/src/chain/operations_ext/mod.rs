@@ -1044,17 +1044,17 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
             r#"
                 SELECT tx_hash, created_at, success, block_number
                 FROM txs_batches_hashes
-                LEFT JOIN executed_transactions
-                ON txs_batches_hashes.batch_id = executed_transactions.batch_id
+                INNER JOIN executed_transactions
+                ON txs_batches_hashes.batch_id = COALESCE(executed_transactions.batch_id, 0)
                 WHERE batch_hash = $1
+                ORDER BY created_at ASC
             "#,
             batch_hash.as_ref()
         )
         .fetch_all(self.0.conn())
         .await?;
-
         let result = if !batch_data.is_empty() {
-            let created_at = batch_data.iter().map(|tx| tx.created_at).min().unwrap();
+            let created_at = batch_data[0].created_at;
             let transaction_hashes: Vec<TxHash> = batch_data
                 .iter()
                 .map(|tx| TxHash::from_slice(&tx.tx_hash).unwrap())
@@ -1116,19 +1116,20 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
                 r#"
                     SELECT tx_hash, created_at
                     FROM txs_batches_hashes
-                    LEFT JOIN mempool_txs
+                    INNER JOIN mempool_txs
                     ON txs_batches_hashes.batch_id = mempool_txs.batch_id
                     WHERE batch_hash = $1
+                    ORDER BY created_at ASC
                 "#,
                 batch_hash.as_ref()
             )
             .fetch_all(self.0.conn())
             .await?;
             if !batch_data.is_empty() {
-                let created_at = batch_data.iter().map(|tx| tx.created_at).min().unwrap();
+                let created_at = batch_data[0].created_at;
                 let transaction_hashes: Vec<TxHash> = batch_data
                     .iter()
-                    .map(|tx| serde_json::from_str(&format!("0x{}", tx.tx_hash)).unwrap())
+                    .map(|tx| serde_json::from_str(&format!("\"0x{}\"", tx.tx_hash)).unwrap())
                     .collect();
                 Some(ApiTxBatch {
                     batch_hash,

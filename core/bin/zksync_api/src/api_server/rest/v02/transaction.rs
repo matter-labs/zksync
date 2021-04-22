@@ -559,9 +559,36 @@ mod tests {
             EthBatchSignatures::Single(single_signature)
         };
 
-        let response = client.submit_batch_v02(good_batch, batch_signature).await?;
+        let response = client
+            .submit_batch_v02(good_batch.clone(), batch_signature)
+            .await?;
         let submit_batch_response: SubmitBatchResponse = deserialize_response_result(response)?;
         assert_eq!(submit_batch_response, expected_response);
+
+        {
+            let mut storage = cfg.pool.access_storage().await?;
+            let txs: Vec<_> = good_batch
+                .into_iter()
+                .map(|tx| SignedZkSyncTx {
+                    tx,
+                    eth_sign_data: None,
+                })
+                .collect();
+            storage
+                .chain()
+                .mempool_schema()
+                .insert_batch(&txs, Vec::new())
+                .await?;
+        };
+
+        let response = client.get_batch(submit_batch_response.batch_hash).await?;
+        let batch: ApiTxBatch = deserialize_response_result(response)?;
+        assert_eq!(batch.batch_hash, submit_batch_response.batch_hash);
+        assert_eq!(
+            batch.transaction_hashes,
+            submit_batch_response.transaction_hashes
+        );
+        assert_eq!(batch.batch_status.last_state, L2Status::Queued);
 
         let tx_hash = {
             let mut storage = cfg.pool.access_storage().await?;
