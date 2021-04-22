@@ -61,7 +61,8 @@ In this example, we use Rinkeby Ethereum testnet, generate a proof for account w
 0x3b48b21a2f4910c04c04de00a23f7c07bf3cb04f and token with ID 0 (Ether), and use the API located at
 `http://127.0.0.1:8545`
 
-If during the process you encounter any error with the database, you should reset the database and run the `./exit-tool init` again.
+If during the process you encounter any error with the database, you should reset the database and run the
+`./exit-tool init` again.
 
 **Note:** Synchronizing the state will scan a big part of Ethereum blockchain, and that's a lot of work to do. It may
 take hours or even days to complete, depending on the size of zkSync blockchain.
@@ -143,7 +144,8 @@ What user has to do after that:
 1. Create transaction for an [`performExodus`][pe] method call, sign it and broadcast to register balance to withdraw.
 2. Send a transaction which invokes [`withdrawPendingBalance `][wd] method of contract to obtain their funds.
 
-[pe]: https://github.com/matter-labs/zksync/blob/5f47fe9990ec87e3087d32d083d13e6cab331ff1/contracts/contracts/ZkSync.sol#L574
+[pe]:
+  https://github.com/matter-labs/zksync/blob/5f47fe9990ec87e3087d32d083d13e6cab331ff1/contracts/contracts/ZkSync.sol#L574
 [wd]: https://github.com/matter-labs/zksync/blob/master/contracts/contracts/ZkSync.sol#L262
 
 ## Sending exodus L1 transactions
