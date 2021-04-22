@@ -533,6 +533,16 @@
           "ordinal": 3,
           "name": "fee_account",
           "type_info": "Int8"
+        },
+        {
+          "ordinal": 4,
+          "name": "timestamp",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 5,
+          "name": "previous_block_root_hash",
+          "type_info": "Bytea"
         }
       ],
       "parameters": {
@@ -542,7 +552,9 @@
         false,
         false,
         false,
-        false
+        false,
+        true,
+        true
       ]
     }
   },
@@ -2678,6 +2690,22 @@
       "nullable": []
     }
   },
+  "87da73cc513debdbf4c40c4c3ebceca7aecdd985323c0ecb6cd6bbaab17fa4be": {
+    "query": "INSERT INTO data_restore_rollup_ops (block_num, operation, fee_account, timestamp, previous_block_root_hash) VALUES ($1, $2, $3, $4, $5)",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "Int8",
+          "Jsonb",
+          "Int8",
+          "Int8",
+          "Bytea"
+        ]
+      },
+      "nullable": []
+    }
+  },
   "8a039b0bae78afb5d106d84f7d136be17670909814f92a8e8070ba99a9aea21c": {
     "query": "SELECT * FROM data_restore_last_watched_eth_block LIMIT 1",
     "describe": {
@@ -2786,20 +2814,6 @@
           "Int8",
           "Int8",
           "Jsonb"
-        ]
-      },
-      "nullable": []
-    }
-  },
-  "8fc71818833ae5c6084a582ed5de6a60e7dedb566d9a09871adb6774280b4837": {
-    "query": "INSERT INTO data_restore_rollup_ops (block_num, operation, fee_account) VALUES ($1, $2, $3)",
-    "describe": {
-      "columns": [],
-      "parameters": {
-        "Left": [
-          "Int8",
-          "Jsonb",
-          "Int8"
         ]
       },
       "nullable": []

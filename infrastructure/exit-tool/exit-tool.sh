@@ -9,7 +9,7 @@ where
 
 If command is "run" or "continue", the following additional arguments are required:
     network           Ethereum network (rinkeby / ropsten / mainnet)
-    account id        ID of account in zkSync network to generate exit proof for
+    account address   Address of the account to generate exit proof for
     token             Token for which proof will be generated (may be numeric token ID, address or symbol, e.g. ETH)
     web3 url          Address of the HTTP Web3 API, which will be used to gather data from Ethereum.
 
@@ -45,20 +45,20 @@ case $COMMAND in
     ;;
   run | continue)
     NETWORK=$2
-    ACCOUNT_ID=$3
+    ADDRESS=$3
     TOKEN=$4
     WEB3_URL=$5
 
-    SUBCOMMAND="$COMMAND $NETWORK $ACCOUNT_ID $TOKEN $WEB3_URL"
+    SUBCOMMAND="$COMMAND $NETWORK $ADDRESS $TOKEN $WEB3_URL"
     ;;
   -h | --help)
-      echo "$USAGE"
-      exit 0
+    echo "$USAGE"
+    exit 0
     ;;
   *)
-      echo "Unknown Data Restore command"
-      echo "$USAGE"
-      exit 1
+    echo "Unknown Data Restore command"
+    echo "$USAGE"
+    exit 1
     ;;
 esac
 

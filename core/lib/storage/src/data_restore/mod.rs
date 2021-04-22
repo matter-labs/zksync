@@ -2,6 +2,7 @@
 use std::time::Instant;
 // External imports
 use itertools::Itertools;
+use zksync_basic_types::H256;
 // Workspace imports
 use zksync_types::{AccountId, AccountUpdate, BlockNumber, Token, ZkSyncOp};
 // Local imports
@@ -110,10 +111,18 @@ impl<'a, 'c> DataRestoreSchema<'a, 'c> {
                 // let mut ops: Vec<ZkSyncOp> = vec![];
                 let mut block_num: i64 = 0;
                 let mut fee_account: i64 = 0;
+                let mut timestamp: Option<u64> = None;
+                let mut previous_block_root_hash: H256 = H256::default();
                 let ops: Vec<ZkSyncOp> = stored_ops
                     .map(|stored_op| {
                         block_num = stored_op.block_num;
                         fee_account = stored_op.fee_account;
+                        timestamp = stored_op.timestamp.map(|t| t as u64);
+                        previous_block_root_hash = stored_op
+                            .previous_block_root_hash
+                            .clone()
+                            .map(|h| H256::from_slice(&h))
+                            .unwrap_or_default();
                         stored_op.into_franklin_op()
                     })
                     .collect();
@@ -121,6 +130,8 @@ impl<'a, 'c> DataRestoreSchema<'a, 'c> {
                     block_num: BlockNumber(block_num as u32),
                     ops,
                     fee_account: AccountId(fee_account as u32),
+                    timestamp,
+                    previous_block_root_hash,
                 }
             })
             .collect();
@@ -215,7 +226,7 @@ impl<'a, 'c> DataRestoreSchema<'a, 'c> {
 
     pub async fn save_rollup_ops(
         &mut self,
-        ops: &[(BlockNumber, &ZkSyncOp, AccountId)],
+        ops: &[(BlockNumber, &ZkSyncOp, AccountId, Option<u64>, H256)],
     ) -> QueryResult<()> {
         let start = Instant::now();
         let new_state = self.new_storage_state("Operations");
@@ -225,13 +236,14 @@ impl<'a, 'c> DataRestoreSchema<'a, 'c> {
             .await?;
 
         for op in ops.iter() {
-            let stored_op = NewZkSyncOp::prepare_stored_op(&op.1, op.0, op.2);
+            let stored_op =
+                NewZkSyncOp::prepare_stored_op(&op.1, op.0, op.2, op.3, op.4.as_bytes().to_vec());
 
             sqlx::query!(
-                "INSERT INTO data_restore_rollup_ops (block_num, operation, fee_account) VALUES ($1, $2, $3)",
-                stored_op.block_num, stored_op.operation, stored_op.fee_account
+                "INSERT INTO data_restore_rollup_ops (block_num, operation, fee_account, timestamp, previous_block_root_hash) VALUES ($1, $2, $3, $4, $5)",
+                stored_op.block_num, stored_op.operation, stored_op.fee_account, stored_op.timestamp, stored_op.previous_block_root_hash
             ).execute(transaction.conn())
-                .await?;
+            .await?;
         }
         DataRestoreSchema(&mut transaction)
             .update_storage_state(new_state)

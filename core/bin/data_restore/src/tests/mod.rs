@@ -381,6 +381,7 @@ async fn test_run_state_update(mut storage: StorageProcessor<'_>) {
     ]);
 
     let eth = Eth::new(transport.clone());
+    let available_block_chunk_sizes = vec![10, 32, 72, 156, 322, 654];
     let mut driver = DataRestoreDriver::new(
         Web3::new(transport.clone()),
         [1u8; 20].into(),
@@ -389,6 +390,7 @@ async fn test_run_state_update(mut storage: StorageProcessor<'_>) {
         true,
         None,
         ZkSyncDeployedContract::version4(eth, [1u8; 20].into()),
+        available_block_chunk_sizes,
     );
 
     driver.run_state_update(&mut interactor).await;
@@ -414,6 +416,7 @@ async fn test_run_state_update(mut storage: StorageProcessor<'_>) {
     // Nullify the state of driver
     let eth = Eth::new(transport.clone());
 
+    let available_block_chunk_sizes = vec![10, 32, 72, 156, 322, 654];
     let mut driver = DataRestoreDriver::new(
         Web3::new(transport.clone()),
         [1u8; 20].into(),
@@ -422,6 +425,7 @@ async fn test_run_state_update(mut storage: StorageProcessor<'_>) {
         true,
         None,
         ZkSyncDeployedContract::version4(eth, [1u8; 20].into()),
+        available_block_chunk_sizes,
     );
 
     // Load state from db and check it
@@ -585,6 +589,7 @@ async fn test_with_inmemory_storage() {
     let web3 = Web3::new(transport.clone());
 
     let eth = Eth::new(transport.clone());
+    let available_block_chunk_sizes = vec![10, 32, 72, 156, 322, 654];
     let mut driver = DataRestoreDriver::new(
         web3.clone(),
         [1u8; 20].into(),
@@ -593,6 +598,7 @@ async fn test_with_inmemory_storage() {
         true,
         None,
         ZkSyncDeployedContract::version4(eth, [1u8; 20].into()),
+        available_block_chunk_sizes,
     );
 
     driver.run_state_update(&mut interactor).await;
@@ -611,6 +617,7 @@ async fn test_with_inmemory_storage() {
 
     // Nullify the state of driver
     let eth = Eth::new(transport.clone());
+    let available_block_chunk_sizes = vec![10, 32, 72, 156, 322, 654];
     let mut driver = DataRestoreDriver::new(
         web3.clone(),
         [1u8; 20].into(),
@@ -619,6 +626,7 @@ async fn test_with_inmemory_storage() {
         true,
         None,
         ZkSyncDeployedContract::version4(eth, [1u8; 20].into()),
+        available_block_chunk_sizes,
     );
 
     // Load state from db and check it
