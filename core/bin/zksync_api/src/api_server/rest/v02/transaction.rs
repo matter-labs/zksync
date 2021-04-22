@@ -8,12 +8,11 @@ use actix_web::{
     web::{self, Json},
     Scope,
 };
-use hex::FromHexError;
 
 // Workspace uses
 use zksync_api_types::v02::transaction::{
-    IncomingTx, IncomingTxBatch, L1Receipt, L1Status, L1Transaction, L2Receipt, L2Status, Receipt,
-    SubmitBatchResponse, Transaction, TransactionData, TxData,
+    ApiTxBatch, BlockStatus, IncomingTx, IncomingTxBatch, L1Receipt, L1Transaction, L2Receipt,
+    L2Status, Receipt, SubmitBatchResponse, Transaction, TransactionData, TxData,
 };
 use zksync_storage::{
     chain::{
@@ -29,18 +28,12 @@ use zksync_types::{
 };
 
 // Local uses
-use super::{
-    error::{Error, TxError},
-    response::ApiResult,
-};
-use crate::{
-    api_server::{rpc_server::types::TxWithSignature, tx_sender::TxSender},
-    api_try,
-};
+use super::{error::Error, response::ApiResult};
+use crate::api_server::{rpc_server::types::TxWithSignature, tx_sender::TxSender};
 
 pub fn l1_receipt_from_op_and_status(
     op: StoredExecutedPriorityOperation,
-    status: L1Status,
+    status: BlockStatus,
 ) -> L1Receipt {
     let eth_block = EthBlockId(op.eth_block as u64);
     let rollup_block = Some(BlockNumber(op.block_number as u32));
@@ -87,28 +80,31 @@ impl ApiTransactionData {
         Self { tx_sender }
     }
 
-    fn decode_hash(&self, tx_hash: String) -> Result<Vec<u8>, FromHexError> {
-        let tx_hash: &str = if let Some(value) = (&tx_hash).strip_prefix("0x") {
-            value
-        } else if let Some(value) = (&tx_hash).strip_prefix("sync-tx:") {
-            value
-        } else {
-            &tx_hash
-        };
-        hex::decode(tx_hash)
-    }
-
-    async fn is_block_finalized(
+    async fn get_block_status(
         storage: &mut StorageProcessor<'_>,
         block_number: BlockNumber,
-    ) -> bool {
-        storage
+    ) -> BlockStatus {
+        if storage
             .chain()
             .operations_schema()
             .get_stored_aggregated_operation(block_number, AggregatedActionType::ExecuteBlocks)
             .await
             .map(|operation| operation.confirmed)
             .unwrap_or(false)
+        {
+            BlockStatus::Finalized
+        } else if storage
+            .chain()
+            .operations_schema()
+            .get_stored_aggregated_operation(block_number, AggregatedActionType::CommitBlocks)
+            .await
+            .map(|operation| operation.confirmed)
+            .unwrap_or(false)
+        {
+            BlockStatus::Committed
+        } else {
+            BlockStatus::Queued
+        }
     }
 
     async fn get_l1_receipt(
@@ -123,12 +119,7 @@ impl ApiTransactionData {
             .await
             .map_err(Error::storage)?
         {
-            let status =
-                if Self::is_block_finalized(storage, BlockNumber(op.block_number as u32)).await {
-                    L1Status::Finalized
-                } else {
-                    L1Status::Committed
-                };
+            let status = Self::get_block_status(storage, BlockNumber(op.block_number as u32)).await;
 
             Ok(Some(l1_receipt_from_op_and_status(op, status)))
         } else if let Some((eth_block, priority_op)) = self
@@ -139,7 +130,7 @@ impl ApiTransactionData {
             .map_err(Error::core_api)?
         {
             Ok(Some(L1Receipt {
-                status: L1Status::Queued,
+                status: BlockStatus::Queued,
                 eth_block,
                 rollup_block: None,
                 id: PriorityOpId(priority_op.serial_id),
@@ -222,13 +213,7 @@ impl ApiTransactionData {
             .map_err(Error::storage)?;
         if let Some(op) = operation {
             let block_number = BlockNumber(op.block_number as u32);
-            let finalized = Self::is_block_finalized(storage, block_number).await;
-
-            let status = if finalized {
-                L2Status::Finalized
-            } else {
-                L2Status::Committed
-            };
+            let status = Self::get_block_status(storage, block_number).await.into();
             let operation: ZkSyncOp = serde_json::from_value(op.operation).unwrap();
             let eth_hash = H256::from_slice(&op.eth_hash);
             let id = PriorityOpId(op.priority_op_serialid as u64);
@@ -293,14 +278,8 @@ impl ApiTransactionData {
 
         if let Some(op) = operation {
             let block_number = BlockNumber(op.block_number as u32);
-            let finalized = Self::is_block_finalized(storage, block_number).await;
-
             let status = if op.success {
-                if finalized {
-                    L2Status::Finalized
-                } else {
-                    L2Status::Committed
-                }
+                Self::get_block_status(storage, block_number).await.into()
             } else {
                 L2Status::Rejected
             };
@@ -377,27 +356,36 @@ impl ApiTransactionData {
             Ok(None)
         }
     }
+
+    async fn get_batch(&self, batch_hash: TxHash) -> Result<Option<ApiTxBatch>, Error> {
+        let mut storage = self
+            .tx_sender
+            .pool
+            .access_storage()
+            .await
+            .map_err(Error::storage)?;
+        storage
+            .chain()
+            .operations_ext_schema()
+            .get_batch_info(batch_hash)
+            .await
+            .map_err(Error::storage)
+    }
 }
 
 // Server implementation
 
 async fn tx_status(
     data: web::Data<ApiTransactionData>,
-    web::Path(tx_hash): web::Path<String>,
+    web::Path(tx_hash): web::Path<TxHash>,
 ) -> ApiResult<Option<Receipt>> {
-    let bytes = api_try!(data.decode_hash(tx_hash).map_err(Error::from));
-    let tx_hash =
-        api_try!(TxHash::from_slice(&bytes).ok_or_else(|| Error::from(TxError::IncorrectTxHash)));
     data.tx_status(tx_hash).await.into()
 }
 
 async fn tx_data(
     data: web::Data<ApiTransactionData>,
-    web::Path(tx_hash): web::Path<String>,
+    web::Path(tx_hash): web::Path<TxHash>,
 ) -> ApiResult<Option<TxData>> {
-    let bytes = api_try!(data.decode_hash(tx_hash).map_err(Error::from));
-    let tx_hash =
-        api_try!(TxHash::from_slice(&bytes).ok_or_else(|| Error::from(TxError::IncorrectTxHash)));
     data.tx_data(tx_hash).await.into()
 }
 
@@ -437,6 +425,13 @@ async fn submit_batch(
     response.into()
 }
 
+async fn get_batch(
+    data: web::Data<ApiTransactionData>,
+    web::Path(batch_hash): web::Path<TxHash>,
+) -> ApiResult<Option<ApiTxBatch>> {
+    data.get_batch(batch_hash).await.into()
+}
+
 pub fn api_scope(tx_sender: TxSender) -> Scope {
     let data = ApiTransactionData::new(tx_sender);
 
@@ -446,6 +441,7 @@ pub fn api_scope(tx_sender: TxSender) -> Scope {
         .route("{tx_hash}", web::get().to(tx_status))
         .route("{tx_hash}/data", web::get().to(tx_data))
         .route("/batches", web::post().to(submit_batch))
+        .route("/batches/{batch_hash}", web::get().to(get_batch))
 }
 
 #[cfg(test)]

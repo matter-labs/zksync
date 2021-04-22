@@ -258,6 +258,44 @@
       ]
     }
   },
+  "0932cb02bd3d86eded5c0508978c141d57b08c59dc016dd9e3b5443061fb0856": {
+    "query": "\n                SELECT tx_hash, created_at, success, block_number\n                FROM txs_batches_hashes\n                LEFT JOIN executed_transactions\n                ON txs_batches_hashes.batch_id = executed_transactions.batch_id\n                WHERE batch_hash = $1\n            ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "tx_hash",
+          "type_info": "Bytea"
+        },
+        {
+          "ordinal": 1,
+          "name": "created_at",
+          "type_info": "Timestamptz"
+        },
+        {
+          "ordinal": 2,
+          "name": "success",
+          "type_info": "Bool"
+        },
+        {
+          "ordinal": 3,
+          "name": "block_number",
+          "type_info": "Int8"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Bytea"
+        ]
+      },
+      "nullable": [
+        false,
+        false,
+        false,
+        false
+      ]
+    }
+  },
   "0c9fc29aabfefa38588a298002e7a60c0c6cf578f7a305e8e7f58695651662dc": {
     "query": "UPDATE prover_job_queue\n            SET (updated_at, updated_by) = (now(), $1)\n            WHERE id = $2",
     "describe": {
@@ -4856,6 +4894,32 @@
         ]
       },
       "nullable": []
+    }
+  },
+  "edf2aa13afc95075fbc28a07507d65371f74349606c696a2e481b2ebd443eadc": {
+    "query": "\n                    SELECT tx_hash, created_at\n                    FROM txs_batches_hashes\n                    LEFT JOIN mempool_txs\n                    ON txs_batches_hashes.batch_id = mempool_txs.batch_id\n                    WHERE batch_hash = $1\n                ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "tx_hash",
+          "type_info": "Text"
+        },
+        {
+          "ordinal": 1,
+          "name": "created_at",
+          "type_info": "Timestamptz"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Bytea"
+        ]
+      },
+      "nullable": [
+        false,
+        false
+      ]
     }
   },
   "eed5ed38e4418ad2f4cd93f60a08ca4dd8a8d6f1405cd10a64bec094be24c117": {

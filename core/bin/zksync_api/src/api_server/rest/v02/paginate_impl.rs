@@ -14,7 +14,7 @@ use zksync_types::{BlockNumber, Token, TokenId};
 // Local uses
 use super::{
     block::block_info_from_details,
-    error::{Error, TxError},
+    error::{Error, InvalidDataError},
     paginate_trait::Paginate,
 };
 
@@ -91,7 +91,7 @@ impl Paginate<Transaction> for StorageProcessor<'_> {
             .get_block_transactions_page(query)
             .await
             .map_err(Error::storage)?
-            .ok_or_else(|| Error::from(TxError::TransactionNotFound))?;
+            .ok_or_else(|| Error::from(InvalidDataError::TransactionNotFound))?;
         let count = self
             .chain()
             .block_schema()

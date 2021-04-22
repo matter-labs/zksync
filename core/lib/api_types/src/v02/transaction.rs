@@ -24,7 +24,7 @@ pub struct IncomingTx {
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
-pub enum L1Status {
+pub enum BlockStatus {
     Queued,
     Committed,
     Finalized,
@@ -39,12 +39,12 @@ pub enum L2Status {
     Rejected,
 }
 
-impl From<L1Status> for L2Status {
-    fn from(status: L1Status) -> Self {
+impl From<BlockStatus> for L2Status {
+    fn from(status: BlockStatus) -> Self {
         match status {
-            L1Status::Queued => L2Status::Queued,
-            L1Status::Committed => L2Status::Committed,
-            L1Status::Finalized => L2Status::Finalized,
+            BlockStatus::Queued => L2Status::Queued,
+            BlockStatus::Committed => L2Status::Committed,
+            BlockStatus::Finalized => L2Status::Finalized,
         }
     }
 }
@@ -57,7 +57,7 @@ pub struct TxData {
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub struct L1Receipt {
-    pub status: L1Status,
+    pub status: BlockStatus,
     pub eth_block: EthBlockId,
     pub rollup_block: Option<BlockNumber>,
     pub id: PriorityOpId,
@@ -196,4 +196,18 @@ where
 pub struct SubmitBatchResponse {
     pub transaction_hashes: Vec<TxHash>,
     pub batch_hash: TxHash,
+}
+
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
+pub struct ApiTxBatch {
+    pub batch_hash: TxHash,
+    pub transaction_hashes: Vec<TxHash>,
+    pub created_at: DateTime<Utc>,
+    pub batch_status: BatchStatus,
+}
+
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
+pub struct BatchStatus {
+    pub updated_at: DateTime<Utc>,
+    pub last_state: L2Status,
 }

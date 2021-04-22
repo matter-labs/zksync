@@ -137,6 +137,7 @@ impl<'a, 'c> MempoolSchema<'a, 'c> {
             anyhow::bail!("Cannot insert an empty batch");
         }
 
+        let mut transaction = self.0.start_transaction().await?;
         let tx_hashes: Vec<TxHash> = txs.iter().map(|tx| tx.tx.hash()).collect();
 
         // The first transaction of the batch would be inserted manually
@@ -161,7 +162,7 @@ impl<'a, 'c> MempoolSchema<'a, 'c> {
                 chrono::Utc::now(),
                 eth_sign_data,
             )
-            .execute(self.0.conn())
+            .execute(transaction.conn())
             .await?;
 
             sqlx::query_as!(
@@ -170,7 +171,7 @@ impl<'a, 'c> MempoolSchema<'a, 'c> {
                 ORDER BY batch_id DESC
                 LIMIT 1",
             )
-            .fetch_optional(self.0.conn())
+            .fetch_optional(transaction.conn())
             .await?
             .ok_or_else(|| anyhow::format_err!("Can't get maximal batch_id from mempool_txs"))?
             .batch_id
@@ -206,7 +207,7 @@ impl<'a, 'c> MempoolSchema<'a, 'c> {
             chrono::Utc::now(),
             batch_id
         )
-        .execute(self.0.conn())
+        .execute(transaction.conn())
         .await?;
 
         // If there're signatures for the whole batch, store them too.
@@ -217,7 +218,7 @@ impl<'a, 'c> MempoolSchema<'a, 'c> {
                 batch_id,
                 signature
             )
-            .execute(self.0.conn())
+            .execute(transaction.conn())
             .await?;
         }
 
@@ -227,7 +228,7 @@ impl<'a, 'c> MempoolSchema<'a, 'c> {
             batch_id,
             batch_hash.as_ref()
         )
-        .execute(self.0.conn())
+        .execute(transaction.conn())
         .await?;
 
         metrics::histogram!("sql.chain.mempool.insert_batch", start.elapsed());
