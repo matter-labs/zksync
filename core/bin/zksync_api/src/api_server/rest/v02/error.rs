@@ -2,7 +2,6 @@
 use std::fmt::{Display, Formatter};
 
 // External uses
-use hex::FromHexError;
 use serde::{Deserialize, Serialize};
 use serde_repr::Serialize_repr;
 use thiserror::Error;
@@ -209,20 +208,6 @@ impl ApiError for PriceError {
             Self::TokenNotFound(_) => ErrorCode::TokenNotFound,
             Self::ApiError(_) => ErrorCode::ExternalApiError,
             Self::DBError(_) => ErrorCode::StorageError,
-        }
-    }
-}
-
-impl ApiError for FromHexError {
-    fn error_type(&self) -> String {
-        String::from("parse_hex_string_error")
-    }
-
-    fn code(&self) -> ErrorCode {
-        match self {
-            Self::InvalidHexCharacter { .. } => ErrorCode::InvalidHexCharacter,
-            Self::OddLength => ErrorCode::HexStringOddLength,
-            Self::InvalidStringLength => ErrorCode::InvalidHexStringLength,
         }
     }
 }

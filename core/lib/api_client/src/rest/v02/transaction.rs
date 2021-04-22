@@ -45,4 +45,13 @@ impl Client {
         .send()
         .await
     }
+
+    pub async fn get_batch(&self, batch_hash: TxHash) -> Result<Response> {
+        self.get_with_scope(
+            super::API_V02_SCOPE,
+            &format!("transaction/batches/{}", batch_hash.to_string()),
+        )
+        .send()
+        .await
+    }
 }
