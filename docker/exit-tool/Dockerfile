@@ -14,7 +14,7 @@ ENV RUSTUP_HOME=/usr/local/rustup \
     PATH=/usr/local/cargo/bin:$PATH
 RUN curl https://sh.rustup.rs -sSf | bash -s -- -y
 RUN cargo install diesel_cli --no-default-features --features postgres
-RUN cargo install --version=0.2.0 sqlx-cli
+RUN cargo install --version==0.5.2 sqlx-cli
 
 # Copy workspace
 COPY . .

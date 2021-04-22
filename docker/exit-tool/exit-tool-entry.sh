@@ -9,11 +9,11 @@ USAGE="exit_tool_entry.sh init|restart|run|continue network account_id token web
 
 cd $ZKSYNC_HOME
 
-if [ -z $ZKSYNC_ENV ];
-then 
-  echo "$USAGE"
-  exit 1
-fi
+# if [ -z $ZKSYNC_ENV ];
+# then 
+#   echo "$USAGE"
+#   exit 1
+# fi
 
 zk
 zk run plonk-setup
@@ -24,7 +24,7 @@ COMMAND=$1
 
 case $COMMAND in
   init)
-    zk db setup
+    zk db basic-setup
     echo "Database set up"
     exit 0
     ;;
@@ -47,7 +47,7 @@ esac
 
 # Load the rest of arguments now, since they're not required for the init command.
 NETWORK=$2
-ACCOUNT_ID=$3
+ADDRESS=$3
 TOKEN=$4
 WEB3_URL=$5
 
@@ -56,7 +56,7 @@ CONFIG_FILE="/usr/src/configs/${NETWORK}.json"
 # Set the required verification keys dir
 case $NETWORK in
   mainnet | rinkeby | ropsten)
-    export KEY_DIR=keys/plonk-975ae851
+    export KEY_DIR=keys/contracts-4
     ;;
   *)
       echo "Unknown Ethereum network"
@@ -65,6 +65,6 @@ case $NETWORK in
     ;;
 esac
 
-f ./target/release/zksync_data_restore $COMMAND --finite --config $CONFIG_FILE --web3 $WEB3_URL || exit 1
+zk f ./target/release/zksync_data_restore $COMMAND --finite --config $CONFIG_FILE --web3 $WEB3_URL || exit 1
 
-./target/release/examples/generate_exit_proof --account_id $ACCOUNT_ID --token $TOKEN
+zk f ./target/release/examples/generate_exit_proof --address $ADDRESS --token $TOKEN

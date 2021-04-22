@@ -5,7 +5,7 @@ use zksync_types::operations::ZkSyncOp;
 use crate::contract;
 use crate::eth_tx_helpers::{get_ethereum_transaction, get_input_data_from_ethereum_transaction};
 use crate::events::BlockEvent;
-use zksync_types::{AccountId, BlockNumber};
+use zksync_types::{AccountId, BlockNumber, H256};
 
 /// Description of a Rollup operations block
 #[derive(Debug, Clone)]
@@ -16,6 +16,10 @@ pub struct RollupOpsBlock {
     pub ops: Vec<ZkSyncOp>,
     /// Fee account
     pub fee_account: AccountId,
+    /// Timestamp
+    pub timestamp: Option<u64>,
+    /// Previous block root hash.
+    pub previous_block_root_hash: H256,
 }
 
 impl RollupOpsBlock {

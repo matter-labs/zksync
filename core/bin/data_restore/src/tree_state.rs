@@ -76,6 +76,7 @@ impl TreeState {
     pub fn update_tree_states_from_ops_block(
         &mut self,
         ops_block: &RollupOpsBlock,
+        available_block_chunk_sizes: &[usize],
     ) -> Result<(Block, AccountUpdates), anyhow::Error> {
         let operations = ops_block.ops.clone();
 
@@ -299,7 +300,7 @@ impl TreeState {
         // As we restoring an already executed block, this value isn't important.
         let gas_limit = 0.into();
 
-        let block = Block::new_with_current_chunk_size(
+        let block = Block::new_from_available_block_sizes(
             ops_block.block_num,
             self.state.root_hash(),
             ops_block.fee_account,
@@ -308,10 +309,11 @@ impl TreeState {
                 last_unprocessed_prior_op,
                 self.current_unprocessed_priority_op,
             ),
+            &available_block_chunk_sizes,
             gas_limit,
             gas_limit,
-            H256::default(),
-            0,
+            ops_block.previous_block_root_hash,
+            ops_block.timestamp.unwrap_or_default(),
         );
 
         *self.state.block_number += 1;
@@ -460,6 +462,8 @@ mod test {
             block_num: BlockNumber(1),
             ops: ops1,
             fee_account: AccountId(0),
+            timestamp: None,
+            previous_block_root_hash: Default::default(),
         };
 
         // Withdraw 20 with 1 fee from 7 to 10
@@ -484,6 +488,8 @@ mod test {
             block_num: BlockNumber(2),
             ops: ops2,
             fee_account: AccountId(0),
+            timestamp: None,
+            previous_block_root_hash: Default::default(),
         };
 
         // Transfer 40 with 1 fee from 7 to 8
@@ -509,6 +515,8 @@ mod test {
             block_num: BlockNumber(3),
             ops: ops3,
             fee_account: AccountId(0),
+            timestamp: None,
+            previous_block_root_hash: Default::default(),
         };
 
         // Transfer 19 with 1 fee from 8 to 7
@@ -534,6 +542,8 @@ mod test {
             block_num: BlockNumber(4),
             ops: ops4,
             fee_account: AccountId(0),
+            timestamp: None,
+            previous_block_root_hash: Default::default(),
         };
 
         let pub_key_hash_7 = PubKeyHash::from_hex("sync:8888888888888888888888888888888888888888")
@@ -559,6 +569,8 @@ mod test {
             block_num: BlockNumber(5),
             ops: ops5,
             fee_account: AccountId(0),
+            timestamp: None,
+            previous_block_root_hash: Default::default(),
         };
 
         // Full exit for 8
@@ -577,6 +589,8 @@ mod test {
             block_num: BlockNumber(5),
             ops: ops6,
             fee_account: AccountId(0),
+            timestamp: None,
+            previous_block_root_hash: Default::default(),
         };
 
         // Forced exit for 7
@@ -600,6 +614,8 @@ mod test {
             block_num: BlockNumber(7),
             ops: ops7,
             fee_account: AccountId(1),
+            timestamp: None,
+            previous_block_root_hash: Default::default(),
         };
         // This transaction have to be deleted, do not uncomment. Delete it after removing the corresponding code        // let tx6 = Close {
         //     account: Address::from_hex("sync:8888888888888888888888888888888888888888").unwrap(),
@@ -619,19 +635,20 @@ mod test {
         //     fee_account: AccountId(0),
         // };
         //
+        let available_block_chunk_sizes = vec![10, 32, 72, 156, 322, 654];
         let mut tree = TreeState::new();
-        tree.update_tree_states_from_ops_block(&block1)
+        tree.update_tree_states_from_ops_block(&block1, &available_block_chunk_sizes)
             .expect("Cant update state from block 1");
         let zero_acc = tree.get_account(AccountId(0)).expect("Cant get 0 account");
         assert_eq!(zero_acc.address, [7u8; 20].into());
         assert_eq!(zero_acc.get_balance(TokenId(1)), BigUint::from(1000u32));
 
-        tree.update_tree_states_from_ops_block(&block2)
+        tree.update_tree_states_from_ops_block(&block2, &available_block_chunk_sizes)
             .expect("Cant update state from block 2");
         let zero_acc = tree.get_account(AccountId(0)).expect("Cant get 0 account");
         assert_eq!(zero_acc.get_balance(TokenId(1)), BigUint::from(980u32));
 
-        tree.update_tree_states_from_ops_block(&block3)
+        tree.update_tree_states_from_ops_block(&block3, &available_block_chunk_sizes)
             .expect("Cant update state from block 3");
         // Verify creating accounts
         assert_eq!(tree.get_accounts().len(), 2);
@@ -643,7 +660,7 @@ mod test {
         assert_eq!(zero_acc.get_balance(TokenId(1)), BigUint::from(940u32));
         assert_eq!(first_acc.get_balance(TokenId(1)), BigUint::from(40u32));
 
-        tree.update_tree_states_from_ops_block(&block4)
+        tree.update_tree_states_from_ops_block(&block4, &available_block_chunk_sizes)
             .expect("Cant update state from block 4");
         let zero_acc = tree.get_account(AccountId(0)).expect("Cant get 0 account");
         let first_acc = tree.get_account(AccountId(1)).expect("Cant get 0 account");
@@ -651,19 +668,19 @@ mod test {
         assert_eq!(first_acc.get_balance(TokenId(1)), BigUint::from(20u32));
 
         assert_eq!(zero_acc.pub_key_hash, PubKeyHash::zero());
-        tree.update_tree_states_from_ops_block(&block5)
+        tree.update_tree_states_from_ops_block(&block5, &available_block_chunk_sizes)
             .expect("Cant update state from block 5");
         let zero_acc = tree.get_account(AccountId(0)).expect("Cant get 0 account");
         assert_eq!(zero_acc.pub_key_hash, pub_key_hash_7);
 
-        tree.update_tree_states_from_ops_block(&block6)
+        tree.update_tree_states_from_ops_block(&block6, &available_block_chunk_sizes)
             .expect("Cant update state from block 6");
         let zero_acc = tree.get_account(AccountId(0)).expect("Cant get 0 account");
         let first_acc = tree.get_account(AccountId(1)).expect("Cant get 0 account");
         assert_eq!(zero_acc.get_balance(TokenId(1)), BigUint::from(960u32));
         assert_eq!(first_acc.get_balance(TokenId(1)), BigUint::from(0u32));
 
-        tree.update_tree_states_from_ops_block(&block7)
+        tree.update_tree_states_from_ops_block(&block7, &available_block_chunk_sizes)
             .expect("Cant update state from block 7");
         let zero_acc = tree.get_account(AccountId(0)).expect("Cant get 0 account");
         let first_acc = tree.get_account(AccountId(1)).expect("Cant get 0 account");
@@ -798,10 +815,13 @@ mod test {
             block_num: BlockNumber(1),
             ops,
             fee_account: AccountId(0),
+            timestamp: None,
+            previous_block_root_hash: Default::default(),
         };
 
         let mut tree = TreeState::new();
-        tree.update_tree_states_from_ops_block(&block)
+        let available_block_chunk_sizes = vec![10, 32, 72, 156, 322, 654];
+        tree.update_tree_states_from_ops_block(&block, &available_block_chunk_sizes)
             .expect("Cant update state from block");
 
         assert_eq!(tree.get_accounts().len(), 2);
