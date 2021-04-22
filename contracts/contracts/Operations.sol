@@ -23,6 +23,7 @@ library Operations {
         ChangePubKey,
         ForcedExit,
         MintNFT,
+        WithdrawNFT,
         Swap
     }
 

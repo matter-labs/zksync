@@ -22,8 +22,8 @@ pub struct WithdrawNFTOp {
 }
 
 impl WithdrawNFTOp {
-    pub const CHUNKS: usize = 10;
-    pub const OP_CODE: u8 = 0x0b;
+    pub const CHUNKS: usize = 9;
+    pub const OP_CODE: u8 = 0x0a;
     pub const WITHDRAW_DATA_PREFIX: [u8; 1] = [1];
 
     pub(crate) fn get_public_data(&self) -> Vec<u8> {

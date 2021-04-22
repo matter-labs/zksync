@@ -25,7 +25,7 @@ pub struct WithdrawNFT {
     pub from: Address,
     /// Address of L1 account to withdraw funds to.
     pub to: Address,
-    /// Type of token for withdrawal. Also represents the token in which fee will be paid.
+    /// Type of token for withdrawal.
     pub token: TokenId,
     pub creator: Address,
     pub content_hash: H256,
@@ -54,7 +54,7 @@ pub struct WithdrawNFT {
 
 impl WithdrawNFT {
     /// Unique identifier of the transaction type in zkSync network.
-    pub const TX_TYPE: u8 = 11;
+    pub const TX_TYPE: u8 = 10;
 
     /// Creates transaction from all the required fields.
     ///

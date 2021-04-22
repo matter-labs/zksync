@@ -455,11 +455,14 @@ impl MintNFTWitness<Bn256> {
                 valid_from: Some(Fr::zero()),
                 valid_until: Some(Fr::from_str(&u32::MAX.to_string()).unwrap()),
 
-                special_eth_address: Some(
-                    recipient_account_witness_before_fifth_chunk
-                        .address
-                        .expect("recipient account should not be empty"),
-                ),
+                special_eth_addresses: vec![
+                    Some(
+                        recipient_account_witness_before_fifth_chunk
+                            .address
+                            .expect("recipient account should not be empty"),
+                    ),
+                    Some(Fr::zero()),
+                ],
                 special_tokens: vec![Some(token_fe), Some(new_token_id)],
                 special_account_ids: vec![
                     Some(creator_account_id_fe),

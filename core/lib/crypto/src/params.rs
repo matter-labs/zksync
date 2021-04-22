@@ -227,6 +227,18 @@ pub const SIGNED_MINT_NFT_BIT_WIDTH: usize = TX_TYPE_BIT_WIDTH
     + FEE_MANTISSA_BIT_WIDTH
     + NONCE_BIT_WIDTH;
 
+/// Size of the data that is signed for withdraw nft tx
+pub const SIGNED_WITHDRAW_NFT_BIT_WIDTH: usize = TX_TYPE_BIT_WIDTH
+    + ACCOUNT_ID_BIT_WIDTH
+    + ADDRESS_WIDTH
+    + ADDRESS_WIDTH
+    + CONTENT_HASH_WIDTH
+    + TOKEN_BIT_WIDTH
+    + TOKEN_BIT_WIDTH
+    + FEE_EXPONENT_BIT_WIDTH
+    + FEE_MANTISSA_BIT_WIDTH
+    + NONCE_BIT_WIDTH;
+
 /// Size of the data that is signed for change pubkey tx
 pub const SIGNED_CHANGE_PUBKEY_BIT_WIDTH: usize = TX_TYPE_BIT_WIDTH
     + ACCOUNT_ID_BIT_WIDTH
