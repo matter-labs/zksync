@@ -150,7 +150,9 @@ async function main() {
     console.log('performExodus confirmed');
 
     console.log('Sending withdrawPendingBalance transaction');
-    const withdrawTx = await zkSyncContract.withdrawPendingBalance(owner, tokenAddress, amount);
+    const withdrawTx = await zkSyncContract.withdrawPendingBalance(owner, tokenAddress, amount, {
+        gasLimit: 500_000
+    });
     console.log('withdrawPendingBalance sent, waiting for confirmation...');
     await withdrawTx.wait();
     console.log('withdrawPendingBalance confirmed');
