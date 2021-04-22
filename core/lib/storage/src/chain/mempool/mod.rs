@@ -231,6 +231,8 @@ impl<'a, 'c> MempoolSchema<'a, 'c> {
         .execute(transaction.conn())
         .await?;
 
+        transaction.commit().await?;
+
         metrics::histogram!("sql.chain.mempool.insert_batch", start.elapsed());
         Ok(batch_id)
     }
