@@ -137,7 +137,7 @@ The last entry (`token_address`) is needed for the [`withdrawPendingBalance`][wd
 What user has to do after that:
 
 1. Create transaction for an `exit` method call, sign it and broadcast to register balance to withdraw.
-2. Send a transaction which invokes [`withdrawPendingBalance `][wd] method of contract to obtain their funds.
+2. Send a transaction which invokes [`withdrawPendingBalance`][wd] method of contract to obtain their funds.
 
 [wd]: https://github.com/matter-labs/zksync/blob/master/contracts/contracts/ZkSync.sol#L262
 
