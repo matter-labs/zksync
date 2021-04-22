@@ -2,7 +2,6 @@
 // External uses
 use actix::prelude::*;
 use actix_web_actors::ws;
-use futures_util::FutureExt;
 // Workspace uses
 // Local uses
 use crate::messages::{NewEvents, RegisterSubscriber, RemoveSubscriber};
@@ -24,6 +23,20 @@ impl Subscriber {
             monitor,
         }
     }
+
+    fn shutdown(&mut self, ctx: &mut <Self as Actor>::Context) {
+        let request = RemoveSubscriber(ctx.address());
+        self.monitor
+            .send(request)
+            .into_actor(self)
+            .map(|response, _, ctx| {
+                if let Err(err) = response {
+                    vlog::error!("Couldn't remove the subscriber, reason: {:?}", err);
+                }
+                ctx.stop();
+            })
+            .wait(ctx);
+    }
 }
 
 impl Actor for Subscriber {
@@ -44,15 +57,6 @@ impl Actor for Subscriber {
             })
             .wait(ctx);
     }
-
-    fn stopped(&mut self, ctx: &mut Self::Context) {
-        let request = RemoveSubscriber(ctx.address());
-        actix::spawn(self.monitor.send(request).map(|response| {
-            if let Err(err) = response {
-                vlog::error!("Couldn't remove the subscriber, reason: {:?}", err);
-            }
-        }));
-    }
 }
 
 impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for Subscriber {
@@ -67,17 +71,34 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for Subscriber {
                     Ok(filters) => {
                         self.filters = Some(filters);
                     }
-                    Err(_err) => {
-                        // TODO: close the connection with a reason.
-                        ctx.stop();
+                    Err(err) => {
+                        let reason = Some(ws::CloseReason {
+                            code: ws::CloseCode::Policy,
+                            description: Some(err.to_string()),
+                        });
+                        ctx.close(reason);
+                        self.shutdown(ctx);
                     }
                 }
             }
-            Ok(ws::Message::Close(_)) => {
-                ctx.stop();
+            Ok(ws::Message::Close(reason)) => {
+                ctx.close(reason);
+                self.shutdown(ctx);
+            }
+            Err(err) => {
+                let reason = Some(ws::CloseReason {
+                    code: ws::CloseCode::Error,
+                    description: Some(err.to_string()),
+                });
+                ctx.close(reason);
+                self.shutdown(ctx);
             }
             _ => {}
         }
+    }
+
+    fn finished(&mut self, ctx: &mut Self::Context) {
+        self.shutdown(ctx);
     }
 }
 
