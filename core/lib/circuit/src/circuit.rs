@@ -851,6 +851,11 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
                     &op_data.special_accounts,
                     &prev.op_data.special_accounts,
                 )?,
+                sequences_equal(
+                    cs.namespace(|| "are special_prices equal to previous"),
+                    &op_data.special_prices,
+                    &prev.op_data.special_prices,
+                )?,
                 CircuitElement::equals(
                     cs.namespace(|| "is eth_address equal to previous"),
                     &op_data.eth_address,
@@ -2263,7 +2268,7 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
 
         let nonce_inc_1 = Expression::select_ifeq(
             cs.namespace(|| "nonce increment 1"),
-            &op_data.special_amounts_unpacked[3].get_number(),
+            &op_data.special_amounts_unpacked[1].get_number(),
             Expression::u64::<CS>(0u64),
             zero.clone(),
             one.clone(),
@@ -2307,8 +2312,8 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
         serialized_order_bits_0.extend(op_data.special_nonces[0].get_bits_be());
         serialized_order_bits_0.extend(op_data.special_tokens[0].get_bits_be());
         serialized_order_bits_0.extend(op_data.special_tokens[1].get_bits_be());
-        serialized_order_bits_0.extend(op_data.special_amounts_unpacked[1].get_bits_be());
-        serialized_order_bits_0.extend(op_data.special_amounts_unpacked[2].get_bits_be());
+        serialized_order_bits_0.extend(op_data.special_prices[0].get_bits_be());
+        serialized_order_bits_0.extend(op_data.special_prices[1].get_bits_be());
         serialized_order_bits_0.extend(op_data.special_amounts_packed[0].get_bits_be());
         serialized_order_bits_0.extend(op_data.valid_from.get_bits_be());
         serialized_order_bits_0.extend(op_data.valid_until.get_bits_be());
@@ -2318,9 +2323,9 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
         serialized_order_bits_1.extend(op_data.special_nonces[1].get_bits_be());
         serialized_order_bits_1.extend(op_data.special_tokens[1].get_bits_be());
         serialized_order_bits_1.extend(op_data.special_tokens[0].get_bits_be());
-        serialized_order_bits_1.extend(op_data.special_amounts_unpacked[4].get_bits_be());
-        serialized_order_bits_1.extend(op_data.special_amounts_unpacked[5].get_bits_be());
-        serialized_order_bits_1.extend(op_data.special_amounts_packed[3].get_bits_be());
+        serialized_order_bits_1.extend(op_data.special_prices[2].get_bits_be());
+        serialized_order_bits_1.extend(op_data.special_prices[3].get_bits_be());
+        serialized_order_bits_1.extend(op_data.special_amounts_packed[1].get_bits_be());
         serialized_order_bits_1.extend(op_data.second_valid_from.get_bits_be());
         serialized_order_bits_1.extend(op_data.second_valid_until.get_bits_be());
 
@@ -2527,12 +2532,12 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
         let is_second_amount_valid = {
             let is_amount_explicit = CircuitElement::equals(
                 cs.namespace(|| "is second amount explicit"),
-                &op_data.special_amounts_unpacked[3],
+                &op_data.special_amounts_unpacked[1],
                 &op_data.second_amount_unpacked,
             )?;
             let is_amount_implicit = CircuitElement::equals(
                 cs.namespace(|| "is second amount implicit"),
-                &op_data.special_amounts_unpacked[3],
+                &op_data.special_amounts_unpacked[1],
                 &global_variables.explicit_zero,
             )?;
             boolean_or(
@@ -2549,24 +2554,24 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
             let amount_bought = {
                 let amount = op_data.amount_unpacked.get_number().mul(
                     cs.namespace(|| "amountA * orderA.price_buy"),
-                    &op_data.special_amounts_unpacked[2].get_number(),
+                    &op_data.special_prices[1].get_number(),
                 )?;
                 CircuitElement::from_number_with_known_length(
                     cs.namespace(|| "amount bought - first order"),
                     amount,
-                    (E::Fr::CAPACITY - 1) as usize,
+                    params::BALANCE_BIT_WIDTH + params::PRICE_BIT_WIDTH,
                 )?
             };
 
             let amount_sold = {
                 let amount = op_data.second_amount_unpacked.get_number().mul(
                     cs.namespace(|| "amountB * orderA.price_sell"),
-                    &op_data.special_amounts_unpacked[1].get_number(),
+                    &op_data.special_prices[0].get_number(),
                 )?;
                 CircuitElement::from_number_with_known_length(
                     cs.namespace(|| "amount sold - first order"),
                     amount,
-                    (E::Fr::CAPACITY - 1) as usize,
+                    params::BALANCE_BIT_WIDTH + params::PRICE_BIT_WIDTH,
                 )?
             };
 
@@ -2582,24 +2587,24 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
             let amount_bought = {
                 let amount = op_data.second_amount_unpacked.get_number().mul(
                     cs.namespace(|| "amountB * orderB.price_buy"),
-                    &op_data.special_amounts_unpacked[5].get_number(),
+                    &op_data.special_prices[3].get_number(),
                 )?;
                 CircuitElement::from_number_with_known_length(
                     cs.namespace(|| "amount bought - second order"),
                     amount,
-                    (E::Fr::CAPACITY - 1) as usize,
+                    params::BALANCE_BIT_WIDTH + params::PRICE_BIT_WIDTH,
                 )?
             };
 
             let amount_sold = {
                 let amount = op_data.amount_unpacked.get_number().mul(
                     cs.namespace(|| "amountA * orderB.price_sell"),
-                    &op_data.special_amounts_unpacked[4].get_number(),
+                    &op_data.special_prices[2].get_number(),
                 )?;
                 CircuitElement::from_number_with_known_length(
                     cs.namespace(|| "amount sold - second order"),
                     amount,
-                    (E::Fr::CAPACITY - 1) as usize,
+                    params::BALANCE_BIT_WIDTH + params::PRICE_BIT_WIDTH,
                 )?
             };
 

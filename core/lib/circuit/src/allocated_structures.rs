@@ -103,6 +103,7 @@ pub struct AllocatedOperationData<E: Engine> {
     pub second_amount_unpacked: CircuitElement<E>,
     pub special_amounts_packed: Vec<CircuitElement<E>>,
     pub special_amounts_unpacked: Vec<CircuitElement<E>>,
+    pub special_prices: Vec<CircuitElement<E>>,
     pub special_nonces: Vec<CircuitElement<E>>,
     pub special_tokens: Vec<CircuitElement<E>>,
     pub special_accounts: Vec<CircuitElement<E>>,
@@ -159,6 +160,11 @@ impl<E: RescueEngine> AllocatedOperationData<E> {
         let amount_unpacked = CircuitElement::unsafe_empty_of_some_length(
             zero_element.clone(),
             franklin_constants::BALANCE_BIT_WIDTH,
+        );
+
+        let price_part = CircuitElement::unsafe_empty_of_some_length(
+            zero_element.clone(),
+            franklin_constants::PRICE_BIT_WIDTH,
         );
 
         let fee = CircuitElement::unsafe_empty_of_some_length(
@@ -218,8 +224,9 @@ impl<E: RescueEngine> AllocatedOperationData<E> {
             amount_unpacked: amount_unpacked.clone(),
             second_amount_packed: amount_packed.clone(),
             second_amount_unpacked: amount_unpacked.clone(),
-            special_amounts_packed: vec![amount_packed; 6],
-            special_amounts_unpacked: vec![amount_unpacked; 6],
+            special_amounts_packed: vec![amount_packed; 2],
+            special_amounts_unpacked: vec![amount_unpacked; 2],
+            special_prices: vec![price_part; 4],
             special_accounts: vec![special_account_id; 5],
             special_nonces: vec![pub_nonce; 3],
             special_tokens: vec![special_token; 3],
@@ -330,6 +337,20 @@ impl<E: RescueEngine> AllocatedOperationData<E> {
             })
             .collect::<Result<Vec<_>, _>>()?;
 
+        let special_prices = op
+            .args
+            .special_prices
+            .iter()
+            .enumerate()
+            .map(|(idx, special_price)| {
+                CircuitElement::from_fe_with_known_length(
+                    cs.namespace(|| format!("special_price with index {}", idx)),
+                    || special_price.grab(),
+                    franklin_constants::PRICE_BIT_WIDTH,
+                )
+            })
+            .collect::<Result<Vec<_>, _>>()?;
+
         let (special_amounts_unpacked, special_amounts_packed) = op
             .args
             .special_amounts
@@ -432,6 +453,7 @@ impl<E: RescueEngine> AllocatedOperationData<E> {
             second_amount_unpacked,
             special_amounts_packed,
             special_amounts_unpacked,
+            special_prices,
             special_accounts,
             special_nonces,
             special_tokens,

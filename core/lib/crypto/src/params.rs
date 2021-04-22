@@ -108,6 +108,8 @@ pub const FEE_MANTISSA_BIT_WIDTH: usize = 11;
 /// Timestamp bit width
 pub const TIMESTAMP_BIT_WIDTH: usize = 8 * 8;
 
+pub const PRICE_BIT_WIDTH: usize = 120;
+
 // Signature data
 pub const SIGNATURE_S_BIT_WIDTH: usize = 254;
 pub const SIGNATURE_S_BIT_WIDTH_PADDED: usize = 256;

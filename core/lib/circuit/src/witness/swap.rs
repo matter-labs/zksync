@@ -347,11 +347,14 @@ impl SwapWitness<Bn256> {
         let mut rhs_paths = vec![];
         let mut witnesses = vec![];
 
-        let special_amounts: Vec<_> = vec![
-            swap.orders.0.amount,
+        let special_amounts: Vec<_> = vec![swap.orders.0.amount, swap.orders.1.amount]
+            .into_iter()
+            .map(|x| Some(fr_from(x)))
+            .collect();
+
+        let special_prices: Vec<_> = vec![
             swap.orders.0.price_sell,
             swap.orders.0.price_buy,
-            swap.orders.1.amount,
             swap.orders.1.price_sell,
             swap.orders.1.price_buy,
         ]
@@ -401,7 +404,7 @@ impl SwapWitness<Bn256> {
                 if swap.orders.1.account == swap.submitter {
                     return;
                 }
-                acc.nonce.add_assign(&nonce_increment(&special_amounts[3]));
+                acc.nonce.add_assign(&nonce_increment(&special_amounts[1]));
             },
             |bal| {
                 bal.value.sub_assign(&amount_1_fe);
@@ -567,6 +570,7 @@ impl SwapWitness<Bn256> {
                 ],
                 special_tokens: vec![Some(token_0_fe), Some(token_1_fe), Some(fee_token_fe)],
                 special_amounts,
+                special_prices,
                 ..Default::default()
             },
             a_and_b: a_and_b
