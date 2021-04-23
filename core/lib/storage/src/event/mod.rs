@@ -3,13 +3,7 @@
 use serde_json::Value;
 // Workspace uses
 use zksync_basic_types::{AccountId, BlockNumber};
-use zksync_types::{
-    account::AccountUpdate, block::ExecutedOperations, priority_ops::ZkSyncPriorityOp,
-};
-// Local uses
-use crate::{diff::StorageAccountDiff, QueryResult, StorageProcessor};
-use records::{EventType, StoredEvent};
-use types::{
+use zksync_types::event::{
     account::{
         AccountEvent, AccountStateChangeStatus, AccountStateChangeType, AccountUpdateDetails,
     },
@@ -17,9 +11,15 @@ use types::{
     transaction::TransactionEvent,
     ZkSyncEvent,
 };
+use zksync_types::{
+    account::AccountUpdate, block::ExecutedOperations, priority_ops::ZkSyncPriorityOp,
+};
+// Local uses
+use crate::{diff::StorageAccountDiff, QueryResult, StorageProcessor};
+use records::{EventType, StoredEvent};
 
 pub mod records;
-pub mod types;
+pub use records::get_event_type;
 
 #[derive(Debug)]
 pub struct EventSchema<'a, 'c>(pub &'a mut StorageProcessor<'c>);
@@ -91,7 +91,7 @@ impl<'a, 'c> EventSchema<'a, 'c> {
 
         let block_event = BlockEvent {
             status,
-            block_details,
+            block_details: block_details.into(),
         };
 
         let event_data = serde_json::to_value(block_event).expect("couldn't serialize block event");

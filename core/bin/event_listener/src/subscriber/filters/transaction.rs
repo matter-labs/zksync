@@ -1,7 +1,7 @@
 // Built-in uses
 use std::collections::HashSet;
 // Workspace uses
-use zksync_storage::event::types::{transaction::*, EventData, ZkSyncEvent};
+use zksync_types::event::{transaction::*, EventData, ZkSyncEvent};
 // External uses
 use serde::Deserialize;
 // Local uses

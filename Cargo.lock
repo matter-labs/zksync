@@ -6387,6 +6387,7 @@ dependencies = [
  "vlog",
  "zksync_config",
  "zksync_storage",
+ "zksync_types",
 ]
 
 [[package]]
@@ -6566,7 +6567,6 @@ dependencies = [
  "parity-crypto",
  "serde",
  "serde_json",
- "serde_with",
  "sqlx",
  "thiserror",
  "tokio 0.2.22",
@@ -6623,6 +6623,7 @@ dependencies = [
 name = "zksync_types"
 version = "1.0.0"
 dependencies = [
+ "bigdecimal",
  "chrono",
  "criterion",
  "ethabi",
@@ -6634,6 +6635,7 @@ dependencies = [
  "secp256k1",
  "serde",
  "serde_json",
+ "serde_with",
  "thiserror",
  "tiny-keccak 1.5.0",
  "vlog",

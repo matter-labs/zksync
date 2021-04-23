@@ -6,12 +6,14 @@ use num::{BigInt, BigUint};
 use sqlx::types::BigDecimal;
 use zksync_basic_types::{H256, U256};
 // Workspace imports
-use zksync_types::aggregated_operations::{AggregatedActionType, AggregatedOperation};
-use zksync_types::ethereum::{ETHOperation, InsertedOperationResponse};
-use zksync_types::BlockNumber;
+use zksync_types::{
+    aggregated_operations::{AggregatedActionType, AggregatedOperation},
+    ethereum::{ETHOperation, InsertedOperationResponse},
+    event::block::BlockStatus,
+    BlockNumber,
+};
 // Local imports
 use self::records::{ETHParams, ETHStats, ETHTxHash, StorageETHOperation};
-use crate::event::types::block::BlockStatus;
 use crate::{chain::operations::records::StoredAggregatedOperation, QueryResult, StorageProcessor};
 
 pub mod records;

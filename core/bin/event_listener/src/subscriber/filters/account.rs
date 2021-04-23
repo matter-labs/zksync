@@ -3,7 +3,7 @@ use std::collections::HashSet;
 // External uses
 use serde::Deserialize;
 // Workspace uses
-use zksync_storage::event::types::{account::*, EventData, ZkSyncEvent};
+use zksync_types::event::{account::*, EventData, ZkSyncEvent};
 // Local uses
 
 #[derive(Debug, Clone, Deserialize)]

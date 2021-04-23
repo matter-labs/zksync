@@ -2,7 +2,8 @@
 use std::collections::HashMap;
 use std::fmt;
 // Workspace uses
-use zksync_storage::event::{records::EventType, types::ZkSyncEvent};
+use zksync_storage::event::{get_event_type, records::EventType};
+use zksync_types::event::ZkSyncEvent;
 // External uses
 use serde::de::{MapAccess, Visitor};
 use serde::{Deserialize, Deserializer};
@@ -37,7 +38,7 @@ pub struct SubscriberFilters(HashMap<EventType, EventFilter>);
 
 impl SubscriberFilters {
     pub fn matches(&self, event: &ZkSyncEvent) -> bool {
-        let event_type = event.get_type();
+        let event_type = get_event_type(event);
         match self.0.get(&event_type) {
             Some(filter) => filter.matches(event),
             None => self.0.is_empty(),

@@ -4,9 +4,8 @@ use std::convert::TryFrom;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 // Workspace uses
-use zksync_basic_types::{AccountId, BlockNumber};
-use zksync_types::block::ExecutedOperations;
 // Local uses
+use crate::{block::ExecutedOperations, AccountId, BlockNumber};
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]

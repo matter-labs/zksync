@@ -2,7 +2,7 @@
 // External uses
 use serde::Deserialize;
 // Workspace uses
-use zksync_storage::event::types::{block::*, EventData, ZkSyncEvent};
+use zksync_types::event::{block::*, EventData, ZkSyncEvent};
 // Local uses
 
 #[derive(Debug, Clone, Deserialize)]

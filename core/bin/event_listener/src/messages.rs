@@ -3,7 +3,8 @@ use std::sync::Arc;
 // External uses
 use actix::prelude::*;
 // Workspace uses
-use zksync_storage::{event::types::ZkSyncEvent, listener::notification::StorageNotification};
+use zksync_storage::listener::notification::StorageNotification;
+use zksync_types::event::ZkSyncEvent;
 // Local uses
 use crate::subscriber::Subscriber;
 

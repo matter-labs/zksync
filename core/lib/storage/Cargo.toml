@@ -22,7 +22,6 @@ zksync_basic_types = { path = "../basic_types", version = "1.0" }
 
 serde = "1.0.90"
 serde_json = "1.0.0"
-serde_with = "1.8.0"
 num = { version = "0.3.1", features = ["serde"] }
 chrono = { version = "0.4", features = ["serde", "rustc-serialize"] }
 thiserror = "1.0"

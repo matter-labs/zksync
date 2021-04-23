@@ -7,12 +7,13 @@ use zksync_crypto::convert::FeConvert;
 use zksync_types::{
     aggregated_operations::AggregatedActionType,
     block::{Block, BlockMetadata, ExecutedOperations, PendingBlock},
+    event::block::BlockStatus,
     AccountId, BlockNumber, Fr, ZkSyncOp,
 };
 // Local imports
 use self::records::{
-    AccountTreeCache, BlockDetails, BlockTransactionItem, StorageBlock, StorageBlockMetadata,
-    StoragePendingBlock,
+    AccountTreeCache, BlockTransactionItem, StorageBlock, StorageBlockDetails,
+    StorageBlockMetadata, StoragePendingBlock,
 };
 use crate::{
     chain::account::records::EthAccountType,
@@ -23,7 +24,6 @@ use crate::{
         },
         OperationsSchema,
     },
-    event::types::block::BlockStatus,
     QueryResult, StorageProcessor,
 };
 
@@ -314,7 +314,7 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
         &mut self,
         max_block: BlockNumber,
         limit: u32,
-    ) -> QueryResult<Vec<BlockDetails>> {
+    ) -> QueryResult<Vec<StorageBlockDetails>> {
         let start = Instant::now();
         // This query does the following:
         // - joins the `operations` and `eth_tx_hashes` (using the intermediate `eth_ops_binding` table)
@@ -324,7 +324,7 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
         //   and verified operations;
         // - collects the {limit} blocks in the descending order with the data gathered above.
         let details = sqlx::query_as!(
-            BlockDetails,
+            StorageBlockDetails,
             r#"
             WITH aggr_comm AS (
                 SELECT 
@@ -397,7 +397,10 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
     ///
     /// Will return `None` if the query is malformed or there is no block that matches
     /// the query.
-    pub async fn find_block_by_height_or_hash(&mut self, query: String) -> Option<BlockDetails> {
+    pub async fn find_block_by_height_or_hash(
+        &mut self,
+        query: String,
+    ) -> Option<StorageBlockDetails> {
         let start = Instant::now();
         // If the input looks like hash, add the hash lookup part.
         let hash_bytes = if let Some(hex_query) = self.try_parse_hex(&query) {
@@ -435,7 +438,7 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
         //   + query equals to the state hash obtained in the block (in form of `sync-bl:00{..}00`);
         //   + query equals to the number of the block.
         let result = sqlx::query_as!(
-            BlockDetails,
+            StorageBlockDetails,
             r#"
             WITH aggr_comm AS (
                 SELECT 

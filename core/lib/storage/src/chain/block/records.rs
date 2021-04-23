@@ -4,6 +4,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::value::Value;
 use sqlx::FromRow;
 // Workspace imports
+use zksync_types::event::block::BlockDetails;
 use zksync_utils::{BytesToHexSerde, OptionBytesToHexSerde, SyncBlockPrefix, ZeroxPrefix};
 // Local imports
 
@@ -32,7 +33,7 @@ pub struct StoragePendingBlock {
 }
 
 #[derive(Debug, Serialize, Deserialize, FromRow, PartialEq, Clone)]
-pub struct BlockDetails {
+pub struct StorageBlockDetails {
     pub block_number: i64,
 
     #[serde(with = "BytesToHexSerde::<SyncBlockPrefix>")]
@@ -67,7 +68,7 @@ pub struct AccountTreeCache {
     pub tree_cache: String,
 }
 
-impl BlockDetails {
+impl StorageBlockDetails {
     /// Checks if block is finalized, meaning that
     /// both Verify operation is performed for it, and this
     /// operation is anchored on the Ethereum blockchain.
@@ -75,6 +76,20 @@ impl BlockDetails {
         // We assume that it's not possible to have block that is
         // verified and not committed.
         self.verified_at.is_some() && self.verify_tx_hash.is_some()
+    }
+}
+
+impl From<StorageBlockDetails> for BlockDetails {
+    fn from(storage_details: StorageBlockDetails) -> Self {
+        Self {
+            block_number: storage_details.block_number,
+            new_state_root: storage_details.new_state_root,
+            block_size: storage_details.block_size,
+            commit_tx_hash: storage_details.commit_tx_hash,
+            verify_tx_hash: storage_details.verify_tx_hash,
+            committed_at: storage_details.committed_at,
+            verified_at: storage_details.verified_at,
+        }
     }
 }
 
