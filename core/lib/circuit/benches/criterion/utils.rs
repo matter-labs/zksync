@@ -39,7 +39,9 @@ impl ZkSyncStateGenerator {
         } else {
             std::iter::once((
                 FEE_ACCOUNT_ID,
-                Account::default_with_address(&Address::default()),
+                Account::default_with_address(
+                    &Address::from_str("feeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee").unwrap(),
+                ),
             ))
             .chain(accounts)
             .collect()

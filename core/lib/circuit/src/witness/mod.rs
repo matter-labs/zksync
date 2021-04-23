@@ -28,6 +28,7 @@ pub mod noop;
 pub mod transfer;
 pub mod transfer_to_new;
 pub mod withdraw;
+pub mod withdraw_nft;
 
 pub mod utils;
 

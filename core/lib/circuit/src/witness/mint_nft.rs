@@ -235,7 +235,7 @@ impl MintNFTWitness<Bn256> {
         let before_first_chunk_root = tree.root_hash();
         vlog::debug!("Initial root = {}", before_first_chunk_root);
 
-        // applying first chunk: change the balance of the creator
+        // applying first chunk: take fee from creator, increment nonce
         let (audit_creator_account_before_first_chunk, audit_creator_balance_before_first_chunk) =
             get_audits(tree, mint_nft.creator_account_id, mint_nft.fee_token);
 
@@ -372,7 +372,6 @@ impl MintNFTWitness<Bn256> {
                 bal.value.add_assign(&content_to_store);
             },
         );
-        assert_eq!(special_account_content_before_fourth_chunk, Fr::zero());
 
         let (_audit_special_account_after_fourth_chunk, _audit_special_balance_after_fourth_chunk) =
             get_audits(tree, NFT_STORAGE_ACCOUNT_ID.0, new_token_id_u32);
@@ -440,11 +439,7 @@ impl MintNFTWitness<Bn256> {
 
             tx_type: Some(Fr::from_str(&MintNFTOp::OP_CODE.to_string()).unwrap()),
             args: OperationArguments {
-                eth_address: Some(
-                    creator_account_witness_before_first_chunk
-                        .address
-                        .expect("creator account should not be empty"),
-                ),
+                eth_address: Some(Fr::zero()),
                 amount_packed: Some(Fr::zero()),
                 full_amount: Some(Fr::zero()),
                 fee: Some(fee_encoded),

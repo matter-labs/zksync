@@ -242,6 +242,7 @@ impl<'a, E: RescueEngine + JubjubEngine> Circuit<E> for ZkSyncCircuit<'a, E> {
                         ForcedExitOp::OP_CODE,
                         FullExitOp::OP_CODE,
                         ChangePubKeyOp::OP_CODE,
+                        WithdrawNFTOp::OP_CODE,
                     ];
 
                     let mut onchain_op_flags = Vec::new();
@@ -2177,6 +2178,7 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
 
             flags.push(is_special_nft_storage_account.clone());
             flags.push(is_new_token.clone());
+            flags.push(is_special_nft_token.not()); // all possible NFT slots are filled
 
             multi_and(cs.namespace(|| "fourth_chunk_valid"), &flags)?
         };
@@ -2363,13 +2365,6 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
             serialized_tx_bits.extend(op_data.special_account_ids[0].get_bits_be()); // initiator_id
             serialized_tx_bits.extend(cur.account.address.get_bits_be()); // initiator_address
             serialized_tx_bits.extend(op_data.special_eth_addresses[0].get_bits_be()); // to_address
-            serialized_tx_bits.extend(
-                op_data
-                    .special_content_hash
-                    .iter()
-                    .map(|bit| bit.get_bits_be())
-                    .flatten(),
-            ); // content_hash
             serialized_tx_bits.extend(op_data.special_tokens[1].get_bits_be()); // token
             serialized_tx_bits.extend(cur.token.get_bits_be()); // fee_token
             serialized_tx_bits.extend(op_data.fee_packed.get_bits_be()); // fee
