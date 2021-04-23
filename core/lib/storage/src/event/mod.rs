@@ -121,7 +121,7 @@ impl<'a, 'c> EventSchema<'a, 'c> {
         let account_event = AccountEvent {
             update_type,
             status,
-            account_update_details,
+            update_details: account_update_details,
         };
 
         let event_data =
@@ -146,7 +146,7 @@ impl<'a, 'c> EventSchema<'a, 'c> {
         let account_event = AccountEvent {
             update_type,
             status,
-            account_update_details,
+            update_details: account_update_details,
         };
 
         let event_data =

@@ -39,7 +39,7 @@ pub struct TransactionEvent {
     /// Since the event is shared among server worker threads, it has
     /// to implement [std::marker::Sync], which is not the case for [std::cell::Cell].
     #[serde(skip)]
-    tx_type: OnceCell<TransactionType>,
+    pub(crate) tx_type: OnceCell<TransactionType>,
 }
 
 impl TransactionEvent {

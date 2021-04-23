@@ -1,5 +1,4 @@
 // Built-in uses
-
 // External uses
 use bigdecimal::BigDecimal;
 use num::BigInt;
@@ -9,8 +8,8 @@ use crate::{
     account::{AccountUpdate, PubKeyHash},
     AccountId,
 };
-
 // Local uses
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum AccountStateChangeStatus {
@@ -31,7 +30,7 @@ pub enum AccountStateChangeType {
 pub struct AccountEvent {
     pub update_type: AccountStateChangeType,
     pub status: AccountStateChangeStatus,
-    pub account_update_details: AccountUpdateDetails,
+    pub update_details: AccountUpdateDetails,
 }
 
 #[serde_with::skip_serializing_none]

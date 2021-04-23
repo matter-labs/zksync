@@ -8,13 +8,14 @@ use zksync_types::event::ZkSyncEvent;
 use serde::de::{MapAccess, Visitor};
 use serde::{Deserialize, Deserializer};
 // Local uses
-use account::AccountFilter;
-use block::BlockFilter;
-use transaction::TransactionFilter;
+use self::{account::AccountFilter, block::BlockFilter, transaction::TransactionFilter};
 
 mod account;
 mod block;
 mod transaction;
+
+#[cfg(test)]
+mod tests;
 
 #[derive(Debug, Clone)]
 pub enum EventFilter {
@@ -52,7 +53,7 @@ impl<'de> Visitor<'de> for EventFiltersVisitor {
     type Value = HashMap<EventType, EventFilter>;
 
     fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-        formatter.write_str("a map of event interests")
+        formatter.write_str("map")
     }
 
     fn visit_map<M>(self, mut access: M) -> Result<Self::Value, M::Error>
