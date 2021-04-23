@@ -1,5 +1,6 @@
 // Built-in uses
 // Workspace uses
+use zksync_config::ZkSyncConfig;
 // External uses
 use actix::prelude::*;
 use actix_web::{web, App, Error, HttpRequest, HttpResponse, HttpServer};
@@ -26,27 +27,23 @@ async fn ws_index(
     ws::start(Subscriber::new(data.server_monitor.clone()), &req, stream)
 }
 
-pub fn run_event_server() {
-    let mut sys = actix_web::rt::System::new("event-server");
-
-    sys.block_on(async {
-        let server_monitor = ServerMonitor::new().start();
-        EventListener::new(server_monitor.clone())
-            .await
-            .unwrap()
-            .start();
-
-        let state = web::Data::new(AppState { server_monitor });
-
-        HttpServer::new(move || {
-            App::new()
-                .app_data(state.clone())
-                .route("/ws/", web::get().to(ws_index))
-        })
-        .bind("127.0.0.1:9999")
-        .unwrap()
-        .run()
+pub async fn run_event_server(config: ZkSyncConfig) {
+    let server_monitor = ServerMonitor::new().start();
+    EventListener::new(server_monitor.clone(), &config)
         .await
         .unwrap()
-    });
+        .start();
+
+    let state = web::Data::new(AppState { server_monitor });
+
+    HttpServer::new(move || {
+        App::new()
+            .app_data(state.clone())
+            .route("/", web::get().to(ws_index))
+    })
+    .bind(config.event_listener.ws_bind_addr())
+    .unwrap()
+    .run()
+    .await
+    .unwrap();
 }

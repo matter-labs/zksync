@@ -8,6 +8,3 @@ pool_size=10
 rejected_transactions_max_age=336
 # Sleep time (in hours) of the actor responsible for deleting failed transactions.
 rejected_transactions_cleaner_interval=24
-
-# Channel name to listen for event notifications on.
-listen_channel_name = "event_channel"

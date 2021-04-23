@@ -18,8 +18,6 @@ pub struct DBConfig {
     pub rejected_transactions_max_age: u64,
     /// Sleep time (in hours) of the actor responsible for deleting failed transactions from the database.
     pub rejected_transactions_cleaner_interval: u64,
-    /// Channel name to accept event notifications on.
-    pub listen_channel_name: String,
 }
 
 impl DBConfig {
@@ -49,7 +47,6 @@ mod tests {
             url: "postgres://postgres@localhost/plasma".into(),
             rejected_transactions_max_age: 336,
             rejected_transactions_cleaner_interval: 24,
-            listen_channel_name: "channel".into(),
         }
     }
 
@@ -60,7 +57,6 @@ DATABASE_POOL_SIZE="10"
 DATABASE_URL="postgres://postgres@localhost/plasma"
 DATABASE_REJECTED_TRANSACTIONS_MAX_AGE="336"
 DATABASE_REJECTED_TRANSACTIONS_CLEANER_INTERVAL="24"
-DATABASE_LISTEN_CHANNEL_NAME="channel"
         "#;
         set_env(config);
 

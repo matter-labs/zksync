@@ -4,8 +4,8 @@ use std::sync::Arc;
 use actix::prelude::*;
 use futures_util::stream::StreamExt;
 // Workspace uses
+use zksync_config::ZkSyncConfig;
 use zksync_storage::{listener::StorageListener, ConnectionPool};
-// use zksync_config::ZkSyncConfig;
 // Local uses
 use crate::messages::{NewEvents, NewStorageEvent};
 use crate::monitor::ServerMonitor;
@@ -69,7 +69,10 @@ impl Actor for EventListener {
 impl EventListener {
     const DB_POOL_SIZE: u32 = 1;
 
-    pub async fn new(server_monitor: Addr<ServerMonitor>) -> anyhow::Result<EventListener> {
+    pub async fn new(
+        server_monitor: Addr<ServerMonitor>,
+        config: &ZkSyncConfig,
+    ) -> anyhow::Result<EventListener> {
         let mut listener = StorageListener::connect().await?;
         let db_pool = ConnectionPool::new(Some(Self::DB_POOL_SIZE));
         let last_processed_event_id = db_pool
@@ -79,7 +82,9 @@ impl EventListener {
             .get_last_processed_event_id()
             .await?
             .unwrap_or(0);
-        listener.listen("event_channel").await?;
+
+        let channel_name = &config.event_listener.channel_name;
+        listener.listen(channel_name).await?;
 
         Ok(EventListener {
             db_pool,
