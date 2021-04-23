@@ -23,8 +23,7 @@ async fn ws_index(
     stream: web::Payload,
     data: web::Data<AppState>,
 ) -> Result<HttpResponse, Error> {
-    let resp = ws::start(Subscriber::new(data.server_monitor.clone()), &req, stream);
-    resp
+    ws::start(Subscriber::new(data.server_monitor.clone()), &req, stream)
 }
 
 pub fn run_event_server() {

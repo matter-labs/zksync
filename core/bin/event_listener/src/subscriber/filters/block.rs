@@ -22,6 +22,6 @@ impl BlockFilter {
                 return false;
             }
         }
-        return true;
+        true
     }
 }

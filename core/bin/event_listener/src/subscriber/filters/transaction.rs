@@ -44,6 +44,6 @@ impl TransactionFilter {
                 return false;
             }
         }
-        return true;
+        true
     }
 }

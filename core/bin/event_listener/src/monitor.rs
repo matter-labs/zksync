@@ -7,16 +7,14 @@ use actix::prelude::*;
 use crate::messages::*;
 use crate::subscriber::Subscriber;
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct ServerMonitor {
     addrs: HashSet<Addr<Subscriber>>,
 }
 
 impl ServerMonitor {
     pub fn new() -> Self {
-        Self {
-            addrs: HashSet::new(),
-        }
+        Self::default()
     }
 }
 

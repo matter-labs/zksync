@@ -42,6 +42,6 @@ impl AccountFilter {
                 return false;
             }
         }
-        return true;
+        true
     }
 }
