@@ -3,12 +3,11 @@
 pragma solidity ^0.7.0;
 
 import "./Config.sol";
-
-import "./Storage.sol";
+import "./Utils.sol";
 
 /// @title Governance Contract
 /// @author Matter Labs
-contract Governance is Config, Storage {
+contract Governance is Config {
     /// @notice Token added to Franklin net
     event NewToken(address indexed token, uint16 indexed tokenId);
 
@@ -46,6 +45,9 @@ contract Governance is Config, Storage {
 
     /// @notice Address that is authorized to add tokens to the Governance.
     address public tokenGovernance;
+
+    /// @notice NFT Creator address to factory address mapping
+    mapping(address => address) public NFTFactories;
 
     /// @notice Governance contract initialization. Can be external because Proxy contract intercepts illegal calls of this function.
     /// @param initializationParameters Encoded representation of initialization parameters:
