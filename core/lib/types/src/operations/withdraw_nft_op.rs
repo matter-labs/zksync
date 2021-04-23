@@ -19,6 +19,9 @@ pub struct WithdrawNFTOp {
     pub tx: WithdrawNFT,
     pub account_id: AccountId,
     pub creator_id: AccountId,
+    pub creator_address: Address,
+    pub content_hash: H256,
+    pub serial_id: u32,
 }
 
 impl WithdrawNFTOp {
@@ -29,8 +32,8 @@ impl WithdrawNFTOp {
     pub(crate) fn get_public_data(&self) -> Vec<u8> {
         let mut data = vec![Self::OP_CODE];
         data.extend_from_slice(&self.account_id.to_be_bytes());
-        data.extend_from_slice(&self.creator_id.to_be_bytes());
-        data.extend_from_slice(&self.tx.content_hash.as_bytes());
+        data.extend_from_slice(&self.creator_address.as_bytes());
+        data.extend_from_slice(&self.content_hash.as_bytes());
         data.extend_from_slice(&self.tx.token.to_be_bytes());
         data.extend_from_slice(&self.tx.fee_token.to_be_bytes());
         data.extend_from_slice(&pack_fee_amount(&self.tx.fee));
@@ -93,8 +96,6 @@ impl WithdrawNFTOp {
                 AccountId(account_id),
                 from,
                 to,
-                creator_address,
-                content_hash,
                 TokenId(token),
                 TokenId(token_fee),
                 fee,
@@ -104,6 +105,10 @@ impl WithdrawNFTOp {
             ),
             account_id: AccountId(account_id),
             creator_id: AccountId(creator_id),
+            creator_address,
+            content_hash,
+
+            serial_id: 0,
         })
     }
 

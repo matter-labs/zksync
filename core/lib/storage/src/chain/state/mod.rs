@@ -646,4 +646,23 @@ impl<'a, 'c> StateSchema<'a, 'c> {
         metrics::histogram!("sql.token.get_mint_nft_update", start.elapsed());
         Ok(nft.map(|p| p.into()))
     }
+    pub async fn load_committed_nft_tokens(
+        &mut self,
+        block_number: Option<BlockNumber>,
+    ) -> QueryResult<Vec<StorageMintNFTUpdate>> {
+        let tokens = if let Some(block_number) = block_number {
+            sqlx::query_as!(
+                StorageMintNFTUpdate,
+                "SELECT * FROM mint_nft_updates WHERE block_number <= $1",
+                block_number.0 as i64
+            )
+            .fetch_all(self.0.conn())
+            .await
+        } else {
+            sqlx::query_as!(StorageMintNFTUpdate, "SELECT * FROM mint_nft_updates")
+                .fetch_all(self.0.conn())
+                .await
+        };
+        Ok(tokens?)
+    }
 }

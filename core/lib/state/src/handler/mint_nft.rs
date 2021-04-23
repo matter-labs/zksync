@@ -127,6 +127,7 @@ impl TxHandler<MintNFT> for ZkSyncState {
                     token_id,
                     serial_id,
                     op.tx.creator_id,
+                    creator_account.address,
                     token_address,
                     None,
                     op.tx.content_hash,

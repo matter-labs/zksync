@@ -524,6 +524,72 @@
       ]
     }
   },
+  "1453c487619584da255ac032a521e5813934324f443d07d77cbf894e071202b5": {
+    "query": "SELECT * FROM mint_nft_updates",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "token_id",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 1,
+          "name": "block_number",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 2,
+          "name": "creator_account_id",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 3,
+          "name": "creator_address",
+          "type_info": "Bytea"
+        },
+        {
+          "ordinal": 4,
+          "name": "update_order_id",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 5,
+          "name": "serial_id",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 6,
+          "name": "address",
+          "type_info": "Bytea"
+        },
+        {
+          "ordinal": 7,
+          "name": "content_hash",
+          "type_info": "Bytea"
+        },
+        {
+          "ordinal": 8,
+          "name": "symbol",
+          "type_info": "Text"
+        }
+      ],
+      "parameters": {
+        "Left": []
+      },
+      "nullable": [
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false
+      ]
+    }
+  },
   "15faacf14edd991dedc35011ef12eefc5a04771a6b3f24a4c655f9259c9ea572": {
     "query": "SELECT * FROM account_balance_updates WHERE block_number > $1 AND block_number <= $2 ",
     "describe": {
@@ -1895,26 +1961,31 @@
         },
         {
           "ordinal": 3,
+          "name": "creator_address",
+          "type_info": "Bytea"
+        },
+        {
+          "ordinal": 4,
           "name": "update_order_id",
           "type_info": "Int4"
         },
         {
-          "ordinal": 4,
+          "ordinal": 5,
           "name": "serial_id",
           "type_info": "Int4"
         },
         {
-          "ordinal": 5,
+          "ordinal": 6,
           "name": "address",
           "type_info": "Bytea"
         },
         {
-          "ordinal": 6,
+          "ordinal": 7,
           "name": "content_hash",
           "type_info": "Bytea"
         },
         {
-          "ordinal": 7,
+          "ordinal": 8,
           "name": "symbol",
           "type_info": "Text"
         }
@@ -1925,6 +1996,7 @@
         ]
       },
       "nullable": [
+        false,
         false,
         false,
         false,
@@ -4507,26 +4579,31 @@
         },
         {
           "ordinal": 3,
+          "name": "creator_address",
+          "type_info": "Bytea"
+        },
+        {
+          "ordinal": 4,
           "name": "update_order_id",
           "type_info": "Int4"
         },
         {
-          "ordinal": 4,
+          "ordinal": 5,
           "name": "serial_id",
           "type_info": "Int4"
         },
         {
-          "ordinal": 5,
+          "ordinal": 6,
           "name": "address",
           "type_info": "Bytea"
         },
         {
-          "ordinal": 6,
+          "ordinal": 7,
           "name": "content_hash",
           "type_info": "Bytea"
         },
         {
-          "ordinal": 7,
+          "ordinal": 8,
           "name": "symbol",
           "type_info": "Text"
         }
@@ -4537,6 +4614,7 @@
         ]
       },
       "nullable": [
+        false,
         false,
         false,
         false,
@@ -4888,6 +4966,74 @@
       },
       "nullable": [
         null
+      ]
+    }
+  },
+  "fabb011dfd474fd56c71b7fb1707bbe586e66f9a45deac15b486845ba5c87979": {
+    "query": "SELECT * FROM mint_nft_updates WHERE block_number <= $1",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "token_id",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 1,
+          "name": "block_number",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 2,
+          "name": "creator_account_id",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 3,
+          "name": "creator_address",
+          "type_info": "Bytea"
+        },
+        {
+          "ordinal": 4,
+          "name": "update_order_id",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 5,
+          "name": "serial_id",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 6,
+          "name": "address",
+          "type_info": "Bytea"
+        },
+        {
+          "ordinal": 7,
+          "name": "content_hash",
+          "type_info": "Bytea"
+        },
+        {
+          "ordinal": 8,
+          "name": "symbol",
+          "type_info": "Text"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Int8"
+        ]
+      },
+      "nullable": [
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false
       ]
     }
   },

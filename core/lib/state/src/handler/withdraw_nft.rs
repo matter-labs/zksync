@@ -1,6 +1,6 @@
 use std::time::Instant;
 
-use anyhow::{ensure, format_err};
+use anyhow::{bail, ensure, format_err};
 use num::BigUint;
 
 use zksync_crypto::params::{self, max_account_id};
@@ -21,9 +21,6 @@ impl TxHandler<WithdrawNFT> for ZkSyncState {
             tx.token <= params::max_token_id() && tx.token >= TokenId(params::MIN_NFT_TOKEN_ID),
             "Token id is not supported"
         );
-        let (creator_id, _creator_account) = self
-            .get_account_by_address(&tx.creator)
-            .ok_or_else(|| format_err!("Account does not exist"))?;
         let (account_id, account) = self
             .get_account_by_address(&tx.from)
             .ok_or_else(|| format_err!("Account does not exist"))?;
@@ -39,13 +36,23 @@ impl TxHandler<WithdrawNFT> for ZkSyncState {
             account_id == tx.account_id,
             "Withdraw account id is incorrect"
         );
-        let withdraw_op = WithdrawNFTOp {
-            tx,
-            account_id,
-            creator_id,
-        };
+        if let Some(nft) = self.nfts.get(&tx.token) {
+            let (creator_id, _creator_account) = self
+                .get_account_by_address(&nft.creator_address)
+                .ok_or_else(|| format_err!("Account does not exist"))?;
+            let withdraw_op = WithdrawNFTOp {
+                tx,
+                account_id,
+                creator_id,
+                creator_address: nft.creator_address,
+                content_hash: nft.content_hash,
+                serial_id: nft.serial_id,
+            };
 
-        Ok(withdraw_op)
+            Ok(withdraw_op)
+        } else {
+            bail!("NFT was not found")
+        }
     }
 
     fn apply_tx(&mut self, tx: WithdrawNFT) -> Result<OpSuccess, anyhow::Error> {
