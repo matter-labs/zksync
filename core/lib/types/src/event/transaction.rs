@@ -1,7 +1,7 @@
 // Built-in uses
-use std::convert::TryFrom;
 // External uses
 use chrono::{DateTime, Utc};
+use once_cell::sync::OnceCell;
 use serde::{Deserialize, Serialize};
 // Workspace uses
 // Local uses
@@ -35,10 +35,11 @@ pub struct TransactionEvent {
     pub status: TransactionStatus,
     pub fail_reason: Option<String>,
     pub created_at: DateTime<Utc>,
-    /// This field is only used for filtering.
-    /// TODO: move to another type after removing deserializing
+    /// This field is lazily initialized and only used for filtering.
+    /// Since the event is shared among server worker threads, it has
+    /// to implement [std::marker::Sync], which is not the case for [std::cell::Cell].
     #[serde(skip)]
-    tx_type: Option<TransactionType>,
+    tx_type: OnceCell<TransactionType>,
 }
 
 impl TransactionEvent {
@@ -61,7 +62,7 @@ impl TransactionEvent {
                 },
                 fail_reason: exec_tx.fail_reason.clone(),
                 created_at: exec_tx.created_at,
-                tx_type: None,
+                tx_type: OnceCell::default(),
             },
             ExecutedOperations::PriorityOp(exec_prior_op) => Self {
                 tx_hash: exec_prior_op.priority_op.eth_hash.to_string(),
@@ -72,23 +73,14 @@ impl TransactionEvent {
                 status: TransactionStatus::Committed,
                 fail_reason: None,
                 created_at: exec_prior_op.created_at,
-                tx_type: None,
+                tx_type: OnceCell::default(),
             },
         }
     }
 
     pub fn tx_type(&self) -> TransactionType {
-        self.tx_type.unwrap()
-    }
-}
-
-impl TryFrom<serde_json::Value> for TransactionEvent {
-    type Error = serde_json::Error;
-
-    fn try_from(value: serde_json::Value) -> Result<Self, Self::Error> {
-        let mut tx_event: TransactionEvent = serde_json::from_value(value)?;
-        let tx_type = serde_json::from_value(tx_event.tx["type"].clone())?;
-        tx_event.tx_type = Some(tx_type);
-        Ok(tx_event)
+        *self
+            .tx_type
+            .get_or_init(|| serde_json::from_value(self.tx["type"].clone()).unwrap())
     }
 }

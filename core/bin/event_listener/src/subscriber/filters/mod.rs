@@ -2,7 +2,7 @@
 use std::collections::HashMap;
 use std::fmt;
 // Workspace uses
-use zksync_storage::event::{get_event_type, records::EventType};
+use zksync_storage::event::{get_event_type, EventType};
 use zksync_types::event::ZkSyncEvent;
 // External uses
 use serde::de::{MapAccess, Visitor};

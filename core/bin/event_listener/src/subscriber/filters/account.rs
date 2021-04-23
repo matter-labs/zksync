@@ -25,6 +25,8 @@ impl AccountFilter {
                 return false;
             }
         }
+        // If there's a filter for tokens, deny events that do not feature them.
+        // (Essentially, `CreateAccount` and `DeleteAccount`).
         if let Some(token_ids) = &self.tokens {
             let token_id = match account_event.account_update_details.token_id {
                 Some(token_id) => token_id,

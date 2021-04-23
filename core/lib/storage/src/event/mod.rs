@@ -16,10 +16,11 @@ use zksync_types::{
 };
 // Local uses
 use crate::{diff::StorageAccountDiff, QueryResult, StorageProcessor};
-use records::{EventType, StoredEvent};
+use records::StoredEvent;
 
 pub mod records;
-pub use records::get_event_type;
+
+pub use records::{get_event_type, EventType};
 
 #[derive(Debug)]
 pub struct EventSchema<'a, 'c>(pub &'a mut StorageProcessor<'c>);

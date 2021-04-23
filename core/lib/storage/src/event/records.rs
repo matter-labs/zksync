@@ -1,12 +1,10 @@
-use std::convert::TryFrom;
-
 // Built-in uses
 // External uses
 use serde::{Deserialize, Serialize};
 use serde_json::value::Value;
 use sqlx::FromRow;
 // Workspace uses
-use zksync_types::event::{transaction::TransactionEvent, EventData, ZkSyncEvent};
+use zksync_types::event::{EventData, ZkSyncEvent};
 // Local uses
 
 #[derive(sqlx::Type, Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -37,7 +35,7 @@ impl From<StoredEvent> for ZkSyncEvent {
                 EventData::Block(serde_json::from_value(stored_event.event_data).unwrap())
             }
             EventType::Transaction => {
-                EventData::Transaction(TransactionEvent::try_from(stored_event.event_data).unwrap())
+                EventData::Transaction(serde_json::from_value(stored_event.event_data).unwrap())
             }
         };
         Self { id, data }

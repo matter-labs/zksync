@@ -12,6 +12,7 @@ pub mod block;
 pub mod transaction;
 
 #[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "snake_case")]
 pub enum EventData {
     Account(AccountEvent),
     Block(BlockEvent),
