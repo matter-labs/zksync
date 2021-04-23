@@ -14,9 +14,6 @@ interface Events {
     /// @notice Event emitted when a block is verified
     event BlockVerification(uint32 indexed blockNumber);
 
-    /// @notice
-    event NFTFactoryRegistered(address indexed creatorAddress, address factoryAddress, bytes signature);
-
     /// @notice Event emitted when user funds are withdrawn from the zkSync contract
     event Withdrawal(uint16 indexed tokenId, uint128 amount);
 

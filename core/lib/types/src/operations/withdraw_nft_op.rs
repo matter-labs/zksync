@@ -17,7 +17,6 @@ use zksync_crypto::primitives::FromBytes;
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct WithdrawNFTOp {
     pub tx: WithdrawNFT,
-    pub account_id: AccountId,
     pub creator_id: AccountId,
     pub creator_address: Address,
     pub content_hash: H256,
@@ -31,7 +30,7 @@ impl WithdrawNFTOp {
 
     pub(crate) fn get_public_data(&self) -> Vec<u8> {
         let mut data = vec![Self::OP_CODE];
-        data.extend_from_slice(&self.account_id.to_be_bytes());
+        data.extend_from_slice(&self.tx.account_id.to_be_bytes());
         data.extend_from_slice(&self.creator_address.as_bytes());
         data.extend_from_slice(&self.content_hash.as_bytes());
         data.extend_from_slice(&self.tx.token.to_be_bytes());
@@ -103,16 +102,14 @@ impl WithdrawNFTOp {
                 time_range,
                 None,
             ),
-            account_id: AccountId(account_id),
             creator_id: AccountId(creator_id),
             creator_address,
             content_hash,
-
             serial_id: 0,
         })
     }
 
     pub fn get_updated_account_ids(&self) -> Vec<AccountId> {
-        vec![self.account_id]
+        vec![self.tx.account_id]
     }
 }

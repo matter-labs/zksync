@@ -42,7 +42,6 @@ impl TxHandler<WithdrawNFT> for ZkSyncState {
                 .ok_or_else(|| format_err!("Account does not exist"))?;
             let withdraw_op = WithdrawNFTOp {
                 tx,
-                account_id,
                 creator_id,
                 creator_address: nft.creator_address,
                 content_hash: nft.content_hash,
@@ -72,7 +71,7 @@ impl TxHandler<WithdrawNFT> for ZkSyncState {
     ) -> Result<(Option<CollectedFee>, AccountUpdates), anyhow::Error> {
         let start = Instant::now();
         ensure!(
-            op.account_id <= max_account_id(),
+            op.tx.account_id <= max_account_id(),
             "Withdraw account id is bigger than max supported"
         );
         ensure!(
@@ -81,7 +80,7 @@ impl TxHandler<WithdrawNFT> for ZkSyncState {
         );
 
         let mut updates = Vec::new();
-        let mut from_account = self.get_account(op.account_id).unwrap();
+        let mut from_account = self.get_account(op.tx.account_id).unwrap();
 
         let from_old_balance = from_account.get_balance(op.tx.token);
         let from_old_nonce = from_account.nonce;
@@ -100,7 +99,7 @@ impl TxHandler<WithdrawNFT> for ZkSyncState {
 
         // Withdraw nft
         updates.push((
-            op.account_id,
+            op.tx.account_id,
             AccountUpdate::UpdateBalance {
                 balance_update: (op.tx.token, from_old_balance, from_new_balance),
                 old_nonce: from_old_nonce,
@@ -114,7 +113,7 @@ impl TxHandler<WithdrawNFT> for ZkSyncState {
         ensure!(from_old_balance >= op.tx.fee, "Not enough balance");
         // Pay fee
         updates.push((
-            op.account_id,
+            op.tx.account_id,
             AccountUpdate::UpdateBalance {
                 balance_update: (op.tx.fee_token, from_old_balance, from_new_balance),
                 old_nonce: from_new_nonce,
@@ -122,7 +121,7 @@ impl TxHandler<WithdrawNFT> for ZkSyncState {
             },
         ));
 
-        self.insert_account(op.account_id, from_account);
+        self.insert_account(op.tx.account_id, from_account);
 
         let fee = CollectedFee {
             token: op.tx.fee_token,
