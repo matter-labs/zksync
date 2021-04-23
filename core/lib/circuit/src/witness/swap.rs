@@ -11,7 +11,7 @@ use zksync_crypto::franklin_crypto::{
 use zksync_crypto::{
     circuit::{
         account::CircuitAccountTree,
-        utils::{append_be_fixed_width, le_bit_vector_into_field_element},
+        utils::{append_be_fixed_width, eth_address_to_fr, le_bit_vector_into_field_element},
     },
     params::{
         account_tree_depth, ACCOUNT_ID_BIT_WIDTH, AMOUNT_EXPONENT_BIT_WIDTH,
@@ -34,7 +34,7 @@ use crate::{
 #[derive(Debug)]
 pub struct OrderData {
     pub account: u32,
-    pub nonce: Fr,
+    pub nonce: u32,
     pub recipient: u32,
     pub amount: u128,
     pub price_sell: u128,
@@ -52,7 +52,7 @@ pub struct SwapData {
     pub fee_token: u32,
     pub submitter: u32,
     pub submitter_address: Fr,
-    pub nonce: Fr,
+    pub nonce: u32,
 }
 
 pub struct SwapWitness<E: RescueEngine> {
@@ -79,7 +79,7 @@ impl Witness for SwapWitness<Bn256> {
             price_buy: swap.tx.orders.0.price.1.to_u128().unwrap(),
             valid_from: swap.tx.orders.0.time_range.valid_from,
             valid_until: swap.tx.orders.0.time_range.valid_until,
-            nonce: fr_from(swap.tx.orders.0.nonce),
+            nonce: *swap.tx.orders.0.nonce,
         };
 
         let order_1 = OrderData {
@@ -90,7 +90,7 @@ impl Witness for SwapWitness<Bn256> {
             price_buy: swap.tx.orders.1.price.1.to_u128().unwrap(),
             valid_from: swap.tx.orders.1.time_range.valid_from,
             valid_until: swap.tx.orders.1.time_range.valid_until,
-            nonce: fr_from(swap.tx.orders.1.nonce),
+            nonce: *swap.tx.orders.1.nonce,
         };
 
         let swap_data = SwapData {
@@ -106,8 +106,8 @@ impl Witness for SwapWitness<Bn256> {
             fee_token: *swap.tx.fee_token as u32,
             orders: (order_0, order_1),
             submitter: *swap.submitter as u32,
-            submitter_address: fr_from(swap.tx.submitter_address),
-            nonce: fr_from(swap.tx.nonce),
+            submitter_address: eth_address_to_fr(&swap.tx.submitter_address),
+            nonce: *swap.tx.nonce,
         };
 
         Self::apply_data(tree, &swap_data)
@@ -125,7 +125,7 @@ impl Witness for SwapWitness<Bn256> {
         );
         append_be_fixed_width(
             &mut pubdata_bits,
-            &self.recipients.0[0].address.unwrap(),
+            &self.recipients.1[0].address.unwrap(),
             ACCOUNT_ID_BIT_WIDTH,
         );
         append_be_fixed_width(
@@ -135,7 +135,7 @@ impl Witness for SwapWitness<Bn256> {
         );
         append_be_fixed_width(
             &mut pubdata_bits,
-            &self.recipients.1[0].address.unwrap(),
+            &self.recipients.0[0].address.unwrap(),
             ACCOUNT_ID_BIT_WIDTH,
         );
         append_be_fixed_width(
@@ -210,7 +210,7 @@ impl Witness for SwapWitness<Bn256> {
                     ..self.args.clone()
                 },
                 lhs: self.accounts.0[0].clone(),
-                rhs: self.recipients.1[0].clone(),
+                rhs: self.recipients.0[0].clone(),
             },
             Operation {
                 new_root: self.roots[1],
@@ -228,7 +228,7 @@ impl Witness for SwapWitness<Bn256> {
                     ..self.args.clone()
                 },
                 lhs: self.accounts.0[1].clone(),
-                rhs: self.recipients.1[1].clone(),
+                rhs: self.recipients.0[1].clone(),
             },
             Operation {
                 new_root: self.roots[2],
@@ -246,7 +246,7 @@ impl Witness for SwapWitness<Bn256> {
                     ..self.args.clone()
                 },
                 lhs: self.accounts.1[0].clone(),
-                rhs: self.recipients.0[0].clone(),
+                rhs: self.recipients.1[0].clone(),
             },
             Operation {
                 new_root: self.roots[3],
@@ -264,7 +264,7 @@ impl Witness for SwapWitness<Bn256> {
                     ..self.args.clone()
                 },
                 lhs: self.accounts.1[1].clone(),
-                rhs: self.recipients.0[1].clone(),
+                rhs: self.recipients.1[1].clone(),
             },
             Operation {
                 new_root: self.roots[4],
@@ -294,7 +294,7 @@ impl SwapWitness<Bn256> {
         // b = 0 if orders.1.amount == 0 else 1
         // nonce_mask = a | (b << 1)
         let mut nonce_mask = Fr::zero();
-        nonce_mask.add_assign(&nonce_increment(&self.args.special_amounts[3]));
+        nonce_mask.add_assign(&nonce_increment(&self.args.special_amounts[1]));
         nonce_mask.double();
         nonce_mask.add_assign(&nonce_increment(&self.args.special_amounts[0]));
         nonce_mask
@@ -495,7 +495,7 @@ impl SwapWitness<Bn256> {
                 vec![
                     OperationBranch {
                         address: Some(recipient_1_fe),
-                        token: Some(token_1_fe),
+                        token: Some(token_0_fe),
                         witness: OperationBranchWitness {
                             account_witness: witnesses[3].0.clone(),
                             balance_value: Some(witnesses[3].2),
@@ -505,7 +505,7 @@ impl SwapWitness<Bn256> {
                     },
                     OperationBranch {
                         address: Some(recipient_1_fe),
-                        token: Some(token_1_fe),
+                        token: Some(token_0_fe),
                         witness: OperationBranchWitness {
                             account_witness: witnesses[3].0.clone(),
                             balance_value: Some(witnesses[3].2),
@@ -517,7 +517,7 @@ impl SwapWitness<Bn256> {
                 vec![
                     OperationBranch {
                         address: Some(recipient_0_fe),
-                        token: Some(token_0_fe),
+                        token: Some(token_1_fe),
                         witness: OperationBranchWitness {
                             account_witness: witnesses[1].0.clone(),
                             balance_value: Some(witnesses[1].2),
@@ -527,7 +527,7 @@ impl SwapWitness<Bn256> {
                     },
                     OperationBranch {
                         address: Some(recipient_0_fe),
-                        token: Some(token_0_fe),
+                        token: Some(token_1_fe),
                         witness: OperationBranchWitness {
                             account_witness: witnesses[1].0.clone(),
                             balance_value: Some(witnesses[1].2),

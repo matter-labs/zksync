@@ -12,7 +12,7 @@ use serde::{Deserialize, Serialize};
 use zksync_basic_types::Address;
 use zksync_crypto::{
     franklin_crypto::eddsa::PrivateKey,
-    params::{max_account_id, max_token_id},
+    params::{max_account_id, max_token_id, PRICE_BIT_WIDTH},
     primitives::rescue_hash_tx_msg,
 };
 use zksync_utils::{format_units, BigUintPairSerdeAsRadix10Str, BigUintSerdeAsRadix10Str};
@@ -74,13 +74,43 @@ impl Order {
     }
 
     pub fn check_correctness(&self) -> bool {
-        self.price.0 <= BigUint::from(u128::max_value())
-            && self.price.1 <= BigUint::from(u128::max_value())
+        self.price.0 < BigUint::from(1u128 << PRICE_BIT_WIDTH)
+            && self.price.1 <= BigUint::from(1u128 << PRICE_BIT_WIDTH)
             && self.account_id <= max_account_id()
             && self.recipient_id <= max_account_id()
             && self.token_buy <= max_token_id()
             && self.token_sell <= max_token_id()
             && self.time_range.check_correctness()
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    pub fn new_signed(
+        account_id: AccountId,
+        recipient_id: AccountId,
+        nonce: Nonce,
+        token_sell: TokenId,
+        token_buy: TokenId,
+        price: (BigUint, BigUint),
+        amount: BigUint,
+        time_range: TimeRange,
+        private_key: &PrivateKey<Engine>,
+    ) -> Result<Self, anyhow::Error> {
+        let mut tx = Self {
+            account_id,
+            recipient_id,
+            nonce,
+            token_buy,
+            token_sell,
+            price,
+            amount,
+            time_range,
+            signature: Default::default(),
+        };
+        tx.signature = TxSignature::sign_musig(private_key, &tx.get_bytes());
+        if !tx.check_correctness() {
+            anyhow::bail!(crate::tx::TRANSACTION_SIGNATURE_ERROR);
+        }
+        Ok(tx)
     }
 }
 

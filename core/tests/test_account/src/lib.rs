@@ -11,7 +11,8 @@ use zksync_types::{
         ChangePubKey, ChangePubKeyCREATE2Data, ChangePubKeyECDSAData, ChangePubKeyEthAuthData,
         ChangePubKeyType, PackedEthSignature, TimeRange, TxSignature,
     },
-    AccountId, Address, Close, ForcedExit, Nonce, PubKeyHash, TokenId, Transfer, Withdraw,
+    AccountId, Address, Close, ForcedExit, Nonce, Order, PubKeyHash, Swap, TokenId, Transfer,
+    Withdraw,
 };
 
 #[derive(Debug, Clone)]
@@ -138,6 +139,83 @@ impl ZkSyncAccount {
 
     pub fn get_account_id(&self) -> Option<AccountId> {
         *self.account_id.lock().unwrap()
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    pub fn sign_order(
+        &self,
+        token_sell: TokenId,
+        token_buy: TokenId,
+        price_sell: BigUint,
+        price_buy: BigUint,
+        amount: BigUint,
+        recipient: AccountId,
+        nonce: Option<Nonce>,
+        increment_nonce: bool,
+        time_range: TimeRange,
+    ) -> Order {
+        let mut stored_nonce = self.nonce.lock().unwrap();
+        let order = Order::new_signed(
+            self.get_account_id()
+                .expect("can't sign tx without account id"),
+            recipient,
+            nonce.unwrap_or_else(|| *stored_nonce),
+            token_sell,
+            token_buy,
+            (price_sell, price_buy),
+            amount,
+            time_range,
+            &self.private_key,
+        )
+        .expect("Failed to sign transfer");
+
+        if increment_nonce {
+            **stored_nonce += 1;
+        }
+
+        order
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    pub fn sign_swap(
+        &self,
+        orders: (Order, Order),
+        amounts: (BigUint, BigUint),
+        nonce: Option<Nonce>,
+        increment_nonce: bool,
+        fee_token: TokenId,
+        fee_token_symbol: &str,
+        fee: BigUint,
+    ) -> (Swap, Option<PackedEthSignature>) {
+        let mut stored_nonce = self.nonce.lock().unwrap();
+        let swap = Swap::new_signed(
+            self.get_account_id()
+                .expect("can't sign tx without account id"),
+            self.address,
+            nonce.unwrap_or_else(|| *stored_nonce),
+            orders,
+            amounts,
+            fee,
+            fee_token,
+            &self.private_key,
+        )
+        .expect("Failed to sign transfer");
+
+        if increment_nonce {
+            **stored_nonce += 1;
+        }
+
+        let eth_signature =
+            if let ZkSyncETHAccountData::EOA { eth_private_key } = &self.eth_account_data {
+                let message = swap.get_ethereum_sign_message(fee_token_symbol, 18);
+                Some(
+                    PackedEthSignature::sign(&eth_private_key, &message.as_bytes())
+                        .expect("Signing the transfer unexpectedly failed"),
+                )
+            } else {
+                None
+            };
+        (swap, eth_signature)
     }
 
     #[allow(clippy::too_many_arguments)]
