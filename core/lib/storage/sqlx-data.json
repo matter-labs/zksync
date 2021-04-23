@@ -3113,6 +3113,24 @@
       "nullable": []
     }
   },
+  "99b1aad6f25729e9189706d99c87b8487788b2de0a4ed7915d4f49daf37b62dc": {
+    "query": "SELECT COUNT(*) from mempool_txs",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "count",
+          "type_info": "Int8"
+        }
+      ],
+      "parameters": {
+        "Left": []
+      },
+      "nullable": [
+        null
+      ]
+    }
+  },
   "9aeeb5e20f4f34d4b4e1987f1bf0a23ee931f12da071b134225069d32c1896de": {
     "query": "SELECT * FROM pending_block\n            ORDER BY number DESC\n            LIMIT 1",
     "describe": {

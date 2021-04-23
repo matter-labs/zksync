@@ -7,6 +7,7 @@ use zksync_types::network::Network;
 pub mod block;
 pub mod fee;
 pub mod pagination;
+pub mod status;
 pub mod token;
 pub mod transaction;
 

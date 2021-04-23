@@ -19,6 +19,7 @@ mod fee;
 mod paginate_impl;
 mod paginate_trait;
 mod response;
+mod status;
 #[cfg(test)]
 pub mod test_utils;
 mod token;
@@ -42,6 +43,7 @@ pub(crate) fn api_scope(tx_sender: TxSender, zk_config: &ZkSyncConfig) -> Scope 
         ))
         .service(config::api_scope(&zk_config))
         .service(fee::api_scope(tx_sender.clone()))
+        .service(status::api_scope(tx_sender.pool.clone()))
         .service(token::api_scope(
             &zk_config,
             tx_sender.pool.clone(),

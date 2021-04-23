@@ -399,4 +399,17 @@ impl<'a, 'c> MempoolSchema<'a, 'c> {
         metrics::histogram!("sql.chain.mempool.collect_garbage", start.elapsed());
         Ok(())
     }
+
+    /// Returns mempool size.
+    pub async fn get_mempool_size(&mut self) -> QueryResult<u32> {
+        let start = Instant::now();
+
+        let size = sqlx::query!("SELECT COUNT(*) from mempool_txs")
+            .fetch_one(self.0.conn())
+            .await?
+            .count;
+
+        metrics::histogram!("sql.chain", start.elapsed(), "mempool" => "get_mempool_size");
+        Ok(size.unwrap_or(0) as u32)
+    }
 }

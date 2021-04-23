@@ -186,7 +186,9 @@ mod tests {
         test_utils::{deserialize_response_result, TestServerConfig},
         SharedData,
     };
-    use zksync_api_types::v02::{pagination::PaginationDirection, ApiVersion};
+    use zksync_api_types::v02::{
+        pagination::PaginationDirection, transaction::TransactionData, ApiVersion,
+    };
 
     #[actix_rt::test]
     #[cfg_attr(
@@ -266,7 +268,9 @@ mod tests {
             assert_eq!(tx.created_at, Some(expected_tx.created_at));
             assert_eq!(*tx.block_number.unwrap(), expected_tx.block_number as u32);
             assert_eq!(tx.fail_reason, expected_tx.fail_reason);
-            //assert_eq!(tx.op, expected_tx.op);
+            if matches!(tx.op, TransactionData::L2(_)) {
+                assert_eq!(serde_json::to_value(tx.op).unwrap(), expected_tx.op);
+            }
         }
 
         server.stop().await;
