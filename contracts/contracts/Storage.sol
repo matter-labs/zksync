@@ -157,6 +157,4 @@ contract Storage {
     /// @dev Used when user wants to reset `authFacts` for some nonce.
     mapping(address => mapping(uint32 => uint256)) internal authFactsResetTimer;
 
-    /// @notice NFT Creator address to factory address mapping
-    mapping(address => address) public NFTFactories;
 }
