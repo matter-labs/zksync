@@ -16,6 +16,7 @@ pub use self::{
     transfer_to_new::TransferToNewWitness,
     utils::{SigDataInput, WitnessBuilder},
     withdraw::WithdrawWitness,
+    withdraw_nft::WithdrawNFTWitness,
 };
 
 pub mod change_pubkey_offchain;

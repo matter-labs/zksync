@@ -43,6 +43,8 @@ pub struct WithdrawNFTData {
     pub content_hash: H256,
     pub token: u32,
     pub to_address: Fr,
+    pub valid_from: u64,
+    pub valid_until: u64,
 }
 
 pub struct WithdrawNFTWitness<E: RescueEngine> {
@@ -65,15 +67,18 @@ impl Witness for WithdrawNFTWitness<Bn256> {
     type CalculateOpsInput = SigDataInput;
 
     fn apply_tx(tree: &mut CircuitAccountTree, withdraw_nft: &WithdrawNFTOp) -> Self {
+        let time_range = withdraw_nft.tx.time_range;
         let withdraw_nft_data = WithdrawNFTData {
             fee: withdraw_nft.tx.fee.to_u128().unwrap(),
             fee_token: *withdraw_nft.tx.fee_token as u32,
             initiator_account_id: *withdraw_nft.tx.account_id,
             creator_account_id: *withdraw_nft.creator_id,
-            nft_serial_id: 0,              // todo!()
-            content_hash: H256::default(), // todo!()
+            nft_serial_id: withdraw_nft.serial_id,
+            content_hash: withdraw_nft.content_hash,
             token: *withdraw_nft.tx.token as u32,
             to_address: eth_address_to_fr(&withdraw_nft.tx.to),
+            valid_from: time_range.valid_from,
+            valid_until: time_range.valid_until,
         };
         Self::apply_data(tree, &withdraw_nft_data)
     }
@@ -243,6 +248,9 @@ impl WithdrawNFTWitness<Bn256> {
         .unwrap();
         let fee_encoded: Fr = le_bit_vector_into_field_element(&fee_bits);
 
+        let valid_from = withdraw_nft.valid_from;
+        let valid_until = withdraw_nft.valid_until;
+
         let before_first_chunk_root = tree.root_hash();
         vlog::debug!("Initial root = {}", before_first_chunk_root);
 
@@ -378,8 +386,8 @@ impl WithdrawNFTWitness<Bn256> {
                 a: Some(a),
                 b: Some(b),
                 new_pub_key_hash: Some(Fr::zero()),
-                valid_from: Some(Fr::zero()),
-                valid_until: Some(Fr::from_str(&u32::MAX.to_string()).unwrap()),
+                valid_from: Some(Fr::from_str(&valid_from.to_string()).unwrap()),
+                valid_until: Some(Fr::from_str(&valid_until.to_string()).unwrap()),
 
                 special_eth_addresses: vec![
                     Some(withdraw_nft.to_address),
@@ -429,11 +437,7 @@ impl WithdrawNFTWitness<Bn256> {
                 },
             },
             creator_account_fourth_chunk: OperationBranch {
-                address: Some(
-                    creator_account_witness_fourth_chunk
-                        .address
-                        .expect("creator account should not be empty"),
-                ),
+                address: Some(creator_account_id_fe),
                 token: Some(Fr::zero()),
                 witness: OperationBranchWitness {
                     account_witness: creator_account_witness_fourth_chunk,

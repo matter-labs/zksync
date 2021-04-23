@@ -1055,6 +1055,7 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
                 &op_data,
                 &signer_key,
                 &ext_pubdata_chunk,
+                &is_valid_timestamp,
                 &signature_data.is_verified,
                 &mut previous_pubdatas[WithdrawNFTOp::OP_CODE as usize],
                 is_special_nft_storage_account,
@@ -2249,6 +2250,7 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
         op_data: &AllocatedOperationData<E>,
         signer_key: &AllocatedSignerPubkey<E>,
         ext_pubdata_chunk: &AllocatedNum<E>,
+        is_valid_timestamp: &Boolean,
         is_sig_verified: &Boolean,
         pubdata_holder: &mut Vec<AllocatedNum<E>>,
         is_special_nft_storage_account: &Boolean,
@@ -2339,6 +2341,7 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
                 pubdata_properly_copied,
                 is_pubdata_chunk_correct,
                 is_withdraw_nft_operation,
+                is_valid_timestamp.clone(),
             ],
         )?;
 
@@ -2369,6 +2372,8 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
             serialized_tx_bits.extend(cur.token.get_bits_be()); // fee_token
             serialized_tx_bits.extend(op_data.fee_packed.get_bits_be()); // fee
             serialized_tx_bits.extend(cur.account.nonce.get_bits_be()); // nonce
+            serialized_tx_bits.extend(op_data.valid_from.get_bits_be()); // valid_from
+            serialized_tx_bits.extend(op_data.valid_until.get_bits_be()); // valid_until
             assert_eq!(serialized_tx_bits.len(), SIGNED_WITHDRAW_NFT_BIT_WIDTH);
 
             let is_serialized_tx_correct = verify_signature_message_construction(

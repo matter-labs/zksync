@@ -27,7 +27,8 @@ use zksync_state::state::CollectedFee;
 use zksync_types::{
     block::Block,
     operations::{
-        ChangePubKeyOp, CloseOp, ForcedExitOp, MintNFTOp, TransferOp, TransferToNewOp, WithdrawOp,
+        ChangePubKeyOp, CloseOp, ForcedExitOp, MintNFTOp, TransferOp, TransferToNewOp,
+        WithdrawNFTOp, WithdrawOp,
     },
     tx::PackedPublicKey,
     AccountId, BlockNumber, ZkSyncOp,
@@ -635,6 +636,20 @@ impl SigDataInput {
             &sign_packed,
             &mint_nft_op.tx.get_bytes(),
             &mint_nft_op.tx.signature.pub_key,
+        )
+    }
+
+    pub fn from_withdraw_nft_op(withdraw_nft_op: &WithdrawNFTOp) -> Result<Self, anyhow::Error> {
+        let sign_packed = withdraw_nft_op
+            .tx
+            .signature
+            .signature
+            .serialize_packed()
+            .expect("signature serialize");
+        SigDataInput::new(
+            &sign_packed,
+            &withdraw_nft_op.tx.get_bytes(),
+            &withdraw_nft_op.tx.signature.pub_key,
         )
     }
 
