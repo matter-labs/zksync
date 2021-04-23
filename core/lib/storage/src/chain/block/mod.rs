@@ -238,7 +238,7 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
                     tx_hash as "tx_hash!",
                     block_number as "block_number!",
                     op as "op!",
-                    success as "success?",
+                    success as "success!",
                     fail_reason as "fail_reason?",
                     created_at as "created_at!"
                 FROM everything
@@ -1037,25 +1037,15 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
                 sqlx::query_as!(
                     BlockTransactionItem,
                     r#"
-                        WITH transactions AS (
-                            SELECT
-                                '0x' || encode(tx_hash, 'hex') as tx_hash,
-                                tx as op,
-                                block_number,
-                                success,
-                                fail_reason,
-                                created_at
-                            FROM executed_transactions
-                            WHERE block_number = $1 AND created_at >= $2
-                        )
                         SELECT
-                            tx_hash as "tx_hash!",
-                            block_number as "block_number!",
-                            op as "op!",
-                            success as "success?",
-                            fail_reason as "fail_reason?",
-                            created_at as "created_at!"
-                        FROM transactions
+                            '0x' || encode(tx_hash, 'hex') as "tx_hash!",
+                            tx as op,
+                            block_number,
+                            success,
+                            fail_reason,
+                            created_at
+                        FROM executed_transactions
+                        WHERE block_number = $1 AND created_at >= $2
                         ORDER BY created_at ASC
                         LIMIT $3
                     "#,
@@ -1085,7 +1075,7 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
                             tx_hash as "tx_hash!",
                             block_number as "block_number!",
                             op as "op!",
-                            success as "success?",
+                            success as "success!",
                             fail_reason as "fail_reason?",
                             created_at as "created_at!"
                         FROM transactions
@@ -1114,7 +1104,7 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
         let txs: Vec<Transaction> = raw_txs
             .into_iter()
             .map(|tx| {
-                let status = if tx.success.unwrap_or(false) {
+                let status = if tx.success {
                     if is_block_finalized {
                         L2Status::Finalized
                     } else {
