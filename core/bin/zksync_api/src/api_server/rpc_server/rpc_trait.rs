@@ -9,7 +9,7 @@ use jsonrpc_derive::rpc;
 use zksync_crypto::params::ZKSYNC_VERSION;
 use zksync_types::{
     tx::{EthBatchSignatures, TxEthSignature, TxHash},
-    Address, BatchFee, Fee, Token, TokenLike, TxFeeTypes, ZkSyncTx,
+    Address, Fee, Token, TokenLike, TotalFee, TxFeeTypes, ZkSyncTx,
 };
 
 // Local uses
@@ -60,13 +60,13 @@ pub trait Rpc {
     ) -> FutureResp<Fee>;
 
     // _addresses argument is left for the backward compatibility.
-    #[rpc(name = "get_txs_batch_fee_in_wei", returns = "BatchFee")]
+    #[rpc(name = "get_txs_batch_fee_in_wei", returns = "TotalFee")]
     fn get_txs_batch_fee_in_wei(
         &self,
         tx_types: Vec<TxFeeTypes>,
         _addresses: Vec<Address>,
         token_like: TokenLike,
-    ) -> FutureResp<BatchFee>;
+    ) -> FutureResp<TotalFee>;
 
     #[rpc(name = "get_token_price", returns = "BigDecimal")]
     fn get_token_price(&self, token_like: TokenLike) -> FutureResp<BigDecimal>;
@@ -177,7 +177,7 @@ impl Rpc for RpcApp {
         tx_types: Vec<TxFeeTypes>,
         addresses: Vec<Address>,
         token_like: TokenLike,
-    ) -> FutureResp<BatchFee> {
+    ) -> FutureResp<TotalFee> {
         let handle = self.runtime_handle.clone();
         let self_ = self.clone();
         let resp = async move {
