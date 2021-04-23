@@ -4,11 +4,16 @@ pragma solidity ^0.7.0;
 
 import "./Config.sol";
 
+import "./Storage.sol";
+
 /// @title Governance Contract
 /// @author Matter Labs
-contract Governance is Config {
+contract Governance is Config, Storage {
     /// @notice Token added to Franklin net
     event NewToken(address indexed token, uint16 indexed tokenId);
+
+    /// @notice
+    event NFTFactoryRegistered(address indexed creatorAddress, address factoryAddress, bytes signature);
 
     /// @notice Governor changed
     event NewGovernor(address newGovernor);
@@ -141,5 +146,27 @@ contract Governance is Config {
         uint16 tokenId = tokenIds[_tokenAddr];
         require(tokenId != 0, "1i"); // 0 is not a valid token
         return tokenId;
+    }
+
+    /// @notice Registers creator corresponding to the factory
+    /// @param _creatorAddress NFT creator address
+    /// @param _signature creator's signature
+    function registerNFTFactory(address _creatorAddress, bytes memory _signature) external {
+        require(NFTFactories[_creatorAddress] == address(0), "Q");
+        bytes32 messageHash =
+            keccak256(
+                abi.encodePacked(
+                    "\x19Ethereum Signed Message:\n60",
+                    "\nCreator:",
+                    _creatorAddress,
+                    "\nFactory:",
+                    msg.sender
+                )
+            );
+        address recoveredAddress = Utils.recoverAddressFromEthSignature(_signature, messageHash);
+        if (recoveredAddress == _creatorAddress && recoveredAddress != address(0)) {
+            NFTFactories[_creatorAddress] = msg.sender;
+            emit NFTFactoryRegistered(_creatorAddress, msg.sender, _signature);
+        }
     }
 }
