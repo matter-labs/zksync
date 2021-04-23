@@ -208,7 +208,7 @@ fn apply_many_ops() -> ZkSyncCircuit<'static, Bn256> {
             .0,
         account_id: accounts[3].id,
         creator_id: accounts[2].id,
-        creator_address: accounts[2].zksync_account.address,
+        creator_address: accounts[2].account.address,
         content_hash: nft_content_hash,
         serial_id: 0,
     };

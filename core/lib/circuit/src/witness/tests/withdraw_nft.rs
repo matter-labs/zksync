@@ -1,6 +1,12 @@
 // External deps
 use num::BigUint;
-use zksync_crypto::params::{MIN_NFT_TOKEN_ID, NFT_STORAGE_ACCOUNT_ID, NFT_TOKEN_ID};
+use zksync_crypto::franklin_crypto::bellman::pairing::{
+    bn256::{Bn256, Fr},
+    ff::Field,
+};
+use zksync_crypto::params::{
+    CONTENT_HASH_WIDTH, MIN_NFT_TOKEN_ID, NFT_STORAGE_ACCOUNT_ID, NFT_TOKEN_ID,
+};
 // Workspace deps
 use zksync_state::{handler::TxHandler, state::ZkSyncState};
 use zksync_types::{
@@ -8,17 +14,19 @@ use zksync_types::{
     AccountId, BlockNumber, MintNFT, TokenId, WithdrawNFT, H256,
 };
 // Local deps
-use crate::witness::{
-    tests::test_utils::{check_circuit, WitnessTestAccount, ZkSyncStateGenerator, FEE_ACCOUNT_ID},
-    utils::{SigDataInput, WitnessBuilder},
-    MintNFTWitness, WithdrawNFTWitness, Witness,
+use crate::{
+    circuit::ZkSyncCircuit,
+    witness::{
+        tests::test_utils::{
+            check_circuit, check_circuit_non_panicking, WitnessTestAccount, ZkSyncStateGenerator,
+            FEE_ACCOUNT_ID,
+        },
+        utils::{SigDataInput, WitnessBuilder},
+        MintNFTWitness, WithdrawNFTWitness, Witness,
+    },
 };
 
-/// Basic check for execution of `WithdrawNFT` operation in circuit.
-/// Here we create two accounts and perform mintNFT and withdrawNFT operations.
-#[test]
-#[ignore]
-fn test_mint_and_withdraw_nft() {
+fn apply_nft_mint_and_withdraw_operations() -> ZkSyncCircuit<'static, Bn256> {
     let accounts = vec![
         WitnessTestAccount::new(AccountId(1), 10u64), // nft creator account
         WitnessTestAccount::new(AccountId(2), 10u64), // account to withdraw nft
@@ -68,7 +76,7 @@ fn test_mint_and_withdraw_nft() {
             .0,
         account_id: accounts[1].id,
         creator_id: accounts[0].id,
-        creator_address: accounts[0].zksync_account.address,
+        creator_address: accounts[0].account.address,
         content_hash: nft_content_hash,
         serial_id: 0,
     };
@@ -134,6 +142,77 @@ fn test_mint_and_withdraw_nft() {
         "root hash in state keeper and witness generation code mismatch"
     );
 
+    witness_accum.into_circuit_instance()
+}
+
+/// Basic check for execution of `WithdrawNFT` operation in circuit.
+/// Here we create two accounts and perform mintNFT and withdrawNFT operations.
+#[test]
+#[ignore]
+fn test_mint_and_withdraw_nft() {
+    let circuit = apply_nft_mint_and_withdraw_operations();
+
     // Verify that there are no unsatisfied constraints
-    check_circuit(witness_accum.into_circuit_instance());
+    check_circuit(circuit);
+}
+
+/// Checks that executing a withdrawNFT operation with
+/// incorrect content_hash results in an error.
+#[test]
+#[ignore]
+fn test_withdraw_nft_with_incorrect_content_hash() {
+    const ERR_MSG: &str = "chunk number 7/execute_op/op_valid is true/enforce equal to one";
+
+    let mut circuit = apply_nft_mint_and_withdraw_operations();
+    for operation_id in MintNFTOp::CHUNKS..MintNFTOp::CHUNKS + WithdrawNFTOp::CHUNKS {
+        circuit.operations[operation_id].args.special_content_hash =
+            vec![Some(Fr::zero()); CONTENT_HASH_WIDTH];
+    }
+
+    let result = check_circuit_non_panicking(circuit);
+    match result {
+        Ok(_) => panic!(
+            "Operation did not err, but was expected to err with message '{}'",
+            ERR_MSG,
+        ),
+        Err(error_msg) => {
+            assert!(
+                error_msg.contains(ERR_MSG),
+                "Code erred with unexpected message. \
+                 Provided message: '{}', but expected '{}'.",
+                error_msg,
+                ERR_MSG,
+            );
+        }
+    }
+}
+
+/// Checks that executing a withdrawNFT operation with
+/// incorrect serial_id results in an error.
+#[test]
+#[ignore]
+fn test_withdraw_nft_with_incorrect_serial_id() {
+    const ERR_MSG: &str = "chunk number 7/execute_op/op_valid is true/enforce equal to one";
+
+    let mut circuit = apply_nft_mint_and_withdraw_operations();
+    for operation_id in MintNFTOp::CHUNKS..MintNFTOp::CHUNKS + WithdrawNFTOp::CHUNKS {
+        circuit.operations[operation_id].args.special_serial_id = Some(Fr::one());
+    }
+
+    let result = check_circuit_non_panicking(circuit);
+    match result {
+        Ok(_) => panic!(
+            "Operation did not err, but was expected to err with message '{}'",
+            ERR_MSG,
+        ),
+        Err(error_msg) => {
+            assert!(
+                error_msg.contains(ERR_MSG),
+                "Code erred with unexpected message. \
+                 Provided message: '{}', but expected '{}'.",
+                error_msg,
+                ERR_MSG,
+            );
+        }
+    }
 }

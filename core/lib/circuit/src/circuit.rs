@@ -2438,6 +2438,12 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
 
             flags.push(is_initiator_account);
             flags.push(is_token_to_withdraw.clone());
+            let is_balance_valid = Boolean::from(Expression::equals(
+                cs.namespace(|| "is_balance_valid"),
+                &cur.balance.get_number(),
+                Expression::u64::<CS>(1),
+            )?);
+            flags.push(is_balance_valid);
 
             multi_and(cs.namespace(|| "second_chunk_valid"), &flags)?
         };
