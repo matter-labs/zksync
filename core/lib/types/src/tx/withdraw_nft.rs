@@ -1,19 +1,19 @@
-use crate::{
-    helpers::{is_fee_amount_packable, pack_fee_amount},
-    AccountId, Nonce, TokenId, H256,
-};
 use num::{BigUint, Zero};
-
-use crate::account::PubKeyHash;
-
-use crate::Engine;
 use serde::{Deserialize, Serialize};
-use zksync_basic_types::Address;
-use zksync_crypto::franklin_crypto::eddsa::PrivateKey;
-use zksync_crypto::params::{max_account_id, max_token_id, MIN_NFT_TOKEN_ID};
+
+use zksync_crypto::{
+    franklin_crypto::eddsa::PrivateKey,
+    params::{max_account_id, max_fungible_token_id, max_token_id, MIN_NFT_TOKEN_ID},
+};
+
 use zksync_utils::{format_units, BigUintSerdeAsRadix10Str};
 
 use super::{TimeRange, TxSignature, VerifiedSignatureCache};
+use crate::{
+    account::PubKeyHash,
+    helpers::{is_fee_amount_packable, pack_fee_amount},
+    AccountId, Address, Engine, Nonce, TokenId,
+};
 
 /// `Withdraw` transaction performs a withdrawal of funds from zkSync account to L1 account.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -27,8 +27,6 @@ pub struct WithdrawNFT {
     pub to: Address,
     /// Type of token for withdrawal. Also represents the token in which fee will be paid.
     pub token: TokenId,
-    pub creator: Address,
-    pub content_hash: H256,
     /// Token Fee for the transaction.
     pub fee_token: TokenId,
     /// Fee for the transaction.
@@ -47,7 +45,6 @@ pub struct WithdrawNFT {
     #[serde(default)]
     pub fast: bool,
     /// Time range when the transaction is valid
-    /// This fields must be Option<...> because of backward compatibility with first version of ZkSync
     #[serde(flatten)]
     pub time_range: TimeRange,
 }
@@ -65,8 +62,6 @@ impl WithdrawNFT {
         account_id: AccountId,
         from: Address,
         to: Address,
-        creator_address: Address,
-        content_hash: H256,
         token: TokenId,
         fee_token: TokenId,
         fee: BigUint,
@@ -79,8 +74,6 @@ impl WithdrawNFT {
             from,
             to,
             token,
-            creator: creator_address,
-            content_hash,
             fee_token,
             fee,
             nonce,
@@ -103,8 +96,6 @@ impl WithdrawNFT {
         from: Address,
         to: Address,
         token: TokenId,
-        creator_address: Address,
-        content_hash: H256,
         fee_token: TokenId,
         fee: BigUint,
         nonce: Nonce,
@@ -112,17 +103,7 @@ impl WithdrawNFT {
         private_key: &PrivateKey<Engine>,
     ) -> Result<Self, anyhow::Error> {
         let mut tx = Self::new(
-            account_id,
-            from,
-            to,
-            creator_address,
-            content_hash,
-            token,
-            fee_token,
-            fee,
-            nonce,
-            time_range,
-            None,
+            account_id, from, to, token, fee_token, fee, nonce, time_range, None,
         );
         tx.signature = TxSignature::sign_musig(private_key, &tx.get_bytes());
         if !tx.check_correctness() {
@@ -138,8 +119,6 @@ impl WithdrawNFT {
         out.extend_from_slice(&self.account_id.to_be_bytes());
         out.extend_from_slice(&self.from.as_bytes());
         out.extend_from_slice(self.to.as_bytes());
-        out.extend_from_slice(self.creator.as_bytes());
-        out.extend_from_slice(self.content_hash.as_bytes());
         out.extend_from_slice(&self.token.to_be_bytes());
         out.extend_from_slice(&self.fee_token.to_be_bytes());
         out.extend_from_slice(&pack_fee_amount(&self.fee));
@@ -158,6 +137,7 @@ impl WithdrawNFT {
     pub fn check_correctness(&mut self) -> bool {
         let mut valid = is_fee_amount_packable(&self.fee)
             && self.account_id <= max_account_id()
+            && self.fee_token <= max_fungible_token_id()
             && self.token <= max_token_id()
             && self.token >= TokenId(MIN_NFT_TOKEN_ID)
             && self.time_range.check_correctness();

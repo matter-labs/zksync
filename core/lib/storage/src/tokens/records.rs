@@ -64,6 +64,7 @@ impl From<StorageNFT> for NFT {
         Self {
             id: TokenId(val.token_id as u32),
             serial_id: val.serial_id as u32,
+            creator_address: Address::from_slice(val.creator_address.as_slice()),
             creator_id: AccountId(val.creator_account_id as u32),
             address: Address::from_slice(val.address.as_slice()),
             symbol: "".to_string(),

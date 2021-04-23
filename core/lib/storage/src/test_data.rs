@@ -100,6 +100,7 @@ pub fn generate_nft(
         TokenId(MIN_NFT_TOKEN_ID + number),
         number,
         account_id,
+        account.address,
         Address::random(),
         None,
         H256::random(),
