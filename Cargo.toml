@@ -6,13 +6,13 @@ members = [
     "core/bin/server",
     "core/bin/prover",
     "core/bin/parse_pub_data",
-    "core/bin/event_listener",
     "core/bin/block_revert",
 
     # Server micro-services
     "core/bin/zksync_api",
     "core/bin/zksync_core",
     "core/bin/zksync_eth_sender",
+    "core/bin/zksync_event_listener",
     "core/bin/zksync_witness_generator",
     "core/bin/zksync_forced_exit_requests",
 
