@@ -1244,22 +1244,14 @@
       "nullable": []
     }
   },
-  "379999e0e38149efab633ece21c87b3d28db263563278c9ae18d4148c7b68d8a": {
-    "query": "SELECT MAX(id) FROM events WHERE is_processed = true",
+  "369e06c3d2f837dfbfaddb5497983ff7f831143c3262446d706218d57e787df5": {
+    "query": "TRUNCATE TABLE events RESTART IDENTITY",
     "describe": {
-      "columns": [
-        {
-          "ordinal": 0,
-          "name": "max",
-          "type_info": "Int8"
-        }
-      ],
+      "columns": [],
       "parameters": {
         "Left": []
       },
-      "nullable": [
-        null
-      ]
+      "nullable": []
     }
   },
   "393fa462bb0a3b247c99946e569f06fc7fa1f742d564adce560ac69e1729fece": {
@@ -1773,31 +1765,6 @@
       "parameters": {
         "Left": [
           "Int8Array"
-        ]
-      },
-      "nullable": []
-    }
-  },
-  "4dd0d931ce42a1a7a3606a2914b3c0686c103fbb18d60efd96232a2617734272": {
-    "query": "INSERT INTO events VALUES (DEFAULT, $1, $2, $3)",
-    "describe": {
-      "columns": [],
-      "parameters": {
-        "Left": [
-          {
-            "Custom": {
-              "name": "event_type",
-              "kind": {
-                "Enum": [
-                  "Account",
-                  "Block",
-                  "Transaction"
-                ]
-              }
-            }
-          },
-          "Jsonb",
-          "Bool"
         ]
       },
       "nullable": []
@@ -2351,6 +2318,47 @@
         ]
       },
       "nullable": [
+        false
+      ]
+    }
+  },
+  "7611b6424a0e061e39d70b45f48d10fef49e3fdc67021092fff2c9e22b025c4c": {
+    "query": "\n            DELETE FROM events\n            RETURNING \n                id,\n                event_type as \"event_type!: EventType\",\n                event_data\n            ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "id",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 1,
+          "name": "event_type!: EventType",
+          "type_info": {
+            "Custom": {
+              "name": "event_type",
+              "kind": {
+                "Enum": [
+                  "Account",
+                  "Block",
+                  "Transaction"
+                ]
+              }
+            }
+          }
+        },
+        {
+          "ordinal": 2,
+          "name": "event_data",
+          "type_info": "Jsonb"
+        }
+      ],
+      "parameters": {
+        "Left": []
+      },
+      "nullable": [
+        false,
+        false,
         false
       ]
     }
@@ -2909,6 +2917,30 @@
       "parameters": {
         "Left": [
           "Timestamptz"
+        ]
+      },
+      "nullable": []
+    }
+  },
+  "968f966d0bc4f41249721a5238e27ddef739406a28f7f1db5c4d9c54bb31b8a8": {
+    "query": "INSERT INTO events VALUES (DEFAULT, $1, $2)",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          {
+            "Custom": {
+              "name": "event_type",
+              "kind": {
+                "Enum": [
+                  "Account",
+                  "Block",
+                  "Transaction"
+                ]
+              }
+            }
+          },
+          "Jsonb"
         ]
       },
       "nullable": []
@@ -4626,53 +4658,6 @@
         "Left": []
       },
       "nullable": []
-    }
-  },
-  "ef038cf4026b804617dda638d7fe9c380f44a05d76aa0e92455c73a966300757": {
-    "query": "\n            UPDATE events SET is_processed = true \n            WHERE is_processed = false\n            RETURNING id, event_type as \"event_type!: EventType\",\n                event_data, is_processed\n            ",
-    "describe": {
-      "columns": [
-        {
-          "ordinal": 0,
-          "name": "id",
-          "type_info": "Int8"
-        },
-        {
-          "ordinal": 1,
-          "name": "event_type!: EventType",
-          "type_info": {
-            "Custom": {
-              "name": "event_type",
-              "kind": {
-                "Enum": [
-                  "Account",
-                  "Block",
-                  "Transaction"
-                ]
-              }
-            }
-          }
-        },
-        {
-          "ordinal": 2,
-          "name": "event_data",
-          "type_info": "Jsonb"
-        },
-        {
-          "ordinal": 3,
-          "name": "is_processed",
-          "type_info": "Bool"
-        }
-      ],
-      "parameters": {
-        "Left": []
-      },
-      "nullable": [
-        false,
-        false,
-        false,
-        false
-      ]
     }
   },
   "f02021c46f5edc171f22c16e29bb028353eb0519aec1555c066fdd8dfe1d61e5": {

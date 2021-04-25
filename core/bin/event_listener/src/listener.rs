@@ -28,7 +28,7 @@ impl StreamHandler<NewStorageEvent> for EventListener {
                 .await
                 .unwrap()
                 .event_schema()
-                .get_unprocessed_events()
+                .fetch_new_events()
                 .await
                 .unwrap()
         }
@@ -75,13 +75,12 @@ impl EventListener {
     ) -> anyhow::Result<EventListener> {
         let mut listener = StorageListener::connect().await?;
         let db_pool = ConnectionPool::new(Some(Self::DB_POOL_SIZE));
-        let last_processed_event_id = db_pool
+        db_pool
             .access_storage()
             .await?
             .event_schema()
-            .get_last_processed_event_id()
-            .await?
-            .unwrap_or(0);
+            .reset()
+            .await?;
 
         let channel_name = &config.event_listener.channel_name;
         listener.listen(channel_name).await?;
@@ -90,7 +89,7 @@ impl EventListener {
             db_pool,
             server_monitor,
             listener: Some(listener),
-            last_processed_event_id,
+            last_processed_event_id: 0,
         })
     }
 }

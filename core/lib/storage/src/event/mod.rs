@@ -33,10 +33,9 @@ impl<'a, 'c> EventSchema<'a, 'c> {
         event_data: Value,
     ) -> QueryResult<()> {
         sqlx::query!(
-            "INSERT INTO events VALUES (DEFAULT, $1, $2, $3)",
+            "INSERT INTO events VALUES (DEFAULT, $1, $2)",
             event_type as EventType,
-            event_data,
-            false
+            event_data
         )
         .execute(self.0.conn())
         .await?;
@@ -44,14 +43,15 @@ impl<'a, 'c> EventSchema<'a, 'c> {
         Ok(())
     }
 
-    pub async fn get_unprocessed_events(&mut self) -> QueryResult<Vec<ZkSyncEvent>> {
+    pub async fn fetch_new_events(&mut self) -> QueryResult<Vec<ZkSyncEvent>> {
         let events = sqlx::query_as!(
             StoredEvent,
             r#"
-            UPDATE events SET is_processed = true 
-            WHERE is_processed = false
-            RETURNING id, event_type as "event_type!: EventType",
-                event_data, is_processed
+            DELETE FROM events
+            RETURNING 
+                id,
+                event_type as "event_type!: EventType",
+                event_data
             "#
         )
         .fetch_all(self.0.conn())
@@ -63,13 +63,12 @@ impl<'a, 'c> EventSchema<'a, 'c> {
         Ok(events)
     }
 
-    pub async fn get_last_processed_event_id(&mut self) -> QueryResult<Option<i64>> {
-        let id = sqlx::query!("SELECT MAX(id) FROM events WHERE is_processed = true")
-            .fetch_one(self.0.conn())
-            .await?
-            .max;
+    pub async fn reset(&mut self) -> QueryResult<()> {
+        sqlx::query!("TRUNCATE TABLE events RESTART IDENTITY")
+            .execute(self.0.conn())
+            .await?;
 
-        Ok(id)
+        Ok(())
     }
 
     pub async fn store_block_event(
@@ -200,7 +199,7 @@ impl<'a, 'c> EventSchema<'a, 'c> {
             TransactionEvent::from_executed_operation(executed_operation, block, account_id);
 
         let event_data =
-            serde_json::to_value(transaction_event).expect("couldn't serialize account event");
+            serde_json::to_value(transaction_event).expect("couldn't serialize transaction event");
 
         transaction
             .event_schema()

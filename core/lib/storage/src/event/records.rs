@@ -21,7 +21,6 @@ pub struct StoredEvent {
     pub id: i64,
     pub event_type: EventType,
     pub event_data: Value,
-    pub is_processed: bool,
 }
 
 impl From<StoredEvent> for ZkSyncEvent {
