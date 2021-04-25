@@ -1,4 +1,5 @@
 // Built-in uses
+use std::time::Instant;
 // External uses
 use serde_json::Value;
 // Workspace uses
@@ -25,13 +26,13 @@ pub use records::{get_event_type, EventType};
 #[derive(Debug)]
 pub struct EventSchema<'a, 'c>(pub &'a mut StorageProcessor<'c>);
 
-// TODO: add metrics.
 impl<'a, 'c> EventSchema<'a, 'c> {
     async fn store_event_data(
         &mut self,
         event_type: EventType,
         event_data: Value,
     ) -> QueryResult<()> {
+        let start = Instant::now();
         sqlx::query!(
             "INSERT INTO events VALUES (DEFAULT, $1, $2)",
             event_type as EventType,
@@ -40,10 +41,12 @@ impl<'a, 'c> EventSchema<'a, 'c> {
         .execute(self.0.conn())
         .await?;
 
+        metrics::histogram!("sql.event.store_event_data", start.elapsed());
         Ok(())
     }
 
     pub async fn fetch_new_events(&mut self) -> QueryResult<Vec<ZkSyncEvent>> {
+        let start = Instant::now();
         let events = sqlx::query_as!(
             StoredEvent,
             r#"
@@ -60,14 +63,17 @@ impl<'a, 'c> EventSchema<'a, 'c> {
         .map(ZkSyncEvent::from)
         .collect();
 
+        metrics::histogram!("sql.event.fetch_new_events", start.elapsed());
         Ok(events)
     }
 
     pub async fn reset(&mut self) -> QueryResult<()> {
+        let start = Instant::now();
         sqlx::query!("TRUNCATE TABLE events RESTART IDENTITY")
             .execute(self.0.conn())
             .await?;
 
+        metrics::histogram!("sql.event.reset", start.elapsed());
         Ok(())
     }
 
@@ -76,6 +82,7 @@ impl<'a, 'c> EventSchema<'a, 'c> {
         status: BlockStatus,
         block_number: BlockNumber,
     ) -> QueryResult<()> {
+        let start = Instant::now();
         let mut transaction = self.0.start_transaction().await?;
 
         let block_details = transaction
@@ -102,6 +109,7 @@ impl<'a, 'c> EventSchema<'a, 'c> {
             .await?;
         transaction.commit().await?;
 
+        metrics::histogram!("sql.event.store_block_event", start.elapsed());
         Ok(())
     }
 
@@ -110,7 +118,7 @@ impl<'a, 'c> EventSchema<'a, 'c> {
         account_id: AccountId,
         account_update: &AccountUpdate,
     ) -> QueryResult<()> {
-        // TODO: skip fee account?
+        let start = Instant::now();
         let account_update_details =
             AccountUpdateDetails::from_account_update(account_id, account_update);
 
@@ -129,6 +137,7 @@ impl<'a, 'c> EventSchema<'a, 'c> {
         self.store_event_data(EventType::Account, event_data)
             .await?;
 
+        metrics::histogram!("sql.event.store_state_committed_event", start.elapsed());
         Ok(())
     }
 
@@ -136,7 +145,7 @@ impl<'a, 'c> EventSchema<'a, 'c> {
         &mut self,
         account_diff: &StorageAccountDiff,
     ) -> QueryResult<()> {
-        // TODO: skip fee account?
+        let start = Instant::now();
         let account_update_details = AccountUpdateDetails::from(account_diff);
 
         let update_type = AccountStateChangeType::from(account_diff);
@@ -154,6 +163,7 @@ impl<'a, 'c> EventSchema<'a, 'c> {
         self.store_event_data(EventType::Account, event_data)
             .await?;
 
+        metrics::histogram!("sql.event.store_state_verified_event", start.elapsed());
         Ok(())
     }
 
@@ -184,6 +194,7 @@ impl<'a, 'c> EventSchema<'a, 'c> {
         executed_operation: &ExecutedOperations,
         block: BlockNumber,
     ) -> QueryResult<()> {
+        let start = Instant::now();
         let mut transaction = self.0.start_transaction().await?;
 
         let account_id = match transaction
@@ -207,6 +218,7 @@ impl<'a, 'c> EventSchema<'a, 'c> {
             .await?;
         transaction.commit().await?;
 
+        metrics::histogram!("sql.event.store_transaction_event", start.elapsed());
         Ok(())
     }
 }
