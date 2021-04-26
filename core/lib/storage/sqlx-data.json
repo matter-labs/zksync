@@ -2469,26 +2469,6 @@
       ]
     }
   },
-  "72da396ec3ea46d20822ded96051401169938d3701fe3c03c819287fa7190a9c": {
-    "query": "SELECT COUNT(id) from mempool_txs\n            WHERE tx_hash = $1",
-    "describe": {
-      "columns": [
-        {
-          "ordinal": 0,
-          "name": "count",
-          "type_info": "Int8"
-        }
-      ],
-      "parameters": {
-        "Left": [
-          "Text"
-        ]
-      },
-      "nullable": [
-        null
-      ]
-    }
-  },
   "73eedd4444ef5bfbfd526c319f97d75609a65517d63e88add0a864a9f7141a02": {
     "query": "\n            INSERT INTO block_metadata (block_number, fast_processing)\n            VALUES ($1, $2)\n            ",
     "describe": {
@@ -2795,6 +2775,26 @@
       "nullable": [
         false,
         false
+      ]
+    }
+  },
+  "839caf265f3e87a43a788d8fc321ec8d3ada6987d46ce1179683aefb0bb1e789": {
+    "query": "SELECT COUNT(*) from mempool_txs\n            WHERE tx_hash = $1",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "count",
+          "type_info": "Int8"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Text"
+        ]
+      },
+      "nullable": [
+        null
       ]
     }
   },
@@ -3161,6 +3161,24 @@
         ]
       },
       "nullable": []
+    }
+  },
+  "99b1aad6f25729e9189706d99c87b8487788b2de0a4ed7915d4f49daf37b62dc": {
+    "query": "SELECT COUNT(*) from mempool_txs",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "count",
+          "type_info": "Int8"
+        }
+      ],
+      "parameters": {
+        "Left": []
+      },
+      "nullable": [
+        null
+      ]
     }
   },
   "9aeeb5e20f4f34d4b4e1987f1bf0a23ee931f12da071b134225069d32c1896de": {
@@ -4680,24 +4698,6 @@
         false,
         true,
         false
-      ]
-    }
-  },
-  "e2db07c30857f2002685faaf6b2ab62b4937ecdbf8016671a8015a9338a3c07a": {
-    "query": "SELECT COUNT(id) from mempool_txs",
-    "describe": {
-      "columns": [
-        {
-          "ordinal": 0,
-          "name": "count",
-          "type_info": "Int8"
-        }
-      ],
-      "parameters": {
-        "Left": []
-      },
-      "nullable": [
-        null
       ]
     }
   },

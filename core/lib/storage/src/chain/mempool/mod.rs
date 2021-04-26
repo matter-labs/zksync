@@ -304,7 +304,7 @@ impl<'a, 'c> MempoolSchema<'a, 'c> {
         let tx_hash = hex::encode(tx_hash.as_ref());
 
         let row = sqlx::query!(
-            "SELECT COUNT(id) from mempool_txs
+            "SELECT COUNT(*) from mempool_txs
             WHERE tx_hash = $1",
             &tx_hash
         )
@@ -404,7 +404,7 @@ impl<'a, 'c> MempoolSchema<'a, 'c> {
     pub async fn get_mempool_size(&mut self) -> QueryResult<u32> {
         let start = Instant::now();
 
-        let size = sqlx::query!("SELECT COUNT(id) from mempool_txs")
+        let size = sqlx::query!("SELECT COUNT(*) from mempool_txs")
             .fetch_one(self.0.conn())
             .await?
             .count;
