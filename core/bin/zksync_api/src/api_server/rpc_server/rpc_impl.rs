@@ -6,7 +6,7 @@ use jsonrpc_core::{Error, Result};
 // Workspace uses
 use zksync_types::{
     tx::{EthBatchSignatures, TxEthSignature, TxHash},
-    Address, BatchFee, Fee, Token, TokenLike, TxFeeTypes, ZkSyncTx,
+    Address, Fee, Token, TokenLike, TotalFee, TxFeeTypes, ZkSyncTx,
 };
 
 // Local uses
@@ -212,7 +212,7 @@ impl RpcApp {
         tx_types: Vec<TxFeeTypes>,
         addresses: Vec<Address>,
         token: TokenLike,
-    ) -> Result<BatchFee> {
+    ) -> Result<TotalFee> {
         let start = Instant::now();
         if tx_types.len() != addresses.len() {
             return Err(Error {
@@ -244,7 +244,9 @@ impl RpcApp {
         };
 
         metrics::histogram!("api.rpc.get_txs_batch_fee_in_wei", start.elapsed());
-        Ok(fee)
+        Ok(TotalFee {
+            total_fee: fee.total_fee,
+        })
     }
 
     pub async fn _impl_get_token_price(self, token: TokenLike) -> Result<BigDecimal> {
