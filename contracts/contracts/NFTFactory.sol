@@ -5,9 +5,9 @@ interface NFTFactory {
     function mintNFT(
         address creator,
         address recipient,
-        bytes memory contentHash,
+        bytes32 contentHash,
         uint256 tokenId
-    ) external returns (bool);
+    ) external;
 
     event MintNFT(address indexed creator, address indexed recipient, bytes contentHash, uint256 tokenId);
 }

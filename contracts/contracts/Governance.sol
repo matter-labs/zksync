@@ -29,6 +29,9 @@ contract Governance is Config {
     /// @notice Address which will exercise governance over the network i.e. add tokens, change validator set, conduct upgrades
     address public networkGovernor;
 
+    /// @notice Address which will be used if NFT token has no factories
+    NFTFactory public defaultFactory;
+
     /// @notice Total number of ERC20 tokens registered in the network (excluding ETH, which is hardcoded as tokenId = 0)
     uint16 public totalTokens;
 
@@ -170,6 +173,20 @@ contract Governance is Config {
         if (recoveredAddress == _creatorAddress && recoveredAddress != address(0)) {
             NFTFactories[_creatorAddress] = NFTFactory(msg.sender);
             emit NFTFactoryRegistered(_creatorAddress, msg.sender, _signature);
+        }
+    }
+
+    function setDefaultFactory(address _factory) public {
+        require(msg.sender == tokenGovernance, "1E");
+        defaultFactory = NFTFactory(_factory);
+    }
+
+    function getFactory(address _creator) external returns (NFTFactory) {
+        NFTFactory _factory = NFTFactories[_creator];
+        if (address(_factory) == address(0x0)) {
+            return defaultFactory;
+        } else {
+            return _factory;
         }
     }
 }
