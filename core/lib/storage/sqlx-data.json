@@ -1244,16 +1244,6 @@
       "nullable": []
     }
   },
-  "369e06c3d2f837dfbfaddb5497983ff7f831143c3262446d706218d57e787df5": {
-    "query": "TRUNCATE TABLE events RESTART IDENTITY",
-    "describe": {
-      "columns": [],
-      "parameters": {
-        "Left": []
-      },
-      "nullable": []
-    }
-  },
   "393fa462bb0a3b247c99946e569f06fc7fa1f742d564adce560ac69e1729fece": {
     "query": "SELECT * FROM balances WHERE account_id = ANY($1)",
     "describe": {
@@ -2322,47 +2312,6 @@
       ]
     }
   },
-  "7611b6424a0e061e39d70b45f48d10fef49e3fdc67021092fff2c9e22b025c4c": {
-    "query": "\n            DELETE FROM events\n            RETURNING \n                id,\n                event_type as \"event_type!: EventType\",\n                event_data\n            ",
-    "describe": {
-      "columns": [
-        {
-          "ordinal": 0,
-          "name": "id",
-          "type_info": "Int8"
-        },
-        {
-          "ordinal": 1,
-          "name": "event_type!: EventType",
-          "type_info": {
-            "Custom": {
-              "name": "event_type",
-              "kind": {
-                "Enum": [
-                  "Account",
-                  "Block",
-                  "Transaction"
-                ]
-              }
-            }
-          }
-        },
-        {
-          "ordinal": 2,
-          "name": "event_data",
-          "type_info": "Jsonb"
-        }
-      ],
-      "parameters": {
-        "Left": []
-      },
-      "nullable": [
-        false,
-        false,
-        false
-      ]
-    }
-  },
   "76ac37f173ae27687dbb0eb261a5ab9920fd2185e50a476c00315a874dd6b75c": {
     "query": "UPDATE prover_job_queue\n            SET (updated_at, job_status, updated_by) = (now(), $1, 'server_finish_job')\n            WHERE id = $2 AND job_type = $3",
     "describe": {
@@ -3284,6 +3233,24 @@
         ]
       },
       "nullable": []
+    }
+  },
+  "b1fb7dce805a681d3d552ac180156f5d3cd05bd26b96cdc6cccee3a4b869687b": {
+    "query": "SELECT max(id) FROM events",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "max",
+          "type_info": "Int8"
+        }
+      ],
+      "parameters": {
+        "Left": []
+      },
+      "nullable": [
+        null
+      ]
     }
   },
   "b5e0f843d267576d57f41e2c4a63335749cb40e79bdb2b2cccbbaed5200abe96": {
@@ -5112,6 +5079,49 @@
         false,
         false,
         false,
+        false,
+        false,
+        false
+      ]
+    }
+  },
+  "ff6eb0b5913167ab2daa8b7acc71bbe7226531ec4eae9bb2f60bc811d0b7baae": {
+    "query": "\n            SELECT\n                id,\n                event_type as \"event_type!: EventType\",\n                event_data\n            FROM events WHERE id > $1\n            ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "id",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 1,
+          "name": "event_type!: EventType",
+          "type_info": {
+            "Custom": {
+              "name": "event_type",
+              "kind": {
+                "Enum": [
+                  "Account",
+                  "Block",
+                  "Transaction"
+                ]
+              }
+            }
+          }
+        },
+        {
+          "ordinal": 2,
+          "name": "event_data",
+          "type_info": "Jsonb"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Int8"
+        ]
+      },
+      "nullable": [
         false,
         false,
         false

@@ -45,17 +45,18 @@ impl<'a, 'c> EventSchema<'a, 'c> {
         Ok(())
     }
 
-    pub async fn fetch_new_events(&mut self) -> QueryResult<Vec<ZkSyncEvent>> {
+    pub async fn fetch_new_events(&mut self, from: i64) -> QueryResult<Vec<ZkSyncEvent>> {
         let start = Instant::now();
         let events = sqlx::query_as!(
             StoredEvent,
             r#"
-            DELETE FROM events
-            RETURNING 
+            SELECT
                 id,
                 event_type as "event_type!: EventType",
                 event_data
-            "#
+            FROM events WHERE id > $1
+            "#,
+            from
         )
         .fetch_all(self.0.conn())
         .await?
@@ -67,14 +68,15 @@ impl<'a, 'c> EventSchema<'a, 'c> {
         Ok(events)
     }
 
-    pub async fn reset(&mut self) -> QueryResult<()> {
+    pub async fn get_last_event_id(&mut self) -> QueryResult<Option<i64>> {
         let start = Instant::now();
-        sqlx::query!("TRUNCATE TABLE events RESTART IDENTITY")
-            .execute(self.0.conn())
-            .await?;
+        let id = sqlx::query!("SELECT max(id) FROM events")
+            .fetch_one(self.0.conn())
+            .await?
+            .max;
 
-        metrics::histogram!("sql.event.reset", start.elapsed());
-        Ok(())
+        metrics::histogram!("sql.event.get_last_event_id", start.elapsed());
+        Ok(id)
     }
 
     pub async fn store_block_event(

@@ -23,12 +23,13 @@ impl StreamHandler<NewStorageEvent> for EventListener {
             return;
         }
         let pool = self.db_pool.clone();
+        let last_processed_event_id = self.last_processed_event_id;
         async move {
             pool.access_storage()
                 .await
                 .unwrap()
                 .event_schema()
-                .fetch_new_events()
+                .fetch_new_events(last_processed_event_id)
                 .await
                 .unwrap()
         }
@@ -75,12 +76,13 @@ impl EventListener {
     ) -> anyhow::Result<EventListener> {
         let mut listener = StorageListener::connect().await?;
         let db_pool = ConnectionPool::new(Some(Self::DB_POOL_SIZE));
-        db_pool
+        let last_processed_event_id = db_pool
             .access_storage()
             .await?
             .event_schema()
-            .reset()
-            .await?;
+            .get_last_event_id()
+            .await?
+            .unwrap_or(0);
 
         let channel_name = &config.event_listener.channel_name;
         listener.listen(channel_name).await?;
@@ -89,7 +91,7 @@ impl EventListener {
             db_pool,
             server_monitor,
             listener: Some(listener),
-            last_processed_event_id: 0,
+            last_processed_event_id,
         })
     }
 }

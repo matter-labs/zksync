@@ -77,11 +77,12 @@ fn check_block_event(event: &ZkSyncEvent, block_status: BlockStatus, block_numbe
 /// The test does the following:
 /// 1. Commit 3 blocks, after each commit fetch a single "block committed" event.
 /// 2. Commit 4th block.
-/// 3. Finalize first 3 blocks then fetch 1 "block committed" event and 4 "block finalized"
+/// 3. Finalize first 3 blocks then fetch 1 "block committed" event and 3 "block finalized"
 /// in a single query.
 #[db_test]
 async fn test_block_events(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
     storage.ethereum_schema().initialize_eth_data().await?;
+    let mut last_event_id = 0;
     const FROM_BLOCK: u32 = 1;
     const TO_BLOCK: u32 = 3;
 
@@ -106,9 +107,14 @@ async fn test_block_events(mut storage: StorageProcessor<'_>) -> QueryResult<()>
         )
         .await?;
         // Expect a single block event with the `Committed` status.
-        let events = storage.event_schema().fetch_new_events().await?;
+        let events = storage
+            .event_schema()
+            .fetch_new_events(last_event_id)
+            .await?;
+
         assert_eq!(events.len(), 1);
         check_block_event(&events[0], BlockStatus::Committed, block_number);
+        last_event_id = events[0].id;
     }
     // Commit one more block.
     let block_number = BlockNumber(4);
@@ -138,7 +144,10 @@ async fn test_block_events(mut storage: StorageProcessor<'_>) -> QueryResult<()>
         .await?;
     }
     // Fetch populated events.
-    let events = storage.event_schema().fetch_new_events().await?;
+    let events = storage
+        .event_schema()
+        .fetch_new_events(last_event_id)
+        .await?;
     assert_eq!(events.len(), 4);
     // The first event is "block committed".
     let mut events_iter = events.into_iter();
