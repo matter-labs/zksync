@@ -1,9 +1,13 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.7.0;
 
-interface MintNFT {
+interface NFTFactory {
+    function mintNFT(
+        address creator,
+        address recipient,
+        bytes memory contentHash,
+        uint256 tokenId
+    ) external returns (bool);
 
-    function mintNFT(address creator, address recipient, bytes contentHash) external view returns (bool);
-
-    event MintNFT(address indexed creator,address indexed recipient, bytes contentHash);
+    event MintNFT(address indexed creator, address indexed recipient, bytes contentHash, uint256 tokenId);
 }
