@@ -386,12 +386,12 @@ pub fn rescue_hash_orders(msg: &[u8]) -> Vec<u8> {
     let hasher = &params::RESCUE_HASHER as &BabyRescueHasher;
     let hash_fr = hasher.hash_bits(msg_bits.into_iter());
     let hash_bits = hash_fr.get_bits_le_fixed(248);
-    
-    let serialized_bits = hash_bits
-        .iter()
-        .map(|bit| if *bit { "1" } else { "0" })
-        .collect::<String>();
-    println!("SERVER HASH BITS: {}", serialized_bits);
+
+    // let serialized_bits = hash_bits
+    //     .iter()
+    //     .map(|bit| if *bit { "1" } else { "0" })
+    //     .collect::<String>();
+    // println!("SERVER HASH BITS: {}", serialized_bits);
     // let mut hash_bits = Vec::new();
     // append_le_fixed_width(&mut hash_bits, &hash_fr, 256);
     BitConvert::into_bytes_ordered(hash_bits)

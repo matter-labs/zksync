@@ -2669,12 +2669,12 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
             &op_data,
         )?;
 
-        println!(
-            "{}, {}, {}",
-            is_serialized_order_0_correct.get_value().unwrap(),
-            is_serialized_order_1_correct.get_value().unwrap(),
-            is_serialized_swap_correct.get_value().unwrap()
-        );
+        // println!(
+        //     "{}, {}, {}",
+        //     is_serialized_order_0_correct.get_value().unwrap(),
+        //     is_serialized_order_1_correct.get_value().unwrap(),
+        //     is_serialized_swap_correct.get_value().unwrap()
+        // );
 
         let correct_messages_in_corresponding_chunks = &[
             Boolean::and(
@@ -2721,13 +2721,13 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
             )?,
         ];
 
-        println!(
-            "LHS: {:#?}",
-            lhs_valid_flags
-                .iter()
-                .map(|x| x.get_value().unwrap())
-                .collect::<Vec<_>>()
-        );
+        // println!(
+        //     "LHS: {:#?}",
+        //     lhs_valid_flags
+        //         .iter()
+        //         .map(|x| x.get_value().unwrap())
+        //         .collect::<Vec<_>>()
+        // );
 
         let lhs_valid = multi_and(cs.namespace(|| "lhs_valid"), &lhs_valid_flags)?;
 
@@ -2791,15 +2791,20 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
         )?;
 
         let rhs_valid_flags = &[common_valid_flag, is_account_empty.not(), is_rhs_chunk];
-        println!(
-            "RHS: {:#?}",
-            rhs_valid_flags
-                .iter()
-                .map(|x| x.get_value().unwrap())
-                .collect::<Vec<_>>()
-        );
+        // println!(
+        //     "RHS: {:#?}",
+        //     rhs_valid_flags
+        //         .iter()
+        //         .map(|x| x.get_value().unwrap())
+        //         .collect::<Vec<_>>()
+        // );
         // rhs
         let rhs_valid = multi_and(cs.namespace(|| "is_rhs_valid"), rhs_valid_flags)?;
+        println!(
+            "LHS: {}, RHS: {}",
+            lhs_valid.get_value().unwrap(),
+            rhs_valid.get_value().unwrap()
+        );
 
         // calculate new rhs balance value
         let updated_balance = Expression::from(&cur.balance.get_number())
@@ -3786,7 +3791,7 @@ fn rescue_hash_allocated_bits<E: RescueEngine + JubjubEngine, CS: ConstraintSyst
     //     .collect::<Result<Vec<_>, _>>()?
     //     .iter()
     //     // .flatten()
-    //     .map(|bits| 
+    //     .map(|bits|
     //         bits
     //             .iter()
     //             .map(|bit| if bit.get_value().unwrap() { "1" } else { "0" })
@@ -3799,13 +3804,13 @@ fn rescue_hash_allocated_bits<E: RescueEngine + JubjubEngine, CS: ConstraintSyst
     assert_eq!(sponge_output.len(), 1);
 
     let output_bits_le = sponge_output[0].into_bits_le(cs.namespace(|| "rescue hash bits"))?;
-
-    let serialized_bits = output_bits_le
-        .iter()
-        .map(|bit| if bit.get_value().unwrap() { "1" } else { "0" })
-        .collect::<String>();
-
-    println!("CIRCUIT HASH BITS {}", serialized_bits);
+    //
+    // let serialized_bits = output_bits_le
+    //     .iter()
+    //     .map(|bit| if bit.get_value().unwrap() { "1" } else { "0" })
+    //     .collect::<String>();
+    //
+    // println!("CIRCUIT HASH BITS {}", serialized_bits);
     Ok(output_bits_le[..248].to_vec())
 
     // let result = CircuitElement::from_le_bits(
