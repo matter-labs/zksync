@@ -351,7 +351,7 @@ impl<E: RescueEngine> AllocatedOperationData<E> {
             })
             .collect::<Result<Vec<_>, _>>()?;
 
-        let (special_amounts_unpacked, special_amounts_packed) = op
+        let (special_amounts_packed, special_amounts_unpacked) = op
             .args
             .special_amounts
             .iter()

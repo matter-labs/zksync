@@ -294,9 +294,9 @@ impl SwapWitness<Bn256> {
         // b = 0 if orders.1.amount == 0 else 1
         // nonce_mask = a | (b << 1)
         let mut nonce_mask = Fr::zero();
-        nonce_mask.add_assign(&nonce_increment(&self.args.special_amounts[1]));
+        nonce_mask.add_assign(&nonce_increment(&self.args.special_amounts[1].unwrap()));
         nonce_mask.double();
-        nonce_mask.add_assign(&nonce_increment(&self.args.special_amounts[0]));
+        nonce_mask.add_assign(&nonce_increment(&self.args.special_amounts[0].unwrap()));
         nonce_mask
     }
 
@@ -310,25 +310,11 @@ impl SwapWitness<Bn256> {
         let token_0_fe = fr_from(swap.tokens.0);
         let token_1_fe = fr_from(swap.tokens.1);
         let fee_token_fe = fr_from(swap.fee_token);
-        let amount_0_fe = fr_from(swap.amounts.0);
-        let amount_1_fe = fr_from(swap.amounts.1);
+        let (amount_0_fe, amount_0_packed) = pack_amount(swap.amounts.0);
+        let (amount_1_fe, amount_1_packed) = pack_amount(swap.amounts.1);
+        let (special_amount_0_fe, special_amount_0_packed) = pack_amount(swap.orders.0.amount);
+        let (special_amount_1_fe, special_amount_1_packed) = pack_amount(swap.orders.1.amount);
         let fee_fe = fr_from(swap.fee);
-
-        let amount_0_bits = FloatConversions::to_float(
-            swap.amounts.0,
-            AMOUNT_EXPONENT_BIT_WIDTH,
-            AMOUNT_MANTISSA_BIT_WIDTH,
-            10,
-        )
-        .unwrap();
-
-        let amount_1_bits = FloatConversions::to_float(
-            swap.amounts.1,
-            AMOUNT_EXPONENT_BIT_WIDTH,
-            AMOUNT_MANTISSA_BIT_WIDTH,
-            10,
-        )
-        .unwrap();
 
         let fee_bits = FloatConversions::to_float(
             swap.fee,
@@ -338,19 +324,12 @@ impl SwapWitness<Bn256> {
         )
         .unwrap();
 
-        let amount_0_encoded: Fr = le_bit_vector_into_field_element(&amount_0_bits);
-        let amount_1_encoded: Fr = le_bit_vector_into_field_element(&amount_1_bits);
         let fee_encoded: Fr = le_bit_vector_into_field_element(&fee_bits);
 
         let mut roots = vec![];
         let mut lhs_paths = vec![];
         let mut rhs_paths = vec![];
         let mut witnesses = vec![];
-
-        let special_amounts: Vec<_> = vec![swap.orders.0.amount, swap.orders.1.amount]
-            .into_iter()
-            .map(|x| Some(fr_from(x)))
-            .collect();
 
         let special_prices: Vec<_> = vec![
             swap.orders.0.price_sell,
@@ -373,7 +352,7 @@ impl SwapWitness<Bn256> {
                 if swap.orders.0.account == swap.submitter {
                     return;
                 }
-                acc.nonce.add_assign(&nonce_increment(&special_amounts[0]));
+                acc.nonce.add_assign(&nonce_increment(&special_amount_0_fe));
             },
             |bal| {
                 bal.value.sub_assign(&amount_0_fe);
@@ -404,7 +383,7 @@ impl SwapWitness<Bn256> {
                 if swap.orders.1.account == swap.submitter {
                     return;
                 }
-                acc.nonce.add_assign(&nonce_increment(&special_amounts[1]));
+                acc.nonce.add_assign(&nonce_increment(&special_amount_1_fe));
             },
             |bal| {
                 bal.value.sub_assign(&amount_1_fe);
@@ -548,8 +527,8 @@ impl SwapWitness<Bn256> {
                 },
             },
             args: OperationArguments {
-                amount_packed: Some(amount_0_encoded),
-                second_amount_packed: Some(amount_1_encoded),
+                amount_packed: Some(amount_0_packed),
+                second_amount_packed: Some(amount_1_packed),
                 special_nonces: vec![
                     Some(fr_from(swap.orders.0.nonce)),
                     Some(fr_from(swap.orders.1.nonce)),
@@ -569,7 +548,7 @@ impl SwapWitness<Bn256> {
                     Some(submitter_fe),
                 ],
                 special_tokens: vec![Some(token_0_fe), Some(token_1_fe), Some(fee_token_fe)],
-                special_amounts,
+                special_amounts: vec![Some(special_amount_0_packed), Some(special_amount_1_packed)],
                 special_prices,
                 ..Default::default()
             },
@@ -583,10 +562,23 @@ impl SwapWitness<Bn256> {
     }
 }
 
-fn nonce_increment(amount: &Option<Fr>) -> Fr {
-    if amount.unwrap().is_zero() {
+fn nonce_increment(amount: &Fr) -> Fr {
+    if amount.is_zero() {
         Fr::zero()
     } else {
         Fr::one()
     }
+}
+
+fn pack_amount(amount: u128) -> (Fr, Fr) {
+    let amount_fe = fr_from(amount);
+    let amount_bits = FloatConversions::to_float(
+        amount,
+        AMOUNT_EXPONENT_BIT_WIDTH,
+        AMOUNT_MANTISSA_BIT_WIDTH,
+        10,
+    )
+    .unwrap();
+    let amount_packed: Fr = le_bit_vector_into_field_element(&amount_bits);
+    (amount_fe, amount_packed)
 }

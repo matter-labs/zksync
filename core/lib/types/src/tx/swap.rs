@@ -13,7 +13,7 @@ use zksync_basic_types::Address;
 use zksync_crypto::{
     franklin_crypto::eddsa::PrivateKey,
     params::{max_account_id, max_token_id, PRICE_BIT_WIDTH},
-    primitives::rescue_hash_tx_msg,
+    primitives::rescue_hash_orders,
 };
 use zksync_utils::{format_units, BigUintPairSerdeAsRadix10Str, BigUintSerdeAsRadix10Str};
 
@@ -60,8 +60,8 @@ impl Order {
         out.extend_from_slice(&self.nonce.to_be_bytes());
         out.extend_from_slice(&self.token_sell.to_be_bytes());
         out.extend_from_slice(&self.token_buy.to_be_bytes());
-        out.extend_from_slice(&self.price.0.to_bytes_be());
-        out.extend_from_slice(&self.price.1.to_bytes_be());
+        out.extend_from_slice(&pad_front(&self.price.0.to_bytes_be(), PRICE_BIT_WIDTH / 8));
+        out.extend_from_slice(&pad_front(&self.price.1.to_bytes_be(), PRICE_BIT_WIDTH / 8));
         out.extend_from_slice(&pack_token_amount(&self.amount));
         out.extend_from_slice(&self.time_range.to_be_bytes());
         out
@@ -74,8 +74,8 @@ impl Order {
     }
 
     pub fn check_correctness(&self) -> bool {
-        self.price.0 < BigUint::from(1u128 << PRICE_BIT_WIDTH)
-            && self.price.1 <= BigUint::from(1u128 << PRICE_BIT_WIDTH)
+        self.price.0.bits() as usize <= PRICE_BIT_WIDTH
+            && self.price.1.bits() as usize <= PRICE_BIT_WIDTH
             && self.account_id <= max_account_id()
             && self.recipient_id <= max_account_id()
             && self.token_buy <= max_token_id()
@@ -116,7 +116,7 @@ impl Order {
 
 impl Swap {
     /// Unique identifier of the transaction type in zkSync network.
-    pub const TX_TYPE: u8 = 10;
+    pub const TX_TYPE: u8 = 9;
 
     /// Creates transaction from all the required fields.
     ///
@@ -206,7 +206,8 @@ impl Swap {
         orders_bytes.append(&mut first_order_bytes);
         orders_bytes.append(&mut second_order_bytes);
 
-        let orders_hash = rescue_hash_tx_msg(&orders_bytes);
+        println!( "NOW!");
+        let orders_hash = rescue_hash_orders(&orders_bytes);
 
         self.get_swap_bytes(&orders_hash)
     }
@@ -224,6 +225,11 @@ impl Swap {
         out.extend_from_slice(&pack_fee_amount(&self.fee));
         out.extend_from_slice(&pack_token_amount(&self.amounts.0));
         out.extend_from_slice(&pack_token_amount(&self.amounts.1));
+        let out_bits = out
+            .iter()
+            .map(|byte| format!("{:08b}", byte))
+            .collect::<String>();
+        // println!("SERVER SIG BITS: {}", out_bits);
         out
     }
 
@@ -304,4 +310,11 @@ impl Swap {
         message.push_str(format!("Nonce: {}", self.nonce).as_str());
         message
     }
+}
+
+fn pad_front(bytes: &[u8], size: usize) -> Vec<u8> {
+    assert!(size >= bytes.len());
+    let mut result = vec![0u8; size];
+    result[size - bytes.len()..].copy_from_slice(bytes);
+    result
 }

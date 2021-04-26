@@ -1,8 +1,9 @@
 // Pedersen hash implementation of the Hasher trait
 
-use crate::franklin_crypto::bellman::pairing::bn256::Bn256;
+use crate::franklin_crypto::bellman::{pairing::bn256::Bn256, PrimeField, PrimeFieldRepr};
 use crate::franklin_crypto::circuit::multipack;
 use crate::franklin_crypto::rescue::{rescue_hash, RescueEngine};
+use crate::primitives::GetBitsFixed;
 
 use super::hasher::Hasher;
 use core::fmt;
@@ -34,6 +35,15 @@ impl<E: RescueEngine> Hasher<E::Fr> for RescueHasher<E> {
     fn hash_bits<I: IntoIterator<Item = bool>>(&self, input: I) -> E::Fr {
         let bits: Vec<bool> = input.into_iter().collect();
         let packed = multipack::compute_multipacking::<E>(&bits);
+        // let packed_bits = packed
+        //     .iter()
+        //     .map(|el| {
+        //         let res = el.get_bits_le_fixed(254);
+        //         res.iter().map(|bit| if *bit { "1" } else { "0" }).collect::<String>()
+        //     })
+        //     .collect::<String>();
+        // println!("SERVER PREIMAGE BITS: {:#?}", packed_bits);
+
         let sponge_output = rescue_hash::<E>(self.params, &packed);
 
         assert_eq!(sponge_output.len(), 1);
