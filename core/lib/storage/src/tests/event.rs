@@ -3,11 +3,11 @@
 // Workspace uses
 use zksync_types::{
     aggregated_operations::AggregatedActionType,
-    event::{block::BlockStatus, EventData, ZkSyncEvent},
-    BlockNumber,
+    event::{account::AccountStateChangeStatus, block::BlockStatus, EventData, ZkSyncEvent},
+    AccountMap, BlockNumber,
 };
 // Local uses
-use super::db_test;
+use super::{chain::apply_random_updates, create_rng, db_test};
 use crate::{
     test_data::{
         dummy_ethereum_tx_hash, gen_sample_block, gen_unique_aggregated_operation,
@@ -81,8 +81,17 @@ fn check_block_event(event: &ZkSyncEvent, block_status: BlockStatus, block_numbe
 /// in a single query.
 #[db_test]
 async fn test_block_events(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
-    storage.ethereum_schema().initialize_eth_data().await?;
     let mut last_event_id = 0;
+    assert!(
+        storage
+            .event_schema()
+            .fetch_new_events(last_event_id)
+            .await?
+            .is_empty(),
+        "database should be empty"
+    );
+
+    storage.ethereum_schema().initialize_eth_data().await?;
     const FROM_BLOCK: u32 = 1;
     const TO_BLOCK: u32 = 3;
 
@@ -160,5 +169,81 @@ async fn test_block_events(mut storage: StorageProcessor<'_>) -> QueryResult<()>
         check_block_event(&event, BlockStatus::Finalized, block_number);
     }
 
+    Ok(())
+}
+
+fn check_account_event(event: &ZkSyncEvent, status: AccountStateChangeStatus) -> bool {
+    match &event.data {
+        EventData::Account(account_event) => account_event.status == status,
+        _ => false,
+    }
+}
+
+/// Checks the creation of account events in the database.
+/// The test flow is as follows:
+/// 1. Commit 1 state update and fetch all new events.
+/// 2. Commit another update and finalize the first one, fetch
+/// new events in a single query and verify their correctness.
+#[db_test]
+async fn test_account_events(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
+    let last_event_id = 0;
+    assert!(
+        storage
+            .event_schema()
+            .fetch_new_events(last_event_id)
+            .await?
+            .is_empty(),
+        "database should be empty"
+    );
+
+    let mut rng = create_rng();
+    let (accounts_block_1, updates_block_1) = apply_random_updates(AccountMap::default(), &mut rng);
+    // Commit random updates, for each update a corresponding
+    // account event is created.
+    storage
+        .chain()
+        .state_schema()
+        .commit_state_update(BlockNumber(1), &updates_block_1, 0)
+        .await?;
+    // Load new events.
+    let events = storage
+        .event_schema()
+        .fetch_new_events(last_event_id)
+        .await?;
+    assert!(!events.is_empty());
+    assert_eq!(events.len(), updates_block_1.len());
+    // For all events the status is `Committed`.
+    assert!(events
+        .iter()
+        .all(|event| check_account_event(event, AccountStateChangeStatus::Committed)));
+
+    // Update the offset.
+    let last_event_id = events.last().unwrap().id;
+    // New pack of updates. Commit it and apply the previous one.
+    let (_, updates_block_2) = apply_random_updates(accounts_block_1.clone(), &mut rng);
+    storage
+        .chain()
+        .state_schema()
+        .commit_state_update(BlockNumber(2), &updates_block_2, 0)
+        .await?;
+    storage
+        .chain()
+        .state_schema()
+        .apply_state_update(BlockNumber(1))
+        .await?;
+    // Load new events.
+    let events = storage
+        .event_schema()
+        .fetch_new_events(last_event_id)
+        .await?;
+    assert_eq!(events.len(), updates_block_1.len() + updates_block_2.len());
+    assert!(events
+        .iter()
+        .take(updates_block_1.len())
+        .all(|event| check_account_event(event, AccountStateChangeStatus::Committed)));
+    assert!(events
+        .iter()
+        .skip(updates_block_1.len())
+        .all(|event| check_account_event(event, AccountStateChangeStatus::Finalized)));
     Ok(())
 }
