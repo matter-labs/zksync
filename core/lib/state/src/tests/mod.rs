@@ -12,7 +12,7 @@ use zksync_crypto::{
 use zksync_types::tx::PackedEthSignature;
 use zksync_types::{
     Account, AccountId, AccountUpdate, PubKeyHash, SignedZkSyncTx, TokenId, ZkSyncPriorityOp,
-    ZkSyncTx,
+    ZkSyncTx, NFT,
 };
 
 type BoundAccountUpdates = [(AccountId, AccountUpdate)];
@@ -39,6 +39,27 @@ impl PlasmaTestBuilder {
             rng: XorShiftRng::from_seed([1, 2, 3, 4]),
             state: ZkSyncState::empty(),
         }
+    }
+
+    pub fn mint_nft(
+        &mut self,
+        token_id: TokenId,
+        content_hash: H256,
+        recipient_id: AccountId,
+        creator_id: AccountId,
+    ) {
+        let creator_address = self.state.get_account(creator_id).unwrap().address;
+        let nft = NFT::new(
+            token_id,
+            0,
+            creator_id,
+            creator_address,
+            Default::default(),
+            None,
+            content_hash,
+        );
+        self.state.nfts.insert(token_id, nft);
+        self.set_balance(recipient_id, token_id, 1u32);
     }
 
     pub fn add_account(&mut self, state: AccountState) -> (AccountId, Account, PrivateKey) {

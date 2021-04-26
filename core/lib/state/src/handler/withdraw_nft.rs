@@ -108,9 +108,9 @@ impl TxHandler<WithdrawNFT> for ZkSyncState {
         ));
 
         let from_old_balance = from_account.get_balance(op.tx.fee_token);
+        ensure!(from_old_balance >= op.tx.fee, "Not enough balance");
         from_account.sub_balance(op.tx.fee_token, &op.tx.fee);
         let from_new_balance = from_account.get_balance(op.tx.fee_token);
-        ensure!(from_old_balance >= op.tx.fee, "Not enough balance");
         // Pay fee
         updates.push((
             op.tx.account_id,

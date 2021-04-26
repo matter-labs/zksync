@@ -68,8 +68,7 @@ impl WithdrawNFTOp {
                 .ok_or_else(|| format_err!("Cant get account id from withdraw pubdata"))?;
         let creator_address = Address::from_slice(
             &bytes[creator_account_offset..creator_account_offset + ADDRESS_WIDTH / 8],
-        )
-        .ok_or_else(|| format_err!("Cant get account id from withdraw pubdata"))?;
+        );
         let content_hash = H256::from_slice(
             &bytes[content_hash_offset..content_hash_offset + CONTENT_HASH_WIDTH / 8],
         );
