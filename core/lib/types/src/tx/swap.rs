@@ -206,9 +206,7 @@ impl Swap {
         orders_bytes.append(&mut first_order_bytes);
         orders_bytes.append(&mut second_order_bytes);
 
-        // println!("NOW!");
         let orders_hash = rescue_hash_orders(&orders_bytes);
-
         self.get_swap_bytes(&orders_hash)
     }
 
@@ -225,11 +223,6 @@ impl Swap {
         out.extend_from_slice(&pack_fee_amount(&self.fee));
         out.extend_from_slice(&pack_token_amount(&self.amounts.0));
         out.extend_from_slice(&pack_token_amount(&self.amounts.1));
-        // let out_bits = out
-        //     .iter()
-        //     .map(|byte| format!("{:08b}", byte))
-        //     .collect::<String>();
-        // println!("SERVER SIG BITS: {}", out_bits);
         out
     }
 

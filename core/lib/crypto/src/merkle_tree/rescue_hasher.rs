@@ -35,17 +35,7 @@ impl<E: RescueEngine> Hasher<E::Fr> for RescueHasher<E> {
     fn hash_bits<I: IntoIterator<Item = bool>>(&self, input: I) -> E::Fr {
         let bits: Vec<bool> = input.into_iter().collect();
         let packed = multipack::compute_multipacking::<E>(&bits);
-        // let packed_bits = packed
-        //     .iter()
-        //     .map(|el| {
-        //         let res = el.get_bits_le_fixed(254);
-        //         res.iter().map(|bit| if *bit { "1" } else { "0" }).collect::<String>()
-        //     })
-        //     .collect::<String>();
-        // println!("SERVER PREIMAGE BITS: {:#?}", packed_bits);
-
         let sponge_output = rescue_hash::<E>(self.params, &packed);
-
         assert_eq!(sponge_output.len(), 1);
         sponge_output[0]
     }

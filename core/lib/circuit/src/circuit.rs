@@ -2669,13 +2669,6 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
             &op_data,
         )?;
 
-        // println!(
-        //     "{}, {}, {}",
-        //     is_serialized_order_0_correct.get_value().unwrap(),
-        //     is_serialized_order_1_correct.get_value().unwrap(),
-        //     is_serialized_swap_correct.get_value().unwrap()
-        // );
-
         let correct_messages_in_corresponding_chunks = &[
             Boolean::and(
                 cs.namespace(|| "serialized order 0 in first part of the swap"),
@@ -2720,14 +2713,6 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
                 &cur.account.nonce.get_number(),
             )?,
         ];
-
-        // println!(
-        //     "LHS: {:#?}",
-        //     lhs_valid_flags
-        //         .iter()
-        //         .map(|x| x.get_value().unwrap())
-        //         .collect::<Vec<_>>()
-        // );
 
         let lhs_valid = multi_and(cs.namespace(|| "lhs_valid"), &lhs_valid_flags)?;
 
@@ -2790,21 +2775,11 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
             &lhs_valid,
         )?;
 
-        let rhs_valid_flags = &[common_valid_flag, is_account_empty.not(), is_rhs_chunk];
-        // println!(
-        //     "RHS: {:#?}",
-        //     rhs_valid_flags
-        //         .iter()
-        //         .map(|x| x.get_value().unwrap())
-        //         .collect::<Vec<_>>()
-        // );
         // rhs
-        let rhs_valid = multi_and(cs.namespace(|| "is_rhs_valid"), rhs_valid_flags)?;
-        println!(
-            "LHS: {}, RHS: {}",
-            lhs_valid.get_value().unwrap(),
-            rhs_valid.get_value().unwrap()
-        );
+        let rhs_valid = multi_and(
+            cs.namespace(|| "is_rhs_valid"),
+            &[common_valid_flag, is_account_empty.not(), is_rhs_chunk],
+        )?;
 
         // calculate new rhs balance value
         let updated_balance = Expression::from(&cur.balance.get_number())
@@ -3784,44 +3759,10 @@ fn rescue_hash_allocated_bits<E: RescueEngine + JubjubEngine, CS: ConstraintSyst
         &bits,
     )?;
 
-    // let serialized_bits = input
-    //     .iter()
-    //     .enumerate()
-    //     .map(|(idx, el)| el.into_bits_le(cs.namespace(||format!("{}", idx))))
-    //     .collect::<Result<Vec<_>, _>>()?
-    //     .iter()
-    //     // .flatten()
-    //     .map(|bits|
-    //         bits
-    //             .iter()
-    //             .map(|bit| if bit.get_value().unwrap() { "1" } else { "0" })
-    //             .collect::<String>()
-    //     )
-    //     .collect::<String>();
-    // println!("CIRCUIT PREIMAGE BITS: {:#?}", serialized_bits);
     let sponge_output = rescue::rescue_hash(cs.namespace(|| "rescue hash"), &input, rescue_params)?;
-
     assert_eq!(sponge_output.len(), 1);
 
     let output_bits_le = sponge_output[0].into_bits_le(cs.namespace(|| "rescue hash bits"))?;
-    //
-    // let serialized_bits = output_bits_le
-    //     .iter()
-    //     .map(|bit| if bit.get_value().unwrap() { "1" } else { "0" })
-    //     .collect::<String>();
-    //
-    // println!("CIRCUIT HASH BITS {}", serialized_bits);
+
     Ok(output_bits_le[..248].to_vec())
-
-    // let result = CircuitElement::from_le_bits(
-    //     cs.namespace(|| "sponge output"),
-    //     output_bits_le[..248].to_vec(),
-    // )?;
-    // Ok(result.get_bits_be())
-
-    // let bits_be: Vec<_> = BitIterator::new(sponge_output[0].get_value().grab()?.into_repr())
-    //     .map(Boolean::constant)
-    //     .collect();
-
-    // Ok(bits_be)
 }
