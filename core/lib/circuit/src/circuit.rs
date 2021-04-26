@@ -785,7 +785,7 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
             AllocatedOperationData::from_witness(cs.namespace(|| "allocated_operation_data"), op)?;
         // ensure op_data is equal to previous
         {
-            let mut is_op_data_correct_flags = vec![
+            let is_op_data_correct_flags = vec![
                 CircuitElement::equals(
                     cs.namespace(|| "is a equal to previous"),
                     &op_data.a,
@@ -831,32 +831,32 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
                     &op_data.valid_until,
                     &prev.op_data.valid_until,
                 )?,
+                sequences_equal(
+                    cs.namespace(|| "special_eth_addresses"),
+                    &op_data.special_eth_addresses,
+                    &prev.op_data.special_eth_addresses,
+                )?,
+                sequences_equal(
+                    cs.namespace(|| "special_tokens"),
+                    &op_data.special_tokens,
+                    &prev.op_data.special_tokens,
+                )?,
+                sequences_equal(
+                    cs.namespace(|| "special_account_ids"),
+                    &op_data.special_account_ids,
+                    &prev.op_data.special_account_ids,
+                )?,
+                sequences_equal(
+                    cs.namespace(|| "special_content_hash"),
+                    &op_data.special_content_hash,
+                    &prev.op_data.special_content_hash,
+                )?,
+                CircuitElement::equals(
+                    cs.namespace(|| "is special_serial_id equal to previous"),
+                    &op_data.special_serial_id,
+                    &prev.op_data.special_serial_id,
+                )?,
             ];
-            is_op_data_correct_flags.push(sequences_equal(
-                cs.namespace(|| "special_eth_addresses"),
-                &op_data.special_eth_addresses,
-                &prev.op_data.special_eth_addresses,
-            )?);
-            is_op_data_correct_flags.push(sequences_equal(
-                cs.namespace(|| "special_tokens"),
-                &op_data.special_tokens,
-                &prev.op_data.special_tokens,
-            )?);
-            is_op_data_correct_flags.push(sequences_equal(
-                cs.namespace(|| "special_account_ids"),
-                &op_data.special_account_ids,
-                &prev.op_data.special_account_ids,
-            )?);
-            is_op_data_correct_flags.push(sequences_equal(
-                cs.namespace(|| "special_content_hash"),
-                &op_data.special_content_hash,
-                &prev.op_data.special_content_hash,
-            )?);
-            is_op_data_correct_flags.push(CircuitElement::equals(
-                cs.namespace(|| "is special_serial_id equal to previous"),
-                &op_data.special_serial_id,
-                &prev.op_data.special_serial_id,
-            )?);
 
             let is_op_data_equal_to_previous = multi_and(
                 cs.namespace(|| "is_op_data_equal_to_previous"),
@@ -914,6 +914,14 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
             cs.namespace(|| "verify operation timestamp"),
             &op_data,
             &global_variables,
+        )?;
+
+        let nft_content_as_balance = hash_nft_content_to_balance_type(
+            cs.namespace(|| "nft_content_as_balance"),
+            &op_data.special_account_ids[0], // creator_account_id
+            &op_data.special_serial_id,      // serial_id
+            &op_data.special_content_hash,   // content_hash
+            self.rescue_params,
         )?;
 
         let op_flags = vec![
@@ -1044,6 +1052,7 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
                 &ext_pubdata_chunk,
                 &signature_data.is_verified,
                 &mut previous_pubdatas[MintNFTOp::OP_CODE as usize],
+                &nft_content_as_balance,
                 is_special_nft_storage_account,
                 is_special_nft_token,
             )?,
@@ -1058,6 +1067,7 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
                 &is_valid_timestamp,
                 &signature_data.is_verified,
                 &mut previous_pubdatas[WithdrawNFTOp::OP_CODE as usize],
+                &nft_content_as_balance,
                 is_special_nft_storage_account,
                 is_special_nft_token,
             )?,
@@ -1943,6 +1953,7 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
         ext_pubdata_chunk: &AllocatedNum<E>,
         is_sig_verified: &Boolean,
         pubdata_holder: &mut Vec<AllocatedNum<E>>,
+        nft_content_as_balance: &CircuitElement<E>,
         is_special_nft_storage_account: &Boolean,
         is_special_nft_token: &Boolean,
     ) -> Result<Boolean, SynthesisError> {
@@ -1951,8 +1962,10 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
             "pubdata holder has to be preallocated"
         );
         /*
-        op_data special fields specification:
-        special_eth_addresses = [recipient_address, unused]
+        fields specification:
+
+        special:
+        special_eth_addresses = [recipient_address]
         special_tokens = [fee_token, new_token]
         special_account_ids = [creator_account_id, recipient_account_id]
         special_content_hash = vector of bits of the content hash
@@ -2183,16 +2196,9 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
 
             multi_and(cs.namespace(|| "fourth_chunk_valid"), &flags)?
         };
-        let content_to_store_as_balance = nft_content_as_balance(
-            cs.namespace(|| "NFT_content_to_store_as_balance"),
-            &op_data.special_account_ids[0],
-            &op_data.special_serial_id,
-            &op_data.special_content_hash,
-            self.rescue_params,
-        )?;
         cur.balance = CircuitElement::conditionally_select_with_number_strict(
             cs.namespace(|| "updated cur balance (fourth chunk)"),
-            Expression::from(&content_to_store_as_balance.get_number()),
+            Expression::from(&nft_content_as_balance.get_number()),
             &cur.balance,
             &fourth_chunk_valid,
         )?;
@@ -2253,6 +2259,7 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
         is_valid_timestamp: &Boolean,
         is_sig_verified: &Boolean,
         pubdata_holder: &mut Vec<AllocatedNum<E>>,
+        nft_content_as_balance: &CircuitElement<E>,
         is_special_nft_storage_account: &Boolean,
         is_special_nft_token: &Boolean,
     ) -> Result<Boolean, SynthesisError> {
@@ -2261,10 +2268,13 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
             "pubdata holder has to be preallocated"
         );
         /*
-        op_data special fields specification:
-        special_eth_addresses = [to_address, creator_address]
+        fields specification:
+        eth_address = to_address
+
+        special:
+        special_eth_addresses = [creator_address]
         special_tokens = [fee_token, token]
-        special_account_ids = [initiator_account_id, creator_account_id]
+        special_account_ids = [creator_account_id, initiator_account_id]
         special_content_hash = vector of bits of the content hash
         special_serial_id = serial_id of the NFT from this creator
         */
@@ -2272,8 +2282,8 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
         //construct pubdata
         let mut pubdata_bits = vec![];
         pubdata_bits.extend(global_variables.chunk_data.tx_type.get_bits_be()); // tx_type = 1 byte
-        pubdata_bits.extend(op_data.special_account_ids[0].get_bits_be()); // initiator_account_id = 4 bytes
-        pubdata_bits.extend(op_data.special_eth_addresses[1].get_bits_be()); // creator_address = 20 bytes
+        pubdata_bits.extend(op_data.special_account_ids[1].get_bits_be()); // initiator_account_id = 4 bytes
+        pubdata_bits.extend(op_data.special_eth_addresses[0].get_bits_be()); // creator_address = 20 bytes
         pubdata_bits.extend(
             op_data
                 .special_content_hash
@@ -2281,7 +2291,7 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
                 .map(|bit| bit.get_bits_be())
                 .flatten(),
         ); // content_hash = 32 bytes
-        pubdata_bits.extend(op_data.special_eth_addresses[0].get_bits_be()); // to_address = 20 bytes
+        pubdata_bits.extend(op_data.eth_address.get_bits_be()); // to_address = 20 bytes
         pubdata_bits.extend(op_data.special_tokens[1].get_bits_be()); // token = 4 bytes
         pubdata_bits.extend(op_data.special_tokens[0].get_bits_be()); // fee_token = 4 bytes
         pubdata_bits.extend(op_data.fee_packed.get_bits_be()); // fee = 2 bytes
@@ -2348,7 +2358,7 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
         // used in first and second chunk
         let is_initiator_account = CircuitElement::equals(
             cs.namespace(|| "is_initiator_account"),
-            &op_data.special_account_ids[0],
+            &op_data.special_account_ids[1],
             &cur.account_id,
         )?;
         // used in second and third chunk
@@ -2365,9 +2375,9 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
 
             let mut serialized_tx_bits = vec![];
             serialized_tx_bits.extend(global_variables.chunk_data.tx_type.get_bits_be()); // tx_type
-            serialized_tx_bits.extend(op_data.special_account_ids[0].get_bits_be()); // initiator_id
+            serialized_tx_bits.extend(op_data.special_account_ids[1].get_bits_be()); // initiator_id
             serialized_tx_bits.extend(cur.account.address.get_bits_be()); // initiator_address
-            serialized_tx_bits.extend(op_data.special_eth_addresses[0].get_bits_be()); // to_address
+            serialized_tx_bits.extend(op_data.eth_address.get_bits_be()); // to_address
             serialized_tx_bits.extend(op_data.special_tokens[1].get_bits_be()); // token
             serialized_tx_bits.extend(cur.token.get_bits_be()); // fee_token
             serialized_tx_bits.extend(op_data.fee_packed.get_bits_be()); // fee
@@ -2461,16 +2471,9 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
 
             flags.push(is_special_nft_storage_account.clone());
             flags.push(is_token_to_withdraw);
-            let content_as_balance = nft_content_as_balance(
-                cs.namespace(|| "NFT_content_as_balance"),
-                &op_data.special_account_ids[1],
-                &op_data.special_serial_id,
-                &op_data.special_content_hash,
-                self.rescue_params,
-            )?;
             let stored_content_valid = CircuitElement::equals(
                 cs.namespace(|| "stored_content_valid"),
-                &content_as_balance,
+                &nft_content_as_balance,
                 &cur.balance,
             )?;
             flags.push(stored_content_valid);
@@ -2484,13 +2487,13 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
 
             let is_creator_account = CircuitElement::equals(
                 cs.namespace(|| "is_creator_account"),
-                &op_data.special_account_ids[1],
+                &op_data.special_account_ids[0],
                 &cur.account_id,
             )?;
             flags.push(is_creator_account);
             let creator_address_valid = CircuitElement::equals(
                 cs.namespace(|| "creator_address_valid"),
-                &op_data.special_eth_addresses[1],
+                &op_data.special_eth_addresses[0],
                 &cur.account.address,
             )?;
             flags.push(creator_address_valid);
@@ -3776,7 +3779,7 @@ fn continue_leftmost_subroot_to_root<E: RescueEngine, CS: ConstraintSystem<E>>(
     Ok(node_hash)
 }
 
-fn nft_content_as_balance<E: RescueEngine, CS: ConstraintSystem<E>>(
+fn hash_nft_content_to_balance_type<E: RescueEngine, CS: ConstraintSystem<E>>(
     mut cs: CS,
     creator_account_id: &CircuitElement<E>,
     serial_id: &CircuitElement<E>,

@@ -74,7 +74,6 @@ fn apply_nft_mint_and_withdraw_operations() -> ZkSyncCircuit<'static, Bn256> {
                 Default::default(),
             )
             .0,
-        account_id: accounts[1].id,
         creator_id: accounts[0].id,
         creator_address: accounts[0].account.address,
         content_hash: nft_content_hash,
