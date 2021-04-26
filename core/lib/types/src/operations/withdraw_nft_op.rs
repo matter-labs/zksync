@@ -56,12 +56,12 @@ impl WithdrawNFTOp {
         );
 
         let account_offset = 1;
-        let creator_account_offset = account_offset + ADDRESS_WIDTH / 8;
-        let content_hash_offset = creator_account_offset + CONTENT_HASH_WIDTH / 8;
-        let token_id_offset = content_hash_offset + ACCOUNT_ID_BIT_WIDTH / 8;
+        let creator_account_offset = account_offset + ACCOUNT_ID_BIT_WIDTH / 8;
+        let content_hash_offset = creator_account_offset + ADDRESS_WIDTH / 8;
+        let eth_address_offset = content_hash_offset + CONTENT_HASH_WIDTH / 8;
+        let token_id_offset = eth_address_offset + ADDRESS_WIDTH / 8;
         let token_fee_id_offset = token_id_offset + TOKEN_BIT_WIDTH / 8;
         let fee_offset = token_fee_id_offset + TOKEN_BIT_WIDTH / 8;
-        let eth_address_offset = fee_offset + (FEE_EXPONENT_BIT_WIDTH + FEE_MANTISSA_BIT_WIDTH) / 8;
 
         let account_id =
             u32::from_bytes(&bytes[account_offset..account_offset + ACCOUNT_ID_BIT_WIDTH / 8])
@@ -110,5 +110,45 @@ impl WithdrawNFTOp {
 
     pub fn get_updated_account_ids(&self) -> Vec<AccountId> {
         vec![self.tx.account_id]
+    }
+}
+#[cfg(test)]
+mod tests {
+    use crate::{AccountId, Address, Nonce, TokenId, WithdrawNFT, WithdrawNFTOp, H256};
+    use num::BigUint;
+
+    #[test]
+    fn public_data() {
+        let op = WithdrawNFTOp {
+            tx: WithdrawNFT::new(
+                AccountId(10),
+                Address::random(),
+                Address::random(),
+                TokenId(10),
+                TokenId(0),
+                BigUint::from(10u32),
+                Nonce(0),
+                Default::default(),
+                None,
+            ),
+            creator_id: AccountId(0),
+            creator_address: Address::random(),
+            content_hash: H256::random(),
+            serial_id: 1,
+        };
+        let pub_data = op.get_public_data();
+        let new_op = WithdrawNFTOp::from_public_data(&pub_data).unwrap();
+        dbg!(&new_op);
+        dbg!(&op);
+        assert!(
+            new_op.tx.account_id == op.tx.account_id
+                && new_op.creator_address == op.creator_address
+                && new_op.creator_id == AccountId(0)
+                && new_op.content_hash == op.content_hash
+                && new_op.tx.to == op.tx.to
+                && new_op.tx.fee_token == op.tx.fee_token
+                && new_op.tx.token == op.tx.token
+                && new_op.tx.fee == op.tx.fee
+        )
     }
 }
