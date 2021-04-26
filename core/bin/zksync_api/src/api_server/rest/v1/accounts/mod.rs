@@ -223,10 +223,10 @@ impl ApiAccountsData {
 
     async fn pending_op_receipts(
         &self,
-        address: Address,
+        _address: Address,
     ) -> QueryResult<Vec<PendingAccountOpReceipt>> {
-        let ongoing_ops = self.core_api_client.get_unconfirmed_ops(address).await?;
-
+        //let ongoing_ops = self.core_api_client.get_unconfirmed_ops(address).await?;
+        let ongoing_ops = Vec::new();
         let receipts = ongoing_ops
             .into_iter()
             .map(pending_account_op_receipt_from_priority_op)

@@ -1,6 +1,7 @@
 pub use zksync_types::EthBlockId;
 use zksync_types::{
-    priority_ops::PriorityOpLookupQuery, tx::TxEthSignature, Address, PriorityOp, SignedZkSyncTx,
+    priority_ops::PriorityOpLookupQuery, tx::TxEthSignature, AccountId, Address, PriorityOp,
+    SignedZkSyncTx,
 };
 
 use crate::tx_error::TxAddError;
@@ -51,9 +52,18 @@ impl CoreApiClient {
         self.get(&endpoint).await
     }
 
-    /// Queries information about unconfirmed priority operations for a certain address from a Core.
-    pub async fn get_unconfirmed_ops(&self, address: Address) -> anyhow::Result<Vec<PriorityOp>> {
-        let endpoint = format!("{}/unconfirmed_ops/0x{}", self.addr, hex::encode(address));
+    /// Queries information about unconfirmed priority operations for a certain account from a Core.
+    pub async fn get_unconfirmed_ops(
+        &self,
+        address: Address,
+        account_id: AccountId,
+    ) -> anyhow::Result<Vec<PriorityOp>> {
+        let endpoint = format!(
+            "{}/unconfirmed_ops?address=0x{}&account_id={}",
+            self.addr,
+            hex::encode(address),
+            account_id
+        );
         self.get(&endpoint).await
     }
 

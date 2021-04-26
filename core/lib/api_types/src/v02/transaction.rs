@@ -5,7 +5,7 @@ use serde_json::Value;
 use zksync_types::{
     tx::TxHash,
     tx::{EthBatchSignatures, TxEthSignature},
-    AccountId, Address, BlockNumber, EthBlockId, PriorityOpId, TokenId, ZkSyncOp, ZkSyncPriorityOp,
+    AccountId, Address, BlockNumber, EthBlockId, SerialId, TokenId, ZkSyncOp, ZkSyncPriorityOp,
     ZkSyncTx, H256,
 };
 use zksync_utils::BigUintSerdeAsRadix10Str;
@@ -60,7 +60,7 @@ pub struct L1Receipt {
     pub status: BlockStatus,
     pub eth_block: EthBlockId,
     pub rollup_block: Option<BlockNumber>,
-    pub id: PriorityOpId,
+    pub id: SerialId,
 }
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
@@ -108,7 +108,7 @@ impl L1Transaction {
     pub fn from_executed_op(
         op: ZkSyncOp,
         eth_hash: H256,
-        id: PriorityOpId,
+        id: SerialId,
         tx_hash: TxHash,
     ) -> Option<Self> {
         match op {
@@ -136,11 +136,11 @@ impl L1Transaction {
     pub fn from_pending_op(
         op: ZkSyncPriorityOp,
         eth_hash: H256,
-        id: PriorityOpId,
+        id: SerialId,
         tx_hash: TxHash,
-    ) -> Option<Self> {
+    ) -> Self {
         match op {
-            ZkSyncPriorityOp::Deposit(deposit) => Some(Self::Deposit(ApiDeposit {
+            ZkSyncPriorityOp::Deposit(deposit) => Self::Deposit(ApiDeposit {
                 from: deposit.from,
                 token_id: deposit.token,
                 amount: deposit.amount,
@@ -149,14 +149,14 @@ impl L1Transaction {
                 eth_hash,
                 id,
                 tx_hash,
-            })),
-            ZkSyncPriorityOp::FullExit(deposit) => Some(Self::FullExit(ApiFullExit {
+            }),
+            ZkSyncPriorityOp::FullExit(deposit) => Self::FullExit(ApiFullExit {
                 token_id: deposit.token,
                 account_id: deposit.account_id,
                 eth_hash,
                 id,
                 tx_hash,
-            })),
+            }),
         }
     }
 }
@@ -170,7 +170,7 @@ pub struct ApiDeposit {
     pub to: Address,
     pub account_id: Option<AccountId>,
     pub eth_hash: H256,
-    pub id: PriorityOpId,
+    pub id: SerialId,
     #[serde(serialize_with = "serialize_tx_hash_with_0x")]
     pub tx_hash: TxHash,
 }
@@ -180,7 +180,7 @@ pub struct ApiFullExit {
     pub account_id: AccountId,
     pub token_id: TokenId,
     pub eth_hash: H256,
-    pub id: PriorityOpId,
+    pub id: SerialId,
     #[serde(serialize_with = "serialize_tx_hash_with_0x")]
     pub tx_hash: TxHash,
 }

@@ -23,8 +23,7 @@ use zksync_storage::{
 };
 use zksync_types::{
     aggregated_operations::AggregatedActionType, priority_ops::PriorityOpLookupQuery,
-    tx::EthSignData, tx::TxEthSignature, tx::TxHash, BlockNumber, EthBlockId, PriorityOpId,
-    ZkSyncOp, H256,
+    tx::EthSignData, tx::TxEthSignature, tx::TxHash, BlockNumber, EthBlockId, ZkSyncOp, H256,
 };
 
 // Local uses
@@ -37,7 +36,7 @@ pub fn l1_receipt_from_op_and_status(
 ) -> L1Receipt {
     let eth_block = EthBlockId(op.eth_block as u64);
     let rollup_block = Some(BlockNumber(op.block_number as u32));
-    let id = PriorityOpId(op.priority_op_serialid as u64);
+    let id = op.priority_op_serialid as u64;
 
     L1Receipt {
         status,
@@ -133,7 +132,7 @@ impl ApiTransactionData {
                 status: BlockStatus::Queued,
                 eth_block,
                 rollup_block: None,
-                id: PriorityOpId(priority_op.serial_id),
+                id: priority_op.serial_id,
             }))
         } else {
             Ok(None)
@@ -216,7 +215,7 @@ impl ApiTransactionData {
             let status = Self::get_block_status(storage, block_number).await.into();
             let operation: ZkSyncOp = serde_json::from_value(op.operation).unwrap();
             let eth_hash = H256::from_slice(&op.eth_hash);
-            let id = PriorityOpId(op.priority_op_serialid as u64);
+            let id = op.priority_op_serialid as u64;
             let tx = Transaction {
                 tx_hash,
                 block_number: Some(block_number),
@@ -242,15 +241,12 @@ impl ApiTransactionData {
             let tx = Transaction {
                 tx_hash,
                 block_number: None,
-                op: TransactionData::L1(
-                    L1Transaction::from_pending_op(
-                        priority_op.data,
-                        priority_op.eth_hash,
-                        PriorityOpId(priority_op.serial_id),
-                        tx_hash,
-                    )
-                    .unwrap(),
-                ),
+                op: TransactionData::L1(L1Transaction::from_pending_op(
+                    priority_op.data,
+                    priority_op.eth_hash,
+                    priority_op.serial_id,
+                    tx_hash,
+                )),
                 status: L2Status::Queued,
                 fail_reason: None,
                 created_at: None,

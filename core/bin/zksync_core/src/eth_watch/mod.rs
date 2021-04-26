@@ -22,7 +22,7 @@ use web3::types::{Address, BlockNumber};
 
 // Workspace deps
 use zksync_crypto::params::PRIORITY_EXPIRATION;
-use zksync_types::{tx::TxHash, Nonce, PriorityOp, PubKeyHash, ZkSyncPriorityOp, H256};
+use zksync_types::{tx::TxHash, AccountId, Nonce, PriorityOp, PubKeyHash, ZkSyncPriorityOp, H256};
 
 // Local deps
 use self::{
@@ -82,6 +82,7 @@ pub enum EthWatchRequest {
     },
     GetUnconfirmedOps {
         address: Address,
+        account_id: AccountId,
         resp: oneshot::Sender<Vec<PriorityOp>>,
     },
     GetUnconfirmedOpByEthHash {
@@ -263,16 +264,16 @@ impl<W: EthClient> EthWatch<W> {
             .collect()
     }
 
-    fn get_ongoing_ops_for(&self, address: Address) -> Vec<PriorityOp> {
+    fn get_ongoing_ops_for(&self, address: Address, account_id: AccountId) -> Vec<PriorityOp> {
         self.eth_state
             .unconfirmed_queue()
             .iter()
             .filter(|op| match &op.data {
                 ZkSyncPriorityOp::Deposit(deposit) => {
                     // Address may be set to sender.
-                    deposit.from == address
+                    deposit.to == address
                 }
-                ZkSyncPriorityOp::FullExit(full_exit) => full_exit.eth_address == address,
+                ZkSyncPriorityOp::FullExit(full_exit) => full_exit.account_id == account_id,
             })
             .cloned()
             .collect()
@@ -386,8 +387,12 @@ impl<W: EthClient> EthWatch<W> {
                     let deposits_for_address = self.get_ongoing_deposits_for(address);
                     resp.send(deposits_for_address).ok();
                 }
-                EthWatchRequest::GetUnconfirmedOps { address, resp } => {
-                    let deposits_for_address = self.get_ongoing_ops_for(address);
+                EthWatchRequest::GetUnconfirmedOps {
+                    address,
+                    account_id,
+                    resp,
+                } => {
+                    let deposits_for_address = self.get_ongoing_ops_for(address, account_id);
                     resp.send(deposits_for_address).ok();
                 }
                 EthWatchRequest::GetUnconfirmedOpByEthHash { eth_hash, resp } => {

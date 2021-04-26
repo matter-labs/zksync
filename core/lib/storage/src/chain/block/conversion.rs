@@ -12,8 +12,8 @@ use zksync_types::{
     aggregated_operations::AggregatedOperation,
     block::{ExecutedPriorityOp, ExecutedTx},
     tx::TxHash,
-    Action, ActionType, BlockNumber, Operation, PriorityOp, PriorityOpId, SignedZkSyncTx, ZkSyncOp,
-    ZkSyncTx, H256,
+    Action, ActionType, BlockNumber, Operation, PriorityOp, SignedZkSyncTx, ZkSyncOp, ZkSyncTx,
+    H256,
 };
 // Local imports
 use crate::chain::operations::records::StoredAggregatedOperation;
@@ -234,7 +234,7 @@ pub fn l1_transaction_from_item_and_status(
 ) -> Transaction {
     let tx_hash = TxHash::from_slice(&item.tx_hash).unwrap();
     let eth_hash = H256::from_slice(&item.eth_hash);
-    let id = PriorityOpId(item.priority_op_serialid as u64);
+    let id = item.priority_op_serialid as u64;
     let operation: ZkSyncOp = serde_json::from_value(item.operation).unwrap();
     Transaction {
         tx_hash,

@@ -5,8 +5,10 @@
 // Workspace uses
 use zksync_api_types::v02::{
     block::BlockInfo,
-    pagination::{BlockAndTxHash, Paginated, PaginationQuery},
-    transaction::Transaction,
+    pagination::{
+        BlockAndTxHash, Paginated, PaginationDirection, PaginationQuery, PendingOpsRequest,
+    },
+    transaction::{L1Transaction, L2Status, Transaction, TransactionData},
 };
 use zksync_storage::StorageProcessor;
 use zksync_types::{BlockNumber, Token, TokenId};
@@ -17,6 +19,7 @@ use super::{
     error::{Error, InvalidDataError},
     paginate_trait::Paginate,
 };
+use crate::core_api_client::CoreApiClient;
 
 #[async_trait::async_trait]
 impl Paginate<Token> for StorageProcessor<'_> {
@@ -104,6 +107,71 @@ impl Paginate<Transaction> for StorageProcessor<'_> {
             query.limit,
             query.direction,
             count,
+        ))
+    }
+}
+
+#[async_trait::async_trait]
+impl Paginate<Transaction> for CoreApiClient {
+    type Index = PendingOpsRequest;
+
+    async fn paginate(
+        &mut self,
+        query: &PaginationQuery<PendingOpsRequest>,
+    ) -> Result<Paginated<Transaction, PendingOpsRequest>, Error> {
+        let mut all_ops = self
+            .get_unconfirmed_ops(query.from.address, query.from.account_id)
+            .await
+            .map_err(Error::core_api)?;
+        let count = all_ops.len();
+
+        let index = match query.direction {
+            PaginationDirection::Newer => {
+                all_ops.sort_by(|a, b| a.serial_id.cmp(&b.serial_id));
+                all_ops
+                    .iter()
+                    .position(|a| a.serial_id >= query.from.serial_id)
+            }
+            PaginationDirection::Older => {
+                all_ops.sort_by(|a, b| b.serial_id.cmp(&a.serial_id));
+                all_ops
+                    .iter()
+                    .position(|a| a.serial_id <= query.from.serial_id)
+            }
+        };
+
+        let list = match index {
+            Some(index) => {
+                let mut ops: Vec<_> = all_ops[index..].into_iter().collect();
+                ops.truncate(query.limit as usize);
+                ops.into_iter()
+                    .map(|op| {
+                        let tx_hash = op.tx_hash();
+                        let tx = L1Transaction::from_pending_op(
+                            op.data.clone(),
+                            op.eth_hash,
+                            op.serial_id,
+                            tx_hash,
+                        );
+                        Transaction {
+                            tx_hash,
+                            block_number: None,
+                            op: TransactionData::L1(tx),
+                            status: L2Status::Queued,
+                            fail_reason: None,
+                            created_at: None,
+                        }
+                    })
+                    .collect()
+            }
+            None => Vec::new(),
+        };
+        Ok(Paginated::new(
+            list,
+            query.from,
+            query.limit,
+            query.direction,
+            count as u32,
         ))
     }
 }

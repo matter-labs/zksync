@@ -177,12 +177,14 @@ async fn test_operation_queues() {
     // Make sure that the old behavior of the pending deposits getter has not changed.
     let deposits = watcher.get_ongoing_deposits_for(to_addr);
     assert_eq!(deposits.len(), 1);
-    // Check that the new pending operations getter shows only deposits with the same `from` address.
-    let ops = watcher.get_ongoing_ops_for(from_addr);
+    // Check that the new pending operations getter shows only deposits with the same `to` address.
+    let ops = watcher.get_ongoing_ops_for(to_addr, AccountId(1));
 
     assert_eq!(ops[0].serial_id, 0);
     assert_eq!(ops[1].serial_id, 2);
-    assert!(watcher.get_ongoing_ops_for(to_addr).is_empty());
+    assert!(watcher
+        .get_ongoing_ops_for(from_addr, AccountId(0))
+        .is_empty());
 }
 
 /// This test simulates the situation when eth watch module did not poll Ethereum node for some time

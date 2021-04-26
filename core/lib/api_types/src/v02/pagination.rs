@@ -1,6 +1,6 @@
 use super::transaction::serialize_tx_hash_with_0x;
 use serde::{Deserialize, Serialize};
-use zksync_types::{tx::TxHash, BlockNumber};
+use zksync_types::{tx::TxHash, AccountId, Address, BlockNumber, SerialId};
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone, Copy)]
 #[serde(rename_all = "snake_case")]
@@ -55,4 +55,11 @@ pub struct BlockAndTxHash {
     pub block_number: BlockNumber,
     #[serde(serialize_with = "serialize_tx_hash_with_0x")]
     pub tx_hash: TxHash,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, Copy)]
+pub struct PendingOpsRequest {
+    pub address: Address,
+    pub account_id: AccountId,
+    pub serial_id: SerialId,
 }
