@@ -5,3 +5,4 @@ mod mint_nft;
 mod priority_ops;
 mod transfer;
 mod withdraw;
+mod withdraw_nft;
