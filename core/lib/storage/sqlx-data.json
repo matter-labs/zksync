@@ -4996,6 +4996,49 @@
       ]
     }
   },
+  "f5f49544d90f3a83b8507de025837a162a589ca5170ec426c65e870294c98902": {
+    "query": "\n            SELECT\n                id,\n                event_type as \"event_type!: EventType\",\n                event_data\n            FROM events WHERE id > $1\n            ORDER BY id ASC\n            ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "id",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 1,
+          "name": "event_type!: EventType",
+          "type_info": {
+            "Custom": {
+              "name": "event_type",
+              "kind": {
+                "Enum": [
+                  "Account",
+                  "Block",
+                  "Transaction"
+                ]
+              }
+            }
+          }
+        },
+        {
+          "ordinal": 2,
+          "name": "event_data",
+          "type_info": "Jsonb"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Int8"
+        ]
+      },
+      "nullable": [
+        false,
+        false,
+        false
+      ]
+    }
+  },
   "f7599bbef8c317c1ab1a61b2bcba3c5b03855b8a536bcdf369332c567b29d92c": {
     "query": "SELECT pg_notify($1, $2)",
     "describe": {
@@ -5079,49 +5122,6 @@
         false,
         false,
         false,
-        false,
-        false,
-        false
-      ]
-    }
-  },
-  "ff6eb0b5913167ab2daa8b7acc71bbe7226531ec4eae9bb2f60bc811d0b7baae": {
-    "query": "\n            SELECT\n                id,\n                event_type as \"event_type!: EventType\",\n                event_data\n            FROM events WHERE id > $1\n            ",
-    "describe": {
-      "columns": [
-        {
-          "ordinal": 0,
-          "name": "id",
-          "type_info": "Int8"
-        },
-        {
-          "ordinal": 1,
-          "name": "event_type!: EventType",
-          "type_info": {
-            "Custom": {
-              "name": "event_type",
-              "kind": {
-                "Enum": [
-                  "Account",
-                  "Block",
-                  "Transaction"
-                ]
-              }
-            }
-          }
-        },
-        {
-          "ordinal": 2,
-          "name": "event_data",
-          "type_info": "Jsonb"
-        }
-      ],
-      "parameters": {
-        "Left": [
-          "Int8"
-        ]
-      },
-      "nullable": [
         false,
         false,
         false

@@ -21,7 +21,7 @@ pub enum EventData {
 
 #[derive(Debug, Clone, Serialize)]
 pub struct ZkSyncEvent {
-    #[serde(skip)]
+    #[serde(rename = "event_id")]
     pub id: i64,
     #[serde(flatten)]
     pub data: EventData,

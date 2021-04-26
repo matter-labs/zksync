@@ -870,12 +870,12 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
         let start = Instant::now();
         let mut transaction = self.0.start_transaction().await?;
 
-        let last_commited_block = transaction
+        let last_committed_block = transaction
             .chain()
             .block_schema()
             .get_last_committed_block()
             .await?;
-        for block_number in *last_block..=*last_commited_block {
+        for block_number in *last_block..=*last_committed_block {
             transaction
                 .event_schema()
                 .store_block_event(BlockStatus::Reverted, BlockNumber(block_number))

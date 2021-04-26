@@ -16,6 +16,12 @@ use crate::{
     QueryResult, StorageProcessor,
 };
 
+// TODO: add a test for transaction events.
+// Trying to store non-empty block concurrently causes a dead-lock in tests.
+// (inserts into `executed_priority_operations` and `eth_account_types`)
+// Also, a more generic setup is needed to check a deposit event which
+// doesn't store an account id.
+
 /// Helper method for populating block events in the database.
 /// Since `store_block_event` relies on `load_block_range` method,
 /// it's necessary to have a confirmed Eth transaction in the db,
@@ -79,6 +85,7 @@ fn check_block_event(event: &ZkSyncEvent, block_status: BlockStatus, block_numbe
 /// 2. Commit 4th block.
 /// 3. Finalize first 3 blocks then fetch 1 "block committed" event and 3 "block finalized"
 /// in a single query.
+/// 4. Revert all 4 blocks and expect new "block reverted" events.
 #[db_test]
 async fn test_block_events(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
     let mut last_event_id = 0;
@@ -126,7 +133,7 @@ async fn test_block_events(mut storage: StorageProcessor<'_>) -> QueryResult<()>
         last_event_id = events[0].id;
     }
     // Commit one more block.
-    let block_number = BlockNumber(4);
+    let block_number = BlockNumber(TO_BLOCK + 1);
     storage
         .chain()
         .block_schema()
@@ -152,12 +159,15 @@ async fn test_block_events(mut storage: StorageProcessor<'_>) -> QueryResult<()>
         )
         .await?;
     }
-    // Fetch populated events.
+    // Fetch new events.
     let events = storage
         .event_schema()
         .fetch_new_events(last_event_id)
         .await?;
-    assert_eq!(events.len(), 4);
+    // Update the offset.
+    last_event_id = events.last().unwrap().id;
+    let expected_len = TO_BLOCK as usize + 1;
+    assert_eq!(events.len(), expected_len);
     // The first event is "block committed".
     let mut events_iter = events.into_iter();
     let block_event = events_iter.next().unwrap();
@@ -167,6 +177,23 @@ async fn test_block_events(mut storage: StorageProcessor<'_>) -> QueryResult<()>
         let block_number = BlockNumber(block_number);
         let event = events_iter.next().unwrap();
         check_block_event(&event, BlockStatus::Finalized, block_number);
+    }
+    // Revert all blocks.
+    storage
+        .chain()
+        .block_schema()
+        .remove_blocks(BlockNumber(0))
+        .await?;
+    let mut events = storage
+        .event_schema()
+        .fetch_new_events(last_event_id)
+        .await?
+        .into_iter();
+    // Check the status for each event.
+    for block_number in FROM_BLOCK..=TO_BLOCK + 1 {
+        let block_number = BlockNumber(block_number);
+        let event = events.next().unwrap();
+        check_block_event(&event, BlockStatus::Reverted, block_number);
     }
 
     Ok(())

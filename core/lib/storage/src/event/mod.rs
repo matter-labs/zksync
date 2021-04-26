@@ -55,6 +55,7 @@ impl<'a, 'c> EventSchema<'a, 'c> {
                 event_type as "event_type!: EventType",
                 event_data
             FROM events WHERE id > $1
+            ORDER BY id ASC
             "#,
             from
         )
