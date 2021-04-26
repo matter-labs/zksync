@@ -407,6 +407,23 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
 
     /// @dev 1. Try to send token to _recipients
     /// @dev 2. On failure: Increment _recipients balance to withdraw.
+    function withdrawNFT(
+        uint32 _tokenId,
+        address _recipient,
+        address _creator,
+        bytes32 _contentHash
+    ) internal {
+        NFTFactory _factory = governance.getFactory(_creator);
+        bool sent = false;
+        try _factory.mintNFT{gas: WITHDRAWAL_GAS_LIMIT}(_creator, _recipient, _contentHash, _tokenId) {
+            sent = true;
+        } catch {
+            sent = false;
+        }
+    }
+
+    /// @dev 1. Try to send token to _recipients
+    /// @dev 2. On failure: Increment _recipients balance to withdraw.
     function withdrawOrStore(
         uint16 _tokenId,
         address _recipient,
@@ -468,10 +485,17 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
                 if (op.tokenId <= MAX_FUNGIBLE_TOKEN_ID) {
                     withdrawOrStore(uint16(op.tokenId), op.owner, op.amount);
                 } else {
-                    if (op.amount) {
-                        // TODO
+                    if (op.amount == 1) {
+                        withdrawNFT(op.tokenId, op.owner, op.creator, op.contentHash);
+                    } else {
+                        revert("ds") // Unsupported amount for nft
                     }
                 }
+            } else if (opType == Operations.OpType.WithdrawNFT) {
+                Operations.WithdrawNFT memory op = Operations.readWithdrawNFTPubdata(pubData);
+                // MUST be one of the NFTs
+                require(op.tokenId >= MAX_FUNGIBLE_TOKEN_ID, "w");
+                withdrawNFT(op.tokenId, op.owner, op.creator, op.contentHash);
             } else {
                 revert("l"); // unsupported op in block execution
             }

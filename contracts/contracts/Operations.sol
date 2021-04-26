@@ -196,4 +196,23 @@ library Operations {
         (offset, parsed.owner) = Bytes.readAddress(_data, offset); // owner
         (offset, parsed.nonce) = Bytes.readUInt32(_data, offset); // nonce
     }
+
+    struct WithdrawNFT {
+        //uint8 opType; -- present in pubdata, ignored at serialization
+        //uint32 accountId; -- present in pubdata, ignored at serialization
+        address creator;
+        bytes32 contentHash;
+        address owner;
+        uint32 tokenId;
+        //uint32 feeTokenId;
+        //uint16 fee; -- present in pubdata, ignored at serialization
+    }
+
+    function readWithdrawNFTPubdata(bytes memory _data) internal pure returns (WithdrawNFT memory parsed) {
+        uint256 offset = OP_TYPE_BYTES + ACCOUNT_ID_BYTES; // opType + accountId (ignored)
+        (offset, parsed.creator) = Bytes.readAddress(_data, offset);
+        (offset, parsed.contentHash) = Bytes.readBytes32(_data, offset);
+        (offset, parsed.owner) = Bytes.readAddress(_data, offset);
+        (offset, parsed.tokenId) = Bytes.readUInt32(_data, offset);
+    }
 }

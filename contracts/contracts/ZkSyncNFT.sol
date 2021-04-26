@@ -40,7 +40,7 @@ contract ZkSyncNFT is Context, ERC165, IERC721, IERC721Enumerable, NFTFactory {
     string private _symbol;
 
     // Optional mapping for token content hashes
-    mapping(uint256 => bytes) private _contentHashes;
+    mapping(uint256 => bytes32) private _contentHashes;
 
     /*
      *     bytes4(keccak256('balanceOf(address)')) == 0x70a08231
@@ -97,12 +97,11 @@ contract ZkSyncNFT is Context, ERC165, IERC721, IERC721Enumerable, NFTFactory {
     function mintNFT(
         address _creator,
         address recipient,
-        bytes memory contentHash,
+        bytes32 contentHash,
         uint256 tokenId
-    ) external override returns (bool) {
+    ) external override {
         require(_msgSender() == _zksync_address, "Miniting allowed only from zksync");
         _safeMint(recipient, tokenId, contentHash);
-        return true;
     }
 
     /**
@@ -135,10 +134,10 @@ contract ZkSyncNFT is Context, ERC165, IERC721, IERC721Enumerable, NFTFactory {
         return _symbol;
     }
 
-    function contentHash(uint256 tokenId) public view returns (bytes memory) {
+    function contentHash(uint256 tokenId) public view returns (bytes32) {
         require(_exists(tokenId), "Content hash query for nonexistent token");
 
-        bytes memory _contentHash = _contentHashes[tokenId];
+        bytes32  _contentHash = _contentHashes[tokenId];
 
         return _contentHash;
     }
@@ -311,7 +310,7 @@ contract ZkSyncNFT is Context, ERC165, IERC721, IERC721Enumerable, NFTFactory {
     function _safeMint(
         address to,
         uint256 tokenId,
-        bytes memory contentHash
+        bytes32 contentHash
     ) internal virtual {
         _safeMint(to, tokenId, contentHash, "");
     }
@@ -323,7 +322,7 @@ contract ZkSyncNFT is Context, ERC165, IERC721, IERC721Enumerable, NFTFactory {
     function _safeMint(
         address to,
         uint256 tokenId,
-        bytes memory contentHash,
+        bytes32 contentHash,
         bytes memory _data
     ) internal virtual {
         _mint(to, tokenId, contentHash);
@@ -348,7 +347,7 @@ contract ZkSyncNFT is Context, ERC165, IERC721, IERC721Enumerable, NFTFactory {
     function _mint(
         address to,
         uint256 tokenId,
-        bytes memory contentHash
+        bytes32 contentHash
     ) internal virtual {
         require(to != address(0), "ERC721: mint to the zero address");
         require(!_exists(tokenId), "ERC721: token already minted");
@@ -379,7 +378,7 @@ contract ZkSyncNFT is Context, ERC165, IERC721, IERC721Enumerable, NFTFactory {
         _approve(address(0), tokenId);
 
         // Clear metadata (if any)
-        if (bytes(_contentHashes[tokenId]).length != 0) {
+        if (_contentHashes[tokenId].length != 0) {
             delete _contentHashes[tokenId];
         }
 
