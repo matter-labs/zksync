@@ -2,7 +2,7 @@
 
 This document covers development-related actions in zkSync.
 
-## **Initializing the project**
+## Initializing the project
 
 To setup the main toolkit, `zk`, simply run:
 
@@ -50,7 +50,7 @@ zk up   # Set up `geth` and `postgres` containers
 zk down # Shut down `geth` and `postgres` containers
 ```
 
-## **Committing changes**
+## Committing changes
 
 `zksync` uses pre-commit and pre-push git hooks for basic code integrity checks. Hooks are set up automatically
 withinthe workspace initialization process. These hooks will not allow to commit the code which does not pass several
@@ -62,7 +62,7 @@ Currently the following criteria are checked:
 - Other code should always be formatted via `zk fmt`.
 - Dummy Prover should not be staged for commit (see below for the explanation).
 
-## **Using Dummy Prover**
+## Using Dummy Prover
 
 Using the real prover for the development can be not really handy, since it’s pretty slow and resource consuming.
 
@@ -99,7 +99,7 @@ $ zk dummy-prover status
 Dummy Prover status: disabled
 ```
 
-## **Database migrations**
+## Database migrations
 
 zkSync uses PostgreSQL as a database backend, and `diesel-cli` for database migrations management.
 
@@ -130,7 +130,7 @@ Adding a new migration requires the following actions:
 zk test db
 ```
 
-## **Testing**
+## Testing
 
 - Running the `rust` unit-tests (heavy tests such as ones for `circuit` and database will not be run):
 
@@ -181,7 +181,7 @@ zk test db
   **Note**. If you have compilation issues with `sqlx`, then make sure to run `zk up` before running the tests. Also,
   ifyou see some tests fail, might need to call `zk db reset` and restart the tests.
 
-## **Developing circuit**
+## Developing circuit
 
 - To generate proofs one must have the universal setup files (which are downloaded during the first initialization).
 - To verify generated proofs one must have verification keys. Verification keys are generated for specific circuit
@@ -194,21 +194,21 @@ Steps to do after updating circuit:
 2. Regenerate verification keys and Verifier contract using `zk run verify-keys gen` command.
 3. Pack generated verification keys using `zk run verify-keys pack` command and commit resulting file to repo.
 
-## **Build and push Docker images to dockerhub**
+## Build and push Docker images to dockerhub
 
 ```
 zk docker push <IMAGE>
 ```
 
-## **Contracts**
+## Contracts
 
-### **Re-build contracts**
+### Re-build contracts
 
 ```
 zk contract build
 ```
 
-### **Publish source code on etherscan**
+### Publish source code on etherscan
 
 ```
 zk contract publish

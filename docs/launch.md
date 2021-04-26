@@ -2,13 +2,13 @@
 
 This document covers common scenarios of launching zkSync applications set locally.
 
-## **Prerequisites**
+## Prerequisites
 
 Prepare dev environment prerequisites: see
 
 [Installing dependencies](./setup-dev.md)
 
-## **Setup local dev environment**
+## Setup local dev environment
 
 Setup:
 
@@ -40,13 +40,13 @@ simplylaunch:
 zk up
 ```
 
-## **(Re)deploy db and contraсts**
+## (Re)deploy db and contraсts
 
 ```
 zk contract redeploy
 ```
 
-## **Environment configurations**
+## Environment configurations
 
 Env config files are held in `etc/env/`
 
@@ -65,7 +65,7 @@ zk env <ENV_NAME>
 Default confiruration is `dev.env`, which is generated automatically
 from `dev.env.example` during `zk init` commandexecution.
 
-## **Build and run server + prover locally for development**
+## Build and run server + prover locally for development
 
 Run server:
 
@@ -95,7 +95,7 @@ see `* dev` inoutput.
 
 ## Troubleshooting
 
-### **SSL error: certificate verify failed**
+### SSL error: certificate verify failed
 
 **Problem**. `zk init` fails with the following error:
 
@@ -106,7 +106,7 @@ SSL error: certificate verify failed
 
 **Solution**. Make sure that the version of `axel` on your computer is `2.17.10`.
 
-### **rmSync is not a function**
+### rmSync is not a function
 
 **Problem**. `zk init` fails with the following error:
 

@@ -1,6 +1,6 @@
 # Installing dependencies
 
-## **`Docker`**
+## `Docker`
 
 Install `docker`. It is recommended to follow the instructions from the
 [official site](https://docs.docker.com/install/).
@@ -34,7 +34,7 @@ solvedat this step.
 
 If logging out does not help, restarting the computer should.
 
-## **`Node` & `Yarn`**
+## `Node` & `Yarn`
 
 1. Install `Node` (requires version 14.14.0 or higher). Since our team attempts to always use the latest LTS version
    of`Node.js`, we suggest you to install [nvm](https://github.com/nvm-sh/nvm). It will allow you to
@@ -45,7 +45,7 @@ If logging out does not help, restarting the computer should.
    official website. It contains a lot of troubleshootingguides in it.
 3. Run `yarn global add @vue/cli-service`
 
-## **`Axel`**
+## `Axel`
 
 Install `axel` for downloading keys:
 
@@ -69,7 +69,7 @@ axel --version
 
 Make sure the version is `2.17.10`.
 
-## **`Rust`**
+## `Rust`
 
 Install the latest `rust` version.
 
@@ -82,7 +82,7 @@ rustc --version
 rustc 1.48.0 (7eac88abb 2020-11-16)
 ```
 
-### **`lld`**
+### `lld`
 
 Optionally, you may want to optimize the build time with the LLVM linker, `lld`. Make sure you have it installed and
 append `"-C", "link-arg=-fuse-ld=lld"` to the `rustflags` in your `.cargo/config` file, so it looks like this:
@@ -96,7 +96,7 @@ rustflags = [
 
 **Warning:** This is only viable for linux since `lld` doesn’t work on mac.
 
-## **PSQL**
+## PSQL
 
 Install `psql` CLI tool to interact with postgres.
 
@@ -106,7 +106,7 @@ On debian-based linux:
 sudo apt-get install postgresql-client
 ```
 
-## **`Diesel` CLI**
+## `Diesel` CLI
 
 Install `[diesel](https://diesel.rs/)` CLI (it is used for migrations management only):
 
@@ -128,7 +128,7 @@ If you still see the errors, install the `build-essential` package. On debian-
 sudo apt install build-essential
 ```
 
-## **`sqlx` CLI**
+## `sqlx` CLI
 
 Also, we need `[sqlx](https://github.com/launchbadge/sqlx)` CLI (it is used to generate database wrappers):
 
@@ -160,7 +160,7 @@ export OPENSSL_DIR=/usr/local/ssl
 sudo apt-get install -y pkg-config
 ```
 
-## **`solc`**
+## `solc`
 
 You have to install `solc` v0.5.16. Instructions can be found at
 [readthedocs](https://solidity.readthedocs.io/en/v0.6.2/installing-solidity.html).
@@ -189,7 +189,7 @@ Finally, to prevent pacman from upgrading it, add this line to your /etc/pacman.
 IgnorePkg = solidity
 ```
 
-## **drone cli**
+## drone cli
 
 drone cli used to create promotion jobs [described here](https://docs.drone.io/cli/install/).
 
@@ -201,7 +201,7 @@ Required by `binaryen` to build C++ sources. In order to speed it up, you might 
 sudo apt-get install cmake clang lld
 ```
 
-## **Environment**
+## Environment
 
 Edit the lines below and add them to your shell profile file (e.g. `~/.bash_profile`):
 
