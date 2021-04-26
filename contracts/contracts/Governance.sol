@@ -4,6 +4,7 @@ pragma solidity ^0.7.0;
 
 import "./Config.sol";
 import "./Utils.sol";
+import "./NFTFactory.sol";
 
 /// @title Governance Contract
 /// @author Matter Labs
@@ -47,7 +48,7 @@ contract Governance is Config {
     address public tokenGovernance;
 
     /// @notice NFT Creator address to factory address mapping
-    mapping(address => address) public NFTFactories;
+    mapping(address => NFTFactory) public NFTFactories;
 
     /// @notice Governance contract initialization. Can be external because Proxy contract intercepts illegal calls of this function.
     /// @param initializationParameters Encoded representation of initialization parameters:
@@ -154,7 +155,7 @@ contract Governance is Config {
     /// @param _creatorAddress NFT creator address
     /// @param _signature creator's signature
     function registerNFTFactory(address _creatorAddress, bytes memory _signature) external {
-        require(NFTFactories[_creatorAddress] == address(0), "Q");
+        require(address(NFTFactories[_creatorAddress]) == address(0), "Q");
         bytes32 messageHash =
             keccak256(
                 abi.encodePacked(
@@ -167,7 +168,7 @@ contract Governance is Config {
             );
         address recoveredAddress = Utils.recoverAddressFromEthSignature(_signature, messageHash);
         if (recoveredAddress == _creatorAddress && recoveredAddress != address(0)) {
-            NFTFactories[_creatorAddress] = msg.sender;
+            NFTFactories[_creatorAddress] = NFTFactory(msg.sender);
             emit NFTFactoryRegistered(_creatorAddress, msg.sender, _signature);
         }
     }
