@@ -1,6 +1,9 @@
 // External deps
 use num::BigUint;
-use zksync_crypto::franklin_crypto::bellman::pairing::bn256::Bn256;
+use zksync_crypto::franklin_crypto::bellman::pairing::{
+    bn256::{Bn256, Fr},
+    ff::Field,
+};
 // Workspace deps
 use zksync_state::{handler::TxHandler, state::ZkSyncState};
 use zksync_types::{
@@ -12,14 +15,16 @@ use crate::{
     witness::{
         full_exit::FullExitWitness,
         tests::test_utils::{
-            check_circuit, generic_test_scenario, incorrect_op_test_scenario, WitnessTestAccount,
-            ZkSyncStateGenerator, FEE_ACCOUNT_ID,
+            check_circuit, check_circuit_non_panicking, generic_test_scenario, incorrect_fr,
+            incorrect_op_test_scenario, WitnessTestAccount, ZkSyncStateGenerator, FEE_ACCOUNT_ID,
         },
         utils::WitnessBuilder,
         MintNFTWitness, SigDataInput, Witness,
     },
 };
-use zksync_crypto::params::{MIN_NFT_TOKEN_ID, NFT_STORAGE_ACCOUNT_ID, NFT_TOKEN_ID};
+use zksync_crypto::params::{
+    CONTENT_HASH_WIDTH, MIN_NFT_TOKEN_ID, NFT_STORAGE_ACCOUNT_ID, NFT_TOKEN_ID,
+};
 
 /// Checks that `FullExit` can be applied to an existing account.
 /// Here we generate a ZkSyncState with one account (which has some funds), and
@@ -165,6 +170,69 @@ fn test_full_exit_nft_success() {
 
     // Verify that there are no unsatisfied constraints
     check_circuit(circuit);
+}
+
+/// Checks that executing a FullExit of NFT with
+/// incorrect content_hash results in an error.
+#[test]
+#[ignore]
+fn test_full_exit_nft_with_incorrect_content_hash() {
+    const ERR_MSG: &str = "chunk number 6/execute_op/op_valid is true/enforce equal to one";
+
+    let mut circuit = apply_nft_mint_and_full_exit_nft_operations();
+    for operation_id in MintNFTOp::CHUNKS..MintNFTOp::CHUNKS + FullExitOp::CHUNKS {
+        circuit.operations[operation_id].args.special_content_hash =
+            vec![Some(Fr::zero()); CONTENT_HASH_WIDTH];
+    }
+
+    let result = check_circuit_non_panicking(circuit);
+    match result {
+        Ok(_) => panic!(
+            "Operation did not err, but was expected to err with message '{}'",
+            ERR_MSG,
+        ),
+        Err(error_msg) => {
+            assert!(
+                error_msg.contains(ERR_MSG),
+                "Code erred with unexpected message. \
+                 Provided message: '{}', but expected '{}'.",
+                error_msg,
+                ERR_MSG,
+            );
+        }
+    }
+}
+
+/// Checks that executing a FullExit of NFT with
+/// incorrect creator_address results in an error.
+#[test]
+#[ignore]
+fn test_full_exit_nft_with_incorrect_creator_address() {
+    const ERR_MSG: &str = "chunk number 7/execute_op/op_valid is true/enforce equal to one";
+
+    let mut circuit = apply_nft_mint_and_full_exit_nft_operations();
+    let incorrect_creator_address = incorrect_fr();
+    for operation_id in MintNFTOp::CHUNKS..MintNFTOp::CHUNKS + FullExitOp::CHUNKS {
+        circuit.operations[operation_id].args.special_eth_addresses[0] =
+            Some(incorrect_creator_address);
+    }
+
+    let result = check_circuit_non_panicking(circuit);
+    match result {
+        Ok(_) => panic!(
+            "Operation did not err, but was expected to err with message '{}'",
+            ERR_MSG,
+        ),
+        Err(error_msg) => {
+            assert!(
+                error_msg.contains(ERR_MSG),
+                "Code erred with unexpected message. \
+                 Provided message: '{}', but expected '{}'.",
+                error_msg,
+                ERR_MSG,
+            );
+        }
+    }
 }
 
 #[test]
