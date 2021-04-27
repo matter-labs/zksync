@@ -8,7 +8,7 @@ use zksync_state::{
 };
 use zksync_types::{
     operations::SwapOp,
-    tx::{Order, Swap, TimeRange},
+    tx::{Order, Swap},
     AccountId, TokenId,
 };
 // Local deps
@@ -16,7 +16,7 @@ use crate::witness::{
     swap::SwapWitness,
     tests::test_utils::{
         corrupted_input_test_scenario, generic_test_scenario, incorrect_op_test_scenario,
-        WitnessTestAccount, BLOCK_TIMESTAMP,
+        WitnessTestAccount,
     },
     utils::SigDataInput,
 };
@@ -59,19 +59,13 @@ impl TestSwap {
                 self.balances.2,
                 TokenId(self.fee_token),
             ),
+            WitnessTestAccount::new_empty(AccountId(self.recipients.0)),
+            WitnessTestAccount::new_empty(AccountId(self.recipients.1)),
         ];
     }
 
     fn get_accounts(&self) -> Vec<WitnessTestAccount> {
-        let ids = [self.accounts.0, self.accounts.1, self.submitter];
-        let mut accounts = self.test_accounts.clone();
-        if !ids.contains(&self.recipients.0) {
-            accounts.push(WitnessTestAccount::new_empty(AccountId(self.recipients.0)));
-        }
-        if !ids.contains(&self.recipients.1) {
-            accounts.push(WitnessTestAccount::new_empty(AccountId(self.recipients.1)));
-        }
-        accounts
+        self.test_accounts.clone()
     }
 
     fn get_op(&self) -> (SwapOp, SwapSigDataInput, (Order, Order)) {
@@ -131,7 +125,6 @@ impl TestSwap {
             submitter: self.test_accounts[2].id,
         };
 
-        // Additional data required for performing the operation.
         let input = (
             SigDataInput::from_order(&order_0).expect("SigDataInput creation failed"),
             SigDataInput::from_order(&order_1).expect("SigDataInput creation failed"),
@@ -195,6 +188,21 @@ fn test_swap_success() {
         TestSwap {
             accounts: (1, 3),
             recipients: (1, 3),
+            submitter: 5,
+            tokens: (18, 19),
+            fee_token: 0,
+            amounts: (50, 100),
+            fee: 25,
+            balances: (100, 200, 50),
+            first_price: (1, 2),
+            second_price: (2, 1),
+            is_limit_order: (false, false),
+            test_accounts: vec![],
+        },
+        // Equal recipients
+        TestSwap {
+            accounts: (1, 3),
+            recipients: (2, 2),
             submitter: 5,
             tokens: (18, 19),
             fee_token: 0,
@@ -271,6 +279,123 @@ fn test_swap_success() {
         );
     }
 }
+
+#[test]
+#[ignore]
+fn test_self_swap() {
+    let mut account = WitnessTestAccount::new_with_token(AccountId(1), 100, TokenId(1));
+    account
+        .account
+        .add_balance(TokenId(2), &BigUint::from(200u8));
+    let submitter = WitnessTestAccount::new_with_token(AccountId(2), 100, TokenId(0));
+
+    let order_0 = account.zksync_account.sign_order(
+        TokenId(1),
+        TokenId(2),
+        BigUint::from(1u8),
+        BigUint::from(1u8),
+        BigUint::from(10u8),
+        AccountId(1),
+        None,
+        false,
+        Default::default(),
+    );
+
+    let order_1 = account.zksync_account.sign_order(
+        TokenId(2),
+        TokenId(1),
+        BigUint::from(1u8),
+        BigUint::from(1u8),
+        BigUint::from(10u8),
+        AccountId(1),
+        None,
+        true,
+        Default::default(),
+    );
+
+    let swap_op = SwapOp {
+        tx: submitter
+            .zksync_account
+            .sign_swap(
+                (order_0.clone(), order_1.clone()),
+                (BigUint::from(10u8), BigUint::from(10u8)),
+                None,
+                true,
+                TokenId(0),
+                "",
+                BigUint::from(1u8),
+            )
+            .0,
+        accounts: (AccountId(1), AccountId(1)),
+        recipients: (AccountId(1), AccountId(1)),
+        submitter: AccountId(2),
+    };
+
+    let input = (
+        SigDataInput::from_order(&order_0).expect("SigDataInput creation failed"),
+        SigDataInput::from_order(&order_1).expect("SigDataInput creation failed"),
+        SigDataInput::from_swap_op(&swap_op).expect("SigDataInput creation failed"),
+    );
+
+    incorrect_op_test_scenario::<SwapWitness<Bn256>, _>(
+        &[account, submitter],
+        swap_op,
+        input,
+        "",
+        || {
+            vec![CollectedFee {
+                token: TokenId(0),
+                amount: 1u8.into(),
+            }]
+        },
+    );
+}
+
+#[test]
+#[ignore]
+fn test_swap_sign_and_submit() {
+    let mut test_swap = TestSwap {
+        accounts: (1, 3),
+        recipients: (2, 4),
+        submitter: 1,
+        tokens: (18, 19),
+        fee_token: 18,
+        amounts: (50, 100),
+        fee: 25,
+        balances: (100, 200, 50),
+        first_price: (1, 2),
+        second_price: (2, 1),
+        is_limit_order: (false, false),
+        test_accounts: vec![],
+    };
+
+    test_swap.create_accounts();
+    // submitter is the first account
+    test_swap.test_accounts[2] = test_swap.test_accounts[0].clone();
+
+    let (swap_op, input, _) = test_swap.get_op();
+
+    generic_test_scenario::<SwapWitness<Bn256>, _>(
+        &test_swap.get_accounts(),
+        swap_op,
+        input,
+        |state, op| {
+            let fee = <ZkSyncState as TxHandler<Swap>>::apply_op(state, &op)
+                .expect("Operation failed")
+                .0
+                .unwrap();
+            vec![fee]
+        },
+    );
+}
+
+#[test]
+#[ignore]
+fn test_swap_incompatible_orders() {
+    // different tokens
+    // different amounts
+}
+
 #[test]
 #[ignore]
 fn test_swap_failure() {
