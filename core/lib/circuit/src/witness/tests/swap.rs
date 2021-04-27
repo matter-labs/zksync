@@ -59,9 +59,23 @@ impl TestSwap {
                 self.balances.2,
                 TokenId(self.fee_token),
             ),
-            WitnessTestAccount::new_empty(AccountId(self.recipients.0)),
-            WitnessTestAccount::new_empty(AccountId(self.recipients.1)),
         ];
+        if self
+            .test_accounts
+            .iter()
+            .all(|acc| *acc.id != self.recipients.0)
+        {
+            self.test_accounts
+                .push(WitnessTestAccount::new_empty(AccountId(self.recipients.0)));
+        }
+        if self
+            .test_accounts
+            .iter()
+            .all(|acc| *acc.id != self.recipients.1)
+        {
+            self.test_accounts
+                .push(WitnessTestAccount::new_empty(AccountId(self.recipients.1)));
+        }
     }
 
     fn get_accounts(&self) -> Vec<WitnessTestAccount> {
