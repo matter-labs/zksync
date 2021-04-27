@@ -58,8 +58,6 @@ pub struct WithdrawNFTWitness<E: RescueEngine> {
     pub initiator_before_second_chunk: OperationBranch<E>,
     pub special_account_third_chunk: OperationBranch<E>,
     pub creator_account_fourth_chunk: OperationBranch<E>,
-
-    pub content_hash: Vec<Option<E::Fr>>,
 }
 
 impl Witness for WithdrawNFTWitness<Bn256> {
@@ -98,7 +96,7 @@ impl Witness for WithdrawNFTWitness<Bn256> {
             &self.args.special_eth_addresses[0].unwrap(),
             ETH_ADDRESS_BIT_WIDTH,
         );
-        for bit in &self.content_hash {
+        for bit in &self.args.special_content_hash {
             append_be_fixed_width(&mut pubdata_bits, &bit.unwrap(), 1);
         }
         append_be_fixed_width(
@@ -399,7 +397,7 @@ impl WithdrawNFTWitness<Bn256> {
                     Some(creator_account_id_fe),
                     Some(initiator_account_id_fe),
                 ],
-                special_content_hash: content_hash_as_vec.clone(),
+                special_content_hash: content_hash_as_vec,
                 special_serial_id: Some(serial_id_fe),
             },
 
@@ -443,8 +441,6 @@ impl WithdrawNFTWitness<Bn256> {
                     balance_subtree_path: audit_creator_balance_fourth_chunk,
                 },
             },
-
-            content_hash: content_hash_as_vec,
         }
     }
 }

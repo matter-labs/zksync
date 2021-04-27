@@ -299,7 +299,9 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
                 accountId: _accountId,
                 owner: msg.sender,
                 tokenId: uint32(tokenId),
-                amount: 0 // unknown at this point
+                amount: 0, // unknown at this point
+                nftCreatorAddress: address(0), // unknown at this point
+                nftContentHash: bytes32(0) // unknown at this point
             });
         bytes memory pubData = Operations.writeFullExitPubdataForPriorityQueue(op);
         addPriorityRequest(Operations.OpType.FullExit, pubData);
@@ -308,6 +310,29 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
         // In this case operator should just overwrite this slot during confirming withdrawal
         bytes22 packedBalanceKey = packAddressAndTokenId(msg.sender, tokenId);
         pendingBalances[packedBalanceKey].gasReserveValue = FILLED_GAS_RESERVE_VALUE;
+    }
+
+    /// @notice Register full exit nft request - pack pubdata, add priority request
+    /// @param _accountId Numerical id of the account
+    /// @param _tokenId NFT token id in zkSync network
+    function requestFullExitNFT(uint32 _accountId, uint32 _tokenId) public nonReentrant {
+        requireActive();
+        require(_accountId <= MAX_ACCOUNT_ID, "e");
+        require(_accountId != SPECIAL_ACCOUNT_ID, "v"); // request full exit nft for nft storage account
+        require(MAX_FUNGIBLE_TOKEN_ID < _tokenId && _tokenId < SPECIAL_NFT_TOKEN_ID, "T"); // request full exit nft for invalid token id
+
+        // Priority Queue request
+        Operations.FullExit memory op =
+            Operations.FullExit({
+                accountId: _accountId,
+                owner: msg.sender,
+                tokenId: _tokenId,
+                amount: 0, // unknown at this point
+                nftCreatorAddress: address(0), // unknown at this point
+                nftContentHash: bytes32(0) // unknown at this point
+            });
+        bytes memory pubData = Operations.writeFullExitPubdataForPriorityQueue(op);
+        addPriorityRequest(Operations.OpType.FullExit, pubData);
     }
 
     /// @notice Register full exit request - pack pubdata, add priority request
@@ -440,8 +465,13 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
                 withdrawOrStore(uint16(op.tokenId), op.target, op.amount);
             } else if (opType == Operations.OpType.FullExit) {
                 Operations.FullExit memory op = Operations.readFullExitPubdata(pubData);
-                require(op.tokenId <= MAX_FUNGIBLE_TOKEN_ID, "w");
-                withdrawOrStore(uint16(op.tokenId), op.owner, op.amount);
+                if (op.tokenId <= MAX_FUNGIBLE_TOKEN_ID) {
+                    withdrawOrStore(uint16(op.tokenId), op.owner, op.amount);
+                } else {
+                    if (op.amount) {
+                        // TODO
+                    }
+                }
             } else {
                 revert("l"); // unsupported op in block execution
             }

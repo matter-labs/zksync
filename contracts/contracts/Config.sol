@@ -100,6 +100,7 @@ contract Config {
 
     uint32 internal constant SPECIAL_ACCOUNT_ID = $$((2**24) - 1);
     address internal constant SPECIAL_ACCOUNT_ADDRESS = address(0xFFfFfFffFFfffFFfFFfFFFFFffFFFffffFfFFFfF);
+    uint32 internal constant SPECIAL_NFT_TOKEN_ID = $$((2**31) - 2);
 
     uint32 internal constant MAX_FUNGIBLE_TOKEN_ID = $$((2**16) - 1);
 }

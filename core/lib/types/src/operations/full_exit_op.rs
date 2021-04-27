@@ -18,7 +18,7 @@ pub struct FullExitOp {
 }
 
 impl FullExitOp {
-    pub const CHUNKS: usize = 6;
+    pub const CHUNKS: usize = 10;
     pub const OP_CODE: u8 = 0x06;
     pub const WITHDRAW_DATA_PREFIX: [u8; 1] = [0];
 

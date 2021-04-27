@@ -60,8 +60,6 @@ pub struct MintNFTWitness<E: RescueEngine> {
     pub special_account_before_third_chunk: OperationBranch<E>,
     pub special_account_before_fourth_chunk: OperationBranch<E>,
     pub recipient_account_before_fifth_chunk: OperationBranch<E>,
-
-    pub content_hash: Vec<Option<E::Fr>>,
 }
 
 impl Witness for MintNFTWitness<Bn256> {
@@ -94,7 +92,7 @@ impl Witness for MintNFTWitness<Bn256> {
             &self.recipient_account_before_fifth_chunk.address.unwrap(),
             ACCOUNT_ID_BIT_WIDTH,
         );
-        for bit in &self.content_hash {
+        for bit in &self.args.special_content_hash {
             append_be_fixed_width(&mut pubdata_bits, &bit.unwrap(), 1);
         }
         append_be_fixed_width(
@@ -460,7 +458,7 @@ impl MintNFTWitness<Bn256> {
                     Some(creator_account_id_fe),
                     Some(recipient_account_id_fe),
                 ],
-                special_content_hash: content_hash_as_vec.clone(),
+                special_content_hash: content_hash_as_vec,
                 special_serial_id: Some(serial_id),
             },
 
@@ -514,8 +512,6 @@ impl MintNFTWitness<Bn256> {
                     balance_subtree_path: audit_recipient_balance_before_fifth_chunk,
                 },
             },
-
-            content_hash: content_hash_as_vec,
         }
     }
 }

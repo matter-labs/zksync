@@ -71,6 +71,7 @@ pub struct CircuitGlobalVariables<E: RescueEngine + JubjubEngine> {
     pub explicit_zero: CircuitElement<E>,
     pub block_timestamp: CircuitElement<E>,
     pub chunk_data: AllocatedChunkData<E>,
+    pub min_nft_token_id: CircuitElement<E>,
 }
 
 impl<'a, E: RescueEngine + JubjubEngine> std::clone::Clone for ZkSyncCircuit<'a, E> {
@@ -171,6 +172,20 @@ impl<'a, E: RescueEngine + JubjubEngine> Circuit<E> for ZkSyncCircuit<'a, E> {
             params::TIMESTAMP_BIT_WIDTH,
         )?;
 
+        let min_nft_token_id_number =
+            AllocatedNum::alloc(cs.namespace(|| "min_nft_token_id number"), || {
+                Ok(E::Fr::from_str(&params::MIN_NFT_TOKEN_ID.to_string()).unwrap())
+            })?;
+        min_nft_token_id_number.assert_number(
+            cs.namespace(|| "assert min_nft_token_id is a constant"),
+            &E::Fr::from_str(&params::MIN_NFT_TOKEN_ID.to_string()).unwrap(),
+        )?;
+        let min_nft_token_id = CircuitElement::from_number_with_known_length(
+            cs.namespace(|| "min_nft_token_id circuit element"),
+            min_nft_token_id_number,
+            params::TOKEN_BIT_WIDTH,
+        )?;
+
         let chunk_data: AllocatedChunkData<E> = AllocatedChunkData {
             is_chunk_last: Boolean::constant(false),
             is_chunk_first: Boolean::constant(false),
@@ -182,6 +197,7 @@ impl<'a, E: RescueEngine + JubjubEngine> Circuit<E> for ZkSyncCircuit<'a, E> {
             block_timestamp,
             chunk_data,
             explicit_zero: zero_circuit_element,
+            min_nft_token_id,
         };
 
         // we create a memory value for a token ID that is used to collect fees.
@@ -202,7 +218,7 @@ impl<'a, E: RescueEngine + JubjubEngine> Circuit<E> for ZkSyncCircuit<'a, E> {
             data[TransferOp::OP_CODE as usize] = vec![zero.clone(); 1];
             data[TransferToNewOp::OP_CODE as usize] = vec![zero.clone(); 2];
             data[WithdrawOp::OP_CODE as usize] = vec![zero.clone(); 2];
-            data[FullExitOp::OP_CODE as usize] = vec![zero.clone(); 2];
+            data[FullExitOp::OP_CODE as usize] = vec![zero.clone(); 4];
             data[ChangePubKeyOp::OP_CODE as usize] = vec![zero.clone(); 2];
             data[ForcedExitOp::OP_CODE as usize] = vec![zero.clone(); 2];
             data[MintNFTOp::OP_CODE as usize] = vec![zero.clone(); 2];
@@ -924,6 +940,12 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
             self.rescue_params,
         )?;
 
+        let is_fungible_token = CircuitElement::less_than_fixed(
+            cs.namespace(|| "is_fungible_token"),
+            &cur.token,
+            &global_variables.min_nft_token_id,
+        )?;
+
         let op_flags = vec![
             self.deposit(
                 cs.namespace(|| "deposit"),
@@ -1001,6 +1023,10 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
                 &op_data,
                 &ext_pubdata_chunk,
                 &mut previous_pubdatas[FullExitOp::OP_CODE as usize],
+                &nft_content_as_balance,
+                is_special_nft_storage_account,
+                is_special_nft_token,
+                &is_fungible_token,
             )?,
             self.change_pubkey_offchain(
                 cs.namespace(|| "change_pubkey_offchain"),
@@ -1150,7 +1176,7 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
         is_special_nft_token: &Boolean,
     ) -> Result<Boolean, SynthesisError> {
         let mut base_valid_flags = vec![];
-        //construct pubdata
+        // construct pubdata
         let mut pubdata_bits = vec![];
 
         pubdata_bits.extend(global_variables.chunk_data.tx_type.get_bits_be()); //TX_TYPE_BIT_WIDTH=8
@@ -1351,157 +1377,206 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
         op_data: &AllocatedOperationData<E>,
         ext_pubdata_chunk: &AllocatedNum<E>,
         pubdata_holder: &mut Vec<AllocatedNum<E>>,
+        nft_content_as_balance: &CircuitElement<E>,
+        is_special_nft_storage_account: &Boolean,
+        _is_special_nft_token: &Boolean,
+        is_fungible_token: &Boolean,
     ) -> Result<Boolean, SynthesisError> {
-        // Execute first chunk
+        assert!(
+            !pubdata_holder.is_empty(),
+            "pubdata holder has to be preallocated"
+        );
+        /*
+        fields specification:
 
-        let is_first_chunk = Boolean::from(Expression::equals(
-            cs.namespace(|| "is_first_chunk"),
+        special:
+        special_eth_addresses = [creator_address]
+        special_account_ids = [creator_account_id, account_id]
+        */
+
+        // construct pubdata
+        let mut pubdata_bits = vec![];
+        pubdata_bits.extend(global_variables.chunk_data.tx_type.get_bits_be()); // tx_type = 1 byte
+        pubdata_bits.extend(op_data.special_account_ids[1].get_bits_be()); // account_id = 4 bytes
+        pubdata_bits.extend(op_data.eth_address.get_bits_be()); // initiator_address = 20 bytes
+        pubdata_bits.extend(cur.token.get_bits_be()); // token_id = 4 bytes
+        pubdata_bits.extend(op_data.full_amount.get_bits_be()); // full_amount = 16 bytes
+        pubdata_bits.extend(op_data.special_eth_addresses[0].get_bits_be()); // creator_address = 20 bytes
+        pubdata_bits.extend(
+            op_data
+                .special_content_hash
+                .iter()
+                .map(|bit| bit.get_bits_be())
+                .flatten(),
+        ); // content_hash = 32 bytes
+        resize_grow_only(
+            &mut pubdata_bits,
+            FullExitOp::CHUNKS * params::CHUNK_BIT_WIDTH,
+            Boolean::constant(false),
+        );
+
+        let (is_equal_pubdata, packed_pubdata) = vectorized_compare(
+            cs.namespace(|| "compare pubdata"),
+            &*pubdata_holder,
+            &pubdata_bits,
+        )?;
+
+        *pubdata_holder = packed_pubdata;
+
+        let is_chunk_with_index: Vec<Boolean> = (0..3)
+            .map(|chunk_index| {
+                Expression::equals(
+                    cs.namespace(|| format!("is_chunk_with_index {}", chunk_index)),
+                    &global_variables.chunk_data.chunk_number,
+                    Expression::u64::<CS>(chunk_index as u64),
+                )
+            })
+            .collect::<Result<Vec<_>, SynthesisError>>()?
+            .iter()
+            .map(|bit| Boolean::from(bit.clone()))
+            .collect();
+
+        // common valid flags
+        let pubdata_properly_copied = boolean_or(
+            cs.namespace(|| "first chunk or pubdata is copied properly"),
+            &is_chunk_with_index[0].clone(),
+            &is_equal_pubdata,
+        )?;
+        let pubdata_chunk = select_pubdata_chunk(
+            cs.namespace(|| "select_pubdata_chunk"),
+            &pubdata_bits,
             &global_variables.chunk_data.chunk_number,
-            Expression::constant::<CS>(E::Fr::zero()),
+            FullExitOp::CHUNKS,
+        )?;
+        let is_pubdata_chunk_correct = Boolean::from(Expression::equals(
+            cs.namespace(|| "is_pubdata_equal"),
+            &pubdata_chunk,
+            ext_pubdata_chunk,
+        )?);
+        let fee_is_zero = CircuitElement::equals(
+            cs.namespace(|| "fee_is_zero"),
+            &op_data.fee,
+            &global_variables.explicit_zero,
+        )?;
+        let is_full_exit_operation = Boolean::from(Expression::equals(
+            cs.namespace(|| "is_full_exit_operation"),
+            &global_variables.chunk_data.tx_type.get_number(),
+            Expression::u64::<CS>(u64::from(FullExitOp::OP_CODE)),
         )?);
 
-        // MUST be true for all chunks
-        let (is_pubdata_chunk_correct, pubdata_is_properly_copied) = {
-            //construct pubdata
-            let pubdata_bits = {
-                let mut pub_data = Vec::new();
-                pub_data.extend(global_variables.chunk_data.tx_type.get_bits_be()); //1
-                pub_data.extend(cur.account_id.get_bits_be()); //3
-                pub_data.extend(op_data.eth_address.get_bits_be()); //20
-                pub_data.extend(cur.token.get_bits_be()); // 2
-                pub_data.extend(op_data.full_amount.get_bits_be());
-
-                resize_grow_only(
-                    &mut pub_data,
-                    FullExitOp::CHUNKS * params::CHUNK_BIT_WIDTH,
-                    Boolean::constant(false),
-                );
-
-                pub_data
-            };
-
-            let pubdata_chunk = select_pubdata_chunk(
-                cs.namespace(|| "select_pubdata_chunk"),
-                &pubdata_bits,
-                &global_variables.chunk_data.chunk_number,
-                FullExitOp::CHUNKS,
-            )?;
-
-            let pubdata_chunk_correct = Boolean::from(Expression::equals(
-                cs.namespace(|| "is_pubdata_equal"),
-                &pubdata_chunk,
-                ext_pubdata_chunk,
-            )?);
-
-            let (is_equal_pubdata, packed_pubdata) = vectorized_compare(
-                cs.namespace(|| "compare pubdata"),
-                &*pubdata_holder,
-                &pubdata_bits,
-            )?;
-
-            *pubdata_holder = packed_pubdata;
-
-            let pubdata_properly_copied = boolean_or(
-                cs.namespace(|| "first chunk or pubdata is copied properly"),
-                &is_first_chunk,
-                &is_equal_pubdata,
-            )?;
-
-            (pubdata_chunk_correct, pubdata_properly_copied)
-        };
-
-        let fee_is_zero = AllocatedNum::equals(
-            cs.namespace(|| "fee is zero for full exit"),
-            &op_data.fee.get_number(),
-            &global_variables.explicit_zero.get_number(),
+        let common_valid = multi_and(
+            cs.namespace(|| "is_common_valid"),
+            &[
+                pubdata_properly_copied,
+                is_pubdata_chunk_correct,
+                fee_is_zero,
+                is_full_exit_operation,
+            ],
         )?;
 
-        let fee_is_zero = Boolean::from(fee_is_zero);
+        let first_chunk_valid = {
+            let mut flags = vec![common_valid.clone(), is_chunk_with_index[0].clone()];
 
-        let is_base_valid = {
-            let mut base_valid_flags = Vec::new();
+            let is_initiator_account = CircuitElement::equals(
+                cs.namespace(|| "is_initiator_account"),
+                &op_data.special_account_ids[1],
+                &cur.account_id,
+            )?;
+            flags.push(is_initiator_account);
 
-            vlog::debug!(
-                "is_pubdata_chunk_correct {:?}",
-                is_pubdata_chunk_correct.get_value()
-            );
-            base_valid_flags.push(is_pubdata_chunk_correct);
-            // MUST be true
-            let is_full_exit = Boolean::from(Expression::equals(
-                cs.namespace(|| "is_full_exit"),
-                &global_variables.chunk_data.tx_type.get_number(),
-                Expression::u64::<CS>(u64::from(FullExitOp::OP_CODE)), //full_exit tx code
-            )?);
-
-            base_valid_flags.push(is_full_exit);
-            base_valid_flags.push(pubdata_is_properly_copied);
-            base_valid_flags.push(fee_is_zero);
-            multi_and(cs.namespace(|| "valid base full_exit"), &base_valid_flags)?
-        };
-
-        // SHOULD be true for successful exit
-        let is_address_correct = CircuitElement::equals(
-            cs.namespace(|| "is_address_correct"),
-            &cur.account.address,
-            &op_data.eth_address,
-        )?;
-
-        // MUST be true for the validity of the first chunk
-        let is_pubdata_amount_valid = {
-            let circuit_pubdata_amount = CircuitElement::conditionally_select_with_number_strict(
-                cs.namespace(|| "pubdata_amount"),
+            let is_full_exit_success = CircuitElement::equals(
+                cs.namespace(|| "is_full_exit_success"),
+                &op_data.eth_address,
+                &cur.account.address,
+            )?;
+            let real_full_amount = CircuitElement::conditionally_select_with_number_strict(
+                cs.namespace(|| "real_full_amount"),
                 Expression::constant::<CS>(E::Fr::zero()),
                 &cur.balance,
-                &is_address_correct.not(),
+                &is_full_exit_success.not(),
             )?;
-
-            CircuitElement::equals(
-                cs.namespace(|| "is_pubdata_amount_correct"),
-                &circuit_pubdata_amount,
+            flags.push(CircuitElement::equals(
+                cs.namespace(|| "real_full_amount equals to declared in op_data"),
+                &real_full_amount,
                 &op_data.full_amount,
-            )?
-        };
+            )?);
 
-        // MUST be true for correct op. First chunk is correct and tree update can be executed.
-        let first_chunk_valid = {
-            let flags = vec![
-                is_first_chunk.clone(),
-                is_base_valid.clone(),
-                no_nonce_overflow(
-                    cs.namespace(|| "no nonce overflow"),
-                    &cur.account.nonce.get_number(),
-                )?,
-                is_pubdata_amount_valid,
-            ];
             multi_and(cs.namespace(|| "first_chunk_valid"), &flags)?
         };
-
-        // Full exit was a success, update account is the first chunk.
-        let success_account_update = multi_and(
-            cs.namespace(|| "success_account_update"),
-            &[first_chunk_valid.clone(), is_address_correct],
-        )?;
-
-        //mutate current branch if it is first chunk of a successful withdraw transaction
+        let updated_balance = Expression::from(&cur.balance.get_number())
+            - Expression::from(&op_data.full_amount.get_number());
         cur.balance = CircuitElement::conditionally_select_with_number_strict(
-            cs.namespace(|| "mutated balance"),
-            Expression::constant::<CS>(E::Fr::zero()),
+            cs.namespace(|| "updated cur balance"),
+            updated_balance,
             &cur.balance,
-            &success_account_update,
+            &first_chunk_valid,
         )?;
 
-        // Check other chunks
-        let other_chunks_valid = {
-            let flags = vec![is_base_valid, is_first_chunk.not()];
-            multi_and(cs.namespace(|| "other_chunks_valid"), &flags)?
+        let second_chunk_valid = {
+            let mut flags = vec![common_valid.clone(), is_chunk_with_index[1].clone()];
+
+            flags.push(is_special_nft_storage_account.clone());
+
+            let full_amount_equals_to_zero = CircuitElement::equals(
+                cs.namespace(|| "full_amount_equals_to_zero"),
+                &op_data.full_amount,
+                &global_variables.explicit_zero,
+            )?;
+            let is_nft_stored_content_valid = CircuitElement::equals(
+                cs.namespace(|| "is_nft_stored_content_valid"),
+                &nft_content_as_balance,
+                &cur.balance,
+            )?;
+            flags.push(multi_or(
+                cs.namespace(|| "is_nft_content_correct"),
+                &[
+                    full_amount_equals_to_zero,
+                    is_nft_stored_content_valid,
+                    is_fungible_token.clone(),
+                ],
+            )?);
+
+            multi_and(cs.namespace(|| "second_chunk_valid"), &flags)?
         };
 
-        // MUST be true for correct (successful or not) full exit
-        let tx_valid = multi_or(
-            cs.namespace(|| "tx_valid"),
-            &[first_chunk_valid, other_chunks_valid],
+        let third_chunk_valid = {
+            let mut flags = vec![common_valid.clone(), is_chunk_with_index[2].clone()];
+
+            let is_creator_account = CircuitElement::equals(
+                cs.namespace(|| "is_creator_account"),
+                &op_data.special_account_ids[0],
+                &cur.account_id,
+            )?;
+            flags.push(is_creator_account);
+            let creator_address_valid = CircuitElement::equals(
+                cs.namespace(|| "creator_address_valid"),
+                &op_data.special_eth_addresses[0],
+                &cur.account.address,
+            )?;
+            flags.push(creator_address_valid);
+
+            multi_and(cs.namespace(|| "third_chunk_valid"), &flags)?
+        };
+
+        let ohs_valid = multi_and(
+            cs.namespace(|| "ohs_valid"),
+            &[
+                common_valid,
+                is_chunk_with_index[0].not(),
+                is_chunk_with_index[1].not(),
+                is_chunk_with_index[2].not(),
+            ],
         )?;
-        Ok(tx_valid)
+
+        multi_or(
+            cs.namespace(|| "is_full_exit_valid"),
+            &[
+                first_chunk_valid,
+                second_chunk_valid,
+                third_chunk_valid,
+                ohs_valid,
+            ],
+        )
     }
 
     fn deposit<CS: ConstraintSystem<E>>(
@@ -1519,7 +1594,7 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
             "pubdata holder has to be preallocated"
         );
 
-        //construct pubdata
+        // construct pubdata
         let mut pubdata_bits = vec![];
         pubdata_bits.extend(global_variables.chunk_data.tx_type.get_bits_be()); //TX_TYPE_BIT_WIDTH=8
         pubdata_bits.extend(cur.account_id.get_bits_be()); //ACCOUNT_TREE_DEPTH=24
@@ -1663,7 +1738,7 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
             "pubdata holder has to be preallocated"
         );
 
-        //construct pubdata
+        // construct pubdata
         let mut pubdata_bits = vec![];
         pubdata_bits.extend(global_variables.chunk_data.tx_type.get_bits_be()); //TX_TYPE_BIT_WIDTH=8
         pubdata_bits.extend(cur.account_id.get_bits_be()); //ACCOUNT_TREE_DEPTH=24
@@ -1892,7 +1967,7 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
         );
 
         let mut is_valid_flags = vec![];
-        //construct pubdata (it's all 0 for noop)
+        // construct pubdata (it's all 0 for noop)
         let mut pubdata_bits = vec![];
         pubdata_bits.resize(params::CHUNK_BIT_WIDTH, Boolean::constant(false));
 
@@ -1972,7 +2047,7 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
         special_serial_id = serial_id of the NFT from this creator
         */
 
-        //construct pubdata
+        // construct pubdata
         let mut pubdata_bits = vec![];
         pubdata_bits.extend(global_variables.chunk_data.tx_type.get_bits_be()); // tx_type = 1 byte
         pubdata_bits.extend(op_data.special_account_ids[0].get_bits_be()); // creator_account_id = 4 bytes
@@ -2279,7 +2354,7 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
         special_serial_id = serial_id of the NFT from this creator
         */
 
-        //construct pubdata
+        // construct pubdata
         let mut pubdata_bits = vec![];
         pubdata_bits.extend(global_variables.chunk_data.tx_type.get_bits_be()); // tx_type = 1 byte
         pubdata_bits.extend(op_data.special_account_ids[1].get_bits_be()); // initiator_account_id = 4 bytes
