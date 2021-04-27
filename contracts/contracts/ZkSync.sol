@@ -257,6 +257,19 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
         }
     }
 
+    /// @notice  Withdraws tokens from zkSync contract to the owner
+    /// @param _owner Address of the tokens owner
+    /// @param _tokenId Id of NFT token
+    function withdrawPendingNFTBalance(address payable _owner, uint32 _tokenId) external nonReentrant {
+        Operations.WithdrawNFT memory op = pendingWithdrawnNFTs[_tokenId];
+        if (op.owner == _owner) {
+            NFTFactory _factory = governance.getFactory(op.creator);
+            try _factory.mintNFT(op.creator, op.owner, op.contentHash, op.tokenId) {
+                delete pendingWithdrawnNFTs[_tokenId];
+            } catch {}
+        }
+    }
+
     /// @notice Withdraw ERC20 token to Layer 1 - register withdrawal and transfer ERC20 to sender
     /// @notice DEPRECATED: use withdrawPendingBalance instead
     /// @param _token Token address
@@ -407,18 +420,10 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
 
     /// @dev 1. Try to send token to _recipients
     /// @dev 2. On failure: Increment _recipients balance to withdraw.
-    function withdrawNFT(
-        uint32 _tokenId,
-        address _recipient,
-        address _creator,
-        bytes32 _contentHash
-    ) internal {
-        NFTFactory _factory = governance.getFactory(_creator);
-        bool sent = false;
-        try _factory.mintNFT{gas: WITHDRAWAL_GAS_LIMIT}(_creator, _recipient, _contentHash, _tokenId) {
-            sent = true;
-        } catch {
-            sent = false;
+    function withdrawNFT(Operations.WithdrawNFT op) internal {
+        NFTFactory _factory = governance.getFactory(op.creator);
+        try _factory.mintNFT{gas: WITHDRAWAL_GAS_LIMIT}(op.creator, op.owner, op.contentHash, op.tokenId) {} catch {
+            pendingWithdrawnNFTs[op.tokenId] = op;
         }
     }
 
