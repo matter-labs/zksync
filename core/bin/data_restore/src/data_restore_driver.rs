@@ -324,6 +324,9 @@ where
     /// Updates events state, saves new blocks, tokens events and the last watched eth block number in storage
     /// Returns bool flag, true if there are new block events
     async fn update_events_state(&mut self, interactor: &mut I) -> bool {
+        let last_store_block = interactor.get_last_store_block().await;
+        vlog::info!("last_store_block: {:?}", last_store_block);
+
         let (block_events, token_events, last_watched_eth_block_number) = self
             .events_state
             .update_events_state(
@@ -332,6 +335,7 @@ where
                 &self.governance_contract,
                 self.eth_blocks_step,
                 self.end_eth_blocks_offset,
+                last_store_block.0
             )
             .await
             .expect("Updating events state: cant update events state");

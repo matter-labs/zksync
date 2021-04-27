@@ -90,6 +90,9 @@ pub trait StorageInteractor {
 
     /// Returns last recovery state update step from storage
     async fn get_storage_state(&mut self) -> StorageUpdateState;
+
+    /// Returns last block in table blocks
+    async fn get_last_store_block(&mut self) -> BlockNumber;
 }
 
 /// Returns Rollup contract event from its stored representation

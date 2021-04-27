@@ -298,4 +298,13 @@ impl StorageInteractor for DatabaseStorageInteractor<'_> {
             _ => panic!("Unknown storage state"),
         }
     }
+
+    async fn get_last_store_block(&mut self) -> BlockNumber {
+        self
+            .storage
+            .data_restore_schema()
+            .load_last_store_block()
+            .await
+            .expect("Cant load storage state")
+    }
 }

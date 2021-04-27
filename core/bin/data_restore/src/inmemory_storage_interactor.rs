@@ -138,6 +138,10 @@ impl StorageInteractor for InMemoryStorageInteractor {
     async fn get_storage_state(&mut self) -> StorageUpdateState {
         self.storage_state
     }
+
+    async fn get_last_store_block(&mut self) -> BlockNumber {
+        BlockNumber(0)
+    }
 }
 
 impl InMemoryStorageInteractor {

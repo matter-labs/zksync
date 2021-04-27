@@ -358,4 +358,16 @@ impl<'a, 'c> DataRestoreSchema<'a, 'c> {
         metrics::histogram!("sql.data_restore.update_block_events", start.elapsed());
         Ok(())
     }
+
+    pub async fn load_last_store_block(&mut self) -> QueryResult<BlockNumber> {
+        let last_block = sqlx::query!("SELECT max(number) FROM blocks")
+            .fetch_one(self.0.conn())
+            .await?;
+
+        let last_store_block = last_block
+            .max
+            .map(|last_block| BlockNumber(last_block as u32))
+            .unwrap_or(BlockNumber(0));
+        Ok(last_store_block)
+    }
 }
