@@ -1,3 +1,4 @@
+use super::block::BlockStatus;
 use chrono::{DateTime, Utc};
 use num::BigUint;
 use serde::{Deserialize, Serialize, Serializer};
@@ -22,29 +23,21 @@ pub struct IncomingTx {
     pub signature: Option<TxEthSignature>,
 }
 
-#[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone, Copy)]
 #[serde(rename_all = "snake_case")]
-pub enum BlockStatus {
-    Queued,
-    Committed,
-    Finalized,
-}
-
-#[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
-#[serde(rename_all = "snake_case")]
-pub enum L2Status {
+pub enum TxInBlockStatus {
     Queued,
     Committed,
     Finalized,
     Rejected,
 }
 
-impl From<BlockStatus> for L2Status {
+impl From<BlockStatus> for TxInBlockStatus {
     fn from(status: BlockStatus) -> Self {
         match status {
-            BlockStatus::Queued => L2Status::Queued,
-            BlockStatus::Committed => L2Status::Committed,
-            BlockStatus::Finalized => L2Status::Finalized,
+            BlockStatus::Queued => TxInBlockStatus::Queued,
+            BlockStatus::Committed => TxInBlockStatus::Committed,
+            BlockStatus::Finalized => TxInBlockStatus::Finalized,
         }
     }
 }
@@ -68,7 +61,7 @@ pub struct L2Receipt {
     #[serde(serialize_with = "serialize_tx_hash_with_0x")]
     pub tx_hash: TxHash,
     pub rollup_block: Option<BlockNumber>,
-    pub status: L2Status,
+    pub status: TxInBlockStatus,
     pub fail_reason: Option<String>,
 }
 
@@ -85,7 +78,7 @@ pub struct Transaction {
     pub tx_hash: TxHash,
     pub block_number: Option<BlockNumber>,
     pub op: TransactionData,
-    pub status: L2Status,
+    pub status: TxInBlockStatus,
     pub fail_reason: Option<String>,
     pub created_at: Option<DateTime<Utc>>,
 }
@@ -209,5 +202,5 @@ pub struct ApiTxBatch {
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub struct BatchStatus {
     pub updated_at: DateTime<Utc>,
-    pub last_state: L2Status,
+    pub last_state: TxInBlockStatus,
 }

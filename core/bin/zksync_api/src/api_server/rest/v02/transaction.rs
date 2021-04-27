@@ -10,20 +10,23 @@ use actix_web::{
 };
 
 // Workspace uses
-use zksync_api_types::v02::transaction::{
-    ApiTxBatch, BlockStatus, IncomingTx, IncomingTxBatch, L1Receipt, L1Transaction, L2Receipt,
-    L2Status, Receipt, SubmitBatchResponse, Transaction, TransactionData, TxData,
+use zksync_api_types::v02::{
+    block::BlockStatus,
+    transaction::{
+        ApiTxBatch, IncomingTx, IncomingTxBatch, L1Receipt, L1Transaction, L2Receipt, Receipt,
+        SubmitBatchResponse, Transaction, TransactionData, TxData, TxInBlockStatus,
+    },
 };
 use zksync_storage::{
     chain::{
-        operations::records::StoredExecutedPriorityOperation,
+        operations::records::{StoredExecutedPriorityOperation, StoredExecutedTransaction},
         operations_ext::records::TxReceiptResponse,
     },
     QueryResult, StorageProcessor,
 };
 use zksync_types::{
-    aggregated_operations::AggregatedActionType, priority_ops::PriorityOpLookupQuery,
-    tx::EthSignData, tx::TxEthSignature, tx::TxHash, BlockNumber, EthBlockId, ZkSyncOp, H256,
+    priority_ops::PriorityOpLookupQuery, tx::EthSignData, tx::TxEthSignature, tx::TxHash,
+    BlockNumber, EthBlockId, ZkSyncOp, H256,
 };
 
 // Local uses
@@ -35,7 +38,10 @@ pub fn l1_receipt_from_op_and_status(
     status: BlockStatus,
 ) -> L1Receipt {
     let eth_block = EthBlockId(op.eth_block as u64);
-    let rollup_block = Some(BlockNumber(op.block_number as u32));
+    let rollup_block = match status {
+        BlockStatus::Queued => None,
+        _ => Some(BlockNumber(op.block_number as u32)),
+    };
     let id = op.priority_op_serialid as u64;
 
     L1Receipt {
@@ -46,25 +52,95 @@ pub fn l1_receipt_from_op_and_status(
     }
 }
 
-pub fn l2_receipt_from_tx_receipt_response(receipt: TxReceiptResponse) -> L2Receipt {
+pub fn l2_receipt_from_response_and_status(
+    receipt: TxReceiptResponse,
+    block_status: BlockStatus,
+) -> L2Receipt {
     let tx_hash_prefixed = format!("0x{}", receipt.tx_hash);
     let tx_hash = TxHash::from_str(&tx_hash_prefixed).unwrap();
-    let rollup_block = Some(BlockNumber(receipt.block_number as u32));
+    let rollup_block = match block_status {
+        BlockStatus::Queued => None,
+        _ => Some(BlockNumber(receipt.block_number as u32)),
+    };
     let fail_reason = receipt.fail_reason;
     let status = if receipt.success {
-        if receipt.verified {
-            L2Status::Finalized
-        } else {
-            L2Status::Committed
-        }
+        block_status.into()
     } else {
-        L2Status::Rejected
+        TxInBlockStatus::Rejected
     };
     L2Receipt {
         tx_hash,
         rollup_block,
         status,
         fail_reason,
+    }
+}
+
+pub fn l1_tx_data_from_op_and_status(
+    op: StoredExecutedPriorityOperation,
+    block_status: BlockStatus,
+) -> TxData {
+    let block_number = match block_status {
+        BlockStatus::Queued => None,
+        _ => Some(BlockNumber(op.block_number as u32)),
+    };
+    let operation: ZkSyncOp = serde_json::from_value(op.operation).unwrap();
+    let eth_hash = H256::from_slice(&op.eth_hash);
+    let id = op.priority_op_serialid as u64;
+    let tx_hash = TxHash::from_slice(&op.tx_hash).unwrap();
+    let tx = Transaction {
+        tx_hash,
+        block_number,
+        op: TransactionData::L1(
+            L1Transaction::from_executed_op(operation, eth_hash, id, tx_hash).unwrap(),
+        ),
+        status: block_status.into(),
+        fail_reason: None,
+        created_at: Some(op.created_at),
+    };
+
+    TxData {
+        tx,
+        eth_signature: None,
+    }
+}
+
+pub fn l2_tx_from_op_and_status(
+    op: StoredExecutedTransaction,
+    block_status: BlockStatus,
+) -> Transaction {
+    let block_number = match block_status {
+        BlockStatus::Queued => None,
+        _ => Some(BlockNumber(op.block_number as u32)),
+    };
+    let status = if op.success {
+        block_status.into()
+    } else {
+        TxInBlockStatus::Rejected
+    };
+    let tx_hash = TxHash::from_slice(&op.tx_hash).unwrap();
+    Transaction {
+        tx_hash,
+        block_number,
+        op: TransactionData::L2(op.tx),
+        status,
+        fail_reason: op.fail_reason,
+        created_at: Some(op.created_at),
+    }
+}
+
+fn get_sign_bytes(eth_sign_data: serde_json::Value) -> String {
+    let eth_sign_data: EthSignData = serde_json::from_value(eth_sign_data).unwrap_or_else(|err| {
+        panic!(
+            "Database provided an incorrect eth_sign_data field, an error occurred {}",
+            err
+        )
+    });
+    match eth_sign_data.signature {
+        TxEthSignature::EthereumSignature(sign) => {
+            format!("0x{}", hex::encode(sign.serialize_packed()))
+        }
+        TxEthSignature::EIP1271Signature(sign) => format!("0x{}", hex::encode(sign.0)),
     }
 }
 
@@ -79,33 +155,6 @@ impl ApiTransactionData {
         Self { tx_sender }
     }
 
-    async fn get_block_status(
-        storage: &mut StorageProcessor<'_>,
-        block_number: BlockNumber,
-    ) -> BlockStatus {
-        if storage
-            .chain()
-            .operations_schema()
-            .get_stored_aggregated_operation(block_number, AggregatedActionType::ExecuteBlocks)
-            .await
-            .map(|operation| operation.confirmed)
-            .unwrap_or(false)
-        {
-            BlockStatus::Finalized
-        } else if storage
-            .chain()
-            .operations_schema()
-            .get_stored_aggregated_operation(block_number, AggregatedActionType::CommitBlocks)
-            .await
-            .map(|operation| operation.confirmed)
-            .unwrap_or(false)
-        {
-            BlockStatus::Committed
-        } else {
-            BlockStatus::Queued
-        }
-    }
-
     async fn get_l1_receipt(
         &self,
         storage: &mut StorageProcessor<'_>,
@@ -118,7 +167,11 @@ impl ApiTransactionData {
             .await
             .map_err(Error::storage)?
         {
-            let status = Self::get_block_status(storage, BlockNumber(op.block_number as u32)).await;
+            let status = storage
+                .chain()
+                .block_schema()
+                .get_block_status(BlockNumber(op.block_number as u32))
+                .await;
 
             Ok(Some(l1_receipt_from_op_and_status(op, status)))
         } else if let Some((eth_block, priority_op)) = self
@@ -150,7 +203,12 @@ impl ApiTransactionData {
             .tx_receipt(tx_hash.as_ref())
             .await?
         {
-            Ok(Some(l2_receipt_from_tx_receipt_response(receipt)))
+            let status = storage
+                .chain()
+                .block_schema()
+                .get_block_status(BlockNumber(receipt.block_number as u32))
+                .await;
+            Ok(Some(l2_receipt_from_response_and_status(receipt, status)))
         } else if storage
             .chain()
             .mempool_schema()
@@ -160,7 +218,7 @@ impl ApiTransactionData {
             Ok(Some(L2Receipt {
                 tx_hash,
                 rollup_block: None,
-                status: L2Status::Queued,
+                status: TxInBlockStatus::Queued,
                 fail_reason: None,
             }))
         } else {
@@ -188,17 +246,6 @@ impl ApiTransactionData {
         }
     }
 
-    fn get_sign_bytes(eth_sign_data: EthSignData) -> String {
-        let mut result = String::from("0x");
-        match eth_sign_data.signature {
-            TxEthSignature::EthereumSignature(sign) => {
-                result.push_str(hex::encode(sign.serialize_packed()).as_str())
-            }
-            TxEthSignature::EIP1271Signature(sign) => result.push_str(hex::encode(sign.0).as_str()),
-        }
-        result
-    }
-
     async fn get_l1_tx_data(
         &self,
         storage: &mut StorageProcessor<'_>,
@@ -211,26 +258,13 @@ impl ApiTransactionData {
             .await
             .map_err(Error::storage)?;
         if let Some(op) = operation {
-            let block_number = BlockNumber(op.block_number as u32);
-            let status = Self::get_block_status(storage, block_number).await.into();
-            let operation: ZkSyncOp = serde_json::from_value(op.operation).unwrap();
-            let eth_hash = H256::from_slice(&op.eth_hash);
-            let id = op.priority_op_serialid as u64;
-            let tx = Transaction {
-                tx_hash,
-                block_number: Some(block_number),
-                op: TransactionData::L1(
-                    L1Transaction::from_executed_op(operation, eth_hash, id, tx_hash).unwrap(),
-                ),
-                status,
-                fail_reason: None,
-                created_at: Some(op.created_at),
-            };
-
-            Ok(Some(TxData {
-                tx,
-                eth_signature: None,
-            }))
+            let status = storage
+                .chain()
+                .block_schema()
+                .get_block_status(BlockNumber(op.block_number as u32))
+                .await
+                .into();
+            Ok(Some(l1_tx_data_from_op_and_status(op, status)))
         } else if let Some((_, priority_op)) = self
             .tx_sender
             .core_api_client
@@ -247,7 +281,7 @@ impl ApiTransactionData {
                     priority_op.serial_id,
                     tx_hash,
                 )),
-                status: L2Status::Queued,
+                status: TxInBlockStatus::Queued,
                 fail_reason: None,
                 created_at: None,
             };
@@ -273,31 +307,14 @@ impl ApiTransactionData {
             .await?;
 
         if let Some(op) = operation {
-            let block_number = BlockNumber(op.block_number as u32);
-            let status = if op.success {
-                Self::get_block_status(storage, block_number).await.into()
-            } else {
-                L2Status::Rejected
-            };
-            let tx = Transaction {
-                tx_hash,
-                block_number: Some(block_number),
-                op: TransactionData::L2(op.tx),
-                status,
-                fail_reason: op.fail_reason,
-                created_at: Some(op.created_at),
-            };
-            let eth_sign_data: Option<EthSignData> = op
-                .eth_sign_data
-                .map(serde_json::from_value)
-                .transpose()
-                .unwrap_or_else(|err| {
-                    panic!(
-                        "Database provided an incorrect eth_sign_data field, an error occurred {}",
-                        err
-                    )
-                });
-            let eth_signature = eth_sign_data.map(Self::get_sign_bytes);
+            let block_status = storage
+                .chain()
+                .block_schema()
+                .get_block_status(BlockNumber(op.block_number as u32))
+                .await
+                .into();
+            let eth_signature = op.eth_sign_data.clone().map(get_sign_bytes);
+            let tx = l2_tx_from_op_and_status(op, block_status);
 
             Ok(Some(TxData { tx, eth_signature }))
         } else if let Some(op) = storage
@@ -310,22 +327,11 @@ impl ApiTransactionData {
                 tx_hash,
                 block_number: None,
                 op: TransactionData::L2(op.tx),
-                status: L2Status::Queued,
+                status: TxInBlockStatus::Queued,
                 fail_reason: None,
                 created_at: Some(op.created_at),
             };
-
-            let eth_sign_data: Option<EthSignData> = op
-                .eth_sign_data
-                .map(serde_json::from_value)
-                .transpose()
-                .unwrap_or_else(|err| {
-                    panic!(
-                        "Database provided an incorrect eth_sign_data field, an error occurred {}",
-                        err
-                    )
-                });
-            let eth_signature = eth_sign_data.map(Self::get_sign_bytes);
+            let eth_signature = op.eth_sign_data.map(get_sign_bytes);
 
             Ok(Some(TxData { tx, eth_signature }))
         } else {
@@ -584,7 +590,7 @@ mod tests {
             batch.transaction_hashes,
             submit_batch_response.transaction_hashes
         );
-        assert_eq!(batch.batch_status.last_state, L2Status::Queued);
+        assert_eq!(batch.batch_status.last_state, TxInBlockStatus::Queued);
 
         let tx_hash = {
             let mut storage = cfg.pool.access_storage().await?;
@@ -602,7 +608,7 @@ mod tests {
         let expected_tx_status = Receipt::L2(L2Receipt {
             tx_hash,
             rollup_block: Some(BlockNumber(1)),
-            status: L2Status::Finalized,
+            status: TxInBlockStatus::Finalized,
             fail_reason: None,
         });
         assert_eq!(tx_status, expected_tx_status);
@@ -632,7 +638,7 @@ mod tests {
         let expected_tx_status = Receipt::L2(L2Receipt {
             tx_hash: pending_tx_hash,
             rollup_block: None,
-            status: L2Status::Queued,
+            status: TxInBlockStatus::Queued,
             fail_reason: None,
         });
         assert_eq!(tx_status, expected_tx_status);

@@ -8,7 +8,7 @@ use actix_web::{web, Scope};
 
 // Workspace uses
 use zksync_api_types::v02::{
-    block::BlockInfo,
+    block::{BlockInfo, BlockStatus},
     pagination::{BlockAndTxHash, Paginated, PaginationQuery},
     transaction::Transaction,
 };
@@ -24,7 +24,12 @@ use super::{
 };
 use crate::{api_try, utils::block_details_cache::BlockDetailsCache};
 
-pub fn block_info_from_details(details: BlockDetails) -> BlockInfo {
+pub fn block_info_from_details_and_status(details: BlockDetails, status: BlockStatus) -> BlockInfo {
+    let (committed_at, finalized_at) = match status {
+        BlockStatus::Queued => (None, None),
+        BlockStatus::Committed => (Some(details.committed_at), None),
+        BlockStatus::Finalized => (Some(details.committed_at), details.verified_at),
+    };
     BlockInfo {
         block_number: BlockNumber(details.block_number as u32),
         new_state_root: Fr::from_bytes(&details.new_state_root).unwrap_or_else(|err| {
@@ -36,8 +41,9 @@ pub fn block_info_from_details(details: BlockDetails) -> BlockInfo {
         block_size: details.block_size as u64,
         commit_tx_hash: details.commit_tx_hash.map(|bytes| H256::from_slice(&bytes)),
         verify_tx_hash: details.verify_tx_hash.map(|bytes| H256::from_slice(&bytes)),
-        committed_at: details.committed_at,
-        finalized_at: details.verified_at,
+        committed_at,
+        finalized_at,
+        status,
     }
 }
 
@@ -59,11 +65,21 @@ impl ApiBlockData {
     /// Returns information about block with the specified number.
     ///
     /// This method caches some of the verified blocks.
-    async fn block_info(&self, block_number: BlockNumber) -> Result<Option<BlockDetails>, Error> {
-        self.verified_blocks_cache
+    async fn block_info(&self, block_number: BlockNumber) -> Result<Option<BlockInfo>, Error> {
+        let status = {
+            let mut storage = self.pool.access_storage().await.map_err(Error::storage)?;
+            storage
+                .chain()
+                .block_schema()
+                .get_block_status(block_number)
+                .await
+        };
+        let details = self
+            .verified_blocks_cache
             .get(&self.pool, block_number)
             .await
-            .map_err(Error::storage)
+            .map_err(Error::storage)?;
+        Ok(details.map(|details| block_info_from_details_and_status(details, status)))
     }
 
     async fn get_block_number_by_position(
@@ -150,10 +166,7 @@ async fn block_by_number(
 ) -> ApiResult<Option<BlockInfo>> {
     let block_number = api_try!(data.get_block_number_by_position(&block_position).await);
 
-    data.block_info(block_number)
-        .await
-        .map(|details| details.map(block_info_from_details))
-        .into()
+    data.block_info(block_number).await.into()
 }
 
 async fn block_transactions(

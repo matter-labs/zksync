@@ -175,50 +175,51 @@ impl ApiAccountsData {
 
     async fn tx_receipts(
         &self,
-        address: Address,
-        location: TxLocation,
-        direction: SearchDirection,
-        limit: u32,
+        _address: Address,
+        _location: TxLocation,
+        _direction: SearchDirection,
+        _limit: u32,
     ) -> QueryResult<Vec<AccountTxReceipt>> {
-        let mut storage = self.access_storage().await?;
+        // let mut storage = self.access_storage().await?;
 
-        let items = storage
-            .chain()
-            .operations_ext_schema()
-            .get_account_transactions_receipts(
-                address,
-                *location.block as u64,
-                location.index,
-                search_direction_as_storage(direction),
-                limit as u64,
-            )
-            .await?;
+        // let items = storage
+        //     .chain()
+        //     .operations_ext_schema()
+        //     .get_account_transactions_receipts(
+        //         address,
+        //         *location.block as u64,
+        //         location.index,
+        //         search_direction_as_storage(direction),
+        //         limit as u64,
+        //     )
+        //     .await?;
 
-        Ok(items.into_iter().map(tx_receipt_from_response).collect())
+        // Ok(items.into_iter().map(tx_receipt_from_response).collect())
+        Ok(Vec::new())
     }
 
     async fn op_receipts(
         &self,
-        address: Address,
-        location: TxLocation,
-        direction: SearchDirection,
-        limit: u32,
+        _address: Address,
+        _location: TxLocation,
+        _direction: SearchDirection,
+        _limit: u32,
     ) -> QueryResult<Vec<AccountOpReceipt>> {
-        let mut storage = self.access_storage().await?;
+        // let mut storage = self.access_storage().await?;
 
-        let items = storage
-            .chain()
-            .operations_ext_schema()
-            .get_account_operations_receipts(
-                address,
-                *location.block as u64,
-                location.index.unwrap_or_default(),
-                search_direction_as_storage(direction),
-                limit as u64,
-            )
-            .await?;
+        // let items = storage
+        //     .chain()
+        //     .operations_ext_schema()
+        //     .get_account_operations_receipts(
+        //         address,
+        //         *location.block as u64,
+        //         location.index.unwrap_or_default(),
+        //         search_direction_as_storage(direction),
+        //         limit as u64,
+        //     )
+        //     .await?;
 
-        Ok(items.into_iter().map(op_receipt_from_response).collect())
+        Ok(Vec::new())
     }
 
     async fn pending_op_receipts(

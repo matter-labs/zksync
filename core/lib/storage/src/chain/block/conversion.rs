@@ -7,7 +7,10 @@ use std::convert::TryFrom;
 use std::str::FromStr;
 // External imports
 // Workspace imports
-use zksync_api_types::v02::transaction::{L1Transaction, L2Status, Transaction, TransactionData};
+use zksync_api_types::v02::{
+    block::BlockStatus,
+    transaction::{L1Transaction, Transaction, TransactionData, TxInBlockStatus},
+};
 use zksync_types::{
     aggregated_operations::AggregatedOperation,
     block::{ExecutedPriorityOp, ExecutedTx},
@@ -215,12 +218,21 @@ impl StoredAggregatedOperation {
 
 pub fn l2_transaction_from_item_and_status(
     item: BlockTransactionItem,
-    status: L2Status,
+    block_status: BlockStatus,
 ) -> Transaction {
     let tx_hash = TxHash::from_str(&item.tx_hash).unwrap();
+    let block_number = match block_status {
+        BlockStatus::Queued => None,
+        _ => Some(BlockNumber(item.block_number as u32)),
+    };
+    let status = if item.success {
+        block_status.into()
+    } else {
+        TxInBlockStatus::Rejected
+    };
     Transaction {
         tx_hash,
-        block_number: Some(BlockNumber(item.block_number as u32)),
+        block_number,
         op: TransactionData::L2(item.op),
         status,
         fail_reason: item.fail_reason,
@@ -230,19 +242,23 @@ pub fn l2_transaction_from_item_and_status(
 
 pub fn l1_transaction_from_item_and_status(
     item: BlockL1TransactionItem,
-    status: L2Status,
+    block_status: BlockStatus,
 ) -> Transaction {
     let tx_hash = TxHash::from_slice(&item.tx_hash).unwrap();
     let eth_hash = H256::from_slice(&item.eth_hash);
     let id = item.priority_op_serialid as u64;
     let operation: ZkSyncOp = serde_json::from_value(item.operation).unwrap();
+    let block_number = match block_status {
+        BlockStatus::Queued => None,
+        _ => Some(BlockNumber(item.block_number as u32)),
+    };
     Transaction {
         tx_hash,
-        block_number: Some(BlockNumber(item.block_number as u32)),
+        block_number,
         op: TransactionData::L1(
             L1Transaction::from_executed_op(operation, eth_hash, id, tx_hash).unwrap(),
         ),
-        status,
+        status: block_status.into(),
         fail_reason: None,
         created_at: Some(item.created_at),
     }

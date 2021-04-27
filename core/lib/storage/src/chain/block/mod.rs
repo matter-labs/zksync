@@ -4,8 +4,9 @@ use std::time::{Instant, SystemTime, UNIX_EPOCH};
 use chrono::{DateTime, Utc};
 // Workspace imports
 use zksync_api_types::v02::{
+    block::BlockStatus,
     pagination::{BlockAndTxHash, PaginationDirection, PaginationQuery},
-    transaction::{L2Status, Transaction},
+    transaction::Transaction,
 };
 use zksync_basic_types::{H256, U256};
 use zksync_crypto::convert::FeConvert;
@@ -34,7 +35,7 @@ use crate::{
     QueryResult, StorageProcessor,
 };
 
-mod conversion;
+pub(crate) mod conversion;
 pub mod records;
 
 /// Block schema is a primary sidechain storage controller.
@@ -238,7 +239,7 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
                     tx_hash as "tx_hash!",
                     block_number as "block_number!",
                     op as "op!",
-                    success as "success?",
+                    success as "success!",
                     fail_reason as "fail_reason?",
                     created_at as "created_at!"
                 FROM everything
@@ -587,6 +588,19 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
             .get_last_block_by_aggregated_action(AggregatedActionType::CommitBlocks, None)
             .await;
         metrics::histogram!("sql.chain.block.get_last_committed_block", start.elapsed());
+        result
+    }
+
+    /// Returns the number of last block which commit is confirmed on Ethereum.
+    pub async fn get_last_committed_confirmed_block(&mut self) -> QueryResult<BlockNumber> {
+        let start = Instant::now();
+        let result = OperationsSchema(self.0)
+            .get_last_block_by_aggregated_action(AggregatedActionType::CommitBlocks, Some(true))
+            .await;
+        metrics::histogram!(
+            "sql.chain.block.get_last_committed_confirmed_block",
+            start.elapsed()
+        );
         result
     }
 
@@ -943,6 +957,32 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
         Ok(self.save_block(block).await?)
     }
 
+    pub async fn get_block_status(&mut self, block_number: BlockNumber) -> BlockStatus {
+        if self
+            .0
+            .chain()
+            .operations_schema()
+            .get_stored_aggregated_operation(block_number, AggregatedActionType::ExecuteBlocks)
+            .await
+            .map(|operation| operation.confirmed)
+            .unwrap_or(false)
+        {
+            BlockStatus::Finalized
+        } else if self
+            .0
+            .chain()
+            .operations_schema()
+            .get_stored_aggregated_operation(block_number, AggregatedActionType::CommitBlocks)
+            .await
+            .map(|operation| operation.confirmed)
+            .unwrap_or(false)
+        {
+            BlockStatus::Committed
+        } else {
+            BlockStatus::Queued
+        }
+    }
+
     /// Retrieves L1 operations stored in the block for the given pagination query
     pub async fn get_block_l1_transactions_page(
         &mut self,
@@ -998,27 +1038,16 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
                 .await?
             }
         };
-        let is_block_finalized = self
+        let block_status = self
             .0
             .chain()
-            .operations_schema()
-            .get_stored_aggregated_operation(
-                query.from.block_number,
-                AggregatedActionType::ExecuteBlocks,
-            )
+            .block_schema()
+            .get_block_status(query.from.block_number)
             .await
-            .map(|operation| operation.confirmed)
-            .unwrap_or(false);
+            .into();
         let txs: Vec<Transaction> = raw_txs
             .into_iter()
-            .map(|tx| {
-                let status = if is_block_finalized {
-                    L2Status::Finalized
-                } else {
-                    L2Status::Committed
-                };
-                l1_transaction_from_item_and_status(tx, status)
-            })
+            .map(|tx| l1_transaction_from_item_and_status(tx, block_status))
             .collect();
 
         metrics::histogram!("sql.chain.block.get_block_l1_transactions", start.elapsed());
@@ -1037,25 +1066,15 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
                 sqlx::query_as!(
                     BlockTransactionItem,
                     r#"
-                        WITH transactions AS (
-                            SELECT
-                                '0x' || encode(tx_hash, 'hex') as tx_hash,
-                                tx as op,
-                                block_number,
-                                success,
-                                fail_reason,
-                                created_at
-                            FROM executed_transactions
-                            WHERE block_number = $1 AND created_at >= $2
-                        )
                         SELECT
-                            tx_hash as "tx_hash!",
-                            block_number as "block_number!",
-                            op as "op!",
-                            success as "success?",
-                            fail_reason as "fail_reason?",
-                            created_at as "created_at!"
-                        FROM transactions
+                            '0x' || encode(tx_hash, 'hex') as "tx_hash!",
+                            tx as op,
+                            block_number,
+                            success,
+                            fail_reason,
+                            created_at
+                        FROM executed_transactions
+                        WHERE block_number = $1 AND created_at >= $2
                         ORDER BY created_at ASC
                         LIMIT $3
                     "#,
@@ -1070,25 +1089,15 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
                 sqlx::query_as!(
                     BlockTransactionItem,
                     r#"
-                        WITH transactions AS (
-                            SELECT
-                                '0x' || encode(tx_hash, 'hex') as tx_hash,
-                                tx as op,
-                                block_number,
-                                success,
-                                fail_reason,
-                                created_at
-                            FROM executed_transactions
-                            WHERE block_number = $1 AND created_at <= $2
-                        )
                         SELECT
-                            tx_hash as "tx_hash!",
-                            block_number as "block_number!",
-                            op as "op!",
-                            success as "success?",
-                            fail_reason as "fail_reason?",
-                            created_at as "created_at!"
-                        FROM transactions
+                            '0x' || encode(tx_hash, 'hex') as "tx_hash!",
+                            tx as op,
+                            block_number,
+                            success,
+                            fail_reason,
+                            created_at
+                        FROM executed_transactions
+                        WHERE block_number = $1 AND created_at <= $2
                         ORDER BY created_at DESC
                         LIMIT $3
                     "#,
@@ -1100,31 +1109,15 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
                 .await?
             }
         };
-        let is_block_finalized = self
+        let block_status = self
             .0
             .chain()
-            .operations_schema()
-            .get_stored_aggregated_operation(
-                query.from.block_number,
-                AggregatedActionType::ExecuteBlocks,
-            )
-            .await
-            .map(|operation| operation.confirmed)
-            .unwrap_or(false);
+            .block_schema()
+            .get_block_status(query.from.block_number)
+            .await;
         let txs: Vec<Transaction> = raw_txs
             .into_iter()
-            .map(|tx| {
-                let status = if tx.success.unwrap_or(false) {
-                    if is_block_finalized {
-                        L2Status::Finalized
-                    } else {
-                        L2Status::Committed
-                    }
-                } else {
-                    L2Status::Rejected
-                };
-                l2_transaction_from_item_and_status(tx, status)
-            })
+            .map(|tx| l2_transaction_from_item_and_status(tx, block_status))
             .collect();
 
         metrics::histogram!("sql.chain.block.get_block_l2_transactions", start.elapsed());
@@ -1142,32 +1135,36 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
         // 2. Get at most `limit` priority ops and at most `limit` transactions.
         // 3. Merge them and leave at most `limit` entries.
 
-        let created_at: Option<DateTime<Utc>> = self
+        let created_at_and_block = self
             .0
             .chain()
             .operations_ext_schema()
-            .get_tx_created_at(query.from.block_number, query.from.tx_hash)
+            .get_tx_created_at_and_block_number(query.from.tx_hash)
             .await?;
-        let block_txs = if let Some(created_at) = created_at {
-            let mut block_txs = self
-                .0
-                .chain()
-                .block_schema()
-                .get_block_l2_transactions_page(query, created_at)
-                .await?;
-            let mut l1_txs = self
-                .0
-                .chain()
-                .block_schema()
-                .get_block_l1_transactions_page(query, created_at)
-                .await?;
-            block_txs.append(&mut l1_txs);
-            block_txs.sort_by(|a, b| match query.direction {
-                PaginationDirection::Newer => a.created_at.cmp(&b.created_at),
-                PaginationDirection::Older => b.created_at.cmp(&a.created_at),
-            });
-            block_txs.truncate(query.limit as usize);
-            Some(block_txs)
+        let block_txs = if let Some((created_at, block_number)) = created_at_and_block {
+            if block_number == query.from.block_number {
+                let mut block_txs = self
+                    .0
+                    .chain()
+                    .block_schema()
+                    .get_block_l1_transactions_page(query, created_at)
+                    .await?;
+                let mut l2_txs = self
+                    .0
+                    .chain()
+                    .block_schema()
+                    .get_block_l2_transactions_page(query, created_at)
+                    .await?;
+                block_txs.append(&mut l2_txs);
+                block_txs.sort_by(|a, b| match query.direction {
+                    PaginationDirection::Newer => a.created_at.cmp(&b.created_at),
+                    PaginationDirection::Older => b.created_at.cmp(&a.created_at),
+                });
+                block_txs.truncate(query.limit as usize);
+                Some(block_txs)
+            } else {
+                None
+            }
         } else {
             None
         };
