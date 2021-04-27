@@ -59,7 +59,7 @@ contract Governance is Config {
     function initialize(bytes calldata initializationParameters) external {
         (address _networkGovernor, address _defaultFactory) = abi.decode(initializationParameters, (address, address));
         networkGovernor = _networkGovernor;
-        defaultFactory = _defaultFactory;
+        defaultFactory = NFTFactory(_defaultFactory);
     }
 
     /// @notice Governance contract upgrade. Can be external because Proxy contract intercepts illegal calls of this function.
