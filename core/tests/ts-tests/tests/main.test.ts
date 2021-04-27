@@ -104,9 +104,6 @@ describe(`ZkSync integration tests (token: ${token}, transport: ${transport})`, 
     });
 
     step('should change pubkey offchain', async () => {
-        if (onlyBasic) {
-            return;
-        }
         await tester.testChangePubKey(chuck, token, false);
     });
 
@@ -153,6 +150,10 @@ describe(`ZkSync integration tests (token: ${token}, transport: ${transport})`, 
 
     step('should execute a withdrawal', async () => {
         await tester.testVerifiedWithdraw(alice, token, TX_AMOUNT);
+    });
+
+    step('should execute a transfer NFT', async () => {
+        await tester.testTransferNFT(chuck, alice, token);
     });
 
     step('should execute a ForcedExit', async () => {

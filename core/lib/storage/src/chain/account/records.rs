@@ -1,5 +1,6 @@
 // External imports
 use sqlx::{types::BigDecimal, FromRow};
+use zksync_types::{AccountId, Address, TokenId, H256, NFT};
 
 #[derive(Debug, FromRow)]
 pub struct StorageAccount {
@@ -34,6 +35,15 @@ pub struct StorageAccountUpdate {
 }
 
 #[derive(Debug, FromRow)]
+pub struct StorageNFT {
+    pub token_id: i32,
+    pub serial_id: i32,
+    pub creator_account_id: i32,
+    pub address: Vec<u8>,
+    pub content_hash: Vec<u8>,
+}
+
+#[derive(Debug, FromRow)]
 pub struct StorageMintNFTUpdate {
     pub token_id: i32,
     pub serial_id: i32,
@@ -43,6 +53,19 @@ pub struct StorageMintNFTUpdate {
     pub update_order_id: i32,
     pub block_number: i64,
     pub symbol: String,
+}
+
+impl From<StorageMintNFTUpdate> for NFT {
+    fn from(val: StorageMintNFTUpdate) -> Self {
+        Self {
+            id: TokenId(val.token_id as u32),
+            serial_id: val.serial_id as u32,
+            creator_id: AccountId(val.creator_account_id as u32),
+            address: Address::from_slice(val.address.as_slice()),
+            symbol: val.symbol,
+            content_hash: H256::from_slice(val.content_hash.as_slice()),
+        }
+    }
 }
 
 #[derive(Debug, FromRow)]

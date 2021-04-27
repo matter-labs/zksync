@@ -44,7 +44,7 @@ export async function contracts() {
 
 export async function circuit(threads: number = 1, testName?: string, ...args: string[]) {
     await utils.spawn(
-        `cargo test --no-fail-fast --release -p zksync_circuit ${testName || ''} 
+        `cargo test --no-fail-fast --release -p zksync_circuit ${testName || ''}
          -- --ignored --test-threads ${threads} ${args.join(' ')}`
     );
 }
@@ -72,12 +72,7 @@ export async function rust() {
     await db(true);
     await rustApi(true);
     await prover();
-    const { stdout: threads } = await utils.exec('nproc');
-    let circuitTestsThreads = Math.trunc(parseInt(threads) / 4); // if we use all CPUs tests can consume all RAM
-    if (circuitTestsThreads < 3) {
-        circuitTestsThreads = 3;
-    }
-    await circuit(circuitTestsThreads);
+    await circuit(1);
     await rustCryptoTests();
 }
 

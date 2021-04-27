@@ -19,7 +19,7 @@ import {
 } from '../../typechain';
 
 const TEST_PRIORITY_EXPIRATION = 101;
-const CHUNK_SIZE = 9;
+const CHUNK_SIZE = 10;
 
 let wallet;
 
@@ -593,8 +593,8 @@ describe('zkSync test process next operation', function () {
         let offset = 1;
         pubdata.writeUInt32BE(0xccaabbff, offset);
         offset += 4;
-        pubdata.writeUInt16BE(0, offset); // token
-        offset += 2;
+        pubdata.writeUInt32BE(0, offset); // token
+        offset += 4;
         Buffer.from(
             depositAmount
                 .toHexString()
@@ -633,7 +633,7 @@ describe('zkSync test process next operation', function () {
         zksyncContract.connect(wallet);
         const tokenId = await ethProxy.resolveTokenId(tokenContract.address);
         const fullExitAmount = parseEther('0.7');
-        const accountId = 0x00ffffff;
+        const accountId = 0x00faffaf;
 
         await zksyncContract.requestFullExit(accountId, tokenContract.address);
 
@@ -645,8 +645,8 @@ describe('zkSync test process next operation', function () {
         offset += 4;
         Buffer.from(wallet.address.substr(2), 'hex').copy(pubdata, offset);
         offset += 20;
-        pubdata.writeUInt16BE(tokenId, offset);
-        offset += 2;
+        pubdata.writeUInt32BE(tokenId, offset);
+        offset += 4;
         Buffer.from(
             fullExitAmount
                 .toHexString()

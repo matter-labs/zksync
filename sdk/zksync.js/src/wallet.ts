@@ -24,7 +24,8 @@ import {
     ChangePubKeyECDSA,
     ChangePubKeyCREATE2,
     Create2Data,
-    MintNFT
+    MintNFT,
+    NFT
 } from './types';
 import {
     ERC20_APPROVE_TRESHOLD,
@@ -313,6 +314,7 @@ export class Wallet {
             token: TokenLike;
             amount: BigNumberish;
             fee: BigNumberish;
+            symbol?: string;
             nonce?: Nonce;
             validFrom?: number;
             validUntil?: number;
@@ -347,7 +349,7 @@ export class Wallet {
                 validUntil: transfer.validUntil || MAX_TIMESTAMP
             });
 
-            messages.push(this.getTransferEthMessagePart(transfer));
+            messages.push(this.getTransferEthMessagePart({ stringToken: transfer.symbol, ...transfer }));
             batch.push({ tx, signature: null });
         }
 
@@ -360,6 +362,44 @@ export class Wallet {
 
         const transactionHashes = await this.provider.submitTxsBatch(batch, ethSignatures);
         return transactionHashes.map((txHash, idx) => new Transaction(batch[idx], txHash, this.provider));
+    }
+
+    async syncTransferNFT(transfer: {
+        to: Address;
+        token: NFT;
+        feeToken: TokenLike;
+        fee?: BigNumberish;
+        nonce?: Nonce;
+        validFrom?: number;
+        validUntil?: number;
+    }): Promise<Transaction[]> {
+        transfer.nonce = transfer.nonce != null ? await this.getNonce(transfer.nonce) : await this.getNonce();
+
+        let fee;
+        if (transfer.fee == null) {
+            fee = await this.provider.getTransactionsBatchFee(
+                ['Transfer', 'Transfer'],
+                [this.address(), this.address()],
+                transfer.feeToken
+            );
+        } else {
+            fee = transfer.fee;
+        }
+        const txFee = {
+            to: transfer.to,
+            token: transfer.feeToken,
+            amount: 0,
+            fee
+        };
+        const txNFT = {
+            to: transfer.to,
+            token: transfer.token.id,
+            amount: 1,
+            fee: 0,
+            symbol: transfer.token.symbol
+        };
+
+        return await this.syncMultiTransfer([txFee, txNFT]);
     }
 
     async syncTransfer(transfer: {
@@ -387,8 +427,6 @@ export class Wallet {
         feeToken: TokenLike;
         fee: BigNumberish;
         nonce: number;
-        validFrom: number;
-        validUntil: number;
     }): Promise<MintNFT> {
         if (!this.signer) {
             throw new Error('ZKSync signer is required for sending zksync transactions.');
@@ -405,8 +443,7 @@ export class Wallet {
             fee: mintNft.fee,
             nonce: mintNft.nonce
         };
-        console.log('data');
-        console.log(transactionData);
+
         return await this.signer.signMintNFT(transactionData);
     }
 
@@ -513,11 +550,9 @@ export class Wallet {
         feeToken: TokenLike;
         fee?: BigNumberish;
         nonce?: Nonce;
-        validFrom?: number;
-        validUntil?: number;
     }): Promise<Transaction> {
         mintNft.nonce = mintNft.nonce != null ? await this.getNonce(mintNft.nonce) : await this.getNonce();
-        console.log(mintNft);
+
         if (mintNft.fee == null) {
             const fullFee = await this.provider.getTransactionFee('MintNFT', mintNft.recipient, mintNft.feeToken);
             mintNft.fee = fullFee.totalFee;
@@ -707,6 +742,7 @@ export class Wallet {
         token: TokenLike;
         amount: BigNumberish;
         fee: BigNumberish;
+        stringToken?: string;
     }): string {
         const stringAmount = BigNumber.from(transfer.amount).isZero()
             ? null
@@ -714,7 +750,11 @@ export class Wallet {
         const stringFee = BigNumber.from(transfer.fee).isZero()
             ? null
             : this.provider.tokenSet.formatToken(transfer.token, transfer.fee);
-        const stringToken = this.provider.tokenSet.resolveTokenSymbol(transfer.token);
+
+        const stringToken =
+            transfer.stringToken == null
+                ? this.provider.tokenSet.resolveTokenSymbol(transfer.token)
+                : transfer.stringToken;
         return this.ethMessageSigner.getTransferEthMessagePart({
             stringAmount,
             stringFee,
@@ -840,6 +880,17 @@ export class Wallet {
 
     async getAccountState(): Promise<AccountState> {
         return this.provider.getState(this.address());
+    }
+
+    async getNFT(tokenId: number, type: 'committed' | 'verified' = 'committed'): Promise<NFT> {
+        const accountState = await this.getAccountState();
+        let token: NFT;
+        if (type === 'committed') {
+            token = accountState.committed.nfts[tokenId];
+        } else {
+            token = accountState.verified.nfts[tokenId];
+        }
+        return token;
     }
 
     async getBalance(token: TokenLike, type: 'committed' | 'verified' = 'committed'): Promise<BigNumber> {

@@ -6,7 +6,7 @@ use sqlx::types::BigDecimal;
 // Workspace imports
 use zksync_types::{
     helpers::{apply_updates, reverse_updates},
-    AccountId, AccountMap, AccountUpdate, AccountUpdates, BlockNumber, PubKeyHash,
+    AccountId, AccountMap, AccountUpdate, AccountUpdates, BlockNumber, PubKeyHash, TokenId, NFT,
 };
 // Local imports
 use crate::chain::{
@@ -170,7 +170,7 @@ impl<'a, 'c> StateSchema<'a, 'c> {
                         .execute(transaction.conn())
                         .await?;
                 }
-                AccountUpdate::RemoveToken { ref token } => {
+                AccountUpdate::RemoveNFT { ref token } => {
                     let token_id = token.id.0 as i32;
                     let block_number = i64::from(*block_number);
                     sqlx::query!(
@@ -627,5 +627,23 @@ impl<'a, 'c> StateSchema<'a, 'c> {
 
         metrics::histogram!("sql.chain.state.load_state_diff", start.elapsed());
         result
+    }
+
+    pub async fn get_mint_nft_update(&mut self, token_id: TokenId) -> QueryResult<Option<NFT>> {
+        let start = Instant::now();
+        let nft = sqlx::query_as!(
+            StorageMintNFTUpdate,
+            r#"
+            SELECT * FROM mint_nft_updates 
+            WHERE token_id = $1
+            LIMIT 1
+            "#,
+            *token_id as i32
+        )
+        .fetch_optional(self.0.conn())
+        .await?;
+
+        metrics::histogram!("sql.token.get_mint_nft_update", start.elapsed());
+        Ok(nft.map(|p| p.into()))
     }
 }
