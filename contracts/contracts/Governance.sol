@@ -29,9 +29,6 @@ contract Governance is Config {
     /// @notice Address which will exercise governance over the network i.e. add tokens, change validator set, conduct upgrades
     address public networkGovernor;
 
-    /// @notice Address which will be used if NFT token has no factories
-    NFTFactory public defaultFactory;
-
     /// @notice Total number of ERC20 tokens registered in the network (excluding ETH, which is hardcoded as tokenId = 0)
     uint16 public totalTokens;
 
@@ -53,13 +50,16 @@ contract Governance is Config {
     /// @notice NFT Creator address to factory address mapping
     mapping(address => NFTFactory) public NFTFactories;
 
+    /// @notice Address which will be used if NFT token has no factories
+    NFTFactory public defaultFactory;
+
     /// @notice Governance contract initialization. Can be external because Proxy contract intercepts illegal calls of this function.
     /// @param initializationParameters Encoded representation of initialization parameters:
     ///     _networkGovernor The address of network governor
     function initialize(bytes calldata initializationParameters) external {
-        address _networkGovernor = abi.decode(initializationParameters, (address));
-
+        (address _networkGovernor, address _defaultFactory) = abi.decode(initializationParameters, (address, address));
         networkGovernor = _networkGovernor;
+        defaultFactory = _defaultFactory;
     }
 
     /// @notice Governance contract upgrade. Can be external because Proxy contract intercepts illegal calls of this function.
@@ -174,12 +174,6 @@ contract Governance is Config {
             NFTFactories[_creatorAddress] = NFTFactory(msg.sender);
             emit NFTFactoryRegistered(_creatorAddress, msg.sender, _signature);
         }
-    }
-
-    function setDefaultFactory(address _factory) public {
-        require(msg.sender == tokenGovernance, "1E");
-        require(address(defaultFactory) == address(0), "1E");
-        defaultFactory = NFTFactory(_factory);
     }
 
     function getFactory(address _creator) external view returns (NFTFactory) {
