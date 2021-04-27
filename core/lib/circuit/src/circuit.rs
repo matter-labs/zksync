@@ -3854,7 +3854,7 @@ fn continue_leftmost_subroot_to_root<E: RescueEngine, CS: ConstraintSystem<E>>(
     Ok(node_hash)
 }
 
-fn hash_nft_content_to_balance_type<E: RescueEngine, CS: ConstraintSystem<E>>(
+pub fn hash_nft_content_to_balance_type<E: RescueEngine, CS: ConstraintSystem<E>>(
     mut cs: CS,
     creator_account_id: &CircuitElement<E>,
     serial_id: &CircuitElement<E>,

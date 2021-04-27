@@ -79,9 +79,11 @@ async fn main() {
 
     vlog::info!("Restored state from db: {} s", timer.elapsed().as_secs());
 
-    let (proof, amount) =
-        zksync_prover_utils::exit_proof::create_exit_proof(accounts, account_id, address, token_id)
-            .expect("Failed to generate exit proof");
+    let (proof, amount) = zksync_prover_utils::exit_proof::create_exit_proof_fungible(
+        accounts, account_id, address, token_id,
+    )
+    .expect("Failed to generate exit proof");
+    todo!(); // fix for nft
 
     let proof_data = ExitProofData {
         token_id,

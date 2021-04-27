@@ -590,22 +590,40 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
         StoredBlockInfo memory _storedBlockInfo,
         address _owner,
         uint32 _accountId,
-        uint16 _tokenId,
+        uint32 _tokenId,
         uint128 _amount,
+        address _nftCreatorAddress,
+        bytes32 _nftContentHash,
         uint256[] memory _proof
     ) external nonReentrant {
-        require(governance.isValidTokenId(_tokenId), "a"); // should request only available tokens
+        require(_accountId <= MAX_ACCOUNT_ID, "e");
+        require(_accountId != SPECIAL_ACCOUNT_ID, "v");
+        require(_tokenId < SPECIAL_NFT_TOKEN_ID, "T");
 
-        bytes22 packedBalanceKey = packAddressAndTokenId(_owner, _tokenId);
         require(exodusMode, "s"); // must be in exodus mode
         require(!performedExodus[_accountId][_tokenId], "t"); // already exited
         require(storedBlockHashes[totalBlocksExecuted] == hashStoredBlockInfo(_storedBlockInfo), "u"); // incorrect stored block info
 
         bool proofCorrect =
-            verifier.verifyExitProof(_storedBlockInfo.stateHash, _accountId, _owner, uint32(_tokenId), _amount, _proof);
+            verifier.verifyExitProof(
+                _storedBlockInfo.stateHash,
+                _accountId,
+                _owner,
+                _tokenId,
+                _amount,
+                _nftCreatorAddress,
+                _nftContentHash,
+                _proof
+            );
         require(proofCorrect, "x");
 
-        increaseBalanceToWithdraw(packedBalanceKey, _amount);
+        if (_tokenId <= MAX_FUNGIBLE_TOKEN_ID) {
+            bytes22 packedBalanceKey = packAddressAndTokenId(_owner, uint16(_tokenId));
+            increaseBalanceToWithdraw(packedBalanceKey, _amount);
+        } else {
+            // TODO :)
+            require(_amount == 1, "Z");
+        }
         performedExodus[_accountId][_tokenId] = true;
     }
 

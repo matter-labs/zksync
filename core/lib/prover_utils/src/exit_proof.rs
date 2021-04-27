@@ -8,13 +8,16 @@ use zksync_circuit::exit_circuit::create_exit_circuit_with_public_input;
 use zksync_crypto::circuit::account::CircuitAccount;
 use zksync_crypto::circuit::CircuitAccountTree;
 use zksync_crypto::proof::EncodedSingleProof;
-use zksync_types::{AccountId, AccountMap, Address, TokenId};
+use zksync_types::{AccountId, AccountMap, Address, TokenId, H256};
 
 pub fn create_exit_proof(
     accounts: AccountMap,
     account_id: AccountId,
     owner: Address,
     token_id: TokenId,
+    nft_creator_id: AccountId,
+    nft_serial_id: u32,
+    nft_content_hash: H256,
 ) -> Result<(EncodedSingleProof, BigUint), anyhow::Error> {
     let timer = Instant::now();
     let mut circuit_account_tree =
@@ -38,8 +41,14 @@ pub fn create_exit_proof(
             )
         })?;
 
-    let zksync_exit_circuit =
-        create_exit_circuit_with_public_input(&mut circuit_account_tree, account_id, token_id);
+    let zksync_exit_circuit = create_exit_circuit_with_public_input(
+        &mut circuit_account_tree,
+        account_id,
+        token_id,
+        nft_creator_id,
+        nft_serial_id,
+        nft_content_hash,
+    );
     let commitment = zksync_exit_circuit
         .pub_data_commitment
         .expect("Witness should contract commitment");
@@ -50,4 +59,21 @@ pub fn create_exit_proof(
 
     vlog::info!("Exit proof created: {} s", timer.elapsed().as_secs());
     Ok((proof.serialize_single_proof(), balance))
+}
+
+pub fn create_exit_proof_fungible(
+    accounts: AccountMap,
+    account_id: AccountId,
+    owner: Address,
+    token_id: TokenId,
+) -> Result<(EncodedSingleProof, BigUint), anyhow::Error> {
+    create_exit_proof(
+        accounts,
+        account_id,
+        owner,
+        token_id,
+        Default::default(),
+        Default::default(),
+        Default::default(),
+    )
 }

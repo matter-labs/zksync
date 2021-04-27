@@ -51,24 +51,29 @@ pub(crate) fn make_plonk_blocks_verify_keys(config: ChainConfig) {
 
 /// Creates instance of the exodus mode zkSync circuit.
 fn exit_circuit() -> impl Circuit<Engine> + Clone {
+    let empty_branch = OperationBranch {
+        address: None,
+        token: None,
+        witness: OperationBranchWitness {
+            account_witness: AccountWitness {
+                nonce: None,
+                pub_key_hash: None,
+                address: None,
+            },
+            account_path: vec![None; params::account_tree_depth()],
+            balance_value: None,
+            balance_subtree_path: vec![None; params::balance_tree_depth()],
+        },
+    };
     ZkSyncExitCircuit::<'_, Engine> {
         params: &params::RESCUE_PARAMS,
         pub_data_commitment: None,
         root_hash: None,
-        account_audit_data: OperationBranch {
-            address: None,
-            token: None,
-            witness: OperationBranchWitness {
-                account_witness: AccountWitness {
-                    nonce: None,
-                    pub_key_hash: None,
-                    address: None,
-                },
-                account_path: vec![None; params::account_tree_depth()],
-                balance_value: None,
-                balance_subtree_path: vec![None; params::balance_tree_depth()],
-            },
-        },
+        account_audit_data: empty_branch.clone(),
+        special_account_audit_data: empty_branch.clone(),
+        creator_account_audit_data: empty_branch,
+        serial_id: None,
+        content_hash: vec![None; params::CONTENT_HASH_WIDTH],
     }
 }
 
