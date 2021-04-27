@@ -20,7 +20,6 @@ use crate::witness::{
     },
     utils::SigDataInput,
 };
-use zksync_crypto::params::number_of_processable_tokens;
 
 struct TestSwap {
     accounts: (u32, u32),
@@ -75,7 +74,7 @@ impl TestSwap {
         accounts
     }
 
-    fn get_op(&self) -> (SwapOp, SwapSigDataInput) {
+    fn get_op(&self) -> (SwapOp, SwapSigDataInput, (Order, Order)) {
         assert!(!self.test_accounts.is_empty());
 
         let amount_0 = if self.is_limit_order.0 {
@@ -98,7 +97,7 @@ impl TestSwap {
             amount_0,
             AccountId(self.recipients.0),
             None,
-            true,
+            self.is_limit_order.0,
             Default::default(),
         );
 
@@ -110,7 +109,7 @@ impl TestSwap {
             amount_1,
             AccountId(self.recipients.1),
             None,
-            true,
+            self.is_limit_order.1,
             Default::default(),
         );
 
@@ -139,7 +138,7 @@ impl TestSwap {
             SigDataInput::from_swap_op(&swap_op).expect("SigDataInput creation failed"),
         );
 
-        (swap_op, input)
+        (swap_op, input, (order_0, order_1))
     }
 }
 
@@ -256,7 +255,7 @@ fn test_swap_success() {
 
     for test_swap in test_swaps.iter_mut() {
         test_swap.create_accounts();
-        let (swap_op, input) = test_swap.get_op();
+        let (swap_op, input, _) = test_swap.get_op();
 
         generic_test_scenario::<SwapWitness<Bn256>, _>(
             &test_swap.get_accounts(),
@@ -271,4 +270,77 @@ fn test_swap_success() {
             },
         );
     }
+}
+#[test]
+#[ignore]
+fn test_swap_limit_orders() {
+    let mut test_swap = TestSwap {
+        accounts: (1, 3),
+        recipients: (2, 4),
+        submitter: 5,
+        tokens: (18, 19),
+        fee_token: 0,
+        amounts: (50, 100),
+        fee: 25,
+        balances: (100, 200, 50),
+        first_price: (1, 2),
+        second_price: (2, 1),
+        is_limit_order: (true, true),
+        test_accounts: vec![],
+    };
+
+    test_swap.create_accounts();
+    let (swap_op, input, orders) = test_swap.get_op();
+    let mut test_accounts = test_swap.get_accounts();
+
+    generic_test_scenario::<SwapWitness<Bn256>, _>(
+        &test_accounts,
+        swap_op,
+        input.clone(),
+        |state, op| {
+            let fee = <ZkSyncState as TxHandler<Swap>>::apply_op(state, &op)
+                .expect("Operation failed")
+                .0
+                .unwrap();
+            vec![fee]
+        },
+    );
+
+    let new_submitter = WitnessTestAccount::new_with_token(AccountId(6), 24, TokenId(10));
+
+    // Using same signed limit orders but different submitter
+    let second_swap_op = SwapOp {
+        tx: new_submitter
+            .zksync_account
+            .sign_swap(
+                (orders.0, orders.1),
+                (BigUint::from(40u8), BigUint::from(80u8)),
+                None,
+                true,
+                TokenId(10),
+                "",
+                BigUint::from(20u8),
+            )
+            .0,
+        accounts: (AccountId(1), AccountId(3)),
+        recipients: (AccountId(2), AccountId(4)),
+        submitter: AccountId(6),
+    };
+
+    test_accounts.push(new_submitter);
+    let second_swap_input =
+        SigDataInput::from_swap_op(&second_swap_op).expect("SigDataInput creation failed");
+
+    generic_test_scenario::<SwapWitness<Bn256>, _>(
+        &test_accounts,
+        second_swap_op,
+        (input.0, input.1, second_swap_input),
+        |state, op| {
+            let fee = <ZkSyncState as TxHandler<Swap>>::apply_op(state, &op)
+                .expect("Operation failed")
+                .0
+                .unwrap();
+            vec![fee]
+        },
+    );
 }
