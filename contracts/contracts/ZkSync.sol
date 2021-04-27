@@ -335,14 +335,6 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
         addPriorityRequest(Operations.OpType.FullExit, pubData);
     }
 
-    /// @notice Register full exit request - pack pubdata, add priority request
-    /// @notice DEPRECATED: use requestFullExit instead.
-    /// @param _accountId Numerical id of the account
-    /// @param _token Token address, 0 address for ether
-    function fullExit(uint32 _accountId, address _token) external {
-        requestFullExit(_accountId, _token);
-    }
-
     /// @dev Process one block commit using previous block StoredBlockInfo,
     /// @dev returns new block StoredBlockInfo
     /// @dev NOTE: Does not change storage (except events, so we can't mark it view)
@@ -468,7 +460,7 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
                 if (op.tokenId <= MAX_FUNGIBLE_TOKEN_ID) {
                     withdrawOrStore(uint16(op.tokenId), op.owner, op.amount);
                 } else {
-                    if (op.amount) {
+                    if (op.amount != 0) {
                         // TODO
                     }
                 }
@@ -952,22 +944,6 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
         emit NewPriorityRequest(msg.sender, nextPriorityRequestId, _opType, _pubData, uint256(expirationBlock));
 
         totalOpenPriorityRequests++;
-    }
-
-    /// @notice Deletes processed priority requests
-    /// @param _number The number of requests
-    function deleteRequests(uint64 _number) internal {
-        require(_number <= totalOpenPriorityRequests, "M"); // number is higher than total priority requests number
-
-        uint64 numberOfRequestsToClear = Utils.minU64(_number, MAX_PRIORITY_REQUESTS_TO_DELETE_IN_VERIFY);
-        uint64 startIndex = firstPriorityRequestId;
-        for (uint64 i = startIndex; i < startIndex + numberOfRequestsToClear; i++) {
-            delete priorityRequests[i];
-        }
-
-        totalOpenPriorityRequests -= _number;
-        firstPriorityRequestId += _number;
-        totalCommittedPriorityRequests -= _number;
     }
 
     function increaseBalanceToWithdraw(bytes22 _packedBalanceKey, uint128 _amount) internal {
