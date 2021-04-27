@@ -226,16 +226,22 @@ where
             tree_state.unprocessed_prior_ops, // unprocessed priority op
             tree_state.fee_acc_id,            // fee account
         );
+
+        let last_store_block = interactor.get_last_store_block().await;
         match state {
             StorageUpdateState::Events => {
                 // Update operations
-                let new_ops_blocks = self.update_operations_state(interactor).await;
+                let mut new_ops_blocks = self.update_operations_state(interactor).await;
+                //delete used ops when program exit unexpected
+                new_ops_blocks.retain(|x| x.block_num>last_store_block);
                 // Update tree
                 self.update_tree_state(interactor, new_ops_blocks).await;
             }
             StorageUpdateState::Operations => {
                 // Update operations
-                let new_ops_blocks = interactor.get_ops_blocks_from_storage().await;
+                let mut new_ops_blocks = interactor.get_ops_blocks_from_storage().await;
+                //delete used ops when program exit unexpected
+                new_ops_blocks.retain(|x| x.block_num>last_store_block);
                 // Update tree
                 self.update_tree_state(interactor, new_ops_blocks).await;
             }
@@ -324,6 +330,9 @@ where
     /// Updates events state, saves new blocks, tokens events and the last watched eth block number in storage
     /// Returns bool flag, true if there are new block events
     async fn update_events_state(&mut self, interactor: &mut I) -> bool {
+        let last_store_block = interactor.get_last_store_block().await;
+        vlog::info!("last_store_block: {:?}", last_store_block);
+
         let (block_events, token_events, last_watched_eth_block_number) = self
             .events_state
             .update_events_state(
@@ -332,6 +341,7 @@ where
                 &self.governance_contract,
                 self.eth_blocks_step,
                 self.end_eth_blocks_offset,
+                last_store_block.0
             )
             .await
             .expect("Updating events state: cant update events state");

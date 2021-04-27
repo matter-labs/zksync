@@ -91,8 +91,9 @@ impl EventsState {
         governance_contract: &(ethabi::Contract, Contract<T>),
         eth_blocks_step: u64,
         end_eth_blocks_offset: u64,
+        last_store_block: u32
     ) -> Result<(Vec<BlockEvent>, Vec<NewTokenEvent>, u64), anyhow::Error> {
-        self.remove_verified_events();
+        self.remove_verified_events(last_store_block);
 
         let (events, token_events, to_block_number) =
             EventsState::get_new_events_and_last_watched_block(
@@ -360,17 +361,20 @@ impl EventsState {
         true
     }
 
-    /// Removes verified committed blocks events and all verified
-    fn remove_verified_events(&mut self) {
-        let count_to_remove = self.verified_events.len();
-        self.verified_events.clear();
-        self.committed_events.drain(0..count_to_remove);
+    /// Removes verified committed blocks events and all verified and remain the not use events for next round restore
+    fn remove_verified_events(&mut self, last_store_block: u32) {
+        self.verified_events.retain(|&x| x.block_num.0 > last_store_block);
+        self.committed_events.retain(|&x| x.block_num.0 > last_store_block);
     }
 
     /// Returns only verified committed blocks from verified
     pub fn get_only_verified_committed_events(&self) -> Vec<BlockEvent> {
         let count_to_get = self.verified_events.len();
-        self.committed_events[0..count_to_get].to_vec()
+        if count_to_get <= self.committed_events.len() {
+            return self.committed_events[0..count_to_get].to_vec()
+        }
+        self.committed_events.to_vec()
+
     }
 }
 
