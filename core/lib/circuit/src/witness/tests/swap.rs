@@ -97,7 +97,7 @@ impl TestSwap {
             amount_0,
             AccountId(self.recipients.0),
             None,
-            self.is_limit_order.0,
+            !self.is_limit_order.0,
             Default::default(),
         );
 
@@ -109,7 +109,7 @@ impl TestSwap {
             amount_1,
             AccountId(self.recipients.1),
             None,
-            self.is_limit_order.1,
+            !self.is_limit_order.1,
             Default::default(),
         );
 
@@ -271,6 +271,130 @@ fn test_swap_success() {
         );
     }
 }
+#[test]
+#[ignore]
+fn test_swap_failure() {
+    let mut test_swaps = vec![
+        // Not enough balance
+        TestSwap {
+            accounts: (1, 3),
+            recipients: (2, 4),
+            submitter: 5,
+            tokens: (18, 19),
+            fee_token: 0,
+            amounts: (50, 100),
+            fee: 25,
+            balances: (49, 200, 50),
+            first_price: (1, 2),
+            second_price: (2, 1),
+            is_limit_order: (false, false),
+            test_accounts: vec![],
+        },
+        // Wrong prices
+        TestSwap {
+            accounts: (1, 3),
+            recipients: (2, 4),
+            submitter: 5,
+            tokens: (18, 19),
+            fee_token: 0,
+            amounts: (50, 100),
+            fee: 25,
+            balances: (50, 200, 50),
+            first_price: (1, 2),
+            second_price: (1, 2),
+            is_limit_order: (false, false),
+            test_accounts: vec![],
+        },
+        // equal tokens
+        TestSwap {
+            accounts: (1, 3),
+            recipients: (2, 4),
+            submitter: 5,
+            tokens: (18, 18),
+            fee_token: 0,
+            amounts: (50, 100),
+            fee: 25,
+            balances: (50, 200, 50),
+            first_price: (1, 2),
+            second_price: (2, 1),
+            is_limit_order: (false, false),
+            test_accounts: vec![],
+        },
+    ];
+
+    for test_swap in test_swaps.iter_mut() {
+        test_swap.create_accounts();
+        let (swap_op, input, _) = test_swap.get_op();
+
+        incorrect_op_test_scenario::<SwapWitness<Bn256>, _>(
+            &test_swap.get_accounts(),
+            swap_op,
+            input,
+            "",
+            || {
+                vec![CollectedFee {
+                    token: TokenId(test_swap.fee_token),
+                    amount: test_swap.fee.into(),
+                }]
+            },
+        );
+    }
+}
+
+#[test]
+#[ignore]
+fn test_swap_corrupted_input() {
+    let mut test_swap = TestSwap {
+        accounts: (1, 3),
+        recipients: (2, 4),
+        submitter: 5,
+        tokens: (18, 19),
+        fee_token: 0,
+        amounts: (50, 100),
+        fee: 25,
+        balances: (100, 200, 50),
+        first_price: (1, 2),
+        second_price: (2, 1),
+        is_limit_order: (false, false),
+        test_accounts: vec![],
+    };
+
+    test_swap.create_accounts();
+    let (swap_op, input, _) = test_swap.get_op();
+
+    for sig in input.0.corrupted_variations() {
+        corrupted_input_test_scenario::<SwapWitness<Bn256>, _>(
+            &test_swap.get_accounts(),
+            swap_op.clone(),
+            (sig, input.1.clone(), input.2.clone()),
+            "op_valid is true",
+            |state, op| {
+                let fee = <ZkSyncState as TxHandler<Swap>>::apply_op(state, &op)
+                    .expect("Operation failed")
+                    .0
+                    .unwrap();
+                vec![fee]
+            },
+        );
+    }
+
+    for sig in input.2.corrupted_variations() {
+        corrupted_input_test_scenario::<SwapWitness<Bn256>, _>(
+            &test_swap.get_accounts(),
+            swap_op.clone(),
+            (input.0.clone(), input.1.clone(), sig),
+            "op_valid is true",
+            |state, op| {
+                let fee = <ZkSyncState as TxHandler<Swap>>::apply_op(state, &op)
+                    .expect("Operation failed")
+                    .0
+                    .unwrap();
+                vec![fee]
+            },
+        );
+    }
+}
+
 #[test]
 #[ignore]
 fn test_swap_limit_orders() {
