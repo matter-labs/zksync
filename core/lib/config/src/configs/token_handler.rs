@@ -5,7 +5,6 @@ use std::time::Duration;
 use serde::Deserialize;
 // Workspace uses
 use zksync_types::TokenInfo;
-use zksync_utils::get_env;
 // Local uses
 use crate::envy_load;
 
@@ -35,9 +34,8 @@ impl TokenHandlerConfig {
     }
 
     pub fn token_list(&self) -> Vec<TokenInfo> {
-        let home = get_env("ZKSYNC_HOME");
         let token_list_name = self.token_list_file();
-        let path = format!("{}/etc/token-lists/{}.json", home, token_list_name);
+        let path = format!("./etc/token-lists/{}.json", token_list_name);
 
         serde_json::from_str(&fs::read_to_string(path).expect("Invalid config path"))
             .expect("Invalid config format")
