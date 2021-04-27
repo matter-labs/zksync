@@ -621,8 +621,8 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
             bytes22 packedBalanceKey = packAddressAndTokenId(_owner, uint16(_tokenId));
             increaseBalanceToWithdraw(packedBalanceKey, _amount);
         } else {
-            // TODO :)
             require(_amount == 1, "Z");
+            // TODO :)
         }
         performedExodus[_accountId][_tokenId] = true;
     }
