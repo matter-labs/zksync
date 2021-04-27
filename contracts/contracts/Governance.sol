@@ -178,10 +178,11 @@ contract Governance is Config {
 
     function setDefaultFactory(address _factory) public {
         require(msg.sender == tokenGovernance, "1E");
+        require(address(defaultFactory) == address(0), "1E");
         defaultFactory = NFTFactory(_factory);
     }
 
-    function getFactory(address _creator) external returns (NFTFactory) {
+    function getFactory(address _creator) external view NFTFactory {
         NFTFactory _factory = NFTFactories[_creator];
         if (address(_factory) == address(0x0)) {
             return defaultFactory;

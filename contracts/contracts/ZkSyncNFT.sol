@@ -8,7 +8,6 @@ import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
  * @dev see https://eips.ethereum.org/EIPS/eip-721
  */
 contract ZkSyncNFT is ERC721, NFTFactory {
-
     // Optional mapping for token content hashes
     mapping(uint256 => bytes32) private _contentHashes;
     address private _zksync_address;
@@ -32,7 +31,11 @@ contract ZkSyncNFT is ERC721, NFTFactory {
         _contentHashes[tokenId] = contentHash;
     }
 
-    function _beforeTokenTransfer(address from, address to, uint256 tokenId) override internal virtual {
+    function _beforeTokenTransfer(
+        address from,
+        address to,
+        uint256 tokenId
+    ) internal virtual override {
         // That means token is burning
         if (to == address(0)) {
             delete _contentHashes[tokenId];
