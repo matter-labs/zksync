@@ -74,7 +74,7 @@ impl ApiV01 {
         // Different APIs have different views on how to represent ETH in their system.
         // But ETH is always allowed to pay fee, and in all cases it should be on the list.
 
-        if tokens.get(&TokenId(0)) {
+        if tokens.get(&TokenId(0)).is_none() {
             let eth = Token::new(TokenId(0), Default::default(), "ETH", 18);
             tokens.insert(eth.id, eth);
         }
