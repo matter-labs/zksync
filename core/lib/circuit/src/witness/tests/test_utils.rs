@@ -87,7 +87,7 @@ impl ZkSyncStateGenerator {
 
 /// A helper structure for witness tests which contains both testkit
 /// zkSync account and an actual zkSync account.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct WitnessTestAccount {
     pub zksync_account: ZkSyncAccount,
     pub id: AccountId,
