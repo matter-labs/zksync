@@ -260,14 +260,12 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
     /// @notice  Withdraws tokens from zkSync contract to the owner
     /// @param _owner Address of the tokens owner
     /// @param _tokenId Id of NFT token
-    function withdrawPendingNFTBalance(address payable _owner, uint32 _tokenId) external nonReentrant {
+    function withdrawPendingNFTBalance(uint32 _tokenId) external nonReentrant {
         Operations.WithdrawNFT memory op = pendingWithdrawnNFTs[_tokenId];
-        if (op.owner == _owner) {
-            NFTFactory _factory = governance.getFactory(op.creator);
-            try _factory.mintNFT(op.creator, op.owner, op.contentHash, op.tokenId) {
-                delete pendingWithdrawnNFTs[_tokenId];
-            } catch {}
-        }
+        require(op.owner != address(0x0), "oq"); // Token is not exists
+        NFTFactory _factory = governance.getFactory(op.creator);
+        _factory.mintNFT(op.creator, op.owner, op.contentHash, op.tokenId);
+        delete pendingWithdrawnNFTs[_tokenId];
     }
 
     /// @notice Withdraw ERC20 token to Layer 1 - register withdrawal and transfer ERC20 to sender
