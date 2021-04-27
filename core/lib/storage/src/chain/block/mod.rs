@@ -1060,25 +1060,15 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
                 sqlx::query_as!(
                     BlockTransactionItem,
                     r#"
-                        WITH transactions AS (
-                            SELECT
-                                '0x' || encode(tx_hash, 'hex') as tx_hash,
-                                tx as op,
-                                block_number,
-                                success,
-                                fail_reason,
-                                created_at
-                            FROM executed_transactions
-                            WHERE block_number = $1 AND created_at <= $2
-                        )
                         SELECT
-                            tx_hash as "tx_hash!",
-                            block_number as "block_number!",
-                            op as "op!",
-                            success as "success!",
-                            fail_reason as "fail_reason?",
-                            created_at as "created_at!"
-                        FROM transactions
+                            '0x' || encode(tx_hash, 'hex') as "tx_hash!",
+                            tx as op,
+                            block_number,
+                            success,
+                            fail_reason,
+                            created_at
+                        FROM executed_transactions
+                        WHERE block_number = $1 AND created_at <= $2
                         ORDER BY created_at DESC
                         LIMIT $3
                     "#,
