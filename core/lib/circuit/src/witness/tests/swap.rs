@@ -68,7 +68,11 @@ impl TestSwap {
         self.test_accounts.clone()
     }
 
-    fn get_op(&self) -> (SwapOp, SwapSigDataInput, (Order, Order)) {
+    fn get_op(
+        &self,
+        wrong_token: Option<TokenId>,
+        wrong_amount: Option<BigUint>,
+    ) -> (SwapOp, SwapSigDataInput, (Order, Order)) {
         assert!(!self.test_accounts.is_empty());
 
         let amount_0 = if self.is_limit_order.0 {
@@ -85,10 +89,10 @@ impl TestSwap {
 
         let order_0 = self.test_accounts[0].zksync_account.sign_order(
             TokenId(self.tokens.0),
-            TokenId(self.tokens.1),
+            wrong_token.unwrap_or(TokenId(self.tokens.1)),
             BigUint::from(self.first_price.0),
             BigUint::from(self.first_price.1),
-            amount_0,
+            wrong_amount.unwrap_or(amount_0),
             AccountId(self.recipients.0),
             None,
             !self.is_limit_order.0,
@@ -263,7 +267,7 @@ fn test_swap_success() {
 
     for test_swap in test_swaps.iter_mut() {
         test_swap.create_accounts();
-        let (swap_op, input, _) = test_swap.get_op();
+        let (swap_op, input, _) = test_swap.get_op(None, None);
 
         generic_test_scenario::<SwapWitness<Bn256>, _>(
             &test_swap.get_accounts(),
@@ -373,7 +377,7 @@ fn test_swap_sign_and_submit() {
     // submitter is the first account
     test_swap.test_accounts[2] = test_swap.test_accounts[0].clone();
 
-    let (swap_op, input, _) = test_swap.get_op();
+    let (swap_op, input, _) = test_swap.get_op(None, None);
 
     generic_test_scenario::<SwapWitness<Bn256>, _>(
         &test_swap.get_accounts(),
@@ -392,8 +396,69 @@ fn test_swap_sign_and_submit() {
 #[test]
 #[ignore]
 fn test_swap_incompatible_orders() {
-    // different tokens
-    // different amounts
+    let mut test_swap = TestSwap {
+        accounts: (1, 3),
+        recipients: (2, 4),
+        submitter: 5,
+        tokens: (18, 19),
+        fee_token: 18,
+        amounts: (50, 100),
+        fee: 25,
+        balances: (100, 200, 50),
+        first_price: (1, 2),
+        second_price: (2, 1),
+        is_limit_order: (false, false),
+        test_accounts: vec![],
+    };
+
+    test_swap.create_accounts();
+
+    let (swap_op, input, _) = test_swap.get_op(Some(TokenId(20)), None);
+
+    incorrect_op_test_scenario::<SwapWitness<Bn256>, _>(
+        &test_swap.get_accounts(),
+        swap_op,
+        input,
+        "",
+        || {
+            vec![CollectedFee {
+                token: TokenId(test_swap.fee_token),
+                amount: test_swap.fee.into(),
+            }]
+        },
+    );
+
+    let mut test_swap = TestSwap {
+        accounts: (1, 3),
+        recipients: (2, 4),
+        submitter: 5,
+        tokens: (18, 19),
+        fee_token: 18,
+        amounts: (50, 100),
+        fee: 25,
+        balances: (100, 200, 50),
+        first_price: (1, 2),
+        second_price: (2, 1),
+        is_limit_order: (false, false),
+        test_accounts: vec![],
+    };
+
+    test_swap.create_accounts();
+
+    let (swap_op, input, _) = test_swap.get_op(None, Some(BigUint::from(1u8)));
+
+    incorrect_op_test_scenario::<SwapWitness<Bn256>, _>(
+        &test_swap.get_accounts(),
+        swap_op,
+        input,
+        "",
+        || {
+            vec![CollectedFee {
+                token: TokenId(test_swap.fee_token),
+                amount: test_swap.fee.into(),
+            }]
+        },
+    );
 }
 
 #[test]
@@ -449,7 +514,7 @@ fn test_swap_failure() {
 
     for test_swap in test_swaps.iter_mut() {
         test_swap.create_accounts();
-        let (swap_op, input, _) = test_swap.get_op();
+        let (swap_op, input, _) = test_swap.get_op(None, None);
 
         incorrect_op_test_scenario::<SwapWitness<Bn256>, _>(
             &test_swap.get_accounts(),
@@ -485,7 +550,7 @@ fn test_swap_corrupted_input() {
     };
 
     test_swap.create_accounts();
-    let (swap_op, input, _) = test_swap.get_op();
+    let (swap_op, input, _) = test_swap.get_op(None, None);
 
     for sig in input.0.corrupted_variations() {
         corrupted_input_test_scenario::<SwapWitness<Bn256>, _>(
@@ -539,7 +604,7 @@ fn test_swap_limit_orders() {
     };
 
     test_swap.create_accounts();
-    let (swap_op, input, orders) = test_swap.get_op();
+    let (swap_op, input, orders) = test_swap.get_op(None, None);
     let mut test_accounts = test_swap.get_accounts();
 
     generic_test_scenario::<SwapWitness<Bn256>, _>(

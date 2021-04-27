@@ -1,9 +1,8 @@
 // Pedersen hash implementation of the Hasher trait
 
-use crate::franklin_crypto::bellman::{pairing::bn256::Bn256, PrimeField, PrimeFieldRepr};
+use crate::franklin_crypto::bellman::pairing::bn256::Bn256;
 use crate::franklin_crypto::circuit::multipack;
 use crate::franklin_crypto::rescue::{rescue_hash, RescueEngine};
-use crate::primitives::GetBitsFixed;
 
 use super::hasher::Hasher;
 use core::fmt;

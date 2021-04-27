@@ -17,7 +17,6 @@ use zksync_crypto::franklin_crypto::{
     rescue::RescueEngine,
 };
 // Workspace deps
-use zksync_crypto::pairing::BitIterator;
 use zksync_crypto::params::{
     self, FR_BIT_WIDTH_PADDED, OLD_SIGNED_TRANSFER_BIT_WIDTH, SIGNED_FORCED_EXIT_BIT_WIDTH,
     SIGNED_TRANSFER_BIT_WIDTH,
