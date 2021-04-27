@@ -420,7 +420,7 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
 
     /// @dev 1. Try to send token to _recipients
     /// @dev 2. On failure: Increment _recipients balance to withdraw.
-    function withdrawNFT(Operations.WithdrawNFT op) internal {
+    function withdrawNFT(Operations.WithdrawNFT memory op) internal {
         NFTFactory _factory = governance.getFactory(op.creator);
         try _factory.mintNFT{gas: WITHDRAWAL_GAS_LIMIT}(op.creator, op.owner, op.contentHash, op.tokenId) {} catch {
             pendingWithdrawnNFTs[op.tokenId] = op;
@@ -500,7 +500,7 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
                 Operations.WithdrawNFT memory op = Operations.readWithdrawNFTPubdata(pubData);
                 // MUST be one of the NFTs
                 require(op.tokenId >= MAX_FUNGIBLE_TOKEN_ID, "w");
-                withdrawNFT(op.tokenId, op.owner, op.creator, op.contentHash);
+                withdrawNFT(op);
             } else {
                 revert("l"); // unsupported op in block execution
             }

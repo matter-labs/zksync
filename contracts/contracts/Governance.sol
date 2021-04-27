@@ -182,7 +182,7 @@ contract Governance is Config {
         defaultFactory = NFTFactory(_factory);
     }
 
-    function getFactory(address _creator) external view NFTFactory {
+    function getFactory(address _creator) external view returns (NFTFactory) {
         NFTFactory _factory = NFTFactories[_creator];
         if (address(_factory) == address(0x0)) {
             return defaultFactory;
