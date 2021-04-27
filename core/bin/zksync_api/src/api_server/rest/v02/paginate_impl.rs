@@ -6,7 +6,8 @@
 use zksync_api_types::v02::{
     block::BlockInfo,
     pagination::{
-        BlockAndTxHash, Paginated, PaginationDirection, PaginationQuery, PendingOpsRequest,
+        AccountTxsRequest, BlockAndTxHash, Paginated, PaginationDirection, PaginationQuery,
+        PendingOpsRequest,
     },
     transaction::{L1Transaction, L2Status, Transaction, TransactionData},
 };
@@ -22,9 +23,7 @@ use super::{
 use crate::core_api_client::CoreApiClient;
 
 #[async_trait::async_trait]
-impl Paginate<Token> for StorageProcessor<'_> {
-    type Index = TokenId;
-
+impl Paginate<Token, TokenId> for StorageProcessor<'_> {
     async fn paginate(
         &mut self,
         query: &PaginationQuery<TokenId>,
@@ -50,9 +49,7 @@ impl Paginate<Token> for StorageProcessor<'_> {
 }
 
 #[async_trait::async_trait]
-impl Paginate<BlockInfo> for StorageProcessor<'_> {
-    type Index = BlockNumber;
-
+impl Paginate<BlockInfo, BlockNumber> for StorageProcessor<'_> {
     async fn paginate(
         &mut self,
         query: &PaginationQuery<BlockNumber>,
@@ -81,9 +78,7 @@ impl Paginate<BlockInfo> for StorageProcessor<'_> {
 }
 
 #[async_trait::async_trait]
-impl Paginate<Transaction> for StorageProcessor<'_> {
-    type Index = BlockAndTxHash;
-
+impl Paginate<Transaction, BlockAndTxHash> for StorageProcessor<'_> {
     async fn paginate(
         &mut self,
         query: &PaginationQuery<BlockAndTxHash>,
@@ -112,9 +107,25 @@ impl Paginate<Transaction> for StorageProcessor<'_> {
 }
 
 #[async_trait::async_trait]
-impl Paginate<Transaction> for CoreApiClient {
-    type Index = PendingOpsRequest;
+impl Paginate<Transaction, AccountTxsRequest> for StorageProcessor<'_> {
+    async fn paginate(
+        &mut self,
+        query: &PaginationQuery<AccountTxsRequest>,
+    ) -> Result<Paginated<Transaction, AccountTxsRequest>, Error> {
+        let txs = Vec::new();
+        let count = 0;
+        Ok(Paginated::new(
+            txs,
+            query.from,
+            query.limit,
+            query.direction,
+            count,
+        ))
+    }
+}
 
+#[async_trait::async_trait]
+impl Paginate<Transaction, PendingOpsRequest> for CoreApiClient {
     async fn paginate(
         &mut self,
         query: &PaginationQuery<PendingOpsRequest>,

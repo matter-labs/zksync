@@ -63,3 +63,10 @@ pub struct PendingOpsRequest {
     pub account_id: AccountId,
     pub serial_id: SerialId,
 }
+
+#[derive(Debug, Serialize, Deserialize, Clone, Copy)]
+pub struct AccountTxsRequest {
+    pub address: Address,
+    pub account_id: AccountId,
+    pub tx_hash: TxHash,
+}

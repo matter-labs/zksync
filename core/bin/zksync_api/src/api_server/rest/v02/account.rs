@@ -8,12 +8,12 @@ use actix_web::{web, Scope};
 
 // Workspace uses
 use zksync_api_types::v02::{
-    pagination::{Paginated, PaginationQuery, PendingOpsRequest},
+    pagination::{AccountTxsRequest, Paginated, PaginationQuery, PendingOpsRequest},
     transaction::Transaction,
 };
 use zksync_config::ZkSyncConfig;
 use zksync_storage::ConnectionPool;
-use zksync_types::{AccountId, Address, BlockNumber, SerialId};
+use zksync_types::{tx::TxHash, AccountId, Address, BlockNumber, SerialId};
 
 // Local uses
 use super::{
@@ -90,6 +90,25 @@ impl ApiAccountData {
         }
     }
 
+    async fn account_txs(
+        &self,
+        query: PaginationQuery<TxHash>,
+        address: Address,
+        account_id: AccountId,
+    ) -> Result<Paginated<Transaction, AccountTxsRequest>, Error> {
+        let new_query = PaginationQuery {
+            from: AccountTxsRequest {
+                address,
+                account_id,
+                tx_hash: query.from,
+            },
+            limit: query.limit,
+            direction: query.direction,
+        };
+        let mut storage = self.pool.access_storage().await.map_err(Error::storage)?;
+        storage.paginate(&new_query).await
+    }
+
     async fn account_pending_txs(
         &self,
         query: PaginationQuery<SerialId>,
@@ -110,13 +129,17 @@ impl ApiAccountData {
     }
 }
 
-// async fn account_txs(
-//     data: web::Data<ApiAccountData>,
-//     web::Path(account_id_or_address): web::Path<String>,
-//     web::Query(query): web::Query<PaginationQuery<TxHash>>,
-// ) -> ApiResult<Paginated<Transaction, TxHash>> {
-//     Err(Error::storage("aa")).into()
-// }
+async fn account_txs(
+    data: web::Data<ApiAccountData>,
+    web::Path(account_id_or_address): web::Path<String>,
+    web::Query(query): web::Query<PaginationQuery<TxHash>>,
+) -> ApiResult<Paginated<Transaction, AccountTxsRequest>> {
+    let (address, account_id) = api_try!(
+        data.parse_account_id_or_address(&account_id_or_address)
+            .await
+    );
+    data.account_txs(query, address, account_id).await.into()
+}
 
 async fn account_pending_txs(
     data: web::Data<ApiAccountData>,
@@ -151,10 +174,10 @@ pub fn api_scope(
         //     "{account_id_or_address}/{block}",
         //     web::get().to(account_info),
         // )
-        // .route(
-        //     "{account_id_or_address}/transactions",
-        //     web::get().to(account_txs),
-        // )
+        .route(
+            "{account_id_or_address}/transactions",
+            web::get().to(account_txs),
+        )
         .route(
             "{account_id_or_address}/transactions/pending",
             web::get().to(account_pending_txs),
