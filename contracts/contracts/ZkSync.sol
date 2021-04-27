@@ -258,11 +258,11 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
     }
 
     /// @notice  Withdraws tokens from zkSync contract to the owner
-    /// @param _owner Address of the tokens owner
     /// @param _tokenId Id of NFT token
     function withdrawPendingNFTBalance(uint32 _tokenId) external nonReentrant {
+        require(_tokenId > MAX_FUNGIBLE_TOKEN_ID, "oq"); // Withdraw only nft tokens
         Operations.WithdrawNFT memory op = pendingWithdrawnNFTs[_tokenId];
-        require(op.owner != address(0x0), "oq"); // Token is not exists
+        require(_tokenId == op.tokenId, "op"); // Token is not exists
         NFTFactory _factory = governance.getFactory(op.creator);
         _factory.mintNFT(op.creator, op.owner, op.contentHash, op.tokenId);
         delete pendingWithdrawnNFTs[_tokenId];
@@ -420,7 +420,10 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
     /// @dev 2. On failure: Increment _recipients balance to withdraw.
     function withdrawNFT(Operations.WithdrawNFT memory op) internal {
         NFTFactory _factory = governance.getFactory(op.creator);
-        try _factory.mintNFT{gas: WITHDRAWAL_GAS_LIMIT}(op.creator, op.owner, op.contentHash, op.tokenId) {} catch {
+        try _factory.mintNFT{gas: WITHDRAWAL_GAS_LIMIT}(op.creator, op.owner, op.contentHash, op.tokenId) {
+            // Save withdrawn nfts for future deposits
+            withdrawnNFTs[op.tokenId] = address(_factory);
+        } catch {
             pendingWithdrawnNFTs[op.tokenId] = op;
         }
     }
