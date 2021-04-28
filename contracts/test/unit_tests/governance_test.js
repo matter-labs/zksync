@@ -16,7 +16,7 @@ describe('Governance unit tests', function () {
     });
 
     it('checking correctness of using MAX_AMOUNT_OF_REGISTERED_TOKENS constant', async () => {
-        const MAX_AMOUNT_OF_REGISTERED_TOKENS = 5;
+        const MAX_AMOUNT_OF_REGISTERED_TOKENS = 1023;
         for (let step = 1; step <= MAX_AMOUNT_OF_REGISTERED_TOKENS + 1; step++) {
             let { revertReason } = await getCallRevertReason(() =>
                 testContract.addToken('0x' + step.toString().padStart(40, '0'))
