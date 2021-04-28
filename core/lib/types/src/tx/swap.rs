@@ -57,8 +57,7 @@ impl Order {
     pub const MSG_TYPE: u8 = b'o'; // 'o' for "order"
 
     pub fn get_bytes(&self) -> Vec<u8> {
-        let mut out = Vec::new();
-        out.push(Self::MSG_TYPE);
+        let mut out = vec![Self::MSG_TYPE];
         out.extend_from_slice(&self.account_id.to_be_bytes());
         out.extend_from_slice(&self.recipient_id.to_be_bytes());
         out.extend_from_slice(&self.nonce.to_be_bytes());
@@ -84,6 +83,7 @@ impl Order {
             && self.recipient_id <= max_account_id()
             && self.token_buy <= max_token_id()
             && self.token_sell <= max_token_id()
+            && self.token_buy != self.token_sell
             && self.time_range.check_correctness()
     }
 
@@ -217,8 +217,7 @@ impl Swap {
     /// Encodes transaction data, using provided encoded data for orders.
     /// This function does not care how orders are encoded: is it data or hash.
     fn get_swap_bytes(&self, order_bytes: &[u8]) -> Vec<u8> {
-        let mut out = Vec::new();
-        out.push(Self::TX_TYPE);
+        let mut out = vec![Self::TX_TYPE];
         out.extend_from_slice(&self.submitter_id.to_be_bytes());
         out.extend_from_slice(&self.submitter_address.as_bytes());
         out.extend_from_slice(&self.nonce.to_be_bytes());
@@ -263,6 +262,7 @@ impl Swap {
             && self.fee_token <= max_token_id()
             && self.orders.0.check_correctness()
             && self.orders.1.check_correctness()
+            && self.orders.0.account_id != self.orders.1.account_id
             && self.time_range().check_correctness();
         if valid {
             let signer = self.verify_signature();
