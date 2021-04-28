@@ -7,7 +7,7 @@ import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
  * @title ZkSync Default ERC721 Non-Fungible Token Standard basic implementation
  * @dev see https://eips.ethereum.org/EIPS/eip-721
  */
-contract ZkSyncNFT is ERC721, NFTFactory {
+contract ZkSyncNFTFactory is ERC721, NFTFactory {
     // Optional mapping for token content hashes
     mapping(uint256 => bytes32) private _contentHashes;
     address private _zksync_address;

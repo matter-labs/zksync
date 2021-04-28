@@ -21,7 +21,8 @@ const CONFIG_FILES = [
     'private.toml',
     'forced_exit_requests.toml',
     'private.toml',
-    'token_handler.toml'
+    'token_handler.toml',
+    'nft_factory.toml'
 ];
 
 async function getEnvironment(): Promise<string> {

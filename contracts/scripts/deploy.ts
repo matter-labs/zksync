@@ -70,6 +70,9 @@ async function main() {
     if (args.contract === 'ForcedExit' || args.contract == null) {
         await deployer.deployForcedExit({ gasPrice, nonce: args.nonce });
     }
+    if (args.contract === 'ZkSyncNFTFactory' || args.contract == null) {
+        await deployer.deployNFTFactory({ gasPrice, nonce: args.nonce });
+    }
 }
 
 main()
