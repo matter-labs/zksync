@@ -393,13 +393,19 @@ async fn priority_ops_hashes(mut storage: StorageProcessor<'_>) -> QueryResult<(
         eth_block_index: Some(1),
     };
     // Store executed priority op and try to get it by `eth_hash` and `tx_hash`.
-    OperationsSchema(&mut storage)
+    storage
+        .chain()
+        .operations_schema()
         .store_executed_priority_op(executed_priority_op.clone())
         .await?;
-    let op_by_eth_hash = OperationsSchema(&mut storage)
+    let op_by_eth_hash = storage
+        .chain()
+        .operations_schema()
         .get_executed_priority_operation_by_eth_hash(&executed_priority_op.eth_hash)
         .await?;
-    let op_by_tx_hash = OperationsSchema(&mut storage)
+    let op_by_tx_hash = storage
+        .chain()
+        .operations_schema()
         .get_executed_priority_operation_by_tx_hash(&executed_priority_op.tx_hash)
         .await?;
     assert_eq!(op_by_eth_hash, op_by_tx_hash);
@@ -409,7 +415,9 @@ async fn priority_ops_hashes(mut storage: StorageProcessor<'_>) -> QueryResult<(
     );
 
     // Checks that it doesn't find unexisting operation
-    let op = OperationsSchema(&mut storage)
+    let op = storage
+        .chain()
+        .operations_schema()
         .get_executed_priority_operation_by_tx_hash(&[0xDE, 0xAD, 0xBE, 0xEF])
         .await?;
     assert!(op.is_none());
