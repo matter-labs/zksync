@@ -83,7 +83,6 @@ impl Order {
             && self.recipient_id <= max_account_id()
             && self.token_buy <= max_token_id()
             && self.token_sell <= max_token_id()
-            && self.token_buy != self.token_sell
             && self.time_range.check_correctness()
     }
 
@@ -262,7 +261,6 @@ impl Swap {
             && self.fee_token <= max_token_id()
             && self.orders.0.check_correctness()
             && self.orders.1.check_correctness()
-            && self.orders.0.account_id != self.orders.1.account_id
             && self.time_range().check_correctness();
         if valid {
             let signer = self.verify_signature();

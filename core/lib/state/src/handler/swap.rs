@@ -74,6 +74,10 @@ impl ZkSyncState {
         );
         ensure!(order.token_buy <= max_token_id(), "Token is not supported");
         ensure!(order.token_sell <= max_token_id(), "Token is not supported");
+        ensure!(
+            order.token_buy != order.token_sell,
+            "Can't swap tokens with equal IDs"
+        );
 
         let account = self
             .get_account(order.account_id)
@@ -132,16 +136,16 @@ impl ZkSyncState {
             "Buy/Sell tokens do not match"
         );
         ensure!(
-            swap.orders.0.token_sell != swap.orders.1.token_sell,
-            "Can't swap for the same token"
-        );
-        ensure!(
             swap.orders.0.amount.is_zero() || swap.orders.0.amount == swap.amounts.0,
             "Amounts do not match"
         );
         ensure!(
             swap.orders.1.amount.is_zero() || swap.orders.1.amount == swap.amounts.1,
             "Amounts do not match"
+        );
+        ensure!(
+            swap.orders.0.account_id != swap.orders.1.account_id,
+            "Self-swap is not allowed"
         );
 
         let sold = &swap.amounts.0 * &swap.orders.0.price.1;
