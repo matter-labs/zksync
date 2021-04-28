@@ -40,7 +40,7 @@ macro_rules! custom_circuit_account {
                     nonce: Fr::zero(),
                     pub_key_hash: Fr::zero(),
                     address: Fr::zero(),
-                    subtree: subtree
+                    subtree
                 };
 
                 Self(circuit_account)
