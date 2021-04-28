@@ -243,6 +243,7 @@ export class Deployer {
             );
         }
         this.addresses.NFTFactory = nftFactoryContarct.address;
+        await this.governanceContract(this.deployWallet).setDefaultNFTFactory(nftFactoryContarct.address);
     }
     public async deployForcedExit(ethTxOptions?: ethers.providers.TransactionRequest) {
         if (this.verbose) {
