@@ -23,16 +23,30 @@ pub mod records;
 
 pub use records::{get_event_type, EventType};
 
+/// Schema for persisting events that happen in the zkSync network.
+///
+/// All events are serialized into JSON and stored in a single `events` table.
+/// On every insert into this table a special PostgreSQL channel gets notified
+/// about it.
+///
+/// Note, that all events should be created solely by other `storage` methods
+/// and they are persisted in the database forever.
 #[derive(Debug)]
 pub struct EventSchema<'a, 'c>(pub &'a mut StorageProcessor<'c>);
 
 impl<'a, 'c> EventSchema<'a, 'c> {
+    /// Store new serialized event in the database. This method is private
+    /// since the type safety is only guaranteed by the correctness of `event_type`
+    /// parameter.
     async fn store_event_data(
         &mut self,
         event_type: EventType,
         event_data: Value,
     ) -> QueryResult<()> {
         let start = Instant::now();
+        // Note, that the id can happen not to be continuous,
+        // sequences are always incremented ignoring
+        // the fact whether the transaction is committed or reverted.
         sqlx::query!(
             "INSERT INTO events VALUES (DEFAULT, $1, $2)",
             event_type as EventType,
@@ -45,6 +59,7 @@ impl<'a, 'c> EventSchema<'a, 'c> {
         Ok(())
     }
 
+    /// Load all events from the database with the `id` greater than `from`.
     pub async fn fetch_new_events(&mut self, from: i64) -> QueryResult<Vec<ZkSyncEvent>> {
         let start = Instant::now();
         let events = sqlx::query_as!(
@@ -69,6 +84,8 @@ impl<'a, 'c> EventSchema<'a, 'c> {
         Ok(events)
     }
 
+    /// Load the id of the latest event in the database.
+    /// Returns `None` if the `events` table is empty.
     pub async fn get_last_event_id(&mut self) -> QueryResult<Option<i64>> {
         let start = Instant::now();
         let id = sqlx::query!("SELECT max(id) FROM events")
@@ -80,6 +97,10 @@ impl<'a, 'c> EventSchema<'a, 'c> {
         Ok(id)
     }
 
+    /// Create new block event and store it in the database.
+    /// This method relies on the `load_block_range` which may return `None`
+    /// if there're no Ethereum transactions featuring this block (`Committed` or `Executed`).
+    /// In such cases, it silently returns `Ok`.
     pub async fn store_block_event(
         &mut self,
         status: BlockStatus,
@@ -93,10 +114,21 @@ impl<'a, 'c> EventSchema<'a, 'c> {
             .block_schema()
             .load_block_range(block_number, 1)
             .await?;
-
+        // If there're no block details for the given block number,
+        // ignore the event. Since the `eth_sender` is currently
+        // responsible for confirming Ethereum operations in the database,
+        // failing here will make it think there's some kind of network error.
         let block_details = match block_details.into_iter().next() {
             Some(block_details) => block_details,
-            None => return Ok(()),
+            None => {
+                vlog::warn!(
+                    "Couldn't create block event, no details found in the database. \
+                    Block number: {}, status: {:?}",
+                    *block_number,
+                    status
+                );
+                return Ok(());
+            }
         };
 
         let block_event = BlockEvent {
@@ -116,6 +148,8 @@ impl<'a, 'c> EventSchema<'a, 'c> {
         Ok(())
     }
 
+    /// Create new account event with the `Committed` status
+    /// and store it in the database.
     pub async fn store_state_committed_event(
         &mut self,
         account_id: AccountId,
@@ -144,6 +178,8 @@ impl<'a, 'c> EventSchema<'a, 'c> {
         Ok(())
     }
 
+    /// Create new account event with the `Finalized` status
+    /// and store it in the database.
     pub async fn store_state_verified_event(
         &mut self,
         account_diff: &StorageAccountDiff,
@@ -170,6 +206,10 @@ impl<'a, 'c> EventSchema<'a, 'c> {
         Ok(())
     }
 
+    /// Returns the account affected by the operation.
+    /// In case of `Deposit` we have to query the database in order
+    /// to get the id, at this point the account creation should be already
+    /// committed in storage.
     async fn account_id_from_op(
         &mut self,
         executed_operation: &ExecutedOperations,
@@ -192,6 +232,7 @@ impl<'a, 'c> EventSchema<'a, 'c> {
         }
     }
 
+    /// Create new transaction event and store it in the database.
     pub async fn store_transaction_event(
         &mut self,
         executed_operation: &ExecutedOperations,
@@ -200,13 +241,23 @@ impl<'a, 'c> EventSchema<'a, 'c> {
         let start = Instant::now();
         let mut transaction = self.0.start_transaction().await?;
 
+        // Like in the case of block events, we return `Ok`
+        // if we didn't manage to fetch the account id for the given
+        // operation.
         let account_id = match transaction
             .event_schema()
             .account_id_from_op(executed_operation)
             .await
         {
             Ok(account_id) => account_id,
-            _ => return Ok(()),
+            _ => {
+                vlog::warn!(
+                    "Couldn't create transaction event, no account id exists \
+                    in the database. Operation: {:?}",
+                    executed_operation
+                );
+                return Ok(());
+            }
         };
 
         let transaction_event =
