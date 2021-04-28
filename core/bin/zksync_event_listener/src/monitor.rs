@@ -7,6 +7,7 @@ use actix::prelude::*;
 use crate::messages::*;
 use crate::subscriber::Subscriber;
 
+/// The actor responsible for maintaining the set of connections.
 #[derive(Debug, Default)]
 pub struct ServerMonitor {
     addrs: HashSet<Addr<Subscriber>>,
@@ -47,7 +48,7 @@ impl Handler<NewEvents> for ServerMonitor {
 
     fn handle(&mut self, msg: NewEvents, ctx: &mut Self::Context) {
         if msg.0.as_ref().is_empty() {
-            vlog::warn!("Got an empty vec of events, which is unexpected");
+            vlog::info!("Server monitor received empty array of events");
             return;
         }
         for addr in self.addrs.iter().cloned() {
@@ -57,6 +58,9 @@ impl Handler<NewEvents> for ServerMonitor {
                     Ok(()) => {}
                     Err(MailboxError::Timeout) => {}
                     Err(MailboxError::Closed) => {
+                        // The corresponding `Subscriber` actor finished its work,
+                        // but didn't notify the monitor about it.
+                        // Remove his address.
                         act.addrs.remove(&addr);
                     }
                 })

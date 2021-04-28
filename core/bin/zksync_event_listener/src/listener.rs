@@ -10,15 +10,25 @@ use zksync_storage::{listener::StorageListener, ConnectionPool};
 use crate::messages::{NewEvents, NewStorageEvent};
 use crate::monitor::ServerMonitor;
 
+/// The main actor which is responsible for fetching new events from
+/// the database and sending them to the [`ServerMonitor`].
 pub struct EventListener {
+    /// Pool of connections to the database.
     db_pool: ConnectionPool,
+    /// Address of the [`ServerMonitor`] actor for communication.
     server_monitor: Addr<ServerMonitor>,
+    /// A storage listener that gets notified about new database events.
+    /// This field gets consumed at the start of the actor.
     listener: Option<StorageListener>,
+    /// The id of the last processed event.
     last_processed_event_id: i64,
 }
 
 impl StreamHandler<NewStorageEvent> for EventListener {
     fn handle(&mut self, new_event: NewStorageEvent, ctx: &mut Self::Context) {
+        // The listener gets notified about every new row in the `events`
+        // table, however we fetch them in packs. If new event's id is less
+        // than our tracked offset, skip the message processing.
         if self.last_processed_event_id >= new_event.0 {
             return;
         }
@@ -35,9 +45,11 @@ impl StreamHandler<NewStorageEvent> for EventListener {
         }
         .into_actor(self)
         .then(|events, act, _ctx| {
+            // Update the offset.
             if let Some(event) = events.last() {
                 act.last_processed_event_id = event.id;
             }
+            // We don't process new notifications until we send the message.
             let msg = NewEvents(Arc::new(events));
             act.server_monitor.send(msg).into_actor(act)
         })
@@ -57,6 +69,8 @@ impl Actor for EventListener {
     type Context = Context<Self>;
 
     fn started(&mut self, ctx: &mut Self::Context) {
+        // Turn the storage listener into stream and register it.
+        assert!(self.listener.is_some());
         let stream = self
             .listener
             .take()
@@ -76,6 +90,8 @@ impl EventListener {
     ) -> anyhow::Result<EventListener> {
         let mut listener = StorageListener::connect().await?;
         let db_pool = ConnectionPool::new(Some(Self::DB_POOL_SIZE));
+        // Load the offset, we don't want to distribute events that already
+        // happened.
         let last_processed_event_id = db_pool
             .access_storage()
             .await?
@@ -84,6 +100,7 @@ impl EventListener {
             .await?
             .unwrap_or(0);
 
+        // Configure the listener.
         let channel_name = &config.event_listener.channel_name;
         listener.listen(channel_name).await?;
 

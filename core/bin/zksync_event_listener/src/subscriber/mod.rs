@@ -10,9 +10,14 @@ use filters::SubscriberFilters;
 
 mod filters;
 
+/// The WebSocket actor. Created for each connected client.
 #[derive(Debug)]
 pub struct Subscriber {
+    /// Subscriber's events interests. Remain `None` until the client
+    /// sends JSON-serialized map of filters. Before that, all incoming
+    /// events will be ignored.
     filters: Option<SubscriberFilters>,
+    /// The address of the [`ServerMonitor`] for registering.
     monitor: Addr<ServerMonitor>,
 }
 
@@ -24,7 +29,14 @@ impl Subscriber {
         }
     }
 
+    /// Remove the subscriber's address from the monitor's set and stop
+    /// the execution context completely. Should be called instead of
+    /// `ctx.stop()`.
+    ///
+    /// Note, that the close frame is expected to be sent to the client and
+    /// this method rather serves the purpose of the clean-up.
     fn shutdown(&mut self, ctx: &mut <Self as Actor>::Context) {
+        // Send the message and wait for the empty response on the actor's context.
         let request = RemoveSubscriber(ctx.address());
         self.monitor
             .send(request)
@@ -33,6 +45,7 @@ impl Subscriber {
                 if let Err(err) = response {
                     vlog::error!("Couldn't remove the subscriber, reason: {:?}", err);
                 }
+                // Finally, stop the actor's context.
                 ctx.stop();
             })
             .wait(ctx);
@@ -44,7 +57,9 @@ impl Actor for Subscriber {
 
     fn started(&mut self, ctx: &mut Self::Context) {
         ctx.set_mailbox_capacity(1 << 10);
-
+        // Send the register message and wait for the empty response on the actor's context.
+        // If we couldn't register this subscriber for some reason, close the connection
+        // immediately.
         let request = RegisterSubscriber(ctx.address());
         self.monitor
             .send(request)
@@ -52,6 +67,11 @@ impl Actor for Subscriber {
             .map(|response, _, ctx| {
                 if let Err(err) = response {
                     vlog::error!("Couldn't register new subscriber, reason: {:?}", err);
+                    let reason = Some(ws::CloseReason {
+                        code: ws::CloseCode::Error,
+                        description: None,
+                    });
+                    ctx.close(reason);
                     ctx.stop();
                 }
             })
@@ -64,6 +84,8 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for Subscriber {
         match msg {
             Ok(ws::Message::Ping(msg)) => ctx.pong(&msg),
             Ok(ws::Message::Text(text)) => {
+                // If the client already registered his interests,
+                // ignore the message, otherwise, try to parse the text.
                 if self.filters.is_some() {
                     return;
                 }
@@ -72,6 +94,8 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for Subscriber {
                         self.filters = Some(filters);
                     }
                     Err(err) => {
+                        // The client provided invalid JSON, give
+                        // him the error message and close the connection.
                         let reason = Some(ws::CloseReason {
                             code: ws::CloseCode::Policy,
                             description: Some(err.to_string()),
@@ -82,6 +106,7 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for Subscriber {
                 }
             }
             Ok(ws::Message::Close(reason)) => {
+                // Send back the close frame.
                 ctx.close(reason);
                 self.shutdown(ctx);
             }
@@ -98,6 +123,7 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for Subscriber {
     }
 
     fn finished(&mut self, ctx: &mut Self::Context) {
+        // The client disconnected without sending the close frame.
         self.shutdown(ctx);
     }
 }

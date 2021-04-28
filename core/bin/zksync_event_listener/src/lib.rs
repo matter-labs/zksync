@@ -1,3 +1,7 @@
+//! The `zksync_event_listener` is a stand-alone server-application responsible for
+//! fetching new events that happen in the zkSync network from the database
+//! and streaming them to the connected WebSocket clients.
+
 // Built-in uses
 // Workspace uses
 use zksync_config::ZkSyncConfig;
