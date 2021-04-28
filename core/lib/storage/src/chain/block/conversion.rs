@@ -4,7 +4,6 @@
 
 // Built-in deps
 use std::convert::TryFrom;
-use std::str::FromStr;
 // External imports
 // Workspace imports
 use zksync_api_types::v02::{
@@ -22,10 +21,7 @@ use zksync_types::{
 use crate::chain::operations::records::StoredAggregatedOperation;
 use crate::{
     chain::{
-        block::{
-            records::{BlockL1TransactionItem, BlockTransactionItem},
-            BlockSchema,
-        },
+        block::{records::TransactionItem, BlockSchema},
         operations::records::{
             NewExecutedPriorityOperation, NewExecutedTransaction, StoredExecutedPriorityOperation,
             StoredExecutedTransaction, StoredOperation,
@@ -216,11 +212,11 @@ impl StoredAggregatedOperation {
     }
 }
 
-pub fn l2_transaction_from_item_and_status(
-    item: BlockTransactionItem,
+pub fn transaction_from_item_and_status(
+    item: TransactionItem,
     block_status: BlockStatus,
 ) -> Transaction {
-    let tx_hash = TxHash::from_str(&item.tx_hash).unwrap();
+    let tx_hash = TxHash::from_slice(&item.tx_hash).unwrap();
     let block_number = match block_status {
         BlockStatus::Queued => None,
         _ => Some(BlockNumber(item.block_number as u32)),
@@ -230,36 +226,22 @@ pub fn l2_transaction_from_item_and_status(
     } else {
         TxInBlockStatus::Rejected
     };
-    Transaction {
-        tx_hash,
-        block_number,
-        op: TransactionData::L2(item.op),
-        status,
-        fail_reason: item.fail_reason,
-        created_at: Some(item.created_at),
-    }
-}
-
-pub fn l1_transaction_from_item_and_status(
-    item: BlockL1TransactionItem,
-    block_status: BlockStatus,
-) -> Transaction {
-    let tx_hash = TxHash::from_slice(&item.tx_hash).unwrap();
-    let eth_hash = H256::from_slice(&item.eth_hash);
-    let id = item.priority_op_serialid as u64;
-    let operation: ZkSyncOp = serde_json::from_value(item.operation).unwrap();
-    let block_number = match block_status {
-        BlockStatus::Queued => None,
-        _ => Some(BlockNumber(item.block_number as u32)),
+    let op = if let Some(eth_hash) = item.eth_hash {
+        let eth_hash = H256::from_slice(&eth_hash);
+        let id = item.priority_op_serialid.unwrap() as u64;
+        let operation: ZkSyncOp = serde_json::from_value(item.op).unwrap();
+        TransactionData::L1(
+            L1Transaction::from_executed_op(operation, eth_hash, id, tx_hash).unwrap(),
+        )
+    } else {
+        TransactionData::L2(item.op)
     };
     Transaction {
         tx_hash,
         block_number,
-        op: TransactionData::L1(
-            L1Transaction::from_executed_op(operation, eth_hash, id, tx_hash).unwrap(),
-        ),
-        status: block_status.into(),
-        fail_reason: None,
+        op,
+        status,
+        fail_reason: item.fail_reason,
         created_at: Some(item.created_at),
     }
 }
