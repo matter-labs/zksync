@@ -25,7 +25,7 @@ hex = "0.4"
 structopt = "0.3.20"
 
 serde = { version = "1.0", features = ["derive"] }
-serde_json = { version = "1.0.0", features = ["arbitrary_precision"] }
+serde_json = { version = "1.0.0" }
 
-parity-crypto = {version = "0.6.2", features = ["publickey"] }
+parity-crypto = { version = "0.6.2", features = ["publickey"] }
 

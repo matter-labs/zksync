@@ -16,6 +16,7 @@ use serde::{Deserialize, Serialize};
 use std::fs;
 use std::{collections::HashMap, convert::TryInto};
 use zksync_types::{account::Account, Address, Nonce, PubKeyHash, TokenId};
+use zksync_utils::BigUintSerdeAsRadix10Str;
 
 pub fn get_balance_tree(depth: usize) -> CircuitBalanceTree {
     match depth {
@@ -113,7 +114,8 @@ pub struct StorageBalance {
     // The DB stores balances as large numbers, so
     // the only way to keep precision is too use serde_json::Number
     // with unlimited precision and then convert it to BigUint
-    pub balance: serde_json::Number,
+    #[serde(with = "BigUintSerdeAsRadix10Str")]
+    pub balance: BigUint,
 }
 
 impl TryInto<Account> for StorageAccount {

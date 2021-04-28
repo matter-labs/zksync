@@ -14,4 +14,4 @@ This command should be run in the psql to get the json of the account balances
 SELECT json_agg(t) FROM (SELECT * FROM accounts) t;
 
 /* To get the content for the balances file */
-SELECT json_agg(t) FROM (SELECT * FROM balances) t;
+SELECT json_agg(t) FROM (SELECT account_id, coin_id, balance::VARCHAR FROM balances) t;
