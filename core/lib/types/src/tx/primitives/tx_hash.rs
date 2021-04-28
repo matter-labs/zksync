@@ -25,11 +25,8 @@ impl TxHash {
     }
 
     pub fn batch_hash(tx_hashes: &[TxHash]) -> TxHash {
-        let mut batch_hash_bytes = Vec::new();
-        tx_hashes
-            .iter()
-            .for_each(|tx_hash| batch_hash_bytes.extend_from_slice(tx_hash.as_ref()));
-        TxHash::from_slice(&*sha256(&batch_hash_bytes)).unwrap()
+        let bytes: Vec<u8> = tx_hashes.iter().flat_map(AsRef::as_ref).cloned().collect();
+        TxHash::from_slice(&*sha256(&bytes)).unwrap()
     }
 }
 

@@ -950,6 +950,7 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
         time_from: DateTime<Utc>,
     ) -> QueryResult<Vec<Transaction>> {
         let start = Instant::now();
+        let mut transaction = self.0.start_transaction().await?;
         let raw_txs: Vec<BlockL1TransactionItem> = match query.direction {
             PaginationDirection::Newer => {
                 sqlx::query_as!(
@@ -971,7 +972,7 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
                     time_from,
                     i64::from(query.limit),
                 )
-                .fetch_all(self.0.conn())
+                .fetch_all(transaction.conn())
                 .await?
             }
             PaginationDirection::Older => {
@@ -994,12 +995,11 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
                     time_from,
                     i64::from(query.limit),
                 )
-                .fetch_all(self.0.conn())
+                .fetch_all(transaction.conn())
                 .await?
             }
         };
-        let is_block_finalized = self
-            .0
+        let is_block_finalized = transaction
             .chain()
             .operations_schema()
             .get_stored_aggregated_operation(
@@ -1020,6 +1020,7 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
                 l1_transaction_from_item_and_status(tx, status)
             })
             .collect();
+        transaction.commit().await?;
 
         metrics::histogram!("sql.chain.block.get_block_l1_transactions", start.elapsed());
         Ok(txs)
@@ -1032,6 +1033,7 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
         time_from: DateTime<Utc>,
     ) -> QueryResult<Vec<Transaction>> {
         let start = Instant::now();
+        let mut transaction = self.0.start_transaction().await?;
         let raw_txs: Vec<BlockTransactionItem> = match query.direction {
             PaginationDirection::Newer => {
                 sqlx::query_as!(
@@ -1053,7 +1055,7 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
                     time_from,
                     i64::from(query.limit),
                 )
-                .fetch_all(self.0.conn())
+                .fetch_all(transaction.conn())
                 .await?
             }
             PaginationDirection::Older => {
@@ -1076,12 +1078,11 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
                     time_from,
                     i64::from(query.limit),
                 )
-                .fetch_all(self.0.conn())
+                .fetch_all(transaction.conn())
                 .await?
             }
         };
-        let is_block_finalized = self
-            .0
+        let is_block_finalized = transaction
             .chain()
             .operations_schema()
             .get_stored_aggregated_operation(
@@ -1106,6 +1107,7 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
                 l2_transaction_from_item_and_status(tx, status)
             })
             .collect();
+        transaction.commit().await?;
 
         metrics::histogram!("sql.chain.block.get_block_l2_transactions", start.elapsed());
         Ok(txs)
@@ -1117,26 +1119,23 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
         query: &PaginationQuery<BlockAndTxHash>,
     ) -> QueryResult<Option<Vec<Transaction>>> {
         let start = Instant::now();
-
+        let mut transaction = self.0.start_transaction().await?;
         // 1. Get `created_at` of tx from query.
         // 2. Get at most `limit` priority ops and at most `limit` transactions.
         // 3. Merge them and leave at most `limit` entries.
 
-        let created_at: Option<DateTime<Utc>> = self
-            .0
+        let created_at: Option<DateTime<Utc>> = transaction
             .chain()
             .operations_ext_schema()
             .get_tx_created_at(query.from.block_number, query.from.tx_hash)
             .await?;
         let block_txs = if let Some(created_at) = created_at {
-            let mut block_txs = self
-                .0
+            let mut block_txs = transaction
                 .chain()
                 .block_schema()
                 .get_block_l2_transactions_page(query, created_at)
                 .await?;
-            let mut l1_txs = self
-                .0
+            let mut l1_txs = transaction
                 .chain()
                 .block_schema()
                 .get_block_l1_transactions_page(query, created_at)
@@ -1151,6 +1150,7 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
         } else {
             None
         };
+        transaction.commit().await?;
 
         metrics::histogram!(
             "sql.chain.block.get_block_transactions_page",
@@ -1165,21 +1165,23 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
         block_number: BlockNumber,
     ) -> QueryResult<u32> {
         let start = Instant::now();
+        let mut transaction = self.0.start_transaction().await?;
 
         let tx_count = sqlx::query!(
             r#"SELECT count(*) as "count!" FROM executed_transactions WHERE block_number = $1"#,
             i64::from(*block_number)
         )
-        .fetch_one(self.0.conn())
+        .fetch_one(transaction.conn())
         .await?
         .count;
         let priority_op_count = sqlx::query!(
             r#"SELECT count(*) as "count!" FROM executed_priority_operations WHERE block_number = $1"#,
             i64::from(*block_number)
         )
-        .fetch_one(self.0.conn())
+        .fetch_one(transaction.conn())
         .await?
         .count;
+        transaction.commit().await?;
 
         metrics::histogram!(
             "sql.chain.block.get_block_transactions_count",

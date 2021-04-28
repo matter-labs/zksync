@@ -1,6 +1,6 @@
 use chrono::{DateTime, Utc};
 use num::BigUint;
-use serde::{Deserialize, Serialize, Serializer};
+use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use zksync_types::{
     tx::TxHash,
@@ -8,7 +8,7 @@ use zksync_types::{
     AccountId, Address, BlockNumber, EthBlockId, PriorityOpId, TokenId, ZkSyncOp, ZkSyncPriorityOp,
     ZkSyncTx, H256,
 };
-use zksync_utils::BigUintSerdeAsRadix10Str;
+use zksync_utils::{BigUintSerdeAsRadix10Str, ZeroPrefixHexSerde};
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct IncomingTxBatch {
@@ -65,7 +65,7 @@ pub struct L1Receipt {
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub struct L2Receipt {
-    #[serde(serialize_with = "serialize_tx_hash_with_0x")]
+    #[serde(serialize_with = "ZeroPrefixHexSerde::serialize")]
     pub tx_hash: TxHash,
     pub rollup_block: Option<BlockNumber>,
     pub status: L2Status,
@@ -81,7 +81,7 @@ pub enum Receipt {
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub struct Transaction {
-    #[serde(serialize_with = "serialize_tx_hash_with_0x")]
+    #[serde(serialize_with = "ZeroPrefixHexSerde::serialize")]
     pub tx_hash: TxHash,
     pub block_number: Option<BlockNumber>,
     pub op: TransactionData,
@@ -171,7 +171,7 @@ pub struct ApiDeposit {
     pub account_id: Option<AccountId>,
     pub eth_hash: H256,
     pub id: PriorityOpId,
-    #[serde(serialize_with = "serialize_tx_hash_with_0x")]
+    #[serde(serialize_with = "ZeroPrefixHexSerde::serialize")]
     pub tx_hash: TxHash,
 }
 
@@ -181,15 +181,8 @@ pub struct ApiFullExit {
     pub token_id: TokenId,
     pub eth_hash: H256,
     pub id: PriorityOpId,
-    #[serde(serialize_with = "serialize_tx_hash_with_0x")]
+    #[serde(serialize_with = "ZeroPrefixHexSerde::serialize")]
     pub tx_hash: TxHash,
-}
-
-pub fn serialize_tx_hash_with_0x<S>(val: &TxHash, serializer: S) -> Result<S::Ok, S::Error>
-where
-    S: Serializer,
-{
-    serializer.serialize_str(&val.to_string().replace("sync-tx:", "0x"))
 }
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
