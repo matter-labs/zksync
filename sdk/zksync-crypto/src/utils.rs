@@ -103,6 +103,7 @@ fn rescue_hash_elements(input: &[Fr]) -> Fr {
 
 pub fn rescue_hash_tx_msg(msg: &[u8]) -> Vec<u8> {
     let mut msg_bits = bytes_into_be_bits(msg);
+    assert!(msg_bits.len() <= PAD_MSG_BEFORE_HASH_BITS_LEN);
     msg_bits.resize(PAD_MSG_BEFORE_HASH_BITS_LEN, false);
     let hash_fr = rescue_hash_fr(msg_bits);
     let mut hash_bits = Vec::new();

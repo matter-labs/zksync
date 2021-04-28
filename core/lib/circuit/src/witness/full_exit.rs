@@ -2,7 +2,7 @@
 use zksync_crypto::franklin_crypto::{
     bellman::pairing::{
         bn256::{Bn256, Fr},
-        ff::{Field, PrimeField},
+        ff::Field,
     },
     rescue::RescueEngine,
 };
@@ -25,7 +25,7 @@ use crate::{
     },
     utils::resize_grow_only,
     witness::{
-        utils::{apply_leaf_operation, get_audits},
+        utils::{apply_leaf_operation, fr_from, get_audits},
         Witness,
     },
 };
@@ -61,7 +61,7 @@ impl Witness for FullExitWitness<Bn256> {
             full_exit_amount: full_exit
                 .withdraw_amount
                 .clone()
-                .map(|amount| Fr::from_str(&amount.0.to_string()).unwrap())
+                .map(|amount| fr_from(amount.0))
                 .unwrap_or_else(Fr::zero),
         };
 
@@ -121,7 +121,7 @@ impl Witness for FullExitWitness<Bn256> {
         let mut operations = vec![Operation {
             new_root: self.after_root,
             tx_type: self.tx_type,
-            chunk: Some(Fr::from_str("0").unwrap()),
+            chunk: Some(fr_from(0)),
             pubdata_chunk: Some(pubdata_chunks[0]),
             first_sig_msg: Some(Fr::zero()),
             second_sig_msg: Some(Fr::zero()),
@@ -137,7 +137,7 @@ impl Witness for FullExitWitness<Bn256> {
             operations.push(Operation {
                 new_root: self.after_root,
                 tx_type: self.tx_type,
-                chunk: Some(Fr::from_str(&i.to_string()).unwrap()),
+                chunk: Some(fr_from(i)),
                 pubdata_chunk: Some(pubdata_chunk),
                 first_sig_msg: Some(Fr::zero()),
                 second_sig_msg: Some(Fr::zero()),
@@ -168,8 +168,8 @@ impl FullExitWitness<Bn256> {
 
         let capacity = tree.capacity();
         assert_eq!(capacity, 1 << account_tree_depth());
-        let account_address_fe = Fr::from_str(&full_exit.account_address.to_string()).unwrap();
-        let token_fe = Fr::from_str(&full_exit.token.to_string()).unwrap();
+        let account_address_fe = fr_from(full_exit.account_address);
+        let token_fe = fr_from(full_exit.token);
 
         let (account_witness_before, account_witness_after, balance_before, balance_after) = {
             if is_success {
@@ -224,19 +224,14 @@ impl FullExitWitness<Bn256> {
             },
             args: OperationArguments {
                 eth_address: Some(full_exit.eth_address),
-                amount_packed: Some(Fr::zero()),
                 full_amount: Some(full_exit.full_exit_amount),
-                fee: Some(Fr::zero()),
-                pub_nonce: Some(Fr::zero()),
                 a: Some(a),
                 b: Some(b),
-                new_pub_key_hash: Some(Fr::zero()),
-                valid_from: Some(Fr::zero()),
-                valid_until: Some(Fr::from_str(&u32::MAX.to_string()).unwrap()),
+                ..Default::default()
             },
             before_root: Some(before_root),
             after_root: Some(after_root),
-            tx_type: Some(Fr::from_str("6").unwrap()),
+            tx_type: Some(fr_from(FullExitOp::OP_CODE)),
         }
     }
 }

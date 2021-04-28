@@ -87,7 +87,7 @@ impl ZkSyncStateGenerator {
 
 /// A helper structure for witness tests which contains both testkit
 /// zkSync account and an actual zkSync account.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct WitnessTestAccount {
     pub zksync_account: ZkSyncAccount,
     pub id: AccountId,
@@ -96,12 +96,16 @@ pub struct WitnessTestAccount {
 
 impl WitnessTestAccount {
     pub fn new(id: AccountId, balance: u64) -> Self {
+        Self::new_with_token(id, balance, TokenId(0))
+    }
+
+    pub fn new_with_token(id: AccountId, balance: u64, token: TokenId) -> Self {
         let zksync_account = ZkSyncAccount::rand();
         zksync_account.set_account_id(Some(id));
 
         let account = {
             let mut account = Account::default_with_address(&zksync_account.address);
-            account.add_balance(TokenId(0), &BigUint::from(balance));
+            account.add_balance(token, &BigUint::from(balance));
             account.pub_key_hash = zksync_account.pubkey_hash;
             account
         };

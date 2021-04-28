@@ -22,7 +22,10 @@ use zksync_crypto::{
     circuit::utils::le_bit_vector_into_field_element, params as franklin_constants, primitives::*,
 };
 // Local deps
-use crate::operation::{SignatureData, TransactionSignature};
+use crate::{
+    element::CircuitElement,
+    operation::{SignatureData, TransactionSignature},
+};
 
 pub fn reverse_bytes<T: Clone>(bits: &[T]) -> Vec<T> {
     bits.chunks(8)
@@ -453,4 +456,25 @@ pub fn vectorized_compare<E: Engine, CS: ConstraintSystem<E>>(
     let is_equal = multi_and(cs.namespace(|| "all data is equal"), &equality_bits)?;
 
     Ok((is_equal, packed))
+}
+
+pub fn sequences_equal<E: Engine, CS: ConstraintSystem<E>>(
+    mut cs: CS,
+    lhs: &[CircuitElement<E>],
+    rhs: &[CircuitElement<E>],
+) -> Result<Boolean, SynthesisError> {
+    assert_eq!(lhs.len(), rhs.len());
+    let equality_flags = lhs
+        .iter()
+        .zip(rhs.iter())
+        .enumerate()
+        .map(|(idx, (lhs, rhs))| {
+            CircuitElement::equals(
+                cs.namespace(|| format!("element with index {}", idx)),
+                &lhs,
+                &rhs,
+            )
+        })
+        .collect::<Result<Vec<_>, SynthesisError>>()?;
+    multi_and(cs, &equality_flags)
 }
