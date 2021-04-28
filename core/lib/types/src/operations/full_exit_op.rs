@@ -1,5 +1,5 @@
-use crate::FullExit;
 use crate::{AccountId, Address, TokenId};
+use crate::{FullExit, H256};
 use anyhow::{ensure, format_err};
 use num::{BigUint, FromPrimitive, ToPrimitive};
 use serde::{Deserialize, Serialize};
@@ -15,6 +15,9 @@ pub struct FullExitOp {
     pub priority_op: FullExit,
     /// None if withdraw was unsuccessful
     pub withdraw_amount: Option<BigUintSerdeWrapper>,
+    pub creator_account_id: Option<AccountId>,
+    pub serial_id: Option<u32>,
+    pub content_hash: Option<H256>,
 }
 
 impl FullExitOp {
@@ -37,6 +40,15 @@ impl FullExitOp {
                 .unwrap()
                 .to_be_bytes(),
         );
+        data.extend_from_slice(
+            &self
+                .creator_account_id
+                .clone()
+                .unwrap_or_default()
+                .to_be_bytes(),
+        );
+        data.extend_from_slice(&self.serial_id.clone().unwrap_or_default().to_be_bytes());
+        data.extend_from_slice(&self.content_hash.clone().unwrap_or_default().as_bytes());
         data.resize(Self::CHUNKS * CHUNK_BYTES, 0x00);
         data
     }
@@ -52,6 +64,13 @@ impl FullExitOp {
                 .clone()
                 .map(|a| a.0.to_u128().unwrap())
                 .unwrap_or(0)
+                .to_be_bytes(),
+        );
+        data.extend_from_slice(
+            &self
+                .creator_account_id
+                .clone()
+                .unwrap_or_default()
                 .to_be_bytes(),
         );
         data
@@ -78,6 +97,7 @@ impl FullExitOp {
                 .ok_or_else(|| format_err!("Cant get amount from full exit pubdata"))?,
         )
         .unwrap();
+        todo!();
 
         Ok(Self {
             priority_op: FullExit {
@@ -86,6 +106,9 @@ impl FullExitOp {
                 token: TokenId(token),
             },
             withdraw_amount: Some(amount.into()),
+            creator_account_id: None,
+            serial_id: None,
+            content_hash: None,
         })
     }
 
