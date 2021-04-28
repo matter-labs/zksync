@@ -153,6 +153,9 @@ impl TestSwap {
     }
 }
 
+/// Basic tests for swaps and limit orders, include:
+/// zero-swap, swap with different prices,
+/// swaps with recipient accounts that match other accounts, etc.
 #[test]
 #[ignore]
 fn test_swap_success() {
@@ -298,6 +301,7 @@ fn test_swap_success() {
     }
 }
 
+/// Check failure of a swap with both sides represented by one account
 #[test]
 #[ignore]
 fn test_self_swap() {
@@ -369,6 +373,8 @@ fn test_self_swap() {
     );
 }
 
+/// Check swap execution where one of the swapping sides
+/// also submits the swap and pays fees for it.
 #[test]
 #[ignore]
 fn test_swap_sign_and_submit() {
@@ -407,6 +413,7 @@ fn test_swap_sign_and_submit() {
     );
 }
 
+/// Check failure of swaps where amounts or tokens are incompatible
 #[test]
 #[ignore]
 fn test_swap_incompatible_orders() {
@@ -475,6 +482,9 @@ fn test_swap_incompatible_orders() {
     );
 }
 
+/// Basic failure tests for swaps, include:
+/// not enough balance, incompatible prices,
+/// equal tokens that are being swapped
 #[test]
 #[ignore]
 fn test_swap_failure() {
@@ -509,7 +519,7 @@ fn test_swap_failure() {
             is_limit_order: (false, false),
             test_accounts: vec![],
         },
-        // equal tokens
+        // Equal tokens
         TestSwap {
             accounts: (1, 3),
             recipients: (2, 4),
@@ -545,6 +555,7 @@ fn test_swap_failure() {
     }
 }
 
+/// Check swap failure if signatures are corrupted
 #[test]
 #[ignore]
 fn test_swap_corrupted_input() {
@@ -599,6 +610,9 @@ fn test_swap_corrupted_input() {
     }
 }
 
+/// Check limit order use-case:
+/// once orders are signed, they can be partially filled
+/// multiple times without re-signing, potentially by multiple submitters
 #[test]
 #[ignore]
 fn test_swap_limit_orders() {
