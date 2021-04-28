@@ -124,6 +124,11 @@ pub fn rescue_hash_tx_msg(msg: &[u8]) -> Vec<u8> {
     utils::rescue_hash_tx_msg(msg)
 }
 
+#[wasm_bindgen(js_name = "rescueHashOrders")]
+pub fn rescue_hash_orders(msg: &[u8]) -> Vec<u8> {
+    utils::rescue_hash_orders(msg)
+}
+
 #[wasm_bindgen]
 /// We use musig Schnorr signature scheme.
 /// It is impossible to restore signer for signature, that is why we provide public key of the signer
