@@ -19,10 +19,13 @@ pub enum EventData {
     Transaction(TransactionEvent),
 }
 
+// An event that happened in the zkSync network.
+// Only created by the `storage`.
 #[derive(Debug, Clone, Serialize)]
 pub struct ZkSyncEvent {
-    #[serde(rename = "event_id")]
+    // Id of the event. This value is equal to
+    // the id of the corresponding row in the database.
     pub id: i64,
-    #[serde(flatten)]
     pub data: EventData,
+    // TODO: Add a block_number field (ZKS-653).
 }

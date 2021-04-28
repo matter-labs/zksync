@@ -10,10 +10,14 @@ use crate::{block::ExecutedOperations, AccountId, BlockNumber};
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum TransactionStatus {
+    // We don't store transaction finalized events because
+    // they simply correspond to the executed block.
     Committed,
     Rejected,
 }
 
+/// All possible types of operations in the zkSync network.
+/// Deserialized from the `tx` field of the [TransactionEvent].
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, Deserialize)]
 pub enum TransactionType {
     Transfer,

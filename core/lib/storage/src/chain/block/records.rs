@@ -32,6 +32,11 @@ pub struct StoragePendingBlock {
     pub timestamp: Option<i64>,
 }
 
+// This struct is a copy of `BlockDetails` from the `zksync_types` crate
+// with the only difference that it implements `FromRow` trait. To get rid
+// of this, we should either wait for the implementation of `sqlx::flatten`
+// attribute and use the "inner" pattern, or bring `sqlx` as a dependency to
+// types and implement `FromRow` for `BlockDetails`.
 #[derive(Debug, Serialize, Deserialize, FromRow, PartialEq, Clone)]
 pub struct StorageBlockDetails {
     pub block_number: i64,
