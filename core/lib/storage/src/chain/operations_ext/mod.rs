@@ -918,12 +918,12 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
         Ok(result)
     }
 
-    pub async fn get_batch_info(&mut self, batch_hash: TxHash) -> QueryResult<Option<ApiTxBatch>> {
+    pub async fn get_in_block_batch_info(
+        &mut self,
+        batch_hash: TxHash,
+    ) -> QueryResult<Option<ApiTxBatch>> {
         let start = Instant::now();
-
-        // 1. Try to get batch from `executed_transactions`.
-        // 2. if this batch isn't in `executed_transactions` then try to find it in `mempool_txs`.
-        // 3. if this batch isn't in `mempool_txs` return None.
+        let mut transaction = self.0.start_transaction().await?;
 
         let batch_data = sqlx::query!(
             r#"
@@ -936,7 +936,7 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
             "#,
             batch_hash.as_ref()
         )
-        .fetch_all(self.0.conn())
+        .fetch_all(transaction.conn())
         .await?;
         let result = if !batch_data.is_empty() {
             let created_at = batch_data[0].created_at;
@@ -946,43 +946,24 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
                 .collect();
             let block_number = BlockNumber(batch_data[0].block_number as u32);
             let batch_status = if batch_data[0].success {
-                let (is_commit_confirmed, commit_block_time) = self
-                    .0
+                let (block_status, updated_at) = transaction
                     .chain()
-                    .operations_schema()
-                    .get_stored_aggregated_operation(
-                        block_number,
-                        AggregatedActionType::CommitBlocks,
-                    )
-                    .await
-                    .map(|operation| (operation.confirmed, operation.created_at))
-                    .unwrap_or((false, created_at));
-                let (is_execution_confirmed, execute_block_time) = self
-                    .0
-                    .chain()
-                    .operations_schema()
-                    .get_stored_aggregated_operation(
-                        block_number,
-                        AggregatedActionType::ExecuteBlocks,
-                    )
-                    .await
-                    .map(|operation| (operation.confirmed, operation.created_at))
-                    .unwrap_or((false, created_at));
-                if is_execution_confirmed {
-                    BatchStatus {
-                        updated_at: execute_block_time,
+                    .block_schema()
+                    .get_block_status_and_last_updated(block_number)
+                    .await?;
+                match block_status {
+                    BlockStatus::Finalized => BatchStatus {
+                        updated_at: updated_at,
                         last_state: TxInBlockStatus::Finalized,
-                    }
-                } else if is_commit_confirmed {
-                    BatchStatus {
-                        updated_at: commit_block_time,
+                    },
+                    BlockStatus::Committed => BatchStatus {
+                        updated_at: updated_at,
                         last_state: TxInBlockStatus::Committed,
-                    }
-                } else {
-                    BatchStatus {
+                    },
+                    BlockStatus::Queued => BatchStatus {
                         updated_at: created_at,
                         last_state: TxInBlockStatus::Queued,
-                    }
+                    },
                 }
             } else {
                 BatchStatus {
@@ -997,40 +978,38 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
                 batch_status,
             })
         } else {
-            let batch_data = sqlx::query!(
-                r#"
-                    SELECT tx_hash, created_at
-                    FROM txs_batches_hashes
-                    INNER JOIN mempool_txs
-                    ON txs_batches_hashes.batch_id = mempool_txs.batch_id
-                    WHERE batch_hash = $1
-                    ORDER BY created_at ASC
-                "#,
-                batch_hash.as_ref()
-            )
-            .fetch_all(self.0.conn())
-            .await?;
-            if !batch_data.is_empty() {
-                let created_at = batch_data[0].created_at;
-                let transaction_hashes: Vec<TxHash> = batch_data
-                    .iter()
-                    .map(|tx| serde_json::from_str(&format!("\"0x{}\"", tx.tx_hash)).unwrap())
-                    .collect();
-                Some(ApiTxBatch {
-                    batch_hash,
-                    transaction_hashes,
-                    created_at,
-                    batch_status: BatchStatus {
-                        updated_at: created_at,
-                        last_state: TxInBlockStatus::Queued,
-                    },
-                })
-            } else {
-                None
-            }
+            None
         };
+        transaction.commit().await?;
 
-        metrics::histogram!("sql.chain.block.get_tx_created_at", start.elapsed());
+        metrics::histogram!("sql.chain.block.get_in_block_batch_info", start.elapsed());
+        Ok(result)
+    }
+
+    pub async fn get_batch_info(&mut self, batch_hash: TxHash) -> QueryResult<Option<ApiTxBatch>> {
+        let start = Instant::now();
+        let mut transaction = self.0.start_transaction().await?;
+
+        let result = if let Some(batch_info) = transaction
+            .chain()
+            .operations_ext_schema()
+            .get_in_block_batch_info(batch_hash)
+            .await?
+        {
+            Some(batch_info)
+        } else if let Some(batch_info) = transaction
+            .chain()
+            .mempool_schema()
+            .get_queued_batch_info(batch_hash)
+            .await?
+        {
+            Some(batch_info)
+        } else {
+            None
+        };
+        transaction.commit().await?;
+
+        metrics::histogram!("sql.chain.block.get_batch_info", start.elapsed());
         Ok(result)
     }
 }

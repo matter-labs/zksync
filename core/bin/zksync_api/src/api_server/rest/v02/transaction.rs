@@ -170,8 +170,10 @@ impl ApiTransactionData {
             let status = storage
                 .chain()
                 .block_schema()
-                .get_block_status(BlockNumber(op.block_number as u32))
-                .await;
+                .get_block_status_and_last_updated(BlockNumber(op.block_number as u32))
+                .await
+                .map_err(Error::from)?
+                .0;
 
             Ok(Some(l1_receipt_from_op_and_status(op, status)))
         } else if let Some((eth_block, priority_op)) = self
@@ -206,8 +208,10 @@ impl ApiTransactionData {
             let status = storage
                 .chain()
                 .block_schema()
-                .get_block_status(BlockNumber(receipt.block_number as u32))
-                .await;
+                .get_block_status_and_last_updated(BlockNumber(receipt.block_number as u32))
+                .await
+                .map_err(Error::from)?
+                .0;
             Ok(Some(l2_receipt_from_response_and_status(receipt, status)))
         } else if storage
             .chain()
@@ -261,9 +265,10 @@ impl ApiTransactionData {
             let status = storage
                 .chain()
                 .block_schema()
-                .get_block_status(BlockNumber(op.block_number as u32))
+                .get_block_status_and_last_updated(BlockNumber(op.block_number as u32))
                 .await
-                .into();
+                .map_err(Error::from)?
+                .0;
             Ok(Some(l1_tx_data_from_op_and_status(op, status)))
         } else if let Some((_, priority_op)) = self
             .tx_sender
@@ -310,9 +315,10 @@ impl ApiTransactionData {
             let block_status = storage
                 .chain()
                 .block_schema()
-                .get_block_status(BlockNumber(op.block_number as u32))
+                .get_block_status_and_last_updated(BlockNumber(op.block_number as u32))
                 .await
-                .into();
+                .map_err(Error::from)?
+                .0;
             let eth_signature = op.eth_sign_data.clone().map(get_sign_bytes);
             let tx = l2_tx_from_op_and_status(op, block_status);
 

@@ -1,6 +1,7 @@
 // Built-in deps
 use std::time::{Instant, SystemTime, UNIX_EPOCH};
 // External imports
+use chrono::{DateTime, Utc};
 // Workspace imports
 use zksync_api_types::v02::{
     block::BlockStatus,
@@ -956,30 +957,36 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
         Ok(self.save_block(block).await?)
     }
 
-    pub async fn get_block_status(&mut self, block_number: BlockNumber) -> BlockStatus {
-        if self
-            .0
+    pub async fn get_block_status_and_last_updated(
+        &mut self,
+        block_number: BlockNumber,
+    ) -> QueryResult<(BlockStatus, DateTime<Utc>)> {
+        let mut transaction = self.0.start_transaction().await?;
+        let (is_finalized, finalized_at) = transaction
             .chain()
             .operations_schema()
             .get_stored_aggregated_operation(block_number, AggregatedActionType::ExecuteBlocks)
             .await
-            .map(|operation| operation.confirmed)
-            .unwrap_or(false)
-        {
-            BlockStatus::Finalized
-        } else if self
-            .0
-            .chain()
-            .operations_schema()
-            .get_stored_aggregated_operation(block_number, AggregatedActionType::CommitBlocks)
-            .await
-            .map(|operation| operation.confirmed)
-            .unwrap_or(false)
-        {
-            BlockStatus::Committed
+            .map(|operation| (operation.confirmed, operation.created_at))
+            .unwrap_or((false, chrono::MIN_DATETIME));
+        let result = if is_finalized {
+            (BlockStatus::Finalized, finalized_at)
         } else {
-            BlockStatus::Queued
-        }
+            let (is_committed, committed_at) = transaction
+                .chain()
+                .operations_schema()
+                .get_stored_aggregated_operation(block_number, AggregatedActionType::ExecuteBlocks)
+                .await
+                .map(|operation| (operation.confirmed, operation.created_at))
+                .unwrap_or((false, chrono::MIN_DATETIME));
+            if is_committed {
+                (BlockStatus::Committed, committed_at)
+            } else {
+                (BlockStatus::Queued, chrono::MIN_DATETIME)
+            }
+        };
+        transaction.commit().await?;
+        Ok(result)
     }
 
     /// Retrieves both L1 and L2 operations stored in the block for the given pagination query
@@ -1109,9 +1116,9 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
                     .0
                     .chain()
                     .block_schema()
-                    .get_block_status(block_number)
-                    .await
-                    .into();
+                    .get_block_status_and_last_updated(block_number)
+                    .await?
+                    .0;
                 let txs: Vec<Transaction> = raw_txs
                     .into_iter()
                     .map(|tx| transaction_from_item_and_status(tx, block_status))

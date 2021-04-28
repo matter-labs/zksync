@@ -71,8 +71,10 @@ impl ApiBlockData {
             storage
                 .chain()
                 .block_schema()
-                .get_block_status(block_number)
+                .get_block_status_and_last_updated(block_number)
                 .await
+                .map_err(Error::from)?
+                .0
         };
         let details = self
             .verified_blocks_cache

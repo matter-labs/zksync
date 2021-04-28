@@ -3,6 +3,7 @@ use std::{collections::VecDeque, convert::TryFrom, time::Instant};
 // External imports
 use itertools::Itertools;
 // Workspace imports
+use zksync_api_types::v02::transaction::{ApiTxBatch, BatchStatus, TxInBlockStatus};
 use zksync_types::{
     mempool::SignedTxVariant,
     tx::{TxEthSignature, TxHash},
@@ -411,5 +412,48 @@ impl<'a, 'c> MempoolSchema<'a, 'c> {
 
         metrics::histogram!("sql.chain", start.elapsed(), "mempool" => "get_mempool_size");
         Ok(size.unwrap_or(0) as u32)
+    }
+
+    /// Get info about batch in mempool.
+    pub async fn get_queued_batch_info(
+        &mut self,
+        batch_hash: TxHash,
+    ) -> QueryResult<Option<ApiTxBatch>> {
+        let start = Instant::now();
+
+        let batch_data = sqlx::query!(
+            r#"
+                SELECT tx_hash, created_at
+                FROM txs_batches_hashes
+                INNER JOIN mempool_txs
+                ON txs_batches_hashes.batch_id = mempool_txs.batch_id
+                WHERE batch_hash = $1
+                ORDER BY created_at ASC
+            "#,
+            batch_hash.as_ref()
+        )
+        .fetch_all(self.0.conn())
+        .await?;
+        let result = if !batch_data.is_empty() {
+            let created_at = batch_data[0].created_at;
+            let transaction_hashes: Vec<TxHash> = batch_data
+                .iter()
+                .map(|tx| serde_json::from_str(&format!("\"0x{}\"", tx.tx_hash)).unwrap())
+                .collect();
+            Some(ApiTxBatch {
+                batch_hash,
+                transaction_hashes,
+                created_at,
+                batch_status: BatchStatus {
+                    updated_at: created_at,
+                    last_state: TxInBlockStatus::Queued,
+                },
+            })
+        } else {
+            None
+        };
+
+        metrics::histogram!("sql.chain", start.elapsed(), "mempool" => "get_queued_batch_info");
+        Ok(result)
     }
 }
