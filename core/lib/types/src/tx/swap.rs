@@ -53,8 +53,12 @@ pub struct Swap {
 }
 
 impl Order {
+    /// Unique identifier of the signed message, similar to TX_TYPE
+    pub const MSG_TYPE: u8 = b'o'; // 'o' for "order"
+
     pub fn get_bytes(&self) -> Vec<u8> {
         let mut out = Vec::new();
+        out.push(Self::MSG_TYPE);
         out.extend_from_slice(&self.account_id.to_be_bytes());
         out.extend_from_slice(&self.recipient_id.to_be_bytes());
         out.extend_from_slice(&self.nonce.to_be_bytes());
@@ -214,7 +218,7 @@ impl Swap {
     /// This function does not care how orders are encoded: is it data or hash.
     fn get_swap_bytes(&self, order_bytes: &[u8]) -> Vec<u8> {
         let mut out = Vec::new();
-        out.extend_from_slice(&[Self::TX_TYPE]);
+        out.push(Self::TX_TYPE);
         out.extend_from_slice(&self.submitter_id.to_be_bytes());
         out.extend_from_slice(&self.submitter_address.as_bytes());
         out.extend_from_slice(&self.nonce.to_be_bytes());

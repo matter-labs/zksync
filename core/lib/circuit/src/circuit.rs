@@ -23,6 +23,7 @@ use zksync_crypto::params::{
 };
 use zksync_types::{
     operations::{ChangePubKeyOp, NoopOp},
+    tx::Order,
     CloseOp, DepositOp, ForcedExitOp, FullExitOp, SwapOp, TransferOp, TransferToNewOp, WithdrawOp,
 };
 // Local deps
@@ -2307,6 +2308,13 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
         let mut serialized_order_bits_1 = vec![];
         let mut serialized_tx_bits = vec![];
 
+        let order_type = CircuitElement::from_fe_with_known_length(
+            cs.namespace(|| "order message type"),
+            || Ok(E::Fr::from_str(&Order::MSG_TYPE.to_string()).unwrap()),
+            8,
+        )?;
+
+        serialized_order_bits_0.extend(order_type.get_bits_be());
         serialized_order_bits_0.extend(op_data.special_accounts[0].get_bits_be());
         serialized_order_bits_0.extend(op_data.special_accounts[1].get_bits_be());
         serialized_order_bits_0.extend(op_data.special_nonces[0].get_bits_be());
@@ -2318,6 +2326,7 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
         serialized_order_bits_0.extend(op_data.valid_from.get_bits_be());
         serialized_order_bits_0.extend(op_data.valid_until.get_bits_be());
 
+        serialized_order_bits_1.extend(order_type.get_bits_be());
         serialized_order_bits_1.extend(op_data.special_accounts[2].get_bits_be());
         serialized_order_bits_1.extend(op_data.special_accounts[3].get_bits_be());
         serialized_order_bits_1.extend(op_data.special_nonces[1].get_bits_be());
@@ -2333,8 +2342,11 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
         orders_bits.extend_from_slice(&serialized_order_bits_0);
         orders_bits.extend_from_slice(&serialized_order_bits_1);
 
-        let result_orders_hash =
-            rescue_hash_allocated_bits(&mut cs, self.rescue_params, &orders_bits)?;
+        let result_orders_hash = rescue_hash_allocated_bits(
+            cs.namespace(|| "hash orders"),
+            self.rescue_params,
+            &orders_bits,
+        )?;
 
         serialized_tx_bits.extend(global_variables.chunk_data.tx_type.get_bits_be());
         serialized_tx_bits.extend(op_data.special_accounts[4].get_bits_be());
