@@ -167,7 +167,7 @@ impl ZkSyncAccount {
             time_range,
             &self.private_key,
         )
-        .expect("Failed to sign transfer");
+        .expect("Failed to sign order");
 
         if increment_nonce {
             **stored_nonce += 1;
@@ -199,7 +199,7 @@ impl ZkSyncAccount {
             fee_token,
             &self.private_key,
         )
-        .expect("Failed to sign transfer");
+        .expect("Failed to sign swap");
 
         if increment_nonce {
             **stored_nonce += 1;
@@ -210,7 +210,7 @@ impl ZkSyncAccount {
                 let message = swap.get_ethereum_sign_message(fee_token_symbol, 18);
                 Some(
                     PackedEthSignature::sign(&eth_private_key, &message.as_bytes())
-                        .expect("Signing the transfer unexpectedly failed"),
+                        .expect("Signing the swap unexpectedly failed"),
                 )
             } else {
                 None
