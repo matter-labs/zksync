@@ -57,9 +57,8 @@ contract Governance is Config {
     /// @param initializationParameters Encoded representation of initialization parameters:
     ///     _networkGovernor The address of network governor
     function initialize(bytes calldata initializationParameters) external {
-        (address _networkGovernor, address _defaultFactory) = abi.decode(initializationParameters, (address, address));
+        address _networkGovernor = abi.decode(initializationParameters, (address));
         networkGovernor = _networkGovernor;
-        defaultFactory = NFTFactory(_defaultFactory);
     }
 
     /// @notice Governance contract upgrade. Can be external because Proxy contract intercepts illegal calls of this function.
@@ -174,6 +173,12 @@ contract Governance is Config {
             NFTFactories[_creatorAddress] = NFTFactory(msg.sender);
             emit NFTFactoryRegistered(_creatorAddress, msg.sender, _signature);
         }
+    }
+
+    function setDefaultNFTFactory(address _factory) external {
+        requireGovernor(msg.sender);
+        require(address(defaultFactory) == address(0x0), "mb");
+        defaultFactory = NFTFactory(_factory);
     }
 
     function getFactory(address _creator) external view returns (NFTFactory) {
