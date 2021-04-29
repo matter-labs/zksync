@@ -9,7 +9,7 @@ use actix_web::{
 };
 
 // Workspace uses
-use zksync_api_types::v02::fee::{ApiBatchFee, ApiFee, BatchFeeRequest, TxFeeRequest};
+use zksync_api_types::v02::fee::{ApiFee, BatchFeeRequest, TxFeeRequest};
 
 // Local uses
 use super::{error::Error, response::ApiResult};
@@ -42,7 +42,7 @@ async fn get_tx_fee(
 async fn get_batch_fee(
     data: web::Data<ApiFeeData>,
     Json(body): Json<BatchFeeRequest>,
-) -> ApiResult<ApiBatchFee> {
+) -> ApiResult<ApiFee> {
     let mut txs = Vec::new();
     for tx in body.transactions {
         txs.push((tx.tx_type, tx.address));
@@ -51,7 +51,7 @@ async fn get_batch_fee(
         .get_txs_batch_fee_in_wei(txs, body.token_like)
         .await
         .map_err(Error::from)
-        .map(ApiBatchFee::from)
+        .map(ApiFee::from)
         .into()
 }
 
@@ -75,7 +75,7 @@ mod tests {
     };
     use num::BigUint;
     use zksync_api_types::v02::{fee::TxInBatchFeeRequest, ApiVersion};
-    use zksync_types::{tokens::TokenLike, Address, OutputFeeType, TokenId, TxFeeTypes};
+    use zksync_types::{tokens::TokenLike, Address, TokenId, TxFeeTypes};
 
     #[actix_rt::test]
     #[cfg_attr(
@@ -109,9 +109,6 @@ mod tests {
             .get_txs_fee_v02(tx_type, address, token_like.clone())
             .await?;
         let api_fee: ApiFee = deserialize_response_result(response)?;
-        assert_eq!(api_fee.fee_type, OutputFeeType::Withdraw);
-        assert_eq!(api_fee.gas_tx_amount, BigUint::from(1u32));
-        assert_eq!(api_fee.gas_price_wei, BigUint::from(1u32));
         assert_eq!(api_fee.gas_fee, BigUint::from(1u32));
         assert_eq!(api_fee.zkp_fee, BigUint::from(1u32));
         assert_eq!(api_fee.total_fee, BigUint::from(2u32));
@@ -123,7 +120,9 @@ mod tests {
         let txs = vec![tx.clone(), tx.clone(), tx];
 
         let response = client.get_batch_fee_v02(txs, token_like).await?;
-        let api_batch_fee: ApiBatchFee = deserialize_response_result(response)?;
+        let api_batch_fee: ApiFee = deserialize_response_result(response)?;
+        assert_eq!(api_batch_fee.gas_fee, BigUint::from(3u32));
+        assert_eq!(api_batch_fee.zkp_fee, BigUint::from(3u32));
         assert_eq!(api_batch_fee.total_fee, BigUint::from(6u32));
 
         server.stop().await;

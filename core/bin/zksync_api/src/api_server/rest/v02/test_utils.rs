@@ -760,9 +760,10 @@ pub fn dummy_fee_ticker(prices: &[(TokenLike, BigDecimal)]) -> mpsc::Sender<Tick
                     transactions,
                     ..
                 } => {
-                    let normal_fee = BatchFee {
-                        total_fee: BigUint::from(2 * transactions.len()),
-                    };
+                    let normal_fee = BatchFee::new(
+                        BigUint::from(transactions.len()).into(),
+                        BigUint::from(transactions.len()).into(),
+                    );
                     let subsidy_fee = normal_fee.clone();
 
                     let res = Ok(ResponseBatchFee {

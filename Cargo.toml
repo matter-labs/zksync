@@ -6,7 +6,6 @@ members = [
     "core/bin/server",
     "core/bin/prover",
     "core/bin/parse_pub_data",
-    "core/bin/hashes_migration",
 
     # Server micro-services
     "core/bin/zksync_api",

@@ -305,7 +305,7 @@ impl<'a, 'c> MempoolSchema<'a, 'c> {
         let tx_hash = hex::encode(tx_hash.as_ref());
 
         let row = sqlx::query!(
-            "SELECT count(*) from mempool_txs
+            "SELECT COUNT(*) from mempool_txs
             WHERE tx_hash = $1",
             &tx_hash
         )
