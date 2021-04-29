@@ -492,7 +492,9 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
                     withdrawOrStore(uint16(op.tokenId), op.owner, op.amount);
                 } else {
                     if (op.amount == 1) {
-                        withdrawNFT(op.tokenId, op.owner, op.nftCreatorAddress, op.nftContentHash);
+                        Operations.WithdrawNFT memory nft_op =
+                            Operations.WithdrawNFT(op.nftCreatorAddress, op.nftContentHash, op.owner, op.tokenId);
+                        withdrawNFT(nft_op);
                     } else {
                         revert("ds"); // Unsupported amount for nft
                     }
@@ -652,7 +654,9 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
             increaseBalanceToWithdraw(packedBalanceKey, _amount);
         } else {
             require(_amount == 1, "Z");
-            // TODO :)
+            Operations.WithdrawNFT memory nft_op =
+                Operations.WithdrawNFT(_nftCreatorAddress, _nftContentHash, _owner, _tokenId);
+            pendingWithdrawnNFTs[_tokenId] = nft_op;
         }
         performedExodus[_accountId][_tokenId] = true;
     }

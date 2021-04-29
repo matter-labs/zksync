@@ -73,7 +73,7 @@ contract Storage {
     mapping(uint32 => BlockDEPRECATED) internal blocksDEPRECATED;
 
     /// @dev Flag indicates that a user has exited in the exodus mode certain token balance (per account id and tokenId)
-    mapping(uint32 => mapping(uint16 => bool)) internal performedExodus;
+    mapping(uint32 => mapping(uint32 => bool)) internal performedExodus;
 
     /// @dev Flag indicates that exodus (mass exit) mode is triggered
     /// @dev Once it was raised, it can not be cleared again, and all users must exit
