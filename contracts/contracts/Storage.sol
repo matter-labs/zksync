@@ -39,11 +39,10 @@ contract Storage {
     mapping(bytes22 => PendingBalance) internal pendingBalances;
 
     /// @dev Total number of executed blocks i.e. blocks[totalBlocksExecuted] points at the latest executed block (block 0 is genesis)
-    uint32 internal totalBlocksExecuted;
+    uint32 public totalBlocksExecuted;
 
     /// @dev Total number of committed blocks i.e. blocks[totalBlocksCommitted] points at the latest committed block
     uint32 public totalBlocksCommitted;
-
 
     /// @dev Flag indicates that a user has exited in the exodus mode certain token balance (per account id and tokenId)
     mapping(uint32 => mapping(uint32 => bool)) internal performedExodus;
