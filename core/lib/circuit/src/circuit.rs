@@ -3775,5 +3775,8 @@ fn rescue_hash_allocated_bits<E: RescueEngine + JubjubEngine, CS: ConstraintSyst
 
     let output_bits_le = sponge_output[0].into_bits_le(cs.namespace(|| "rescue hash bits"))?;
 
-    Ok(output_bits_le[..248].to_vec())
+    // Max whole number of bytes that fit into Fr (248 bits)
+    let len_bits = (E::Fr::CAPACITY / 8 * 8) as usize;
+
+    Ok(output_bits_le[..len_bits].to_vec())
 }
