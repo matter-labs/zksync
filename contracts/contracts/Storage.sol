@@ -38,39 +38,12 @@ contract Storage {
     /// @dev Root-chain balances (per owner and token id, see packAddressAndTokenId) to withdraw
     mapping(bytes22 => PendingBalance) internal pendingBalances;
 
-    // @dev Pending withdrawals are not used in this version
-    struct PendingWithdrawalDEPRECATED {
-        address to;
-        uint16 tokenId;
-    }
-    mapping(uint32 => PendingWithdrawalDEPRECATED) internal pendingWithdrawalsDEPRECATED;
-    uint32 internal firstPendingWithdrawalIndexDEPRECATED;
-    uint32 internal numberOfPendingWithdrawalsDEPRECATED;
-
     /// @dev Total number of executed blocks i.e. blocks[totalBlocksExecuted] points at the latest executed block (block 0 is genesis)
     uint32 internal totalBlocksExecuted;
 
     /// @dev Total number of committed blocks i.e. blocks[totalBlocksCommitted] points at the latest committed block
-    uint32 internal totalBlocksCommitted;
+    uint32 public totalBlocksCommitted;
 
-    /// @Old rollup block stored data - not used in current version
-    /// @member validator Block producer
-    /// @member committedAtBlock ETH block number at which this block was committed
-    /// @member cumulativeOnchainOperations Total number of operations in this and all previous blocks
-    /// @member priorityOperations Total number of priority operations for this block
-    /// @member commitment Hash of the block circuit commitment
-    /// @member stateRoot New tree root hash
-    ///
-    /// Consider memory alignment when changing field order: https://solidity.readthedocs.io/en/v0.4.21/miscellaneous.html
-    struct BlockDEPRECATED {
-        uint32 committedAtBlock;
-        uint64 priorityOperations;
-        uint32 chunks;
-        bytes32 withdrawalsDataHash; // can be restricted to 16 bytes to reduce number of required storage slots
-        bytes32 commitment;
-        bytes32 stateRoot;
-    }
-    mapping(uint32 => BlockDEPRECATED) internal blocksDEPRECATED;
 
     /// @dev Flag indicates that a user has exited in the exodus mode certain token balance (per account id and tokenId)
     mapping(uint32 => mapping(uint32 => bool)) internal performedExodus;
@@ -80,7 +53,7 @@ contract Storage {
     bool internal exodusMode;
 
     /// @dev User authenticated fact hashes for some nonce.
-    mapping(address => mapping(uint32 => bytes32)) internal authFacts;
+    mapping(address => mapping(uint32 => bytes32)) public authFacts;
 
     /// @notice Old Priority Operation container
     /// @member opType Priority operation type
