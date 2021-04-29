@@ -80,30 +80,22 @@
           "ordinal": 6,
           "name": "eth_hash?",
           "type_info": "Bytea"
-<<<<<<< HEAD
         },
         {
           "ordinal": 7,
           "name": "priority_op_serialid?",
           "type_info": "Int8"
-=======
->>>>>>> perekopskiy-zks-599-calculate-tx_hash-for-l1-operation
         }
       ],
       "parameters": {
         "Left": [
           "Bytea",
           "Int8",
-<<<<<<< HEAD
           "Timestamptz",
-=======
-          "Int4",
->>>>>>> perekopskiy-zks-599-calculate-tx_hash-for-l1-operation
           "Int8"
         ]
       },
       "nullable": [
-<<<<<<< HEAD
         null,
         null,
         null,
@@ -112,15 +104,6 @@
         null,
         null,
         null
-=======
-        false,
-        true,
-        false,
-        false,
-        true,
-        true,
-        true
->>>>>>> perekopskiy-zks-599-calculate-tx_hash-for-l1-operation
       ]
     }
   },
@@ -778,75 +761,6 @@
       ]
     }
   },
-<<<<<<< HEAD
-=======
-  "1ce3fbb6c510621c830b0b4679d51fb2ac4379a474d7ee7074500d786102fcd3": {
-    "query": "INSERT INTO mempool_txs (tx_hash, tx, eth_sign_data, created_at, batch_id)\n            SELECT u.tx_hash, u.tx, u.eth_sign_data, $4, $5\n                FROM UNNEST ($1::text[], $2::jsonb[], $3::jsonb[])\n                AS u(tx_hash, tx, eth_sign_data)",
-    "describe": {
-      "columns": [],
-      "parameters": {
-        "Left": [
-          "TextArray",
-          "JsonbArray",
-          "JsonbArray",
-          "Timestamptz",
-          "Int8"
-        ]
-      },
-      "nullable": []
-    }
-  },
-  "1d4884ae73b5c60662e2d778b43230a9fa2c7b683402bb67966428f70db2d900": {
-    "query": "\n                WITH transactions AS (\n                    SELECT\n                        '0x' || encode(tx_hash, 'hex') as tx_hash,\n                        tx as op,\n                        block_number,\n                        success,\n                        fail_reason,\n                        created_at\n                    FROM executed_transactions\n                    WHERE block_number = $1\n                ), priority_ops AS (\n                    SELECT\n                        '0x' || encode(eth_hash, 'hex') as tx_hash,\n                        operation as op,\n                        block_number,\n                        true as success,\n                        Null as fail_reason,\n                        created_at\n                    FROM executed_priority_operations\n                    WHERE block_number = $1\n                ), everything AS (\n                    SELECT * FROM transactions\n                    UNION ALL\n                    SELECT * FROM priority_ops\n                )\n                SELECT\n                    tx_hash as \"tx_hash!\",\n                    block_number as \"block_number!\",\n                    op as \"op!\",\n                    success as \"success!\",\n                    fail_reason as \"fail_reason?\",\n                    created_at as \"created_at!\"\n                FROM everything\n                ORDER BY created_at DESC\n            ",
-    "describe": {
-      "columns": [
-        {
-          "ordinal": 0,
-          "name": "tx_hash!",
-          "type_info": "Text"
-        },
-        {
-          "ordinal": 1,
-          "name": "block_number!",
-          "type_info": "Int8"
-        },
-        {
-          "ordinal": 2,
-          "name": "op!",
-          "type_info": "Jsonb"
-        },
-        {
-          "ordinal": 3,
-          "name": "success!",
-          "type_info": "Bool"
-        },
-        {
-          "ordinal": 4,
-          "name": "fail_reason?",
-          "type_info": "Text"
-        },
-        {
-          "ordinal": 5,
-          "name": "created_at!",
-          "type_info": "Timestamptz"
-        }
-      ],
-      "parameters": {
-        "Left": [
-          "Int8"
-        ]
-      },
-      "nullable": [
-        null,
-        null,
-        null,
-        null,
-        null,
-        null
-      ]
-    }
-  },
->>>>>>> perekopskiy-zks-599-calculate-tx_hash-for-l1-operation
   "1e491f4afb54c10a9e4f2ea467bd7f219e7a32bdf741691cb6f350d50caae417": {
     "query": "\n            UPDATE forced_exit_requests\n                SET fulfilled_at = $1\n                WHERE id = $2\n            ",
     "describe": {
@@ -3952,7 +3866,6 @@
       ]
     }
   },
-<<<<<<< HEAD
   "bbf6839d81439b9760bea580b95a044cfb2b418aa385e051295252ea7a0d60dd": {
     "query": "SELECT * FROM data_restore_storage_state_update\n            LIMIT 1",
     "describe": {
@@ -3977,8 +3890,6 @@
       ]
     }
   },
-=======
->>>>>>> perekopskiy-zks-599-calculate-tx_hash-for-l1-operation
   "bec05747dcfbf729bfd6e5d6aedf8da39f6d0d4ab5f0eae8dfed6c07adac1ba8": {
     "query": "SELECT eth_operations.* FROM aggregate_operations\n                LEFT JOIN eth_aggregated_ops_binding ON eth_aggregated_ops_binding.op_id = aggregate_operations.id\n                LEFT JOIN eth_operations ON eth_aggregated_ops_binding.eth_op_id = eth_operations.id\n            WHERE\n                ($1 BETWEEN from_block AND to_block) AND action_type = $2 AND eth_operations.confirmed = true \n            LIMIT 1",
     "describe": {
@@ -4517,113 +4428,6 @@
       "nullable": []
     }
   },
-<<<<<<< HEAD
-=======
-  "cf7a4e0b38261be06c53bbd6ae9d3e26be783c3ef7cafc8444b975184ecf51fb": {
-    "query": "\n                        SELECT\n                            '0x' || encode(tx_hash, 'hex') as \"tx_hash!\",\n                            tx as op,\n                            block_number,\n                            success,\n                            fail_reason,\n                            created_at\n                        FROM executed_transactions\n                        WHERE block_number = $1 AND created_at >= $2\n                        ORDER BY created_at ASC\n                        LIMIT $3\n                    ",
-    "describe": {
-      "columns": [
-        {
-          "ordinal": 0,
-          "name": "tx_hash!",
-          "type_info": "Text"
-        },
-        {
-          "ordinal": 1,
-          "name": "op",
-          "type_info": "Jsonb"
-        },
-        {
-          "ordinal": 2,
-          "name": "block_number",
-          "type_info": "Int8"
-        },
-        {
-          "ordinal": 3,
-          "name": "success",
-          "type_info": "Bool"
-        },
-        {
-          "ordinal": 4,
-          "name": "fail_reason",
-          "type_info": "Text"
-        },
-        {
-          "ordinal": 5,
-          "name": "created_at",
-          "type_info": "Timestamptz"
-        }
-      ],
-      "parameters": {
-        "Left": [
-          "Int8",
-          "Timestamptz",
-          "Int8"
-        ]
-      },
-      "nullable": [
-        null,
-        false,
-        false,
-        false,
-        true,
-        false
-      ]
-    }
-  },
-  "d0223e0d0cc7971441d1c2ab2900b5b32a0c9e1c79993862a866c7bbec1b5912": {
-    "query": "\n                        SELECT\n                            block_number,\n                            created_at,\n                            operation,\n                            tx_hash,\n                            eth_hash,\n                            priority_op_serialid\n                        FROM executed_priority_operations\n                        WHERE block_number = $1 AND created_at >= $2\n                        ORDER BY created_at ASC\n                        LIMIT $3\n                    ",
-    "describe": {
-      "columns": [
-        {
-          "ordinal": 0,
-          "name": "block_number",
-          "type_info": "Int8"
-        },
-        {
-          "ordinal": 1,
-          "name": "created_at",
-          "type_info": "Timestamptz"
-        },
-        {
-          "ordinal": 2,
-          "name": "operation",
-          "type_info": "Jsonb"
-        },
-        {
-          "ordinal": 3,
-          "name": "tx_hash",
-          "type_info": "Bytea"
-        },
-        {
-          "ordinal": 4,
-          "name": "eth_hash",
-          "type_info": "Bytea"
-        },
-        {
-          "ordinal": 5,
-          "name": "priority_op_serialid",
-          "type_info": "Int8"
-        }
-      ],
-      "parameters": {
-        "Left": [
-          "Int8",
-          "Timestamptz",
-          "Int8"
-        ]
-      },
-      "nullable": [
-        false,
-        false,
-        false,
-        false,
-        false,
-        false
-      ]
-    }
-  },
->>>>>>> perekopskiy-zks-599-calculate-tx_hash-for-l1-operation
   "d3b822a6639901acd986e82d2779a7318c3805385a7772db83063d9507c049a7": {
     "query": "INSERT INTO eth_parameters (nonce, gas_price_limit, last_committed_block, last_verified_block, last_executed_block)\n                VALUES ($1, $2, $3, $4, $5)",
     "describe": {
@@ -4750,65 +4554,8 @@
       ]
     }
   },
-<<<<<<< HEAD
   "ddfadf4fd743817cf7fec359d5081be61ec932e8829e2b46216ecd197c93b987": {
     "query": "\n                SELECT tx_hash, created_at, success, block_number\n                FROM executed_transactions\n                INNER JOIN txs_batches_hashes\n                ON txs_batches_hashes.batch_id = COALESCE(executed_transactions.batch_id, 0)\n                WHERE batch_hash = $1\n                ORDER BY created_at ASC\n            ",
-=======
-  "dd07f6d9935252010aba38b76dcdca46ee59ea6cad442160854edd98493b8c75": {
-    "query": "\n                        SELECT\n                            '0x' || encode(tx_hash, 'hex') as \"tx_hash!\",\n                            tx as op,\n                            block_number,\n                            success,\n                            fail_reason,\n                            created_at\n                        FROM executed_transactions\n                        WHERE block_number = $1 AND created_at <= $2\n                        ORDER BY created_at DESC\n                        LIMIT $3\n                    ",
-    "describe": {
-      "columns": [
-        {
-          "ordinal": 0,
-          "name": "tx_hash!",
-          "type_info": "Text"
-        },
-        {
-          "ordinal": 1,
-          "name": "op",
-          "type_info": "Jsonb"
-        },
-        {
-          "ordinal": 2,
-          "name": "block_number",
-          "type_info": "Int8"
-        },
-        {
-          "ordinal": 3,
-          "name": "success",
-          "type_info": "Bool"
-        },
-        {
-          "ordinal": 4,
-          "name": "fail_reason",
-          "type_info": "Text"
-        },
-        {
-          "ordinal": 5,
-          "name": "created_at",
-          "type_info": "Timestamptz"
-        }
-      ],
-      "parameters": {
-        "Left": [
-          "Int8",
-          "Timestamptz",
-          "Int8"
-        ]
-      },
-      "nullable": [
-        null,
-        false,
-        false,
-        false,
-        true,
-        false
-      ]
-    }
-  },
-  "debbe23f0c730c331482c798387d1739911923edcafc2bd80463464ff98f3b71": {
-    "query": "SELECT * from mempool_txs\n            WHERE tx_hash = $1",
->>>>>>> perekopskiy-zks-599-calculate-tx_hash-for-l1-operation
     "describe": {
       "columns": [
         {
@@ -5064,22 +4811,6 @@
       "nullable": []
     }
   },
-<<<<<<< HEAD
-  "ec07bf1dcfe77b28e753f3f145ff02ce47924ed311b2b7848b6e13c377d1a235": {
-    "query": "\n                INSERT INTO txs_batches_hashes (batch_id, batch_hash)\n                SELECT u.batch_id, u.batch_hash\n                FROM UNNEST ($1::bigint[], $2::bytea[])\n                AS u(batch_id, batch_hash)\n            ",
-    "describe": {
-      "columns": [],
-      "parameters": {
-        "Left": [
-          "Int8Array",
-          "ByteaArray"
-        ]
-      },
-      "nullable": []
-    }
-  },
-=======
->>>>>>> perekopskiy-zks-599-calculate-tx_hash-for-l1-operation
   "f057b85811c3991b73c58991fc8dae8bf4cdf9d2238171ca13a3fdf1172f2c91": {
     "query": "SELECT * FROM data_restore_events_state\n            WHERE block_type = $1\n            ORDER BY block_num ASC",
     "describe": {
