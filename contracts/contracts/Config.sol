@@ -48,7 +48,7 @@ contract Config {
     uint256 internal constant FORCED_EXIT_BYTES = 6 * CHUNK_BYTES;
 
     /// @dev Full exit operation length
-    uint256 internal constant FULL_EXIT_BYTES = 6 * CHUNK_BYTES;
+    uint256 internal constant FULL_EXIT_BYTES = 10 * CHUNK_BYTES;
 
     /// @dev ChangePubKey operation length
     uint256 internal constant CHANGE_PUBKEY_BYTES = 6 * CHUNK_BYTES;
