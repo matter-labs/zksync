@@ -166,6 +166,9 @@ fn apply_many_ops() -> ZkSyncCircuit<'static, Bn256> {
             token: TokenId(0),
         },
         withdraw_amount: Some(BigUint::from(900u32).into()),
+        creator_account_id: None,
+        serial_id: None,
+        content_hash: None,
     };
     let full_exit_success = true;
 

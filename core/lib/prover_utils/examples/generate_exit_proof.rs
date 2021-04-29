@@ -84,7 +84,7 @@ async fn main() {
         zksync_prover_utils::exit_proof::create_exit_proof_fungible(
             accounts, account_id, address, token_id,
         )
-        .expect("Failed to generate exit proof");
+        .expect("Failed to generate exit proof")
     } else {
         let nft = storage
             .tokens_schema()
@@ -101,7 +101,7 @@ async fn main() {
             nft.serial_id,
             nft.content_hash,
         )
-        .expect("Failed to generate exit proof");
+        .expect("Failed to generate exit proof")
     };
 
     let proof_data = ExitProofData {
