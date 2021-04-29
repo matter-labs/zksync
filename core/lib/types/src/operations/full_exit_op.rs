@@ -4,7 +4,8 @@ use anyhow::{ensure, format_err};
 use num::{BigUint, FromPrimitive, ToPrimitive};
 use serde::{Deserialize, Serialize};
 use zksync_crypto::params::{
-    ACCOUNT_ID_BIT_WIDTH, BALANCE_BIT_WIDTH, CHUNK_BYTES, ETH_ADDRESS_BIT_WIDTH, TOKEN_BIT_WIDTH,
+    ACCOUNT_ID_BIT_WIDTH, BALANCE_BIT_WIDTH, CHUNK_BYTES, CONTENT_HASH_WIDTH,
+    ETH_ADDRESS_BIT_WIDTH, SERIAL_ID_WIDTH, TOKEN_BIT_WIDTH,
 };
 use zksync_crypto::primitives::FromBytes;
 use zksync_utils::BigUintSerdeWrapper;
@@ -86,6 +87,9 @@ impl FullExitOp {
         let eth_address_offset = account_id_offset + ACCOUNT_ID_BIT_WIDTH / 8;
         let token_offset = eth_address_offset + ETH_ADDRESS_BIT_WIDTH / 8;
         let amount_offset = token_offset + TOKEN_BIT_WIDTH / 8;
+        let creator_id = amount_offset + BALANCE_BIT_WIDTH / 8;
+        let serial_id = creator_id + SERIAL_ID_WIDTH / 8;
+        let content_hash = serial_id + CONTENT_HASH_WIDTH / 8;
 
         let account_id = u32::from_bytes(&bytes[account_id_offset..eth_address_offset])
             .ok_or_else(|| format_err!("Cant get account id from full exit pubdata"))?;
@@ -97,7 +101,14 @@ impl FullExitOp {
                 .ok_or_else(|| format_err!("Cant get amount from full exit pubdata"))?,
         )
         .unwrap();
-        todo!();
+
+        let creator_id = u32::from_bytes(&bytes[creator_id..serial_id])
+            .ok_or_else(|| format_err!("Cant get creator account id from full exit pubdata"))?;
+
+        let serial_id = u32::from_bytes(&bytes[serial_id..content_hash])
+            .ok_or_else(|| format_err!("Cant get serial id from full exit pubdata"))?;
+
+        let content_hash = H256::from_slice(&bytes[content_hash..]);
 
         Ok(Self {
             priority_op: FullExit {
@@ -106,9 +117,9 @@ impl FullExitOp {
                 token: TokenId(token),
             },
             withdraw_amount: Some(amount.into()),
-            creator_account_id: None,
-            serial_id: None,
-            content_hash: None,
+            creator_account_id: Some(AccountId(creator_id)),
+            serial_id: Some(serial_id),
+            content_hash: Some(content_hash),
         })
     }
 

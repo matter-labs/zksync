@@ -77,3 +77,23 @@ pub fn create_exit_proof_fungible(
         Default::default(),
     )
 }
+
+pub fn create_exit_proof_nft(
+    accounts: AccountMap,
+    account_id: AccountId,
+    owner: Address,
+    token_id: TokenId,
+    creator_id: AccountId,
+    serial_id: u32,
+    content_hash: H256,
+) -> Result<(EncodedSingleProof, BigUint), anyhow::Error> {
+    create_exit_proof(
+        accounts,
+        account_id,
+        owner,
+        token_id,
+        creator_id,
+        serial_id,
+        content_hash,
+    )
+}

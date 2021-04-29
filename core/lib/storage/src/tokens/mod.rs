@@ -6,10 +6,10 @@ use num::{rational::Ratio, BigUint};
 
 use thiserror::Error;
 // Workspace imports
-use zksync_types::{AccountId, Address, Token, TokenId, TokenLike, TokenPrice};
+use zksync_types::{AccountId, Address, Token, TokenId, TokenLike, TokenPrice, NFT};
 use zksync_utils::ratio_to_big_decimal;
 // Local imports
-use self::records::{DBMarketVolume, DbTickerPrice, DbToken};
+use self::records::{DBMarketVolume, DbTickerPrice, DbToken, StorageNFT};
 
 use crate::utils::address_to_stored_string;
 use crate::{QueryResult, StorageProcessor};
@@ -195,6 +195,22 @@ impl<'a, 'c> TokensSchema<'a, 'c> {
 
         metrics::histogram!("sql.token.get_last_token_id", start.elapsed());
         Ok(TokenId(last_token_id))
+    }
+    pub async fn get_nft(&mut self, token_id: TokenId) -> QueryResult<Option<NFT>> {
+        let start = Instant::now();
+        let db_token = sqlx::query_as!(
+            StorageNFT,
+            r#"
+                SELECT * FROM nft
+                WHERE token_id = $1
+                LIMIT 1
+            "#,
+            *token_id as i32
+        )
+        .fetch_optional(self.0.conn())
+        .await?;
+        metrics::histogram!("sql.token.get_nft", start.elapsed());
+        Ok(db_token.map(|t| t.into()))
     }
 
     /// Given the numeric token ID, symbol or address, returns token.
