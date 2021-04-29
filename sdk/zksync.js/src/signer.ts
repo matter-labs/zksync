@@ -51,7 +51,7 @@ export class Signer {
 
     async signSyncOrder(order: {
         accountId: number;
-        recipientId: number;
+        recipientAddress: Address;
         nonce: number;
         tokenSell: number;
         tokenBuy: number;

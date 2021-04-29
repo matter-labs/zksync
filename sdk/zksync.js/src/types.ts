@@ -75,7 +75,7 @@ export interface Signature {
 
 export interface Order {
     accountId: number;
-    recipientId: number;
+    recipientAddress: Address;
     nonce: number;
     tokenSell: number;
     tokenBuy: number;

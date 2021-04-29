@@ -379,19 +379,11 @@ export class Wallet {
         }
         await this.setRequiredAccountIdFromServer('Swap order');
         const nonce = order.nonce != null ? await this.getNonce(order.nonce) : await this.getNonce();
-        let recipientId: number;
-        if (order.recipient != null) {
-            const recipient = await this.provider.getState(order.recipient);
-            recipientId = recipient.id;
-        } else {
-            recipientId = this.accountId;
-        }
-        if (recipientId === undefined) {
-            throw new Error('Recipient has to have an accountID');
-        }
+        const recipientAddress = order.recipient || this.address();
+
         return this.signer.signSyncOrder({
             accountId: this.accountId,
-            recipientId,
+            recipientAddress,
             nonce,
             amount: order.amount || BigNumber.from(0),
             tokenSell: this.provider.tokenSet.resolveTokenId(order.tokenSell),

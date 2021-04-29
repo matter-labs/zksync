@@ -16,6 +16,7 @@ import {
     Order,
     Swap
 } from './types';
+import * as zks from 'zksync-crypto';
 
 // Max number of tokens for the current version, it is determined by the zkSync circuit implementation.
 const MAX_NUMBER_OF_TOKENS = 128;
@@ -57,9 +58,6 @@ const FEE_MANTISSA_BIT_WIDTH = 11;
 
 export class Price {
     private constructor(private _sell: BigNumber, private _buy: BigNumber) {}
-    static from(price: string) {
-        return new Price(utils.parseUnits(price, 18), BigNumber.from(10 ** 18));
-    }
     static fromRatio(sell: BigNumberish, buy: BigNumberish) {
         return new Price(BigNumber.from(sell), BigNumber.from(buy));
     }
@@ -68,6 +66,14 @@ export class Price {
     }
     buy() {
         return this._buy;
+    }
+    serialize() {
+        const sellBytes = this._sell.toHexString();
+        const buyBytes = this._buy.toHexString();
+        return ethers.utils.concat([
+            ethers.utils.zeroPad(sellBytes, 15),
+            ethers.utils.zeroPad(buyBytes, 15),
+        ]);
     }
 }
 
@@ -580,24 +586,24 @@ export function serializeTimestamp(time: number): Uint8Array {
 }
 
 export function serializeOrder(order: Order): Uint8Array {
+    const type = new Uint8Array(['o'.charCodeAt(0)]);
     const accountId = serializeAccountId(order.accountId);
-    const recipientId = serializeAccountId(order.recipientId);
+    const recipientBytes = serializeAddress(order.recipientAddress);
     const nonceBytes = serializeNonce(order.nonce);
     const tokenSellId = serializeTokenId(order.tokenSell);
     const tokenBuyId = serializeTokenId(order.tokenBuy);
-    const priceSellBytes = serializeAmountFull(order.price.sell());
-    const priceBuyBytes = serializeAmountFull(order.price.buy());
+    const priceBytes = order.price.serialize();
     const amountBytes = serializeAmountFull(order.amount);
     const validFrom = serializeTimestamp(order.validFrom);
     const validUntil = serializeTimestamp(order.validUntil);
     return ethers.utils.concat([
+        type,
         accountId,
-        recipientId,
+        recipientBytes,
         nonceBytes,
         tokenSellId,
         tokenBuyId,
-        priceSellBytes,
-        priceBuyBytes,
+        priceBytes,
         amountBytes,
         validFrom,
         validUntil
@@ -611,6 +617,7 @@ export function serializeSwap(swap: Swap): Uint8Array {
     const nonceBytes = serializeNonce(swap.nonce);
     const orderA = serializeOrder(swap.orders[0]);
     const orderB = serializeOrder(swap.orders[1]);
+    const ordersHashed = zks.rescueHashOrders(ethers.utils.concat([orderA, orderB]));
     const tokenIdBytes = serializeTokenId(swap.feeToken);
     const feeBytes = serializeFeePacked(swap.fee);
     const amountABytes = serializeAmountFull(swap.amounts[0]);
@@ -620,8 +627,7 @@ export function serializeSwap(swap: Swap): Uint8Array {
         submitterId,
         submitterAddress,
         nonceBytes,
-        orderA,
-        orderB,
+        ordersHashed,
         tokenIdBytes,
         feeBytes,
         amountABytes,
