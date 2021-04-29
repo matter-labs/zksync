@@ -87,9 +87,9 @@ impl FullExitOp {
         let eth_address_offset = account_id_offset + ACCOUNT_ID_BIT_WIDTH / 8;
         let token_offset = eth_address_offset + ETH_ADDRESS_BIT_WIDTH / 8;
         let amount_offset = token_offset + TOKEN_BIT_WIDTH / 8;
-        let creator_id = amount_offset + BALANCE_BIT_WIDTH / 8;
-        let serial_id = creator_id + SERIAL_ID_WIDTH / 8;
-        let content_hash = serial_id + CONTENT_HASH_WIDTH / 8;
+        let creator_id_offset = amount_offset + BALANCE_BIT_WIDTH / 8;
+        let serial_id_offset = creator_id_offset + ACCOUNT_ID_BIT_WIDTH / 8;
+        let content_hash_offset = serial_id_offset + SERIAL_ID_WIDTH / 8;
 
         let account_id = u32::from_bytes(&bytes[account_id_offset..eth_address_offset])
             .ok_or_else(|| format_err!("Cant get account id from full exit pubdata"))?;
@@ -102,13 +102,16 @@ impl FullExitOp {
         )
         .unwrap();
 
-        let creator_id = u32::from_bytes(&bytes[creator_id..serial_id])
+        let creator_id = u32::from_bytes(&bytes[creator_id_offset..serial_id_offset])
             .ok_or_else(|| format_err!("Cant get creator account id from full exit pubdata"))?;
 
-        let serial_id = u32::from_bytes(&bytes[serial_id..content_hash])
+        println!("{:?}", &bytes[serial_id_offset..content_hash_offset]);
+        let serial_id = u32::from_bytes(&bytes[serial_id_offset..content_hash_offset])
             .ok_or_else(|| format_err!("Cant get serial id from full exit pubdata"))?;
 
-        let content_hash = H256::from_slice(&bytes[content_hash..]);
+        let content_hash = H256::from_slice(
+            &bytes[content_hash_offset..content_hash_offset + CONTENT_HASH_WIDTH / 8],
+        );
 
         Ok(Self {
             priority_op: FullExit {

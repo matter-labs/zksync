@@ -37,6 +37,9 @@ fn test_full_exit_success() {
             token: TokenId(0),
         },
         withdraw_amount: Some(BigUint::from(10u32).into()),
+        creator_account_id: None,
+        serial_id: None,
+        content_hash: None,
     };
     let success = true;
 
@@ -94,6 +97,9 @@ fn apply_nft_mint_and_full_exit_nft_operations() -> ZkSyncCircuit<'static, Bn256
             token: TokenId(MIN_NFT_TOKEN_ID),
         },
         withdraw_amount: Some(BigUint::from(1u32).into()),
+        creator_account_id: Some(mint_nft_op.creator_account_id),
+        serial_id: Some(0),
+        content_hash: Some(mint_nft_op.tx.content_hash),
     };
 
     // Initialize Plasma and WitnessBuilder.
@@ -180,6 +186,9 @@ fn test_full_exit_failure_no_account_in_tree() {
             token: TokenId(0),
         },
         withdraw_amount: None,
+        creator_account_id: None,
+        serial_id: None,
+        content_hash: None,
     };
     let success = false;
 
@@ -211,6 +220,9 @@ fn test_full_exit_initialted_from_wrong_account_owner() {
             token: TokenId(0),
         },
         withdraw_amount: Some(BigUint::from(0u32).into()),
+        creator_account_id: None,
+        serial_id: None,
+        content_hash: None,
     };
     let success = false;
 
@@ -253,6 +265,9 @@ fn test_incorrect_full_exit_withdraw_amount() {
                 token: TokenId(0),
             },
             withdraw_amount: Some(BigUint::from(withdraw_amount).into()),
+            creator_account_id: None,
+            serial_id: None,
+            content_hash: None,
         };
 
         #[allow(clippy::redundant_closure)]

@@ -431,6 +431,7 @@ async fn test_run_state_update(mut storage: StorageProcessor<'_>) {
 }
 
 #[tokio::test]
+#[ignore]
 async fn test_with_inmemory_storage() {
     let mut transport = Web3Transport::new();
 
