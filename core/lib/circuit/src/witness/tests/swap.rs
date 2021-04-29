@@ -101,13 +101,22 @@ impl TestSwap {
             BigUint::from(self.amounts.1)
         };
 
+        let get_address = |id| {
+            self.test_accounts
+                .iter()
+                .find(|x| *x.id == id)
+                .unwrap()
+                .account
+                .address
+        };
+
         let order_0 = self.test_accounts[0].zksync_account.sign_order(
             TokenId(self.tokens.0),
             wrong_token.unwrap_or(TokenId(self.tokens.1)),
             BigUint::from(self.first_price.0),
             BigUint::from(self.first_price.1),
             wrong_amount.unwrap_or(amount_0),
-            AccountId(self.recipients.0),
+            &get_address(self.recipients.0),
             None,
             !self.is_limit_order.0,
             Default::default(),
@@ -119,7 +128,7 @@ impl TestSwap {
             BigUint::from(self.second_price.0),
             BigUint::from(self.second_price.1),
             amount_1,
-            AccountId(self.recipients.1),
+            &get_address(self.recipients.1),
             None,
             !self.is_limit_order.1,
             Default::default(),
@@ -362,7 +371,7 @@ fn test_self_swap() {
         BigUint::from(1u8),
         BigUint::from(1u8),
         BigUint::from(10u8),
-        AccountId(1),
+        &account.account.address,
         None,
         false,
         Default::default(),
@@ -374,7 +383,7 @@ fn test_self_swap() {
         BigUint::from(1u8),
         BigUint::from(1u8),
         BigUint::from(10u8),
-        AccountId(1),
+        &account.account.address,
         None,
         true,
         Default::default(),

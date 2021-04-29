@@ -149,7 +149,7 @@ impl ZkSyncAccount {
         price_sell: BigUint,
         price_buy: BigUint,
         amount: BigUint,
-        recipient: AccountId,
+        recipient: &Address,
         nonce: Option<Nonce>,
         increment_nonce: bool,
         time_range: TimeRange,
@@ -158,7 +158,7 @@ impl ZkSyncAccount {
         let order = Order::new_signed(
             self.get_account_id()
                 .expect("can't sign tx without account id"),
-            recipient,
+            *recipient,
             nonce.unwrap_or_else(|| *stored_nonce),
             token_sell,
             token_buy,
