@@ -11,6 +11,7 @@ import './forced-exit';
 import './misc';
 import './batch-builder';
 import './create2';
+import './swap';
 
 const TX_AMOUNT = utils.parseEther('10.0');
 // should be enough for ~200 test transactions (excluding fees), increase if needed
@@ -105,6 +106,15 @@ describe(`ZkSync integration tests (token: ${token}, transport: ${transport})`, 
         await tester.testChangePubKey(chuck, token, false);
     });
 
+    step('should perform a swap', async () => {
+        if (onlyBasic) {
+            return;
+        }
+        const secondToken = token == 'ETH' ? 'wBTC' : 'ETH';
+        await tester.testDeposit(chuck, secondToken, DEPOSIT_AMOUNT);
+        await tester.testSwap(alice, chuck, token, secondToken, TX_AMOUNT);
+    });
+
     step('should test multi-transfers', async () => {
         if (onlyBasic) {
             return;
@@ -150,7 +160,7 @@ describe(`ZkSync integration tests (token: ${token}, transport: ${transport})`, 
         await tester.testVerifiedWithdraw(alice, token, TX_AMOUNT);
     });
 
-    step('should execute a ForcedExit', async () => {
+    step('should execute a forced exit', async () => {
         if (onlyBasic) {
             return;
         }
