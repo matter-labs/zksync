@@ -158,7 +158,7 @@ contract Storage {
     /// @dev Used when user wants to reset `authFacts` for some nonce.
     mapping(address => mapping(uint32 => uint256)) internal authFactsResetTimer;
 
-    mapping(uint32 => address) withdrawnNFTs;
+    mapping(uint32 => address) internal withdrawnNFTs;
 
-    mapping(uint32 => Operations.WithdrawNFT) pendingWithdrawnNFTs;
+    mapping(uint32 => Operations.WithdrawNFT) internal pendingWithdrawnNFTs;
 }

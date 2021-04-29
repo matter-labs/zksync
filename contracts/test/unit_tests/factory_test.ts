@@ -1,9 +1,8 @@
 import { expect, use } from 'chai';
 import { solidity } from 'ethereum-waffle';
-import { Signer, utils } from 'ethers';
+import { Signer } from 'ethers';
 import { ZkSyncNFTFactory } from '../../typechain/ZkSyncNFTFactory';
 import { ZkSyncNFTFactoryFactory } from '../../typechain/ZkSyncNFTFactoryFactory';
-import { getCallRevertReason } from './common';
 
 import * as hardhat from 'hardhat';
 
@@ -16,11 +15,9 @@ describe('NFTFactory unit tests', function () {
     let nftFactory: ZkSyncNFTFactory;
     let wallet1: Signer;
     let wallet2: Signer;
-    let wallet3: Signer;
-    let wallet4: Signer;
 
     before(async () => {
-        [wallet1, wallet2, wallet3, wallet4] = await hardhat.ethers.getSigners();
+        [wallet1, wallet2] = await hardhat.ethers.getSigners();
 
         const nftFactoryFactory = await hardhat.ethers.getContractFactory('ZkSyncNFTFactory');
         contract = await nftFactoryFactory.deploy('test', 'TS', wallet1.getAddress());

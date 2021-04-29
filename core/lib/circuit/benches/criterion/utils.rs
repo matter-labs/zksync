@@ -7,6 +7,7 @@ use zksync_test_account::ZkSyncAccount;
 use zksync_types::{Account, AccountId, AccountMap, Address, BlockNumber, TokenId};
 
 // Public re-exports
+use std::str::FromStr;
 pub use zksync_circuit::witness::utils::WitnessBuilder;
 
 pub const FEE_ACCOUNT_ID: AccountId = AccountId(0);

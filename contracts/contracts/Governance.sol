@@ -48,7 +48,7 @@ contract Governance is Config {
     address public tokenGovernance;
 
     /// @notice NFT Creator address to factory address mapping
-    mapping(address => NFTFactory) public NFTFactories;
+    mapping(address => NFTFactory) public nftFactories;
 
     /// @notice Address which will be used if NFT token has no factories
     NFTFactory public defaultFactory;
@@ -157,7 +157,7 @@ contract Governance is Config {
     /// @param _creatorAddress NFT creator address
     /// @param _signature creator's signature
     function registerNFTFactory(address _creatorAddress, bytes memory _signature) external {
-        require(address(NFTFactories[_creatorAddress]) == address(0), "Q");
+        require(address(nftFactories[_creatorAddress]) == address(0), "Q");
         bytes32 messageHash =
             keccak256(
                 abi.encodePacked(
@@ -170,7 +170,7 @@ contract Governance is Config {
             );
         address recoveredAddress = Utils.recoverAddressFromEthSignature(_signature, messageHash);
         if (recoveredAddress == _creatorAddress && recoveredAddress != address(0)) {
-            NFTFactories[_creatorAddress] = NFTFactory(msg.sender);
+            nftFactories[_creatorAddress] = NFTFactory(msg.sender);
             emit NFTFactoryRegistered(_creatorAddress, msg.sender, _signature);
         }
     }
@@ -184,7 +184,7 @@ contract Governance is Config {
     }
 
     function getNFTFactory(address _creator) external view returns (NFTFactory) {
-        NFTFactory _factory = NFTFactories[_creator];
+        NFTFactory _factory = nftFactories[_creator];
         if (address(_factory) == address(0x0)) {
             return defaultFactory;
         } else {

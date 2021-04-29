@@ -8,14 +8,14 @@ import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
 contract ZkSyncNFTFactory is ERC721, NFTFactory {
     // Optional mapping for token content hashes
     mapping(uint256 => bytes32) private _contentHashes;
-    address private _zksync_address;
+    address private _zksyncAddress;
 
     constructor(
         string memory name,
         string memory symbol,
-        address zksync_address
+        address zksyncAddress
     ) ERC721(name, symbol) {
-        _zksync_address = zksync_address;
+        _zksyncAddress = zksyncAddress;
     }
 
     function mintNFT(
@@ -24,7 +24,7 @@ contract ZkSyncNFTFactory is ERC721, NFTFactory {
         bytes32 contentHash,
         uint256 tokenId
     ) external override {
-        require(_msgSender() == _zksync_address, "Miniting allowed only from zksync");
+        require(_msgSender() == _zksyncAddress, "r"); // Minting allowed only from zksync
         _safeMint(recipient, tokenId);
         _contentHashes[tokenId] = contentHash;
     }

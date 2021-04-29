@@ -263,7 +263,7 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
         require(_tokenId > MAX_FUNGIBLE_TOKEN_ID, "oq"); // Withdraw only nft tokens
         Operations.WithdrawNFT memory op = pendingWithdrawnNFTs[_tokenId];
         require(_tokenId == op.tokenId, "op"); // Token is not exists
-        NFTFactory _factory = governance.getFactory(op.creator);
+        NFTFactory _factory = governance.getNFTFactory(op.creator);
         _factory.mintNFT(op.creator, op.owner, op.contentHash, op.tokenId);
         delete pendingWithdrawnNFTs[_tokenId];
     }
@@ -411,7 +411,7 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
     /// @dev 1. Try to send token to _recipients
     /// @dev 2. On failure: Increment _recipients balance to withdraw.
     function withdrawNFT(Operations.WithdrawNFT memory op) internal {
-        NFTFactory _factory = governance.getFactory(op.creator);
+        NFTFactory _factory = governance.getNFTFactory(op.creator);
         try _factory.mintNFT{gas: WITHDRAWAL_GAS_LIMIT}(op.creator, op.owner, op.contentHash, op.tokenId) {
             // Save withdrawn nfts for future deposits
             withdrawnNFTs[op.tokenId] = address(_factory);
@@ -440,15 +440,10 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
             // and fail if token subtracted from zkSync balance more then `_amount` that was requested.
             // This can happen if token subtracts fee from sender while transferring `_amount` that was requested to transfer.
             try this._transferERC20{gas: WITHDRAWAL_GAS_LIMIT}(IERC20(tokenAddr), _recipient, _amount, _amount) {
-                sent = true;
+                emit Withdrawal(_tokenId, _amount);
             } catch {
-                sent = false;
+                increaseBalanceToWithdraw(packedBalanceKey, _amount);
             }
-        }
-        if (sent) {
-            emit Withdrawal(_tokenId, _amount);
-        } else {
-            increaseBalanceToWithdraw(packedBalanceKey, _amount);
         }
     }
 
@@ -484,10 +479,10 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
                 if (op.tokenId <= MAX_FUNGIBLE_TOKEN_ID) {
                     withdrawOrStore(uint16(op.tokenId), op.owner, op.amount);
                 } else {
-                    require(op.amount == 1, "ds"); // Unsupported amount for nft
-                    Operations.WithdrawNFT memory nft_op =
+                    require(op.amount != 0, "ds"); // Unsupported amount for nft
+                    Operations.WithdrawNFT memory nftOp =
                         Operations.WithdrawNFT(op.nftCreatorAddress, op.nftContentHash, op.owner, op.tokenId);
-                    withdrawNFT(nft_op);
+                    withdrawNFT(nftOp);
                 }
             } else if (opType == Operations.OpType.WithdrawNFT) {
                 Operations.WithdrawNFT memory op = Operations.readWithdrawNFTPubdata(pubData);
@@ -643,10 +638,10 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
             bytes22 packedBalanceKey = packAddressAndTokenId(_owner, uint16(_tokenId));
             increaseBalanceToWithdraw(packedBalanceKey, _amount);
         } else {
-            require(_amount == 1, "Z");
-            Operations.WithdrawNFT memory nft_op =
+            require(_amount != 0, "Z"); // Unsupported nft amount
+            Operations.WithdrawNFT memory nftOp =
                 Operations.WithdrawNFT(_nftCreatorAddress, _nftContentHash, _owner, _tokenId);
-            pendingWithdrawnNFTs[_tokenId] = nft_op;
+            pendingWithdrawnNFTs[_tokenId] = nftOp;
         }
         performedExodus[_accountId][_tokenId] = true;
     }

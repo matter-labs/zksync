@@ -32,7 +32,7 @@ impl TxHandler<FullExit> for ZkSyncState {
             let nft = self
                 .nfts
                 .get(&priority_op.token)
-                .ok_or(format_err!("NFT for full exit does not exist"))?;
+                .ok_or_else(|| format_err!("NFT for full exit does not exist"))?;
             FullExitOp {
                 priority_op,
                 withdraw_amount: account_balance,

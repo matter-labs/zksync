@@ -2352,6 +2352,56 @@
       ]
     }
   },
+  "72e7f8ffef6a594e659f5d0eb02e7463612d2ff4c2b6d4db120b94ebde1c314b": {
+    "query": "\n                SELECT * FROM nft\n                WHERE token_id = $1\n                LIMIT 1\n            ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "token_id",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 1,
+          "name": "creator_account_id",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 2,
+          "name": "creator_address",
+          "type_info": "Bytea"
+        },
+        {
+          "ordinal": 3,
+          "name": "serial_id",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 4,
+          "name": "address",
+          "type_info": "Bytea"
+        },
+        {
+          "ordinal": 5,
+          "name": "content_hash",
+          "type_info": "Bytea"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Int4"
+        ]
+      },
+      "nullable": [
+        false,
+        false,
+        false,
+        false,
+        false,
+        false
+      ]
+    }
+  },
   "73eedd4444ef5bfbfd526c319f97d75609a65517d63e88add0a864a9f7141a02": {
     "query": "\n            INSERT INTO block_metadata (block_number, fast_processing)\n            VALUES ($1, $2)\n            ",
     "describe": {
