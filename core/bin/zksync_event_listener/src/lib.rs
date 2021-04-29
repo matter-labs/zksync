@@ -19,6 +19,7 @@ pub mod messages;
 pub mod monitor;
 pub mod subscriber;
 
+#[derive(Debug)]
 struct AppState {
     server_monitor: Addr<ServerMonitor>,
 }
