@@ -23,7 +23,7 @@ use super::{TxSignature, VerifiedSignatureCache};
 #[serde(rename_all = "camelCase")]
 pub struct Order {
     pub account_id: AccountId,
-    pub recipient_id: AccountId,
+    pub recipient_address: Address,
     pub nonce: Nonce,
     pub token_buy: TokenId,
     pub token_sell: TokenId,
@@ -59,7 +59,7 @@ impl Order {
     pub fn get_bytes(&self) -> Vec<u8> {
         let mut out = vec![Self::MSG_TYPE];
         out.extend_from_slice(&self.account_id.to_be_bytes());
-        out.extend_from_slice(&self.recipient_id.to_be_bytes());
+        out.extend_from_slice(&self.recipient_address.as_bytes());
         out.extend_from_slice(&self.nonce.to_be_bytes());
         out.extend_from_slice(&self.token_sell.to_be_bytes());
         out.extend_from_slice(&self.token_buy.to_be_bytes());
@@ -80,7 +80,7 @@ impl Order {
         self.price.0.bits() as usize <= PRICE_BIT_WIDTH
             && self.price.1.bits() as usize <= PRICE_BIT_WIDTH
             && self.account_id <= max_account_id()
-            && self.recipient_id <= max_account_id()
+            && self.recipient_address != Address::zero()
             && self.token_buy <= max_token_id()
             && self.token_sell <= max_token_id()
             && self.time_range.check_correctness()
@@ -89,7 +89,7 @@ impl Order {
     #[allow(clippy::too_many_arguments)]
     pub fn new_signed(
         account_id: AccountId,
-        recipient_id: AccountId,
+        recipient_address: Address,
         nonce: Nonce,
         token_sell: TokenId,
         token_buy: TokenId,
@@ -100,7 +100,7 @@ impl Order {
     ) -> Result<Self, anyhow::Error> {
         let mut tx = Self {
             account_id,
-            recipient_id,
+            recipient_address,
             nonce,
             token_buy,
             token_sell,

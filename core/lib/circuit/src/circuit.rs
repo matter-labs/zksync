@@ -838,6 +838,11 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
                     &prev.op_data.special_amounts_packed,
                 )?,
                 sequences_equal(
+                    cs.namespace(|| "are special_eth_addresses equal to previous"),
+                    &op_data.special_eth_addresses,
+                    &prev.op_data.special_eth_addresses,
+                )?,
+                sequences_equal(
                     cs.namespace(|| "are special_nonces equal to previous"),
                     &op_data.special_nonces,
                     &prev.op_data.special_nonces,
@@ -2316,7 +2321,7 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
 
         serialized_order_bits_0.extend(order_type.get_bits_be());
         serialized_order_bits_0.extend(op_data.special_accounts[0].get_bits_be());
-        serialized_order_bits_0.extend(op_data.special_accounts[1].get_bits_be());
+        serialized_order_bits_0.extend(op_data.special_eth_addresses[0].get_bits_be());
         serialized_order_bits_0.extend(op_data.special_nonces[0].get_bits_be());
         serialized_order_bits_0.extend(op_data.special_tokens[0].get_bits_be());
         serialized_order_bits_0.extend(op_data.special_tokens[1].get_bits_be());
@@ -2328,7 +2333,7 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
 
         serialized_order_bits_1.extend(order_type.get_bits_be());
         serialized_order_bits_1.extend(op_data.special_accounts[2].get_bits_be());
-        serialized_order_bits_1.extend(op_data.special_accounts[3].get_bits_be());
+        serialized_order_bits_1.extend(op_data.special_eth_addresses[1].get_bits_be());
         serialized_order_bits_1.extend(op_data.special_nonces[1].get_bits_be());
         serialized_order_bits_1.extend(op_data.special_tokens[1].get_bits_be());
         serialized_order_bits_1.extend(op_data.special_tokens[0].get_bits_be());
@@ -2474,17 +2479,47 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
             &is_token_correct_in_chunk,
         )?;
 
-        let is_submitter_address_correct = CircuitElement::equals(
-            cs.namespace(|| "is_address_correct"),
-            &cur.account.address,
-            &op_data.eth_address,
-        )?;
+        let is_submitter_address_correct = {
+            let is_correct = CircuitElement::equals(
+                cs.namespace(|| "is_submitter_address_correct"),
+                &cur.account.address,
+                &op_data.eth_address,
+            )?;
 
-        let is_submitter_address_correct = boolean_or(
-            cs.namespace(|| "is_address_correct_in_last_chunk"),
-            &is_submitter_address_correct,
-            &is_chunk_number[4].not(),
-        )?;
+            boolean_or(
+                cs.namespace(|| "is_submitter_address_correct_in_last_chunk"),
+                &is_correct,
+                &is_chunk_number[4].not(),
+            )?
+        };
+
+        let is_recipient_0_address_correct = {
+            let is_correct = CircuitElement::equals(
+                cs.namespace(|| "is_recipient_0_address_correct"),
+                &cur.account.address,
+                &op_data.special_eth_addresses[0],
+            )?;
+
+            boolean_or(
+                cs.namespace(|| "is_recipient_0_address_correct_in_fourth_chunk"),
+                &is_correct,
+                &is_chunk_number[3].not(),
+            )?
+        };
+
+        let is_recipient_1_address_correct = {
+            let is_correct = CircuitElement::equals(
+                cs.namespace(|| "is_recipient_1_address_correct"),
+                &cur.account.address,
+                &op_data.special_eth_addresses[1],
+            )?;
+
+            boolean_or(
+                cs.namespace(|| "is_recipient_1_address_correct_in_second_chunk"),
+                &is_correct,
+                &is_chunk_number[1].not(),
+            )?
+        };
 
         let is_a_correct =
             CircuitElement::equals(cs.namespace(|| "is_a_correct"), &op_data.a, &cur.balance)?;
@@ -2638,6 +2673,8 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
                 is_account_id_correct,
                 is_token_correct,
                 is_submitter_address_correct,
+                is_recipient_0_address_correct,
+                is_recipient_1_address_correct,
                 are_swapped_tokens_different,
                 are_swapping_accounts_different,
                 is_amount_valid,
@@ -3775,5 +3812,8 @@ fn rescue_hash_allocated_bits<E: RescueEngine + JubjubEngine, CS: ConstraintSyst
 
     let output_bits_le = sponge_output[0].into_bits_le(cs.namespace(|| "rescue hash bits"))?;
 
-    Ok(output_bits_le[..248].to_vec())
+    // Max whole number of bytes that fit into Fr (248 bits)
+    let len_bits = (E::Fr::CAPACITY / 8 * 8) as usize;
+
+    Ok(output_bits_le[..len_bits].to_vec())
 }

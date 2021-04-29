@@ -142,6 +142,8 @@ pub struct OperationArgumentsDef {
     pub special_nonces: Vec<Option<Fr>>,
     #[serde(with = "VecOptionalFrSerde")]
     pub special_prices: Vec<Option<Fr>>,
+    #[serde(with = "VecOptionalFrSerde")]
+    pub special_eth_addresses: Vec<Option<Fr>>,
     #[serde(with = "OptionalFrSerde")]
     pub full_amount: Option<Fr>,
     #[serde(with = "OptionalFrSerde")]

@@ -3,7 +3,7 @@ use crate::{
     tx::Order,
     Swap,
 };
-use crate::{AccountId, Nonce, TokenId};
+use crate::{AccountId, Address, Nonce, TokenId};
 use anyhow::{ensure, format_err};
 use num::Zero;
 use serde::{Deserialize, Serialize};
@@ -28,11 +28,11 @@ impl SwapOp {
 
     pub(crate) fn get_public_data(&self) -> Vec<u8> {
         let mut data = vec![Self::OP_CODE]; // opcode
-        data.extend_from_slice(&self.tx.orders.0.account_id.to_be_bytes());
-        data.extend_from_slice(&self.tx.orders.0.recipient_id.to_be_bytes());
-        data.extend_from_slice(&self.tx.orders.1.account_id.to_be_bytes());
-        data.extend_from_slice(&self.tx.orders.1.recipient_id.to_be_bytes());
-        data.extend_from_slice(&self.tx.submitter_id.to_be_bytes());
+        data.extend_from_slice(&self.accounts.0.to_be_bytes());
+        data.extend_from_slice(&self.recipients.0.to_be_bytes());
+        data.extend_from_slice(&self.accounts.1.to_be_bytes());
+        data.extend_from_slice(&self.recipients.1.to_be_bytes());
+        data.extend_from_slice(&self.submitter.to_be_bytes());
         data.extend_from_slice(&self.tx.orders.0.token_sell.to_be_bytes());
         data.extend_from_slice(&self.tx.orders.1.token_sell.to_be_bytes());
         data.extend_from_slice(&self.tx.fee_token.to_be_bytes());
@@ -99,7 +99,7 @@ impl SwapOp {
         let order_a = Order {
             account_id: account_id_0,
             nonce,
-            recipient_id: recipient_id_0,
+            recipient_address: Address::zero(), // unknown from pubdata
             // First bit indicates whether this amount is 0 or not.
             amount: amount_0.clone() * (nonce_mask & 1),
             token_buy: token_1,
@@ -112,7 +112,7 @@ impl SwapOp {
         let order_b = Order {
             account_id: account_id_1,
             nonce,
-            recipient_id: recipient_id_1,
+            recipient_address: Address::zero(), // unknown from pubdata
             // Second bit indicates whether this amount is 0 or not,
             // there're only 2 bits in total.
             amount: amount_1.clone() * (nonce_mask >> 1),

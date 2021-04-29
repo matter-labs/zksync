@@ -94,6 +94,7 @@ fn zksync_circuit(block_chunks: usize) -> impl Circuit<Engine> + Clone {
             special_nonces: vec![None; 3],
             special_tokens: vec![None; 3],
             special_accounts: vec![None; 5],
+            special_eth_addresses: vec![None; 2],
             full_amount: None,
             fee: None,
             pub_nonce: None,

@@ -107,6 +107,7 @@ pub struct AllocatedOperationData<E: Engine> {
     pub special_nonces: Vec<CircuitElement<E>>,
     pub special_tokens: Vec<CircuitElement<E>>,
     pub special_accounts: Vec<CircuitElement<E>>,
+    pub special_eth_addresses: Vec<CircuitElement<E>>,
 
     pub full_amount: CircuitElement<E>,
     pub fee: CircuitElement<E>,
@@ -218,6 +219,7 @@ impl<E: RescueEngine> AllocatedOperationData<E> {
         );
 
         Ok(AllocatedOperationData {
+            special_eth_addresses: vec![eth_address.clone(); 2],
             eth_address,
             pub_nonce: pub_nonce.clone(),
             amount_packed: amount_packed.clone(),
@@ -305,6 +307,20 @@ impl<E: RescueEngine> AllocatedOperationData<E> {
                     cs.namespace(|| format!("special_token with index {}", idx)),
                     || special_token.grab(),
                     franklin_constants::TOKEN_BIT_WIDTH,
+                )
+            })
+            .collect::<Result<Vec<_>, _>>()?;
+
+        let special_eth_addresses = op
+            .args
+            .special_eth_addresses
+            .iter()
+            .enumerate()
+            .map(|(idx, special_token)| {
+                CircuitElement::from_fe_with_known_length(
+                    cs.namespace(|| format!("special_eth_address with index {}", idx)),
+                    || special_token.grab(),
+                    franklin_constants::ETH_ADDRESS_BIT_WIDTH,
                 )
             })
             .collect::<Result<Vec<_>, _>>()?;
@@ -457,6 +473,7 @@ impl<E: RescueEngine> AllocatedOperationData<E> {
             special_accounts,
             special_nonces,
             special_tokens,
+            special_eth_addresses,
             fee_packed,
             fee,
             amount_unpacked,

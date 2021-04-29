@@ -101,13 +101,22 @@ impl TestSwap {
             BigUint::from(self.amounts.1)
         };
 
+        let get_address = |id| {
+            self.test_accounts
+                .iter()
+                .find(|x| *x.id == id)
+                .unwrap()
+                .account
+                .address
+        };
+
         let order_0 = self.test_accounts[0].zksync_account.sign_order(
             TokenId(self.tokens.0),
             wrong_token.unwrap_or(TokenId(self.tokens.1)),
             BigUint::from(self.first_price.0),
             BigUint::from(self.first_price.1),
             wrong_amount.unwrap_or(amount_0),
-            AccountId(self.recipients.0),
+            &get_address(self.recipients.0),
             None,
             !self.is_limit_order.0,
             Default::default(),
@@ -119,7 +128,7 @@ impl TestSwap {
             BigUint::from(self.second_price.0),
             BigUint::from(self.second_price.1),
             amount_1,
-            AccountId(self.recipients.1),
+            &get_address(self.recipients.1),
             None,
             !self.is_limit_order.1,
             Default::default(),
@@ -187,6 +196,36 @@ fn test_swap_success() {
             balances: (100, 200, 50),
             first_price: (1, 2),
             second_price: (2, 1),
+            is_limit_order: (false, false),
+            test_accounts: vec![],
+        },
+        // One price is (0, 0)
+        TestSwap {
+            accounts: (1, 3),
+            recipients: (2, 4),
+            submitter: 5,
+            tokens: (18, 19),
+            fee_token: 0,
+            amounts: (50, 100),
+            fee: 25,
+            balances: (100, 200, 50),
+            first_price: (0, 0),
+            second_price: (2, 1),
+            is_limit_order: (false, false),
+            test_accounts: vec![],
+        },
+        // Trasnfer, but using a swap
+        TestSwap {
+            accounts: (1, 3),
+            recipients: (2, 4),
+            submitter: 5,
+            tokens: (18, 19),
+            fee_token: 0,
+            amounts: (50, 0),
+            fee: 25,
+            balances: (100, 200, 50),
+            first_price: (1, 0),
+            second_price: (0, 1),
             is_limit_order: (false, false),
             test_accounts: vec![],
         },
@@ -265,6 +304,21 @@ fn test_swap_success() {
             is_limit_order: (false, false),
             test_accounts: vec![],
         },
+        // Recipient is the fee account
+        TestSwap {
+            accounts: (1, 3),
+            recipients: (0, 2),
+            submitter: 5,
+            tokens: (18, 19),
+            fee_token: 0,
+            amounts: (50, 100),
+            fee: 25,
+            balances: (100, 200, 50),
+            first_price: (1, 2),
+            second_price: (2, 1),
+            is_limit_order: (false, false),
+            test_accounts: vec![],
+        },
         // Basic limit order
         TestSwap {
             accounts: (1, 3),
@@ -317,7 +371,7 @@ fn test_self_swap() {
         BigUint::from(1u8),
         BigUint::from(1u8),
         BigUint::from(10u8),
-        AccountId(1),
+        &account.account.address,
         None,
         false,
         Default::default(),
@@ -329,7 +383,7 @@ fn test_self_swap() {
         BigUint::from(1u8),
         BigUint::from(1u8),
         BigUint::from(10u8),
-        AccountId(1),
+        &account.account.address,
         None,
         true,
         Default::default(),

@@ -36,6 +36,7 @@ pub struct OrderData {
     pub account: u32,
     pub nonce: u32,
     pub recipient: u32,
+    pub recipient_address: Fr,
     pub amount: u128,
     pub price_sell: u128,
     pub price_buy: u128,
@@ -74,6 +75,7 @@ impl Witness for SwapWitness<Bn256> {
         let order_0 = OrderData {
             account: *swap.accounts.0 as u32,
             recipient: *swap.recipients.0 as u32,
+            recipient_address: eth_address_to_fr(&swap.tx.orders.0.recipient_address),
             amount: swap.tx.orders.0.amount.to_u128().unwrap(),
             price_sell: swap.tx.orders.0.price.0.to_u128().unwrap(),
             price_buy: swap.tx.orders.0.price.1.to_u128().unwrap(),
@@ -85,6 +87,7 @@ impl Witness for SwapWitness<Bn256> {
         let order_1 = OrderData {
             account: *swap.accounts.1 as u32,
             recipient: *swap.recipients.1 as u32,
+            recipient_address: eth_address_to_fr(&swap.tx.orders.1.recipient_address),
             amount: swap.tx.orders.1.amount.to_u128().unwrap(),
             price_sell: swap.tx.orders.1.price.0.to_u128().unwrap(),
             price_buy: swap.tx.orders.1.price.1.to_u128().unwrap(),
@@ -539,6 +542,10 @@ impl SwapWitness<Bn256> {
                 second_valid_from: Some(fr_from(swap.orders.1.valid_from)),
                 second_valid_until: Some(fr_from(swap.orders.1.valid_until)),
                 eth_address: Some(swap.submitter_address),
+                special_eth_addresses: vec![
+                    Some(swap.orders.0.recipient_address),
+                    Some(swap.orders.1.recipient_address),
+                ],
                 fee: Some(fee_encoded),
                 special_accounts: vec![
                     Some(account_0_fe),
