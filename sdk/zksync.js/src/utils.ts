@@ -14,7 +14,8 @@ import {
     Withdraw,
     CloseAccount,
     Order,
-    Swap
+    Swap,
+    Price
 } from './types';
 import * as zks from 'zksync-crypto';
 
@@ -56,25 +57,11 @@ const AMOUNT_MANTISSA_BIT_WIDTH = 35;
 const FEE_EXPONENT_BIT_WIDTH = 5;
 const FEE_MANTISSA_BIT_WIDTH = 11;
 
-export class Price {
-    private constructor(private _sell: BigNumber, private _buy: BigNumber) {}
-    static fromRatio(sell: BigNumberish, buy: BigNumberish) {
-        return new Price(BigNumber.from(sell), BigNumber.from(buy));
-    }
-    sell() {
-        return this._sell;
-    }
-    buy() {
-        return this._buy;
-    }
-    serialize() {
-        const sellBytes = this._sell.toHexString();
-        const buyBytes = this._buy.toHexString();
-        return ethers.utils.concat([
-            ethers.utils.zeroPad(sellBytes, 15),
-            ethers.utils.zeroPad(buyBytes, 15),
-        ]);
-    }
+export function price(price: {
+    sellPrice: BigNumberish,
+    buyPrice: BigNumberish,
+}): Price {
+    return [BigNumber.from(price.sellPrice), BigNumber.from(price.buyPrice)];
 }
 
 export function floatToInteger(
@@ -592,7 +579,8 @@ export function serializeOrder(order: Order): Uint8Array {
     const nonceBytes = serializeNonce(order.nonce);
     const tokenSellId = serializeTokenId(order.tokenSell);
     const tokenBuyId = serializeTokenId(order.tokenBuy);
-    const priceBytes = order.price.serialize();
+    const sellPriceBytes = order.price[0].toHexString();
+    const buyPriceBytes = order.price[1].toHexString();
     const amountBytes = serializeAmountFull(order.amount);
     const validFrom = serializeTimestamp(order.validFrom);
     const validUntil = serializeTimestamp(order.validUntil);
@@ -603,7 +591,8 @@ export function serializeOrder(order: Order): Uint8Array {
         nonceBytes,
         tokenSellId,
         tokenBuyId,
-        priceBytes,
+        ethers.utils.zeroPad(sellPriceBytes, 15),
+        ethers.utils.zeroPad(buyPriceBytes, 15),
         amountBytes,
         validFrom,
         validUntil

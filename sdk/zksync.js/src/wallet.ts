@@ -25,7 +25,8 @@ import {
     ChangePubKeyCREATE2,
     Create2Data,
     Order,
-    Swap
+    Swap,
+    Price
 } from './types';
 import {
     ERC20_APPROVE_TRESHOLD,
@@ -42,7 +43,6 @@ import {
     ETH_RECOMMENDED_DEPOSIT_GAS_LIMIT,
     getChangePubkeyLegacyMessage,
     ERC20_DEPOSIT_GAS_LIMIT,
-    Price
 } from './utils';
 
 const EthersErrorCode = ErrorCode;

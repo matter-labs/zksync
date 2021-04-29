@@ -14,7 +14,8 @@ import {
     ChangePubKeyCREATE2,
     Create2Data,
     Swap,
-    Order
+    Order,
+    Price
 } from './types';
 
 export class Signer {
@@ -56,7 +57,7 @@ export class Signer {
         tokenSell: number;
         tokenBuy: number;
         amount: BigNumberish;
-        price: utils.Price;
+        price: Price;
         validFrom: number;
         validUntil: number;
     }): Promise<Order> {

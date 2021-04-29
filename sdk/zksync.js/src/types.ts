@@ -1,5 +1,4 @@
 import { BigNumber, BigNumberish } from 'ethers';
-import { Price } from './utils';
 
 // 0x-prefixed, hex encoded, ethereum account address
 export type Address = string;
@@ -72,6 +71,8 @@ export interface Signature {
     pubKey: string;
     signature: string;
 }
+
+export type Price = [BigNumber, BigNumber];
 
 export interface Order {
     accountId: number;
