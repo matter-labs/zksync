@@ -88,7 +88,7 @@ impl<'a, 'c> EventSchema<'a, 'c> {
     /// Returns `None` if the `events` table is empty.
     pub async fn get_last_event_id(&mut self) -> QueryResult<Option<EventId>> {
         let start = Instant::now();
-        let id = sqlx::query!("SELECT max(id) FROM events")
+        let id = sqlx::query!("SELECT MAX(id) as max FROM events")
             .fetch_one(self.0.conn())
             .await?
             .max

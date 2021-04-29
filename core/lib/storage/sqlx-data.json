@@ -3235,24 +3235,6 @@
       "nullable": []
     }
   },
-  "b1fb7dce805a681d3d552ac180156f5d3cd05bd26b96cdc6cccee3a4b869687b": {
-    "query": "SELECT max(id) FROM events",
-    "describe": {
-      "columns": [
-        {
-          "ordinal": 0,
-          "name": "max",
-          "type_info": "Int8"
-        }
-      ],
-      "parameters": {
-        "Left": []
-      },
-      "nullable": [
-        null
-      ]
-    }
-  },
   "b5e0f843d267576d57f41e2c4a63335749cb40e79bdb2b2cccbbaed5200abe96": {
     "query": "\n                    SELECT * FROM tokens\n                    WHERE address = $1\n                    LIMIT 1\n                    ",
     "describe": {
@@ -4094,6 +4076,24 @@
         ]
       },
       "nullable": []
+    }
+  },
+  "d18525d8bf10383d307bf56110fac63276a82dc8b65b358c098fca7c2991579e": {
+    "query": "SELECT MAX(id) as max FROM events",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "max",
+          "type_info": "Int8"
+        }
+      ],
+      "parameters": {
+        "Left": []
+      },
+      "nullable": [
+        null
+      ]
     }
   },
   "d3b822a6639901acd986e82d2779a7318c3805385a7772db83063d9507c049a7": {
