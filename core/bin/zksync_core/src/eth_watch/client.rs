@@ -33,7 +33,7 @@ impl ContractTopics {
                 .event("NewToken")
                 .expect("main contract abi error")
                 .signature(),
-            factory_registered: zksync_contract
+            factory_registered: governance_contract
                 .event("NFTFactoryRegistered")
                 .expect("main contract abi error")
                 .signature(),
