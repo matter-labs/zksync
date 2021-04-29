@@ -112,29 +112,29 @@ impl From<&StorageAccountDiff> for AccountUpdateDetails {
     fn from(account_diff: &StorageAccountDiff) -> Self {
         match account_diff {
             StorageAccountDiff::BalanceUpdate(update) => Self {
-                account_id: update.account_id,
-                nonce: update.new_nonce,
+                account_id: AccountId(update.account_id as u32),
+                nonce: Nonce(update.new_nonce as u32),
                 new_pub_key_hash: None,
-                token_id: Some(update.coin_id),
+                token_id: Some(TokenId(update.coin_id as u16)),
                 new_balance: Some(update.new_balance.clone()),
             },
             StorageAccountDiff::Create(update) => Self {
-                account_id: update.account_id,
-                nonce: update.nonce,
+                account_id: AccountId(update.account_id as u32),
+                nonce: Nonce(update.nonce as u32),
                 new_pub_key_hash: None,
                 token_id: None,
                 new_balance: None,
             },
             StorageAccountDiff::Delete(update) => Self {
-                account_id: update.account_id,
-                nonce: update.nonce,
+                account_id: AccountId(update.account_id as u32),
+                nonce: Nonce(update.nonce as u32),
                 new_pub_key_hash: None,
                 token_id: None,
                 new_balance: None,
             },
             StorageAccountDiff::ChangePubKey(update) => Self {
-                account_id: update.account_id,
-                nonce: update.new_nonce,
+                account_id: AccountId(update.account_id as u32),
+                nonce: Nonce(update.new_nonce as u32),
                 new_pub_key_hash: Some(
                     PubKeyHash::from_bytes(update.new_pubkey_hash.as_slice()).unwrap(),
                 ),

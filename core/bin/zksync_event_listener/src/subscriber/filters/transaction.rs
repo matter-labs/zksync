@@ -1,17 +1,20 @@
 // Built-in uses
 use std::collections::HashSet;
-// Workspace uses
-use zksync_types::event::{transaction::*, EventData, ZkSyncEvent};
 // External uses
 use serde::Deserialize;
+// Workspace uses
+use zksync_types::{
+    event::{transaction::*, EventData, ZkSyncEvent},
+    AccountId, TokenId,
+};
 // Local uses
 
 #[derive(Debug, Clone, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct TransactionFilter {
     pub types: Option<HashSet<TransactionType>>,
-    pub accounts: Option<HashSet<i64>>,
-    pub tokens: Option<HashSet<i32>>,
+    pub accounts: Option<HashSet<AccountId>>,
+    pub tokens: Option<HashSet<TokenId>>,
     pub status: Option<TransactionStatus>,
 }
 
@@ -63,8 +66,12 @@ mod tests {
             status: None,
         };
 
-        let event =
-            get_transaction_event(TransactionType::Deposit, 1, 0, TransactionStatus::Committed);
+        let event = get_transaction_event(
+            TransactionType::Deposit,
+            AccountId(1),
+            TokenId(0),
+            TransactionStatus::Committed,
+        );
         assert!(tx_filter.matches(&event));
         // Add types filter.
         let tx_types = [
@@ -77,7 +84,12 @@ mod tests {
         assert!(!tx_filter.matches(&event));
         // Change the type so it matches.
         for &tx_type in tx_types.iter() {
-            let event = get_transaction_event(tx_type, 1, 0, TransactionStatus::Committed);
+            let event = get_transaction_event(
+                tx_type,
+                AccountId(1),
+                TokenId(0),
+                TransactionStatus::Committed,
+            );
             assert!(tx_filter.matches(&event));
         }
         // Add status filter.
@@ -87,17 +99,17 @@ mod tests {
         // Change the status.
         let event = get_transaction_event(
             TransactionType::ChangePubKey,
-            1,
-            0,
+            AccountId(1),
+            TokenId(0),
             TransactionStatus::Rejected,
         );
         assert!(tx_filter.matches(&event));
         // Add accounts filter.
-        let accounts = [12, 34, 56];
-        tx_filter.accounts = Some(accounts.iter().copied().collect());
+        let accounts = [12, 34, 56].iter().map(|id| AccountId(*id));
+        tx_filter.accounts = Some(accounts.clone().collect());
         assert!(!tx_filter.matches(&event));
-        let tokens = [1, 2, 3, 4];
-        for (&account_id, &token_id) in accounts.iter().zip(tokens.iter()) {
+        let tokens = [1, 2, 3, 4].iter().map(|id| TokenId(*id));
+        for (account_id, token_id) in accounts.zip(tokens.clone()) {
             // Filter by type, account and status. Token doesn't matter.
             let event = get_transaction_event(
                 TransactionType::Transfer,
@@ -108,22 +120,22 @@ mod tests {
             assert!(tx_filter.matches(&event));
         }
         // Finally, add tokens filter.
-        tx_filter.tokens = Some(tokens.iter().copied().collect());
+        tx_filter.tokens = Some(tokens.clone().collect());
         // No matching tokens.
-        for &token_id in &[5, 11, 20, 25] {
+        for token_id in [5, 11, 20, 25].iter().map(|id| TokenId(*id)) {
             let event = get_transaction_event(
                 TransactionType::Transfer,
-                12,
+                AccountId(12),
                 token_id,
                 TransactionStatus::Rejected,
             );
             assert!(!tx_filter.matches(&event));
         }
         // All events should match.
-        for &token_id in tokens.iter() {
+        for token_id in tokens {
             let event = get_transaction_event(
                 TransactionType::Transfer,
-                12,
+                AccountId(12),
                 token_id,
                 TransactionStatus::Rejected,
             );

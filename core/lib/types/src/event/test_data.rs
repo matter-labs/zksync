@@ -5,13 +5,14 @@ use chrono::Utc;
 use once_cell::sync::OnceCell;
 // Workspace uses
 // Local uses
-use super::{account::*, block::*, transaction::*, EventData, ZkSyncEvent};
+use super::{account::*, block::*, transaction::*, EventData, EventId, ZkSyncEvent};
+use crate::{AccountId, BlockNumber, Nonce, TokenId};
 
 /// Constructs default values for `BlockDetails` struct. Since block events
 /// can only be filtered by status, these fields are not used.
 fn get_block_details() -> BlockDetails {
     BlockDetails {
-        block_number: 0,
+        block_number: BlockNumber(0),
         new_state_root: Vec::new(),
         block_size: 0,
         commit_tx_hash: None,
@@ -29,15 +30,15 @@ pub fn get_block_event(block_status: BlockStatus) -> ZkSyncEvent {
         block_details,
     };
     ZkSyncEvent {
-        id: 0,
+        id: EventId(0),
         data: EventData::Block(block_event),
     }
 }
 
 /// Construct account event with the given account id, token and status.
 pub fn get_account_event(
-    account_id: i64,
-    token_id: Option<i32>,
+    account_id: AccountId,
+    token_id: Option<TokenId>,
     status: AccountStateChangeStatus,
 ) -> ZkSyncEvent {
     let (update_type, new_balance) = if token_id.is_some() {
@@ -50,7 +51,7 @@ pub fn get_account_event(
     };
     let update_details = AccountUpdateDetails {
         account_id,
-        nonce: 0,
+        nonce: Nonce(0),
         new_pub_key_hash: None,
         token_id,
         new_balance,
@@ -61,7 +62,7 @@ pub fn get_account_event(
         update_details,
     };
     ZkSyncEvent {
-        id: 0,
+        id: EventId(0),
         data: EventData::Account(account_update),
     }
 }
@@ -70,8 +71,8 @@ pub fn get_account_event(
 /// status.
 pub fn get_transaction_event(
     tx_type: TransactionType,
-    account_id: i64,
-    token_id: i32,
+    account_id: AccountId,
+    token_id: TokenId,
     status: TransactionStatus,
 ) -> ZkSyncEvent {
     // Initialize the cell to prevent panic when deserializing
@@ -80,7 +81,7 @@ pub fn get_transaction_event(
         tx_hash: String::new(),
         account_id,
         token_id,
-        block_number: 0,
+        block_number: BlockNumber(0),
         tx: Default::default(),
         status,
         fail_reason: None,
@@ -88,7 +89,7 @@ pub fn get_transaction_event(
         tx_type: OnceCell::from(tx_type),
     };
     ZkSyncEvent {
-        id: 0,
+        id: EventId(0),
         data: EventData::Transaction(tx_event),
     }
 }

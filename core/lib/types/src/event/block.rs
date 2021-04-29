@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 // Workspace uses
 use zksync_utils::{BytesToHexSerde, OptionBytesToHexSerde, SyncBlockPrefix, ZeroxPrefix};
 // Local uses
-use crate::aggregated_operations::AggregatedActionType;
+use crate::{aggregated_operations::AggregatedActionType, BlockNumber};
 
 #[derive(Debug, Copy, Clone, Serialize, PartialEq, Eq, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -18,7 +18,7 @@ pub enum BlockStatus {
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct BlockDetails {
-    pub block_number: i64,
+    pub block_number: BlockNumber,
 
     #[serde(with = "BytesToHexSerde::<SyncBlockPrefix>")]
     pub new_state_root: Vec<u8>,

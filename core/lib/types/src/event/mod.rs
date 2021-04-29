@@ -5,6 +5,8 @@ use serde::Serialize;
 // Local uses
 use self::{account::AccountEvent, block::BlockEvent, transaction::TransactionEvent};
 
+pub use crate::EventId;
+
 pub mod account;
 pub mod block;
 pub mod transaction;
@@ -25,7 +27,7 @@ pub enum EventData {
 pub struct ZkSyncEvent {
     // Id of the event. This value is equal to
     // the id of the corresponding row in the database.
-    pub id: i64,
+    pub id: EventId,
     pub data: EventData,
     // TODO: Add a block_number field (ZKS-653).
 }

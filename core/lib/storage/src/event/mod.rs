@@ -10,7 +10,7 @@ use zksync_types::event::{
     },
     block::{BlockEvent, BlockStatus},
     transaction::TransactionEvent,
-    ZkSyncEvent,
+    EventId, ZkSyncEvent,
 };
 use zksync_types::{
     account::AccountUpdate, block::ExecutedOperations, priority_ops::ZkSyncPriorityOp,
@@ -60,7 +60,7 @@ impl<'a, 'c> EventSchema<'a, 'c> {
     }
 
     /// Load all events from the database with the `id` greater than `from`.
-    pub async fn fetch_new_events(&mut self, from: i64) -> QueryResult<Vec<ZkSyncEvent>> {
+    pub async fn fetch_new_events(&mut self, from: EventId) -> QueryResult<Vec<ZkSyncEvent>> {
         let start = Instant::now();
         let events = sqlx::query_as!(
             StoredEvent,
@@ -72,7 +72,7 @@ impl<'a, 'c> EventSchema<'a, 'c> {
             FROM events WHERE id > $1
             ORDER BY id ASC
             "#,
-            from
+            *from as i64
         )
         .fetch_all(self.0.conn())
         .await?
@@ -86,12 +86,13 @@ impl<'a, 'c> EventSchema<'a, 'c> {
 
     /// Load the id of the latest event in the database.
     /// Returns `None` if the `events` table is empty.
-    pub async fn get_last_event_id(&mut self) -> QueryResult<Option<i64>> {
+    pub async fn get_last_event_id(&mut self) -> QueryResult<Option<EventId>> {
         let start = Instant::now();
         let id = sqlx::query!("SELECT max(id) FROM events")
             .fetch_one(self.0.conn())
             .await?
-            .max;
+            .max
+            .map(|id| EventId(id as u64));
 
         metrics::histogram!("sql.event.get_last_event_id", start.elapsed());
         Ok(id)

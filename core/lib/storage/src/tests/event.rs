@@ -3,7 +3,9 @@
 // Workspace uses
 use zksync_types::{
     aggregated_operations::AggregatedActionType,
-    event::{account::AccountStateChangeStatus, block::BlockStatus, EventData, ZkSyncEvent},
+    event::{
+        account::AccountStateChangeStatus, block::BlockStatus, EventData, EventId, ZkSyncEvent,
+    },
     AccountMap, BlockNumber,
 };
 // Local uses
@@ -76,7 +78,7 @@ fn check_block_event(event: &ZkSyncEvent, block_status: BlockStatus, block_numbe
         _ => panic!("block event expected"),
     };
     assert_eq!(block_event.status, block_status);
-    assert_eq!(block_event.block_details.block_number, *block_number as i64);
+    assert_eq!(block_event.block_details.block_number, block_number);
 }
 
 /// Checks that block events are created correctly and can be deserialized.
@@ -88,7 +90,7 @@ fn check_block_event(event: &ZkSyncEvent, block_status: BlockStatus, block_numbe
 /// 4. Revert all 4 blocks and expect new "block reverted" events.
 #[db_test]
 async fn test_block_events(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
-    let mut last_event_id = 0;
+    let mut last_event_id = EventId(0);
     assert!(
         storage
             .event_schema()
@@ -213,7 +215,7 @@ fn check_account_event(event: &ZkSyncEvent, status: AccountStateChangeStatus) ->
 /// new events in a single query and verify their correctness.
 #[db_test]
 async fn test_account_events(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
-    let last_event_id = 0;
+    let last_event_id = EventId(0);
     assert!(
         storage
             .event_schema()

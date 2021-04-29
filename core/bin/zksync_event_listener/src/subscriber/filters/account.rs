@@ -3,14 +3,17 @@ use std::collections::HashSet;
 // External uses
 use serde::Deserialize;
 // Workspace uses
-use zksync_types::event::{account::*, EventData, ZkSyncEvent};
+use zksync_types::{
+    event::{account::*, EventData, ZkSyncEvent},
+    AccountId, TokenId,
+};
 // Local uses
 
 #[derive(Debug, Clone, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct AccountFilter {
-    pub accounts: Option<HashSet<i64>>,
-    pub tokens: Option<HashSet<i32>>,
+    pub accounts: Option<HashSet<AccountId>>,
+    pub tokens: Option<HashSet<TokenId>>,
     pub status: Option<AccountStateChangeStatus>,
 }
 
@@ -60,32 +63,52 @@ mod tests {
             status: None,
         };
 
-        let event = get_account_event(100, Some(10), AccountStateChangeStatus::Finalized);
+        let event = get_account_event(
+            AccountId(100),
+            Some(TokenId(10)),
+            AccountStateChangeStatus::Finalized,
+        );
         assert!(account_filter.matches(&event));
 
         // Only match by account id.
-        account_filter.accounts = Some([1000, 2000].iter().copied().collect());
+        account_filter.accounts = Some([1000, 2000].iter().map(|id| AccountId(*id)).collect());
         assert!(!account_filter.matches(&event));
         // Both ids should match.
-        let event = get_account_event(1000, None, AccountStateChangeStatus::Finalized);
+        let event = get_account_event(AccountId(1000), None, AccountStateChangeStatus::Finalized);
         assert!(account_filter.matches(&event));
-        let event = get_account_event(2000, Some(10), AccountStateChangeStatus::Finalized);
+        let event = get_account_event(
+            AccountId(2000),
+            Some(TokenId(10)),
+            AccountStateChangeStatus::Finalized,
+        );
         assert!(account_filter.matches(&event));
         // Regardless of status too.
-        let event = get_account_event(2000, Some(15), AccountStateChangeStatus::Committed);
+        let event = get_account_event(
+            AccountId(2000),
+            Some(TokenId(15)),
+            AccountStateChangeStatus::Committed,
+        );
         assert!(account_filter.matches(&event));
 
         // Add token id filter.
-        account_filter.tokens = Some([0, 20].iter().copied().collect());
+        account_filter.tokens = Some([0, 20].iter().map(|id| TokenId(*id)).collect());
         // Previous event doesn't match.
         assert!(!account_filter.matches(&event));
         // Events without token ids are filtered out too.
-        let event = get_account_event(2000, None, AccountStateChangeStatus::Committed);
+        let event = get_account_event(AccountId(2000), None, AccountStateChangeStatus::Committed);
         assert!(!account_filter.matches(&event));
         // Try correct one with both statuses.
-        let event = get_account_event(2000, Some(0), AccountStateChangeStatus::Committed);
+        let event = get_account_event(
+            AccountId(2000),
+            Some(TokenId(0)),
+            AccountStateChangeStatus::Committed,
+        );
         assert!(account_filter.matches(&event));
-        let event = get_account_event(2000, Some(20), AccountStateChangeStatus::Finalized);
+        let event = get_account_event(
+            AccountId(2000),
+            Some(TokenId(20)),
+            AccountStateChangeStatus::Finalized,
+        );
         assert!(account_filter.matches(&event));
 
         // Finally, add a status filter.
@@ -93,7 +116,11 @@ mod tests {
         // No match.
         assert!(!account_filter.matches(&event));
         // Correct status.
-        let event = get_account_event(1000, Some(20), AccountStateChangeStatus::Committed);
+        let event = get_account_event(
+            AccountId(1000),
+            Some(TokenId(20)),
+            AccountStateChangeStatus::Committed,
+        );
         assert!(account_filter.matches(&event));
     }
 }

@@ -6,6 +6,7 @@ use futures_util::stream::StreamExt;
 // Workspace uses
 use zksync_config::ZkSyncConfig;
 use zksync_storage::{listener::StorageListener, ConnectionPool};
+use zksync_types::event::EventId;
 // Local uses
 use crate::messages::{NewEvents, NewStorageEvent};
 use crate::monitor::ServerMonitor;
@@ -21,7 +22,7 @@ pub struct EventListener {
     /// This field gets consumed at the start of the actor.
     listener: Option<StorageListener>,
     /// The id of the last processed event.
-    last_processed_event_id: i64,
+    last_processed_event_id: EventId,
 }
 
 impl StreamHandler<NewStorageEvent> for EventListener {
@@ -55,7 +56,7 @@ impl StreamHandler<NewStorageEvent> for EventListener {
         })
         .map(|response, _, _| {
             if let Err(err) = response {
-                vlog::warn!(
+                vlog::error!(
                     "Couldn't send new events to server monitor, reason: {:?}",
                     err
                 );
@@ -70,11 +71,10 @@ impl Actor for EventListener {
 
     fn started(&mut self, ctx: &mut Self::Context) {
         // Turn the storage listener into stream and register it.
-        assert!(self.listener.is_some());
         let stream = self
             .listener
             .take()
-            .unwrap()
+            .expect("storage listener is not initialized")
             .into_stream()
             .map(|item| NewStorageEvent::from(item.unwrap()));
         Self::add_stream(stream, ctx);
@@ -90,7 +90,7 @@ impl EventListener {
     ) -> anyhow::Result<EventListener> {
         let mut listener = StorageListener::connect().await?;
         let db_pool = ConnectionPool::new(Some(Self::DB_POOL_SIZE));
-        // Load the offset, we don't want to distribute events that already
+        // Load the offset, we don't want to broadcast events that already
         // happened.
         let last_processed_event_id = db_pool
             .access_storage()
@@ -98,7 +98,7 @@ impl EventListener {
             .event_schema()
             .get_last_event_id()
             .await?
-            .unwrap_or(0);
+            .unwrap_or(EventId(0));
 
         // Configure the listener.
         let channel_name = &config.event_listener.channel_name;

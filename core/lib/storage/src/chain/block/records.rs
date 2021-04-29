@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::value::Value;
 use sqlx::FromRow;
 // Workspace imports
-use zksync_types::event::block::BlockDetails;
+use zksync_types::{event::block::BlockDetails, BlockNumber};
 use zksync_utils::{BytesToHexSerde, OptionBytesToHexSerde, SyncBlockPrefix, ZeroxPrefix};
 // Local imports
 
@@ -87,7 +87,7 @@ impl StorageBlockDetails {
 impl From<StorageBlockDetails> for BlockDetails {
     fn from(storage_details: StorageBlockDetails) -> Self {
         Self {
-            block_number: storage_details.block_number,
+            block_number: BlockNumber(storage_details.block_number as u32),
             new_state_root: storage_details.new_state_root,
             block_size: storage_details.block_size,
             commit_tx_hash: storage_details.commit_tx_hash,

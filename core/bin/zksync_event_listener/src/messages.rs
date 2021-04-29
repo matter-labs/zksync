@@ -4,7 +4,7 @@ use std::sync::Arc;
 use actix::prelude::*;
 // Workspace uses
 use zksync_storage::listener::notification::StorageNotification;
-use zksync_types::event::ZkSyncEvent;
+use zksync_types::event::{EventId, ZkSyncEvent};
 // Local uses
 use crate::subscriber::Subscriber;
 
@@ -22,10 +22,10 @@ pub struct NewEvents(pub Arc<Vec<ZkSyncEvent>>);
 
 #[derive(Debug, Message)]
 #[rtype(result = "()")]
-pub struct NewStorageEvent(pub i64);
+pub struct NewStorageEvent(pub EventId);
 
 impl From<StorageNotification> for NewStorageEvent {
     fn from(notification: StorageNotification) -> Self {
-        Self(notification.payload().parse().unwrap())
+        Self(notification.payload().parse::<u64>().unwrap().into())
     }
 }

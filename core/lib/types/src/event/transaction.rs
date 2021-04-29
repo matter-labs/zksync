@@ -5,7 +5,7 @@ use once_cell::sync::OnceCell;
 use serde::{Deserialize, Serialize};
 // Workspace uses
 // Local uses
-use crate::{block::ExecutedOperations, AccountId, BlockNumber};
+use crate::{block::ExecutedOperations, AccountId, BlockNumber, TokenId};
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -32,9 +32,9 @@ pub enum TransactionType {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TransactionEvent {
     pub tx_hash: String,
-    pub account_id: i64,
-    pub token_id: i32,
-    pub block_number: i64,
+    pub account_id: AccountId,
+    pub token_id: TokenId,
+    pub block_number: BlockNumber,
     pub tx: serde_json::Value,
     pub status: TransactionStatus,
     pub fail_reason: Option<String>,
@@ -49,15 +49,15 @@ pub struct TransactionEvent {
 impl TransactionEvent {
     pub fn from_executed_operation(
         op: &ExecutedOperations,
-        block: BlockNumber,
+        block_number: BlockNumber,
         account_id: AccountId,
     ) -> Self {
         match op {
             ExecutedOperations::Tx(exec_tx) => Self {
                 tx_hash: exec_tx.signed_tx.tx.hash().to_string(),
-                account_id: i64::from(*account_id),
-                token_id: i32::from(*exec_tx.signed_tx.token_id()),
-                block_number: i64::from(*block),
+                account_id,
+                token_id: exec_tx.signed_tx.token_id(),
+                block_number,
                 tx: serde_json::to_value(exec_tx.signed_tx.tx.clone()).unwrap(),
                 status: if exec_tx.success {
                     TransactionStatus::Committed
@@ -70,9 +70,9 @@ impl TransactionEvent {
             },
             ExecutedOperations::PriorityOp(exec_prior_op) => Self {
                 tx_hash: exec_prior_op.priority_op.eth_hash.to_string(),
-                account_id: i64::from(*account_id),
-                token_id: i32::from(*exec_prior_op.priority_op.data.token_id()),
-                block_number: i64::from(*block),
+                account_id,
+                token_id: exec_prior_op.priority_op.data.token_id(),
+                block_number,
                 tx: serde_json::to_value(&exec_prior_op.op.clone()).unwrap(),
                 status: TransactionStatus::Committed,
                 fail_reason: None,

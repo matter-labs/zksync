@@ -2,7 +2,10 @@
 // External uses
 // Workspace uses
 use zksync_storage::event::EventType;
-use zksync_types::event::{account::*, block::*, test_data::*, transaction::*};
+use zksync_types::{
+    event::{account::*, block::*, test_data::*, transaction::*},
+    AccountId, TokenId,
+};
 // Local uses
 use super::{EventFilter, SubscriberFilters};
 
@@ -142,12 +145,16 @@ fn test_filters_deserialize() {
 /// Filtering by event properties is tested separately.
 #[test]
 fn test_subscriber_filters() {
-    let account_event = get_account_event(0, Some(0), AccountStateChangeStatus::Committed);
+    let account_event = get_account_event(
+        AccountId(0),
+        Some(TokenId(0)),
+        AccountStateChangeStatus::Committed,
+    );
     let block_event = get_block_event(BlockStatus::Committed);
     let tx_event = get_transaction_event(
         TransactionType::Transfer,
-        0,
-        0,
+        AccountId(0),
+        TokenId(0),
         TransactionStatus::Committed,
     );
 
