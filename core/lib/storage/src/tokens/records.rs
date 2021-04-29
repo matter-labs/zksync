@@ -3,7 +3,6 @@ use serde::{Deserialize, Serialize};
 use sqlx::{types::BigDecimal, FromRow};
 // Workspace imports
 // Local imports
-use crate::chain::account::records::StorageNFT;
 use crate::utils::{address_to_stored_string, stored_str_address_to_address};
 use chrono::{DateTime, Utc};
 use zksync_types::tokens::{TokenMarketVolume, TokenPrice};
@@ -48,6 +47,16 @@ pub struct DbTickerPrice {
     pub token_id: i32,
     pub usd_price: BigDecimal,
     pub last_updated: DateTime<Utc>,
+}
+
+#[derive(Debug, FromRow)]
+pub struct StorageNFT {
+    pub token_id: i32,
+    pub serial_id: i32,
+    pub creator_account_id: i32,
+    pub creator_address: Vec<u8>,
+    pub address: Vec<u8>,
+    pub content_hash: Vec<u8>,
 }
 
 impl From<DbTickerPrice> for TokenPrice {

@@ -69,9 +69,9 @@ impl Witness for FullExitWitness<Bn256> {
                 .clone()
                 .map(|amount| Fr::from_str(&amount.0.to_string()).unwrap())
                 .unwrap_or_else(Fr::zero),
-            creator_account_id: 1,            // todo!()
-            nft_serial_id: 0,                 // todo!()
-            content_hash: Default::default(), // todo!()
+            creator_account_id: full_exit.creator_account_id.unwrap_or_default().0,
+            nft_serial_id: full_exit.serial_id.unwrap_or_default(),
+            content_hash: full_exit.content_hash.unwrap_or_default(),
         };
 
         // le_bit_vector_into_field_element()

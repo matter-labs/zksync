@@ -35,16 +35,6 @@ pub struct StorageAccountUpdate {
 }
 
 #[derive(Debug, FromRow)]
-pub struct StorageNFT {
-    pub token_id: i32,
-    pub serial_id: i32,
-    pub creator_account_id: i32,
-    pub creator_address: Vec<u8>,
-    pub address: Vec<u8>,
-    pub content_hash: Vec<u8>,
-}
-
-#[derive(Debug, FromRow)]
 pub struct StorageMintNFTUpdate {
     pub token_id: i32,
     pub serial_id: i32,
