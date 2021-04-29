@@ -190,6 +190,36 @@ fn test_swap_success() {
             is_limit_order: (false, false),
             test_accounts: vec![],
         },
+        // One price is (0, 0)
+        TestSwap {
+            accounts: (1, 3),
+            recipients: (2, 4),
+            submitter: 5,
+            tokens: (18, 19),
+            fee_token: 0,
+            amounts: (50, 100),
+            fee: 25,
+            balances: (100, 200, 50),
+            first_price: (0, 0),
+            second_price: (2, 1),
+            is_limit_order: (false, false),
+            test_accounts: vec![],
+        },
+        // Trasnfer, but using a swap
+        TestSwap {
+            accounts: (1, 3),
+            recipients: (2, 4),
+            submitter: 5,
+            tokens: (18, 19),
+            fee_token: 0,
+            amounts: (50, 0),
+            fee: 25,
+            balances: (100, 200, 50),
+            first_price: (1, 0),
+            second_price: (0, 1),
+            is_limit_order: (false, false),
+            test_accounts: vec![],
+        },
         // Not exactly equal, but compatible prices
         TestSwap {
             accounts: (1, 3),
@@ -254,6 +284,21 @@ fn test_swap_success() {
         TestSwap {
             accounts: (1, 3),
             recipients: (2, 5),
+            submitter: 5,
+            tokens: (18, 19),
+            fee_token: 0,
+            amounts: (50, 100),
+            fee: 25,
+            balances: (100, 200, 50),
+            first_price: (1, 2),
+            second_price: (2, 1),
+            is_limit_order: (false, false),
+            test_accounts: vec![],
+        },
+        // Recipient is the fee account
+        TestSwap {
+            accounts: (1, 3),
+            recipients: (0, 2),
             submitter: 5,
             tokens: (18, 19),
             fee_token: 0,
