@@ -3888,11 +3888,11 @@ pub fn hash_nft_content_to_balance_type<E: RescueEngine, CS: ConstraintSystem<E>
     let content_as_bits_le = sponge_output
         .pop()
         .expect("must get a single element")
-        .into_bits_le(cs.namespace(|| "content into_bits_le"))?;
+        .into_bits_le_strict(cs.namespace(|| "content into_bits_le_strict"))?;
 
     CircuitElement::from_le_bits(
-        cs.namespace(|| "NFT_content_as_balance from lower 128 bits"),
-        content_as_bits_le[..128].to_vec(),
+        cs.namespace(|| "NFT_content_as_balance from lower BALANCE_BIT_WIDTH bits"),
+        content_as_bits_le[..params::BALANCE_BIT_WIDTH].to_vec(),
     )
 }
 
