@@ -188,7 +188,7 @@ impl Paginate<Transaction, PendingOpsRequest> for CoreApiClient {
 
         let list = match index {
             Some(index) => {
-                let mut ops: Vec<_> = all_ops[index..].into_iter().collect();
+                let mut ops: Vec<_> = all_ops[index..].iter().collect();
                 ops.truncate(query.limit as usize);
                 ops.into_iter()
                     .map(|op| {
