@@ -10,7 +10,7 @@ use zksync_types::{
     SignedZkSyncTx,
 };
 // Local imports
-use self::records::MempoolTx;
+use self::records::{MempoolTx, QueuedBatchTx};
 use crate::{QueryResult, StorageProcessor};
 
 pub mod records;
@@ -421,11 +421,12 @@ impl<'a, 'c> MempoolSchema<'a, 'c> {
     ) -> QueryResult<Option<ApiTxBatch>> {
         let start = Instant::now();
 
-        let batch_data = sqlx::query!(
+        let batch_data = sqlx::query_as!(
+            QueuedBatchTx,
             r#"
                 SELECT tx_hash, created_at
-                FROM txs_batches_hashes
-                INNER JOIN mempool_txs
+                FROM mempool_txs
+                INNER JOIN txs_batches_hashes
                 ON txs_batches_hashes.batch_id = mempool_txs.batch_id
                 WHERE batch_hash = $1
                 ORDER BY created_at ASC

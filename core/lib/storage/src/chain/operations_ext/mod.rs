@@ -17,8 +17,8 @@ use zksync_types::{
 
 // Local imports
 use self::records::{
-    AccountCreatedAt, PriorityOpReceiptResponse, TransactionsHistoryItem, TxByHashResponse,
-    TxReceiptResponse,
+    AccountCreatedAt, InBlockBatchTx, PriorityOpReceiptResponse, TransactionsHistoryItem,
+    TxByHashResponse, TxReceiptResponse,
 };
 use crate::{
     chain::{
@@ -687,21 +687,19 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
         query: &PaginationQuery<AccountTxsRequest>,
     ) -> QueryResult<Option<Vec<Transaction>>> {
         let start = Instant::now();
-        let created_at_and_block = self
-            .0
+        let mut transaction = self.0.start_transaction().await?;
+        let created_at_and_block = transaction
             .chain()
             .operations_ext_schema()
             .get_tx_created_at_and_block_number(query.from.tx_hash)
             .await?;
         let txs = if let Some((time_from, _)) = created_at_and_block {
-            let last_committed = self
-                .0
+            let last_committed = transaction
                 .chain()
                 .block_schema()
                 .get_last_committed_confirmed_block()
                 .await?;
-            let last_finalized = self
-                .0
+            let last_finalized = transaction
                 .chain()
                 .block_schema()
                 .get_last_verified_confirmed_block()
@@ -759,7 +757,7 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
                         time_from,
                         i64::from(query.limit),
                     )
-                    .fetch_all(self.0.conn())
+                    .fetch_all(transaction.conn())
                     .await?
                 }
                 PaginationDirection::Older => {
@@ -814,7 +812,7 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
                         time_from,
                         i64::from(query.limit),
                     )
-                    .fetch_all(self.0.conn())
+                    .fetch_all(transaction.conn())
                     .await?
                 }
             };
@@ -833,6 +831,8 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
         } else {
             None
         };
+        transaction.commit().await?;
+
         metrics::histogram!(
             "sql.chain.operations_ext.get_account_transactions",
             start.elapsed()
@@ -842,8 +842,8 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
 
     pub async fn get_account_transactions_count(&mut self, address: Address) -> QueryResult<u32> {
         let start = Instant::now();
-        let last_committed = self
-            .0
+        let mut transaction = self.0.start_transaction().await?;
+        let last_committed = transaction
             .chain()
             .block_schema()
             .get_last_committed_confirmed_block()
@@ -856,7 +856,7 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
             i64::from(*last_committed),
             address.as_bytes()
         )
-        .fetch_one(self.0.conn())
+        .fetch_one(transaction.conn())
         .await?
         .count;
 
@@ -868,9 +868,11 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
             i64::from(*last_committed),
             address.as_bytes()
         )
-        .fetch_one(self.0.conn())
+        .fetch_one(transaction.conn())
         .await?
         .count;
+        transaction.commit().await?;
+
         metrics::histogram!(
             "sql.chain.operations_ext.get_account_transactions_count",
             start.elapsed()
@@ -884,13 +886,14 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
         tx_hash: TxHash,
     ) -> QueryResult<Option<(DateTime<Utc>, BlockNumber)>> {
         let start = Instant::now();
+        let mut transaction = self.0.start_transaction().await?;
 
         let record = sqlx::query!(
             "SELECT created_at, block_number FROM executed_transactions
             WHERE tx_hash = $1",
             tx_hash.as_ref()
         )
-        .fetch_optional(self.0.conn())
+        .fetch_optional(transaction.conn())
         .await?;
 
         let result = if let Some(record) = record {
@@ -901,7 +904,7 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
                 WHERE tx_hash = $1",
                 tx_hash.as_ref()
             )
-            .fetch_optional(self.0.conn())
+            .fetch_optional(transaction.conn())
             .await?;
 
             if let Some(record) = record {
@@ -910,6 +913,7 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
                 None
             }
         };
+        transaction.commit().await?;
 
         metrics::histogram!(
             "sql.chain.block.get_tx_created_at_and_block_number",
@@ -925,11 +929,12 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
         let start = Instant::now();
         let mut transaction = self.0.start_transaction().await?;
 
-        let batch_data = sqlx::query!(
+        let batch_data: Vec<InBlockBatchTx> = sqlx::query_as!(
+            InBlockBatchTx,
             r#"
                 SELECT tx_hash, created_at, success, block_number
-                FROM txs_batches_hashes
-                INNER JOIN executed_transactions
+                FROM executed_transactions
+                INNER JOIN txs_batches_hashes
                 ON txs_batches_hashes.batch_id = COALESCE(executed_transactions.batch_id, 0)
                 WHERE batch_hash = $1
                 ORDER BY created_at ASC

@@ -73,7 +73,7 @@ impl ApiBlockData {
                 .block_schema()
                 .get_block_status_and_last_updated(block_number)
                 .await
-                .map_err(Error::from)?
+                .map_err(Error::storage)?
                 .0
         };
         let details = self

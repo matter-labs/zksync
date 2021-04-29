@@ -995,9 +995,9 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
         query: &PaginationQuery<BlockAndTxHash>,
     ) -> QueryResult<Option<Vec<Transaction>>> {
         let start = Instant::now();
+        let mut transaction = self.0.start_transaction().await?;
 
-        let created_at_and_block = self
-            .0
+        let created_at_and_block = transaction
             .chain()
             .operations_ext_schema()
             .get_tx_created_at_and_block_number(query.from.tx_hash)
@@ -1055,7 +1055,7 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
                             time_from,
                             i64::from(query.limit),
                         )
-                        .fetch_all(self.0.conn())
+                        .fetch_all(transaction.conn())
                         .await?
                     }
                     PaginationDirection::Older => {
@@ -1108,12 +1108,11 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
                             time_from,
                             i64::from(query.limit),
                         )
-                        .fetch_all(self.0.conn())
+                        .fetch_all(transaction.conn())
                         .await?
                     }
                 };
-                let block_status = self
-                    .0
+                let block_status = transaction
                     .chain()
                     .block_schema()
                     .get_block_status_and_last_updated(block_number)
@@ -1130,6 +1129,7 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
         } else {
             None
         };
+        transaction.commit().await?;
 
         metrics::histogram!(
             "sql.chain.block.get_block_transactions_page",
@@ -1144,21 +1144,23 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
         block_number: BlockNumber,
     ) -> QueryResult<u32> {
         let start = Instant::now();
+        let mut transaction = self.0.start_transaction().await?;
 
         let tx_count = sqlx::query!(
             r#"SELECT count(*) as "count!" FROM executed_transactions WHERE block_number = $1"#,
             i64::from(*block_number)
         )
-        .fetch_one(self.0.conn())
+        .fetch_one(transaction.conn())
         .await?
         .count;
         let priority_op_count = sqlx::query!(
             r#"SELECT count(*) as "count!" FROM executed_priority_operations WHERE block_number = $1"#,
             i64::from(*block_number)
         )
-        .fetch_one(self.0.conn())
+        .fetch_one(transaction.conn())
         .await?
         .count;
+        transaction.commit().await?;
 
         metrics::histogram!(
             "sql.chain.block.get_block_transactions_count",
