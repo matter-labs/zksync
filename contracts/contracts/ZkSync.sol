@@ -257,7 +257,7 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
         }
     }
 
-    /// @notice  Withdraws tokens from zkSync contract to the owner
+    /// @notice  Withdraws NFT from zkSync contract to the owner
     /// @param _tokenId Id of NFT token
     function withdrawPendingNFTBalance(uint32 _tokenId) external nonReentrant {
         require(_tokenId > MAX_FUNGIBLE_TOKEN_ID, "oq"); // Withdraw only nft tokens
@@ -415,6 +415,7 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
         try _factory.mintNFT{gas: WITHDRAWAL_GAS_LIMIT}(op.creator, op.owner, op.contentHash, op.tokenId) {
             // Save withdrawn nfts for future deposits
             withdrawnNFTs[op.tokenId] = address(_factory);
+            emit WithdrawalNFT(op.tokenId);
         } catch {
             pendingWithdrawnNFTs[op.tokenId] = op;
         }
@@ -483,18 +484,15 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
                 if (op.tokenId <= MAX_FUNGIBLE_TOKEN_ID) {
                     withdrawOrStore(uint16(op.tokenId), op.owner, op.amount);
                 } else {
-                    if (op.amount == 1) {
-                        Operations.WithdrawNFT memory nft_op =
-                            Operations.WithdrawNFT(op.nftCreatorAddress, op.nftContentHash, op.owner, op.tokenId);
-                        withdrawNFT(nft_op);
-                    } else {
-                        revert("ds"); // Unsupported amount for nft
-                    }
+                    require(op.amount == 1, "ds"); // Unsupported amount for nft
+                    Operations.WithdrawNFT memory nft_op =
+                        Operations.WithdrawNFT(op.nftCreatorAddress, op.nftContentHash, op.owner, op.tokenId);
+                    withdrawNFT(nft_op);
                 }
             } else if (opType == Operations.OpType.WithdrawNFT) {
                 Operations.WithdrawNFT memory op = Operations.readWithdrawNFTPubdata(pubData);
                 // MUST be one of the NFTs
-                require(op.tokenId >= MAX_FUNGIBLE_TOKEN_ID, "w");
+                require(op.tokenId > MAX_FUNGIBLE_TOKEN_ID, "w");
                 withdrawNFT(op);
             } else {
                 revert("l"); // unsupported op in block execution

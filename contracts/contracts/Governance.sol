@@ -175,13 +175,15 @@ contract Governance is Config {
         }
     }
 
+    //@notice Set default factory for our contract. This factory will be used to mint an NFT token that has no factory
+    //@param _factory Address of NFT factory
     function setDefaultNFTFactory(address _factory) external {
         requireGovernor(msg.sender);
         require(address(defaultFactory) == address(0x0), "mb");
         defaultFactory = NFTFactory(_factory);
     }
 
-    function getFactory(address _creator) external view returns (NFTFactory) {
+    function getNFTFactory(address _creator) external view returns (NFTFactory) {
         NFTFactory _factory = NFTFactories[_creator];
         if (address(_factory) == address(0x0)) {
             return defaultFactory;
