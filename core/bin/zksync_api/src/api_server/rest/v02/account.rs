@@ -1,6 +1,7 @@
 //! Account part of API implementation.
 
 // Built-in uses
+use std::collections::BTreeMap;
 use std::str::FromStr;
 
 // External uses
@@ -8,6 +9,7 @@ use actix_web::{web, Scope};
 
 // Workspace uses
 use zksync_api_types::v02::{
+    account::{Account, AccountStateType},
     pagination::{AccountTxsRequest, Paginated, PaginationQuery, PendingOpsRequest},
     transaction::Transaction,
 };
@@ -21,7 +23,10 @@ use super::{
     paginate_trait::Paginate,
     response::ApiResult,
 };
-use crate::{api_try, core_api_client::CoreApiClient, utils::token_db_cache::TokenDBCache};
+use crate::{
+    api_try, core_api_client::CoreApiClient, fee_ticker::PriceError,
+    utils::token_db_cache::TokenDBCache,
+};
 
 /// Shared data between `api/v1/accounts` endpoints.
 #[derive(Clone)]
@@ -90,6 +95,68 @@ impl ApiAccountData {
         }
     }
 
+    async fn account_info(
+        &self,
+        address: Address,
+        account_id: AccountId,
+        state_type: AccountStateType,
+    ) -> Result<Option<Account>, Error> {
+        let mut storage = self.pool.access_storage().await.map_err(Error::storage)?;
+        let (last_update_in_block, account) = match state_type {
+            AccountStateType::Committed => {
+                let account = storage
+                    .chain()
+                    .account_schema()
+                    .last_committed_state_for_account(account_id)
+                    .await
+                    .map_err(Error::storage)?;
+                if let Some(account) = account {
+                    let last_block = storage
+                        .chain()
+                        .account_schema()
+                        .last_committed_block_with_update_for_acc(account_id)
+                        .await
+                        .map_err(Error::storage)?;
+                    (last_block, account)
+                } else {
+                    return Ok(None);
+                }
+            }
+            AccountStateType::Finalized => {
+                let (last_block, account) = storage
+                    .chain()
+                    .account_schema()
+                    .account_and_last_block(account_id)
+                    .await
+                    .map_err(Error::storage)?;
+                if let Some(account) = account {
+                    (BlockNumber(last_block as u32), account)
+                } else {
+                    return Ok(None);
+                }
+            }
+        };
+        let mut balances = BTreeMap::new();
+        for (token_id, balance) in account.get_nonzero_balances() {
+            let token_symbol = self
+                .tokens
+                .token_symbol(&mut storage, token_id)
+                .await
+                .map_err(Error::storage)?
+                .ok_or_else(|| Error::from(PriceError::token_not_found(token_id)))?;
+
+            balances.insert(token_symbol, balance);
+        }
+        Ok(Some(Account {
+            account_id,
+            address,
+            nonce: account.nonce,
+            pub_key_hash: account.pub_key_hash,
+            last_update_in_block,
+            balances,
+        }))
+    }
+
     async fn account_txs(
         &self,
         query: PaginationQuery<TxHash>,
@@ -127,6 +194,27 @@ impl ApiAccountData {
         let mut client = self.core_api_client.clone();
         client.paginate(&new_query).await
     }
+}
+
+async fn account_info(
+    data: web::Data<ApiAccountData>,
+    web::Path(account_id_or_address): web::Path<String>,
+    web::Path(state_type): web::Path<String>,
+) -> ApiResult<Option<Account>> {
+    let (address, account_id) = api_try!(
+        data.parse_account_id_or_address(&account_id_or_address)
+            .await
+    );
+    let state_type = match state_type.as_str() {
+        "committed" => AccountStateType::Committed,
+        "finalized" => AccountStateType::Finalized,
+        _ => {
+            return Err(Error::from(InvalidDataError::InvalidAccountStateType)).into();
+        }
+    };
+    data.account_info(address, account_id, state_type)
+        .await
+        .into()
 }
 
 async fn account_txs(
@@ -170,10 +258,10 @@ pub fn api_scope(
 
     web::scope("account")
         .data(data)
-        // .route(
-        //     "{account_id_or_address}/{block}",
-        //     web::get().to(account_info),
-        // )
+        .route(
+            "{account_id_or_address}/{block}",
+            web::get().to(account_info),
+        )
         .route(
             "{account_id_or_address}/transactions",
             web::get().to(account_txs),

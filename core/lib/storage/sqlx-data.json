@@ -1470,6 +1470,26 @@
       "nullable": []
     }
   },
+  "43469652ff4f68b9990157c9eefb0cce5347db70e6c00df12d9fb23f701bbafd": {
+    "query": "\n                SELECT MAX(block_number)\n                FROM(\n                    SELECT block_number FROM account_balance_updates\n                    WHERE account_id = $1\n                    UNION ALL\n                    SELECT block_number FROM account_creates\n                    WHERE account_id = $1\n                    UNION ALL\n                    SELECT block_number FROM account_pubkey_updates\n                    WHERE account_id = $1\n                ) as subquery\n            ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "max",
+          "type_info": "Int8"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Int8"
+        ]
+      },
+      "nullable": [
+        null
+      ]
+    }
+  },
   "437c7b571b9be4bfbb677acff6b6b4393c7f8fd8c035264052e782bfd89c67ff": {
     "query": "\n                        DELETE FROM accounts\n                        WHERE id = $1\n                        ",
     "describe": {

@@ -21,7 +21,8 @@ pub enum ErrorCode {
     InvalidBlockPosition = 202,
     InvalidAccountIdOrAddress = 203,
     AccountNotFound = 204,
-    TransactionNotFound = 205,
+    InvalidAccountStateType = 205,
+    TransactionNotFound = 206,
     StorageError = 300,
     TokenNotFound = 500,
     ExternalApiError = 501,
@@ -114,6 +115,8 @@ pub enum InvalidDataError {
     InvalidCurrency,
     #[error("Transaction is not found")]
     TransactionNotFound,
+    #[error("Cannot parse account state type. There are only committed, finalized options")]
+    InvalidAccountStateType,
 }
 
 impl ApiError for InvalidDataError {
@@ -129,6 +132,7 @@ impl ApiError for InvalidDataError {
             Self::AccountNotFound => ErrorCode::AccountNotFound,
             Self::InvalidCurrency => ErrorCode::InvalidCurrency,
             Self::TransactionNotFound => ErrorCode::TransactionNotFound,
+            Self::InvalidAccountStateType => ErrorCode::InvalidAccountStateType,
         }
     }
 }
