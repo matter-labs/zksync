@@ -2,16 +2,21 @@
 use std::collections::HashMap;
 // External imports
 // Workspace imports
-use zksync_types::aggregated_operations::AggregatedActionType;
+use zksync_api_types::v02::{
+    pagination::{AccountTxsRequest, PaginationDirection, PaginationQuery},
+    transaction::TxInBlockStatus,
+};
+use zksync_types::{
+    aggregated_operations::{AggregatedActionType, AggregatedOperation},
+    tx::TxHash,
+    AccountId, BlockNumber,
+};
 // Local imports
 use self::setup::TransactionsHistoryTestSetup;
 use crate::{
     chain::block::BlockSchema,
     chain::operations::OperationsSchema,
-    chain::operations_ext::{
-        records::{AccountOpReceiptResponse, AccountTxReceiptResponse},
-        SearchDirection,
-    },
+    chain::operations_ext::SearchDirection,
     test_data::{
         dummy_ethereum_tx_hash, gen_sample_block, gen_unique_aggregated_operation,
         BLOCK_SIZE_CHUNKS,
@@ -19,8 +24,6 @@ use crate::{
     tests::db_test,
     QueryResult, StorageProcessor,
 };
-use zksync_types::aggregated_operations::AggregatedOperation;
-use zksync_types::BlockNumber;
 
 mod setup;
 
@@ -66,36 +69,34 @@ async fn confirm_eth_op(
     Ok(())
 }
 
-// Make first block committed and verified.
-async fn update_blocks_status(mut storage: &mut StorageProcessor<'_>) -> QueryResult<()> {
+async fn commit_block(
+    mut storage: &mut StorageProcessor<'_>,
+    block_number: BlockNumber,
+) -> QueryResult<()> {
     // Required since we use `EthereumSchema` in this test.
     storage.ethereum_schema().initialize_eth_data().await?;
-    // Make first block committed.
     BlockSchema(&mut storage)
         .save_block(gen_sample_block(
-            BlockNumber(1),
+            block_number,
             BLOCK_SIZE_CHUNKS,
             Default::default(),
         ))
         .await?;
     OperationsSchema(&mut storage)
         .store_aggregated_action(gen_unique_aggregated_operation(
-            BlockNumber(1),
+            block_number,
             AggregatedActionType::CommitBlocks,
             BLOCK_SIZE_CHUNKS,
         ))
         .await?;
     let (id, aggregated_op) = OperationsSchema(&mut storage)
-        .get_aggregated_op_that_affects_block(
-            AggregatedActionType::CommitBlocks,
-            BlockNumber(1_u32),
-        )
+        .get_aggregated_op_that_affects_block(AggregatedActionType::CommitBlocks, block_number)
         .await?
         .unwrap();
     storage
         .chain()
         .state_schema()
-        .commit_state_update(BlockNumber(1), &[], 0)
+        .commit_state_update(block_number, &[], 0)
         .await?;
     confirm_eth_op(
         storage,
@@ -104,54 +105,27 @@ async fn update_blocks_status(mut storage: &mut StorageProcessor<'_>) -> QueryRe
     )
     .await?;
 
-    // Make first block verified.
+    Ok(())
+}
+
+async fn verify_block(
+    mut storage: &mut StorageProcessor<'_>,
+    block_number: BlockNumber,
+) -> QueryResult<()> {
     OperationsSchema(&mut storage)
         .store_aggregated_action(gen_unique_aggregated_operation(
-            BlockNumber(1),
+            block_number,
             AggregatedActionType::ExecuteBlocks,
             BLOCK_SIZE_CHUNKS,
         ))
         .await?;
     let (id, op) = OperationsSchema(&mut storage)
-        .get_aggregated_op_that_affects_block(
-            AggregatedActionType::ExecuteBlocks,
-            BlockNumber(1_u32),
-        )
+        .get_aggregated_op_that_affects_block(AggregatedActionType::ExecuteBlocks, block_number)
         .await?
         .unwrap();
     confirm_eth_op(storage, (id, op), AggregatedActionType::ExecuteBlocks).await?;
 
     Ok(())
-}
-
-#[derive(Debug, Copy, Clone, PartialEq)]
-struct ReceiptRequest {
-    block_number: u64,
-    block_index: Option<u32>,
-    limit: u64,
-    direction: SearchDirection,
-}
-
-#[derive(Debug, Copy, Clone, PartialEq)]
-struct ReceiptLocation {
-    block_number: i64,
-    block_index: Option<i32>,
-}
-
-impl ReceiptLocation {
-    fn from_tx(item: AccountTxReceiptResponse) -> Self {
-        Self {
-            block_number: item.block_number,
-            block_index: item.block_index,
-        }
-    }
-
-    fn from_op(item: AccountOpReceiptResponse) -> Self {
-        Self {
-            block_number: item.block_number,
-            block_index: Some(item.block_index),
-        }
-    }
 }
 
 /// Here we take the account transactions using `get_account_transactions` and
@@ -330,552 +304,233 @@ async fn get_account_transactions_history_from(
     Ok(())
 }
 
-// /// Checks that all the transaction receipts related to account address can be loaded
-// /// with the `get_account_transactions_receipts` method and the result will be
-// /// same as expected.
-// #[db_test]
-// async fn get_account_transactions_receipts(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
-//     let mut setup = TransactionsHistoryTestSetup::new();
-//     setup.add_block(1);
-//     setup.add_block_with_rejected_op(2);
+pub struct NewReceiptRequest {
+    tx_hash: TxHash,
+    direction: PaginationDirection,
+    limit: u32,
+}
 
-//     // execute_operation
-//     commit_schema_data(&mut storage, &setup).await?;
+/// Checks that all the transaction related to account address can be loaded
+/// with the `get_account_transactions` method and the result will be
+/// same as expected.
+#[db_test]
+async fn get_account_transactions_receipts(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
+    let mut setup = TransactionsHistoryTestSetup::new();
+    let from = setup.from_zksync_account.address;
+    let to = setup.to_zksync_account.address;
+    setup.add_block(1);
+    setup.add_block_with_rejected_op(2);
 
-//     let from = setup.from_zksync_account.address;
-//     let to = setup.to_zksync_account.address;
-//     let test_data = vec![
-//         (
-//             "Get first five transactions.",
-//             ReceiptRequest {
-//                 block_number: 0,
-//                 block_index: None,
-//                 direction: SearchDirection::Newer,
-//                 limit: 5,
-//             },
-//             vec![
-//                 ReceiptLocation {
-//                     block_number: 1,
-//                     block_index: Some(1),
-//                 },
-//                 ReceiptLocation {
-//                     block_number: 1,
-//                     block_index: Some(2),
-//                 },
-//                 ReceiptLocation {
-//                     block_number: 1,
-//                     block_index: Some(3),
-//                 },
-//                 ReceiptLocation {
-//                     block_number: 1,
-//                     block_index: Some(4),
-//                 },
-//                 ReceiptLocation {
-//                     block_number: 1,
-//                     block_index: Some(5),
-//                 },
-//             ],
-//         ),
-//         (
-//             "Get a single transaction. (newer)",
-//             ReceiptRequest {
-//                 block_number: 1,
-//                 block_index: Some(2),
-//                 direction: SearchDirection::Newer,
-//                 limit: 1,
-//             },
-//             vec![ReceiptLocation {
-//                 block_number: 1,
-//                 block_index: Some(2),
-//             }],
-//         ),
-//         (
-//             "Get a failed transaction. (newer)",
-//             ReceiptRequest {
-//                 block_number: 2,
-//                 block_index: None,
-//                 direction: SearchDirection::Newer,
-//                 limit: 1,
-//             },
-//             vec![ReceiptLocation {
-//                 block_number: 2,
-//                 block_index: None,
-//             }],
-//         ),
-//         (
-//             "Get some transations from the next block.",
-//             ReceiptRequest {
-//                 block_number: 1,
-//                 block_index: Some(100),
-//                 direction: SearchDirection::Newer,
-//                 limit: 5,
-//             },
-//             vec![
-//                 ReceiptLocation {
-//                     block_number: 2,
-//                     block_index: None,
-//                 },
-//                 ReceiptLocation {
-//                     block_number: 2,
-//                     block_index: Some(1),
-//                 },
-//                 ReceiptLocation {
-//                     block_number: 2,
-//                     block_index: Some(2),
-//                 },
-//                 ReceiptLocation {
-//                     block_number: 2,
-//                     block_index: Some(3),
-//                 },
-//                 ReceiptLocation {
-//                     block_number: 2,
-//                     block_index: Some(4),
-//                 },
-//             ],
-//         ),
-//         (
-//             "Get five transactions from some index.",
-//             ReceiptRequest {
-//                 block_number: 1,
-//                 block_index: Some(3),
-//                 direction: SearchDirection::Newer,
-//                 limit: 5,
-//             },
-//             vec![
-//                 ReceiptLocation {
-//                     block_number: 1,
-//                     block_index: Some(3),
-//                 },
-//                 ReceiptLocation {
-//                     block_number: 1,
-//                     block_index: Some(4),
-//                 },
-//                 ReceiptLocation {
-//                     block_number: 1,
-//                     block_index: Some(5),
-//                 },
-//                 ReceiptLocation {
-//                     block_number: 2,
-//                     block_index: None,
-//                 },
-//                 ReceiptLocation {
-//                     block_number: 2,
-//                     block_index: Some(1),
-//                 },
-//             ],
-//         ),
-//         // Older search direction
-//         (
-//             "Get last five transactions.",
-//             ReceiptRequest {
-//                 block_number: i64::MAX as u64,
-//                 block_index: Some(i32::MAX as u32),
-//                 direction: SearchDirection::Older,
-//                 limit: 5,
-//             },
-//             vec![
-//                 ReceiptLocation {
-//                     block_number: 2,
-//                     block_index: Some(4),
-//                 },
-//                 ReceiptLocation {
-//                     block_number: 2,
-//                     block_index: Some(3),
-//                 },
-//                 ReceiptLocation {
-//                     block_number: 2,
-//                     block_index: Some(2),
-//                 },
-//                 ReceiptLocation {
-//                     block_number: 2,
-//                     block_index: Some(1),
-//                 },
-//                 ReceiptLocation {
-//                     block_number: 2,
-//                     block_index: None,
-//                 },
-//             ],
-//         ),
-//         (
-//             "Get a single transaction (older).",
-//             ReceiptRequest {
-//                 block_number: 1,
-//                 block_index: Some(2),
-//                 direction: SearchDirection::Older,
-//                 limit: 1,
-//             },
-//             vec![ReceiptLocation {
-//                 block_number: 1,
-//                 block_index: Some(2),
-//             }],
-//         ),
-//         (
-//             "Get a failed transaction. (older)",
-//             ReceiptRequest {
-//                 block_number: 2,
-//                 block_index: None,
-//                 direction: SearchDirection::Older,
-//                 limit: 1,
-//             },
-//             vec![ReceiptLocation {
-//                 block_number: 2,
-//                 block_index: None,
-//             }],
-//         ),
-//         (
-//             "Get some transations from the previous block.",
-//             ReceiptRequest {
-//                 block_number: 2,
-//                 block_index: None,
-//                 direction: SearchDirection::Older,
-//                 limit: 5,
-//             },
-//             vec![
-//                 ReceiptLocation {
-//                     block_number: 2,
-//                     block_index: None,
-//                 },
-//                 ReceiptLocation {
-//                     block_number: 1,
-//                     block_index: Some(5),
-//                 },
-//                 ReceiptLocation {
-//                     block_number: 1,
-//                     block_index: Some(4),
-//                 },
-//                 ReceiptLocation {
-//                     block_number: 1,
-//                     block_index: Some(3),
-//                 },
-//                 ReceiptLocation {
-//                     block_number: 1,
-//                     block_index: Some(2),
-//                 },
-//             ],
-//         ),
-//         (
-//             "Get five transactions up to some index.",
-//             ReceiptRequest {
-//                 block_number: 2,
-//                 block_index: Some(2),
-//                 direction: SearchDirection::Older,
-//                 limit: 5,
-//             },
-//             vec![
-//                 ReceiptLocation {
-//                     block_number: 2,
-//                     block_index: Some(2),
-//                 },
-//                 ReceiptLocation {
-//                     block_number: 2,
-//                     block_index: Some(1),
-//                 },
-//                 ReceiptLocation {
-//                     block_number: 2,
-//                     block_index: None,
-//                 },
-//                 ReceiptLocation {
-//                     block_number: 1,
-//                     block_index: Some(5),
-//                 },
-//                 ReceiptLocation {
-//                     block_number: 1,
-//                     block_index: Some(4),
-//                 },
-//             ],
-//         ),
-//     ];
+    // Check that it doesn't return not committed txs.
+    let txs = storage
+        .chain()
+        .operations_ext_schema()
+        .get_account_transactions(&PaginationQuery {
+            from: AccountTxsRequest {
+                address: from,
+                account_id: AccountId(0),
+                tx_hash: setup.get_tx_hash(0, 0),
+            },
+            limit: 1,
+            direction: PaginationDirection::Newer,
+        })
+        .await?;
+    assert!(txs.is_none());
 
-//     for (test_name, request, expected_resp) in test_data {
-//         let items = storage
-//             .chain()
-//             .operations_ext_schema()
-//             .get_account_transactions_receipts(
-//                 from,
-//                 request.block_number,
-//                 request.block_index,
-//                 request.direction,
-//                 request.limit,
-//             )
-//             .await?;
+    // execute_operation
+    commit_schema_data(&mut storage, &setup).await?;
 
-//         let actual_resp = items
-//             .into_iter()
-//             .map(ReceiptLocation::from_tx)
-//             .collect::<Vec<_>>();
+    // Make blocks committed
+    commit_block(&mut storage, BlockNumber(1)).await?;
+    commit_block(&mut storage, BlockNumber(2)).await?;
 
-//         assert_eq!(actual_resp, expected_resp, "\"{}\", failed", test_name);
-//     }
+    let test_data = vec![
+        (
+            "Get first five transactions.",
+            NewReceiptRequest {
+                tx_hash: setup.get_tx_hash(0, 0),
+                direction: PaginationDirection::Newer,
+                limit: 5,
+            },
+            vec![
+                setup.get_tx_hash(0, 0),
+                setup.get_tx_hash(0, 1),
+                setup.get_tx_hash(0, 2),
+                setup.get_tx_hash(0, 3),
+                setup.get_tx_hash(0, 4),
+            ],
+        ),
+        (
+            "Get a single transaction. (newer)",
+            NewReceiptRequest {
+                tx_hash: setup.get_tx_hash(0, 2),
+                direction: PaginationDirection::Newer,
+                limit: 1,
+            },
+            vec![setup.get_tx_hash(0, 2)],
+        ),
+        (
+            "Get five transactions from some index.",
+            NewReceiptRequest {
+                tx_hash: setup.get_tx_hash(0, 4),
+                direction: PaginationDirection::Newer,
+                limit: 5,
+            },
+            vec![
+                setup.get_tx_hash(0, 4),
+                setup.get_tx_hash(0, 5),
+                setup.get_tx_hash(0, 6),
+                setup.get_tx_hash(1, 0),
+                setup.get_tx_hash(1, 1),
+            ],
+        ),
+        (
+            "Limit is more than number of txs. (Newer)",
+            NewReceiptRequest {
+                tx_hash: setup.get_tx_hash(1, 5),
+                direction: PaginationDirection::Newer,
+                limit: 5,
+            },
+            vec![setup.get_tx_hash(1, 5), setup.get_tx_hash(1, 6)],
+        ),
+        // Older search direction
+        (
+            "Get last five transactions.",
+            NewReceiptRequest {
+                tx_hash: setup.get_tx_hash(1, 6),
+                direction: PaginationDirection::Older,
+                limit: 5,
+            },
+            vec![
+                setup.get_tx_hash(1, 6),
+                setup.get_tx_hash(1, 5),
+                setup.get_tx_hash(1, 4),
+                setup.get_tx_hash(1, 3),
+                setup.get_tx_hash(1, 2),
+            ],
+        ),
+        (
+            "Get a single transaction. (older)",
+            NewReceiptRequest {
+                tx_hash: setup.get_tx_hash(0, 2),
+                direction: PaginationDirection::Older,
+                limit: 1,
+            },
+            vec![setup.get_tx_hash(0, 2)],
+        ),
+        (
+            "Get some transactions from the previous block.",
+            NewReceiptRequest {
+                tx_hash: setup.get_tx_hash(1, 2),
+                direction: PaginationDirection::Older,
+                limit: 5,
+            },
+            vec![
+                setup.get_tx_hash(1, 2),
+                setup.get_tx_hash(1, 1),
+                setup.get_tx_hash(1, 0),
+                setup.get_tx_hash(0, 6),
+                setup.get_tx_hash(0, 5),
+            ],
+        ),
+        (
+            "Limit is more than number of txs. (Older)",
+            NewReceiptRequest {
+                tx_hash: setup.get_tx_hash(0, 2),
+                direction: PaginationDirection::Older,
+                limit: 5,
+            },
+            vec![
+                setup.get_tx_hash(0, 2),
+                setup.get_tx_hash(0, 1),
+                setup.get_tx_hash(0, 0),
+            ],
+        ),
+    ];
 
-//     // Make first block committed and verified
-//     update_blocks_status(&mut storage).await?;
+    for (test_name, request, expected_resp) in test_data {
+        let items = storage
+            .chain()
+            .operations_ext_schema()
+            .get_account_transactions(&PaginationQuery {
+                from: AccountTxsRequest {
+                    address: from,
+                    account_id: AccountId(0),
+                    tx_hash: request.tx_hash,
+                },
+                limit: request.limit,
+                direction: request.direction,
+            })
+            .await?;
+        let actual_resp: Vec<TxHash> = items.unwrap().into_iter().map(|tx| tx.tx_hash).collect();
 
-//     let receipts = storage
-//         .chain()
-//         .operations_ext_schema()
-//         .get_account_transactions_receipts(from, 1, Some(1), SearchDirection::Newer, 1)
-//         .await?;
+        assert_eq!(actual_resp, expected_resp, "\"{}\", failed", test_name);
+    }
 
-//     // Check that `commit_tx_hash` and `verify_tx_hash` now exist.
-//     let reciept = receipts.into_iter().next().unwrap();
-//     assert!(reciept.commit_tx_hash.is_some());
-//     assert!(reciept.verify_tx_hash.is_some());
-//     // Make sure that the receiver see the same receipts.
-//     let receipts = storage
-//         .chain()
-//         .operations_ext_schema()
-//         .get_account_transactions_receipts(to, 1, Some(1), SearchDirection::Newer, 1)
-//         .await?;
-//     assert_eq!(
-//         storage
-//             .chain()
-//             .operations_ext_schema()
-//             .get_account_transactions_receipts(to, 1, Some(1), SearchDirection::Older, 1)
-//             .await?,
-//         receipts
-//     );
+    let failed_tx = storage
+        .chain()
+        .operations_ext_schema()
+        .get_account_transactions(&PaginationQuery {
+            from: AccountTxsRequest {
+                address: from,
+                account_id: AccountId(0),
+                tx_hash: setup.get_tx_hash(1, 2),
+            },
+            limit: 1,
+            direction: PaginationDirection::Newer,
+        })
+        .await?
+        .unwrap();
+    assert_eq!(failed_tx[0].status, TxInBlockStatus::Rejected);
 
-//     Ok(())
-// }
+    verify_block(&mut storage, BlockNumber(1)).await?;
+    let txs = storage
+        .chain()
+        .operations_ext_schema()
+        .get_account_transactions(&PaginationQuery {
+            from: AccountTxsRequest {
+                address: from,
+                account_id: AccountId(0),
+                tx_hash: setup.get_tx_hash(0, 6),
+            },
+            limit: 2,
+            direction: PaginationDirection::Newer,
+        })
+        .await?
+        .unwrap();
+    assert_eq!(txs[0].status, TxInBlockStatus::Finalized);
+    assert_eq!(txs[1].status, TxInBlockStatus::Committed);
 
-// /// Checks that all the operations receipts related to account address can be loaded
-// /// with the `get_account_operations_receipts` method and the result will be
-// /// same as expected.
-// #[db_test]
-// async fn get_account_operations_receipts(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
-//     let mut setup = TransactionsHistoryTestSetup::new();
-//     setup.add_block(1);
-//     setup.add_block_with_rejected_op(2);
+    // Make sure that the receiver see the same receipts.
+    let from_txs = storage
+        .chain()
+        .operations_ext_schema()
+        .get_account_transactions(&PaginationQuery {
+            from: AccountTxsRequest {
+                address: from,
+                account_id: AccountId(0),
+                tx_hash: setup.get_tx_hash(0, 2),
+            },
+            limit: 1,
+            direction: PaginationDirection::Newer,
+        })
+        .await?
+        .unwrap();
+    let to_txs = storage
+        .chain()
+        .operations_ext_schema()
+        .get_account_transactions(&PaginationQuery {
+            from: AccountTxsRequest {
+                address: to,
+                account_id: AccountId(0),
+                tx_hash: setup.get_tx_hash(0, 2),
+            },
+            limit: 1,
+            direction: PaginationDirection::Newer,
+        })
+        .await?
+        .unwrap();
+    assert_eq!(from_txs, to_txs);
 
-//     // execute_operation
-//     commit_schema_data(&mut storage, &setup).await?;
-
-//     let from = setup.from_zksync_account.address;
-//     let to = setup.to_zksync_account.address;
-//     let test_data = vec![
-//         (
-//             "Get first five operations.",
-//             ReceiptRequest {
-//                 block_number: 0,
-//                 block_index: Some(0),
-//                 direction: SearchDirection::Newer,
-//                 limit: 5,
-//             },
-//             vec![
-//                 ReceiptLocation {
-//                     block_number: 1,
-//                     block_index: Some(0),
-//                 },
-//                 ReceiptLocation {
-//                     block_number: 1,
-//                     block_index: Some(6),
-//                 },
-//                 ReceiptLocation {
-//                     block_number: 2,
-//                     block_index: Some(0),
-//                 },
-//                 ReceiptLocation {
-//                     block_number: 2,
-//                     block_index: Some(6),
-//                 },
-//             ],
-//         ),
-//         (
-//             "Get a single operation. (newer)",
-//             ReceiptRequest {
-//                 block_number: 1,
-//                 block_index: Some(0),
-//                 direction: SearchDirection::Newer,
-//                 limit: 1,
-//             },
-//             vec![ReceiptLocation {
-//                 block_number: 1,
-//                 block_index: Some(0),
-//             }],
-//         ),
-//         (
-//             "Get some operations from the next block.",
-//             ReceiptRequest {
-//                 block_number: 1,
-//                 block_index: Some(100),
-//                 direction: SearchDirection::Newer,
-//                 limit: 5,
-//             },
-//             vec![
-//                 ReceiptLocation {
-//                     block_number: 2,
-//                     block_index: Some(0),
-//                 },
-//                 ReceiptLocation {
-//                     block_number: 2,
-//                     block_index: Some(6),
-//                 },
-//             ],
-//         ),
-//         (
-//             "Get five operations from some index.",
-//             ReceiptRequest {
-//                 block_number: 1,
-//                 block_index: Some(3),
-//                 direction: SearchDirection::Newer,
-//                 limit: 5,
-//             },
-//             vec![
-//                 ReceiptLocation {
-//                     block_number: 1,
-//                     block_index: Some(6),
-//                 },
-//                 ReceiptLocation {
-//                     block_number: 2,
-//                     block_index: Some(0),
-//                 },
-//                 ReceiptLocation {
-//                     block_number: 2,
-//                     block_index: Some(6),
-//                 },
-//             ],
-//         ),
-//         // Older search direction
-//         (
-//             "Get last five operations.",
-//             ReceiptRequest {
-//                 block_number: i64::MAX as u64,
-//                 block_index: Some(i32::MAX as u32),
-//                 direction: SearchDirection::Older,
-//                 limit: 5,
-//             },
-//             vec![
-//                 ReceiptLocation {
-//                     block_number: 2,
-//                     block_index: Some(6),
-//                 },
-//                 ReceiptLocation {
-//                     block_number: 2,
-//                     block_index: Some(0),
-//                 },
-//                 ReceiptLocation {
-//                     block_number: 1,
-//                     block_index: Some(6),
-//                 },
-//                 ReceiptLocation {
-//                     block_number: 1,
-//                     block_index: Some(0),
-//                 },
-//             ],
-//         ),
-//         (
-//             "Get a single operation (older).",
-//             ReceiptRequest {
-//                 block_number: 1,
-//                 block_index: Some(6),
-//                 direction: SearchDirection::Older,
-//                 limit: 1,
-//             },
-//             vec![ReceiptLocation {
-//                 block_number: 1,
-//                 block_index: Some(6),
-//             }],
-//         ),
-//         (
-//             "Get some operations from the previous block.",
-//             ReceiptRequest {
-//                 block_number: 2,
-//                 block_index: Some(0),
-//                 direction: SearchDirection::Older,
-//                 limit: 5,
-//             },
-//             vec![
-//                 ReceiptLocation {
-//                     block_number: 2,
-//                     block_index: Some(0),
-//                 },
-//                 ReceiptLocation {
-//                     block_number: 1,
-//                     block_index: Some(6),
-//                 },
-//                 ReceiptLocation {
-//                     block_number: 1,
-//                     block_index: Some(0),
-//                 },
-//             ],
-//         ),
-//         (
-//             "Get five operations up to some index.",
-//             ReceiptRequest {
-//                 block_number: 2,
-//                 block_index: Some(10),
-//                 direction: SearchDirection::Older,
-//                 limit: 5,
-//             },
-//             vec![
-//                 ReceiptLocation {
-//                     block_number: 2,
-//                     block_index: Some(6),
-//                 },
-//                 ReceiptLocation {
-//                     block_number: 2,
-//                     block_index: Some(0),
-//                 },
-//                 ReceiptLocation {
-//                     block_number: 1,
-//                     block_index: Some(6),
-//                 },
-//                 ReceiptLocation {
-//                     block_number: 1,
-//                     block_index: Some(0),
-//                 },
-//             ],
-//         ),
-//     ];
-
-//     for (test_name, request, expected_resp) in test_data {
-//         let items = storage
-//             .chain()
-//             .operations_ext_schema()
-//             .get_account_operations_receipts(
-//                 from,
-//                 request.block_number,
-//                 request.block_index.unwrap(),
-//                 request.direction,
-//                 request.limit,
-//             )
-//             .await?;
-
-//         let actual_resp = items
-//             .into_iter()
-//             .map(ReceiptLocation::from_op)
-//             .collect::<Vec<_>>();
-
-//         assert_eq!(actual_resp, expected_resp, "\"{}\", failed", test_name);
-//     }
-
-//     // Make first block committed and verified
-//     update_blocks_status(&mut storage).await?;
-
-//     let receipts = storage
-//         .chain()
-//         .operations_ext_schema()
-//         .get_account_operations_receipts(from, 1, 0, SearchDirection::Newer, 1)
-//         .await?;
-
-//     // Check that `commit_tx_hash` and `verify_tx_hash` now exist.
-//     let reciept = receipts.into_iter().next().unwrap();
-//     assert!(reciept.commit_tx_hash.is_some());
-//     assert!(reciept.verify_tx_hash.is_some());
-//     // Make sure that the receiver see the same receipts.
-//     let receipts = storage
-//         .chain()
-//         .operations_ext_schema()
-//         .get_account_operations_receipts(to, 1, 0, SearchDirection::Newer, 1)
-//         .await?;
-//     assert_eq!(
-//         storage
-//             .chain()
-//             .operations_ext_schema()
-//             .get_account_operations_receipts(to, 1, 0, SearchDirection::Older, 1)
-//             .await?,
-//         receipts
-//     );
-
-//     Ok(())
-// }
+    Ok(())
+}

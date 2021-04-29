@@ -20,9 +20,8 @@ use zksync_config::ZkSyncConfig;
 
 use self::types::{
     convert::{
-        depositing_balances_from_pending_ops, op_receipt_from_response,
-        pending_account_op_receipt_from_priority_op, search_direction_as_storage,
-        tx_receipt_from_response, validate_receipts_query,
+        depositing_balances_from_pending_ops, pending_account_op_receipt_from_priority_op,
+        validate_receipts_query,
     },
     AccountReceiptsQuery, SearchDirection,
 };

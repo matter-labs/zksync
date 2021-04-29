@@ -958,11 +958,11 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
                     .await?;
                 match block_status {
                     BlockStatus::Finalized => BatchStatus {
-                        updated_at: updated_at,
+                        updated_at,
                         last_state: TxInBlockStatus::Finalized,
                     },
                     BlockStatus::Committed => BatchStatus {
-                        updated_at: updated_at,
+                        updated_at,
                         last_state: TxInBlockStatus::Committed,
                     },
                     BlockStatus::Queued => BatchStatus {

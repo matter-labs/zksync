@@ -51,6 +51,7 @@ pub(super) mod convert {
         })
     }
 
+    #[allow(dead_code)]
     pub fn search_direction_as_storage(direction: SearchDirection) -> StorageSearchDirection {
         match direction {
             SearchDirection::Older => StorageSearchDirection::Older,
@@ -126,6 +127,7 @@ pub(super) mod convert {
         Ok((location, direction, query.limit))
     }
 
+    #[allow(dead_code)]
     pub fn tx_receipt_from_response(inner: AccountTxReceiptResponse) -> AccountTxReceipt {
         let block = BlockNumber(inner.block_number as u32);
         let index = inner.block_index.map(|x| x as u32);
@@ -166,6 +168,7 @@ pub(super) mod convert {
         }
     }
 
+    #[allow(dead_code)]
     pub fn op_receipt_from_response(inner: AccountOpReceiptResponse) -> AccountOpReceipt {
         let block = BlockNumber(inner.block_number as u32);
         let index = inner.block_index as u32;
