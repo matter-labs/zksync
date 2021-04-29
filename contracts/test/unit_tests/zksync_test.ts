@@ -18,7 +18,7 @@ import {
     ZkSyncWithdrawalUnitTestFactory
 } from '../../typechain';
 
-const TEST_PRIORITY_EXPIRATION = 17280;
+const TEST_PRIORITY_EXPIRATION = 101;
 const CHUNK_SIZE = 10;
 
 let wallet;
