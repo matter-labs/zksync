@@ -1,12 +1,10 @@
+// SPDX-License-Identifier: MIT OR Apache-2.0
+
 pragma solidity ^0.7.0;
 
 import "./NFTFactory.sol";
 import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
 
-/**
- * @title ZkSync Default ERC721 Non-Fungible Token Standard basic implementation
- * @dev see https://eips.ethereum.org/EIPS/eip-721
- */
 contract ZkSyncNFTFactory is ERC721, NFTFactory {
     // Optional mapping for token content hashes
     mapping(uint256 => bytes32) private _contentHashes;
@@ -21,7 +19,7 @@ contract ZkSyncNFTFactory is ERC721, NFTFactory {
     }
 
     function mintNFT(
-        address _creator,
+        address,
         address recipient,
         bytes32 contentHash,
         uint256 tokenId
@@ -32,7 +30,7 @@ contract ZkSyncNFTFactory is ERC721, NFTFactory {
     }
 
     function _beforeTokenTransfer(
-        address from,
+        address,
         address to,
         uint256 tokenId
     ) internal virtual override {
