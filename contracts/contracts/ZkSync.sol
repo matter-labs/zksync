@@ -492,9 +492,9 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
                     withdrawOrStore(uint16(op.tokenId), op.owner, op.amount);
                 } else {
                     if (op.amount == 1) {
-                        withdrawNFT(op.tokenId, op.owner, op.creator, op.contentHash);
+                        withdrawNFT(op.tokenId, op.owner, op.nftCreatorAddress, op.nftContentHash);
                     } else {
-                        revert("ds") // Unsupported amount for nft
+                        revert("ds"); // Unsupported amount for nft
                     }
                 }
             } else if (opType == Operations.OpType.WithdrawNFT) {
