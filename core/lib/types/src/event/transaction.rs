@@ -69,7 +69,7 @@ impl TransactionEvent {
                 tx_type: OnceCell::default(),
             },
             ExecutedOperations::PriorityOp(exec_prior_op) => Self {
-                tx_hash: exec_prior_op.priority_op.eth_hash.to_string(),
+                tx_hash: format!("{:#x}", exec_prior_op.priority_op.eth_hash),
                 account_id,
                 token_id: exec_prior_op.priority_op.data.token_id(),
                 block_number,
