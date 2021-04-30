@@ -111,9 +111,6 @@ pub struct StorageAccount {
 pub struct StorageBalance {
     pub account_id: i64,
     pub coin_id: i32,
-    // The DB stores balances as large numbers, so
-    // the only way to keep precision is too use serde_json::Number
-    // with unlimited precision and then convert it to BigUint
     #[serde(with = "BigUintSerdeAsRadix10Str")]
     pub balance: BigUint,
 }
