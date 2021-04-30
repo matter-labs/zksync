@@ -268,7 +268,10 @@ async fn submit_tx_batch(
         .submit_txs_batch(txs, Some(signatures))
         .await
         .map_err(ApiError::from)?
-        .transaction_hashes;
+        .transaction_hashes
+        .into_iter()
+        .map(|tx_hash| tx_hash.0)
+        .collect();
 
     Ok(Json(tx_hashes))
 }

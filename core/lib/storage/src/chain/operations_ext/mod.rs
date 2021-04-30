@@ -8,7 +8,7 @@ use chrono::{DateTime, Utc};
 use zksync_api_types::v02::{
     block::BlockStatus,
     pagination::{AccountTxsRequest, PaginationDirection, PaginationQuery},
-    transaction::{ApiTxBatch, BatchStatus, Transaction, TxInBlockStatus},
+    transaction::{ApiTxBatch, BatchStatus, Transaction, TxHashSerializeWrapper, TxInBlockStatus},
 };
 use zksync_types::{
     aggregated_operations::AggregatedActionType,
@@ -945,9 +945,9 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
         .await?;
         let result = if !batch_data.is_empty() {
             let created_at = batch_data[0].created_at;
-            let transaction_hashes: Vec<TxHash> = batch_data
+            let transaction_hashes: Vec<TxHashSerializeWrapper> = batch_data
                 .iter()
-                .map(|tx| TxHash::from_slice(&tx.tx_hash).unwrap())
+                .map(|tx| TxHashSerializeWrapper(TxHash::from_slice(&tx.tx_hash).unwrap()))
                 .collect();
             let block_number = BlockNumber(batch_data[0].block_number as u32);
             let batch_status = if batch_data[0].success {

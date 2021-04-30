@@ -365,7 +365,13 @@ async fn test_get_batch_info_from_mempool(mut storage: StorageProcessor<'_>) -> 
         .get_batch_info(batch_hash)
         .await?
         .unwrap();
-    assert_eq!(batch.transaction_hashes, tx_hashes);
+
+    let actual_tx_hashes: Vec<TxHash> = batch
+        .transaction_hashes
+        .into_iter()
+        .map(|tx_hash| tx_hash.0)
+        .collect();
+    assert_eq!(actual_tx_hashes, tx_hashes);
 
     Ok(())
 }

@@ -68,5 +68,6 @@ pub struct PendingOpsRequest {
 pub struct AccountTxsRequest {
     pub address: Address,
     pub account_id: AccountId,
+    #[serde(serialize_with = "ZeroPrefixHexSerde::serialize")]
     pub tx_hash: TxHash,
 }

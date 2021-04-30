@@ -1,7 +1,7 @@
 use crate::rest::client::{Client, Result};
 
 use zksync_api_types::v02::{pagination::PaginationQuery, Response};
-use zksync_types::tx::TxHash;
+use zksync_types::{tx::TxHash, SerialId};
 
 impl Client {
     pub async fn account_info_v02(
@@ -24,7 +24,7 @@ impl Client {
     ) -> Result<Response> {
         self.get_with_scope(
             super::API_V02_SCOPE,
-            &format!("block/{}/transactions", account_id_or_address),
+            &format!("account/{}/transactions", account_id_or_address),
         )
         .query(&pagination_query)
         .send()
@@ -33,12 +33,12 @@ impl Client {
 
     pub async fn account_pending_txs(
         &self,
-        pagination_query: &PaginationQuery<TxHash>,
+        pagination_query: &PaginationQuery<SerialId>,
         account_id_or_address: &str,
     ) -> Result<Response> {
         self.get_with_scope(
             super::API_V02_SCOPE,
-            &format!("block/{}/transactions/pending", account_id_or_address),
+            &format!("account/{}/transactions/pending", account_id_or_address),
         )
         .query(pagination_query)
         .send()

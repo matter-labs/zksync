@@ -21,7 +21,7 @@ use num::{bigint::ToBigInt, rational::Ratio, BigUint, CheckedSub, Zero};
 use thiserror::Error;
 
 // Workspace uses
-use zksync_api_types::v02::transaction::SubmitBatchResponse;
+use zksync_api_types::v02::transaction::{SubmitBatchResponse, TxHashSerializeWrapper};
 use zksync_config::ZkSyncConfig;
 use zksync_storage::{chain::account::records::EthAccountType, ConnectionPool};
 use zksync_types::{
@@ -656,7 +656,7 @@ impl TxSender {
 
         let batch_hash = TxHash::batch_hash(&tx_hashes);
         Ok(SubmitBatchResponse {
-            transaction_hashes: tx_hashes,
+            transaction_hashes: tx_hashes.into_iter().map(TxHashSerializeWrapper).collect(),
             batch_hash,
         })
     }

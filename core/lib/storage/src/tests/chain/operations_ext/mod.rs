@@ -620,8 +620,13 @@ async fn get_batch_info(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
         .await?
         .unwrap();
 
+    let actual_tx_hashes: Vec<TxHash> = batch_info
+        .transaction_hashes
+        .into_iter()
+        .map(|tx_hash| tx_hash.0)
+        .collect();
     assert_eq!(batch_info.batch_hash, batch_hash);
-    assert_eq!(batch_info.transaction_hashes, tx_hashes);
+    assert_eq!(actual_tx_hashes, tx_hashes);
     assert_eq!(batch_info.batch_status.last_state, TxInBlockStatus::Queued);
 
     // Get batch from queued block.
@@ -635,8 +640,13 @@ async fn get_batch_info(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
         .await?
         .unwrap();
 
+    let actual_tx_hashes: Vec<TxHash> = batch_info
+        .transaction_hashes
+        .into_iter()
+        .map(|tx_hash| tx_hash.0)
+        .collect();
     assert_eq!(batch_info.batch_hash, batch_hash);
-    assert_eq!(batch_info.transaction_hashes, tx_hashes);
+    assert_eq!(actual_tx_hashes, tx_hashes);
     assert_eq!(batch_info.batch_status.last_state, TxInBlockStatus::Queued);
 
     // Get batch from committed block.

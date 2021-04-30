@@ -178,16 +178,23 @@ pub struct ApiFullExit {
     pub tx_hash: TxHash,
 }
 
+#[derive(Clone, Debug, Serialize, Deserialize, Default, Ord, PartialOrd, Eq, PartialEq, Hash)]
+pub struct TxHashSerializeWrapper(
+    #[serde(serialize_with = "ZeroPrefixHexSerde::serialize")] pub TxHash,
+);
+
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub struct SubmitBatchResponse {
-    pub transaction_hashes: Vec<TxHash>,
+    pub transaction_hashes: Vec<TxHashSerializeWrapper>,
+    #[serde(serialize_with = "ZeroPrefixHexSerde::serialize")]
     pub batch_hash: TxHash,
 }
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub struct ApiTxBatch {
+    #[serde(serialize_with = "ZeroPrefixHexSerde::serialize")]
     pub batch_hash: TxHash,
-    pub transaction_hashes: Vec<TxHash>,
+    pub transaction_hashes: Vec<TxHashSerializeWrapper>,
     pub created_at: DateTime<Utc>,
     pub batch_status: BatchStatus,
 }

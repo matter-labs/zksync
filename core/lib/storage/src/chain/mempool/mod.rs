@@ -3,7 +3,9 @@ use std::{collections::VecDeque, convert::TryFrom, time::Instant};
 // External imports
 use itertools::Itertools;
 // Workspace imports
-use zksync_api_types::v02::transaction::{ApiTxBatch, BatchStatus, TxInBlockStatus};
+use zksync_api_types::v02::transaction::{
+    ApiTxBatch, BatchStatus, TxHashSerializeWrapper, TxInBlockStatus,
+};
 use zksync_types::{
     mempool::SignedTxVariant,
     tx::{TxEthSignature, TxHash},
@@ -437,7 +439,7 @@ impl<'a, 'c> MempoolSchema<'a, 'c> {
         .await?;
         let result = if !batch_data.is_empty() {
             let created_at = batch_data[0].created_at;
-            let transaction_hashes: Vec<TxHash> = batch_data
+            let transaction_hashes: Vec<TxHashSerializeWrapper> = batch_data
                 .iter()
                 .map(|tx| serde_json::from_str(&format!("\"0x{}\"", tx.tx_hash)).unwrap())
                 .collect();

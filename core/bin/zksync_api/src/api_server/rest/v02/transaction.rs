@@ -469,7 +469,7 @@ mod tests {
         core_api_client::CoreApiClient,
     };
     use actix_web::App;
-    use zksync_api_types::v02::ApiVersion;
+    use zksync_api_types::v02::{transaction::TxHashSerializeWrapper, ApiVersion};
     use zksync_types::{
         tokens::Token,
         tx::{EthBatchSignData, EthBatchSignatures, PackedEthSignature, TxEthSignature},
@@ -547,7 +547,10 @@ mod tests {
             .unzip();
         let expected_batch_hash = TxHash::batch_hash(&expected_tx_hashes);
         let expected_response = SubmitBatchResponse {
-            transaction_hashes: expected_tx_hashes,
+            transaction_hashes: expected_tx_hashes
+                .into_iter()
+                .map(TxHashSerializeWrapper)
+                .collect(),
             batch_hash: expected_batch_hash,
         };
 
