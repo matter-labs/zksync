@@ -102,4 +102,6 @@ contract Config {
     address internal constant SPECIAL_ACCOUNT_ADDRESS = address(0xFFfFfFffFFfffFFfFFfFFFFFffFFFffffFfFFFfF);
 
     uint32 internal constant MAX_FUNGIBLE_TOKEN_ID = $$((2**16) - 1);
+
+    uint32 internal constant NUMBER_OF_PARTNERS = 4;
 }

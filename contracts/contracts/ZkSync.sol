@@ -126,7 +126,79 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
     /// @notice zkSync contract upgrade. Can be external because Proxy contract intercepts illegal calls of this function.
     /// @param upgradeParameters Encoded representation of upgrade parameters
     // solhint-disable-next-line no-empty-blocks
-    function upgrade(bytes calldata upgradeParameters) external nonReentrant {}
+    function upgrade(bytes calldata upgradeParameters) external nonReentrant {
+        require(totalBlocksCommitted == totalBlocksProven, "wq1"); // All the blocks must be processed
+        require(totalBlocksCommitted == totalBlocksExecuted, "w12"); // All the blocks must be processed
+        bytes[] memory signatures;
+        StoredBlockInfo memory lastBlockInfo;
+        bytes32 newRootHash;
+
+        (signatures, newRootHash, lastBlockInfo) = abi.decode(upgradeParameters, (bytes[], bytes32, StoredBlockInfo));
+
+        require(storedBlockHashes[totalBlocksExecuted] == hashStoredBlockInfo(lastBlockInfo), "wqqs"); // The provided block info should be equal to the current one
+
+        // The minimal number of parter's signatures required
+        uint32 minimalNumberOfSignatures = 3;
+
+        // Should be replaced with the real partners
+        address payable[NUMBER_OF_PARTNERS] memory partners =
+            [
+                0x374Ac2A10cBCaE93d2aBBe468f0EDEF6768e65eE,
+                0xB991c776AedacfA5a7e8CF3e7aD6CB6C1AcB9227,
+                0x093Cf8450c5eE506aB865F68F5f8EB8C4C2073C2,
+                0x0d2200E8Ff14516397E86Ad63670516D371Dc862
+            ];
+
+        bytes32 messageHash =
+            keccak256(
+                abi.encodePacked(
+                    "\x19Ethereum Signed Message:\n157",
+                    "OldRootHash:0x",
+                    Bytes.bytesToHexASCIIBytes(abi.encodePacked(lastBlockInfo.stateHash)),
+                    ",NewRootHash:0x",
+                    Bytes.bytesToHexASCIIBytes(abi.encodePacked(newRootHash))
+                )
+            );
+
+        address[NUMBER_OF_PARTNERS] memory recoveredAddresses;
+        for (uint32 i = 0; i < signatures.length; i++) {
+            recoveredAddresses[i] = Utils.recoverAddressFromEthSignature(signatures[i], messageHash);
+        }
+
+        uint32 numberOfRecoveredAddresses = 0;
+        for (uint32 i = 0; i < partners.length; i++) {
+            bool hasSignature = false;
+
+            for (uint32 signatureId = 0; signatureId < signatures.length; signatureId++) {
+                if (recoveredAddresses[signatureId] == address(partners[i])) {
+                    hasSignature = true;
+                    break;
+                }
+            }
+
+            if (hasSignature) {
+                numberOfRecoveredAddresses += 1;
+            }
+        }
+
+        require(numberOfRecoveredAddresses >= minimalNumberOfSignatures, "wwi"); // Not enough number of signatures
+
+        totalBlocksCommitted += 1;
+        totalBlocksProven += 1;
+        totalBlocksExecuted += 1;
+
+        StoredBlockInfo memory storedBlockZero =
+            StoredBlockInfo(
+                totalBlocksExecuted,
+                firstPriorityRequestId,
+                EMPTY_STRING_KECCAK,
+                block.timestamp,
+                newRootHash,
+                bytes32(0)
+            );
+        storedBlockHashes[totalBlocksCommitted] = hashStoredBlockInfo(storedBlockZero);
+        return;
+    }
 
     /// @notice Sends tokens
     /// @dev NOTE: will revert if transfer call fails or rollup balance difference (before and after transfer) is bigger than _maxAmount
