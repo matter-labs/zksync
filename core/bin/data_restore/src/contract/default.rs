@@ -171,7 +171,6 @@ mod test {
             content_hash: None,
         }));
         let pub_data1 = op1.public_data();
-        println!("{:?}", op1.public_data());
         let op2 = get_rollup_ops_from_data(&pub_data1)
             .expect("cant get ops from data")
             .pop()

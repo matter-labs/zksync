@@ -315,6 +315,7 @@ fn execute_txs_batch_success_transfers() {
         &sk,
     )
     .unwrap();
+
     let transfer_bad = Transfer::new_signed(
         account_id,
         account.address,

@@ -154,7 +154,7 @@ contract Governance is Config {
         return tokenId;
     }
 
-    /// @notice Registers creator corresponding to the factory
+    /// @notice Register factory corresponding to the creator
     /// @param _creatorAddress NFT creator address
     /// @param _signature creator's signature
     function registerNFTFactory(address _creatorAddress, bytes memory _signature) external {

@@ -1,6 +1,6 @@
 use anyhow::{ensure, Result};
 use std::collections::{HashMap, VecDeque};
-use std::time::Instant;
+use std::time::{Instant, SystemTime, UNIX_EPOCH};
 // External uses
 use futures::{
     channel::{mpsc, oneshot},
@@ -13,7 +13,10 @@ use tokio::task::JoinHandle;
 use zksync_crypto::{
     convert::FeConvert,
     ff::{self, PrimeField, PrimeFieldRepr},
-    params::ETH_TOKEN_ID,
+    params::{
+        ETH_TOKEN_ID, MIN_NFT_TOKEN_ID, NFT_STORAGE_ACCOUNT_ADDRESS, NFT_STORAGE_ACCOUNT_ID,
+        NFT_TOKEN_ID,
+    },
     PrivateKey,
 };
 use zksync_state::state::{CollectedFee, OpSuccess, ZkSyncState};
@@ -34,10 +37,6 @@ use zksync_types::{
 use crate::{
     committer::{AppliedUpdatesRequest, BlockCommitRequest, CommitRequest},
     mempool::ProposedBlock,
-};
-use std::time::{SystemTime, UNIX_EPOCH};
-use zksync_crypto::params::{
-    MIN_NFT_TOKEN_ID, NFT_STORAGE_ACCOUNT_ADDRESS, NFT_STORAGE_ACCOUNT_ID, NFT_TOKEN_ID,
 };
 
 #[cfg(test)]

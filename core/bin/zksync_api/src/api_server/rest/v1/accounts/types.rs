@@ -19,16 +19,18 @@ use zksync_storage::{
 use zksync_types::{tx::TxHash, Account, BlockNumber, PriorityOp, ZkSyncPriorityOp, H256};
 
 // Local uses
+use crate::{api_server::v1::MAX_LIMIT, utils::token_db_cache::TokenDBCache};
+
 use super::{
     super::{transactions::Receipt, ApiError},
     unable_to_find_token,
 };
-use crate::{api_server::v1::MAX_LIMIT, utils::token_db_cache::TokenDBCache};
 
 pub(super) mod convert {
-    use super::*;
     use std::collections::HashMap;
     use zksync_crypto::params::{MIN_NFT_TOKEN_ID, NFT_TOKEN_ID_VAL};
+
+    use super::*;
 
     pub async fn account_state_from_storage(
         storage: &mut StorageProcessor<'_>,

@@ -16,6 +16,7 @@ use futures::{
     StreamExt,
 };
 use num::{
+    bigint::ToBigInt,
     rational::Ratio,
     traits::{Inv, Pow},
     BigUint, CheckedDiv, CheckedSub, Zero,
@@ -31,27 +32,24 @@ use zksync_config::{configs::ticker::TokenPriceSource, ZkSyncConfig};
 use zksync_storage::ConnectionPool;
 use zksync_types::{
     tokens::ChangePubKeyFeeTypeArg, tx::ChangePubKeyType, Address, BatchFee, ChangePubKeyOp, Fee,
-    OutputFeeType, SwapOp, Token, TokenId, TokenLike, TransferOp, TransferToNewOp, TxFeeTypes,
-    WithdrawNFTOp, WithdrawOp,
+    MintNFTOp, OutputFeeType, SwapOp, Token, TokenId, TokenLike, TransferOp, TransferToNewOp,
+    TxFeeTypes, WithdrawNFTOp, WithdrawOp,
 };
 use zksync_utils::ratio_to_big_decimal;
 
 // Local deps
-use crate::fee_ticker::ticker_info::{FeeTickerInfo, TickerInfo};
-use crate::fee_ticker::validator::MarketUpdater;
 use crate::fee_ticker::{
     ticker_api::{
         coingecko::CoinGeckoAPI, coinmarkercap::CoinMarketCapAPI, FeeTickerAPI, TickerApi,
         CONNECTION_TIMEOUT,
     },
+    ticker_info::{FeeTickerInfo, TickerInfo},
     validator::{
         watcher::{TokenWatcher, UniswapTokenWatcher},
-        FeeTokenValidator,
+        FeeTokenValidator, MarketUpdater,
     },
 };
 use crate::utils::token_db_cache::TokenDBCache;
-use num::bigint::ToBigInt;
-use zksync_types::operations::MintNFTOp;
 
 mod constants;
 mod ticker_api;

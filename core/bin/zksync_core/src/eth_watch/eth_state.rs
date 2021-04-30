@@ -66,6 +66,7 @@ impl ETHState {
     pub fn new_register_nft_factory_events(&self) -> &[RegisterNFTFactoryEvent] {
         &self.register_nft_factory_events
     }
+
     pub fn new_tokens(&self) -> &[NewTokenEvent] {
         &self.new_tokens
     }

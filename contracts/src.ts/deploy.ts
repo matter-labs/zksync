@@ -183,7 +183,7 @@ export class Deployer {
                 this.governorAddress,
                 process.env.CHAIN_STATE_KEEPER_FEE_ACCOUNT_ADDR
             ],
-            { gasLimit: 10000000, ...ethTxOptions }
+            { gasLimit: 5000000, ...ethTxOptions }
         );
         const deployFactoryTx = await deployFactoryContract.deployTransaction.wait();
         const deployFactoryInterface = new Interface(this.deployFactoryCode.abi);
