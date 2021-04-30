@@ -137,9 +137,6 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
 
         require(storedBlockHashes[totalBlocksExecuted] == hashStoredBlockInfo(lastBlockInfo), "wqqs"); // The provided block info should be equal to the current one
 
-        // The minimal number of parter's signatures required
-        uint32 minimalNumberOfSignatures = 3;
-
         // Should be replaced with the real partners
         address payable[NUMBER_OF_PARTNERS] memory partners =
             [
@@ -181,7 +178,7 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
             }
         }
 
-        require(numberOfRecoveredAddresses >= minimalNumberOfSignatures, "wwi"); // Not enough number of signatures
+        require(numberOfRecoveredAddresses >= NUMBER_OF_PARTNER_SIGNATURES_REQUIRED, "wwi"); // Not enough number of signatures
 
         totalBlocksCommitted += 1;
         totalBlocksProven += 1;
