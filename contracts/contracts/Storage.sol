@@ -41,7 +41,7 @@ contract Storage {
     /// @dev Total number of executed blocks i.e. blocks[totalBlocksExecuted] points at the latest executed block (block 0 is genesis)
     uint32 public totalBlocksExecuted;
 
-    /// @dev Total number of committed blocks i.e. blocks[totalBlocksCommitted] points at the latest committed block
+    /// @notice Total number of committed blocks i.e. blocks[totalBlocksCommitted] points at the latest committed block
     uint32 public totalBlocksCommitted;
 
     /// @dev Flag indicates that a user has exited in the exodus mode certain token balance (per account id and tokenId)

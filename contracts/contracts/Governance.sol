@@ -58,6 +58,7 @@ contract Governance is Config {
     ///     _networkGovernor The address of network governor
     function initialize(bytes calldata initializationParameters) external {
         address _networkGovernor = abi.decode(initializationParameters, (address));
+
         networkGovernor = _networkGovernor;
     }
 
