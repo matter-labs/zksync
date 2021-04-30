@@ -9,11 +9,13 @@ use account::{
 };
 
 use structopt::StructOpt;
-use utils::{fr_to_hex, sign_update_message};
+use utils::{fr_to_hex, sign_message};
 use zksync_circuit::witness::utils::fr_from_bytes;
 
 use hasher::{get_state, verify_accounts_equal, verify_identical_trees};
 use zksync_crypto::params::NFT_STORAGE_ACCOUNT_ID;
+
+use crate::utils::get_message_to_sign;
 
 #[derive(StructOpt)]
 pub struct Params {
@@ -66,6 +68,9 @@ fn main() {
     let new_hash = new_tree.root_hash();
     println!("NewHash: {}", fr_to_hex(new_hash));
 
-    let signature = sign_update_message(params.private_key, old_hash, new_hash);
-    println!("Signature: {}", signature);
+    let message_to_sign = get_message_to_sign(old_hash, new_hash);
+    println!("\nSigning prefixed message: {}", message_to_sign);
+
+    let signature = sign_message(params.private_key, message_to_sign);
+    println!("\nSignature: {}", signature);
 }

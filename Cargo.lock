@@ -3949,7 +3949,6 @@ dependencies = [
  "hex",
  "num",
  "once_cell",
- "parity-crypto",
  "serde",
  "serde_json",
  "structopt",
