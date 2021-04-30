@@ -25,10 +25,10 @@ use crate::{
     QueryResult, StorageProcessor,
 };
 
-mod setup;
+pub mod setup;
 
 /// Commits the data from the test setup to the database.
-async fn commit_schema_data(
+pub async fn commit_schema_data(
     storage: &mut StorageProcessor<'_>,
     setup: &TransactionsHistoryTestSetup,
 ) -> QueryResult<()> {
@@ -69,7 +69,7 @@ async fn confirm_eth_op(
     Ok(())
 }
 
-async fn commit_block(
+pub async fn commit_block(
     mut storage: &mut StorageProcessor<'_>,
     block_number: BlockNumber,
 ) -> QueryResult<()> {
@@ -108,7 +108,7 @@ async fn commit_block(
     Ok(())
 }
 
-async fn verify_block(
+pub async fn verify_block(
     mut storage: &mut StorageProcessor<'_>,
     block_number: BlockNumber,
 ) -> QueryResult<()> {

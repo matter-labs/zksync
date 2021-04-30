@@ -957,29 +957,30 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
         Ok(self.save_block(block).await?)
     }
 
-    pub async fn get_block_status_and_last_updated(
+    /// Returns status and last time it was updated of block that exists in `blocks` table.
+    pub async fn get_status_and_last_updated_of_existing_block(
         &mut self,
         block_number: BlockNumber,
     ) -> QueryResult<(BlockStatus, DateTime<Utc>)> {
         let mut transaction = self.0.start_transaction().await?;
-        let (is_finalized, finalized_at) = transaction
+        let (is_finalized_confirmed, finalized_at) = transaction
             .chain()
             .operations_schema()
             .get_stored_aggregated_operation(block_number, AggregatedActionType::ExecuteBlocks)
             .await
             .map(|operation| (operation.confirmed, operation.created_at))
             .unwrap_or((false, chrono::MIN_DATETIME));
-        let result = if is_finalized {
+        let result = if is_finalized_confirmed {
             (BlockStatus::Finalized, finalized_at)
         } else {
-            let (is_committed, committed_at) = transaction
+            let (is_committed_confirmed, committed_at) = transaction
                 .chain()
                 .operations_schema()
                 .get_stored_aggregated_operation(block_number, AggregatedActionType::CommitBlocks)
                 .await
                 .map(|operation| (operation.confirmed, operation.created_at))
                 .unwrap_or((false, chrono::MIN_DATETIME));
-            if is_committed {
+            if is_committed_confirmed {
                 (BlockStatus::Committed, committed_at)
             } else {
                 (BlockStatus::Queued, chrono::MIN_DATETIME)
@@ -1115,7 +1116,7 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
                 let block_status = transaction
                     .chain()
                     .block_schema()
-                    .get_block_status_and_last_updated(block_number)
+                    .get_status_and_last_updated_of_existing_block(block_number)
                     .await?
                     .0;
                 let txs: Vec<Transaction> = raw_txs

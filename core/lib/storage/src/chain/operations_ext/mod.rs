@@ -954,7 +954,7 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
                 let (block_status, updated_at) = transaction
                     .chain()
                     .block_schema()
-                    .get_block_status_and_last_updated(block_number)
+                    .get_status_and_last_updated_of_existing_block(block_number)
                     .await?;
                 match block_status {
                     BlockStatus::Finalized => BatchStatus {

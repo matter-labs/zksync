@@ -170,7 +170,7 @@ impl ApiTransactionData {
             let status = storage
                 .chain()
                 .block_schema()
-                .get_block_status_and_last_updated(BlockNumber(op.block_number as u32))
+                .get_status_and_last_updated_of_existing_block(BlockNumber(op.block_number as u32))
                 .await
                 .map_err(Error::storage)?
                 .0;
@@ -208,7 +208,9 @@ impl ApiTransactionData {
             let status = storage
                 .chain()
                 .block_schema()
-                .get_block_status_and_last_updated(BlockNumber(receipt.block_number as u32))
+                .get_status_and_last_updated_of_existing_block(BlockNumber(
+                    receipt.block_number as u32,
+                ))
                 .await?
                 .0;
             Ok(Some(l2_receipt_from_response_and_status(receipt, status)))
@@ -264,7 +266,7 @@ impl ApiTransactionData {
             let status = storage
                 .chain()
                 .block_schema()
-                .get_block_status_and_last_updated(BlockNumber(op.block_number as u32))
+                .get_status_and_last_updated_of_existing_block(BlockNumber(op.block_number as u32))
                 .await
                 .map_err(Error::storage)?
                 .0;
@@ -314,7 +316,7 @@ impl ApiTransactionData {
             let block_status = storage
                 .chain()
                 .block_schema()
-                .get_block_status_and_last_updated(BlockNumber(op.block_number as u32))
+                .get_status_and_last_updated_of_existing_block(BlockNumber(op.block_number as u32))
                 .await?
                 .0;
             let eth_signature = op.eth_sign_data.clone().map(get_sign_bytes);
