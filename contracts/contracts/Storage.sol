@@ -49,7 +49,7 @@ contract Storage {
 
     /// @dev Flag indicates that exodus (mass exit) mode is triggered
     /// @dev Once it was raised, it can not be cleared again, and all users must exit
-    bool internal exodusMode;
+    bool public exodusMode;
 
     /// @dev User authenticated fact hashes for some nonce.
     mapping(address => mapping(uint32 => bytes32)) public authFacts;
