@@ -73,6 +73,7 @@ async fn store_operation(
 }
 
 fn check_block_event(event: &ZkSyncEvent, block_status: BlockStatus, block_number: BlockNumber) {
+    assert_eq!(event.block_number, block_number);
     let block_event = match &event.data {
         EventData::Block(block_event) => block_event,
         _ => panic!("block event expected"),
@@ -245,7 +246,10 @@ async fn test_account_events(mut storage: StorageProcessor<'_>) -> QueryResult<(
     assert!(events
         .iter()
         .all(|event| check_account_event(event, AccountStateChangeStatus::Committed)));
-
+    // And the block number is correct too.
+    assert!(events
+        .iter()
+        .all(|event| event.block_number == BlockNumber(1)));
     // Update the offset.
     let last_event_id = events.last().unwrap().id;
     // New pack of updates. Commit it and apply the previous one.
@@ -268,11 +272,13 @@ async fn test_account_events(mut storage: StorageProcessor<'_>) -> QueryResult<(
     assert_eq!(events.len(), updates_block_1.len() + updates_block_2.len());
     assert!(events
         .iter()
-        .take(updates_block_1.len())
-        .all(|event| check_account_event(event, AccountStateChangeStatus::Committed)));
+        .take(updates_block_2.len())
+        .all(|event| event.block_number == BlockNumber(2)
+            && check_account_event(event, AccountStateChangeStatus::Committed)));
     assert!(events
         .iter()
-        .skip(updates_block_1.len())
-        .all(|event| check_account_event(event, AccountStateChangeStatus::Finalized)));
+        .skip(updates_block_2.len())
+        .all(|event| event.block_number == BlockNumber(1)
+            && check_account_event(event, AccountStateChangeStatus::Finalized)));
     Ok(())
 }

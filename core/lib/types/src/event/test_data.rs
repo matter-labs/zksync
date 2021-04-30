@@ -31,6 +31,7 @@ pub fn get_block_event(block_status: BlockStatus) -> ZkSyncEvent {
     };
     ZkSyncEvent {
         id: EventId(0),
+        block_number: BlockNumber(0),
         data: EventData::Block(block_event),
     }
 }
@@ -63,6 +64,7 @@ pub fn get_account_event(
     };
     ZkSyncEvent {
         id: EventId(0),
+        block_number: BlockNumber(0),
         data: EventData::Account(account_update),
     }
 }
@@ -90,6 +92,7 @@ pub fn get_transaction_event(
     };
     ZkSyncEvent {
         id: EventId(0),
+        block_number: BlockNumber(0),
         data: EventData::Transaction(tx_event),
     }
 }

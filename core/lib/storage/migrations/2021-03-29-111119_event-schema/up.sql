@@ -2,6 +2,7 @@ CREATE TYPE event_type AS ENUM ('Account', 'Block', 'Transaction');
 
 CREATE TABLE events (
     id BIGSERIAL PRIMARY KEY,
+    block_number BIGINT NOT NULL,
     event_type event_type NOT NULL,
     event_data jsonb NOT NULL
 );
