@@ -58,13 +58,17 @@ const StoredBlockInfoAbi = {
     type: 'tuple'
 };
 
-describe('Regenesis test', function () {
+describe.only('Regenesis test', function () {
     this.timeout(50000);
 
     it('Test that regenesis upgrade works', async () => {
         const wallets = await hardhat.ethers.getSigners();
         // Get some wallet different from than the default one.
-        const wallet = wallets[0];
+        const wallet: ethers.Wallet = wallets[0];
+
+        console.log(wallet.address);
+        console.log(await wallet.getTransactionCount());
+        return;
 
         const contracts = readProductionContracts();
         contracts.zkSync = readContractCode('dev-contracts/ZkSyncRegenesisTest');

@@ -77,7 +77,8 @@ export function deployedAddressesFromEnv(): DeployedAddresses {
         VerifierTarget: process.env.CONTRACTS_VERIFIER_TARGET_ADDR,
         ZkSync: process.env.CONTRACTS_CONTRACT_ADDR,
         ZkSyncTarget: process.env.CONTRACTS_CONTRACT_TARGET_ADDR,
-        ForcedExit: process.env.CONTRACTS_FORCED_EXIT_ADDR
+        ForcedExit: process.env.CONTRACTS_FORCED_EXIT_ADDR,
+        
     };
 }
 
@@ -241,6 +242,10 @@ export class Deployer {
             );
         }
         this.addresses.ForcedExit = forcedExitContract.address;
+    }
+
+    public async deployRegenesisMultisig() {
+
     }
 
     public async publishSourcesToTesseracts() {

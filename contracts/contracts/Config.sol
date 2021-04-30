@@ -104,7 +104,5 @@ contract Config {
     uint32 internal constant MAX_FUNGIBLE_TOKEN_ID = $$((2**16) - 1);
 
     /// @dev The number of the partners for regenesis upgrade. May be different in production
-    uint32 internal constant NUMBER_OF_PARTNERS = 4;
-    /// @dev The number of the partners' signatures required for regenesis upgrade. May be different in production
-    uint32 internal constant NUMBER_OF_PARTNER_SIGNATURES_REQUIRED = 3;
+    address internal REGENESIS_MULTISIG_ADDRESS = address(0xFFfFfFffFFfffFFfFFfFFFFFffFFFffffFfFFFfF);
 }

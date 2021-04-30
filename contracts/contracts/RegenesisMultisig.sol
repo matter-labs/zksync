@@ -1,0 +1,79 @@
+// SPDX-License-Identifier: MIT OR Apache-2.0
+
+pragma solidity ^0.7.0;
+
+import "./Ownable.sol";
+import "./Utils.sol";
+
+pragma experimental ABIEncoderV2;
+
+/// @title zkSync main contract
+/// @author Matter Labs
+contract RegenesisMultisig is Ownable {
+
+    address[] partners;
+
+    uint32 requiredNumberOfSignatures;
+
+    // The total number of partners. May be different 
+    // in production
+    uint32 constant NUMBER_OF_PARTNERS = 4;
+
+    bytes32 public oldRootHash = bytes32(0);
+    bytes32 public newRootHash = bytes32(0);
+
+    constructor(
+        address[] memory _partners,
+        uint32 _requiredNumberOfSignatures
+    ) Ownable(msg.sender) {
+        // There obviously should require less signatures than there are addresses
+        require(_requiredNumberOfSignatures <= _partners.length, "0");
+        require(_partners.length == NUMBER_OF_PARTNERS, "1"); // The number of the supplied partners is not correct
+
+        partners = _partners;
+
+        requiredNumberOfSignatures = _requiredNumberOfSignatures;
+    }
+
+    function submitSignatures(
+        bytes32 _oldRootHash,
+        bytes32 _newRootHash,
+        bytes[] memory _signatures
+    ) external {
+        requireMaster(msg.sender);
+        require(_signatures.length <= NUMBER_OF_PARTNERS); // Obviously we can't submit more signatures than there are partners
+
+        bytes32 messageHash =
+            keccak256(
+                abi.encodePacked(
+                    "\x19Ethereum Signed Message:\n157",
+                    "OldRootHash:0x",
+                    Bytes.bytesToHexASCIIBytes(abi.encodePacked(_oldRootHash)),
+                    ",NewRootHash:0x",
+                    Bytes.bytesToHexASCIIBytes(abi.encodePacked(_newRootHash))
+                )
+            );
+        
+        address[NUMBER_OF_PARTNERS] memory recoveredAddresses;
+        for (uint32 i = 0; i < _signatures.length; i++) {
+            recoveredAddresses[i] = Utils.recoverAddressFromEthSignature(_signatures[i], messageHash);
+        }
+
+        uint32 collectedSignatures = 0;
+        for (uint32 i = 0; i < partners.length; i++) {
+            address partner = partners[i];
+
+            for(uint signatureId = 0; signatureId < _signatures.length; signatureId++) {
+                if(recoveredAddresses[signatureId] == partner) {
+                    collectedSignatures += 1;
+                    break;
+                }
+            }
+        }
+
+        require(collectedSignatures >= requiredNumberOfSignatures, "3"); // Not enough signatures
+
+        oldRootHash = _oldRootHash;
+        newRootHash = _newRootHash;
+    } 
+}
