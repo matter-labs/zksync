@@ -8,6 +8,7 @@ RUST_LOG="""\
 zksync_api=debug,\
 zksync_core=debug,\
 zksync_eth_sender=debug,\
+zksync_event_listener=info,\
 zksync_witness_generator=debug,\
 zksync_server=debug,\
 zksync_prover=debug,\
