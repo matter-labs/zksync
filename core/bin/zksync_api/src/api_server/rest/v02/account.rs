@@ -259,7 +259,7 @@ pub fn api_scope(
     web::scope("account")
         .data(data)
         .route(
-            "{account_id_or_address}/{block}",
+            "{account_id_or_address}/{account_state}",
             web::get().to(account_info),
         )
         .route(
