@@ -9,7 +9,7 @@ use zksync_api_types::v02::{
 use zksync_types::{
     aggregated_operations::{AggregatedActionType, AggregatedOperation},
     tx::TxHash,
-    AccountId, BlockNumber,
+    AccountId, BlockNumber, ExecutedOperations,
 };
 // Local imports
 use self::setup::TransactionsHistoryTestSetup;
@@ -304,7 +304,7 @@ async fn get_account_transactions_history_from(
     Ok(())
 }
 
-pub struct NewReceiptRequest {
+pub struct ReceiptRequest {
     tx_hash: TxHash,
     direction: PaginationDirection,
     limit: u32,
@@ -314,7 +314,7 @@ pub struct NewReceiptRequest {
 /// with the `get_account_transactions` method and the result will be
 /// same as expected.
 #[db_test]
-async fn get_account_transactions_receipts(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
+async fn get_account_transactions(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
     let mut setup = TransactionsHistoryTestSetup::new();
     let from = setup.from_zksync_account.address;
     let to = setup.to_zksync_account.address;
@@ -347,7 +347,7 @@ async fn get_account_transactions_receipts(mut storage: StorageProcessor<'_>) ->
     let test_data = vec![
         (
             "Get first five transactions.",
-            NewReceiptRequest {
+            ReceiptRequest {
                 tx_hash: setup.get_tx_hash(0, 0),
                 direction: PaginationDirection::Newer,
                 limit: 5,
@@ -362,7 +362,7 @@ async fn get_account_transactions_receipts(mut storage: StorageProcessor<'_>) ->
         ),
         (
             "Get a single transaction. (newer)",
-            NewReceiptRequest {
+            ReceiptRequest {
                 tx_hash: setup.get_tx_hash(0, 2),
                 direction: PaginationDirection::Newer,
                 limit: 1,
@@ -371,7 +371,7 @@ async fn get_account_transactions_receipts(mut storage: StorageProcessor<'_>) ->
         ),
         (
             "Get five transactions from some index.",
-            NewReceiptRequest {
+            ReceiptRequest {
                 tx_hash: setup.get_tx_hash(0, 4),
                 direction: PaginationDirection::Newer,
                 limit: 5,
@@ -386,7 +386,7 @@ async fn get_account_transactions_receipts(mut storage: StorageProcessor<'_>) ->
         ),
         (
             "Limit is more than number of txs. (Newer)",
-            NewReceiptRequest {
+            ReceiptRequest {
                 tx_hash: setup.get_tx_hash(1, 5),
                 direction: PaginationDirection::Newer,
                 limit: 5,
@@ -396,7 +396,7 @@ async fn get_account_transactions_receipts(mut storage: StorageProcessor<'_>) ->
         // Older search direction
         (
             "Get last five transactions.",
-            NewReceiptRequest {
+            ReceiptRequest {
                 tx_hash: setup.get_tx_hash(1, 6),
                 direction: PaginationDirection::Older,
                 limit: 5,
@@ -411,7 +411,7 @@ async fn get_account_transactions_receipts(mut storage: StorageProcessor<'_>) ->
         ),
         (
             "Get a single transaction. (older)",
-            NewReceiptRequest {
+            ReceiptRequest {
                 tx_hash: setup.get_tx_hash(0, 2),
                 direction: PaginationDirection::Older,
                 limit: 1,
@@ -420,7 +420,7 @@ async fn get_account_transactions_receipts(mut storage: StorageProcessor<'_>) ->
         ),
         (
             "Get some transactions from the previous block.",
-            NewReceiptRequest {
+            ReceiptRequest {
                 tx_hash: setup.get_tx_hash(1, 2),
                 direction: PaginationDirection::Older,
                 limit: 5,
@@ -435,7 +435,7 @@ async fn get_account_transactions_receipts(mut storage: StorageProcessor<'_>) ->
         ),
         (
             "Limit is more than number of txs. (Older)",
-            NewReceiptRequest {
+            ReceiptRequest {
                 tx_hash: setup.get_tx_hash(0, 2),
                 direction: PaginationDirection::Older,
                 limit: 5,
@@ -531,6 +531,158 @@ async fn get_account_transactions_receipts(mut storage: StorageProcessor<'_>) ->
         .await?
         .unwrap();
     assert_eq!(from_txs, to_txs);
+
+    Ok(())
+}
+
+/// Test `get_tx_created_at_and_block_number` method
+#[db_test]
+async fn get_tx_created_at_and_block_number(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
+    let mut setup = TransactionsHistoryTestSetup::new();
+    setup.add_block(1);
+    commit_schema_data(&mut storage, &setup).await?;
+
+    // Get priority op created_at and block_number
+    let tx_hash = setup.get_tx_hash(0, 0);
+    let result = storage
+        .chain()
+        .operations_ext_schema()
+        .get_tx_created_at_and_block_number(tx_hash)
+        .await?;
+    assert!(result.is_some());
+    assert_eq!(result.unwrap().1, BlockNumber(1));
+
+    // Get transaction created_at and block_number
+    let tx_hash = setup.get_tx_hash(0, 1);
+    let result = storage
+        .chain()
+        .operations_ext_schema()
+        .get_tx_created_at_and_block_number(tx_hash)
+        .await?;
+    assert!(result.is_some());
+    assert_eq!(result.unwrap().1, BlockNumber(1));
+
+    // Try to get unexisting tx
+    setup.add_block(2);
+    let tx_hash = setup.get_tx_hash(1, 0);
+    let result = storage
+        .chain()
+        .operations_ext_schema()
+        .get_tx_created_at_and_block_number(tx_hash)
+        .await?;
+    assert!(result.is_none());
+
+    Ok(())
+}
+
+/// Test `get_batch_info` method
+#[db_test]
+async fn get_batch_info(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
+    let mut setup = TransactionsHistoryTestSetup::new();
+
+    // `batch_id` will be added after we insert batch into mempool.
+    setup.add_block_with_batch(1, true);
+    setup.add_block_with_batch(2, false);
+
+    for i in 0..2 {
+        let txs: Vec<_> = setup.blocks[i]
+            .block_transactions
+            .iter()
+            .map(|tx| tx.get_executed_tx().unwrap().signed_tx.clone())
+            .collect();
+        let batch_id = storage
+            .chain()
+            .mempool_schema()
+            .insert_batch(&txs, Vec::new())
+            .await?;
+        setup.blocks[i]
+            .block_transactions
+            .iter_mut()
+            .for_each(|tx| match tx {
+                ExecutedOperations::Tx(tx) => {
+                    tx.batch_id = Some(batch_id);
+                }
+                _ => unreachable!(),
+            });
+    }
+
+    // Get batch from mempool
+    let tx_hashes = vec![
+        setup.get_tx_hash(0, 0),
+        setup.get_tx_hash(0, 1),
+        setup.get_tx_hash(0, 2),
+    ];
+    let batch_hash = TxHash::batch_hash(&tx_hashes);
+    let batch_info = storage
+        .chain()
+        .operations_ext_schema()
+        .get_batch_info(batch_hash)
+        .await?
+        .unwrap();
+
+    assert_eq!(batch_info.batch_hash, batch_hash);
+    assert_eq!(batch_info.transaction_hashes, tx_hashes);
+    assert_eq!(batch_info.batch_status.last_state, TxInBlockStatus::Queued);
+
+    // Get batch from queued block.
+    commit_schema_data(&mut storage, &setup).await?;
+    storage.chain().mempool_schema().collect_garbage().await?;
+
+    let batch_info = storage
+        .chain()
+        .operations_ext_schema()
+        .get_batch_info(batch_hash)
+        .await?
+        .unwrap();
+
+    assert_eq!(batch_info.batch_hash, batch_hash);
+    assert_eq!(batch_info.transaction_hashes, tx_hashes);
+    assert_eq!(batch_info.batch_status.last_state, TxInBlockStatus::Queued);
+
+    // Get batch from committed block.
+    commit_block(&mut storage, BlockNumber(1)).await?;
+
+    let batch_info = storage
+        .chain()
+        .operations_ext_schema()
+        .get_batch_info(batch_hash)
+        .await?
+        .unwrap();
+    assert_eq!(
+        batch_info.batch_status.last_state,
+        TxInBlockStatus::Committed
+    );
+
+    // Get batch from finalized block.
+    verify_block(&mut storage, BlockNumber(1)).await?;
+    let batch_info = storage
+        .chain()
+        .operations_ext_schema()
+        .get_batch_info(batch_hash)
+        .await?
+        .unwrap();
+    assert_eq!(
+        batch_info.batch_status.last_state,
+        TxInBlockStatus::Finalized
+    );
+
+    // Get failed batch.
+    let tx_hashes = vec![
+        setup.get_tx_hash(1, 0),
+        setup.get_tx_hash(1, 1),
+        setup.get_tx_hash(1, 2),
+    ];
+    let batch_hash = TxHash::batch_hash(&tx_hashes);
+    let batch_info = storage
+        .chain()
+        .operations_ext_schema()
+        .get_batch_info(batch_hash)
+        .await?
+        .unwrap();
+    assert_eq!(
+        batch_info.batch_status.last_state,
+        TxInBlockStatus::Rejected
+    );
 
     Ok(())
 }

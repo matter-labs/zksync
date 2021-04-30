@@ -975,7 +975,7 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
             let (is_committed, committed_at) = transaction
                 .chain()
                 .operations_schema()
-                .get_stored_aggregated_operation(block_number, AggregatedActionType::ExecuteBlocks)
+                .get_stored_aggregated_operation(block_number, AggregatedActionType::CommitBlocks)
                 .await
                 .map(|operation| (operation.confirmed, operation.created_at))
                 .unwrap_or((false, chrono::MIN_DATETIME));

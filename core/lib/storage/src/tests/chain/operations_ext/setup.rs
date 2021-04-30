@@ -140,6 +140,34 @@ impl TransactionsHistoryTestSetup {
         self.blocks.push(block);
     }
 
+    pub fn add_block_with_batch(&mut self, block_id: u32, success: bool) {
+        let block_indexes = if success {
+            vec![Some(0), Some(1), Some(2)]
+        } else {
+            vec![None, None, None]
+        };
+        let transfer_op_0 = self.create_transfer_tx(block_indexes[0]);
+        let transfer_op_1 = self.create_transfer_tx(block_indexes[1]);
+        let transfer_op_2 = self.create_transfer_tx(block_indexes[2]);
+
+        let operations = vec![transfer_op_0, transfer_op_1, transfer_op_2];
+
+        let block = Block::new(
+            BlockNumber(block_id),
+            Fr::zero(),
+            AccountId(0),
+            operations,
+            (0, 0), // Not important
+            100,
+            1_000_000.into(), // Not important
+            1_500_000.into(), // Not important
+            Default::default(),
+            0,
+        );
+
+        self.blocks.push(block);
+    }
+
     fn create_deposit_op(
         &mut self,
         serial_id: u64,
