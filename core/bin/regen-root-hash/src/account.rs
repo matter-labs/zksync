@@ -98,7 +98,7 @@ pub trait CircuitAccountWrapper: Sync + Default + GetBits {
     fn get_inner(&self) -> CircuitAccount<Engine>;
 }
 
-#[derive(Deserialize)]
+#[derive(Debug, Deserialize)]
 pub struct StorageAccount {
     pub id: i64,
     pub last_block: i64,
@@ -107,7 +107,7 @@ pub struct StorageAccount {
     pub pubkey_hash: String,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct StorageBalance {
     pub account_id: i64,
     pub coin_id: i32,

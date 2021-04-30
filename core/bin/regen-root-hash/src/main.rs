@@ -17,7 +17,7 @@ use zksync_crypto::params::NFT_STORAGE_ACCOUNT_ID;
 
 use crate::utils::get_message_to_sign;
 
-#[derive(StructOpt)]
+#[derive(Debug, StructOpt)]
 pub struct Params {
     /// The current root hash (balance subtree depth 11)
     #[structopt(short = "h", env = "CURRENT_ROOT_HASH")]
@@ -50,7 +50,7 @@ fn main() {
     verify_empty(NFT_STORAGE_ACCOUNT_ID.0, &old_tree).unwrap();
 
     let old_hash = old_tree.root_hash();
-    println!("OldHash: {}", fr_to_hex(old_hash));
+    println!("OldHash: 0x{}", fr_to_hex(old_hash));
 
     assert_eq!(
         old_hash, current_hash_fr,
@@ -66,11 +66,11 @@ fn main() {
     let nft_account = get_nft_account();
     new_tree.insert(NFT_STORAGE_ACCOUNT_ID.0, nft_account);
     let new_hash = new_tree.root_hash();
-    println!("NewHash: {}", fr_to_hex(new_hash));
+    println!("NewHash: 0x{}", fr_to_hex(new_hash));
 
     let message_to_sign = get_message_to_sign(old_hash, new_hash);
     println!("\nSigning prefixed message: {}", message_to_sign);
 
     let signature = sign_message(params.private_key, message_to_sign);
-    println!("\nSignature: {}", signature);
+    println!("\nSignature: 0x{}", signature);
 }
