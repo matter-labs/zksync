@@ -123,13 +123,37 @@ export class BatchBuilder {
         this.txs.push({
             type: 'Withdraw',
             tx: _withdraw,
-            feeType: feeType,
+            feeType,
             address: _withdraw.ethAddress,
             token: _withdraw.token
         });
         return this;
     }
 
+    addMintNFT(mintNFT: {
+        recipient: string;
+        contentHash: string;
+        feeToken: TokenLike;
+        fee?: BigNumberish;
+        nonce?: Nonce;
+    }): BatchBuilder {
+        const _mintNft = {
+            recipient: mintNFT.recipient,
+            contentHash: mintNFT.contentHash,
+            feeToken: mintNFT.feeToken,
+            fee: mintNFT.fee || 0,
+            nonce: null
+        };
+        this.txs.push({
+            type: 'MintNFT',
+            tx: _mintNft,
+            feeType: 'MintNFT',
+            address: _mintNft.recipient,
+            token: _mintNft.feeToken
+        });
+
+        return this;
+    }
     addTransfer(transfer: {
         to: Address;
         token: TokenLike;
@@ -273,6 +297,11 @@ export class BatchBuilder {
                     messages.push(this.wallet.getForcedExitEthMessagePart(tx.tx));
                     const forcedExit = { tx: await this.wallet.getForcedExit(tx.tx) };
                     processedTxs.push(forcedExit);
+                    break;
+                case 'MintNFT':
+                    messages.push(this.wallet.getMintNFTMessagePart(tx.tx));
+                    const mintNft = { tx: await this.wallet.getMintNFT(tx.tx) };
+                    processedTxs.push(mintNft);
                     break;
             }
         }

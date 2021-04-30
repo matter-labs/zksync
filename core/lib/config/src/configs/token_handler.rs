@@ -38,11 +38,8 @@ impl TokenHandlerConfig {
         let token_list_name = self.token_list_file();
         let path = format!("etc/token-lists/{}.json", token_list_name);
 
-        if let Ok(data) = &fs::read_to_string(path) {
-            serde_json::from_str(data).expect("Invalid config format")
-        } else {
-            vec![]
-        }
+        serde_json::from_str(&fs::read_to_string(path).expect("File for token list not found"))
+            .expect("Invalid config format")
     }
 }
 

@@ -322,9 +322,11 @@ impl TreeState {
                 ZkSyncOp::Noop(_) => {}
                 ZkSyncOp::MintNFTOp(_) => {
                     todo!()
+                    // Implement data restorer for Minting NFT (ZKS-657)
                 }
                 ZkSyncOp::WithdrawNFT(_) => {
                     todo!()
+                    // Implement data restorer for Minting NFT (ZKS-657)
                 }
             }
         }

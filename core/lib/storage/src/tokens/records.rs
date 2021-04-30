@@ -51,7 +51,10 @@ pub struct DbTickerPrice {
 
 #[derive(Debug, FromRow)]
 pub struct StorageNFT {
+    // Unique token id in zksync
     pub token_id: i32,
+    // Counter of generated tokens for the creator
+    // Required to enforce uniqueness of address
     pub serial_id: i32,
     pub creator_account_id: i32,
     pub creator_address: Vec<u8>,

@@ -22,13 +22,13 @@ use crate::{
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct MintNFT {
-    /// id of nft creator
+    /// Id of nft creator
     pub creator_id: AccountId,
-    /// address of nft creator
+    /// Address of nft creator
     pub creator_address: Address,
-    /// hash of data in nft token
+    /// Hash of data in nft token
     pub content_hash: H256,
-    /// recipient account
+    /// Recipient account
     pub recipient: Address,
     #[serde(with = "BigUintSerdeAsRadix10Str")]
     pub fee: BigUint,

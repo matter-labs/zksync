@@ -20,7 +20,6 @@ const CONFIG_FILES = [
     'rust.toml',
     'private.toml',
     'forced_exit_requests.toml',
-    'private.toml',
     'token_handler.toml',
     'nft_factory.toml'
 ];
