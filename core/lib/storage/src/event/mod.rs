@@ -40,6 +40,7 @@ impl<'a, 'c> EventSchema<'a, 'c> {
     /// parameter.
     async fn store_event_data(
         &mut self,
+        block_number: BlockNumber,
         event_type: EventType,
         event_data: Value,
     ) -> QueryResult<()> {
@@ -48,7 +49,8 @@ impl<'a, 'c> EventSchema<'a, 'c> {
         // sequences are always incremented ignoring
         // the fact whether the transaction is committed or reverted.
         sqlx::query!(
-            "INSERT INTO events VALUES (DEFAULT, $1, $2)",
+            "INSERT INTO events VALUES (DEFAULT, $1, $2, $3)",
+            i64::from(*block_number),
             event_type as EventType,
             event_data
         )
@@ -67,6 +69,7 @@ impl<'a, 'c> EventSchema<'a, 'c> {
             r#"
             SELECT
                 id,
+                block_number,
                 event_type as "event_type!: EventType",
                 event_data
             FROM events WHERE id > $1
@@ -123,7 +126,7 @@ impl<'a, 'c> EventSchema<'a, 'c> {
             Some(block_details) => block_details,
             None => {
                 vlog::warn!(
-                    "Couldn't create block event, no details found in the database. \
+                    "Couldn't create block event, no block details found in the database. \
                     Block number: {}, status: {:?}",
                     *block_number,
                     status
@@ -141,7 +144,7 @@ impl<'a, 'c> EventSchema<'a, 'c> {
 
         transaction
             .event_schema()
-            .store_event_data(EventType::Block, event_data)
+            .store_event_data(block_number, EventType::Block, event_data)
             .await?;
         transaction.commit().await?;
 
@@ -153,6 +156,7 @@ impl<'a, 'c> EventSchema<'a, 'c> {
     /// and store it in the database.
     pub async fn store_state_committed_event(
         &mut self,
+        block_number: BlockNumber,
         account_id: AccountId,
         account_update: &AccountUpdate,
     ) -> QueryResult<()> {
@@ -172,7 +176,7 @@ impl<'a, 'c> EventSchema<'a, 'c> {
         let event_data =
             serde_json::to_value(account_event).expect("couldn't serialize account event");
 
-        self.store_event_data(EventType::Account, event_data)
+        self.store_event_data(block_number, EventType::Account, event_data)
             .await?;
 
         metrics::histogram!("sql.event.store_state_committed_event", start.elapsed());
@@ -183,6 +187,7 @@ impl<'a, 'c> EventSchema<'a, 'c> {
     /// and store it in the database.
     pub async fn store_state_verified_event(
         &mut self,
+        block_number: BlockNumber,
         account_diff: &StorageAccountDiff,
     ) -> QueryResult<()> {
         let start = Instant::now();
@@ -200,7 +205,7 @@ impl<'a, 'c> EventSchema<'a, 'c> {
         let event_data =
             serde_json::to_value(account_event).expect("couldn't serialize account event");
 
-        self.store_event_data(EventType::Account, event_data)
+        self.store_event_data(block_number, EventType::Account, event_data)
             .await?;
 
         metrics::histogram!("sql.event.store_state_verified_event", start.elapsed());
@@ -269,7 +274,7 @@ impl<'a, 'c> EventSchema<'a, 'c> {
 
         transaction
             .event_schema()
-            .store_event_data(EventType::Transaction, event_data)
+            .store_event_data(block, EventType::Transaction, event_data)
             .await?;
         transaction.commit().await?;
 

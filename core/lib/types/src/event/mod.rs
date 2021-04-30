@@ -2,6 +2,7 @@
 // External uses
 use serde::Serialize;
 // Workspace uses
+use zksync_basic_types::BlockNumber;
 // Local uses
 use self::{account::AccountEvent, block::BlockEvent, transaction::TransactionEvent};
 
@@ -27,7 +28,8 @@ pub enum EventData {
 pub struct ZkSyncEvent {
     // Id of the event. This value is equal to
     // the id of the corresponding row in the database.
+    #[serde(skip)]
     pub id: EventId,
+    pub block_number: BlockNumber,
     pub data: EventData,
-    // TODO: Add a block_number field (ZKS-653).
 }

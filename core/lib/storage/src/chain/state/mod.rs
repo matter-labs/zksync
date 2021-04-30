@@ -64,7 +64,7 @@ impl<'a, 'c> StateSchema<'a, 'c> {
 
             transaction
                 .event_schema()
-                .store_state_committed_event(*id, upd)
+                .store_state_committed_event(block_number, *id, upd)
                 .await?;
 
             match *upd {
@@ -236,7 +236,7 @@ impl<'a, 'c> StateSchema<'a, 'c> {
         for acc_update in account_updates.into_iter() {
             transaction
                 .event_schema()
-                .store_state_verified_event(&acc_update)
+                .store_state_verified_event(block_number, &acc_update)
                 .await?;
 
             match acc_update {
