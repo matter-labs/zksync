@@ -155,6 +155,20 @@ pub struct OperationArgumentsDef {
     #[serde(with = "OptionalFrSerde")]
     pub special_serial_id: Option<Fr>,
     #[serde(with = "OptionalFrSerde")]
+    pub second_amount_packed: Option<Fr>,
+    #[serde(with = "VecOptionalFrSerde")]
+    pub special_tokens: Vec<Option<Fr>>,
+    #[serde(with = "VecOptionalFrSerde")]
+    pub special_accounts: Vec<Option<Fr>>,
+    #[serde(with = "VecOptionalFrSerde")]
+    pub special_amounts: Vec<Option<Fr>>,
+    #[serde(with = "VecOptionalFrSerde")]
+    pub special_nonces: Vec<Option<Fr>>,
+    #[serde(with = "VecOptionalFrSerde")]
+    pub special_prices: Vec<Option<Fr>>,
+    #[serde(with = "VecOptionalFrSerde")]
+    pub special_eth_addresses: Vec<Option<Fr>>,
+    #[serde(with = "OptionalFrSerde")]
     pub full_amount: Option<Fr>,
     #[serde(with = "OptionalFrSerde")]
     pub fee: Option<Fr>,
@@ -168,6 +182,10 @@ pub struct OperationArgumentsDef {
     pub valid_from: Option<Fr>,
     #[serde(with = "OptionalFrSerde")]
     pub valid_until: Option<Fr>,
+    #[serde(with = "OptionalFrSerde")]
+    pub second_valid_from: Option<Fr>,
+    #[serde(with = "OptionalFrSerde")]
+    pub second_valid_until: Option<Fr>,
 }
 
 #[derive(Serialize, Deserialize)]

@@ -38,11 +38,18 @@ impl TxHandler<Swap> for ZkSyncState {
             "Submitter account_id or address is incorrect"
         );
 
+        let (recipient_0, _) = self
+            .get_account_by_address(&tx.orders.0.recipient_address)
+            .ok_or_else(|| format_err!("Recipient account does not exist"))?;
+        let (recipient_1, _) = self
+            .get_account_by_address(&tx.orders.1.recipient_address)
+            .ok_or_else(|| format_err!("Recipient account does not exist"))?;
+
         Ok(SwapOp {
             tx: tx.clone(),
             submitter,
             accounts: (tx.orders.0.account_id, tx.orders.1.account_id),
-            recipients: (tx.orders.0.recipient_id, tx.orders.1.recipient_id),
+            recipients: (recipient_0, recipient_1),
         })
     }
 
@@ -71,19 +78,16 @@ impl ZkSyncState {
             order.account_id <= max_account_id(),
             "Account id is too big"
         );
-        ensure!(
-            order.recipient_id <= max_account_id(),
-            "Account id is too big"
-        );
         ensure!(order.token_buy <= max_token_id(), "Token is not supported");
         ensure!(order.token_sell <= max_token_id(), "Token is not supported");
+        ensure!(
+            order.token_buy != order.token_sell,
+            "Can't swap tokens with equal IDs"
+        );
 
         let account = self
             .get_account(order.account_id)
             .ok_or_else(|| format_err!("Account does not exist"))?;
-        let _recipient = self
-            .get_account(order.recipient_id)
-            .ok_or_else(|| format_err!("Recipient account does not exist"))?;
 
         ensure!(
             account.pub_key_hash != PubKeyHash::default(),
@@ -135,16 +139,16 @@ impl ZkSyncState {
             "Buy/Sell tokens do not match"
         );
         ensure!(
-            swap.orders.0.token_sell != swap.orders.1.token_sell,
-            "Can't swap for the same token"
-        );
-        ensure!(
             swap.orders.0.amount.is_zero() || swap.orders.0.amount == swap.amounts.0,
             "Amounts do not match"
         );
         ensure!(
             swap.orders.1.amount.is_zero() || swap.orders.1.amount == swap.amounts.1,
             "Amounts do not match"
+        );
+        ensure!(
+            swap.orders.0.account_id != swap.orders.1.account_id,
+            "Self-swap is not allowed"
         );
 
         let sold = &swap.amounts.0 * &swap.orders.0.price.1;

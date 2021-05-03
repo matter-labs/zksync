@@ -253,13 +253,13 @@ pub mod operations_test {
         let expected_op = {
             let tx = Swap::new(
                 AccountId(42),
-                Address::from_str("2a0a81e257a2f5d6ed4f07b81dbda09f107bd026").unwrap(),
+                Address::random(),
                 Nonce(43),
                 (
                     Order {
                         account_id: AccountId(5),
                         nonce: Nonce(123),
-                        recipient_id: AccountId(6),
+                        recipient_address: Address::random(),
                         token_buy: TokenId(1),
                         token_sell: TokenId(7),
                         amount: BigUint::from(0u8),
@@ -270,7 +270,7 @@ pub mod operations_test {
                     Order {
                         account_id: AccountId(7),
                         nonce: Nonce(100),
-                        recipient_id: AccountId(8),
+                        recipient_address: Address::random(),
                         token_buy: TokenId(7),
                         token_sell: TokenId(1),
                         amount: BigUint::from(12345u32),

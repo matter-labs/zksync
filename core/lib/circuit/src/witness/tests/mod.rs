@@ -42,6 +42,7 @@ mod forced_exit;
 mod full_exit;
 mod mint_nft;
 mod noop;
+mod swap;
 pub(crate) mod test_utils;
 mod transfer;
 mod transfer_to_new;

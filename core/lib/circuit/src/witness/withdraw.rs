@@ -3,7 +3,7 @@ use num::ToPrimitive;
 use zksync_crypto::franklin_crypto::{
     bellman::pairing::{
         bn256::{Bn256, Fr},
-        ff::{Field, PrimeField},
+        ff::Field,
     },
     rescue::RescueEngine,
 };
@@ -27,7 +27,7 @@ use crate::{
     operation::{Operation, OperationArguments, OperationBranch, OperationBranchWitness},
     utils::resize_grow_only,
     witness::{
-        utils::{apply_leaf_operation, get_audits, SigDataInput},
+        utils::{apply_leaf_operation, fr_from, get_audits, SigDataInput},
         Witness,
     },
 };
@@ -128,7 +128,7 @@ impl Witness for WithdrawWitness<Bn256> {
         let operation_zero = Operation {
             new_root: self.after_root,
             tx_type: self.tx_type,
-            chunk: Some(Fr::from_str("0").unwrap()),
+            chunk: Some(fr_from(0)),
             pubdata_chunk: Some(pubdata_chunks[0]),
             first_sig_msg: Some(input.first_sig_msg),
             second_sig_msg: Some(input.second_sig_msg),
@@ -143,7 +143,7 @@ impl Witness for WithdrawWitness<Bn256> {
         let rest_operations = (1..WithdrawOp::CHUNKS).map(|chunk| Operation {
             new_root: self.after_root,
             tx_type: self.tx_type,
-            chunk: Some(Fr::from_str(&chunk.to_string()).unwrap()),
+            chunk: Some(fr_from(chunk)),
             pubdata_chunk: Some(pubdata_chunks[chunk]),
             first_sig_msg: Some(input.first_sig_msg),
             second_sig_msg: Some(input.second_sig_msg),
@@ -160,44 +160,6 @@ impl Witness for WithdrawWitness<Bn256> {
     }
 }
 
-impl<E: RescueEngine> WithdrawWitness<E> {
-    pub fn get_sig_bits(&self) -> Vec<bool> {
-        let mut sig_bits = vec![];
-        append_be_fixed_width(
-            &mut sig_bits,
-            &Fr::from_str("3").unwrap(), //Corresponding tx_type
-            TX_TYPE_BIT_WIDTH,
-        );
-        append_be_fixed_width(
-            &mut sig_bits,
-            &self.before.witness.account_witness.pub_key_hash.unwrap(),
-            NEW_PUBKEY_HASH_WIDTH,
-        );
-        append_be_fixed_width(
-            &mut sig_bits,
-            &self.args.eth_address.unwrap(),
-            ETH_ADDRESS_BIT_WIDTH,
-        );
-        append_be_fixed_width(&mut sig_bits, &self.before.token.unwrap(), TOKEN_BIT_WIDTH);
-        append_be_fixed_width(
-            &mut sig_bits,
-            &self.args.full_amount.unwrap(),
-            BALANCE_BIT_WIDTH,
-        );
-        append_be_fixed_width(
-            &mut sig_bits,
-            &self.args.fee.unwrap(),
-            FEE_MANTISSA_BIT_WIDTH + FEE_EXPONENT_BIT_WIDTH,
-        );
-        append_be_fixed_width(
-            &mut sig_bits,
-            &self.before.witness.account_witness.nonce.unwrap(),
-            NONCE_BIT_WIDTH,
-        );
-        sig_bits
-    }
-}
-
 impl WithdrawWitness<Bn256> {
     fn apply_data(tree: &mut CircuitAccountTree, withdraw: &WithdrawData) -> Self {
         //preparing data and base witness
@@ -208,9 +170,9 @@ impl WithdrawWitness<Bn256> {
 
         let capacity = tree.capacity();
         assert_eq!(capacity, 1 << account_tree_depth());
-        let account_address_fe = Fr::from_str(&withdraw.account_address.to_string()).unwrap();
-        let token_fe = Fr::from_str(&withdraw.token.to_string()).unwrap();
-        let amount_as_field_element = Fr::from_str(&withdraw.amount.to_string()).unwrap();
+        let account_address_fe = fr_from(withdraw.account_address);
+        let token_fe = fr_from(withdraw.token);
+        let amount_as_field_element = fr_from(withdraw.amount);
 
         let amount_bits = FloatConversions::to_float(
             withdraw.amount,
@@ -222,7 +184,7 @@ impl WithdrawWitness<Bn256> {
 
         let amount_encoded: Fr = le_bit_vector_into_field_element(&amount_bits);
 
-        let fee_as_field_element = Fr::from_str(&withdraw.fee.to_string()).unwrap();
+        let fee_as_field_element = fr_from(withdraw.fee);
 
         let fee_bits = FloatConversions::to_float(
             withdraw.fee,
@@ -244,7 +206,7 @@ impl WithdrawWitness<Bn256> {
                 withdraw.account_address,
                 withdraw.token,
                 |acc| {
-                    acc.nonce.add_assign(&Fr::from_str("1").unwrap());
+                    acc.nonce.add_assign(&fr_from(1));
                 },
                 |bal| {
                     bal.value.sub_assign(&amount_as_field_element);
@@ -287,22 +249,21 @@ impl WithdrawWitness<Bn256> {
                 amount_packed: Some(amount_encoded),
                 full_amount: Some(amount_as_field_element),
                 fee: Some(fee_encoded),
-                pub_nonce: Some(Fr::zero()),
                 a: Some(a),
                 b: Some(b),
+                valid_from: Some(fr_from(withdraw.valid_from)),
+                valid_until: Some(fr_from(withdraw.valid_until)),
                 new_pub_key_hash: Some(Fr::zero()),
-                valid_from: Some(Fr::from_str(&withdraw.valid_from.to_string()).unwrap()),
-                valid_until: Some(Fr::from_str(&withdraw.valid_until.to_string()).unwrap()),
-
                 special_eth_addresses: vec![Some(Fr::zero())],
                 special_tokens: vec![Some(Fr::zero()), Some(Fr::zero())],
                 special_account_ids: vec![Some(Fr::zero()), Some(Fr::zero())],
                 special_content_hash: vec![Some(Fr::zero()); CONTENT_HASH_WIDTH],
                 special_serial_id: Some(Fr::zero()),
+                ..Default::default()
             },
             before_root: Some(before_root),
             after_root: Some(after_root),
-            tx_type: Some(Fr::from_str("3").unwrap()),
+            tx_type: Some(fr_from(WithdrawOp::OP_CODE)),
         }
     }
 }
