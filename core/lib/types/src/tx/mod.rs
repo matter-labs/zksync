@@ -23,7 +23,7 @@ pub use self::{
         ChangePubKeyType,
     },
     forced_exit::ForcedExit,
-    mint_nft::MintNFT,
+    mint_nft::{calculate_token_address, calculate_token_data, calculate_token_hash, MintNFT},
     swap::{Order, Swap},
     transfer::Transfer,
     withdraw::Withdraw,

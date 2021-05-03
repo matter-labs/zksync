@@ -24,7 +24,7 @@ contract ZkSyncNFTFactory is ERC721, NFTFactory {
         bytes32 contentHash,
         uint32 tokenId
     ) external override {
-        require(_msgSender() == _zksyncAddress, "r"); // Minting allowed only from zksync
+        require(_msgSender() == _zksyncAddress, "z"); // Minting allowed only from zksync
         _safeMint(recipient, tokenId);
         _contentHashes[tokenId] = contentHash;
     }

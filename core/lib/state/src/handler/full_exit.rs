@@ -1,4 +1,3 @@
-use anyhow::format_err;
 use num::BigUint;
 use std::time::Instant;
 use zksync_crypto::params;
@@ -28,11 +27,10 @@ impl TxHandler<FullExit> for ZkSyncState {
             .map(BigUintSerdeWrapper);
 
         vlog::debug!("Balance: {:?}", account_balance);
-        let op = if priority_op.token.0 >= MIN_NFT_TOKEN_ID {
-            let nft = self
-                .nfts
-                .get(&priority_op.token)
-                .ok_or_else(|| format_err!("NFT for full exit does not exist"))?;
+        let op = if priority_op.token.0 >= MIN_NFT_TOKEN_ID
+            && self.nfts.get(&priority_op.token).is_some()
+        {
+            let nft = self.nfts.get(&priority_op.token).unwrap();
             FullExitOp {
                 priority_op,
                 withdraw_amount: account_balance,

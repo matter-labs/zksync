@@ -1,6 +1,7 @@
 import { expect, use } from 'chai';
 import { solidity } from 'ethereum-waffle';
 import { Signer } from 'ethers';
+const { getCallRevertReason } = require('./common');
 import { ZkSyncNFTFactory } from '../../typechain/ZkSyncNFTFactory';
 import { ZkSyncNFTFactoryFactory } from '../../typechain/ZkSyncNFTFactoryFactory';
 
@@ -27,10 +28,11 @@ describe('NFTFactory unit tests', function () {
 
     it('Success', async () => {
         // The test checks the ability to mint NFT from allowed contract
+        const address = await wallet2.getAddress();
         nftFactory = ZkSyncNFTFactoryFactory.connect(contract.address, wallet1);
         await nftFactory.mintNFT(
-            await wallet2.getAddress(),
-            await wallet2.getAddress(),
+            address,
+            address,
             '0xbd7289936758c562235a3a42ba2c4a56cbb23a263bb8f8d27aead80d74d9d996',
             10
         );
@@ -40,14 +42,15 @@ describe('NFTFactory unit tests', function () {
     it('Error', async () => {
         // The test checks the ability to mint NFT from allowed contract
         nftFactory = ZkSyncNFTFactoryFactory.connect(contract.address, wallet2);
-
-        expect(
-            await nftFactory.mintNFT(
-                await wallet2.getAddress(),
-                await wallet2.getAddress(),
+        const address = await wallet2.getAddress();
+        const { revertReason } = await getCallRevertReason(() =>
+            nftFactory.mintNFT(
+                address,
+                address,
                 '0xbd7289936758c562235a3a42ba2c4a56cbb23a263bb8f8d27aead80d74d9d996',
                 10
             )
-        ).to.throw('Something');
+        );
+        expect(revertReason).equal('z');
     });
 });

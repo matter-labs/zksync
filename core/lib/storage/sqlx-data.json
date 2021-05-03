@@ -1993,6 +1993,22 @@
       ]
     }
   },
+  "578f732b2a605d3af17189dc0c1c72d3f6f1921672098c2a81bccb695843f745": {
+    "query": "\n            INSERT INTO tokens ( id, address, symbol, decimals, is_nft )\n            VALUES ( $1, $2, $3, $4, $5 )\n            ON CONFLICT (id)\n            DO\n              UPDATE SET address = $2, symbol = $3, decimals = $4\n            ",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "Int4",
+          "Text",
+          "Text",
+          "Int2",
+          "Bool"
+        ]
+      },
+      "nullable": []
+    }
+  },
   "58b251c3fbdf9be9b62f669f8cdc2d98940026c831e02a53337474d36a5224f0": {
     "query": "UPDATE aggregate_operations\n                SET confirmed = $1\n                WHERE from_block >= $2 AND to_block <= $3 AND action_type = $4",
     "describe": {
@@ -4144,21 +4160,6 @@
         false,
         false
       ]
-    }
-  },
-  "cdc6f84e5eee67e085706daa75f69a498adcedd7093288bd7ec84813e5066075": {
-    "query": "\n            INSERT INTO tokens ( id, address, symbol, decimals )\n            VALUES ( $1, $2, $3, $4 )\n            ON CONFLICT (id)\n            DO\n              UPDATE SET address = $2, symbol = $3, decimals = $4\n            ",
-    "describe": {
-      "columns": [],
-      "parameters": {
-        "Left": [
-          "Int4",
-          "Text",
-          "Text",
-          "Int2"
-        ]
-      },
-      "nullable": []
     }
   },
   "ceb8e4656aa76e1918a03707a1f047aed19ffcb3c70dbde61a6353b26b5a2493": {

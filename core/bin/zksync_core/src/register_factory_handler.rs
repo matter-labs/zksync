@@ -14,6 +14,7 @@ use zksync_types::RegisterNFTFactoryEvent;
 // Local uses
 use crate::eth_watch::EthWatchRequest;
 
+/// Handle events about registering factories for minting tokens
 #[derive(Debug)]
 struct NFTFactoryHandler {
     connection_pool: ConnectionPool,

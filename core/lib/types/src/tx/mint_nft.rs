@@ -184,19 +184,27 @@ impl MintNFT {
         message.push_str(format!("Nonce: {}", self.nonce).as_str());
         message
     }
+}
 
-    pub fn calculate_hash(&self, serial_id: u32) -> Vec<u8> {
-        let mut lhs_be_bits = vec![];
-        lhs_be_bits.extend_from_slice(&self.creator_id.0.to_be_bytes());
-        lhs_be_bits.extend_from_slice(&serial_id.to_be_bytes());
-        lhs_be_bits.extend_from_slice(&self.content_hash.as_bytes()[..16]);
-        let lhs_fr = Fr::from_hex(&format!("0x{}", hex::encode(&lhs_be_bits))).expect("lhs as Fr");
+pub fn calculate_token_address(data: &[u8]) -> Address {
+    Address::from_slice(&data[12..])
+}
 
-        let mut rhs_be_bits = vec![];
-        rhs_be_bits.extend_from_slice(&self.content_hash.as_bytes()[16..]);
-        let rhs_fr = Fr::from_hex(&format!("0x{}", hex::encode(&rhs_be_bits))).expect("rhs as Fr");
+pub fn calculate_token_data(data: &[u8]) -> BigUint {
+    BigUint::from_bytes_be(&data[16..])
+}
 
-        let hash_result = rescue_hash::<Bn256, 2>(&[lhs_fr, rhs_fr]);
-        hash_result[0].to_bytes()
-    }
+pub fn calculate_token_hash(creator_id: AccountId, serial_id: u32, content_hash: H256) -> Vec<u8> {
+    let mut lhs_be_bits = vec![];
+    lhs_be_bits.extend_from_slice(&creator_id.0.to_be_bytes());
+    lhs_be_bits.extend_from_slice(&serial_id.to_be_bytes());
+    lhs_be_bits.extend_from_slice(&content_hash.as_bytes()[..16]);
+    let lhs_fr = Fr::from_hex(&format!("0x{}", hex::encode(&lhs_be_bits))).expect("lhs as Fr");
+
+    let mut rhs_be_bits = vec![];
+    rhs_be_bits.extend_from_slice(&content_hash.as_bytes()[16..]);
+    let rhs_fr = Fr::from_hex(&format!("0x{}", hex::encode(&rhs_be_bits))).expect("rhs as Fr");
+
+    let hash_result = rescue_hash::<Bn256, 2>(&[lhs_fr, rhs_fr]);
+    hash_result[0].to_bytes()
 }
