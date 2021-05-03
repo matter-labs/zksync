@@ -11,16 +11,16 @@ pragma experimental ABIEncoderV2;
 /// @author Matter Labs
 contract RegenesisMultisig is Ownable {
 
-    address[] partners;
+    address[] public partners;
 
-    uint32 requiredNumberOfSignatures;
+    uint32 public requiredNumberOfSignatures;
 
     // The total number of partners. May be different 
     // in production
-    uint32 constant NUMBER_OF_PARTNERS = 4;
+    uint32 constant public NUMBER_OF_PARTNERS = 4;
 
-    bytes32 public oldRootHash = bytes32(0);
-    bytes32 public newRootHash = bytes32(0);
+    bytes32 oldRootHash = bytes32(0);
+    bytes32 newRootHash = bytes32(0);
 
     constructor(
         address[] memory _partners,
@@ -76,4 +76,12 @@ contract RegenesisMultisig is Ownable {
         oldRootHash = _oldRootHash;
         newRootHash = _newRootHash;
     } 
+
+    function getOldRootHash() public view returns (bytes32) {
+        return oldRootHash;
+    }
+
+    function getNewRootHash() public view returns (bytes32) {
+        return newRootHash;
+    }
 }
