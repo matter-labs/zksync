@@ -223,7 +223,7 @@ impl<'a, E: RescueEngine + JubjubEngine> Circuit<E> for ZkSyncCircuit<'a, E> {
             data[ChangePubKeyOp::OP_CODE as usize] = vec![zero.clone(); 2];
             data[ForcedExitOp::OP_CODE as usize] = vec![zero.clone(); 2];
             data[MintNFTOp::OP_CODE as usize] = vec![zero.clone(); 2];
-            data[WithdrawNFTOp::OP_CODE as usize] = vec![zero; 3];
+            data[WithdrawNFTOp::OP_CODE as usize] = vec![zero.clone(); 3];
             data[SwapOp::OP_CODE as usize] = vec![zero; 2];
 
             // this operation is disabled for now

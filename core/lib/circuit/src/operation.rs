@@ -7,6 +7,7 @@ use zksync_crypto::franklin_crypto::{
 };
 // Workspace
 use crate::account::AccountWitness;
+use zksync_crypto::params::CONTENT_HASH_WIDTH;
 
 #[derive(Clone, Debug)]
 pub struct OperationBranchWitness<E: RescueEngine> {
@@ -80,6 +81,9 @@ impl<E: RescueEngine> Default for OperationArguments<E> {
             special_accounts: vec![Some(E::Fr::zero()); 5],
             special_prices: vec![Some(E::Fr::zero()); 4],
             special_eth_addresses: vec![Some(E::Fr::zero()); 2],
+            special_account_ids: vec![Some(E::Fr::zero()), Some(E::Fr::zero())],
+            special_content_hash: vec![Some(E::Fr::zero()); CONTENT_HASH_WIDTH],
+            special_serial_id: Some(E::Fr::zero()),
             full_amount: Some(E::Fr::zero()),
             fee: Some(E::Fr::zero()),
             new_pub_key_hash: Some(E::Fr::zero()),

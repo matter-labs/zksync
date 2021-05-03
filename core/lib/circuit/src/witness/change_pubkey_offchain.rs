@@ -1,17 +1,17 @@
 // External deps
 use num::ToPrimitive;
-use zksync_crypto::franklin_crypto::{
-    bellman::pairing::{
-        bn256::{Bn256, Fr},
-        ff::Field,
-    },
-    rescue::RescueEngine,
-};
 // Workspace deps
 use zksync_crypto::{
     circuit::{
         account::CircuitAccountTree,
         utils::{append_be_fixed_width, eth_address_to_fr, le_bit_vector_into_field_element},
+    },
+    franklin_crypto::{
+        bellman::pairing::{
+            bn256::{Bn256, Fr},
+            ff::Field,
+        },
+        rescue::RescueEngine,
     },
     params::{
         account_tree_depth, ACCOUNT_ID_BIT_WIDTH, CHUNK_BIT_WIDTH, CONTENT_HASH_WIDTH,
@@ -235,12 +235,8 @@ impl ChangePubkeyOffChainWitness<Bn256> {
                 b: Some(b),
                 pub_nonce: Some(change_pubkey_offcahin.nonce),
                 new_pub_key_hash: Some(change_pubkey_offcahin.new_pubkey_hash),
-                valid_from: Some(
-                    Fr::from_str(&change_pubkey_offcahin.valid_from.to_string()).unwrap(),
-                ),
-                valid_until: Some(
-                    Fr::from_str(&change_pubkey_offcahin.valid_until.to_string()).unwrap(),
-                ),
+                valid_from: Some(fr_from(&change_pubkey_offcahin.valid_from)),
+                valid_until: Some(fr_from(&change_pubkey_offcahin.valid_until)),
 
                 special_eth_addresses: vec![Some(Fr::zero())],
                 special_tokens: vec![Some(Fr::zero()), Some(Fr::zero())],

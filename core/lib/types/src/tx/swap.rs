@@ -12,8 +12,7 @@ use serde::{Deserialize, Serialize};
 use zksync_basic_types::Address;
 use zksync_crypto::{
     franklin_crypto::eddsa::PrivateKey,
-    max_fungible_token_id,
-    params::{max_account_id, max_token_id, PRICE_BIT_WIDTH},
+    params::{max_account_id, max_fungible_token_id, max_token_id, PRICE_BIT_WIDTH},
     primitives::rescue_hash_orders,
 };
 use zksync_utils::{format_units, BigUintPairSerdeAsRadix10Str, BigUintSerdeAsRadix10Str};

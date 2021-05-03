@@ -24,6 +24,7 @@ use zksync_crypto::{
 use zksync_types::operations::WithdrawNFTOp;
 use zksync_types::H256;
 // Local deps
+use crate::witness::utils::fr_from;
 use crate::{
     operation::{Operation, OperationArguments, OperationBranch, OperationBranchWitness},
     utils::resize_grow_only,
@@ -367,7 +368,7 @@ impl WithdrawNFTWitness<Bn256> {
                 byte_as_bits
             })
             .flatten()
-            .map(|bit| Some(Fr::from_str(&bit.to_string()).unwrap()))
+            .map(|bit| Some(fr_from(&bit)))
             .collect();
 
         WithdrawNFTWitness {
@@ -384,8 +385,8 @@ impl WithdrawNFTWitness<Bn256> {
                 a: Some(a),
                 b: Some(b),
                 new_pub_key_hash: Some(Fr::zero()),
-                valid_from: Some(Fr::from_str(&valid_from.to_string()).unwrap()),
-                valid_until: Some(Fr::from_str(&valid_until.to_string()).unwrap()),
+                valid_from: Some(fr_from(&valid_from)),
+                valid_until: Some(fr_from(&valid_until)),
 
                 special_eth_addresses: vec![Some(
                     creator_account_witness_fourth_chunk
@@ -399,6 +400,7 @@ impl WithdrawNFTWitness<Bn256> {
                 ],
                 special_content_hash: content_hash_as_vec,
                 special_serial_id: Some(serial_id_fe),
+                ..Default::default()
             },
 
             initiator_before_first_chunk: OperationBranch {
@@ -422,7 +424,7 @@ impl WithdrawNFTWitness<Bn256> {
                 },
             },
             special_account_third_chunk: OperationBranch {
-                address: Some(Fr::from_str(&NFT_STORAGE_ACCOUNT_ID.0.to_string()).unwrap()),
+                address: Some(fr_from(&NFT_STORAGE_ACCOUNT_ID.0)),
                 token: Some(token_fe),
                 witness: OperationBranchWitness {
                     account_witness: special_account_witness_third_chunk,

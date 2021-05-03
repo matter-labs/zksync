@@ -221,10 +221,9 @@ impl FullExitWitness<Bn256> {
 
         let capacity = tree.capacity();
         assert_eq!(capacity, 1 << account_tree_depth());
-        let creator_account_id_fe =
-            Fr::from_str(&full_exit.creator_account_id.to_string()).unwrap();
-        let token_fe = Fr::from_str(&full_exit.token.to_string()).unwrap();
-        let serial_id_fe = Fr::from_str(&full_exit.nft_serial_id.to_string()).unwrap();
+        let creator_account_id_fe = fr_from(&full_exit.creator_account_id);
+        let token_fe = fr_from(&full_exit.token);
+        let serial_id_fe = fr_from(&full_exit.nft_serial_id);
         let account_address_fe = fr_from(full_exit.account_address);
         let token_fe = fr_from(full_exit.token);
 
@@ -300,7 +299,7 @@ impl FullExitWitness<Bn256> {
                 byte_as_bits
             })
             .flatten()
-            .map(|bit| Some(Fr::from_str(&bit.to_string()).unwrap()))
+            .map(|bit| Some(fr_from(&bit)))
             .collect();
 
         FullExitWitness {
@@ -325,7 +324,7 @@ impl FullExitWitness<Bn256> {
                 },
             },
             special_account_second_chunk: OperationBranch {
-                address: Some(Fr::from_str(&NFT_STORAGE_ACCOUNT_ID.0.to_string()).unwrap()),
+                address: Some(fr_from(&NFT_STORAGE_ACCOUNT_ID.0)),
                 token: Some(token_fe),
                 witness: OperationBranchWitness {
                     account_witness: special_account_witness,
@@ -346,14 +345,14 @@ impl FullExitWitness<Bn256> {
             },
             args: OperationArguments {
                 eth_address: Some(full_exit.eth_address),
+                amount_packed: Some(Fr::zero()),
                 full_amount: Some(full_exit.full_exit_amount),
-                a: Some(a),
-                b: Some(b),
                 fee: Some(Fr::zero()),
                 pub_nonce: Some(Fr::zero()),
+                a: Some(Fr::zero()),
+                b: Some(Fr::zero()),
                 new_pub_key_hash: Some(Fr::zero()),
                 valid_from: Some(Fr::zero()),
-                valid_until: Some(Fr::from_str(&u32::MAX.to_string()).unwrap()),
                 special_eth_addresses: vec![Some(
                     creator_account_witness
                         .address
@@ -367,7 +366,7 @@ impl FullExitWitness<Bn256> {
             },
             before_root: Some(before_root),
             after_root: Some(after_root),
-            tx_type: Some(fr_from(FullExitOp::OP_CODE)),
+            tx_type: Some(fr_from(&FullExitOp::OP_CODE)),
         }
     }
 }

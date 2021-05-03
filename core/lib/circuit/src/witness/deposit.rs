@@ -217,7 +217,6 @@ impl DepositWitness<Bn256> {
                 pub_nonce: Some(Fr::zero()),
                 new_pub_key_hash: Some(Fr::zero()),
                 valid_from: Some(Fr::zero()),
-                valid_until: Some(Fr::from_str(&u32::MAX.to_string()).unwrap()),
                 special_eth_addresses: vec![Some(Fr::zero())],
                 special_tokens: vec![Some(Fr::zero()), Some(Fr::zero())],
                 special_account_ids: vec![Some(Fr::zero()), Some(Fr::zero())],

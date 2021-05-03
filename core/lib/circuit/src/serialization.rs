@@ -145,10 +145,6 @@ pub struct OperationArgumentsDef {
     #[serde(with = "OptionalFrSerde")]
     pub amount_packed: Option<Fr>,
     #[serde(with = "VecOptionalFrSerde")]
-    pub special_eth_addresses: Vec<Option<Fr>>,
-    #[serde(with = "VecOptionalFrSerde")]
-    pub special_tokens: Vec<Option<Fr>>,
-    #[serde(with = "VecOptionalFrSerde")]
     pub special_account_ids: Vec<Option<Fr>>,
     #[serde(with = "VecOptionalFrSerde")]
     pub special_content_hash: Vec<Option<Fr>>,
