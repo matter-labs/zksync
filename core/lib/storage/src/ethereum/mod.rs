@@ -6,9 +6,12 @@ use num::{BigInt, BigUint};
 use sqlx::types::BigDecimal;
 use zksync_basic_types::{H256, U256};
 // Workspace imports
-use zksync_types::aggregated_operations::{AggregatedActionType, AggregatedOperation};
-use zksync_types::ethereum::{ETHOperation, InsertedOperationResponse};
-use zksync_types::BlockNumber;
+use zksync_types::{
+    aggregated_operations::{AggregatedActionType, AggregatedOperation},
+    ethereum::{ETHOperation, InsertedOperationResponse},
+    event::block::BlockStatus,
+    BlockNumber,
+};
 // Local imports
 use self::records::{ETHParams, ETHStats, ETHTxHash, StorageETHOperation};
 use crate::{chain::operations::records::StoredAggregatedOperation, QueryResult, StorageProcessor};
@@ -502,16 +505,38 @@ impl<'a, 'c> EthereumSchema<'a, 'c> {
         .await?;
 
         // If there is a ZKSync operation, mark it as confirmed as well.
-        sqlx::query!(
-            "
-            UPDATE aggregate_operations
-                SET confirmed = $1
-                WHERE id = (SELECT op_id FROM eth_aggregated_ops_binding WHERE eth_op_id = $2)",
-            true,
+        let aggregated_op = sqlx::query_as!(
+            StoredAggregatedOperation,
+            "SELECT * FROM aggregate_operations
+                WHERE id = (SELECT op_id FROM eth_aggregated_ops_binding WHERE eth_op_id = $1)",
             eth_op_id,
         )
-        .execute(transaction.conn())
+        .fetch_optional(transaction.conn())
         .await?;
+
+        if let Some(op) = &aggregated_op {
+            let (from_block, to_block) = (op.from_block as u32, op.to_block as u32);
+            let action_type = AggregatedActionType::from_str(&op.action_type).unwrap();
+            transaction
+                .chain()
+                .operations_schema()
+                .confirm_aggregated_operations(
+                    BlockNumber(from_block),
+                    BlockNumber(to_block),
+                    action_type,
+                )
+                .await?;
+
+            let block_status = BlockStatus::try_from(action_type).ok();
+            if let Some(block_status) = block_status {
+                for block_number in from_block..=to_block {
+                    transaction
+                        .event_schema()
+                        .store_block_event(block_status, BlockNumber(block_number))
+                        .await?;
+                }
+            }
+        }
 
         transaction.commit().await?;
 

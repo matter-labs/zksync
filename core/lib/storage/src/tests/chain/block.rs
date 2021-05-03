@@ -8,7 +8,7 @@ use zksync_types::{
 // Local imports
 use crate::{
     chain::{
-        block::{records::BlockDetails, BlockSchema},
+        block::{records::StorageBlockDetails, BlockSchema},
         operations::OperationsSchema,
         state::StateSchema,
     },
@@ -148,7 +148,7 @@ async fn test_find_block_by_height_or_hash(mut storage: StorageProcessor<'_>) ->
     /// and compares them against the provided sample.
     async fn check_find_block_by_height_or_hash(
         storage: &mut StorageProcessor<'_>,
-        expected_block_detail: &BlockDetails,
+        expected_block_detail: &StorageBlockDetails,
     ) -> QueryResult<()> {
         let mut queries = vec![
             expected_block_detail.block_number.to_string(),
@@ -202,14 +202,14 @@ async fn test_find_block_by_height_or_hash(mut storage: StorageProcessor<'_>) ->
     let n_committed = 5u32;
     let n_verified = n_committed - 2;
 
-    let mut expected_outcome: Vec<BlockDetails> = Vec::new();
+    let mut expected_outcome: Vec<StorageBlockDetails> = Vec::new();
 
     // Create and apply several blocks to work with.
     for block_number in 1..=n_committed {
         let block_number = BlockNumber(block_number);
         // Create blanked block detail object which we will fill
         // with the relevant data and use for the comparison later.
-        let mut current_block_detail = BlockDetails {
+        let mut current_block_detail = StorageBlockDetails {
             block_number: 0,
             new_state_root: Default::default(),
             block_size: 0,

@@ -20,6 +20,12 @@ macro_rules! basic_type {
             }
         }
 
+        impl From<$type> for $name {
+            fn from(value: $type) -> Self {
+                Self(value)
+            }
+        }
+
         impl FromStr for $name {
             type Err = ParseIntError;
 

@@ -12,6 +12,7 @@ members = [
     "core/bin/zksync_api",
     "core/bin/zksync_core",
     "core/bin/zksync_eth_sender",
+    "core/bin/zksync_event_listener",
     "core/bin/zksync_witness_generator",
     "core/bin/zksync_forced_exit_requests",
 

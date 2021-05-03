@@ -66,6 +66,14 @@ impl ZkSyncPriorityOp {
         }
     }
 
+    /// Returns the associated token number.
+    pub fn token_id(&self) -> TokenId {
+        match self {
+            ZkSyncPriorityOp::Deposit(deposit) => deposit.token,
+            ZkSyncPriorityOp::FullExit(full_exit) => full_exit.token,
+        }
+    }
+
     /// Parses priority operation from the Ethereum logs.
     pub fn parse_from_priority_queue_logs(
         pub_data: &[u8],

@@ -7,12 +7,13 @@ use zksync_crypto::convert::FeConvert;
 use zksync_types::{
     aggregated_operations::AggregatedActionType,
     block::{Block, BlockMetadata, ExecutedOperations, PendingBlock},
+    event::block::BlockStatus,
     AccountId, BlockNumber, Fr, ZkSyncOp,
 };
 // Local imports
 use self::records::{
-    AccountTreeCache, BlockDetails, BlockTransactionItem, StorageBlock, StorageBlockMetadata,
-    StoragePendingBlock,
+    AccountTreeCache, BlockTransactionItem, StorageBlock, StorageBlockDetails,
+    StorageBlockMetadata, StoragePendingBlock,
 };
 use crate::{
     chain::account::records::EthAccountType,
@@ -313,7 +314,7 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
         &mut self,
         max_block: BlockNumber,
         limit: u32,
-    ) -> QueryResult<Vec<BlockDetails>> {
+    ) -> QueryResult<Vec<StorageBlockDetails>> {
         let start = Instant::now();
         // This query does the following:
         // - joins the `operations` and `eth_tx_hashes` (using the intermediate `eth_ops_binding` table)
@@ -323,7 +324,7 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
         //   and verified operations;
         // - collects the {limit} blocks in the descending order with the data gathered above.
         let details = sqlx::query_as!(
-            BlockDetails,
+            StorageBlockDetails,
             r#"
             WITH aggr_comm AS (
                 SELECT 
@@ -396,7 +397,10 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
     ///
     /// Will return `None` if the query is malformed or there is no block that matches
     /// the query.
-    pub async fn find_block_by_height_or_hash(&mut self, query: String) -> Option<BlockDetails> {
+    pub async fn find_block_by_height_or_hash(
+        &mut self,
+        query: String,
+    ) -> Option<StorageBlockDetails> {
         let start = Instant::now();
         // If the input looks like hash, add the hash lookup part.
         let hash_bytes = if let Some(hex_query) = self.try_parse_hex(&query) {
@@ -434,7 +438,7 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
         //   + query equals to the state hash obtained in the block (in form of `sync-bl:00{..}00`);
         //   + query equals to the number of the block.
         let result = sqlx::query_as!(
-            BlockDetails,
+            StorageBlockDetails,
             r#"
             WITH aggr_comm AS (
                 SELECT 
@@ -703,6 +707,13 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
         let commitment = block.block_commitment.as_bytes().to_vec();
         let timestamp = Some(block.timestamp as i64);
 
+        for tx in &block.block_transactions {
+            transaction
+                .event_schema()
+                .store_transaction_event(tx, block.block_number)
+                .await?;
+        }
+
         BlockSchema(&mut transaction)
             .save_block_transactions(block.block_number, block.block_transactions)
             .await?;
@@ -869,10 +880,25 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
     // Removes blocks with number greater than `last_block`
     pub async fn remove_blocks(&mut self, last_block: BlockNumber) -> QueryResult<()> {
         let start = Instant::now();
+        let mut transaction = self.0.start_transaction().await?;
+
+        let last_committed_block = transaction
+            .chain()
+            .block_schema()
+            .get_last_committed_block()
+            .await?;
+        for block_number in *last_block..=*last_committed_block {
+            transaction
+                .event_schema()
+                .store_block_event(BlockStatus::Reverted, BlockNumber(block_number))
+                .await?;
+        }
+
         sqlx::query!("DELETE FROM blocks WHERE number > $1", *last_block as i64)
-            .execute(self.0.conn())
+            .execute(transaction.conn())
             .await?;
 
+        transaction.commit().await?;
         metrics::histogram!("sql.chain.block.remove_blocks", start.elapsed());
         Ok(())
     }

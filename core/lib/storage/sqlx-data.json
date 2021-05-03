@@ -1772,6 +1772,31 @@
       "nullable": []
     }
   },
+  "4dd0d931ce42a1a7a3606a2914b3c0686c103fbb18d60efd96232a2617734272": {
+    "query": "INSERT INTO events VALUES (DEFAULT, $1, $2, $3)",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "Int8",
+          {
+            "Custom": {
+              "name": "event_type",
+              "kind": {
+                "Enum": [
+                  "Account",
+                  "Block",
+                  "Transaction"
+                ]
+              }
+            }
+          },
+          "Jsonb"
+        ]
+      },
+      "nullable": []
+    }
+  },
   "4fc97e18f8e63d63d3a52db84ddd38243a865011e69a60061af37ebc2a8f1566": {
     "query": "SELECT * FROM complete_withdrawals_transactions\n                        WHERE pending_withdrawals_queue_start_index <= $1\n                            AND $1 < pending_withdrawals_queue_end_index\n                    LIMIT 1\n                    ",
     "describe": {
@@ -2837,19 +2862,6 @@
       "nullable": [
         null
       ]
-    }
-  },
-  "93bd5b76565dfbadecfd66a394127fd5b701d09dc3d61adb30b337fd12d86f6a": {
-    "query": "\n            UPDATE aggregate_operations\n                SET confirmed = $1\n                WHERE id = (SELECT op_id FROM eth_aggregated_ops_binding WHERE eth_op_id = $2)",
-    "describe": {
-      "columns": [],
-      "parameters": {
-        "Left": [
-          "Bool",
-          "Int8"
-        ]
-      },
-      "nullable": []
     }
   },
   "93fe4dceacf4e052ad807068272dc768eab33513e6c1e1ac62d2f989b1a26eee": {
@@ -4099,6 +4111,24 @@
       "nullable": []
     }
   },
+  "d18525d8bf10383d307bf56110fac63276a82dc8b65b358c098fca7c2991579e": {
+    "query": "SELECT MAX(id) as max FROM events",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "max",
+          "type_info": "Int8"
+        }
+      ],
+      "parameters": {
+        "Left": []
+      },
+      "nullable": [
+        null
+      ]
+    }
+  },
   "d3b822a6639901acd986e82d2779a7318c3805385a7772db83063d9507c049a7": {
     "query": "INSERT INTO eth_parameters (nonce, gas_price_limit, last_committed_block, last_verified_block, last_executed_block)\n                VALUES ($1, $2, $3, $4, $5)",
     "describe": {
@@ -4125,6 +4155,55 @@
         ]
       },
       "nullable": []
+    }
+  },
+  "d7d7b3963c9da1762b0a533eeb2f331addbf6b874534f66562b0ca6f3356de67": {
+    "query": "\n            SELECT\n                id,\n                block_number,\n                event_type as \"event_type!: EventType\",\n                event_data\n            FROM events WHERE id > $1\n            ORDER BY id ASC\n            ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "id",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 1,
+          "name": "block_number",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 2,
+          "name": "event_type!: EventType",
+          "type_info": {
+            "Custom": {
+              "name": "event_type",
+              "kind": {
+                "Enum": [
+                  "Account",
+                  "Block",
+                  "Transaction"
+                ]
+              }
+            }
+          }
+        },
+        {
+          "ordinal": 3,
+          "name": "event_data",
+          "type_info": "Jsonb"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Int8"
+        ]
+      },
+      "nullable": [
+        false,
+        false,
+        false,
+        false
+      ]
     }
   },
   "d9e266ce374cc7d12511a61ca81cd167b59493ee74e44b26c4baf92f4a4152e4": {
@@ -4872,6 +4951,62 @@
       "nullable": []
     }
   },
+  "f1f2c5311487585c29e51db49cac9706d0a48e563aef71381c81a2d0d61da422": {
+    "query": "SELECT * FROM aggregate_operations\n                WHERE id = (SELECT op_id FROM eth_aggregated_ops_binding WHERE eth_op_id = $1)",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "id",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 1,
+          "name": "action_type",
+          "type_info": "Text"
+        },
+        {
+          "ordinal": 2,
+          "name": "arguments",
+          "type_info": "Jsonb"
+        },
+        {
+          "ordinal": 3,
+          "name": "from_block",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 4,
+          "name": "to_block",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 5,
+          "name": "created_at",
+          "type_info": "Timestamptz"
+        },
+        {
+          "ordinal": 6,
+          "name": "confirmed",
+          "type_info": "Bool"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Int8"
+        ]
+      },
+      "nullable": [
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false
+      ]
+    }
+  },
   "f4aaa302a20921ae9ff490ac1a86083c49ee4a9afacf0faeb76aa8e1549f2fe7": {
     "query": "SELECT * FROM account_creates WHERE block_number > $1 AND block_number <= $2 ",
     "describe": {
@@ -4935,6 +5070,27 @@
       ],
       "parameters": {
         "Left": [
+          "Text"
+        ]
+      },
+      "nullable": [
+        null
+      ]
+    }
+  },
+  "f7599bbef8c317c1ab1a61b2bcba3c5b03855b8a536bcdf369332c567b29d92c": {
+    "query": "SELECT pg_notify($1, $2)",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "pg_notify",
+          "type_info": "Void"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Text",
           "Text"
         ]
       },
