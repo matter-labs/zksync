@@ -648,7 +648,6 @@ impl<'a, 'c> StateSchema<'a, 'c> {
             r#"
             SELECT * FROM mint_nft_updates 
             WHERE token_id = $1
-            LIMIT 1
             "#,
             *token_id as i32
         )

@@ -6,7 +6,7 @@ interface NFTFactory {
         address creator,
         address recipient,
         bytes32 contentHash,
-        uint256 tokenId
+        uint32 tokenId
     ) external;
 
     event MintNFT(address indexed creator, address indexed recipient, bytes contentHash, uint256 tokenId);

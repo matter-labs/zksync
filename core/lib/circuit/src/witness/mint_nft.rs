@@ -1,7 +1,6 @@
 // External deps
 use num::ToPrimitive;
 
-use rescue_poseidon::rescue_hash;
 use zksync_crypto::convert::FeConvert;
 use zksync_crypto::franklin_crypto::{
     bellman::pairing::{
@@ -11,6 +10,7 @@ use zksync_crypto::franklin_crypto::{
     bellman::PrimeFieldRepr,
     rescue::RescueEngine,
 };
+use zksync_crypto::rescue_poseidon::rescue_hash;
 // Workspace deps
 use zksync_crypto::{
     circuit::{

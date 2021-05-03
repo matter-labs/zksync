@@ -254,8 +254,8 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
     function withdrawPendingNFTBalance(uint32 _tokenId) external nonReentrant {
         require(_tokenId > MAX_FUNGIBLE_TOKEN_ID, "oq"); // Withdraw only nft tokens
         Operations.WithdrawNFT memory op = pendingWithdrawnNFTs[_tokenId];
-        require(_tokenId == op.tokenId, "op"); // Token is not exists
-        require(op.creator != address(0x0), "oq"); // Token is not exists
+        require(_tokenId == op.tokenId, "op"); // Token dose not exists
+        require(op.creator != address(0x0), "op"); // Token dose not exists
         NFTFactory _factory = governance.getNFTFactory(op.creator);
         _factory.mintNFT(op.creator, op.owner, op.contentHash, op.tokenId);
         delete pendingWithdrawnNFTs[_tokenId];

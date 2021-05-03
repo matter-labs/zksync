@@ -10,7 +10,6 @@ use crate::Address;
 pub struct RegisterNFTFactoryEvent {
     pub factory_address: Address,
     pub creator_address: Address,
-    pub creator_signature: Vec<u8>,
     pub eth_block: u64,
 }
 
@@ -31,18 +30,15 @@ impl TryFrom<Log> for RegisterNFTFactoryEvent {
         let mut decoded_event = decode(
             &[
                 ParamType::Address, // factoryAddress
-                ParamType::Bytes,   // signature
             ],
             &event.data.0,
         )
         .map_err(|e| anyhow::format_err!("Event data decode: {:?}", e))?;
         let creator_address = Address::from_slice(&event.topics[1].as_fixed_bytes()[12..]);
         let factory_address = decoded_event.remove(0).to_address().unwrap();
-        let signature = decoded_event.remove(0).to_bytes().unwrap();
         Ok(Self {
             factory_address,
             creator_address,
-            creator_signature: signature,
             eth_block,
         })
     }

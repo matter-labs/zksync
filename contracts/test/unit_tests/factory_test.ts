@@ -35,21 +35,19 @@ describe('NFTFactory unit tests', function () {
             10
         );
         const owner = await nftFactory.ownerOf(10);
-        expect(owner === (await wallet2.getAddress()));
+        expect(owner).to.equal(await wallet2.getAddress());
     });
     it('Error', async () => {
         // The test checks the ability to mint NFT from allowed contract
         nftFactory = ZkSyncNFTFactoryFactory.connect(contract.address, wallet2);
-        try {
+
+        expect(
             await nftFactory.mintNFT(
                 await wallet2.getAddress(),
                 await wallet2.getAddress(),
                 '0xbd7289936758c562235a3a42ba2c4a56cbb23a263bb8f8d27aead80d74d9d996',
                 10
-            );
-        } catch (e) {
-            return;
-        }
-        throw new Error('No exception');
+            )
+        ).to.throw('Something');
     });
 });

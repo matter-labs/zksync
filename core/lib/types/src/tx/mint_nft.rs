@@ -1,12 +1,12 @@
 use serde::{Deserialize, Serialize};
 
 use num::{BigUint, Zero};
-use rescue_poseidon::rescue_hash;
 
 use zksync_crypto::{
     convert::FeConvert,
     franklin_crypto::bellman::pairing::bn256::{Bn256, Fr},
     params::{max_account_id, max_fungible_token_id},
+    rescue_poseidon::rescue_hash,
     PrivateKey,
 };
 

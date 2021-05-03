@@ -30,7 +30,7 @@ pub struct ETHState {
     priority_queue: HashMap<u64, ReceivedPriorityOp>,
     /// List of tokens that have been added to the contract.
     new_tokens: Vec<NewTokenEvent>,
-    /// List of events about register factories for NFT withdrawing
+    /// List of events denoting registered factories for NFT withdrawing
     register_nft_factory_events: Vec<RegisterNFTFactoryEvent>,
 }
 

@@ -22,7 +22,7 @@ contract ZkSyncNFTFactory is ERC721, NFTFactory {
         address,
         address recipient,
         bytes32 contentHash,
-        uint256 tokenId
+        uint32 tokenId
     ) external override {
         require(_msgSender() == _zksyncAddress, "r"); // Minting allowed only from zksync
         _safeMint(recipient, tokenId);
@@ -34,7 +34,7 @@ contract ZkSyncNFTFactory is ERC721, NFTFactory {
         address to,
         uint256 tokenId
     ) internal virtual override {
-        // That means token is burning
+        // Sending to address `0` means that the token is getting burned.
         if (to == address(0)) {
             delete _contentHashes[tokenId];
         }

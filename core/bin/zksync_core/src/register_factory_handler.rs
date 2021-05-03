@@ -1,4 +1,5 @@
 // Built-in deps
+use std::time::Duration;
 
 // External uses
 use futures::{
@@ -13,14 +14,15 @@ use zksync_types::RegisterNFTFactoryEvent;
 // Local uses
 use crate::eth_watch::EthWatchRequest;
 
-struct RegisterFactoryHandler {
+#[derive(Debug)]
+struct NFTFactoryHandler {
     connection_pool: ConnectionPool,
-    poll_interval: std::time::Duration,
+    poll_interval: Duration,
     eth_watch_req: mpsc::Sender<EthWatchRequest>,
     last_eth_block: Option<u64>,
 }
 
-impl RegisterFactoryHandler {
+impl NFTFactoryHandler {
     async fn new(
         connection_pool: ConnectionPool,
         eth_watch_req: mpsc::Sender<EthWatchRequest>,
@@ -125,7 +127,7 @@ pub fn run_register_factory_handler(
     let config = config.clone();
     tokio::spawn(async move {
         let mut handler =
-            RegisterFactoryHandler::new(db_pool, eth_watch_req, config.token_handler.clone()).await;
+            NFTFactoryHandler::new(db_pool, eth_watch_req, config.token_handler.clone()).await;
 
         handler.run().await
     })

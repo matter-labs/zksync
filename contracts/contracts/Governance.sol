@@ -13,7 +13,7 @@ contract Governance is Config {
     event NewToken(address indexed token, uint16 indexed tokenId);
 
     /// @notice
-    event NFTFactoryRegistered(address indexed creatorAddress, address factoryAddress, bytes signature);
+    event NFTFactoryRegistered(address indexed creatorAddress, address factoryAddress);
 
     /// @notice Governor changed
     event NewGovernor(address newGovernor);
@@ -164,16 +164,15 @@ contract Governance is Config {
                 abi.encodePacked(
                     "\x19Ethereum Signed Message:\n60",
                     "\nCreator:",
-                    _creatorAddress,
+                    Bytes.bytesToHexASCIIBytes(abi.encodePacked((_creatorAddress))),
                     "\nFactory:",
-                    msg.sender
+                    Bytes.bytesToHexASCIIBytes(abi.encodePacked((msg.sender)))
                 )
             );
         address recoveredAddress = Utils.recoverAddressFromEthSignature(_signature, messageHash);
-        if (recoveredAddress == _creatorAddress && recoveredAddress != address(0)) {
-            nftFactories[_creatorAddress] = NFTFactory(msg.sender);
-            emit NFTFactoryRegistered(_creatorAddress, msg.sender, _signature);
-        }
+        require(recoveredAddress == _creatorAddress && recoveredAddress != address(0), "ws");
+        nftFactories[_creatorAddress] = NFTFactory(msg.sender);
+        emit NFTFactoryRegistered(_creatorAddress, msg.sender);
     }
 
     //@notice Set default factory for our contract. This factory will be used to mint an NFT token that has no factory

@@ -100,8 +100,8 @@ impl<'a, 'c> TokensSchema<'a, 'c> {
         let start = Instant::now();
         sqlx::query!(
             r#"
-            INSERT INTO tokens ( id, address, symbol, decimals )
-            VALUES ( $1, $2, $3, $4 )
+            INSERT INTO tokens ( id, address, symbol, decimals, is_nft )
+            VALUES ( $1, $2, $3, $4, $5 )
             ON CONFLICT (id)
             DO
               UPDATE SET address = $2, symbol = $3, decimals = $4
@@ -110,6 +110,7 @@ impl<'a, 'c> TokensSchema<'a, 'c> {
             address_to_stored_string(&token.address),
             token.symbol,
             i16::from(token.decimals),
+            token.is_nft
         )
         .execute(self.0.conn())
         .await?;

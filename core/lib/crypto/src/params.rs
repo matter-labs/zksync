@@ -50,6 +50,7 @@ pub fn number_of_processable_tokens() -> usize {
 
 /// Special token id, which enforce unique pair of creator account id and serial id for generating unique address for token.
 /// Where serial id is balance for this special token
+/// We must use i32 here, because we store data in Postgres, and we have limitation in Postgres about i32. Migration to i64 in database would be really difficult, however i32 is enough for our purposes
 pub const NFT_TOKEN_ID_VAL: u32 = ((i32::MAX) - 1) as u32;
 pub const NFT_TOKEN_ID: TokenId = TokenId(NFT_TOKEN_ID_VAL);
 

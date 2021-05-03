@@ -91,7 +91,7 @@ async fn main() {
             .get_nft(token_id)
             .await
             .expect("Db access fail")
-            .expect("NFT token should be exist");
+            .expect("NFT token should exist");
         zksync_prover_utils::exit_proof::create_exit_proof_nft(
             accounts,
             account_id,

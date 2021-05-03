@@ -161,6 +161,9 @@ impl<W: EthClient> EthWatch<W> {
         for event in updated_state.new_register_nft_factory_events() {
             register_nft_factory_events.push(event.clone());
         }
+        // Remove duplicates.
+        register_nft_factory_events.sort_by_key(|factory_event| factory_event.creator_address);
+        register_nft_factory_events.dedup_by_key(|factory_event| factory_event.creator_address);
 
         let new_state = ETHState::new(
             last_ethereum_block,

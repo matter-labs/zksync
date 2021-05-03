@@ -370,13 +370,13 @@ pub fn create_exit_circuit_with_public_input(
 mod test {
     use super::*;
     use num::BigUint;
-    use rescue_poseidon::rescue_hash;
     use zksync_crypto::circuit::account::CircuitAccount;
     use zksync_crypto::circuit::CircuitAccountTree;
     use zksync_crypto::convert::FeConvert;
     use zksync_crypto::franklin_crypto::bellman::pairing::bn256::{Bn256, Fr};
     use zksync_crypto::franklin_crypto::circuit::test::TestConstraintSystem;
     use zksync_crypto::params::{NFT_STORAGE_ACCOUNT_ADDRESS, NFT_STORAGE_ACCOUNT_ID};
+    use zksync_crypto::rescue_poseidon::rescue_hash;
     use zksync_types::{Account, Nonce};
 
     #[test]

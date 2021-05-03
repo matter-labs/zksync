@@ -105,7 +105,6 @@ impl FullExitOp {
         let creator_id = u32::from_bytes(&bytes[creator_id_offset..serial_id_offset])
             .ok_or_else(|| format_err!("Cant get creator account id from full exit pubdata"))?;
 
-        println!("{:?}", &bytes[serial_id_offset..content_hash_offset]);
         let serial_id = u32::from_bytes(&bytes[serial_id_offset..content_hash_offset])
             .ok_or_else(|| format_err!("Cant get serial id from full exit pubdata"))?;
 

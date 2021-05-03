@@ -10,7 +10,7 @@ use zksync_crypto::circuit::CircuitAccountTree;
 use zksync_crypto::proof::EncodedSingleProof;
 use zksync_types::{AccountId, AccountMap, Address, TokenId, H256};
 
-pub fn create_exit_proof(
+fn create_exit_proof(
     accounts: AccountMap,
     account_id: AccountId,
     owner: Address,
