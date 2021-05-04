@@ -14,7 +14,8 @@ contract RegenesisMultisig is Ownable {
     address[] public partners;
 
     uint32 public requiredNumberOfSignatures;
-    
+    uint32 public numberOfPartners;
+
     bytes32 public oldRootHash = bytes32(0);
     bytes32 public newRootHash = bytes32(0);
 
@@ -26,6 +27,7 @@ contract RegenesisMultisig is Ownable {
         require(_requiredNumberOfSignatures <= _partners.length, "0");
 
         partners = _partners;
+        numberOfPartners = uint32(_partners.length);
         requiredNumberOfSignatures = _requiredNumberOfSignatures;
     }
 
@@ -35,7 +37,6 @@ contract RegenesisMultisig is Ownable {
         bytes[] memory _signatures
     ) external {
         requireMaster(msg.sender);
-        require(_signatures.length <= NUMBER_OF_PARTNERS); // Obviously we can't submit more signatures than there are partners
 
         bytes32 messageHash =
             keccak256(
