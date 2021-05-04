@@ -1188,6 +1188,8 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
                 &is_valid_timestamp,
                 &signature_data.is_verified,
                 &mut previous_pubdatas[SwapOp::OP_CODE as usize],
+                is_special_nft_storage_account,
+                is_special_nft_token,
             )?,
         ];
 
@@ -2991,6 +2993,8 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
         is_valid_timestamp: &Boolean,
         is_sig_verified: &Boolean,
         pubdata_holder: &mut Vec<AllocatedNum<E>>,
+        is_special_nft_storage_account: &Boolean,
+        is_special_nft_token: &Boolean,
     ) -> Result<Boolean, SynthesisError> {
         assert!(
             !pubdata_holder.is_empty(),
@@ -3438,6 +3442,7 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
                 is_second_amount_valid,
                 is_first_price_ok,
                 is_second_price_ok,
+                is_special_nft_token.not(),
             ],
         )?;
 
@@ -3583,7 +3588,12 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
         // rhs
         let rhs_valid = multi_and(
             cs.namespace(|| "is_rhs_valid"),
-            &[common_valid_flag, is_account_empty.not(), is_rhs_chunk],
+            &[
+                common_valid_flag,
+                is_account_empty.not(),
+                is_rhs_chunk,
+                is_special_nft_storage_account.not(),
+            ],
         )?;
 
         // calculate new rhs balance value
