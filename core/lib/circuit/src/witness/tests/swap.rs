@@ -25,12 +25,12 @@ struct TestSwap {
     accounts: (u32, u32),
     recipients: (u32, u32),
     submitter: u32,
-    tokens: (u16, u16),
+    tokens: (u32, u32),
     amounts: (u64, u64),
     balances: (u64, u64, u64),
     first_price: (u64, u64),
     second_price: (u64, u64),
-    fee_token: u16,
+    fee_token: u32,
     fee: u64,
     is_limit_order: (bool, bool),
     test_accounts: Vec<WitnessTestAccount>,
@@ -46,18 +46,18 @@ impl TestSwap {
         self.test_accounts = vec![
             WitnessTestAccount::new_with_token(
                 AccountId(self.accounts.0),
-                self.balances.0,
                 TokenId(self.tokens.0),
+                self.balances.0,
             ),
             WitnessTestAccount::new_with_token(
                 AccountId(self.accounts.1),
-                self.balances.1,
                 TokenId(self.tokens.1),
+                self.balances.1,
             ),
             WitnessTestAccount::new_with_token(
                 AccountId(self.submitter),
-                self.balances.2,
                 TokenId(self.fee_token),
+                self.balances.2,
             ),
         ];
         if self
@@ -359,11 +359,11 @@ fn test_swap_success() {
 #[test]
 #[ignore]
 fn test_self_swap() {
-    let mut account = WitnessTestAccount::new_with_token(AccountId(1), 100, TokenId(1));
+    let mut account = WitnessTestAccount::new_with_token(AccountId(1), TokenId(1), 100);
     account
         .account
         .add_balance(TokenId(2), &BigUint::from(200u8));
-    let submitter = WitnessTestAccount::new_with_token(AccountId(2), 100, TokenId(0));
+    let submitter = WitnessTestAccount::new_with_token(AccountId(2), TokenId(0), 100);
 
     let order_0 = account.zksync_account.sign_order(
         TokenId(1),
@@ -413,7 +413,7 @@ fn test_self_swap() {
         SigDataInput::from_swap_op(&swap_op).expect("SigDataInput creation failed"),
     );
 
-    incorrect_op_test_scenario::<SwapWitness<Bn256>, _>(
+    incorrect_op_test_scenario::<SwapWitness<Bn256>, _, _>(
         &[account, submitter],
         swap_op,
         input,
@@ -424,6 +424,7 @@ fn test_self_swap() {
                 amount: 1u8.into(),
             }]
         },
+        |_| {},
     );
 }
 
@@ -490,7 +491,7 @@ fn test_swap_incompatible_orders() {
 
     let (swap_op, input, _) = test_swap.get_op(Some(TokenId(20)), None);
 
-    incorrect_op_test_scenario::<SwapWitness<Bn256>, _>(
+    incorrect_op_test_scenario::<SwapWitness<Bn256>, _, _>(
         &test_swap.get_accounts(),
         swap_op,
         input,
@@ -501,6 +502,7 @@ fn test_swap_incompatible_orders() {
                 amount: test_swap.fee.into(),
             }]
         },
+        |_| {},
     );
 
     let mut test_swap = TestSwap {
@@ -522,7 +524,7 @@ fn test_swap_incompatible_orders() {
 
     let (swap_op, input, _) = test_swap.get_op(None, Some(BigUint::from(1u8)));
 
-    incorrect_op_test_scenario::<SwapWitness<Bn256>, _>(
+    incorrect_op_test_scenario::<SwapWitness<Bn256>, _, _>(
         &test_swap.get_accounts(),
         swap_op,
         input,
@@ -533,6 +535,7 @@ fn test_swap_incompatible_orders() {
                 amount: test_swap.fee.into(),
             }]
         },
+        |_| {},
     );
 }
 
@@ -594,7 +597,7 @@ fn test_swap_failure() {
         test_swap.create_accounts();
         let (swap_op, input, _) = test_swap.get_op(None, None);
 
-        incorrect_op_test_scenario::<SwapWitness<Bn256>, _>(
+        incorrect_op_test_scenario::<SwapWitness<Bn256>, _, _>(
             &test_swap.get_accounts(),
             swap_op,
             input,
@@ -605,6 +608,7 @@ fn test_swap_failure() {
                     amount: test_swap.fee.into(),
                 }]
             },
+            |_| {},
         );
     }
 }
@@ -632,7 +636,7 @@ fn test_swap_corrupted_input() {
     let (swap_op, input, _) = test_swap.get_op(None, None);
 
     for sig in input.0.corrupted_variations() {
-        corrupted_input_test_scenario::<SwapWitness<Bn256>, _>(
+        corrupted_input_test_scenario::<SwapWitness<Bn256>, _, _>(
             &test_swap.get_accounts(),
             swap_op.clone(),
             (sig, input.1.clone(), input.2.clone()),
@@ -644,11 +648,12 @@ fn test_swap_corrupted_input() {
                     .unwrap();
                 vec![fee]
             },
+            |_| {},
         );
     }
 
     for sig in input.2.corrupted_variations() {
-        corrupted_input_test_scenario::<SwapWitness<Bn256>, _>(
+        corrupted_input_test_scenario::<SwapWitness<Bn256>, _, _>(
             &test_swap.get_accounts(),
             swap_op.clone(),
             (input.0.clone(), input.1.clone(), sig),
@@ -660,6 +665,7 @@ fn test_swap_corrupted_input() {
                     .unwrap();
                 vec![fee]
             },
+            |_| {},
         );
     }
 }
@@ -702,7 +708,7 @@ fn test_swap_limit_orders() {
         },
     );
 
-    let new_submitter = WitnessTestAccount::new_with_token(AccountId(6), 24, TokenId(10));
+    let new_submitter = WitnessTestAccount::new_with_token(AccountId(6), TokenId(10), 24);
 
     // Using same signed limit orders but different submitter
     let second_swap_op = SwapOp {

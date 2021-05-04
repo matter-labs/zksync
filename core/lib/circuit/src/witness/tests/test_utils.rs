@@ -99,7 +99,7 @@ pub struct WitnessTestAccount {
 
 impl WitnessTestAccount {
     pub fn new(id: AccountId, balance: u64) -> Self {
-        Self::new_with_token(id, balance, TokenId(0))
+        Self::new_with_token(id, TokenId(0), balance)
     }
 
     pub fn new_with_token(id: AccountId, token: TokenId, balance: u64) -> Self {

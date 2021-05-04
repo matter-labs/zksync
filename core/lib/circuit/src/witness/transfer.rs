@@ -15,9 +15,8 @@ use zksync_crypto::{
     },
     params::{
         account_tree_depth, ACCOUNT_ID_BIT_WIDTH, AMOUNT_EXPONENT_BIT_WIDTH,
-        AMOUNT_MANTISSA_BIT_WIDTH, CHUNK_BIT_WIDTH, CONTENT_HASH_WIDTH, FEE_EXPONENT_BIT_WIDTH,
-        FEE_MANTISSA_BIT_WIDTH, NEW_PUBKEY_HASH_WIDTH, NONCE_BIT_WIDTH, TOKEN_BIT_WIDTH,
-        TX_TYPE_BIT_WIDTH,
+        AMOUNT_MANTISSA_BIT_WIDTH, CHUNK_BIT_WIDTH, FEE_EXPONENT_BIT_WIDTH, FEE_MANTISSA_BIT_WIDTH,
+        TOKEN_BIT_WIDTH, TX_TYPE_BIT_WIDTH,
     },
     primitives::FloatConversions,
 };
@@ -321,12 +320,6 @@ impl TransferWitness<Bn256> {
                 fee: Some(fee_encoded),
                 a: Some(a),
                 b: Some(b),
-                new_pub_key_hash: Some(Fr::zero()),
-                special_eth_addresses: vec![Some(Fr::zero())],
-                special_tokens: vec![Some(Fr::zero()), Some(Fr::zero())],
-                special_account_ids: vec![Some(Fr::zero()), Some(Fr::zero())],
-                special_content_hash: vec![Some(Fr::zero()); CONTENT_HASH_WIDTH],
-                special_serial_id: Some(Fr::zero()),
                 valid_from: Some(fr_from(valid_from)),
                 valid_until: Some(fr_from(valid_until)),
                 ..Default::default()

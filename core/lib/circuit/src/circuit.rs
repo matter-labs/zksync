@@ -940,11 +940,6 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
                     &prev.op_data.special_tokens,
                 )?,
                 sequences_equal(
-                    cs.namespace(|| "special_account_ids"),
-                    &op_data.special_account_ids,
-                    &prev.op_data.special_account_ids,
-                )?,
-                sequences_equal(
                     cs.namespace(|| "special_content_hash"),
                     &op_data.special_content_hash,
                     &prev.op_data.special_content_hash,
@@ -1016,9 +1011,9 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
 
         let nft_content_as_balance = hash_nft_content_to_balance_type(
             cs.namespace(|| "nft_content_as_balance"),
-            &op_data.special_account_ids[0], // creator_account_id
-            &op_data.special_serial_id,      // serial_id
-            &op_data.special_content_hash,   // content_hash
+            &op_data.special_accounts[0],  // creator_account_id
+            &op_data.special_serial_id,    // serial_id
+            &op_data.special_content_hash, // content_hash
             self.rescue_params,
         )?;
 
@@ -1501,13 +1496,13 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
 
         special:
         special_eth_addresses = [creator_address]
-        special_account_ids = [creator_account_id, account_id]
+        special_accounts = [creator_account_id, account_id]
         */
 
         // construct pubdata
         let mut pubdata_bits = vec![];
         pubdata_bits.extend(global_variables.chunk_data.tx_type.get_bits_be()); // tx_type = 1 byte
-        pubdata_bits.extend(op_data.special_account_ids[1].get_bits_be()); // account_id = 4 bytes
+        pubdata_bits.extend(op_data.special_accounts[1].get_bits_be()); // account_id = 4 bytes
         pubdata_bits.extend(op_data.eth_address.get_bits_be()); // initiator_address = 20 bytes
         pubdata_bits.extend(cur.token.get_bits_be()); // token_id = 4 bytes
         pubdata_bits.extend(op_data.full_amount.get_bits_be()); // full_amount = 16 bytes
@@ -1589,7 +1584,7 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
 
             let is_initiator_account = CircuitElement::equals(
                 cs.namespace(|| "is_initiator_account"),
-                &op_data.special_account_ids[1],
+                &op_data.special_accounts[1],
                 &cur.account_id,
             )?;
             flags.push(is_initiator_account);
@@ -1654,7 +1649,7 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
 
             let is_creator_account = CircuitElement::equals(
                 cs.namespace(|| "is_creator_account"),
-                &op_data.special_account_ids[0],
+                &op_data.special_accounts[0],
                 &cur.account_id,
             )?;
             flags.push(is_creator_account);
@@ -2152,7 +2147,7 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
         special:
         special_eth_addresses = [recipient_address]
         special_tokens = [fee_token, new_token]
-        special_account_ids = [creator_account_id, recipient_account_id]
+        special_accounts = [creator_account_id, recipient_account_id]
         special_content_hash = vector of bits of the content hash
         special_serial_id = serial_id of the NFT from this creator
         */
@@ -2160,8 +2155,8 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
         // construct pubdata
         let mut pubdata_bits = vec![];
         pubdata_bits.extend(global_variables.chunk_data.tx_type.get_bits_be()); // tx_type = 1 byte
-        pubdata_bits.extend(op_data.special_account_ids[0].get_bits_be()); // creator_account_id = 4 bytes
-        pubdata_bits.extend(op_data.special_account_ids[1].get_bits_be()); // recipient_account_id = 4 bytes
+        pubdata_bits.extend(op_data.special_accounts[0].get_bits_be()); // creator_account_id = 4 bytes
+        pubdata_bits.extend(op_data.special_accounts[1].get_bits_be()); // recipient_account_id = 4 bytes
         pubdata_bits.extend(
             op_data
                 .special_content_hash
@@ -2233,7 +2228,7 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
         // used in first and second chunk
         let is_creator_account = CircuitElement::equals(
             cs.namespace(|| "is_creator_account"),
-            &op_data.special_account_ids[0],
+            &op_data.special_accounts[0],
             &cur.account_id,
         )?;
         // used in fourth and fifth chunk
@@ -2250,7 +2245,7 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
 
             let mut serialized_tx_bits = vec![];
             serialized_tx_bits.extend(global_variables.chunk_data.tx_type.get_bits_be()); // tx_type
-            serialized_tx_bits.extend(op_data.special_account_ids[0].get_bits_be()); // creator_id
+            serialized_tx_bits.extend(op_data.special_accounts[0].get_bits_be()); // creator_id
             serialized_tx_bits.extend(cur.account.address.get_bits_be()); // creator_address
             serialized_tx_bits.extend(
                 op_data
@@ -2394,7 +2389,7 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
 
             let is_recipient_account = CircuitElement::equals(
                 cs.namespace(|| "is_recipient_account"),
-                &op_data.special_account_ids[1],
+                &op_data.special_accounts[1],
                 &cur.account_id,
             )?;
             flags.push(is_recipient_account);
@@ -2459,7 +2454,7 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
         special:
         special_eth_addresses = [creator_address]
         special_tokens = [fee_token, token]
-        special_account_ids = [creator_account_id, initiator_account_id]
+        special_accounts = [creator_account_id, initiator_account_id]
         special_content_hash = vector of bits of the content hash
         special_serial_id = serial_id of the NFT from this creator
         */
@@ -2467,7 +2462,7 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
         // construct pubdata
         let mut pubdata_bits = vec![];
         pubdata_bits.extend(global_variables.chunk_data.tx_type.get_bits_be()); // tx_type = 1 byte
-        pubdata_bits.extend(op_data.special_account_ids[1].get_bits_be()); // initiator_account_id = 4 bytes
+        pubdata_bits.extend(op_data.special_accounts[1].get_bits_be()); // initiator_account_id = 4 bytes
         pubdata_bits.extend(op_data.special_eth_addresses[0].get_bits_be()); // creator_address = 20 bytes
         pubdata_bits.extend(
             op_data
@@ -2543,7 +2538,7 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
         // used in first and second chunk
         let is_initiator_account = CircuitElement::equals(
             cs.namespace(|| "is_initiator_account"),
-            &op_data.special_account_ids[1],
+            &op_data.special_accounts[1],
             &cur.account_id,
         )?;
         // used in second and third chunk
@@ -2560,7 +2555,7 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
 
             let mut serialized_tx_bits = vec![];
             serialized_tx_bits.extend(global_variables.chunk_data.tx_type.get_bits_be()); // tx_type
-            serialized_tx_bits.extend(op_data.special_account_ids[1].get_bits_be()); // initiator_id
+            serialized_tx_bits.extend(op_data.special_accounts[1].get_bits_be()); // initiator_id
             serialized_tx_bits.extend(cur.account.address.get_bits_be()); // initiator_address
             serialized_tx_bits.extend(op_data.eth_address.get_bits_be()); // to_address
             serialized_tx_bits.extend(op_data.special_tokens[1].get_bits_be()); // token
@@ -2672,7 +2667,7 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
 
             let is_creator_account = CircuitElement::equals(
                 cs.namespace(|| "is_creator_account"),
-                &op_data.special_account_ids[0],
+                &op_data.special_accounts[0],
                 &cur.account_id,
             )?;
             flags.push(is_creator_account);
@@ -4676,9 +4671,9 @@ fn generate_maxchunk_polynomial<E: JubjubEngine>() -> Vec<E::Fr> {
         get_xy(FullExitOp::OP_CODE, FullExitOp::CHUNKS),
         get_xy(ChangePubKeyOp::OP_CODE, ChangePubKeyOp::CHUNKS),
         get_xy(ForcedExitOp::OP_CODE, ForcedExitOp::CHUNKS),
-        get_xy(SwapOp::OP_CODE, SwapOp::CHUNKS),
         get_xy(MintNFTOp::OP_CODE, MintNFTOp::CHUNKS),
         get_xy(WithdrawNFTOp::OP_CODE, WithdrawNFTOp::CHUNKS),
+        get_xy(SwapOp::OP_CODE, SwapOp::CHUNKS),
     ];
     let interpolation = interpolate::<E>(&points[..]).expect("must interpolate");
     assert_eq!(interpolation.len(), DIFFERENT_TRANSACTIONS_TYPE_NUMBER);

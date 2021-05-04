@@ -12,10 +12,7 @@ use zksync_crypto::{
         account::CircuitAccountTree,
         utils::{append_be_fixed_width, le_bit_vector_into_field_element},
     },
-    params::{
-        account_tree_depth, ACCOUNT_ID_BIT_WIDTH, CHUNK_BIT_WIDTH, CONTENT_HASH_WIDTH,
-        NEW_PUBKEY_HASH_WIDTH, NONCE_BIT_WIDTH, TX_TYPE_BIT_WIDTH,
-    },
+    params::{account_tree_depth, ACCOUNT_ID_BIT_WIDTH, CHUNK_BIT_WIDTH, TX_TYPE_BIT_WIDTH},
 };
 use zksync_types::operations::CloseOp;
 // Local deps
@@ -153,13 +150,6 @@ impl CloseAccountWitness<Bn256> {
             args: OperationArguments {
                 a: Some(a),
                 b: Some(b),
-                new_pub_key_hash: Some(Fr::zero()),
-                valid_from: Some(Fr::zero()),
-                special_eth_addresses: vec![Some(Fr::zero())],
-                special_tokens: vec![Some(Fr::zero()), Some(Fr::zero())],
-                special_account_ids: vec![Some(Fr::zero()), Some(Fr::zero())],
-                special_content_hash: vec![Some(Fr::zero()); CONTENT_HASH_WIDTH],
-                special_serial_id: Some(Fr::zero()),
                 ..Default::default()
             },
             before_root: Some(before_root),

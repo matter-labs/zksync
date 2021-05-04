@@ -438,36 +438,30 @@ impl MintNFTWitness<Bn256> {
 
             tx_type: Some(Fr::from_str(&MintNFTOp::OP_CODE.to_string()).unwrap()),
             args: OperationArguments {
-                eth_address: Some(Fr::zero()),
-                amount_packed: Some(Fr::zero()),
-                second_amount_packed: Some(Fr::zero()),
-                special_amounts: vec![Some(Fr::zero()); 2],
-                full_amount: Some(Fr::zero()),
                 fee: Some(fee_encoded),
-                pub_nonce: Some(Fr::zero()),
                 a: Some(a),
                 b: Some(b),
-                new_pub_key_hash: Some(Fr::zero()),
-                valid_from: Some(Fr::zero()),
-
                 valid_until: None,
                 second_valid_from: None,
-                special_eth_addresses: vec![Some(
-                    recipient_account_witness_before_fifth_chunk
-                        .address
-                        .expect("recipient account should not be empty"),
-                )],
-                special_tokens: vec![Some(token_fe), Some(new_token_id)],
-                special_accounts: vec![],
-                special_account_ids: vec![
+                special_eth_addresses: vec![
+                    Some(
+                        recipient_account_witness_before_fifth_chunk
+                            .address
+                            .expect("recipient account should not be empty"),
+                    ),
+                    Some(Fr::zero()),
+                ],
+                special_tokens: vec![Some(token_fe), Some(new_token_id), Some(Fr::zero())],
+                special_accounts: vec![
                     Some(creator_account_id_fe),
                     Some(recipient_account_id_fe),
+                    Some(Fr::zero()),
+                    Some(Fr::zero()),
+                    Some(Fr::zero()),
                 ],
                 special_content_hash: content_hash_as_vec,
                 special_serial_id: Some(serial_id),
-                special_nonces: vec![],
-                special_prices: vec![],
-                second_valid_until: None,
+                ..Default::default()
             },
 
             creator_before_first_chunk: OperationBranch {

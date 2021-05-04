@@ -89,7 +89,7 @@ impl Witness for WithdrawNFTWitness<Bn256> {
 
         append_be_fixed_width(
             &mut pubdata_bits,
-            &self.args.special_account_ids[1].unwrap(),
+            &self.args.special_accounts[1].unwrap(),
             ACCOUNT_ID_BIT_WIDTH,
         );
         append_be_fixed_width(
@@ -378,25 +378,26 @@ impl WithdrawNFTWitness<Bn256> {
             tx_type: Some(Fr::from_str(&WithdrawNFTOp::OP_CODE.to_string()).unwrap()),
             args: OperationArguments {
                 eth_address: Some(withdraw_nft.to_address),
-                amount_packed: Some(Fr::zero()),
-                full_amount: Some(Fr::zero()),
                 fee: Some(fee_encoded),
-                pub_nonce: Some(Fr::zero()),
                 a: Some(a),
                 b: Some(b),
-                new_pub_key_hash: Some(Fr::zero()),
                 valid_from: Some(fr_from(&valid_from)),
                 valid_until: Some(fr_from(&valid_until)),
-
-                special_eth_addresses: vec![Some(
-                    creator_account_witness_fourth_chunk
-                        .address
-                        .expect("creator account should not be empty"),
-                )],
-                special_tokens: vec![Some(fee_token_fe), Some(token_fe)],
-                special_account_ids: vec![
+                special_eth_addresses: vec![
+                    Some(
+                        creator_account_witness_fourth_chunk
+                            .address
+                            .expect("creator account should not be empty"),
+                    ),
+                    Some(Fr::zero()),
+                ],
+                special_tokens: vec![Some(fee_token_fe), Some(token_fe), Some(Fr::zero())],
+                special_accounts: vec![
                     Some(creator_account_id_fe),
                     Some(initiator_account_id_fe),
+                    Some(Fr::zero()),
+                    Some(Fr::zero()),
+                    Some(Fr::zero()),
                 ],
                 special_content_hash: content_hash_as_vec,
                 special_serial_id: Some(serial_id_fe),

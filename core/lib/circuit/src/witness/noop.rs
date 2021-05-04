@@ -7,10 +7,9 @@ use zksync_crypto::franklin_crypto::bellman::pairing::{
 use zksync_crypto::circuit::{
     account::CircuitAccountTree, utils::le_bit_vector_into_field_element,
 };
-use zksync_crypto::params::{CHUNK_BIT_WIDTH, CONTENT_HASH_WIDTH};
+use zksync_crypto::params::CHUNK_BIT_WIDTH;
 use zksync_types::operations::NoopOp;
 // Local deps
-use crate::operation::OperationArguments;
 use crate::{
     account::AccountWitness,
     operation::{Operation, OperationBranch, OperationBranchWitness, SignatureData},
@@ -49,23 +48,7 @@ pub fn noop_operation(tree: &CircuitAccountTree, acc_id: u32) -> Operation<Bn256
         signature_data,
         signer_pub_key_packed: signer_pub_key_packed.to_vec(),
 
-        args: OperationArguments {
-            eth_address: Some(Fr::zero()),
-            amount_packed: Some(Fr::zero()),
-            full_amount: Some(Fr::zero()),
-            fee: Some(Fr::zero()),
-            a: Some(Fr::zero()),
-            b: Some(Fr::zero()),
-            pub_nonce: Some(Fr::zero()),
-            new_pub_key_hash: Some(Fr::zero()),
-            valid_from: Some(Fr::zero()),
-            special_eth_addresses: vec![Some(Fr::zero())],
-            special_tokens: vec![Some(Fr::zero()), Some(Fr::zero())],
-            special_account_ids: vec![Some(Fr::zero()), Some(Fr::zero())],
-            special_content_hash: vec![Some(Fr::zero()); CONTENT_HASH_WIDTH],
-            special_serial_id: Some(Fr::zero()),
-            ..Default::default()
-        },
+        args: Default::default(),
         lhs: OperationBranch {
             address: Some(account_address_fe),
             token: Some(token_fe),

@@ -109,7 +109,6 @@ fn zksync_circuit(block_chunks: usize) -> impl Circuit<Engine> + Clone {
             valid_until: None,
             second_valid_from: None,
             second_valid_until: None,
-            special_account_ids: vec![None, None],
             special_content_hash: vec![None; params::CONTENT_HASH_WIDTH],
             special_serial_id: None,
         },

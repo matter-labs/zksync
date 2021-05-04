@@ -221,9 +221,8 @@ impl FullExitWitness<Bn256> {
 
         let capacity = tree.capacity();
         assert_eq!(capacity, 1 << account_tree_depth());
-        let creator_account_id_fe = fr_from(&full_exit.creator_account_id);
-        let token_fe = fr_from(&full_exit.token);
-        let serial_id_fe = fr_from(&full_exit.nft_serial_id);
+        let creator_account_id_fe = fr_from(full_exit.creator_account_id);
+        let serial_id_fe = fr_from(full_exit.nft_serial_id);
         let account_address_fe = fr_from(full_exit.account_address);
         let token_fe = fr_from(full_exit.token);
 
@@ -345,21 +344,22 @@ impl FullExitWitness<Bn256> {
             },
             args: OperationArguments {
                 eth_address: Some(full_exit.eth_address),
-                amount_packed: Some(Fr::zero()),
                 full_amount: Some(full_exit.full_exit_amount),
-                fee: Some(Fr::zero()),
-                pub_nonce: Some(Fr::zero()),
-                a: Some(Fr::zero()),
-                b: Some(Fr::zero()),
-                new_pub_key_hash: Some(Fr::zero()),
-                valid_from: Some(Fr::zero()),
-                special_eth_addresses: vec![Some(
-                    creator_account_witness
-                        .address
-                        .expect("creator account should not be empty"),
-                )],
-                special_tokens: vec![Some(Fr::zero()), Some(Fr::zero())],
-                special_account_ids: vec![Some(creator_account_id_fe), Some(account_address_fe)],
+                special_eth_addresses: vec![
+                    Some(
+                        creator_account_witness
+                            .address
+                            .expect("creator account should not be empty"),
+                    ),
+                    Some(Fr::zero()),
+                ],
+                special_accounts: vec![
+                    Some(creator_account_id_fe),
+                    Some(account_address_fe),
+                    Some(Fr::zero()),
+                    Some(Fr::zero()),
+                    Some(Fr::zero()),
+                ],
                 special_content_hash: content_hash_as_vec,
                 special_serial_id: Some(serial_id_fe),
                 ..Default::default()
