@@ -156,6 +156,7 @@ impl<'a, 'c> EventSchema<'a, 'c> {
         block_number: BlockNumber,
         status: AccountStateChangeStatus,
     ) -> QueryResult<()> {
+        let start = Instant::now();
         let mut transaction = self.0.start_transaction().await?;
         // Store new account event for each update in the block.
         let events: Vec<_> = transaction
@@ -182,8 +183,9 @@ impl<'a, 'c> EventSchema<'a, 'c> {
                 .store_event_data(block_number, EventType::Account, event_data)
                 .await?;
         }
-
         transaction.commit().await?;
+
+        metrics::histogram!("sql.event.store_state_updated_event", start.elapsed());
         Ok(())
     }
 
