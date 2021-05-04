@@ -136,9 +136,9 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
         require(storedBlockHashes[totalBlocksExecuted] == hashStoredBlockInfo(lastBlockInfo), "wqqs"); // The provided block info should be equal to the current one
         
         RegenesisMultisig multisig = RegenesisMultisig(REGENESIS_MULTISIG_ADDRESS);
-        bytes32 oldRootHash = multisig.getOldRootHash();
+        bytes32 oldRootHash = multisig.oldRootHash();
         require(oldRootHash == lastBlockInfo.stateHash);
-        bytes32 newRootHash = multisig.getNewRootHash();
+        bytes32 newRootHash = multisig.newRootHash();
 
         totalBlocksCommitted += 1;
         totalBlocksProven += 1;

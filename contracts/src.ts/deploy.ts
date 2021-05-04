@@ -252,8 +252,8 @@ export class Deployer {
             console.log('Deploying ForcedExit contract');
         }
 
-        const partners = process.env.REGENESIS_PARTNERS.split(',');
-        const numberOfNeededSignatures = +process.env.REGENESIS_NEEEDED_SIGNATURES;
+        const partners = process.env.MISC_REGENESIS_PARTNERS.split(',');
+        const numberOfNeededSignatures = +process.env.MISC_REGENESIS_NEEDED_SIGNATURES;
 
         if(partners.length < numberOfNeededSignatures) {
             throw new Error('Number of requiored signatures for Genesis is higher than the number of partners');

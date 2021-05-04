@@ -21,7 +21,7 @@ const testConfig = {
     MAX_AMOUNT_OF_REGISTERED_TOKENS: 5,
     PRIORITY_EXPIRATION: 101,
     DUMMY_VERIFIER: true,
-    REGENESIS_MULTISIG_ADDRESS: '0xAA7113B9de498556dC76eDFEFc57681083c861C1'
+    REGENESIS_MULTISIG_ADDRESS: '0xAA7113B9de498556dC76eDFEFc57681083c861C1',
 };
 
 const localConfig = Object.assign({}, prodConfig);
@@ -29,7 +29,7 @@ const localConfig = Object.assign({}, prodConfig);
 localConfig.UPGRADE_NOTICE_PERIOD = 0;
 localConfig.DUMMY_VERIFIER = process.env.CONTRACTS_TEST_DUMMY_VERIFIER === 'true';
 // @ts-ignore
-localConfig.REGENESIS_MULTISIG_ADDRESS = process.env.REGENESIS_MULTISIG_ADDRESS;
+localConfig.REGENESIS_MULTISIG_ADDRESS = process.env.MISC_REGENESIS_MULTISIG_ADDRESS;
 // @ts-ignore
 localConfig.EASY_EXODUS = process.env.CONTRACTS_TEST_EASY_EXODUS === 'true';
 

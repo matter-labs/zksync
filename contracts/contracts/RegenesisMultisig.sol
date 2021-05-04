@@ -14,13 +14,9 @@ contract RegenesisMultisig is Ownable {
     address[] public partners;
 
     uint32 public requiredNumberOfSignatures;
-
-    // The total number of partners. May be different 
-    // in production
-    uint32 constant public NUMBER_OF_PARTNERS = 4;
-
-    bytes32 oldRootHash = bytes32(0);
-    bytes32 newRootHash = bytes32(0);
+    
+    bytes32 public oldRootHash = bytes32(0);
+    bytes32 public newRootHash = bytes32(0);
 
     constructor(
         address[] memory _partners,
@@ -28,10 +24,8 @@ contract RegenesisMultisig is Ownable {
     ) Ownable(msg.sender) {
         // There obviously should require less signatures than there are addresses
         require(_requiredNumberOfSignatures <= _partners.length, "0");
-        require(_partners.length == NUMBER_OF_PARTNERS, "1"); // The number of the supplied partners is not correct
 
         partners = _partners;
-
         requiredNumberOfSignatures = _requiredNumberOfSignatures;
     }
 
@@ -54,7 +48,7 @@ contract RegenesisMultisig is Ownable {
                 )
             );
         
-        address[NUMBER_OF_PARTNERS] memory recoveredAddresses;
+        address[] memory recoveredAddresses = new address[](_signatures.length);
         for (uint32 i = 0; i < _signatures.length; i++) {
             recoveredAddresses[i] = Utils.recoverAddressFromEthSignature(_signatures[i], messageHash);
         }
@@ -75,13 +69,5 @@ contract RegenesisMultisig is Ownable {
 
         oldRootHash = _oldRootHash;
         newRootHash = _newRootHash;
-    } 
-
-    function getOldRootHash() public view returns (bytes32) {
-        return oldRootHash;
-    }
-
-    function getNewRootHash() public view returns (bytes32) {
-        return newRootHash;
     }
 }
