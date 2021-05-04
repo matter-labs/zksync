@@ -81,7 +81,7 @@ export function deployedAddressesFromEnv(): DeployedAddresses {
         ZkSync: process.env.CONTRACTS_CONTRACT_ADDR,
         ZkSyncTarget: process.env.CONTRACTS_CONTRACT_TARGET_ADDR,
         ForcedExit: process.env.CONTRACTS_FORCED_EXIT_ADDR,
-        RegenesisMultisig: process.env.REGENESIS_MULTISIG_ADDR
+        RegenesisMultisig: process.env.MISC_REGENESIS_MULTISIG_ADDRESS
     };
 }
 
@@ -272,7 +272,7 @@ export class Deployer {
         const zksGasUsed = zksRec.gasUsed;
         const gasPrice = regenesisMultisigContract.deployTransaction.gasPrice;
         if (this.verbose) {
-            console.log(`CONTRACTS_REGENESIS_MULTISIG_ADDR=${regenesisMultisigContract.address}`);
+            console.log(`MISC_REGENESIS_MULTISIG_ADDRESS=${regenesisMultisigContract.address}`);
             console.log(
                 `Regenesis Multisig contract deployed, gasUsed: ${zksGasUsed.toString()}, eth spent: ${formatEther(
                     zksGasUsed.mul(gasPrice)

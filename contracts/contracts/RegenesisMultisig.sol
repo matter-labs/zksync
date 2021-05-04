@@ -19,7 +19,7 @@ contract RegenesisMultisig is Ownable {
     bytes32 public newRootHash = bytes32(0);
 
     constructor(address[] memory _partners, uint32 _requiredNumberOfSignatures) Ownable(msg.sender) {
-        // There obviously should require less signatures than there are addresses
+        // We obviously should require less signatures than there are addresses
         require(_requiredNumberOfSignatures <= _partners.length, "0");
 
         partners = _partners;

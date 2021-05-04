@@ -43,7 +43,7 @@ const StoredBlockInfoAbi = {
     type: 'tuple'
 };
 
-describe.only('Regenesis test', function () {
+describe('Regenesis test', function () {
     this.timeout(50000);
 
     // Not sure about different hardhat versions' wallets,
@@ -53,8 +53,8 @@ describe.only('Regenesis test', function () {
     const wallet = new ethers.Wallet(walletPrivateKey).connect(hardhat.ethers.provider);
 
     it('Test that regenesis upgrade works', async () => {
+        // Fund the deployer wallet
         const hardhatWallets = await hardhat.ethers.getSigners();
-        // Get some wallet different from than the default one.
         const hardhatWallet: ethers.Wallet = hardhatWallets[0];
 
         const supplyMultisigCreatorTx = await hardhatWallet.sendTransaction({
@@ -63,6 +63,7 @@ describe.only('Regenesis test', function () {
         });
         await supplyMultisigCreatorTx.wait();
 
+        // Deploying the contracts
         const contracts = readProductionContracts();
         contracts.zkSync = readContractCode('dev-contracts/ZkSyncRegenesisTest');
         const deployer = new Deployer({ deployWallet: wallet, contracts });
@@ -74,7 +75,6 @@ describe.only('Regenesis test', function () {
             wallet
         );
         const zksyncContract = ZkSyncRegenesisTestFactory.connect(deployer.addresses.ZkSync, wallet);
-
         const governanceAdress = deployer.addresses.GovernanceTarget;
         const verifierAddrss = deployer.addresses.VerifierTarget;
         const zkSyncAddress = deployer.addresses.ZkSyncTarget;
@@ -83,12 +83,11 @@ describe.only('Regenesis test', function () {
             wallet
         );
 
-        // Starting upgrade...
+        // Starting upgrade
         await expect(upgradeGatekeeperContract.startUpgrade([governanceAdress, verifierAddrss, zkSyncAddress])).to.emit(
             upgradeGatekeeperContract,
             'NoticePeriodStart'
         );
-
         await expect(upgradeGatekeeperContract.startPreparation()).to.emit(
             upgradeGatekeeperContract,
             'PreparationStart'
@@ -102,6 +101,10 @@ describe.only('Regenesis test', function () {
         );
 
         const oldRootHash = process.env.CONTRACTS_GENESIS_ROOT;
+        expect(oldRootHash).to.eq(
+            '0x2d5ab622df708ab44944bb02377be85b6f27812e9ae520734873b7a193898ba4',
+            'The test requires a specific GENESIS_ROOT'
+        );
         const newRootHash = '0x2a9b50e17ece607c8c88b1833426fd9e60332685b94a1534fcf26948e373604c';
         const signatures = [
             // Correct signature for 0x374Ac2A10cBCaE93d2aBBe468f0EDEF6768e65eE
@@ -121,6 +124,8 @@ describe.only('Regenesis test', function () {
         );
         await submitSignaturesTx.wait();
 
+        // After the new root hash has been submitted to the multisig,
+        // we need to finish regenesis
         const genesisBlock = {
             blockNumber: 0,
             priorityOperations: 0,
