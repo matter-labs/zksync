@@ -9,14 +9,12 @@ use zksync_types::event::{
         AccountEvent, AccountStateChangeStatus, AccountStateChangeType, AccountUpdateDetails,
     },
     block::{BlockEvent, BlockStatus},
-    transaction::TransactionEvent,
+    transaction::{TransactionEvent, TransactionStatus},
     EventId, ZkSyncEvent,
 };
-use zksync_types::{
-    account::AccountUpdate, block::ExecutedOperations, priority_ops::ZkSyncPriorityOp,
-};
+use zksync_types::{block::ExecutedOperations, priority_ops::ZkSyncPriorityOp};
 // Local uses
-use crate::{diff::StorageAccountDiff, QueryResult, StorageProcessor};
+use crate::{QueryResult, StorageProcessor};
 use records::StoredEvent;
 
 pub mod records;
@@ -107,8 +105,8 @@ impl<'a, 'c> EventSchema<'a, 'c> {
     /// In such cases, it silently returns `Ok`.
     pub async fn store_block_event(
         &mut self,
-        status: BlockStatus,
         block_number: BlockNumber,
+        status: BlockStatus,
     ) -> QueryResult<()> {
         let start = Instant::now();
         let mut transaction = self.0.start_transaction().await?;
@@ -152,63 +150,40 @@ impl<'a, 'c> EventSchema<'a, 'c> {
         Ok(())
     }
 
-    /// Create new account event with the `Committed` status
-    /// and store it in the database.
-    pub async fn store_state_committed_event(
+    /// Creates new account events and stores them in the database.
+    pub async fn store_state_updated_event(
         &mut self,
         block_number: BlockNumber,
-        account_id: AccountId,
-        account_update: &AccountUpdate,
+        status: AccountStateChangeStatus,
     ) -> QueryResult<()> {
-        let start = Instant::now();
-        let account_update_details =
-            AccountUpdateDetails::from_account_update(account_id, account_update);
+        let mut transaction = self.0.start_transaction().await?;
+        // Store new account event for each update in the block.
+        let events: Vec<_> = transaction
+            .chain()
+            .state_schema()
+            .load_state_diff_for_block(block_number)
+            .await?
+            .into_iter()
+            .map(|(account_id, update)| {
+                let update_type = AccountStateChangeType::from(&update);
+                let update_details = AccountUpdateDetails::from_account_update(account_id, update);
+                let account_event = AccountEvent {
+                    update_type,
+                    status,
+                    update_details,
+                };
+                serde_json::to_value(account_event).expect("couldn't serialize account event")
+            })
+            .collect();
 
-        let update_type = AccountStateChangeType::from(account_update);
-        let status = AccountStateChangeStatus::Committed;
+        for event_data in events.into_iter() {
+            transaction
+                .event_schema()
+                .store_event_data(block_number, EventType::Account, event_data)
+                .await?;
+        }
 
-        let account_event = AccountEvent {
-            update_type,
-            status,
-            update_details: account_update_details,
-        };
-
-        let event_data =
-            serde_json::to_value(account_event).expect("couldn't serialize account event");
-
-        self.store_event_data(block_number, EventType::Account, event_data)
-            .await?;
-
-        metrics::histogram!("sql.event.store_state_committed_event", start.elapsed());
-        Ok(())
-    }
-
-    /// Create new account event with the `Finalized` status
-    /// and store it in the database.
-    pub async fn store_state_verified_event(
-        &mut self,
-        block_number: BlockNumber,
-        account_diff: &StorageAccountDiff,
-    ) -> QueryResult<()> {
-        let start = Instant::now();
-        let account_update_details = AccountUpdateDetails::from(account_diff);
-
-        let update_type = AccountStateChangeType::from(account_diff);
-        let status = AccountStateChangeStatus::Finalized;
-
-        let account_event = AccountEvent {
-            update_type,
-            status,
-            update_details: account_update_details,
-        };
-
-        let event_data =
-            serde_json::to_value(account_event).expect("couldn't serialize account event");
-
-        self.store_event_data(block_number, EventType::Account, event_data)
-            .await?;
-
-        metrics::histogram!("sql.event.store_state_verified_event", start.elapsed());
+        transaction.commit().await?;
         Ok(())
     }
 
@@ -238,44 +213,56 @@ impl<'a, 'c> EventSchema<'a, 'c> {
         }
     }
 
-    /// Create new transaction event and store it in the database.
+    /// Create new transaction events and store them in the database.
     pub async fn store_transaction_event(
         &mut self,
-        executed_operation: &ExecutedOperations,
         block: BlockNumber,
+        status: TransactionStatus,
     ) -> QueryResult<()> {
         let start = Instant::now();
         let mut transaction = self.0.start_transaction().await?;
-
-        // Like in the case of block events, we return `Ok`
-        // if we didn't manage to fetch the account id for the given
-        // operation.
-        let account_id = match transaction
-            .event_schema()
-            .account_id_from_op(executed_operation)
-            .await
-        {
-            Ok(account_id) => account_id,
-            _ => {
-                vlog::warn!(
-                    "Couldn't create transaction event, no account id exists \
-                    in the database. Operation: {:?}",
-                    executed_operation
-                );
-                return Ok(());
-            }
-        };
-
-        let transaction_event =
-            TransactionEvent::from_executed_operation(executed_operation, block, account_id);
-
-        let event_data =
-            serde_json::to_value(transaction_event).expect("couldn't serialize transaction event");
-
-        transaction
-            .event_schema()
-            .store_event_data(block, EventType::Transaction, event_data)
+        // Load all operations executed in the given block. Rejected transaction
+        // are present in the database at the moment of events creation.
+        let block_operations = transaction
+            .chain()
+            .block_schema()
+            .get_block_executed_ops(block)
             .await?;
+
+        for executed_operation in block_operations {
+            // Like in the case of block events, we return `Ok`
+            // if we didn't manage to fetch the account id for the given
+            // operation.
+            let account_id = match transaction
+                .event_schema()
+                .account_id_from_op(&executed_operation)
+                .await
+            {
+                Ok(account_id) => account_id,
+                _ => {
+                    vlog::warn!(
+                        "Couldn't create transaction event, no account id exists \
+                        in the database. Operation: {:?}",
+                        executed_operation
+                    );
+                    return Ok(());
+                }
+            };
+
+            let transaction_event = TransactionEvent::from_executed_operation(
+                executed_operation,
+                block,
+                account_id,
+                status,
+            );
+
+            let event_data = serde_json::to_value(transaction_event)
+                .expect("couldn't serialize transaction event");
+            transaction
+                .event_schema()
+                .store_event_data(block, EventType::Transaction, event_data)
+                .await?;
+        }
         transaction.commit().await?;
 
         metrics::histogram!("sql.event.store_transaction_event", start.elapsed());

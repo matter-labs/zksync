@@ -5,14 +5,14 @@ use once_cell::sync::OnceCell;
 use serde::{Deserialize, Serialize};
 // Workspace uses
 // Local uses
+use super::account::AccountStateChangeStatus;
 use crate::{block::ExecutedOperations, AccountId, BlockNumber, TokenId};
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum TransactionStatus {
-    // We don't store transaction finalized events because
-    // they simply correspond to the executed block.
     Committed,
+    Finalized,
     Rejected,
 }
 
@@ -48,9 +48,10 @@ pub struct TransactionEvent {
 
 impl TransactionEvent {
     pub fn from_executed_operation(
-        op: &ExecutedOperations,
+        op: ExecutedOperations,
         block_number: BlockNumber,
         account_id: AccountId,
+        status: TransactionStatus,
     ) -> Self {
         match op {
             ExecutedOperations::Tx(exec_tx) => Self {
@@ -58,13 +59,13 @@ impl TransactionEvent {
                 account_id,
                 token_id: exec_tx.signed_tx.token_id(),
                 block_number,
-                tx: serde_json::to_value(exec_tx.signed_tx.tx.clone()).unwrap(),
+                tx: serde_json::to_value(exec_tx.signed_tx.tx).unwrap(),
                 status: if exec_tx.success {
-                    TransactionStatus::Committed
+                    status
                 } else {
                     TransactionStatus::Rejected
                 },
-                fail_reason: exec_tx.fail_reason.clone(),
+                fail_reason: exec_tx.fail_reason,
                 created_at: exec_tx.created_at,
                 tx_type: OnceCell::default(),
             },
@@ -73,8 +74,8 @@ impl TransactionEvent {
                 account_id,
                 token_id: exec_prior_op.priority_op.data.token_id(),
                 block_number,
-                tx: serde_json::to_value(&exec_prior_op.op.clone()).unwrap(),
-                status: TransactionStatus::Committed,
+                tx: serde_json::to_value(&exec_prior_op.op).unwrap(),
+                status,
                 fail_reason: None,
                 created_at: exec_prior_op.created_at,
                 tx_type: OnceCell::default(),
@@ -86,5 +87,14 @@ impl TransactionEvent {
         *self
             .tx_type
             .get_or_init(|| serde_json::from_value(self.tx["type"].clone()).unwrap())
+    }
+}
+
+impl From<AccountStateChangeStatus> for TransactionStatus {
+    fn from(status: AccountStateChangeStatus) -> Self {
+        match status {
+            AccountStateChangeStatus::Committed => Self::Committed,
+            AccountStateChangeStatus::Finalized => Self::Finalized,
+        }
     }
 }

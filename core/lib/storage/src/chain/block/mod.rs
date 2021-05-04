@@ -707,13 +707,6 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
         let commitment = block.block_commitment.as_bytes().to_vec();
         let timestamp = Some(block.timestamp as i64);
 
-        for tx in &block.block_transactions {
-            transaction
-                .event_schema()
-                .store_transaction_event(tx, block.block_number)
-                .await?;
-        }
-
         BlockSchema(&mut transaction)
             .save_block_transactions(block.block_number, block.block_transactions)
             .await?;
@@ -890,7 +883,7 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
         for block_number in *last_block..=*last_committed_block {
             transaction
                 .event_schema()
-                .store_block_event(BlockStatus::Reverted, BlockNumber(block_number))
+                .store_block_event(BlockNumber(block_number), BlockStatus::Reverted)
                 .await?;
         }
 
