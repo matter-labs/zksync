@@ -1150,6 +1150,18 @@ export class Wallet {
         return new ETHOperation(ethTransaction, this.provider);
     }
 
+    async resolveAccountId(): Promise<number> {
+        if (this.accountId !== undefined) {
+            return this.accountId;
+        } else {
+            const accountState = await this.getAccountState();
+            if (!accountState.id) {
+                throw new Error("Can't resolve account id from the zkSync node");
+            }
+            return accountState.id;
+        }
+    }
+
     async emergencyWithdraw(withdraw: {
         token: TokenLike;
         accountId?: number;
@@ -1157,18 +1169,7 @@ export class Wallet {
     }): Promise<ETHOperation> {
         const gasPrice = await this.ethSigner.provider.getGasPrice();
 
-        let accountId: number;
-        if (withdraw.accountId != null) {
-            accountId = withdraw.accountId;
-        } else if (this.accountId !== undefined) {
-            accountId = this.accountId;
-        } else {
-            const accountState = await this.getAccountState();
-            if (!accountState.id) {
-                throw new Error("Can't resolve account id from the zkSync node");
-            }
-            accountId = accountState.id;
-        }
+        let accountId: number = withdraw.accountId != null ? withdraw.accountId : await this.resolveAccountId();
 
         const mainZkSyncContract = this.getZkSyncMainContract();
 
@@ -1178,6 +1179,29 @@ export class Wallet {
                 gasLimit: BigNumber.from('500000'),
                 gasPrice,
                 ...withdraw.ethTxOptions
+            });
+            return new ETHOperation(ethTransaction, this.provider);
+        } catch (e) {
+            this.modifyEthersError(e);
+        }
+    }
+
+    async emergencyWithdrawNFT(withdrawNFT: {
+        tokenId: number;
+        accountId?: number;
+        ethTxOptions?: ethers.providers.TransactionRequest;
+    }): Promise<ETHOperation> {
+        const gasPrice = await this.ethSigner.provider.getGasPrice();
+
+        let accountId: number = withdrawNFT.accountId != null ? withdrawNFT.accountId : await this.resolveAccountId();
+
+        const mainZkSyncContract = this.getZkSyncMainContract();
+
+        try {
+            const ethTransaction = await mainZkSyncContract.requestFullExitNFT(accountId, withdrawNFT.tokenId, {
+                gasLimit: BigNumber.from('500000'),
+                gasPrice,
+                ...withdrawNFT.ethTxOptions
             });
             return new ETHOperation(ethTransaction, this.provider);
         } catch (e) {
