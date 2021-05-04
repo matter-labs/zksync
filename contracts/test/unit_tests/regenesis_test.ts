@@ -1,8 +1,4 @@
-import {
-    RegenesisMultisigFactory,
-    UpgradeGatekeeperFactory,
-    ZkSyncRegenesisTestFactory
-} from '../../typechain';
+import { RegenesisMultisigFactory, UpgradeGatekeeperFactory, ZkSyncRegenesisTestFactory } from '../../typechain';
 import { ethers, utils } from 'ethers';
 const { expect } = require('chai');
 const hardhat = require('hardhat');
