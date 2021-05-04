@@ -1,23 +1,11 @@
 import {
-    Governance,
-    GovernanceFactory,
-    Proxy,
-    ProxyFactory,
     RegenesisMultisigFactory,
-    UpgradeGatekeeper,
     UpgradeGatekeeperFactory,
-    Verifier,
-    VerifierFactory,
-    ZkSync,
-    ZkSyncFactory,
-    ZkSyncRegenesisTest,
     ZkSyncRegenesisTestFactory
 } from '../../typechain';
-import { BigNumber, constants, ethers, utils } from 'ethers';
+import { ethers, utils } from 'ethers';
 const { expect } = require('chai');
-const { getCallRevertReason } = require('./common');
 const hardhat = require('hardhat');
-const { performance } = require('perf_hooks');
 import { Deployer, readContractCode, readProductionContracts } from '../../src.ts/deploy';
 import { ParamType } from '@ethersproject/abi';
 
@@ -64,9 +52,9 @@ describe.only('Regenesis test', function () {
 
     // Not sure about different hardhat versions' wallets,
     // so it is better to always deploy the multisig with the same address to
-    // preserve the contract's address 
+    // preserve the contract's address
     const walletPrivateKey = '0x6878e5113d9fae7eec373bd9f7975e692c1c4ace22b536c63aa2c818ef92ef00';
-    const wallet = (new ethers.Wallet(walletPrivateKey)).connect(hardhat.ethers.provider);
+    const wallet = new ethers.Wallet(walletPrivateKey).connect(hardhat.ethers.provider);
 
     it('Test that regenesis upgrade works', async () => {
         const hardhatWallets = await hardhat.ethers.getSigners();
@@ -85,7 +73,10 @@ describe.only('Regenesis test', function () {
         await deployer.deployRegenesisMultisig({ gasLimit: 6500000 });
         await deployer.deployAll({ gasLimit: 6500000 });
 
-        const regenesisMultisigContract = RegenesisMultisigFactory.connect(deployer.addresses.RegenesisMultisig, wallet);
+        const regenesisMultisigContract = RegenesisMultisigFactory.connect(
+            deployer.addresses.RegenesisMultisig,
+            wallet
+        );
         const zksyncContract = ZkSyncRegenesisTestFactory.connect(deployer.addresses.ZkSync, wallet);
 
         const governanceAdress = deployer.addresses.GovernanceTarget;
@@ -109,7 +100,10 @@ describe.only('Regenesis test', function () {
 
         // Submitting signatures to the multisig
         expect(await regenesisMultisigContract.numberOfPartners()).to.eq(4, 'The test is aimed at 4 partners');
-        expect(await regenesisMultisigContract.requiredNumberOfSignatures()).to.eq(3, 'The test is aimed at 3 required signatures');
+        expect(await regenesisMultisigContract.requiredNumberOfSignatures()).to.eq(
+            3,
+            'The test is aimed at 3 required signatures'
+        );
 
         const oldRootHash = process.env.CONTRACTS_GENESIS_ROOT;
         const newRootHash = '0x2a9b50e17ece607c8c88b1833426fd9e60332685b94a1534fcf26948e373604c';
@@ -142,11 +136,8 @@ describe.only('Regenesis test', function () {
 
         const StoredBlockInfo = ParamType.fromObject(StoredBlockInfoAbi);
 
-        const encodedStoredBlockInfo = ethers.utils.defaultAbiCoder.encode(
-            [StoredBlockInfo],
-            [genesisBlock]
-        );
-        
+        const encodedStoredBlockInfo = ethers.utils.defaultAbiCoder.encode([StoredBlockInfo], [genesisBlock]);
+
         const tx = await upgradeGatekeeperContract.finishUpgrade([[], [], encodedStoredBlockInfo]);
         const receipt = await tx.wait();
 

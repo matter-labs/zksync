@@ -10,7 +10,6 @@ pragma experimental ABIEncoderV2;
 /// @title zkSync main contract
 /// @author Matter Labs
 contract RegenesisMultisig is Ownable {
-
     address[] public partners;
 
     uint32 public requiredNumberOfSignatures;
@@ -19,10 +18,7 @@ contract RegenesisMultisig is Ownable {
     bytes32 public oldRootHash = bytes32(0);
     bytes32 public newRootHash = bytes32(0);
 
-    constructor(
-        address[] memory _partners,
-        uint32 _requiredNumberOfSignatures
-    ) Ownable(msg.sender) {
+    constructor(address[] memory _partners, uint32 _requiredNumberOfSignatures) Ownable(msg.sender) {
         // There obviously should require less signatures than there are addresses
         require(_requiredNumberOfSignatures <= _partners.length, "0");
 
@@ -48,7 +44,7 @@ contract RegenesisMultisig is Ownable {
                     Bytes.bytesToHexASCIIBytes(abi.encodePacked(_newRootHash))
                 )
             );
-        
+
         address[] memory recoveredAddresses = new address[](_signatures.length);
         for (uint32 i = 0; i < _signatures.length; i++) {
             recoveredAddresses[i] = Utils.recoverAddressFromEthSignature(_signatures[i], messageHash);
@@ -58,8 +54,8 @@ contract RegenesisMultisig is Ownable {
         for (uint32 i = 0; i < partners.length; i++) {
             address partner = partners[i];
 
-            for(uint signatureId = 0; signatureId < _signatures.length; signatureId++) {
-                if(recoveredAddresses[signatureId] == partner) {
+            for (uint256 signatureId = 0; signatureId < _signatures.length; signatureId++) {
+                if (recoveredAddresses[signatureId] == partner) {
                     collectedSignatures += 1;
                     break;
                 }

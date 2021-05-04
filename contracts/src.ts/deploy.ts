@@ -81,7 +81,7 @@ export function deployedAddressesFromEnv(): DeployedAddresses {
         ZkSync: process.env.CONTRACTS_CONTRACT_ADDR,
         ZkSyncTarget: process.env.CONTRACTS_CONTRACT_TARGET_ADDR,
         ForcedExit: process.env.CONTRACTS_FORCED_EXIT_ADDR,
-        RegenesisMultisig: process.env.REGENESIS_MULTISIG_ADDR,  
+        RegenesisMultisig: process.env.REGENESIS_MULTISIG_ADDR
     };
 }
 
@@ -255,7 +255,7 @@ export class Deployer {
         const partners = process.env.MISC_REGENESIS_PARTNERS.split(',');
         const numberOfNeededSignatures = +process.env.MISC_REGENESIS_NEEDED_SIGNATURES;
 
-        if(partners.length < numberOfNeededSignatures) {
+        if (partners.length < numberOfNeededSignatures) {
             throw new Error('Number of requiored signatures for Genesis is higher than the number of partners');
         }
 

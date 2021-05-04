@@ -51,7 +51,7 @@ async function main() {
 
     const deployer = new Deployer({ deployWallet: wallet, governorAddress, verbose: true });
 
-    // We don't deploy it by default even though we could, since 
+    // We don't deploy it by default even though we could, since
     // the address of it wouldn't be able to be inserted into the solpp
     // for ZkSync smart contract
     if (args.contract === 'RegenesisMultisig') {

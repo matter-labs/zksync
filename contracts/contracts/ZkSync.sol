@@ -130,11 +130,11 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
     function upgrade(bytes calldata upgradeParameters) external nonReentrant {
         require(totalBlocksCommitted == totalBlocksProven, "wq1"); // All the blocks must be processed
         require(totalBlocksCommitted == totalBlocksExecuted, "w12"); // All the blocks must be processed
-        
+
         StoredBlockInfo memory lastBlockInfo;
         (lastBlockInfo) = abi.decode(upgradeParameters, (StoredBlockInfo));
         require(storedBlockHashes[totalBlocksExecuted] == hashStoredBlockInfo(lastBlockInfo), "wqqs"); // The provided block info should be equal to the current one
-        
+
         RegenesisMultisig multisig = RegenesisMultisig(REGENESIS_MULTISIG_ADDRESS);
         bytes32 oldRootHash = multisig.oldRootHash();
         require(oldRootHash == lastBlockInfo.stateHash);
