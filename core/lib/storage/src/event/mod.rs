@@ -33,24 +33,32 @@ pub use records::{get_event_type, EventType};
 pub struct EventSchema<'a, 'c>(pub &'a mut StorageProcessor<'c>);
 
 impl<'a, 'c> EventSchema<'a, 'c> {
-    /// Store new serialized event in the database. This method is private
-    /// since the type safety is only guaranteed by the correctness of `event_type`
-    /// parameter.
+    /// Store [Vec](std::vec::Vec) of serialized events in the database.
+    /// This method is private since the type safety is only guaranteed
+    /// by the correctness of `event_type` parameter.
+    /// Events are expected to have the same type and belong to the same block.
     async fn store_event_data(
         &mut self,
         block_number: BlockNumber,
         event_type: EventType,
-        event_data: Value,
+        event_data: Vec<Value>,
     ) -> QueryResult<()> {
         let start = Instant::now();
+
+        if event_data.is_empty() {
+            return Ok(());
+        }
         // Note, that the id can happen not to be continuous,
         // sequences are always incremented ignoring
         // the fact whether the transaction is committed or reverted.
         sqlx::query!(
-            "INSERT INTO events VALUES (DEFAULT, $1, $2, $3)",
+            "INSERT INTO events (block_number, event_type, event_data)
+            SELECT $1, $2, u.event_data
+                FROM UNNEST ($3::jsonb[])
+                AS u(event_data)",
             i64::from(*block_number),
             event_type as EventType,
-            event_data
+            &event_data,
         )
         .execute(self.0.conn())
         .await?;
@@ -142,7 +150,7 @@ impl<'a, 'c> EventSchema<'a, 'c> {
 
         transaction
             .event_schema()
-            .store_event_data(block_number, EventType::Block, event_data)
+            .store_event_data(block_number, EventType::Block, vec![event_data])
             .await?;
         transaction.commit().await?;
 
@@ -177,12 +185,10 @@ impl<'a, 'c> EventSchema<'a, 'c> {
             })
             .collect();
 
-        for event_data in events.into_iter() {
-            transaction
-                .event_schema()
-                .store_event_data(block_number, EventType::Account, event_data)
-                .await?;
-        }
+        transaction
+            .event_schema()
+            .store_event_data(block_number, EventType::Account, events)
+            .await?;
         transaction.commit().await?;
 
         metrics::histogram!("sql.event.store_state_updated_event", start.elapsed());
@@ -218,7 +224,7 @@ impl<'a, 'c> EventSchema<'a, 'c> {
     /// Create new transaction events and store them in the database.
     pub async fn store_transaction_event(
         &mut self,
-        block: BlockNumber,
+        block_number: BlockNumber,
         status: TransactionStatus,
     ) -> QueryResult<()> {
         let start = Instant::now();
@@ -228,9 +234,10 @@ impl<'a, 'c> EventSchema<'a, 'c> {
         let block_operations = transaction
             .chain()
             .block_schema()
-            .get_block_executed_ops(block)
+            .get_block_executed_ops(block_number)
             .await?;
 
+        let mut events = Vec::with_capacity(block_operations.len());
         for executed_operation in block_operations {
             // Like in the case of block events, we return `Ok`
             // if we didn't manage to fetch the account id for the given
@@ -253,18 +260,21 @@ impl<'a, 'c> EventSchema<'a, 'c> {
 
             let transaction_event = TransactionEvent::from_executed_operation(
                 executed_operation,
-                block,
+                block_number,
                 account_id,
                 status,
             );
 
             let event_data = serde_json::to_value(transaction_event)
                 .expect("couldn't serialize transaction event");
-            transaction
-                .event_schema()
-                .store_event_data(block, EventType::Transaction, event_data)
-                .await?;
+
+            events.push(event_data);
         }
+
+        transaction
+            .event_schema()
+            .store_event_data(block_number, EventType::Transaction, events)
+            .await?;
         transaction.commit().await?;
 
         metrics::histogram!("sql.event.store_transaction_event", start.elapsed());

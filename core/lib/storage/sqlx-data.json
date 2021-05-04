@@ -901,6 +901,31 @@
       ]
     }
   },
+  "25cd6e69f55e94fae6c907a8807169df57eccff2f0bf0c8f21ffdb637dd2ea44": {
+    "query": "INSERT INTO events (block_number, event_type, event_data)\n            SELECT $1, $2, u.event_data\n                FROM UNNEST ($3::jsonb[])\n                AS u(event_data)",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "Int8",
+          {
+            "Custom": {
+              "name": "event_type",
+              "kind": {
+                "Enum": [
+                  "Account",
+                  "Block",
+                  "Transaction"
+                ]
+              }
+            }
+          },
+          "JsonbArray"
+        ]
+      },
+      "nullable": []
+    }
+  },
   "26204b0d5ff5ce98cc8ee5d483d4b5536724f7d8f17c66e19387bc5acd3e713d": {
     "query": "DELETE FROM eth_tx_hashes WHERE eth_op_id = ANY($1)",
     "describe": {
@@ -1767,31 +1792,6 @@
       "parameters": {
         "Left": [
           "Int8Array"
-        ]
-      },
-      "nullable": []
-    }
-  },
-  "4dd0d931ce42a1a7a3606a2914b3c0686c103fbb18d60efd96232a2617734272": {
-    "query": "INSERT INTO events VALUES (DEFAULT, $1, $2, $3)",
-    "describe": {
-      "columns": [],
-      "parameters": {
-        "Left": [
-          "Int8",
-          {
-            "Custom": {
-              "name": "event_type",
-              "kind": {
-                "Enum": [
-                  "Account",
-                  "Block",
-                  "Transaction"
-                ]
-              }
-            }
-          },
-          "Jsonb"
         ]
       },
       "nullable": []
