@@ -24,7 +24,7 @@ pub struct SwapOp {
 
 impl SwapOp {
     pub const CHUNKS: usize = 6;
-    pub const OP_CODE: u8 = 0x0a;
+    pub const OP_CODE: u8 = 0x0b;
 
     pub(crate) fn get_public_data(&self) -> Vec<u8> {
         let mut data = vec![Self::OP_CODE]; // opcode

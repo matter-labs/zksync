@@ -244,7 +244,7 @@ impl ChangePubkeyOffChainWitness<Bn256> {
                     Fr::from_str(&change_pubkey_offcahin.valid_until.to_string()).unwrap(),
                 ),
 
-                special_eth_address: Some(Fr::zero()),
+                special_eth_addresses: vec![Some(Fr::zero())],
                 special_tokens: vec![Some(Fr::zero()), Some(Fr::zero())],
                 special_account_ids: vec![Some(Fr::zero()), Some(Fr::zero())],
                 special_content_hash: vec![Some(Fr::zero()); CONTENT_HASH_WIDTH],

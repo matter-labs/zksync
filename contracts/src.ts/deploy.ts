@@ -29,6 +29,7 @@ export interface Contracts {
     upgradeGatekeeper;
     forcedExit;
     regenesisMultisig;
+    nftFactory;
 }
 
 export interface DeployedAddresses {
@@ -42,6 +43,7 @@ export interface DeployedAddresses {
     DeployFactory: string;
     ForcedExit: string;
     RegenesisMultisig: string;
+    NFTFactory: string;
 }
 
 export interface DeployerConfig {
@@ -60,6 +62,7 @@ export function readContractCode(name: string) {
 
 export function readProductionContracts(): Contracts {
     return {
+        nftFactory: readContractCode('ZkSyncNFTFactory'),
         governance: readContractCode('Governance'),
         zkSync: readContractCode('ZkSync'),
         verifier: readContractCode('Verifier'),
@@ -72,6 +75,7 @@ export function readProductionContracts(): Contracts {
 
 export function deployedAddressesFromEnv(): DeployedAddresses {
     return {
+        NFTFactory: process.env.CONTRACTS_NFT_FACTORY_ADDR,
         DeployFactory: process.env.CONTRACTS_DEPLOY_FACTORY_ADDR,
         Governance: process.env.CONTRACTS_GOVERNANCE_ADDR,
         GovernanceTarget: process.env.CONTRACTS_GOVERNANCE_TARGET_ADDR,
@@ -108,7 +112,7 @@ export class Deployer {
         }
 
         const govContract = await deployContract(this.deployWallet, this.contracts.governance, [], {
-            gasLimit: 700000,
+            gasLimit: 1000000,
             ...ethTxOptions
         });
         const govRec = await govContract.deployTransaction.wait();
@@ -215,6 +219,36 @@ export class Deployer {
         }
     }
 
+    public async deployNFTFactory(ethTxOptions?: ethers.providers.TransactionRequest) {
+        if (this.verbose) {
+            console.log('Deploying NFT FACTORY contract');
+        }
+        const name = process.env.NFT_FACTORY_NAME;
+        const symbol = process.env.NFT_FACTORY_SYMBOL;
+
+        const nftFactoryContarct = await deployContract(
+            this.deployWallet,
+            this.contracts.nftFactory,
+            [name, symbol, this.addresses.ZkSync],
+            {
+                gasLimit: 6000000,
+                ...ethTxOptions
+            }
+        );
+        const zksRec = await nftFactoryContarct.deployTransaction.wait();
+        const zksGasUsed = zksRec.gasUsed;
+        const gasPrice = nftFactoryContarct.deployTransaction.gasPrice;
+        if (this.verbose) {
+            console.log(`CONTRACTS_NFT_FACTORY_ADDR=${nftFactoryContarct.address}`);
+            console.log(
+                `NFT Factory contract deployed, gasUsed: ${zksGasUsed.toString()}, eth spent: ${formatEther(
+                    zksGasUsed.mul(gasPrice)
+                )}`
+            );
+        }
+        this.addresses.NFTFactory = nftFactoryContarct.address;
+        await this.governanceContract(this.deployWallet).setDefaultNFTFactory(nftFactoryContarct.address);
+    }
     public async deployForcedExit(ethTxOptions?: ethers.providers.TransactionRequest) {
         if (this.verbose) {
             console.log('Deploying ForcedExit contract');
@@ -351,6 +385,7 @@ export class Deployer {
         await this.deployVerifierTarget(ethTxOptions);
         await this.deployProxiesAndGatekeeper(ethTxOptions);
         await this.deployForcedExit(ethTxOptions);
+        await this.deployNFTFactory(ethTxOptions);
     }
 
     public governanceContract(signerOrProvider: Signer | providers.Provider): Governance {

@@ -12,6 +12,7 @@ use zksync_types::{
         ChangePubKeyType, PackedEthSignature, TimeRange, TxSignature,
     },
     AccountId, Address, Close, ForcedExit, MintNFT, Nonce, PubKeyHash, TokenId, Transfer, Withdraw,
+    WithdrawNFT,
 };
 
 #[derive(Debug, Clone)]
@@ -165,7 +166,7 @@ impl ZkSyncAccount {
             nonce.unwrap_or_else(|| *stored_nonce),
             &self.private_key,
         )
-        .expect("Failed to sign transfer");
+        .expect("Failed to sign mint nft");
 
         if increment_nonce {
             **stored_nonce += 1;
@@ -176,12 +177,58 @@ impl ZkSyncAccount {
                 let message = mint_nft.get_ethereum_sign_message(token_symbol, 18);
                 Some(
                     PackedEthSignature::sign(&eth_private_key, &message.as_bytes())
-                        .expect("Signing the transfer unexpectedly failed"),
+                        .expect("Signing the mint nft unexpectedly failed"),
                 )
             } else {
                 None
             };
         (mint_nft, eth_signature)
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    pub fn sign_withdraw_nft(
+        &self,
+        token: TokenId,
+        fee_token: TokenId,
+        token_symbol: &str,
+        fee: BigUint,
+        recipient: &Address,
+        nonce: Option<Nonce>,
+        increment_nonce: bool,
+        time_range: TimeRange,
+    ) -> (WithdrawNFT, Option<PackedEthSignature>) {
+        let mut stored_nonce = self.nonce.lock().unwrap();
+        let withdraw_nft = WithdrawNFT::new_signed(
+            self.account_id
+                .lock()
+                .unwrap()
+                .expect("can't sign tx without account id"),
+            self.address,
+            *recipient,
+            token,
+            fee_token,
+            fee,
+            nonce.unwrap_or_else(|| *stored_nonce),
+            time_range,
+            &self.private_key,
+        )
+        .expect("Failed to sign withdraw nft");
+
+        if increment_nonce {
+            **stored_nonce += 1;
+        }
+
+        let eth_signature =
+            if let ZkSyncETHAccountData::EOA { eth_private_key } = &self.eth_account_data {
+                let message = withdraw_nft.get_ethereum_sign_message(token_symbol, 18);
+                Some(
+                    PackedEthSignature::sign(&eth_private_key, &message.as_bytes())
+                        .expect("Signing the withdraw nft unexpectedly failed"),
+                )
+            } else {
+                None
+            };
+        (withdraw_nft, eth_signature)
     }
 
     #[allow(clippy::too_many_arguments)]

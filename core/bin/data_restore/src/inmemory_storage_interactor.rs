@@ -243,8 +243,9 @@ impl InMemoryStorageInteractor {
                     account.nonce = max(account.nonce, *new_nonce);
                     account.pub_key_hash = *new_pub_key_hash;
                 }
-                AccountUpdate::MintNFT { .. } => todo!(),
-                AccountUpdate::RemoveNFT { .. } => todo!(),
+                AccountUpdate::MintNFT { .. } => todo!(), // Implement data restorer for Minting NFT (ZKS-657)
+
+                AccountUpdate::RemoveNFT { .. } => todo!(), // Implement data restorer for Minting NFT (ZKS-657
             }
         }
     }

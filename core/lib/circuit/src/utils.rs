@@ -376,12 +376,7 @@ pub fn boolean_or<E: Engine, CS: ConstraintSystem<E>>(
     y: &Boolean,
 ) -> Result<Boolean, SynthesisError> {
     // A OR B = ( A NAND A ) NAND ( B NAND B ) = (NOT(A)) NAND (NOT (B))
-    let result = Boolean::and(
-        cs.namespace(|| "lhs_valid nand rhs_valid"),
-        &x.not(),
-        &y.not(),
-    )?
-    .not();
+    let result = Boolean::and(cs.namespace(|| "x.not() nand y.not()"), &x.not(), &y.not())?.not();
 
     Ok(result)
 }

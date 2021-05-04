@@ -14,11 +14,12 @@ use crate::{
     account::PubKeyHash,
     operations::{
         ChangePubKeyOp, DepositOp, ForcedExitOp, FullExitOp, NoopOp, SwapOp, TransferOp,
-        TransferToNewOp, WithdrawOp,
+        TransferToNewOp, WithdrawNFTOp, WithdrawOp,
     },
     priority_ops::{Deposit, FullExit},
     tx::{
         ChangePubKey, ForcedExit, Order, PackedEthSignature, Swap, TimeRange, Transfer, Withdraw,
+        WithdrawNFT,
     },
     Log, PriorityOp,
 };
@@ -30,6 +31,7 @@ pub mod operations_test {
     use super::*;
     use crate::tx::{ChangePubKeyECDSAData, ChangePubKeyEthAuthData};
     use crate::{MintNFT, MintNFTOp};
+    use zksync_crypto::params::MIN_NFT_TOKEN_ID;
 
     // Public data parameters, using them we can restore `ZkSyncOp`.
     const NOOP_PUBLIC_DATA: &str = "00000000000000000000";
@@ -38,11 +40,12 @@ pub mod operations_test {
     const WITHDRAW_PUBLIC_DATA: &str =
         "030000002a0000002a0000000000000000000000000000002a054021abaed8712072e918632259780e587698ef58da00000000000000000000000000";
     const TRANSFER_PUBLIC_DATA: &str = "05000000010000002a0000000200000005400540";
-    const FULL_EXIT_PUBLIC_DATA: &str = "060000002a2a0a81e257a2f5d6ed4f07b81dbda09f107bd0260000002a00000000000000000000000000000000000000000000000000000000000000";
+    const FULL_EXIT_PUBLIC_DATA: &str = "060000002a2a0a81e257a2f5d6ed4f07b81dbda09f107bd0260000002a0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000";
     const CHANGE_PUBKEY_PUBLIC_DATA: &str = "070000002a3cfb9a39096d9e02b24187355f628f9a6331511b2a0a81e257a2f5d6ed4f07b81dbda09f107bd0260000002a0000002a05400000000000";
     const FORCED_EXIT_PUBLIC_DATA: &str = "080000002a0000002a0000002a0000000000000000000000000000000005402a0a81e257a2f5d6ed4f07b81dbda09f107bd026000000000000000000";
-    const SWAP_PUBLIC_DATA: &str = "0a000000050000000600000007000000080000002a00000007000000010000002d00000012200000001b200580020000000000000000000000000000";
+    const SWAP_PUBLIC_DATA: &str = "0b000000050000000600000007000000080000002a00000007000000010000002d00000012200000001b200580020000000000000000000000000000";
     const MINT_NFT_PUBLIC_DATA: &str = "090000000a0000000b0000000000000000000000000000000000000000000000000000000000000000000000000140000000";
+    const WITHDRAW_NFT_PUBLIC_DATA: &str = "0a0000002a21abaed8712072e918632259780e587698ef58da000000000000000000000000000000000000000000000000000000000000000021abaed8712072e918632259780e587698ef58da000100000000002a0540000000";
 
     #[test]
     fn test_public_data_conversions_noop() {
@@ -136,6 +139,38 @@ pub mod operations_test {
     }
 
     #[test]
+    fn test_public_data_conversions_withdraw_nft() {
+        let expected_op = {
+            let tx = WithdrawNFT::new(
+                AccountId(42),
+                Address::from_str("2a0a81e257a2f5d6ed4f07b81dbda09f107bd026").unwrap(),
+                Address::from_str("21abaed8712072e918632259780e587698ef58da").unwrap(),
+                TokenId(MIN_NFT_TOKEN_ID),
+                TokenId(42),
+                BigUint::from(42u32),
+                Nonce(42),
+                Default::default(),
+                None,
+            );
+            let creator_account_id = AccountId(43u32);
+
+            WithdrawNFTOp {
+                tx,
+                creator_id: creator_account_id,
+                creator_address: Address::from_str("21abaed8712072e918632259780e587698ef58da")
+                    .unwrap(),
+                content_hash: Default::default(),
+                serial_id: 0,
+            }
+        };
+
+        assert_eq!(
+            hex::encode(expected_op.get_public_data()),
+            WITHDRAW_NFT_PUBLIC_DATA
+        );
+    }
+
+    #[test]
     fn test_public_data_conversions_full_exit() {
         let expected_op = {
             let priority_op = FullExit {
@@ -147,6 +182,9 @@ pub mod operations_test {
             FullExitOp {
                 priority_op,
                 withdraw_amount: None,
+                creator_account_id: None,
+                serial_id: None,
+                content_hash: None,
             }
         };
 
@@ -296,10 +334,7 @@ pub mod operations_test {
             hex::encode(forced_exit.get_withdrawal_data()),
             "012a0a81e257a2f5d6ed4f07b81dbda09f107bd0260000002a00000000000000000000000000000000"
         );
-        assert_eq!(
-            hex::encode(full_exit.get_withdrawal_data()),
-            "002a0a81e257a2f5d6ed4f07b81dbda09f107bd0260000002a00000000000000000000000000000000"
-        );
+        assert_eq!(hex::encode(full_exit.get_withdrawal_data()), "002a0a81e257a2f5d6ed4f07b81dbda09f107bd0260000002a0000000000000000000000000000000000000000");
     }
 
     #[test]
@@ -351,6 +386,23 @@ pub mod tx_conversion_test {
     #[test]
     fn test_convert_to_bytes_swap() {
         todo!(); // Part of (ZKS-593)
+    }
+
+    #[test]
+    fn test_convert_to_bytes_withdraw_nft() {
+        let withdrwa_nft = WithdrawNFT::new(
+            ACCOUNT_ID,
+            *ALICE,
+            *ALICE,
+            TOKEN_ID,
+            TOKEN_ID,
+            (*FEE).clone(),
+            NONCE,
+            Default::default(),
+            None,
+        );
+        let bytes = withdrwa_nft.get_bytes();
+        assert_eq!(hex::encode(bytes), "0a000000642a0a81e257a2f5d6ed4f07b81dbda09f107bd0262a0a81e257a2f5d6ed4f07b81dbda09f107bd02600000005000000057d03000000140000000000000000ffffffffffffffff");
     }
 
     #[test]

@@ -23,6 +23,7 @@ library Operations {
         ChangePubKey,
         ForcedExit,
         MintNFT,
+        WithdrawNFT,
         Swap
     }
 
@@ -34,6 +35,7 @@ library Operations {
     uint8 internal constant NONCE_BYTES = 4;
     uint8 internal constant PUBKEY_HASH_BYTES = 20;
     uint8 internal constant ADDRESS_BYTES = 20;
+    uint8 internal constant CONTENT_HASH_BYTES = 32;
     /// @dev Packed fee bytes lengths
     uint8 internal constant FEE_BYTES = 2;
     /// @dev zkSync account id bytes lengths
@@ -90,10 +92,18 @@ library Operations {
         address owner;
         uint32 tokenId;
         uint128 amount;
+        address nftCreatorAddress;
+        bytes32 nftContentHash;
     }
 
     uint256 public constant PACKED_FULL_EXIT_PUBDATA_BYTES =
-        OP_TYPE_BYTES + ACCOUNT_ID_BYTES + ADDRESS_BYTES + TOKEN_BYTES + AMOUNT_BYTES;
+        OP_TYPE_BYTES +
+            ACCOUNT_ID_BYTES +
+            ADDRESS_BYTES +
+            TOKEN_BYTES +
+            AMOUNT_BYTES +
+            ADDRESS_BYTES +
+            CONTENT_HASH_BYTES;
 
     function readFullExitPubdata(bytes memory _data) internal pure returns (FullExit memory parsed) {
         // NOTE: there is no check that variable sizes are same as constants (i.e. TOKEN_BYTES), fix if possible.
@@ -102,6 +112,8 @@ library Operations {
         (offset, parsed.owner) = Bytes.readAddress(_data, offset); // owner
         (offset, parsed.tokenId) = Bytes.readUInt32(_data, offset); // tokenId
         (offset, parsed.amount) = Bytes.readUInt128(_data, offset); // amount
+        (offset, parsed.nftCreatorAddress) = Bytes.readAddress(_data, offset); // nftCreatorAddress
+        (offset, parsed.nftContentHash) = Bytes.readBytes32(_data, offset); // nftContentHash
 
         require(offset == PACKED_FULL_EXIT_PUBDATA_BYTES, "O"); // reading invalid full exit pubdata size
     }
@@ -112,7 +124,9 @@ library Operations {
             op.accountId, // accountId
             op.owner, // owner
             op.tokenId, // tokenId
-            uint128(0) // amount -- ignored
+            uint128(0), // amount -- ignored
+            address(0), // nftCreatorAddress -- ignored
+            bytes32(0) // nftContentHash -- ignored
         );
     }
 
@@ -181,5 +195,24 @@ library Operations {
         (offset, parsed.pubKeyHash) = Bytes.readBytes20(_data, offset); // pubKeyHash
         (offset, parsed.owner) = Bytes.readAddress(_data, offset); // owner
         (offset, parsed.nonce) = Bytes.readUInt32(_data, offset); // nonce
+    }
+
+    struct WithdrawNFT {
+        //uint8 opType; -- present in pubdata, ignored at serialization
+        //uint32 accountId; -- present in pubdata, ignored at serialization
+        address creator;
+        bytes32 contentHash;
+        address owner;
+        uint32 tokenId;
+        //uint32 feeTokenId;
+        //uint16 fee; -- present in pubdata, ignored at serialization
+    }
+
+    function readWithdrawNFTPubdata(bytes memory _data) internal pure returns (WithdrawNFT memory parsed) {
+        uint256 offset = OP_TYPE_BYTES + ACCOUNT_ID_BYTES; // opType + accountId (ignored)
+        (offset, parsed.creator) = Bytes.readAddress(_data, offset);
+        (offset, parsed.contentHash) = Bytes.readBytes32(_data, offset);
+        (offset, parsed.owner) = Bytes.readAddress(_data, offset);
+        (offset, parsed.tokenId) = Bytes.readUInt32(_data, offset);
     }
 }

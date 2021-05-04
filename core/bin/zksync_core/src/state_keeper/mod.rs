@@ -1,6 +1,6 @@
 use anyhow::{ensure, Result};
 use std::collections::{HashMap, VecDeque};
-use std::time::Instant;
+use std::time::{Instant, SystemTime, UNIX_EPOCH};
 // External uses
 use futures::{
     channel::{mpsc, oneshot},
@@ -13,7 +13,10 @@ use tokio::task::JoinHandle;
 use zksync_crypto::{
     convert::FeConvert,
     ff::{self, PrimeField, PrimeFieldRepr},
-    params::ETH_TOKEN_ID,
+    params::{
+        ETH_TOKEN_ID, MIN_NFT_TOKEN_ID, NFT_STORAGE_ACCOUNT_ADDRESS, NFT_STORAGE_ACCOUNT_ID,
+        NFT_TOKEN_ID,
+    },
     PrivateKey,
 };
 use zksync_state::state::{CollectedFee, OpSuccess, ZkSyncState};
@@ -28,16 +31,12 @@ use zksync_types::{
     mempool::SignedTxVariant,
     tx::{TxHash, ZkSyncTx},
     Account, AccountId, AccountTree, AccountUpdate, AccountUpdates, Address, BlockNumber,
-    PriorityOp, SignedZkSyncTx, Token, Transfer, TransferOp, H256,
+    PriorityOp, SignedZkSyncTx, Token, TokenId, Transfer, TransferOp, H256, NFT,
 };
 // Local uses
 use crate::{
     committer::{AppliedUpdatesRequest, BlockCommitRequest, CommitRequest},
     mempool::ProposedBlock,
-};
-use std::time::{SystemTime, UNIX_EPOCH};
-use zksync_crypto::params::{
-    MIN_NFT_TOKEN_ID, NFT_STORAGE_ACCOUNT_ADDRESS, NFT_STORAGE_ACCOUNT_ID, NFT_TOKEN_ID,
 };
 
 #[cfg(test)]
@@ -150,6 +149,7 @@ pub struct ZkSyncStateKeeper {
 pub struct ZkSyncStateInitParams {
     pub tree: AccountTree,
     pub acc_id_by_addr: HashMap<Address, AccountId>,
+    pub nfts: HashMap<TokenId, NFT>,
     pub last_block_number: BlockNumber,
     pub unprocessed_priority_op: u64,
 }
@@ -165,6 +165,7 @@ impl ZkSyncStateInitParams {
         Self {
             tree: AccountTree::new(zksync_crypto::params::account_tree_depth()),
             acc_id_by_addr: HashMap::new(),
+            nfts: HashMap::new(),
             last_block_number: BlockNumber(0),
             unprocessed_priority_op: 0,
         }
@@ -303,6 +304,7 @@ impl ZkSyncStateInitParams {
         self.last_block_number = block_number;
         self.unprocessed_priority_op =
             Self::unprocessed_priority_op_id(storage, block_number).await?;
+        self.nfts = Self::load_nft_tokens(storage, block_number).await?;
 
         vlog::info!(
             "Loaded committed state: last block number: {}, unprocessed priority op: {}",
@@ -351,6 +353,24 @@ impl ZkSyncStateInitParams {
         }
     }
 
+    async fn load_nft_tokens(
+        storage: &mut zksync_storage::StorageProcessor<'_>,
+        block_number: BlockNumber,
+    ) -> anyhow::Result<HashMap<TokenId, NFT>> {
+        let nfts = storage
+            .chain()
+            .state_schema()
+            .load_committed_nft_tokens(Some(block_number))
+            .await?
+            .into_iter()
+            .map(|nft| {
+                let token: NFT = nft.into();
+                (token.id, token)
+            })
+            .collect();
+        Ok(nfts)
+    }
+
     async fn unprocessed_priority_op_id(
         storage: &mut zksync_storage::StorageProcessor<'_>,
         block_number: BlockNumber,
@@ -393,6 +413,7 @@ impl ZkSyncStateKeeper {
             initial_state.tree,
             initial_state.acc_id_by_addr,
             initial_state.last_block_number + 1,
+            initial_state.nfts,
         );
 
         let (fee_account_id, _) = state
@@ -769,6 +790,7 @@ impl ZkSyncStateKeeper {
             ZkSyncTx::Close(tx) => tx.time_range,
             ZkSyncTx::MintNFT(_) => Default::default(),
             ZkSyncTx::Swap(tx) => tx.time_range(),
+            ZkSyncTx::WithdrawNFT(tx) => tx.time_range,
         };
         ensure!(
             time_range.is_valid(block_timestamp),
@@ -1145,6 +1167,7 @@ impl ZkSyncStateKeeper {
         ZkSyncStateInitParams {
             tree: self.state.get_balance_tree(),
             acc_id_by_addr: self.state.get_account_addresses(),
+            nfts: self.state.nfts.clone(),
             last_block_number: self.state.block_number - 1,
             unprocessed_priority_op: self.current_unprocessed_priority_op,
         }

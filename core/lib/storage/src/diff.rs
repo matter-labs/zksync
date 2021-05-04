@@ -104,6 +104,7 @@ impl From<StorageAccountDiff> for (AccountId, AccountUpdate) {
                         TokenId(upd.token_id as u32),
                         upd.serial_id as u32,
                         AccountId(upd.creator_account_id as u32),
+                        Address::from_slice(&upd.creator_address.as_slice()),
                         Address::from_slice(&upd.address.as_slice()),
                         Some(upd.symbol),
                         H256::from_slice(&upd.content_hash.as_slice()),

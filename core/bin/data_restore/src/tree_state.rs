@@ -322,6 +322,11 @@ impl TreeState {
                 ZkSyncOp::Noop(_) => {}
                 ZkSyncOp::MintNFTOp(_) => {
                     todo!()
+                    // Implement data restorer for Minting NFT (ZKS-657)
+                }
+                ZkSyncOp::WithdrawNFT(_) => {
+                    todo!()
+                    // Implement data restorer for Minting NFT (ZKS-657)
                 }
             }
         }
@@ -610,6 +615,9 @@ mod test {
         let op6 = ZkSyncOp::FullExit(Box::new(FullExitOp {
             priority_op: tx6,
             withdraw_amount: Some(BigUint::from(980u32).into()),
+            creator_account_id: None,
+            serial_id: None,
+            content_hash: None,
         }));
         let pub_data6 = op6.public_data();
         let ops6 = get_rollup_ops_from_data(&pub_data6).expect("cant get ops from data 5");
@@ -805,6 +813,9 @@ mod test {
         let op6 = ZkSyncOp::FullExit(Box::new(FullExitOp {
             priority_op: tx6,
             withdraw_amount: Some(BigUint::from(980u32).into()),
+            creator_account_id: None,
+            serial_id: None,
+            content_hash: None,
         }));
         let pub_data6 = op6.public_data();
 

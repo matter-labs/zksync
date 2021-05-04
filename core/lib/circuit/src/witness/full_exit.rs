@@ -14,10 +14,11 @@ use zksync_crypto::{
     },
     params::{
         account_tree_depth, ACCOUNT_ID_BIT_WIDTH, BALANCE_BIT_WIDTH, CHUNK_BIT_WIDTH,
-        CONTENT_HASH_WIDTH, ETH_ADDRESS_BIT_WIDTH, TOKEN_BIT_WIDTH, TX_TYPE_BIT_WIDTH,
+        ETH_ADDRESS_BIT_WIDTH, NFT_STORAGE_ACCOUNT_ID, TOKEN_BIT_WIDTH, TX_TYPE_BIT_WIDTH,
     },
 };
 use zksync_types::FullExitOp;
+use zksync_types::H256;
 // Local deps
 use crate::{
     operation::{
@@ -35,11 +36,16 @@ pub struct FullExitData {
     pub account_address: u32,
     pub eth_address: Fr,
     pub full_exit_amount: Fr,
+    pub creator_account_id: u32,
+    pub nft_serial_id: u32,
+    pub content_hash: H256,
 }
 
 pub struct FullExitWitness<E: RescueEngine> {
     pub before: OperationBranch<E>,
     pub after: OperationBranch<E>,
+    pub special_account_second_chunk: OperationBranch<E>,
+    pub creator_account_third_chunk: OperationBranch<E>,
     pub args: OperationArguments<E>,
     pub before_root: Option<E::Fr>,
     pub after_root: Option<E::Fr>,
@@ -63,6 +69,9 @@ impl Witness for FullExitWitness<Bn256> {
                 .clone()
                 .map(|amount| Fr::from_str(&amount.0.to_string()).unwrap())
                 .unwrap_or_else(Fr::zero),
+            creator_account_id: full_exit.creator_account_id.unwrap_or_default().0,
+            nft_serial_id: full_exit.serial_id.unwrap_or_default(),
+            content_hash: full_exit.content_hash.unwrap_or_default(),
         };
 
         // le_bit_vector_into_field_element()
@@ -92,6 +101,14 @@ impl Witness for FullExitWitness<Bn256> {
             &self.args.full_amount.unwrap(),
             BALANCE_BIT_WIDTH,
         );
+        append_be_fixed_width(
+            &mut pubdata_bits,
+            &self.args.special_eth_addresses[0].unwrap(),
+            ETH_ADDRESS_BIT_WIDTH,
+        );
+        for bit in &self.args.special_content_hash {
+            append_be_fixed_width(&mut pubdata_bits, &bit.unwrap(), 1);
+        }
 
         resize_grow_only(
             &mut pubdata_bits,
@@ -118,22 +135,58 @@ impl Witness for FullExitWitness<Bn256> {
             r_packed: vec![Some(false); 256],
             s: vec![Some(false); 256],
         };
-        let mut operations = vec![Operation {
-            new_root: self.after_root,
-            tx_type: self.tx_type,
-            chunk: Some(Fr::from_str("0").unwrap()),
-            pubdata_chunk: Some(pubdata_chunks[0]),
-            first_sig_msg: Some(Fr::zero()),
-            second_sig_msg: Some(Fr::zero()),
-            third_sig_msg: Some(Fr::zero()),
-            signer_pub_key_packed: vec![Some(false); 256],
-            args: self.args.clone(),
-            lhs: self.before.clone(),
-            rhs: self.before.clone(),
-            signature_data: empty_sig_data.clone(),
-        }];
+        let mut operations = vec![
+            Operation {
+                new_root: self.after_root,
+                tx_type: self.tx_type,
+                chunk: Some(Fr::from_str("0").unwrap()),
+                pubdata_chunk: Some(pubdata_chunks[0]),
+                first_sig_msg: Some(Fr::zero()),
+                second_sig_msg: Some(Fr::zero()),
+                third_sig_msg: Some(Fr::zero()),
+                signer_pub_key_packed: vec![Some(false); 256],
+                args: self.args.clone(),
+                lhs: self.before.clone(),
+                rhs: self.before.clone(),
+                signature_data: empty_sig_data.clone(),
+            },
+            Operation {
+                new_root: self.after_root,
+                tx_type: self.tx_type,
+                chunk: Some(Fr::from_str("1").unwrap()),
+                pubdata_chunk: Some(pubdata_chunks[1]),
+                first_sig_msg: Some(Fr::zero()),
+                second_sig_msg: Some(Fr::zero()),
+                third_sig_msg: Some(Fr::zero()),
+                signer_pub_key_packed: vec![Some(false); 256],
+                args: self.args.clone(),
+                lhs: self.special_account_second_chunk.clone(),
+                rhs: self.special_account_second_chunk.clone(),
+                signature_data: empty_sig_data.clone(),
+            },
+            Operation {
+                new_root: self.after_root,
+                tx_type: self.tx_type,
+                chunk: Some(Fr::from_str("2").unwrap()),
+                pubdata_chunk: Some(pubdata_chunks[2]),
+                first_sig_msg: Some(Fr::zero()),
+                second_sig_msg: Some(Fr::zero()),
+                third_sig_msg: Some(Fr::zero()),
+                signer_pub_key_packed: vec![Some(false); 256],
+                args: self.args.clone(),
+                lhs: self.creator_account_third_chunk.clone(),
+                rhs: self.creator_account_third_chunk.clone(),
+                signature_data: empty_sig_data.clone(),
+            },
+        ];
 
-        for (i, pubdata_chunk) in pubdata_chunks.iter().cloned().enumerate().take(6).skip(1) {
+        for (i, pubdata_chunk) in pubdata_chunks
+            .iter()
+            .cloned()
+            .enumerate()
+            .take(FullExitOp::CHUNKS)
+            .skip(3)
+        {
             operations.push(Operation {
                 new_root: self.after_root,
                 tx_type: self.tx_type,
@@ -169,7 +222,10 @@ impl FullExitWitness<Bn256> {
         let capacity = tree.capacity();
         assert_eq!(capacity, 1 << account_tree_depth());
         let account_address_fe = Fr::from_str(&full_exit.account_address.to_string()).unwrap();
+        let creator_account_id_fe =
+            Fr::from_str(&full_exit.creator_account_id.to_string()).unwrap();
         let token_fe = Fr::from_str(&full_exit.token.to_string()).unwrap();
+        let serial_id_fe = Fr::from_str(&full_exit.nft_serial_id.to_string()).unwrap();
 
         let (account_witness_before, account_witness_after, balance_before, balance_after) = {
             if is_success {
@@ -198,8 +254,53 @@ impl FullExitWitness<Bn256> {
         let (audit_path_after, audit_balance_path_after) =
             get_audits(tree, full_exit.account_address, full_exit.token);
 
-        let a = balance_before;
-        let b = Fr::zero();
+        let (audit_special_account, audit_balance_special_account) =
+            get_audits(tree, NFT_STORAGE_ACCOUNT_ID.0, full_exit.token);
+        let (
+            special_account_witness,
+            _special_account_witness,
+            special_account_balance,
+            _special_account_balance,
+        ) = apply_leaf_operation(
+            tree,
+            NFT_STORAGE_ACCOUNT_ID.0,
+            full_exit.token,
+            |_| {},
+            |_| {},
+        );
+
+        let (audit_creator_account, audit_balance_creator_account) =
+            get_audits(tree, full_exit.creator_account_id, full_exit.token);
+        let (
+            creator_account_witness,
+            _creator_account_witness,
+            creator_account_balance,
+            _creator_account_balance,
+        ) = apply_leaf_operation(
+            tree,
+            full_exit.creator_account_id,
+            full_exit.token,
+            |_| {},
+            |_| {},
+        );
+
+        let content_hash_as_vec: Vec<Option<Fr>> = full_exit
+            .content_hash
+            .as_bytes()
+            .iter()
+            .map(|input_byte| {
+                let mut byte_as_bits = vec![];
+                let mut byte = *input_byte;
+                for _ in 0..8 {
+                    byte_as_bits.push(byte & 1);
+                    byte /= 2;
+                }
+                byte_as_bits.reverse();
+                byte_as_bits
+            })
+            .flatten()
+            .map(|bit| Some(Fr::from_str(&bit.to_string()).unwrap()))
+            .collect();
 
         FullExitWitness {
             before: OperationBranch {
@@ -222,27 +323,51 @@ impl FullExitWitness<Bn256> {
                     balance_subtree_path: audit_balance_path_after,
                 },
             },
+            special_account_second_chunk: OperationBranch {
+                address: Some(Fr::from_str(&NFT_STORAGE_ACCOUNT_ID.0.to_string()).unwrap()),
+                token: Some(token_fe),
+                witness: OperationBranchWitness {
+                    account_witness: special_account_witness,
+                    account_path: audit_special_account,
+                    balance_value: Some(special_account_balance),
+                    balance_subtree_path: audit_balance_special_account,
+                },
+            },
+            creator_account_third_chunk: OperationBranch {
+                address: Some(creator_account_id_fe),
+                token: Some(token_fe),
+                witness: OperationBranchWitness {
+                    account_witness: creator_account_witness.clone(),
+                    account_path: audit_creator_account,
+                    balance_value: Some(creator_account_balance),
+                    balance_subtree_path: audit_balance_creator_account,
+                },
+            },
             args: OperationArguments {
                 eth_address: Some(full_exit.eth_address),
                 amount_packed: Some(Fr::zero()),
                 full_amount: Some(full_exit.full_exit_amount),
                 fee: Some(Fr::zero()),
                 pub_nonce: Some(Fr::zero()),
-                a: Some(a),
-                b: Some(b),
+                a: Some(Fr::zero()),
+                b: Some(Fr::zero()),
                 new_pub_key_hash: Some(Fr::zero()),
                 valid_from: Some(Fr::zero()),
                 valid_until: Some(Fr::from_str(&u32::MAX.to_string()).unwrap()),
 
-                special_eth_address: Some(Fr::zero()),
+                special_eth_addresses: vec![Some(
+                    creator_account_witness
+                        .address
+                        .expect("creator account should not be empty"),
+                )],
                 special_tokens: vec![Some(Fr::zero()), Some(Fr::zero())],
-                special_account_ids: vec![Some(Fr::zero()), Some(Fr::zero())],
-                special_content_hash: vec![Some(Fr::zero()); CONTENT_HASH_WIDTH],
-                special_serial_id: Some(Fr::zero()),
+                special_account_ids: vec![Some(creator_account_id_fe), Some(account_address_fe)],
+                special_content_hash: content_hash_as_vec,
+                special_serial_id: Some(serial_id_fe),
             },
             before_root: Some(before_root),
             after_root: Some(after_root),
-            tx_type: Some(Fr::from_str("6").unwrap()),
+            tx_type: Some(Fr::from_str(&FullExitOp::OP_CODE.to_string()).unwrap()),
         }
     }
 }

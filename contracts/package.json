@@ -7,7 +7,6 @@
     "@nomiclabs/hardhat-etherscan": "^2.1.0",
     "@nomiclabs/hardhat-solpp": "^2.0.0",
     "@nomiclabs/hardhat-waffle": "^2.0.0",
-    "@openzeppelin/contracts": "3.2.1-solc-0.7",
     "@typechain/ethers-v5": "^2.0.0",
     "@types/argparse": "^1.0.36",
     "@types/chai": "^4.2.14",
@@ -22,10 +21,10 @@
     "ethers": "^5.0.0",
     "ethjs": "^0.4.0",
     "fs": "^0.0.1-security",
+    "handlebars": "^4.7.6",
     "hardhat": "^2.0.8",
     "hardhat-contract-sizer": "^2.0.2",
     "hardhat-typechain": "^0.3.3",
-    "handlebars": "^4.7.6",
     "jsonwebtoken": "^8.5.1",
     "mocha": "^8.2.0",
     "openzeppelin-solidity": "^2.3.0",
@@ -55,5 +54,8 @@
     "publish-sources": "hardhat run --network env scripts/publish.ts",
     "deploy-testnet-erc20": "ts-node scripts/deploy-testnet-token.ts",
     "read-variable": "ts-node scripts/read-variable.ts"
+  },
+  "dependencies": {
+    "@openzeppelin/contracts": "3.4.0-solc-0.7"
   }
 }

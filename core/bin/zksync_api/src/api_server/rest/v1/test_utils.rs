@@ -684,6 +684,9 @@ pub fn dummy_full_exit_op(
             token: TokenId(0),
         },
         withdraw_amount: None,
+        creator_account_id: None,
+        serial_id: None,
+        content_hash: None,
     }));
 
     ExecutedPriorityOp {

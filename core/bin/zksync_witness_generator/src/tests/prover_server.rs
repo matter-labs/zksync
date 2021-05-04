@@ -95,6 +95,7 @@ async fn test_api_client_simple_simulation(prover_name: &str, database: MockData
     database.add_block(block).await;
 
     println!("Inserting test block");
+
     MockDatabase::wait_for_stale_job_stale_idle().await;
 
     // Should return job.
