@@ -255,6 +255,7 @@ export class Provider {
             | 'FastWithdraw'
             | 'MintNFT'
             | 'WithdrawNFT'
+            | 'FastWithdrawNFT'
             | ChangePubKeyFee
             | LegacyChangePubKeyFee
         )[],

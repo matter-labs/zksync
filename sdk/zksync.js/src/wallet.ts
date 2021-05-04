@@ -635,19 +635,22 @@ export class Wallet {
         feeToken: TokenLike;
         fee?: BigNumberish;
         nonce?: Nonce;
+        fastProcessing?: boolean;
         validFrom: number;
         validUntil: number;
     }): Promise<Transaction> {
         withdrawNFT.nonce = withdrawNFT.nonce != null ? await this.getNonce(withdrawNFT.nonce) : await this.getNonce();
 
         if (withdrawNFT.fee == null) {
-            const fullFee = await this.provider.getTransactionFee('WithdrawNFT', withdrawNFT.to, withdrawNFT.feeToken);
+            const feeType = withdrawNFT.fastProcessing === true ? 'FastWithdrawNFT' : 'WithdrawNFT';
+
+            const fullFee = await this.provider.getTransactionFee(feeType, withdrawNFT.to, withdrawNFT.feeToken);
             withdrawNFT.fee = fullFee.totalFee;
         }
 
         const signedWithdrawNFTTransaction = await this.signWithdrawNFT(withdrawNFT as any);
 
-        return submitSignedTransaction(signedWithdrawNFTTransaction, this.provider, false);
+        return submitSignedTransaction(signedWithdrawNFTTransaction, this.provider, withdrawNFT.fastProcessing);
     }
 
     async withdrawFromSyncToEthereum(withdraw: {
