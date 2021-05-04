@@ -226,25 +226,46 @@ async fn test_account_events(mut storage: StorageProcessor<'_>) -> QueryResult<(
         "database should be empty"
     );
 
+    storage.ethereum_schema().initialize_eth_data().await?;
+
     let mut rng = create_rng();
     let (accounts_block_1, updates_block_1) = apply_random_updates(AccountMap::default(), &mut rng);
-    // Commit random updates, for each update a corresponding
-    // account event is created.
+    // To create account events we have to commit a block. It will
+    // also create a block event which is expected to be inserted first.
+
+    // Commit state update and confirm Ethereum operation.
     storage
         .chain()
         .state_schema()
         .commit_state_update(BlockNumber(1), &updates_block_1, 0)
         .await?;
-    // Load new events.
+    storage
+        .chain()
+        .block_schema()
+        .save_block(gen_sample_block(
+            BlockNumber(1),
+            BLOCK_SIZE_CHUNKS,
+            Vec::new(),
+        ))
+        .await?;
+    store_operation(
+        &mut storage,
+        AggregatedActionType::CommitBlocks,
+        BlockNumber(1),
+    )
+    .await?;
+    // Load new events. The first event should be "block committed",
+    // the rest is "state updated".
     let events = storage
         .event_schema()
         .fetch_new_events(last_event_id)
         .await?;
     assert!(!events.is_empty());
-    assert_eq!(events.len(), updates_block_1.len());
+    assert_eq!(events.len(), updates_block_1.len() + 1);
     // For all events the status is `Committed`.
     assert!(events
         .iter()
+        .skip(1) // Skip block event.
         .all(|event| check_account_event(event, AccountStateChangeStatus::Committed)));
     // And the block number is correct too.
     assert!(events
@@ -261,23 +282,49 @@ async fn test_account_events(mut storage: StorageProcessor<'_>) -> QueryResult<(
         .await?;
     storage
         .chain()
+        .block_schema()
+        .save_block(gen_sample_block(
+            BlockNumber(2),
+            BLOCK_SIZE_CHUNKS,
+            Vec::new(),
+        ))
+        .await?;
+    store_operation(
+        &mut storage,
+        AggregatedActionType::CommitBlocks,
+        BlockNumber(2),
+    )
+    .await?;
+    // Finalize updates for the first block.
+    storage
+        .chain()
         .state_schema()
         .apply_state_update(BlockNumber(1))
         .await?;
+    store_operation(
+        &mut storage,
+        AggregatedActionType::ExecuteBlocks,
+        BlockNumber(1),
+    )
+    .await?;
     // Load new events.
     let events = storage
         .event_schema()
         .fetch_new_events(last_event_id)
         .await?;
-    assert_eq!(events.len(), updates_block_1.len() + updates_block_2.len());
+    assert_eq!(
+        events.len(),
+        updates_block_1.len() + updates_block_2.len() + 2
+    );
     assert!(events
         .iter()
+        .skip(1)
         .take(updates_block_2.len())
         .all(|event| event.block_number == BlockNumber(2)
             && check_account_event(event, AccountStateChangeStatus::Committed)));
     assert!(events
         .iter()
-        .skip(updates_block_2.len())
+        .skip(updates_block_2.len() + 2)
         .all(|event| event.block_number == BlockNumber(1)
             && check_account_event(event, AccountStateChangeStatus::Finalized)));
     Ok(())
