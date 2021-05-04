@@ -225,6 +225,7 @@ export class Provider {
     }
 
     async getTransactionFee(
+<<<<<<< HEAD
         txType:
             | 'Withdraw'
             | 'Transfer'
@@ -234,6 +235,9 @@ export class Provider {
             | LegacyChangePubKeyFee
             | 'WithdrawNFT'
             | 'FastWithdrawNFT',
+=======
+        txType: 'Withdraw' | 'Transfer' | 'FastWithdraw' | 'MintNFT' | 'WithdrawNFT' | ChangePubKeyFee | LegacyChangePubKeyFee,
+>>>>>>> Add WithdrawNFT to zksync.js
         address: Address,
         tokenLike: TokenLike
     ): Promise<Fee> {
@@ -249,16 +253,7 @@ export class Provider {
     }
 
     async getTransactionsBatchFee(
-        txTypes: (
-            | 'Withdraw'
-            | 'Transfer'
-            | 'FastWithdraw'
-            | ChangePubKeyFee
-            | LegacyChangePubKeyFee
-            | 'MintNFT'
-            | 'WithdrawNFT'
-            | 'FastWithdrawNFT'
-        )[],
+            txTypes: ('Withdraw' | 'Transfer' | 'FastWithdraw' | 'MintNFT' | 'WithdrawNFT' | ChangePubKeyFee | LegacyChangePubKeyFee)[],
         addresses: Address[],
         tokenLike: TokenLike
     ): Promise<BigNumber> {
