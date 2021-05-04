@@ -139,7 +139,7 @@ export class BatchBuilder {
             recipient: mintNFT.recipient,
             contentHash: mintNFT.contentHash,
             feeToken: mintNFT.feeToken,
-            fee: mintNFT.fee || 0,
+            fee: mintNFT.fee || 0
         };
         this.txs.push({
             type: 'MintNFT',
@@ -173,7 +173,7 @@ export class BatchBuilder {
             tx: _withdrawNFT,
             feeType: 'WithdrawNFT',
             address: _withdrawNFT.to,
-            token: _withdrawNFT.feeToken,
+            token: _withdrawNFT.feeToken
         });
 
         return this;

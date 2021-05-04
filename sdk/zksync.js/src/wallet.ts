@@ -473,7 +473,7 @@ export class Wallet {
             fee: withdrawNFT.fee,
             nonce: withdrawNFT.nonce,
             validFrom: withdrawNFT.validFrom,
-            validUntil: withdrawNFT.validUntil,
+            validUntil: withdrawNFT.validUntil
         };
 
         return await this.signer.signWithdrawNFT(transactionData);
@@ -901,7 +901,7 @@ export class Wallet {
             stringToken,
             stringFee,
             recipient: mintNFT.recipient,
-            contentHash: mintNFT.contentHash,
+            contentHash: mintNFT.contentHash
         });
     }
 
@@ -924,11 +924,7 @@ export class Wallet {
         });
     }
 
-    getForcedExitEthMessagePart(forcedExit: {
-        target: Address;
-        token: TokenLike;
-        fee: BigNumberish;
-    }): string {
+    getForcedExitEthMessagePart(forcedExit: { target: Address; token: TokenLike; fee: BigNumberish }): string {
         const stringFee = BigNumber.from(forcedExit.fee).isZero()
             ? null
             : this.provider.tokenSet.formatToken(forcedExit.token, forcedExit.fee);

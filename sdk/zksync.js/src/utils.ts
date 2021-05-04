@@ -717,7 +717,9 @@ export function serializeForcedExit(forcedExit: ForcedExit): Uint8Array {
  * Encodes the transaction data as the byte sequence according to the zkSync protocol.
  * @param tx A transaction to serialize.
  */
-export function serializeTx(tx: Transfer | Withdraw | ChangePubKey | CloseAccount | ForcedExit | MintNFT | WithdrawNFT): Uint8Array {
+export function serializeTx(
+    tx: Transfer | Withdraw | ChangePubKey | CloseAccount | ForcedExit | MintNFT | WithdrawNFT
+): Uint8Array {
     switch (tx.type) {
         case 'Transfer':
             return serializeTransfer(tx);
