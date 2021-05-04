@@ -9,6 +9,7 @@ declare module './tester' {
     interface Tester {
         testVerifiedWithdraw(wallet: Wallet, token: TokenLike, amount: BigNumber, fast?: boolean): Promise<void>;
         testWithdraw(wallet: Wallet, token: TokenLike, amount: BigNumber, fast?: boolean): Promise<any>;
+        testWithdrawNFT(wallet: Wallet, feeToken: TokenLike, fast?: boolean): Promise<void>;
     }
 }
 
@@ -65,4 +66,32 @@ Tester.prototype.testWithdraw = async function (
     expect(balanceBefore.sub(balanceAfter).eq(amount.add(fee)), 'Wrong amount in wallet after withdraw').to.be.true;
     this.runningFee = this.runningFee.add(fee);
     return handle;
+};
+
+Tester.prototype.testWithdrawNFT = async function (wallet: Wallet, feeToken: TokenLike, fastProcessing?: boolean) {
+    const type = fastProcessing ? 'FastWithdrawNFT' : 'WithdrawNFT';
+    const { totalFee: fee } = await this.syncProvider.getTransactionFee(type, wallet.address(), feeToken);
+
+    const state = await wallet.getAccountState();
+    let nft: any = Object.values(state.committed.nfts)[0];
+
+    const balanceBefore = await wallet.getNFT(nft.id);
+
+    const handle = await wallet.withdrawNFT({
+        to: wallet.address(),
+        token: nft,
+        feeToken,
+        fee,
+        fastProcessing
+    });
+
+    const receipt = await handle.awaitReceipt();
+    expect(receipt.success, `Withdraw transaction failed with a reason: ${receipt.failReason}`).to.be.true;
+
+    const balanceAfter = await wallet.getNFT(nft.id);
+
+    expect(balanceBefore.id == nft.id, 'NFT withdraw failed').to.be.true;
+    expect(balanceAfter === undefined, 'NFT withdraw failed').to.be.true;
+
+    this.runningFee = this.runningFee.add(fee);
 };

@@ -545,9 +545,11 @@ export class Wallet {
         feeToken: TokenLike;
         fee: BigNumberish;
         nonce: number;
-        validFrom: number;
-        validUntil: number;
+        validFrom?: number;
+        validUntil?: number;
     }): Promise<SignedTransaction> {
+        withdrawNFT.validFrom = withdrawNFT.validFrom || 0;
+        withdrawNFT.validUntil = withdrawNFT.validUntil || MAX_TIMESTAMP;
         const signedWithdrawNFTTransaction = await this.getWithdrawNFT(withdrawNFT as any);
 
         const stringFee = BigNumber.from(withdrawNFT.fee).isZero()
@@ -636,8 +638,8 @@ export class Wallet {
         fee?: BigNumberish;
         nonce?: Nonce;
         fastProcessing?: boolean;
-        validFrom: number;
-        validUntil: number;
+        validFrom?: number;
+        validUntil?: number;
     }): Promise<Transaction> {
         withdrawNFT.nonce = withdrawNFT.nonce != null ? await this.getNonce(withdrawNFT.nonce) : await this.getNonce();
 

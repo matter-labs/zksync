@@ -9,6 +9,7 @@ declare module './tester' {
     interface Tester {
         testDeposit(wallet: Wallet, token: TokenLike, amount: BigNumber, approve?: boolean): Promise<void>;
         testFullExit(wallet: Wallet, token: TokenLike, accountId?: number): Promise<[BigNumber, BigNumber]>;
+        testFullExitNFT(wallet: Wallet, accountId?: number): Promise<void>;
     }
 }
 
@@ -38,4 +39,18 @@ Tester.prototype.testFullExit = async function (wallet: Wallet, token: TokenLike
     expect(receipt.executed, 'Full Exit was not executed').to.be.true;
     const balanceAfter = await wallet.getBalance(token);
     return [balanceBefore, balanceAfter];
+};
+
+Tester.prototype.testFullExitNFT = async function (wallet: Wallet, accountId?: number) {
+    const state = await wallet.getAccountState();
+    let nft: any = Object.values(state.committed.nfts)[0];
+
+    const balanceBefore = await wallet.getNFT(nft.id);
+    const handle = await wallet.emergencyWithdrawNFT({ tokenId: nft.id, accountId });
+    let receipt = await handle.awaitReceipt();
+    expect(receipt.executed, 'NFT Full Exit was not executed').to.be.true;
+    const balanceAfter = await wallet.getNFT(nft.id);
+
+    expect(balanceBefore.id == nft.id, 'NFT Full Exit failed').to.be.true;
+    expect(balanceAfter === undefined, 'NFT Full Exit failed').to.be.true;
 };

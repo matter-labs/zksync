@@ -152,8 +152,12 @@ describe(`ZkSync integration tests (token: ${token}, transport: ${transport})`, 
         await tester.testVerifiedWithdraw(alice, token, TX_AMOUNT);
     });
 
-    step('should execute a transfer NFT', async () => {
+    step('should execute NFT transfer', async () => {
         await tester.testTransferNFT(chuck, alice, token);
+    });
+
+    step('should execute NFT withdraw', async () => {
+        await tester.testWithdrawNFT(alice, token);
     });
 
     step('should execute a ForcedExit', async () => {
@@ -202,6 +206,14 @@ describe(`ZkSync integration tests (token: ${token}, transport: ${transport})`, 
             expect(before.eq(0), 'Balance before Full Exit must be non-zero').to.be.false;
             expect(before.eq(after), 'Balance after incorrect Full Exit should not change').to.be.true;
             carl.ethSigner = oldSigner;
+        });
+
+        step('should execute nft full-exit', async () => {
+            if (onlyBasic) {
+                return;
+            }
+            await tester.testMintNFT(carl, carl, "0x0000000000000000000000000000000000000000000000000000000000000001", token);
+            await tester.testFullExitNFT(carl);
         });
 
         step('should execute a normal full-exit', async () => {
