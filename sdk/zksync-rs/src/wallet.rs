@@ -129,6 +129,16 @@ where
         WithdrawBuilder::new(self)
     }
 
+    /// Initializes `MintNFT` transaction sending.
+    pub fn start_mint_nft(&self) -> MintNFTBuilder<'_, S, P> {
+        MintNFTBuilder::new(self)
+    }
+
+    /// Initializes `WithdrawNFT` transaction sending.
+    pub fn start_withdraw_nft(&self) -> WithdrawNFTBuilder<'_, S, P> {
+        WithdrawNFTBuilder::new(self)
+    }
+
     /// Creates an `EthereumProvider` to interact with the Ethereum network.
     ///
     /// Returns an error if wallet was created without providing an Ethereum private key.

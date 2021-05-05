@@ -1,15 +1,17 @@
 // Built-in imports
 use std::fmt;
-use zksync_eth_signer::error::SignerError;
-use zksync_eth_signer::EthereumSigner;
-use zksync_types::tx::{ChangePubKeyECDSAData, ChangePubKeyEthAuthData, TimeRange, TxEthSignature};
 // External uses
 use num::BigUint;
 // Workspace uses
 use zksync_crypto::PrivateKey;
-use zksync_types::tx::{ChangePubKey, PackedEthSignature};
+use zksync_eth_signer::{error::SignerError, EthereumSigner};
 use zksync_types::{
-    AccountId, Address, ForcedExit, Nonce, PubKeyHash, Token, Transfer, Withdraw, H256,
+    tx::{
+        ChangePubKey, ChangePubKeyECDSAData, ChangePubKeyEthAuthData, PackedEthSignature,
+        TimeRange, TxEthSignature,
+    },
+    AccountId, Address, ForcedExit, MintNFT, Nonce, PubKeyHash, Token, Transfer, Withdraw,
+    WithdrawNFT, H256,
 };
 // Local imports
 use crate::WalletCredentials;
@@ -252,5 +254,86 @@ impl<S: EthereumSigner> Signer<S> {
         };
 
         Ok((forced_exit, eth_signature))
+    }
+
+    pub async fn sign_mint_nft(
+        &self,
+        recipient: Address,
+        content_hash: H256,
+        fee_token: Token,
+        fee: BigUint,
+        nonce: Nonce,
+    ) -> Result<(MintNFT, Option<PackedEthSignature>), SignerError> {
+        let account_id = self.account_id.ok_or(SignerError::NoSigningKey)?;
+
+        let mint_nft = MintNFT::new_signed(
+            account_id,
+            self.address,
+            content_hash,
+            recipient,
+            fee,
+            fee_token.id,
+            nonce,
+            &self.private_key,
+        )
+        .map_err(signing_failed_error)?;
+
+        let eth_signature = match &self.eth_signer {
+            Some(signer) => {
+                let message =
+                    mint_nft.get_ethereum_sign_message(&fee_token.symbol, fee_token.decimals);
+                let signature = signer.sign_message(&message.as_bytes()).await?;
+
+                if let TxEthSignature::EthereumSignature(packed_signature) = signature {
+                    Some(packed_signature)
+                } else {
+                    return Err(SignerError::MissingEthSigner);
+                }
+            }
+            _ => None,
+        };
+
+        Ok((mint_nft, eth_signature))
+    }
+
+    pub async fn sign_withdraw_nft(
+        &self,
+        to: Address,
+        token: Token,
+        fee_token: Token,
+        fee: BigUint,
+        nonce: Nonce,
+        time_range: TimeRange,
+    ) -> Result<(WithdrawNFT, Option<PackedEthSignature>), SignerError> {
+        let account_id = self.account_id.ok_or(SignerError::NoSigningKey)?;
+
+        let withdraw_nft = WithdrawNFT::new_signed(
+            account_id,
+            self.address,
+            to,
+            token.id,
+            fee_token.id,
+            fee,
+            nonce,
+            time_range,
+            &self.private_key,
+        )
+        .map_err(signing_failed_error)?;
+
+        let eth_signature = match &self.eth_signer {
+            Some(signer) => {
+                let message = withdraw_nft.get_ethereum_sign_message(&token.symbol, token.decimals);
+                let signature = signer.sign_message(&message.as_bytes()).await?;
+
+                if let TxEthSignature::EthereumSignature(packed_signature) = signature {
+                    Some(packed_signature)
+                } else {
+                    return Err(SignerError::MissingEthSigner);
+                }
+            }
+            _ => None,
+        };
+
+        Ok((withdraw_nft, eth_signature))
     }
 }

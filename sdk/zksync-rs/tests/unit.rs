@@ -454,6 +454,7 @@ mod wallet_tests {
                     balances: committed_balances,
                     nonce: Nonce(0),
                     pub_key_hash: self.pub_key_hash().await,
+                    ..Default::default()
                 },
                 verified: AccountState {
                     balances: verified_balances,

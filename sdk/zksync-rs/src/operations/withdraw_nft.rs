@@ -2,37 +2,37 @@ use num::BigUint;
 use zksync_eth_signer::EthereumSigner;
 use zksync_types::{
     helpers::{closest_packable_fee_amount, is_fee_amount_packable},
-    tokens::TxFeeTypes,
-    tx::ChangePubKeyType,
-    Nonce, Token, TokenLike, ZkSyncTx,
+    tx::{PackedEthSignature, TimeRange},
+    Address, Nonce, Token, TokenLike, TxFeeTypes, ZkSyncTx,
 };
 
 use crate::{
     error::ClientError, operations::SyncTransactionHandle, provider::Provider, wallet::Wallet,
 };
-use zksync_types::tokens::ChangePubKeyFeeTypeArg;
 
 #[derive(Debug)]
-pub struct ChangePubKeyBuilder<'a, S: EthereumSigner, P: Provider> {
+pub struct WithdrawNFTBuilder<'a, S: EthereumSigner, P: Provider> {
     wallet: &'a Wallet<S, P>,
-    onchain_auth: bool,
+    to: Option<Address>,
+    token: Option<Token>,
     fee_token: Option<Token>,
     fee: Option<BigUint>,
     nonce: Option<Nonce>,
-    valid_from: Option<u32>,
-    valid_until: Option<u32>,
+    valid_from: Option<u64>,
+    valid_until: Option<u64>,
 }
 
-impl<'a, S, P> ChangePubKeyBuilder<'a, S, P>
+impl<'a, S, P> WithdrawNFTBuilder<'a, S, P>
 where
     S: EthereumSigner,
     P: Provider + Clone,
 {
-    /// Initializes a change public key transaction building process.
+    /// Initializes a withdraw transaction building process.
     pub fn new(wallet: &'a Wallet<S, P>) -> Self {
         Self {
             wallet,
-            onchain_auth: false,
+            to: None,
+            token: None,
             fee_token: None,
             fee: None,
             nonce: None,
@@ -41,8 +41,14 @@ where
         }
     }
 
-    /// Directly returns the signed transfer transaction for the subsequent usage.
-    pub async fn tx(self) -> Result<ZkSyncTx, ClientError> {
+    /// Directly returns the signed withdraw transaction for the subsequent usage.
+    pub async fn tx(self) -> Result<(ZkSyncTx, Option<PackedEthSignature>), ClientError> {
+        let to = self
+            .to
+            .ok_or_else(|| ClientError::MissingRequiredField("to".into()))?;
+        let token = self
+            .token
+            .ok_or_else(|| ClientError::MissingRequiredField("token".into()))?;
         let fee_token = self
             .fee_token
             .ok_or_else(|| ClientError::MissingRequiredField("fee_token".into()))?;
@@ -53,19 +59,7 @@ where
                 let fee = self
                     .wallet
                     .provider
-                    .get_tx_fee(
-                        if self.onchain_auth {
-                            TxFeeTypes::ChangePubKey(ChangePubKeyFeeTypeArg::ContractsV4Version(
-                                ChangePubKeyType::Onchain,
-                            ))
-                        } else {
-                            TxFeeTypes::ChangePubKey(ChangePubKeyFeeTypeArg::ContractsV4Version(
-                                ChangePubKeyType::ECDSA,
-                            ))
-                        },
-                        self.wallet.address(),
-                        fee_token.id,
-                    )
+                    .get_tx_fee(TxFeeTypes::Withdraw, to, token.id)
                     .await?;
                 fee.total_fee
             }
@@ -83,25 +77,46 @@ where
             }
         };
 
-        let time_range = Default::default();
+        let valid_from = self.valid_from.unwrap_or(0);
+        let valid_until = self.valid_until.unwrap_or(u64::MAX);
 
-        Ok(ZkSyncTx::from(
-            self.wallet
-                .signer
-                .sign_change_pubkey_tx(nonce, self.onchain_auth, fee_token, fee, time_range)
-                .await
-                .map_err(ClientError::SigningError)?,
-        ))
+        self.wallet
+            .signer
+            .sign_withdraw_nft(
+                to,
+                token,
+                fee_token,
+                fee,
+                nonce,
+                TimeRange::new(valid_from, valid_until),
+            )
+            .await
+            .map(|(tx, sign)| (ZkSyncTx::WithdrawNFT(Box::new(tx)), sign))
+            .map_err(ClientError::SigningError)
     }
 
     /// Sends the transaction, returning the handle for its awaiting.
     pub async fn send(self) -> Result<SyncTransactionHandle<P>, ClientError> {
         let provider = self.wallet.provider.clone();
 
-        let tx = self.tx().await?;
-        let tx_hash = provider.send_tx(tx, None).await?;
+        let (tx, eth_signature) = self.tx().await?;
+        let tx_hash = provider.send_tx(tx, eth_signature).await?;
 
         Ok(SyncTransactionHandle::new(tx_hash, provider))
+    }
+
+    /// Sets the transaction token. Returns an error if token is not supported by zkSync.
+    pub fn token(mut self, token: impl Into<TokenLike>) -> Result<Self, ClientError> {
+        let token_like = token.into();
+        let token = self
+            .wallet
+            .tokens
+            .resolve(token_like)
+            .ok_or(ClientError::UnknownToken)?;
+
+        self.token = Some(token);
+
+        Ok(self)
     }
 
     /// Sets the transaction fee token. Returns an error if token is not supported by zkSync.
@@ -143,6 +158,26 @@ where
         Ok(self)
     }
 
+    /// Sets the address of Ethereum wallet to withdraw funds to.
+    pub fn to(mut self, to: Address) -> Self {
+        self.to = Some(to);
+        self
+    }
+
+    /// Same as `WithdrawNFTBuilder::to`, but accepts a string address value.
+    ///
+    /// Provided string value must be a correct address in a hexadecimal form,
+    /// otherwise an error will be returned.
+    pub fn str_to(mut self, to: impl AsRef<str>) -> Result<Self, ClientError> {
+        let to: Address = to
+            .as_ref()
+            .parse()
+            .map_err(|_| ClientError::IncorrectAddress)?;
+
+        self.to = Some(to);
+        Ok(self)
+    }
+
     /// Sets the transaction nonce.
     pub fn nonce(mut self, nonce: Nonce) -> Self {
         self.nonce = Some(nonce);
@@ -150,13 +185,13 @@ where
     }
 
     /// Sets the unix format timestamp of the first moment when transaction execution is valid.
-    pub fn valid_from(mut self, valid_from: u32) -> Self {
+    pub fn valid_from(mut self, valid_from: u64) -> Self {
         self.valid_from = Some(valid_from);
         self
     }
 
     /// Sets the unix format timestamp of the last moment when transaction execution is valid.
-    pub fn valid_until(mut self, valid_until: u32) -> Self {
+    pub fn valid_until(mut self, valid_until: u64) -> Self {
         self.valid_until = Some(valid_until);
         self
     }

@@ -440,6 +440,42 @@ impl<S: EthereumSigner> EthereumProvider<S> {
         Ok(transaction_hash)
     }
 
+    /// Performs a full exit for a certain token.
+    pub async fn full_exit_nft(
+        &self,
+        token: impl Into<TokenLike>,
+        account_id: AccountId,
+    ) -> Result<H256, ClientError> {
+        let token = token.into();
+        let token = self
+            .tokens_cache
+            .resolve(token.clone())
+            .ok_or(ClientError::UnknownToken)?;
+        let account_id = U256::from(*account_id);
+
+        let options = Options {
+            gas: Some(500_000.into()),
+            ..Default::default()
+        };
+
+        let data = self
+            .eth_client
+            .encode_tx_data("requestFullExitNFT", (account_id, *token.id));
+        let signed_tx = self
+            .eth_client
+            .sign_prepared_tx(data, options)
+            .await
+            .map_err(|_| ClientError::IncorrectCredentials)?;
+
+        let transaction_hash = self
+            .eth_client
+            .send_raw_tx(signed_tx.raw_tx)
+            .await
+            .map_err(|err| ClientError::NetworkError(err.to_string()))?;
+
+        Ok(transaction_hash)
+    }
+
     /// Sets the timeout to wait for transactions to appear in the Ethereum network.
     /// By default it is set to 10 seconds.
     pub fn set_confirmation_timeout(&mut self, timeout: Duration) {

@@ -3,46 +3,49 @@ use zksync_eth_signer::EthereumSigner;
 use zksync_types::{
     helpers::{closest_packable_fee_amount, is_fee_amount_packable},
     tokens::TxFeeTypes,
-    tx::ChangePubKeyType,
-    Nonce, Token, TokenLike, ZkSyncTx,
+    tx::PackedEthSignature,
+    Address, Nonce, Token, TokenLike, ZkSyncTx, H256,
 };
 
 use crate::{
     error::ClientError, operations::SyncTransactionHandle, provider::Provider, wallet::Wallet,
 };
-use zksync_types::tokens::ChangePubKeyFeeTypeArg;
 
 #[derive(Debug)]
-pub struct ChangePubKeyBuilder<'a, S: EthereumSigner, P: Provider> {
+pub struct MintNFTBuilder<'a, S: EthereumSigner, P: Provider> {
     wallet: &'a Wallet<S, P>,
-    onchain_auth: bool,
+    recipient: Option<Address>,
+    content_hash: Option<H256>,
     fee_token: Option<Token>,
     fee: Option<BigUint>,
     nonce: Option<Nonce>,
-    valid_from: Option<u32>,
-    valid_until: Option<u32>,
 }
 
-impl<'a, S, P> ChangePubKeyBuilder<'a, S, P>
+impl<'a, S, P> MintNFTBuilder<'a, S, P>
 where
     S: EthereumSigner,
     P: Provider + Clone,
 {
-    /// Initializes a change public key transaction building process.
+    /// Initializes a transfer transaction building process.
     pub fn new(wallet: &'a Wallet<S, P>) -> Self {
         Self {
             wallet,
-            onchain_auth: false,
+            recipient: None,
+            content_hash: None,
             fee_token: None,
             fee: None,
             nonce: None,
-            valid_from: None,
-            valid_until: None,
         }
     }
 
     /// Directly returns the signed transfer transaction for the subsequent usage.
-    pub async fn tx(self) -> Result<ZkSyncTx, ClientError> {
+    pub async fn tx(self) -> Result<(ZkSyncTx, Option<PackedEthSignature>), ClientError> {
+        let recipient = self
+            .recipient
+            .ok_or_else(|| ClientError::MissingRequiredField("recipient".into()))?;
+        let content_hash = self
+            .content_hash
+            .ok_or_else(|| ClientError::MissingRequiredField("content_hash".into()))?;
         let fee_token = self
             .fee_token
             .ok_or_else(|| ClientError::MissingRequiredField("fee_token".into()))?;
@@ -53,19 +56,7 @@ where
                 let fee = self
                     .wallet
                     .provider
-                    .get_tx_fee(
-                        if self.onchain_auth {
-                            TxFeeTypes::ChangePubKey(ChangePubKeyFeeTypeArg::ContractsV4Version(
-                                ChangePubKeyType::Onchain,
-                            ))
-                        } else {
-                            TxFeeTypes::ChangePubKey(ChangePubKeyFeeTypeArg::ContractsV4Version(
-                                ChangePubKeyType::ECDSA,
-                            ))
-                        },
-                        self.wallet.address(),
-                        fee_token.id,
-                    )
+                    .get_tx_fee(TxFeeTypes::MintNFT, recipient, fee_token.id)
                     .await?;
                 fee.total_fee
             }
@@ -83,23 +74,20 @@ where
             }
         };
 
-        let time_range = Default::default();
-
-        Ok(ZkSyncTx::from(
-            self.wallet
-                .signer
-                .sign_change_pubkey_tx(nonce, self.onchain_auth, fee_token, fee, time_range)
-                .await
-                .map_err(ClientError::SigningError)?,
-        ))
+        self.wallet
+            .signer
+            .sign_mint_nft(recipient, content_hash, fee_token, fee, nonce)
+            .await
+            .map(|(tx, signature)| (ZkSyncTx::MintNFT(Box::new(tx)), signature))
+            .map_err(ClientError::SigningError)
     }
 
     /// Sends the transaction, returning the handle for its awaiting.
     pub async fn send(self) -> Result<SyncTransactionHandle<P>, ClientError> {
         let provider = self.wallet.provider.clone();
 
-        let tx = self.tx().await?;
-        let tx_hash = provider.send_tx(tx, None).await?;
+        let (tx, eth_signature) = self.tx().await?;
+        let tx_hash = provider.send_tx(tx, eth_signature).await?;
 
         Ok(SyncTransactionHandle::new(tx_hash, provider))
     }
@@ -118,7 +106,7 @@ where
         Ok(self)
     }
 
-    /// Set the fee amount. If the amount provided is not packable,
+    /// Set the fee amount. If the provided fee is not packable,
     /// rounds it to the closest packable fee amount.
     ///
     /// For more details, see [utils](../utils/index.html) functions.
@@ -143,21 +131,35 @@ where
         Ok(self)
     }
 
+    /// Sets the transaction recipient.
+    pub fn recipient(mut self, recipient: Address) -> Self {
+        self.recipient = Some(recipient);
+        self
+    }
+
+    /// Same as `MintNFTBuilder::recipient`, but accepts a string address value.
+    ///
+    /// Provided string value must be a correct address in a hexadecimal form,
+    /// otherwise an error will be returned.
+    pub fn str_recipient(mut self, recipient: impl AsRef<str>) -> Result<Self, ClientError> {
+        let recipient: Address = recipient
+            .as_ref()
+            .parse()
+            .map_err(|_| ClientError::IncorrectAddress)?;
+
+        self.recipient = Some(recipient);
+        Ok(self)
+    }
+
     /// Sets the transaction nonce.
     pub fn nonce(mut self, nonce: Nonce) -> Self {
         self.nonce = Some(nonce);
         self
     }
 
-    /// Sets the unix format timestamp of the first moment when transaction execution is valid.
-    pub fn valid_from(mut self, valid_from: u32) -> Self {
-        self.valid_from = Some(valid_from);
-        self
-    }
-
-    /// Sets the unix format timestamp of the last moment when transaction execution is valid.
-    pub fn valid_until(mut self, valid_until: u32) -> Self {
-        self.valid_until = Some(valid_until);
+    /// Sets the transaction content hash.
+    pub fn content_hash(mut self, content_hash: H256) -> Self {
+        self.content_hash = Some(content_hash);
         self
     }
 }
