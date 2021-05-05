@@ -57,10 +57,7 @@ const AMOUNT_MANTISSA_BIT_WIDTH = 35;
 const FEE_EXPONENT_BIT_WIDTH = 5;
 const FEE_MANTISSA_BIT_WIDTH = 11;
 
-export function price(price: {
-    sellPrice: BigNumberish,
-    buyPrice: BigNumberish,
-}): Price {
+export function price(price: { sellPrice: BigNumberish; buyPrice: BigNumberish }): Price {
     return [BigNumber.from(price.sellPrice), BigNumber.from(price.buyPrice)];
 }
 
@@ -579,9 +576,9 @@ export function serializeOrder(order: Order): Uint8Array {
     const nonceBytes = serializeNonce(order.nonce);
     const tokenSellId = serializeTokenId(order.tokenSell);
     const tokenBuyId = serializeTokenId(order.tokenBuy);
-    const sellPriceBytes = order.price[0].toHexString();
-    const buyPriceBytes = order.price[1].toHexString();
-    const amountBytes = serializeAmountFull(order.amount);
+    const sellPriceBytes = BigNumber.from(order.price[0]).toHexString();
+    const buyPriceBytes = BigNumber.from(order.price[1]).toHexString();
+    const amountBytes = serializeAmountPacked(order.amount);
     const validFrom = serializeTimestamp(order.validFrom);
     const validUntil = serializeTimestamp(order.validUntil);
     return ethers.utils.concat([
@@ -609,8 +606,8 @@ export function serializeSwap(swap: Swap): Uint8Array {
     const ordersHashed = zks.rescueHashOrders(ethers.utils.concat([orderA, orderB]));
     const tokenIdBytes = serializeTokenId(swap.feeToken);
     const feeBytes = serializeFeePacked(swap.fee);
-    const amountABytes = serializeAmountFull(swap.amounts[0]);
-    const amountBBytes = serializeAmountFull(swap.amounts[1]);
+    const amountABytes = serializeAmountPacked(swap.amounts[0]);
+    const amountBBytes = serializeAmountPacked(swap.amounts[1]);
     return ethers.utils.concat([
         type,
         submitterId,

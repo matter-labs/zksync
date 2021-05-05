@@ -67,6 +67,8 @@ export class Signer {
         return {
             ...order,
             amount: BigNumber.from(order.amount).toString(),
+            // @ts-ignore
+            price: order.price.map((p) => BigNumber.from(p).toString()),
             signature
         };
     }

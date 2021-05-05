@@ -72,7 +72,7 @@ export interface Signature {
     signature: string;
 }
 
-export type Price = [BigNumber, BigNumber];
+export type Price = [BigNumberish, BigNumberish];
 
 export interface Order {
     accountId: number;

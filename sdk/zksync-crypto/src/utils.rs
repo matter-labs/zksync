@@ -111,7 +111,7 @@ fn get_bits_le_fixed(fr: &Fr, size: usize) -> Vec<bool> {
     let mut bits: Vec<bool> = Vec::with_capacity(size);
     let repr = fr.into_repr();
     let repr: &[u64] = repr.as_ref();
-    let n = std::cmp::max(repr.len() * 64, size);
+    let n = std::cmp::min(repr.len() * 64, size);
     for i in 0..n {
         let part = i / 64;
         let bit = i - (64 * part);

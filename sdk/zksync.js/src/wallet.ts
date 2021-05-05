@@ -42,7 +42,7 @@ import {
     getEthereumBalance,
     ETH_RECOMMENDED_DEPOSIT_GAS_LIMIT,
     getChangePubkeyLegacyMessage,
-    ERC20_DEPOSIT_GAS_LIMIT,
+    ERC20_DEPOSIT_GAS_LIMIT
 } from './utils';
 
 const EthersErrorCode = ErrorCode;

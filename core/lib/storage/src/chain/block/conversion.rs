@@ -164,8 +164,9 @@ impl NewExecutedTransaction {
                     serde_json::from_value(tx["target"].clone()).unwrap(),
                 ),
                 ZkSyncTx::Swap(_) => (
-                    serde_json::from_value(tx["submitter_address"].clone()).unwrap(),
-                    serde_json::from_value(tx["submitter_address"].clone()).unwrap(),
+                    serde_json::from_value(tx["submitterAddress"].clone()).unwrap(),
+                    serde_json::from_value(tx["submitterAddress"].clone()).unwrap(),
+                    // TODO verify that this is what is needed
                 ),
             };
 
