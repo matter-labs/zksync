@@ -1,5 +1,5 @@
 // Built-in uses
-use std::time::Instant;
+use std::{slice, time::Instant};
 // External uses
 use serde_json::Value;
 // Workspace uses
@@ -33,7 +33,7 @@ pub use records::{get_event_type, EventType};
 pub struct EventSchema<'a, 'c>(pub &'a mut StorageProcessor<'c>);
 
 impl<'a, 'c> EventSchema<'a, 'c> {
-    /// Store [Vec](std::vec::Vec) of serialized events in the database.
+    /// Store serialized events in the database.
     /// This method is private since the type safety is only guaranteed
     /// by the correctness of `event_type` parameter.
     /// Events are expected to have the same type and belong to the same block.
@@ -41,7 +41,7 @@ impl<'a, 'c> EventSchema<'a, 'c> {
         &mut self,
         block_number: BlockNumber,
         event_type: EventType,
-        event_data: Vec<Value>,
+        event_data: &[Value],
     ) -> QueryResult<()> {
         let start = Instant::now();
 
@@ -58,7 +58,7 @@ impl<'a, 'c> EventSchema<'a, 'c> {
                 AS u(event_data)",
             i64::from(*block_number),
             event_type as EventType,
-            &event_data,
+            event_data,
         )
         .execute(self.0.conn())
         .await?;
@@ -150,7 +150,7 @@ impl<'a, 'c> EventSchema<'a, 'c> {
 
         transaction
             .event_schema()
-            .store_event_data(block_number, EventType::Block, vec![event_data])
+            .store_event_data(block_number, EventType::Block, slice::from_ref(&event_data))
             .await?;
         transaction.commit().await?;
 
@@ -187,7 +187,7 @@ impl<'a, 'c> EventSchema<'a, 'c> {
 
         transaction
             .event_schema()
-            .store_event_data(block_number, EventType::Account, events)
+            .store_event_data(block_number, EventType::Account, &events)
             .await?;
         transaction.commit().await?;
 
@@ -273,7 +273,7 @@ impl<'a, 'c> EventSchema<'a, 'c> {
 
         transaction
             .event_schema()
-            .store_event_data(block_number, EventType::Transaction, events)
+            .store_event_data(block_number, EventType::Transaction, &events)
             .await?;
         transaction.commit().await?;
 
