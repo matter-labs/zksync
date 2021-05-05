@@ -1080,6 +1080,7 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
                 &mut previous_pubdatas[WithdrawOp::OP_CODE as usize],
                 is_special_nft_storage_account,
                 is_special_nft_token,
+                &is_fungible_token,
             )?,
             // Close disable.
             // self.close_account(
@@ -1143,6 +1144,7 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
                 &mut previous_pubdatas[ForcedExitOp::OP_CODE as usize],
                 is_special_nft_storage_account,
                 is_special_nft_token,
+                &is_fungible_token,
             )?,
             self.mint_nft(
                 cs.namespace(|| "mint_nft"),
@@ -1281,6 +1283,7 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
         pubdata_holder: &mut Vec<AllocatedNum<E>>,
         _is_special_nft_storage_account: &Boolean,
         is_special_nft_token: &Boolean,
+        is_fungible_token: &Boolean,
     ) -> Result<Boolean, SynthesisError> {
         let mut base_valid_flags = vec![];
         // construct pubdata
@@ -1408,6 +1411,8 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
             &cur.account.pub_key_hash,
         )?;
         base_valid_flags.push(is_signer_valid);
+
+        base_valid_flags.push(is_fungible_token.clone());
 
         let is_base_valid = multi_and(cs.namespace(|| "valid base withdraw"), &base_valid_flags)?;
 
@@ -3864,6 +3869,7 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
         pubdata_holder: &mut Vec<AllocatedNum<E>>,
         is_special_nft_storage_account: &Boolean,
         is_special_nft_token: &Boolean,
+        is_fungible_token: &Boolean,
     ) -> Result<Boolean, SynthesisError> {
         assert!(
             !pubdata_holder.is_empty(),
@@ -3986,6 +3992,8 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
         )?;
         lhs_valid_flags.push(is_signer_valid);
 
+        lhs_valid_flags.push(is_fungible_token.clone());
+
         let lhs_valid = multi_and(cs.namespace(|| "lhs_valid"), &lhs_valid_flags)?;
 
         let updated_balance = Expression::from(&cur.balance.get_number()) - fee_expr;
@@ -4052,6 +4060,8 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
         )?;
         rhs_valid_flags.push(is_pubkey_empty);
 
+        rhs_valid_flags.push(is_fungible_token.clone());
+
         let rhs_valid = multi_and(cs.namespace(|| "is_rhs_valid"), &rhs_valid_flags)?;
 
         // calculate new rhs balance value
@@ -4074,6 +4084,7 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
             is_forced_exit,
             is_valid_timestamp.clone(),
             pubdata_properly_copied,
+            is_fungible_token.clone(),
         ];
 
         let is_ohs_valid = multi_and(cs.namespace(|| "is_ohs_valid"), &ohs_valid_flags)?;
