@@ -1305,7 +1305,7 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
         )?;
         base_valid_flags.push(is_signer_valid);
 
-        base_valid_flags.push(is_fungible_token);
+        base_valid_flags.push(is_fungible_token.clone());
 
         let is_base_valid = multi_and(cs.namespace(|| "valid base withdraw"), &base_valid_flags)?;
 
