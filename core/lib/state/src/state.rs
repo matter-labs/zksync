@@ -501,6 +501,7 @@ impl ZkSyncState {
                     self.insert_account(*account_id, account);
                 }
                 AccountUpdate::MintNFT { token } => {
+                    println!("mint token{:?}", &token);
                     self.nfts.insert(token.id, token.clone());
                 }
                 AccountUpdate::RemoveNFT { token } => {

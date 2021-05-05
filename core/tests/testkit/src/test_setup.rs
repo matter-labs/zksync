@@ -5,7 +5,7 @@ use futures::{
     channel::{mpsc, oneshot},
     SinkExt, StreamExt,
 };
-use num::{bigint::Sign, BigInt, BigUint, Zero};
+use num::{bigint::Sign, BigInt, BigUint, ToPrimitive, Zero};
 use std::collections::HashMap;
 use zksync_core::committer::{BlockCommitRequest, CommitRequest};
 use zksync_core::mempool::ProposedBlock;
@@ -27,7 +27,9 @@ use crate::account_set::AccountSet;
 use crate::state_keeper_utils::*;
 use crate::types::*;
 
+use zksync_crypto::params::{NFT_STORAGE_ACCOUNT_ADDRESS, NFT_STORAGE_ACCOUNT_ID, NFT_TOKEN_ID};
 use zksync_types::tx::TimeRange;
+
 /// Used to create transactions between accounts and check for their validity.
 /// Every new block should start with `.start_block()`
 /// and end with `execute_commit_and_verify_block()`
@@ -563,6 +565,41 @@ impl TestSetup {
 
         self.execute_tx(tx).await;
     }
+    pub async fn mint_nft(
+        &mut self,
+        creator: ZKSyncAccountId,
+        recipient: ZKSyncAccountId,
+        fee_token: Token,
+        content_hash: H256,
+        fee: BigUint,
+    ) {
+        let mut zksync0_old = self
+            .get_expected_zksync_account_balance(creator, fee_token.0)
+            .await;
+        zksync0_old -= &fee;
+        self.expected_changes_for_current_block
+            .sync_accounts_state
+            .insert((creator, fee_token.0), zksync0_old);
+
+        let mut zksync0_old = self
+            .get_expected_zksync_account_balance(self.accounts.fee_account_id, fee_token.0)
+            .await;
+        zksync0_old += &fee;
+        self.expected_changes_for_current_block
+            .sync_accounts_state
+            .insert((self.accounts.fee_account_id, fee_token.0), zksync0_old);
+
+        let token_id = self.get_last_committed_nft_id().await;
+        let mint_nft =
+            self.accounts
+                .mint_nft(creator, recipient, fee_token, content_hash, fee, None, true);
+
+        // self.expected_changes_for_current_block
+        //     .sync_accounts_state
+        //     .insert((recipient, TokenId(token_id + 1)), BigUint::from(1u32));
+
+        self.execute_tx(mint_nft).await;
+    }
 
     pub async fn transfer(
         &mut self,
@@ -673,6 +710,43 @@ impl TestSetup {
         self.execute_tx(withdraw).await;
     }
 
+    pub async fn withdraw_nft(
+        &mut self,
+        from: ZKSyncAccountId,
+        token: Token,
+        fee_token: Token,
+        fee: BigUint,
+        rng: &mut impl Rng,
+    ) {
+        let mut zksync0_old = self
+            .get_expected_zksync_account_balance(from, fee_token.0)
+            .await;
+        zksync0_old -= &fee;
+        self.expected_changes_for_current_block
+            .sync_accounts_state
+            .insert((from, fee_token.0), zksync0_old);
+        let mut zksync0_old = self
+            .get_expected_zksync_account_balance(from, token.0)
+            .await;
+        assert_eq!(zksync0_old, BigUint::from(1u32));
+        self.expected_changes_for_current_block
+            .sync_accounts_state
+            .insert((from, token.0), BigUint::zero());
+
+        let mut zksync0_old = self
+            .get_expected_zksync_account_balance(self.accounts.fee_account_id, fee_token.0)
+            .await;
+        zksync0_old += &fee;
+        self.expected_changes_for_current_block
+            .sync_accounts_state
+            .insert((self.accounts.fee_account_id, fee_token.0), zksync0_old);
+
+        let withdraw = self
+            .accounts
+            .withdraw_nft(from, token, fee_token, fee, None, true, rng);
+
+        self.execute_tx(withdraw).await;
+    }
     pub async fn withdraw_to_random_account(
         &mut self,
         from: ZKSyncAccountId,
@@ -959,21 +1033,13 @@ impl TestSetup {
             &self.expected_changes_for_current_block.sync_accounts_state
         {
             let real = self.get_zksync_balance(*zksync_account, *token).await;
-            if balance > &real {
+            if balance != &real {
                 println!(
-                    "wrong zksync acc {} balance {}, real: {}",
+                    "zksync acc {} balance {}, real: {} token: {}",
                     zksync_account.0,
                     balance,
-                    real.clone()
-                );
-            }
-            let is_diff_valid = real.clone() - balance == BigUint::from(0u32);
-            if !is_diff_valid {
-                println!(
-                    "zksync acc {} diff {}, real: {}",
-                    zksync_account.0,
-                    real.clone() - balance,
-                    real.clone()
+                    real.clone(),
+                    token.0
                 );
                 block_checks_failed = true;
             }
@@ -999,6 +1065,17 @@ impl TestSetup {
             withdrawals_result,
             block_chunks,
         ))
+    }
+
+    pub async fn get_last_committed_nft_id(&self) -> u32 {
+        let (_, account) = state_keeper_get_account(
+            self.state_keeper_request_sender.clone(),
+            &NFT_STORAGE_ACCOUNT_ADDRESS,
+        )
+        .await
+        .unwrap();
+        let balance = account.get_balance(NFT_TOKEN_ID).to_u32().unwrap();
+        balance - 1
     }
 
     pub async fn get_zksync_account_committed_state(

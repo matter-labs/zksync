@@ -1,7 +1,7 @@
 use crate::eth_account::EthereumAccount;
 use crate::zksync_account::ZkSyncAccount;
 use num::BigUint;
-use web3::types::{TransactionReceipt, U64};
+use web3::types::{TransactionReceipt, H256, U64};
 use zksync_crypto::rand::Rng;
 use zksync_types::tx::{ChangePubKeyType, TimeRange};
 use zksync_types::{AccountId, Address, Nonce, PriorityOp, TokenId, ZkSyncTx};
@@ -60,6 +60,37 @@ impl AccountSet {
         }
     }
 
+    /// Create signed mint nft between zksync accounts
+    /// `nonce` optional nonce override
+    /// `increment_nonce` - flag for `from` account nonce increment
+    #[allow(clippy::too_many_arguments)]
+    pub fn mint_nft(
+        &self,
+        creator: ZKSyncAccountId,
+        recipient: ZKSyncAccountId,
+        fee_token: Token,
+        content_hash: H256,
+        fee: BigUint,
+        nonce: Option<Nonce>,
+        increment_nonce: bool,
+    ) -> ZkSyncTx {
+        let creator = &self.zksync_accounts[creator.0];
+        let recipient = &self.zksync_accounts[recipient.0];
+
+        ZkSyncTx::MintNFT(Box::new(
+            creator
+                .sign_mint_nft(
+                    fee_token.0,
+                    "",
+                    content_hash,
+                    fee,
+                    &recipient.address,
+                    nonce,
+                    increment_nonce,
+                )
+                .0,
+        ))
+    }
     /// Create signed transfer between zksync accounts
     /// `nonce` optional nonce override
     /// `increment_nonce` - flag for `from` account nonce increment
@@ -185,6 +216,37 @@ impl AccountSet {
         )))
     }
 
+    /// Create withdraw from zksync account to random eth account
+    /// `nonce` optional nonce override
+    /// `increment_nonce` - flag for `from` account nonce increment
+    #[allow(clippy::too_many_arguments)]
+    pub fn withdraw_nft(
+        &self,
+        from: ZKSyncAccountId,
+        token_id: Token,
+        fee_token_id: Token,
+        fee: BigUint,
+        nonce: Option<Nonce>,
+        increment_nonce: bool,
+        rng: &mut impl Rng,
+    ) -> ZkSyncTx {
+        let from = &self.zksync_accounts[from.0];
+        let to_address = Address::from_slice(&rng.gen::<[u8; 20]>());
+
+        ZkSyncTx::WithdrawNFT(Box::new(
+            from.sign_withdraw_nft(
+                token_id.0,
+                fee_token_id.0,
+                "",
+                fee,
+                &to_address,
+                nonce,
+                increment_nonce,
+                Default::default(),
+            )
+            .0,
+        ))
+    }
     /// Create withdraw from zksync account to random eth account
     /// `nonce` optional nonce override
     /// `increment_nonce` - flag for `from` account nonce increment
