@@ -147,7 +147,7 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
         StoredBlockInfo memory storedBlockZero =
             StoredBlockInfo(
                 totalBlocksExecuted,
-                firstPriorityRequestId,
+                0,
                 EMPTY_STRING_KECCAK,
                 block.timestamp,
                 newRootHash,
