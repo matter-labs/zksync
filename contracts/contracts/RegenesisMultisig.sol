@@ -15,8 +15,8 @@ contract RegenesisMultisig is Ownable {
     uint32 public requiredNumberOfSignatures;
     uint32 public numberOfPartners;
 
-    bytes32 public oldRootHash = bytes32(0);
-    bytes32 public newRootHash = bytes32(0);
+    bytes32 public oldRootHash;
+    bytes32 public newRootHash;
 
     constructor(address[] memory _partners, uint32 _requiredNumberOfSignatures) Ownable(msg.sender) {
         // We obviously should require less signatures than there are addresses
