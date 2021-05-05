@@ -3952,8 +3952,10 @@ dependencies = [
  "serde",
  "serde_json",
  "structopt",
+ "tokio 0.2.22",
  "zksync_circuit",
  "zksync_crypto",
+ "zksync_storage",
  "zksync_types",
  "zksync_utils",
 ]

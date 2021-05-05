@@ -180,9 +180,15 @@ pub fn verify_empty<T: CircuitAccountWrapper>(
     }
 }
 
-pub fn get_nft_account() -> CircuitAccountDepth32 {
+pub fn get_nft_account() -> Account {
     let mut nft_account = Account::default_with_address(&NFT_STORAGE_ACCOUNT_ADDRESS);
     nft_account.set_balance(NFT_TOKEN_ID, BigUint::from(MIN_NFT_TOKEN_ID));
+
+    nft_account
+}
+
+pub fn get_nft_circuit_account() -> CircuitAccountDepth32 {
+    let nft_account = get_nft_account();
 
     CircuitAccountDepth32::from_account(nft_account)
 }

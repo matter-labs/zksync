@@ -735,6 +735,29 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
         Ok(())
     }
 
+    // This method does not have metrics, since it is used only for the
+    // migration for the nft regenesis.
+    // Remove this function once the regenesis is complete and the tool is not
+    // neded anymore: ZKS-663
+    pub async fn change_block_root_hash(
+        &mut self,
+        block_number: BlockNumber,
+        new_root_hash: Fr,
+    ) -> QueryResult<()> {
+        let root_hash_bytes = new_root_hash.to_bytes();
+        sqlx::query!(
+            "UPDATE blocks
+                SET root_hash = $1
+                WHERE number = $2",
+            root_hash_bytes,
+            *block_number as i64
+        )
+        .execute(self.0.conn())
+        .await?;
+
+        Ok(())
+    }
+
     pub async fn save_block_metadata(
         &mut self,
         block_number: BlockNumber,
@@ -782,6 +805,21 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
         .await?;
 
         metrics::histogram!("sql.chain.block.store_account_tree_cache", start.elapsed());
+        Ok(())
+    }
+
+    pub async fn reset_account_tree_cache(&mut self, block: BlockNumber) -> QueryResult<()> {
+        sqlx::query!(
+            "
+            UPDATE account_tree_cache 
+            SET tree_cache = NULL
+            WHERE block = $1
+            ",
+            *block as i64
+        )
+        .execute(self.0.conn())
+        .await?;
+
         Ok(())
     }
 

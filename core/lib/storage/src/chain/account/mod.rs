@@ -10,7 +10,7 @@ use crate::diff::StorageAccountDiff;
 use crate::{QueryResult, StorageProcessor};
 
 pub mod records;
-mod restore_account;
+pub mod restore_account;
 mod stored_state;
 
 pub(crate) use self::restore_account::restore_account;
@@ -312,5 +312,21 @@ impl<'a, 'c> AccountSchema<'a, 'c> {
         let address = result.map(|record| Address::from_slice(&record.address));
         metrics::histogram!("sql.chain.account.account_address_by_id", start.elapsed());
         Ok(address)
+    }
+
+    pub async fn get_all_accounts(&mut self) -> QueryResult<Vec<StorageAccount>> {
+        let result = sqlx::query_as!(StorageAccount, "SELECT * FROM accounts")
+            .fetch_all(self.0.conn())
+            .await?;
+
+        Ok(result)
+    }
+
+    pub async fn get_all_balances(&mut self) -> QueryResult<Vec<StorageBalance>> {
+        let result = sqlx::query_as!(StorageBalance, "SELECT * FROM balances",)
+            .fetch_all(self.0.conn())
+            .await?;
+
+        Ok(result)
     }
 }

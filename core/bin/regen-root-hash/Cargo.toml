@@ -16,6 +16,7 @@ zksync_crypto = { path = "../../lib/crypto", version = "1.0" }
 zksync_types = { path = "../../lib/types", version = "1.0" }
 zksync_utils = { path = "../../lib/utils", version = "1.0" }
 zksync_circuit = { path = "../../lib/circuit", version = "1.0" }
+zksync_storage = { path = "../../lib/storage", version = "1.0" }
 
 once_cell = "1.4"
 anyhow = "1.0"
@@ -26,3 +27,5 @@ structopt = "0.3.20"
 
 serde = { version = "1.0", features = ["derive"] }
 serde_json = { version = "1.0.0" }
+
+tokio = { version = "0.2", features = ["full"] }

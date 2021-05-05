@@ -1,12 +1,16 @@
 // Built-in deps
-use std::{cmp, collections::HashMap, time::Instant};
+use std::{cmp, collections::HashMap, convert::TryInto, time::Instant};
 // External imports
 use num::BigInt;
 use sqlx::types::BigDecimal;
 // Workspace imports
+use zksync_crypto::params::{
+    MIN_NFT_TOKEN_ID, NFT_STORAGE_ACCOUNT_ADDRESS, NFT_STORAGE_ACCOUNT_ID, NFT_TOKEN_ID,
+};
 use zksync_types::{
     helpers::{apply_updates, reverse_updates},
-    AccountId, AccountMap, AccountUpdate, AccountUpdates, BlockNumber, PubKeyHash, TokenId, NFT,
+    Account, AccountId, AccountMap, AccountUpdate, AccountUpdates, BlockNumber, PubKeyHash, Token,
+    TokenId, NFT,
 };
 // Local imports
 use crate::chain::{
@@ -193,6 +197,116 @@ impl<'a, 'c> StateSchema<'a, 'c> {
         Ok(())
     }
 
+    pub async fn apply_storage_account_diff(
+        &mut self,
+        acc_update: StorageAccountDiff,
+    ) -> QueryResult<()> {
+        match acc_update {
+            StorageAccountDiff::BalanceUpdate(upd) => {
+                sqlx::query!(
+                    r#"
+                    INSERT INTO balances ( account_id, coin_id, balance )
+                    VALUES ( $1, $2, $3 )
+                    ON CONFLICT (account_id, coin_id)
+                    DO UPDATE
+                      SET balance = $3
+                    "#,
+                    upd.account_id,
+                    upd.coin_id,
+                    upd.new_balance.clone(),
+                )
+                .execute(self.0.conn())
+                .await?;
+
+                sqlx::query!(
+                    r#"
+                    UPDATE accounts 
+                    SET last_block = $1, nonce = $2
+                    WHERE id = $3
+                    "#,
+                    upd.block_number,
+                    upd.new_nonce,
+                    upd.account_id,
+                )
+                .execute(self.0.conn())
+                .await?;
+            }
+
+            StorageAccountDiff::Create(upd) => {
+                sqlx::query!(
+                    r#"
+                    INSERT INTO accounts ( id, last_block, nonce, address, pubkey_hash )
+                    VALUES ( $1, $2, $3, $4, $5 )
+                    "#,
+                    upd.account_id,
+                    upd.block_number,
+                    upd.nonce,
+                    upd.address,
+                    PubKeyHash::default().data.to_vec()
+                )
+                .execute(self.0.conn())
+                .await?;
+            }
+            StorageAccountDiff::Delete(upd) => {
+                sqlx::query!(
+                    r#"
+                    DELETE FROM accounts
+                    WHERE id = $1
+                    "#,
+                    upd.account_id,
+                )
+                .execute(self.0.conn())
+                .await?;
+            }
+            StorageAccountDiff::ChangePubKey(upd) => {
+                sqlx::query!(
+                    r#"
+                    UPDATE accounts 
+                    SET last_block = $1, nonce = $2, pubkey_hash = $3
+                    WHERE id = $4
+                    "#,
+                    upd.block_number,
+                    upd.new_nonce,
+                    upd.new_pubkey_hash,
+                    upd.account_id,
+                )
+                .execute(self.0.conn())
+                .await?;
+            }
+            StorageAccountDiff::MintNFT(upd) => {
+                let address = address_to_stored_string(&Address::from_slice(&upd.address));
+                sqlx::query!(
+                    r#"
+                    INSERT INTO tokens ( id, address, symbol, decimals, is_nft )
+                    VALUES ( $1, $2, $3, $4, true )
+                    "#,
+                    upd.token_id,
+                    address,
+                    upd.symbol,
+                    1
+                )
+                .execute(self.0.conn())
+                .await?;
+
+                sqlx::query!(
+                    r#"
+                    INSERT INTO nft ( token_id, creator_account_id, serial_id, address, content_hash )
+                    VALUES ( $1, $2, $3, $4, $5)
+                    "#,
+                    upd.token_id,
+                    upd.creator_account_id,
+                    upd.serial_id,
+                    upd.address,
+                    upd.content_hash,
+                )
+                    .execute(self.0.conn())
+                    .await?;
+            }
+        }
+
+        Ok(())
+    }
+
     /// Applies the previously stored list of account changes to the stored state.
     ///
     /// This method is invoked from the `zksync_eth_sender` after corresponding `Verify` transaction
@@ -278,108 +392,11 @@ impl<'a, 'c> StateSchema<'a, 'c> {
 
         // Then go through the collected list of changes and apply them by one.
         for acc_update in account_updates.into_iter() {
-            match acc_update {
-                StorageAccountDiff::BalanceUpdate(upd) => {
-                    sqlx::query!(
-                        r#"
-                        INSERT INTO balances ( account_id, coin_id, balance )
-                        VALUES ( $1, $2, $3 )
-                        ON CONFLICT (account_id, coin_id)
-                        DO UPDATE
-                          SET balance = $3
-                        "#,
-                        upd.account_id,
-                        upd.coin_id,
-                        upd.new_balance.clone(),
-                    )
-                    .execute(transaction.conn())
-                    .await?;
-
-                    sqlx::query!(
-                        r#"
-                        UPDATE accounts 
-                        SET last_block = $1, nonce = $2
-                        WHERE id = $3
-                        "#,
-                        upd.block_number,
-                        upd.new_nonce,
-                        upd.account_id,
-                    )
-                    .execute(transaction.conn())
-                    .await?;
-                }
-
-                StorageAccountDiff::Create(upd) => {
-                    sqlx::query!(
-                        r#"
-                        INSERT INTO accounts ( id, last_block, nonce, address, pubkey_hash )
-                        VALUES ( $1, $2, $3, $4, $5 )
-                        "#,
-                        upd.account_id,
-                        upd.block_number,
-                        upd.nonce,
-                        upd.address,
-                        PubKeyHash::default().data.to_vec()
-                    )
-                    .execute(transaction.conn())
-                    .await?;
-                }
-                StorageAccountDiff::Delete(upd) => {
-                    sqlx::query!(
-                        r#"
-                        DELETE FROM accounts
-                        WHERE id = $1
-                        "#,
-                        upd.account_id,
-                    )
-                    .execute(transaction.conn())
-                    .await?;
-                }
-                StorageAccountDiff::ChangePubKey(upd) => {
-                    sqlx::query!(
-                        r#"
-                        UPDATE accounts 
-                        SET last_block = $1, nonce = $2, pubkey_hash = $3
-                        WHERE id = $4
-                        "#,
-                        upd.block_number,
-                        upd.new_nonce,
-                        upd.new_pubkey_hash,
-                        upd.account_id,
-                    )
-                    .execute(transaction.conn())
-                    .await?;
-                }
-                StorageAccountDiff::MintNFT(upd) => {
-                    let address = address_to_stored_string(&Address::from_slice(&upd.address));
-                    sqlx::query!(
-                        r#"
-                        INSERT INTO tokens ( id, address, symbol, decimals, is_nft )
-                        VALUES ( $1, $2, $3, $4, true )
-                        "#,
-                        upd.token_id,
-                        address,
-                        upd.symbol,
-                        1
-                    )
-                    .execute(transaction.conn())
-                    .await?;
-
-                    sqlx::query!(
-                        r#"
-                        INSERT INTO nft ( token_id, creator_account_id, serial_id, address, content_hash )
-                        VALUES ( $1, $2, $3, $4, $5)
-                        "#,
-                        upd.token_id,
-                        upd.creator_account_id,
-                        upd.serial_id,
-                        upd.address,
-                        upd.content_hash,
-                    )
-                        .execute(transaction.conn())
-                        .await?;
-                }
-            }
+            transaction
+                .chain()
+                .state_schema()
+                .apply_storage_account_diff(acc_update)
+                .await?;
         }
 
         transaction.commit().await?;
@@ -474,6 +491,105 @@ impl<'a, 'c> StateSchema<'a, 'c> {
         transaction.commit().await?;
         metrics::histogram!("sql.chain.state.load_verified_state", start.elapsed());
         Ok((last_block, account_map))
+    }
+
+    pub async fn insert_nft_account(&mut self, block_number: BlockNumber) -> QueryResult<()> {
+        let mut transaction = self.0.start_transaction().await?;
+
+        vlog::info!("Adding special token");
+        // Adding NFT token
+        transaction
+            .tokens_schema()
+            .store_token(Token {
+                id: NFT_TOKEN_ID,
+                symbol: "SPECIAL".to_string(),
+                address: *NFT_STORAGE_ACCOUNT_ADDRESS,
+                decimals: 18,
+                is_nft: true, // TODO: ZKS-635
+            })
+            .await?;
+        vlog::info!("Special token added");
+
+        // Added committed state for the special account
+        let (mut special_account, db_create_special_account) =
+            Account::create_account(NFT_STORAGE_ACCOUNT_ID, *NFT_STORAGE_ACCOUNT_ADDRESS);
+        special_account.set_balance(NFT_TOKEN_ID, num::BigUint::from(MIN_NFT_TOKEN_ID));
+
+        let db_set_special_account_balance = AccountUpdate::UpdateBalance {
+            old_nonce: special_account.nonce,
+            new_nonce: special_account.nonce,
+            balance_update: (
+                NFT_TOKEN_ID,
+                num::BigUint::from(0u64),
+                num::BigUint::from(MIN_NFT_TOKEN_ID),
+            ),
+        };
+
+        // This number is only used for sorting when applying the block
+        // Since we are overridining the existing block
+        // we could enter here any number we want
+        let update_order_id = 1000;
+
+        transaction
+            .chain()
+            .state_schema()
+            .commit_state_update(
+                block_number,
+                &[
+                    db_create_special_account[0usize].clone(),
+                    (NFT_STORAGE_ACCOUNT_ID, db_set_special_account_balance),
+                ],
+                update_order_id,
+            )
+            .await?;
+
+        // Applying account
+        let account_id: i64 = NFT_STORAGE_ACCOUNT_ID.0.try_into().unwrap();
+        let nonce: i64 = special_account.nonce.0.try_into().unwrap();
+        let block_number: i64 = block_number.0.try_into().unwrap();
+        let update_order_id: i32 = update_order_id.try_into().unwrap();
+        let coin_id: i32 = NFT_TOKEN_ID.0.try_into().unwrap();
+
+        let storage_account_creation = StorageAccountCreation {
+            account_id,
+            is_create: true,
+            block_number,
+            address: NFT_STORAGE_ACCOUNT_ADDRESS.as_bytes().to_vec(),
+            nonce,
+            update_order_id,
+        };
+
+        let storage_balance_update = StorageAccountUpdate {
+            // This value is not used for our pursposes and will not be stored anywhere
+            // so can put whatever we want here
+            balance_update_id: 0,
+            account_id,
+            block_number,
+            coin_id,
+            old_balance: BigDecimal::from(0u64),
+            new_balance: BigDecimal::from(MIN_NFT_TOKEN_ID),
+            old_nonce: nonce,
+            new_nonce: nonce,
+            update_order_id: update_order_id + 1,
+        };
+
+        let create_diff = StorageAccountDiff::Create(storage_account_creation);
+        let upd_balance_diff = StorageAccountDiff::BalanceUpdate(storage_balance_update);
+
+        transaction
+            .chain()
+            .state_schema()
+            .apply_storage_account_diff(create_diff)
+            .await?;
+        transaction
+            .chain()
+            .state_schema()
+            .apply_storage_account_diff(upd_balance_diff)
+            .await?;
+
+        transaction.commit().await?;
+
+        Ok(())
     }
 
     /// Returns the list of updates, and the block number such that if we apply
