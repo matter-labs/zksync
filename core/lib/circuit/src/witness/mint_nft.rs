@@ -205,12 +205,6 @@ impl Witness for MintNFTWitness<Bn256> {
     }
 }
 
-impl<E: RescueEngine> MintNFTWitness<E> {
-    pub fn get_sig_bits(&self) -> Vec<bool> {
-        unreachable!() // no reason to keep this
-    }
-}
-
 impl MintNFTWitness<Bn256> {
     fn apply_data(tree: &mut CircuitAccountTree, mint_nft: &MintNFTData) -> Self {
         let capacity = tree.capacity();
@@ -441,8 +435,6 @@ impl MintNFTWitness<Bn256> {
                 fee: Some(fee_encoded),
                 a: Some(a),
                 b: Some(b),
-                valid_until: None,
-                second_valid_from: None,
                 special_eth_addresses: vec![
                     Some(
                         recipient_account_witness_before_fifth_chunk

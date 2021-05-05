@@ -218,12 +218,6 @@ impl Witness for WithdrawNFTWitness<Bn256> {
     }
 }
 
-impl<E: RescueEngine> WithdrawNFTWitness<E> {
-    pub fn get_sig_bits(&self) -> Vec<bool> {
-        unreachable!() // no reason to keep this
-    }
-}
-
 impl WithdrawNFTWitness<Bn256> {
     fn apply_data(tree: &mut CircuitAccountTree, withdraw_nft: &WithdrawNFTData) -> Self {
         let capacity = tree.capacity();
