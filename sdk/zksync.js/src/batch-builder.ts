@@ -19,7 +19,7 @@ import { Wallet } from './wallet';
 interface InternalTx {
     type: 'Withdraw' | 'Transfer' | 'ChangePubKey' | 'ForcedExit' | 'MintNFT' | 'WithdrawNFT';
     tx: any;
-    feeType: 'Withdraw' | 'Transfer' | 'FastWithdraw' | ChangePubKeyFee | 'MintNFT' | 'WithdrawNFT';
+    feeType: 'Withdraw' | 'Transfer' | 'FastWithdraw' | ChangePubKeyFee | 'MintNFT' | 'WithdrawNFT' | 'FastWithdrawNFT';
     address: Address;
     token: TokenLike;
     // Whether or not the tx has been signed.
@@ -157,6 +157,7 @@ export class BatchBuilder {
         token: TokenLike;
         feeToken: TokenLike;
         fee?: BigNumberish;
+        fastProcessing?: boolean;
         validFrom?: number;
         validUntil?: number;
     }): BatchBuilder {
@@ -168,10 +169,11 @@ export class BatchBuilder {
             validFrom: withdrawNFT.validFrom || 0,
             validUntil: withdrawNFT.validUntil || MAX_TIMESTAMP
         };
+        const feeType = withdrawNFT.fastProcessing === true ? 'FastWithdrawNFT' : 'WithdrawNFT';
         this.txs.push({
             type: 'WithdrawNFT',
             tx: _withdrawNFT,
-            feeType: 'WithdrawNFT',
+            feeType,
             address: _withdrawNFT.to,
             token: _withdrawNFT.feeToken
         });

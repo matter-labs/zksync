@@ -76,10 +76,11 @@ Tester.prototype.testWithdrawNFT = async function (wallet: Wallet, feeToken: Tok
     let nft: any = Object.values(state.committed.nfts)[0];
 
     const balanceBefore = await wallet.getNFT(nft.id);
+    expect(balanceBefore.id == nft.id, 'Account does not have an NFT initially').to.be.true;
 
     const handle = await wallet.withdrawNFT({
         to: wallet.address(),
-        token: nft,
+        token: nft.id,
         feeToken,
         fee,
         fastProcessing
@@ -89,9 +90,7 @@ Tester.prototype.testWithdrawNFT = async function (wallet: Wallet, feeToken: Tok
     expect(receipt.success, `Withdraw transaction failed with a reason: ${receipt.failReason}`).to.be.true;
 
     const balanceAfter = await wallet.getNFT(nft.id);
-
-    expect(balanceBefore.id == nft.id, 'NFT withdraw failed').to.be.true;
-    expect(balanceAfter === undefined, 'NFT withdraw failed').to.be.true;
+    expect(balanceAfter === undefined, 'Account has an NFT after withdrawing').to.be.true;
 
     this.runningFee = this.runningFee.add(fee);
 };

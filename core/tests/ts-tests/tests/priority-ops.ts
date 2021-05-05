@@ -46,11 +46,12 @@ Tester.prototype.testFullExitNFT = async function (wallet: Wallet, accountId?: n
     let nft: any = Object.values(state.committed.nfts)[0];
 
     const balanceBefore = await wallet.getNFT(nft.id);
+    expect(balanceBefore.id == nft.id, 'Account does not have an NFT initially').to.be.true;
+
     const handle = await wallet.emergencyWithdrawNFT({ tokenId: nft.id, accountId });
     let receipt = await handle.awaitReceipt();
     expect(receipt.executed, 'NFT Full Exit was not executed').to.be.true;
-    const balanceAfter = await wallet.getNFT(nft.id);
 
-    expect(balanceBefore.id == nft.id, 'NFT Full Exit failed').to.be.true;
-    expect(balanceAfter === undefined, 'NFT Full Exit failed').to.be.true;
+    const balanceAfter = await wallet.getNFT(nft.id);
+    expect(balanceAfter === undefined, 'Account has an NFT after Full Exit').to.be.true;
 };

@@ -86,7 +86,7 @@ describe(`ZkSync integration tests (token: ${token}, transport: ${transport})`, 
     });
 
     step('should execute a mintNFT', async () => {
-        await tester.testMintNFT(alice, chuck, "0x0000000000000000000000000000000000000000000000000000000000000000", token);
+        await tester.testMintNFT(alice, chuck, '0x' + ''.padStart(64, "0"), token);
     });
 
     step('should execute a transfer to existing account', async () => {
@@ -134,6 +134,7 @@ describe(`ZkSync integration tests (token: ${token}, transport: ${transport})`, 
         await tester.testBatchBuilderChangePubKey(frank, token, TX_AMOUNT, false);
         await tester.testBatchBuilderTransfers(david, frank, token, TX_AMOUNT);
         await tester.testBatchBuilderPayInDifferentToken(frank, david, token, feeToken, TX_AMOUNT);
+        await tester.testBatchBuilderNFT(frank, david, feeToken);
         // Finally, transfer, withdraw and forced exit in a single batch.
         await tester.testBatchBuilderGenericUsage(david, frank, judy, token, TX_AMOUNT);
     });
@@ -208,11 +209,11 @@ describe(`ZkSync integration tests (token: ${token}, transport: ${transport})`, 
             carl.ethSigner = oldSigner;
         });
 
-        step('should execute nft full-exit', async () => {
+        step('should execute NFT full-exit', async () => {
             if (onlyBasic) {
                 return;
             }
-            await tester.testMintNFT(carl, carl, "0x0000000000000000000000000000000000000000000000000000000000000001", token);
+            await tester.testMintNFT(carl, carl, '0x' + '1'.padStart(64, "0"), token);
             await tester.testFullExitNFT(carl);
         });
 
