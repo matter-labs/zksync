@@ -169,8 +169,8 @@ impl Account {
                     account.nonce = new_nonce;
                     Some(account)
                 }
+                // Minting does not change the account state
                 AccountUpdate::MintNFT { .. } | AccountUpdate::RemoveNFT { .. } => Some(account),
-                // Minting do not change account state
                 _ => {
                     vlog::error!(
                         "Incorrect update received {:?} for account {:?}",

@@ -3,7 +3,6 @@ use serde::{Deserialize, Serialize};
 use sqlx::{types::BigDecimal, FromRow};
 // Workspace imports
 // Local imports
-use crate::chain::account::records::StorageNFT;
 use crate::utils::{address_to_stored_string, stored_str_address_to_address};
 use chrono::{DateTime, Utc};
 use zksync_types::tokens::{TokenMarketVolume, TokenPrice};
@@ -50,6 +49,19 @@ pub struct DbTickerPrice {
     pub last_updated: DateTime<Utc>,
 }
 
+#[derive(Debug, FromRow)]
+pub struct StorageNFT {
+    // Unique token id in zksync
+    pub token_id: i32,
+    // Counter of generated tokens for the creator
+    // Required to enforce uniqueness of address
+    pub serial_id: i32,
+    pub creator_account_id: i32,
+    pub creator_address: Vec<u8>,
+    pub address: Vec<u8>,
+    pub content_hash: Vec<u8>,
+}
+
 impl From<DbTickerPrice> for TokenPrice {
     fn from(val: DbTickerPrice) -> Self {
         Self {
@@ -64,6 +76,7 @@ impl From<StorageNFT> for NFT {
         Self {
             id: TokenId(val.token_id as u32),
             serial_id: val.serial_id as u32,
+            creator_address: Address::from_slice(val.creator_address.as_slice()),
             creator_id: AccountId(val.creator_account_id as u32),
             address: Address::from_slice(val.address.as_slice()),
             symbol: "".to_string(),

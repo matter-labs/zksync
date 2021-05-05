@@ -180,6 +180,9 @@ impl TransactionsHistoryTestSetup {
                 token: self.tokens[2].id,
             },
             withdraw_amount: Some(self.amount.clone().into()),
+            creator_account_id: None,
+            serial_id: None,
+            content_hash: None,
         }));
 
         let executed_op = ExecutedPriorityOp {

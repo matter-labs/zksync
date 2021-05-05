@@ -15,6 +15,7 @@ mod crypto_exports {
     pub use franklin_crypto;
     pub use rand;
     pub use recursive_aggregation_circuit;
+    pub use rescue_poseidon;
 }
 
 pub use crypto_exports::*;

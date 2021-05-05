@@ -223,7 +223,7 @@ impl ZkSyncState {
                 account,
                 op
             );
-            panic!("Transfer to new account exists")
+            panic!("Transfer to new account exists");
         }
 
         let mut to_account = {

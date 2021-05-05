@@ -19,7 +19,7 @@ use web3::types::{Address, BlockNumber};
 
 // Workspace deps
 use zksync_crypto::params::PRIORITY_EXPIRATION;
-use zksync_types::{NewTokenEvent, PriorityOp, ZkSyncPriorityOp};
+use zksync_types::{NewTokenEvent, PriorityOp, RegisterNFTFactoryEvent, ZkSyncPriorityOp};
 
 // Local deps
 use self::{client::EthClient, eth_state::ETHState, received_ops::sift_outdated_ops};
@@ -78,6 +78,10 @@ pub enum EthWatchRequest {
     GetNewTokens {
         last_eth_block: Option<u64>,
         resp: oneshot::Sender<Vec<NewTokenEvent>>,
+    },
+    GetRegisterNFTFactoryEvents {
+        last_eth_block: Option<u64>,
+        resp: oneshot::Sender<Vec<RegisterNFTFactoryEvent>>,
     },
 }
 
@@ -152,11 +156,21 @@ impl<W: EthClient> EthWatch<W> {
         new_tokens.sort_by_key(|token_event| token_event.id.0);
         new_tokens.dedup_by_key(|token_event| token_event.id.0);
 
+        let mut register_nft_factory_events =
+            self.eth_state.new_register_nft_factory_events().to_vec();
+        for event in updated_state.new_register_nft_factory_events() {
+            register_nft_factory_events.push(event.clone());
+        }
+        // Remove duplicates.
+        register_nft_factory_events.sort_by_key(|factory_event| factory_event.creator_address);
+        register_nft_factory_events.dedup_by_key(|factory_event| factory_event.creator_address);
+
         let new_state = ETHState::new(
             last_ethereum_block,
             updated_state.unconfirmed_queue().to_vec(),
             priority_queue,
             new_tokens,
+            register_nft_factory_events,
         );
         self.set_new_state(new_state);
         Ok(())
@@ -201,17 +215,41 @@ impl<W: EthClient> EthWatch<W> {
                 BlockNumber::Number(new_block_with_accepted_events.into()),
             )
             .await?;
+        let new_register_nft_factory_events = self
+            .client
+            .get_new_register_nft_factory_events(
+                BlockNumber::Number(previous_block_with_accepted_events.into()),
+                BlockNumber::Number(new_block_with_accepted_events.into()),
+            )
+            .await?;
 
         let new_state = ETHState::new(
             current_ethereum_block,
             unconfirmed_queue,
             priority_queue,
             new_tokens,
+            new_register_nft_factory_events,
         );
 
         Ok(new_state)
     }
 
+    fn get_register_factory_event(
+        &self,
+        last_block_number: Option<u64>,
+    ) -> Vec<RegisterNFTFactoryEvent> {
+        let mut events = self.eth_state.new_register_nft_factory_events().to_vec();
+
+        if let Some(last_block_number) = last_block_number {
+            events = events
+                .iter()
+                .filter(|event| event.eth_block > last_block_number)
+                .cloned()
+                .collect();
+        }
+
+        events
+    }
     fn get_new_tokens(&self, last_block_number: Option<u64>) -> Vec<NewTokenEvent> {
         let mut new_tokens = self.eth_state.new_tokens().to_vec();
 
@@ -404,6 +442,13 @@ impl<W: EthClient> EthWatch<W> {
                     resp,
                 } => {
                     resp.send(self.get_new_tokens(last_eth_block)).ok();
+                }
+                EthWatchRequest::GetRegisterNFTFactoryEvents {
+                    last_eth_block,
+                    resp,
+                } => {
+                    resp.send(self.get_register_factory_event(last_eth_block))
+                        .ok();
                 }
             }
         }

@@ -431,6 +431,8 @@ async fn test_run_state_update(mut storage: StorageProcessor<'_>) {
 }
 
 #[tokio::test]
+#[ignore]
+// Fix FullExit (ZKS-657)
 async fn test_with_inmemory_storage() {
     let mut transport = Web3Transport::new();
 

@@ -83,7 +83,7 @@ impl Order {
 
 impl Swap {
     /// Unique identifier of the transaction type in zkSync network.
-    pub const TX_TYPE: u8 = 10;
+    pub const TX_TYPE: u8 = 11;
 
     /// Creates transaction from all the required fields.
     ///

@@ -8,7 +8,7 @@ use zksync_types::{
     helpers::reverse_updates,
     operations::{TransferOp, TransferToNewOp, ZkSyncOp},
     Account, AccountId, AccountMap, AccountTree, AccountUpdate, AccountUpdates, Address,
-    BlockNumber, SignedZkSyncTx, TokenId, ZkSyncPriorityOp, ZkSyncTx,
+    BlockNumber, SignedZkSyncTx, TokenId, ZkSyncPriorityOp, ZkSyncTx, NFT,
 };
 
 use crate::handler::TxHandler;
@@ -26,6 +26,8 @@ pub struct ZkSyncState {
     balance_tree: AccountTree,
 
     account_id_by_address: HashMap<Address, AccountId>,
+
+    pub nfts: HashMap<TokenId, NFT>,
 
     /// Current block number
     pub block_number: BlockNumber,
@@ -70,6 +72,7 @@ impl ZkSyncState {
             block_number: BlockNumber(0),
             account_id_by_address: HashMap::new(),
             next_free_id: AccountId(0),
+            nfts: HashMap::new(),
         }
     }
 
@@ -95,6 +98,7 @@ impl ZkSyncState {
         balance_tree: AccountTree,
         account_id_by_address: HashMap<Address, AccountId>,
         current_block: BlockNumber,
+        nfts: HashMap<TokenId, NFT>,
     ) -> Self {
         let mut next_free_id = 0;
         for index in balance_tree.items.keys() {
@@ -108,6 +112,7 @@ impl ZkSyncState {
             block_number: current_block,
             account_id_by_address,
             next_free_id: AccountId(next_free_id as u32),
+            nfts,
         }
     }
 
@@ -281,8 +286,12 @@ impl ZkSyncState {
                     account.nonce = new_nonce;
                     self.insert_account(account_id, account);
                 }
-                AccountUpdate::RemoveNFT { .. } => {}
-                AccountUpdate::MintNFT { .. } => {} // NFT does not affect zksync state
+                AccountUpdate::RemoveNFT { token } => {
+                    self.nfts.insert(token.id, token);
+                }
+                AccountUpdate::MintNFT { token } => {
+                    self.nfts.remove(&token.id);
+                }
             }
         }
     }
@@ -336,6 +345,7 @@ impl ZkSyncState {
             ZkSyncTx::ForcedExit(tx) => self.apply_tx(*tx),
             ZkSyncTx::Swap(tx) => self.apply_tx(*tx),
             ZkSyncTx::MintNFT(tx) => self.apply_tx(*tx),
+            ZkSyncTx::WithdrawNFT(tx) => self.apply_tx(*tx),
         }
     }
 
@@ -418,6 +428,7 @@ impl ZkSyncState {
             ZkSyncTx::ForcedExit(tx) => self.create_op(*tx).map(Into::into),
             ZkSyncTx::Swap(tx) => self.create_op(*tx).map(Into::into),
             ZkSyncTx::MintNFT(tx) => self.create_op(*tx).map(Into::into),
+            ZkSyncTx::WithdrawNFT(tx) => self.create_op(*tx).map(Into::into),
         }
     }
 
@@ -489,8 +500,12 @@ impl ZkSyncState {
 
                     self.insert_account(*account_id, account);
                 }
-                AccountUpdate::MintNFT { .. } => {}
-                AccountUpdate::RemoveNFT { .. } => {}
+                AccountUpdate::MintNFT { token } => {
+                    self.nfts.insert(token.id, token.clone());
+                }
+                AccountUpdate::RemoveNFT { token } => {
+                    self.nfts.remove(&token.id);
+                }
             }
         }
     }
@@ -1041,7 +1056,12 @@ mod tests {
         account_id_by_address.insert(random_addresses[3], AccountId(8));
         account_id_by_address.insert(random_addresses[4], AccountId(9));
 
-        let state = ZkSyncState::new(balance_tree, account_id_by_address, BlockNumber(5));
+        let state = ZkSyncState::new(
+            balance_tree,
+            account_id_by_address,
+            BlockNumber(5),
+            HashMap::new(),
+        );
         assert_eq!(*state.next_free_id, 10);
     }
 

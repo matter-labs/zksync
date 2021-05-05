@@ -1125,7 +1125,7 @@ impl TestSetup {
         account_map
     }
 
-    pub fn gen_exit_proof(
+    pub fn gen_exit_proof_fungible(
         &self,
         accounts: AccountMap,
         fund_owner: ZKSyncAccountId,
@@ -1136,7 +1136,7 @@ impl TestSetup {
             .get_account_id()
             .expect("Account should have id to exit");
         // restore account state
-        zksync_prover_utils::exit_proof::create_exit_proof(
+        zksync_prover_utils::exit_proof::create_exit_proof_fungible(
             accounts,
             owner_id,
             owner.address,

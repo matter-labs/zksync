@@ -399,7 +399,7 @@ export class Wallet {
             symbol: transfer.token.symbol
         };
 
-        return await this.syncMultiTransfer([txFee, txNFT]);
+        return await this.syncMultiTransfer([txNFT, txFee]);
     }
 
     async syncTransfer(transfer: {
@@ -506,6 +506,7 @@ export class Wallet {
             ethereumSignature
         };
     }
+
     async signWithdrawFromSyncToEthereum(withdraw: {
         ethAddress: string;
         token: TokenLike;
@@ -797,6 +798,26 @@ export class Wallet {
             pubKeyHash: changePubKey.pubKeyHash,
             stringToken,
             stringFee
+        });
+    }
+
+    getMintNFTMessagePart(mintNFT: {
+        recipient: string;
+        contentHash: string;
+        feeToken: TokenLike;
+        fee: BigNumberish;
+        nonce: number;
+    }): string {
+        const stringFee = BigNumber.from(mintNFT.fee).isZero()
+            ? null
+            : this.provider.tokenSet.formatToken(mintNFT.feeToken, mintNFT.fee);
+        const stringToken = this.provider.tokenSet.resolveTokenSymbol(mintNFT.feeToken);
+        return this.ethMessageSigner.getMintEthEthSignMessage({
+            stringToken,
+            stringFee,
+            recipient: mintNFT.recipient,
+            contentHash: mintNFT.contentHash,
+            nonce: mintNFT.nonce
         });
     }
 

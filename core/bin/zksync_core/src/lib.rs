@@ -22,6 +22,7 @@ pub mod committer;
 pub mod eth_watch;
 pub mod mempool;
 pub mod private_api;
+pub mod register_factory_handler;
 pub mod rejected_tx_cleaner;
 pub mod state_keeper;
 pub mod token_handler;

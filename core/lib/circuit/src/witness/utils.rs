@@ -27,7 +27,8 @@ use zksync_state::state::CollectedFee;
 use zksync_types::{
     block::Block,
     operations::{
-        ChangePubKeyOp, CloseOp, ForcedExitOp, MintNFTOp, TransferOp, TransferToNewOp, WithdrawOp,
+        ChangePubKeyOp, CloseOp, ForcedExitOp, MintNFTOp, TransferOp, TransferToNewOp,
+        WithdrawNFTOp, WithdrawOp,
     },
     tx::PackedPublicKey,
     AccountId, BlockNumber, ZkSyncOp,
@@ -35,8 +36,8 @@ use zksync_types::{
 // Local deps
 use crate::witness::{
     ChangePubkeyOffChainWitness, CloseAccountWitness, DepositWitness, ForcedExitWitness,
-    FullExitWitness, MintNFTWitness, TransferToNewWitness, TransferWitness, WithdrawWitness,
-    Witness,
+    FullExitWitness, MintNFTWitness, TransferToNewWitness, TransferWitness, WithdrawNFTWitness,
+    WithdrawWitness, Witness,
 };
 use crate::{
     account::AccountWitness,
@@ -638,6 +639,20 @@ impl SigDataInput {
         )
     }
 
+    pub fn from_withdraw_nft_op(withdraw_nft_op: &WithdrawNFTOp) -> Result<Self, anyhow::Error> {
+        let sign_packed = withdraw_nft_op
+            .tx
+            .signature
+            .signature
+            .serialize_packed()
+            .expect("signature serialize");
+        SigDataInput::new(
+            &sign_packed,
+            &withdraw_nft_op.tx.get_bytes(),
+            &withdraw_nft_op.tx.signature.pub_key,
+        )
+    }
+
     /// Provides a vector of copies of this `SigDataInput` object, all with one field
     /// set to incorrect value.
     /// Used for circuit tests.
@@ -849,6 +864,21 @@ pub fn build_block_witness<'a>(
                 });
                 pub_data.extend(mint_nft_witness.get_pubdata());
                 offset_commitment.extend(mint_nft_witness.get_offset_commitment_data())
+            }
+            ZkSyncOp::WithdrawNFT(withdraw_nft) => {
+                let withdraw_nft_witness =
+                    WithdrawNFTWitness::apply_tx(&mut witness_accum.account_tree, &withdraw_nft);
+
+                let input = SigDataInput::from_withdraw_nft_op(&withdraw_nft)?;
+                let withdraw_nft_operations = withdraw_nft_witness.calculate_operations(input);
+
+                operations.extend(withdraw_nft_operations);
+                fees.push(CollectedFee {
+                    token: withdraw_nft.tx.fee_token,
+                    amount: withdraw_nft.tx.fee,
+                });
+                pub_data.extend(withdraw_nft_witness.get_pubdata());
+                offset_commitment.extend(withdraw_nft_witness.get_offset_commitment_data())
             }
         }
     }
