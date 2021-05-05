@@ -254,8 +254,8 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
     function withdrawPendingNFTBalance(uint32 _tokenId) external nonReentrant {
         require(_tokenId > MAX_FUNGIBLE_TOKEN_ID, "oq"); // Withdraw only nft tokens
         Operations.WithdrawNFT memory op = pendingWithdrawnNFTs[_tokenId];
-        require(_tokenId == op.tokenId, "op"); // Token dose not exists
-        require(op.creator != address(0x0), "op"); // Token dose not exists
+        require(_tokenId == op.tokenId, "op"); // Token does not exists
+        require(op.creator != address(0x0), "op"); // Token does not exists
         NFTFactory _factory = governance.getNFTFactory(op.creator);
         _factory.mintNFT(op.creator, op.owner, op.contentHash, op.tokenId);
         delete pendingWithdrawnNFTs[_tokenId];
@@ -440,24 +440,23 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
 
             if (opType == Operations.OpType.PartialExit) {
                 Operations.PartialExit memory op = Operations.readPartialExitPubdata(pubData);
-                require(op.tokenId <= MAX_FUNGIBLE_TOKEN_ID, "w");
                 withdrawOrStore(uint16(op.tokenId), op.owner, op.amount);
             } else if (opType == Operations.OpType.ForcedExit) {
                 Operations.ForcedExit memory op = Operations.readForcedExitPubdata(pubData);
-                require(op.tokenId <= MAX_FUNGIBLE_TOKEN_ID, "w");
                 withdrawOrStore(uint16(op.tokenId), op.target, op.amount);
             } else if (opType == Operations.OpType.FullExit) {
                 Operations.FullExit memory op = Operations.readFullExitPubdata(pubData);
                 if (op.tokenId <= MAX_FUNGIBLE_TOKEN_ID) {
                     withdrawOrStore(uint16(op.tokenId), op.owner, op.amount);
                 } else {
-                    Operations.WithdrawNFT memory nftOp =
-                        Operations.WithdrawNFT(op.nftCreatorAddress, op.nftContentHash, op.owner, op.tokenId);
-                    withdrawNFT(nftOp);
+                    if (op.amount == 1) {
+                        Operations.WithdrawNFT memory nftOp =
+                            Operations.WithdrawNFT(op.nftCreatorAddress, op.nftContentHash, op.owner, op.tokenId);
+                        withdrawNFT(nftOp);
+                    }
                 }
             } else if (opType == Operations.OpType.WithdrawNFT) {
                 Operations.WithdrawNFT memory op = Operations.readWithdrawNFTPubdata(pubData);
-                require(op.tokenId > MAX_FUNGIBLE_TOKEN_ID, "wn"); // MUST be one of the NFTs
                 withdrawNFT(op);
             } else {
                 revert("l"); // unsupported op in block execution
