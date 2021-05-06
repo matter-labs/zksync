@@ -1479,6 +1479,12 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
             ],
         )?;
 
+        let full_amount_equals_to_zero = CircuitElement::equals(
+            cs.namespace(|| "full_amount_equals_to_zero"),
+            &op_data.full_amount,
+            &global_variables.explicit_zero,
+        )?;
+
         let first_chunk_valid = {
             let mut flags = vec![common_valid.clone(), is_chunk_with_index[0].clone()];
 
@@ -1522,11 +1528,6 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
 
             flags.push(is_special_nft_storage_account.clone());
 
-            let full_amount_equals_to_zero = CircuitElement::equals(
-                cs.namespace(|| "full_amount_equals_to_zero"),
-                &op_data.full_amount,
-                &global_variables.explicit_zero,
-            )?;
             let is_nft_stored_content_valid = CircuitElement::equals(
                 cs.namespace(|| "is_nft_stored_content_valid"),
                 &nft_content_as_balance,
@@ -1535,7 +1536,7 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
             flags.push(multi_or(
                 cs.namespace(|| "is_nft_content_correct"),
                 &[
-                    full_amount_equals_to_zero,
+                    full_amount_equals_to_zero.clone(),
                     is_nft_stored_content_valid,
                     is_fungible_token.clone(),
                 ],
@@ -1553,12 +1554,20 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
                 &cur.account_id,
             )?;
             flags.push(is_creator_account);
+
             let creator_address_valid = CircuitElement::equals(
                 cs.namespace(|| "creator_address_valid"),
                 &op_data.special_eth_addresses[0],
                 &cur.account.address,
             )?;
-            flags.push(creator_address_valid);
+            flags.push(multi_or(
+                cs.namespace(|| "is_creator_address_correct"),
+                &[
+                    full_amount_equals_to_zero,
+                    creator_address_valid,
+                    is_fungible_token.clone(),
+                ],
+            )?);
 
             multi_and(cs.namespace(|| "third_chunk_valid"), &flags)?
         };

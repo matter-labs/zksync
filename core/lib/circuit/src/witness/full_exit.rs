@@ -37,6 +37,7 @@ pub struct FullExitData {
     pub eth_address: Fr,
     pub full_exit_amount: Fr,
     pub creator_account_id: u32,
+    pub creator_account_address: Fr,
     pub nft_serial_id: u32,
     pub content_hash: H256,
 }
@@ -70,6 +71,9 @@ impl Witness for FullExitWitness<Bn256> {
                 .map(|amount| Fr::from_str(&amount.0.to_string()).unwrap())
                 .unwrap_or_else(Fr::zero),
             creator_account_id: full_exit.creator_account_id.unwrap_or_default().0,
+            creator_account_address: eth_address_to_fr(
+                &full_exit.creator_address.unwrap_or_default(),
+            ),
             nft_serial_id: full_exit.serial_id.unwrap_or_default(),
             content_hash: full_exit.content_hash.unwrap_or_default(),
         };
@@ -355,11 +359,7 @@ impl FullExitWitness<Bn256> {
                 valid_from: Some(Fr::zero()),
                 valid_until: Some(Fr::from_str(&u32::MAX.to_string()).unwrap()),
 
-                special_eth_addresses: vec![Some(
-                    creator_account_witness
-                        .address
-                        .expect("creator account should not be empty"),
-                )],
+                special_eth_addresses: vec![Some(full_exit.creator_account_address)],
                 special_tokens: vec![Some(Fr::zero()), Some(Fr::zero())],
                 special_account_ids: vec![Some(creator_account_id_fe), Some(account_address_fe)],
                 special_content_hash: content_hash_as_vec,
