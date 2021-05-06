@@ -137,14 +137,13 @@ describe(`ZkSync integration tests (token: ${token}, transport: ${transport})`, 
         await tester.testBatchBuilderGenericUsage(david, frank, judy, token, TX_AMOUNT);
     });
 
-    step('should perform a swap', async () => {
+    step('should test swaps and limit orders', async () => {
         if (onlyBasic) {
             return;
         }
         const secondToken = token == 'ETH' ? 'wBTC' : 'ETH';
-        await tester.testDeposit(chuck, secondToken, DEPOSIT_AMOUNT);
-        await tester.testSwap(alice, chuck, token, secondToken, TX_AMOUNT);
-        await tester.testSwapBatch(alice, chuck, frank, token, secondToken, TX_AMOUNT);
+        await tester.testSwap(alice, frank, token, secondToken, TX_AMOUNT);
+        await tester.testSwapBatch(alice, frank, david, token, secondToken, TX_AMOUNT);
     });
 
     step('should test multi-signers', async () => {

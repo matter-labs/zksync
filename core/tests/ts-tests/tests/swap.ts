@@ -33,8 +33,8 @@ Tester.prototype.testSwap = async function (
     amount: BigNumber
 ) {
     const { totalFee: fee } = await this.syncProvider.getTransactionFee('Swap', walletA.address(), tokenA);
-    const balanceABefore = (await this.syncProvider.getState(walletA.address())).committed.balances;
-    const balanceBBefore = (await this.syncProvider.getState(walletB.address())).committed.balances;
+    const stateABefore = (await this.syncProvider.getState(walletA.address())).committed;
+    const stateBBefore = (await this.syncProvider.getState(walletB.address())).committed;
 
     const orderA = await walletA.getOrder({
         tokenSell: tokenA,
@@ -65,22 +65,26 @@ Tester.prototype.testSwap = async function (
     const receipt = await swap.awaitReceipt();
     expect(receipt.success, `Swap transaction failed with a reason: ${receipt.failReason}`).to.be.true;
 
-    const balanceAAfter = (await this.syncProvider.getState(walletA.address())).committed.balances;
-    const balanceBAfter = (await this.syncProvider.getState(walletB.address())).committed.balances;
+    const stateAAfter = (await this.syncProvider.getState(walletA.address())).committed;
+    const stateBAfter = (await this.syncProvider.getState(walletB.address())).committed;
 
     const diffA = {
-        tokenA: BigNumber.from(balanceABefore[tokenA] || 0).sub(balanceAAfter[tokenA] || 0),
-        tokenB: BigNumber.from(balanceAAfter[tokenB] || 0).sub(balanceABefore[tokenB] || 0)
+        tokenA: BigNumber.from(stateABefore.balances[tokenA] || 0).sub(stateAAfter.balances[tokenA] || 0),
+        tokenB: BigNumber.from(stateAAfter.balances[tokenB] || 0).sub(stateABefore.balances[tokenB] || 0),
+        nonce: stateAAfter.nonce - stateABefore.nonce
     };
     const diffB = {
-        tokenB: BigNumber.from(balanceBBefore[tokenB] || 0).sub(balanceBAfter[tokenB] || 0),
-        tokenA: BigNumber.from(balanceBAfter[tokenA] || 0).sub(balanceBBefore[tokenA] || 0)
+        tokenB: BigNumber.from(stateBBefore.balances[tokenB] || 0).sub(stateBAfter.balances[tokenB] || 0),
+        tokenA: BigNumber.from(stateBAfter.balances[tokenA] || 0).sub(stateBBefore.balances[tokenA] || 0),
+        nonce: stateBAfter.nonce - stateBBefore.nonce
     };
 
     expect(diffA.tokenA.eq(amount.add(fee)), 'Wrong amount after swap (walletA, tokenA)').to.be.true;
     expect(diffA.tokenB.eq(amount.mul(2)), 'Wrong amount after swap (walletA, tokenB)').to.be.true;
     expect(diffB.tokenB.eq(amount.mul(2)), 'Wrong amount after swap (walletB, tokenB)').to.be.true;
     expect(diffB.tokenA.eq(amount), 'Wrong amount after swap (walletB, tokenA)').to.be.true;
+    expect(diffA.nonce, 'Wrong nonce after swap (wallet A)').to.eq(1);
+    expect(diffB.nonce, 'Wrong nonce after swap (wallet B)').to.eq(1);
 
     this.runningFee = this.runningFee.add(fee);
 };
@@ -93,6 +97,9 @@ Tester.prototype.testSwapBatch = async function (
     tokenB: TokenLike,
     amount: BigNumber
 ) {
+    const nonceBefore = await walletA.getNonce();
+
+    // these are limit orders, so they can be reused
     const orderA = await walletA.getOrder({
         tokenSell: tokenA,
         tokenBuy: tokenB,
@@ -127,6 +134,9 @@ Tester.prototype.testSwapBatch = async function (
 
     const handles = await wallet.submitSignedTransactionsBatch(this.syncProvider, batch.txs, [batch.signature]);
     await Promise.all(handles.map((handle) => handle.awaitReceipt()));
+
+    const nonceAfter = await walletA.getNonce();
+    expect(nonceAfter, 'Nonce should not increase after limit order is partially filled').to.eq(nonceBefore);
 
     this.runningFee = this.runningFee.add(batch.totalFee.get(tokenA) || 0);
 };
