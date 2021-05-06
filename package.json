@@ -6,6 +6,7 @@
   "workspaces": {
     "packages": [
       "sdk/zksync.js",
+      "sdk/zksync-crypto",
       "contracts",
       "infrastructure/zcli",
       "infrastructure/explorer",
@@ -25,6 +26,7 @@
   },
   "scripts": {
     "zksync": "yarn workspace zksync",
+    "crypto": "yarn workspace zksync-crypto",
     "contracts": "yarn workspace franklin-contracts",
     "zcli": "yarn workspace zcli",
     "ts-tests": "yarn workspace ts-tests",
