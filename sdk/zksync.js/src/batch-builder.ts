@@ -7,7 +7,8 @@ import {
     ChangePubKeyFee,
     SignedTransaction,
     TxEthSignature,
-    ChangePubkeyTypes
+    ChangePubkeyTypes,
+    Order
 } from './types';
 import { MAX_TIMESTAMP } from './utils';
 import { Wallet } from './wallet';
@@ -16,9 +17,9 @@ import { Wallet } from './wallet';
  * Used by `BatchBuilder` to store transactions until the `build()` call.
  */
 interface InternalTx {
-    type: 'Withdraw' | 'Transfer' | 'ChangePubKey' | 'ForcedExit';
+    type: 'Swap' | 'Withdraw' | 'Transfer' | 'ChangePubKey' | 'ForcedExit';
     tx: any;
-    feeType: 'Withdraw' | 'Transfer' | 'FastWithdraw' | ChangePubKeyFee;
+    feeType: 'Swap' | 'Withdraw' | 'Transfer' | 'FastWithdraw' | ChangePubKeyFee;
     address: Address;
     token: TokenLike;
     // Whether or not the tx has been signed.
@@ -29,14 +30,13 @@ interface InternalTx {
 type TotalFee = Map<TokenLike, BigNumber>;
 
 /**
- * Provides iterface for constructing batches of transactions.
+ * Provides interface for constructing batches of transactions.
  */
 export class BatchBuilder {
     private constructor(private wallet: Wallet, private nonce: Nonce, private txs: InternalTx[] = []) {}
 
     static fromWallet(wallet: Wallet, nonce?: Nonce): BatchBuilder {
-        const batchBuilder = new BatchBuilder(wallet, nonce, []);
-        return batchBuilder;
+        return new BatchBuilder(wallet, nonce, []);
     }
 
     /**
@@ -123,9 +123,32 @@ export class BatchBuilder {
         this.txs.push({
             type: 'Withdraw',
             tx: _withdraw,
-            feeType: feeType,
+            feeType,
             address: _withdraw.ethAddress,
             token: _withdraw.token
+        });
+        return this;
+    }
+
+    addSwap(swap: {
+        orders: [Order, Order];
+        amounts: [BigNumberish, BigNumberish];
+        feeToken: TokenLike;
+        fee?: BigNumberish;
+    }): BatchBuilder {
+        const _swap = {
+            orders: swap.orders,
+            amounts: swap.amounts,
+            nonce: null,
+            fee: swap.fee || 0,
+            feeToken: swap.feeToken
+        };
+        this.txs.push({
+            type: 'Swap',
+            tx: _swap,
+            feeType: 'Swap',
+            address: this.wallet.address(),
+            token: swap.feeToken
         });
         return this;
     }
@@ -273,6 +296,11 @@ export class BatchBuilder {
                     messages.push(this.wallet.getForcedExitEthMessagePart(tx.tx));
                     const forcedExit = { tx: await this.wallet.getForcedExit(tx.tx) };
                     processedTxs.push(forcedExit);
+                    break;
+                case 'Swap':
+                    messages.push(this.wallet.getSwapEthSignMessagePart(tx.tx));
+                    const swap = { tx: await this.wallet.getSwap(tx.tx) };
+                    processedTxs.push(swap);
                     break;
             }
         }

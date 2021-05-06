@@ -788,6 +788,20 @@ export class Wallet {
         });
     }
 
+    getSwapEthSignMessagePart(swap: {
+        fee: BigNumberish;
+        feeToken: TokenLike;
+    }): string {
+        const stringFee = BigNumber.from(swap.fee).isZero()
+            ? null
+            : this.provider.tokenSet.formatToken(swap.feeToken, swap.fee);
+        const stringToken = this.provider.tokenSet.resolveTokenSymbol(swap.feeToken);
+        return this.ethMessageSigner.getSwapEthSignMessagePart({
+            fee: stringFee,
+            feeToken: stringToken
+        });
+    }
+
     getForcedExitEthMessagePart(forcedExit: {
         target: Address;
         token: TokenLike;
