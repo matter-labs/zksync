@@ -60,30 +60,19 @@ Tester.prototype.testSwap = async function (
     const balanceAAfter = (await this.syncProvider.getState(walletA.address())).committed.balances;
     const balanceBAfter = (await this.syncProvider.getState(walletB.address())).committed.balances;
 
-    expect(
-        BigNumber.from(balanceABefore[tokenA] || 0)
-            .sub(balanceAAfter[tokenA] || 0)
-            .eq(amount.add(fee)),
-        'Wrong amount in wallet after swap'
-    ).to.be.true;
-    expect(
-        BigNumber.from(balanceAAfter[tokenB] || 0)
-            .sub(balanceABefore[tokenB] || 0)
-            .eq(amount.mul(2)),
-        'Wrong amount in wallet after swap'
-    ).to.be.true;
-    expect(
-        BigNumber.from(balanceBBefore[tokenB] || 0)
-            .sub(balanceBAfter[tokenB] || 0)
-            .eq(amount.mul(2)),
-        'Wrong amount in wallet after swap'
-    ).to.be.true;
-    expect(
-        BigNumber.from(balanceBAfter[tokenA] || 0)
-            .sub(balanceBBefore[tokenA] || 0)
-            .eq(amount),
-        'Wrong amount in wallet after swap'
-    ).to.be.true;
+    const diffA = {
+        tokenA: BigNumber.from(balanceABefore[tokenA] || 0).sub(balanceAAfter[tokenA] || 0),
+        tokenB: BigNumber.from(balanceAAfter[tokenB] || 0).sub(balanceABefore[tokenB] || 0)
+    };
+    const diffB = {
+        tokenB: BigNumber.from(balanceBBefore[tokenB] || 0).sub(balanceBAfter[tokenB] || 0),
+        tokenA: BigNumber.from(balanceBAfter[tokenA] || 0).sub(balanceBBefore[tokenA] || 0)
+    };
+
+    expect(diffA.tokenA.eq(amount.add(fee)), 'Wrong amount after swap (walletA, tokenA)').to.be.true;
+    expect(diffA.tokenB.eq(amount.mul(2)), 'Wrong amount after swap (walletA, tokenB)').to.be.true;
+    expect(diffB.tokenB.eq(amount.mul(2)), 'Wrong amount after swap (walletB, tokenB)').to.be.true;
+    expect(diffB.tokenA.eq(amount), 'Wrong amount in swap (walletB, tokenA)').to.be.true;
 
     this.runningFee = this.runningFee.add(fee);
 };

@@ -124,6 +124,8 @@ pub fn rescue_hash_tx_msg(msg: &[u8]) -> Vec<u8> {
     utils::rescue_hash_tx_msg(msg)
 }
 
+/// `msg` should be represented by 2 concatenated
+/// serialized orders of the swap transaction
 #[wasm_bindgen(js_name = "rescueHashOrders")]
 pub fn rescue_hash_orders(msg: &[u8]) -> Vec<u8> {
     utils::rescue_hash_orders(msg)
