@@ -311,7 +311,6 @@ impl WithdrawNFTWitness<Bn256> {
                 bal.value.sub_assign(&Fr::from_str("1").unwrap());
             },
         );
-        assert_eq!(token_balance_before_second_chunk, Fr::one());
 
         let (
             _audit_initiator_account_after_second_chunk,

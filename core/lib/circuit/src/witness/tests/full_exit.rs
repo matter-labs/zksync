@@ -43,6 +43,7 @@ fn test_full_exit_success() {
         },
         withdraw_amount: Some(BigUint::from(10u32).into()),
         creator_account_id: None,
+        creator_address: None,
         serial_id: None,
         content_hash: None,
     };
@@ -103,6 +104,7 @@ fn apply_nft_mint_and_full_exit_nft_operations() -> ZkSyncCircuit<'static, Bn256
         },
         withdraw_amount: Some(BigUint::from(1u32).into()),
         creator_account_id: Some(mint_nft_op.creator_account_id),
+        creator_address: Some(accounts[0].account.address),
         serial_id: Some(0),
         content_hash: Some(mint_nft_op.tx.content_hash),
     };
@@ -255,6 +257,7 @@ fn test_full_exit_failure_no_account_in_tree() {
         },
         withdraw_amount: None,
         creator_account_id: None,
+        creator_address: None,
         serial_id: None,
         content_hash: None,
     };
@@ -289,6 +292,7 @@ fn test_full_exit_initialted_from_wrong_account_owner() {
         },
         withdraw_amount: Some(BigUint::from(0u32).into()),
         creator_account_id: None,
+        creator_address: None,
         serial_id: None,
         content_hash: None,
     };
@@ -334,6 +338,7 @@ fn test_incorrect_full_exit_withdraw_amount() {
             },
             withdraw_amount: Some(BigUint::from(withdraw_amount).into()),
             creator_account_id: None,
+            creator_address: None,
             serial_id: None,
             content_hash: None,
         };
