@@ -594,9 +594,9 @@ impl TestSetup {
             self.accounts
                 .mint_nft(creator, recipient, fee_token, content_hash, fee, None, true);
 
-        // self.expected_changes_for_current_block
-        //     .sync_accounts_state
-        //     .insert((recipient, TokenId(token_id + 1)), BigUint::from(1u32));
+        self.expected_changes_for_current_block
+            .sync_accounts_state
+            .insert((recipient, TokenId(token_id + 1)), BigUint::from(1u32));
 
         self.execute_tx(mint_nft).await;
     }

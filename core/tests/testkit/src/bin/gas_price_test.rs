@@ -11,14 +11,14 @@
 use crate::eth_account::EthereumAccount;
 use crate::external_commands::{deploy_contracts, get_test_accounts};
 use crate::zksync_account::ZkSyncAccount;
-use num::{rational::Ratio, traits::Pow, BigInt, BigUint, ToPrimitive};
+use num::{rational::Ratio, traits::Pow, BigInt, BigUint};
 use std::ops::Mul;
 use std::str::FromStr;
 use web3::transports::Http;
 use web3::types::{H256, U256};
 use zksync_crypto::params::{
     AMOUNT_EXPONENT_BIT_WIDTH, AMOUNT_MANTISSA_BIT_WIDTH, FEE_EXPONENT_BIT_WIDTH,
-    FEE_MANTISSA_BIT_WIDTH, NFT_STORAGE_ACCOUNT_ID, NFT_TOKEN_ID,
+    FEE_MANTISSA_BIT_WIDTH,
 };
 use zksync_crypto::rand::{Rng, SeedableRng, XorShiftRng};
 use zksync_crypto::{priv_key_from_fs, rand};
@@ -286,51 +286,51 @@ async fn gas_price_test() {
         println!();
     }
 
-    // commit_cost_of_deposits(&mut test_setup, 100, Token(TokenId(0)), rng)
-    //     .await
-    //     .report(&base_cost, "deposit ETH", true);
-    // commit_cost_of_deposits(&mut test_setup, 50, Token(TokenId(1)), rng)
-    //     .await
-    //     .report(&base_cost, "deposit ERC20", true);
-    //
-    // commit_cost_of_create2_change_pubkey(&mut test_setup, 50)
-    //     .await
-    //     .report(&base_cost, "create2 change pubkey", false);
-    //
-    // commit_cost_of_onchain_change_pubkey(&mut test_setup, 50)
-    //     .await
-    //     .report(&base_cost, "onchain change pubkey", false);
+    commit_cost_of_deposits(&mut test_setup, 100, Token(TokenId(0)), rng)
+        .await
+        .report(&base_cost, "deposit ETH", true);
+    commit_cost_of_deposits(&mut test_setup, 50, Token(TokenId(1)), rng)
+        .await
+        .report(&base_cost, "deposit ERC20", true);
+
+    commit_cost_of_create2_change_pubkey(&mut test_setup, 50)
+        .await
+        .report(&base_cost, "create2 change pubkey", false);
+
+    commit_cost_of_onchain_change_pubkey(&mut test_setup, 50)
+        .await
+        .report(&base_cost, "onchain change pubkey", false);
     commit_cost_of_mint_nft(&mut test_setup, 40, rng)
         .await
         .report(&base_cost, "Mint nft cost", false);
 
-    // commit_cost_of_withdrawals_nft(&mut test_setup, 40, rng)
-    //     .await
-    //     .report(&base_cost, "withdrawals NFT", false);
-    //
-    // commit_cost_of_change_pubkey(&mut test_setup, 50)
-    //     .await
-    //     .report(&base_cost, "change pubkey", false);
-    //
-    // commit_cost_of_transfers(&mut test_setup, 500, rng)
-    //     .await
-    //     .report(&base_cost, "transfer", false);
-    // commit_cost_of_transfers_to_new(&mut test_setup, 500, rng)
-    //     .await
-    //     .report(&base_cost, "transfer to new", false);
-    // commit_cost_of_full_exits(&mut test_setup, 100, Token(TokenId(0)))
-    //     .await
-    //     .report(&base_cost, "full exit ETH", true);
-    // commit_cost_of_full_exits(&mut test_setup, 100, Token(TokenId(1)))
-    //     .await
-    //     .report(&base_cost, "full exit ERC20", true);
-    //
-    // commit_cost_of_withdrawals(&mut test_setup, 40, Token(TokenId(0)), rng)
-    //     .await
-    //     .report(&base_cost, "withdrawals ETH", false);
-    // commit_cost_of_withdrawals(&mut test_setup, 40, Token(TokenId(1)), rng)
-    //     .await
-    //     .report(&base_cost, "withdrawals ERC20", false);
+    commit_cost_of_withdrawals_nft(&mut test_setup, 40, rng)
+        .await
+        .report(&base_cost, "withdrawals NFT", false);
+
+    commit_cost_of_change_pubkey(&mut test_setup, 50)
+        .await
+        .report(&base_cost, "change pubkey", false);
+
+    commit_cost_of_transfers(&mut test_setup, 500, rng)
+        .await
+        .report(&base_cost, "transfer", false);
+    commit_cost_of_transfers_to_new(&mut test_setup, 500, rng)
+        .await
+        .report(&base_cost, "transfer to new", false);
+    commit_cost_of_full_exits(&mut test_setup, 100, Token(TokenId(0)))
+        .await
+        .report(&base_cost, "full exit ETH", true);
+    commit_cost_of_full_exits(&mut test_setup, 100, Token(TokenId(1)))
+        .await
+        .report(&base_cost, "full exit ERC20", true);
+
+    commit_cost_of_withdrawals(&mut test_setup, 40, Token(TokenId(0)), rng)
+        .await
+        .report(&base_cost, "withdrawals ETH", false);
+    commit_cost_of_withdrawals(&mut test_setup, 40, Token(TokenId(1)), rng)
+        .await
+        .report(&base_cost, "withdrawals ERC20", false);
 
     stop_state_keeper_sender.send(()).expect("sk stop send");
     sk_thread_handle.join().expect("sk thread join");
