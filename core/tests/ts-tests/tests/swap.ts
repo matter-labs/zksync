@@ -1,6 +1,6 @@
 import { Tester } from './tester';
 import { expect } from 'chai';
-import { Wallet, types, utils } from 'zksync';
+import { Wallet, types, utils, wallet } from 'zksync';
 import { BigNumber } from 'ethers';
 
 type TokenLike = types.TokenLike;
@@ -10,6 +10,14 @@ declare module './tester' {
         testSwap(
             walletA: Wallet,
             walletB: Wallet,
+            tokenA: TokenLike,
+            tokenB: TokenLike,
+            amount: BigNumber
+        ): Promise<void>;
+        testSwapBatch(
+            walletA: Wallet,
+            walletB: Wallet,
+            walletC: Wallet,
             tokenA: TokenLike,
             tokenB: TokenLike,
             amount: BigNumber
@@ -72,7 +80,53 @@ Tester.prototype.testSwap = async function (
     expect(diffA.tokenA.eq(amount.add(fee)), 'Wrong amount after swap (walletA, tokenA)').to.be.true;
     expect(diffA.tokenB.eq(amount.mul(2)), 'Wrong amount after swap (walletA, tokenB)').to.be.true;
     expect(diffB.tokenB.eq(amount.mul(2)), 'Wrong amount after swap (walletB, tokenB)').to.be.true;
-    expect(diffB.tokenA.eq(amount), 'Wrong amount in swap (walletB, tokenA)').to.be.true;
+    expect(diffB.tokenA.eq(amount), 'Wrong amount after swap (walletB, tokenA)').to.be.true;
 
     this.runningFee = this.runningFee.add(fee);
+};
+
+Tester.prototype.testSwapBatch = async function (
+    walletA: Wallet,
+    walletB: Wallet,
+    walletC: Wallet,
+    tokenA: TokenLike,
+    tokenB: TokenLike,
+    amount: BigNumber
+) {
+    const orderA = await walletA.getOrder({
+        tokenSell: tokenA,
+        tokenBuy: tokenB,
+        price: utils.price({
+            sellPrice: 2,
+            buyPrice: 5
+        })
+    });
+
+    const orderB = await walletB.getOrder({
+        tokenSell: tokenB,
+        tokenBuy: tokenA,
+        price: utils.price({
+            sellPrice: 4,
+            buyPrice: 1
+        })
+    });
+
+    const batch = await walletC
+        .batchBuilder()
+        .addSwap({
+            orders: [orderA, orderB],
+            amounts: [amount.div(5), amount.div(2)],
+            feeToken: tokenA
+        })
+        .addSwap({
+            orders: [orderB, orderA],
+            amounts: [amount, amount.div(4)],
+            feeToken: tokenA
+        })
+        .build(tokenA);
+
+    const handles = await wallet.submitSignedTransactionsBatch(this.syncProvider, batch.txs, [batch.signature]);
+    await Promise.all(handles.map((handle) => handle.awaitReceipt()));
+
+    this.runningFee = this.runningFee.add(batch.totalFee.get(tokenA) || 0);
 };

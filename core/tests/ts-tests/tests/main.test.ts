@@ -70,8 +70,8 @@ describe(`ZkSync integration tests (token: ${token}, transport: ${transport})`, 
                 await tester.syncWallet.isERC20DepositsApproved(token, DEPOSIT_AMOUNT),
                 'Token should not be approved'
             ).to.be.false;
-            const approveERC20_next = await tester.syncWallet.approveERC20TokenDeposits(token);
-            await approveERC20_next.wait();
+            const approveERC20Next = await tester.syncWallet.approveERC20TokenDeposits(token);
+            await approveERC20Next.wait();
             expect(await tester.syncWallet.isERC20DepositsApproved(token), 'The second deposit should be approved')
                 .to.be.true;
         }
@@ -106,15 +106,6 @@ describe(`ZkSync integration tests (token: ${token}, transport: ${transport})`, 
         await tester.testChangePubKey(chuck, token, false);
     });
 
-    step('should perform a swap', async () => {
-        if (onlyBasic) {
-            return;
-        }
-        const secondToken = token == 'ETH' ? 'wBTC' : 'ETH';
-        await tester.testDeposit(chuck, secondToken, DEPOSIT_AMOUNT);
-        await tester.testSwap(alice, chuck, token, secondToken, TX_AMOUNT);
-    });
-
     step('should test multi-transfers', async () => {
         if (onlyBasic) {
             return;
@@ -144,6 +135,16 @@ describe(`ZkSync integration tests (token: ${token}, transport: ${transport})`, 
         await tester.testBatchBuilderPayInDifferentToken(frank, david, token, feeToken, TX_AMOUNT);
         // Finally, transfer, withdraw and forced exit in a single batch.
         await tester.testBatchBuilderGenericUsage(david, frank, judy, token, TX_AMOUNT);
+    });
+
+    step('should perform a swap', async () => {
+        if (onlyBasic) {
+            return;
+        }
+        const secondToken = token == 'ETH' ? 'wBTC' : 'ETH';
+        await tester.testDeposit(chuck, secondToken, DEPOSIT_AMOUNT);
+        await tester.testSwap(alice, chuck, token, secondToken, TX_AMOUNT);
+        await tester.testSwapBatch(alice, chuck, frank, token, secondToken, TX_AMOUNT);
     });
 
     step('should test multi-signers', async () => {

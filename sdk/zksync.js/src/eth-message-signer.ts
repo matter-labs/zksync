@@ -58,7 +58,7 @@ export class EthMessageSigner {
     }
 
     getSwapEthSignMessagePart(swap: { fee: string; feeToken: string }): string {
-        if (swap.fee != '0') {
+        if (swap.fee != '0' && swap.fee) {
             return `Swap fee: ${swap.fee} ${swap.feeToken}`;
         }
         return '';

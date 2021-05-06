@@ -788,10 +788,7 @@ export class Wallet {
         });
     }
 
-    getSwapEthSignMessagePart(swap: {
-        fee: BigNumberish;
-        feeToken: TokenLike;
-    }): string {
+    getSwapEthSignMessagePart(swap: { fee: BigNumberish; feeToken: TokenLike }): string {
         const stringFee = BigNumber.from(swap.fee).isZero()
             ? null
             : this.provider.tokenSet.formatToken(swap.feeToken, swap.fee);
