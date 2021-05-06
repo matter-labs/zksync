@@ -8,7 +8,7 @@
         "axios": "^0.21.1",
         "websocket": "^1.0.30",
         "websocket-as-promised": "^1.1.0",
-        "//": "TODO: publish a new version of zksync-crypto and depend on it",
+        "//": "TODO: publish a new version of zksync-crypto and depend on it (ZKS-664)",
         "zksync-crypto": "link:../zksync-crypto"
     },
     "peerDependencies": {
