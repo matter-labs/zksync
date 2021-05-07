@@ -341,7 +341,7 @@ impl FullExitWitness<Bn256> {
                 address: Some(creator_account_id_fe),
                 token: Some(token_fe),
                 witness: OperationBranchWitness {
-                    account_witness: creator_account_witness.clone(),
+                    account_witness: creator_account_witness,
                     account_path: audit_creator_account,
                     balance_value: Some(creator_account_balance),
                     balance_subtree_path: audit_balance_creator_account,
