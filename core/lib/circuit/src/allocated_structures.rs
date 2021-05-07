@@ -292,25 +292,41 @@ impl<E: RescueEngine> AllocatedOperationData<E> {
         mut cs: CS,
         op: &Operation<E>,
     ) -> Result<AllocatedOperationData<E>, SynthesisError> {
+        macro_rules! parse_circuit_elements {
+            ($element:ident, $len:expr) => {
+                let $element = op
+                    .args
+                    .$element
+                    .iter()
+                    .enumerate()
+                    .map(|(idx, item)| {
+                        CircuitElement::from_fe_with_known_length(
+                            cs.namespace(|| {
+                                format!("{} item with index {}", stringify!($element), idx)
+                            }),
+                            || item.grab(),
+                            $len,
+                        )
+                    })
+                    .collect::<Result<Vec<_>, SynthesisError>>()?;
+            };
+        }
+
         let eth_address = CircuitElement::from_fe_with_known_length(
             cs.namespace(|| "eth_address"),
             || op.args.eth_address.grab(),
             franklin_constants::ETH_ADDRESS_BIT_WIDTH,
         )?;
 
-        let special_content_hash = op
-            .args
-            .special_content_hash
-            .iter()
-            .enumerate()
-            .map(|(idx, special_content_hash_bit)| {
-                CircuitElement::from_fe_with_known_length(
-                    cs.namespace(|| format!("special_content_hash bit with index {}", idx)),
-                    || special_content_hash_bit.grab(),
-                    1,
-                )
-            })
-            .collect::<Result<Vec<_>, SynthesisError>>()?;
+        parse_circuit_elements!(special_content_hash, 1);
+        parse_circuit_elements!(special_tokens, franklin_constants::TOKEN_BIT_WIDTH);
+        parse_circuit_elements!(special_accounts, franklin_constants::ACCOUNT_ID_BIT_WIDTH);
+        parse_circuit_elements!(special_nonces, franklin_constants::NONCE_BIT_WIDTH);
+        parse_circuit_elements!(special_prices, franklin_constants::PRICE_BIT_WIDTH);
+        parse_circuit_elements!(
+            special_eth_addresses,
+            franklin_constants::ETH_ADDRESS_BIT_WIDTH
+        );
 
         let special_serial_id = CircuitElement::from_fe_with_known_length(
             cs.namespace(|| "special_serial_id"),
@@ -331,76 +347,6 @@ impl<E: RescueEngine> AllocatedOperationData<E> {
             cs.namespace(|| "get second amount"),
             op.args.second_amount_packed,
         )?;
-
-        let special_tokens = op
-            .args
-            .special_tokens
-            .iter()
-            .enumerate()
-            .map(|(idx, special_token)| {
-                CircuitElement::from_fe_with_known_length(
-                    cs.namespace(|| format!("special_token with index {}", idx)),
-                    || special_token.grab(),
-                    franklin_constants::TOKEN_BIT_WIDTH,
-                )
-            })
-            .collect::<Result<Vec<_>, _>>()?;
-
-        let special_eth_addresses = op
-            .args
-            .special_eth_addresses
-            .iter()
-            .enumerate()
-            .map(|(idx, special_token)| {
-                CircuitElement::from_fe_with_known_length(
-                    cs.namespace(|| format!("special_eth_address with index {}", idx)),
-                    || special_token.grab(),
-                    franklin_constants::ETH_ADDRESS_BIT_WIDTH,
-                )
-            })
-            .collect::<Result<Vec<_>, _>>()?;
-
-        let special_accounts = op
-            .args
-            .special_accounts
-            .iter()
-            .enumerate()
-            .map(|(idx, special_account_id)| {
-                CircuitElement::from_fe_with_known_length(
-                    cs.namespace(|| format!("special_account_id with index {}", idx)),
-                    || special_account_id.grab(),
-                    franklin_constants::ACCOUNT_ID_BIT_WIDTH,
-                )
-            })
-            .collect::<Result<Vec<_>, _>>()?;
-
-        let special_nonces = op
-            .args
-            .special_nonces
-            .iter()
-            .enumerate()
-            .map(|(idx, special_nonce)| {
-                CircuitElement::from_fe_with_known_length(
-                    cs.namespace(|| format!("special_nonce with index {}", idx)),
-                    || special_nonce.grab(),
-                    franklin_constants::NONCE_BIT_WIDTH,
-                )
-            })
-            .collect::<Result<Vec<_>, _>>()?;
-
-        let special_prices = op
-            .args
-            .special_prices
-            .iter()
-            .enumerate()
-            .map(|(idx, special_price)| {
-                CircuitElement::from_fe_with_known_length(
-                    cs.namespace(|| format!("special_price with index {}", idx)),
-                    || special_price.grab(),
-                    franklin_constants::PRICE_BIT_WIDTH,
-                )
-            })
-            .collect::<Result<Vec<_>, _>>()?;
 
         let (special_amounts_packed, special_amounts_unpacked) = op
             .args

@@ -1179,8 +1179,6 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
             self.swap(
                 cs.namespace(|| "swap"),
                 &mut cur,
-                &lhs,
-                &rhs,
                 global_variables,
                 &is_a_geq_b,
                 &is_account_empty,
@@ -2996,8 +2994,6 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
         &self,
         mut cs: CS,
         cur: &mut AllocatedOperationBranch<E>,
-        lhs: &AllocatedOperationBranch<E>,
-        _rhs: &AllocatedOperationBranch<E>,
         global_variables: &CircuitGlobalVariables<E>,
         is_a_geq_b: &Boolean,
         is_account_empty: &Boolean,
@@ -3014,6 +3010,15 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
             !pubdata_holder.is_empty(),
             "pubdata holder has to be preallocated"
         );
+        /*
+        fields specification:
+
+        special_eth_addresses = [recipient_0_address, recipient_1_address]
+        special_tokens = [order_0_sell_token, order_1_sell_token, fee_token]
+        special_accounts = [order_0_sell_amount, order_1_sell_amount]
+        special_prices = [order_0_sell_price, order_0_buy_price, order_1_sell_price, order_1_buy_price]
+        special_nonces = [account_0_nonce, account_1_nonce, submitter_nonce]
+        */
 
         // construct pubdata
         let mut pubdata_bits = vec![];
@@ -3191,7 +3196,7 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
             .map(|num| {
                 let nonce_correct = CircuitElement::equals(
                     cs.namespace(|| format!("is_nonce_correct_in_slot {}", num)),
-                    &lhs.account.nonce,
+                    &cur.account.nonce,
                     &op_data.special_nonces[num],
                 )?;
                 Boolean::and(
@@ -3519,7 +3524,7 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
         let is_signer_valid = CircuitElement::equals(
             cs.namespace(|| "signer_key_correct"),
             &signer_key.pubkey.get_hash(),
-            &lhs.account.pub_key_hash,
+            &cur.account.pub_key_hash,
         )?;
 
         let lhs_valid_flags = vec![
@@ -3559,7 +3564,7 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
 
         let sender_is_submitter = CircuitElement::equals(
             cs.namespace(|| "is account sender == submitter"),
-            &lhs.account_id,
+            &cur.account_id,
             &op_data.special_accounts[4],
         )?;
 
