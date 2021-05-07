@@ -564,6 +564,67 @@ impl TestSetup {
         self.execute_tx(tx).await;
     }
 
+    #[allow(clippy::too_many_arguments)]
+    pub async fn swap(
+        &mut self,
+        accounts: (ZKSyncAccountId, ZKSyncAccountId),
+        recipients: (ZKSyncAccountId, ZKSyncAccountId),
+        submitter: ZKSyncAccountId,
+        tokens: (Token, Token, Token),
+        amounts: (BigUint, BigUint),
+        fee: BigUint,
+        time_range: TimeRange,
+    ) {
+        let account_0_old = self
+            .get_expected_zksync_account_balance(accounts.0, tokens.0 .0)
+            .await;
+        self.expected_changes_for_current_block
+            .sync_accounts_state
+            .insert((accounts.0, tokens.0 .0), account_0_old - &amounts.0);
+        let account_1_old = self
+            .get_expected_zksync_account_balance(accounts.1, tokens.1 .0)
+            .await;
+        self.expected_changes_for_current_block
+            .sync_accounts_state
+            .insert((accounts.1, tokens.1 .0), account_1_old - &amounts.1);
+
+        let recipient_0_old = self
+            .get_expected_zksync_account_balance(recipients.0, tokens.1 .0)
+            .await;
+        self.expected_changes_for_current_block
+            .sync_accounts_state
+            .insert((recipients.0, tokens.1 .0), recipient_0_old + &amounts.1);
+        let recipient_1_old = self
+            .get_expected_zksync_account_balance(recipients.1, tokens.0 .0)
+            .await;
+        self.expected_changes_for_current_block
+            .sync_accounts_state
+            .insert((recipients.1, tokens.0 .0), recipient_1_old + &amounts.0);
+
+        let submitter_old = self
+            .get_expected_zksync_account_balance(submitter, tokens.2 .0)
+            .await;
+        self.expected_changes_for_current_block
+            .sync_accounts_state
+            .insert((submitter, tokens.2 .0), submitter_old - &fee);
+
+        let fee_account_old = self
+            .get_expected_zksync_account_balance(self.accounts.fee_account_id, tokens.2 .0)
+            .await;
+        self.expected_changes_for_current_block
+            .sync_accounts_state
+            .insert(
+                (self.accounts.fee_account_id, tokens.2 .0),
+                fee_account_old + &fee,
+            );
+
+        let swap = self.accounts.swap(
+            accounts, recipients, submitter, tokens, amounts, fee, None, true, time_range,
+        );
+
+        self.execute_tx(swap).await;
+    }
+
     pub async fn transfer(
         &mut self,
         from: ZKSyncAccountId,
