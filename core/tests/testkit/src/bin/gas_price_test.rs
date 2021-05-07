@@ -390,7 +390,7 @@ async fn commit_cost_of_mint_nft(
                 ZKSyncAccountId(1),
                 ZKSyncAccountId(2),
                 Token(TokenId(0)),
-                content_hashes[i].clone(),
+                content_hashes[i],
                 tranfers_fee[i].clone(),
             )
             .await;
@@ -604,7 +604,7 @@ async fn commit_cost_of_withdrawals_nft(
         .expect("Block execution failed");
 
     test_setup.start_block();
-    for i in 0..n_withdrawals {
+    for fee in withdrawals_fee {
         println!("Current nft {}", current_nft);
         current_nft += 1;
         test_setup
@@ -612,7 +612,7 @@ async fn commit_cost_of_withdrawals_nft(
                 ZKSyncAccountId(2),
                 Token(TokenId(current_nft)),
                 Token(TokenId(0)),
-                withdrawals_fee[i].clone(),
+                fee,
                 rng,
             )
             .await;
