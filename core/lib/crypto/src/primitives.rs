@@ -372,12 +372,29 @@ impl FloatConversions {
 
 pub fn rescue_hash_tx_msg(msg: &[u8]) -> Vec<u8> {
     let mut msg_bits = BitConvert::from_be_bytes(msg);
+    assert!(msg_bits.len() <= params::PAD_MSG_BEFORE_HASH_BITS_LEN);
     msg_bits.resize(params::PAD_MSG_BEFORE_HASH_BITS_LEN, false);
     let hasher = &params::RESCUE_HASHER as &BabyRescueHasher;
     let hash_fr = hasher.hash_bits(msg_bits.into_iter());
     let mut hash_bits = Vec::new();
     append_le_fixed_width(&mut hash_bits, &hash_fr, 256);
     BitConvert::into_bytes(hash_bits)
+}
+
+// This differs from `rescue_hash_tx_msg` in several ways:
+// - It does not constrain its input to be <= 92 bytes
+//   In fact, it only accepts inputs of 176 bytes (2 * order_size)
+// - It does not pad its message
+// - It encodes the resulting Fr a bit differently
+// - It returns 31 byte instead of 32
+pub fn rescue_hash_orders(msg: &[u8]) -> Vec<u8> {
+    assert_eq!(msg.len(), 176);
+    let msg_bits = BitConvert::from_be_bytes(msg);
+    let hasher = &params::RESCUE_HASHER as &BabyRescueHasher;
+    let hash_fr = hasher.hash_bits(msg_bits.into_iter());
+    // 248 == bits in max whole number of bytes that fit into Fr
+    let hash_bits = hash_fr.get_bits_le_fixed(248);
+    BitConvert::into_bytes_ordered(hash_bits)
 }
 
 pub trait FromBytes: Sized {

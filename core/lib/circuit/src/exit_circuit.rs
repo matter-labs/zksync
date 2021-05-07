@@ -23,6 +23,7 @@ use zksync_crypto::{
 };
 use zksync_types::{AccountId, TokenId, H256};
 // Local deps
+use crate::witness::utils::fr_from;
 use crate::{
     allocated_structures::*,
     circuit::{check_account_data, hash_nft_content_to_balance_type},
@@ -307,7 +308,7 @@ pub fn create_exit_circuit_with_public_input(
             byte_as_bits
         })
         .flatten()
-        .map(|bit| Some(Fr::from_str(&bit.to_string()).unwrap()))
+        .map(|bit| Some(fr_from(&bit)))
         .collect();
     for bit in &content_hash_as_vec {
         append_be_fixed_width(&mut pubdata_commitment, &bit.unwrap(), 1);
@@ -342,7 +343,7 @@ pub fn create_exit_circuit_with_public_input(
             },
         },
         special_account_audit_data: OperationBranch {
-            address: Some(Fr::from_str(&NFT_STORAGE_ACCOUNT_ID.0.to_string()).unwrap()),
+            address: Some(fr_from(&NFT_STORAGE_ACCOUNT_ID)),
             token: Some(token_id_fe),
             witness: OperationBranchWitness {
                 account_witness: special_account_witness,

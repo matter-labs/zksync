@@ -44,7 +44,8 @@ fn test_signature() {
     let (pk, serialized_pk) = gen_private_key_and_its_be_bytes();
     let pubkey = public_key_from_private(&pk);
 
-    for msg_len in &[0, 2, 4, 5, 32, 128] {
+    // msg len cannot be greater than PAD_MSG_BEFORE_HASH_BITS_LEN (92 bytes)
+    for msg_len in &[0, 2, 4, 5, 32, 92] {
         let msg = random_msg(*msg_len);
 
         let wasm_signature = sign_musig(&serialized_pk, &msg).unwrap();
