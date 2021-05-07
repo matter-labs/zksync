@@ -168,6 +168,7 @@ fn apply_many_ops() -> ZkSyncCircuit<'static, Bn256> {
         },
         withdraw_amount: Some(BigUint::from(900u32).into()),
         creator_account_id: None,
+        creator_address: None,
         serial_id: None,
         content_hash: None,
     };

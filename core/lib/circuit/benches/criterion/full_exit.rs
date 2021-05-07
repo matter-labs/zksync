@@ -22,6 +22,7 @@ fn full_exit_apply_tx(b: &mut Bencher<'_>, number_of_accounts: &usize) {
         },
         withdraw_amount: Some(BigUint::from(10u32).into()),
         creator_account_id: None,
+        creator_address: None,
         serial_id: None,
         content_hash: None,
     };
@@ -45,6 +46,7 @@ fn full_exit_get_pubdata(b: &mut Bencher<'_>) {
         },
         withdraw_amount: Some(BigUint::from(10u32).into()),
         creator_account_id: None,
+        creator_address: None,
         serial_id: None,
         content_hash: None,
     };
@@ -68,6 +70,7 @@ fn full_exit_calculate_operations(b: &mut Bencher<'_>) {
         },
         withdraw_amount: Some(BigUint::from(10u32).into()),
         creator_account_id: None,
+        creator_address: None,
         serial_id: None,
         content_hash: None,
     };

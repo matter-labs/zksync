@@ -20,6 +20,7 @@ pub fn create_full_exit_op() -> ExecutedOperations {
             priority_op,
             withdraw_amount: None,
             creator_account_id: None,
+            creator_address: None,
             serial_id: None,
             content_hash: None,
         })),

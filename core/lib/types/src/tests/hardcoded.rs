@@ -183,6 +183,7 @@ pub mod operations_test {
                 priority_op,
                 withdraw_amount: None,
                 creator_account_id: None,
+                creator_address: None,
                 serial_id: None,
                 content_hash: None,
             }

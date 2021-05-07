@@ -382,7 +382,7 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
 
     /// @dev 1. Try to send token to _recipients
     /// @dev 2. On failure: Increment _recipients balance to withdraw.
-    function withdrawNFT(Operations.WithdrawNFT memory op) internal {
+    function withdrawOrStoreNFT(Operations.WithdrawNFT memory op) internal {
         NFTFactory _factory = governance.getNFTFactory(op.creator);
         try _factory.mintNFT{gas: WITHDRAWAL_GAS_LIMIT}(op.creator, op.owner, op.contentHash, op.tokenId) {
             // Save withdrawn nfts for future deposits
@@ -412,10 +412,15 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
             // and fail if token subtracted from zkSync balance more then `_amount` that was requested.
             // This can happen if token subtracts fee from sender while transferring `_amount` that was requested to transfer.
             try this._transferERC20{gas: WITHDRAWAL_GAS_LIMIT}(IERC20(tokenAddr), _recipient, _amount, _amount) {
-                emit Withdrawal(_tokenId, _amount);
+                sent = true;
             } catch {
-                increaseBalanceToWithdraw(packedBalanceKey, _amount);
+                sent = false;
             }
+        }
+        if (sent) {
+            emit Withdrawal(_tokenId, _amount);
+        } else {
+            increaseBalanceToWithdraw(packedBalanceKey, _amount);
         }
     }
 
@@ -452,12 +457,12 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
                     if (op.amount == 1) {
                         Operations.WithdrawNFT memory nftOp =
                             Operations.WithdrawNFT(op.nftCreatorAddress, op.nftContentHash, op.owner, op.tokenId);
-                        withdrawNFT(nftOp);
+                        withdrawOrStoreNFT(nftOp);
                     }
                 }
             } else if (opType == Operations.OpType.WithdrawNFT) {
                 Operations.WithdrawNFT memory op = Operations.readWithdrawNFTPubdata(pubData);
-                withdrawNFT(op);
+                withdrawOrStoreNFT(op);
             } else {
                 revert("l"); // unsupported op in block execution
             }

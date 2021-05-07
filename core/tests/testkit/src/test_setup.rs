@@ -27,7 +27,7 @@ use crate::account_set::AccountSet;
 use crate::state_keeper_utils::*;
 use crate::types::*;
 
-use zksync_crypto::params::{NFT_STORAGE_ACCOUNT_ADDRESS, NFT_STORAGE_ACCOUNT_ID, NFT_TOKEN_ID};
+use zksync_crypto::params::{NFT_STORAGE_ACCOUNT_ADDRESS, NFT_TOKEN_ID};
 use zksync_types::tx::TimeRange;
 
 /// Used to create transactions between accounts and check for their validity.
@@ -594,9 +594,9 @@ impl TestSetup {
             self.accounts
                 .mint_nft(creator, recipient, fee_token, content_hash, fee, None, true);
 
-        // self.expected_changes_for_current_block
-        //     .sync_accounts_state
-        //     .insert((recipient, TokenId(token_id + 1)), BigUint::from(1u32));
+        self.expected_changes_for_current_block
+            .sync_accounts_state
+            .insert((recipient, TokenId(token_id + 1)), BigUint::from(1u32));
 
         self.execute_tx(mint_nft).await;
     }
@@ -725,7 +725,7 @@ impl TestSetup {
         self.expected_changes_for_current_block
             .sync_accounts_state
             .insert((from, fee_token.0), zksync0_old);
-        let mut zksync0_old = self
+        let zksync0_old = self
             .get_expected_zksync_account_balance(from, token.0)
             .await;
         assert_eq!(zksync0_old, BigUint::from(1u32));

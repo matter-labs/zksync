@@ -4,8 +4,8 @@ use anyhow::{ensure, format_err};
 use num::{BigUint, FromPrimitive, ToPrimitive};
 use serde::{Deserialize, Serialize};
 use zksync_crypto::params::{
-    ACCOUNT_ID_BIT_WIDTH, BALANCE_BIT_WIDTH, CHUNK_BYTES, CONTENT_HASH_WIDTH,
-    ETH_ADDRESS_BIT_WIDTH, SERIAL_ID_WIDTH, TOKEN_BIT_WIDTH,
+    ACCOUNT_ID_BIT_WIDTH, ADDRESS_WIDTH, BALANCE_BIT_WIDTH, CHUNK_BYTES, CONTENT_HASH_WIDTH,
+    ETH_ADDRESS_BIT_WIDTH, TOKEN_BIT_WIDTH,
 };
 use zksync_crypto::primitives::FromBytes;
 use zksync_utils::BigUintSerdeWrapper;
@@ -17,6 +17,7 @@ pub struct FullExitOp {
     /// None if withdraw was unsuccessful
     pub withdraw_amount: Option<BigUintSerdeWrapper>,
     pub creator_account_id: Option<AccountId>,
+    pub creator_address: Option<Address>,
     pub serial_id: Option<u32>,
     pub content_hash: Option<H256>,
 }
@@ -41,14 +42,7 @@ impl FullExitOp {
                 .unwrap()
                 .to_be_bytes(),
         );
-        data.extend_from_slice(
-            &self
-                .creator_account_id
-                .clone()
-                .unwrap_or_default()
-                .to_be_bytes(),
-        );
-        data.extend_from_slice(&self.serial_id.clone().unwrap_or_default().to_be_bytes());
+        data.extend_from_slice(&self.creator_address.clone().unwrap_or_default().as_bytes());
         data.extend_from_slice(&self.content_hash.clone().unwrap_or_default().as_bytes());
         data.resize(Self::CHUNKS * CHUNK_BYTES, 0x00);
         data
@@ -87,9 +81,8 @@ impl FullExitOp {
         let eth_address_offset = account_id_offset + ACCOUNT_ID_BIT_WIDTH / 8;
         let token_offset = eth_address_offset + ETH_ADDRESS_BIT_WIDTH / 8;
         let amount_offset = token_offset + TOKEN_BIT_WIDTH / 8;
-        let creator_id_offset = amount_offset + BALANCE_BIT_WIDTH / 8;
-        let serial_id_offset = creator_id_offset + ACCOUNT_ID_BIT_WIDTH / 8;
-        let content_hash_offset = serial_id_offset + SERIAL_ID_WIDTH / 8;
+        let creator_address = amount_offset + BALANCE_BIT_WIDTH / 8;
+        let content_hash_offset = creator_address + ADDRESS_WIDTH / 8;
 
         let account_id = u32::from_bytes(&bytes[account_id_offset..eth_address_offset])
             .ok_or_else(|| format_err!("Cant get account id from full exit pubdata"))?;
@@ -102,11 +95,7 @@ impl FullExitOp {
         )
         .unwrap();
 
-        let creator_id = u32::from_bytes(&bytes[creator_id_offset..serial_id_offset])
-            .ok_or_else(|| format_err!("Cant get creator account id from full exit pubdata"))?;
-
-        let serial_id = u32::from_bytes(&bytes[serial_id_offset..content_hash_offset])
-            .ok_or_else(|| format_err!("Cant get serial id from full exit pubdata"))?;
+        let creator_address = Address::from_slice(&bytes[creator_address..content_hash_offset]);
 
         let content_hash = H256::from_slice(
             &bytes[content_hash_offset..content_hash_offset + CONTENT_HASH_WIDTH / 8],
@@ -119,8 +108,9 @@ impl FullExitOp {
                 token: TokenId(token),
             },
             withdraw_amount: Some(amount.into()),
-            creator_account_id: Some(AccountId(creator_id)),
-            serial_id: Some(serial_id),
+            creator_address: Some(creator_address),
+            creator_account_id: None, // Unknown from pub data
+            serial_id: None,          // Unknown from pub data
             content_hash: Some(content_hash),
         })
     }

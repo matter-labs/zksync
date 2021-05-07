@@ -37,6 +37,7 @@ pub struct FullExitData {
     pub eth_address: Fr,
     pub full_exit_amount: Fr,
     pub creator_account_id: u32,
+    pub creator_account_address: Fr,
     pub nft_serial_id: u32,
     pub content_hash: H256,
 }
@@ -70,6 +71,9 @@ impl Witness for FullExitWitness<Bn256> {
                 .map(|amount| fr_from(amount.0))
                 .unwrap_or_else(Fr::zero),
             creator_account_id: full_exit.creator_account_id.unwrap_or_default().0,
+            creator_account_address: eth_address_to_fr(
+                &full_exit.creator_address.unwrap_or_default(),
+            ),
             nft_serial_id: full_exit.serial_id.unwrap_or_default(),
             content_hash: full_exit.content_hash.unwrap_or_default(),
         };
@@ -336,7 +340,7 @@ impl FullExitWitness<Bn256> {
                 address: Some(creator_account_id_fe),
                 token: Some(token_fe),
                 witness: OperationBranchWitness {
-                    account_witness: creator_account_witness.clone(),
+                    account_witness: creator_account_witness,
                     account_path: audit_creator_account,
                     balance_value: Some(creator_account_balance),
                     balance_subtree_path: audit_balance_creator_account,
@@ -346,11 +350,7 @@ impl FullExitWitness<Bn256> {
                 eth_address: Some(full_exit.eth_address),
                 full_amount: Some(full_exit.full_exit_amount),
                 special_eth_addresses: vec![
-                    Some(
-                        creator_account_witness
-                            .address
-                            .expect("creator account should not be empty"),
-                    ),
+                    Some(full_exit.creator_account_address),
                     Some(Fr::zero()),
                 ],
                 special_accounts: vec![

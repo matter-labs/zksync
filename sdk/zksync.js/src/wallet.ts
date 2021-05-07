@@ -348,8 +348,8 @@ export class Wallet {
                 validFrom: transfer.validFrom || 0,
                 validUntil: transfer.validUntil || MAX_TIMESTAMP
             });
-
-            messages.push(this.getTransferEthMessagePart({ stringToken: transfer.symbol, ...transfer }));
+            const message = this.getTransferEthMessagePart({ stringToken: transfer.symbol, ...transfer });
+            messages.push(message);
             batch.push({ tx, signature: null });
         }
 
