@@ -219,9 +219,9 @@ pub enum ChangePubKeyFeeTypeArg {
 /// Type of transaction fees that exist in the zkSync network.
 #[derive(Debug, Serialize, Deserialize, Clone, Copy, PartialEq, Hash, Eq)]
 pub enum TxFeeTypes {
-    /// Fee for the `Withdraw` or `ForcedExit` transaction.
+    /// Fee for the `WithdrawNFT` transaction.
     WithdrawNFT,
-    /// Fee for the `Withdraw` operation that requires fast processing.
+    /// Fee for the `WithdrawNFT` operation that requires fast processing.
     FastWithdrawNFT,
     /// Fee for the `Withdraw` or `ForcedExit` transaction.
     Withdraw,

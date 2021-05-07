@@ -76,6 +76,10 @@ impl GasOperationsCost {
             (constants::BASE_WITHDRAW_COST as f64 * fast_processing_coeff) as u32;
         let subsidy_fast_withdrawal_cost =
             (constants::SUBSIDY_WITHDRAW_COST as f64 * fast_processing_coeff) as u32;
+        let standard_fast_withdrawal_nft_cost =
+            (constants::BASE_WITHDRAW_NFT_COST as f64 * fast_processing_coeff) as u32;
+        let subsidy_fast_withdrawal_nft_cost =
+            (constants::SUBSIDY_WITHDRAW_NFT_COST as f64 * fast_processing_coeff) as u32;
 
         let standard_cost = vec![
             (
@@ -94,6 +98,14 @@ impl GasOperationsCost {
             (
                 OutputFeeType::FastWithdraw,
                 standard_fast_withdrawal_cost.into(),
+            ),
+            (
+                OutputFeeType::WithdrawNFT,
+                constants::BASE_WITHDRAW_NFT_COST.into(),
+            ),
+            (
+                OutputFeeType::FastWithdrawNFT,
+                standard_fast_withdrawal_nft_cost.into(),
             ),
             (OutputFeeType::MintNFT, constants::BASE_MINT_NFT_COST.into()),
             (
@@ -148,6 +160,14 @@ impl GasOperationsCost {
                 subsidy_fast_withdrawal_cost.into(),
             ),
             (
+                OutputFeeType::WithdrawNFT,
+                constants::SUBSIDY_WITHDRAW_NFT_COST.into(),
+            ),
+            (
+                OutputFeeType::FastWithdrawNFT,
+                subsidy_fast_withdrawal_nft_cost.into(),
+            ),
+            (
                 OutputFeeType::ChangePubKey(ChangePubKeyFeeTypeArg::PreContracts4Version {
                     onchain_pubkey_auth: false,
                 }),
@@ -177,7 +197,10 @@ impl GasOperationsCost {
                 )),
                 constants::SUBSIDY_CHANGE_PUBKEY_CREATE2_COST.into(),
             ),
-            (OutputFeeType::MintNFT, constants::BASE_MINT_NFT_COST.into()),
+            (
+                OutputFeeType::MintNFT,
+                constants::SUBSIDY_MINT_NFT_COST.into(),
+            ),
         ]
         .into_iter()
         .collect::<HashMap<_, _>>();
