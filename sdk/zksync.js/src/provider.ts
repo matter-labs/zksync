@@ -225,7 +225,7 @@ export class Provider {
     }
 
     async getTransactionFee(
-        txType: 'Withdraw' | 'Transfer' | 'FastWithdraw' | 'MintNFT' | ChangePubKeyFee | LegacyChangePubKeyFee,
+        txType: 'Withdraw' | 'Transfer' | 'FastWithdraw' | 'MintNFT' | ChangePubKeyFee | LegacyChangePubKeyFee | 'WithdrawNFT' | 'FastWithdrawNFT',
         address: Address,
         tokenLike: TokenLike
     ): Promise<Fee> {
@@ -241,7 +241,7 @@ export class Provider {
     }
 
     async getTransactionsBatchFee(
-        txTypes: ('Withdraw' | 'Transfer' | 'FastWithdraw' | ChangePubKeyFee | LegacyChangePubKeyFee | 'MintNFT')[],
+        txTypes: ('Withdraw' | 'Transfer' | 'FastWithdraw' | ChangePubKeyFee | LegacyChangePubKeyFee | 'MintNFT' | 'WithdrawNFT' | 'FastWithdrawNFT')[],
         addresses: Address[],
         tokenLike: TokenLike
     ): Promise<BigNumber> {
