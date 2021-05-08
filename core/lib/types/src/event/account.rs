@@ -1,4 +1,5 @@
 // Built-in uses
+use std::convert::TryFrom;
 // External uses
 use bigdecimal::BigDecimal;
 use num::BigInt;
@@ -7,10 +8,11 @@ use serde::{Deserialize, Serialize};
 // Local uses
 use crate::{
     account::{AccountUpdate, PubKeyHash},
+    aggregated_operations::AggregatedActionType,
     AccountId, Nonce, TokenId,
 };
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum AccountStateChangeStatus {
     Committed,
@@ -44,18 +46,18 @@ pub struct AccountUpdateDetails {
 }
 
 impl AccountUpdateDetails {
-    pub fn from_account_update(account_id: AccountId, account_update: &AccountUpdate) -> Self {
+    pub fn from_account_update(account_id: AccountId, account_update: AccountUpdate) -> Self {
         match account_update {
             AccountUpdate::Create { address: _, nonce } => Self {
                 account_id,
-                nonce: *nonce,
+                nonce,
                 new_pub_key_hash: None,
                 token_id: None,
                 new_balance: None,
             },
             AccountUpdate::Delete { address: _, nonce } => Self {
                 account_id,
-                nonce: *nonce,
+                nonce,
                 new_pub_key_hash: None,
                 token_id: None,
                 new_balance: None,
@@ -66,10 +68,10 @@ impl AccountUpdateDetails {
                 balance_update,
             } => Self {
                 account_id,
-                nonce: *new_nonce,
+                nonce: new_nonce,
                 new_pub_key_hash: None,
                 token_id: Some(balance_update.0),
-                new_balance: Some(BigDecimal::from(BigInt::from(balance_update.2.clone()))),
+                new_balance: Some(BigDecimal::from(BigInt::from(balance_update.2))),
             },
             AccountUpdate::ChangePubKeyHash {
                 old_pub_key_hash: _,
@@ -78,8 +80,8 @@ impl AccountUpdateDetails {
                 new_nonce,
             } => Self {
                 account_id,
-                nonce: *new_nonce,
-                new_pub_key_hash: Some(*new_pub_key_hash),
+                nonce: new_nonce,
+                new_pub_key_hash: Some(new_pub_key_hash),
                 token_id: None,
                 new_balance: None,
             },
@@ -94,6 +96,18 @@ impl From<&AccountUpdate> for AccountStateChangeType {
             AccountUpdate::Delete { .. } => AccountStateChangeType::Delete,
             AccountUpdate::UpdateBalance { .. } => AccountStateChangeType::UpdateBalance,
             AccountUpdate::ChangePubKeyHash { .. } => AccountStateChangeType::ChangePubKeyHash,
+        }
+    }
+}
+
+impl TryFrom<AggregatedActionType> for AccountStateChangeStatus {
+    type Error = &'static str;
+
+    fn try_from(action_type: AggregatedActionType) -> Result<Self, Self::Error> {
+        match action_type {
+            AggregatedActionType::CommitBlocks => Ok(Self::Committed),
+            AggregatedActionType::ExecuteBlocks => Ok(Self::Finalized),
+            _ => Err("No matching account update status for the given action type"),
         }
     }
 }

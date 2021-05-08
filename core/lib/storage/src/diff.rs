@@ -3,10 +3,7 @@ use std::cmp::Ordering;
 // External imports
 use num::bigint::ToBigInt;
 // Workspace imports
-use zksync_types::{
-    event::account::{AccountStateChangeType, AccountUpdateDetails},
-    AccountId, AccountUpdate, Address, Nonce, PubKeyHash, TokenId,
-};
+use zksync_types::{AccountId, AccountUpdate, Address, Nonce, PubKeyHash, TokenId};
 // Local imports
 use crate::chain::account::records::*;
 
@@ -93,54 +90,6 @@ impl From<StorageAccountDiff> for (AccountId, AccountUpdate) {
                         .expect("PubkeyHash update from db deserialize"),
                 },
             ),
-        }
-    }
-}
-
-impl From<&StorageAccountDiff> for AccountStateChangeType {
-    fn from(account_update: &StorageAccountDiff) -> Self {
-        match account_update {
-            StorageAccountDiff::BalanceUpdate(_) => AccountStateChangeType::UpdateBalance,
-            StorageAccountDiff::Create(_) => AccountStateChangeType::Create,
-            StorageAccountDiff::Delete(_) => AccountStateChangeType::Delete,
-            StorageAccountDiff::ChangePubKey(_) => AccountStateChangeType::ChangePubKeyHash,
-        }
-    }
-}
-
-impl From<&StorageAccountDiff> for AccountUpdateDetails {
-    fn from(account_diff: &StorageAccountDiff) -> Self {
-        match account_diff {
-            StorageAccountDiff::BalanceUpdate(update) => Self {
-                account_id: AccountId(update.account_id as u32),
-                nonce: Nonce(update.new_nonce as u32),
-                new_pub_key_hash: None,
-                token_id: Some(TokenId(update.coin_id as u16)),
-                new_balance: Some(update.new_balance.clone()),
-            },
-            StorageAccountDiff::Create(update) => Self {
-                account_id: AccountId(update.account_id as u32),
-                nonce: Nonce(update.nonce as u32),
-                new_pub_key_hash: None,
-                token_id: None,
-                new_balance: None,
-            },
-            StorageAccountDiff::Delete(update) => Self {
-                account_id: AccountId(update.account_id as u32),
-                nonce: Nonce(update.nonce as u32),
-                new_pub_key_hash: None,
-                token_id: None,
-                new_balance: None,
-            },
-            StorageAccountDiff::ChangePubKey(update) => Self {
-                account_id: AccountId(update.account_id as u32),
-                nonce: Nonce(update.new_nonce as u32),
-                new_pub_key_hash: Some(
-                    PubKeyHash::from_bytes(update.new_pubkey_hash.as_slice()).unwrap(),
-                ),
-                token_id: None,
-                new_balance: None,
-            },
         }
     }
 }

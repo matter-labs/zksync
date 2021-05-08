@@ -9,7 +9,9 @@ use zksync_basic_types::{H256, U256};
 use zksync_types::{
     aggregated_operations::{AggregatedActionType, AggregatedOperation},
     ethereum::{ETHOperation, InsertedOperationResponse},
-    event::block::BlockStatus,
+    event::{
+        account::AccountStateChangeStatus, block::BlockStatus, transaction::TransactionStatus,
+    },
     BlockNumber,
 };
 // Local imports
@@ -527,12 +529,24 @@ impl<'a, 'c> EthereumSchema<'a, 'c> {
                 )
                 .await?;
 
-            let block_status = BlockStatus::try_from(action_type).ok();
-            if let Some(block_status) = block_status {
+            let status = AccountStateChangeStatus::try_from(action_type).ok();
+            if let Some(status) = status {
+                let block_status = BlockStatus::from(status);
+                let block_operations_status = TransactionStatus::from(status);
+                // Store events about the block, corresponding account updates and
+                // executed operations.
                 for block_number in from_block..=to_block {
                     transaction
                         .event_schema()
-                        .store_block_event(block_status, BlockNumber(block_number))
+                        .store_block_event(BlockNumber(block_number), block_status)
+                        .await?;
+                    transaction
+                        .event_schema()
+                        .store_state_updated_event(BlockNumber(block_number), status)
+                        .await?;
+                    transaction
+                        .event_schema()
+                        .store_transaction_event(BlockNumber(block_number), block_operations_status)
                         .await?;
                 }
             }
