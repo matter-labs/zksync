@@ -122,20 +122,22 @@ impl TxHandler<MintNFT> for ZkSyncState {
         let token_id = TokenId(new_token_id.to_u32().expect("Should be correct u32"));
         let token_hash = calculate_token_hash(op.tx.creator_id, serial_id, op.tx.content_hash);
         let token_address = calculate_token_address(&token_hash);
+        let token = NFT::new(
+            token_id,
+            serial_id,
+            op.tx.creator_id,
+            creator_account.address,
+            token_address,
+            None,
+            op.tx.content_hash,
+        );
         updates.push((
             op.creator_account_id,
             AccountUpdate::MintNFT {
-                token: NFT::new(
-                    token_id,
-                    serial_id,
-                    op.tx.creator_id,
-                    creator_account.address,
-                    token_address,
-                    None,
-                    op.tx.content_hash,
-                ),
+                token: token.clone(),
             },
         ));
+        self.nfts.insert(token_id, token);
         self.insert_account(op.creator_account_id, creator_account);
 
         // Token data is a special balance for NFT_STORAGE_ACCOUNT,

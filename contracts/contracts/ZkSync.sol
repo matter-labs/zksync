@@ -116,7 +116,6 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
         verifier = Verifier(_verifierAddress);
         governance = Governance(_governanceAddress);
 
-        // We need initial state hash because it is used in the commitment of the next block
         StoredBlockInfo memory storedBlockZero =
             StoredBlockInfo(0, 0, EMPTY_STRING_KECCAK, 0, _genesisStateHash, bytes32(0));
 
@@ -741,6 +740,8 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
                     opPubData = Bytes.slice(pubData, pubdataOffset, PARTIAL_EXIT_BYTES);
                 } else if (opType == Operations.OpType.ForcedExit) {
                     opPubData = Bytes.slice(pubData, pubdataOffset, FORCED_EXIT_BYTES);
+                } else if (opType == Operations.OpType.WithdrawNFT) {
+                    opPubData = Bytes.slice(pubData, pubdataOffset, WITHDRAW_NFT_BYTES);
                 } else if (opType == Operations.OpType.FullExit) {
                     opPubData = Bytes.slice(pubData, pubdataOffset, FULL_EXIT_BYTES);
 

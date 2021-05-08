@@ -28,7 +28,7 @@ use zksync_types::{
     helpers::{pack_fee_amount, pack_token_amount, unpack_fee_amount, unpack_token_amount},
     tx::ChangePubKeyCREATE2Data,
     Address, ChangePubKeyOp, DepositOp, FullExitOp, MintNFTOp, Nonce, PubKeyHash, TokenId,
-    TransferOp, TransferToNewOp, WithdrawOp,
+    TransferOp, TransferToNewOp, WithdrawNFTOp, WithdrawOp,
 };
 use zksync_utils::UnsignedRatioSerializeAsDecimal;
 
@@ -186,7 +186,6 @@ fn gen_unpacked_amount(rng: &mut impl Rng) -> BigUint {
 }
 
 async fn gas_price_test() {
-    vlog::init();
     let testkit_config = TestkitConfig::from_env();
 
     let fee_account = ZkSyncAccount::rand();
@@ -605,7 +604,6 @@ async fn commit_cost_of_withdrawals_nft(
 
     test_setup.start_block();
     for fee in withdrawals_fee {
-        println!("Current nft {}", current_nft);
         current_nft += 1;
         test_setup
             .withdraw_nft(
@@ -624,7 +622,7 @@ async fn commit_cost_of_withdrawals_nft(
         .expect("Block execution failed");
     assert_eq!(
         withdraws_execute_result.block_size_chunks,
-        n_withdrawals * WithdrawOp::CHUNKS,
+        n_withdrawals * WithdrawNFTOp::CHUNKS,
         "block size mismatch"
     );
     CostsSample::new(n_withdrawals, U256::from(0), withdraws_execute_result)

@@ -36,7 +36,6 @@ impl TxHandler<WithdrawNFT> for ZkSyncState {
             account_id == tx.account_id,
             "Withdraw account id is incorrect"
         );
-        vlog::error!("nfts {:?}", &self.nfts);
         if let Some(nft) = self.nfts.get(&tx.token) {
             let (creator_id, _creator_account) = self
                 .get_account_by_address(&nft.creator_address)
