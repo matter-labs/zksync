@@ -140,13 +140,9 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
         require(oldRootHash == lastBlockInfo.stateHash);
         bytes32 newRootHash = multisig.newRootHash();
 
-        totalBlocksCommitted += 1;
-        totalBlocksProven += 1;
-        totalBlocksExecuted += 1;
-
-        StoredBlockInfo memory storedBlockZero =
-            StoredBlockInfo(totalBlocksExecuted, 0, EMPTY_STRING_KECCAK, block.timestamp, newRootHash, bytes32(0));
-        storedBlockHashes[totalBlocksExecuted] = hashStoredBlockInfo(storedBlockZero);
+        // Overriding the old block's root hash with the new one
+        lastBlockInfo.stateHash = newRootHash;
+        storedBlockHashes[totalBlocksExecuted] = hashStoredBlockInfo(lastBlockInfo);
         return;
     }
 
