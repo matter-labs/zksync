@@ -808,6 +808,10 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
         Ok(())
     }
 
+    // This method does not have metrics, since it is used only for the
+    // migration for the nft regenesis.
+    // Remove this function once the regenesis is complete and the tool is not
+    // neded anymore: ZKS-663
     pub async fn reset_account_tree_cache(&mut self, block: BlockNumber) -> QueryResult<()> {
         sqlx::query!(
             "

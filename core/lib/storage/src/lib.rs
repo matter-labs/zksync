@@ -101,6 +101,7 @@ mod utils;
 use forced_exit_requests::ForcedExitRequestsSchema;
 
 pub use crate::connection::ConnectionPool;
+pub use sqlx::types::BigDecimal;
 pub type QueryResult<T, E = anyhow::Error> = Result<T, E>;
 
 /// The maximum possible block number in the storage.

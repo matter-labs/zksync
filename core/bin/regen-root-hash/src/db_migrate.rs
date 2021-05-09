@@ -1,16 +1,24 @@
-use num::BigUint;
 use std::collections::HashMap;
-use zksync_crypto::Fr;
-use zksync_storage::chain::account::{
-    records::{
-        // To remove confusion with the StorageAccounts in the `account.rs`
-        StorageAccount as ZkSyncStorageAccount,
-        StorageBalance as ZkSyncStorageBalance,
-    },
-    restore_account::restore_account,
+use std::convert::TryInto;
+use zksync_crypto::{
+    params::{MIN_NFT_TOKEN_ID, NFT_STORAGE_ACCOUNT_ADDRESS, NFT_STORAGE_ACCOUNT_ID, NFT_TOKEN_ID},
+    Fr,
 };
 use zksync_storage::StorageProcessor;
-use zksync_types::{Account, BlockNumber, Token, H256, U256};
+use zksync_storage::{
+    chain::account::{
+        records::{
+            StorageAccountCreation,
+            StorageAccountUpdate,
+            // To remove confusion with the StorageBalance in the `account.rs`
+            StorageBalance as DbStorageBalance,
+        },
+        restore_account::restore_account,
+    },
+    diff::StorageAccountDiff,
+    BigDecimal,
+};
+use zksync_types::{Account, AccountUpdate, BlockNumber, Token};
 
 pub async fn get_verified_block_number(
     storage: &mut StorageProcessor<'_>,
@@ -72,7 +80,7 @@ pub async fn read_accounts_from_db() -> anyhow::Result<Vec<(i64, Account)>> {
         .get_all_balances()
         .await?;
 
-    let mut accounts_balances: HashMap<i64, Vec<ZkSyncStorageBalance>> = HashMap::new();
+    let mut accounts_balances: HashMap<i64, Vec<DbStorageBalance>> = HashMap::new();
 
     for stored_account in stored_accounts.iter() {
         accounts_balances.insert(stored_account.id, vec![]);
@@ -95,6 +103,138 @@ pub async fn read_accounts_from_db() -> anyhow::Result<Vec<(i64, Account)>> {
     }
 
     Ok(accounts)
+}
+
+pub async fn add_nft_special_token(storage: &mut StorageProcessor<'_>) -> anyhow::Result<()> {
+    storage
+        .tokens_schema()
+        .store_token(Token {
+            id: NFT_TOKEN_ID,
+            symbol: "SPECIAL".to_string(),
+            address: *NFT_STORAGE_ACCOUNT_ADDRESS,
+            decimals: 18,
+            is_nft: true, // TODO: ZKS-635
+        })
+        .await?;
+    Ok(())
+}
+
+pub async fn commit_nft_special_account(
+    storage: &mut StorageProcessor<'_>,
+    block_number: BlockNumber,
+    update_order_id: usize,
+) -> anyhow::Result<Account> {
+    let (mut special_account, db_create_special_account) =
+        Account::create_account(NFT_STORAGE_ACCOUNT_ID, *NFT_STORAGE_ACCOUNT_ADDRESS);
+    special_account.set_balance(NFT_TOKEN_ID, num::BigUint::from(MIN_NFT_TOKEN_ID));
+
+    let db_set_special_account_balance = AccountUpdate::UpdateBalance {
+        old_nonce: special_account.nonce,
+        new_nonce: special_account.nonce,
+        balance_update: (
+            NFT_TOKEN_ID,
+            num::BigUint::from(0u64),
+            num::BigUint::from(MIN_NFT_TOKEN_ID),
+        ),
+    };
+
+    storage
+        .chain()
+        .state_schema()
+        .commit_state_update(
+            block_number,
+            &[
+                db_create_special_account[0usize].clone(),
+                (NFT_STORAGE_ACCOUNT_ID, db_set_special_account_balance),
+            ],
+            update_order_id,
+        )
+        .await?;
+
+    Ok(special_account)
+}
+
+pub async fn apply_nft_storage_account(
+    storage: &mut StorageProcessor<'_>,
+    special_account: Account,
+    block_number: BlockNumber,
+    update_order_id: usize,
+) -> anyhow::Result<()> {
+    let account_id: i64 = NFT_STORAGE_ACCOUNT_ID.0.try_into().unwrap();
+    let nonce: i64 = special_account.nonce.0.try_into().unwrap();
+    let block_number: i64 = block_number.0.try_into().unwrap();
+    let update_order_id: i32 = update_order_id.try_into().unwrap();
+    let coin_id: i32 = NFT_TOKEN_ID.0.try_into().unwrap();
+
+    let storage_account_creation = StorageAccountCreation {
+        account_id,
+        is_create: true,
+        block_number,
+        address: NFT_STORAGE_ACCOUNT_ADDRESS.as_bytes().to_vec(),
+        nonce,
+        update_order_id,
+    };
+
+    let storage_balance_update = StorageAccountUpdate {
+        // This value is not used for our pursposes and will not be stored anywhere
+        // so can put whatever we want here
+        balance_update_id: 0,
+        account_id,
+        block_number,
+        coin_id,
+        old_balance: BigDecimal::from(0u64),
+        new_balance: BigDecimal::from(MIN_NFT_TOKEN_ID),
+        old_nonce: nonce,
+        new_nonce: nonce,
+        update_order_id: update_order_id + 1,
+    };
+
+    let create_diff = StorageAccountDiff::Create(storage_account_creation);
+    let upd_balance_diff = StorageAccountDiff::BalanceUpdate(storage_balance_update);
+
+    storage
+        .chain()
+        .state_schema()
+        .apply_storage_account_diff(create_diff)
+        .await?;
+    storage
+        .chain()
+        .state_schema()
+        .apply_storage_account_diff(upd_balance_diff)
+        .await?;
+
+    Ok(())
+}
+
+pub async fn insert_nft_account(
+    storage: &mut StorageProcessor<'_>,
+    block_number: BlockNumber,
+) -> anyhow::Result<()> {
+    let mut transaction = storage.start_transaction().await?;
+
+    add_nft_special_token(&mut transaction).await?;
+
+    // This number is only used for sorting when applying the block
+    // Since we are overridining the existing block
+    // we could enter here any number we want
+    let update_order_id = 1000;
+
+    let special_account =
+        commit_nft_special_account(&mut transaction, block_number, update_order_id).await?;
+
+    // Applying account
+
+    apply_nft_storage_account(
+        &mut transaction,
+        special_account,
+        block_number,
+        update_order_id,
+    )
+    .await?;
+
+    transaction.commit().await?;
+
+    Ok(())
 }
 
 pub async fn migrage_db_for_nft(past_root_hash: Fr, root_hash: Fr) -> anyhow::Result<()> {
@@ -122,11 +262,7 @@ pub async fn migrage_db_for_nft(past_root_hash: Fr, root_hash: Fr) -> anyhow::Re
         .await?;
 
     println!("The new root hash is set. Inserting nft account.");
-    transaction
-        .chain()
-        .state_schema()
-        .insert_nft_account(block_number)
-        .await?;
+    insert_nft_account(&mut transaction, block_number).await?;
 
     println!("Delete account tree cache for the last block.");
     transaction
