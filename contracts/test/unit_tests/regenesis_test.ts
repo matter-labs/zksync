@@ -4,6 +4,7 @@ const { expect } = require('chai');
 const hardhat = require('hardhat');
 import { Deployer, readContractCode, readProductionContracts } from '../../src.ts/deploy';
 import { ParamType } from '@ethersproject/abi';
+import { getSigners } from '@nomiclabs/hardhat-ethers/dist/src/helpers';
 
 const StoredBlockInfoAbi = {
     components: [
@@ -145,12 +146,8 @@ describe('Regenesis test', function () {
         const timestamp = (await wallet.provider.getBlock(receipt.blockNumber)).timestamp;
 
         const newBlock = {
-            blockNumber: 1,
-            priorityOperations: 0,
-            pendingOnchainOperationsHash: '0xc5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470',
-            timestamp: timestamp,
+            ...genesisBlock,
             stateHash: '0x2a9b50e17ece607c8c88b1833426fd9e60332685b94a1534fcf26948e373604c',
-            commitment: '0x0000000000000000000000000000000000000000000000000000000000000000'
         };
 
         const newBlockData = ethers.utils.defaultAbiCoder.encode([StoredBlockInfo], [newBlock]);
