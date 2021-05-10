@@ -9,6 +9,7 @@ use zksync_crypto::{
 use zksync_utils::{format_units, BigUintSerdeAsRadix10Str};
 
 use super::{TimeRange, TxSignature, VerifiedSignatureCache};
+use crate::tx::error::TransactionSignatureError;
 use crate::{
     account::PubKeyHash,
     helpers::{is_fee_amount_packable, pack_fee_amount},
@@ -101,13 +102,13 @@ impl WithdrawNFT {
         nonce: Nonce,
         time_range: TimeRange,
         private_key: &PrivateKey<Engine>,
-    ) -> Result<Self, anyhow::Error> {
+    ) -> Result<Self, TransactionSignatureError> {
         let mut tx = Self::new(
             account_id, from, to, token, fee_token, fee, nonce, time_range, None,
         );
         tx.signature = TxSignature::sign_musig(private_key, &tx.get_bytes());
         if !tx.check_correctness() {
-            anyhow::bail!(crate::tx::TRANSACTION_SIGNATURE_ERROR);
+            return Err(TransactionSignatureError);
         }
         Ok(tx)
     }

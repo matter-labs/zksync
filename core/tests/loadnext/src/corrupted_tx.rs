@@ -103,6 +103,18 @@ impl Corrupted for (ZkSyncTx, Option<PackedEthSignature>) {
                     .as_bytes()
                     .to_vec()
             }
+            ZkSyncTx::MintNFT(tx) => {
+                tx.signature = TxSignature::sign_musig(&zksync_pk, &tx.get_bytes());
+                tx.get_ethereum_sign_message(token_symbol, decimals)
+                    .as_bytes()
+                    .to_vec()
+            }
+            ZkSyncTx::WithdrawNFT(tx) => {
+                tx.signature = TxSignature::sign_musig(&zksync_pk, &tx.get_bytes());
+                tx.get_ethereum_sign_message(token_symbol, decimals)
+                    .as_bytes()
+                    .to_vec()
+            }
         };
 
         if let Some(eth_sig) = &mut self.1 {
@@ -148,12 +160,18 @@ impl Corrupted for (ZkSyncTx, Option<PackedEthSignature>) {
                 tx.signature = bad_signature;
             }
             ZkSyncTx::Close(_tx) => unreachable!(),
+            ZkSyncTx::MintNFT(tx) => {
+                tx.signature = bad_signature;
+            }
+            ZkSyncTx::WithdrawNFT(tx) => {
+                tx.signature = bad_signature;
+            }
         }
         self
     }
 
     fn nonexistent_token(mut self, eth_pk: H256, token_symbol: &str, decimals: u8) -> Self {
-        let bad_token = TokenId(199u16); // Assuming that on the stand there will be much less tokens.
+        let bad_token = TokenId(199u32); // Assuming that on the stand there will be much less tokens.
         match &mut self.0 {
             ZkSyncTx::ChangePubKey(tx) => {
                 tx.fee_token = bad_token;
@@ -171,6 +189,12 @@ impl Corrupted for (ZkSyncTx, Option<PackedEthSignature>) {
                 tx.fee_token = bad_token;
             }
             ZkSyncTx::Close(_tx) => unreachable!(),
+            ZkSyncTx::MintNFT(tx) => {
+                tx.fee_token = bad_token;
+            }
+            ZkSyncTx::WithdrawNFT(tx) => {
+                tx.fee_token = bad_token;
+            }
         }
         self.resign(eth_pk, token_symbol, decimals);
 
@@ -197,6 +221,8 @@ impl Corrupted for (ZkSyncTx, Option<PackedEthSignature>) {
             ZkSyncTx::Swap(tx) => {
                 tx.amounts = (bad_amount.clone(), bad_amount);
             }
+            ZkSyncTx::MintNFT(_) => unreachable!("MintNFT doesn't have amount"),
+            ZkSyncTx::WithdrawNFT(_) => unreachable!("WithdrawNFT doesn't have amount"),
             ZkSyncTx::Close(_tx) => unreachable!(),
         }
         self.resign(eth_pk, token_symbol, decimals);
@@ -225,6 +251,12 @@ impl Corrupted for (ZkSyncTx, Option<PackedEthSignature>) {
                 tx.fee = bad_fee;
             }
             ZkSyncTx::Close(_tx) => unreachable!(),
+            ZkSyncTx::MintNFT(tx) => {
+                tx.fee = bad_fee;
+            }
+            ZkSyncTx::WithdrawNFT(tx) => {
+                tx.fee = bad_fee;
+            }
         }
         self.resign(eth_pk, token_symbol, decimals);
 
@@ -247,6 +279,8 @@ impl Corrupted for (ZkSyncTx, Option<PackedEthSignature>) {
                 tx.amounts = (big_amount.clone(), big_amount);
             }
             ZkSyncTx::Close(_tx) => unreachable!(),
+            ZkSyncTx::MintNFT(_) => unreachable!("MintNFT doesn't have amount"),
+            ZkSyncTx::WithdrawNFT(_) => unreachable!("WithdrawNFT doesn't have amount"),
         }
         self.resign(eth_pk, token_symbol, decimals);
 
@@ -272,6 +306,12 @@ impl Corrupted for (ZkSyncTx, Option<PackedEthSignature>) {
                 tx.fee = zero_fee;
             }
             ZkSyncTx::Close(_tx) => unreachable!(),
+            ZkSyncTx::MintNFT(tx) => {
+                tx.fee = zero_fee;
+            }
+            ZkSyncTx::WithdrawNFT(tx) => {
+                tx.fee = zero_fee;
+            }
         }
         self.resign(eth_pk, token_symbol, decimals);
 

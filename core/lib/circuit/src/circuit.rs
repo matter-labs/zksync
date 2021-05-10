@@ -223,7 +223,7 @@ impl<'a, E: RescueEngine + JubjubEngine> Circuit<E> for ZkSyncCircuit<'a, E> {
             data[ChangePubKeyOp::OP_CODE as usize] = vec![zero.clone(); 2];
             data[ForcedExitOp::OP_CODE as usize] = vec![zero.clone(); 2];
             data[MintNFTOp::OP_CODE as usize] = vec![zero.clone(); 2];
-            data[WithdrawNFTOp::OP_CODE as usize] = vec![zero.clone(); 3];
+            data[WithdrawNFTOp::OP_CODE as usize] = vec![zero.clone(); 4];
             data[SwapOp::OP_CODE as usize] = vec![zero; 2];
 
             // this operation is disabled for now
@@ -1511,7 +1511,9 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
         pubdata_bits.extend(op_data.eth_address.get_bits_be()); // initiator_address = 20 bytes
         pubdata_bits.extend(cur.token.get_bits_be()); // token_id = 4 bytes
         pubdata_bits.extend(op_data.full_amount.get_bits_be()); // full_amount = 16 bytes
+        pubdata_bits.extend(op_data.special_accounts[0].get_bits_be()); // creator_account_id = 4 bytes
         pubdata_bits.extend(op_data.special_eth_addresses[0].get_bits_be()); // creator_address = 20 bytes
+        pubdata_bits.extend(op_data.special_serial_id.get_bits_be()); // serial_id = 4 bytes
         pubdata_bits.extend(
             op_data
                 .special_content_hash
@@ -2477,7 +2479,9 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
         let mut pubdata_bits = vec![];
         pubdata_bits.extend(global_variables.chunk_data.tx_type.get_bits_be()); // tx_type = 1 byte
         pubdata_bits.extend(op_data.special_accounts[1].get_bits_be()); // initiator_account_id = 4 bytes
+        pubdata_bits.extend(op_data.special_accounts[0].get_bits_be()); // creator_account_id = 4 bytes
         pubdata_bits.extend(op_data.special_eth_addresses[0].get_bits_be()); // creator_address = 20 bytes
+        pubdata_bits.extend(op_data.special_serial_id.get_bits_be()); // serial_id = 4 bytes
         pubdata_bits.extend(
             op_data
                 .special_content_hash

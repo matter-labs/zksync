@@ -1,8 +1,6 @@
 use num::BigUint;
 use std::collections::{HashMap, HashSet};
 
-use anyhow::Error;
-
 use zksync_crypto::{params, params::NFT_STORAGE_ACCOUNT_ID, Fr};
 use zksync_types::{
     helpers::reverse_updates,
@@ -342,14 +340,14 @@ impl ZkSyncState {
 
     pub fn execute_tx(&mut self, tx: ZkSyncTx) -> Result<OpSuccess, OpError> {
         match tx {
-            ZkSyncTx::Transfer(tx) => self.apply_tx(*tx)?,
-            ZkSyncTx::Withdraw(tx) => self.apply_tx(*tx)?,
-            ZkSyncTx::Close(tx) => self.apply_tx(*tx)?,
-            ZkSyncTx::ChangePubKey(tx) => self.apply_tx(*tx)?,
-            ZkSyncTx::ForcedExit(tx) => self.apply_tx(*tx)?,
-            ZkSyncTx::Swap(tx) => self.apply_tx(*tx)?,
-            ZkSyncTx::MintNFT(tx) => self.apply_tx(*tx)?,
-            ZkSyncTx::WithdrawNFT(tx) => self.apply_tx(*tx)?,
+            ZkSyncTx::Transfer(tx) => Ok(self.apply_tx(*tx)?),
+            ZkSyncTx::Withdraw(tx) => Ok(self.apply_tx(*tx)?),
+            ZkSyncTx::Close(tx) => Ok(self.apply_tx(*tx)?),
+            ZkSyncTx::ChangePubKey(tx) => Ok(self.apply_tx(*tx)?),
+            ZkSyncTx::ForcedExit(tx) => Ok(self.apply_tx(*tx)?),
+            ZkSyncTx::Swap(tx) => Ok(self.apply_tx(*tx)?),
+            ZkSyncTx::MintNFT(tx) => Ok(self.apply_tx(*tx)?),
+            ZkSyncTx::WithdrawNFT(tx) => Ok(self.apply_tx(*tx)?),
         }
     }
 

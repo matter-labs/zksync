@@ -4,7 +4,6 @@ use std::str::FromStr;
 use lazy_static::lazy_static;
 use zksync_basic_types::{AccountId, Address, TokenId};
 // Workspace deps
-use crate::merkle_tree::rescue_hasher::BabyRescueHasher;
 use crate::{
     franklin_crypto::{alt_babyjubjub::AltJubjubBn256, rescue::bn256::Bn256RescueParams},
     merkle_tree::rescue_hasher::BabyRescueHasher,

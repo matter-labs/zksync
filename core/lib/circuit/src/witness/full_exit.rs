@@ -14,7 +14,8 @@ use zksync_crypto::{
     },
     params::{
         account_tree_depth, ACCOUNT_ID_BIT_WIDTH, BALANCE_BIT_WIDTH, CHUNK_BIT_WIDTH,
-        ETH_ADDRESS_BIT_WIDTH, NFT_STORAGE_ACCOUNT_ID, TOKEN_BIT_WIDTH, TX_TYPE_BIT_WIDTH,
+        ETH_ADDRESS_BIT_WIDTH, NFT_STORAGE_ACCOUNT_ID, SERIAL_ID_WIDTH, TOKEN_BIT_WIDTH,
+        TX_TYPE_BIT_WIDTH,
     },
 };
 use zksync_types::FullExitOp;
@@ -105,10 +106,21 @@ impl Witness for FullExitWitness<Bn256> {
             &self.args.full_amount.unwrap(),
             BALANCE_BIT_WIDTH,
         );
+
+        append_be_fixed_width(
+            &mut pubdata_bits,
+            &self.args.special_accounts[0].unwrap(),
+            ACCOUNT_ID_BIT_WIDTH,
+        );
         append_be_fixed_width(
             &mut pubdata_bits,
             &self.args.special_eth_addresses[0].unwrap(),
             ETH_ADDRESS_BIT_WIDTH,
+        );
+        append_be_fixed_width(
+            &mut pubdata_bits,
+            &self.args.special_serial_id.unwrap(),
+            SERIAL_ID_WIDTH,
         );
         for bit in &self.args.special_content_hash {
             append_be_fixed_width(&mut pubdata_bits, &bit.unwrap(), 1);

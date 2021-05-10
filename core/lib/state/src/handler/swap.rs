@@ -20,7 +20,10 @@ impl TxHandler<Swap> for ZkSyncState {
             tx.submitter_id <= max_account_id(),
             SwapOpError::AccountIncorrect
         );
-        invariant!(tx.fee_token <= max_token_id(), SwapOpError::InvalidTokenId);
+        invariant!(
+            tx.fee_token <= max_fungible_token_id(),
+            SwapOpError::InvalidTokenId
+        );
 
         let (submitter, submitter_account) = self
             .get_account_by_address(&tx.submitter_address)
@@ -41,10 +44,10 @@ impl TxHandler<Swap> for ZkSyncState {
 
         let (recipient_0, _) = self
             .get_account_by_address(&tx.orders.0.recipient_address)
-            .ok_or_else(|| format_err!("Recipient account does not exist"))?;
+            .ok_or(SwapOpError::RecipientAccountNotFound)?;
         let (recipient_1, _) = self
             .get_account_by_address(&tx.orders.1.recipient_address)
-            .ok_or_else(|| format_err!("Recipient account does not exist"))?;
+            .ok_or(SwapOpError::RecipientAccountNotFound)?;
 
         Ok(SwapOp {
             tx: tx.clone(),
@@ -87,16 +90,12 @@ impl ZkSyncState {
             order.account_id <= max_account_id(),
             SwapOpError::AccountIncorrect
         );
-        invariant!(
-            order.recipient_id <= max_account_id(),
-            SwapOpError::AccountIncorrect
-        );
 
         let account = self
             .get_account(order.account_id)
             .ok_or(SwapOpError::AccountIncorrect)?;
         let _recipient = self
-            .get_account(order.recipient_id)
+            .get_account_by_address(&order.recipient_address)
             .ok_or(SwapOpError::RecipientAccountNotFound)?;
 
         invariant!(
@@ -160,9 +159,9 @@ impl ZkSyncState {
             swap.orders.1.amount.is_zero() || swap.orders.1.amount == swap.amounts.1,
             SwapOpError::AmountsNotMatched
         );
-        ensure!(
+        invariant!(
             swap.orders.0.account_id != swap.orders.1.account_id,
-            "Self-swap is not allowed"
+            SwapOpError::SelfSwap
         );
 
         let sold = &swap.amounts.0 * &swap.orders.0.price.1;

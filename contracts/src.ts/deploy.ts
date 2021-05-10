@@ -108,7 +108,7 @@ export class Deployer {
         }
 
         const govContract = await deployContract(this.deployWallet, this.contracts.governance, [], {
-            gasLimit: 1000000,
+            gasLimit: 1500000,
             ...ethTxOptions
         });
         const govRec = await govContract.deployTransaction.wait();

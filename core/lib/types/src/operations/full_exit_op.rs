@@ -1,13 +1,13 @@
-use crate::{operations::error::FullExitOpError, AccountId, Address, FullExit, TokenId};
-use crate::{AccountId, Address, TokenId};
-use crate::{FullExit, H256};
 use num::{BigUint, FromPrimitive, ToPrimitive};
 use serde::{Deserialize, Serialize};
 use zksync_crypto::params::{
     ACCOUNT_ID_BIT_WIDTH, ADDRESS_WIDTH, BALANCE_BIT_WIDTH, CHUNK_BYTES, CONTENT_HASH_WIDTH,
     ETH_ADDRESS_BIT_WIDTH, TOKEN_BIT_WIDTH,
 };
+use zksync_crypto::primitives::FromBytes;
 use zksync_utils::BigUintSerdeWrapper;
+
+use crate::{operations::error::FullExitOpError, AccountId, Address, FullExit, TokenId, H256};
 
 /// FullExit operation. For details, see the documentation of [`ZkSyncOp`](./operations/enum.ZkSyncOp.html).
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -22,7 +22,7 @@ pub struct FullExitOp {
 }
 
 impl FullExitOp {
-    pub const CHUNKS: usize = 10;
+    pub const CHUNKS: usize = 11;
     pub const OP_CODE: u8 = 0x06;
     pub const WITHDRAW_DATA_PREFIX: [u8; 1] = [0];
 
@@ -41,7 +41,15 @@ impl FullExitOp {
                 .unwrap()
                 .to_be_bytes(),
         );
+        data.extend_from_slice(
+            &self
+                .creator_account_id
+                .clone()
+                .unwrap_or_default()
+                .to_be_bytes(),
+        );
         data.extend_from_slice(&self.creator_address.clone().unwrap_or_default().as_bytes());
+        data.extend_from_slice(&self.serial_id.clone().unwrap_or_default().to_be_bytes());
         data.extend_from_slice(&self.content_hash.clone().unwrap_or_default().as_bytes());
         data.resize(Self::CHUNKS * CHUNK_BYTES, 0x00);
         data

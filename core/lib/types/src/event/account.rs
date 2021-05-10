@@ -26,6 +26,8 @@ pub enum AccountStateChangeType {
     Delete,
     UpdateBalance,
     ChangePubKeyHash,
+    MintNFT,
+    RemoveNFT,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -46,45 +48,50 @@ pub struct AccountUpdateDetails {
 }
 
 impl AccountUpdateDetails {
-    pub fn from_account_update(account_id: AccountId, account_update: AccountUpdate) -> Self {
+    pub fn from_account_update(
+        account_id: AccountId,
+        account_update: AccountUpdate,
+    ) -> Option<Self> {
         match account_update {
-            AccountUpdate::Create { address: _, nonce } => Self {
+            AccountUpdate::Create { address: _, nonce } => Some(Self {
                 account_id,
                 nonce,
                 new_pub_key_hash: None,
                 token_id: None,
                 new_balance: None,
-            },
-            AccountUpdate::Delete { address: _, nonce } => Self {
+            }),
+            AccountUpdate::Delete { address: _, nonce } => Some(Self {
                 account_id,
                 nonce,
                 new_pub_key_hash: None,
                 token_id: None,
                 new_balance: None,
-            },
+            }),
             AccountUpdate::UpdateBalance {
                 old_nonce: _,
                 new_nonce,
                 balance_update,
-            } => Self {
+            } => Some(Self {
                 account_id,
                 nonce: new_nonce,
                 new_pub_key_hash: None,
                 token_id: Some(balance_update.0),
                 new_balance: Some(BigDecimal::from(BigInt::from(balance_update.2))),
-            },
+            }),
             AccountUpdate::ChangePubKeyHash {
                 old_pub_key_hash: _,
                 new_pub_key_hash,
                 old_nonce: _,
                 new_nonce,
-            } => Self {
+            } => Some(Self {
                 account_id,
                 nonce: new_nonce,
                 new_pub_key_hash: Some(new_pub_key_hash),
                 token_id: None,
                 new_balance: None,
-            },
+            }),
+            // Do not notify about minting nft's
+            AccountUpdate::MintNFT { .. } | AccountUpdate::RemoveNFT { .. } => None,
         }
     }
 }
@@ -96,6 +103,8 @@ impl From<&AccountUpdate> for AccountStateChangeType {
             AccountUpdate::Delete { .. } => AccountStateChangeType::Delete,
             AccountUpdate::UpdateBalance { .. } => AccountStateChangeType::UpdateBalance,
             AccountUpdate::ChangePubKeyHash { .. } => AccountStateChangeType::ChangePubKeyHash,
+            AccountUpdate::MintNFT { .. } => AccountStateChangeType::MintNFT,
+            AccountUpdate::RemoveNFT { .. } => AccountStateChangeType::RemoveNFT,
         }
     }
 }

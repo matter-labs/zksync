@@ -1,10 +1,3 @@
-use crate::{
-    helpers::{pack_fee_amount, pack_token_amount, unpack_fee_amount, unpack_token_amount},
-    tx::Order,
-    Swap,
-};
-use crate::{AccountId, Address, Nonce, TokenId};
-use anyhow::{ensure, format_err};
 use num::Zero;
 use serde::{Deserialize, Serialize};
 use zksync_crypto::params::{
@@ -17,7 +10,7 @@ use crate::{
     helpers::{pack_fee_amount, pack_token_amount, unpack_fee_amount, unpack_token_amount},
     operations::error::SwapOpError,
     tx::Order,
-    AccountId, Nonce, Swap, TokenId,
+    AccountId, Address, Nonce, Swap, TokenId,
 };
 
 /// Swap operation. For details, see the documentation of [`ZkSyncOp`](./operations/enum.ZkSyncOp.html).

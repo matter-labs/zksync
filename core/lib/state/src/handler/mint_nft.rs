@@ -1,8 +1,6 @@
 use num::{BigUint, ToPrimitive, Zero};
 use std::time::Instant;
 
-use anyhow::{bail, ensure, format_err};
-
 use zksync_types::{
     operations::MintNFTOp,
     tokens::NFT,
@@ -16,25 +14,26 @@ use zksync_crypto::params::{
 };
 
 use crate::{
-    handler::TxHandler,
+    handler::{error::MintNFTOpError, TxHandler},
     state::{CollectedFee, OpSuccess, ZkSyncState},
 };
 
 impl TxHandler<MintNFT> for ZkSyncState {
     type Op = MintNFTOp;
+    type OpError = MintNFTOpError;
 
-    fn create_op(&self, tx: MintNFT) -> Result<Self::Op, anyhow::Error> {
-        ensure!(
+    fn create_op(&self, tx: MintNFT) -> Result<Self::Op, Self::OpError> {
+        invariant!(
             tx.fee_token <= max_fungible_token_id(),
-            "Token id is not supported"
+            MintNFTOpError::InvalidTokenId
         );
-        ensure!(
+        invariant!(
             tx.recipient != Address::zero(),
-            "Minting to Account with address 0 is not allowed"
+            MintNFTOpError::RecipientAccountIncorrect
         );
         let (recipient, _) = self
             .get_account_by_address(&tx.recipient)
-            .ok_or_else(|| format_err!("Recipient account does not exist"))?;
+            .ok_or(MintNFTOpError::RecipientAccountNotFound)?;
 
         let op = MintNFTOp {
             creator_account_id: tx.creator_id,
@@ -45,7 +44,7 @@ impl TxHandler<MintNFT> for ZkSyncState {
         Ok(op)
     }
 
-    fn apply_tx(&mut self, tx: MintNFT) -> Result<OpSuccess, anyhow::Error> {
+    fn apply_tx(&mut self, tx: MintNFT) -> Result<OpSuccess, Self::OpError> {
         let op = self.create_op(tx)?;
 
         let (fee, updates) = <Self as TxHandler<MintNFT>>::apply_op(self, &op)?;
@@ -61,14 +60,14 @@ impl TxHandler<MintNFT> for ZkSyncState {
     fn apply_op(
         &mut self,
         op: &Self::Op,
-    ) -> Result<(Option<CollectedFee>, AccountUpdates), anyhow::Error> {
+    ) -> Result<(Option<CollectedFee>, AccountUpdates), Self::OpError> {
         let start = Instant::now();
         let mut updates = Vec::new();
 
         // The creator must pay fee for generating NFT.
         let mut creator_account = self
             .get_account(op.creator_account_id)
-            .ok_or_else(|| format_err!("Creator account not found"))?;
+            .ok_or(MintNFTOpError::CreatorAccountNotFound)?;
         let old_balance = creator_account.get_balance(op.tx.fee_token);
         let nonce = creator_account.nonce;
         creator_account.sub_balance(op.tx.fee_token, &op.tx.fee);
@@ -163,11 +162,12 @@ impl TxHandler<MintNFT> for ZkSyncState {
         // Add this token to recipient account
         let mut recipient_account = self
             .get_account(op.recipient_account_id)
-            .ok_or_else(|| format_err!("Recipient account not found"))?;
+            .ok_or(MintNFTOpError::RecipientAccountNotFound)?;
         let old_amount = recipient_account.get_balance(token_id);
-        if old_amount != BigUint::zero() {
-            bail!("Token {} is already in account", token_id)
-        }
+        invariant!(
+            old_amount == BigUint::zero(),
+            MintNFTOpError::TokenIsAlreadyInAccount
+        );
         let old_nonce = recipient_account.nonce;
         recipient_account.add_balance(token_id, &BigUint::from(1u32));
         updates.push((

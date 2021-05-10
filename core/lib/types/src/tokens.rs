@@ -8,7 +8,7 @@ use thiserror::Error;
 pub use zksync_crypto::params::ETH_TOKEN_ID;
 use zksync_utils::{parse_env, UnsignedRatioSerializeAsDecimal};
 
-use crate::{tx::ChangePubKeyType, Address, Log, TokenId, U256};
+use crate::{tx::ChangePubKeyType, AccountId, Address, Log, TokenId, H256, U256};
 
 #[derive(Debug, Error)]
 pub enum NewTokenEventParseError {

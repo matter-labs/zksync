@@ -87,6 +87,50 @@ pub enum TransferOpError {
 }
 
 #[derive(Clone, Debug, Error, PartialEq)]
+pub enum MintNFTOpError {
+    #[error("Token id is not supported")]
+    InvalidTokenId,
+    #[error("Creator account does not exist")]
+    CreatorAccountNotFound,
+    #[error("Account is locked")]
+    CreatorAccountLocked,
+    #[error("MintNFT signature is incorrect")]
+    InvalidSignature,
+    #[error("Recipient account id is incorrect")]
+    RecipientAccountIncorrect,
+    #[error("Recipient account not found")]
+    RecipientAccountNotFound,
+    #[error("Nonce mismatch")]
+    NonceMismatch,
+    #[error("Not enough balance")]
+    InsufficientBalance,
+    #[error("NFT token is already in account")]
+    TokenIsAlreadyInAccount,
+}
+
+#[derive(Clone, Debug, Error, PartialEq)]
+pub enum WithdrawNFTOpError {
+    #[error("Token id is not supported")]
+    InvalidTokenId,
+    #[error("From account does not exist")]
+    FromAccountNotFound,
+    #[error("Account is locked")]
+    FromAccountLocked,
+    #[error("Withdraw signature is incorrect")]
+    InvalidSignature,
+    #[error("Withdraw account id is incorrect")]
+    FromAccountIncorrect,
+    #[error("Creator account id is incorrect")]
+    CreatorAccountIncorrect,
+    #[error("Nonce mismatch")]
+    NonceMismatch,
+    #[error("Not enough balance")]
+    InsufficientBalance,
+    #[error("NFT was not found")]
+    NFTNotFound,
+}
+
+#[derive(Clone, Debug, Error, PartialEq)]
 pub enum WithdrawOpError {
     #[error("Token id is not supported")]
     InvalidTokenId,
@@ -139,4 +183,6 @@ pub enum SwapOpError {
     AmountsNotMatched,
     #[error("Amounts are not compatible with prices")]
     AmountsNotCompatible,
+    #[error("Self-swap is not allowed")]
+    SelfSwap,
 }

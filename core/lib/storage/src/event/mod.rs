@@ -175,14 +175,20 @@ impl<'a, 'c> EventSchema<'a, 'c> {
             .into_iter()
             .map(|(account_id, update)| {
                 let update_type = AccountStateChangeType::from(&update);
-                let update_details = AccountUpdateDetails::from_account_update(account_id, update);
-                let account_event = AccountEvent {
-                    update_type,
-                    status,
-                    update_details,
-                };
-                serde_json::to_value(account_event).expect("couldn't serialize account event")
+                AccountUpdateDetails::from_account_update(account_id, update).map(
+                    |update_details| {
+                        let account_event = AccountEvent {
+                            update_type,
+                            status,
+                            update_details,
+                        };
+                        serde_json::to_value(account_event)
+                            .expect("couldn't serialize account event")
+                    },
+                )
             })
+            .filter(|x| x.is_some())
+            .map(|x| x.unwrap())
             .collect();
 
         transaction
