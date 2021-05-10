@@ -30,6 +30,11 @@ pub struct Params {
     #[structopt(short = "d")]
     pub db_migrate: bool,
 
+    /// A flag that indicates that the new tree will not be
+    /// double-checked. Shoult NOT be used in production
+    #[structopt(long = "no-double-check")]
+    pub no_double_check: bool,
+
     /// The path to the JSON dump of the accounts table
     #[structopt(short = "a", env = "ACCOUNTS_DUMP")]
     pub accounts_dump: Option<String>,
@@ -77,8 +82,12 @@ async fn main() -> anyhow::Result<()> {
 
     let mut new_tree = get_state::<CircuitAccountDepth32>(&accounts);
 
-    // Verify that each of the u32::MAX accounts has the same accounts in both trees
-    verify_identical_trees(&old_tree, &new_tree, u32::MAX, verify_accounts_equal).unwrap();
+    if params.no_double_check {
+        println!("Skipping re-verification of the trees. This should not be used in production.");
+    } else {
+        // Verify that each of the u32::MAX accounts has the same accounts in both trees
+        verify_identical_trees(&old_tree, &new_tree, u32::MAX, verify_accounts_equal).unwrap();
+    }
 
     // The new tree will also contain the NFT_STORAGE_ACCOUNT
     let nft_account = get_nft_circuit_account();
