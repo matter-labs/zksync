@@ -7,7 +7,7 @@ import "./Utils.sol";
 
 pragma experimental ABIEncoderV2;
 
-/// @title zkSync main contract
+/// @title Regenesis Multisig contract
 /// @author Matter Labs
 contract RegenesisMultisig is Ownable {
     address[] public partners;
@@ -19,7 +19,6 @@ contract RegenesisMultisig is Ownable {
     bytes32 public newRootHash;
 
     constructor(address[] memory _partners, uint32 _requiredNumberOfSignatures) Ownable(msg.sender) {
-        // We obviously should require less signatures than there are addresses
         require(_requiredNumberOfSignatures <= _partners.length, "0");
 
         partners = _partners;
