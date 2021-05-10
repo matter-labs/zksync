@@ -26,6 +26,10 @@ pub struct Params {
     #[structopt(short = "h", env = "CURRENT_ROOT_HASH")]
     pub current_root_hash: String,
 
+    /// A flag to tell that we want to migrate the db
+    #[structopt(short = "d")]
+    pub db_migrate: bool,
+
     /// The path to the JSON dump of the accounts table
     #[structopt(short = "a", env = "ACCOUNTS_DUMP")]
     pub accounts_dump: Option<String>,
@@ -35,12 +39,8 @@ pub struct Params {
     pub balances_dump: Option<String>,
 
     /// The private key of the signer
-    #[structopt(short = "pk", env = "PRIVATE_KEY")]
+    #[structopt(short = "p", env = "PRIVATE_KEY")]
     pub private_key: Option<String>,
-
-    /// A flag to tell that we want to migrate the db
-    #[structopt(short = "db")]
-    pub db_migrate: bool,
 }
 
 #[tokio::main]
