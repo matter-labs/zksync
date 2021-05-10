@@ -137,7 +137,7 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
 
         RegenesisMultisig multisig = RegenesisMultisig($$(REGENESIS_MULTISIG_ADDRESS));
         bytes32 oldRootHash = multisig.oldRootHash();
-        require(oldRootHash == lastBlockInfo.stateHash);
+        require(oldRootHash == lastBlockInfo.stateHash, "wqqe");
         bytes32 newRootHash = multisig.newRootHash();
 
         // Overriding the old block's root hash with the new one
