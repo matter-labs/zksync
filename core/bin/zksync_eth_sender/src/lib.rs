@@ -173,9 +173,9 @@ impl<DB: DatabaseInterface> ETHSender<DB> {
         drop(connection);
 
         Self {
-            ethereum,
             ongoing_ops,
             db,
+            ethereum,
             tx_queue,
             gas_adjuster,
             options,

@@ -487,7 +487,7 @@ impl LoadtestExecutor {
                 CHUNK_SIZES,
                 txs_queue
                     .into_iter()
-                    .filter_map(|x| x)
+                    .flatten()
                     .map(|(tx, sign)| monitor.send_tx(tx, sign)),
             )
             .await?;
