@@ -34,7 +34,7 @@ impl ContractTopics {
                 .expect("main contract abi error")
                 .signature(),
             factory_registered: governance_contract
-                .event("NFTFactoryRegistered")
+                .event("NFTFactoryRegisteredCreator")
                 .expect("main contract abi error")
                 .signature(),
         }

@@ -23,7 +23,7 @@ pub struct FullExitOp {
 }
 
 impl FullExitOp {
-    pub const CHUNKS: usize = 10;
+    pub const CHUNKS: usize = 11;
     pub const OP_CODE: u8 = 0x06;
     pub const WITHDRAW_DATA_PREFIX: [u8; 1] = [0];
 
@@ -42,7 +42,15 @@ impl FullExitOp {
                 .unwrap()
                 .to_be_bytes(),
         );
+        data.extend_from_slice(
+            &self
+                .creator_account_id
+                .clone()
+                .unwrap_or_default()
+                .to_be_bytes(),
+        );
         data.extend_from_slice(&self.creator_address.clone().unwrap_or_default().as_bytes());
+        data.extend_from_slice(&self.serial_id.clone().unwrap_or_default().to_be_bytes());
         data.extend_from_slice(&self.content_hash.clone().unwrap_or_default().as_bytes());
         data.resize(Self::CHUNKS * CHUNK_BYTES, 0x00);
         data

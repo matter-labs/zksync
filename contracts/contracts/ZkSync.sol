@@ -251,12 +251,13 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
     /// @notice  Withdraws NFT from zkSync contract to the owner
     /// @param _tokenId Id of NFT token
     function withdrawPendingNFTBalance(uint32 _tokenId) external nonReentrant {
-        require(_tokenId > MAX_FUNGIBLE_TOKEN_ID, "oq"); // Withdraw only nft tokens
         Operations.WithdrawNFT memory op = pendingWithdrawnNFTs[_tokenId];
-        require(_tokenId == op.tokenId, "op"); // Token does not exists
-        require(op.creator != address(0x0), "op"); // Token does not exists
-        NFTFactory _factory = governance.getNFTFactory(op.creator);
-        _factory.mintNFT(op.creator, op.owner, op.contentHash, op.tokenId);
+        require(op.creatorAddress != address(0), "op"); // No NFT to withdraw
+        NFTFactory _factory = governance.getNFTFactory(op.creatorAccountId, op.creatorAddress);
+        _factory.mintNFT(op.creatorAddress, op.receiver, op.serialId, op.contentHash, op.tokenId);
+        // Save withdrawn nfts for future deposits
+        withdrawnNFTs[op.tokenId] = address(_factory);
+        emit WithdrawalNFT(op.tokenId);
         delete pendingWithdrawnNFTs[_tokenId];
     }
 
@@ -282,7 +283,9 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
                 owner: msg.sender,
                 tokenId: uint32(tokenId),
                 amount: 0, // unknown at this point
+                nftCreatorAccountId: uint32(0), // unknown at this point
                 nftCreatorAddress: address(0), // unknown at this point
+                nftSerialId: uint32(0), // unknown at this point
                 nftContentHash: bytes32(0) // unknown at this point
             });
         bytes memory pubData = Operations.writeFullExitPubdataForPriorityQueue(op);
@@ -310,7 +313,9 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
                 owner: msg.sender,
                 tokenId: _tokenId,
                 amount: 0, // unknown at this point
+                nftCreatorAccountId: uint32(0), // unknown at this point
                 nftCreatorAddress: address(0), // unknown at this point
+                nftSerialId: uint32(0), // unknown at this point
                 nftContentHash: bytes32(0) // unknown at this point
             });
         bytes memory pubData = Operations.writeFullExitPubdataForPriorityQueue(op);
@@ -382,8 +387,16 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
     /// @dev 1. Try to send token to _recipients
     /// @dev 2. On failure: Increment _recipients balance to withdraw.
     function withdrawOrStoreNFT(Operations.WithdrawNFT memory op) internal {
-        NFTFactory _factory = governance.getNFTFactory(op.creator);
-        try _factory.mintNFT{gas: WITHDRAWAL_GAS_LIMIT}(op.creator, op.owner, op.contentHash, op.tokenId) {
+        NFTFactory _factory = governance.getNFTFactory(op.creatorAccountId, op.creatorAddress);
+        try
+            _factory.mintNFT{gas: WITHDRAWAL_GAS_LIMIT}(
+                op.creatorAddress,
+                op.receiver,
+                op.serialId,
+                op.contentHash,
+                op.tokenId
+            )
+        {
             // Save withdrawn nfts for future deposits
             withdrawnNFTs[op.tokenId] = address(_factory);
             emit WithdrawalNFT(op.tokenId);
@@ -454,9 +467,16 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
                     withdrawOrStore(uint16(op.tokenId), op.owner, op.amount);
                 } else {
                     if (op.amount == 1) {
-                        Operations.WithdrawNFT memory nftOp =
-                            Operations.WithdrawNFT(op.nftCreatorAddress, op.nftContentHash, op.owner, op.tokenId);
-                        withdrawOrStoreNFT(nftOp);
+                        Operations.WithdrawNFT memory withdrawNftOp =
+                            Operations.WithdrawNFT(
+                                op.nftCreatorAccountId,
+                                op.nftCreatorAddress,
+                                op.nftSerialId,
+                                op.nftContentHash,
+                                op.owner,
+                                op.tokenId
+                            );
+                        withdrawOrStoreNFT(withdrawNftOp);
                     }
                 }
             } else if (opType == Operations.OpType.WithdrawNFT) {
@@ -582,7 +602,9 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
         uint32 _accountId,
         uint32 _tokenId,
         uint128 _amount,
+        uint32 _nftCreatorAccountId,
         address _nftCreatorAddress,
+        uint32 _nftSerialId,
         bytes32 _nftContentHash,
         uint256[] memory _proof
     ) external nonReentrant {
@@ -601,7 +623,9 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
                 _owner,
                 _tokenId,
                 _amount,
+                _nftCreatorAccountId,
                 _nftCreatorAddress,
+                _nftSerialId,
                 _nftContentHash,
                 _proof
             );
@@ -612,9 +636,16 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
             increaseBalanceToWithdraw(packedBalanceKey, _amount);
         } else {
             require(_amount != 0, "Z"); // Unsupported nft amount
-            Operations.WithdrawNFT memory nftOp =
-                Operations.WithdrawNFT(_nftCreatorAddress, _nftContentHash, _owner, _tokenId);
-            pendingWithdrawnNFTs[_tokenId] = nftOp;
+            Operations.WithdrawNFT memory withdrawNftOp =
+                Operations.WithdrawNFT(
+                    _nftCreatorAccountId,
+                    _nftCreatorAddress,
+                    _nftSerialId,
+                    _nftContentHash,
+                    _owner,
+                    _tokenId
+                );
+            pendingWithdrawnNFTs[_tokenId] = withdrawNftOp;
         }
         performedExodus[_accountId][_tokenId] = true;
     }
