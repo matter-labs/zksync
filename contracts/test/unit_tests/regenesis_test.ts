@@ -1,47 +1,10 @@
 import { RegenesisMultisigFactory, UpgradeGatekeeperFactory, ZkSyncRegenesisTestFactory } from '../../typechain';
 import { ethers, utils } from 'ethers';
+import { storedBlockInfoParam } from '../../scripts/utils';
 const { expect } = require('chai');
 const hardhat = require('hardhat');
 import { Deployer, readContractCode, readProductionContracts } from '../../src.ts/deploy';
-import { ParamType } from '@ethersproject/abi';
 
-const StoredBlockInfoAbi = {
-    components: [
-        {
-            internalType: 'uint32',
-            name: 'blockNumber',
-            type: 'uint32'
-        },
-        {
-            internalType: 'uint64',
-            name: 'priorityOperations',
-            type: 'uint64'
-        },
-        {
-            internalType: 'bytes32',
-            name: 'pendingOnchainOperationsHash',
-            type: 'bytes32'
-        },
-        {
-            internalType: 'uint256',
-            name: 'timestamp',
-            type: 'uint256'
-        },
-        {
-            internalType: 'bytes32',
-            name: 'stateHash',
-            type: 'bytes32'
-        },
-        {
-            internalType: 'bytes32',
-            name: 'commitment',
-            type: 'bytes32'
-        }
-    ],
-    internalType: 'struct Storage.StoredBlockInfo',
-    name: '_lastCommittedBlockData',
-    type: 'tuple'
-};
 
 describe('Regenesis test', function () {
     this.timeout(50000);
@@ -135,7 +98,7 @@ describe('Regenesis test', function () {
             commitment: '0x0000000000000000000000000000000000000000000000000000000000000000'
         };
 
-        const StoredBlockInfo = ParamType.fromObject(StoredBlockInfoAbi);
+        const StoredBlockInfo = storedBlockInfoParam();
 
         const encodedStoredBlockInfo = ethers.utils.defaultAbiCoder.encode([StoredBlockInfo], [genesisBlock]);
 

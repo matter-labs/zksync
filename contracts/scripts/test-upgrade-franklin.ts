@@ -3,7 +3,7 @@ import { deployContract } from 'ethereum-waffle';
 import { constants, ethers } from 'ethers';
 import * as fs from 'fs';
 import * as path from 'path';
-import { web3Provider } from './utils';
+import { web3Provider, storedBlockInfoParam } from './utils';
 import { readProductionContracts } from '../src.ts/deploy';
 
 const { expect } = require('chai');
@@ -20,11 +20,14 @@ async function main() {
     });
     parser.addArgument('contractAddress');
     parser.addArgument('upgradeGatekeeperAddress');
+    parser.addArgument('lastBlockInfo');
     const args = parser.parseArgs(process.argv.slice(2));
     if (process.env.CHAIN_ETH_NETWORK !== 'test') {
         console.log('Upgrading test contract not on test network is not allowed');
         process.exit(1);
     }
+
+    const encodedStoredBlockInfo = ethers.utils.defaultAbiCoder.encode([storedBlockInfoParam()], [args.lastBlockInfo]);
 
     const provider = web3Provider();
 
@@ -56,7 +59,7 @@ async function main() {
 
     console.log('Finish upgrade notice period');
     // finish upgrade
-    await (await upgradeGatekeeper.finishUpgrade([[], [], []], { gasLimit: 300000 })).wait();
+    await (await upgradeGatekeeper.finishUpgrade([[], [], [encodedStoredBlockInfo]], { gasLimit: 300000 })).wait();
 
     await expect(await proxyContract.getTarget()).to.equal(newTargetFranklin.address, 'upgrade was unsuccessful');
 }

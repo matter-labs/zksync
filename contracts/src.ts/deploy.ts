@@ -283,7 +283,7 @@ export class Deployer {
 
     public async deployRegenesisMultisig(ethTxOptions?: ethers.providers.TransactionRequest) {
         if (this.verbose) {
-            console.log('Deploying ForcedExit contract');
+            console.log('Deploying Regenesis Multisig contract');
         }
 
         const partners = process.env.MISC_REGENESIS_PARTNERS.split(',');
