@@ -236,11 +236,11 @@ Tester.prototype.testBatchBuilderNFT = async function (from: Wallet, to: Wallet,
     const mint_handles = await wallet.submitSignedTransactionsBatch(from.provider, mint_batch.txs, [
         mint_batch.signature
     ]);
-    await Promise.all(mint_handles.map((handle) => handle.awaitReceipt()));
+    await Promise.all(mint_handles.map((handle) => handle.awaitVerifyReceipt()));
 
     const state_after_mint = await to.getAccountState();
-    let nft1: any = Object.values(state_after_mint.committed.nfts)[0];
-    let nft2: any = Object.values(state_after_mint.committed.nfts)[1];
+    let nft1: any = Object.values(state_after_mint.verified.nfts)[0];
+    let nft2: any = Object.values(state_after_mint.verified.nfts)[1];
 
     const balanceAfterMint1 = await to.getNFT(nft1.id);
     const balanceAfterMint2 = await to.getNFT(nft2.id);

@@ -541,7 +541,7 @@ export class Wallet {
 
     async signWithdrawNFT(withdrawNFT: {
         to: string;
-        token: TokenLike;
+        token: number;
         feeToken: TokenLike;
         fee: BigNumberish;
         nonce: number;
@@ -555,13 +555,12 @@ export class Wallet {
         const stringFee = BigNumber.from(withdrawNFT.fee).isZero()
             ? null
             : this.provider.tokenSet.formatToken(withdrawNFT.feeToken, withdrawNFT.fee);
-        const stringToken = this.provider.tokenSet.resolveTokenSymbol(withdrawNFT.token);
         const stringFeeToken = this.provider.tokenSet.resolveTokenSymbol(withdrawNFT.feeToken);
         const ethereumSignature =
             this.ethSigner instanceof Create2WalletSigner
                 ? null
                 : await this.ethMessageSigner.ethSignWithdrawNFT({
-                      stringToken,
+                      token: withdrawNFT.token,
                       to: withdrawNFT.to,
                       stringFee,
                       stringFeeToken,
@@ -633,7 +632,7 @@ export class Wallet {
 
     async withdrawNFT(withdrawNFT: {
         to: string;
-        token: TokenLike;
+        token: number;
         feeToken: TokenLike;
         fee?: BigNumberish;
         nonce?: Nonce;
@@ -912,17 +911,16 @@ export class Wallet {
 
     getWithdrawNFTEthMessagePart(withdrawNFT: {
         to: string;
-        token: TokenLike;
+        token: number;
         feeToken: TokenLike;
         fee: BigNumberish;
     }): string {
         const stringFee = BigNumber.from(withdrawNFT.fee).isZero()
             ? null
             : this.provider.tokenSet.formatToken(withdrawNFT.feeToken, withdrawNFT.fee);
-        const stringToken = this.provider.tokenSet.resolveTokenSymbol(withdrawNFT.token);
         const stringFeeToken = this.provider.tokenSet.resolveTokenSymbol(withdrawNFT.feeToken);
         return this.ethMessageSigner.getWithdrawNFTEthMessagePart({
-            stringToken,
+            token: withdrawNFT.token,
             to: withdrawNFT.to,
             stringFee,
             stringFeeToken

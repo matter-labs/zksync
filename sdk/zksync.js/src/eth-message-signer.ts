@@ -92,12 +92,12 @@ export class EthMessageSigner {
     }
 
     getWithdrawNFTEthMessagePart(withdrawNFT: {
-        stringToken: string;
+        token: number;
         to: string;
         stringFee: string;
         stringFeeToken: string;
     }): string {
-        let humanReadableTxInfo = `WithdrawNFT ${withdrawNFT.stringToken} to: ${withdrawNFT.to.toLowerCase()}`;
+        let humanReadableTxInfo = `WithdrawNFT ${withdrawNFT.token} to: ${withdrawNFT.to.toLowerCase()}`;
 
         if (withdrawNFT.stringFee != null) {
             humanReadableTxInfo += `\nFee: ${withdrawNFT.stringFee} ${withdrawNFT.stringFeeToken}`;
@@ -107,7 +107,7 @@ export class EthMessageSigner {
     }
 
     getWithdrawNFTEthSignMessage(withdrawNFT: {
-        stringToken: string;
+        token: number;
         to: string;
         stringFee: string;
         stringFeeToken: string;
@@ -222,7 +222,7 @@ export class EthMessageSigner {
     }
 
     async ethSignWithdrawNFT(withdrawNFT: {
-        stringToken: string;
+        token: number;
         to: string;
         stringFee: string;
         stringFeeToken: string;

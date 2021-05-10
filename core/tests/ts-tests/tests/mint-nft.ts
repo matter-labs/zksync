@@ -6,7 +6,13 @@ type TokenLike = types.TokenLike;
 
 declare module './tester' {
     interface Tester {
-        testMintNFT(wallet: Wallet, receiver: Wallet, contentHash: string, feeToken: TokenLike): Promise<any>;
+        testMintNFT(
+            wallet: Wallet,
+            receiver: Wallet,
+            contentHash: string,
+            feeToken: TokenLike,
+            waitVerified?: boolean
+        ): Promise<any>;
     }
 }
 
@@ -14,7 +20,8 @@ Tester.prototype.testMintNFT = async function (
     wallet: Wallet,
     receiver: Wallet,
     contentHash: string,
-    feeToken: TokenLike
+    feeToken: TokenLike,
+    waitVerified?: boolean
 ) {
     const type = 'MintNFT';
     let { totalFee: fee } = await this.syncProvider.getTransactionFee(type, wallet.address(), feeToken);
@@ -27,7 +34,13 @@ Tester.prototype.testMintNFT = async function (
     });
 
     const balanceBefore = await wallet.getBalance(feeToken);
-    const receipt = await handle.awaitReceipt();
+    let receipt;
+    if (waitVerified === true) {
+        receipt = await handle.awaitVerifyReceipt();
+    } else {
+        receipt = await handle.awaitReceipt();
+    }
+
     expect(receipt.success, `Mint NFT failed with a reason: ${receipt.failReason}`).to.be.true;
 
     const balanceAfter = await wallet.getBalance(feeToken);

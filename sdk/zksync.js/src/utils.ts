@@ -634,7 +634,7 @@ export function serializeWithdrawNFT(withdrawNFT: WithdrawNFT): Uint8Array {
     const type = new Uint8Array([10]);
     const accountId = serializeAccountId(withdrawNFT.accountId);
     const accountBytes = serializeAddress(withdrawNFT.from);
-    const ethAddressBytes = serializeContentHash(withdrawNFT.to);
+    const ethAddressBytes = serializeAddress(withdrawNFT.to);
     const tokenBytes = serializeTokenId(withdrawNFT.token);
     const tokenIdBytes = serializeTokenId(withdrawNFT.feeToken);
     const feeBytes = serializeFeePacked(withdrawNFT.fee);
