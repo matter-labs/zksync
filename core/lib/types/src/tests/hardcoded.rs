@@ -23,7 +23,7 @@ use crate::{
     },
     Log, PriorityOp,
 };
-use lazy_static::lazy_static;
+use once_cell::sync::Lazy;
 use zksync_basic_types::{AccountId, Address, Nonce, TokenId, H256};
 
 #[cfg(test)]
@@ -371,17 +371,17 @@ pub mod tx_conversion_test {
     const NONCE: Nonce = Nonce(20);
     const VALID_FROM: u64 = 0;
     const VALID_UNTIL: u64 = 1612201680;
-    lazy_static! {
-        static ref ALICE: Address =
-            Address::from_str("2a0a81e257a2f5d6ed4f07b81dbda09f107bd026").unwrap();
-        static ref BOB: Address =
-            Address::from_str("21abaed8712072e918632259780e587698ef58da").unwrap();
-        static ref PK_HASH: PubKeyHash =
-            PubKeyHash::from_hex("sync:3cfb9a39096d9e02b24187355f628f9a6331511b").unwrap();
-        static ref AMOUNT: BigUint = BigUint::from(12345678u64);
-        static ref FEE: BigUint = BigUint::from(1000000u32);
-        static ref TIME_RANGE: TimeRange = TimeRange::new(VALID_FROM, VALID_UNTIL);
-    }
+
+    static ALICE: Lazy<Address> =
+        Lazy::new(|| Address::from_str("2a0a81e257a2f5d6ed4f07b81dbda09f107bd026").unwrap());
+    static BOB: Lazy<Address> =
+        Lazy::new(|| Address::from_str("21abaed8712072e918632259780e587698ef58da").unwrap());
+    static PK_HASH: Lazy<PubKeyHash> = Lazy::new(|| {
+        PubKeyHash::from_hex("sync:3cfb9a39096d9e02b24187355f628f9a6331511b").unwrap()
+    });
+    static AMOUNT: Lazy<BigUint> = Lazy::new(|| BigUint::from(12345678u64));
+    static FEE: Lazy<BigUint> = Lazy::new(|| BigUint::from(1000000u32));
+    static TIME_RANGE: Lazy<TimeRange> = Lazy::new(|| TimeRange::new(VALID_FROM, VALID_UNTIL));
 
     #[ignore]
     #[test]

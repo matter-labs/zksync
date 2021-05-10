@@ -28,7 +28,9 @@ This tool handles these steps as follows:
 
 ## Usage
 
-Prior to the state restoring, application must be initialized
+Prior to the state restoring, application must be initialized.
+
+Firstly, you need to create the `volumes/postgres` folder. Then run the initialization script with the following command
 
 ```sh
 ./exit-tool.sh init
@@ -39,24 +41,28 @@ At this step, database will be created and initialized.
 After that, you can launch the utility:
 
 ```sh
-./exit-tool.sh run NETWORK ACCOUNT_ID TOKEN WEB3_ADDR
+./exit-tool.sh run NETWORK ACCOUNT_ADDRESS TOKEN WEB3_ADDR
 ```
 
 where:
 
 - NETWORK: Ethereum network to use. Must be one of `rinkeby`, `ropsten` or `mainnet`.
-- ACCOUNT_ID: A numerical identifier of account in the zkSync network.
+- ACCOUNT_ADDRESS: Address of the target account. **Note:** address **should not** start with `0x` prefix.
 - TOKEN: Token to be withdrawn. Must be either numerical token ID or ERC-20 token address.
 - WEB3_ADDR: Address of the Web3 HTTP API.
 
 Example:
 
 ```sh
-./exit-tool.sh run rinkeby 1 0 http://127.0.0.1:8545
+./exit-tool.sh run rinkeby 3b48b21a2f4910c04c04de00a23f7c07bf3cb04f 0 http://127.0.0.1:8545
 ```
 
-In this example, we use Rinkeby Ethereum testnet, generate a proof for account with ID 1 and token with ID 0 (Ether),
-and use the API located at `http://127.0.0.1:8545`
+In this example, we use Rinkeby Ethereum testnet, generate a proof for account with address
+0x3b48b21a2f4910c04c04de00a23f7c07bf3cb04f and token with ID 0 (Ether), and use the API located at
+`http://127.0.0.1:8545`
+
+If during the process you encounter any error with the database, you should reset the database and run the
+`./exit-tool init` again.
 
 **Note:** Synchronizing the state will scan a big part of Ethereum blockchain, and that's a lot of work to do. It may
 take hours or even days to complete, depending on the size of zkSync blockchain.
@@ -64,7 +70,7 @@ take hours or even days to complete, depending on the size of zkSync blockchain.
 However, if the synchronization process was interrupted, it is possible to resume a previously started data restore:
 
 ```sh
-./exit-tool.sh continue rinkeby 1 0 http://127.0.0.1:8545
+./exit-tool.sh continue rinkeby 3b48b21a2f4910c04c04de00a23f7c07bf3cb04f 0 http://127.0.0.1:8545
 ```
 
 In that case, a partially restored state will be loaded from the database, and restoring will continue from this point.
@@ -74,59 +80,82 @@ as follows:
 
 ```json
 {
-  "token_id": 0,
-  "account_id": 1,
-  "account_address": "0x3b48b21a2f4910c04c04de00a23f7c07bf3cb04f",
-  "amount": "3939999843080000000000",
+  "storedBlockInfo": {
+    "blockNumber": 2235,
+    "priorityOperations": 0,
+    "pendingOnchainOperationsHash": "0xc5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470",
+    "timestamp": 1618987864,
+    "stateHash": "0x0c44d4ed6eecba6565ab63bf713a8d7be538f98d4950f5ade4ac84a3638e8f35",
+    "commitment": "0xfbdcaadca3c6cb4f0bb2eccd46218ef73cdff58c19549737d266529cad0f67e5"
+  },
+  "owner": "0x3b48b21a2f4910c04c04de00a23f7c07bf3cb04f",
+  "accountId": 131,
+  "tokenId": 0,
+  "amount": "1354669000000000",
   "proof": {
-    "inputs": ["0x11e55c73db5f552b9d95b3351a90165676da2af365be22721e874448bb47c6ca"],
+    "inputs": ["0x11dc24e0520936783ef6cf2ead4a2f40057d0cee7e0c205da4e4c1f102360e1c"],
     "proof": [
-      "0x314676cac431331aacfab085471f78e5dd4151c886f83a342a9e8aad7064eb2",
-      "0x1a6147ba1176be942b8b1abcc347f91de54955a3cf87726bdd99050edba2d01",
-      "0xaf47b6b53b978235a0ef6b272c7c14bda8d1026fa62ccbff30e3d6c3dc0c04",
-      "0x2d5ce349718a2a0659fc67a9bcbbdbbad99401ec4481f4eb0ed2c4326f381f15",
-      "0xbb038dfae788d2e2b560a70ec523f5028e9bbef9149652827ea3a8289e64c03",
-      "0x1c3e60e60a8f1c570934bdd7534efb6bceab33d0e9ab69b809139e314573ed41",
-      "0x2cee6e92d4f6161582392dbcf4ba48290f9d1dd2d4aed8ffafe4cce3e4839038",
-      "0xcfe36c8728e769d78890a19f8a387bc6a2c8d6d76d74f1448f50ea70fea0ab3",
-      "0x1f7bbaf4d632ab00fc88cdc0261b34537f7dd6019e2e9b0a445b189a26d5d46a",
-      "0x51defabf221112b25b2b99e6be0caf189becd4ed85adb2a128143880b2250f0",
-      "0x21c098c20f968d5dfb6d81c45b8412fc66c5323e51a73a76231472dd9ca1ae64",
-      "0xd1a678899eac7b6c6f1e0e363a833e4a7861f35c326b7d5355e2682cd088775",
-      "0x2058b084ea1e288c81ba8ef4df434d9a4e03e32ec821a1be468af68beaa36c83",
-      "0x1765d6a52744edb661c8c8e7fe80b781c0690b3d21b98bdb0c0d0fb723222cbc",
-      "0x1560b3bb23b8b25f4f58acf6d457f7d53f87e0aef30b3ac642bbf3cfef88f794",
-      "0x1fc0fd25de54736625bbbaed6a336ea24c132c7b771d712c42bc7f257fc31f9b",
-      "0x2b839102ae0a6679ad6ea45c818022155a5e0392f582cd4b68d4a58d1465a1a1",
-      "0x6fcb21b6a5583e7b60d5404bae67799a28b51bbacb586d5ce7a218133390ccd",
-      "0x1ce7f02c0ff33b532ed26850162e6f1289b6884bd920471b3bb283c044531585",
-      "0x1ce956bdc735bd5b5d947c5ea63e94923aea7fcf56042dd90d1c5d777c497c81",
-      "0x6b927b847965eac8bbe7603c7729c61c5ca41ce2b6115d1dd9b05f6d9f5c134",
-      "0x25d819ef472dfcf62a469acaf28ebf85ffd681c6b7d34e0c0466d9ab1b372d86",
-      "0x14fa12dc426ce6038387e068ce63a512e0e08a84e69b9cbaa17f1a558a93b0f",
-      "0x304753ce7297dbbe83013b18cac18e962f2601eaf6c898ada51c79c551cd572f",
-      "0x24a7674aa7d5f5cc02b0858481876cfbb026002bab5a98bf589479fc9304a2ee",
-      "0x12a64be6750dd39bf5fabb77aa24018144f6d850384340d860c59514c2aa440f",
-      "0x4d70b5a1dde6e2f397dd780ed6e7144f00807058f58775cd6f18b59a47dbec3",
-      "0xf41386d588d768d8d74ce6394eb1ef064cebf3dfd315bc2fbd0a16f0c99df03",
-      "0x11f3cd395d2695f2b1dd3a4e3702ccaeedc62c6e551fe9f62594aa05439dc7",
-      "0x2f493446b767bf41c3ea5360d0cf5262357040e8f585daedae8dff5bdf2a8858",
-      "0x2c4a32600012042c46c64ad6ecc56abf5dc41e120de5ddc04dbf62fe4128da0e",
-      "0x26c07e32e6d267bf323ca6b4912a24bc667a0f5fabd9e20e1eacc84ce94af511",
-      "0x39905b1b49147ee1237722580e881d9b0956d069266e932b5341c2c76b3046e"
+      "0x1e4f4360fef1dbc0823472e8aca5d29caee1b667e0354e6747d33020fccef74b",
+      "0x54a4bad356b44f710be10c07f98ac3006534fdf8147be7031071e9da1bc9781",
+      "0xecb0793b066a84e07e10e82ce9153562771f15f4d2ea156f50ef23387eb3bff",
+      "0x1c59efed4501a0d5d1d229dd2045e32944aadfee47a38de6b6b69b8bc5eb0189",
+      "0x300f189fdd7e14addabbf29115ed23427f5e011aec358c18892452d5f93ef9b6",
+      "0x1270402c986c9514a171c86888171e1396cdf2174ce5740b9b5866fb3d356496",
+      "0xedaf01436e147f2fdc64de63f484ca62aee41f096dee05006274bed594a4f4",
+      "0x16811befa267b39189dbcfb29b6eb9011f704bfeaa0291281ca592fa66d0b23e",
+      "0x21cc1afd708038f92e05fd73944970111b77b247f65a8e15833e2e504d9387a",
+      "0x24fc84db9774ee7ae556cb0f43f2ebae5a50fbe4b15b7dbd1318734af8961a42",
+      "0x22a366fe8910b3892919e5382d724c89146db9adea7b18cbfbe97a65be9f02ea",
+      "0x1e4a9e14d79fff26f358e752db6ca2fab34e2d4c501ec2704263bfd7a8f31677",
+      "0xc92e385021ec21f399af41a7712f34fd63bbefa0f436ac626baa9f9853d1a42",
+      "0x21d1bbc2fd3694e54963986c20c93b1e48fcfb9684e42ba82172107366235334",
+      "0x1aaa6c36e8270b09803f852054ae6f36f61ba7f6b2c93746099ae73b3eeaac29",
+      "0x9c0331f4c5bd6a5b5c553751d615a2d546deed267de537e7173808a7d707c5d",
+      "0x2db349b9f5b1ff0e3be0c64689a197b223219def5671132d2371ed1aef23c8f0",
+      "0x16b18f25825b2384e0fdff124ee8905b54cc0bac426ecdbc1809b0b80c378700",
+      "0x2d1d952c9b4583c1fb2447ebe058123db8b96f8eb830b063ba4d54722a7b18c7",
+      "0x1a6ea76c5f44d13e6f03a3bcc0282c2f8f7a84e3481ee56b599eaa415845cd3a",
+      "0x2e285b6e0facccce57fdae9f52d52fa221563f02cdc1667474a655c5a05fdd94",
+      "0xcd06119e20786a41ff3d435e21972631c4e3a506c67231e54c7ed225dfe49e1",
+      "0x1833f5b3945b223c2d58f311dc9fd33f4df20b063280071242a8021cec8c7092",
+      "0x204af9a284dc8eca3223b72a93a5e05e05170aab99ecaf5c8d068e9d5f4510c3",
+      "0x2799be4725b38772e0d1d843bdf60cf167a31cbd764ff2119417cc674e2fd5e3",
+      "0x1aacc735b90ecd492569eca265c42de81120dc8dfb9352fe3f9270f312dd9454",
+      "0xbd93eb76f83f9c02f1437a85bd21f792eaec9014a82ffbb9ab6e9e937ef4c94",
+      "0x1224ac8ef5f98d19eca09475d75b2819302cc0b903ade1eb897ff0c346450fb9",
+      "0x2845b0204d84a81de3321111680197521fec98c857cd2f7042d96c530721ca16",
+      "0x1783b195d08ac2b597901dd71a67e579a3965dc201c4acbfd8ee8f25e0f24aab",
+      "0x9fbdff9a803cf76b8031e06ee015ea52a0a019eac47e4b7a0c91c8da2f6262f",
+      "0x46e53f6724dcdb913612c66b8b3cfa95cdf37d47fcc4bb6dc53734ca76c37eb",
+      "0x20690079f9a7cbbf1dc1dcffe6395ea4c88e99e2bd9564c495ab72556fee2897"
     ]
-  }
+  },
+  "tokenAddress": "0x0000000000000000000000000000000000000000"
 }
 ```
 
-This data represents inputs for an
-[`exit` method on the smart contract](https://github.com/matter-labs/zksync/blob/e3ee657e5f02601e0aed523f4237cc9708d6daf9/contracts/contracts/ZkSync.sol#L351).
+Data until the last entry represents inputs for an
+[`performExodus` method on the smart contract](https://github.com/matter-labs/zksync/blob/master/contracts/contracts/ZkSync.sol#L574).
+
+The last entry (`token_address`) is needed for the [`withdrawPendingBalance`][wd] method invocation;
 
 What user has to do after that:
 
-1. Create transaction for an `exit` method call, sign it and broadcast to register balance to withdraw.
-2. Send a transaction which invokes either
-   [`withdrawETH`](https://github.com/matter-labs/zksync/blob/e3ee657e5f02601e0aed523f4237cc9708d6daf9/contracts/contracts/ZkSync.sol#L175)
-   or
-   [`withdrawERC20`](https://github.com/matter-labs/zksync/blob/e3ee657e5f02601e0aed523f4237cc9708d6daf9/contracts/contracts/ZkSync.sol#L202)
-   method of contract to obtain their funds.
+1. Create transaction for an [`performExodus`][pe] method call, sign it and broadcast to register balance to withdraw.
+2. Send a transaction which invokes [`withdrawPendingBalance`][wd] method of contract to obtain their funds.
+
+[pe]:
+  https://github.com/matter-labs/zksync/blob/5f47fe9990ec87e3087d32d083d13e6cab331ff1/contracts/contracts/ZkSync.sol#L574
+[wd]: https://github.com/matter-labs/zksync/blob/master/contracts/contracts/ZkSync.sol#L262
+
+## Sending exodus L1 transactions
+
+In case you have the private key for the wallet you want to perform exodus for, you may use
+[`perform_exodus`](perform_exodus) script for that matter.
+
+Otherwise, please check your wallet documentation in order to know how to execute arbitrary transactions from it.
+
+## What if I need proofs for multiple tokens
+
+After generating proof, run `./exit-tool.sh continue` with the new token ID. The state is already synchronized at this
+moment, so it won't take as long.

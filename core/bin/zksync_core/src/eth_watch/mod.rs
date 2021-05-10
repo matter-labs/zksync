@@ -457,13 +457,13 @@ impl<W: EthClient> EthWatch<W> {
 
 #[must_use]
 pub fn start_eth_watch(
-    config_options: &ZkSyncConfig,
     eth_req_sender: mpsc::Sender<EthWatchRequest>,
     eth_req_receiver: mpsc::Receiver<EthWatchRequest>,
+    eth_gateway: EthereumGateway,
+    config_options: &ZkSyncConfig,
 ) -> JoinHandle<()> {
-    let client = EthereumGateway::from_config(&config_options);
     let eth_client = EthHttpClient::new(
-        client,
+        eth_gateway,
         config_options.contracts.contract_addr,
         config_options.contracts.governance_addr,
     );

@@ -13,6 +13,13 @@ use zksync_crypto::params::{
 };
 use zksync_crypto::primitives::FromBytes;
 
+use crate::{
+    helpers::{pack_fee_amount, pack_token_amount, unpack_fee_amount, unpack_token_amount},
+    operations::error::SwapOpError,
+    tx::Order,
+    AccountId, Nonce, Swap, TokenId,
+};
+
 /// Swap operation. For details, see the documentation of [`ZkSyncOp`](./operations/enum.ZkSyncOp.html).
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SwapOp {
@@ -46,11 +53,10 @@ impl SwapOp {
         data
     }
 
-    pub fn from_public_data(bytes: &[u8]) -> Result<Self, anyhow::Error> {
-        ensure!(
-            bytes.len() == Self::CHUNKS * CHUNK_BYTES,
-            "Wrong bytes length for swap pubdata"
-        );
+    pub fn from_public_data(bytes: &[u8]) -> Result<Self, SwapOpError> {
+        if bytes.len() != Self::CHUNKS * CHUNK_BYTES {
+            return Err(SwapOpError::PubdataSizeMismatch);
+        }
 
         const AMOUNT_BIT_WIDTH: usize = AMOUNT_EXPONENT_BIT_WIDTH + AMOUNT_MANTISSA_BIT_WIDTH;
         const FEE_BIT_WIDTH: usize = FEE_EXPONENT_BIT_WIDTH + FEE_MANTISSA_BIT_WIDTH;
@@ -62,21 +68,21 @@ impl SwapOp {
 
         let read_token = |offset| {
             u32::from_bytes(&bytes[offset..offset + TOKEN_BIT_WIDTH / 8])
-                .ok_or_else(|| format_err!("Cant get token id from swap pubdata"))
+                .ok_or(SwapOpError::CannotGetTokenId)
         };
 
         let read_account = |offset| {
             u32::from_bytes(&bytes[offset..offset + ACCOUNT_ID_BIT_WIDTH / 8])
-                .ok_or_else(|| format_err!("Cant get from account id from swap pubdata"))
+                .ok_or(SwapOpError::CannotGetAccountId)
         };
 
         let read_amount = |offset| {
             unpack_token_amount(&bytes[offset..offset + AMOUNT_BIT_WIDTH / 8])
-                .ok_or_else(|| format_err!("Cant get amount from swap pubdata"))
+                .ok_or(SwapOpError::CannotGetAmount)
         };
 
         let fee = unpack_fee_amount(&bytes[fee_offset..fee_offset + FEE_BIT_WIDTH / 8])
-            .ok_or_else(|| format_err!("Cant get fee from swap pubdata"))?;
+            .ok_or(SwapOpError::CannotGetFee)?;
         let account_id_0 = AccountId(read_account(accounts_offset)?);
         let recipient_id_0 = AccountId(read_account(accounts_offset + ACCOUNT_ID_BIT_WIDTH / 8)?);
         let account_id_1 = AccountId(read_account(

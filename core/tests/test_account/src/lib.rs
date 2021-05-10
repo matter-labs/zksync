@@ -28,6 +28,13 @@ impl ZkSyncETHAccountData {
         matches!(self, ZkSyncETHAccountData::EOA { .. })
     }
 
+    pub fn unwrap_eoa_pk(&self) -> H256 {
+        match self {
+            Self::EOA { eth_private_key } => *eth_private_key,
+            _ => panic!("Not an EOA"),
+        }
+    }
+
     pub fn is_create2(&self) -> bool {
         matches!(self, ZkSyncETHAccountData::Create2(..))
     }

@@ -1,14 +1,17 @@
-use crate::helpers::{pack_fee_amount, unpack_fee_amount};
-use crate::tx::ChangePubKey;
-use crate::PubKeyHash;
-use crate::{AccountId, Address, Nonce, TokenId};
-use anyhow::{ensure, format_err};
-use serde::{Deserialize, Serialize};
-use zksync_crypto::params::{
-    ACCOUNT_ID_BIT_WIDTH, ADDRESS_WIDTH, CHUNK_BYTES, FEE_EXPONENT_BIT_WIDTH,
-    FEE_MANTISSA_BIT_WIDTH, NEW_PUBKEY_HASH_WIDTH, NONCE_BIT_WIDTH, TOKEN_BIT_WIDTH,
+use crate::{
+    helpers::{pack_fee_amount, unpack_fee_amount},
+    operations::error::ChangePubkeyOpError,
+    tx::ChangePubKey,
+    AccountId, Address, Nonce, PubKeyHash, TokenId,
 };
-use zksync_crypto::primitives::FromBytes;
+use serde::{Deserialize, Serialize};
+use zksync_crypto::{
+    params::{
+        ACCOUNT_ID_BIT_WIDTH, ADDRESS_WIDTH, CHUNK_BYTES, FEE_EXPONENT_BIT_WIDTH,
+        FEE_MANTISSA_BIT_WIDTH, NEW_PUBKEY_HASH_WIDTH, NONCE_BIT_WIDTH, TOKEN_BIT_WIDTH,
+    },
+    primitives::FromBytes,
+};
 
 /// ChangePubKey operation. For details, see the documentation of [`ZkSyncOp`](./operations/enum.ZkSyncOp.html).
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -45,7 +48,7 @@ impl ChangePubKeyOp {
         }
     }
 
-    pub fn from_public_data(bytes: &[u8]) -> Result<Self, anyhow::Error> {
+    pub fn from_public_data(bytes: &[u8]) -> Result<Self, ChangePubkeyOpError> {
         let account_id_offset = 1;
         let pk_hash_offset = account_id_offset + ACCOUNT_ID_BIT_WIDTH / 8;
         let account_offset = pk_hash_offset + NEW_PUBKEY_HASH_WIDTH / 8;
@@ -54,21 +57,20 @@ impl ChangePubKeyOp {
         let fee_offset = fee_token_offset + TOKEN_BIT_WIDTH / 8;
         let end = fee_offset + (FEE_EXPONENT_BIT_WIDTH + FEE_MANTISSA_BIT_WIDTH) / 8;
 
-        ensure!(
-            bytes.len() >= end,
-            "Change pubkey offchain, pubdata too short"
-        );
+        if bytes.len() < end {
+            return Err(ChangePubkeyOpError::PubdataSizeMismatch);
+        }
 
         let account_id = u32::from_bytes(&bytes[account_id_offset..pk_hash_offset])
-            .ok_or_else(|| format_err!("Change pubkey offchain, fail to get account id"))?;
+            .ok_or(ChangePubkeyOpError::CannotGetAccountId)?;
         let new_pk_hash = PubKeyHash::from_bytes(&bytes[pk_hash_offset..account_offset])?;
         let account = Address::from_slice(&bytes[account_offset..nonce_offset]);
         let nonce = u32::from_bytes(&bytes[nonce_offset..fee_token_offset])
-            .ok_or_else(|| format_err!("Change pubkey offchain, fail to get nonce"))?;
+            .ok_or(ChangePubkeyOpError::CannotGetNonce)?;
         let fee_token = u32::from_bytes(&bytes[fee_token_offset..fee_offset])
-            .ok_or_else(|| format_err!("Change pubkey offchain, fail to get fee token ID"))?;
-        let fee = unpack_fee_amount(&bytes[fee_offset..end])
-            .ok_or_else(|| format_err!("Change pubkey offchain, fail to get fee"))?;
+            .ok_or(ChangePubkeyOpError::CannotGetFeeTokenId)?;
+        let fee =
+            unpack_fee_amount(&bytes[fee_offset..end]).ok_or(ChangePubkeyOpError::CannotGetFee)?;
 
         Ok(ChangePubKeyOp {
             tx: ChangePubKey::new(

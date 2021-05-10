@@ -18,6 +18,7 @@ use zksync_crypto::{
 use zksync_utils::{format_units, BigUintPairSerdeAsRadix10Str, BigUintSerdeAsRadix10Str};
 
 use super::{TxSignature, VerifiedSignatureCache};
+use crate::tx::error::TransactionSignatureError;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -165,7 +166,7 @@ impl Swap {
         fee: BigUint,
         fee_token: TokenId,
         private_key: &PrivateKey<Engine>,
-    ) -> Result<Self, anyhow::Error> {
+    ) -> Result<Self, TransactionSignatureError> {
         let mut tx = Self::new(
             submitter_id,
             submitter_address,
@@ -178,7 +179,7 @@ impl Swap {
         );
         tx.signature = TxSignature::sign_musig(private_key, &tx.get_sign_bytes());
         if !tx.check_correctness() {
-            anyhow::bail!(crate::tx::TRANSACTION_SIGNATURE_ERROR);
+            return Err(TransactionSignatureError);
         }
         Ok(tx)
     }

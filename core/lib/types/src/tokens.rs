@@ -1,11 +1,20 @@
-use crate::{tx::ChangePubKeyType, Address, Log, TokenId, U256};
 use chrono::{DateTime, Utc};
 use num::{rational::Ratio, BigUint};
 use serde::{Deserialize, Serialize};
 use std::{convert::TryFrom, fmt, fs::read_to_string, path::PathBuf, str::FromStr};
-use zksync_basic_types::{AccountId, H256};
-use zksync_utils::parse_env;
-use zksync_utils::UnsignedRatioSerializeAsDecimal;
+use thiserror::Error;
+
+/// ID of the ETH token in zkSync network.
+pub use zksync_crypto::params::ETH_TOKEN_ID;
+use zksync_utils::{parse_env, UnsignedRatioSerializeAsDecimal};
+
+use crate::{tx::ChangePubKeyType, Address, Log, TokenId, U256};
+
+#[derive(Debug, Error)]
+pub enum NewTokenEventParseError {
+    #[error("Cannot parse log for New Token Event {0:?}")]
+    ParseError(Log),
+}
 
 // Order of the fields is important (from more specific types to less specific types)
 /// Set of values that can be interpreted as a token descriptor.
@@ -149,25 +158,19 @@ pub struct NewTokenEvent {
 }
 
 impl TryFrom<Log> for NewTokenEvent {
-    type Error = anyhow::Error;
+    type Error = NewTokenEventParseError;
 
-    fn try_from(event: Log) -> Result<NewTokenEvent, anyhow::Error> {
+    fn try_from(event: Log) -> Result<NewTokenEvent, NewTokenEventParseError> {
         // `event NewToken(address indexed token, uint16 indexed tokenId)`
         //  Event has such a signature, so let's check that the number of topics is equal to the number of parameters + 1.
         if event.topics.len() != 3 {
-            return Err(anyhow::format_err!(
-                "Failed to parse NewTokenEvent: {:#?}",
-                event
-            ));
+            return Err(NewTokenEventParseError::ParseError(event));
         }
 
         let eth_block_number = match event.block_number {
             Some(block_number) => block_number.as_u64(),
             None => {
-                return Err(anyhow::format_err!(
-                    "Failed to parse NewTokenEvent: {:#?}",
-                    event
-                ))
+                return Err(NewTokenEventParseError::ParseError(event));
             }
         };
 
@@ -181,7 +184,7 @@ impl TryFrom<Log> for NewTokenEvent {
 
 // Hidden as it relies on the filesystem structure, which can be different for reverse dependencies.
 #[doc(hidden)]
-pub fn get_genesis_token_list(network: &str) -> anyhow::Result<Vec<TokenInfo>> {
+pub fn get_genesis_token_list(network: &str) -> Result<Vec<TokenInfo>, GetGenesisTokenListError> {
     let mut file_path = parse_env::<PathBuf>("ZKSYNC_HOME");
     file_path.push("etc");
     file_path.push("tokens");
@@ -277,6 +280,18 @@ impl NFT {
             content_hash,
         }
     }
+}
+
+#[derive(Debug, Error, PartialEq)]
+#[error("Incorrect ProverJobStatus number: {0}")]
+pub struct IncorrectProverJobStatus(pub i32);
+
+#[derive(Debug, Error)]
+pub enum GetGenesisTokenListError {
+    #[error(transparent)]
+    IOError(#[from] std::io::Error),
+    #[error(transparent)]
+    SerdeError(#[from] serde_json::Error),
 }
 
 #[cfg(test)]
