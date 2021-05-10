@@ -364,11 +364,26 @@ export class Wallet {
         return transactionHashes.map((txHash, idx) => new Transaction(batch[idx], txHash, this.provider));
     }
 
+    async getLimitOrder(order: {
+        tokenSell: TokenLike;
+        tokenBuy: TokenLike;
+        price: Price;
+        recipient?: Address;
+        nonce?: Nonce;
+        validFrom?: number;
+        validUntil?: number;
+    }): Promise<Order> {
+        return this.getOrder({
+            ...order,
+            amount: 0
+        });
+    }
+
     async getOrder(order: {
         tokenSell: TokenLike;
         tokenBuy: TokenLike;
         price: Price;
-        amount?: BigNumberish;
+        amount: BigNumberish;
         recipient?: Address;
         nonce?: Nonce;
         validFrom?: number;

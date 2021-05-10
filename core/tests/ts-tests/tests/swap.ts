@@ -100,7 +100,7 @@ Tester.prototype.testSwapBatch = async function (
     const nonceBefore = await walletA.getNonce();
 
     // these are limit orders, so they can be reused
-    const orderA = await walletA.getOrder({
+    const orderA = await walletA.getLimitOrder({
         tokenSell: tokenA,
         tokenBuy: tokenB,
         price: utils.price({
@@ -109,7 +109,7 @@ Tester.prototype.testSwapBatch = async function (
         })
     });
 
-    const orderB = await walletB.getOrder({
+    const orderB = await walletB.getLimitOrder({
         tokenSell: tokenB,
         tokenBuy: tokenA,
         price: utils.price({
