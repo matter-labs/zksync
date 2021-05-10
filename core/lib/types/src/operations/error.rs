@@ -105,6 +105,10 @@ pub enum WithdrawOpError {
 pub enum WithdrawNFTOpError {
     #[error("Wrong bytes length for withdraw nft pubdata")]
     PubdataSizeMismatch,
+    #[error("Failed to get creator account id")]
+    CannotGetCreatorAccountId,
+    #[error("Failed to get serial id")]
+    CannotGetSerialId,
     #[error("Failed to get account id")]
     CannotGetAccountId,
     #[error("Failed to get token id")]
