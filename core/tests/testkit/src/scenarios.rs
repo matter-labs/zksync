@@ -117,6 +117,7 @@ pub async fn perform_basic_tests() {
         test_setup.get_accounts_state().await,
         tokens,
         test_setup.last_committed_block.new_root_hash,
+        testkit_config.available_block_chunk_sizes,
     )
     .await;
 

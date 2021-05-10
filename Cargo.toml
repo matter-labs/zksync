@@ -6,11 +6,13 @@ members = [
     "core/bin/server",
     "core/bin/prover",
     "core/bin/parse_pub_data",
+    "core/bin/block_revert",
 
     # Server micro-services
     "core/bin/zksync_api",
     "core/bin/zksync_core",
     "core/bin/zksync_eth_sender",
+    "core/bin/zksync_event_listener",
     "core/bin/zksync_witness_generator",
     "core/bin/zksync_forced_exit_requests",
 
@@ -18,6 +20,7 @@ members = [
     "core/lib/circuit",
     "core/lib/eth_client",
     "core/lib/eth_signer",
+    "core/lib/gateway_watcher",
     "core/lib/prometheus_exporter",
     "core/lib/types",
     "core/lib/state",
@@ -37,6 +40,7 @@ members = [
     "core/tests/test_account",
     "core/tests/testkit",
     "core/tests/loadtest",
+    "core/tests/loadnext",
 
     # SDK section
     "sdk/zksync-rs",

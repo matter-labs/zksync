@@ -1,3 +1,4 @@
+use thiserror::Error;
 use zksync_basic_types::BlockNumber;
 
 #[derive(Debug, Clone)]
@@ -16,12 +17,12 @@ impl ProverJobStatus {
         }
     }
 
-    pub fn from_number(num: i32) -> anyhow::Result<Self> {
+    pub fn from_number(num: i32) -> Result<Self, IncorrectProverJobStatus> {
         Ok(match num {
             0 => Self::Idle,
             1 => Self::InProgress,
             2 => Self::Done,
-            _ => anyhow::bail!("Incorrect ProverJobStatus number: {}", num),
+            _ => return Err(IncorrectProverJobStatus(num)),
         })
     }
 }
@@ -67,3 +68,7 @@ impl ToString for ProverJobType {
         }
     }
 }
+
+#[derive(Debug, Error, PartialEq)]
+#[error("Incorrect ProverJobStatus number: {0}")]
+pub struct IncorrectProverJobStatus(pub i32);

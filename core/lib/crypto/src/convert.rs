@@ -1,4 +1,7 @@
-use crate::franklin_crypto::bellman::pairing::ff::{PrimeField, PrimeFieldRepr};
+use crate::{
+    error::ConversionError,
+    franklin_crypto::bellman::pairing::ff::{PrimeField, PrimeFieldRepr},
+};
 
 /// Extension trait denoting common conversion method for field elements.
 pub trait FeConvert: PrimeField {
@@ -11,20 +14,20 @@ pub trait FeConvert: PrimeField {
     }
 
     /// Reads a field element from its byte sequence representation.
-    fn from_bytes(value: &[u8]) -> Result<Self, anyhow::Error> {
+    fn from_bytes(value: &[u8]) -> Result<Self, ConversionError> {
         let mut repr = Self::Repr::default();
 
         // `repr.as_ref()` converts `repr` to a list of `u64`. Each element has 8 bytes,
         // so to obtain size in bytes, we multiply the array size with the size of `u64`.
         let expected_input_size = repr.as_ref().len() * 8;
         if value.len() != expected_input_size {
-            anyhow::bail!("Incorrect input size")
+            return Err(ConversionError::IncorrectInputSize {
+                size: value.len(),
+                expected_size: expected_input_size,
+            });
         }
-        repr.read_be(value)
-            .map_err(|e| anyhow::format_err!("Cannot parse value {:?}: {}", value, e))?;
-        Self::from_repr(repr).map_err(|e| {
-            anyhow::format_err!("Cannot convert into prime field value {:?}: {}", value, e)
-        })
+        repr.read_be(value).map_err(ConversionError::ParsingError)?;
+        Self::from_repr(repr).map_err(From::from)
     }
 
     /// Returns hex representation of the field element without `0x` prefix.
@@ -35,7 +38,7 @@ pub trait FeConvert: PrimeField {
     }
 
     /// Reads a field element from its hexadecimal representation.
-    fn from_hex(value: &str) -> Result<Self, anyhow::Error> {
+    fn from_hex(value: &str) -> Result<Self, ConversionError> {
         let value = if let Some(value) = value.strip_prefix("0x") {
             value
         } else {
@@ -44,8 +47,7 @@ pub trait FeConvert: PrimeField {
 
         // Buffer is reversed and read as little endian, since we pad it with zeros to
         // match the expected length.
-        let mut buf = hex::decode(&value)
-            .map_err(|e| anyhow::format_err!("could not decode hex: {}, reason: {}", value, e))?;
+        let mut buf = hex::decode(&value)?;
         buf.reverse();
         let mut repr = Self::Repr::default();
 
@@ -53,10 +55,8 @@ pub trait FeConvert: PrimeField {
         // so to obtain size in bytes, we multiply the array size with the size of `u64`.
         buf.resize(repr.as_ref().len() * 8, 0);
         repr.read_le(&buf[..])
-            .map_err(|e| anyhow::format_err!("could not read {}: {}", value, e))?;
-        Self::from_repr(repr).map_err(|e| {
-            anyhow::format_err!("could not convert into prime field: {}: {}", value, e)
-        })
+            .map_err(ConversionError::ParsingError)?;
+        Self::from_repr(repr).map_err(From::from)
     }
 }
 
@@ -66,8 +66,10 @@ impl<T> FeConvert for T where T: PrimeField {}
 mod tests {
     use super::*;
 
-    use crate::rand::{Rand, SeedableRng, XorShiftRng};
-    use crate::Fr;
+    use crate::{
+        rand::{Rand, SeedableRng, XorShiftRng},
+        Fr,
+    };
 
     /// Checks that converting FE to the hex form and back results
     /// in the same FE.

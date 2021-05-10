@@ -1,4 +1,3 @@
-use anyhow::Error;
 use num::BigUint;
 use std::collections::{HashMap, HashSet};
 use zksync_crypto::{params, Fr};
@@ -9,7 +8,10 @@ use zksync_types::{
     BlockNumber, SignedZkSyncTx, TokenId, ZkSyncPriorityOp, ZkSyncTx,
 };
 
-use crate::handler::TxHandler;
+use crate::{
+    error::{OpError, TxBatchError},
+    handler::{error::CloseOpError, TxHandler},
+};
 
 #[derive(Debug)]
 pub struct OpSuccess {
@@ -276,7 +278,10 @@ impl ZkSyncState {
         }
     }
 
-    pub fn execute_txs_batch(&mut self, txs: &[SignedZkSyncTx]) -> Vec<Result<OpSuccess, Error>> {
+    pub fn execute_txs_batch(
+        &mut self,
+        txs: &[SignedZkSyncTx],
+    ) -> Vec<Result<OpSuccess, TxBatchError>> {
         let mut successes = Vec::new();
 
         for (id, tx) in txs.iter().enumerate() {
@@ -295,16 +300,14 @@ impl ZkSyncState {
                         self.apply_account_updates(updates);
                     }
 
-                    // Create message for an error.
-                    let error_msg = format!(
-                        "Batch execution failed, since tx #{} of batch failed with a reason: {}",
-                        id + 1,
-                        error
-                    );
-
                     // Create the same error for each transaction.
                     let errors = (0..txs.len())
-                        .map(|_| Err(anyhow::format_err!("{}", error_msg)))
+                        .map(|_| {
+                            Err(TxBatchError {
+                                failed_tx_index: id + 1,
+                                reason: error.clone(),
+                            })
+                        })
                         .collect();
 
                     // Stop execution and return an error.
@@ -316,15 +319,15 @@ impl ZkSyncState {
         successes
     }
 
-    pub fn execute_tx(&mut self, tx: ZkSyncTx) -> Result<OpSuccess, Error> {
-        match tx {
-            ZkSyncTx::Transfer(tx) => self.apply_tx(*tx),
-            ZkSyncTx::Withdraw(tx) => self.apply_tx(*tx),
-            ZkSyncTx::Close(tx) => self.apply_tx(*tx),
-            ZkSyncTx::ChangePubKey(tx) => self.apply_tx(*tx),
-            ZkSyncTx::ForcedExit(tx) => self.apply_tx(*tx),
-            ZkSyncTx::Swap(tx) => self.apply_tx(*tx),
-        }
+    pub fn execute_tx(&mut self, tx: ZkSyncTx) -> Result<OpSuccess, OpError> {
+        Ok(match tx {
+            ZkSyncTx::Transfer(tx) => self.apply_tx(*tx)?,
+            ZkSyncTx::Withdraw(tx) => self.apply_tx(*tx)?,
+            ZkSyncTx::Close(tx) => self.apply_tx(*tx)?,
+            ZkSyncTx::ChangePubKey(tx) => self.apply_tx(*tx)?,
+            ZkSyncTx::ForcedExit(tx) => self.apply_tx(*tx)?,
+            ZkSyncTx::Swap(tx) => self.apply_tx(*tx)?,
+        })
     }
 
     pub(crate) fn get_free_account_id(&self) -> AccountId {
@@ -398,15 +401,17 @@ impl ZkSyncState {
     }
 
     /// Converts the `ZkSyncTx` object to a `ZkSyncOp`, without applying it.
-    pub fn zksync_tx_to_zksync_op(&self, tx: ZkSyncTx) -> Result<ZkSyncOp, anyhow::Error> {
-        match tx {
-            ZkSyncTx::Transfer(tx) => self.create_op(*tx).map(TransferOutcome::into_franklin_op),
-            ZkSyncTx::Withdraw(tx) => self.create_op(*tx).map(Into::into),
-            ZkSyncTx::ChangePubKey(tx) => self.create_op(*tx).map(Into::into),
-            ZkSyncTx::Close(_) => anyhow::bail!("Close op is disabled"),
-            ZkSyncTx::ForcedExit(tx) => self.create_op(*tx).map(Into::into),
-            ZkSyncTx::Swap(tx) => self.create_op(*tx).map(Into::into),
-        }
+    pub fn zksync_tx_to_zksync_op(&self, tx: ZkSyncTx) -> Result<ZkSyncOp, OpError> {
+        Ok(match tx {
+            ZkSyncTx::Transfer(tx) => TransferOutcome::into_franklin_op(self.create_op(*tx)?),
+            ZkSyncTx::Withdraw(tx) => Into::into(self.create_op(*tx)?),
+            ZkSyncTx::ChangePubKey(tx) => Into::into(self.create_op(*tx)?),
+            ZkSyncTx::Close(_) => {
+                return Err(OpError::CloseOpError(CloseOpError::CloseOperationsDisabled))
+            }
+            ZkSyncTx::ForcedExit(tx) => Into::into(self.create_op(*tx)?),
+            ZkSyncTx::Swap(tx) => Into::into(self.create_op(*tx)?),
+        })
     }
 
     /// Converts the `PriorityOp` object to a `ZkSyncOp`, without applying it.

@@ -2,13 +2,13 @@
 
 use super::ZkSyncTx;
 use crate::ZkSyncPriorityOp;
-use anyhow::format_err;
 use serde::{Deserialize, Serialize};
 use zksync_crypto::params::CHUNK_BYTES;
 
 mod change_pubkey_op;
 mod close_op;
 mod deposit_op;
+mod error;
 mod forced_exit;
 mod full_exit_op;
 mod noop_op;
@@ -24,6 +24,7 @@ pub use self::{
     full_exit_op::FullExitOp, noop_op::NoopOp, swap_op::SwapOp, transfer_op::TransferOp,
     transfer_to_new_op::TransferToNewOp, withdraw_op::WithdrawOp,
 };
+use crate::operations::error::{PublicDataDecodeError, UnexpectedOperationType};
 use zksync_basic_types::AccountId;
 
 /// zkSync network operation.
@@ -110,8 +111,8 @@ impl ZkSyncOp {
     }
 
     /// Attempts to restore the operation from the public data committed on the Ethereum smart contract.
-    pub fn from_public_data(bytes: &[u8]) -> Result<Self, anyhow::Error> {
-        let op_type: u8 = *bytes.first().ok_or_else(|| format_err!("Empty pubdata"))?;
+    pub fn from_public_data(bytes: &[u8]) -> Result<Self, PublicDataDecodeError> {
+        let op_type: u8 = *bytes.first().ok_or(PublicDataDecodeError::EmptyData)?;
         match op_type {
             NoopOp::OP_CODE => Ok(ZkSyncOp::Noop(NoopOp::from_public_data(&bytes)?)),
             DepositOp::OP_CODE => Ok(ZkSyncOp::Deposit(Box::new(DepositOp::from_public_data(
@@ -139,12 +140,12 @@ impl ZkSyncOp {
                 ForcedExitOp::from_public_data(&bytes)?,
             ))),
             SwapOp::OP_CODE => Ok(ZkSyncOp::Swap(Box::new(SwapOp::from_public_data(&bytes)?))),
-            _ => Err(format_err!("Wrong operation type: {}", &op_type)),
+            _ => Err(PublicDataDecodeError::UnknownOperationType),
         }
     }
 
     /// Returns the expected number of chunks for a certain type of operation.
-    pub fn public_data_length(op_type: u8) -> Result<usize, anyhow::Error> {
+    pub fn public_data_length(op_type: u8) -> Result<usize, UnexpectedOperationType> {
         match op_type {
             NoopOp::OP_CODE => Ok(NoopOp::CHUNKS),
             DepositOp::OP_CODE => Ok(DepositOp::CHUNKS),
@@ -156,13 +157,13 @@ impl ZkSyncOp {
             ChangePubKeyOp::OP_CODE => Ok(ChangePubKeyOp::CHUNKS),
             ForcedExitOp::OP_CODE => Ok(ForcedExitOp::CHUNKS),
             SwapOp::OP_CODE => Ok(SwapOp::CHUNKS),
-            _ => Err(format_err!("Wrong operation type: {}", &op_type)),
+            _ => Err(UnexpectedOperationType()),
         }
         .map(|chunks| chunks * CHUNK_BYTES)
     }
 
     /// Attempts to interpret the operation as the L2 transaction.
-    pub fn try_get_tx(&self) -> Result<ZkSyncTx, anyhow::Error> {
+    pub fn try_get_tx(&self) -> Result<ZkSyncTx, UnexpectedOperationType> {
         match self {
             ZkSyncOp::Transfer(op) => Ok(ZkSyncTx::Transfer(Box::new(op.tx.clone()))),
             ZkSyncOp::TransferToNew(op) => Ok(ZkSyncTx::Transfer(Box::new(op.tx.clone()))),
@@ -173,16 +174,16 @@ impl ZkSyncOp {
             }
             ZkSyncOp::ForcedExit(op) => Ok(ZkSyncTx::ForcedExit(Box::new(op.tx.clone()))),
             ZkSyncOp::Swap(op) => Ok(ZkSyncTx::Swap(Box::new(op.tx.clone()))),
-            _ => Err(format_err!("Wrong tx type")),
+            _ => Err(UnexpectedOperationType()),
         }
     }
 
     /// Attempts to interpret the operation as the L1 priority operation.
-    pub fn try_get_priority_op(&self) -> Result<ZkSyncPriorityOp, anyhow::Error> {
+    pub fn try_get_priority_op(&self) -> Result<ZkSyncPriorityOp, UnexpectedOperationType> {
         match self {
             ZkSyncOp::Deposit(op) => Ok(ZkSyncPriorityOp::Deposit(op.priority_op.clone())),
             ZkSyncOp::FullExit(op) => Ok(ZkSyncPriorityOp::FullExit(op.priority_op.clone())),
-            _ => Err(format_err!("Wrong operation type")),
+            _ => Err(UnexpectedOperationType()),
         }
     }
 

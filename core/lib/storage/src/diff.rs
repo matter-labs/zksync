@@ -2,10 +2,8 @@
 use std::cmp::Ordering;
 // External imports
 use num::bigint::ToBigInt;
-use zksync_basic_types::Address;
 // Workspace imports
-use zksync_types::PubKeyHash;
-use zksync_types::{AccountId, AccountUpdate, Nonce, TokenId};
+use zksync_types::{AccountId, AccountUpdate, Address, Nonce, PubKeyHash, TokenId};
 // Local imports
 use crate::chain::account::records::*;
 

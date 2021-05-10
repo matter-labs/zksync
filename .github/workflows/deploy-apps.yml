@@ -115,3 +115,13 @@ jobs:
           token: ${{ github.token }}
           state: failure
           deployment_id: ${{ github.event.deployment.id }}
+      -
+        name: Notify to Mattermost (on failure)
+        uses: tferreira/matterfy@releases/v1
+        if: failure()
+        with:
+          type: ${{ job.status }}
+          job_name: '*Deployment to "${{ github.event.deployment.environment }}" failed*'
+          icon_emoji: octocat
+          channel: 'matterlabs-alerts'
+          url: ${{ secrets.MATTERMOST_WEBHOOK }}

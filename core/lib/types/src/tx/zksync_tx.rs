@@ -6,7 +6,10 @@ use zksync_basic_types::{AccountId, Address};
 
 use crate::{
     operations::ChangePubKeyOp,
-    tx::{ChangePubKey, Close, ForcedExit, Swap, Transfer, TxEthSignature, TxHash, Withdraw},
+    tx::{
+        error::CloseOperationsDisabled, ChangePubKey, Close, ForcedExit, Swap, Transfer,
+        TxEthSignature, TxHash, Withdraw,
+    },
     utils::deserialize_eth_message,
     CloseOp, ForcedExitOp, Nonce, SwapOp, Token, TokenId, TokenLike, TransferOp, TxFeeTypes,
     WithdrawOp,
@@ -119,14 +122,14 @@ impl ZkSyncTx {
         }
     }
 
-    pub fn account_id(&self) -> anyhow::Result<AccountId> {
+    pub fn account_id(&self) -> Result<AccountId, CloseOperationsDisabled> {
         match self {
             ZkSyncTx::Transfer(tx) => Ok(tx.account_id),
             ZkSyncTx::Withdraw(tx) => Ok(tx.account_id),
             ZkSyncTx::ChangePubKey(tx) => Ok(tx.account_id),
             ZkSyncTx::ForcedExit(tx) => Ok(tx.initiator_account_id),
             ZkSyncTx::Swap(tx) => Ok(tx.submitter_id),
-            ZkSyncTx::Close(_) => Err(anyhow::anyhow!("Close operations are disabled")),
+            ZkSyncTx::Close(_) => Err(CloseOperationsDisabled()),
         }
     }
 

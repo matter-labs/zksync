@@ -1,10 +1,9 @@
-use crate::tx::TxSignature;
-use crate::Close;
-use crate::{AccountId, Address, Nonce};
-use anyhow::{ensure, format_err};
+use crate::{operations::error::CloseOpError, tx::TxSignature, AccountId, Address, Close, Nonce};
 use serde::{Deserialize, Serialize};
-use zksync_crypto::params::{ACCOUNT_ID_BIT_WIDTH, CHUNK_BYTES};
-use zksync_crypto::primitives::FromBytes;
+use zksync_crypto::{
+    params::{ACCOUNT_ID_BIT_WIDTH, CHUNK_BYTES},
+    primitives::FromBytes,
+};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CloseOp {
@@ -23,17 +22,16 @@ impl CloseOp {
         data
     }
 
-    pub fn from_public_data(bytes: &[u8]) -> Result<Self, anyhow::Error> {
-        ensure!(
-            bytes.len() == Self::CHUNKS * CHUNK_BYTES,
-            "Wrong bytes length for close pubdata"
-        );
+    pub fn from_public_data(bytes: &[u8]) -> Result<Self, CloseOpError> {
+        if bytes.len() != Self::CHUNKS * CHUNK_BYTES {
+            return Err(CloseOpError::PubdataSizeMismatch);
+        }
 
         let account_id_offset = 1;
         let account_id = u32::from_bytes(
             &bytes[account_id_offset..account_id_offset + ACCOUNT_ID_BIT_WIDTH / 8],
         )
-        .ok_or_else(|| format_err!("Cant get from account id from close pubdata"))?;
+        .ok_or(CloseOpError::CannotGetFromAccountId)?;
         let account_address = Address::zero(); // From pubdata it is unknown
         let nonce = 0; // From pubdata it is unknown
         let signature = TxSignature::default(); // From pubdata it is unknown

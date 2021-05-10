@@ -8,7 +8,7 @@ use zksync_types::{
 // Local imports
 use crate::{
     chain::{
-        block::{records::BlockDetails, BlockSchema},
+        block::{records::StorageBlockDetails, BlockSchema},
         operations::OperationsSchema,
         state::StateSchema,
     },
@@ -148,7 +148,7 @@ async fn test_find_block_by_height_or_hash(mut storage: StorageProcessor<'_>) ->
     /// and compares them against the provided sample.
     async fn check_find_block_by_height_or_hash(
         storage: &mut StorageProcessor<'_>,
-        expected_block_detail: &BlockDetails,
+        expected_block_detail: &StorageBlockDetails,
     ) -> QueryResult<()> {
         let mut queries = vec![
             expected_block_detail.block_number.to_string(),
@@ -202,14 +202,14 @@ async fn test_find_block_by_height_or_hash(mut storage: StorageProcessor<'_>) ->
     let n_committed = 5u32;
     let n_verified = n_committed - 2;
 
-    let mut expected_outcome: Vec<BlockDetails> = Vec::new();
+    let mut expected_outcome: Vec<StorageBlockDetails> = Vec::new();
 
     // Create and apply several blocks to work with.
     for block_number in 1..=n_committed {
         let block_number = BlockNumber(block_number);
         // Create blanked block detail object which we will fill
         // with the relevant data and use for the comparison later.
-        let mut current_block_detail = BlockDetails {
+        let mut current_block_detail = StorageBlockDetails {
             block_number: 0,
             new_state_root: Default::default(),
             block_size: 0,
@@ -926,6 +926,104 @@ async fn test_operations_counter(mut storage: StorageProcessor<'_>) -> QueryResu
             .await?,
         2
     );
+
+    Ok(())
+}
+
+/// Check that blocks are removed correctly.
+#[db_test]
+async fn test_remove_blocks(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
+    // Insert 5 blocks.
+    for block_number in 1..=5 {
+        BlockSchema(&mut storage)
+            .save_block(gen_sample_block(
+                BlockNumber(block_number),
+                BLOCK_SIZE_CHUNKS,
+                Default::default(),
+            ))
+            .await?;
+        OperationsSchema(&mut storage)
+            .store_aggregated_action(gen_unique_aggregated_operation(
+                BlockNumber(block_number),
+                AggregatedActionType::CommitBlocks,
+                BLOCK_SIZE_CHUNKS,
+            ))
+            .await?;
+    }
+    // Remove blocks with numbers greater than 2.
+    BlockSchema(&mut storage)
+        .remove_blocks(BlockNumber(2))
+        .await?;
+
+    // Check if the 2nd block is present, and the 3rd is not.
+    assert!(BlockSchema(&mut storage)
+        .get_block(BlockNumber(2))
+        .await?
+        .is_some());
+    assert!(BlockSchema(&mut storage)
+        .get_block(BlockNumber(3))
+        .await?
+        .is_none());
+
+    Ok(())
+}
+
+/// Check that blocks are removed correctly.
+#[db_test]
+async fn test_remove_pending_block(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
+    use zksync_types::block::PendingBlock;
+
+    let pending_block_1 = PendingBlock {
+        number: BlockNumber(3),
+        chunks_left: 10,
+        unprocessed_priority_op_before: 0,
+        pending_block_iteration: 1,
+        success_operations: Vec::new(),
+        failed_txs: Vec::new(),
+        previous_block_root_hash: H256::default(),
+        timestamp: 0,
+    };
+
+    BlockSchema(&mut storage)
+        .save_pending_block(pending_block_1.clone())
+        .await?;
+    BlockSchema(&mut storage).remove_pending_block().await?;
+    assert!(!BlockSchema(&mut storage).pending_block_exists().await?);
+
+    Ok(())
+}
+
+/// Check that account tree cache is removed correctly.
+#[db_test]
+async fn test_remove_account_tree_cache(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
+    // Insert account tree cache for 5 blocks.
+    for block_number in 1..=5 {
+        BlockSchema(&mut storage)
+            .save_block(gen_sample_block(
+                BlockNumber(block_number),
+                BLOCK_SIZE_CHUNKS,
+                Default::default(),
+            ))
+            .await?;
+        BlockSchema(&mut storage)
+            .store_account_tree_cache(BlockNumber(block_number), serde_json::Value::default())
+            .await?;
+    }
+
+    // Remove account tree cache for blocks with numbers greater than 2.
+    BlockSchema(&mut storage)
+        .remove_account_tree_cache(BlockNumber(2))
+        .await?;
+
+    // Check if account tree cache for the 2nd block is present, and for the 3rd is not.
+    assert!(BlockSchema(&mut storage)
+        .get_account_tree_cache_block(BlockNumber(2))
+        .await?
+        .is_some());
+    assert!(BlockSchema(&mut storage)
+        .get_account_tree_cache_block(BlockNumber(3))
+        .await?
+        .is_none());
 
     Ok(())
 }
